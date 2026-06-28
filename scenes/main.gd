@@ -23,6 +23,7 @@ const FALL_DURATION: float = 0.30
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
 const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
+const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
 
 const EARTH_COLOR := Color(0.30, 0.22, 0.16)
 const ORE_COLOR := Color(0.85, 0.55, 0.24)
@@ -67,9 +68,19 @@ func _ready() -> void:
 	add_child(_player)
 
 	_camera = Camera2D.new()
-	_camera.zoom = Vector2(1.0 / 3.0, 1.0 / 3.0)  # ~3× zoomed out — see the world, not a cramped grid
+	# Zoom: 0.7 frames the body as a readable character while keeping enough world to see a vertical
+	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
+	_camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	_camera.position_smoothing_enabled = true
-	_camera.position_smoothing_speed = 8.0
+	_camera.position_smoothing_speed = 7.0
+	# Dead-zone (drag margins): the body moves freely inside a centre box; the camera only scrolls once
+	# it pushes the edge — so walking and jumping don't jitter the view. Smoothing eases the catch-up.
+	_camera.drag_horizontal_enabled = true
+	_camera.drag_vertical_enabled = true
+	_camera.drag_left_margin = 0.18
+	_camera.drag_right_margin = 0.18
+	_camera.drag_top_margin = 0.22
+	_camera.drag_bottom_margin = 0.24
 	_camera.limit_left = 0
 	_camera.limit_top = 0
 	_camera.limit_right = int(WORLD_SIZE.x)
