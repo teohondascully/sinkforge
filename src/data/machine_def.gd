@@ -19,3 +19,7 @@ extends Resource
 ## (NOT a type enum or capability system — those stay deferred); it just lets the sim branch on
 ## the few machines that don't fit "named recipe-runner". See DECISIONS.md 2026-06-27.
 @export var behavior: StringName = &""
+## What it costs to CRAFT one of these machine items (item StringName -> count), e.g. {&"ingot": 3}.
+## Empty = not hand-craftable. Drives the Factorio-style build economy: forge ingots → craft a
+## machine item into the pack → place it. PROVISIONAL numbers, tuned by feel.
+@export var craft_cost: Dictionary = {}

@@ -23,11 +23,17 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   and the item flow. Deterministic; runs headless.
 - **Public API:** `place_machine(def, cell) -> MachineState` · `remove_machine(cell)` ·
   `machine_at(cell)` · `in_bounds(cell)` · `advance(delta)` (game-loop time driver) ·
-  `tick()` (one logical step) · reads: `machines`, `grid`, `sink`, `total_produced/consumed`.
+  `tick()` (one logical step). Terrain/pack/economy: `is_solid`/`material_at`/`set_solid`/`mine` ·
+  `inventory_slots()` · `deposit(cell,item,n)` · `collect_ground(cell)` (walk-over pickup of a spat
+  pile) · `craft(def)` (spend `craft_cost` ingots → a machine item, counted as consumed) ·
+  `build_from_pack(def,cell)` / `pickup_machine(cell)` (place/return a carried machine, salvaging
+  buffers). Reads: `machines`, `grid`, `inventory`, `ground`, `sink`, `total_produced/consumed`.
 - **Topology:** machines occupy grid cells (`GRID_COLS`×`GRID_ROWS`, row increases downward).
   Each tick: every machine runs, then `_flow` hands each machine's output to its **destination
   list** (`_destinations` → `_column_landing`). An ordinary machine has ONE destination (straight
-  down its column to the next machine, else `sink`). A **splitter** (`behavior == &"splitter"`)
+  down its column): the next machine below catches it (cascade), else it **lands on top of the
+  first solid floor as a physical `ground` pile** the player walks over to collect; a column dug
+  clear to the void uses `sink` (conservation-only). A **splitter** (`behavior == &"splitter"`)
   runs no recipe — it passes its incoming stream through and `_flow` divides it evenly between
   TWO destinations (down + the column to its right), dealt round-robin via the machine's
   `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
@@ -55,13 +61,16 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   mouse/keys into the body's **world-verbs**. Reads sim production state only — never writes it;
   every world edit goes through the sim's discrete API (`mine`/`deposit`/`place_machine`/
   `remove_machine`). Delete it and the numbers are unchanged.
-- **Input (embodied):** ←→/AD move, Space jump (handled by `Player`); **LMB mine** the aimed solid
-  cell (reach-limited); **RMB build** (`_try_build`) — place the selected machine on an in-reach
-  open cell, or pick one of your own machines back up; **1/2** select the build palette
-  (Processor/Splitter — the Ore Vent is excluded so you stay the ore source by hand); **E** deposit
-  carried ore into an in-reach machine; **P** pause. The cursor is context-sensitive (`_draw_aim`):
-  a solid cell shows a MINE box, an open in-reach cell shows a BUILD ghost of the selected machine
-  (green border = placeable). **S3 building added no sim code** — placement/removal already existed;
+- **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
+  the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
+  a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
+  machine item on an in-reach open cell (consumes it) or picks one of your machines back up
+  (returns it + salvages its buffers); **E** deposits the selected resource into an in-reach
+  machine; **P** pause. You also **auto-collect** product piles by walking over them. The cursor is
+  context-sensitive (`_draw_aim`): a solid cell shows a MINE box; an open in-reach cell shows a
+  BUILD ghost of the selected machine item (green = placeable) — only when a machine is selected.
+  The Ore Vent is excluded from crafting so you stay the ore source by hand. **The economy added no
+  determinism/boundary change** — placement/removal/craft are discrete sim calls;
   reach + "where allowed" are representation concerns (like deposit), so the sim API stays
   position-agnostic and the determinism boundary holds.
 

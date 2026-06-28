@@ -34,14 +34,14 @@ var _font: Font = ThemeDB.fallback_font
 var _paused: bool = false
 var _mine_cooldown: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
-## The hand-build palette: which machine defs you can place, and which is selected (1/2 keys). The
-## ore_vent (a SOURCE) is deliberately absent — you remain the ore source by hand, which keeps the
-## dig-by-hand loop intact (manual→automated pillar; see DECISIONS 2026-06-27).
-var _palette: Array[MachineDef] = []
-var _selected: int = 0
+## The machines you can CRAFT (1/2 keys → craft one into the pack, spending ingots). The ore_vent (a
+## SOURCE) is deliberately absent — you remain the ore source by hand (manual→automated pillar; see
+## DECISIONS 2026-06-27). `_machine_defs_by_id` resolves a carried hotbar item back to its def so a
+## selected machine item can be placed.
+var _craftable: Array[MachineDef] = []
+var _machine_defs_by_id: Dictionary = {}
 ## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
-## item is what E deposits — the inventory is the player's held-resource surface (substrate the build
-## economy will plug machines/ingots into next).
+## item is what E deposits (a resource) or RMB places (a machine) — the unified Factorio-style hotbar.
 var _inv_selected: int = 0
 ## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
@@ -49,10 +49,12 @@ var _falling: Array[Dictionary] = []
 
 func _ready() -> void:
 	sim = FactorySim.new()
-	_palette = [
+	_craftable = [
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
 	]
+	for def: MachineDef in _craftable:
+		_machine_defs_by_id[def.id] = def
 	_seed_world()
 
 	_player = Player.new()
@@ -74,11 +76,13 @@ func _ready() -> void:
 	var hud := Hud.new()
 	hud.sim = sim
 	hud.paused_getter = func() -> bool: return _paused
-	var names: PackedStringArray = []
-	for def: MachineDef in _palette:
-		names.append(def.display_name)
-	hud.palette_names = names
-	hud.selected_getter = func() -> int: return _selected
+	var craft_opts: Array[Dictionary] = []
+	var machine_icons: Dictionary = {}
+	for def: MachineDef in _craftable:
+		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
+		machine_icons[def.id] = {"color": _machine_color(def), "tag": _tag(def.display_name)}
+	hud.craft_options = craft_opts
+	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
 	layer.add_child(hud)
 	add_child(layer)
@@ -121,8 +125,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_paused = not _paused
 			elif key.keycode == KEY_E:
 				_deposit_into_reach()
-			elif key.keycode >= KEY_1 and key.keycode < KEY_1 + _palette.size():
-				_selected = key.keycode - KEY_1
+			elif key.keycode >= KEY_1 and key.keycode < KEY_1 + _craftable.size():
+				sim.craft(_craftable[key.keycode - KEY_1])  # 1/2 craft a machine item into the pack
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
@@ -193,9 +197,21 @@ func _try_build() -> void:
 	if _paused or not _can_reach(_aim):
 		return
 	if sim.machine_at(_aim) != null:
-		sim.remove_machine(_aim)
-	elif _placeable(_aim):
-		sim.place_machine(_palette[_selected], _aim)
+		sim.pickup_machine(_aim)  # pick your machine back up into the pack
+		return
+	var def: MachineDef = _selected_machine_def()
+	if def != null and _placeable(_aim):
+		sim.build_from_pack(def, _aim)
+
+
+## The machine def for the active hotbar slot, or null if the selected item isn't a placeable
+## machine you carry (it's a resource, or the pack is empty).
+func _selected_machine_def() -> MachineDef:
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return null
+	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
+	return _machine_defs_by_id.get(slots[sel]["item"], null)
 
 
 ## A cell takes a hand-placed machine if it's in-bounds, open (not earth), unoccupied, and NOT the
@@ -291,7 +307,9 @@ func _draw_aim() -> void:
 	if sim.machine_at(_aim) != null:
 		draw_rect(inner, Color(0.95, 0.45, 0.40, 0.9), false, 2.0)  # pick-up affordance
 		return
-	var def: MachineDef = _palette[_selected]
+	var def: MachineDef = _selected_machine_def()
+	if def == null:
+		return  # the active hotbar item isn't a placeable machine — nothing to ghost
 	# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own — not only
 	# by its border (4b critique: the dark fill leaned entirely on the green outline to be seen).
 	var ghost: Color = _machine_color(def).lerp(Color.WHITE, 0.20)

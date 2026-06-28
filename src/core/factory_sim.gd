@@ -131,6 +131,59 @@ func deposit(cell: Vector2i, item: StringName, count: int) -> int:
 	return moved
 
 
+## Player action: CRAFT one machine item into the pack, spending its `craft_cost` from inventory.
+## Returns true if crafted. Spent items are counted as consumed so conservation holds (crafting is
+## a real ingot sink). The machine item (keyed by def.id) lives in the same pack as ore/ingots.
+func craft(def: MachineDef) -> bool:
+	if def.craft_cost.is_empty():
+		return false
+	for item: StringName in def.craft_cost:
+		if int(inventory.get(item, 0)) < int(def.craft_cost[item]):
+			return false
+	for item: StringName in def.craft_cost:
+		var n: int = int(def.craft_cost[item])
+		_take_from_pack(item, n)
+		total_consumed[item] = int(total_consumed.get(item, 0)) + n
+	inventory[def.id] = int(inventory.get(def.id, 0)) + 1
+	return true
+
+
+## Player action: place a machine you CARRY — consumes one machine item (def.id) from the pack and
+## places it. Returns the MachineState, or null if you don't carry one or the cell is blocked.
+func build_from_pack(def: MachineDef, cell: Vector2i) -> MachineState:
+	if int(inventory.get(def.id, 0)) <= 0:
+		return null
+	var state: MachineState = place_machine(def, cell)
+	if state == null:
+		return null
+	_take_from_pack(def.id, 1)
+	return state
+
+
+## Player action: pick a placed machine back up into the pack (one machine item by its def.id).
+## Returns true if a machine was there. Any items the machine was holding are SALVAGED back into the
+## pack rather than discarded — so picking up a mid-work forge never silently destroys your ore
+## (items just move machine→pack, both "present" → conservation holds).
+func pickup_machine(cell: Vector2i) -> bool:
+	var state: MachineState = grid.get(cell, null)
+	if state == null:
+		return false
+	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
+		for item: StringName in buffer:
+			inventory[item] = int(inventory.get(item, 0)) + int(buffer[item])
+	inventory[state.def.id] = int(inventory.get(state.def.id, 0)) + 1
+	remove_machine(cell)
+	return true
+
+
+func _take_from_pack(item: StringName, n: int) -> void:
+	var left: int = int(inventory.get(item, 0)) - n
+	if left > 0:
+		inventory[item] = left
+	else:
+		inventory.erase(item)
+
+
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
 ## inside solid earth.
 func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:

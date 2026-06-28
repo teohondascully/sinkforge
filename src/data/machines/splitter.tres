@@ -8,3 +8,6 @@ id = &"splitter"
 display_name = "Splitter"
 recipe = null
 behavior = &"splitter"
+craft_cost = {
+&"ingot": 2
+}

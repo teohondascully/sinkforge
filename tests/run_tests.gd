@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_hand_built_chain()
 	_test_inventory_slots()
 	_test_spit_and_collect()
+	_test_craft_and_build()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -290,3 +291,36 @@ func _test_spit_and_collect() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across spit+collect (present=%d, net=%d)" % [item, present, net])
+
+
+## Factorio-style building: craft a machine ITEM from carried ingots (spending them, counted as
+## consumed), place it from the pack (consuming the item), and pick it back up (returning the item).
+func _test_craft_and_build() -> void:
+	print("- craft + build")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var sim: FactorySim = FactorySim.new()
+	sim.inventory[&"ingot"] = 5                         # forged elsewhere; inject for a focused test
+	sim.total_produced[&"ingot"] = 5                    # account so conservation is checkable
+	_check(sim.craft(proc_def), "craft a processor with enough ingots")
+	_check(int(sim.inventory.get(&"ingot", 0)) == 2, "crafting spent 3 ingots")
+	_check(int(sim.inventory.get(&"processor", 0)) == 1, "a processor item is now in the pack")
+	_check(int(sim.total_consumed.get(&"ingot", 0)) == 3, "spent ingots counted as consumed")
+	_check(not sim.craft(proc_def), "cannot craft a second one (only 2 ingots left)")
+	var built: MachineState = sim.build_from_pack(proc_def, Vector2i(4, 4))
+	_check(built != null and sim.machine_at(Vector2i(4, 4)) != null, "placed the processor from the pack")
+	_check(int(sim.inventory.get(&"processor", 0)) == 0, "placing consumed the processor item")
+	_check(sim.build_from_pack(proc_def, Vector2i(5, 5)) == null, "cannot place a machine you don't carry")
+	# Pick up a machine that is HOLDING ore -> the ore is salvaged back, not destroyed (conservation).
+	sim.set_solid(Vector2i(9, 0), &"ore")
+	sim.set_solid(Vector2i(9, 1), &"ore")
+	sim.mine(Vector2i(9, 0))
+	sim.mine(Vector2i(9, 1))
+	sim.deposit(Vector2i(4, 4), &"ore", 2)
+	_check(int(sim.inventory.get(&"ore", 0)) == 0, "ore handed into the machine left the pack")
+	_check(sim.pickup_machine(Vector2i(4, 4)), "picked the machine back up")
+	_check(int(sim.inventory.get(&"processor", 0)) == 1, "the machine item returned to the pack")
+	_check(int(sim.inventory.get(&"ore", 0)) == 2, "the machine's held ore was salvaged back to the pack")
+	for item: StringName in [&"ore", &"ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved across craft+pickup (present=%d, net=%d)" % [item, present, net])
