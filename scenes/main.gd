@@ -70,8 +70,12 @@ func _seed_world() -> void:
 			sim.set_solid(Vector2i(col, row), &"earth")
 	for row: int in range(4, FactorySim.GRID_ROWS):  # clear the forge's output chute (col 6)
 		sim.set_solid(Vector2i(6, row), &"")
-	for vein: Array in [[3, 8], [4, 8], [3, 9], [10, 12], [11, 12], [10, 13],
-			[15, 6], [15, 7], [16, 7], [8, 16], [9, 16], [9, 17], [13, 10], [13, 11]]:
+	# Shallow veins (rows 5-6) are mineable from the surface within reach, so the FIRST loop is
+	# completable by hand today — no ladders yet. Deeper veins are aspiration: getting back up from
+	# them is the friction that will later pull traversal/automation (the manual→automated arc).
+	var shallow: Array = [[8, 5], [9, 5], [8, 6], [11, 5], [12, 5], [12, 6]]
+	var deep: Array = [[3, 9], [4, 9], [10, 12], [11, 12], [15, 7], [16, 7], [8, 16], [9, 16], [9, 17]]
+	for vein: Array in shallow + deep:
 		sim.set_solid(Vector2i(int(vein[0]), int(vein[1])), &"ore")
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
 	sim.place_machine(processor, Vector2i(6, 3))  # the forge — fed ONLY by ore you dig + deposit
