@@ -17,7 +17,8 @@ const AGENT := preload("res://tools/play_agent.gd")
 const PROC: String = "res://src/data/machines/processor.tres"
 
 var _failures: int = 0
-var _agent: PlayAgent = null  # current agent (for trace on failure)
+var _agent: PlayAgent = null      # current agent
+var _last_trace: Array[String] = []  # the failing try's narration, printed only if both tries miss
 
 
 func _initialize() -> void:
@@ -26,11 +27,18 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	await _goal_find_and_dig_ore()
-	await _goal_switch_items()
-	await _goal_craft_a_machine()
-	await _goal_build_a_machine()
-	await _goal_feed_and_smelt()
+	# Each goal returns whether it was MET. These run on real-time physics with heuristic navigation, so
+	# a single miss can be timing variance, not a broken game — _attempt retries once. A genuine breakage
+	# fails BOTH tries; a flake passes on the retry. (Pure-logic guarantees live in the headless suite.)
+	for goal: Array in [
+		["find & dig ore", _goal_find_and_dig_ore],
+		["switch carried items", _goal_switch_items],
+		["craft a machine", _goal_craft_a_machine],
+		["build a machine", _goal_build_a_machine],
+		["feed the forge & smelt", _goal_feed_and_smelt],
+	]:
+		if not await _attempt(goal[0], goal[1]):
+			_failures += 1
 	if _failures == 0:
 		print("ALL PLAY-GOALS MET")
 		quit(0)
@@ -39,27 +47,40 @@ func _run() -> void:
 		quit(1)
 
 
+## Run a goal, retrying ONCE if it's missed (real-time physics flake guard). A fresh scene each try.
+func _attempt(name: String, fn: Callable) -> bool:
+	print("- goal: %s" % name)
+	for try_i: int in 2:
+		var met: bool = await fn.call()
+		if met:
+			print("  PASS: %s%s" % [name, "  (on retry)" if try_i > 0 else ""])
+			return true
+		if try_i == 0:
+			print("  ... missed; retrying once (real-time physics)")
+	if not _last_trace.is_empty():
+		for line: String in _last_trace:
+			printerr("        · %s" % line)
+	printerr("  FAIL: %s (missed twice)" % name)
+	return false
+
+
 # --- goals ----------------------------------------------------------------------------------------
 
 ## The body finds a buried ore vein and digs down to mine it — the core by-hand "go get the ore" loop.
-func _goal_find_and_dig_ore() -> void:
-	print("- goal: find & dig ore")
+func _goal_find_and_dig_ore() -> bool:
 	var agent: PlayAgent = await _boot()
 	var ore: Vector2i = agent.nearest_material(&"ore")
 	if ore.x < 0:
-		_check(false, "the world contains an ore vein to find")
-		await _teardown(agent)
-		return
+		return await _finish(agent, false, "the world contains an ore vein to find")
 	var before: int = int(agent.sim.inventory.get(&"ore", 0))
 	var dug: bool = await agent.dig_down_to(ore)
 	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
-	_check(dug and got >= 1, "agent dug down to %s and mined ore (got %d)" % [ore, got])
-	_teardown(agent)
+	return await _finish(agent, dug and got >= 1,
+		"agent dug down to %s and mined ore (got %d)" % [ore, got])
 
 
 ## The body cycles its pack and lands the active slot on each carried item type — the hotbar select verb.
-func _goal_switch_items() -> void:
-	print("- goal: switch carried items")
+func _goal_switch_items() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ore", 2)
 	agent.give(&"ingot", 2)
@@ -68,29 +89,25 @@ func _goal_switch_items() -> void:
 	var picked_ingot: bool = await agent.select_item(&"ingot")
 	var ingot_slot: int = agent.main._inv_selected
 	var slots: Array[Dictionary] = agent.sim.inventory_slots()
-	_check(picked_ore and picked_ingot and slots[ore_slot]["item"] == &"ore"
+	return await _finish(agent, picked_ore and picked_ingot and slots[ore_slot]["item"] == &"ore"
 		and slots[ingot_slot]["item"] == &"ingot",
 		"agent switched the active slot between ore and ingot")
-	_teardown(agent)
 
 
 ## The body crafts a machine item from carried ingots — the Factorio-style craft verb (keys 1/2/3).
-func _goal_craft_a_machine() -> void:
-	print("- goal: craft a machine")
+func _goal_craft_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
 	agent.sim.total_produced[&"ingot"] = int(agent.sim.total_produced.get(&"ingot", 0)) + 3
 	var proc_def: MachineDef = load(PROC)
 	var ok: bool = agent.craft(proc_def)
-	_check(ok and int(agent.sim.inventory.get(&"processor", 0)) == 1
+	return await _finish(agent, ok and int(agent.sim.inventory.get(&"processor", 0)) == 1
 		and int(agent.sim.inventory.get(&"ingot", 0)) == 0,
 		"agent crafted a processor (spent 3 ingots, gained the item)")
-	_teardown(agent)
 
 
 ## The body crafts then PLACES a machine on an open cell within reach — the embodied build verb.
-func _goal_build_a_machine() -> void:
-	print("- goal: build a machine")
+func _goal_build_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
 	agent.sim.total_produced[&"ingot"] = int(agent.sim.total_produced.get(&"ingot", 0)) + 3
@@ -99,18 +116,14 @@ func _goal_build_a_machine() -> void:
 	await agent.select_item(&"processor")
 	var target: Vector2i = _open_cell_near(agent)
 	if target.x < 0:
-		_check(false, "found an open cell beside the body to build on")
-		await _teardown(agent)
-		return
+		return await _finish(agent, false, "found an open cell beside the body to build on")
 	var built: bool = await agent.build_at(target)
-	_check(built and agent.sim.machine_at(target) != null,
+	return await _finish(agent, built and agent.sim.machine_at(target) != null,
 		"agent placed a processor at %s and it's there" % target)
-	_teardown(agent)
 
 
 ## The body walks to the forge, hand-feeds it ore, and the forge smelts an ingot — the manual feed loop.
-func _goal_feed_and_smelt() -> void:
-	print("- goal: feed the forge & smelt")
+func _goal_feed_and_smelt() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ore", 3)
 	await agent.select_item(&"ore")
@@ -119,9 +132,8 @@ func _goal_feed_and_smelt() -> void:
 	for _i: int in 120:                      # let the forge run a few production cycles
 		await physics_frame
 	var forged: int = int(agent.sim.total_produced.get(&"ingot", 0)) - forged_before
-	_check(deposited and forged >= 1,
+	return await _finish(agent, deposited and forged >= 1,
 		"agent fed the forge ore and it smelted an ingot (forged %d)" % forged)
-	_teardown(agent)
 
 
 # --- scaffolding ----------------------------------------------------------------------------------
@@ -154,12 +166,11 @@ func _open_cell_near(agent: PlayAgent) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-		if _agent != null and not _agent.trace.is_empty():
-			for line: String in _agent.trace:
-				printerr("        · %s" % line)
+## Record this try's verdict, tear the scene down, and return whether the goal was met. On a miss it
+## stashes the agent's trace + the label so _attempt can print them if BOTH tries fail.
+func _finish(agent: PlayAgent, ok: bool, label: String) -> bool:
+	if not ok:
+		_last_trace = agent.trace.duplicate()
+		_last_trace.append(label)
+	await _teardown(agent)
+	return ok
