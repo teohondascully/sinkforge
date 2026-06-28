@@ -15,6 +15,8 @@ var _phase: int = 0
 var _t: float = 0.0
 var _x0: float = 0.0
 var _y0: float = 0.0
+var _prev_y: float = 0.0
+var _max_rise: float = 0.0  ## largest single-frame UPWARD jump during the climb (teleport detector)
 var _failures: int = 0
 
 
@@ -61,9 +63,12 @@ func _phys() -> void:
 			if _player.on_floor:
 				_y0 = _player.position.y
 				_x0 = _player.position.x
+				_prev_y = _player.position.y
 				_phase = 1; _t = 0.0
-		1:  # one long walk right: climb the 1-tile step, then get STOPPED by the 2-tile wall
+		1:  # one long walk right: GLIDE up the 1-tile ramp, then get STOPPED by the 2-tile wall
 			_player.input_dir = 1.0
+			_max_rise = maxf(_max_rise, _prev_y - _player.position.y)  # track biggest 1-frame lift
+			_prev_y = _player.position.y
 			_t += 1.0 / 60.0
 			if _t >= 3.0:
 				var climbed: bool = _player.position.y < _y0 - 16.0
@@ -72,6 +77,10 @@ func _phys() -> void:
 				_check(climbed and passed_step,
 					"climbed the 1-tile step and walked on (dy=%.0f, x=%.0f)"
 					% [_player.position.y - _y0, _player.position.x])
+				# The climb must be a smooth GLIDE, not a teleport: at 150px/s on a 45° ramp the body
+				# rises ~2.5px/frame; a one-frame snap would be ~32px. Guard well below a tile.
+				_check(_max_rise < 8.0,
+					"glided up the ramp (max single-frame rise %.1fpx — a teleport would be ~32)" % _max_rise)
 				_check(stopped_at_wall,
 					"the 2-tile wall stopped the body (x=%.0f, wall at %d)" % [_player.position.x, 15 * 32])
 				_phase = 3
