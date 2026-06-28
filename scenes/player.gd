@@ -24,6 +24,7 @@ const GRAVITY: float = 900.0         ## px/s^2
 const JUMP_VELOCITY: float = -330.0  ## px/s instantaneous on jump  (apex ~= 330^2/(2*900) ~= 60px)
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
+const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (the paid inverse of gravity)
 ## Slope follow: a single-tile rise is walked as a 45° ramp (glide, not teleport); a taller rise is a
 ## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
 const MAX_STEP: float = CELL * 1.3
@@ -80,6 +81,12 @@ func _step(delta: float) -> void:
 		_coyote = 0.0
 		grounded = false
 	_jump_request = false
+
+	# Updraft: standing in a lift's open shaft, the body is carried UP (the rideable half of the lift).
+	# Ensures at least rise speed upward — a jump can still beat it — and skips slope-follow (airborne).
+	if sim.updraft_at(_cell_of(position)):
+		velocity.y = minf(velocity.y, -LIFT_RISE_SPEED)
+		grounded = false
 
 	# Horizontal move, THEN follow the ground slope (lift/lower y in lockstep with x) BEFORE the
 	# horizontal collision resolve — so a single-tile rise is glided up as a 45° ramp rather than

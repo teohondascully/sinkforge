@@ -77,6 +77,20 @@ func is_solid(cell: Vector2i) -> bool:
 	return solid.has(cell)
 
 
+## Is `cell` inside a LIFT's updraft — i.e. is there a clear (unblocked) column straight DOWN to a
+## lift machine? The lift inverts gravity in the open shaft above it; the avatar reads this to ride
+## UP (representation only — pure query, no sim mutation, determinism untouched).
+func updraft_at(cell: Vector2i) -> bool:
+	for row: int in range(cell.y + 1, GRID_ROWS):
+		var here := Vector2i(cell.x, row)
+		if solid.has(here):
+			return false  # a floor breaks the draft
+		var m: MachineState = grid.get(here, null)
+		if m != null:
+			return m.def.behavior == &"lift"  # first machine below is a lift → in its updraft
+	return false
+
+
 ## The material in a cell (&"earth" / &"ore"), or &"" if open. Lets the view tint veins.
 func material_at(cell: Vector2i) -> StringName:
 	return solid.get(cell, &"")
