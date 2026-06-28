@@ -36,7 +36,14 @@ var inventory: Dictionary = {}
 const INVENTORY_SLOTS: int = 8
 ## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
-## Items that have fallen out the bottom of a column. The prototype's running output total.
+## Physical product piles resting on the dug floor: cell (Vector2i) -> {item -> count}. A machine
+## SPITS its output downward; gravity carries it down the column and it lands on top of the first
+## solid cell (or cascades into a machine below). The player walks over a pile to scoop it into the
+## pack — the embodied collect half of the loop. Authoritative sim state (mutated only in _flow and
+## by collect_ground), counted as "items present" for conservation.
+var ground: Dictionary = {}
+## Items that fell off the bottom of the world (a column dug clear through, no floor). A void sink
+## kept only so conservation accounting never silently loses an item.
 var sink: Dictionary = {}
 ## Conservation bookkeeping: every item is created/destroyed ONLY by a recipe (holds while no
 ## machine is removed mid-run; removing a machine intentionally discards its buffered items).
@@ -258,11 +265,37 @@ func _destinations(machine: MachineState) -> Array[Dictionary]:
 	return [down, _column_landing(right_col, y)]
 
 
-## The first machine at or below `start_row` in `col`, as a delivery destination; if the column
-## is clear to the bottom, the destination is that column's sink.
+## Where a spat product lands, scanning down `col` from `start_row`: the first machine below catches
+## it (cascade), else it rests on top of the first solid floor as a physical ground pile. A column
+## dug clear to the bottom drops it into the void sink (conservation-only).
 func _column_landing(col: int, start_row: int) -> Dictionary:
 	for row: int in range(start_row, GRID_ROWS):
 		var m: MachineState = grid.get(Vector2i(col, row), null)
 		if m != null:
 			return {"to_cell": m.cell, "target": m.input_buffer}
+		if solid.has(Vector2i(col, row)):
+			var rest := Vector2i(col, row - 1)  # the open cell on top of the floor
+			return {"to_cell": rest, "target": _ground_pile(rest)}
 	return {"to_cell": Vector2i(col, GRID_ROWS), "target": sink}
+
+
+## The product pile resting in `cell`, created on first landing. Returned as a live Dictionary so
+## _deliver adds straight into it.
+func _ground_pile(cell: Vector2i) -> Dictionary:
+	if not ground.has(cell):
+		ground[cell] = {}
+	return ground[cell]
+
+
+## Player action: walk over a resting pile and scoop it all into the pack. Returns how many items
+## were collected. The embodied collect half of spit-out → fall → collect (no abstract counter).
+func collect_ground(cell: Vector2i) -> int:
+	var pile: Dictionary = ground.get(cell, {})
+	if pile.is_empty():
+		return 0
+	var collected: int = 0
+	for item: StringName in pile:
+		inventory[item] = int(inventory.get(item, 0)) + int(pile[item])
+		collected += int(pile[item])
+	ground.erase(cell)
+	return collected

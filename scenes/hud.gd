@@ -23,7 +23,7 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	draw_string(_font, Vector2(10, 22), "OUTPUT   %s" % _buf(sim.sink),
+	draw_string(_font, Vector2(10, 22), "FORGED   %d ingot" % int(sim.total_produced.get(&"ingot", 0)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
 	_draw_palette()
 	_draw_inventory()

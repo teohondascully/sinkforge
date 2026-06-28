@@ -90,8 +90,8 @@ func _seed_world() -> void:
 	for row: int in range(4, FactorySim.GRID_ROWS):
 		for col: int in FactorySim.GRID_COLS:
 			sim.set_solid(Vector2i(col, row), &"earth")
-	for row: int in range(4, FactorySim.GRID_ROWS):  # clear the forge's output chute (col 6)
-		sim.set_solid(Vector2i(6, row), &"")
+	for row: int in range(4, 6):  # a SHORT chute under the forge (col 6) — spat ingots fall a couple
+		sim.set_solid(Vector2i(6, row), &"")  # cells and land on the row-6 floor, where you collect them
 	# Shallow veins (rows 5-6) are mineable from the surface within reach, so the FIRST loop is
 	# completable by hand today — no ladders yet. Deeper veins are aspiration: getting back up from
 	# them is the friction that will later pull traversal/automation (the manual→automated arc).
@@ -108,6 +108,7 @@ func _process(delta: float) -> void:
 		sim.advance(delta)
 		_spawn_falling_from_events()
 		_advance_falling(delta)
+		_collect_ground_under_player()
 	_update_mining(delta)
 	queue_redraw()
 
@@ -160,6 +161,19 @@ func _deposit_into_reach() -> void:
 		if _can_reach(machine.cell):
 			sim.deposit(machine.cell, item, carried)
 			return
+
+
+## Scoop up any resting product pile in a cell the body overlaps — Factorio/Terraria-style "walk
+## over items to grab them". Pure discrete sim edit (collect_ground); the avatar only triggers it.
+func _collect_ground_under_player() -> void:
+	if _player == null or sim.ground.is_empty():
+		return
+	var half := Vector2(Player.WIDTH, Player.HEIGHT) * 0.5
+	var lo: Vector2i = _cell_at(_player.position - half)
+	var hi: Vector2i = _cell_at(_player.position + half)
+	for cy: int in range(lo.y, hi.y + 1):
+		for cx: int in range(lo.x, hi.x + 1):
+			sim.collect_ground(Vector2i(cx, cy))
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.
@@ -238,6 +252,7 @@ func _draw() -> void:
 	_draw_grid()
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
+	_draw_ground()
 	_draw_falling()
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
@@ -320,12 +335,35 @@ func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
 	return stub_from + float(CELL) * 0.9
 
 
+## Resting product piles on the floor (sim.ground) — what a machine has spat out, waiting to be
+## walked over and collected. A little stack so a bigger pile reads as "more".
+func _draw_ground() -> void:
+	for cell_v: Variant in sim.ground:
+		var cell: Vector2i = cell_v
+		var pile: Dictionary = sim.ground[cell]
+		var base := Vector2(cell) * float(CELL)
+		var total: int = 0
+		for v: int in pile.values():
+			total += v
+		var shown: int = mini(total, 4)
+		var idx: int = 0
+		for item: StringName in pile:
+			var per: int = mini(int(pile[item]), shown)
+			for _k: int in per:
+				var p := base + Vector2(float(CELL) * 0.5, float(CELL) - 6.0 - float(idx) * 4.5)
+				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
+				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), _item_color(item))
+				idx += 1
+
+
 func _draw_falling() -> void:
 	for f: Dictionary in _falling:
 		var from: Vector2 = f["from"]
 		var to: Vector2 = f["to"]
 		var t: float = clampf(float(f["t"]), 0.0, 1.0)
-		var p: Vector2 = from.lerp(to, t * t)
+		# Travel down the column, with a small launch-hop so the item reads as SPAT OUT, then gravity.
+		var p: Vector2 = from.lerp(to, t)
+		p.y -= sin(t * PI) * 10.0
 		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.05, 0.07))
 		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), f["color"])
 

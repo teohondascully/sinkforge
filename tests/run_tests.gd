@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_mining_and_deposit()
 	_test_hand_built_chain()
 	_test_inventory_slots()
+	_test_spit_and_collect()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -53,6 +54,8 @@ func _check(condition: bool, label: String) -> void:
 func _items_present(sim: FactorySim, item: StringName) -> int:
 	var total: int = int(sim.sink.get(item, 0))
 	total += int(sim.inventory.get(item, 0))  # what the player is carrying counts as present too
+	for pile: Variant in sim.ground.values():  # resting product piles on the floor
+		total += int((pile as Dictionary).get(item, 0))
 	for machine: MachineState in sim.machines:
 		total += int(machine.input_buffer.get(item, 0))
 		total += int(machine.output_buffer.get(item, 0))
@@ -259,3 +262,31 @@ func _test_inventory_slots() -> void:
 	slots = sim.inventory_slots()
 	_check(slots.size() == 2, "second item type = second slot")
 	_check(slots[1]["item"] == &"ingot" and int(slots[1]["count"]) == 3, "insertion order preserved (ore, then ingot)")
+
+
+## A machine SPITS its product down the column; with a solid floor below, it lands as a physical
+## ground pile (not the void sink); the player collects the pile into the pack. Conservation holds
+## across spit → land → collect.
+func _test_spit_and_collect() -> void:
+	print("- spit + collect")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var sim: FactorySim = FactorySim.new()
+	sim.set_solid(Vector2i(3, 6), &"earth")            # a floor two cells below the forge
+	sim.place_machine(proc_def, Vector2i(3, 3))
+	sim.set_solid(Vector2i(0, 0), &"ore")              # mine 2 ore into the pack (real loop)
+	sim.set_solid(Vector2i(0, 1), &"ore")
+	sim.mine(Vector2i(0, 0))
+	sim.mine(Vector2i(0, 1))
+	_check(sim.deposit(Vector2i(3, 3), &"ore", 2) == 2, "hand-fed 2 ore into the forge")
+	for _i: int in 80:
+		sim.tick()
+	var rest := Vector2i(3, 5)                          # on top of the row-6 floor
+	_check(sim.sink.is_empty(), "nothing fell into the void sink (a floor caught it)")
+	_check(int((sim.ground.get(rest, {}) as Dictionary).get(&"ingot", 0)) == 1, "one ingot rests on the floor")
+	_check(sim.collect_ground(rest) == 1, "collecting the pile returns 1 item")
+	_check(int(sim.inventory.get(&"ingot", 0)) == 1, "collected ingot is now in the pack")
+	_check(sim.ground.is_empty(), "the pile is gone after collecting")
+	for item: StringName in [&"ore", &"ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved across spit+collect (present=%d, net=%d)" % [item, present, net])
