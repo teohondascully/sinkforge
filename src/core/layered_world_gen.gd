@@ -41,15 +41,33 @@ const ORE_SIZE_MIN: int = 2
 const ORE_SIZE_DEPTH_BONUS: int = 6
 
 
+## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
+## so descending crosses distinct material zones (the "deeper = different place" read).
+const DEEPSLATE_ROW: int = 26
+
+
 func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# Start from the heightmap base (surface + earth/stone blocks + matching walls), then enrich.
 	var world: WorldData = super.generate(cols, rows, seed)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
+	_band_deepslate(world)
 	_carve_caves(world, seed)
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
 	return world
+
+
+## Convert the deep band (rows ≥ DEEPSLATE_ROW) of stone to deepslate, in both grids, so a dug-out deep
+## cell reveals a deepslate wall. A new material id dropped into generation — renderer just needs it
+## registered. Veins still overlay afterwards.
+func _band_deepslate(world: WorldData) -> void:
+	for cell: Vector2i in world.blocks:
+		if cell.y >= DEEPSLATE_ROW and world.blocks[cell] == &"stone":
+			world.blocks[cell] = &"deepslate"
+	for cell: Vector2i in world.walls:
+		if cell.y >= DEEPSLATE_ROW and world.walls[cell] == &"stone_wall":
+			world.walls[cell] = &"deepslate_wall"
 
 
 ## Carve organic caves with seeded noise. A cell opens (block erased, WALL kept) when the noise there
@@ -134,7 +152,7 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 	var cell: Vector2i = seed_cell
 	for _step: int in size:
 		var here: StringName = world.blocks.get(cell, &"")
-		if here == &"earth" or here == &"stone":
+		if here == &"earth" or here == &"stone" or here == &"deepslate":
 			world.blocks[cell] = &"ore"
 		var dir: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][rng.randi_range(0, 3)]
 		cell += dir

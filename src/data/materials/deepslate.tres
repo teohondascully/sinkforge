@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MaterialDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/material_def.gd" id="1_mat"]
+
+[resource]
+script = ExtResource("1_mat")
+id = &"deepslate"
+display_name = "Deepslate"
+layer = &"block"
+base_color = Color(0.20, 0.22, 0.30, 1)
+grain = true
+cap_color = Color(0, 0, 0, 0)
+nugget_color = Color(0, 0, 0, 0)
+depth_darken = 0.35

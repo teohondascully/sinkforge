@@ -61,8 +61,10 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 		"res://src/data/materials/earth.tres",
 		"res://src/data/materials/ore.tres",
 		"res://src/data/materials/stone.tres",
+		"res://src/data/materials/deepslate.tres",
 		"res://src/data/materials/dirt_wall.tres",
 		"res://src/data/materials/stone_wall.tres",
+		"res://src/data/materials/deepslate_wall.tres",
 	]:
 		var def: MaterialDef = load(path)
 		_materials[def.id] = def
@@ -119,6 +121,12 @@ func _draw_terrain() -> void:
 		var c: Vector2i = cell
 		var pos := Vector2(c) * float(CELL)
 		var def: MaterialDef = _material(sim.solid[c])
+		# Sprite-ready: if a tile PNG exists for this material, draw it and skip the procedural fill
+		# (still draw the surface cap/ramp pass below). Phase B of docs/ART_SPEC.md.
+		var tile: Texture2D = Art.tex("tile_" + String(def.id))
+		if tile != null:
+			draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
+			continue
 		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 		var col: Color = def.base_color.darkened(depth * def.depth_darken)
