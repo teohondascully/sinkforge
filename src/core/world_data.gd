@@ -1,0 +1,23 @@
+class_name WorldData
+extends RefCounted
+
+## THE HANDSHAKE ARTIFACT (see docs/WORLDGEN.md). What a WorldGen PRODUCES and the FactorySim
+## INGESTS — plain data with no engine/scene/sim dependency, so a generator can be built and tested
+## in isolation. Two material grids (the bounded, two-layer world) plus the provenance that made it.
+##
+## Cells store material IDS (StringName); the appearance of an id lives in its MaterialDef (the
+## visualiser's registry). Improve generation (fill these grids differently) or the look (edit
+## MaterialDefs) without either side knowing about the other.
+
+var cols: int = 0
+var rows: int = 0
+## The seed that produced this world — stored for determinism/repro (same seed → identical grids).
+var seed: int = 0
+## Foreground solid layer: cell (Vector2i) -> material id. The ground you stand on and dig.
+var blocks: Dictionary = {}
+## Background layer: cell (Vector2i) -> material id. Walls behind dug-out cells (Terraria-style).
+var walls: Dictionary = {}
+
+
+func in_bounds(cell: Vector2i) -> bool:
+	return cell.x >= 0 and cell.x < cols and cell.y >= 0 and cell.y < rows

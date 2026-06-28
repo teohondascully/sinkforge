@@ -24,6 +24,7 @@ const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its
 const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
+const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
 
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 const WALL_COLOR := Color(0.16, 0.12, 0.095)       ## dug-out BACK WALL (dark dirt) behind carved rooms
@@ -58,6 +59,7 @@ func _ready() -> void:
 	for path: String in [
 		"res://src/data/materials/earth.tres",
 		"res://src/data/materials/ore.tres",
+		"res://src/data/materials/stone.tres",
 	]:
 		var def: MaterialDef = load(path)
 		_materials[def.id] = def
@@ -111,37 +113,18 @@ func _ready() -> void:
 	add_child(layer)
 
 
-## Build the starting world: open sky on top, an UNDULATING earth surface (so the world reads as
-## hills with smooth slopes, not a flat slab), an output chute under the forge, ore veins to dig,
-## and the lone Processor the player hand-feeds. The spawn/forge region (cols ≤ 8) is kept flat so
-## the motion harness stays valid and the first loop is easy.
+## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
+## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
+## HOW the world is made — swap the generator and nothing here changes. Then place the lone Processor
+## forge the player hand-feeds (a machine, not terrain — stays MainView's concern).
 func _seed_world() -> void:
-	for col: int in FactorySim.GRID_COLS:
-		var top: int = _seed_surface_row(col)
-		for row: int in range(top, FactorySim.GRID_ROWS):
-			sim.set_solid(Vector2i(col, row), &"earth")
-	# Ore veins scattered through the earth (only set where there IS earth, so hills don't float ore).
-	var veins: Array = [
-		[8, 6], [9, 6], [11, 7], [12, 7], [16, 9], [17, 9], [22, 8], [23, 8], [28, 12], [29, 12],
-		[34, 10], [35, 10], [41, 14], [42, 14], [13, 18], [14, 18], [50, 11], [51, 11], [60, 16], [61, 16]]
-	for vein: Array in veins:
-		var cell := Vector2i(int(vein[0]), int(vein[1]))
-		if sim.is_solid(cell):
-			sim.set_solid(cell, &"ore")
+	var gen: WorldGen = HeightmapWorldGen.new()
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
+	sim.load_world(world)
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
 	# The forge sits ON the surface (row 4, resting on the row-5 grass), not floating in the sky. It's
 	# fed ONLY by ore you dig + deposit; forged ingots pile in its own cell to be walked over.
 	sim.place_machine(processor, Vector2i(6, 4))
-
-
-## Surface (topmost solid) row for a column. Flat at row 5 across the spawn/forge/measure region
-## (cols ≤ 8); gentle layered-sine hills beyond, so the terrain steps by a tile here and there and
-## those steps render as smooth diagonal slopes.
-func _seed_surface_row(col: int) -> int:
-	if col <= 8:
-		return 5
-	var h: float = 5.0 - 2.2 * sin(float(col) * 0.30) - 1.1 * sin(float(col) * 0.11 + 1.7)
-	return clampi(int(round(h)), 3, 11)
 
 
 func _process(delta: float) -> void:

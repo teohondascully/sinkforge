@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_inventory_slots()
 	_test_spit_and_collect()
 	_test_craft_and_build()
+	_test_worldgen()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -324,3 +325,29 @@ func _test_craft_and_build() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across craft+pickup (present=%d, net=%d)" % [item, present, net])
+
+
+## The world-engine handshake: a generator produces a WorldData deterministically; the sim ingests
+## it; mining carves a block but leaves its wall. Validates the gen↔sim contract independent of viz.
+func _test_worldgen() -> void:
+	print("- worldgen")
+	var gen: WorldGen = HeightmapWorldGen.new()
+	var a: WorldData = gen.generate(72, 40, 1337)
+	var b: WorldData = gen.generate(72, 40, 1337)
+	_check(a.blocks.size() > 0, "generated a non-empty world")
+	_check(a.blocks == b.blocks, "same seed → identical blocks (deterministic)")
+	var c: WorldData = gen.generate(72, 40, 99)
+	_check(a.blocks != c.blocks, "a different seed → a different world (ore scatter varies)")
+	# The stone smoke test: earth near the surface, stone deep down (richness via a new material id).
+	var top: int = HeightmapWorldGen.FLAT_SURFACE_ROW
+	_check(a.blocks.get(Vector2i(2, top)) == &"earth", "surface is earth")
+	_check(a.blocks.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone",
+		"deep cells are stone (a new material dropped into generation)")
+	# Ingest + wall persistence (forward-covers Slice 3): mining clears the block, keeps the wall.
+	var sim: FactorySim = FactorySim.new()
+	sim.load_world(a)
+	_check(sim.is_solid(Vector2i(2, top)), "sim ingested the world (surface cell is solid)")
+	sim.set_wall(Vector2i(2, top), &"stone_wall")
+	sim.mine(Vector2i(2, top))
+	_check(not sim.is_solid(Vector2i(2, top)), "mining cleared the block")
+	_check(sim.wall_at(Vector2i(2, top)) == &"stone_wall", "the background wall survives mining the block")

@@ -25,6 +25,10 @@ var grid: Dictionary = {}
 ## effect of the real-time avatar moving — so the sim stays deterministic and serializable. The
 ## avatar lives in the representation layer and never enters the tick (docs/RISKS.md "embodied").
 var solid: Dictionary = {}
+## Background WALL layer (cell -> material id): what sits BEHIND a cell, independent of whether the
+## cell is solid. Mining a block leaves its wall (Terraria-style). Read-only to the view (wall_at);
+## written only by load_world / set_wall. Not collision (you walk through walls), not "items present".
+var wall: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -86,9 +90,40 @@ func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 		solid[cell] = material
 
 
+## The background wall material in a cell (e.g. &"stone_wall"), or &"" if none. View reads this to
+## draw the carved-room backing behind dug-out cells.
+func wall_at(cell: Vector2i) -> StringName:
+	return wall.get(cell, &"")
+
+
+## Set or clear a background wall cell (in-bounds; &"" clears). Discrete edit like set_solid.
+func set_wall(cell: Vector2i, material: StringName = &"") -> void:
+	if not in_bounds(cell):
+		return
+	if material == &"":
+		wall.erase(cell)
+	else:
+		wall[cell] = material
+
+
+## Ingest a generated world (the gen→sim handshake): replace terrain with the WorldData's two grids.
+## Only cells in bounds are taken. The avatar/machines are unaffected; this is the start-of-world
+## seeding step that replaces the old hand-coded _seed_world terrain loop.
+func load_world(world: WorldData) -> void:
+	solid.clear()
+	wall.clear()
+	for cell: Vector2i in world.blocks:
+		if in_bounds(cell):
+			solid[cell] = world.blocks[cell]
+	for cell: Vector2i in world.walls:
+		if in_bounds(cell):
+			wall[cell] = world.walls[cell]
+
+
 ## Player action: dig out a solid cell. Returns the material mined (&"earth"/&"ore"), or &"" if the
 ## cell was already open. Mining an ORE vein yields one ore into the player's pack — and that ore is
 ## genuinely produced from the world, so it counts toward total_produced (conservation stays true).
+## The cell's background WALL is left intact (you carve the block, the wall stays behind).
 func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
