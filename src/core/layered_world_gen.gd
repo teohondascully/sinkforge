@@ -22,6 +22,14 @@ const CAVE_FREQ: float = 0.11
 const CAVE_THRESHOLD_TOP: float = 0.40
 const CAVE_THRESHOLD_DEEP: float = 0.12
 
+# --- tunnels (winding caverns that connect the noise pockets into an explorable system) ---
+## Worm count ≈ this × columns — a handful of long tunnels threading the rock.
+const TUNNEL_PER_COL: float = 0.09
+const TUNNEL_MIN_LEN: int = 18
+const TUNNEL_MAX_LEN: int = 46
+## Carve radius around the worm path (1 → ~3-wide walkable caverns).
+const TUNNEL_RADIUS: int = 1
+
 # --- ore ---
 ## Vein-seed attempts ≈ this × columns. Each is accepted by a depth-weighted roll, so most surviving
 ## veins land deep — the band. Tuned to a touch richer overall than the old flat 0.3/col scatter.
@@ -39,6 +47,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	_carve_caves(world, seed)
+	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
 	return world
 
@@ -61,6 +70,45 @@ func _carve_caves(world: WorldData, seed: int) -> void:
 			var threshold: float = lerpf(CAVE_THRESHOLD_TOP, CAVE_THRESHOLD_DEEP, depth_frac)
 			if noise.get_noise_2d(float(col), float(row)) > threshold:
 				world.blocks.erase(cell)        # open air; the wall behind it stays (carved room)
+
+
+## Winding TUNNELS: a few worms random-walk through the rock with a horizontal bias, carving walkable
+## caverns that thread the isolated noise pockets into one connected, explorable system (the noise alone
+## gives blobs; these give you somewhere to GO). Each worm keeps its wall (carved room) and never rises
+## into the base-safe band. Deterministic via the shared rng.
+func _carve_tunnels(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var worms: int = maxi(3, int(round(float(world.cols) * TUNNEL_PER_COL)))
+	for _w: int in worms:
+		var x: float = float(rng.randi_range(2, world.cols - 3))
+		var min_row: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + 2
+		if min_row >= world.rows - 2:
+			continue
+		var y: float = float(rng.randi_range(min_row, world.rows - 2))
+		var angle: float = rng.randf_range(-PI, PI)
+		var length: int = rng.randi_range(TUNNEL_MIN_LEN, TUNNEL_MAX_LEN)
+		for _s: int in length:
+			_carve_disc(world, Vector2i(int(round(x)), int(round(y))), TUNNEL_RADIUS)
+			angle += rng.randf_range(-0.5, 0.5)         # gentle wander
+			x += cos(angle)
+			y += sin(angle) * 0.55                       # bias horizontal (flatten vertical drift)
+			if x < 1.0 or x >= float(world.cols - 1) or y >= float(world.rows - 1):
+				break
+
+
+## Carve a small disc of OPEN air (block erased, wall kept), refusing any cell in a column's base-safe
+## band so tunnels never undermine the spawn surface.
+func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
+	for dy: int in range(-radius, radius + 1):
+		for dx: int in range(-radius, radius + 1):
+			if dx * dx + dy * dy > radius * radius + 1:
+				continue
+			var cell: Vector2i = center + Vector2i(dx, dy)
+			if not world.in_bounds(cell):
+				continue
+			if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+				continue                                 # protect the near-surface base
+			if world.blocks.has(cell):
+				world.blocks.erase(cell)
 
 
 ## Depth-banded ore: many vein-seed attempts, each kept by a depth-weighted roll (deep seeds survive,
