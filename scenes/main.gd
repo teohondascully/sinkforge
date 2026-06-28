@@ -122,6 +122,40 @@ func _ready() -> void:
 	# map can paint terrain without the HUD depending on the renderer's internals.
 	hud.minimap_color = _renderer.material_color
 
+	_setup_post_fx()
+
+
+## Modern-rendering layer (docs/MODERN_FEEL.md): a WorldEnvironment post-process that gives the scene
+## its "2026 sheen" — BLOOM on our additive light pools (head-lamp, ore stream, machine glow, forge
+## embers) so warm light blooms into the dark, plus a gentle colour grade (a touch more contrast +
+## saturation). HDR-2D lets the additive pools exceed 1.0 so only genuine light blooms, not flat UI.
+## Pure representation — the sim never knows. Vignette + film grain ride on a separate screen shader.
+func _setup_post_fx() -> void:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CANVAS
+	env.glow_enabled = true
+	env.glow_normalized = true
+	env.glow_intensity = 0.28
+	env.glow_strength = 0.85
+	env.glow_bloom = 0.0                   # no whole-image lift — halo only the already-bright pixels
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT  # gloss, not a wash-out add
+	env.glow_hdr_threshold = 0.85         # bloom the bright cores (lamp/ember/ore/cursor), leave dark dark
+	env.glow_hdr_scale = 1.0
+	# Favour the tighter bloom levels so light "halos" close to its source instead of ballooning into a
+	# giant soft orb that swallows readability.
+	for i: int in range(0, 7):
+		env.set_glow_level(i, 0.0)
+	env.set_glow_level(1, 1.0)
+	env.set_glow_level(2, 0.7)
+	env.set_glow_level(3, 0.3)
+	env.adjustment_enabled = true          # gentle grade — keep the readability floor (Terraria never
+	env.adjustment_contrast = 1.03         # sacrifices legibility), just a touch more pop + warmth
+	env.adjustment_saturation = 1.07
+	env.adjustment_brightness = 1.02
+	var we := WorldEnvironment.new()
+	we.environment = env
+	add_child(we)
+
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
