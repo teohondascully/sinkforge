@@ -50,10 +50,20 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
 
 ### MainView — representation + input (disposable, read-only)
 - **Location:** `scenes/main.gd` (`class_name MainView`, `Node2D`) + `scenes/main.tscn`
-- **Responsibility:** OWNS a `FactorySim`, advances it (pausable), draws the grid + machines +
-  buffers + OUTPUT total, and translates mouse/keys into sim placement ops. Reads sim
-  production state only — never writes it. Delete it and the numbers are unchanged.
-- **Input:** click palette to select; left-click places, right-click removes; space pauses.
+- **Responsibility:** OWNS a `FactorySim`, advances it (pausable), draws the WORLD in world-space
+  under a follow `Camera2D`, hosts the embodied `Player` + a screen-fixed `Hud`, and translates
+  mouse/keys into the body's **world-verbs**. Reads sim production state only — never writes it;
+  every world edit goes through the sim's discrete API (`mine`/`deposit`/`place_machine`/
+  `remove_machine`). Delete it and the numbers are unchanged.
+- **Input (embodied):** ←→/AD move, Space jump (handled by `Player`); **LMB mine** the aimed solid
+  cell (reach-limited); **RMB build** (`_try_build`) — place the selected machine on an in-reach
+  open cell, or pick one of your own machines back up; **1/2** select the build palette
+  (Processor/Splitter — the Ore Vent is excluded so you stay the ore source by hand); **E** deposit
+  carried ore into an in-reach machine; **P** pause. The cursor is context-sensitive (`_draw_aim`):
+  a solid cell shows a MINE box, an open in-reach cell shows a BUILD ghost of the selected machine
+  (green border = placeable). **S3 building added no sim code** — placement/removal already existed;
+  reach + "where allowed" are representation concerns (like deposit), so the sim API stays
+  position-agnostic and the determinism boundary holds.
 
 ### Dev harness (Track B)
 - **Location:** `tests/run_tests.gd` (headless sim tests), `tools/capture.gd` (visual capture).

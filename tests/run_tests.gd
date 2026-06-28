@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_splitter()
 	_test_terrain()
 	_test_mining_and_deposit()
+	_test_hand_built_chain()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -210,3 +211,31 @@ func _test_mining_and_deposit() -> void:
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across the by-hand loop (present=%d, net=%d)" % [item, present, net])
 	_check(sim.deposit(Vector2i(2, 5), &"ore", 1) == 0, "cannot deposit ore you don't carry")
+
+
+## S3 — a chain BUILT by hand. The player only ever calls place_machine / deposit / remove_machine,
+## so building a splitter + two processors, digging a stock of ore, and hand-feeding the splitter
+## must produce ingots down BOTH branches and conserve — guarding the chain the embodied body
+## assembles. (S3 adds no sim code: place/remove already exist, so this exercises that same path.)
+func _test_hand_built_chain() -> void:
+	print("- hand-built chain")
+	var split_def: MachineDef = load("res://src/data/machines/splitter.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(sim.place_machine(split_def, Vector2i(6, 2)) != null, "placed a splitter by hand")
+	_check(sim.place_machine(proc_def, Vector2i(6, 4)) != null, "placed a processor under the down branch")
+	_check(sim.place_machine(proc_def, Vector2i(7, 4)) != null, "placed a processor under the right branch")
+	for v: int in 8:  # dig a stock of ore into the pack
+		sim.set_solid(Vector2i(0, v), &"ore")
+		sim.mine(Vector2i(0, v))
+	_check(int(sim.inventory.get(&"ore", 0)) == 8, "dug 8 ore into the pack")
+	_check(sim.deposit(Vector2i(6, 2), &"ore", 8) == 8, "hand-fed all 8 ore into the splitter")
+	for _i: int in 200:
+		sim.tick()
+	_check(int(sim.sink.get(&"ingot", 0)) > 0, "the hand-built chain forged ingots (%d)" % int(sim.sink.get(&"ingot", 0)))
+	for item: StringName in [&"ore", &"ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved in the hand-built chain (present=%d, net=%d)" % [item, present, net])
+	sim.remove_machine(Vector2i(7, 4))  # pick a machine back up
+	_check(sim.machine_at(Vector2i(7, 4)) == null, "picked the processor back up (cell is buildable again)")

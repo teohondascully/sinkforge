@@ -8,9 +8,12 @@ extends Node2D
 ## discrete API (mine/deposit/set_solid). Falling-item sprites are PURELY COSMETIC. Delete the
 ## visuals/player and the production numbers are identical.
 ##
-## P2·S1a→S1b/S2: a body in a world of solid earth you DIG through (mouse, reach-limited); ore veins
-## you mine into your pack; a lone Processor "forge" you hand-feed to drive production — the first
-## complete by-hand loop. NOT here yet: automation of hauling/movement (S3+), combat, worldgen.
+## P2·S1a→S3: a body in a world of solid earth you DIG through (LMB, reach-limited); ore veins you
+## mine into your pack; a Processor "forge" you hand-feed; and now you BUILD the chain from inside
+## the world — RMB places a selected machine (Processor/Splitter) on an open cell within reach, or
+## picks one of your machines back up (the embodied replacement for the removed god-cursor palette).
+## NOT here yet: a build economy (machines are free this slice — see DECISIONS), automation of
+## hauling/movement, combat, worldgen.
 ##
 ## DESIGN-OPEN (placeholder, undecided): world size/layout, colours, camera feel, the body's look,
 ## mining feel/reach, all numbers, art style. Collected for PLAYTEST_NOTES once felt.
@@ -31,12 +34,21 @@ var _font: Font = ThemeDB.fallback_font
 var _paused: bool = false
 var _mine_cooldown: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
+## The hand-build palette: which machine defs you can place, and which is selected (1/2 keys). The
+## ore_vent (a SOURCE) is deliberately absent — you remain the ore source by hand, which keeps the
+## dig-by-hand loop intact (manual→automated pillar; see DECISIONS 2026-06-27).
+var _palette: Array[MachineDef] = []
+var _selected: int = 0
 ## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	sim = FactorySim.new()
+	_palette = [
+		load("res://src/data/machines/processor.tres"),
+		load("res://src/data/machines/splitter.tres"),
+	]
 	_seed_world()
 
 	_player = Player.new()
@@ -58,6 +70,11 @@ func _ready() -> void:
 	var hud := Hud.new()
 	hud.sim = sim
 	hud.paused_getter = func() -> bool: return _paused
+	var names: PackedStringArray = []
+	for def: MachineDef in _palette:
+		names.append(def.display_name)
+	hud.palette_names = names
+	hud.selected_getter = func() -> int: return _selected
 	layer.add_child(hud)
 	add_child(layer)
 
@@ -98,6 +115,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_paused = not _paused
 			elif key.keycode == KEY_E:
 				_deposit_into_reach()
+			elif key.keycode >= KEY_1 and key.keycode < KEY_1 + _palette.size():
+				_selected = key.keycode - KEY_1
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			_try_build()
 
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
@@ -122,6 +145,35 @@ func _deposit_into_reach() -> void:
 		if _can_reach(machine.cell):
 			sim.deposit(machine.cell, &"ore", carried)
 			return
+
+
+## RMB build verb: standing in reach of the aimed cell, place the selected machine on an open cell,
+## or pick one of your own machines back up. Reach-limited + situated — the embodied replacement for
+## the removed god-cursor palette. Every edit goes through the sim's discrete place/remove API, so
+## the body still only triggers discrete mutations (determinism preserved).
+func _try_build() -> void:
+	if _paused or not _can_reach(_aim):
+		return
+	if sim.machine_at(_aim) != null:
+		sim.remove_machine(_aim)
+	elif _placeable(_aim):
+		sim.place_machine(_palette[_selected], _aim)
+
+
+## A cell takes a hand-placed machine if it's in-bounds, open (not earth), unoccupied, and NOT the
+## cell the body is standing in — so you can never seal yourself inside a machine you place.
+func _placeable(cell: Vector2i) -> bool:
+	return sim.in_bounds(cell) and not sim.is_solid(cell) \
+		and sim.machine_at(cell) == null and not _player_occupies(cell)
+
+
+func _player_occupies(cell: Vector2i) -> bool:
+	if _player == null:
+		return false
+	var cell_rect := Rect2(Vector2(cell) * float(CELL), Vector2(CELL, CELL))
+	var body := Rect2(_player.position - Vector2(Player.WIDTH, Player.HEIGHT) * 0.5,
+		Vector2(Player.WIDTH, Player.HEIGHT))
+	return cell_rect.intersects(body)
 
 
 func _can_reach(cell: Vector2i) -> bool:
@@ -179,14 +231,38 @@ func _draw_terrain() -> void:
 			draw_circle(pos + Vector2(CELL, CELL) * 0.5, 3.5, Color(1.0, 0.85, 0.5))
 
 
-## Highlight the cell the body is aiming at: bright if it's minable in reach, faint if out of reach.
+## The cursor cell, drawn by context so digging and building are legible without a god-cursor:
+##   solid earth   -> MINE target (white box; faint out of reach)
+##   your machine  -> PICK-UP affordance (red outline; only when in reach)
+##   open cell     -> BUILD ghost of the selected machine within reach (green outline = placeable,
+##                    red = blocked, e.g. your own footing). Out-of-reach open cells draw nothing, so
+##                    the open sky stays uncluttered.
 func _draw_aim() -> void:
-	if not sim.is_solid(_aim):
+	if not sim.in_bounds(_aim):
 		return
 	var pos := Vector2(_aim) * float(CELL)
 	var in_reach: bool = _can_reach(_aim)
-	var col := Color(1, 1, 1, 0.85) if in_reach else Color(1, 1, 1, 0.18)
-	draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
+	if sim.is_solid(_aim):
+		var col := Color(1, 1, 1, 0.85) if in_reach else Color(1, 1, 1, 0.18)
+		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
+		return
+	if not in_reach:
+		return
+	var inner := Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2))
+	if sim.machine_at(_aim) != null:
+		draw_rect(inner, Color(0.95, 0.45, 0.40, 0.9), false, 2.0)  # pick-up affordance
+		return
+	var def: MachineDef = _palette[_selected]
+	# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own — not only
+	# by its border (4b critique: the dark fill leaned entirely on the green outline to be seen).
+	var ghost: Color = _machine_color(def).lerp(Color.WHITE, 0.20)
+	ghost.a = 0.55
+	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
+	var ok: bool = _placeable(_aim)
+	var border := Color(0.45, 0.95, 0.5, 0.9) if ok else Color(0.95, 0.45, 0.40, 0.9)
+	draw_rect(inner, border, false, 2.0)
+	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(def.display_name),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.92, 0.97, 0.92, 0.8))
 
 
 func _draw_grid() -> void:
