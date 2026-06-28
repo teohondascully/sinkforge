@@ -50,6 +50,9 @@ var _shake: float = 0.0            ## current screenshake magnitude (px), decays
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
 var _objectives: Objectives
+## GPU ambient dust motes (docs/MODERN_FEEL.md) — a continuous GPUParticles2D haze that drifts in the
+## air and catches the lamp light. Pure atmosphere; follows the camera each frame.
+var _motes: GPUParticles2D
 
 
 func _ready() -> void:
@@ -157,6 +160,8 @@ func _setup_post_fx() -> void:
 	we.environment = env
 	add_child(we)
 
+	_setup_ambient_motes()
+
 	# The screen-space LENS pass — vignette + film grain + a whisper of chromatic aberration, on a
 	# full-screen ColorRect on a CanvasLayer BELOW the HUD (layer 5 < HUD's 10), so the WORLD gets the
 	# lens and the UI stays crisp. Reads the composited screen; sits under the WorldEnvironment glow.
@@ -169,6 +174,55 @@ func _setup_post_fx() -> void:
 	lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fx_layer.add_child(lens)
 	add_child(fx_layer)
+
+
+## A continuous GPUParticles2D haze of dust motes drifting in the air — the modern particle lever
+## (docs/MODERN_FEEL.md). It fills the camera view (repositioned to the camera each frame) and sits at
+## z 45, BELOW the lighting veil (z 50) + light pools (z 51), so a mote is dark in the gloom and lit
+## warm where the lamp/glow reaches — "dust catching the light." Pure atmosphere; never touches the sim.
+func _setup_ambient_motes() -> void:
+	var view: Vector2 = Vector2(Hud.CANVAS) / CAMERA_ZOOM    # world area the camera shows
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	mat.emission_box_extents = Vector3(view.x * 0.6, view.y * 0.6, 1.0)  # a touch wider than the view
+	mat.direction = Vector3(0.2, 1.0, 0.0)
+	mat.spread = 180.0
+	mat.gravity = Vector3(0.0, 5.0, 0.0)                     # a barely-there settle
+	mat.initial_velocity_min = 2.0
+	mat.initial_velocity_max = 11.0
+	mat.damping_min = 1.0
+	mat.damping_max = 4.0
+	mat.scale_min = 0.5
+	mat.scale_max = 1.7
+	mat.color = Color(1.0, 0.94, 0.82, 0.40)                 # warm dust; the lamp tints it brighter
+	mat.turbulence_enabled = true                            # organic, swirling drift
+	mat.turbulence_noise_strength = 4.0
+	mat.turbulence_noise_scale = 1.4
+	_motes = GPUParticles2D.new()
+	_motes.process_material = mat
+	_motes.texture = _make_mote_texture()
+	_motes.amount = 130
+	_motes.lifetime = 7.0
+	_motes.preprocess = 5.0                                  # start with a full field, not an empty screen
+	_motes.z_index = 45
+	_motes.z_as_relative = false
+	add_child(_motes)
+
+
+## A tiny soft round dot for a single mote (radial alpha falloff) so motes read as out-of-focus specks
+## of dust rather than hard pixels.
+func _make_mote_texture() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 1.0), Color(1, 1, 1, 0.5), Color(1, 1, 1, 0.0)])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.width = 12
+	t.height = 12
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	return t
 
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
@@ -207,6 +261,8 @@ func _process(delta: float) -> void:
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_juice(delta)
+	if _motes != null and _camera != null:
+		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
 	if _objectives != null:
 		_objectives.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
