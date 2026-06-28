@@ -7,7 +7,8 @@ extends SceneTree
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_walk.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const BACK_EPS: float = 0.3          ## a backward step bigger than this (px) against input = a snap
+const BACK_EPS: float = 4.0          ## backward jump > this (px) against input = a real teleport (sub-px
+                                     ## collision jitter is ~2.5px/frame and fine; a teleport is a tile+)
 
 var _main: MainView
 var _player: Player
@@ -68,12 +69,8 @@ func _phys() -> void:
 	# level is OPEN (so it's not a legit wall stopping us — something at body/head height snagged us).
 	if absf(dx) < 0.2:
 		_stuck_frames += 1
-		if _stuck_frames == 40:
-			var sim: FactorySim = _main.sim
-			var c: Vector2i = _main._cell_at(_player.position)
-			var foot_ahead: Vector2i = c + Vector2i(int(_dir), 1)
-			printerr("  STUCK at x=%.1f cell=%s — foot-ahead solid=%s | %s"
-				% [_player.position.x, c, sim.is_solid(foot_ahead), _context()])
+		if _stuck_frames % 18 == 0 and _player.on_floor:
+			_player.request_jump()      # hop machines/walls (you jump over them) so we test the WHOLE walk
 	else:
 		_stuck_frames = 0
 	# A snap = moving opposite to input by more than BACK_EPS (not just decelerating into a wall, which

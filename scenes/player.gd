@@ -19,11 +19,14 @@ const WIDTH: float = 18.0
 const HEIGHT: float = 26.0
 
 ## --- feel constants (placeholder; harness measures these vs intent) ---
-const RUN_SPEED: float = 150.0       ## px/s horizontal
+const RUN_SPEED: float = 150.0       ## px/s horizontal top speed
+const ACCEL: float = 1700.0          ## px/s^2 toward top speed (~0.09s) — quick, but not instant (less stiff)
+const FRICTION: float = 2200.0       ## px/s^2 rubbed off when no input (snappy stop)
 const GRAVITY: float = 900.0         ## px/s^2
 const JUMP_VELOCITY: float = -330.0  ## px/s instantaneous on jump  (apex ~= 330^2/(2*900) ~= 60px)
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
+const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
 const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (the paid inverse of gravity)
 ## Slope follow: a single-tile rise is walked as a 45° ramp (glide, not teleport); a taller rise is a
 ## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
@@ -39,8 +42,15 @@ var velocity: Vector2 = Vector2.ZERO
 var on_floor: bool = false
 var facing: int = 1
 
+## Cosmetic feedback MainView reads to spawn juice (dust / shake) — never touches the sim.
+var landed_hard: bool = false        ## one-shot: set the frame the body lands from a real fall
+
 var _jump_request: bool = false
 var _coyote: float = 0.0
+var _jump_buffer: float = 0.0
+var _was_on_floor: bool = false
+var _squash: float = 0.0             ## 0..1 landing squash, decays — pure visual
+var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / future anim-frame pick
 
 
 func _physics_process(delta: float) -> void:
@@ -69,18 +79,27 @@ func request_jump() -> void:
 
 ## One physics step: horizontal (with slope follow) then vertical, each integrated and collided.
 func _step(delta: float) -> void:
-	velocity.x = input_dir * RUN_SPEED
+	landed_hard = false
+	# Accelerate toward the input target / rub off speed with friction — not instant (which reads stiff).
 	if input_dir != 0.0:
+		velocity.x = move_toward(velocity.x, input_dir * RUN_SPEED, ACCEL * delta)
 		facing = int(signf(input_dir))
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 
 	velocity.y = minf(velocity.y + GRAVITY * delta, MAX_FALL)
 	var grounded: bool = on_floor or _coyote > 0.0
-	if _jump_request and grounded:
+	if _jump_request:
+		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant we land (forgiving)
+	_jump_request = false
+	if _jump_buffer > 0.0 and grounded:
 		velocity.y = JUMP_VELOCITY
 		on_floor = false
 		_coyote = 0.0
 		grounded = false
-	_jump_request = false
+		_jump_buffer = 0.0
+	_jump_buffer = maxf(0.0, _jump_buffer - delta)
+	var impact_v: float = velocity.y         # remembered for the landing squash
 
 	# Updraft: standing in a lift's open shaft, the body is carried UP (the rideable half of the lift).
 	# Ensures at least rise speed upward — a jump can still beat it — and skips slope-follow (airborne).
@@ -106,6 +125,14 @@ func _step(delta: float) -> void:
 		position.y += velocity.y * delta
 		on_floor = false
 		_resolve_axis(false)
+
+	# Landing squash + a one-shot "landed hard" signal for juice, on touching ground after a real fall.
+	if on_floor and not _was_on_floor and impact_v > 240.0:
+		_squash = 1.0
+		landed_hard = true
+	_was_on_floor = on_floor
+	_squash = move_toward(_squash, 0.0, delta * 5.0)
+	_walk_phase += (absf(velocity.x) * delta * 0.06) if on_floor else 0.0
 
 	_coyote = COYOTE_TIME if on_floor else _coyote - delta
 
@@ -152,7 +179,11 @@ func _surface_y(world_x: float) -> float:
 			return base                               # flat top (or peak/valley): no ramp
 
 
-## Push the body out of any blocked cell it now overlaps, along the axis it just moved.
+## Push the body out of any blocked cell it now overlaps. The HORIZONTAL pass resolves by MINIMUM
+## penetration, pushing out by the overlap DEPTH — not snapping to the cell face. Two consequences that
+## kill the ~47px backward "teleport": (1) if the overlap is shallower in Y than X, it's a ledge/step
+## you're descending onto, NOT a wall — skip the sideways push and let the vertical pass land you; (2) a
+## real wall is pushed out by its (small) penetration, so a fast bump nudges a few px, never a whole tile.
 func _resolve_axis(horizontal: bool) -> void:
 	var rect: Rect2 = _aabb()
 	var lo: Vector2i = _cell_of(rect.position)
@@ -166,10 +197,12 @@ func _resolve_axis(horizontal: bool) -> void:
 			if not rect.intersects(cell_rect):
 				continue
 			if horizontal:
-				if velocity.x > 0.0:
-					position.x = cell_rect.position.x - WIDTH * 0.5
-				elif velocity.x < 0.0:
-					position.x = cell_rect.end.x + WIDTH * 0.5
+				var ov_x: float = minf(rect.end.x, cell_rect.end.x) - maxf(rect.position.x, cell_rect.position.x)
+				var ov_y: float = minf(rect.end.y, cell_rect.end.y) - maxf(rect.position.y, cell_rect.position.y)
+				if ov_x > ov_y:
+					continue          # shallower in Y → a ledge to step/land onto, not a wall to block
+				# Push out by the penetration depth, away from the cell centre (no snap-to-face teleport).
+				position.x += ov_x if rect.get_center().x > cell_rect.get_center().x else -ov_x
 				velocity.x = 0.0
 			else:
 				if velocity.y > 0.0:
@@ -201,12 +234,27 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
 
 
-## A little MINER (art still an open question, but a person — not a slab): boots + legs, blue
-## overalls, skin head, and a yellow hardhat with a head-lamp that points the way you face. Drawn
-## small (the body is ~9px on screen at this zoom), so it's built from bold blocks that read as a
-## silhouette rather than fine detail. A dark backing gives it contrast against earth and walls.
+## The MINER. Draws `assets/sprites/miner.png` if present (feet-anchored, flipped by facing, landing
+## squash applied), else the code-drawn fallback figure. Squash (flatten + widen on landing, + a tiny
+## walk bob) is the first scrap of game-feel juice and applies to either path.
 func _draw() -> void:
 	var f: float = float(facing)
+	var sxq: float = 1.0 + 0.18 * _squash             # landing squash widens X
+	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
+	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
+	var tex: Texture2D = Art.tex("miner")
+	if tex != null:
+		var w: float = float(tex.get_width()) * sxq
+		var h: float = float(tex.get_height()) * syq
+		var dst := Rect2(-w * 0.5, (HEIGHT * 0.5) - h + bob, w, h)  # feet on the AABB bottom, centred
+		if f < 0.0:
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
+			dst.position.x = -w * 0.5
+		draw_texture_rect(tex, dst, false)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
+
+	draw_set_transform(Vector2(0.0, (HEIGHT * 0.5) * (1.0 - syq) + bob), 0.0, Vector2(sxq, syq))
 	var overalls := Color(0.24, 0.40, 0.62)
 	var legs := Color(0.18, 0.20, 0.28)
 	var skin := Color(0.84, 0.66, 0.50)
@@ -235,3 +283,4 @@ func _draw() -> void:
 	draw_rect(Rect2(head.x + (1.0 if f > 0.0 else -5.5), head.y - 1.4, 4.5, 1.6), helmet)
 	# Head-lamp glow on the facing side.
 	draw_circle(head + Vector2(f * 4.2, -2.2), 1.5, Color(1.0, 0.97, 0.7))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)  # clear the squash transform

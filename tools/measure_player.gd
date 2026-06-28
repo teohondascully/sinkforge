@@ -61,11 +61,15 @@ func _phys() -> void:
 				var height: float = _floor_y - _apex
 				var intended: float = Player.JUMP_VELOCITY * Player.JUMP_VELOCITY / (2.0 * Player.GRAVITY)
 				_report("jump apex px", height, intended, JUMP_TOL)
-				_phase = 2; _t = 0.0; _x0 = _player.position.x
-		2:  # run left ~0.5s (open ground, away from the chute) and measure horizontal speed
+				_phase = 2; _t = 0.0; _x0 = 0.0  # _x0 set once the body is up to speed (phase 2)
+		2:  # spin up to top speed (~0.2s of accel), THEN measure STEADY-STATE speed over a window — we
+			# want the intended top speed, not the average-from-rest (which accel would drag below).
 			_player.input_dir = -1.0
 			_t += dt
-			if _t >= 0.5:
+			if _t >= 0.2 and _x0 == 0.0:
+				_x0 = _player.position.x          # start the measurement window once up to speed
+				_t = 0.0
+			elif _x0 != 0.0 and _t >= 0.4:
 				var speed: float = absf(_player.position.x - _x0) / _t
 				_report("run speed px/s", speed, Player.RUN_SPEED, RUN_TOL)
 				_player.input_dir = 0.0
