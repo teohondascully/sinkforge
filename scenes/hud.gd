@@ -365,16 +365,19 @@ func _draw_inventory() -> void:
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
 			var icon := Rect2(sx + 6.0, y + 6.0, SLOT - 12.0, SLOT - 14.0)
-			if machine_icons.has(item):  # a machine item: its casing colour + a mini silhouette
-				var ic: Dictionary = machine_icons[item]
-				draw_rect(icon, ic["color"])
-				draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
-				# Same glyph the world draws (shared Visuals), just scaled down to the chip — never drifts.
-				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
-					icon.size.y / 20.0, false, 0.0)
-			else:
-				draw_rect(icon, Visuals.item_color(item))
-				draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
+			if machine_icons.has(item):  # a machine item: its sprite, or casing colour + a mini silhouette
+				var mspr: Texture2D = Art.tex("machine_" + String(item))
+				if mspr != null:
+					draw_texture_rect(mspr, icon, false)
+				else:
+					var ic: Dictionary = machine_icons[item]
+					draw_rect(icon, ic["color"])
+					draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
+					# Same glyph the world draws (shared Visuals), scaled to the chip — never drifts.
+					Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
+						icon.size.y / 20.0, false, 0.0)
+			else:  # a resource item: its sprite (item_<id>.png) or the flat colour chip
+				Visuals.draw_item(self, icon.position + icon.size * 0.5, icon.size.y, item)
 			# Count badge bottom-right with a dark backing so it stays legible over any icon colour.
 			var cnt: String = str(count)
 			var cw: float = _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x

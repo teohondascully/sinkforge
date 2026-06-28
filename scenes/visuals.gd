@@ -100,6 +100,18 @@ static func item_color(item: StringName) -> Color:
 	return Color.WHITE
 
 
+## Draw an item icon centred at `center`, `size` px square. Sprite-ready: an item_<id>.png
+## (docs/ART_SPEC.md) replaces the flat colour chip the moment it exists; absent → today's look.
+## One helper so ground piles, the hotbar, and anything else share the same swap.
+static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: StringName) -> void:
+	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
+	var tex: Texture2D = Art.tex("item_" + String(item))
+	if tex != null:
+		canvas.draw_texture_rect(tex, rect, false)
+	else:
+		canvas.draw_rect(rect, item_color(item))
+
+
 ## Debris/dust colour for a mined terrain material (juice particles) — roughly its rock tone.
 static func terrain_dust(material: StringName) -> Color:
 	if material == &"stone":

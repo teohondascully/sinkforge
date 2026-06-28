@@ -267,9 +267,14 @@ func _draw_background() -> void:
 	for cell_v: Variant in sim.wall:
 		var c: Vector2i = cell_v
 		var def: MaterialDef = _material(sim.wall[c])
+		var wpos := Vector2(c) * float(CELL)
+		# Sprite-ready: a tile_<wall-id>.png (e.g. tile_dirt_wall.png) replaces the flat fill.
+		var wtex: Texture2D = Art.tex("tile_" + String(def.id))
+		if wtex != null:
+			draw_texture_rect(wtex, Rect2(wpos, Vector2(CELL, CELL)), false)
+			continue
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)),
-			def.base_color.darkened(depth * def.depth_darken))
+		draw_rect(Rect2(wpos, Vector2(CELL, CELL)), def.base_color.darkened(depth * def.depth_darken))
 
 
 func _draw_drop_paths() -> void:
@@ -337,7 +342,7 @@ func _draw_ground() -> void:
 			for _k: int in per:
 				var p := base + Vector2(float(CELL) * 0.5, float(CELL) - 6.0 - float(idx) * 4.5)
 				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
-				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), Visuals.item_color(item))
+				Visuals.draw_item(self, p, 9.0, item)  # sprite-ready (item_<id>.png) or flat chip
 				idx += 1
 
 
@@ -351,16 +356,21 @@ func _draw_machine(machine: MachineState) -> void:
 	draw_set_transform(pos + Vector2(float(CELL) * 0.5, float(CELL) - 1.0), 0.0, Vector2(1.0, 0.26))
 	draw_circle(Vector2.ZERO, float(CELL) * 0.46, Color(0.0, 0.0, 0.0, 0.30))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
-	draw_rect(body, Visuals.machine_color(machine.def))
-	draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)  # darker inset casing
-	for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
-			Vector2(CELL - 4, CELL - 4)]:
-		draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))  # bolts
-
-	# A machine reads as ALIVE while it's working — it has materials in hand or a cycle in progress.
-	var active: bool = _held(machine) > 0 or machine.progress > 0.0
-	Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, _anim_time)
+	# Sprite-ready: a machine_<id>.png replaces the code-drawn casing+glyph (docs/ART_SPEC.md, Phase A);
+	# the badge / progress bar / I/O ports below still overlay it. Absent → today's primitive look.
+	var spr: Texture2D = Art.tex("machine_" + String(machine.def.id))
+	if spr != null:
+		draw_texture_rect(spr, Rect2(pos, Vector2(CELL, CELL)), false)
+	else:
+		var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
+		draw_rect(body, Visuals.machine_color(machine.def))
+		draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)  # darker inset casing
+		for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
+				Vector2(CELL - 4, CELL - 4)]:
+			draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))  # bolts
+		# A machine reads as ALIVE while it's working — materials in hand or a cycle in progress.
+		var active: bool = _held(machine) > 0 or machine.progress > 0.0
+		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, _anim_time)
 
 	var held: int = _held(machine)
 	if held > 0:
