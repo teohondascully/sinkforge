@@ -19,6 +19,9 @@ var craft_options: Array[Dictionary] = []
 var machine_icons: Dictionary = {}
 ## The active carried-item slot in the inventory hotbar (set by MainView; mouse-wheel cycles it).
 var inv_selected_getter: Callable
+## When you aim at one of your machines in reach, MainView pushes its inspector info here (name, recipe
+## in→out, routing mode, what it's holding). Empty = nothing hovered. Drawn top-right under FORGED.
+var hover_info: Dictionary = {}
 
 
 func _process(_delta: float) -> void:
@@ -33,6 +36,7 @@ func _draw() -> void:
 	draw_string(_font, Vector2(CANVAS.x - fw - 12.0, 22), forged,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
 	_draw_objectives()  # the tutorial chain, top-left — the "how do I play?" signpost
+	_draw_hover()       # inspector for the machine under the cursor (recipe / I/O / holding)
 	_draw_craft()       # now sits just above the hotbar (crafting next to the pack — Factorio-like)
 	_draw_inventory()
 	draw_rect(Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0), Color(0.07, 0.08, 0.11, 0.9))  # controls backing
@@ -100,6 +104,70 @@ func _draw_objectives() -> void:
 func _panel(rect: Rect2) -> void:
 	draw_rect(rect, Color(0.06, 0.07, 0.10, 0.82))
 	draw_rect(rect, Color(0.28, 0.31, 0.38, 0.9), false, 1.0)
+
+
+## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
+## reach. Names it and shows its recipe as item chips (inputs → outputs) or its routing mode, plus what
+## it's currently holding. The "where does this eat / spit / what does it make" answer without a manual.
+func _draw_hover() -> void:
+	if hover_info.is_empty():
+		return
+	var ins: Array = hover_info.get("in", [])
+	var outs: Array = hover_info.get("out", [])
+	var holding: Array = hover_info.get("holding", [])
+	var has_recipe: bool = not ins.is_empty() or not outs.is_empty()
+	var has_mode: bool = hover_info.has("mode") and str(hover_info["mode"]) != ""
+	var width: float = 218.0
+	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty())
+	var pad: float = 9.0
+	var line_h: float = 18.0
+	var origin := Vector2(CANVAS.x - width - 12.0, 34.0)
+	_panel(Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0)))
+	var x0: float = origin.x + pad
+	var y: float = origin.y + 8.0 + 12.0
+	draw_string(_font, Vector2(x0, y), str(hover_info.get("name", "")),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.92, 0.80))
+	y += line_h
+	if has_recipe:
+		var x: float = _chips(x0, y, ins)
+		x = _arrow(x, y)
+		_chips(x, y, outs)
+		y += line_h
+	if has_mode:
+		draw_string(_font, Vector2(x0, y), str(hover_info["mode"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.66, 0.80, 0.90))
+		y += line_h
+	if not holding.is_empty():
+		var hx: float = draw_string_pos(x0, y, "holds")
+		_chips(hx, y, holding)
+
+
+## Draw a run of item chips (a colour swatch + count) left-to-right; returns the x just past them.
+func _chips(x0: float, y: float, items: Array) -> float:
+	var x: float = x0
+	for entry: Dictionary in items:
+		var item: StringName = entry["item"]
+		var sw := Rect2(x, y - 11.0, 12.0, 12.0)
+		if machine_icons.has(item):
+			draw_rect(sw, machine_icons[item]["color"])
+		else:
+			draw_rect(sw, Visuals.item_color(item))
+		draw_rect(sw, Color(0.0, 0.0, 0.0, 0.4), false, 1.0)
+		var label: String = " %d" % int(entry["count"])
+		draw_string(_font, Vector2(x + 14.0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+			Color(0.92, 0.93, 0.96))
+		x += 14.0 + _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 8.0
+	return x
+
+
+func _arrow(x: float, y: float) -> float:
+	draw_string(_font, Vector2(x, y), "->", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.70, 0.74, 0.82))
+	return x + _font.get_string_size("->", HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 8.0
+
+
+func draw_string_pos(x: float, y: float, text: String) -> float:
+	draw_string(_font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.62, 0.66, 0.74))
+	return x + _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 8.0
 
 
 ## The CRAFT strip — 1 Processor (3 ingot)  2 Splitter (2 ingot) — press the number to craft one

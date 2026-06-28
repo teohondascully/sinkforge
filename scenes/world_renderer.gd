@@ -369,6 +369,42 @@ func _draw_machine(machine: MachineState) -> void:
 		var frac: float = clampf(machine.progress / recipe.time, 0.0, 1.0)
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
+	_draw_machine_io(machine, pos)
+
+
+## Small item-tinted PORTS on a machine's edges: where it EATS (input mouth, top, points IN) and where
+## it SPITS (output spout, in the flow direction — down for a recipe-runner/source, down+right for a
+## splitter, up for a lift). Tinted by the item so you learn "orange goes in here, yellow comes out
+## there" at a glance — the in-world half of the I/O affordances (VIBE_GAP #8). Pure cosmetic.
+func _draw_machine_io(machine: MachineState, pos: Vector2) -> void:
+	var recipe: RecipeDef = machine.def.recipe
+	var c: float = float(CELL)
+	if recipe != null and not recipe.inputs.is_empty():
+		var in_item: StringName = recipe.inputs.keys()[0]
+		_port(pos + Vector2(c * 0.5, 0.0), Vector2(0, 1), Visuals.item_color(in_item))   # mouth: points in
+	var out_col := Color(0.80, 0.86, 0.94)                                                # neutral "routes"
+	if recipe != null and not recipe.outputs.is_empty():
+		out_col = Visuals.item_color(recipe.outputs.keys()[0])
+	match machine.def.behavior:
+		&"lift":
+			_port(pos + Vector2(c * 0.5, c), Vector2(0, -1), Color(0.5, 1.0, 0.92))       # spouts UP
+		&"splitter":
+			_port(pos + Vector2(c * 0.5, c), Vector2(0, 1), out_col)                      # down
+			_port(pos + Vector2(c, c * 0.5), Vector2(1, 0), out_col)                      # + right
+		_:
+			_port(pos + Vector2(c * 0.5, c), Vector2(0, 1), out_col)                      # spouts down
+
+
+## One little triangular port: base sits on the casing edge at `base`, apex juts out by `dir`.
+func _port(base: Vector2, dir: Vector2, color: Color) -> void:
+	var size: float = 4.5
+	var perp := Vector2(dir.y, -dir.x) * size
+	var apex := base + dir * (size + 2.5)
+	var p1 := base + perp
+	var p2 := base - perp
+	draw_colored_polygon(PackedVector2Array([apex, p1, p2]), Color(color.r, color.g, color.b, 0.95))
+	draw_line(p1, p2, Color(0.04, 0.04, 0.06, 0.55), 1.0)
+
 
 func _held(machine: MachineState) -> int:
 	var n: int = 0

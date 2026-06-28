@@ -29,6 +29,7 @@ var sim: FactorySim
 var _player: Player
 var _camera: Camera2D
 var _renderer: WorldRenderer       ## the VIEW: all world-space drawing + lighting (we push it aim state)
+var _hud: Hud                      ## screen-space HUD (we push it objectives + the machine inspector)
 var _paused: bool = false
 var _mine_cooldown: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
@@ -105,6 +106,7 @@ func _ready() -> void:
 	# handed to the HUD to render. It only reads the sim; MainView refreshes it each frame.
 	_objectives = Objectives.new(sim)
 	hud.objectives = _objectives
+	_hud = hud
 	layer.add_child(hud)
 	add_child(layer)
 
@@ -157,6 +159,8 @@ func _process(delta: float) -> void:
 		_objectives.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
+	if _hud != null:
+		_hud.hover_info = _hover_info()
 
 
 ## Drive the cosmetic juice: advance particles, kick dust on a hard landing + periodic footsteps, and
@@ -297,6 +301,48 @@ func try_build(cell: Vector2i) -> bool:
 			_shake = maxf(_shake, 2.2)
 		return built
 	return false
+
+
+## Inspector data for the machine under the cursor (if you aim at one of your machines within reach):
+## its name, recipe (inputs → outputs as item lists), routing mode, and what it currently holds. The
+## HUD renders it. Pure read of the sim — the legibility answer to "where does this eat / spit / make".
+func _hover_info() -> Dictionary:
+	if not _can_reach(_aim):
+		return {}
+	var m: MachineState = sim.machine_at(_aim)
+	if m == null:
+		return {}
+	var info: Dictionary = {"name": m.def.display_name}
+	var recipe: RecipeDef = m.def.recipe
+	var ins: Array = []
+	var outs: Array = []
+	if recipe != null:
+		for it: StringName in recipe.inputs:
+			ins.append({"item": it, "count": int(recipe.inputs[it])})
+		for it: StringName in recipe.outputs:
+			outs.append({"item": it, "count": int(recipe.outputs[it])})
+	info["in"] = ins
+	info["out"] = outs
+	match m.def.behavior:
+		&"lift":
+			info["mode"] = "lifts goods + you UP (costs throughput)"
+		&"splitter":
+			info["mode"] = "splits the flow DOWN + RIGHT"
+		_:
+			if recipe != null and recipe.inputs.is_empty():
+				info["mode"] = "ore source"
+			elif recipe != null:
+				info["mode"] = "smelts (%.1fs/cycle)" % recipe.time
+	var hold: Dictionary = {}
+	for it: StringName in m.input_buffer:
+		hold[it] = int(hold.get(it, 0)) + int(m.input_buffer[it])
+	for it: StringName in m.output_buffer:
+		hold[it] = int(hold.get(it, 0)) + int(m.output_buffer[it])
+	var holding: Array = []
+	for it: StringName in hold:
+		holding.append({"item": it, "count": int(hold[it])})
+	info["holding"] = holding
+	return info
 
 
 ## The machine def for the active hotbar slot, or null if the selected item isn't a placeable
