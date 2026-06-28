@@ -117,11 +117,10 @@ func _step(delta: float) -> void:
 ## would push the head into a ceiling (a tight gap is a wall, not a step).
 func _follow_slope() -> bool:
 	var rect: Rect2 = _aabb()
-	var ref_row: int = _cell_of(Vector2(position.x, rect.end.y - 1.0)).y
 	# The box rests on the HIGHEST ground under its footprint — sample both bottom corners + centre.
-	var target: float = minf(_surface_y(rect.position.x + 1.0, ref_row),
-			_surface_y(rect.end.x - 1.0, ref_row))
-	target = minf(target, _surface_y(position.x, ref_row))
+	var target: float = minf(_surface_y(rect.position.x + 1.0),
+			_surface_y(rect.end.x - 1.0))
+	target = minf(target, _surface_y(position.x))
 	var lift: float = rect.end.y - target  # feet_y - surface_y: >0 climb up, <0 step down
 	if lift > MAX_STEP or lift < -MAX_DROP:
 		return false  # rise too tall (a wall) or drop too deep (a real fall) → not on this surface
@@ -135,31 +134,22 @@ func _follow_slope() -> bool:
 	return true
 
 
-## World-Y of the walkable surface at a horizontal position, modelling a single-tile step as a 45°
-## ramp that occupies its OWN column edge-to-edge (matching the diagonal the terrain renders): the
-## surface runs from this column's floor top on the low side to the neighbour's (one tile higher) on
-## the high side, so the feet ride the hypotenuse through the AIR cell — never inside the solid square.
-func _surface_y(world_x: float, ref_row: int) -> float:
+## World-Y of the walkable surface at a horizontal position — read straight from the sim's shared
+## silhouette authority (sim.surface_row / sim.ramp_dir), the SAME source the renderer draws from, so
+## the hypotenuse we glide is exactly the diagonal on screen. A single-tile step is a 45° ramp across
+## its own column; flat otherwise. Terrain-only by construction: machines aren't in the silhouette, so
+## a placed machine is a box the square-resolve bumps/climbs — never a phantom invisible ramp.
+func _surface_y(world_x: float) -> float:
 	var c: int = floori(world_x / float(CELL))
 	var frac: float = world_x / float(CELL) - float(c)  # 0..1 across column c
-	var fr: int = _floor_row(c, ref_row)
-	var base: float = float(fr * CELL)
-	var fr_left: int = _floor_row(c - 1, ref_row)
-	var fr_right: int = _floor_row(c + 1, ref_row)
-	if fr_right == fr - 1 and fr_left >= fr:      # one tile higher to the RIGHT → ramp up rightward
-		return base - frac * float(CELL)
-	if fr_left == fr - 1 and fr_right >= fr:       # one tile higher to the LEFT → ramp up leftward
-		return base - (1.0 - frac) * float(CELL)
-	return base                                    # flat top (or peak/valley): no ramp
-
-
-## Row of the floor the feet rest on (or would step onto) in a column: the topmost blocked cell at or
-## just above the feet, scanning down. Starts one tile above the feet so a single-tile rise is seen.
-func _floor_row(col: int, ref_row: int) -> int:
-	for r: int in range(maxi(ref_row - 1, 0), FactorySim.GRID_ROWS):
-		if _blocked(Vector2i(col, r)):
-			return r
-	return FactorySim.GRID_ROWS
+	var base: float = float(sim.surface_row(c) * CELL)
+	match sim.ramp_dir(c):
+		1:
+			return base - frac * float(CELL)          # one tile higher to the RIGHT → ramp up rightward
+		-1:
+			return base - (1.0 - frac) * float(CELL)  # one tile higher to the LEFT → ramp up leftward
+		_:
+			return base                               # flat top (or peak/valley): no ramp
 
 
 ## Push the body out of any blocked cell it now overlaps, along the axis it just moved.

@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_production()
 	_test_splitter()
 	_test_terrain()
+	_test_surface_silhouette()
 	_test_mining_and_deposit()
 	_test_hand_built_chain()
 	_test_inventory_slots()
@@ -191,6 +192,39 @@ func _test_terrain() -> void:
 	_check(sim.place_machine(vent_def, Vector2i(3, 3)) != null, "can place after mining out the earth")
 	_check(sim.mine(Vector2i(5, 5)) == &"", "mining a non-solid cell yields nothing")
 	_check(not sim.is_solid(Vector2i(-1, 0)), "out-of-bounds is never solid")
+
+
+## The SHARED surface silhouette (sim.surface_row / sim.ramp_dir) the renderer draws and the avatar
+## walks. Locks in: the slope is terrain-topology only, material-independent, ONE tile = a ramp, taller
+## = a wall, and — the bug this whole slice fixes — a placed MACHINE never alters the silhouette (no
+## phantom invisible diagonal). One authority → seen slope == walked slope, by construction.
+func _test_surface_silhouette() -> void:
+	print("- surface silhouette")
+	var sim: FactorySim = FactorySim.new()
+	# A flat run at row 10, with one column (5) raised a single tile, and column 8 raised TWO tiles.
+	for col: int in range(3, 12):
+		sim.set_solid(Vector2i(col, 10), &"earth")
+	sim.set_solid(Vector2i(5, 9), &"earth")               # +1 step
+	sim.set_solid(Vector2i(8, 9), &"stone")               # +2 tower (with the one below)
+	sim.set_solid(Vector2i(8, 8), &"stone")
+	_check(sim.surface_row(4) == 10, "surface_row finds the exposed top")
+	_check(sim.surface_row(5) == 9, "surface_row tracks a raised column")
+	_check(sim.surface_row(99) == FactorySim.GRID_ROWS, "an empty column has no surface")
+	# Column 4 sits one tile below its right neighbour (col 5) → ramp rising to the RIGHT.
+	_check(sim.ramp_dir(4) == 1, "a 1-tile step right reads as a rightward ramp")
+	# Column 6 sits one tile below its left neighbour (col 5) → ramp rising to the LEFT.
+	_check(sim.ramp_dir(6) == -1, "a 1-tile step left reads as a leftward ramp")
+	_check(sim.ramp_dir(3) == 0, "flat ground has no ramp")
+	# Stone slopes exactly like earth — geometry is material-independent (bug #1).
+	_check(sim.surface_row(8) == 8 and sim.ramp_dir(7) == 0,
+		"a 2-tile step is a WALL, not a ramp (only single steps slope)")
+	# THE phantom-ramp killer: drop a machine onto FLAT ground (col 10, both neighbours level); the
+	# silhouette must NOT move — no raised surface, no diagonal — so you bump the box, never glide it (bug #3).
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	_check(sim.ramp_dir(10) == 0, "flat ground reads flat before any machine")
+	sim.place_machine(proc_def, Vector2i(10, 9))           # a machine standing on the flat row-10 ground
+	_check(sim.surface_row(10) == 10, "a placed machine does NOT raise the surface silhouette")
+	_check(sim.ramp_dir(10) == 0, "a placed machine casts NO phantom ramp (it's a box you bump, not a hill)")
 
 
 ## Mining an ore vein fills the pack and is conservation-safe; depositing hands it to a machine.

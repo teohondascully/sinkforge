@@ -96,6 +96,35 @@ func material_at(cell: Vector2i) -> StringName:
 	return solid.get(cell, &"")
 
 
+## --- Surface silhouette: the ONE authority for the walkable-top shape (renderer + player share it) ---
+## The diagonal "slope" of the ground is a property of TERRAIN TOPOLOGY alone — independent of material
+## (earth, stone, ore all ramp the same) and EXCLUDING machines (a placed machine is a box you bump or
+## jump onto, never a hill). Both the renderer (draws the diagonal) and the avatar (glides it) call
+## these, so what you SEE is exactly what you WALK — no phantom invisible ramps, no un-ramped stone.
+
+## Topmost solid terrain row in a column (the exposed surface), or GRID_ROWS if the column is all air.
+func surface_row(col: int) -> int:
+	for row: int in range(0, GRID_ROWS):
+		if solid.has(Vector2i(col, row)):
+			return row
+	return GRID_ROWS
+
+
+## Slope of the exposed surface at a column: +1 rising to the right, -1 rising to the left, 0 flat.
+## A neighbour exactly ONE tile higher reads as a 45° ramp; a bigger step is a wall (0 here → the
+## avatar's square-collision blocks it, the renderer draws no diagonal). Terrain only — machines and
+## material never enter, which is precisely what kills the two bugs the split authority caused.
+func ramp_dir(col: int) -> int:
+	var here: int = surface_row(col)
+	var left: int = surface_row(col - 1)
+	var right: int = surface_row(col + 1)
+	if right == here - 1 and left >= here:
+		return 1
+	if left == here - 1 and right >= here:
+		return -1
+	return 0
+
+
 ## Seed or clear a terrain cell — used to build the starting world. Discrete edit; in-bounds only.
 ## Pass &"" to clear, otherwise the material (&"earth" default).
 func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:

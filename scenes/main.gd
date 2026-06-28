@@ -339,36 +339,32 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 	return out
 
 
-## A cell is "surface" if it's solid with open space directly above — the exposed top of the ground.
-func _is_surface(c: Vector2i) -> bool:
-	return sim.is_solid(c) and not sim.is_solid(c + Vector2i(0, -1))
-
-
-## Smooth the blocky surface: a flat grass cap on level ground, and a filled diagonal RAMP where the
-## surface steps up by a tile (Terraria-style slope), with a grass edge — so hills read as slopes.
+## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
+## sim.ramp_dir) so the diagonal we DRAW is exactly the one the avatar WALKS. The ramp GEOMETRY is
+## universal (every material — earth, stone, ore — slopes); only the EDGE PAINT is material-specific:
+## a capped material (grass) gets its bright cap colour, an uncapped one (stone) a subtle lightened lip.
 func _draw_terrain_surface() -> void:
-	for cell: Variant in sim.solid:
-		var c: Vector2i = cell
-		var def: MaterialDef = _material(sim.solid[c])
-		if not def.has_cap() or not _is_surface(c):
-			continue
-		var cap: Color = def.cap_color
-		var px := float(c.x * CELL)
-		var py := float(c.y * CELL)
-		var right_up: bool = sim.is_solid(Vector2i(c.x + 1, c.y - 1))
-		var left_up: bool = sim.is_solid(Vector2i(c.x - 1, c.y - 1))
-		if right_up and not left_up:  # ramp rising to the right, filling the air corner above
-			var lo := Vector2(px, py)
-			var hi := Vector2(px + CELL, py - CELL)
-			draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
-			draw_line(lo, hi, cap, 3.0)
-		elif left_up and not right_up:  # ramp rising to the left
-			var lo2 := Vector2(px + CELL, py)
-			var hi2 := Vector2(px, py - CELL)
-			draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
-			draw_line(lo2, hi2, cap, 3.0)
-		else:  # flat top: a grass cap
-			draw_rect(Rect2(px, py, float(CELL), 4.0), cap)
+	for col: int in range(FactorySim.GRID_COLS):
+		var r: int = sim.surface_row(col)
+		if r >= FactorySim.GRID_ROWS:
+			continue  # empty column, no surface
+		var def: MaterialDef = _material(sim.material_at(Vector2i(col, r)))
+		var edge: Color = def.cap_color if def.has_cap() else def.base_color.lightened(0.18)
+		var px := float(col * CELL)
+		var py := float(r * CELL)
+		match sim.ramp_dir(col):
+			1:  # rising to the right — fill the air corner above with a 45° slope
+				var lo := Vector2(px, py)
+				var hi := Vector2(px + CELL, py - CELL)
+				draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
+				draw_line(lo, hi, edge, 3.0)
+			-1:  # rising to the left
+				var lo2 := Vector2(px + CELL, py)
+				var hi2 := Vector2(px, py - CELL)
+				draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
+				draw_line(lo2, hi2, edge, 3.0)
+			_:  # flat top: a capped lip
+				draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
 
 
 ## The cursor cell, drawn by context so digging and building are legible without a god-cursor:
