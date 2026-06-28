@@ -28,6 +28,16 @@ const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a n
 
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 
+## --- Lighting (representation-only; the Terraria mood lever) -------------------------------------
+## A depth DARKNESS veil (smooth vertical fade from the daylight line down to near-black) plus additive
+## warm LIGHT pools (the miner's lamp, glowing machines) that punch back through it. All purely visual.
+const SURFACE_LINE: int = 5                         ## daylight row (the flat surface); darkness starts below
+const DARK_SPAN: float = 13.0                       ## tiles of depth over which it fades to near-black
+const MAX_DARK: float = 0.93                        ## deepest shadow alpha (a hint of ambient remains)
+const SHADOW_COLOR := Color(0.02, 0.025, 0.05)      ## the cool dark the underworld fades toward
+const LAMP_COLOR := Color(1.0, 0.92, 0.70)          ## the miner's warm head-lamp
+const LAMP_RADIUS: float = CELL * 4.7
+
 var sim: FactorySim
 var _player: Player
 var _camera: Camera2D
@@ -52,6 +62,11 @@ var _anim_time: float = 0.0
 ## The renderer maps a cell's material id to its appearance through this; the sim/generator only ever
 ## deal in ids. Loaded from src/data/materials/*.tres (see docs/WORLDGEN.md).
 var _materials: Dictionary = {}
+## The two lighting canvases (darkness veil + additive light pools) and the textures they paint with.
+var _dark: LightLayer
+var _lights: LightLayer
+var _glow_tex: GradientTexture2D
+var _dark_tex: GradientTexture2D
 
 
 func _ready() -> void:
@@ -77,6 +92,7 @@ func _ready() -> void:
 	_player = Player.new()
 	_player.sim = sim
 	_player.position = _cell_center(Vector2i(3, 3))  # on the surface, near the forge
+	_player.z_index = 60  # above the light layers (50/51) so the miner stays crisp inside his lamp pool
 	add_child(_player)
 
 	_camera = Camera2D.new()
@@ -115,6 +131,17 @@ func _ready() -> void:
 	layer.add_child(hud)
 	add_child(layer)
 
+	# Lighting: two world-space canvases above the world draw — a darkness veil, then additive light
+	# pools on top. Built last so they sit over the terrain/machines/body (z_index 50/51 > the world's 0).
+	_glow_tex = _make_glow_texture()
+	_dark_tex = _make_dark_texture()
+	_dark = LightLayer.new()
+	_dark.setup(50, false, _paint_darkness)
+	add_child(_dark)
+	_lights = LightLayer.new()
+	_lights.setup(51, true, _paint_lights)
+	add_child(_lights)
+
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
@@ -139,6 +166,9 @@ func _process(delta: float) -> void:
 		_collect_ground_under_player()
 	_update_mining(delta)
 	queue_redraw()
+	if _lights != null:
+		_lights.queue_redraw()   # the lamp follows the body + machines shimmer → repaint every frame
+		_dark.queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -479,6 +509,79 @@ func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
 		if sim.machine_at(Vector2i(col, row)) != null:
 			return float(row * CELL)
 	return stub_from + float(CELL) * 0.9
+
+
+# --- Lighting passes (painted by the LightLayer children; pure visuals) ----------------------------
+
+## The DARKNESS veil: clear at/above the daylight line, fading smoothly down to near-black deep below
+## (a vertical gradient texture, no per-cell banding), then solid shadow to the world floor.
+func _paint_darkness(layer: LightLayer) -> void:
+	var w: float = WORLD_SIZE.x
+	var top: float = float(SURFACE_LINE) * float(CELL)
+	var fade_h: float = DARK_SPAN * float(CELL)
+	layer.draw_texture_rect(_dark_tex, Rect2(0.0, top, w, fade_h), false)
+	var below: float = top + fade_h
+	layer.draw_rect(Rect2(0.0, below, w, WORLD_SIZE.y - below),
+		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK))
+
+
+## The additive LIGHT pools that punch back through the veil: the miner's warm head-lamp (pushed toward
+## the way he faces) plus a soft glow per machine (the forge warmest, the lift teal — echoing its shimmer).
+func _paint_lights(layer: LightLayer) -> void:
+	if _player != null:
+		var f: float = float(_player.facing)
+		_draw_glow(layer, _player.position + Vector2(f * float(CELL) * 0.7, -float(CELL) * 0.2),
+			LAMP_RADIUS, LAMP_COLOR, 0.8)
+		_draw_glow(layer, _player.position, float(CELL) * 1.6, LAMP_COLOR, 0.22)  # close body glow
+	for machine: MachineState in sim.machines:
+		var kind: String = _machine_kind(machine.def)
+		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
+		if kind == "lift":
+			col = Color(0.5, 1.0, 0.92)                    # lift teal (echoes the updraft motes)
+		elif kind != "furnace":
+			col = Color(0.55, 0.82, 0.98)                  # cool machine glow
+		# Producing machines pulse a touch brighter (a sign of life), driven by the cosmetic clock.
+		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))
+		_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+
+
+## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
+func _draw_glow(layer: LightLayer, center: Vector2, radius: float, color: Color, intensity: float) -> void:
+	var tint := Color(color.r, color.g, color.b, intensity)
+	layer.draw_texture_rect(_glow_tex, Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0),
+		false, tint)
+
+
+## A 128² radial gradient (bright centre → transparent edge, soft curve) reused for every light pool.
+func _make_glow_texture() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.28), Color(1, 1, 1, 0.0)])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.width = 128
+	t.height = 128
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	return t
+
+
+## A vertical gradient (transparent → deep shadow) stretched over the depth-fade band of the darkness veil.
+func _make_dark_texture() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 1.0])
+	g.colors = PackedColorArray([
+		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, 0.0),
+		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK)])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.width = 4
+	t.height = 64
+	t.fill = GradientTexture2D.FILL_LINEAR
+	t.fill_from = Vector2(0.0, 0.0)
+	t.fill_to = Vector2(0.0, 1.0)
+	return t
 
 
 ## Resting product piles on the floor (sim.ground) — what a machine has spat out, waiting to be

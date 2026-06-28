@@ -212,9 +212,10 @@ func _draw() -> void:
 	var skin := Color(0.84, 0.66, 0.50)
 	var helmet := Color(0.95, 0.78, 0.22)
 
-	# Dark silhouette backing (1px halo) so the body pops against terrain/back-wall.
-	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0),
-		Color(0.04, 0.04, 0.06))
+	# (No hard silhouette plate: the head-lamp pool now provides the contrast — a backing rect read as
+	# a hard box fighting the soft lighting. A subtle 1px dark outline keeps edges crisp without a plate.)
+	var outline := Color(0.03, 0.03, 0.05, 0.5)
+	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0), outline, false, 1.0)
 
 	# Legs + boots.
 	draw_rect(Rect2(-5.0, 5.0, 4.0, 8.0), legs)
