@@ -211,6 +211,23 @@ func deposit(cell: Vector2i, item: StringName, count: int) -> int:
 	return moved
 
 
+## Player action: DROP items from the pack into a column — gravity is the conveyor, so you don't
+## "insert" into a machine, you let go and it FALLS. Reuses _column_landing: the dropped items cascade
+## straight down `cell`'s column from the player's row and land in the first machine below (feeding its
+## input), else on the first floor as a ground pile (re-collectable), else the void sink. Returns how
+## many dropped. Conservation holds: items only MOVE pack→(machine|ground|sink), none made or destroyed.
+func drop_item(cell: Vector2i, item: StringName, count: int) -> int:
+	var have: int = int(inventory.get(item, 0))
+	var n: int = mini(have, count)
+	if n <= 0:
+		return 0
+	_take_from_pack(item, n)
+	var dest: Dictionary = _column_landing(cell.x, cell.y)
+	dest["target"][item] = int(dest["target"].get(item, 0)) + n
+	flow_events.append({"item": item, "from": cell, "to": dest["to_cell"], "count": n})
+	return n
+
+
 ## Player action: CRAFT one machine item into the pack, spending its `craft_cost` from inventory.
 ## Returns true if crafted. Spent items are counted as consumed so conservation holds (crafting is
 ## a real ingot sink). The machine item (keyed by def.id) lives in the same pack as ore/ingots.

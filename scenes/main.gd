@@ -8,9 +8,10 @@ extends Node2D
 ## WorldRenderer is the VIEW (it reads the sim + the aim state we push it each frame); FallingItems is
 ## the cosmetic drop layer. Delete the view/player and the production numbers are identical.
 ##
-## The loop you drive: DIG solid earth (LMB, reach-limited) → mine ore veins into your pack → hand-feed
-## a Processor "forge" → craft machines from ingots (1/2/3) → BUILD the chain (RMB place / pick-up) →
-## the Lift hauls goods + you UP. See docs/ for the design; combat/worldgen/power are still ahead.
+## The loop you drive: DIG solid earth (LMB, reach-limited) → mine ore veins into your pack → DROP ore
+## (Q) above a Processor "forge" so gravity feeds it in → craft machines from ingots in the E screen →
+## BUILD the chain (RMB place / pick-up) → the Lift hauls goods + you UP. Controls: 1–8 select, wheel
+## cycles, Q drop, E crafting, M map, H help. See docs/; combat/worldgen/power are still ahead.
 ##
 ## DESIGN-OPEN (placeholder): world size/layout, camera feel, the body's look, mining feel/reach, all
 ## numbers, art style — collected for PLAYTEST_NOTES once felt.
@@ -31,6 +32,11 @@ var _camera: Camera2D
 var _renderer: WorldRenderer       ## the VIEW: all world-space drawing + lighting (we push it aim state)
 var _hud: Hud                      ## screen-space HUD (we push it objectives + the machine inspector)
 var _paused: bool = false
+## On-demand UI state (the calm-screen model): the crafting screen (E), the map (M), and the controls
+## help (H/?) are summoned, not permanent. Pushed to the HUD each frame so it knows what to draw.
+var _crafting_open: bool = false
+var _show_minimap: bool = false
+var _show_help: bool = false
 var _mine_cooldown: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
 ## The machines you can CRAFT (1/2 keys → craft one into the pack, spending ingots). The ore_vent (a
@@ -77,15 +83,12 @@ func _ready() -> void:
 	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
 	_camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	_camera.position_smoothing_enabled = true
-	_camera.position_smoothing_speed = 7.0
-	# Dead-zone (drag margins): the body moves freely inside a centre box; the camera only scrolls once
-	# it pushes the edge — so walking and jumping don't jitter the view. Smoothing eases the catch-up.
-	_camera.drag_horizontal_enabled = true
-	_camera.drag_vertical_enabled = true
-	_camera.drag_left_margin = 0.18
-	_camera.drag_right_margin = 0.18
-	_camera.drag_top_margin = 0.22
-	_camera.drag_bottom_margin = 0.24
+	_camera.position_smoothing_speed = 8.0
+	# CENTERED on the body — no dead-zone. The avatar is the player's anchor and must always be the
+	# focal point; the old drag margins let it drift into a screen corner (and under the HUD), which read
+	# as "I can't find my character". Position smoothing alone eases the follow so motion stays soft.
+	_camera.drag_horizontal_enabled = false
+	_camera.drag_vertical_enabled = false
 	_camera.limit_left = 0
 	_camera.limit_top = 0
 	_camera.limit_right = int(WORLD_SIZE.x)
@@ -194,14 +197,14 @@ func _setup_ambient_motes() -> void:
 	mat.damping_max = 4.0
 	mat.scale_min = 0.5
 	mat.scale_max = 1.7
-	mat.color = Color(1.0, 0.94, 0.82, 0.40)                 # warm dust; the lamp tints it brighter
+	mat.color = Color(1.0, 0.94, 0.82, 0.20)                 # warm dust, faint (was 0.40 — fogged the screen)
 	mat.turbulence_enabled = true                            # organic, swirling drift
 	mat.turbulence_noise_strength = 4.0
 	mat.turbulence_noise_scale = 1.4
 	_motes = GPUParticles2D.new()
 	_motes.process_material = mat
 	_motes.texture = _make_mote_texture()
-	_motes.amount = 130
+	_motes.amount = 55                                       # halved+ : atmosphere, not a snowstorm
 	_motes.lifetime = 7.0
 	_motes.preprocess = 5.0                                  # start with a full field, not an empty screen
 	_motes.z_index = 45
@@ -269,6 +272,9 @@ func _process(delta: float) -> void:
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
 	if _hud != null:
 		_hud.hover_info = _hover_info()
+		_hud.crafting_open = _crafting_open
+		_hud.show_minimap = _show_minimap
+		_hud.show_help = _show_help
 		if _player != null:
 			_hud.minimap_focus = _player.position
 			_hud.minimap_view = Vector2(Hud.CANVAS) / CAMERA_ZOOM  # world area the camera shows
@@ -296,16 +302,35 @@ func _update_juice(delta: float) -> void:
 		_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) if _shake > 0.05 else Vector2.ZERO
 
 
+## Terraria/Minecraft-convention controls: 1–8 SELECT hotbar slots (not craft), E opens the crafting
+## SCREEN (where the numbers craft), the mouse wheel cycles the hotbar, M toggles the map, H the help.
+## Feeding a machine is automatic (walk up to it) — see _auto_feed — so E is free for the inventory.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key := event as InputEventKey
 		if key.pressed and not key.echo:
-			if key.keycode == KEY_P:
-				_paused = not _paused
-			elif key.keycode == KEY_E:
-				try_deposit()
-			elif key.keycode >= KEY_1 and key.keycode < KEY_1 + _craftable.size():
-				try_craft(_craftable[key.keycode - KEY_1])  # 1/2 craft a machine item into the pack
+			match key.keycode:
+				KEY_P:
+					_paused = not _paused
+				KEY_E:
+					_crafting_open = not _crafting_open
+				KEY_Q:
+					try_drop()                          # drop the selected stack — gravity feeds it in
+				KEY_M:
+					_show_minimap = not _show_minimap
+				KEY_H, KEY_SLASH:
+					_show_help = not _show_help
+				KEY_ESCAPE:
+					_crafting_open = false
+					_show_help = false
+				_:
+					if key.keycode >= KEY_1 and key.keycode <= KEY_9:
+						var idx: int = key.keycode - KEY_1
+						if _crafting_open:
+							if idx < _craftable.size():
+								try_craft(_craftable[idx])  # in the crafting screen, numbers CRAFT
+						else:
+							_select_slot(idx)               # otherwise they SELECT the hotbar slot
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
@@ -393,6 +418,32 @@ func _cycle_inventory(dir: int) -> void:
 		_inv_selected = 0
 		return
 	_inv_selected = (_inv_selected + dir + n) % n
+
+
+## Select hotbar slot `idx` directly (the number keys 1–8). No-op past the last carried item, so an
+## empty slot can't become the active selection.
+func _select_slot(idx: int) -> void:
+	if idx < sim.inventory_slots().size():
+		_inv_selected = idx
+
+
+## DROP the selected stack (Q): gravity is the conveyor, so feeding is DROPPING — you don't insert into
+## a machine, you let go above its column and it falls in (or onto the floor). Drops at the body's own
+## cell; the sim cascades it down via drop_item. Returns whether anything fell.
+func try_drop() -> bool:
+	if _player == null:
+		return false
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return false
+	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
+	var item: StringName = slots[sel]["item"]
+	var carried: int = int(slots[sel]["count"])
+	var cell: Vector2i = _cell_at(_player.position)
+	var dropped: int = sim.drop_item(cell, item, carried)
+	if dropped > 0:
+		_particles.pop(_cell_center(cell), Visuals.item_color(item))
+	return dropped > 0
 
 
 ## RMB build verb: standing in reach of `cell`, place the selected machine on an open cell, or pick one

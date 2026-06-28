@@ -127,18 +127,20 @@ func _goal_build_a_machine() -> bool:
 		"agent placed a processor at %s and it's there" % target)
 
 
-## The body walks to the forge, hand-feeds it ore, and the forge smelts an ingot — the manual feed loop.
+## The body carries ore over the forge's column and DROPS it (Q) — gravity feeds it in — and the forge
+## smelts an ingot. The embodied gravity-feed loop: you don't deposit, you drop above it and it falls in.
 func _goal_feed_and_smelt() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ore", 3)
 	await agent.select_item(&"ore")
 	var forged_before: int = int(agent.sim.total_produced.get(&"ingot", 0))
-	var deposited: bool = await agent.deposit_selected()
+	var over: bool = await agent.walk_to_column(agent.sim.machines[0].cell.x)  # stand over the forge column
+	var dropped: bool = agent.main.try_drop()                                   # let go — gravity feeds it
 	for _i: int in 120:                      # let the forge run a few production cycles
 		await physics_frame
 	var forged: int = int(agent.sim.total_produced.get(&"ingot", 0)) - forged_before
-	return await _finish(agent, deposited and forged >= 1,
-		"agent fed the forge ore and it smelted an ingot (forged %d)" % forged)
+	return await _finish(agent, over and dropped and forged >= 1,
+		"agent dropped ore over the forge column; it fed and smelted an ingot (forged %d)" % forged)
 
 
 # --- scaffolding ----------------------------------------------------------------------------------

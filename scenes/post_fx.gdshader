@@ -6,11 +6,11 @@ shader_type canvas_item;
 // so the world gets the lens treatment and the UI stays crisp. Reads the composited screen so far.
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
-uniform float vignette_strength : hint_range(0.0, 1.0) = 0.34;  // how dark the corners go
-uniform float vignette_inner : hint_range(0.0, 1.0) = 0.42;     // radius where darkening starts
-uniform float vignette_outer : hint_range(0.0, 1.5) = 0.92;     // radius of full darkening
-uniform float grain_amount : hint_range(0.0, 0.2) = 0.030;      // film-grain intensity
-uniform float aberration : hint_range(0.0, 0.01) = 0.0011;      // edge colour-fringe amount
+uniform float vignette_strength : hint_range(0.0, 1.0) = 0.22;  // how dark the corners go (dialed back)
+uniform float vignette_inner : hint_range(0.0, 1.0) = 0.48;     // radius where darkening starts
+uniform float vignette_outer : hint_range(0.0, 1.5) = 0.98;     // radius of full darkening
+uniform float grain_amount : hint_range(0.0, 0.2) = 0.014;      // film-grain intensity (was 0.030 — too busy)
+uniform float aberration : hint_range(0.0, 0.01) = 0.0007;      // edge colour-fringe amount
 uniform float time_scale = 24.0;                                // grain re-seed speed
 
 // Cheap hash noise for the grain (no texture needed).

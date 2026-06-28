@@ -44,26 +44,32 @@ var _minimap_tex: ImageTexture
 var _minimap_solid_count: int = -1
 const CELL: float = 32.0
 
+## On-demand overlays (pushed by MainView each frame). The screen is calm by default: only the hotbar,
+## a small FORGED chip, and the current-objective line are permanent. The crafting screen (E), the map
+## (M), and the controls help (H/?) are summoned, so they never clutter the playfield.
+var crafting_open: bool = false
+var show_minimap: bool = false
+var show_help: bool = false
+
 
 func _process(_delta: float) -> void:
 	queue_redraw()
 
 
 func _draw() -> void:
-	_draw_forged()      # top-right production chip
-	_draw_objectives()  # the tutorial chain, top-left — the "how do I play?" signpost
-	_draw_hover()       # inspector for the machine under the cursor (recipe / I/O / holding)
-	_draw_minimap()     # top-right world map — where you are, your machines, the dug shafts
-	_draw_pack_backing()  # one framed panel uniting the craft strip + hotbar (the "pack")
-	_draw_craft()       # crafting row, sits just above the hotbar (Factorio-like)
-	_draw_inventory()
-	# Controls footer — a slim framed strip matching the panel skin.
-	var footer := Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0)
-	draw_rect(footer, UI_BG)
-	draw_line(footer.position, footer.position + Vector2(CANVAS.x, 0.0), UI_EDGE, 1.0)
-	draw_string(_font, Vector2(10, CANVAS.y - 8),
-		"move A/D   jump SPACE   mine LMB   wheel pick   craft 1/2/3   place RMB   deposit E   pause P",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	# --- always on (minimal): the anchor furniture only ---
+	_draw_forged()         # top-right production chip (small)
+	_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
+	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
+	_draw_inventory()      # bottom-centre hotbar
+	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
+	# --- on demand (summoned, so they never clutter) ---
+	if show_minimap:
+		_draw_minimap()    # M — top-right world map
+	if crafting_open:
+		_draw_crafting_overlay()  # E — the crafting screen (off the hotbar, table-style)
+	if show_help:
+		_draw_help_overlay()      # H / ? — the full controls list
 	if paused_getter.is_valid() and bool(paused_getter.call()):
 		var p := Rect2(CANVAS.x * 0.5 - 52.0, 8.0, 104.0, 26.0)
 		_panel(p, true)
@@ -91,69 +97,35 @@ func _draw_forged() -> void:
 	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
 
 
-## A single framed panel behind the craft strip + hotbar so they read as one "pack" unit (not two
-## floating rows). Sized to the wider of the two; the content draws on top, unchanged.
-func _draw_pack_backing() -> void:
-	var n: int = FactorySim.INVENTORY_SLOTS
-	var hot_w: float = n * SLOT + (n - 1) * SLOT_GAP
-	var content_w: float = maxf(hot_w, _craft_width())
-	var pad: float = 12.0
-	var top: float = CANVAS.y - 28.0 - SLOT - (28.0 if not craft_options.is_empty() else 6.0)
-	var bottom: float = CANVAS.y - 28.0 + 6.0
-	var rect := Rect2((CANVAS.x - content_w) * 0.5 - pad, top, content_w + pad * 2.0, bottom - top)
-	_panel(rect, true)
-
-
-## The OBJECTIVES panel (top-left) — the signposted path through the loop. The current step is
-## bright with its goal chip; done steps get a green tick and dim out; future steps stay muted. When
-## the whole chain is finished it collapses to a short "all set" line, then auto-hides after a few
-## seconds (the Guide stops nagging). Pure read of the Objectives tracker — no sim mutation.
-func _draw_objectives() -> void:
+## The OBJECTIVE line (top-centre) — ONE line: the current step only, as a gentle nudge, not a wall of
+## text. A small gold dot + the step's how-to label. When the whole chain is done it shows a brief
+## "all set" then auto-hides (the Guide stops nagging). Pure read of the Objectives tracker. Top-centre
+## sits over open sky, so it never buries the avatar (who spawns top-left) the way the old panel did.
+func _draw_objective_line() -> void:
 	if objectives == null:
 		return
-	var cur: int = objectives.current_index()
-	# Finished + lingered long enough → don't draw at all (keep the playfield clean for veterans).
-	if objectives.all_done() and objectives.done_for() > 6.0:
-		return
-	var pad: float = 9.0
-	var line_h: float = 16.0
-	var pos := Vector2(12.0, 12.0)
+	if objectives.all_done() and objectives.done_for() > 5.0:
+		return  # finished + lingered → clear the screen for veterans
+	var text: String
+	var col: Color
 	if objectives.all_done():
-		var w: float = 232.0
-		_panel(Rect2(pos, Vector2(w, 30.0)), true)
-		draw_string(_font, pos + Vector2(pad, 21.0), "✓  All set — keep digging deeper.",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.86, 0.58))
-		return
-	var rows: int = objectives.steps.size()
-	var width: float = 244.0
-	var height: float = 26.0 + float(rows) * line_h + pad
-	_panel(Rect2(pos, Vector2(width, height)), true)
-	draw_string(_font, pos + Vector2(pad, 20.0), "OBJECTIVES",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI_TEXT_DIM)
-	var y: float = pos.y + 26.0 + 12.0
-	for i: int in rows:
-		var step: Dictionary = objectives.steps[i]
-		var done: bool = objectives.is_done(step["id"])
-		var is_cur: bool = i == cur
-		var box := Vector2(pos.x + pad, y - 9.0)
-		# Checkbox: filled green tick when done, bright hollow ring when current, muted dot otherwise.
-		if done:
-			draw_string(_font, box, "✓", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.84, 0.52))
-		elif is_cur:
-			draw_rect(Rect2(box + Vector2(1.0, -9.0), Vector2(9.0, 9.0)), Color(0.96, 0.82, 0.36), false, 1.5)
-		else:
-			draw_rect(Rect2(box + Vector2(2.0, -8.0), Vector2(7.0, 7.0)), Color(0.34, 0.36, 0.42), false, 1.0)
-		var label: String = str(step["label"]) if is_cur else str(step["goal"])
-		var col: Color
-		if done:
-			col = Color(0.50, 0.55, 0.52)        # completed — dim
-		elif is_cur:
-			col = Color(0.97, 0.93, 0.78)        # active — bright
-		else:
-			col = Color(0.55, 0.58, 0.66)        # upcoming — muted
-		draw_string(_font, Vector2(pos.x + pad + 16.0, y), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12 if is_cur else 11, col)
-		y += line_h
+		text = "✓  All set — keep digging deeper."
+		col = Color(0.62, 0.86, 0.58)
+	else:
+		var step: Dictionary = objectives.steps[objectives.current_index()]
+		text = str(step["label"])
+		col = Color(0.97, 0.93, 0.78)
+	var fs: int = 13
+	var tw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var pad: float = 12.0
+	var w: float = tw + pad * 2.0 + 14.0
+	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, 24.0)
+	_panel(rect, true)
+	var cy: float = rect.position.y + rect.size.y * 0.5
+	if not objectives.all_done():
+		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, UI_ACCENT)
+	draw_string(_font, Vector2(rect.position.x + pad + 14.0, cy + 5.0), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
 
 ## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,
@@ -183,8 +155,10 @@ func _draw_hover() -> void:
 	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty())
 	var pad: float = 9.0
 	var line_h: float = 18.0
-	# Sits just below the minimap (same top-right column) so the two never collide.
-	var mini_bottom: float = MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)
+	# Sits below whatever occupies the top-right column: the minimap if it's shown, else just the FORGED
+	# chip — so the inspector never collides and doesn't leave a gap when the map is hidden.
+	var mini_bottom: float = (MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)) \
+		if show_minimap else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_panel(Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0)))
 	var x0: float = origin.x + pad
@@ -286,43 +260,84 @@ func _rebuild_minimap() -> void:
 	_minimap_tex = ImageTexture.create_from_image(img)
 
 
-## The CRAFT strip — 1 Processor (3 ingot)  2 Splitter (2 ingot) — press the number to craft one
-## into the pack. Greyed when unaffordable. Centred just ABOVE the hotbar so crafting reads as part
-## of the pack UI (and the top-left playfield stays clear). Two-pass: measure to centre, then draw.
-func _draw_craft() -> void:
-	if craft_options.is_empty():
-		return
-	var y: float = CANVAS.y - 28.0 - SLOT - 12.0
-	var gap: float = 16.0
-	var segs: Array[String] = ["CRAFT"]
+## The CRAFTING SCREEN (E) — a centred, table-style panel, OFF the hotbar. Dims the world behind it so
+## the player knows they're in a menu, lists each craftable machine as a row (icon · name · cost · the
+## [N] key to make it), greyed when unaffordable. Press the number to craft into the pack; E/Esc closes.
+func _draw_crafting_overlay() -> void:
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))  # dim the world — "you're in a menu"
+	var row_h: float = 30.0
+	var w: float = 280.0
+	var head: float = 34.0
+	var h: float = head + float(craft_options.size()) * row_h + 12.0
+	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
+	_panel(Rect2(origin, Vector2(w, h)), true)
+	draw_string(_font, origin + Vector2(14.0, 23.0), "CRAFTING", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(w - 116.0, 22.0), "E / Esc to close",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	var y: float = origin.y + head
 	for i: int in craft_options.size():
 		var opt: Dictionary = craft_options[i]
-		segs.append("[%d] %s (%s)" % [i + 1, str(opt["name"]), _cost_text(opt["cost"])])
-	var total_w: float = 0.0
-	for s: String in segs:
-		total_w += _font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
-	var x: float = (CANVAS.x - (total_w - gap)) * 0.5
-	draw_string(_font, Vector2(x, y), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
-	x += _font.get_string_size("CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
-	for i: int in craft_options.size():
-		var cost: Dictionary = craft_options[i]["cost"]
-		var label: String = segs[i + 1]
-		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
-			UI_TEXT if _can_afford(cost) else Color(0.42, 0.44, 0.50))
-		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+		var afford: bool = _can_afford(opt["cost"])
+		var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 4.0)
+		draw_rect(rr, UI_SLOT)
+		draw_rect(rr, UI_EDGE, false, 1.0)
+		var icon := Rect2(rr.position + Vector2(6.0, 4.0), Vector2(row_h - 12.0, row_h - 12.0))
+		var id: StringName = _craft_id(i)
+		if machine_icons.has(id):
+			var spr: Texture2D = Art.tex("machine_" + String(id))
+			if spr != null:
+				draw_texture_rect(spr, icon, false)
+			else:
+				draw_rect(icon, machine_icons[id]["color"])
+				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5,
+					str(machine_icons[id]["kind"]), icon.size.y / 20.0, false, 0.0)
+		var tcol: Color = UI_TEXT if afford else Color(0.45, 0.47, 0.53)
+		draw_string(_font, rr.position + Vector2(34.0, 19.0),
+			"[%d]  %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tcol)
+		var cost: String = _cost_text(opt["cost"])
+		var cw: float = _font.get_string_size(cost, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		draw_string(_font, rr.position + Vector2(rr.size.x - cw - 8.0, 19.0), cost,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+		y += row_h
 
 
-## The craft strip's rendered width (CRAFT + each option, gap-separated) — for sizing the pack panel.
-func _craft_width() -> float:
-	if craft_options.is_empty():
-		return 0.0
-	var gap: float = 16.0
-	var total: float = _font.get_string_size("CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
-	for i: int in craft_options.size():
-		var opt: Dictionary = craft_options[i]
-		var seg: String = "[%d] %s (%s)" % [i + 1, str(opt["name"]), _cost_text(opt["cost"])]
-		total += _font.get_string_size(seg, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
-	return total - gap
+## The id of the i-th craftable (its icon key). machine_icons is keyed by id; craft_options is parallel,
+## so the i-th icon key is the i-th machine_icons key in insertion order (both built from _craftable).
+func _craft_id(i: int) -> StringName:
+	var keys: Array = machine_icons.keys()
+	return keys[i] if i < keys.size() else &""
+
+
+## The HELP overlay (H / ?) — the full control list, summoned not stuck on screen. Centred card.
+func _draw_help_overlay() -> void:
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.45))
+	var lines: Array[String] = [
+		"move        A / D  (or ← →)",
+		"jump        SPACE / W",
+		"mine        LMB (hold)",
+		"select      1–8  ·  mouse wheel",
+		"place / pick  RMB",
+		"drop / feed  Q  (gravity feeds it in)",
+		"craft       E  (crafting screen)",
+		"map         M",
+		"pause       P     ·   help   H",
+	]
+	var w: float = 244.0
+	var h: float = 30.0 + float(lines.size()) * 16.0 + 10.0
+	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
+	_panel(Rect2(origin, Vector2(w, h)), true)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	var y: float = origin.y + 38.0
+	for ln: String in lines:
+		draw_string(_font, Vector2(origin.x + 16.0, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
+		y += 16.0
+
+
+## A tiny dim hint, bottom-left — the toggle keys, so the player knows the menus exist without the old
+## always-on keyboard-reference footer hogging the whole bottom edge.
+func _draw_hint() -> void:
+	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "Q drop   ·   E craft   ·   M map   ·   H keys",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 
 
 func _can_afford(cost: Dictionary) -> bool:
@@ -348,6 +363,9 @@ func _draw_inventory() -> void:
 	var total_w: float = n * SLOT + (n - 1) * SLOT_GAP
 	var x0: float = (CANVAS.x - total_w) * 0.5
 	var y: float = CANVAS.y - 28.0 - SLOT
+	# A clean framed backing just for the hotbar (the craft strip that used to share this panel now lives
+	# in the E screen). Keeps the bar reading as one deliberate unit, not floating slots.
+	_panel(Rect2(x0 - 8.0, y - 7.0, total_w + 16.0, SLOT + 14.0), true)
 	for i: int in n:
 		var sx: float = x0 + float(i) * (SLOT + SLOT_GAP)
 		var slot_rect := Rect2(sx, y, SLOT, SLOT)

@@ -22,9 +22,9 @@ var _all_done_time: float = -1.0        ## seconds the chain has been fully comp
 ## condition, shown as the chip). Order IS the tutorial path. Predicates live in `_achieved`.
 var steps: Array[Dictionary] = [
 	{"id": &"mine",  "label": "Dig an ore vein — hold LMB on orange-flecked rock", "goal": "Mine 3 ore"},
-	{"id": &"feed",  "label": "Carry ore to the forge and press E to feed it",     "goal": "Feed the forge"},
+	{"id": &"feed",  "label": "Stand over the forge and press Q to drop ore in",   "goal": "Feed the forge"},
 	{"id": &"forge", "label": "Let the forge smelt your ore into an ingot",        "goal": "Forge 1 ingot"},
-	{"id": &"craft", "label": "Press 1 to craft a Processor from ingots",          "goal": "Craft a machine"},
+	{"id": &"craft", "label": "Press E for the crafting screen, then 1 for a Processor", "goal": "Craft a machine"},
 	{"id": &"build", "label": "Place it with RMB on open ground below",            "goal": "Build a machine"},
 	{"id": &"auto",  "label": "Watch product fall & pile up — walk over to grab it", "goal": "Automate"},
 ]
