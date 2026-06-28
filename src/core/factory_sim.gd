@@ -20,12 +20,16 @@ const GRID_ROWS: int = 20
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
-## Solid terrain cells (cell -> true). The earth the player stands on and (later) digs through.
-## Authoritative world state, like `grid`: placement is blocked in solid cells, and it is mutated
-## ONLY by discrete calls (set_solid / mine) — never as a side effect of the real-time avatar
-## moving — so the sim stays deterministic and serializable. The avatar lives in the
-## representation layer and never enters the tick (see docs/RISKS.md "embodied pivot").
+## Solid terrain cells (cell -> material StringName, e.g. &"earth" / &"ore"). The ground the
+## player stands on and digs through. Authoritative world state, like `grid`: placement is blocked
+## in solid cells, and it is mutated ONLY by discrete calls (set_solid / mine) — never as a side
+## effect of the real-time avatar moving — so the sim stays deterministic and serializable. The
+## avatar lives in the representation layer and never enters the tick (docs/RISKS.md "embodied").
 var solid: Dictionary = {}
+## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
+## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
+## "items present" for conservation.
+var inventory: Dictionary = {}
 ## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
 ## Items that have fallen out the bottom of a column. The prototype's running output total.
@@ -50,29 +54,60 @@ func machine_at(cell: Vector2i) -> MachineState:
 	return grid.get(cell, null)
 
 
-## Is this cell solid earth? (Representation layer reads this for collision; sim mutates it only
+## Is this cell solid (any material)? (Representation reads this for collision; sim mutates it only
 ## via set_solid / mine.)
 func is_solid(cell: Vector2i) -> bool:
-	return solid.get(cell, false)
+	return solid.has(cell)
+
+
+## The material in a cell (&"earth" / &"ore"), or &"" if open. Lets the view tint veins.
+func material_at(cell: Vector2i) -> StringName:
+	return solid.get(cell, &"")
 
 
 ## Seed or clear a terrain cell — used to build the starting world. Discrete edit; in-bounds only.
-func set_solid(cell: Vector2i, value: bool) -> void:
+## Pass &"" to clear, otherwise the material (&"earth" default).
+func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 	if not in_bounds(cell):
 		return
-	if value:
-		solid[cell] = true
-	else:
+	if material == &"":
 		solid.erase(cell)
+	else:
+		solid[cell] = material
 
 
-## Player action: dig out a solid earth cell. Returns true if a cell was actually cleared. (P2·S1b
-## will hook the ore yield onto this; S1a only needs terrain to exist + be queryable.)
-func mine(cell: Vector2i) -> bool:
-	if not solid.get(cell, false):
-		return false
+## Player action: dig out a solid cell. Returns the material mined (&"earth"/&"ore"), or &"" if the
+## cell was already open. Mining an ORE vein yields one ore into the player's pack — and that ore is
+## genuinely produced from the world, so it counts toward total_produced (conservation stays true).
+func mine(cell: Vector2i) -> StringName:
+	if not solid.has(cell):
+		return &""
+	var material: StringName = solid[cell]
 	solid.erase(cell)
-	return true
+	if material == &"ore":
+		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + 1
+		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + 1
+	return material
+
+
+## Player action: hand items from the pack into the machine at `cell` (its input buffer). Returns
+## the number actually deposited (capped by what's carried). The avatar triggers this when standing
+## in reach of a machine — the manual half of the manual→automated arc.
+func deposit(cell: Vector2i, item: StringName, count: int) -> int:
+	var machine: MachineState = grid.get(cell, null)
+	if machine == null or count <= 0:
+		return 0
+	var have: int = int(inventory.get(item, 0))
+	var moved: int = mini(have, count)
+	if moved <= 0:
+		return 0
+	machine.input_buffer[item] = int(machine.input_buffer.get(item, 0)) + moved
+	var left: int = have - moved
+	if left > 0:
+		inventory[item] = left
+	else:
+		inventory.erase(item)
+	return moved
 
 
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /

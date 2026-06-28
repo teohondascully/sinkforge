@@ -18,7 +18,10 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	draw_string(_font, Vector2(10, 22), "OUTPUT   %s" % _buf(sim.sink),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
-	draw_string(_font, Vector2(10, CANVAS.y - 12), "← → / A D  move      SPACE / W  jump      P  pause",
+	draw_string(_font, Vector2(10, 42), "PACK     %s" % _buf(sim.inventory),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.90, 0.66, 0.40))
+	draw_string(_font, Vector2(10, CANVAS.y - 12),
+		"← → / A D  move    SPACE  jump    LMB  mine    E  deposit ore    P  pause",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.75, 0.78, 0.85))
 	if paused_getter.is_valid() and bool(paused_getter.call()):
 		draw_string(_font, Vector2(CANVAS.x - 110, 22), "PAUSED (P)",

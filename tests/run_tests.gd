@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_production()
 	_test_splitter()
 	_test_terrain()
+	_test_mining_and_deposit()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -49,6 +50,7 @@ func _check(condition: bool, label: String) -> void:
 
 func _items_present(sim: FactorySim, item: StringName) -> int:
 	var total: int = int(sim.sink.get(item, 0))
+	total += int(sim.inventory.get(item, 0))  # what the player is carrying counts as present too
 	for machine: MachineState in sim.machines:
 		total += int(machine.input_buffer.get(item, 0))
 		total += int(machine.output_buffer.get(item, 0))
@@ -171,12 +173,40 @@ func _test_terrain() -> void:
 	print("- terrain")
 	var sim: FactorySim = FactorySim.new()
 	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
-	sim.set_solid(Vector2i(3, 3), true)
+	sim.set_solid(Vector2i(3, 3))  # default &"earth"
 	_check(sim.is_solid(Vector2i(3, 3)), "set_solid marks a cell solid")
+	_check(sim.material_at(Vector2i(3, 3)) == &"earth", "default material is earth")
 	_check(not sim.is_solid(Vector2i(4, 3)), "neighbouring cell stays open")
 	_check(sim.place_machine(vent_def, Vector2i(3, 3)) == null, "cannot place a machine in solid earth")
-	_check(sim.mine(Vector2i(3, 3)), "mine clears a solid cell")
+	_check(sim.mine(Vector2i(3, 3)) == &"earth", "mining earth returns the earth material")
 	_check(not sim.is_solid(Vector2i(3, 3)), "mined cell is now open")
 	_check(sim.place_machine(vent_def, Vector2i(3, 3)) != null, "can place after mining out the earth")
-	_check(not sim.mine(Vector2i(5, 5)), "mining a non-solid cell is a no-op")
+	_check(sim.mine(Vector2i(5, 5)) == &"", "mining a non-solid cell yields nothing")
 	_check(not sim.is_solid(Vector2i(-1, 0)), "out-of-bounds is never solid")
+
+
+## Mining an ore vein fills the pack and is conservation-safe; depositing hands it to a machine.
+func _test_mining_and_deposit() -> void:
+	print("- mining + deposit")
+	var sim: FactorySim = FactorySim.new()
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	sim.set_solid(Vector2i(2, 2), &"ore")
+	sim.set_solid(Vector2i(2, 3), &"ore")
+	_check(sim.mine(Vector2i(2, 2)) == &"ore", "mining a vein returns ore")
+	_check(int(sim.inventory.get(&"ore", 0)) == 1, "mined ore goes into the pack")
+	sim.mine(Vector2i(2, 3))
+	_check(int(sim.inventory.get(&"ore", 0)) == 2, "pack accumulates")
+	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "mined ore conserved")
+	# Deposit into a processor and let it smelt — the by-hand loop drives production.
+	var proc: MachineState = sim.place_machine(proc_def, Vector2i(2, 5))
+	_check(sim.deposit(Vector2i(2, 5), &"ore", 2) == 2, "deposited both ore into the processor")
+	_check(sim.inventory.is_empty(), "pack emptied after depositing")
+	_check(int(proc.input_buffer.get(&"ore", 0)) == 2, "processor received the ore")
+	for _i: int in 80:
+		sim.tick()
+	_check(int(sim.sink.get(&"ingot", 0)) == 1, "hand-fed ore forged one ingot")
+	for item: StringName in [&"ore", &"ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved across the by-hand loop (present=%d, net=%d)" % [item, present, net])
+	_check(sim.deposit(Vector2i(2, 5), &"ore", 1) == 0, "cannot deposit ore you don't carry")

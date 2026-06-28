@@ -41,7 +41,7 @@ func _phys() -> void:
 	if _player == null:
 		_player = _main._player
 		_player.auto_input = false
-		_player.position = _main._cell_center(Vector2i(7, 16))  # clear headroom; ground below; left of chute
+		_player.position = _main._cell_center(Vector2i(3, 3))  # on the open surface: clear sky above, earth below
 		_player.velocity = Vector2.ZERO
 		return
 
