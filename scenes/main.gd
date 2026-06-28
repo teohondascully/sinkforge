@@ -26,6 +26,7 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 
 const EARTH_COLOR := Color(0.30, 0.22, 0.16)
 const ORE_COLOR := Color(0.85, 0.55, 0.24)
+const GRASS_COLOR := Color(0.34, 0.47, 0.22)
 
 var sim: FactorySim
 var _player: Player
@@ -63,6 +64,7 @@ func _ready() -> void:
 	add_child(_player)
 
 	_camera = Camera2D.new()
+	_camera.zoom = Vector2(1.0 / 3.0, 1.0 / 3.0)  # ~3× zoomed out — see the world, not a cramped grid
 	_camera.position_smoothing_enabled = true
 	_camera.position_smoothing_speed = 8.0
 	_camera.limit_left = 0
@@ -88,23 +90,37 @@ func _ready() -> void:
 	add_child(layer)
 
 
-## Build the starting world: open sky on top, solid earth below, an output chute under the forge,
-## ore veins to discover by digging, and the lone Processor the player hand-feeds.
+## Build the starting world: open sky on top, an UNDULATING earth surface (so the world reads as
+## hills with smooth slopes, not a flat slab), an output chute under the forge, ore veins to dig,
+## and the lone Processor the player hand-feeds. The spawn/forge region (cols ≤ 8) is kept flat so
+## the motion harness stays valid and the first loop is easy.
 func _seed_world() -> void:
-	for row: int in range(4, FactorySim.GRID_ROWS):
-		for col: int in FactorySim.GRID_COLS:
+	for col: int in FactorySim.GRID_COLS:
+		var top: int = _seed_surface_row(col)
+		for row: int in range(top, FactorySim.GRID_ROWS):
 			sim.set_solid(Vector2i(col, row), &"earth")
-	for row: int in range(4, 6):  # a SHORT chute under the forge (col 6) — spat ingots fall a couple
-		sim.set_solid(Vector2i(6, row), &"")  # cells and land on the row-6 floor, where you collect them
-	# Shallow veins (rows 5-6) are mineable from the surface within reach, so the FIRST loop is
-	# completable by hand today — no ladders yet. Deeper veins are aspiration: getting back up from
-	# them is the friction that will later pull traversal/automation (the manual→automated arc).
-	var shallow: Array = [[8, 5], [9, 5], [8, 6], [11, 5], [12, 5], [12, 6]]
-	var deep: Array = [[3, 9], [4, 9], [10, 12], [11, 12], [15, 7], [16, 7], [8, 16], [9, 16], [9, 17]]
-	for vein: Array in shallow + deep:
-		sim.set_solid(Vector2i(int(vein[0]), int(vein[1])), &"ore")
+	for row: int in range(3, 7):  # a SHORT chute under the forge (col 6) — spat ingots fall a couple
+		sim.set_solid(Vector2i(6, row), &"")  # cells and land on the floor below, where you collect them
+	# Ore veins scattered through the earth (only set where there IS earth, so hills don't float ore).
+	var veins: Array = [
+		[8, 6], [9, 6], [11, 7], [12, 7], [16, 9], [17, 9], [22, 8], [23, 8], [28, 12], [29, 12],
+		[34, 10], [35, 10], [41, 14], [42, 14], [13, 18], [14, 18], [50, 11], [51, 11], [60, 16], [61, 16]]
+	for vein: Array in veins:
+		var cell := Vector2i(int(vein[0]), int(vein[1]))
+		if sim.is_solid(cell):
+			sim.set_solid(cell, &"ore")
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
 	sim.place_machine(processor, Vector2i(6, 3))  # the forge — fed ONLY by ore you dig + deposit
+
+
+## Surface (topmost solid) row for a column. Flat at row 5 across the spawn/forge/measure region
+## (cols ≤ 8); gentle layered-sine hills beyond, so the terrain steps by a tile here and there and
+## those steps render as smooth diagonal slopes.
+func _seed_surface_row(col: int) -> int:
+	if col <= 8:
+		return 5
+	var h: float = 5.0 - 2.2 * sin(float(col) * 0.30) - 1.1 * sin(float(col) * 0.11 + 1.7)
+	return clampi(int(round(h)), 3, 11)
 
 
 func _process(delta: float) -> void:
@@ -264,8 +280,8 @@ func _advance_falling(delta: float) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.07, 0.08, 0.11))  # open air / sky-in-the-dark
+	_draw_grid()  # behind the terrain now, so it only shows in OPEN cells (no grid over solid earth)
 	_draw_terrain()
-	_draw_grid()
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
 	_draw_ground()
@@ -281,9 +297,39 @@ func _draw_terrain() -> void:
 		var pos := Vector2(c) * float(CELL)
 		var is_ore: bool = sim.solid[c] == &"ore"
 		draw_rect(Rect2(pos, Vector2(CELL, CELL)), ORE_COLOR if is_ore else EARTH_COLOR)
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), Color(0.0, 0.0, 0.0, 0.18), false, 1.0)
 		if is_ore:  # a few facets so a vein reads as "valuable", not just a brown tile
 			draw_circle(pos + Vector2(CELL, CELL) * 0.5, 3.5, Color(1.0, 0.85, 0.5))
+	_draw_terrain_surface()  # grass caps + diagonal slope ramps on the exposed surface
+
+
+## A cell is "surface" if it's solid with open space directly above — the exposed top of the ground.
+func _is_surface(c: Vector2i) -> bool:
+	return sim.is_solid(c) and not sim.is_solid(c + Vector2i(0, -1))
+
+
+## Smooth the blocky surface: a flat grass cap on level ground, and a filled diagonal RAMP where the
+## surface steps up by a tile (Terraria-style slope), with a grass edge — so hills read as slopes.
+func _draw_terrain_surface() -> void:
+	for cell: Variant in sim.solid:
+		var c: Vector2i = cell
+		if sim.solid[c] != &"earth" or not _is_surface(c):
+			continue
+		var px := float(c.x * CELL)
+		var py := float(c.y * CELL)
+		var right_up: bool = sim.is_solid(Vector2i(c.x + 1, c.y - 1))
+		var left_up: bool = sim.is_solid(Vector2i(c.x - 1, c.y - 1))
+		if right_up and not left_up:  # ramp rising to the right, filling the air corner above
+			var lo := Vector2(px, py)
+			var hi := Vector2(px + CELL, py - CELL)
+			draw_colored_polygon([lo, Vector2(px + CELL, py), hi], EARTH_COLOR)
+			draw_line(lo, hi, GRASS_COLOR, 3.0)
+		elif left_up and not right_up:  # ramp rising to the left
+			var lo2 := Vector2(px + CELL, py)
+			var hi2 := Vector2(px, py - CELL)
+			draw_colored_polygon([lo2, Vector2(px, py), hi2], EARTH_COLOR)
+			draw_line(lo2, hi2, GRASS_COLOR, 3.0)
+		else:  # flat top: a grass cap
+			draw_rect(Rect2(px, py, float(CELL), 4.0), GRASS_COLOR)
 
 
 ## The cursor cell, drawn by context so digging and building are legible without a god-cursor:
@@ -316,8 +362,9 @@ func _draw_aim() -> void:
 	ghost.a = 0.55
 	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
 	var ok: bool = _placeable(_aim)
-	var border := Color(0.45, 0.95, 0.5, 0.9) if ok else Color(0.95, 0.45, 0.40, 0.9)
-	draw_rect(inner, border, false, 2.0)
+	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
+	var border := Color(0.97, 0.98, 1.0, 0.95) if ok else Color(0.95, 0.45, 0.40, 0.95)
+	draw_rect(inner, border, false, 2.5)
 	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(def.display_name),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.92, 0.97, 0.92, 0.8))
 

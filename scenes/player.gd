@@ -75,14 +75,37 @@ func _step(delta: float) -> void:
 		_coyote = 0.0
 	_jump_request = false
 
+	var grounded: bool = on_floor or _coyote > 0.0
 	position.x += velocity.x * delta
 	_resolve_axis(true)
+	if grounded and input_dir != 0.0 and is_equal_approx(velocity.x, 0.0):
+		_try_step_up()  # walking into a 1-tile rise (a hill/slope) → climb it smoothly, don't stop
 
 	position.y += velocity.y * delta
 	on_floor = false
 	_resolve_axis(false)
 
 	_coyote = COYOTE_TIME if on_floor else _coyote - delta
+
+
+## Auto-climb a SINGLE-tile step in the walk direction (so gentle hills/slopes are smooth to walk,
+## not a staircase you must jump). Only fires when grounded and blocked by a rise that is exactly one
+## tile tall with clear headroom above — a taller rise stays a wall you must jump.
+func _try_step_up() -> void:
+	var dir: float = signf(input_dir)
+	var rect: Rect2 = _aabb()
+	var foot_y: float = rect.end.y - 2.0
+	var ahead_x: float = (rect.end.x + 2.0) if dir > 0.0 else (rect.position.x - 2.0)
+	var step_cell: Vector2i = _cell_of(Vector2(ahead_x, foot_y))
+	if not sim.is_solid(step_cell):
+		return
+	var stand_cell: Vector2i = step_cell + Vector2i(0, -1)  # the body rises into this cell
+	if _blocked(stand_cell):
+		return  # rise is taller than one tile → a real wall, don't auto-climb
+	position.y = float(step_cell.y * CELL) - HEIGHT * 0.5 - 1.0  # feet just ABOVE the step top
+	position.x += dir * 4.0                                      # nudge forward over the edge
+	velocity.y = 0.0
+	_resolve_axis(true)                                         # re-resolve x at the new height
 
 
 ## Push the body out of any blocked cell it now overlaps, along the axis it just moved.

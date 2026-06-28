@@ -12,11 +12,10 @@ extends RefCounted
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
-## Wider than the 640px viewport so the world fills the screen horizontally, and taller than one
-## screen so descending scrolls (embodied pivot, P2·S1a). The world is no longer a single fixed
-## screen of grid.
-const GRID_COLS: int = 20
-const GRID_ROWS: int = 20
+## A larger world so a zoomed-out (3×) camera has real terrain to show and scroll through — hills,
+## depth, room to explore (presentation sprint). Provisional size; real worldgen is still deferred.
+const GRID_COLS: int = 72
+const GRID_ROWS: int = 40
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
