@@ -148,14 +148,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			if key.keycode == KEY_P:
 				_paused = not _paused
 			elif key.keycode == KEY_E:
-				_deposit_into_reach()
+				try_deposit()
 			elif key.keycode >= KEY_1 and key.keycode < KEY_1 + _craftable.size():
-				sim.craft(_craftable[key.keycode - KEY_1])  # 1/2 craft a machine item into the pack
+				try_craft(_craftable[key.keycode - KEY_1])  # 1/2 craft a machine item into the pack
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_RIGHT:
-				_try_build()
+				try_build(_aim)
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 				_cycle_inventory(1)
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -170,25 +170,41 @@ func _update_mining(delta: float) -> void:
 	if _paused:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _mine_cooldown <= 0.0 \
-			and _can_reach(_aim) and sim.is_solid(_aim):
-		sim.mine(_aim)
+			and try_mine(_aim):
 		_mine_cooldown = MINE_TIME
 
 
+## --- Player VERBS (the addressable game surface) --------------------------------------------------
+## The body's world-actions, each reach-gated and boolean (did it happen?). The real input layer above
+## drives them from mouse/keys; the scripted play-harness (tools/play_agent.gd) drives the SAME methods
+## to literally play the game. One verb surface → what a human can do, the test can do, by construction.
+
+## Mine the aimed cell if it's solid and within reach. (Cooldown is input pacing, not part of the verb.)
+func try_mine(cell: Vector2i) -> bool:
+	if _paused or not _can_reach(cell) or not sim.is_solid(cell):
+		return false
+	return sim.mine(cell) != &""
+
+
 ## Hand the SELECTED carried item into the nearest machine within reach (the manual half of the arc).
-func _deposit_into_reach() -> void:
+func try_deposit() -> bool:
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	if slots.is_empty():
-		return
+		return false
 	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
 	var item: StringName = slots[sel]["item"]
 	var carried: int = int(slots[sel]["count"])
 	if carried <= 0:
-		return
+		return false
 	for machine: MachineState in sim.machines:
 		if _can_reach(machine.cell):
-			sim.deposit(machine.cell, item, carried)
-			return
+			return sim.deposit(machine.cell, item, carried) > 0
+	return false
+
+
+## Craft a machine item from carried ingots into the pack (the 1/2/3 hotbar craft).
+func try_craft(def: MachineDef) -> bool:
+	return sim.craft(def)
 
 
 ## Scoop up any resting product pile in a cell the body overlaps — Factorio/Terraria-style "walk
@@ -213,19 +229,19 @@ func _cycle_inventory(dir: int) -> void:
 	_inv_selected = (_inv_selected + dir + n) % n
 
 
-## RMB build verb: standing in reach of the aimed cell, place the selected machine on an open cell,
-## or pick one of your own machines back up. Reach-limited + situated — the embodied replacement for
-## the removed god-cursor palette. Every edit goes through the sim's discrete place/remove API, so
-## the body still only triggers discrete mutations (determinism preserved).
-func _try_build() -> void:
-	if _paused or not _can_reach(_aim):
-		return
-	if sim.machine_at(_aim) != null:
-		sim.pickup_machine(_aim)  # pick your machine back up into the pack
-		return
+## RMB build verb: standing in reach of `cell`, place the selected machine on an open cell, or pick one
+## of your own machines back up. Reach-limited + situated — the embodied replacement for the removed
+## god-cursor palette. Every edit goes through the sim's discrete place/remove API, so the body still
+## only triggers discrete mutations (determinism preserved). Returns whether anything happened.
+func try_build(cell: Vector2i) -> bool:
+	if _paused or not _can_reach(cell):
+		return false
+	if sim.machine_at(cell) != null:
+		return sim.pickup_machine(cell)  # pick your machine back up into the pack
 	var def: MachineDef = _selected_machine_def()
-	if def != null and _placeable(_aim):
-		sim.build_from_pack(def, _aim)
+	if def != null and _placeable(cell):
+		return sim.build_from_pack(def, cell) != null
+	return false
 
 
 ## The machine def for the active hotbar slot, or null if the selected item isn't a placeable
