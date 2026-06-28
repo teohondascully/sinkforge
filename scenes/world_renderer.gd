@@ -184,6 +184,12 @@ func _material(id: StringName) -> MaterialDef:
 	return _materials.get(id, _materials.get(&"earth"))
 
 
+## Public: a material's base colour by id (for the HUD minimap, which has no MaterialDef registry of
+## its own). Decoupled — handed to the HUD as a Callable so it doesn't depend on this node's internals.
+func material_color(id: StringName) -> Color:
+	return _material(id).base_color
+
+
 ## Deterministic in-cell speckle positions (no RNG → determinism-safe): a stable hash of the cell
 ## seeds N points inset from the edges. Used for dirt grain + ore nuggets so terrain reads textured.
 func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:

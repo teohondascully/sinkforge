@@ -118,6 +118,10 @@ func _ready() -> void:
 	_renderer.particles = _particles
 	add_child(_renderer)
 
+	# Hand the HUD minimap a material-colour lookup (the renderer owns the MaterialDef registry) so the
+	# map can paint terrain without the HUD depending on the renderer's internals.
+	hud.minimap_color = _renderer.material_color
+
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
@@ -161,6 +165,9 @@ func _process(delta: float) -> void:
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
 	if _hud != null:
 		_hud.hover_info = _hover_info()
+		if _player != null:
+			_hud.minimap_focus = _player.position
+			_hud.minimap_view = Vector2(Hud.CANVAS) / CAMERA_ZOOM  # world area the camera shows
 
 
 ## Drive the cosmetic juice: advance particles, kick dust on a hard landing + periodic footsteps, and

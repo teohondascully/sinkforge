@@ -7,6 +7,8 @@ extends Node2D
 const CANVAS := Vector2(640, 360)
 const SLOT: float = 30.0        ## inventory hotbar slot size
 const SLOT_GAP: float = 4.0
+const MINI_W: float = 150.0     ## minimap width (top-right); height derives from the world aspect
+const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
@@ -22,6 +24,16 @@ var inv_selected_getter: Callable
 ## When you aim at one of your machines in reach, MainView pushes its inspector info here (name, recipe
 ## in→out, routing mode, what it's holding). Empty = nothing hovered. Drawn top-right under FORGED.
 var hover_info: Dictionary = {}
+## Minimap inputs (pushed by MainView): a material-id → colour lookup (the renderer's, handed over as a
+## Callable so the HUD stays decoupled), the camera focus (player world pos) and the world-space view
+## size, so the minimap can mark "you are here" + the visible window. The terrain image is cached and
+## only rebuilt when you DIG (sim.solid changes), like the skylight veil.
+var minimap_color: Callable
+var minimap_focus: Vector2 = Vector2.ZERO
+var minimap_view: Vector2 = Vector2.ZERO
+var _minimap_tex: ImageTexture
+var _minimap_solid_count: int = -1
+const CELL: float = 32.0
 
 
 func _process(_delta: float) -> void:
@@ -37,6 +49,7 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
 	_draw_objectives()  # the tutorial chain, top-left — the "how do I play?" signpost
 	_draw_hover()       # inspector for the machine under the cursor (recipe / I/O / holding)
+	_draw_minimap()     # bottom-right world map — where you are, your machines, the dug shafts
 	_draw_craft()       # now sits just above the hotbar (crafting next to the pack — Factorio-like)
 	_draw_inventory()
 	draw_rect(Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0), Color(0.07, 0.08, 0.11, 0.9))  # controls backing
@@ -121,7 +134,9 @@ func _draw_hover() -> void:
 	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty())
 	var pad: float = 9.0
 	var line_h: float = 18.0
-	var origin := Vector2(CANVAS.x - width - 12.0, 34.0)
+	# Sits just below the minimap (same top-right column) so the two never collide.
+	var mini_bottom: float = MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)
+	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_panel(Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0)))
 	var x0: float = origin.x + pad
 	var y: float = origin.y + 8.0 + 12.0
@@ -168,6 +183,58 @@ func _arrow(x: float, y: float) -> float:
 func draw_string_pos(x: float, y: float, text: String) -> float:
 	draw_string(_font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.62, 0.66, 0.74))
 	return x + _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 8.0
+
+
+## The MINIMAP (bottom-right): a cached image of the whole world — solid cells in their material
+## colour, carved/dug cells as a dim wall backing, open sky as void — with your machines, YOU, and the
+## visible window overlaid live. The terrain image rebuilds only when you DIG (sim.solid changes), so
+## per-frame cost is one textured blit + a few dots. Navigation legibility for the cave-rich world (#9).
+func _draw_minimap() -> void:
+	if sim == null or not minimap_color.is_valid():
+		return
+	if _minimap_tex == null or sim.solid.size() != _minimap_solid_count:
+		_minimap_solid_count = sim.solid.size()
+		_rebuild_minimap()
+	var cols: float = float(FactorySim.GRID_COLS)
+	var rows: float = float(FactorySim.GRID_ROWS)
+	var mw: float = MINI_W
+	var mh: float = mw * rows / cols
+	var origin := Vector2(CANVAS.x - mw - 12.0, MINI_TOP)
+	var frame := Rect2(origin, Vector2(mw, mh))
+	_panel(Rect2(origin - Vector2(3.0, 3.0), Vector2(mw + 6.0, mh + 6.0)))
+	draw_texture_rect(_minimap_tex, frame, false)
+	var scale := Vector2(mw / cols, mh / rows)
+	var dot := Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0))
+	for m: MachineState in sim.machines:                       # your placed machines
+		draw_rect(Rect2(origin + Vector2(m.cell) * scale, dot), Visuals.machine_color(m.def))
+	if minimap_view.length() > 1.0:                            # the visible window
+		var half: Vector2 = minimap_view * 0.5 / CELL
+		var fc: Vector2 = minimap_focus / CELL
+		var vr := Rect2(origin + (fc - half) * scale, minimap_view / CELL * scale)
+		draw_rect(vr.intersection(frame), Color(1.0, 1.0, 1.0, 0.55), false, 1.0)
+	var you := origin + minimap_focus / CELL * scale           # you-are-here marker
+	draw_rect(Rect2(you - Vector2(2.5, 2.5), Vector2(5.0, 5.0)), Color(0.97, 0.86, 0.36))
+	draw_rect(Rect2(you - Vector2(2.5, 2.5), Vector2(5.0, 5.0)), Color(0.10, 0.08, 0.0), false, 1.0)
+
+
+## Rebuild the cached terrain image: one pixel per cell — solid = material colour, dug-but-walled = a
+## dim wall backing (the carved room), open sky = void. Cheap; runs only when terrain changes.
+func _rebuild_minimap() -> void:
+	var w: int = FactorySim.GRID_COLS
+	var h: int = FactorySim.GRID_ROWS
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for y: int in h:
+		for x: int in w:
+			var cell := Vector2i(x, y)
+			var c: Color
+			if sim.is_solid(cell):
+				c = minimap_color.call(sim.material_at(cell))
+			elif sim.wall_at(cell) != &"":
+				c = (minimap_color.call(sim.wall_at(cell)) as Color).darkened(0.5)
+			else:
+				c = Color(0.09, 0.11, 0.16)
+			img.set_pixel(x, y, c)
+	_minimap_tex = ImageTexture.create_from_image(img)
 
 
 ## The CRAFT strip — 1 Processor (3 ingot)  2 Splitter (2 ingot) — press the number to craft one
