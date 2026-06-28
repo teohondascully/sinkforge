@@ -15,13 +15,20 @@ const CELL: int = 32
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 
-## --- Lighting (the Terraria mood lever): a depth DARKNESS veil + additive warm LIGHT pools ---------
-const SURFACE_LINE: int = 5                         ## daylight row (the flat surface); darkness starts below
-const DARK_SPAN: float = 13.0                       ## tiles of depth over which it fades to near-black
-const MAX_DARK: float = 0.93                        ## deepest shadow alpha (a hint of ambient remains)
-const SHADOW_COLOR := Color(0.02, 0.025, 0.05)      ## the cool dark the underworld fades toward
-const LAMP_COLOR := Color(1.0, 0.92, 0.70)          ## the miner's warm head-lamp
-const LAMP_RADIUS: float = CELL * 4.7
+## --- Lighting (the mood lever) -----------------------------------------------------------------
+## The model is SKYLIGHT + ambient, not a depth gradient: the underground is near-black EVERYWHERE,
+## and daylight only reaches where open air connects it to the sky. Sky floods DOWN each column's open
+## air, attenuating with depth, and is BLOCKED by the first solid rock — so a dug shaft pours daylight
+## down (it follows your digging), the dirt beside it stays dark, and an enclosed cave is pitch black
+## until you bring a lamp. Warm artificial LIGHT pools (head-lamp, forge embers, machine glow) are the
+## only light in the deep — your claimed territory in the black. (Recomputed when terrain changes.)
+const SURFACE_LINE: int = 5                         ## reference daylight row; sky attenuates with depth past it
+const SKY_REACH: int = 10                           ## tiles of open air sunlight reaches before going dark
+const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
+const AMBIENT_DARK: float = 0.965                   ## underground ambient alpha (near-black; the lamp matters)
+const SHADOW_COLOR := Color(0.03, 0.04, 0.075)      ## the cool blue-black the underworld sits in
+const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
+const LAMP_RADIUS: float = CELL * 5.0
 
 var sim: FactorySim
 var player: Player
@@ -40,7 +47,7 @@ var _ghost_def: MachineDef = null
 var _dark: LightLayer
 var _lights: LightLayer
 var _glow_tex: GradientTexture2D
-var _dark_tex: GradientTexture2D
+var _last_solid_count: int = -1                      ## repaint the skylight only when terrain (digging) changes
 
 
 ## Wire the renderer to the session it draws (called once by MainView after the sim + player exist).
@@ -57,16 +64,15 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	]:
 		var def: MaterialDef = load(path)
 		_materials[def.id] = def
-	# Two world-space canvases ABOVE this renderer's draw — a darkness veil, then additive light pools.
+	# Two world-space canvases ABOVE this renderer's draw — the skylight/darkness veil, then light pools.
 	_glow_tex = _make_glow_texture()
-	_dark_tex = _make_dark_texture()
 	_dark = LightLayer.new()
 	_dark.setup(50, false, _paint_darkness)
 	add_child(_dark)
 	_lights = LightLayer.new()
 	_lights.setup(51, true, _paint_lights)
 	add_child(_lights)
-	_dark.queue_redraw()  # the darkness veil is static (depth-only) → paint ONCE, not every frame
+	_dark.queue_redraw()  # the skylight veil changes only when you DIG — repaint on terrain change, not per-frame
 
 
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
@@ -81,7 +87,12 @@ func _process(delta: float) -> void:
 	_anim_time += delta
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
-		_lights.queue_redraw()  # the lamp follows the body + machines shimmer (darkness stays static)
+		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
+	# Skylight depends on terrain: when you DIG (solid count drops), daylight can reach further down a
+	# new shaft — so repaint the static veil then, not every frame.
+	if _dark != null and sim.solid.size() != _last_solid_count:
+		_last_solid_count = sim.solid.size()
+		_dark.queue_redraw()
 
 
 # --- draw sequence (WORLD space; the Camera2D provides the view transform) ----
@@ -358,16 +369,38 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 # --- Lighting passes (painted by the LightLayer children; pure visuals) -------
 
-## The DARKNESS veil: clear at/above the daylight line, fading smoothly down to near-black deep below
-## (a vertical gradient texture, no per-cell banding), then solid shadow to the world floor. Static.
+## The SKYLIGHT veil (per column): daylight floods DOWN each column's open air, attenuating with depth
+## (SKY_REACH) and BLOCKED by the first solid rock — below that it's full underground ambient, plus a
+## couple tiles of shallow scatter just under the exposed surface. So an open/dug shaft is lit down its
+## length, the rock beside it is dark, and an enclosed cave is near-black. Painted only on terrain change.
 func _paint_darkness(layer: LightLayer) -> void:
-	var w: float = WORLD_SIZE.x
-	var top: float = float(SURFACE_LINE) * float(CELL)
-	var fade_h: float = DARK_SPAN * float(CELL)
-	layer.draw_texture_rect(_dark_tex, Rect2(0.0, top, w, fade_h), false)
-	var below: float = top + fade_h
-	layer.draw_rect(Rect2(0.0, below, w, WORLD_SIZE.y - below),
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK))
+	var cell_f: float = float(CELL)
+	for col: int in range(FactorySim.GRID_COLS):
+		var surf: int = sim.surface_row(col)            # first solid going down = where sky is blocked
+		var x: float = float(col) * cell_f
+		var ambient_from: int = surf + SKY_FADE         # below the shallow-scatter band → pure ambient
+		for row: int in range(FactorySim.GRID_ROWS):
+			var a: float = _skylight_alpha(row, surf)
+			if a <= 0.004:
+				continue                                # full daylight — let the world show through
+			if row >= ambient_from:                     # collapse the uniform deep ambient into one rect
+				layer.draw_rect(Rect2(x, float(row) * cell_f, cell_f,
+					float(FactorySim.GRID_ROWS - row) * cell_f),
+					Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, a))
+				break
+			layer.draw_rect(Rect2(x, float(row) * cell_f, cell_f, cell_f),
+				Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, a))
+
+
+## Darkness alpha for one cell, given its column's first-solid row. Open air above the rock is lit by
+## sky (attenuating with absolute depth past SURFACE_LINE); the exposed surface + SKY_FADE tiles below
+## get shallow scatter; everything deeper is full ambient.
+func _skylight_alpha(row: int, surf: int) -> float:
+	var atten: float = clampf(float(row - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0)
+	if row <= surf:
+		return AMBIENT_DARK * atten                     # sky-lit open air / exposed ground, dimming with depth
+	var scatter: float = clampf(float(row - surf) / float(SKY_FADE), 0.0, 1.0)
+	return lerpf(AMBIENT_DARK * atten, AMBIENT_DARK, scatter)
 
 
 ## The additive LIGHT pools that punch back through the veil: the miner's head-lamp + a glow per machine
@@ -375,9 +408,11 @@ func _paint_darkness(layer: LightLayer) -> void:
 func _paint_lights(layer: LightLayer) -> void:
 	if player != null:
 		var f: float = float(player.facing)
+		# A faint flicker so the lamp reads as a live flame, not a static disc.
+		var flick: float = 0.8 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
 		_draw_glow(layer, player.position + Vector2(f * float(CELL) * 0.7, -float(CELL) * 0.2),
-			LAMP_RADIUS, LAMP_COLOR, 0.8)
-		_draw_glow(layer, player.position, float(CELL) * 1.6, LAMP_COLOR, 0.22)  # close body glow
+			LAMP_RADIUS, LAMP_COLOR, flick)
+		_draw_glow(layer, player.position, float(CELL) * 1.7, LAMP_COLOR, 0.24)  # close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
@@ -401,8 +436,9 @@ func _draw_glow(layer: LightLayer, center: Vector2, radius: float, color: Color,
 ## A 128² radial gradient (bright centre → transparent edge, soft curve) reused for every light pool.
 func _make_glow_texture() -> GradientTexture2D:
 	var g := Gradient.new()
+	# Softer core (0.72, not a clipping 0.85) so a pool shows its WARM colour instead of blowing to white.
 	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-	g.colors = PackedColorArray([Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.28), Color(1, 1, 1, 0.0)])
+	g.colors = PackedColorArray([Color(1, 1, 1, 0.72), Color(1, 1, 1, 0.26), Color(1, 1, 1, 0.0)])
 	var t := GradientTexture2D.new()
 	t.gradient = g
 	t.width = 128
@@ -410,21 +446,4 @@ func _make_glow_texture() -> GradientTexture2D:
 	t.fill = GradientTexture2D.FILL_RADIAL
 	t.fill_from = Vector2(0.5, 0.5)
 	t.fill_to = Vector2(1.0, 0.5)
-	return t
-
-
-## A vertical gradient (transparent → deep shadow) stretched over the depth-fade band of the darkness veil.
-func _make_dark_texture() -> GradientTexture2D:
-	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 1.0])
-	g.colors = PackedColorArray([
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, 0.0),
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK)])
-	var t := GradientTexture2D.new()
-	t.gradient = g
-	t.width = 4
-	t.height = 64
-	t.fill = GradientTexture2D.FILL_LINEAR
-	t.fill_from = Vector2(0.0, 0.0)
-	t.fill_to = Vector2(0.0, 1.0)
 	return t

@@ -93,6 +93,14 @@ production state — delete them and the numbers are unchanged):
   drop guides, updrafts, the aim cursor) **and** the lighting passes (owns the `MaterialDef` registry,
   the cosmetic clock, the two `LightLayer` canvases + glow textures). One-way data flow: it derives
   what it can from the sim and reads the pushed aim state; it never reaches back into the controller.
+  - **Lighting model — SKYLIGHT + ambient (not a depth gradient).** The `_dark` LightLayer paints a
+    near-black underground ambient EVERYWHERE, lifted only where open air connects a cell to the sky:
+    daylight floods DOWN each column's open air (`_skylight_alpha`, attenuating with depth via
+    `SKY_REACH`), blocked by the first solid rock (`sim.surface_row`). So a dug shaft pours daylight
+    down (the veil repaints when `sim.solid` changes = you dug), the rock beside it stays dark, and an
+    enclosed cave is near-black until lit. The `_lights` LightLayer (additive) punches warm pools back:
+    the miner's flickering head-lamp, a warm ember per furnace / cool glow per other machine, a glow
+    per falling drop. Warm artificial light vs cold dark = the deliberate vibe.
 - **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: machine kind/colour,
   the scalable animated machine glyph (drawn by both the world + the HUD, so they never drift), item
   colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
