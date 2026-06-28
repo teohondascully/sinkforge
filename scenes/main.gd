@@ -1,22 +1,19 @@
 class_name MainView
 extends Node2D
 
-## Representation + input root for Prototype 2. OWNS a FactorySim (game-session-owns-sim rule,
-## docs/RISKS.md), advances it, draws the WORLD in world-space under a follow Camera2D, hosts the
-## embodied Player, and translates the mouse/keys into the player's WORLD-INTERACTION tools (mining,
-## depositing). It only READS sim production state — terrain/inventory edits go through the sim's
-## discrete API (mine/deposit/set_solid). Falling-item sprites are PURELY COSMETIC. Delete the
-## visuals/player and the production numbers are identical.
+## The CONTROLLER + session root. OWNS a FactorySim (game-session-owns-sim rule, docs/RISKS.md),
+## advances it, hosts the embodied Player + follow Camera2D, and translates mouse/keys into the
+## player's reach-gated WORLD VERBS (try_mine / try_deposit / try_build / try_craft). It only READS
+## sim production state — every edit goes through the sim's discrete API. It does NOT draw: a child
+## WorldRenderer is the VIEW (it reads the sim + the aim state we push it each frame); FallingItems is
+## the cosmetic drop layer. Delete the view/player and the production numbers are identical.
 ##
-## P2·S1a→S3: a body in a world of solid earth you DIG through (LMB, reach-limited); ore veins you
-## mine into your pack; a Processor "forge" you hand-feed; and now you BUILD the chain from inside
-## the world — RMB places a selected machine (Processor/Splitter) on an open cell within reach, or
-## picks one of your machines back up (the embodied replacement for the removed god-cursor palette).
-## NOT here yet: a build economy (machines are free this slice — see DECISIONS), automation of
-## hauling/movement, combat, worldgen.
+## The loop you drive: DIG solid earth (LMB, reach-limited) → mine ore veins into your pack → hand-feed
+## a Processor "forge" → craft machines from ingots (1/2/3) → BUILD the chain (RMB place / pick-up) →
+## the Lift hauls goods + you UP. See docs/ for the design; combat/worldgen/power are still ahead.
 ##
-## DESIGN-OPEN (placeholder, undecided): world size/layout, colours, camera feel, the body's look,
-## mining feel/reach, all numbers, art style. Collected for PLAYTEST_NOTES once felt.
+## DESIGN-OPEN (placeholder): world size/layout, camera feel, the body's look, mining feel/reach, all
+## numbers, art style — collected for PLAYTEST_NOTES once felt.
 
 const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
@@ -25,22 +22,10 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
 
-const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
-
-## --- Lighting (representation-only; the Terraria mood lever) -------------------------------------
-## A depth DARKNESS veil (smooth vertical fade from the daylight line down to near-black) plus additive
-## warm LIGHT pools (the miner's lamp, glowing machines) that punch back through it. All purely visual.
-const SURFACE_LINE: int = 5                         ## daylight row (the flat surface); darkness starts below
-const DARK_SPAN: float = 13.0                       ## tiles of depth over which it fades to near-black
-const MAX_DARK: float = 0.93                        ## deepest shadow alpha (a hint of ambient remains)
-const SHADOW_COLOR := Color(0.02, 0.025, 0.05)      ## the cool dark the underworld fades toward
-const LAMP_COLOR := Color(1.0, 0.92, 0.70)          ## the miner's warm head-lamp
-const LAMP_RADIUS: float = CELL * 4.7
-
 var sim: FactorySim
 var _player: Player
 var _camera: Camera2D
-var _font: Font = ThemeDB.fallback_font
+var _renderer: WorldRenderer       ## the VIEW: all world-space drawing + lighting (we push it aim state)
 var _paused: bool = false
 var _mine_cooldown: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
@@ -55,30 +40,10 @@ var _machine_defs_by_id: Dictionary = {}
 var _inv_selected: int = 0
 ## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
 var _falling := FallingItems.new()
-## Free-running clock for cosmetic animation (the lift updraft shimmer). Never feeds the sim.
-var _anim_time: float = 0.0
-## The MaterialDef registry (id -> MaterialDef): the VISUALISER half of the world-engine handshake.
-## The renderer maps a cell's material id to its appearance through this; the sim/generator only ever
-## deal in ids. Loaded from src/data/materials/*.tres (see docs/WORLDGEN.md).
-var _materials: Dictionary = {}
-## The two lighting canvases (darkness veil + additive light pools) and the textures they paint with.
-var _dark: LightLayer
-var _lights: LightLayer
-var _glow_tex: GradientTexture2D
-var _dark_tex: GradientTexture2D
 
 
 func _ready() -> void:
 	sim = FactorySim.new()
-	for path: String in [
-		"res://src/data/materials/earth.tres",
-		"res://src/data/materials/ore.tres",
-		"res://src/data/materials/stone.tres",
-		"res://src/data/materials/dirt_wall.tres",
-		"res://src/data/materials/stone_wall.tres",
-	]:
-		var def: MaterialDef = load(path)
-		_materials[def.id] = def
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
@@ -130,16 +95,12 @@ func _ready() -> void:
 	layer.add_child(hud)
 	add_child(layer)
 
-	# Lighting: two world-space canvases above the world draw — a darkness veil, then additive light
-	# pools on top. Built last so they sit over the terrain/machines/body (z_index 50/51 > the world's 0).
-	_glow_tex = _make_glow_texture()
-	_dark_tex = _make_dark_texture()
-	_dark = LightLayer.new()
-	_dark.setup(50, false, _paint_darkness)
-	add_child(_dark)
-	_lights = LightLayer.new()
-	_lights.setup(51, true, _paint_lights)
-	add_child(_lights)
+	# The VIEW: a WorldRenderer draws all world-space sim state (terrain, machines, ground, falling
+	# items, lighting). It reads the sim + the aim state we push each frame; it never mutates anything.
+	# Its draw sits at z 0 and its lighting at z 50/51, so the player (z 60) stays crisp on top.
+	_renderer = WorldRenderer.new()
+	_renderer.setup(sim, _falling, _player)
+	add_child(_renderer)
 
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
@@ -157,17 +118,14 @@ func _seed_world() -> void:
 
 
 func _process(delta: float) -> void:
-	_anim_time += delta
 	if not _paused:
 		sim.advance(delta)
 		_falling.spawn_from_events(sim, _cell_center)
 		_falling.advance(delta)
 		_collect_ground_under_player()
-	_update_mining(delta)
-	queue_redraw()
-	if _lights != null:
-		_lights.queue_redraw()   # the lamp follows the body + machines shimmer → repaint every frame
-		_dark.queue_redraw()
+	_update_mining(delta)  # refreshes _aim from the mouse
+	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
+	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -305,355 +263,6 @@ func _can_reach(cell: Vector2i) -> bool:
 	return _player.position.distance_to(_cell_center(cell)) <= REACH_CELLS * float(CELL)
 
 
-# --- drawing (WORLD space; the Camera2D provides the view transform) ----------
-
-func _draw() -> void:
-	_draw_background()  # sky above the surface; dark-dirt BACK WALL behind every dug-out cell + depth
-	_draw_terrain()
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
-	_draw_drop_paths()
-	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
-	_draw_ground()
-	_falling.draw(self)
-	for machine: MachineState in sim.machines:
-		_draw_machine(machine)
-	_draw_aim()
-
-
-func _draw_terrain() -> void:
-	for cell: Variant in sim.solid:
-		var c: Vector2i = cell
-		var pos := Vector2(c) * float(CELL)
-		var def: MaterialDef = _material(sim.solid[c])
-		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
-		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		var col: Color = def.base_color.darkened(depth * def.depth_darken)
-		# Per-cell tonal jitter (deterministic) so a field of earth isn't ONE flat colour — the single
-		# biggest flat-fill tell. A stable hash nudges each cell's value a few percent up or down.
-		var j: float = _cell_jitter(c)
-		col = col.lightened(j) if j > 0.0 else col.darkened(-j)
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
-		if def.grain:
-			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
-			# surface reads as textured rock rather than a colour swatch.
-			var sp: Array[Vector2] = _cell_speckles(c, 3)
-			draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
-			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
-			draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
-		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
-			for nug: Vector2 in _cell_speckles(c, def.nugget_count):
-				draw_circle(pos + nug, 2.0, def.nugget_color)
-				draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
-		_draw_edge_ao(c, pos)  # carved depth: ambient occlusion on faces that border open air
-	_draw_terrain_surface()
-
-
-## A SMOOTH, spatially-coherent value nudge (~[-0.06, +0.06]) — low-frequency sines so neighbouring
-## cells share tone (cloudy patches), NOT a per-cell random that seams at every tile edge (which just
-## rebuilds the grid). Breaks the flat fill into organic light/dark drift. RNG-free → determinism-safe.
-func _cell_jitter(c: Vector2i) -> float:
-	var x: float = float(c.x)
-	var y: float = float(c.y)
-	var n: float = sin(x * 0.37 + y * 0.21) + sin(x * 0.13 - y * 0.41) + sin((x + y) * 0.27)
-	return n / 3.0 * 0.06
-
-
-## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
-## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
-func _draw_edge_ao(c: Vector2i, pos: Vector2) -> void:
-	const STEPS: int = 3
-	for i: int in STEPS:
-		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
-		var sh := Color(0.0, 0.0, 0.0, a)
-		var o: float = float(i) * 2.0
-		var s := 2.0
-		if not sim.is_solid(c + Vector2i(0, -1)):  # top face exposed
-			draw_rect(Rect2(pos.x, pos.y + o, float(CELL), s), sh)
-		if not sim.is_solid(c + Vector2i(0, 1)):   # bottom face exposed (a ceiling from below)
-			draw_rect(Rect2(pos.x, pos.y + float(CELL) - o - s, float(CELL), s), sh)
-		if not sim.is_solid(c + Vector2i(-1, 0)):  # left face exposed
-			draw_rect(Rect2(pos.x + o, pos.y, s, float(CELL)), sh)
-		if not sim.is_solid(c + Vector2i(1, 0)):   # right face exposed
-			draw_rect(Rect2(pos.x + float(CELL) - o - s, pos.y, s, float(CELL)), sh)  # grass caps + diagonal slope ramps on the exposed surface
-
-
-## A cell's MaterialDef via the registry, or a safe fallback so an unknown id still renders.
-func _material(id: StringName) -> MaterialDef:
-	return _materials.get(id, _materials.get(&"earth"))
-
-
-## Deterministic in-cell speckle positions (no RNG → determinism-safe): a stable hash of the cell
-## seeds N points inset from the edges. Used for dirt grain + ore nuggets so terrain reads textured.
-func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
-	var out: Array[Vector2] = []
-	var h: int = (int(c.x) * 73856093) ^ (int(c.y) * 19349663)
-	for _i: int in n:
-		h = (h * 1103515245 + 12345) & 0x7fffffff
-		var fx: float = float(h % 1000) / 1000.0
-		h = (h * 1103515245 + 12345) & 0x7fffffff
-		var fy: float = float(h % 1000) / 1000.0
-		out.append(Vector2(4.0 + fx * float(CELL - 8), 4.0 + fy * float(CELL - 8)))
-	return out
-
-
-## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
-## sim.ramp_dir) so the diagonal we DRAW is exactly the one the avatar WALKS. The ramp GEOMETRY is
-## universal (every material — earth, stone, ore — slopes); only the EDGE PAINT is material-specific:
-## a capped material (grass) gets its bright cap colour, an uncapped one (stone) a subtle lightened lip.
-func _draw_terrain_surface() -> void:
-	for col: int in range(FactorySim.GRID_COLS):
-		var r: int = sim.surface_row(col)
-		if r >= FactorySim.GRID_ROWS:
-			continue  # empty column, no surface
-		var def: MaterialDef = _material(sim.material_at(Vector2i(col, r)))
-		var edge: Color = def.cap_color if def.has_cap() else def.base_color.lightened(0.18)
-		var px := float(col * CELL)
-		var py := float(r * CELL)
-		match sim.ramp_dir(col):
-			1:  # rising to the right — fill the air corner above with a 45° slope
-				var lo := Vector2(px, py)
-				var hi := Vector2(px + CELL, py - CELL)
-				draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
-				draw_line(lo, hi, edge, 3.0)
-			-1:  # rising to the left
-				var lo2 := Vector2(px + CELL, py)
-				var hi2 := Vector2(px, py - CELL)
-				draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
-				draw_line(lo2, hi2, edge, 3.0)
-			_:  # flat top: a capped lip
-				draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
-
-
-## The cursor cell, drawn by context so digging and building are legible without a god-cursor:
-##   solid earth   -> MINE target (white box; faint out of reach)
-##   your machine  -> PICK-UP affordance (red outline; only when in reach)
-##   open cell     -> BUILD ghost of the selected machine within reach (green outline = placeable,
-##                    red = blocked, e.g. your own footing). Out-of-reach open cells draw nothing, so
-##                    the open sky stays uncluttered.
-func _draw_aim() -> void:
-	if not sim.in_bounds(_aim):
-		return
-	var pos := Vector2(_aim) * float(CELL)
-	var in_reach: bool = _can_reach(_aim)
-	if sim.is_solid(_aim):
-		var col := Color(1, 1, 1, 0.85) if in_reach else Color(1, 1, 1, 0.18)
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
-		return
-	if not in_reach:
-		return
-	var inner := Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2))
-	if sim.machine_at(_aim) != null:
-		draw_rect(inner, Color(0.95, 0.45, 0.40, 0.9), false, 2.0)  # pick-up affordance
-		return
-	var def: MachineDef = _selected_machine_def()
-	if def == null:
-		return  # the active hotbar item isn't a placeable machine — nothing to ghost
-	# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own — not only
-	# by its border (4b critique: the dark fill leaned entirely on the green outline to be seen).
-	var ghost: Color = Visuals.machine_color(def).lerp(Color.WHITE, 0.20)
-	ghost.a = 0.55
-	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
-	# PREVIEW the actual silhouette (a still glyph), not a "P".
-	Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(def), 1.0, false, 0.0)
-	var ok: bool = _placeable(_aim)
-	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
-	var border := Color(0.97, 0.98, 1.0, 0.95) if ok else Color(0.95, 0.45, 0.40, 0.95)
-	draw_rect(inner, border, false, 2.5)
-
-
-## Sky + the REAL background WALL layer (sim.wall). Open sky fills the top; each wall cell paints its
-## material colour (depth-darkened) BEHIND the terrain, so a dug-out cell reveals the carved-room
-## backing (a Terraria wall) rather than floating void. Blocks draw on top, so a wall only shows where
-## its block has been mined away — exactly the dug rooms/tunnels.
-func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), SKY_COLOR)
-	for cell_v: Variant in sim.wall:
-		var c: Vector2i = cell_v
-		var def: MaterialDef = _material(sim.wall[c])
-		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)),
-			def.base_color.darkened(depth * def.depth_darken))
-
-
-func _draw_drop_paths() -> void:
-	var guide := Color(0.45, 0.55, 0.68, 0.20)
-	for machine: MachineState in sim.machines:
-		var col: int = machine.cell.x
-		var cx: float = float(col * CELL) + float(CELL) * 0.5
-		var bottom: float = float(machine.cell.y * CELL) + float(CELL)
-		draw_line(Vector2(cx, bottom), Vector2(cx, _guide_end_y(col, machine.cell.y + 1, bottom)), guide, 2.0)
-		if machine.def.behavior == &"splitter" and col + 1 < FactorySim.GRID_COLS:
-			var cy: float = float(machine.cell.y * CELL) + float(CELL) * 0.5
-			var rx: float = float((col + 1) * CELL) + float(CELL) * 0.5
-			draw_line(Vector2(cx, cy), Vector2(rx, cy), guide, 2.0)
-			draw_line(Vector2(rx, cy), Vector2(rx, _guide_end_y(col + 1, machine.cell.y, cy)), guide, 2.0)
-
-
-## Rising shimmer in the open shaft above each lift — teal motes that ascend and fade, so the
-## inverted-gravity column reads at a glance. Purely cosmetic (driven by _anim_time, never the sim).
-func _draw_updrafts() -> void:
-	for machine: MachineState in sim.machines:
-		if machine.def.behavior != &"lift":
-			continue
-		var c: Vector2i = machine.cell
-		var top_row: int = 0  # scan up to the first solid/machine — the top of the open shaft
-		for r: int in range(c.y - 1, -1, -1):
-			if sim.is_solid(Vector2i(c.x, r)) or sim.machine_at(Vector2i(c.x, r)) != null:
-				top_row = r + 1
-				break
-		var top_y: float = float(top_row * CELL)
-		var bot_y: float = float(c.y * CELL)
-		var height: float = bot_y - top_y
-		if height <= 1.0:
-			continue
-		var cx: float = float(c.x * CELL) + float(CELL) * 0.5
-		var motes: int = 6
-		for i: int in motes:
-			var phase: float = fmod(_anim_time * 46.0 + float(i) * height / float(motes), height)
-			var my: float = bot_y - phase                          # rises from the lift up the shaft
-			var mx: float = cx + sin((_anim_time * 2.0 + float(i)) * 1.7) * 7.0
-			var a: float = (1.0 - phase / height) * 0.7            # fade as it climbs
-			draw_circle(Vector2(mx, my), 2.4, Color(0.6, 1.0, 0.92, a))
-
-
-func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
-	for row: int in range(start_row, FactorySim.GRID_ROWS):
-		if sim.machine_at(Vector2i(col, row)) != null:
-			return float(row * CELL)
-	return stub_from + float(CELL) * 0.9
-
-
-# --- Lighting passes (painted by the LightLayer children; pure visuals) ----------------------------
-
-## The DARKNESS veil: clear at/above the daylight line, fading smoothly down to near-black deep below
-## (a vertical gradient texture, no per-cell banding), then solid shadow to the world floor.
-func _paint_darkness(layer: LightLayer) -> void:
-	var w: float = WORLD_SIZE.x
-	var top: float = float(SURFACE_LINE) * float(CELL)
-	var fade_h: float = DARK_SPAN * float(CELL)
-	layer.draw_texture_rect(_dark_tex, Rect2(0.0, top, w, fade_h), false)
-	var below: float = top + fade_h
-	layer.draw_rect(Rect2(0.0, below, w, WORLD_SIZE.y - below),
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK))
-
-
-## The additive LIGHT pools that punch back through the veil: the miner's warm head-lamp (pushed toward
-## the way he faces) plus a soft glow per machine (the forge warmest, the lift teal — echoing its shimmer).
-func _paint_lights(layer: LightLayer) -> void:
-	if _player != null:
-		var f: float = float(_player.facing)
-		_draw_glow(layer, _player.position + Vector2(f * float(CELL) * 0.7, -float(CELL) * 0.2),
-			LAMP_RADIUS, LAMP_COLOR, 0.8)
-		_draw_glow(layer, _player.position, float(CELL) * 1.6, LAMP_COLOR, 0.22)  # close body glow
-	for machine: MachineState in sim.machines:
-		var kind: String = Visuals.machine_kind(machine.def)
-		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
-		if kind == "lift":
-			col = Color(0.5, 1.0, 0.92)                    # lift teal (echoes the updraft motes)
-		elif kind != "furnace":
-			col = Color(0.55, 0.82, 0.98)                  # cool machine glow
-		# Producing machines pulse a touch brighter (a sign of life), driven by the cosmetic clock.
-		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))
-		_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
-	# Each falling product is a LIGHT — a stream of glowing drops pouring down the dark shaft is the
-	# gravity hook made loud. The motes are item-coloured (ore amber, ingot gold), so the flow reads hot.
-	for m: Dictionary in _falling.motes():
-		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
-
-
-## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
-func _draw_glow(layer: LightLayer, center: Vector2, radius: float, color: Color, intensity: float) -> void:
-	var tint := Color(color.r, color.g, color.b, intensity)
-	layer.draw_texture_rect(_glow_tex, Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0),
-		false, tint)
-
-
-## A 128² radial gradient (bright centre → transparent edge, soft curve) reused for every light pool.
-func _make_glow_texture() -> GradientTexture2D:
-	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-	g.colors = PackedColorArray([Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.28), Color(1, 1, 1, 0.0)])
-	var t := GradientTexture2D.new()
-	t.gradient = g
-	t.width = 128
-	t.height = 128
-	t.fill = GradientTexture2D.FILL_RADIAL
-	t.fill_from = Vector2(0.5, 0.5)
-	t.fill_to = Vector2(1.0, 0.5)
-	return t
-
-
-## A vertical gradient (transparent → deep shadow) stretched over the depth-fade band of the darkness veil.
-func _make_dark_texture() -> GradientTexture2D:
-	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 1.0])
-	g.colors = PackedColorArray([
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, 0.0),
-		Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, MAX_DARK)])
-	var t := GradientTexture2D.new()
-	t.gradient = g
-	t.width = 4
-	t.height = 64
-	t.fill = GradientTexture2D.FILL_LINEAR
-	t.fill_from = Vector2(0.0, 0.0)
-	t.fill_to = Vector2(0.0, 1.0)
-	return t
-
-
-## Resting product piles on the floor (sim.ground) — what a machine has spat out, waiting to be
-## walked over and collected. A little stack so a bigger pile reads as "more".
-func _draw_ground() -> void:
-	for cell_v: Variant in sim.ground:
-		var cell: Vector2i = cell_v
-		var pile: Dictionary = sim.ground[cell]
-		var base := Vector2(cell) * float(CELL)
-		var total: int = 0
-		for v: int in pile.values():
-			total += v
-		var shown: int = mini(total, 4)
-		var idx: int = 0
-		for item: StringName in pile:
-			var per: int = mini(int(pile[item]), shown)
-			for _k: int in per:
-				var p := base + Vector2(float(CELL) * 0.5, float(CELL) - 6.0 - float(idx) * 4.5)
-				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
-				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), Visuals.item_color(item))
-				idx += 1
-
-
-## A machine as a CASING + a type silhouette (no more "P 0" debug letters): a glowing furnace for the
-## ore-fed forge/source, a gear for processors, a down+right fork for splitters. Buffered count shows
-## as a small corner badge only when non-zero; the recipe progress bar stays.
-func _draw_machine(machine: MachineState) -> void:
-	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
-	var recipe: RecipeDef = machine.def.recipe
-	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
-	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
-	draw_rect(body, Visuals.machine_color(machine.def))
-	# Riveted casing: darker inset + corner bolts so it reads as a built machine, not a flat tile.
-	draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)
-	for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
-			Vector2(CELL - 4, CELL - 4)]:
-		draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))
-
-	# A machine reads as ALIVE while it's working — it has materials in hand or a cycle in progress.
-	var active: bool = _held(machine) > 0 or machine.progress > 0.0
-	Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, _anim_time)
-
-	var held: int = _held(machine)
-	if held > 0:
-		var badge := Vector2(pos.x + float(CELL) - 12.0, pos.y + 4.0)
-		draw_rect(Rect2(badge, Vector2(10.0, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
-		draw_string(_font, badge + Vector2(1.5, 9.0), str(held),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.97, 0.97, 0.99))
-
-	if recipe != null and recipe.time > 0.0:
-		var bar_y: float = pos.y + float(CELL) - 3.0
-		draw_rect(Rect2(pos.x, bar_y, float(CELL), 3.0), Color(0.0, 0.0, 0.0, 0.35))
-		var frac: float = clampf(machine.progress / recipe.time, 0.0, 1.0)
-		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
-
-
 # --- helpers -----------------------------------------------------------------
 
 func _cell_center(cell: Vector2i) -> Vector2:
@@ -662,12 +271,3 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 func _cell_at(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
-
-
-func _held(machine: MachineState) -> int:
-	var n: int = 0
-	for v: int in machine.input_buffer.values():
-		n += v
-	for v: int in machine.output_buffer.values():
-		n += v
-	return n
