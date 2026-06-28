@@ -4,11 +4,17 @@ extends Node2D
 ## The embodied avatar — P2·S1a. PURELY a representation-layer entity: it reads the sim's world
 ## (is_solid / machine_at) for collision but NEVER enters the deterministic tick and never writes
 ## production state. Delete it and the factory numbers are identical. Movement is a small custom
-## platformer controller with per-axis move-then-resolve AABB collision against the sim's solid
-## cells, the machines, and the world walls/floor (safe from tunnelling at these speeds vs 32px
-## cells; would need substep clamping only under severe frame drops) — plain GDScript so the feel is
-## fully ours to
+## platformer controller with per-axis move-then-resolve AABB collision against the sim's solid cells,
+## the machines, and the world walls/floor (safe from tunnelling at these speeds vs 32px cells; would
+## need substep clamping only under severe frame drops) — plain GDScript so the feel is fully ours to
 ## tune (custom-now, not TileMap; see docs/DECISIONS.md / prompts/prototype-2.md).
+##
+## FLOOR AUTHORITY (the 2026-06 movement-rebuild fix). The heightmap slope-follow (surface_row/ramp_dir)
+## glides smooth 45° ramps but only knows a 1-D per-column surface — it can't see cave floors, dug pits,
+## or machines, so it used to FIGHT the AABB and trap you in a 1-pit. Now it acts ONLY on a genuine
+## rendered ramp (ramp_dir≠0); EVERYWHERE ELSE the AABB is the sole authority via two mirror moves in the
+## resolve: auto STEP-UP a ≤1-tile rise (climb out of a pit, over a machine, up a cave ledge) and
+## floor-SNAP a ≤1-tile descent (hug stairs/slopes without launching). Guarded by tools/check_step.gd.
 ##
 ## DESIGN-OPEN: every number here (speed, gravity, jump, size) is placeholder feel, measured vs
 ## intended by the harness (tools/measure_player.gd) and tuned by taste — see docs/HARNESS.md.
@@ -51,6 +57,8 @@ var _jump_buffer: float = 0.0
 var _was_on_floor: bool = false
 var _squash: float = 0.0             ## 0..1 landing squash, decays — pure visual
 var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / future anim-frame pick
+var _step_grounded: bool = false     ## set per-step: may the horizontal resolve auto-step UP this frame?
+var _stepped: bool = false           ## set BY the resolve when it auto-stepped up onto a ledge this frame
 
 
 func _physics_process(delta: float) -> void:
@@ -107,24 +115,34 @@ func _step(delta: float) -> void:
 		velocity.y = minf(velocity.y, -LIFT_RISE_SPEED)
 		grounded = false
 
-	# Horizontal move, THEN follow the ground slope (lift/lower y in lockstep with x) BEFORE the
-	# horizontal collision resolve — so a single-tile rise is glided up as a 45° ramp rather than
-	# blocking x and teleporting. A taller rise isn't followed, so the resolve blocks it as a wall.
+	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
+	# that trapped you in a dug 1-pit): on a GENUINE rendered ramp (ramp_dir≠0) the heightmap glides the
+	# feet up/down the 45° hypotenuse for a smooth slope; EVERYWHERE ELSE (flat, pits, valleys, caves,
+	# post-dig terrain, machines) the AABB is the sole authority — auto STEP-UP for ≤1-tile rises in the
+	# resolve below, and floor-SNAP for ≤1-tile descents. So slopes stay smooth, and you climb out of a
+	# pit / over a machine instead of wedging against it.
 	position.x += velocity.x * delta
-	var on_ramp: bool = false
-	if grounded and velocity.y >= 0.0:
-		on_ramp = _follow_slope()
+	var glided: bool = false
+	if grounded and velocity.y >= 0.0 and sim.ramp_dir(_cell_of(position).x) != 0:
+		glided = _follow_slope()
+	_step_grounded = grounded          # let the horizontal resolve auto-step ≤1-tile walls when grounded
+	_stepped = false
 	_resolve_axis(true)
 
-	# On a ramp the feet ride a virtual hypotenuse ABOVE the real solid square, so the square resolve
-	# can't see the floor — _follow_slope grounds the body itself. Otherwise integrate gravity normally.
-	if on_ramp:
+	# On a ramp the feet ride a virtual hypotenuse ABOVE the real solid square — _follow_slope grounds
+	# the body itself. An auto step-up likewise just placed the feet ON a ledge (perched on its edge, its
+	# footprint may still hang over the lower cell) — so SKIP this frame's gravity drop too, or the same
+	# frame's fall would yank it straight back down; next frame it walks forward fully onto the ledge.
+	# Otherwise integrate gravity, resolve, then snap down a descending step so the body HUGS the terrain.
+	if glided or _stepped:
 		velocity.y = 0.0
 		on_floor = true
 	else:
 		position.y += velocity.y * delta
 		on_floor = false
 		_resolve_axis(false)
+		if grounded and not on_floor and velocity.y >= 0.0:
+			_snap_to_floor()
 
 	# Landing squash + a one-shot "landed hard" signal for juice, on touching ground after a real fall.
 	if on_floor and not _was_on_floor and impact_v > 240.0:
@@ -201,6 +219,20 @@ func _resolve_axis(horizontal: bool) -> void:
 				var ov_y: float = minf(rect.end.y, cell_rect.end.y) - maxf(rect.position.y, cell_rect.position.y)
 				if ov_x > ov_y:
 					continue          # shallower in Y → a ledge to step/land onto, not a wall to block
+				# A WALL in our path. Before blocking, try to STEP UP onto it — the unified auto-step the
+				# heightmap slope-follow can't give: identical for a dug pit's edge, a cave ledge, and a
+				# placed machine (none are in surface_row/ramp_dir). Only a ≤1-tile rise WITH head
+				# clearance steps; anything taller stays a wall you must jump.
+				if _step_grounded and absf(velocity.x) > 1.0:
+					var lift: float = rect.end.y - cell_rect.position.y  # feet depth below the obstacle top
+					if lift > 0.5 and lift <= MAX_STEP:
+						var lifted := Rect2(rect.position.x, rect.position.y - lift, WIDTH, HEIGHT)
+						if not _aabb_blocked(lifted):
+							position.y -= lift
+							on_floor = true
+							_stepped = true          # tell _step to skip this frame's gravity drop
+							rect = _aabb()
+							continue                 # stepped up; keep the x-move, don't block it
 				# Push out by the penetration depth, away from the cell centre (no snap-to-face teleport).
 				position.x += ov_x if rect.get_center().x > cell_rect.get_center().x else -ov_x
 				velocity.x = 0.0
@@ -224,6 +256,45 @@ func _blocked(cell: Vector2i) -> bool:
 	if cell.y < 0:
 		return false
 	return sim.is_solid(cell) or sim.machine_at(cell) != null
+
+
+## Hug descending terrain WITHOUT the heightmap: after a grounded move that left the body hanging just
+## above a lower step (a 1-tile drop, a descending stair, the lip of a pit), snap the feet down onto the
+## nearest solid within MAX_DROP so walking down reads smooth. A real drop (nothing within range) finds
+## no floor and lets gravity take over. Mirror of the auto step-up; together they replace the heightmap
+## glide on all non-ramp terrain.
+func _snap_to_floor() -> void:
+	var rect: Rect2 = _aabb()
+	var feet: float = rect.end.y
+	var best: float = feet + MAX_DROP + 1.0
+	var col_lo: int = floori((rect.position.x + 1.0) / float(CELL))
+	var col_hi: int = floori((rect.end.x - 1.0) / float(CELL))
+	var row_lo: int = floori(feet / float(CELL))
+	var row_hi: int = floori((feet + MAX_DROP) / float(CELL))
+	for cx: int in range(col_lo, col_hi + 1):
+		for ry: int in range(row_lo, row_hi + 1):
+			if _blocked(Vector2i(cx, ry)):
+				var top: float = float(ry * CELL)
+				if top >= feet - 1.0 and top < best:
+					best = top
+				break                       # first solid going down in this column = its floor
+	if best <= feet + MAX_DROP:
+		position.y += best - feet
+		on_floor = true
+		velocity.y = 0.0
+
+
+## True if any blocked cell overlaps `box` — the head-clearance check that gates an auto step-up (don't
+## step into a space the body won't fit, so a 2-tile wall or a low ceiling stays an honest wall).
+func _aabb_blocked(box: Rect2) -> bool:
+	var lo: Vector2i = _cell_of(box.position)
+	var hi: Vector2i = _cell_of(box.end - Vector2(0.001, 0.001))
+	for cy: int in range(lo.y, hi.y + 1):
+		for cx: int in range(lo.x, hi.x + 1):
+			if _blocked(Vector2i(cx, cy)) \
+					and box.intersects(Rect2(float(cx * CELL), float(cy * CELL), float(CELL), float(CELL))):
+				return true
+	return false
 
 
 func _aabb() -> Rect2:
