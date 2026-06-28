@@ -91,6 +91,7 @@ func _ready() -> void:
 	_camera.make_current()
 
 	var layer := CanvasLayer.new()
+	layer.layer = 10  # above the screen-FX lens pass (layer 5) so the HUD stays crisp, un-vignetted
 	var hud := Hud.new()
 	hud.sim = sim
 	hud.paused_getter = func() -> bool: return _paused
@@ -155,6 +156,19 @@ func _setup_post_fx() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
+
+	# The screen-space LENS pass — vignette + film grain + a whisper of chromatic aberration, on a
+	# full-screen ColorRect on a CanvasLayer BELOW the HUD (layer 5 < HUD's 10), so the WORLD gets the
+	# lens and the UI stays crisp. Reads the composited screen; sits under the WorldEnvironment glow.
+	var fx_layer := CanvasLayer.new()
+	fx_layer.layer = 5
+	var lens := ColorRect.new()
+	lens.material = ShaderMaterial.new()
+	(lens.material as ShaderMaterial).shader = load("res://scenes/post_fx.gdshader")
+	lens.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_layer.add_child(lens)
+	add_child(fx_layer)
 
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
