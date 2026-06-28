@@ -62,6 +62,7 @@ var _motes: GPUParticles2D
 
 
 func _ready() -> void:
+	Controls.register()    # register the remappable InputMap actions (foundation for a settings page)
 	sim = FactorySim.new()
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),
@@ -302,44 +303,39 @@ func _update_juice(delta: float) -> void:
 		_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) if _shake > 0.05 else Vector2.ZERO
 
 
-## Terraria/Minecraft-convention controls: 1–8 SELECT hotbar slots (not craft), E opens the crafting
-## SCREEN (where the numbers craft), the mouse wheel cycles the hotbar, M toggles the map, H the help.
-## Feeding a machine is automatic (walk up to it) — see _auto_feed — so E is free for the inventory.
+## Terraria/Minecraft-convention controls, all via REMAPPABLE InputMap actions (see Controls): 1–8
+## SELECT hotbar slots (not craft), E opens the crafting SCREEN (where the numbers craft), the wheel
+## cycles the hotbar, Q drops the selected stack (gravity feeds it in), M map, H help. Feeding is DROP,
+## not deposit — so E is free for the crafting screen. The numeric row stays a direct keycode (a fixed
+## convention); every other binding routes through Controls so a settings page can rebind it.
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		var key := event as InputEventKey
-		if key.pressed and not key.echo:
-			match key.keycode:
-				KEY_P:
-					_paused = not _paused
-				KEY_E:
-					_crafting_open = not _crafting_open
-				KEY_Q:
-					try_drop()                          # drop the selected stack — gravity feeds it in
-				KEY_M:
-					_show_minimap = not _show_minimap
-				KEY_H, KEY_SLASH:
-					_show_help = not _show_help
-				KEY_ESCAPE:
-					_crafting_open = false
-					_show_help = false
-				_:
-					if key.keycode >= KEY_1 and key.keycode <= KEY_9:
-						var idx: int = key.keycode - KEY_1
-						if _crafting_open:
-							if idx < _craftable.size():
-								try_craft(_craftable[idx])  # in the crafting screen, numbers CRAFT
-						else:
-							_select_slot(idx)               # otherwise they SELECT the hotbar slot
-	elif event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed:
-			if mb.button_index == MOUSE_BUTTON_RIGHT:
-				try_build(_aim)
-			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				_cycle_inventory(1)
-			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-				_cycle_inventory(-1)
+	if event.is_action_pressed(Controls.PAUSE):
+		_paused = not _paused
+	elif event.is_action_pressed(Controls.CRAFT):
+		_crafting_open = not _crafting_open
+	elif event.is_action_pressed(Controls.DROP):
+		try_drop()
+	elif event.is_action_pressed(Controls.MAP):
+		_show_minimap = not _show_minimap
+	elif event.is_action_pressed(Controls.HELP):
+		_show_help = not _show_help
+	elif event.is_action_pressed(Controls.CLOSE):
+		_crafting_open = false
+		_show_help = false
+	elif event.is_action_pressed(Controls.BUILD):
+		try_build(_aim)
+	elif event.is_action_pressed(Controls.CYCLE_NEXT):
+		_cycle_inventory(1)
+	elif event.is_action_pressed(Controls.CYCLE_PREV):
+		_cycle_inventory(-1)
+	elif event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode >= KEY_1 and event.keycode <= KEY_9:
+		var idx: int = event.keycode - KEY_1            # the fixed hotbar number row
+		if _crafting_open:
+			if idx < _craftable.size():
+				try_craft(_craftable[idx])              # in the crafting screen, numbers CRAFT
+		else:
+			_select_slot(idx)                           # otherwise they SELECT the hotbar slot
 
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
@@ -349,7 +345,7 @@ func _update_mining(delta: float) -> void:
 	_aim = _cell_at(get_global_mouse_position())
 	if _paused:
 		return
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _mine_cooldown <= 0.0 \
+	if Input.is_action_pressed(Controls.MINE) and _mine_cooldown <= 0.0 \
 			and try_mine(_aim):
 		_mine_cooldown = MINE_TIME
 

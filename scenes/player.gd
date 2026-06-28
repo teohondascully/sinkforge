@@ -61,13 +61,13 @@ var _step_grounded: bool = false     ## set per-step: may the horizontal resolve
 var _stepped: bool = false           ## set BY the resolve when it auto-stepped up onto a ledge this frame
 
 
+func _ready() -> void:
+	Controls.register()    # so the body works standalone in motion harnesses, not only under MainView
+
+
 func _physics_process(delta: float) -> void:
 	if auto_input:
-		input_dir = 0.0
-		if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D):
-			input_dir += 1.0
-		if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
-			input_dir -= 1.0
+		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
 	_step(delta)
 	queue_redraw()
 
@@ -75,10 +75,8 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not auto_input:
 		return
-	if event is InputEventKey:
-		var key := event as InputEventKey
-		if key.pressed and not key.echo and key.keycode in [KEY_SPACE, KEY_UP, KEY_W]:
-			request_jump()
+	if event.is_action_pressed(Controls.JUMP):
+		request_jump()
 
 
 func request_jump() -> void:
