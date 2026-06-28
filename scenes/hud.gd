@@ -104,46 +104,13 @@ func _draw_inventory() -> void:
 			if machine_icons.has(item):  # a machine item: its casing colour + a mini silhouette
 				var ic: Dictionary = machine_icons[item]
 				draw_rect(icon, ic["color"])
-				_draw_mini_machine(icon, str(ic["kind"]))
+				# Same glyph the world draws (shared Visuals), just scaled down to the chip — never drifts.
+				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
+					icon.size.y / 20.0, false, 0.0)
 			else:
-				draw_rect(icon, _item_color(item))
+				draw_rect(icon, Visuals.item_color(item))
 			draw_string(_font, Vector2(sx + 4.0, y + SLOT - 4.0), str(count),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.97, 0.97, 0.99))
-
-
-## A tiny machine silhouette inside a hotbar icon, matching the in-world icons by kind (gear /
-## fork / furnace) so a carried machine reads as that machine — no debug letters.
-func _draw_mini_machine(rect: Rect2, kind: String) -> void:
-	var c: Vector2 = rect.position + rect.size * 0.5
-	var r: float = rect.size.y * 0.36
-	if kind == "lift":
-		var up := Color(0.85, 1.0, 0.95)
-		for k: int in 2:
-			var oy: float = float(k) * r * 0.8 - r * 0.3
-			draw_line(c + Vector2(-r, oy + r * 0.4), c + Vector2(0.0, oy - r * 0.3), up, 1.5)
-			draw_line(c + Vector2(0.0, oy - r * 0.3), c + Vector2(r, oy + r * 0.4), up, 1.5)
-	elif kind == "fork":
-		var fork := Color(0.96, 0.93, 1.0)
-		draw_line(c + Vector2(0.0, -r), c, fork, 1.5)
-		draw_line(c, c + Vector2(0.0, r), fork, 1.5)
-		draw_line(c, c + Vector2(r, r * 0.6), fork, 1.5)
-	elif kind == "furnace":
-		draw_rect(Rect2(c.x - r, c.y - r * 0.7, r * 2.0, r * 1.5), Color(0.12, 0.08, 0.05))
-		draw_circle(c + Vector2(0.0, r * 0.25), r * 0.45, Color(1.0, 0.6, 0.2))
-	else:  # gear
-		draw_circle(c, r, Color(0.10, 0.13, 0.18))
-		for i: int in 6:
-			var a: float = TAU * float(i) / 6.0
-			draw_circle(c + Vector2(cos(a), sin(a)) * r * 1.15, r * 0.26, Color(0.10, 0.13, 0.18))
-		draw_circle(c, r * 0.4, Color(0.55, 0.78, 0.98))
-
-
-func _item_color(item: StringName) -> Color:
-	if item == &"ore":
-		return Color(0.88, 0.52, 0.24)
-	if item == &"ingot":
-		return Color(0.97, 0.85, 0.42)
-	return Color(0.70, 0.72, 0.78)
 
 
 func _buf(d: Dictionary) -> String:

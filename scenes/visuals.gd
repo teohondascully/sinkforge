@@ -1,0 +1,100 @@
+class_name Visuals
+extends RefCounted
+
+## Shared VISUAL VOCABULARY — the one place that maps game data to its on-screen look, so the world
+## renderer and the HUD never drift apart (they used to each re-draw the same machine glyphs + item
+## colours by hand). Pure presentation helpers: a machine's KIND/COLOUR, its silhouette GLYPH drawn on
+## any canvas at any scale, and an item's COLOUR. No state, no sim writes — static functions only.
+
+# --- machines ----------------------------------------------------------------
+
+## The icon "kind" of a machine: lift / fork (splitter) / furnace (no-input source) / gear (everything).
+static func machine_kind(def: MachineDef) -> String:
+	if def.behavior == &"lift":
+		return "lift"
+	if def.behavior == &"splitter":
+		return "fork"
+	if def.recipe != null and def.recipe.inputs.is_empty():
+		return "furnace"
+	return "gear"
+
+
+## The casing colour of a machine (the riveted body the glyph sits on).
+static func machine_color(def: MachineDef) -> Color:
+	if def.behavior == &"lift":
+		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
+	if def.behavior == &"splitter":
+		return Color(0.58, 0.42, 0.78)
+	var recipe: RecipeDef = def.recipe
+	if recipe != null and recipe.inputs.is_empty():
+		return Color(0.82, 0.45, 0.20)
+	return Color(0.30, 0.55, 0.75)
+
+
+## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,
+## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation — a gear
+## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.
+static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String, s: float,
+		active: bool, t: float) -> void:
+	match kind:
+		"furnace":
+			_furnace(canvas, center, s, active, t)
+		"gear":
+			_gear(canvas, center, s, active, t)
+		"lift":
+			_lift(canvas, center, s, active, t)
+		"fork":
+			_fork(canvas, center, s)
+
+
+## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
+static func _furnace(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	canvas.draw_rect(Rect2(c.x - 8.0 * s, c.y - 9.0 * s, 16.0 * s, 2.5 * s), Color(0.05, 0.05, 0.07))
+	canvas.draw_rect(Rect2(c.x - 6.5 * s, c.y - 4.0 * s, 13.0 * s, 10.0 * s), Color(0.12, 0.08, 0.05))
+	var p: float = (0.78 + 0.22 * sin(t * 6.5)) if active else 0.6
+	var ember := c + Vector2(0.0, 2.5 * s)
+	canvas.draw_circle(ember, 3.4 * s * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
+	canvas.draw_circle(ember, 1.7 * s * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
+
+
+## Gear (processor): a cogged dark disc with a bright hub. ROTATES while running — the "machine is on" read.
+static func _gear(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var gear := Color(0.10, 0.13, 0.18)
+	var spin: float = t * 2.6 if active else 0.0
+	canvas.draw_circle(c, 6.2 * s, gear)
+	for i: int in 8:
+		var a: float = TAU * float(i) / 8.0 + spin
+		canvas.draw_circle(c + Vector2(cos(a), sin(a)) * 6.8 * s, 1.7 * s, gear)
+	var hub := Color(0.55, 0.78, 0.98)
+	canvas.draw_circle(c, 2.6 * s, hub.lightened(0.25) if active else hub)
+
+
+## Lift: stacked UP-chevrons. They MARCH upward while carrying — the goods-go-up read.
+static func _lift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var up := Color(0.85, 1.0, 0.95)
+	var rise: float = (fmod(t * 9.0, 7.0) if active else 0.0) * s
+	for k: int in 2:
+		var oy: float = float(k) * 7.0 * s - 2.0 * s - rise
+		var a: float = 1.0 if not active else clampf(1.0 - (float(k) * 7.0 * s - rise) / (9.0 * s), 0.35, 1.0)
+		var col := Color(up.r, up.g, up.b, a)
+		canvas.draw_line(c + Vector2(-6.0 * s, oy + 4.0 * s), c + Vector2(0.0, oy - 2.0 * s), col, 2.0)
+		canvas.draw_line(c + Vector2(0.0, oy - 2.0 * s), c + Vector2(6.0 * s, oy + 4.0 * s), col, 2.0)
+
+
+## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
+static func _fork(canvas: CanvasItem, c: Vector2, s: float) -> void:
+	var fork := Color(0.93, 0.88, 1.0)
+	canvas.draw_line(c + Vector2(0.0, -6.5 * s), c, fork, 2.0)
+	canvas.draw_line(c, c + Vector2(0.0, 7.0 * s), fork, 2.0)
+	canvas.draw_line(c, c + Vector2(7.0 * s, 4.0 * s), fork, 2.0)
+
+
+# --- items -------------------------------------------------------------------
+
+## The colour of a carried/falling/resting item (ore amber, ingot gold).
+static func item_color(item: StringName) -> Color:
+	if item == &"ore":
+		return Color(0.88, 0.52, 0.24)
+	if item == &"ingot":
+		return Color(0.97, 0.85, 0.42)
+	return Color.WHITE

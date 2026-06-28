@@ -124,7 +124,7 @@ func _ready() -> void:
 	var machine_icons: Dictionary = {}
 	for def: MachineDef in _craftable:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
-		machine_icons[def.id] = {"color": _machine_color(def), "kind": _machine_kind(def)}
+		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def)}
 	hud.craft_options = craft_opts
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
@@ -312,7 +312,7 @@ func _spawn_falling_from_events() -> void:
 	for ev: Dictionary in sim.flow_events:
 		var from: Vector2 = _cell_center(ev["from"])
 		var to: Vector2 = _cell_center(ev["to"])
-		var color: Color = _item_color(ev["item"])
+		var color: Color = Visuals.item_color(ev["item"])
 		var count: int = int(ev["count"])
 		for i: int in count:
 			var jitter := Vector2((float(i) - float(count - 1) * 0.5) * 4.0, 0.0)
@@ -475,10 +475,11 @@ func _draw_aim() -> void:
 		return  # the active hotbar item isn't a placeable machine — nothing to ghost
 	# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own — not only
 	# by its border (4b critique: the dark fill leaned entirely on the green outline to be seen).
-	var ghost: Color = _machine_color(def).lerp(Color.WHITE, 0.20)
+	var ghost: Color = Visuals.machine_color(def).lerp(Color.WHITE, 0.20)
 	ghost.a = 0.55
 	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
-	_draw_machine_icon(pos + Vector2(CELL, CELL) * 0.5, def)  # PREVIEW the actual silhouette, not a "P"
+	# PREVIEW the actual silhouette (a still glyph), not a "P".
+	Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(def), 1.0, false, 0.0)
 	var ok: bool = _placeable(_aim)
 	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
 	var border := Color(0.97, 0.98, 1.0, 0.95) if ok else Color(0.95, 0.45, 0.40, 0.95)
@@ -570,7 +571,7 @@ func _paint_lights(layer: LightLayer) -> void:
 			LAMP_RADIUS, LAMP_COLOR, 0.8)
 		_draw_glow(layer, _player.position, float(CELL) * 1.6, LAMP_COLOR, 0.22)  # close body glow
 	for machine: MachineState in sim.machines:
-		var kind: String = _machine_kind(machine.def)
+		var kind: String = Visuals.machine_kind(machine.def)
 		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
 		if kind == "lift":
 			col = Color(0.5, 1.0, 0.92)                    # lift teal (echoes the updraft motes)
@@ -641,7 +642,7 @@ func _draw_ground() -> void:
 			for _k: int in per:
 				var p := base + Vector2(float(CELL) * 0.5, float(CELL) - 6.0 - float(idx) * 4.5)
 				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
-				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), _item_color(item))
+				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), Visuals.item_color(item))
 				idx += 1
 
 
@@ -691,7 +692,7 @@ func _draw_machine(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
 	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
-	draw_rect(body, _machine_color(machine.def))
+	draw_rect(body, Visuals.machine_color(machine.def))
 	# Riveted casing: darker inset + corner bolts so it reads as a built machine, not a flat tile.
 	draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)
 	for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
@@ -700,7 +701,7 @@ func _draw_machine(machine: MachineState) -> void:
 
 	# A machine reads as ALIVE while it's working — it has materials in hand or a cycle in progress.
 	var active: bool = _held(machine) > 0 or machine.progress > 0.0
-	_draw_machine_icon(center, machine.def, active)
+	Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, _anim_time)
 
 	var held: int = _held(machine)
 	if held > 0:
@@ -716,75 +717,6 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 
-## Dispatch a machine's type silhouette at a cell centre (shared by the world machine, the build
-## ghost, and — in spirit — the hotbar): furnace for the ore-fed source, fork for splitters, gear
-## for everything else. One place so the icon a machine shows is the icon you preview when placing.
-func _draw_machine_icon(center: Vector2, def: MachineDef, active: bool = false) -> void:
-	if def.behavior == &"lift":
-		_draw_lift_icon(center, active)
-	elif def.behavior == &"splitter":
-		_draw_splitter_icon(center)
-	elif def.recipe != null and def.recipe.inputs.is_empty():
-		_draw_furnace_icon(center, active)
-	else:
-		_draw_gear_icon(center, active)
-
-
-## The icon "kind" string for the HUD hotbar, so a carried machine item shows its silhouette too.
-func _machine_kind(def: MachineDef) -> String:
-	if def.behavior == &"lift":
-		return "lift"
-	if def.behavior == &"splitter":
-		return "fork"
-	if def.recipe != null and def.recipe.inputs.is_empty():
-		return "furnace"
-	return "gear"
-
-
-## Furnace (ore source / forge): a dark mouth with a glowing ember core + a lintel cap. While working,
-## the ember BREATHES — pulsing brighter and bigger — so an active forge visibly burns.
-func _draw_furnace_icon(center: Vector2, active: bool) -> void:
-	draw_rect(Rect2(center.x - 8.0, center.y - 9.0, 16.0, 2.5), Color(0.05, 0.05, 0.07))  # lintel
-	draw_rect(Rect2(center.x - 6.5, center.y - 4.0, 13.0, 10.0), Color(0.12, 0.08, 0.05))  # mouth
-	var p: float = (0.78 + 0.22 * sin(_anim_time * 6.5)) if active else 0.6  # breathe when burning, dim when idle
-	var ember := Vector2(0.0, 2.5)
-	draw_circle(center + ember, 3.4 * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
-	draw_circle(center + ember, 1.7 * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
-
-
-## Gear (processor): a cogged dark disc with a bright hub. While working it ROTATES — the unmistakable
-## "this machine is running" read (Factorio's soul) — and the hub brightens; idle, it sits still.
-func _draw_gear_icon(center: Vector2, active: bool) -> void:
-	var gear := Color(0.10, 0.13, 0.18)
-	var spin: float = _anim_time * 2.6 if active else 0.0
-	draw_circle(center, 6.2, gear)
-	for i: int in 8:
-		var a: float = TAU * float(i) / 8.0 + spin
-		draw_circle(center + Vector2(cos(a), sin(a)) * 6.8, 1.7, gear)
-	var hub := Color(0.55, 0.78, 0.98)
-	draw_circle(center, 2.6, hub.lightened(0.25) if active else hub)
-
-
-## Lift: stacked UP-chevrons. While carrying, they CLIMB (cycle upward) — the goods-go-up read.
-func _draw_lift_icon(center: Vector2, active: bool = false) -> void:
-	var up := Color(0.85, 1.0, 0.95)
-	var rise: float = fmod(_anim_time * 9.0, 7.0) if active else 0.0  # chevrons march upward when lifting
-	for k: int in 2:
-		var oy: float = float(k) * 7.0 - 2.0 - rise
-		var a: float = 1.0 if not active else clampf(1.0 - (float(k) * 7.0 - rise) / 9.0, 0.35, 1.0)
-		var col := Color(up.r, up.g, up.b, a)
-		draw_line(center + Vector2(-6.0, oy + 4.0), center + Vector2(0.0, oy - 2.0), col, 2.0)
-		draw_line(center + Vector2(0.0, oy - 2.0), center + Vector2(6.0, oy + 4.0), col, 2.0)
-
-
-## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
-func _draw_splitter_icon(center: Vector2) -> void:
-	var fork := Color(0.93, 0.88, 1.0)
-	draw_line(center + Vector2(0.0, -6.5), center, fork, 2.0)
-	draw_line(center, center + Vector2(0.0, 7.0), fork, 2.0)
-	draw_line(center, center + Vector2(7.0, 4.0), fork, 2.0)
-
-
 # --- helpers -----------------------------------------------------------------
 
 func _cell_center(cell: Vector2i) -> Vector2:
@@ -793,25 +725,6 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 func _cell_at(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
-
-
-func _machine_color(def: MachineDef) -> Color:
-	if def.behavior == &"lift":
-		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
-	if def.behavior == &"splitter":
-		return Color(0.58, 0.42, 0.78)
-	var recipe: RecipeDef = def.recipe
-	if recipe != null and recipe.inputs.is_empty():
-		return Color(0.82, 0.45, 0.20)
-	return Color(0.30, 0.55, 0.75)
-
-
-func _item_color(item: StringName) -> Color:
-	if item == &"ore":
-		return Color(0.88, 0.52, 0.24)
-	if item == &"ingot":
-		return Color(0.97, 0.85, 0.42)
-	return Color.WHITE
 
 
 func _held(machine: MachineState) -> int:
