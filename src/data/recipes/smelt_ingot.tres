@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="RecipeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/recipe_def.gd" id="1_recipe"]
+
+[resource]
+script = ExtResource("1_recipe")
+id = &"smelt_ingot"
+inputs = {
+&"ore": 2
+}
+outputs = {
+&"ingot": 1
+}
+time = 2.0
