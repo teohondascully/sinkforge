@@ -25,9 +25,6 @@ const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
 
-const EARTH_COLOR := Color(0.30, 0.22, 0.16)
-const ORE_COLOR := Color(0.85, 0.55, 0.24)
-const GRASS_COLOR := Color(0.34, 0.47, 0.22)
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 const WALL_COLOR := Color(0.16, 0.12, 0.095)       ## dug-out BACK WALL (dark dirt) behind carved rooms
 const DEEP_TINT := Color(0.0, 0.0, 0.0, 0.05)      ## per-band depth darkening (deeper reads darker)
@@ -50,10 +47,20 @@ var _machine_defs_by_id: Dictionary = {}
 var _inv_selected: int = 0
 ## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
+## The MaterialDef registry (id -> MaterialDef): the VISUALISER half of the world-engine handshake.
+## The renderer maps a cell's material id to its appearance through this; the sim/generator only ever
+## deal in ids. Loaded from src/data/materials/*.tres (see docs/WORLDGEN.md).
+var _materials: Dictionary = {}
 
 
 func _ready() -> void:
 	sim = FactorySim.new()
+	for path: String in [
+		"res://src/data/materials/earth.tres",
+		"res://src/data/materials/ore.tres",
+	]:
+		var def: MaterialDef = load(path)
+		_materials[def.id] = def
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
@@ -308,22 +315,26 @@ func _draw_terrain() -> void:
 	for cell: Variant in sim.solid:
 		var c: Vector2i = cell
 		var pos := Vector2(c) * float(CELL)
+		var def: MaterialDef = _material(sim.solid[c])
 		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		if sim.solid[c] == &"ore":
-			var oc: Color = ORE_COLOR.darkened(depth * 0.22)
-			draw_rect(Rect2(pos, Vector2(CELL, CELL)), oc)
-			for nug: Vector2 in _cell_speckles(c, 3):  # embedded nuggets so a vein reads as valuable
-				draw_circle(pos + nug, 2.4, Color(1.0, 0.86, 0.52))
-		else:
-			var ec: Color = EARTH_COLOR.darkened(depth * 0.38)
-			draw_rect(Rect2(pos, Vector2(CELL, CELL)), ec)
+		var col: Color = def.base_color.darkened(depth * def.depth_darken)
+		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
+		if def.grain:
 			# Dirt grain — a darker pit + a lighter clod, deterministic per cell, so earth isn't a
 			# flat colour fill (the #1 "debug art" tell once the grid is gone).
 			var sp: Array[Vector2] = _cell_speckles(c, 2)
-			draw_rect(Rect2(pos + sp[0] - Vector2(2, 2), Vector2(4, 4)), ec.darkened(0.22))
-			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3, 3)), ec.lightened(0.10))
+			draw_rect(Rect2(pos + sp[0] - Vector2(2, 2), Vector2(4, 4)), col.darkened(0.22))
+			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3, 3)), col.lightened(0.10))
+		if def.has_nuggets():  # embedded specks so a vein reads as valuable
+			for nug: Vector2 in _cell_speckles(c, 3):
+				draw_circle(pos + nug, 2.4, def.nugget_color)
 	_draw_terrain_surface()  # grass caps + diagonal slope ramps on the exposed surface
+
+
+## A cell's MaterialDef via the registry, or a safe fallback so an unknown id still renders.
+func _material(id: StringName) -> MaterialDef:
+	return _materials.get(id, _materials.get(&"earth"))
 
 
 ## Deterministic in-cell speckle positions (no RNG → determinism-safe): a stable hash of the cell
@@ -350,8 +361,10 @@ func _is_surface(c: Vector2i) -> bool:
 func _draw_terrain_surface() -> void:
 	for cell: Variant in sim.solid:
 		var c: Vector2i = cell
-		if sim.solid[c] != &"earth" or not _is_surface(c):
+		var def: MaterialDef = _material(sim.solid[c])
+		if not def.has_cap() or not _is_surface(c):
 			continue
+		var cap: Color = def.cap_color
 		var px := float(c.x * CELL)
 		var py := float(c.y * CELL)
 		var right_up: bool = sim.is_solid(Vector2i(c.x + 1, c.y - 1))
@@ -359,15 +372,15 @@ func _draw_terrain_surface() -> void:
 		if right_up and not left_up:  # ramp rising to the right, filling the air corner above
 			var lo := Vector2(px, py)
 			var hi := Vector2(px + CELL, py - CELL)
-			draw_colored_polygon([lo, Vector2(px + CELL, py), hi], EARTH_COLOR)
-			draw_line(lo, hi, GRASS_COLOR, 3.0)
+			draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
+			draw_line(lo, hi, cap, 3.0)
 		elif left_up and not right_up:  # ramp rising to the left
 			var lo2 := Vector2(px + CELL, py)
 			var hi2 := Vector2(px, py - CELL)
-			draw_colored_polygon([lo2, Vector2(px, py), hi2], EARTH_COLOR)
-			draw_line(lo2, hi2, GRASS_COLOR, 3.0)
+			draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
+			draw_line(lo2, hi2, cap, 3.0)
 		else:  # flat top: a grass cap
-			draw_rect(Rect2(px, py, float(CELL), 4.0), GRASS_COLOR)
+			draw_rect(Rect2(px, py, float(CELL), 4.0), cap)
 
 
 ## The cursor cell, drawn by context so digging and building are legible without a god-cursor:
