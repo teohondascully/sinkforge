@@ -579,6 +579,10 @@ func _paint_lights(layer: LightLayer) -> void:
 		# Producing machines pulse a touch brighter (a sign of life), driven by the cosmetic clock.
 		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))
 		_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+	# Each falling product is a LIGHT — a stream of glowing drops pouring down the dark shaft is the
+	# gravity hook made loud. The motes are item-coloured (ore amber, ingot gold), so the flow reads hot.
+	for f: Dictionary in _falling:
+		_draw_glow(layer, _falling_pos(f), float(CELL) * 1.35, f["color"], 0.6)
 
 
 ## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
@@ -641,6 +645,15 @@ func _draw_ground() -> void:
 				idx += 1
 
 
+## The current world position of a falling item (shared by the draw + its light glow): travel down the
+## column with a small launch-hop so it reads as SPAT OUT, then gravity.
+func _falling_pos(f: Dictionary) -> Vector2:
+	var t: float = clampf(float(f["t"]), 0.0, 1.0)
+	var p: Vector2 = (f["from"] as Vector2).lerp(f["to"], t)
+	p.y -= sin(t * PI) * 10.0
+	return p
+
+
 func _draw_falling() -> void:
 	for f: Dictionary in _falling:
 		var from: Vector2 = f["from"]
@@ -649,20 +662,25 @@ func _draw_falling() -> void:
 		var col: Color = f["color"]
 		# A fading comet-trail behind the item along its path, so the DOWNWARD flow reads as a stream
 		# on the gravity "conveyor" (the core hook), not a lone hopping square.
-		var trail: int = 4
+		var trail: int = 5
 		for i: int in range(trail, 0, -1):
-			var tt: float = clampf(t - float(i) * 0.06, 0.0, 1.0)
+			var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
 			var pp: Vector2 = from.lerp(to, tt)
 			pp.y -= sin(tt * PI) * 10.0
-			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.30
-			var sz: float = 5.0 - float(i) * 0.7
+			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
+			var sz: float = 5.5 - float(i) * 0.6
 			draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
-		# Travel down the column, with a small launch-hop so the item reads as SPAT OUT, then gravity.
-		var p: Vector2 = from.lerp(to, t)
-		p.y -= sin(t * PI) * 10.0
-		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.05, 0.07))
-		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), col)
-		draw_rect(Rect2(p - Vector2(2, 2), Vector2(4, 4)), col.lightened(0.4))  # bright core "pops"
+		var p: Vector2 = _falling_pos(f)
+		# Landing SPARKLE: as it nears its rest, a quick expanding ring + flash where it'll land — sells
+		# the "it arrived and piled up" beat at the bottom of the gravity drop.
+		if t > 0.84:
+			var lt: float = (t - 0.84) / 0.16
+			draw_arc(to, 4.0 + lt * 11.0, 0.0, TAU, 18, Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), 2.0)
+		# A chunky glowing nugget with a vertical motion-smear so it reads as a fast drop, not a square.
+		draw_rect(Rect2(p - Vector2(3.0, 8.0), Vector2(6.0, 16.0)), Color(col.r, col.g, col.b, 0.45))  # smear
+		draw_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0)), Color(0.05, 0.05, 0.07))
+		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), col)
+		draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.5))  # bright core "pops"
 
 
 ## A machine as a CASING + a type silhouette (no more "P 0" debug letters): a glowing furnace for the
