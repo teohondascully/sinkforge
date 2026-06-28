@@ -19,8 +19,9 @@ build/
 .vscode/
 .idea/
 
-# Dev harness — generated screenshots
+# Dev harness — generated screenshots (+ their Godot import sidecars)
 /_capture*.png
+/_capture*.png.import
 _zoom_*.png
 
 # Godot import sidecars for reference screenshots (not game assets) + tool-script UIDs
