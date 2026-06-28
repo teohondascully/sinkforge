@@ -10,6 +10,15 @@ const SLOT_GAP: float = 4.0
 const MINI_W: float = 150.0     ## minimap width (top-right); height derives from the world aspect
 const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 
+## --- UI skin palette (one cohesive theme so the HUD reads as designed, not flat code-drawn) -------
+const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill
+const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
+const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → panels read as raised
+const UI_ACCENT := Color(0.96, 0.82, 0.36)           ## gold accent (FORGED, selected slot, current step)
+const UI_TEXT := Color(0.88, 0.90, 0.95)
+const UI_TEXT_DIM := Color(0.58, 0.62, 0.70)
+const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
+
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
 var paused_getter: Callable
@@ -41,24 +50,58 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	# FORGED counter top-RIGHT: at this zoom the surface (and the forge) sits top-LEFT, so keep that
-	# corner clear of HUD text (the forge-under-HUD legibility fix).
-	var forged: String = "FORGED  %d ingot" % int(sim.total_produced.get(&"ingot", 0))
-	var fw: float = _font.get_string_size(forged, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-	draw_string(_font, Vector2(CANVAS.x - fw - 12.0, 22), forged,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
+	_draw_forged()      # top-right production chip
 	_draw_objectives()  # the tutorial chain, top-left — the "how do I play?" signpost
 	_draw_hover()       # inspector for the machine under the cursor (recipe / I/O / holding)
-	_draw_minimap()     # bottom-right world map — where you are, your machines, the dug shafts
-	_draw_craft()       # now sits just above the hotbar (crafting next to the pack — Factorio-like)
+	_draw_minimap()     # top-right world map — where you are, your machines, the dug shafts
+	_draw_pack_backing()  # one framed panel uniting the craft strip + hotbar (the "pack")
+	_draw_craft()       # crafting row, sits just above the hotbar (Factorio-like)
 	_draw_inventory()
-	draw_rect(Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0), Color(0.07, 0.08, 0.11, 0.9))  # controls backing
-	draw_string(_font, Vector2(10, CANVAS.y - 10),
+	# Controls footer — a slim framed strip matching the panel skin.
+	var footer := Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0)
+	draw_rect(footer, UI_BG)
+	draw_line(footer.position, footer.position + Vector2(CANVAS.x, 0.0), UI_EDGE, 1.0)
+	draw_string(_font, Vector2(10, CANVAS.y - 8),
 		"move A/D   jump SPACE   mine LMB   wheel pick   craft 1/2/3   place RMB   deposit E   pause P",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.75, 0.78, 0.85))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	if paused_getter.is_valid() and bool(paused_getter.call()):
-		draw_string(_font, Vector2(CANVAS.x * 0.5 - 36.0, 22), "PAUSED (P)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.72, 0.30))
+		var p := Rect2(CANVAS.x * 0.5 - 52.0, 8.0, 104.0, 26.0)
+		_panel(p, true)
+		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+
+
+## FORGED production chip (top-right): an ingot swatch + the lifetime ingot count, in a small panel —
+## consistent with the inspector/minimap skin instead of bare floating text.
+func _draw_forged() -> void:
+	var n: int = int(sim.total_produced.get(&"ingot", 0))
+	var count: String = str(n)
+	var label_w: float = _font.get_string_size("FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var count_w: float = _font.get_string_size(count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	var w: float = 12.0 + 14.0 + 8.0 + label_w + 8.0 + count_w + 12.0
+	var chip := Rect2(CANVAS.x - w - 10.0, 8.0, w, 22.0)
+	_panel(chip)
+	var x: float = chip.position.x + 12.0
+	var cy: float = chip.position.y + chip.size.y * 0.5
+	draw_rect(Rect2(x, cy - 6.0, 12.0, 12.0), Visuals.item_color(&"ingot"))
+	draw_rect(Rect2(x, cy - 6.0, 12.0, 12.0), Color(0.0, 0.0, 0.0, 0.4), false, 1.0)
+	x += 14.0 + 8.0
+	draw_string(_font, Vector2(x, cy + 5.0), "FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT_DIM)
+	x += label_w + 8.0
+	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+
+
+## A single framed panel behind the craft strip + hotbar so they read as one "pack" unit (not two
+## floating rows). Sized to the wider of the two; the content draws on top, unchanged.
+func _draw_pack_backing() -> void:
+	var n: int = FactorySim.INVENTORY_SLOTS
+	var hot_w: float = n * SLOT + (n - 1) * SLOT_GAP
+	var content_w: float = maxf(hot_w, _craft_width())
+	var pad: float = 12.0
+	var top: float = CANVAS.y - 28.0 - SLOT - (28.0 if not craft_options.is_empty() else 6.0)
+	var bottom: float = CANVAS.y - 28.0 + 6.0
+	var rect := Rect2((CANVAS.x - content_w) * 0.5 - pad, top, content_w + pad * 2.0, bottom - top)
+	_panel(rect, true)
 
 
 ## The OBJECTIVES panel (top-left) — the signposted path through the loop. The current step is
@@ -77,16 +120,16 @@ func _draw_objectives() -> void:
 	var pos := Vector2(12.0, 12.0)
 	if objectives.all_done():
 		var w: float = 232.0
-		_panel(Rect2(pos, Vector2(w, 30.0)))
-		draw_string(_font, pos + Vector2(pad, 20.0), "✓  All set — keep digging deeper.",
+		_panel(Rect2(pos, Vector2(w, 30.0)), true)
+		draw_string(_font, pos + Vector2(pad, 21.0), "✓  All set — keep digging deeper.",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.86, 0.58))
 		return
 	var rows: int = objectives.steps.size()
 	var width: float = 244.0
 	var height: float = 26.0 + float(rows) * line_h + pad
-	_panel(Rect2(pos, Vector2(width, height)))
-	draw_string(_font, pos + Vector2(pad, 19.0), "OBJECTIVES",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.70, 0.74, 0.82))
+	_panel(Rect2(pos, Vector2(width, height)), true)
+	draw_string(_font, pos + Vector2(pad, 20.0), "OBJECTIVES",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI_TEXT_DIM)
 	var y: float = pos.y + 26.0 + 12.0
 	for i: int in rows:
 		var step: Dictionary = objectives.steps[i]
@@ -113,10 +156,16 @@ func _draw_objectives() -> void:
 		y += line_h
 
 
-## A framed translucent panel backing (shared by HUD widgets — the start of the UI skin).
-func _panel(rect: Rect2) -> void:
-	draw_rect(rect, Color(0.06, 0.07, 0.10, 0.82))
-	draw_rect(rect, Color(0.28, 0.31, 0.38, 0.9), false, 1.0)
+## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,
+## inspector, minimap, the bottom pack). A faint lit top edge makes it read as raised rather than a
+## flat sticker; `accent` paints a gold cap bar for headlined panels.
+func _panel(rect: Rect2, accent: bool = false) -> void:
+	draw_rect(rect, UI_BG)
+	draw_line(rect.position + Vector2(1.0, 1.0), rect.position + Vector2(rect.size.x - 1.0, 1.0),
+		UI_EDGE_HI, 1.0)
+	draw_rect(rect, UI_EDGE, false, 1.0)
+	if accent:
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), UI_ACCENT)
 
 
 ## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
@@ -253,14 +302,27 @@ func _draw_craft() -> void:
 	for s: String in segs:
 		total_w += _font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
 	var x: float = (CANVAS.x - (total_w - gap)) * 0.5
-	draw_string(_font, Vector2(x, y), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.78, 0.68))
+	draw_string(_font, Vector2(x, y), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	x += _font.get_string_size("CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
 	for i: int in craft_options.size():
 		var cost: Dictionary = craft_options[i]["cost"]
 		var label: String = segs[i + 1]
 		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
-			Color(0.80, 0.86, 0.66) if _can_afford(cost) else Color(0.42, 0.44, 0.50))
+			UI_TEXT if _can_afford(cost) else Color(0.42, 0.44, 0.50))
 		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+
+
+## The craft strip's rendered width (CRAFT + each option, gap-separated) — for sizing the pack panel.
+func _craft_width() -> float:
+	if craft_options.is_empty():
+		return 0.0
+	var gap: float = 16.0
+	var total: float = _font.get_string_size("CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+	for i: int in craft_options.size():
+		var opt: Dictionary = craft_options[i]
+		var seg: String = "[%d] %s (%s)" % [i + 1, str(opt["name"]), _cost_text(opt["cost"])]
+		total += _font.get_string_size(seg, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+	return total - gap
 
 
 func _can_afford(cost: Dictionary) -> bool:
@@ -289,24 +351,36 @@ func _draw_inventory() -> void:
 	for i: int in n:
 		var sx: float = x0 + float(i) * (SLOT + SLOT_GAP)
 		var slot_rect := Rect2(sx, y, SLOT, SLOT)
-		draw_rect(slot_rect, Color(0.09, 0.10, 0.13, 0.88))
 		var active: bool = i == sel
-		draw_rect(slot_rect, Color(0.96, 0.85, 0.42) if active else Color(0.30, 0.32, 0.38),
-			false, 2.0 if active else 1.0)
+		if active:
+			draw_rect(slot_rect.grow(2.0), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.18))  # selection glow
+		draw_rect(slot_rect, UI_SLOT)                                                            # well
+		draw_line(slot_rect.position + Vector2(1.0, 1.0), slot_rect.position + Vector2(SLOT - 1.0, 1.0),
+			UI_EDGE_HI, 1.0)                                                                      # top bevel
+		draw_rect(slot_rect, UI_ACCENT if active else UI_EDGE, false, 2.0 if active else 1.0)
+		# Faint keybind number in the slot corner (1-8) so the hotbar reads as keyed.
+		draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), str(i + 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.45, 0.48, 0.56))
 		if i < slots.size():
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
-			var icon := Rect2(sx + 5.0, y + 4.0, SLOT - 10.0, SLOT - 13.0)
+			var icon := Rect2(sx + 6.0, y + 6.0, SLOT - 12.0, SLOT - 14.0)
 			if machine_icons.has(item):  # a machine item: its casing colour + a mini silhouette
 				var ic: Dictionary = machine_icons[item]
 				draw_rect(icon, ic["color"])
+				draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
 				# Same glyph the world draws (shared Visuals), just scaled down to the chip — never drifts.
 				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
 					icon.size.y / 20.0, false, 0.0)
 			else:
 				draw_rect(icon, Visuals.item_color(item))
-			draw_string(_font, Vector2(sx + 4.0, y + SLOT - 4.0), str(count),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.97, 0.97, 0.99))
+				draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
+			# Count badge bottom-right with a dark backing so it stays legible over any icon colour.
+			var cnt: String = str(count)
+			var cw: float = _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+			draw_rect(Rect2(sx + SLOT - cw - 5.0, y + SLOT - 13.0, cw + 4.0, 12.0), Color(0.03, 0.03, 0.05, 0.85))
+			draw_string(_font, Vector2(sx + SLOT - cw - 3.0, y + SLOT - 3.0), cnt,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
 
 
 func _buf(d: Dictionary) -> String:
