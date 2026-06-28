@@ -33,6 +33,7 @@ const LAMP_RADIUS: float = CELL * 5.0
 var sim: FactorySim
 var player: Player
 var falling: FallingItems
+var particles: Particles                              ## cosmetic juice layer (set by MainView), drawn on top
 
 var _font: Font = ThemeDB.fallback_font
 var _anim_time: float = 0.0                          ## free-running cosmetic clock (never feeds the sim)
@@ -107,6 +108,8 @@ func _draw() -> void:
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
+	if particles != null:
+		particles.draw(self)
 	_draw_aim()
 
 

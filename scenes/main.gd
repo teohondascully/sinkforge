@@ -43,6 +43,10 @@ var _machine_defs_by_id: Dictionary = {}
 var _inv_selected: int = 0
 ## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
 var _falling := FallingItems.new()
+## Cosmetic particle + screenshake juice (dig/land/place/collect). Pure representation.
+var _particles := Particles.new()
+var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
+var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
 
 
 func _ready() -> void:
@@ -103,6 +107,7 @@ func _ready() -> void:
 	# Its draw sits at z 0 and its lighting at z 50/51, so the player (z 60) stays crisp on top.
 	_renderer = WorldRenderer.new()
 	_renderer.setup(sim, _falling, _player)
+	_renderer.particles = _particles
 	add_child(_renderer)
 
 
@@ -141,8 +146,31 @@ func _process(delta: float) -> void:
 		_falling.advance(delta)
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
+	_update_juice(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
+
+
+## Drive the cosmetic juice: advance particles, kick dust on a hard landing + periodic footsteps, and
+## decay the screenshake into the camera offset. None of this touches the sim.
+func _update_juice(delta: float) -> void:
+	_particles.advance(delta)
+	if _player != null:
+		var feet: Vector2 = _player.position + Vector2(0.0, Player.HEIGHT * 0.5)
+		if _player.landed_hard:
+			_particles.dust(feet, Color(0.42, 0.32, 0.22), 12)
+			_shake = maxf(_shake, 3.2)
+		# Footstep puffs while running on the ground — one every ~22px travelled.
+		if _player.on_floor and absf(_player.velocity.x) > 20.0:
+			_step_dist += absf(_player.velocity.x) * delta
+			if _step_dist >= 22.0:
+				_step_dist = 0.0
+				_particles.dust(feet, Color(0.40, 0.30, 0.20), 3)
+		else:
+			_step_dist = 0.0
+	_shake = move_toward(_shake, 0.0, delta * 24.0)
+	if _camera != null:
+		_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) if _shake > 0.05 else Vector2.ZERO
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -187,7 +215,12 @@ func _update_mining(delta: float) -> void:
 func try_mine(cell: Vector2i) -> bool:
 	if _paused or not _can_reach(cell) or not sim.is_solid(cell):
 		return false
-	return sim.mine(cell) != &""
+	var mat: StringName = sim.material_at(cell)
+	var mined: StringName = sim.mine(cell)
+	if mined != &"":
+		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 10)  # break-debris puff
+		_shake = maxf(_shake, 1.4)
+	return mined != &""
 
 
 ## Hand the SELECTED carried item into the nearest machine within reach (the manual half of the arc).
@@ -221,7 +254,13 @@ func _collect_ground_under_player() -> void:
 	var hi: Vector2i = _cell_at(_player.position + half)
 	for cy: int in range(lo.y, hi.y + 1):
 		for cx: int in range(lo.x, hi.x + 1):
-			sim.collect_ground(Vector2i(cx, cy))
+			var cell := Vector2i(cx, cy)
+			var pile: Dictionary = sim.ground.get(cell, {})
+			if pile.is_empty():
+				continue
+			var item: StringName = pile.keys()[0]
+			if sim.collect_ground(cell):
+				_particles.pop(_cell_center(cell), Visuals.item_color(item))  # walk-over pickup pop
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.
@@ -244,7 +283,11 @@ func try_build(cell: Vector2i) -> bool:
 		return sim.pickup_machine(cell)  # pick your machine back up into the pack
 	var def: MachineDef = _selected_machine_def()
 	if def != null and _placeable(cell):
-		return sim.build_from_pack(def, cell) != null
+		var built: bool = sim.build_from_pack(def, cell) != null
+		if built:
+			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
+			_shake = maxf(_shake, 2.2)
+		return built
 	return false
 
 

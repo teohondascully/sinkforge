@@ -98,3 +98,12 @@ static func item_color(item: StringName) -> Color:
 	if item == &"ingot":
 		return Color(0.97, 0.85, 0.42)
 	return Color.WHITE
+
+
+## Debris/dust colour for a mined terrain material (juice particles) — roughly its rock tone.
+static func terrain_dust(material: StringName) -> Color:
+	if material == &"stone":
+		return Color(0.34, 0.37, 0.44)
+	if material == &"ore":
+		return Color(0.62, 0.45, 0.26)
+	return Color(0.40, 0.30, 0.20)            # earth (default)
