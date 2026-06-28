@@ -46,6 +46,8 @@ var _machine_defs_by_id: Dictionary = {}
 var _inv_selected: int = 0
 ## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
+## Free-running clock for cosmetic animation (the lift updraft shimmer). Never feeds the sim.
+var _anim_time: float = 0.0
 ## The MaterialDef registry (id -> MaterialDef): the VISUALISER half of the world-engine handshake.
 ## The renderer maps a cell's material id to its appearance through this; the sim/generator only ever
 ## deal in ids. Loaded from src/data/materials/*.tres (see docs/WORLDGEN.md).
@@ -129,6 +131,7 @@ func _seed_world() -> void:
 
 
 func _process(delta: float) -> void:
+	_anim_time += delta
 	if not _paused:
 		sim.advance(delta)
 		_spawn_falling_from_events()
@@ -288,6 +291,7 @@ func _draw() -> void:
 	_draw_terrain()
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
+	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_ground()
 	_draw_falling()
 	for machine: MachineState in sim.machines:
@@ -429,6 +433,33 @@ func _draw_drop_paths() -> void:
 			var rx: float = float((col + 1) * CELL) + float(CELL) * 0.5
 			draw_line(Vector2(cx, cy), Vector2(rx, cy), guide, 2.0)
 			draw_line(Vector2(rx, cy), Vector2(rx, _guide_end_y(col + 1, machine.cell.y, cy)), guide, 2.0)
+
+
+## Rising shimmer in the open shaft above each lift — teal motes that ascend and fade, so the
+## inverted-gravity column reads at a glance. Purely cosmetic (driven by _anim_time, never the sim).
+func _draw_updrafts() -> void:
+	for machine: MachineState in sim.machines:
+		if machine.def.behavior != &"lift":
+			continue
+		var c: Vector2i = machine.cell
+		var top_row: int = 0  # scan up to the first solid/machine — the top of the open shaft
+		for r: int in range(c.y - 1, -1, -1):
+			if sim.is_solid(Vector2i(c.x, r)) or sim.machine_at(Vector2i(c.x, r)) != null:
+				top_row = r + 1
+				break
+		var top_y: float = float(top_row * CELL)
+		var bot_y: float = float(c.y * CELL)
+		var height: float = bot_y - top_y
+		if height <= 1.0:
+			continue
+		var cx: float = float(c.x * CELL) + float(CELL) * 0.5
+		var motes: int = 6
+		for i: int in motes:
+			var phase: float = fmod(_anim_time * 46.0 + float(i) * height / float(motes), height)
+			var my: float = bot_y - phase                          # rises from the lift up the shaft
+			var mx: float = cx + sin((_anim_time * 2.0 + float(i)) * 1.7) * 7.0
+			var a: float = (1.0 - phase / height) * 0.7            # fade as it climbs
+			draw_circle(Vector2(mx, my), 2.4, Color(0.6, 1.0, 0.92, a))
 
 
 func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
