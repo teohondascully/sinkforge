@@ -16,6 +16,9 @@ const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
 ## depth, room to explore (presentation sprint). Provisional size; real worldgen is still deferred.
 const GRID_COLS: int = 72
 const GRID_ROWS: int = 40
+## Items/tick a LIFT carries UP its column — the throughput "cost" of fighting gravity (real power is
+## deferred; slowness IS the asymmetry for now). Below this rate, a backlog piles at the lift.
+const LIFT_THROUGHPUT: int = 2
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
@@ -255,6 +258,9 @@ func tick() -> void:
 
 
 func _run_machine(machine: MachineState) -> void:
+	if machine.def.behavior == &"lift":
+		_run_lift(machine)
+		return
 	if machine.def.behavior == &"splitter":
 		_run_splitter(machine)
 		return
@@ -286,6 +292,25 @@ func _has_inputs(machine: MachineState, recipe: RecipeDef) -> bool:
 		if int(machine.input_buffer.get(item, 0)) < int(recipe.inputs[item]):
 			return false
 	return true
+
+
+## A LIFT runs no recipe: it carries items UP its column — the paid inverse of gravity. Each tick it
+## moves up to LIFT_THROUGHPUT items from its input into its output (delivered upward by _flow next);
+## the rest stays as a backlog (the throughput "cost"). No items created or destroyed → conservation
+## holds. Whatever falls onto a lift (gravity brings product down to it) is hauled back up.
+func _run_lift(machine: MachineState) -> void:
+	var moved: int = 0
+	for item: StringName in machine.input_buffer.keys():
+		if moved >= LIFT_THROUGHPUT:
+			break
+		var take: int = mini(int(machine.input_buffer[item]), LIFT_THROUGHPUT - moved)
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + take
+		var left: int = int(machine.input_buffer[item]) - take
+		if left > 0:
+			machine.input_buffer[item] = left
+		else:
+			machine.input_buffer.erase(item)
+		moved += take
 
 
 ## A splitter runs no recipe: it just moves whatever has fallen into it from its input into its
@@ -342,6 +367,8 @@ func _deliver(machine: MachineState, dest: Dictionary, bundle: Dictionary) -> vo
 func _destinations(machine: MachineState) -> Array[Dictionary]:
 	var x: int = machine.cell.x
 	var y: int = machine.cell.y
+	if machine.def.behavior == &"lift":
+		return [_column_rise(x, y - 1)]  # the inverse of gravity: this machine's output goes UP
 	var down: Dictionary = _column_landing(x, y + 1)
 	if machine.def.behavior != &"splitter":
 		return [down]
@@ -364,6 +391,20 @@ func _column_landing(col: int, start_row: int) -> Dictionary:
 			var rest := Vector2i(col, row - 1)  # the open cell on top of the floor
 			return {"to_cell": rest, "target": _ground_pile(rest)}
 	return {"to_cell": Vector2i(col, GRID_ROWS), "target": sink}
+
+
+## Where a LIFTED item goes, scanning UP `col` from `start_row` (the mirror of _column_landing): the
+## first machine above catches it (feed a higher machine), else it rests against the first ceiling
+## (a pile just below the solid cell), else — an open shaft to the top — it rests at the top row.
+func _column_rise(col: int, start_row: int) -> Dictionary:
+	for row: int in range(start_row, -1, -1):
+		var m: MachineState = grid.get(Vector2i(col, row), null)
+		if m != null:
+			return {"to_cell": m.cell, "target": m.input_buffer}
+		if solid.has(Vector2i(col, row)):
+			var rest := Vector2i(col, row + 1)  # the open cell just below the ceiling
+			return {"to_cell": rest, "target": _ground_pile(rest)}
+	return {"to_cell": Vector2i(col, 0), "target": _ground_pile(Vector2i(col, 0))}
 
 
 ## The product pile resting in `cell`, created on first landing. Returned as a live Dictionary so

@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_spit_and_collect()
 	_test_craft_and_build()
 	_test_worldgen()
+	_test_lift()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -348,7 +349,9 @@ func _test_worldgen() -> void:
 	_check(a.walls.get(Vector2i(2, top)) == &"dirt_wall", "near-surface wall is dirt")
 	_check(a.walls.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone_wall",
 		"deep wall is stone")
-	# Ingest + wall persistence (forward-covers Slice 3): mining clears the block, keeps the wall.
+
+
+	# Ingest + wall persistence (Slice 3): mining clears the block, keeps the wall.
 	var sim: FactorySim = FactorySim.new()
 	sim.load_world(a)
 	_check(sim.is_solid(Vector2i(2, top)), "sim ingested the world (surface cell is solid)")
@@ -356,3 +359,24 @@ func _test_worldgen() -> void:
 	sim.mine(Vector2i(2, top))
 	_check(not sim.is_solid(Vector2i(2, top)), "mining cleared the block")
 	_check(sim.wall_at(Vector2i(2, top)) == &"stone_wall", "the background wall survives mining the block")
+
+
+## The LIFT carries items UP its column (the paid inverse of gravity), rate-limited by
+## LIFT_THROUGHPUT, conserving items — they arrive at the top of the shaft.
+func _test_lift() -> void:
+	print("- lift")
+	var lift_def: MachineDef = load("res://src/data/machines/lift.tres")
+	var sim: FactorySim = FactorySim.new()
+	var lift: MachineState = sim.place_machine(lift_def, Vector2i(5, 10))
+	_check(lift != null and lift.def.behavior == &"lift", "placed a lift")
+	lift.input_buffer[&"ore"] = 5                       # 5 ore fell onto the lift
+	_check(_items_present(sim, &"ore") == 5, "5 ore present before lifting")
+	sim.tick()
+	_check(int(lift.input_buffer.get(&"ore", 0)) == 5 - FactorySim.LIFT_THROUGHPUT,
+		"lift carries only LIFT_THROUGHPUT/tick (the rest is backlog = the cost)")
+	for _i: int in 8:
+		sim.tick()
+	_check(lift.input_buffer.is_empty() and lift.output_buffer.is_empty(), "lift drained upward")
+	var pile: Dictionary = sim.ground.get(Vector2i(5, 0), {})
+	_check(int(pile.get(&"ore", 0)) == 5, "all 5 ore arrived at the TOP of the shaft")
+	_check(_items_present(sim, &"ore") == 5, "ore conserved across lifting (present=5)")

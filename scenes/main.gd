@@ -66,6 +66,7 @@ func _ready() -> void:
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
+		load("res://src/data/machines/lift.tres"),
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -517,7 +518,9 @@ func _draw_machine(machine: MachineState) -> void:
 ## ghost, and — in spirit — the hotbar): furnace for the ore-fed source, fork for splitters, gear
 ## for everything else. One place so the icon a machine shows is the icon you preview when placing.
 func _draw_machine_icon(center: Vector2, def: MachineDef) -> void:
-	if def.behavior == &"splitter":
+	if def.behavior == &"lift":
+		_draw_lift_icon(center)
+	elif def.behavior == &"splitter":
 		_draw_splitter_icon(center)
 	elif def.recipe != null and def.recipe.inputs.is_empty():
 		_draw_furnace_icon(center)
@@ -527,6 +530,8 @@ func _draw_machine_icon(center: Vector2, def: MachineDef) -> void:
 
 ## The icon "kind" string for the HUD hotbar, so a carried machine item shows its silhouette too.
 func _machine_kind(def: MachineDef) -> String:
+	if def.behavior == &"lift":
+		return "lift"
 	if def.behavior == &"splitter":
 		return "fork"
 	if def.recipe != null and def.recipe.inputs.is_empty():
@@ -552,6 +557,15 @@ func _draw_gear_icon(center: Vector2) -> void:
 	draw_circle(center, 2.6, Color(0.55, 0.78, 0.98))
 
 
+## Lift: stacked UP-chevrons — it carries goods (and you) up its column, the paid inverse of gravity.
+func _draw_lift_icon(center: Vector2) -> void:
+	var up := Color(0.85, 1.0, 0.95)
+	for k: int in 2:
+		var oy: float = float(k) * 7.0 - 2.0
+		draw_line(center + Vector2(-6.0, oy + 4.0), center + Vector2(0.0, oy - 2.0), up, 2.0)
+		draw_line(center + Vector2(0.0, oy - 2.0), center + Vector2(6.0, oy + 4.0), up, 2.0)
+
+
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
 func _draw_splitter_icon(center: Vector2) -> void:
 	var fork := Color(0.93, 0.88, 1.0)
@@ -571,6 +585,8 @@ func _cell_at(world_pos: Vector2) -> Vector2i:
 
 
 func _machine_color(def: MachineDef) -> Color:
+	if def.behavior == &"lift":
+		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
 	if def.behavior == &"splitter":
 		return Color(0.58, 0.42, 0.78)
 	var recipe: RecipeDef = def.recipe

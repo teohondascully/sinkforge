@@ -116,7 +116,13 @@ func _draw_inventory() -> void:
 func _draw_mini_machine(rect: Rect2, kind: String) -> void:
 	var c: Vector2 = rect.position + rect.size * 0.5
 	var r: float = rect.size.y * 0.36
-	if kind == "fork":
+	if kind == "lift":
+		var up := Color(0.85, 1.0, 0.95)
+		for k: int in 2:
+			var oy: float = float(k) * r * 0.8 - r * 0.3
+			draw_line(c + Vector2(-r, oy + r * 0.4), c + Vector2(0.0, oy - r * 0.3), up, 1.5)
+			draw_line(c + Vector2(0.0, oy - r * 0.3), c + Vector2(r, oy + r * 0.4), up, 1.5)
+	elif kind == "fork":
 		var fork := Color(0.96, 0.93, 1.0)
 		draw_line(c + Vector2(0.0, -r), c, fork, 1.5)
 		draw_line(c, c + Vector2(0.0, r), fork, 1.5)
