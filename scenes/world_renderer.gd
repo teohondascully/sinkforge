@@ -25,7 +25,8 @@ const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 const SURFACE_LINE: int = 5                         ## reference daylight row; sky attenuates with depth past it
 const SKY_REACH: int = 10                           ## tiles of open air sunlight reaches before going dark
 const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
-const AMBIENT_DARK: float = 0.965                   ## underground ambient alpha (near-black; the lamp matters)
+const AMBIENT_DARK: float = 0.945                   ## underground ambient (near-black, but a readability
+                                                   ## floor — faint shapes read in the dark; the lamp still matters)
 const SHADOW_COLOR := Color(0.03, 0.04, 0.075)      ## the cool blue-black the underworld sits in
 const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
 const LAMP_RADIUS: float = CELL * 5.0
@@ -332,6 +333,10 @@ func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
 	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
+	# Contact shadow — grounds the machine on the floor it sits on.
+	draw_set_transform(pos + Vector2(float(CELL) * 0.5, float(CELL) - 1.0), 0.0, Vector2(1.0, 0.26))
+	draw_circle(Vector2.ZERO, float(CELL) * 0.46, Color(0.0, 0.0, 0.0, 0.30))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
 	draw_rect(body, Visuals.machine_color(machine.def))
 	draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)  # darker inset casing

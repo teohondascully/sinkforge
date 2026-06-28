@@ -239,6 +239,12 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 ## walk bob) is the first scrap of game-feel juice and applies to either path.
 func _draw() -> void:
 	var f: float = float(facing)
+	# Contact shadow — a soft dark ellipse at the feet so the body sits ON the ground, not floating.
+	# Shrinks while airborne (a small far shadow) so a jump reads as leaving the floor.
+	var grounded_amt: float = 1.0 if on_floor else 0.45
+	draw_set_transform(Vector2(0.0, HEIGHT * 0.5 - 1.0), 0.0, Vector2(1.0, 0.30))
+	draw_circle(Vector2.ZERO, WIDTH * 0.72 * grounded_amt, Color(0.0, 0.0, 0.0, 0.34 * grounded_amt))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var sxq: float = 1.0 + 0.18 * _squash             # landing squash widens X
 	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
 	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
