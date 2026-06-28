@@ -28,8 +28,12 @@ var grid: Dictionary = {}
 var solid: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
-## "items present" for conservation.
+## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
 var inventory: Dictionary = {}
+## How many distinct stacks the carried pack shows as hotbar slots. The pack is intentionally small
+## (GDD: a limited pack forces hauling trips). No hard capacity is ENFORCED yet — that's a feel/
+## economy knob to turn when trip-friction is the thing being tuned (with the build economy).
+const INVENTORY_SLOTS: int = 8
 ## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
 ## Items that have fallen out the bottom of a column. The prototype's running output total.
@@ -88,6 +92,16 @@ func mine(cell: Vector2i) -> StringName:
 		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + 1
 		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + 1
 	return material
+
+
+## The carried pack as an ordered list of {item, count} for the inventory hotbar UI. Dictionaries
+## preserve insertion order, so the slot layout is stable as items are picked up. Pure read over
+## `inventory` — no behaviour or determinism change.
+func inventory_slots() -> Array[Dictionary]:
+	var slots: Array[Dictionary] = []
+	for item: StringName in inventory:
+		slots.append({"item": item, "count": int(inventory[item])})
+	return slots
 
 
 ## Player action: hand items from the pack into the machine at `cell` (its input buffer). Returns

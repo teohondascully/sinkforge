@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_terrain()
 	_test_mining_and_deposit()
 	_test_hand_built_chain()
+	_test_inventory_slots()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -239,3 +240,22 @@ func _test_hand_built_chain() -> void:
 		_check(present == net, "%s conserved in the hand-built chain (present=%d, net=%d)" % [item, present, net])
 	sim.remove_machine(Vector2i(7, 4))  # pick a machine back up
 	_check(sim.machine_at(Vector2i(7, 4)) == null, "picked the processor back up (cell is buildable again)")
+
+
+## The carried pack surfaces as an ordered slot list for the hotbar — one stack per item type, in
+## stable insertion order, counts correct. Pure read; the inventory dict stays the source of truth.
+func _test_inventory_slots() -> void:
+	print("- inventory slots")
+	var sim: FactorySim = FactorySim.new()
+	_check(sim.inventory_slots().is_empty(), "empty pack = no slots")
+	sim.set_solid(Vector2i(1, 1), &"ore")
+	sim.set_solid(Vector2i(1, 2), &"ore")
+	sim.mine(Vector2i(1, 1))
+	sim.mine(Vector2i(1, 2))
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	_check(slots.size() == 1, "two ore = one stack")
+	_check(slots[0]["item"] == &"ore" and int(slots[0]["count"]) == 2, "ore stack shows count 2")
+	sim.inventory[&"ingot"] = 3  # a second item type appears as a second slot, after ore
+	slots = sim.inventory_slots()
+	_check(slots.size() == 2, "second item type = second slot")
+	_check(slots[1]["item"] == &"ingot" and int(slots[1]["count"]) == 3, "insertion order preserved (ore, then ingot)")

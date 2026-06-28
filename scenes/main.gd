@@ -39,6 +39,10 @@ var _aim: Vector2i = Vector2i(-99, -99)
 ## dig-by-hand loop intact (manual→automated pillar; see DECISIONS 2026-06-27).
 var _palette: Array[MachineDef] = []
 var _selected: int = 0
+## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
+## item is what E deposits — the inventory is the player's held-resource surface (substrate the build
+## economy will plug machines/ingots into next).
+var _inv_selected: int = 0
 ## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
 
@@ -75,6 +79,7 @@ func _ready() -> void:
 		names.append(def.display_name)
 	hud.palette_names = names
 	hud.selected_getter = func() -> int: return _selected
+	hud.inv_selected_getter = func() -> int: return _inv_selected
 	layer.add_child(hud)
 	add_child(layer)
 
@@ -119,8 +124,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_selected = key.keycode - KEY_1
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			_try_build()
+		if mb.pressed:
+			if mb.button_index == MOUSE_BUTTON_RIGHT:
+				_try_build()
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_cycle_inventory(1)
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_cycle_inventory(-1)
 
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
@@ -136,15 +146,29 @@ func _update_mining(delta: float) -> void:
 		_mine_cooldown = MINE_TIME
 
 
-## Hand all carried ore into the nearest machine within reach (the manual half of the arc).
+## Hand the SELECTED carried item into the nearest machine within reach (the manual half of the arc).
 func _deposit_into_reach() -> void:
-	var carried: int = int(sim.inventory.get(&"ore", 0))
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return
+	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
+	var item: StringName = slots[sel]["item"]
+	var carried: int = int(slots[sel]["count"])
 	if carried <= 0:
 		return
 	for machine: MachineState in sim.machines:
 		if _can_reach(machine.cell):
-			sim.deposit(machine.cell, &"ore", carried)
+			sim.deposit(machine.cell, item, carried)
 			return
+
+
+## Move the active hotbar slot, wrapping across the items currently carried.
+func _cycle_inventory(dir: int) -> void:
+	var n: int = sim.inventory_slots().size()
+	if n <= 0:
+		_inv_selected = 0
+		return
+	_inv_selected = (_inv_selected + dir + n) % n
 
 
 ## RMB build verb: standing in reach of the aimed cell, place the selected machine on an open cell,
