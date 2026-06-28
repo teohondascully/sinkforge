@@ -680,7 +680,9 @@ func _draw_machine(machine: MachineState) -> void:
 			Vector2(CELL - 4, CELL - 4)]:
 		draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))
 
-	_draw_machine_icon(center, machine.def)
+	# A machine reads as ALIVE while it's working — it has materials in hand or a cycle in progress.
+	var active: bool = _held(machine) > 0 or machine.progress > 0.0
+	_draw_machine_icon(center, machine.def, active)
 
 	var held: int = _held(machine)
 	if held > 0:
@@ -699,15 +701,15 @@ func _draw_machine(machine: MachineState) -> void:
 ## Dispatch a machine's type silhouette at a cell centre (shared by the world machine, the build
 ## ghost, and — in spirit — the hotbar): furnace for the ore-fed source, fork for splitters, gear
 ## for everything else. One place so the icon a machine shows is the icon you preview when placing.
-func _draw_machine_icon(center: Vector2, def: MachineDef) -> void:
+func _draw_machine_icon(center: Vector2, def: MachineDef, active: bool = false) -> void:
 	if def.behavior == &"lift":
-		_draw_lift_icon(center)
+		_draw_lift_icon(center, active)
 	elif def.behavior == &"splitter":
 		_draw_splitter_icon(center)
 	elif def.recipe != null and def.recipe.inputs.is_empty():
-		_draw_furnace_icon(center)
+		_draw_furnace_icon(center, active)
 	else:
-		_draw_gear_icon(center)
+		_draw_gear_icon(center, active)
 
 
 ## The icon "kind" string for the HUD hotbar, so a carried machine item shows its silhouette too.
@@ -721,31 +723,40 @@ func _machine_kind(def: MachineDef) -> String:
 	return "gear"
 
 
-## Furnace (ore source / forge): a dark mouth with a glowing ember core + a lintel cap.
-func _draw_furnace_icon(center: Vector2) -> void:
+## Furnace (ore source / forge): a dark mouth with a glowing ember core + a lintel cap. While working,
+## the ember BREATHES — pulsing brighter and bigger — so an active forge visibly burns.
+func _draw_furnace_icon(center: Vector2, active: bool) -> void:
 	draw_rect(Rect2(center.x - 8.0, center.y - 9.0, 16.0, 2.5), Color(0.05, 0.05, 0.07))  # lintel
 	draw_rect(Rect2(center.x - 6.5, center.y - 4.0, 13.0, 10.0), Color(0.12, 0.08, 0.05))  # mouth
-	draw_circle(center + Vector2(0.0, 2.5), 3.4, Color(1.0, 0.55, 0.18))                   # ember
-	draw_circle(center + Vector2(0.0, 2.5), 1.7, Color(1.0, 0.90, 0.55))
+	var p: float = (0.78 + 0.22 * sin(_anim_time * 6.5)) if active else 0.6  # breathe when burning, dim when idle
+	var ember := Vector2(0.0, 2.5)
+	draw_circle(center + ember, 3.4 * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
+	draw_circle(center + ember, 1.7 * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
 
 
-## Gear (processor): a cogged dark disc with a bright hub, so it reads as "working machine".
-func _draw_gear_icon(center: Vector2) -> void:
+## Gear (processor): a cogged dark disc with a bright hub. While working it ROTATES — the unmistakable
+## "this machine is running" read (Factorio's soul) — and the hub brightens; idle, it sits still.
+func _draw_gear_icon(center: Vector2, active: bool) -> void:
 	var gear := Color(0.10, 0.13, 0.18)
+	var spin: float = _anim_time * 2.6 if active else 0.0
 	draw_circle(center, 6.2, gear)
 	for i: int in 8:
-		var a: float = TAU * float(i) / 8.0
+		var a: float = TAU * float(i) / 8.0 + spin
 		draw_circle(center + Vector2(cos(a), sin(a)) * 6.8, 1.7, gear)
-	draw_circle(center, 2.6, Color(0.55, 0.78, 0.98))
+	var hub := Color(0.55, 0.78, 0.98)
+	draw_circle(center, 2.6, hub.lightened(0.25) if active else hub)
 
 
-## Lift: stacked UP-chevrons — it carries goods (and you) up its column, the paid inverse of gravity.
-func _draw_lift_icon(center: Vector2) -> void:
+## Lift: stacked UP-chevrons. While carrying, they CLIMB (cycle upward) — the goods-go-up read.
+func _draw_lift_icon(center: Vector2, active: bool = false) -> void:
 	var up := Color(0.85, 1.0, 0.95)
+	var rise: float = fmod(_anim_time * 9.0, 7.0) if active else 0.0  # chevrons march upward when lifting
 	for k: int in 2:
-		var oy: float = float(k) * 7.0 - 2.0
-		draw_line(center + Vector2(-6.0, oy + 4.0), center + Vector2(0.0, oy - 2.0), up, 2.0)
-		draw_line(center + Vector2(0.0, oy - 2.0), center + Vector2(6.0, oy + 4.0), up, 2.0)
+		var oy: float = float(k) * 7.0 - 2.0 - rise
+		var a: float = 1.0 if not active else clampf(1.0 - (float(k) * 7.0 - rise) / 9.0, 0.35, 1.0)
+		var col := Color(up.r, up.g, up.b, a)
+		draw_line(center + Vector2(-6.0, oy + 4.0), center + Vector2(0.0, oy - 2.0), col, 2.0)
+		draw_line(center + Vector2(0.0, oy - 2.0), center + Vector2(6.0, oy + 4.0), col, 2.0)
 
 
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
