@@ -13,3 +13,9 @@ extends Resource
 @export var display_name: String = ""
 ## What this machine runs each cycle. A no-input recipe makes it a source.
 @export var recipe: RecipeDef
+## PROVISIONAL routing tag. Empty (default) = ordinary recipe-runner: output falls straight
+## down its column. &"splitter" = a router: it runs no recipe and instead divides whatever
+## falls into it between two downstream columns. This is a deliberately thin, deletable label
+## (NOT a type enum or capability system — those stay deferred); it just lets the sim branch on
+## the few machines that don't fit "named recipe-runner". See DECISIONS.md 2026-06-27.
+@export var behavior: StringName = &""

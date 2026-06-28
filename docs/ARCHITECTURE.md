@@ -25,8 +25,13 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   `machine_at(cell)` · `in_bounds(cell)` · `advance(delta)` (game-loop time driver) ·
   `tick()` (one logical step) · reads: `machines`, `grid`, `sink`, `total_produced/consumed`.
 - **Topology:** machines occupy grid cells (`GRID_COLS`×`GRID_ROWS`, row increases downward).
-  Flow falls straight down a column to the next machine below, else into `sink`. PROVISIONAL
-  (no lateral routing yet — see docs/RISKS.md).
+  Each tick: every machine runs, then `_flow` hands each machine's output to its **destination
+  list** (`_destinations` → `_column_landing`). An ordinary machine has ONE destination (straight
+  down its column to the next machine, else `sink`). A **splitter** (`behavior == &"splitter"`)
+  runs no recipe — it passes its incoming stream through and `_flow` divides it evenly between
+  TWO destinations (down + the column to its right), dealt round-robin via the machine's
+  `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
+  (PROVISIONAL edge, see docs/RISKS.md).
 - **Depends on:** `MachineState`, and the data Resources (`MachineDef`/`RecipeDef`).
 - **Used by:** `MainView` (reads it to draw; drives it via `advance`/place/remove).
 
@@ -38,7 +43,9 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
 ### Data Resources — the content schema (flyweight)
 - **Location:** `src/data/` (`MachineDef`, `RecipeDef`; `.tres` instances in `machines/`, `recipes/`)
 - **Responsibility:** Shared definitions consumed by the generic sim. A machine = a named
-  recipe-runner; a source = a recipe with no inputs. PROVISIONAL machine model (see DECISIONS).
+  recipe-runner; a source = a recipe with no inputs; a thin `behavior: StringName` tag
+  (default empty) lets the few non-recipe machines (currently the splitter) branch in the sim
+  without a type-enum. PROVISIONAL machine model (see DECISIONS 2026-06-27 splitter entry).
   Every def carries a stable `id: StringName` (save/reference safety, docs/RISKS.md).
 
 ### MainView — representation + input (disposable, read-only)
@@ -56,7 +63,7 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
 
 ## Data Schema Reference
 - **`RecipeDef`** — `id: StringName`, `inputs: Dictionary` (item id→count), `outputs: Dictionary`, `time: float`.
-- **`MachineDef`** — `id: StringName`, `display_name: String`, `recipe: RecipeDef`.
+- **`MachineDef`** — `id: StringName`, `display_name: String`, `recipe: RecipeDef`, `behavior: StringName` (empty = recipe-runner, `&"splitter"` = router).
 - Items are referenced by `StringName` id (e.g. `&"ore"`, `&"ingot"`); no `ItemDef` yet (added when needed).
 
 ## Scene Tree Overview

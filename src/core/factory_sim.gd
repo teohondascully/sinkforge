@@ -77,6 +77,9 @@ func tick() -> void:
 
 
 func _run_machine(machine: MachineState) -> void:
+	if machine.def.behavior == &"splitter":
+		_run_splitter(machine)
+		return
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
@@ -107,33 +110,75 @@ func _has_inputs(machine: MachineState, recipe: RecipeDef) -> bool:
 	return true
 
 
-## Gravity: each machine's output falls straight down its column to the next machine below;
-## if none, it lands in the sink. Items are only moved here, never created or destroyed.
+## A splitter runs no recipe: it just moves whatever has fallen into it from its input into its
+## output (no items created or destroyed), to be divided across two columns by _flow next. This
+## gives one tick of pass-through latency, which keeps it deterministic and order-independent.
+func _run_splitter(machine: MachineState) -> void:
+	for item: StringName in machine.input_buffer:
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + int(machine.input_buffer[item])
+	machine.input_buffer.clear()
+
+
+## Gravity + routing: each machine's output is handed to its destination(s). An ordinary machine
+## has ONE destination — straight down its column. A splitter has TWO — straight down, and down
+## the column to its right — and divides its output evenly between them (alternating item-by-item
+## so odd counts split fairly over time). Items are only moved here, never created or destroyed.
 func _flow() -> void:
 	for machine: MachineState in machines:
 		if machine.output_buffer.is_empty():
 			continue
-		var below: MachineState = _machine_below(machine)
-		var to_cell: Vector2i
-		var target: Dictionary
-		if below != null:
-			to_cell = below.cell
-			target = below.input_buffer
+		var dests: Array[Dictionary] = _destinations(machine)
+		if dests.size() == 1:
+			_deliver(machine, dests[0], machine.output_buffer)
 		else:
-			to_cell = Vector2i(machine.cell.x, GRID_ROWS)  # falls past the bottom into the sink
-			target = sink
-		for item: StringName in machine.output_buffer:
-			var count: int = int(machine.output_buffer[item])
-			target[item] = int(target.get(item, 0)) + count
-			flow_events.append({"item": item, "from": machine.cell, "to": to_cell, "count": count})
+			# Split: deal each item unit to the next destination round-robin via route_toggle.
+			var n: int = dests.size()
+			var portions: Array[Dictionary] = []
+			for _i: int in n:
+				portions.append({})
+			for item: StringName in machine.output_buffer:
+				for _c: int in int(machine.output_buffer[item]):
+					var idx: int = machine.route_toggle % n
+					machine.route_toggle += 1
+					portions[idx][item] = int(portions[idx].get(item, 0)) + 1
+			for i: int in n:
+				if not portions[i].is_empty():
+					_deliver(machine, dests[i], portions[i])
 		machine.output_buffer.clear()
 
 
-## The next machine straight down this one's column, or null if the column is clear to the bottom.
-func _machine_below(machine: MachineState) -> MachineState:
-	var col: int = machine.cell.x
-	for row: int in range(machine.cell.y + 1, GRID_ROWS):
-		var below: MachineState = grid.get(Vector2i(col, row), null)
-		if below != null:
-			return below
-	return null
+## Move a bundle of items from `machine` into one destination, logging the cosmetic flow event.
+func _deliver(machine: MachineState, dest: Dictionary, bundle: Dictionary) -> void:
+	var target: Dictionary = dest["target"]
+	var to_cell: Vector2i = dest["to_cell"]
+	for item: StringName in bundle:
+		var count: int = int(bundle[item])
+		target[item] = int(target.get(item, 0)) + count
+		flow_events.append({"item": item, "from": machine.cell, "to": to_cell, "count": count})
+
+
+## Where a machine's output goes. Each destination is {to_cell: Vector2i, target: Dictionary}.
+## Default: one destination straight down. Splitter: down + the column to the right. A splitter
+## hard against the right wall has no second column, so it degrades to a plain pass-through (down
+## only) — provisional edge behaviour, see docs/RISKS.md.
+func _destinations(machine: MachineState) -> Array[Dictionary]:
+	var x: int = machine.cell.x
+	var y: int = machine.cell.y
+	var down: Dictionary = _column_landing(x, y + 1)
+	if machine.def.behavior != &"splitter":
+		return [down]
+	var right_col: int = x + 1
+	if right_col >= GRID_COLS:
+		return [down]
+	# Diverted items move sideways into the right column at the splitter's row, then fall.
+	return [down, _column_landing(right_col, y)]
+
+
+## The first machine at or below `start_row` in `col`, as a delivery destination; if the column
+## is clear to the bottom, the destination is that column's sink.
+func _column_landing(col: int, start_row: int) -> Dictionary:
+	for row: int in range(start_row, GRID_ROWS):
+		var m: MachineState = grid.get(Vector2i(col, row), null)
+		if m != null:
+			return {"to_cell": m.cell, "target": m.input_buffer}
+	return {"to_cell": Vector2i(col, GRID_ROWS), "target": sink}

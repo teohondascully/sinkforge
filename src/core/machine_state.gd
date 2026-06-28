@@ -15,6 +15,10 @@ var input_buffer: Dictionary = {}
 var output_buffer: Dictionary = {}
 ## Seconds accumulated toward the current craft.
 var progress: float = 0.0
+## Splitter-only: a running counter used to alternate output between destinations item-by-item,
+## so an odd item count splits evenly over time (carries the remainder across ticks). Unused by
+## recipe-runners. Kept here (not a subclass) to honour composition-over-inheritance for now.
+var route_toggle: int = 0
 
 
 func _init(machine_def: MachineDef, machine_cell: Vector2i) -> void:

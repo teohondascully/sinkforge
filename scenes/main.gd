@@ -35,14 +35,19 @@ func _ready() -> void:
 	sim = FactorySim.new()
 	var vent: MachineDef = load("res://src/data/machines/ore_vent.tres")
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
+	var splitter: MachineDef = load("res://src/data/machines/splitter.tres")
 	_palette = [
 		{"def": vent, "color": Color(0.82, 0.45, 0.20)},
 		{"def": processor, "color": Color(0.30, 0.55, 0.75)},
+		{"def": splitter, "color": Color(0.58, 0.42, 0.78)},
 	]
 	_selected_def = vent
-	# Initial demo placement so there is a running cascade on open (provisional).
+	# Initial demo placement: a vent feeds a splitter that fans into two processors — a visible
+	# Y-split on open (provisional demo).
 	sim.place_machine(vent, Vector2i(7, 1))
-	sim.place_machine(processor, Vector2i(7, 5))
+	sim.place_machine(splitter, Vector2i(7, 4))
+	sim.place_machine(processor, Vector2i(7, 7))
+	sim.place_machine(processor, Vector2i(8, 7))
 
 
 func _process(delta: float) -> void:
@@ -133,18 +138,30 @@ func _draw_grid(shaft: Rect2) -> void:
 		draw_line(Vector2(shaft.position.x, y), Vector2(shaft.end.x, y), line_col)
 
 
-## Faint guide line from each machine straight down its column to where its output lands
-## (the next machine, or the shaft floor) — makes the gravity flow path legible at a glance.
+## Faint guide line tracing where each machine's output goes — straight down its column to the
+## next machine or the floor. A splitter shows BOTH of its prongs (down + sideways-then-down) so
+## the routing is legible at a glance. Mirrors FactorySim._destinations.
 func _draw_drop_paths() -> void:
+	var guide := Color(0.45, 0.55, 0.68, 0.20)
 	for machine: MachineState in sim.machines:
-		var x: float = _origin.x + float(machine.cell.x * CELL) + float(CELL) * 0.5
-		var y0: float = _origin.y + float(machine.cell.y * CELL) + float(CELL)
-		draw_line(Vector2(x, y0), Vector2(x, _landing_y(machine)), Color(0.45, 0.55, 0.68, 0.20), 2.0)
+		var col: int = machine.cell.x
+		var cx: float = _origin.x + float(col * CELL) + float(CELL) * 0.5
+		var bottom: float = _origin.y + float(machine.cell.y * CELL) + float(CELL)
+		draw_line(Vector2(cx, bottom), Vector2(cx, _column_landing_y(col, machine.cell.y + 1)), guide, 2.0)
+		if machine.def.behavior == &"splitter" and col + 1 < FactorySim.GRID_COLS:
+			# Elbow: sideways out of the splitter's row into the right column, then fall.
+			var cy: float = _origin.y + float(machine.cell.y * CELL) + float(CELL) * 0.5
+			var rx: float = _origin.x + float((col + 1) * CELL) + float(CELL) * 0.5
+			var land: float = _column_landing_y(col + 1, machine.cell.y)
+			draw_line(Vector2(cx, cy), Vector2(rx, cy), guide, 2.0)
+			draw_line(Vector2(rx, cy), Vector2(rx, land), guide, 2.0)
 
 
-func _landing_y(machine: MachineState) -> float:
-	for row: int in range(machine.cell.y + 1, FactorySim.GRID_ROWS):
-		if sim.machine_at(Vector2i(machine.cell.x, row)) != null:
+## Pixel y where something falling down `col` from `start_row` lands (top of the first machine
+## below, or the shaft floor).
+func _column_landing_y(col: int, start_row: int) -> float:
+	for row: int in range(start_row, FactorySim.GRID_ROWS):
+		if sim.machine_at(Vector2i(col, row)) != null:
 			return _origin.y + float(row * CELL)
 	return _origin.y + float(FactorySim.GRID_ROWS * CELL)
 
@@ -163,9 +180,10 @@ func _draw_falling() -> void:
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = _origin + Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
-	var is_source: bool = recipe != null and recipe.inputs.is_empty()
-	draw_rect(Rect2(pos, Vector2(CELL, CELL)),
-		Color(0.82, 0.45, 0.20) if is_source else Color(0.30, 0.55, 0.75))
+	# Inset the tile + dark seam so two side-by-side machines never fuse into one box.
+	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
+	draw_rect(body, _machine_color(machine.def))
+	draw_rect(body, Color(0.04, 0.04, 0.06, 0.7), false, 1.0)
 	# Type tag (top) so stacked machines are distinguishable at a glance.
 	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(machine.def.display_name),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
@@ -190,7 +208,7 @@ func _draw_palette() -> void:
 	for i: int in _palette.size():
 		var entry: Dictionary = _palette[i]
 		var r: Rect2 = _palette_rect(i)
-		draw_rect(r, entry["color"])
+		draw_rect(r, _machine_color(entry["def"]))
 		draw_string(_font, Vector2(r.position.x + 4, r.position.y + 15),
 			_tag(entry["def"].display_name), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
 		if entry["def"] == _selected_def:
@@ -209,6 +227,17 @@ func _cell_from_pixel(p: Vector2) -> Vector2i:
 
 func _cell_center(cell: Vector2i) -> Vector2:
 	return _origin + Vector2(cell) * float(CELL) + Vector2(CELL, CELL) * 0.5
+
+
+## One place that maps a machine definition to its body colour, so palette swatch and placed
+## machine always agree. Source (no-input recipe) = ore orange; splitter = violet; processor = blue.
+func _machine_color(def: MachineDef) -> Color:
+	if def.behavior == &"splitter":
+		return Color(0.58, 0.42, 0.78)
+	var recipe: RecipeDef = def.recipe
+	if recipe != null and recipe.inputs.is_empty():
+		return Color(0.82, 0.45, 0.20)
+	return Color(0.30, 0.55, 0.75)
 
 
 func _item_color(item: StringName) -> Color:
