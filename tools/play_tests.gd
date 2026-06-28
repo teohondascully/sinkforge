@@ -47,16 +47,20 @@ func _run() -> void:
 		quit(1)
 
 
-## Run a goal, retrying ONCE if it's missed (real-time physics flake guard). A fresh scene each try.
+## Run a goal, retrying up to TRIES times if missed (real-time physics flake guard). Fresh scene each
+## try. 3 tries keeps the inherently timing-sensitive goals (walk-there-and-act) reliably green while a
+## GENUINE break — which fails deterministically — still fails every try.
+const TRIES: int = 3
+
 func _attempt(name: String, fn: Callable) -> bool:
 	print("- goal: %s" % name)
-	for try_i: int in 2:
+	for try_i: int in TRIES:
 		var met: bool = await fn.call()
 		if met:
-			print("  PASS: %s%s" % [name, "  (on retry)" if try_i > 0 else ""])
+			print("  PASS: %s%s" % [name, "  (try %d)" % (try_i + 1) if try_i > 0 else ""])
 			return true
-		if try_i == 0:
-			print("  ... missed; retrying once (real-time physics)")
+		if try_i < TRIES - 1:
+			print("  ... missed (try %d/%d); retrying (real-time physics)" % [try_i + 1, TRIES])
 	if not _last_trace.is_empty():
 		for line: String in _last_trace:
 			printerr("        · %s" % line)

@@ -19,7 +19,6 @@ extends Node2D
 ## mining feel/reach, all numbers, art style. Collected for PLAYTEST_NOTES once felt.
 
 const CELL: int = 32
-const FALL_DURATION: float = 0.30
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
 const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
@@ -54,8 +53,8 @@ var _machine_defs_by_id: Dictionary = {}
 ## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
 ## item is what E deposits (a resource) or RMB places (a machine) — the unified Factorio-style hotbar.
 var _inv_selected: int = 0
-## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
-var _falling: Array[Dictionary] = []
+## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
+var _falling := FallingItems.new()
 ## Free-running clock for cosmetic animation (the lift updraft shimmer). Never feeds the sim.
 var _anim_time: float = 0.0
 ## The MaterialDef registry (id -> MaterialDef): the VISUALISER half of the world-engine handshake.
@@ -161,8 +160,8 @@ func _process(delta: float) -> void:
 	_anim_time += delta
 	if not _paused:
 		sim.advance(delta)
-		_spawn_falling_from_events()
-		_advance_falling(delta)
+		_falling.spawn_from_events(sim, _cell_center)
+		_falling.advance(delta)
 		_collect_ground_under_player()
 	_update_mining(delta)
 	queue_redraw()
@@ -306,30 +305,6 @@ func _can_reach(cell: Vector2i) -> bool:
 	return _player.position.distance_to(_cell_center(cell)) <= REACH_CELLS * float(CELL)
 
 
-# --- cosmetic falling items (driven by the sim, never feeding back) -----------
-
-func _spawn_falling_from_events() -> void:
-	for ev: Dictionary in sim.flow_events:
-		var from: Vector2 = _cell_center(ev["from"])
-		var to: Vector2 = _cell_center(ev["to"])
-		var color: Color = Visuals.item_color(ev["item"])
-		var count: int = int(ev["count"])
-		for i: int in count:
-			var jitter := Vector2((float(i) - float(count - 1) * 0.5) * 4.0, 0.0)
-			_falling.append({"from": from + jitter, "to": to + jitter, "t": 0.0, "color": color})
-	sim.flow_events.clear()
-
-
-func _advance_falling(delta: float) -> void:
-	var keep: Array[Dictionary] = []
-	for f: Dictionary in _falling:
-		var t: float = float(f["t"]) + delta / FALL_DURATION
-		if t < 1.0:
-			f["t"] = t
-			keep.append(f)
-	_falling = keep
-
-
 # --- drawing (WORLD space; the Camera2D provides the view transform) ----------
 
 func _draw() -> void:
@@ -339,7 +314,7 @@ func _draw() -> void:
 	_draw_drop_paths()
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_ground()
-	_draw_falling()
+	_falling.draw(self)
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
 	_draw_aim()
@@ -582,8 +557,8 @@ func _paint_lights(layer: LightLayer) -> void:
 		_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
 	# Each falling product is a LIGHT — a stream of glowing drops pouring down the dark shaft is the
 	# gravity hook made loud. The motes are item-coloured (ore amber, ingot gold), so the flow reads hot.
-	for f: Dictionary in _falling:
-		_draw_glow(layer, _falling_pos(f), float(CELL) * 1.35, f["color"], 0.6)
+	for m: Dictionary in _falling.motes():
+		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
 
 
 ## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
@@ -644,44 +619,6 @@ func _draw_ground() -> void:
 				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
 				draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), Visuals.item_color(item))
 				idx += 1
-
-
-## The current world position of a falling item (shared by the draw + its light glow): travel down the
-## column with a small launch-hop so it reads as SPAT OUT, then gravity.
-func _falling_pos(f: Dictionary) -> Vector2:
-	var t: float = clampf(float(f["t"]), 0.0, 1.0)
-	var p: Vector2 = (f["from"] as Vector2).lerp(f["to"], t)
-	p.y -= sin(t * PI) * 10.0
-	return p
-
-
-func _draw_falling() -> void:
-	for f: Dictionary in _falling:
-		var from: Vector2 = f["from"]
-		var to: Vector2 = f["to"]
-		var t: float = clampf(float(f["t"]), 0.0, 1.0)
-		var col: Color = f["color"]
-		# A fading comet-trail behind the item along its path, so the DOWNWARD flow reads as a stream
-		# on the gravity "conveyor" (the core hook), not a lone hopping square.
-		var trail: int = 5
-		for i: int in range(trail, 0, -1):
-			var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
-			var pp: Vector2 = from.lerp(to, tt)
-			pp.y -= sin(tt * PI) * 10.0
-			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
-			var sz: float = 5.5 - float(i) * 0.6
-			draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
-		var p: Vector2 = _falling_pos(f)
-		# Landing SPARKLE: as it nears its rest, a quick expanding ring + flash where it'll land — sells
-		# the "it arrived and piled up" beat at the bottom of the gravity drop.
-		if t > 0.84:
-			var lt: float = (t - 0.84) / 0.16
-			draw_arc(to, 4.0 + lt * 11.0, 0.0, TAU, 18, Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), 2.0)
-		# A chunky glowing nugget with a vertical motion-smear so it reads as a fast drop, not a square.
-		draw_rect(Rect2(p - Vector2(3.0, 8.0), Vector2(6.0, 16.0)), Color(col.r, col.g, col.b, 0.45))  # smear
-		draw_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0)), Color(0.05, 0.05, 0.07))
-		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), col)
-		draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.5))  # bright core "pops"
 
 
 ## A machine as a CASING + a type silhouette (no more "P 0" debug letters): a glowing furnace for the
