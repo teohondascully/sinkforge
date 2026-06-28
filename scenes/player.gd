@@ -157,10 +157,36 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
 
 
+## A little MINER (art still an open question, but a person — not a slab): boots + legs, blue
+## overalls, skin head, and a yellow hardhat with a head-lamp that points the way you face. Drawn
+## small (the body is ~9px on screen at this zoom), so it's built from bold blocks that read as a
+## silhouette rather than fine detail. A dark backing gives it contrast against earth and walls.
 func _draw() -> void:
-	# Placeholder body (art is an open question): a rounded slab + a facing eye so orientation reads.
-	var body := Rect2(-WIDTH * 0.5, -HEIGHT * 0.5, WIDTH, HEIGHT)
-	draw_rect(body.grow(1.0), Color(0.05, 0.05, 0.07))
-	draw_rect(body, Color(0.93, 0.86, 0.55))
-	var eye_x: float = float(facing) * 3.5
-	draw_circle(Vector2(eye_x, -4.0), 2.2, Color(0.08, 0.08, 0.10))
+	var f: float = float(facing)
+	var overalls := Color(0.24, 0.40, 0.62)
+	var legs := Color(0.18, 0.20, 0.28)
+	var skin := Color(0.84, 0.66, 0.50)
+	var helmet := Color(0.95, 0.78, 0.22)
+
+	# Dark silhouette backing (1px halo) so the body pops against terrain/back-wall.
+	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0),
+		Color(0.04, 0.04, 0.06))
+
+	# Legs + boots.
+	draw_rect(Rect2(-5.0, 5.0, 4.0, 8.0), legs)
+	draw_rect(Rect2(1.0, 5.0, 4.0, 8.0), legs)
+	draw_rect(Rect2(-5.0, 11.0, 4.5, 2.0), Color(0.10, 0.11, 0.14))  # boot
+	draw_rect(Rect2(0.5, 11.0, 4.5, 2.0), Color(0.10, 0.11, 0.14))
+
+	# Torso (overalls) with a strap highlight.
+	draw_rect(Rect2(-6.0, -5.0, 12.0, 11.0), overalls)
+	draw_rect(Rect2(-1.0, -5.0, 2.0, 11.0), overalls.lightened(0.12))
+
+	# Head.
+	var head := Vector2(f * 0.5, -9.0)
+	draw_circle(head, 4.2, skin)
+	# Hardhat: a cap over the top of the head + a brim toward the facing side.
+	draw_rect(Rect2(head.x - 4.6, head.y - 5.0, 9.2, 4.2), helmet)
+	draw_rect(Rect2(head.x + (1.0 if f > 0.0 else -5.5), head.y - 1.4, 4.5, 1.6), helmet)
+	# Head-lamp glow on the facing side.
+	draw_circle(head + Vector2(f * 4.2, -2.2), 1.5, Color(1.0, 0.97, 0.7))

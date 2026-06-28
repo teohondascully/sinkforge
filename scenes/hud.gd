@@ -24,36 +24,47 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	draw_string(_font, Vector2(10, 22), "FORGED   %d ingot" % int(sim.total_produced.get(&"ingot", 0)),
+	# FORGED counter top-RIGHT: at this zoom the surface (and the forge) sits top-LEFT, so keep that
+	# corner clear of HUD text (the forge-under-HUD legibility fix).
+	var forged: String = "FORGED  %d ingot" % int(sim.total_produced.get(&"ingot", 0))
+	var fw: float = _font.get_string_size(forged, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	draw_string(_font, Vector2(CANVAS.x - fw - 12.0, 22), forged,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
-	_draw_craft()
+	_draw_craft()       # now sits just above the hotbar (crafting next to the pack — Factorio-like)
 	_draw_inventory()
 	draw_rect(Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0), Color(0.07, 0.08, 0.11, 0.9))  # controls backing
 	draw_string(_font, Vector2(10, CANVAS.y - 10),
 		"move A/D   jump SPACE   mine LMB   wheel pick   craft 1/2   place RMB   deposit E   pause P",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.75, 0.78, 0.85))
 	if paused_getter.is_valid() and bool(paused_getter.call()):
-		draw_string(_font, Vector2(CANVAS.x - 110, 22), "PAUSED (P)",
+		draw_string(_font, Vector2(CANVAS.x * 0.5 - 36.0, 22), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.72, 0.30))
 
 
 ## The CRAFT strip — 1 Processor (3 ingot)  2 Splitter (2 ingot) — press the number to craft one
-## into the pack. Greyed when you can't afford it. Drawn top-left under FORGED.
+## into the pack. Greyed when unaffordable. Centred just ABOVE the hotbar so crafting reads as part
+## of the pack UI (and the top-left playfield stays clear). Two-pass: measure to centre, then draw.
 func _draw_craft() -> void:
 	if craft_options.is_empty():
 		return
-	var x: float = 10.0
-	var y: float = 44.0
-	draw_string(_font, Vector2(x, y), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.78, 0.68))
-	x += 52.0
+	var y: float = CANVAS.y - 28.0 - SLOT - 12.0
+	var gap: float = 16.0
+	var segs: Array[String] = ["CRAFT"]
 	for i: int in craft_options.size():
 		var opt: Dictionary = craft_options[i]
-		var cost: Dictionary = opt["cost"]
-		var label: String = "[%d] %s (%s)" % [i + 1, str(opt["name"]), _cost_text(cost)]
-		var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		segs.append("[%d] %s (%s)" % [i + 1, str(opt["name"]), _cost_text(opt["cost"])])
+	var total_w: float = 0.0
+	for s: String in segs:
+		total_w += _font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+	var x: float = (CANVAS.x - (total_w - gap)) * 0.5
+	draw_string(_font, Vector2(x, y), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.78, 0.68))
+	x += _font.get_string_size("CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
+	for i: int in craft_options.size():
+		var cost: Dictionary = craft_options[i]["cost"]
+		var label: String = segs[i + 1]
 		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
 			Color(0.80, 0.86, 0.66) if _can_afford(cost) else Color(0.42, 0.44, 0.50))
-		x += w + 16.0
+		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + gap
 
 
 func _can_afford(cost: Dictionary) -> bool:
@@ -90,15 +101,35 @@ func _draw_inventory() -> void:
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
 			var icon := Rect2(sx + 5.0, y + 4.0, SLOT - 10.0, SLOT - 13.0)
-			if machine_icons.has(item):  # a machine item: its colour + letter tag, so it reads as one
+			if machine_icons.has(item):  # a machine item: its casing colour + a mini silhouette
 				var ic: Dictionary = machine_icons[item]
 				draw_rect(icon, ic["color"])
-				draw_string(_font, icon.position + Vector2(2.0, 11.0), str(ic["tag"]),
-					HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
+				_draw_mini_machine(icon, str(ic["kind"]))
 			else:
 				draw_rect(icon, _item_color(item))
 			draw_string(_font, Vector2(sx + 4.0, y + SLOT - 4.0), str(count),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.97, 0.97, 0.99))
+
+
+## A tiny machine silhouette inside a hotbar icon, matching the in-world icons by kind (gear /
+## fork / furnace) so a carried machine reads as that machine — no debug letters.
+func _draw_mini_machine(rect: Rect2, kind: String) -> void:
+	var c: Vector2 = rect.position + rect.size * 0.5
+	var r: float = rect.size.y * 0.36
+	if kind == "fork":
+		var fork := Color(0.96, 0.93, 1.0)
+		draw_line(c + Vector2(0.0, -r), c, fork, 1.5)
+		draw_line(c, c + Vector2(0.0, r), fork, 1.5)
+		draw_line(c, c + Vector2(r, r * 0.6), fork, 1.5)
+	elif kind == "furnace":
+		draw_rect(Rect2(c.x - r, c.y - r * 0.7, r * 2.0, r * 1.5), Color(0.12, 0.08, 0.05))
+		draw_circle(c + Vector2(0.0, r * 0.25), r * 0.45, Color(1.0, 0.6, 0.2))
+	else:  # gear
+		draw_circle(c, r, Color(0.10, 0.13, 0.18))
+		for i: int in 6:
+			var a: float = TAU * float(i) / 6.0
+			draw_circle(c + Vector2(cos(a), sin(a)) * r * 1.15, r * 0.26, Color(0.10, 0.13, 0.18))
+		draw_circle(c, r * 0.4, Color(0.55, 0.78, 0.98))
 
 
 func _item_color(item: StringName) -> Color:

@@ -27,6 +27,9 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 const EARTH_COLOR := Color(0.30, 0.22, 0.16)
 const ORE_COLOR := Color(0.85, 0.55, 0.24)
 const GRASS_COLOR := Color(0.34, 0.47, 0.22)
+const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
+const WALL_COLOR := Color(0.16, 0.12, 0.095)       ## dug-out BACK WALL (dark dirt) behind carved rooms
+const DEEP_TINT := Color(0.0, 0.0, 0.0, 0.05)      ## per-band depth darkening (deeper reads darker)
 
 var sim: FactorySim
 var _player: Player
@@ -82,7 +85,7 @@ func _ready() -> void:
 	var machine_icons: Dictionary = {}
 	for def: MachineDef in _craftable:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
-		machine_icons[def.id] = {"color": _machine_color(def), "tag": _tag(def.display_name)}
+		machine_icons[def.id] = {"color": _machine_color(def), "kind": _machine_kind(def)}
 	hud.craft_options = craft_opts
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
@@ -99,8 +102,6 @@ func _seed_world() -> void:
 		var top: int = _seed_surface_row(col)
 		for row: int in range(top, FactorySim.GRID_ROWS):
 			sim.set_solid(Vector2i(col, row), &"earth")
-	for row: int in range(3, 7):  # a SHORT chute under the forge (col 6) — spat ingots fall a couple
-		sim.set_solid(Vector2i(6, row), &"")  # cells and land on the floor below, where you collect them
 	# Ore veins scattered through the earth (only set where there IS earth, so hills don't float ore).
 	var veins: Array = [
 		[8, 6], [9, 6], [11, 7], [12, 7], [16, 9], [17, 9], [22, 8], [23, 8], [28, 12], [29, 12],
@@ -110,7 +111,9 @@ func _seed_world() -> void:
 		if sim.is_solid(cell):
 			sim.set_solid(cell, &"ore")
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
-	sim.place_machine(processor, Vector2i(6, 3))  # the forge — fed ONLY by ore you dig + deposit
+	# The forge sits ON the surface (row 4, resting on the row-5 grass), not floating in the sky. It's
+	# fed ONLY by ore you dig + deposit; forged ingots pile in its own cell to be walked over.
+	sim.place_machine(processor, Vector2i(6, 4))
 
 
 ## Surface (topmost solid) row for a column. Flat at row 5 across the spawn/forge/measure region
@@ -279,8 +282,7 @@ func _advance_falling(delta: float) -> void:
 # --- drawing (WORLD space; the Camera2D provides the view transform) ----------
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.07, 0.08, 0.11))  # open air / sky-in-the-dark
-	_draw_grid()  # behind the terrain now, so it only shows in OPEN cells (no grid over solid earth)
+	_draw_background()  # sky above the surface; dark-dirt BACK WALL behind every dug-out cell + depth
 	_draw_terrain()
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
@@ -295,11 +297,36 @@ func _draw_terrain() -> void:
 	for cell: Variant in sim.solid:
 		var c: Vector2i = cell
 		var pos := Vector2(c) * float(CELL)
-		var is_ore: bool = sim.solid[c] == &"ore"
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), ORE_COLOR if is_ore else EARTH_COLOR)
-		if is_ore:  # a few facets so a vein reads as "valuable", not just a brown tile
-			draw_circle(pos + Vector2(CELL, CELL) * 0.5, 3.5, Color(1.0, 0.85, 0.5))
+		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
+		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
+		if sim.solid[c] == &"ore":
+			var oc: Color = ORE_COLOR.darkened(depth * 0.22)
+			draw_rect(Rect2(pos, Vector2(CELL, CELL)), oc)
+			for nug: Vector2 in _cell_speckles(c, 3):  # embedded nuggets so a vein reads as valuable
+				draw_circle(pos + nug, 2.4, Color(1.0, 0.86, 0.52))
+		else:
+			var ec: Color = EARTH_COLOR.darkened(depth * 0.38)
+			draw_rect(Rect2(pos, Vector2(CELL, CELL)), ec)
+			# Dirt grain — a darker pit + a lighter clod, deterministic per cell, so earth isn't a
+			# flat colour fill (the #1 "debug art" tell once the grid is gone).
+			var sp: Array[Vector2] = _cell_speckles(c, 2)
+			draw_rect(Rect2(pos + sp[0] - Vector2(2, 2), Vector2(4, 4)), ec.darkened(0.22))
+			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3, 3)), ec.lightened(0.10))
 	_draw_terrain_surface()  # grass caps + diagonal slope ramps on the exposed surface
+
+
+## Deterministic in-cell speckle positions (no RNG → determinism-safe): a stable hash of the cell
+## seeds N points inset from the edges. Used for dirt grain + ore nuggets so terrain reads textured.
+func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var h: int = (int(c.x) * 73856093) ^ (int(c.y) * 19349663)
+	for _i: int in n:
+		h = (h * 1103515245 + 12345) & 0x7fffffff
+		var fx: float = float(h % 1000) / 1000.0
+		h = (h * 1103515245 + 12345) & 0x7fffffff
+		var fy: float = float(h % 1000) / 1000.0
+		out.append(Vector2(4.0 + fx * float(CELL - 8), 4.0 + fy * float(CELL - 8)))
+	return out
 
 
 ## A cell is "surface" if it's solid with open space directly above — the exposed top of the ground.
@@ -361,22 +388,39 @@ func _draw_aim() -> void:
 	var ghost: Color = _machine_color(def).lerp(Color.WHITE, 0.20)
 	ghost.a = 0.55
 	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
+	_draw_machine_icon(pos + Vector2(CELL, CELL) * 0.5, def)  # PREVIEW the actual silhouette, not a "P"
 	var ok: bool = _placeable(_aim)
 	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
 	var border := Color(0.97, 0.98, 1.0, 0.95) if ok else Color(0.95, 0.45, 0.40, 0.95)
 	draw_rect(inner, border, false, 2.5)
-	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(def.display_name),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.92, 0.97, 0.92, 0.8))
 
 
-func _draw_grid() -> void:
-	var line_col := Color(1, 1, 1, 0.04)
-	for c: int in FactorySim.GRID_COLS + 1:
-		var x: float = float(c * CELL)
-		draw_line(Vector2(x, 0.0), Vector2(x, WORLD_SIZE.y), line_col)
-	for r: int in FactorySim.GRID_ROWS + 1:
-		var y: float = float(r * CELL)
-		draw_line(Vector2(0.0, y), Vector2(WORLD_SIZE.x, y), line_col)
+## Sky + underground backing. Open sky fills the top; every cell BELOW its column's surface gets a
+## dark-dirt back wall so a dug tunnel reads as a carved room (not floating void). A few full-width
+## depth bands in the always-underground region darken with depth. All drawn BEHIND the terrain, so
+## only the OPEN (dug/natural) cells show it — solid earth paints over it.
+func _draw_background() -> void:
+	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), SKY_COLOR)
+	for col: int in FactorySim.GRID_COLS:
+		var surf: int = _surface_row(col)
+		if surf >= FactorySim.GRID_ROWS:
+			continue  # an empty column (no earth) — all sky, no back wall
+		var y0: float = float(surf * CELL)
+		draw_rect(Rect2(float(col * CELL), y0, float(CELL), WORLD_SIZE.y - y0), WALL_COLOR)
+	var bands: int = 8
+	var deep_top: float = float(12 * CELL)  # rows >= 12 are always below the (clamped) surface
+	for b: int in bands:
+		var ry: float = lerpf(deep_top, WORLD_SIZE.y, float(b) / float(bands))
+		draw_rect(Rect2(0.0, ry, WORLD_SIZE.x, WORLD_SIZE.y - ry), DEEP_TINT)
+
+
+## Topmost solid row in a column (the live surface, accounting for digging), or GRID_ROWS if the
+## column holds no earth.
+func _surface_row(col: int) -> int:
+	for row: int in FactorySim.GRID_ROWS:
+		if sim.is_solid(Vector2i(col, row)):
+			return row
+	return FactorySim.GRID_ROWS
 
 
 func _draw_drop_paths() -> void:
@@ -433,21 +477,82 @@ func _draw_falling() -> void:
 		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), f["color"])
 
 
+## A machine as a CASING + a type silhouette (no more "P 0" debug letters): a glowing furnace for the
+## ore-fed forge/source, a gear for processors, a down+right fork for splitters. Buffered count shows
+## as a small corner badge only when non-zero; the recipe progress bar stays.
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
+	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
 	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
 	draw_rect(body, _machine_color(machine.def))
-	draw_rect(body, Color(0.04, 0.04, 0.06, 0.7), false, 1.0)
-	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(machine.def.display_name),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
-	draw_string(_font, Vector2(pos.x + 3, pos.y + 25), str(_held(machine)),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.96, 0.96, 0.99))
+	# Riveted casing: darker inset + corner bolts so it reads as a built machine, not a flat tile.
+	draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)
+	for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
+			Vector2(CELL - 4, CELL - 4)]:
+		draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))
+
+	_draw_machine_icon(center, machine.def)
+
+	var held: int = _held(machine)
+	if held > 0:
+		var badge := Vector2(pos.x + float(CELL) - 12.0, pos.y + 4.0)
+		draw_rect(Rect2(badge, Vector2(10.0, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
+		draw_string(_font, badge + Vector2(1.5, 9.0), str(held),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.97, 0.97, 0.99))
+
 	if recipe != null and recipe.time > 0.0:
 		var bar_y: float = pos.y + float(CELL) - 3.0
 		draw_rect(Rect2(pos.x, bar_y, float(CELL), 3.0), Color(0.0, 0.0, 0.0, 0.35))
 		var frac: float = clampf(machine.progress / recipe.time, 0.0, 1.0)
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
+
+
+## Dispatch a machine's type silhouette at a cell centre (shared by the world machine, the build
+## ghost, and — in spirit — the hotbar): furnace for the ore-fed source, fork for splitters, gear
+## for everything else. One place so the icon a machine shows is the icon you preview when placing.
+func _draw_machine_icon(center: Vector2, def: MachineDef) -> void:
+	if def.behavior == &"splitter":
+		_draw_splitter_icon(center)
+	elif def.recipe != null and def.recipe.inputs.is_empty():
+		_draw_furnace_icon(center)
+	else:
+		_draw_gear_icon(center)
+
+
+## The icon "kind" string for the HUD hotbar, so a carried machine item shows its silhouette too.
+func _machine_kind(def: MachineDef) -> String:
+	if def.behavior == &"splitter":
+		return "fork"
+	if def.recipe != null and def.recipe.inputs.is_empty():
+		return "furnace"
+	return "gear"
+
+
+## Furnace (ore source / forge): a dark mouth with a glowing ember core + a lintel cap.
+func _draw_furnace_icon(center: Vector2) -> void:
+	draw_rect(Rect2(center.x - 8.0, center.y - 9.0, 16.0, 2.5), Color(0.05, 0.05, 0.07))  # lintel
+	draw_rect(Rect2(center.x - 6.5, center.y - 4.0, 13.0, 10.0), Color(0.12, 0.08, 0.05))  # mouth
+	draw_circle(center + Vector2(0.0, 2.5), 3.4, Color(1.0, 0.55, 0.18))                   # ember
+	draw_circle(center + Vector2(0.0, 2.5), 1.7, Color(1.0, 0.90, 0.55))
+
+
+## Gear (processor): a cogged dark disc with a bright hub, so it reads as "working machine".
+func _draw_gear_icon(center: Vector2) -> void:
+	var gear := Color(0.10, 0.13, 0.18)
+	draw_circle(center, 6.2, gear)
+	for i: int in 8:
+		var a: float = TAU * float(i) / 8.0
+		draw_circle(center + Vector2(cos(a), sin(a)) * 6.8, 1.7, gear)
+	draw_circle(center, 2.6, Color(0.55, 0.78, 0.98))
+
+
+## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
+func _draw_splitter_icon(center: Vector2) -> void:
+	var fork := Color(0.93, 0.88, 1.0)
+	draw_line(center + Vector2(0.0, -6.5), center, fork, 2.0)
+	draw_line(center, center + Vector2(0.0, 7.0), fork, 2.0)
+	draw_line(center, center + Vector2(7.0, 4.0), fork, 2.0)
 
 
 # --- helpers -----------------------------------------------------------------
@@ -475,14 +580,6 @@ func _item_color(item: StringName) -> Color:
 	if item == &"ingot":
 		return Color(0.97, 0.85, 0.42)
 	return Color.WHITE
-
-
-func _tag(display_name: String) -> String:
-	var t: String = ""
-	for word: String in display_name.split(" ", false):
-		if not word.is_empty():
-			t += word[0]
-	return t.to_upper()
 
 
 func _held(machine: MachineState) -> int:
