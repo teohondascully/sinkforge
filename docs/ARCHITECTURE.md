@@ -62,7 +62,7 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   - **`MaterialDef`** (Resource, flyweight) — the shared vocabulary. A cell holds a material
     **id**; appearance (`base_color`, `grain`, `cap_color`, `nugget_color`, `depth_darken`) +
     `layer` (`&"block"`/`&"wall"`) live here. The generator emits ids; the visualiser maps
-    `id → MaterialDef` through MainView's `_materials` registry.
+    `id → MaterialDef` through `WorldRenderer`'s `_materials` registry.
   - **`WorldData`** (`RefCounted`, plain data, no engine deps) — the handshake artifact a generator
     PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, and two grids `blocks` + `walls`
     (cell → material id). The bounded, two-layer world.
@@ -76,13 +76,38 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   = a new WorldGen; improve the look = edit MaterialDefs; neither touches the other.** Conforms to
   the node-free-sim / data-driven-Resources / viz-as-driven-layer principles.
 
-### MainView — representation + input (disposable, read-only)
-- **Location:** `scenes/main.gd` (`class_name MainView`, `Node2D`) + `scenes/main.tscn`
-- **Responsibility:** OWNS a `FactorySim`, advances it (pausable), draws the WORLD in world-space
-  under a follow `Camera2D`, hosts the embodied `Player` + a screen-fixed `Hud`, and translates
-  mouse/keys into the body's **world-verbs**. Reads sim production state only — never writes it;
-  every world edit goes through the sim's discrete API (`mine`/`deposit`/`place_machine`/
-  `remove_machine`). Delete it and the numbers are unchanged.
+### Representation layer — controller / view / cosmetics (disposable, read-only)
+The representation is split into focused modules (the node-free sim is the model; none of these write
+production state — delete them and the numbers are unchanged):
+
+- **`MainView`** (`scenes/main.gd`, `Node2D`) — the **CONTROLLER + session root**. OWNS a `FactorySim`,
+  advances it (pausable), hosts the embodied `Player` + follow `Camera2D` + a screen-fixed `Hud` +
+  the `WorldRenderer`, and translates mouse/keys into the body's reach-gated **world-verbs**
+  (`try_mine`/`try_deposit`/`try_build`/`try_craft`). Does NOT draw — it pushes the aim cursor + its
+  computed reach/placeable/ghost state to the renderer via `set_aim()` each frame. Every world edit
+  goes through the sim's discrete API.
+- **`WorldRenderer`** (`scenes/world_renderer.gd`, `Node2D`) — the **VIEW**. Draws all world-space sim
+  state (terrain texture/AO/surface, background walls, ground piles, machines, the falling stream,
+  drop guides, updrafts, the aim cursor) **and** the lighting passes (owns the `MaterialDef` registry,
+  the cosmetic clock, the two `LightLayer` canvases + glow textures). One-way data flow: it derives
+  what it can from the sim and reads the pushed aim state; it never reaches back into the controller.
+- **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: machine kind/colour,
+  the scalable animated machine glyph (drawn by both the world + the HUD, so they never drift), item
+  colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
+  layer (state + spawn-from-`flow_events` + advance + draw + light-motes). **`LightLayer`**
+  (`scenes/light_layer.gd`) — a thin canvas giving each lighting pass its own blend mode.
+- **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
+  the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
+  a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
+  machine item on an in-reach open cell (consumes it) or picks one of your machines back up
+  (returns it + salvages its buffers); **E** deposits the selected resource into an in-reach
+  machine; **P** pause. You also **auto-collect** product piles by walking over them. The cursor is
+  context-sensitive (`WorldRenderer._draw_aim`): a solid cell shows a MINE box; an open in-reach cell
+  shows a BUILD ghost of the selected machine item (green = placeable) — only when a machine is
+  selected. The Ore Vent is excluded from crafting so you stay the ore source by hand. **The economy
+  added no determinism/boundary change** — placement/removal/craft are discrete sim calls; reach +
+  "where allowed" are representation concerns, so the sim API stays position-agnostic and the
+  determinism boundary holds.
 - **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
   the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
   a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
