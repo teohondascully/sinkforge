@@ -68,7 +68,9 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
     (cell → material id). The bounded, two-layer world.
   - **`WorldGen`** (`RefCounted`) — `generate(cols, rows, seed) -> WorldData`, contractually
     **deterministic** (seeded RNG). Concrete: `HeightmapWorldGen` (heightmap surface, seeded ore,
-    a stone layer below a depth, stone/dirt walls behind sub-surface cells).
+    a stone layer below a depth, stone/dirt walls behind sub-surface cells); `LayeredWorldGen`
+    (extends it — adds noise CAVES that keep their wall + open up with depth, and DEPTH-BANDED ore
+    veins: deeper = richer. Generation-only — zero renderer change. This is what the live world uses).
 - **Relationships / dependency rule:** WorldGen depends only on material ids + WorldData (not the
   sim, not rendering). `FactorySim.load_world(WorldData)` ingests both grids; the sim gained a
   background **wall layer** (`wall`, `wall_at`/`set_wall`) and `mine` now clears the block but keeps

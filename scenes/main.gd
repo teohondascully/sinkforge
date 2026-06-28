@@ -108,7 +108,7 @@ func _ready() -> void:
 ## HOW the world is made — swap the generator and nothing here changes. Then place the lone Processor
 ## forge the player hand-feeds (a machine, not terrain — stays MainView's concern).
 func _seed_world() -> void:
-	var gen: WorldGen = HeightmapWorldGen.new()
+	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
 	sim.load_world(world)
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")

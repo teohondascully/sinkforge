@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_spit_and_collect()
 	_test_craft_and_build()
 	_test_worldgen()
+	_test_layered_worldgen()
 	_test_lift()
 	if _failures == 0:
 		print("ALL PASS")
@@ -393,6 +394,61 @@ func _test_worldgen() -> void:
 	sim.mine(Vector2i(2, top))
 	_check(not sim.is_solid(Vector2i(2, top)), "mining cleared the block")
 	_check(sim.wall_at(Vector2i(2, top)) == &"stone_wall", "the background wall survives mining the block")
+
+
+## The RICHER generator: same WorldData contract, deterministic, but now with CAVES (carved cells
+## that keep their wall, only below CAVE_MIN_DEPTH so the base stays solid) and DEPTH-BANDED ore
+## (more ore deep than shallow — the "deeper = richer" pull). Still emits only known material ids, so
+## the renderer is untouched.
+func _test_layered_worldgen() -> void:
+	print("- layered worldgen")
+	var gen: WorldGen = LayeredWorldGen.new()
+	var a: WorldData = gen.generate(72, 40, 1337)
+	var b: WorldData = gen.generate(72, 40, 1337)
+	_check(a.blocks == b.blocks, "same seed → identical blocks (deterministic, caves + veins)")
+	_check(gen.generate(72, 40, 99).blocks != a.blocks, "a different seed → a different world")
+
+	# CAVES: some sub-surface cells are carved OPEN (block gone) yet still have a wall behind them —
+	# a Terraria carved room. And the near-surface base is untouched (caves only below CAVE_MIN_DEPTH).
+	var carved: int = 0
+	var carved_with_wall: int = 0
+	var breached_base: int = 0
+	for col: int in 72:
+		var top: int = HeightmapWorldGen.new()._surface_row(col)
+		for row: int in range(top, 40):
+			var cell: Vector2i = Vector2i(col, row)
+			if not a.blocks.has(cell) and a.walls.has(cell):
+				carved += 1
+				carved_with_wall += 1
+				if row < top + LayeredWorldGen.CAVE_MIN_DEPTH:
+					breached_base += 1
+	_check(carved > 50, "caves carved open cells in the rock (%d)" % carved)
+	_check(carved_with_wall == carved, "every carved cell kept its wall (Terraria room, not void)")
+	_check(breached_base == 0, "no cave breached the near-surface base (stays solid by construction)")
+
+	# DEPTH-BANDED ORE: count ore in the top half vs the bottom half of the sub-surface column band.
+	var ore_shallow: int = 0
+	var ore_deep: int = 0
+	for cell: Vector2i in a.blocks:
+		if a.blocks[cell] == &"ore":
+			if cell.y < 24:
+				ore_shallow += 1
+			else:
+				ore_deep += 1
+	_check(ore_deep > ore_shallow, "ore is depth-banded: more deep than shallow (deep=%d, shallow=%d)"
+		% [ore_deep, ore_shallow])
+
+	# Still ingests cleanly through the same contract (carved cells load as not-solid, walls intact).
+	var sim: FactorySim = FactorySim.new()
+	sim.load_world(a)
+	var probe: Vector2i = Vector2i(-1, -1)
+	for cell: Vector2i in a.walls:
+		if not a.blocks.has(cell):
+			probe = cell
+			break
+	_check(probe.x >= 0, "found a carved cave cell to probe")
+	_check(not sim.is_solid(probe), "a carved cave loads as open (not solid)")
+	_check(sim.wall_at(probe) != &"", "the carved cave still shows its background wall")
 
 
 ## The LIFT carries items UP its column (the paid inverse of gravity), rate-limited by
