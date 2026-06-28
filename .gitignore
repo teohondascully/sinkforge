@@ -1,0 +1,20 @@
+# Godot 4
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+
+# macOS
+.DS_Store
+
+# Builds
+build/
+*.dmg
+*.zip
+*.exe
+*.pck
+
+# IDE
+.vscode/
+.idea/

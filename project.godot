@@ -1,0 +1,40 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format documentation:
+; https://docs.godotengine.org/en/stable/classes/class_projectsettings.html
+
+config_version=5
+
+[application]
+
+config/name="Sinkforge"
+config/description="2D vertical factory automation where gravity is the conveyor belt. Prototype 1 — gravity-flow feel test."
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+
+; Base render resolution for 2D pixel art. 640x360 is a 16:9 low-res canvas.
+window/size/viewport_width=640
+window/size/viewport_height=360
+; Open the window at an integer 3x of the base (1920x1080) so pixels stay crisp.
+window/size/window_width_override=1920
+window/size/window_height_override=1080
+; canvas_items + keep = the 2D canvas scales as a whole, letterboxing to preserve aspect.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+; Nearest-neighbour filtering: no blurring of pixel-art textures. 0 == Nearest.
+textures/canvas_textures/default_texture_filter=0
+
+[debug]
+
+; Enforcement tripwire #1 (see DECISIONS.md): make the "static typing everywhere"
+; rule self-enforcing. The editor refuses to run code with an untyped declaration.
+; Warning level values: 0 = ignore, 1 = warn, 2 = error.
+gdscript/warnings/enable=true
+gdscript/warnings/untyped_declaration=2
+
