@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MaterialDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/material_def.gd" id="1_mat"]
+
+[resource]
+script = ExtResource("1_mat")
+id = &"dirt_wall"
+display_name = "Dirt Wall"
+layer = &"wall"
+base_color = Color(0.16, 0.12, 0.095, 1)
+grain = false
+cap_color = Color(0, 0, 0, 0)
+nugget_color = Color(0, 0, 0, 0)
+depth_darken = 0.32

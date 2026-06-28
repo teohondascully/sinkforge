@@ -25,14 +25,18 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 
-	# Surface + fill: earth near the top, stone below STONE_DEPTH.
+	# Surface + fill: earth near the top, stone below STONE_DEPTH — in BOTH layers, so a dug-out cell
+	# reveals a background WALL of the matching rock (Terraria-style carved room), not empty void.
 	var surface: PackedInt32Array = PackedInt32Array()
 	for col: int in cols:
 		var top: int = _surface_row(col)
 		surface.append(top)
 		for row: int in range(top, rows):
 			var below: int = row - top
-			world.blocks[Vector2i(col, row)] = &"stone" if below >= STONE_DEPTH else &"earth"
+			var deep: bool = below >= STONE_DEPTH
+			var cell: Vector2i = Vector2i(col, row)
+			world.blocks[cell] = &"stone" if deep else &"earth"
+			world.walls[cell] = &"stone_wall" if deep else &"dirt_wall"
 
 	# Ore veins: seeded scatter, 2 cells wide, embedded wherever there's rock.
 	var veins: int = int(round(float(cols) * VEIN_DENSITY))

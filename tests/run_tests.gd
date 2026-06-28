@@ -343,6 +343,11 @@ func _test_worldgen() -> void:
 	_check(a.blocks.get(Vector2i(2, top)) == &"earth", "surface is earth")
 	_check(a.blocks.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone",
 		"deep cells are stone (a new material dropped into generation)")
+	# The background WALL layer (Slice 3): walls behind every sub-surface cell, matching the rock zone.
+	_check(a.walls.size() > 0 and a.walls == b.walls, "walls generated + deterministic")
+	_check(a.walls.get(Vector2i(2, top)) == &"dirt_wall", "near-surface wall is dirt")
+	_check(a.walls.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone_wall",
+		"deep wall is stone")
 	# Ingest + wall persistence (forward-covers Slice 3): mining clears the block, keeps the wall.
 	var sim: FactorySim = FactorySim.new()
 	sim.load_world(a)

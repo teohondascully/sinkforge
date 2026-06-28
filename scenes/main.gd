@@ -27,8 +27,6 @@ const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); s
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
 
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
-const WALL_COLOR := Color(0.16, 0.12, 0.095)       ## dug-out BACK WALL (dark dirt) behind carved rooms
-const DEEP_TINT := Color(0.0, 0.0, 0.0, 0.05)      ## per-band depth darkening (deeper reads darker)
 
 var sim: FactorySim
 var _player: Player
@@ -60,6 +58,8 @@ func _ready() -> void:
 		"res://src/data/materials/earth.tres",
 		"res://src/data/materials/ore.tres",
 		"res://src/data/materials/stone.tres",
+		"res://src/data/materials/dirt_wall.tres",
+		"res://src/data/materials/stone_wall.tres",
 	]:
 		var def: MaterialDef = load(path)
 		_materials[def.id] = def
@@ -402,32 +402,18 @@ func _draw_aim() -> void:
 	draw_rect(inner, border, false, 2.5)
 
 
-## Sky + underground backing. Open sky fills the top; every cell BELOW its column's surface gets a
-## dark-dirt back wall so a dug tunnel reads as a carved room (not floating void). A few full-width
-## depth bands in the always-underground region darken with depth. All drawn BEHIND the terrain, so
-## only the OPEN (dug/natural) cells show it — solid earth paints over it.
+## Sky + the REAL background WALL layer (sim.wall). Open sky fills the top; each wall cell paints its
+## material colour (depth-darkened) BEHIND the terrain, so a dug-out cell reveals the carved-room
+## backing (a Terraria wall) rather than floating void. Blocks draw on top, so a wall only shows where
+## its block has been mined away — exactly the dug rooms/tunnels.
 func _draw_background() -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), SKY_COLOR)
-	for col: int in FactorySim.GRID_COLS:
-		var surf: int = _surface_row(col)
-		if surf >= FactorySim.GRID_ROWS:
-			continue  # an empty column (no earth) — all sky, no back wall
-		var y0: float = float(surf * CELL)
-		draw_rect(Rect2(float(col * CELL), y0, float(CELL), WORLD_SIZE.y - y0), WALL_COLOR)
-	var bands: int = 8
-	var deep_top: float = float(12 * CELL)  # rows >= 12 are always below the (clamped) surface
-	for b: int in bands:
-		var ry: float = lerpf(deep_top, WORLD_SIZE.y, float(b) / float(bands))
-		draw_rect(Rect2(0.0, ry, WORLD_SIZE.x, WORLD_SIZE.y - ry), DEEP_TINT)
-
-
-## Topmost solid row in a column (the live surface, accounting for digging), or GRID_ROWS if the
-## column holds no earth.
-func _surface_row(col: int) -> int:
-	for row: int in FactorySim.GRID_ROWS:
-		if sim.is_solid(Vector2i(col, row)):
-			return row
-	return FactorySim.GRID_ROWS
+	for cell_v: Variant in sim.wall:
+		var c: Vector2i = cell_v
+		var def: MaterialDef = _material(sim.wall[c])
+		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
+		draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)),
+			def.base_color.darkened(depth * def.depth_darken))
 
 
 func _draw_drop_paths() -> void:
