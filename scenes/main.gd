@@ -21,6 +21,9 @@ const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
+## Dev: start with a stocked pack (ore/ingots/machines) for testing. A static so the headless harness
+## can force a CLEAN start (it asserts exact counts) by setting MainView.dev_start = false before boot.
+static var dev_start: bool = true
 
 var sim: FactorySim
 var _player: Player
@@ -115,6 +118,20 @@ func _seed_world() -> void:
 	# The forge sits ON the surface (row 4, resting on the row-5 grass), not floating in the sky. It's
 	# fed ONLY by ore you dig + deposit; forged ingots pile in its own cell to be walked over.
 	sim.place_machine(processor, Vector2i(6, 4))
+	if dev_start:
+		_dev_seed_pack()
+
+
+## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
+## (place machines, feed, smelt) without first hand-mining a stack of ore. Items are SPAWNED, so they
+## count as produced to keep the conservation invariant true. Flip DEV_START off for a clean playthrough.
+## NOTE: the head-lamp glow and forge embers are LIGHTING effects on the miner/machines, not carryable
+## items — there's nothing to put in the pack for those; they appear automatically in play.
+func _dev_seed_pack() -> void:
+	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"processor": 2, &"splitter": 2, &"lift": 1}
+	for item: StringName in kit:
+		sim.inventory[item] = int(sim.inventory.get(item, 0)) + int(kit[item])
+		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(kit[item])
 
 
 func _process(delta: float) -> void:

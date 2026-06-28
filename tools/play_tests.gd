@@ -23,6 +23,7 @@ var _last_trace: Array[String] = []  # the failing try's narration, printed only
 
 func _initialize() -> void:
 	print("== Sinkforge scripted play-tests ==")
+	MainView.dev_start = false      # these goals assert exact counts — boot a CLEAN pack, not the dev kit
 	_run()
 
 
