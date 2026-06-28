@@ -353,17 +353,53 @@ func _draw_terrain() -> void:
 		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 		var col: Color = def.base_color.darkened(depth * def.depth_darken)
+		# Per-cell tonal jitter (deterministic) so a field of earth isn't ONE flat colour — the single
+		# biggest flat-fill tell. A stable hash nudges each cell's value a few percent up or down.
+		var j: float = _cell_jitter(c)
+		col = col.lightened(j) if j > 0.0 else col.darkened(-j)
 		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
 		if def.grain:
-			# Dirt grain — a darker pit + a lighter clod, deterministic per cell, so earth isn't a
-			# flat colour fill (the #1 "debug art" tell once the grid is gone).
-			var sp: Array[Vector2] = _cell_speckles(c, 2)
-			draw_rect(Rect2(pos + sp[0] - Vector2(2, 2), Vector2(4, 4)), col.darkened(0.22))
-			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3, 3)), col.lightened(0.10))
+			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
+			# surface reads as textured rock rather than a colour swatch.
+			var sp: Array[Vector2] = _cell_speckles(c, 3)
+			draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
+			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
+			draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
 		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
 			for nug: Vector2 in _cell_speckles(c, def.nugget_count):
 				draw_circle(pos + nug, 2.0, def.nugget_color)
-	_draw_terrain_surface()  # grass caps + diagonal slope ramps on the exposed surface
+				draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
+		_draw_edge_ao(c, pos)  # carved depth: ambient occlusion on faces that border open air
+	_draw_terrain_surface()
+
+
+## A SMOOTH, spatially-coherent value nudge (~[-0.06, +0.06]) — low-frequency sines so neighbouring
+## cells share tone (cloudy patches), NOT a per-cell random that seams at every tile edge (which just
+## rebuilds the grid). Breaks the flat fill into organic light/dark drift. RNG-free → determinism-safe.
+func _cell_jitter(c: Vector2i) -> float:
+	var x: float = float(c.x)
+	var y: float = float(c.y)
+	var n: float = sin(x * 0.37 + y * 0.21) + sin(x * 0.13 - y * 0.41) + sin((x + y) * 0.27)
+	return n / 3.0 * 0.06
+
+
+## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
+## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
+func _draw_edge_ao(c: Vector2i, pos: Vector2) -> void:
+	const STEPS: int = 3
+	for i: int in STEPS:
+		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
+		var sh := Color(0.0, 0.0, 0.0, a)
+		var o: float = float(i) * 2.0
+		var s := 2.0
+		if not sim.is_solid(c + Vector2i(0, -1)):  # top face exposed
+			draw_rect(Rect2(pos.x, pos.y + o, float(CELL), s), sh)
+		if not sim.is_solid(c + Vector2i(0, 1)):   # bottom face exposed (a ceiling from below)
+			draw_rect(Rect2(pos.x, pos.y + float(CELL) - o - s, float(CELL), s), sh)
+		if not sim.is_solid(c + Vector2i(-1, 0)):  # left face exposed
+			draw_rect(Rect2(pos.x + o, pos.y, s, float(CELL)), sh)
+		if not sim.is_solid(c + Vector2i(1, 0)):   # right face exposed
+			draw_rect(Rect2(pos.x + float(CELL) - o - s, pos.y, s, float(CELL)), sh)  # grass caps + diagonal slope ramps on the exposed surface
 
 
 ## A cell's MaterialDef via the registry, or a safe fallback so an unknown id still renders.
