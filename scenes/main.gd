@@ -47,6 +47,8 @@ var _falling := FallingItems.new()
 var _particles := Particles.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
+## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
+var _objectives: Objectives
 
 
 func _ready() -> void:
@@ -99,6 +101,10 @@ func _ready() -> void:
 	hud.craft_options = craft_opts
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
+	# Tutorial chain — built AFTER the world is seeded (so its baseline includes any dev-start kit) and
+	# handed to the HUD to render. It only reads the sim; MainView refreshes it each frame.
+	_objectives = Objectives.new(sim)
+	hud.objectives = _objectives
 	layer.add_child(hud)
 	add_child(layer)
 
@@ -147,6 +153,8 @@ func _process(delta: float) -> void:
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_juice(delta)
+	if _objectives != null:
+		_objectives.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
 

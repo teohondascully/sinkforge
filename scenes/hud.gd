@@ -11,6 +11,8 @@ const SLOT_GAP: float = 4.0
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
 var paused_getter: Callable
+## The tutorial chain (representation-layer legibility — answers "how do I play?"). Set by MainView.
+var objectives: Objectives
 ## Craftable machines for the CRAFT strip (set by MainView): [{name: String, cost: {item->count}}].
 var craft_options: Array[Dictionary] = []
 ## Machine item id -> {color: Color, tag: String}, so machine items in the hotbar read as machines.
@@ -30,15 +32,74 @@ func _draw() -> void:
 	var fw: float = _font.get_string_size(forged, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 	draw_string(_font, Vector2(CANVAS.x - fw - 12.0, 22), forged,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
+	_draw_objectives()  # the tutorial chain, top-left — the "how do I play?" signpost
 	_draw_craft()       # now sits just above the hotbar (crafting next to the pack — Factorio-like)
 	_draw_inventory()
 	draw_rect(Rect2(0.0, CANVAS.y - 22.0, CANVAS.x, 22.0), Color(0.07, 0.08, 0.11, 0.9))  # controls backing
 	draw_string(_font, Vector2(10, CANVAS.y - 10),
-		"move A/D   jump SPACE   mine LMB   wheel pick   craft 1/2   place RMB   deposit E   pause P",
+		"move A/D   jump SPACE   mine LMB   wheel pick   craft 1/2/3   place RMB   deposit E   pause P",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.75, 0.78, 0.85))
 	if paused_getter.is_valid() and bool(paused_getter.call()):
 		draw_string(_font, Vector2(CANVAS.x * 0.5 - 36.0, 22), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.72, 0.30))
+
+
+## The OBJECTIVES panel (top-left) — the signposted path through the loop. The current step is
+## bright with its goal chip; done steps get a green tick and dim out; future steps stay muted. When
+## the whole chain is finished it collapses to a short "all set" line, then auto-hides after a few
+## seconds (the Guide stops nagging). Pure read of the Objectives tracker — no sim mutation.
+func _draw_objectives() -> void:
+	if objectives == null:
+		return
+	var cur: int = objectives.current_index()
+	# Finished + lingered long enough → don't draw at all (keep the playfield clean for veterans).
+	if objectives.all_done() and objectives.done_for() > 6.0:
+		return
+	var pad: float = 9.0
+	var line_h: float = 16.0
+	var pos := Vector2(12.0, 12.0)
+	if objectives.all_done():
+		var w: float = 232.0
+		_panel(Rect2(pos, Vector2(w, 30.0)))
+		draw_string(_font, pos + Vector2(pad, 20.0), "✓  All set — keep digging deeper.",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.62, 0.86, 0.58))
+		return
+	var rows: int = objectives.steps.size()
+	var width: float = 244.0
+	var height: float = 26.0 + float(rows) * line_h + pad
+	_panel(Rect2(pos, Vector2(width, height)))
+	draw_string(_font, pos + Vector2(pad, 19.0), "OBJECTIVES",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.70, 0.74, 0.82))
+	var y: float = pos.y + 26.0 + 12.0
+	for i: int in rows:
+		var step: Dictionary = objectives.steps[i]
+		var done: bool = objectives.is_done(step["id"])
+		var is_cur: bool = i == cur
+		var box := Vector2(pos.x + pad, y - 9.0)
+		# Checkbox: filled green tick when done, bright hollow ring when current, muted dot otherwise.
+		if done:
+			draw_string(_font, box, "✓", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.84, 0.52))
+		elif is_cur:
+			draw_rect(Rect2(box + Vector2(1.0, -9.0), Vector2(9.0, 9.0)), Color(0.96, 0.82, 0.36), false, 1.5)
+		else:
+			draw_rect(Rect2(box + Vector2(2.0, -8.0), Vector2(7.0, 7.0)), Color(0.34, 0.36, 0.42), false, 1.0)
+		var label: String = str(step["label"]) if is_cur else str(step["goal"])
+		var col: Color
+		if done:
+			col = Color(0.50, 0.55, 0.52)        # completed — dim
+		elif is_cur:
+			col = Color(0.97, 0.93, 0.78)        # active — bright
+		else:
+			col = Color(0.55, 0.58, 0.66)        # upcoming — muted
+		draw_string(_font, Vector2(pos.x + pad + 16.0, y), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12 if is_cur else 11, col)
+		y += line_h
+
+
+## A framed translucent panel backing (shared by HUD widgets — the start of the UI skin).
+func _panel(rect: Rect2) -> void:
+	draw_rect(rect, Color(0.06, 0.07, 0.10, 0.82))
+	draw_rect(rect, Color(0.28, 0.31, 0.38, 0.9), false, 1.0)
 
 
 ## The CRAFT strip — 1 Processor (3 ingot)  2 Splitter (2 ingot) — press the number to craft one
