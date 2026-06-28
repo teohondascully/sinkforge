@@ -101,6 +101,24 @@ production state — delete them and the numbers are unchanged):
     enclosed cave is near-black until lit. The `_lights` LightLayer (additive) punches warm pools back:
     the miner's flickering head-lamp, a warm ember per furnace / cool glow per other machine, a glow
     per falling drop. Warm artificial light vs cold dark = the deliberate vibe.
+  - **Post-FX (modern-rendering, docs/MODERN_FEEL.md).** `MainView._setup_post_fx()` adds a
+    `WorldEnvironment` (selective softlight GLOW on the bright cores + a gentle colour grade) and a
+    full-screen LENS pass — `scenes/post_fx.gdshader` (vignette + film grain + edge chromatic
+    aberration) on a ColorRect on a CanvasLayer at layer 5, BELOW the HUD (bumped to layer 10), so the
+    world gets the lens and the UI stays crisp. `_setup_ambient_motes()` adds a `GPUParticles2D` dust
+    haze (z 45, under the lighting veil — motes glow in the lamp, fade in the dark) that follows the
+    camera. All representation-layer; the sim never knows.
+- **`Objectives`** (`scenes/objectives.gd`, RefCounted) — the **tutorial chain / legibility guide**
+  ("how do I play?"). A sim-READING ordered chain (dig→feed→forge→craft→build→automate); each step's
+  predicate is a SESSION DELTA off a baseline snapshot taken at construction (so it guides correctly
+  even when the dev-start kit pre-stocks the pack), and completions LATCH. `MainView` owns one + refreshes
+  it each frame; the `Hud` renders it top-left. Reads only — deleting it changes no production number.
+- **`Hud`** (`scenes/hud.gd`, `Node2D` under a `CanvasLayer`) — the **screen-space UI**, one cohesive
+  skin (palette + beveled accent `_panel()`): the OBJECTIVES panel, the machine INSPECTOR (recipe
+  in→out chips / mode / holding, pushed by `MainView._hover_info()`), a cached MINIMAP (terrain by
+  material + you-here + viewport rect; rebuilt only when `sim.solid` changes; terrain colour via the
+  renderer's `material_color` Callable), the FORGED chip, and the unified craft+hotbar "pack". Reads
+  the sim + a few pushed values; never mutates.
 - **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: machine kind/colour,
   the scalable animated machine glyph (drawn by both the world + the HUD, so they never drift), item
   colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
