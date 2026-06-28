@@ -309,9 +309,9 @@ func _draw_terrain() -> void:
 			var sp: Array[Vector2] = _cell_speckles(c, 2)
 			draw_rect(Rect2(pos + sp[0] - Vector2(2, 2), Vector2(4, 4)), col.darkened(0.22))
 			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3, 3)), col.lightened(0.10))
-		if def.has_nuggets():  # embedded specks so a vein reads as valuable
-			for nug: Vector2 in _cell_speckles(c, 3):
-				draw_circle(pos + nug, 2.4, def.nugget_color)
+		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
+			for nug: Vector2 in _cell_speckles(c, def.nugget_count):
+				draw_circle(pos + nug, 2.0, def.nugget_color)
 	_draw_terrain_surface()  # grass caps + diagonal slope ramps on the exposed surface
 
 

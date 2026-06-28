@@ -27,6 +27,8 @@ extends Resource
 @export var cap_color: Color = Color(0, 0, 0, 0)
 ## Embedded specks (ore nuggets) drawn scattered in the tile. Off when alpha == 0.
 @export var nugget_color: Color = Color(0, 0, 0, 0)
+## How many nuggets to scatter when nugget_color is visible (denser = reads more as a rich vein).
+@export var nugget_count: int = 3
 ## How much the tile darkens with depth (0 = none). Sells "deeper = deeper".
 @export var depth_darken: float = 0.38
 
