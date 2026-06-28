@@ -5,32 +5,59 @@ extends RefCounted
 ## run headless with no scene tree (and does, in tests/run_tests.gd). The representation layer
 ## reads FROM this; it never writes to it. All production math lives here and nowhere else.
 ##
-## PROVISIONAL topology: machines are an ordered vertical chain (index 0 = top). A machine's
-## output "falls" to the next machine's input, and the bottom machine's output lands in the
-## sink. The real 2D grid / lateral routing is deferred (see docs/RISKS.md "Spatial model").
+## TOPOLOGY: machines occupy cells on a grid (x = column, y = row, row increasing DOWNWARD).
+## Gravity = a machine's output falls straight down its column to the next machine below; if
+## none, it lands in the sink. The grid size and the "straight-down only" rule are PROVISIONAL
+## (chutes / splitters / lateral routing are later slices — see docs/RISKS.md "Spatial model").
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
+const GRID_COLS: int = 12
+const GRID_ROWS: int = 9
 
-## Placed machines, top (0) to bottom. Output falls toward higher indices.
+## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
+var grid: Dictionary = {}
+## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
-## Items that have fallen out of the bottom machine. The prototype's running output total.
+## Items that have fallen out the bottom of a column. The prototype's running output total.
 var sink: Dictionary = {}
-## Conservation bookkeeping: every item is created/destroyed ONLY by a recipe. Also useful
-## later as throughput metrics (see docs/HARNESS.md gray-area observability).
+## Conservation bookkeeping: every item is created/destroyed ONLY by a recipe (holds while no
+## machine is removed mid-run; removing a machine intentionally discards its buffered items).
 var total_produced: Dictionary = {}
 var total_consumed: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
 
-func add_machine(state: MachineState) -> void:
+func in_bounds(cell: Vector2i) -> bool:
+	return cell.x >= 0 and cell.x < GRID_COLS and cell.y >= 0 and cell.y < GRID_ROWS
+
+
+func machine_at(cell: Vector2i) -> MachineState:
+	return grid.get(cell, null)
+
+
+## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied.
+func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
+	if not in_bounds(cell) or grid.has(cell):
+		return null
+	var state: MachineState = MachineState.new(def, cell)
+	grid[cell] = state
 	machines.append(state)
+	return state
+
+
+## Remove the machine at a cell (if any). Its buffered items are discarded.
+func remove_machine(cell: Vector2i) -> void:
+	var state: MachineState = grid.get(cell, null)
+	if state == null:
+		return
+	grid.erase(cell)
+	machines.erase(state)
 
 
 ## Advance by real elapsed time, running only whole fixed ticks (deterministic, framerate-
-## independent). The game loop calls this; tests call tick() directly. Fast-forwarding offline
-## progress later is just calling this with a large delta.
+## independent). The game loop calls this; tests call tick() directly.
 func advance(delta: float) -> void:
 	_tick_accumulator += delta
 	while _tick_accumulator >= SECONDS_PER_TICK:
@@ -76,15 +103,24 @@ func _has_inputs(machine: MachineState, recipe: RecipeDef) -> bool:
 	return true
 
 
-## Gravity: each machine's output falls into the next machine's input; the bottom machine's
-## output lands in the sink. Items are only moved here, never created or destroyed.
+## Gravity: each machine's output falls straight down its column to the next machine below;
+## if none, it lands in the sink. Items are only moved here, never created or destroyed.
 func _flow() -> void:
-	var count: int = machines.size()
-	for i: int in count:
-		var machine: MachineState = machines[i]
+	for machine: MachineState in machines:
 		if machine.output_buffer.is_empty():
 			continue
-		var target: Dictionary = sink if i == count - 1 else machines[i + 1].input_buffer
+		var target: Dictionary = _target_below(machine)
 		for item: StringName in machine.output_buffer:
 			target[item] = int(target.get(item, 0)) + int(machine.output_buffer[item])
 		machine.output_buffer.clear()
+
+
+## The input buffer of the next machine straight below this one, or the sink if the column is
+## clear all the way down.
+func _target_below(machine: MachineState) -> Dictionary:
+	var col: int = machine.cell.x
+	for row: int in range(machine.cell.y + 1, GRID_ROWS):
+		var below: MachineState = grid.get(Vector2i(col, row), null)
+		if below != null:
+			return below.input_buffer
+	return sink

@@ -12,6 +12,7 @@ var _failures: int = 0
 
 func _initialize() -> void:
 	print("== Sinkforge sim tests ==")
+	_test_placement()
 	_test_conservation()
 	_test_determinism()
 	_test_production()
@@ -26,11 +27,13 @@ func _initialize() -> void:
 # --- helpers -----------------------------------------------------------------
 
 func _build_sim() -> FactorySim:
+	# Vent on top of a column, processor lower in the SAME column: vent output falls down
+	# the empty cells between them into the processor, then ingots fall to the sink.
 	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
 	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
 	var sim: FactorySim = FactorySim.new()
-	sim.add_machine(MachineState.new(vent_def))
-	sim.add_machine(MachineState.new(proc_def))
+	sim.place_machine(vent_def, Vector2i(6, 0))
+	sim.place_machine(proc_def, Vector2i(6, 3))
 	return sim
 
 
@@ -67,6 +70,20 @@ func _state_signature(sim: FactorySim) -> String:
 
 
 # --- tests -------------------------------------------------------------------
+
+## Placement API: in-bounds empty cells accept machines; occupied/out-of-bounds are rejected;
+## removal clears the cell.
+func _test_placement() -> void:
+	print("- placement")
+	var sim: FactorySim = FactorySim.new()
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	_check(sim.place_machine(vent_def, Vector2i(2, 2)) != null, "place in an empty cell")
+	_check(sim.machine_at(Vector2i(2, 2)) != null, "machine_at finds the placed machine")
+	_check(sim.place_machine(vent_def, Vector2i(2, 2)) == null, "cannot place on an occupied cell")
+	_check(sim.place_machine(vent_def, Vector2i(-1, 0)) == null, "cannot place out of bounds")
+	sim.remove_machine(Vector2i(2, 2))
+	_check(sim.machine_at(Vector2i(2, 2)) == null, "remove clears the cell")
+
 
 ## Every item is created/destroyed ONLY by a recipe: items currently present must equal
 ## (total produced - total consumed). If this ever fails, the sim is leaking or inventing items.
