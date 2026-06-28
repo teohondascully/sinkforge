@@ -26,3 +26,4 @@ _zoom_*.png
 # Godot import sidecars for reference screenshots (not game assets) + tool-script UIDs
 history/*.import
 tools/*.uid
+/_capture_flow.png

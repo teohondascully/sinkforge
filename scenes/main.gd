@@ -463,11 +463,23 @@ func _draw_falling() -> void:
 		var from: Vector2 = f["from"]
 		var to: Vector2 = f["to"]
 		var t: float = clampf(float(f["t"]), 0.0, 1.0)
+		var col: Color = f["color"]
+		# A fading comet-trail behind the item along its path, so the DOWNWARD flow reads as a stream
+		# on the gravity "conveyor" (the core hook), not a lone hopping square.
+		var trail: int = 4
+		for i: int in range(trail, 0, -1):
+			var tt: float = clampf(t - float(i) * 0.06, 0.0, 1.0)
+			var pp: Vector2 = from.lerp(to, tt)
+			pp.y -= sin(tt * PI) * 10.0
+			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.30
+			var sz: float = 5.0 - float(i) * 0.7
+			draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
 		# Travel down the column, with a small launch-hop so the item reads as SPAT OUT, then gravity.
 		var p: Vector2 = from.lerp(to, t)
 		p.y -= sin(t * PI) * 10.0
 		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.05, 0.07))
-		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), f["color"])
+		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), col)
+		draw_rect(Rect2(p - Vector2(2, 2), Vector2(4, 4)), col.lightened(0.4))  # bright core "pops"
 
 
 ## A machine as a CASING + a type silhouette (no more "P 0" debug letters): a glowing furnace for the
