@@ -54,6 +54,28 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   without a type-enum. PROVISIONAL machine model (see DECISIONS 2026-06-27 splitter entry).
   Every def carries a stable `id: StringName` (save/reference safety, docs/RISKS.md).
 
+### World engine — the gen↔viz handshake (see docs/WORLDGEN.md)
+- **Location:** `src/core/world_data.gd`, `src/core/world_gen.gd`,
+  `src/core/heightmap_world_gen.gd`; `src/data/material_def.gd` + `src/data/materials/*.tres`.
+- **Responsibility:** Decouple HOW the world is generated from HOW it is visualised, so either
+  improves without the other. Three contract pieces:
+  - **`MaterialDef`** (Resource, flyweight) — the shared vocabulary. A cell holds a material
+    **id**; appearance (`base_color`, `grain`, `cap_color`, `nugget_color`, `depth_darken`) +
+    `layer` (`&"block"`/`&"wall"`) live here. The generator emits ids; the visualiser maps
+    `id → MaterialDef` through MainView's `_materials` registry.
+  - **`WorldData`** (`RefCounted`, plain data, no engine deps) — the handshake artifact a generator
+    PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, and two grids `blocks` + `walls`
+    (cell → material id). The bounded, two-layer world.
+  - **`WorldGen`** (`RefCounted`) — `generate(cols, rows, seed) -> WorldData`, contractually
+    **deterministic** (seeded RNG). Concrete: `HeightmapWorldGen` (heightmap surface, seeded ore,
+    a stone layer below a depth, stone/dirt walls behind sub-surface cells).
+- **Relationships / dependency rule:** WorldGen depends only on material ids + WorldData (not the
+  sim, not rendering). `FactorySim.load_world(WorldData)` ingests both grids; the sim gained a
+  background **wall layer** (`wall`, `wall_at`/`set_wall`) and `mine` now clears the block but keeps
+  the wall (Terraria-style). The renderer reads the live grids + the registry. **Improve generation
+  = a new WorldGen; improve the look = edit MaterialDefs; neither touches the other.** Conforms to
+  the node-free-sim / data-driven-Resources / viz-as-driven-layer principles.
+
 ### MainView — representation + input (disposable, read-only)
 - **Location:** `scenes/main.gd` (`class_name MainView`, `Node2D`) + `scenes/main.tscn`
 - **Responsibility:** OWNS a `FactorySim`, advances it (pausable), draws the WORLD in world-space
