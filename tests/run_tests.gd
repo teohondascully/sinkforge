@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_test_determinism()
 	_test_production()
 	_test_splitter()
+	_test_terrain()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -162,3 +163,20 @@ func _test_splitter() -> void:
 		a.tick()
 		b.tick()
 	_check(_state_signature(a) == _state_signature(b), "splitter chain is deterministic")
+
+
+## Terrain is authoritative world state: solid cells block placement, mining clears them, and the
+## avatar never touches this (it only reads is_solid). Groundwork for the embodied body (P2·S1a).
+func _test_terrain() -> void:
+	print("- terrain")
+	var sim: FactorySim = FactorySim.new()
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	sim.set_solid(Vector2i(3, 3), true)
+	_check(sim.is_solid(Vector2i(3, 3)), "set_solid marks a cell solid")
+	_check(not sim.is_solid(Vector2i(4, 3)), "neighbouring cell stays open")
+	_check(sim.place_machine(vent_def, Vector2i(3, 3)) == null, "cannot place a machine in solid earth")
+	_check(sim.mine(Vector2i(3, 3)), "mine clears a solid cell")
+	_check(not sim.is_solid(Vector2i(3, 3)), "mined cell is now open")
+	_check(sim.place_machine(vent_def, Vector2i(3, 3)) != null, "can place after mining out the earth")
+	_check(not sim.mine(Vector2i(5, 5)), "mining a non-solid cell is a no-op")
+	_check(not sim.is_solid(Vector2i(-1, 0)), "out-of-bounds is never solid")

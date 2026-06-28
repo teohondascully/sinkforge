@@ -1,53 +1,81 @@
 class_name MainView
 extends Node2D
 
-## Representation + input layer for Prototype 1. OWNS a FactorySim (game-session-owns-sim rule,
-## see docs/RISKS.md), advances it, draws it, and translates mouse/keys into sim placement ops.
-## It only READS sim production state — never writes buffers/progress/sink. Placement goes
-## through the sim's public API. Falling-item sprites are PURELY COSMETIC: spawned from the
-## sim's flow-event log and animated here; they never feed back into production. Delete this
-## node and the numbers are identical.
+## Representation + input root for Prototype 2. OWNS a FactorySim (game-session-owns-sim rule,
+## docs/RISKS.md), advances it, draws the WORLD in world-space under a follow Camera2D, and hosts
+## the embodied Player (a separate representation-layer node). It only READS sim state — never
+## writes buffers/progress/sink. Terrain edits go through the sim's discrete API. Falling-item
+## sprites are PURELY COSMETIC (driven by the sim's flow-event log). Delete the visuals/player and
+## the production numbers are identical.
 ##
-## `sim` is exposed read-only for tests/tools. Only this node advances it.
+## P2·S1a scope: a body you move in a scrolling world that shares space with the running factory.
+## NOT here yet: digging (S1b), inventory/hauling (S2), embodied building (S3). The god-cursor
+## build palette of Prototype 1 was intentionally removed — building becomes embodied in S3.
 ##
-## DESIGN-OPEN (presentation/controls, NOT canon — collect into PLAYTEST_NOTES when playable):
-##  - Shaft framing (rock walls vs blueprint), grid size 14x9, colours, the falling-item look,
-##    fall speed/easing, build UX (click-select + click-place, right-click remove, space pause),
-##    fixed camera/no-zoom: ALL placeholder and undecided.
+## DESIGN-OPEN (placeholder, undecided): world size/shape, terrain layout, colours, camera feel,
+## the body's look, all movement numbers, art style. Collected for PLAYTEST_NOTES once felt.
 
-const CANVAS := Vector2(640, 360)
 const CELL: int = 32
 const FALL_DURATION: float = 0.30
+const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 
 var sim: FactorySim
+var _player: Player
+var _camera: Camera2D
 var _font: Font = ThemeDB.fallback_font
-var _origin: Vector2
-var _palette: Array[Dictionary] = []
-var _selected_def: MachineDef
 var _paused: bool = false
-## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color}.
+## Cosmetic falling sprites: {from: Vector2, to: Vector2, t: float, color: Color} in WORLD coords.
 var _falling: Array[Dictionary] = []
 
 
 func _ready() -> void:
-	# Centre the shaft horizontally; leave a top strip for the palette and a bottom strip for OUTPUT.
-	_origin = Vector2((CANVAS.x - float(FactorySim.GRID_COLS * CELL)) * 0.5, 36.0)
 	sim = FactorySim.new()
+	_seed_world()
+
+	_player = Player.new()
+	_player.sim = sim
+	_player.position = _cell_center(Vector2i(2, 16))  # on the ground near the left
+	add_child(_player)
+
+	_camera = Camera2D.new()
+	_camera.position_smoothing_enabled = true
+	_camera.position_smoothing_speed = 8.0
+	_camera.limit_left = 0
+	_camera.limit_top = 0
+	_camera.limit_right = int(WORLD_SIZE.x)
+	_camera.limit_bottom = int(WORLD_SIZE.y)
+	_player.add_child(_camera)
+	_camera.make_current()
+
+	var layer := CanvasLayer.new()
+	var hud := Hud.new()
+	hud.sim = sim
+	hud.paused_getter = func() -> bool: return _paused
+	layer.add_child(hud)
+	add_child(layer)
+
+
+## Build the starting world: solid ground (with a chute gap under the factory so the cascade falls
+## clean to the sink), a few platforms to climb, and the demo factory in shared space.
+func _seed_world() -> void:
+	var chute: Array[int] = [9, 10]  # leave these columns open top-to-bottom for the cascade
+	for col: int in FactorySim.GRID_COLS:
+		if col in chute:
+			continue
+		sim.set_solid(Vector2i(col, 18), true)
+		sim.set_solid(Vector2i(col, 19), true)
+	# Climbable ledges from the ground up toward the factory at the top.
+	for ledge: Array in [[2, 15, 4], [11, 14, 3], [4, 11, 3], [13, 9, 3], [4, 7, 3]]:
+		for i: int in int(ledge[2]):
+			sim.set_solid(Vector2i(int(ledge[0]) + i, int(ledge[1])), true)
+	# Demo factory: vent → splitter fans into two processors; their ingots rain down the chute.
 	var vent: MachineDef = load("res://src/data/machines/ore_vent.tres")
 	var processor: MachineDef = load("res://src/data/machines/processor.tres")
 	var splitter: MachineDef = load("res://src/data/machines/splitter.tres")
-	_palette = [
-		{"def": vent, "color": Color(0.82, 0.45, 0.20)},
-		{"def": processor, "color": Color(0.30, 0.55, 0.75)},
-		{"def": splitter, "color": Color(0.58, 0.42, 0.78)},
-	]
-	_selected_def = vent
-	# Initial demo placement: a vent feeds a splitter that fans into two processors — a visible
-	# Y-split on open (provisional demo).
-	sim.place_machine(vent, Vector2i(7, 1))
-	sim.place_machine(splitter, Vector2i(7, 4))
-	sim.place_machine(processor, Vector2i(7, 7))
-	sim.place_machine(processor, Vector2i(8, 7))
+	sim.place_machine(vent, Vector2i(9, 1))
+	sim.place_machine(splitter, Vector2i(9, 4))
+	sim.place_machine(processor, Vector2i(9, 7))
+	sim.place_machine(processor, Vector2i(10, 7))
 
 
 func _process(delta: float) -> void:
@@ -61,28 +89,8 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key := event as InputEventKey
-		if key.pressed and not key.echo and key.keycode == KEY_SPACE:
+		if key.pressed and not key.echo and key.keycode == KEY_P:
 			_paused = not _paused
-			queue_redraw()
-		return
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if not mb.pressed:
-			return
-		var pos: Vector2 = get_local_mouse_position()
-		for i: int in _palette.size():
-			if _palette_rect(i).has_point(pos):
-				_selected_def = _palette[i]["def"]
-				queue_redraw()
-				return
-		var cell: Vector2i = _cell_from_pixel(pos)
-		if not sim.in_bounds(cell):
-			return
-		if mb.button_index == MOUSE_BUTTON_LEFT:
-			sim.place_machine(_selected_def, cell)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT:
-			sim.remove_machine(cell)
-		queue_redraw()
 
 
 # --- cosmetic falling items (driven by the sim, never feeding back) -----------
@@ -109,61 +117,62 @@ func _advance_falling(delta: float) -> void:
 	_falling = keep
 
 
-# --- drawing -----------------------------------------------------------------
+# --- drawing (WORLD space; the Camera2D provides the view transform) ----------
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.06, 0.06, 0.08))  # surrounding rock
-	var shaft := Rect2(_origin, Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL))
-	draw_rect(shaft, Color(0.11, 0.12, 0.15))                        # the excavated shaft
-	_draw_grid(shaft)
-	draw_rect(shaft.grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)  # shaft frame
+	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.11, 0.12, 0.15))  # the open shaft/air
+	_draw_terrain()
+	_draw_grid()
+	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
 	_draw_falling()
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
-	_draw_output()
-	_draw_palette()
-	if _paused:
-		draw_string(_font, Vector2(_origin.x, 24), "PAUSED  (space)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.72, 0.30))
 
 
-func _draw_grid(shaft: Rect2) -> void:
-	var line_col := Color(1, 1, 1, 0.05)
+func _draw_terrain() -> void:
+	for cell: Variant in sim.solid:
+		var c: Vector2i = cell
+		var pos := Vector2(c) * float(CELL)
+		draw_rect(Rect2(pos, Vector2(CELL, CELL)), Color(0.30, 0.22, 0.16))          # earth
+		draw_rect(Rect2(pos, Vector2(CELL, CELL)), Color(0.0, 0.0, 0.0, 0.18), false, 1.0)
+
+
+func _draw_grid() -> void:
+	var line_col := Color(1, 1, 1, 0.04)
 	for c: int in FactorySim.GRID_COLS + 1:
-		var x: float = _origin.x + float(c * CELL)
-		draw_line(Vector2(x, shaft.position.y), Vector2(x, shaft.end.y), line_col)
+		var x: float = float(c * CELL)
+		draw_line(Vector2(x, 0.0), Vector2(x, WORLD_SIZE.y), line_col)
 	for r: int in FactorySim.GRID_ROWS + 1:
-		var y: float = _origin.y + float(r * CELL)
-		draw_line(Vector2(shaft.position.x, y), Vector2(shaft.end.x, y), line_col)
+		var y: float = float(r * CELL)
+		draw_line(Vector2(0.0, y), Vector2(WORLD_SIZE.x, y), line_col)
 
 
-## Faint guide line tracing where each machine's output goes — straight down its column to the
-## next machine or the floor. A splitter shows BOTH of its prongs (down + sideways-then-down) so
-## the routing is legible at a glance. Mirrors FactorySim._destinations.
+## Faint guide tracing where each machine's output goes — down its column, and for a splitter the
+## sideways-then-down elbow. Mirrors FactorySim._destinations. A drop that lands on a machine draws
+## a full connector; a terminal drop (falling out to the sink) draws only a short stub, so guides
+## don't streak the whole tall world down into the HUD.
 func _draw_drop_paths() -> void:
 	var guide := Color(0.45, 0.55, 0.68, 0.20)
 	for machine: MachineState in sim.machines:
 		var col: int = machine.cell.x
-		var cx: float = _origin.x + float(col * CELL) + float(CELL) * 0.5
-		var bottom: float = _origin.y + float(machine.cell.y * CELL) + float(CELL)
-		draw_line(Vector2(cx, bottom), Vector2(cx, _column_landing_y(col, machine.cell.y + 1)), guide, 2.0)
+		var cx: float = float(col * CELL) + float(CELL) * 0.5
+		var bottom: float = float(machine.cell.y * CELL) + float(CELL)
+		draw_line(Vector2(cx, bottom), Vector2(cx, _guide_end_y(col, machine.cell.y + 1, bottom)), guide, 2.0)
 		if machine.def.behavior == &"splitter" and col + 1 < FactorySim.GRID_COLS:
-			# Elbow: sideways out of the splitter's row into the right column, then fall.
-			var cy: float = _origin.y + float(machine.cell.y * CELL) + float(CELL) * 0.5
-			var rx: float = _origin.x + float((col + 1) * CELL) + float(CELL) * 0.5
-			var land: float = _column_landing_y(col + 1, machine.cell.y)
+			var cy: float = float(machine.cell.y * CELL) + float(CELL) * 0.5
+			var rx: float = float((col + 1) * CELL) + float(CELL) * 0.5
 			draw_line(Vector2(cx, cy), Vector2(rx, cy), guide, 2.0)
-			draw_line(Vector2(rx, cy), Vector2(rx, land), guide, 2.0)
+			draw_line(Vector2(rx, cy), Vector2(rx, _guide_end_y(col + 1, machine.cell.y, cy)), guide, 2.0)
 
 
-## Pixel y where something falling down `col` from `start_row` lands (top of the first machine
-## below, or the shaft floor).
-func _column_landing_y(col: int, start_row: int) -> float:
+## y where a guide should stop: the top of the next machine down this column, or — if the item just
+## falls out to the sink — a short stub below where it started (no full-height line to nowhere).
+func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
 	for row: int in range(start_row, FactorySim.GRID_ROWS):
 		if sim.machine_at(Vector2i(col, row)) != null:
-			return _origin.y + float(row * CELL)
-	return _origin.y + float(FactorySim.GRID_ROWS * CELL)
+			return float(row * CELL)
+	return stub_from + float(CELL) * 0.9
 
 
 func _draw_falling() -> void:
@@ -172,25 +181,20 @@ func _draw_falling() -> void:
 		var to: Vector2 = f["to"]
 		var t: float = clampf(float(f["t"]), 0.0, 1.0)
 		var p: Vector2 = from.lerp(to, t * t)  # t^2 = accelerating under gravity
-		# Dark outline + colored core so a falling item reads as a distinct token.
 		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.05, 0.05, 0.07))
 		draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9, 9)), f["color"])
 
 
 func _draw_machine(machine: MachineState) -> void:
-	var pos: Vector2 = _origin + Vector2(machine.cell) * float(CELL)
+	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
-	# Inset the tile + dark seam so two side-by-side machines never fuse into one box.
 	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
 	draw_rect(body, _machine_color(machine.def))
 	draw_rect(body, Color(0.04, 0.04, 0.06, 0.7), false, 1.0)
-	# Type tag (top) so stacked machines are distinguishable at a glance.
 	draw_string(_font, Vector2(pos.x + 3, pos.y + 11), _tag(machine.def.display_name),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
-	# Held items (input + output) — ALWAYS shown, even 0, so the readout never disappears.
 	draw_string(_font, Vector2(pos.x + 3, pos.y + 25), str(_held(machine)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.96, 0.96, 0.99))
-	# Progress bar (track + fill) so 0% reads as an empty bar, not a glitchy nub.
 	if recipe != null and recipe.time > 0.0:
 		var bar_y: float = pos.y + float(CELL) - 3.0
 		draw_rect(Rect2(pos.x, bar_y, float(CELL), 3.0), Color(0.0, 0.0, 0.0, 0.35))
@@ -198,39 +202,12 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 
-func _draw_output() -> void:
-	var y: float = _origin.y + float(FactorySim.GRID_ROWS * CELL) + 22.0
-	draw_string(_font, Vector2(_origin.x, y), "OUTPUT   %s" % _buf(sim.sink),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.80, 0.32))
-
-
-func _draw_palette() -> void:
-	for i: int in _palette.size():
-		var entry: Dictionary = _palette[i]
-		var r: Rect2 = _palette_rect(i)
-		draw_rect(r, _machine_color(entry["def"]))
-		draw_string(_font, Vector2(r.position.x + 4, r.position.y + 15),
-			_tag(entry["def"].display_name), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.06, 0.06, 0.09))
-		if entry["def"] == _selected_def:
-			draw_rect(r, Color.WHITE, false, 2.0)
-
-
 # --- helpers -----------------------------------------------------------------
 
-func _palette_rect(i: int) -> Rect2:
-	return Rect2(_origin.x + float(i) * 34.0, 8.0, 26.0, 22.0)
-
-
-func _cell_from_pixel(p: Vector2) -> Vector2i:
-	return Vector2i(floori((p.x - _origin.x) / float(CELL)), floori((p.y - _origin.y) / float(CELL)))
-
-
 func _cell_center(cell: Vector2i) -> Vector2:
-	return _origin + Vector2(cell) * float(CELL) + Vector2(CELL, CELL) * 0.5
+	return Vector2(cell) * float(CELL) + Vector2(CELL, CELL) * 0.5
 
 
-## One place that maps a machine definition to its body colour, so palette swatch and placed
-## machine always agree. Source (no-input recipe) = ore orange; splitter = violet; processor = blue.
 func _machine_color(def: MachineDef) -> Color:
 	if def.behavior == &"splitter":
 		return Color(0.58, 0.42, 0.78)
@@ -263,12 +240,3 @@ func _held(machine: MachineState) -> int:
 	for v: int in machine.output_buffer.values():
 		n += v
 	return n
-
-
-func _buf(d: Dictionary) -> String:
-	if d.is_empty():
-		return "—"
-	var parts: PackedStringArray = []
-	for k: StringName in d:
-		parts.append("%s %d" % [k, int(d[k])])
-	return "  ".join(parts)

@@ -12,11 +12,20 @@ extends RefCounted
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
-const GRID_COLS: int = 14
-const GRID_ROWS: int = 9
+## Wider than the 640px viewport so the world fills the screen horizontally, and taller than one
+## screen so descending scrolls (embodied pivot, P2·S1a). The world is no longer a single fixed
+## screen of grid.
+const GRID_COLS: int = 20
+const GRID_ROWS: int = 20
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
+## Solid terrain cells (cell -> true). The earth the player stands on and (later) digs through.
+## Authoritative world state, like `grid`: placement is blocked in solid cells, and it is mutated
+## ONLY by discrete calls (set_solid / mine) — never as a side effect of the real-time avatar
+## moving — so the sim stays deterministic and serializable. The avatar lives in the
+## representation layer and never enters the tick (see docs/RISKS.md "embodied pivot").
+var solid: Dictionary = {}
 ## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
 ## Items that have fallen out the bottom of a column. The prototype's running output total.
@@ -41,9 +50,35 @@ func machine_at(cell: Vector2i) -> MachineState:
 	return grid.get(cell, null)
 
 
-## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied.
+## Is this cell solid earth? (Representation layer reads this for collision; sim mutates it only
+## via set_solid / mine.)
+func is_solid(cell: Vector2i) -> bool:
+	return solid.get(cell, false)
+
+
+## Seed or clear a terrain cell — used to build the starting world. Discrete edit; in-bounds only.
+func set_solid(cell: Vector2i, value: bool) -> void:
+	if not in_bounds(cell):
+		return
+	if value:
+		solid[cell] = true
+	else:
+		solid.erase(cell)
+
+
+## Player action: dig out a solid earth cell. Returns true if a cell was actually cleared. (P2·S1b
+## will hook the ore yield onto this; S1a only needs terrain to exist + be queryable.)
+func mine(cell: Vector2i) -> bool:
+	if not solid.get(cell, false):
+		return false
+	solid.erase(cell)
+	return true
+
+
+## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
+## inside solid earth.
 func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
-	if not in_bounds(cell) or grid.has(cell):
+	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false):
 		return null
 	var state: MachineState = MachineState.new(def, cell)
 	grid[cell] = state
