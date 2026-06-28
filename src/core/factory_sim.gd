@@ -12,7 +12,7 @@ extends RefCounted
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
-const GRID_COLS: int = 12
+const GRID_COLS: int = 14
 const GRID_ROWS: int = 9
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
@@ -25,6 +25,10 @@ var sink: Dictionary = {}
 ## machine is removed mid-run; removing a machine intentionally discards its buffered items).
 var total_produced: Dictionary = {}
 var total_consumed: Dictionary = {}
+## Cosmetic output channel: item movements logged during _flow, for the view to animate as
+## falling sprites. The sim NEVER reads this back — clearing it changes no production. The
+## representation layer drains it each frame. Each entry: {item, from: Vector2i, to: Vector2i, count}.
+var flow_events: Array[Dictionary] = []
 
 var _tick_accumulator: float = 0.0
 
@@ -109,18 +113,27 @@ func _flow() -> void:
 	for machine: MachineState in machines:
 		if machine.output_buffer.is_empty():
 			continue
-		var target: Dictionary = _target_below(machine)
+		var below: MachineState = _machine_below(machine)
+		var to_cell: Vector2i
+		var target: Dictionary
+		if below != null:
+			to_cell = below.cell
+			target = below.input_buffer
+		else:
+			to_cell = Vector2i(machine.cell.x, GRID_ROWS)  # falls past the bottom into the sink
+			target = sink
 		for item: StringName in machine.output_buffer:
-			target[item] = int(target.get(item, 0)) + int(machine.output_buffer[item])
+			var count: int = int(machine.output_buffer[item])
+			target[item] = int(target.get(item, 0)) + count
+			flow_events.append({"item": item, "from": machine.cell, "to": to_cell, "count": count})
 		machine.output_buffer.clear()
 
 
-## The input buffer of the next machine straight below this one, or the sink if the column is
-## clear all the way down.
-func _target_below(machine: MachineState) -> Dictionary:
+## The next machine straight down this one's column, or null if the column is clear to the bottom.
+func _machine_below(machine: MachineState) -> MachineState:
 	var col: int = machine.cell.x
 	for row: int in range(machine.cell.y + 1, GRID_ROWS):
 		var below: MachineState = grid.get(Vector2i(col, row), null)
 		if below != null:
-			return below.input_buffer
-	return sink
+			return below
+	return null
