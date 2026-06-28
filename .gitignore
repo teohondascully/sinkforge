@@ -18,3 +18,6 @@ build/
 # IDE
 .vscode/
 .idea/
+
+# Dev harness — generated screenshots
+/_capture.png
