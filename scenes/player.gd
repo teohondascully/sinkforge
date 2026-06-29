@@ -358,7 +358,8 @@ func _draw() -> void:
 		var w: float = float(tex.get_width()) * sxq
 		var h: float = float(tex.get_height()) * syq
 		var dst := Rect2(-w * 0.5, (HEIGHT * 0.5) - h + bob, w, h)  # feet on the AABB bottom, centred
-		if f < 0.0:
+		# The drop-in miner art is authored facing LEFT, so flip it when the body faces RIGHT (f > 0).
+		if f > 0.0:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
 			dst.position.x = -w * 0.5
 		draw_texture_rect(tex, dst, false)
