@@ -229,12 +229,20 @@ func _stamp_bazaar_ruin(world: WorldData) -> void:
 	for cx: int in range(RUIN_X, RUIN_X + w):                  # flatten + clear the footprint
 		for ry: int in range(0, ground):
 			world.blocks.erase(Vector2i(cx, ry))              # remove any bump / tree above the ground line
+			world.walls.erase(Vector2i(cx, ry))              # ...and its back-wall, so the cleared area is open
+			                                                 # SKY (no floating dirt wall above the flattened ruin)
 		for ry: int in range(ground, ground + 4):
-			if not world.blocks.has(Vector2i(cx, ry)):
-				world.blocks[Vector2i(cx, ry)] = &"earth"     # ensure solid ground to stand + build on
-				world.walls[Vector2i(cx, ry)] = &"dirt_wall"
+			var fc := Vector2i(cx, ry)
+			var existing: StringName = world.blocks.get(fc, &"")
+			# Solid ground to stand + build on — and CLEAR any buried tree stump (wood/leaves left under a
+			# cleared canopy), so a finished bazaar never connects to orphan wood that could flood-fell it.
+			if existing == &"" or existing == &"wood" or existing == &"leaves":
+				world.blocks[fc] = &"earth"
+				world.walls[fc] = &"dirt_wall"
 	var o := Vector2i(RUIN_X, ground - h)                     # frame top-left
-	var missing := o + Vector2i(w - 1, h - 1)                 # the one block the player places to finish
+	var missing := o + Vector2i(0, h - 1)                     # bottom-LEFT post — the gap faces spawn, so the
+	                                                          # player can walk up and place the finishing block
+	                                                          # (the far side is behind the 3-tall frame wall)
 	for dx: int in w:
 		world.blocks[o + Vector2i(dx, 0)] = &"wood"           # top beam
 	for dy: int in range(1, h):                               # posts (both sides), minus the gap

@@ -28,6 +28,9 @@ const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a n
 ## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
 ## bazaar build material; the list grows as more buildables land (log/stone/etc).
 const BUILD_MATERIALS: Array[StringName] = [&"wood"]
+## How close (chebyshev cells, around a bazaar's centre) you must stand to craft machines — the Bazaar is
+## the crafting hub (Minecraft crafting-table proximity). Away from it, the E screen shows the pack only.
+const BAZAAR_RADIUS: int = 3
 ## Dev: start with a stocked pack (ore/ingots/machines) for testing. A static so the headless harness
 ## can force a CLEAN start (it asserts exact counts) by setting MainView.dev_start = false before boot.
 static var dev_start: bool = true
@@ -40,7 +43,8 @@ var _hud: Hud                      ## screen-space HUD (we push it objectives + 
 var _paused: bool = false
 ## On-demand UI state (the calm-screen model): the crafting screen (E), the map (M), and the controls
 ## help (H/?) are summoned, not permanent. Pushed to the HUD each frame so it knows what to draw.
-var _crafting_open: bool = false
+var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); crafting lives inside it, but
+                                    ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
 var _show_minimap: bool = false
 var _show_help: bool = false
 var _mine_cooldown: float = 0.0
@@ -256,6 +260,7 @@ func _seed_world() -> void:
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
 	sim.load_world(world)
 	_seed_starter_vein()
+	_seed_tutorial_tree()
 	_seed_tutorial_mineshaft()
 	if dev_start:
 		_dev_seed_pack()
@@ -270,6 +275,22 @@ const STARTER_VEIN_CELL := Vector2i(4, 5)
 func _seed_starter_vein() -> void:
 	sim.set_solid(STARTER_VEIN_CELL, &"ore")
 	sim.deposits[STARTER_VEIN_CELL] = 6                            # ~3 ingots' worth — bootstrap + margin
+
+
+## A guaranteed TUTORIAL TREE on the surface, LEFT of spawn — the wood source the bazaar step needs
+## (depth-banded worldgen plants trees out past the ruin, unreachable on the surface early; and a solid
+## tree ON the path would wall it — trunk blocks the torso, canopy blocks a jump). Placed left of spawn it
+## is an ENDPOINT: the body walks to it, chops from beside it, and the whole rightward tutorial path
+## (vein → mineshaft → bazaar) stays clear. Crowned with leaves so it reads + fells as a real tree.
+const TUTORIAL_TREE_COL := 1
+func _seed_tutorial_tree() -> void:
+	var g: int = sim.surface_row(TUTORIAL_TREE_COL)               # ground top row (solid at g); trunk above it
+	sim.set_solid(Vector2i(TUTORIAL_TREE_COL, g - 1), &"wood")    # trunk base
+	sim.set_solid(Vector2i(TUTORIAL_TREE_COL, g - 2), &"wood")    # trunk top
+	for leaf: Vector2i in [Vector2i(TUTORIAL_TREE_COL, g - 3), Vector2i(TUTORIAL_TREE_COL, g - 4),
+			Vector2i(TUTORIAL_TREE_COL + 1, g - 3)]:
+		if not sim.is_solid(leaf):
+			sim.set_solid(leaf, &"leaves")                       # crown — marks it a tree, fells to wood
 
 
 ## An ABANDONED MINESHAFT near spawn with a FORGE already in its mouth — the whole Rung-1 stage in one
@@ -322,7 +343,8 @@ func _process(delta: float) -> void:
 	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
 	if _hud != null:
 		_hud.hover_info = _hover_info()
-		_hud.crafting_open = _crafting_open
+		_hud.inventory_open = _inventory_open
+		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
 		_hud.show_minimap = _show_minimap
 		_hud.show_help = _show_help
 		if _player != null:
@@ -372,7 +394,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(Controls.PAUSE):
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):
-		_crafting_open = not _crafting_open
+		_inventory_open = not _inventory_open
 	elif event.is_action_pressed(Controls.DROP):
 		try_drop()
 	elif event.is_action_pressed(Controls.MAP):
@@ -380,7 +402,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.CLOSE):
-		_crafting_open = false
+		_inventory_open = false
 		_show_help = false
 	elif event.is_action_pressed(Controls.BUILD):
 		try_build(_aim)
@@ -393,9 +415,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode >= KEY_1 and event.keycode <= KEY_9:
 		var idx: int = event.keycode - KEY_1            # the fixed hotbar number row
-		if _crafting_open:
+		if _inventory_open:
 			if idx < _craftable.size():
-				try_craft(_craftable[idx])              # in the crafting screen, numbers CRAFT
+				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT (gated to the Bazaar)
 		else:
 			_select_slot(idx)                           # otherwise they SELECT the hotbar slot
 
@@ -483,8 +505,11 @@ func try_deposit() -> bool:
 	return false
 
 
-## Craft a machine item from carried ingots into the pack (the 1/2/3 hotbar craft).
+## Craft a machine item from carried ingots into the pack — GATED on standing near a claimed Bazaar
+## (the crafting hub, docs/CRAFTING.md). Refused away from it, so machine-crafting pulls you to the stall.
 func try_craft(def: MachineDef) -> bool:
+	if not _near_bazaar():
+		return false
 	return sim.craft(def)
 
 
@@ -707,6 +732,14 @@ func _guide_targets() -> Array[Dictionary]:
 			var forge: Vector2i = _first_forge()
 			if forge.x >= 0:
 				out.append({"cell": forge, "mode": "act"})
+		&"wood":
+			var tree: Vector2i = _nearest_tree_to_player()
+			if tree.x >= 0:
+				out.append({"cell": tree, "mode": "act"})
+		&"bazaar":
+			var gap: Vector2i = sim.bazaar_completion_cell()
+			if gap.x >= 0:
+				out.append({"cell": gap, "mode": "ghost"})
 		&"build":
 			var f: Vector2i = _first_forge()
 			if f.x >= 0:
@@ -714,6 +747,12 @@ func _guide_targets() -> Array[Dictionary]:
 				if sim.machine_at(cap) == null and not sim.is_solid(cap):
 					out.append({"cell": cap, "mode": "ghost"})
 	return out
+
+
+## True when the body stands close enough to a CLAIMED (completed) Bazaar to craft machines there. The
+## crafting hub gate (docs/CRAFTING.md): away from it, the E screen shows the pack but no recipes.
+func _near_bazaar() -> bool:
+	return _player != null and sim.near_bazaar(_cell_at(_player.position), BAZAAR_RADIUS)
 
 
 ## The cell of the first FORGE (processor) placed in the world, or (-1,-1) if none — the smelt/build guide
@@ -734,6 +773,23 @@ func _nearest_ore_to_player() -> Vector2i:
 	for cell_v: Variant in sim.solid:
 		var cell: Vector2i = cell_v
 		if sim.solid[cell] != &"ore":
+			continue
+		var d: int = (cell - here).length_squared()
+		if d < best_d:
+			best_d = d
+			best = cell
+	return best
+
+
+## The nearest WOOD (tree trunk) cell to the player — the chop target for the wood step. Trees are sparse
+## on the surface; this points at the closest one so "go get wood" isn't a hunt.
+func _nearest_tree_to_player() -> Vector2i:
+	var here: Vector2i = _cell_at(_player.position)
+	var best := Vector2i(-1, -1)
+	var best_d: int = 1 << 30
+	for cell_v: Variant in sim.solid:
+		var cell: Vector2i = cell_v
+		if sim.solid[cell] != &"wood":
 			continue
 		var d: int = (cell - here).length_squared()
 		if d < best_d:

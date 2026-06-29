@@ -47,7 +47,8 @@ const CELL: float = 32.0
 ## On-demand overlays (pushed by MainView each frame). The screen is calm by default: only the hotbar,
 ## a small FORGED chip, and the current-objective line are permanent. The crafting screen (E), the map
 ## (M), and the controls help (H/?) are summoned, so they never clutter the playfield.
-var crafting_open: bool = false
+var inventory_open: bool = false   ## E — the PACK screen (full carried inventory + the craft panel)
+var can_craft: bool = false        ## are we near a claimed Bazaar? gates the craft panel inside the pack screen
 var show_minimap: bool = false
 var show_help: bool = false
 
@@ -66,8 +67,8 @@ func _draw() -> void:
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
 		_draw_minimap()    # M — top-right world map
-	if crafting_open:
-		_draw_crafting_overlay()  # E — the crafting screen (off the hotbar, table-style)
+	if inventory_open:
+		_draw_inventory_overlay()  # E — the PACK screen: full inventory + (at the Bazaar) the craft panel
 	if show_help:
 		_draw_help_overlay()      # H / ? — the full controls list
 	if paused_getter.is_valid() and bool(paused_getter.call()):
@@ -260,37 +261,80 @@ func _rebuild_minimap() -> void:
 	_minimap_tex = ImageTexture.create_from_image(img)
 
 
-## The CRAFTING SCREEN (E) — a centred, table-style panel, OFF the hotbar. Dims the world behind it so
-## the player knows they're in a menu, lists each craftable machine as a row (icon · name · cost · the
-## [N] key to make it), greyed when unaffordable. Press the number to craft into the pack; E/Esc closes.
-func _draw_crafting_overlay() -> void:
-	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))  # dim the world — "you're in a menu"
+## The PACK SCREEN (E) — a centred panel, OFF the hotbar, dimming the world ("you're in a menu"). Top: the
+## FULL carried inventory as a grid of icon+count chips (your whole pack, not just the hotbar row). Bottom:
+## the CRAFT panel — but machine-crafting is the Bazaar's job, so the recipes show only when you're near a
+## claimed Bazaar (can_craft); away from it, a hint sends you to find/claim one. E/Esc closes.
+func _draw_inventory_overlay() -> void:
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))  # dim the world
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	var cols: int = 6
+	var cell: float = 34.0
+	var grid_h: float = ceilf(maxf(1.0, float(slots.size())) / float(cols)) * cell + 6.0
+	var craft_rows: int = craft_options.size() if can_craft else 1
 	var row_h: float = 30.0
 	var w: float = 280.0
 	var head: float = 34.0
-	var h: float = head + float(craft_options.size()) * row_h + 12.0
+	var craft_head: float = 26.0
+	var h: float = head + grid_h + craft_head + float(craft_rows) * row_h + 14.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
-	draw_string(_font, origin + Vector2(14.0, 23.0), "CRAFTING", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(14.0, 23.0), "PACK", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
 	draw_string(_font, origin + Vector2(w - 116.0, 22.0), "E / Esc to close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	var y: float = origin.y + head
+	# --- the full pack as an icon grid ---
+	var gx: float = origin.x + 10.0
+	var gy: float = origin.y + head
+	if slots.is_empty():
+		draw_string(_font, Vector2(gx + 2.0, gy + 18.0), "(empty — go dig)", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
+	for i: int in slots.size():
+		var ix: float = gx + float(i % cols) * cell
+		var iy: float = gy + float(i / cols) * cell
+		var box := Rect2(ix, iy, cell - 4.0, cell - 4.0)
+		draw_rect(box, UI_SLOT)
+		draw_rect(box, UI_EDGE, false, 1.0)
+		var item: StringName = slots[i]["item"]
+		var icon := Rect2(box.position + Vector2(5.0, 4.0), Vector2(box.size.x - 10.0, box.size.y - 12.0))
+		if machine_icons.has(item):
+			var mspr: Texture2D = Art.tex("machine_" + String(item))
+			if mspr != null:
+				draw_texture_rect(mspr, icon, false)
+			else:
+				draw_rect(icon, machine_icons[item]["color"])
+				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5,
+					str(machine_icons[item]["kind"]), icon.size.y / 20.0, false, 0.0)
+		else:
+			Visuals.draw_item(self, icon.position + icon.size * 0.5, icon.size.y, item)
+		var cnt: String = str(int(slots[i]["count"]))
+		draw_string(_font, box.position + Vector2(box.size.x - 11.0, box.size.y - 2.0), cnt,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	# --- the craft panel (gated on Bazaar proximity) ---
+	var cy: float = origin.y + head + grid_h
+	draw_line(Vector2(origin.x + 8.0, cy), Vector2(origin.x + w - 8.0, cy), UI_EDGE, 1.0)
+	cy += 4.0
+	if not can_craft:
+		draw_string(_font, Vector2(origin.x + 14.0, cy + 19.0), "CRAFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT_DIM)
+		draw_string(_font, Vector2(origin.x + 70.0, cy + 19.0), "— claim & stand by the Bazaar",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
+		return
+	draw_string(_font, Vector2(origin.x + 14.0, cy + 19.0), "CRAFT  (at the Bazaar)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+	var y: float = cy + craft_head
 	for i: int in craft_options.size():
 		var opt: Dictionary = craft_options[i]
 		var afford: bool = _can_afford(opt["cost"])
 		var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 4.0)
 		draw_rect(rr, UI_SLOT)
 		draw_rect(rr, UI_EDGE, false, 1.0)
-		var icon := Rect2(rr.position + Vector2(6.0, 4.0), Vector2(row_h - 12.0, row_h - 12.0))
+		var icon2 := Rect2(rr.position + Vector2(6.0, 4.0), Vector2(row_h - 12.0, row_h - 12.0))
 		var id: StringName = _craft_id(i)
 		if machine_icons.has(id):
 			var spr: Texture2D = Art.tex("machine_" + String(id))
 			if spr != null:
-				draw_texture_rect(spr, icon, false)
+				draw_texture_rect(spr, icon2, false)
 			else:
-				draw_rect(icon, machine_icons[id]["color"])
-				Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5,
-					str(machine_icons[id]["kind"]), icon.size.y / 20.0, false, 0.0)
+				draw_rect(icon2, machine_icons[id]["color"])
+				Visuals.draw_machine_glyph(self, icon2.position + icon2.size * 0.5,
+					str(machine_icons[id]["kind"]), icon2.size.y / 20.0, false, 0.0)
 		var tcol: Color = UI_TEXT if afford else Color(0.45, 0.47, 0.53)
 		draw_string(_font, rr.position + Vector2(34.0, 19.0),
 			"[%d]  %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tcol)
@@ -318,7 +362,7 @@ func _draw_help_overlay() -> void:
 		"select      1–8  ·  mouse wheel",
 		"place / pick  RMB  (machine, or wood block)",
 		"drop / feed  Q  (gravity feeds it in)",
-		"craft       E  (crafting screen)",
+		"pack        E  (inventory · craft at Bazaar)",
 		"map         M",
 		"pause       P     ·   help   H",
 	]
@@ -336,7 +380,7 @@ func _draw_help_overlay() -> void:
 ## A tiny dim hint, bottom-left — the toggle keys, so the player knows the menus exist without the old
 ## always-on keyboard-reference footer hogging the whole bottom edge.
 func _draw_hint() -> void:
-	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "Q drop   ·   E craft   ·   M map   ·   H keys",
+	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "Q drop   ·   E pack   ·   M map   ·   H keys",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 
 

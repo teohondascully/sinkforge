@@ -106,6 +106,8 @@ func _goal_craft_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
 	agent.sim.total_produced[&"ingot"] = int(agent.sim.total_produced.get(&"ingot", 0)) + 3
+	if not await _claim_and_approach_bazaar(agent):
+		return await _finish(agent, false, "claimed the Bazaar and stood at it (crafting is gated there)")
 	var proc_def: MachineDef = load(PROC)
 	var ok: bool = agent.craft(proc_def)
 	return await _finish(agent, ok and int(agent.sim.inventory.get(&"processor", 0)) == 1
@@ -118,6 +120,8 @@ func _goal_build_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
 	agent.sim.total_produced[&"ingot"] = int(agent.sim.total_produced.get(&"ingot", 0)) + 3
+	if not await _claim_and_approach_bazaar(agent):
+		return await _finish(agent, false, "claimed the Bazaar and stood at it (crafting is gated there)")
 	var proc_def: MachineDef = load(PROC)
 	agent.craft(proc_def)
 	await agent.select_item(&"processor")
@@ -180,11 +184,13 @@ func _goal_reach_first_automation() -> bool:
 ## the body, reach, and the hotbar. Returns whether the action could be carried out at all.
 func _do_step(agent: PlayAgent, id: StringName) -> bool:
 	match id:
-		&"mine":  return await _step_mine(agent)
-		&"smelt": return await _step_smelt(agent)
-		&"craft": return _step_craft(agent)
-		&"build": return await _step_build(agent)
-		&"auto":  return await _step_auto(agent)
+		&"mine":   return await _step_mine(agent)
+		&"smelt":  return await _step_smelt(agent)
+		&"wood":   return await _step_wood(agent)
+		&"bazaar": return await _step_bazaar(agent)
+		&"craft":  return await _step_craft(agent)
+		&"build":  return await _step_build(agent)
+		&"auto":   return await _step_auto(agent)
 	return false
 
 
@@ -224,9 +230,43 @@ func _step_smelt(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
 
 
-## Step 3 — craft a Drill from the 2 carried ingots.
+## Step 3 — chop a tree for wood (the bazaar's build material). Fell the base of the nearest tree; one
+## hit fells the whole tree into wood.
+func _step_wood(agent: PlayAgent) -> bool:
+	var base: Vector2i = _nearest_tree_base(agent)
+	if base.x < 0:
+		agent._note("  wood: no tree in the world to chop")
+		return false
+	await agent.mine_cell(base, 1400)        # the tree may be a surface hike from the mineshaft
+	agent._note("  wood: produced wood=%d carried=%d" % [
+		int(agent.sim.total_produced.get(&"wood", 0)), int(agent.sim.inventory.get(&"wood", 0))])
+	return int(agent.sim.inventory.get(&"wood", 0)) >= 1
+
+
+## Step 4 — claim the Bazaar: place one wood block in the gap of the ruined frame near spawn, completing it.
+func _step_bazaar(agent: PlayAgent) -> bool:
+	var gap: Vector2i = agent.sim.bazaar_completion_cell()
+	if gap.x < 0:
+		agent._note("  bazaar: no near-complete ruin to finish")
+		return false
+	if not await agent.select_item(&"wood"):
+		return false
+	if not await agent.build_at(gap):
+		agent._note("  bazaar: could not place wood at the gap %s" % gap)
+		return false
+	return not agent.sim.find_bazaars().is_empty()
+
+
+## Step 5 — craft a Drill AT the Bazaar: walk to the stall (crafting is gated on proximity) and craft.
 func _step_craft(agent: PlayAgent) -> bool:
-	return agent.craft(load(DRILL))
+	if not await _walk_to_bazaar(agent):
+		agent._note("  craft: could not reach the Bazaar to craft at it")
+		return false
+	if not agent.craft(load(DRILL)):
+		agent._note("  craft: craft refused (near_bazaar=%s ingots=%d)" % [
+			agent.main._near_bazaar(), int(agent.sim.inventory.get(&"ingot", 0))])
+		return false
+	return int(agent.sim.inventory.get(&"drill", 0)) >= 1 or _has_drill(agent)
 
 
 ## Step 4 — cap the shaft forge with the Drill: place it directly above the forge so the drill's bored ore
@@ -249,6 +289,68 @@ func _step_auto(agent: PlayAgent) -> bool:
 	for _i: int in 200:
 		await physics_frame
 	return true
+
+
+## Whether a Drill machine is placed anywhere (the craft step is satisfied by a Drill in pack OR built).
+func _has_drill(agent: PlayAgent) -> bool:
+	for m: MachineState in agent.sim.machines:
+		if m.def.behavior == &"drill":
+			return true
+	return false
+
+
+## The base (lowest) trunk cell of the nearest TREE. Identifies a trunk as a WOOD cell crowned by LEAVES
+## directly above (which only a real tree-top has — a bazaar frame post has wood or sky above it, never
+## leaves), then descends that column to the base. Robust even when a canopy overlaps the frame's columns.
+func _nearest_tree_base(agent: PlayAgent) -> Vector2i:
+	var top := Vector2i(-1, -1)
+	var best_d: float = INF
+	for cell: Variant in agent.sim.solid:
+		var c: Vector2i = cell
+		if agent.sim.solid[c] != &"wood":
+			continue
+		if agent.sim.solid.get(c + Vector2i(0, -1), &"") != &"leaves":
+			continue                                            # not a trunk top — skip frame posts
+		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
+		if d < best_d:
+			best_d = d
+			top = c
+	if top.x < 0:
+		return Vector2i(-1, -1)
+	var base := top
+	for cell2: Variant in agent.sim.solid:
+		var c2: Vector2i = cell2
+		if c2.x == top.x and agent.sim.solid[c2] == &"wood" and c2.y > base.y:
+			base = c2
+	return base
+
+
+## Walk the body to within crafting range of a claimed Bazaar (stand on its centre column). Returns whether
+## the body ends up near enough to craft. Used by the craft step + the isolated craft/build goals.
+func _walk_to_bazaar(agent: PlayAgent) -> bool:
+	var bzs: Array[Vector2i] = agent.sim.find_bazaars()
+	if bzs.is_empty():
+		return false
+	# Stand just OUTSIDE the frame on the spawn side — the 3-tall frame is a wall you can't enter, but the
+	# craft radius reaches its interior from beside it, so don't waste frames trying to climb in.
+	await agent.walk_to_column(bzs[0].x - 1)
+	return agent.main._near_bazaar()
+
+
+## Setup hatch for the isolated craft/build goals: claim the seeded ruin with an injected wood block, then
+## stand at the stall so crafting is unlocked. (The RUNG-1 goal does this for real via the wood+bazaar steps.)
+func _claim_and_approach_bazaar(agent: PlayAgent) -> bool:
+	var gap: Vector2i = agent.sim.bazaar_completion_cell()
+	if gap.x >= 0:
+		agent.give(&"wood", 1)
+		agent.sim.total_produced[&"wood"] = int(agent.sim.total_produced.get(&"wood", 0)) + 1  # account the injected block
+		if not await agent.select_item(&"wood"):
+			return false
+		if not await agent.build_at(gap):
+			return false
+	if agent.sim.find_bazaars().is_empty():
+		return false
+	return await _walk_to_bazaar(agent)
 
 
 ## The nearest solid ORE cell to the body that is NOT in the mineshaft column — so hand-mining the

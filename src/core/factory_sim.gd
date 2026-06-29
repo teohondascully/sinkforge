@@ -237,11 +237,21 @@ func mine(cell: Vector2i) -> StringName:
 			_resettle_pile_above(cell)      # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
-		# Chop a tree: one hit FELLS the whole tree (no floating canopy), yielding 1 wood per trunk cell.
-		var got: int = _fell_tree(cell)
-		if got > 0:
-			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + got
-			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + got
+		# A TREE (wood crowned with connected leaves) FELLS whole on one hit. But PLACED wood — the bazaar
+		# frame, any structure you build — is NOT a tree (no leaves); mining it removes just that one block,
+		# so chopping near your bazaar can't flood-collapse it. (A distinct `log` material is the eventual
+		# clean split; until then "has leaves" is the tree test — docs/CRAFTING.md.)
+		if material == &"leaves" or _foliage_has_leaves(cell):
+			var got: int = _fell_tree(cell)
+			if got > 0:
+				inventory[&"wood"] = int(inventory.get(&"wood", 0)) + got
+				total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + got
+			return material
+		# A bare wood block (built structure): recover one wood (mirrors place_block's consume → conserved).
+		solid.erase(cell)
+		inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
+		total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
+		_resettle_pile_above(cell)
 		return material
 	solid.erase(cell)
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
@@ -252,6 +262,26 @@ func mine(cell: Vector2i) -> StringName:
 ## it all, and return how many WOOD cells it held (leaves yield nothing). The fill stops at the ground
 ## (earth isn't foliage) so it never eats terrain, and is capped so a pathological foliage mass can't run
 ## away. Cleared cells become open air again (a tree has no wall behind it).
+## Is the connected foliage mass at `cell` an actual TREE (contains leaves), versus a bare wood structure
+## (the bazaar frame / a built wall)? Flood the connected foliage; true the instant a leaves cell is found.
+## Cheap, capped, and the discriminator that keeps placed wood from felling like a tree.
+func _foliage_has_leaves(cell: Vector2i) -> bool:
+	var seen: Dictionary = {}
+	var stack: Array[Vector2i] = [cell]
+	while not stack.is_empty() and seen.size() < _FELL_CAP:
+		var c: Vector2i = stack.pop_back()
+		if seen.has(c) or not _is_foliage(solid.get(c, &"")):
+			continue
+		seen[c] = true
+		if solid[c] == &"leaves":
+			return true
+		stack.append(c + Vector2i(1, 0))
+		stack.append(c + Vector2i(-1, 0))
+		stack.append(c + Vector2i(0, 1))
+		stack.append(c + Vector2i(0, -1))
+	return false
+
+
 const _FELL_CAP: int = 64
 func _fell_tree(cell: Vector2i) -> int:
 	var wood: int = 0
@@ -370,6 +400,52 @@ func find_bazaars() -> Array[Vector2i]:
 ## The interior-centre cell of a bazaar at origin `o` (where the NPC stands / the "here" marker sits).
 func bazaar_center(o: Vector2i) -> Vector2i:
 	return o + Vector2i(BAZAAR_W / 2, BAZAAR_H - 1)
+
+
+## Where to place ONE wood block to CLAIM a near-complete bazaar (the ruin needs its last post): scans for
+## a frame that is valid in every respect EXCEPT a single empty frame cell, and returns that cell (the
+## "place wood here" target). Returns (-1,-1) if none is one block from done. Drives the objective pointer
+## and lets the play-test claim the bazaar without hardcoding worldgen geometry. Pure read of `solid`.
+func bazaar_completion_cell() -> Vector2i:
+	for y: int in range(0, GRID_ROWS - BAZAAR_H):
+		for x: int in range(0, GRID_COLS - BAZAAR_W + 1):
+			var o := Vector2i(x, y)
+			var cell: Vector2i = _bazaar_missing_one(o)
+			if cell.x >= 0:
+				return cell
+	return Vector2i(-1, -1)
+
+
+## If the frame at `o` would be a valid bazaar with exactly ONE empty frame cell filled with wood, return
+## that cell; else (-1,-1). Mirrors is_bazaar_at's checks but tolerates a single open frame slot.
+func _bazaar_missing_one(o: Vector2i) -> Vector2i:
+	if not in_bounds(o) or not in_bounds(o + Vector2i(BAZAAR_W - 1, BAZAAR_H)):
+		return Vector2i(-1, -1)
+	var missing := Vector2i(-1, -1)
+	var frame: Array[Vector2i] = []
+	for dx: int in BAZAAR_W:
+		frame.append(o + Vector2i(dx, 0))                      # top beam
+	for dy: int in range(1, BAZAAR_H):
+		frame.append(o + Vector2i(0, dy))                      # left post
+		frame.append(o + Vector2i(BAZAAR_W - 1, dy))           # right post
+		for ix: int in range(1, BAZAAR_W - 1):
+			if solid.has(o + Vector2i(ix, dy)):
+				return Vector2i(-1, -1)                         # interior must stay open
+	for fc: Vector2i in frame:
+		var mat: StringName = solid.get(fc, &"")
+		if mat == &"wood":
+			continue
+		if mat == &"" and missing.x < 0:
+			missing = fc                                        # the single allowed gap
+		else:
+			return Vector2i(-1, -1)                             # a non-wood block, or a second gap
+	if missing.x < 0:
+		return Vector2i(-1, -1)                                 # already complete — nothing to place
+	for ix: int in range(1, BAZAAR_W - 1):                     # interior floor must be solid ground
+		var floor_cell: Vector2i = o + Vector2i(ix, BAZAAR_H)
+		if not solid.has(floor_cell) or _is_foliage(solid[floor_cell]):
+			return Vector2i(-1, -1)
+	return missing
 
 
 ## True if any active bazaar's interior is within `radius` cells of `cell` — the gate for crafting

@@ -578,6 +578,16 @@ func _test_trees_and_wood() -> void:
 	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives")
 	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")
 
+	# PLACED wood (a structure with no leaves, e.g. the bazaar frame) is NOT a tree: mining one block
+	# removes only that block (no flood-fell), so chopping near a built bazaar can't collapse it.
+	var s2: FactorySim = FactorySim.new()
+	for c: Vector2i in [Vector2i(2, 2), Vector2i(3, 2), Vector2i(2, 3), Vector2i(3, 3)]:
+		s2.set_solid(c, &"wood")                       # a bare 2×2 wood structure — no leaves
+	_check(s2.mine(Vector2i(2, 2)) == &"wood", "mining built wood returns wood")
+	_check(int(s2.inventory.get(&"wood", 0)) == 1, "mining built wood yields exactly ONE block, not a flood")
+	_check(s2.is_solid(Vector2i(3, 2)) and s2.is_solid(Vector2i(2, 3)) and s2.is_solid(Vector2i(3, 3)),
+		"the rest of the structure stands (no tree-fell on placed wood)")
+
 
 ## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).
 func _test_block_placement_and_bazaar() -> void:
@@ -603,8 +613,10 @@ func _test_block_placement_and_bazaar() -> void:
 	b.set_solid(o + Vector2i(0, 1), &"wood"); b.set_solid(o + Vector2i(3, 1), &"wood")  # posts
 	b.set_solid(o + Vector2i(0, 2), &"wood")
 	_check(not b.is_bazaar_at(o), "frame missing one post is NOT yet a bazaar")
+	_check(b.bazaar_completion_cell() == o + Vector2i(3, 2), "completion cell points at the single missing post")
 	b.set_solid(o + Vector2i(3, 2), &"wood")           # the completing block
 	_check(b.is_bazaar_at(o), "completing the frame forms a valid bazaar")
+	_check(b.bazaar_completion_cell() == Vector2i(-1, -1), "a complete bazaar has no completion cell")
 	var found: Array[Vector2i] = b.find_bazaars()
 	_check(found.size() == 1 and found[0] == o, "find_bazaars locates exactly it")
 	_check(b.near_bazaar(b.bazaar_center(o), 3), "near_bazaar true at the interior")

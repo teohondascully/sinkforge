@@ -27,11 +27,13 @@ var _ingots_at_line: int = -1           ## ingots produced the moment the drill�
 ## win condition, shown as the chip). Order IS the tutorial path — each step is doable from the state the
 ## previous one leaves you in. Predicates live in `_achieved`.
 var steps: Array[Dictionary] = [
-	{"id": &"mine",  "label": "Dig ore — hold LMB on the orange-flecked rock by spawn", "goal": "Mine 4 ore"},
-	{"id": &"smelt", "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
-	{"id": &"craft", "label": "Press E, then the Drill key, to craft a Drill", "goal": "Craft a Drill"},
-	{"id": &"build", "label": "Cap the forge with the Drill — place it (RMB) directly on top", "goal": "Build the line"},
-	{"id": &"auto",  "label": "Stand back — the Drill now feeds the forge for you. First automation!", "goal": "First automation"},
+	{"id": &"mine",   "label": "Dig ore — hold LMB on the orange-flecked rock by spawn", "goal": "Mine 4 ore"},
+	{"id": &"smelt",  "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
+	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
+	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
+	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
+	{"id": &"build",  "label": "Cap the forge with the Drill — place it (RMB) directly on top", "goal": "Build the line"},
+	{"id": &"auto",   "label": "Stand back — the Drill now feeds the forge for you. First automation!", "goal": "First automation"},
 ]
 
 
@@ -84,9 +86,11 @@ func done_for() -> float:
 
 func _achieved(id: StringName) -> bool:
 	match id:
-		&"mine":  return _produced(&"ore") >= 4
-		&"smelt": return _produced(&"ingot") >= 2 and int(sim.inventory.get(&"ingot", 0)) >= 2  # smelted AND collected
-		&"craft": return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
+		&"mine":   return _produced(&"ore") >= 4
+		&"smelt":  return _produced(&"ingot") >= 2 and int(sim.inventory.get(&"ingot", 0)) >= 2  # smelted AND collected
+		&"wood":   return _produced(&"wood") >= 1                                                 # felled a tree this session
+		&"bazaar": return not sim.find_bazaars().is_empty()                                       # a frame is complete + claimed
+		&"craft":  return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
 		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
 		&"auto":  return _line_has_run()                                                          # the line forged an ingot on its own
 	return false
