@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_test_power_field()
 	_test_conduit_network()
 	_test_powered_lift()
+	_test_automated_line()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -679,3 +680,38 @@ func _test_powered_lift() -> void:
 		"fully powered → full throughput (%d)" % carried)
 	var present: int = _items_present(sim, &"ore")
 	_check(present == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the powered lift (present=%d)" % present)
+
+
+## RUNG 1 — the SELF-FEEDING LINE (docs/PROGRESSION.md, the first automation milestone). The mechanical
+## spec the guided objective chain + the R1 agent-play-test drive the player to build: a Drill stacked
+## directly above a Processor forge, over an ore vein within drill reach, a rock floor beneath. The drill
+## bores the vein; its ore FALLS into the forge (gravity is the conveyor, the locked hook); the forge
+## smelts; ingots pile on the floor — all with ZERO hand-mining or hand-feeding once placed. If this ever
+## breaks, the rung the player is being guided toward is unbuildable. Conservation must hold throughout.
+func _test_automated_line() -> void:
+	print("- automated ore→ingot line (Rung 1)")
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var sim: FactorySim = FactorySim.new()
+	var col: int = 8
+	var drill_row: int = 4
+	# Stack: drill (row 4) → forge (row 5) → 2-cell air gap → vein (row 8, dist 4 = drill reach) → floor.
+	sim.place_machine(drill_def, Vector2i(col, drill_row))
+	sim.place_machine(proc_def, Vector2i(col, drill_row + 1))
+	sim.set_solid(Vector2i(col, drill_row + 4), &"ore")
+	sim.deposits[Vector2i(col, drill_row + 4)] = 12          # rich enough to run the whole window
+	sim.set_solid(Vector2i(col, drill_row + 5), &"stone")    # floor: catches ingots, stops the drill
+	# Run hands-free — the player does NOTHING after building it.
+	for _i: int in 400:
+		sim.tick()
+	var ingots: int = int(sim.total_produced.get(&"ingot", 0))
+	_check(ingots > 0, "the line forged ingots with NO hand intervention (%d)" % ingots)
+	_check(int(sim.total_produced.get(&"ore", 0)) >= ingots * 2, "the drill supplied the ore the forge smelted")
+	var piled: int = 0
+	for pile: Variant in sim.ground.values():
+		piled += int((pile as Dictionary).get(&"ingot", 0))
+	_check(piled > 0, "ingots piled on the floor, ready to collect (%d)" % piled)
+	for item: StringName in [&"ore", &"ingot"]:
+		var present_i: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present_i == net, "%s conserved in the automated line (present=%d, net=%d)" % [item, present_i, net])
