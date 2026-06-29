@@ -391,6 +391,19 @@ func _draw_ground() -> void:
 
 ## A machine: a riveted CASING + its animated type glyph (shared Visuals) + a held-count badge + the
 ## recipe progress bar. The glyph spins/breathes while the machine is working.
+## Is a machine visibly "working" this tick — behavior-aware, so the glyph animates truthfully: a
+## generator burns only while fueled, a lift stirs while powered or holding goods, others while a cycle
+## runs or they hold product. Shared by the glyph draw and the light pool so they never disagree.
+func _machine_active(machine: MachineState) -> bool:
+	match machine.def.behavior:
+		&"generator":
+			return machine.fuel > 0
+		&"lift":
+			return machine.power_factor > 0.05 or not machine.input_buffer.is_empty()
+		_:
+			return _held(machine) > 0 or machine.progress > 0.0
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
@@ -411,9 +424,12 @@ func _draw_machine(machine: MachineState) -> void:
 		for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
 				Vector2(CELL - 4, CELL - 4)]:
 			draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))  # bolts
-		# A machine reads as ALIVE while it's working — materials in hand or a cycle in progress.
-		var active: bool = _held(machine) > 0 or machine.progress > 0.0
-		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, _anim_time)
+		# A machine reads as ALIVE while it's working (behavior-aware), and a powered LIFT marches faster.
+		var active: bool = _machine_active(machine)
+		var clock: float = _anim_time
+		if machine.def.behavior == &"lift":
+			clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
+		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock)
 
 	var held: int = _held(machine)
 	if held > 0:
@@ -527,12 +543,24 @@ func _paint_lights(layer: LightLayer) -> void:
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
-		if kind == "lift":
+		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
+		if kind == "generator":
+			col = Color(1.0, 0.72, 0.30)                   # warm coal-burner glow
+			# Breathes while fueled, goes DARK when it runs dry — the "is it making power?" read.
+			pulse = (0.55 + 0.2 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
+		elif kind == "lift":
 			col = Color(0.5, 1.0, 0.92)                    # lift teal (echoes the updraft motes)
+			pulse *= 0.4 + 0.6 * machine.power_factor      # brighter the more power it's drawing
 		elif kind != "furnace":
 			col = Color(0.55, 0.82, 0.98)                  # cool machine glow
-		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
-		_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+		if pulse > 0.0:
+			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft
+	# (the in-world tube is drawn under the veil; this is what makes its power read from across the room).
+	for cell: Variant in sim.conduit:
+		var lvl: float = clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+		if lvl > 0.04:
+			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
 	for m: Dictionary in falling.motes():
 		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
 
