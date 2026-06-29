@@ -403,12 +403,48 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _update_mining(delta: float) -> void:
 	_mine_cooldown = maxf(0.0, _mine_cooldown - delta)
-	_aim = _cell_at(get_global_mouse_position())
+	_aim = _effective_aim(get_global_mouse_position())
 	if _paused:
 		return
 	if Input.is_action_pressed(Controls.MINE) and _mine_cooldown <= 0.0 \
 			and try_mine(_aim):
 		_mine_cooldown = MINE_TIME
+
+
+## Terraria-style mining reach: you don't have to land the cursor exactly on a reachable cell. When you
+## point at a BLOCK that's out of reach, the aim snaps to the closest reachable block toward your cursor
+## (and the highlight follows, so you see what you'll hit). Precise in-reach hovering is unchanged, and
+## while BUILDING (a machine/material selected) the aim stays exact — placement wants the cell you point at.
+func _effective_aim(mouse_world: Vector2) -> Vector2i:
+	var raw: Vector2i = _cell_at(mouse_world)
+	var building: bool = _selected_machine_def() != null or _selected_build_material() != &""
+	if building or _can_reach(raw):
+		return raw
+	return _nearest_reachable_solid(mouse_world, raw)
+
+
+## The reachable SOLID cell whose centre is closest to `point` (the cursor) — the block Terraria-reach
+## mining would bite. Scans only the small in-reach neighbourhood. Returns `fallback` if the cursor isn't
+## near any reachable block (pointing at open air far off → no snap, so the cursor never jumps to a random
+## wall behind you). The tolerance is one reach-radius from the cursor: point at/near a wall and it snaps.
+func _nearest_reachable_solid(point: Vector2, fallback: Vector2i) -> Vector2i:
+	if _player == null:
+		return fallback
+	var center: Vector2i = _cell_at(_player.position)
+	var span: int = ceili(REACH_CELLS) + 1
+	var tol_sq: float = pow(REACH_CELLS * float(CELL), 2.0)
+	var best: Vector2i = fallback
+	var best_d: float = INF
+	for dy: int in range(-span, span + 1):
+		for dx: int in range(-span, span + 1):
+			var c: Vector2i = center + Vector2i(dx, dy)
+			if not sim.is_solid(c) or not _can_reach(c):
+				continue
+			var d: float = _cell_center(c).distance_squared_to(point)
+			if d < best_d and d <= tol_sq:
+				best_d = d
+				best = c
+	return best
 
 
 ## --- Player VERBS (the addressable game surface) --------------------------------------------------
