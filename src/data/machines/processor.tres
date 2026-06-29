@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_machine")
 id = &"processor"
-display_name = "Processor"
+display_name = "Forge"
 recipe = ExtResource("2_recipe")
 craft_cost = {
 &"ingot": 3

@@ -404,6 +404,22 @@ func _draw_inventory() -> void:
 			draw_rect(Rect2(sx + SLOT - cw - 5.0, y + SLOT - 13.0, cw + 4.0, 12.0), Color(0.03, 0.03, 0.05, 0.85))
 			draw_string(_font, Vector2(sx + SLOT - cw - 3.0, y + SLOT - 3.0), cnt,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
+	# Name the SELECTED item just above the bar — so the coloured chips stop being mystery squares.
+	if sel < slots.size():
+		var label: String = _item_label(slots[sel]["item"])
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		var lx: float = x0 + float(sel) * (SLOT + SLOT_GAP) + (SLOT - lw) * 0.5
+		var ly: float = y - 12.0
+		draw_rect(Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0), Color(0.05, 0.06, 0.09, 0.88))
+		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
+
+
+## Human-readable name for a carried item: a machine item uses its def's display name (Forge/Drill/…),
+## a resource its capitalised id (ore → "Ore"). Stops the hotbar chips from being unlabelled colour squares.
+func _item_label(item: StringName) -> String:
+	if machine_icons.has(item):
+		return String(machine_icons[item].get("name", item))
+	return String(item).capitalize()
 
 
 func _buf(d: Dictionary) -> String:

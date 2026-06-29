@@ -118,7 +118,7 @@ func _ready() -> void:
 	var machine_icons: Dictionary = {}
 	for def: MachineDef in _craftable:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
-		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def)}
+		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def), "name": def.display_name}
 	hud.craft_options = craft_opts
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
@@ -319,6 +319,7 @@ func _process(delta: float) -> void:
 		_objectives.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def(), _selected_build_material())
+	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
 	if _hud != null:
 		_hud.hover_info = _hover_info()
 		_hud.crafting_open = _crafting_open
@@ -687,3 +688,55 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 func _cell_at(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
+
+
+## World-space hint cells for the CURRENT objective step — the legibility answer to "where do I do that?".
+## Each is {cell, mode}: "act" = pulse a target ring here (mine this rock / feed this forge), "ghost" =
+## outline where to place the next machine (cap the forge). The view pulses them; deleting this changes no
+## production number (pure read of the sim + objective state). Maps the objective id → fixtures/sim queries.
+func _guide_targets() -> Array[Dictionary]:
+	if _objectives == null or _objectives.all_done():
+		return []
+	var out: Array[Dictionary] = []
+	match _objectives.current_id():
+		&"mine":
+			var ore: Vector2i = _nearest_ore_to_player()
+			if ore.x >= 0:
+				out.append({"cell": ore, "mode": "act"})
+		&"smelt":
+			var forge: Vector2i = _first_forge()
+			if forge.x >= 0:
+				out.append({"cell": forge, "mode": "act"})
+		&"build":
+			var f: Vector2i = _first_forge()
+			if f.x >= 0:
+				var cap: Vector2i = f + Vector2i(0, -1)   # the drill caps the forge from directly above
+				if sim.machine_at(cap) == null and not sim.is_solid(cap):
+					out.append({"cell": cap, "mode": "ghost"})
+	return out
+
+
+## The cell of the first FORGE (processor) placed in the world, or (-1,-1) if none — the smelt/build guide
+## follows the forge wherever it sits (seeded mineshaft, or one the player built themselves).
+func _first_forge() -> Vector2i:
+	for m: MachineState in sim.machines:
+		if m.def.id == &"processor":
+			return m.cell
+	return Vector2i(-1, -1)
+
+
+## The ore cell nearest the player (the dig target for the opening step). Scans the bounded terrain; the
+## starter vein by spawn wins by proximity, and it keeps pointing at real ore as veins deplete.
+func _nearest_ore_to_player() -> Vector2i:
+	var here: Vector2i = _cell_at(_player.position)
+	var best := Vector2i(-1, -1)
+	var best_d: int = 1 << 30
+	for cell_v: Variant in sim.solid:
+		var cell: Vector2i = cell_v
+		if sim.solid[cell] != &"ore":
+			continue
+		var d: int = (cell - here).length_squared()
+		if d < best_d:
+			best_d = d
+			best = cell
+	return best

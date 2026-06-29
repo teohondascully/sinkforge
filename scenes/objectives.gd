@@ -60,6 +60,13 @@ func current_index() -> int:
 	return steps.size()
 
 
+## The id of the current (first incomplete) step, or &"" when the whole chain is done. Lets the view
+## point a world-space highlight at WHERE the current step happens (the controller maps id→cells).
+func current_id() -> StringName:
+	var i: int = current_index()
+	return steps[i]["id"] if i < steps.size() else &""
+
+
 func is_done(id: StringName) -> bool:
 	return _done.has(id)
 

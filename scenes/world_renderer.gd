@@ -47,6 +47,7 @@ var _aim_in_reach: bool = false
 var _aim_placeable: bool = false
 var _ghost_def: MachineDef = null
 var _ghost_material: StringName = &""                ## a building material selected for block placement
+var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 
 var _dark: LightLayer
@@ -93,6 +94,12 @@ func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: Machine
 	_ghost_def = ghost_def
 
 
+## The controller hands over the cells the CURRENT objective points at (each {cell, mode}) — drawn as a
+## pulsing ring ("act") or a ghost outline ("ghost") so a new player always sees WHERE the next step happens.
+func set_guide_targets(targets: Array[Dictionary]) -> void:
+	_guide_targets = targets
+
+
 func _process(delta: float) -> void:
 	_anim_time += delta
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
@@ -122,6 +129,7 @@ func _draw() -> void:
 		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
 	if particles != null:
 		particles.draw(self)
+	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_aim()
 
 
@@ -273,6 +281,33 @@ func _draw_terrain_surface() -> void:
 				draw_line(lo2, hi2, edge, 3.0)
 			_:  # flat top: a capped lip
 				draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
+
+
+## The current objective's WHERE-cell(s), drawn as a breathing beacon so a new player can't miss where to
+## act. "act" = a pulsing amber ring + a bobbing down-arrow over the target (dig this / feed this forge);
+## "ghost" = a pulsing green dashed cell showing where to place the next machine (cap the forge). Cosmetic.
+func _draw_guide_targets() -> void:
+	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)         # 0..1 breathing
+	for t: Dictionary in _guide_targets:
+		var cell: Vector2i = t["cell"]
+		if not sim.in_bounds(cell):
+			continue
+		var pos := Vector2(cell) * float(CELL)
+		var center := pos + Vector2(CELL, CELL) * 0.5
+		if String(t.get("mode", "act")) == "ghost":
+			var g := Color(0.45, 1.0, 0.55, 0.35 + 0.45 * pulse)
+			var pad: float = 2.0 + 2.0 * pulse
+			draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
+		else:
+			var ring := Color(1.0, 0.78, 0.30, 0.55 + 0.40 * pulse)
+			var r: float = float(CELL) * (0.62 + 0.12 * pulse)
+			draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
+			draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
+		# A bobbing down-pointer above the cell so it's obvious even off-centre.
+		var bob: float = -float(CELL) * (0.9 + 0.18 * pulse)
+		var tip := center + Vector2(0.0, bob)
+		var arrow := Color(1.0, 0.85, 0.40, 0.85)
+		draw_colored_polygon([tip + Vector2(0, 7), tip + Vector2(-6, -4), tip + Vector2(6, -4)], arrow)
 
 
 ## The cursor cell, drawn by context (using the affordances MainView pushed via set_aim):
@@ -438,6 +473,8 @@ func _draw_machine(machine: MachineState) -> void:
 			clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
 		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock)
 
+	_draw_machine_label(machine, pos)
+
 	var held: int = _held(machine)
 	if held > 0:
 		var badge := Vector2(pos.x + float(CELL) - 12.0, pos.y + 4.0)
@@ -452,6 +489,22 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 	_draw_machine_io(machine, pos)
+
+
+## A small NAME plate centred just above the machine (FORGE / DRILL / LIFT / GENERATOR), so a new player
+## can read what each box IS at a glance — the direct fix for "which one is the forge?". Dark pill backing
+## keeps it legible over any terrain; uppercased + tight so it reads as a label, not prose. Pure cosmetic.
+func _draw_machine_label(machine: MachineState, pos: Vector2) -> void:
+	var name: String = machine.def.display_name.to_upper()
+	if name.is_empty():
+		return
+	var fs: int = 8
+	var w: float = _font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var cx: float = pos.x + float(CELL) * 0.5
+	var top: float = pos.y - 11.0
+	draw_rect(Rect2(cx - w * 0.5 - 3.0, top, w + 6.0, 11.0), Color(0.04, 0.05, 0.08, 0.82))
+	draw_string(_font, Vector2(cx - w * 0.5, top + 8.5), name,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.86, 0.90, 0.98))
 
 
 ## Small item-tinted PORTS on a machine's edges: where it EATS (input mouth, top, points IN) and where
