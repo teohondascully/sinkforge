@@ -1,34 +1,36 @@
 class_name Objectives
 extends RefCounted
 
-## REPRESENTATION-LAYER legibility (NOT sim): an ordered tutorial chain that walks a new player through
-## the whole loop dig→feed→forge→craft→build→automate — the direct answer to "how do I actually play?"
-## (the VIBE_GAP #8 indictment). It READS the sim only (never mutates, never enters the tick), so deleting
-## it changes no production number.
+## REPRESENTATION-LAYER legibility (NOT sim): an ordered, guided RUNG-1 ladder that walks a new player
+## all the way to their FIRST AUTOMATION — the self-feeding ore→ingot line. It is the direct answer to
+## "what do I do?" / "how do I get to L2?": there is ALWAYS a signposted next action, and the chain only
+## completes when the player has built a drill→forge stack that mines and smelts on its own (docs/PROGRESSION.md).
+## It READS the sim only (never mutates, never enters the tick), so deleting it changes no production number.
 ##
-## It measures SESSION DELTAS from a baseline snapshot taken at construction (lifetime counters minus
-## their start value), so it still guides correctly even when the dev-start kit pre-stocks the pack — you
-## must actually mine/feed/craft THIS session for a step to tick. Completions LATCH: a transient state
-## (ore sitting in a buffer, a pile on the ground) still counts once seen, so steps never un-complete.
+## It measures SESSION DELTAS from a baseline snapshot taken at construction (lifetime counters minus their
+## start value), so it still guides correctly even when the dev-start kit pre-stocks the pack — you must
+## actually mine/smelt THIS session for a step to tick. Completions LATCH: a transient state (ore in a
+## buffer, a pile on the ground) still counts once seen, so steps never un-complete.
+##
+## The chain IS the spec the Rung-1 agent-play-test drives (tools/play_tests.gd): the test follows these
+## same steps through the real verbs and fails if any step can't be reached — "nothing to do" made executable.
 
 var sim: FactorySim
 var _base_produced: Dictionary = {}
 var _base_consumed: Dictionary = {}
 var _base_machines: int = 0
-var _base_bazaars: int = 0
 var _done: Dictionary = {}              ## step id -> true once achieved (latched)
 var _all_done_time: float = -1.0        ## seconds the chain has been fully complete (for HUD auto-hide)
 
-## The chain. Each step: stable id, an imperative label (what to DO), and a short goal tag (the win
-## condition, shown as the chip). Order IS the tutorial path. Predicates live in `_achieved`.
+## The Rung-1 ladder. Each step: stable id, an imperative label (what to DO), and a short goal tag (the
+## win condition, shown as the chip). Order IS the tutorial path — each step is doable from the state the
+## previous one leaves you in. Predicates live in `_achieved`.
 var steps: Array[Dictionary] = [
-	{"id": &"mine",  "label": "Dig an ore vein — hold LMB on orange-flecked rock", "goal": "Mine 3 ore"},
-	{"id": &"feed",  "label": "Stand over the forge and press Q to drop ore in",   "goal": "Feed the forge"},
-	{"id": &"forge", "label": "Let the forge smelt your ore into an ingot",        "goal": "Forge 1 ingot"},
-	{"id": &"craft", "label": "Press E for the crafting screen, then 1 for a Processor", "goal": "Craft a machine"},
-	{"id": &"build", "label": "Place it with RMB on open ground below",            "goal": "Build a machine"},
-	{"id": &"auto",  "label": "Watch product fall & pile up — walk over to grab it", "goal": "Automate"},
-	{"id": &"bazaar", "label": "Finish the abandoned Bazaar near spawn — select wood, RMB the gap in its frame", "goal": "Raise the Bazaar"},
+	{"id": &"mine",  "label": "Dig ore — hold LMB on the orange-flecked rock", "goal": "Mine 4 ore"},
+	{"id": &"smelt", "label": "Toss ore into the forge (face it, press Q), then step into the pit to grab the ingots", "goal": "Forge 2 ingots"},
+	{"id": &"craft", "label": "Press E, then the Drill key, to craft a Drill", "goal": "Craft a Drill"},
+	{"id": &"build", "label": "Drop your forge then the Drill into the mineshaft (RMB) — drill on top", "goal": "Build the line"},
+	{"id": &"auto",  "label": "Stand back — the line mines & smelts on its own. Grab the ingots it pours!", "goal": "First automation"},
 ]
 
 
@@ -37,7 +39,6 @@ func _init(factory: FactorySim) -> void:
 	_base_produced = factory.total_produced.duplicate()
 	_base_consumed = factory.total_consumed.duplicate()
 	_base_machines = factory.machines.size()
-	_base_bazaars = factory.find_bazaars().size()
 
 
 ## Call every frame: latch any newly-achieved step. Cheap (a handful of dict reads).
@@ -75,13 +76,45 @@ func done_for() -> float:
 
 func _achieved(id: StringName) -> bool:
 	match id:
-		&"mine":  return _produced(&"ore") >= 3
-		&"feed":  return _any_input() or _consumed(&"ore") >= 1   # fed OR already smelting
-		&"forge": return _produced(&"ingot") >= 1
-		&"craft": return _consumed(&"ingot") >= 1                 # only crafting spends ingots
-		&"build": return sim.machines.size() - _base_machines >= 1
-		&"auto":  return not sim.ground.is_empty()                # gravity dropped product into a pile
-		&"bazaar": return sim.find_bazaars().size() > _base_bazaars  # completed a wood frame this session
+		&"mine":  return _produced(&"ore") >= 4
+		&"smelt": return _produced(&"ingot") >= 2 and int(sim.inventory.get(&"ingot", 0)) >= 2  # smelted AND collected
+		&"craft": return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
+		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
+		&"auto":  return _line_is_pouring()                                                       # the line has spat ingots on its own
+	return false
+
+
+## The SELF-FEEDING LINE, detected anywhere in the world: a drill with a processor directly below it (so
+## the drill's bored ore falls straight into the forge). Returns {drill, proc} cells, or {} if none. This
+## is location-independent — building the stack in the mineshaft OR anywhere else counts.
+func _find_line() -> Dictionary:
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"drill":
+			var below: Vector2i = m.cell + Vector2i(0, 1)
+			var p: MachineState = sim.machine_at(below)
+			if p != null and p.def.id == &"processor":
+				return {"drill": m.cell, "proc": p.cell}
+	return {}
+
+
+## True once a built line has actually POURED ingots on its own: a line exists and an ingot pile rests in
+## its column below the forge (only the running line puts ingots there — proof of hands-free automation).
+func _line_is_pouring() -> bool:
+	var line: Dictionary = _find_line()
+	if line.is_empty():
+		return false
+	var proc: Vector2i = line["proc"]
+	for cell: Variant in sim.ground:
+		var c: Vector2i = cell
+		if c.x == proc.x and c.y >= proc.y and int((sim.ground[c] as Dictionary).get(&"ingot", 0)) > 0:
+			return true
+	return false
+
+
+func _has_drill_machine() -> bool:
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"drill":
+			return true
 	return false
 
 
@@ -91,10 +124,3 @@ func _produced(item: StringName) -> int:
 
 func _consumed(item: StringName) -> int:
 	return int(sim.total_consumed.get(item, 0)) - int(_base_consumed.get(item, 0))
-
-
-func _any_input() -> bool:
-	for m: MachineState in sim.machines:
-		if not m.input_buffer.is_empty():
-			return true
-	return false
