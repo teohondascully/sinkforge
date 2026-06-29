@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_block_placement_and_bazaar()
 	_test_power_field()
 	_test_conduit_network()
+	_test_powered_lift()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -649,3 +650,32 @@ func _test_conduit_network() -> void:
 	_check(not s2.place_conduit(Vector2i(4, 3)), "cannot run a conduit through solid rock")
 	_check(s2.remove_conduit(Vector2i(3, 3)), "pick the conduit back up")
 	_check(not s2.has_conduit(Vector2i(3, 3)) and int(s2.inventory.get(&"conduit", 0)) == 2, "it returned to the pack")
+
+
+## POWER governs the lift (docs/POWER.md): unpowered it runs at LIFT_THROUGHPUT (proved by _test_lift);
+## with a generator beside it pouring power into its cell, it carries up to LIFT_POWERED_THROUGHPUT — the
+## cost rule (power_throttle) routing the boost. Fighting gravity UP is the canonical "costs power" case.
+func _test_powered_lift() -> void:
+	print("- powered lift")
+	var lift_def: MachineDef = load("res://src/data/machines/lift.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var sim: FactorySim = FactorySim.new()
+	var lift: MachineState = sim.place_machine(lift_def, Vector2i(5, 10))
+	var g: MachineState = sim.place_machine(gen_def, Vector2i(4, 10))   # beside the lift; aura covers it
+	g.input_buffer[&"coal"] = 9
+	sim.total_produced[&"coal"] = 9
+	for _i: int in 3:
+		sim.tick()                                                     # warm the generator so power flows
+	_check(sim.power_at(lift.cell) > 0.0, "power reaches the lift's cell")
+	_check(lift.power_factor > 0.0, "the lift registers a power boost (factor=%.2f)" % lift.power_factor)
+	# One powered tick: it should carry more than the unpowered baseline.
+	lift.input_buffer[&"ore"] = 12
+	sim.total_produced[&"ore"] = 12
+	sim.tick()
+	var carried: int = 12 - int(lift.input_buffer.get(&"ore", 0))
+	_check(carried > FactorySim.LIFT_THROUGHPUT,
+		"a powered lift beats the unpowered baseline (%d > %d)" % [carried, FactorySim.LIFT_THROUGHPUT])
+	_check(carried == FactorySim.LIFT_POWERED_THROUGHPUT,
+		"fully powered → full throughput (%d)" % carried)
+	var present: int = _items_present(sim, &"ore")
+	_check(present == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the powered lift (present=%d)" % present)

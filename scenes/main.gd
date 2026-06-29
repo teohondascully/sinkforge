@@ -526,7 +526,7 @@ func _hover_info() -> Dictionary:
 	info["out"] = outs
 	match m.def.behavior:
 		&"lift":
-			info["mode"] = "lifts goods + you UP (costs throughput)"
+			info["mode"] = "lifts goods + you UP" + ("  (POWERED ×%.1f)" % (1.0 + (float(FactorySim.LIFT_POWERED_THROUGHPUT) / float(FactorySim.LIFT_THROUGHPUT) - 1.0) * m.power_factor) if m.power_factor > 0.05 else "  (unpowered baseline)")
 		&"splitter":
 			info["mode"] = "splits the flow DOWN + RIGHT"
 		&"generator":

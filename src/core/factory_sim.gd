@@ -16,9 +16,14 @@ const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
 ## depth, room to explore (presentation sprint). Provisional size; real worldgen is still deferred.
 const GRID_COLS: int = 72
 const GRID_ROWS: int = 40
-## Items/tick a LIFT carries UP its column — the throughput "cost" of fighting gravity (real power is
-## deferred; slowness IS the asymmetry for now). Below this rate, a backlog piles at the lift.
-const LIFT_THROUGHPUT: int = 2
+## Items/tick a LIFT carries UP its column with NO power — its hand-cranked baseline (the L1 rate, before
+## power exists). Below this rate, a backlog piles at the lift. Power is what lifts it past this baseline:
+## a fully-powered lift reaches LIFT_POWERED_THROUGHPUT, scaled by the power reaching its cell (docs/POWER.md
+## — fighting gravity UP is the canonical "costs power" case). Under-supplied, it labours back toward
+## baseline = brownout. Baseline kept non-zero so the lift still works pre-power and L1 is unaffected.
+const LIFT_THROUGHPUT: int = 2          ## unpowered baseline (L1), also the floor under brownout
+const LIFT_POWERED_THROUGHPUT: int = 6  ## items/tick at FULL power — the governed deep-frontier rate
+const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full boost (less → proportional)
 ## How many cells straight DOWN a Drill reaches for ore (docs/MINING.md). It bores the first ore cell
 ## within this range, stopping at any non-ore rock — so you place it with a clear shot at the vein.
 const DRILL_REACH: int = 4
@@ -562,6 +567,16 @@ func power_at(cell: Vector2i) -> float:
 	return float(power.get(cell, 0.0))
 
 
+## THE COST RULE, in one place (docs/POWER.md §7): the fraction of full speed a power consumer at `cell`
+## gets, = clamp(available power / its demand, 0..1). 1.0 when fully supplied, proportionally less as the
+## supply (attenuated by distance from the source) falls short — so the deep frontier, furthest from
+## generation, browns out first for free. Every consumer routes its draw through this and nothing else.
+func power_throttle(cell: Vector2i, demand: float) -> float:
+	if demand <= 0.0:
+		return 1.0
+	return clampf(power_at(cell) / demand, 0.0, 1.0)
+
+
 ## Flood power through the conduit network in ONE top-to-bottom sweep (docs/POWER.md §7). Because power
 ## only flows DOWN + LATERAL (never up), the network is acyclic by row, so each row is finalized before
 ## the next reads it — no iterative solver. Per row: (1) VERTICAL inflow = the SUM of the feeders in the
@@ -656,16 +671,18 @@ func _has_inputs(machine: MachineState, recipe: RecipeDef) -> bool:
 	return true
 
 
-## A LIFT runs no recipe: it carries items UP its column — the paid inverse of gravity. Each tick it
-## moves up to LIFT_THROUGHPUT items from its input into its output (delivered upward by _flow next);
-## the rest stays as a backlog (the throughput "cost"). No items created or destroyed → conservation
-## holds. Whatever falls onto a lift (gravity brings product down to it) is hauled back up.
+## A LIFT runs no recipe: it carries items UP its column — the paid inverse of gravity (docs/POWER.md).
+## Its throughput is POWER-GOVERNED: LIFT_THROUGHPUT at its unpowered baseline, scaling up to
+## LIFT_POWERED_THROUGHPUT as power reaches its cell (the power_throttle cost rule). The rest stays a
+## backlog. No items created or destroyed → conservation holds. Whatever falls onto a lift is hauled up.
 func _run_lift(machine: MachineState) -> void:
+	machine.power_factor = power_throttle(machine.cell, LIFT_POWER_DEMAND)
+	var cap: int = LIFT_THROUGHPUT + int(round(float(LIFT_POWERED_THROUGHPUT - LIFT_THROUGHPUT) * machine.power_factor))
 	var moved: int = 0
 	for item: StringName in machine.input_buffer.keys():
-		if moved >= LIFT_THROUGHPUT:
+		if moved >= cap:
 			break
-		var take: int = mini(int(machine.input_buffer[item]), LIFT_THROUGHPUT - moved)
+		var take: int = mini(int(machine.input_buffer[item]), cap - moved)
 		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + take
 		var left: int = int(machine.input_buffer[item]) - take
 		if left > 0:
