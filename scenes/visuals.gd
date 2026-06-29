@@ -8,7 +8,7 @@ extends RefCounted
 
 # --- machines ----------------------------------------------------------------
 
-## The icon "kind" of a machine: drill / lift / fork (splitter) / furnace (no-input source) / gear.
+## The icon "kind" of a machine: drill / lift / fork (splitter) / generator / furnace (no-input source) / gear.
 static func machine_kind(def: MachineDef) -> String:
 	if def.behavior == &"drill":
 		return "drill"
@@ -16,6 +16,8 @@ static func machine_kind(def: MachineDef) -> String:
 		return "lift"
 	if def.behavior == &"splitter":
 		return "fork"
+	if def.behavior == &"generator":
+		return "generator"
 	if def.recipe != null and def.recipe.inputs.is_empty():
 		return "furnace"
 	return "gear"
@@ -29,6 +31,8 @@ static func machine_color(def: MachineDef) -> Color:
 		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
 	if def.behavior == &"splitter":
 		return Color(0.58, 0.42, 0.78)
+	if def.behavior == &"generator":
+		return Color(0.80, 0.66, 0.26)  # warm electric gold — "burns fuel, makes power"
 	var recipe: RecipeDef = def.recipe
 	if recipe != null and recipe.inputs.is_empty():
 		return Color(0.82, 0.45, 0.20)
@@ -51,6 +55,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_fork(canvas, center, s)
 		"drill":
 			_drill(canvas, center, s, active, t)
+		"generator":
+			_generator(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -107,6 +113,27 @@ static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 			canvas.draw_line(Vector2(c.x - 3.0 * s, fy), Vector2(c.x + 3.0 * s, fy - 1.4 * s), edge, 1.0)
 
 
+## Generator (coal burner → power): a steel housing with a coal-fire at its base that BREATHES while
+## fueled, and a bright lightning bolt that flares when it's pouring power. The fire + bolt go dim/still
+## when it runs dry — the "is it making power?" read (mirrors _run_generator's fuel state).
+static func _generator(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var steel := Color(0.15, 0.16, 0.20)
+	canvas.draw_rect(Rect2(c.x - 7.0 * s, c.y - 7.5 * s, 14.0 * s, 15.0 * s), steel)
+	# Coal fire glowing in the firebox at the base — breathes while burning.
+	var p: float = (0.72 + 0.28 * sin(t * 7.0)) if active else 0.32
+	var fire := c + Vector2(0.0, 5.0 * s)
+	canvas.draw_circle(fire, 4.2 * s * (0.8 + 0.3 * p), Color(1.0, 0.5, 0.15, 0.55 + 0.4 * p))
+	canvas.draw_circle(fire, 2.0 * s, Color(1.0, 0.85, 0.45, 0.6 + 0.4 * p))
+	# Lightning bolt up top — the power output, bright when active.
+	var bolt := Color(1.0, 0.92, 0.45).lightened(0.2 * p) if active else Color(0.55, 0.52, 0.34)
+	var w: float = 2.2 if active else 1.6
+	var pts := PackedVector2Array([
+		c + Vector2(1.5 * s, -7.0 * s), c + Vector2(-2.0 * s, -1.5 * s),
+		c + Vector2(0.8 * s, -1.5 * s), c + Vector2(-1.8 * s, 4.5 * s)])
+	for i: int in pts.size() - 1:
+		canvas.draw_line(pts[i], pts[i + 1], bolt, w)
+
+
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
 static func _fork(canvas: CanvasItem, c: Vector2, s: float) -> void:
 	var fork := Color(0.93, 0.88, 1.0)
@@ -125,6 +152,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.97, 0.85, 0.42)
 	if item == &"wood":
 		return Color(0.55, 0.38, 0.22)
+	if item == &"coal":
+		return Color(0.24, 0.25, 0.29)        # dark slate-black — the generator's fuel
 	return Color.WHITE
 
 

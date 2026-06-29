@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_finite_deposit_and_drill()
 	_test_trees_and_wood()
 	_test_block_placement_and_bazaar()
+	_test_power_field()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -576,3 +577,35 @@ func _test_block_placement_and_bazaar() -> void:
 	# A wood block dropped INTO the interior breaks it (no longer open).
 	b.set_solid(o + Vector2i(1, 1), &"wood")
 	_check(not b.is_bazaar_at(o), "a blocked interior is no longer a valid bazaar")
+
+
+## POWER (docs/POWER.md): a fueled generator pours power into its aura; out of coal it goes dark; coal
+## is genuinely consumed (conservation). The field is derived — recomputed each tick, never stored.
+func _test_power_field() -> void:
+	print("- power field + generator")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var sim: FactorySim = FactorySim.new()
+	var cell := Vector2i(8, 8)
+	var g: MachineState = sim.place_machine(gen_def, cell)
+	# No fuel yet → no power anywhere.
+	sim.tick()
+	_check(sim.power_at(cell) == 0.0, "an unfueled generator emits no power")
+	# Feed it coal (as a drop would) and let it burn.
+	g.input_buffer[&"coal"] = 2
+	sim.total_produced[&"coal"] = 2                     # account for the injected coal (conservation)
+	sim.tick()                                          # consumes 1 coal, fuel set; power appears next tick
+	sim.tick()
+	_check(sim.power_at(cell) > 0.0, "a fueled generator powers its own cell")
+	_check(sim.power_at(cell + Vector2i(1, 0)) > 0.0, "the aura reaches an adjacent cell")
+	_check(sim.power_at(cell + Vector2i(0, 1)) > sim.power_at(cell + Vector2i(0, FactorySim.POWER_AURA + 5)),
+		"power attenuates with distance (near > far)")
+	_check(sim.power_at(cell + Vector2i(0, FactorySim.POWER_AURA + 1)) == 0.0, "no power past the aura rim")
+	_check(int(sim.total_consumed.get(&"coal", 0)) == 1, "burned exactly one coal so far")
+	# Burn the rest dry, then it should go dark.
+	for _i: int in FactorySim.GENERATOR_FUEL_TICKS * 3:
+		sim.tick()
+	_check(sim.power_at(cell) == 0.0, "out of coal, the generator goes dark")
+	_check(int(sim.total_consumed.get(&"coal", 0)) == 2, "consumed both coal total (extraction finite)")
+	var present: int = _items_present(sim, &"coal")
+	var net: int = int(sim.total_produced.get(&"coal", 0)) - int(sim.total_consumed.get(&"coal", 0))
+	_check(present == net, "coal conserved across burning (present=%d, net=%d)" % [present, net])

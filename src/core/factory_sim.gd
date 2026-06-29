@@ -22,6 +22,14 @@ const LIFT_THROUGHPUT: int = 2
 ## How many cells straight DOWN a Drill reaches for ore (docs/MINING.md). It bores the first ore cell
 ## within this range, stopping at any non-ore rock — so you place it with a clear shot at the vein.
 const DRILL_REACH: int = 4
+## --- POWER (the L2 twist, docs/POWER.md): power FALLS on the hook. A fueled GENERATOR burns coal and
+## pours power into the cells around it (its innate aura — conduits will extend the reach down+lateral
+## in a later slice); consumers draw from the field to run. The field is a DERIVED quantity recomputed
+## every tick from machine placement + fuel — never stored authoritative state, exactly like updraft_at —
+## so determinism is untouched and it can never desync.
+const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
+const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
+const POWER_AURA: int = 2               ## innate radius (cells) a generator powers WITHOUT any conduit
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
@@ -46,8 +54,9 @@ var deposits: Dictionary = {}
 var inventory: Dictionary = {}
 ## How many distinct stacks the carried pack shows as hotbar slots. The pack is intentionally small
 ## (GDD: a limited pack forces hauling trips). No hard capacity is ENFORCED yet — that's a feel/
-## economy knob to turn when trip-friction is the thing being tuned (with the build economy).
-const INVENTORY_SLOTS: int = 8
+## economy knob to turn when trip-friction is the thing being tuned (with the build economy). Sized to
+## hold the current resources + craftable machine types at once (ore/ingot/wood/coal + the machines).
+const INVENTORY_SLOTS: int = 10
 ## Placed machines in insertion order, for deterministic iteration.
 var machines: Array[MachineState] = []
 ## Physical product piles resting on the dug floor: cell (Vector2i) -> {item -> count}. A machine
@@ -67,6 +76,10 @@ var total_consumed: Dictionary = {}
 ## falling sprites. The sim NEVER reads this back — clearing it changes no production. The
 ## representation layer drains it each frame. Each entry: {item, from: Vector2i, to: Vector2i, count}.
 var flow_events: Array[Dictionary] = []
+## DERIVED power field (cell -> available power units), rebuilt from scratch every tick by _compute_power
+## from fueled generators (+ conduits, later). NOT authoritative state — a pure function of placement +
+## fuel, like updraft_at — so it can never desync. Consumers read it via power_at(); the view tints it.
+var power: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
@@ -458,11 +471,45 @@ func advance(delta: float) -> void:
 		tick()
 
 
-## One deterministic logical step: every machine runs, then items fall one stage downward.
+## One deterministic logical step: derive the power field, every machine runs (consumers read the field),
+## then items fall one stage downward.
 func tick() -> void:
+	_compute_power()
 	for machine: MachineState in machines:
 		_run_machine(machine)
 	_flow()
+
+
+## Rebuild the power field from scratch (docs/POWER.md): every FUELED generator stamps its innate aura.
+## Pure derived state — cleared and recomputed each tick so it never desyncs from placement/fuel. Conduits
+## extend this field in a later slice; for now a generator powers only the diamond of cells around it.
+func _compute_power() -> void:
+	power.clear()
+	for machine: MachineState in machines:
+		if machine.def.behavior == &"generator" and machine.fuel > 0:
+			_emit_aura(machine.cell, GENERATOR_POWER)
+
+
+## Stamp a generator's innate aura: an attenuating diamond (manhattan radius POWER_AURA) of power around
+## `origin`. Overlapping auras take the MAX (a supply reading, not a sum — two generators don't conjure
+## double power at a shared cell). The strength fades to 0 at the rim so the lit zone reads as a falloff.
+func _emit_aura(origin: Vector2i, amount: float) -> void:
+	for dy: int in range(-POWER_AURA, POWER_AURA + 1):
+		for dx: int in range(-POWER_AURA, POWER_AURA + 1):
+			var dist: int = absi(dx) + absi(dy)
+			if dist > POWER_AURA:
+				continue
+			var cell: Vector2i = origin + Vector2i(dx, dy)
+			if not in_bounds(cell):
+				continue
+			var v: float = amount * (1.0 - float(dist) / float(POWER_AURA + 1))
+			power[cell] = maxf(float(power.get(cell, 0.0)), v)
+
+
+## Available power at a cell (the derived field; 0.0 where none reaches). Consumers read this to throttle;
+## the view tints it. Pure read — no mutation, determinism untouched (mirrors updraft_at / material_at).
+func power_at(cell: Vector2i) -> float:
+	return float(power.get(cell, 0.0))
 
 
 func _run_machine(machine: MachineState) -> void:
@@ -474,6 +521,9 @@ func _run_machine(machine: MachineState) -> void:
 		return
 	if machine.def.behavior == &"drill":
 		_run_drill(machine)
+		return
+	if machine.def.behavior == &"generator":
+		_run_generator(machine)
 		return
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
@@ -556,6 +606,24 @@ func _run_drill(machine: MachineState) -> void:
 		var n: int = int(recipe.outputs[item])
 		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + n
 		total_produced[item] = int(total_produced.get(item, 0)) + n
+
+
+## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;
+## when that runs out it consumes one coal from its input buffer to reburn for GENERATOR_FUEL_TICKS. No
+## fuel left and no coal → it goes dark (fuel stays 0, so _compute_power emits nothing for it). Coal is
+## genuinely consumed (total_consumed) so conservation holds. The power it makes is NOT an item — it's the
+## derived field, which _compute_power reads from this machine's fuel>0 state at the top of the next tick.
+func _run_generator(machine: MachineState) -> void:
+	if machine.fuel > 0:
+		machine.fuel -= 1
+	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) > 0:
+		var left: int = int(machine.input_buffer[&"coal"]) - 1
+		if left > 0:
+			machine.input_buffer[&"coal"] = left
+		else:
+			machine.input_buffer.erase(&"coal")
+		total_consumed[&"coal"] = int(total_consumed.get(&"coal", 0)) + 1
+		machine.fuel = GENERATOR_FUEL_TICKS
 
 
 ## The cell a drill bores: scanning straight DOWN from the drill within DRILL_REACH, the first SOLID cell

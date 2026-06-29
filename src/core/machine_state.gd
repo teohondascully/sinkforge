@@ -19,6 +19,10 @@ var progress: float = 0.0
 ## so an odd item count splits evenly over time (carries the remainder across ticks). Unused by
 ## recipe-runners. Kept here (not a subclass) to honour composition-over-inheritance for now.
 var route_toggle: int = 0
+## Generator-only: ticks of burn remaining from the current piece of fuel. >0 means the generator is
+## pouring power this tick; it refuels by consuming one coal when this hits 0 (see _run_generator).
+## Unused by other machines (same composition-over-inheritance stance as route_toggle).
+var fuel: int = 0
 
 
 func _init(machine_def: MachineDef, machine_cell: Vector2i) -> void:
