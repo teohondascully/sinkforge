@@ -22,6 +22,9 @@ const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
+## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
+## bazaar build material; the list grows as more buildables land (log/stone/etc).
+const BUILD_MATERIALS: Array[StringName] = [&"wood"]
 ## Dev: start with a stocked pack (ore/ingots/machines) for testing. A static so the headless harness
 ## can force a CLEAN start (it asserts exact counts) by setting MainView.dev_start = false before boot.
 static var dev_start: bool = true
@@ -50,6 +53,9 @@ var _machine_defs_by_id: Dictionary = {}
 var _inv_selected: int = 0
 ## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
 var _falling := FallingItems.new()
+## Bazaar view: detects completed wood frames (sim.find_bazaars) and plays the block-by-block transform
+## into a decorated stall + shopkeeper. Representation-only; never writes the sim (docs/CRAFTING.md).
+var _bazaars := Bazaars.new()
 ## Cosmetic particle + screenshake juice (dig/land/place/collect). Pure representation.
 var _particles := Particles.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
@@ -125,6 +131,7 @@ func _ready() -> void:
 	_renderer = WorldRenderer.new()
 	_renderer.setup(sim, _falling, _player)
 	_renderer.particles = _particles
+	_renderer.bazaars = _bazaars
 	add_child(_renderer)
 
 	# Hand the HUD minimap a material-colour lookup (the renderer owns the MaterialDef registry) so the
@@ -252,7 +259,7 @@ func _seed_world() -> void:
 ## NOTE: the head-lamp glow and forge embers are LIGHTING effects on the miner/machines, not carryable
 ## items — there's nothing to put in the pack for those; they appear automatically in play.
 func _dev_seed_pack() -> void:
-	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1}
+	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"wood": 10, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1}
 	for item: StringName in kit:
 		sim.inventory[item] = int(sim.inventory.get(item, 0)) + int(kit[item])
 		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(kit[item])
@@ -265,13 +272,14 @@ func _process(delta: float) -> void:
 		_falling.advance(delta)
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
+	_update_bazaars(delta)
 	_update_juice(delta)
 	if _motes != null and _camera != null:
 		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
 	if _objectives != null:
 		_objectives.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
-	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def())
+	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def(), _selected_build_material())
 	if _hud != null:
 		_hud.hover_info = _hover_info()
 		_hud.crafting_open = _crafting_open
@@ -280,6 +288,17 @@ func _process(delta: float) -> void:
 		if _player != null:
 			_hud.minimap_focus = _player.position
 			_hud.minimap_view = Vector2(Hud.CANVAS) / CAMERA_ZOOM  # world area the camera shows
+
+
+## Reconcile the Bazaar view against the sim's detected frames. When one COMPLETES this frame, throw a
+## celebratory burst of sparks + a shake at its centre, so the cosmetic transform reads as a real event.
+func _update_bazaars(delta: float) -> void:
+	for origin: Vector2i in _bazaars.update(sim, delta):
+		var c: Vector2 = _bazaars.center_of(origin)
+		_particles.dust(c + Vector2(0.0, -CELL), Color(1.0, 0.86, 0.5), 26)
+		_particles.spark(c + Vector2(0.0, -CELL), Color(0.93, 0.84, 0.60))
+		_particles.pop(c + Vector2(0.0, -CELL), Color(0.30, 0.62, 0.60))
+		_shake = maxf(_shake, 3.6)
 
 
 ## Drive the cosmetic juice: advance particles, kick dust on a hard landing + periodic footsteps, and
@@ -461,6 +480,11 @@ func try_build(cell: Vector2i) -> bool:
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 			_shake = maxf(_shake, 2.2)
 		return built
+	# Block placement (the Terraria build primitive): the selected hotbar item is a building material.
+	var mat: StringName = _selected_build_material()
+	if mat != &"" and _placeable(cell) and sim.place_block(cell, mat):
+		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 6)
+		return true
 	return false
 
 
@@ -514,6 +538,17 @@ func _selected_machine_def() -> MachineDef:
 		return null
 	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
 	return _machine_defs_by_id.get(slots[sel]["item"], null)
+
+
+## The building MATERIAL for the active hotbar slot (e.g. &"wood"), or &"" if the selected item isn't a
+## placeable block. Drives RMB block placement + the renderer's placement ghost.
+func _selected_build_material() -> StringName:
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return &""
+	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
+	var item: StringName = slots[sel]["item"]
+	return item if item in BUILD_MATERIALS else &""
 
 
 ## A cell takes a hand-placed machine if it's in-bounds, open (not earth), unoccupied, and NOT the

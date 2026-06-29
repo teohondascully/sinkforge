@@ -238,6 +238,82 @@ func _fell_tree(cell: Vector2i) -> int:
 	return wood
 
 
+## Player action: PLACE a building-material block from the pack into an open cell (the Terraria build
+## primitive — the inverse of mine). Consumes one `material` from the pack; the cell becomes solid. Like
+## crafting, the spent item is counted as CONSUMED, and mining it back counts as produced, so conservation
+## holds across build/dig (terrain isn't "items present"). Refuses solid/occupied/out-of-bounds cells.
+func place_block(cell: Vector2i, material: StringName) -> bool:
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell):
+		return false
+	if int(inventory.get(material, 0)) <= 0:
+		return false
+	_take_from_pack(material, 1)
+	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
+	solid[cell] = material
+	return true
+
+
+## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
+## A bazaar is a distinctive WOOD FRAME with an open interior, sitting on solid ground:
+##     W W W W      top beam (all wood)
+##     W . . W      posts + open interior
+##     W . . W      posts + open interior
+##     . G G .      interior floor must be solid ground
+## "Active" is DERIVED from the world (a valid frame == active) — no persistent state, so it stays
+## deterministic + node-free, and a bazaar you rebuild elsewhere just works. The open interior + exact
+## shape is what stops a plain wall/house from matching. (A second `log` material for extra robustness +
+## the cozy look, and the NPC walk-in, are deferred — see docs/CRAFTING.md.)
+const BAZAAR_W: int = 4
+const BAZAAR_H: int = 3
+
+## True if a valid bazaar frame has its top-left corner at `o`. Pure read of `solid`.
+func is_bazaar_at(o: Vector2i) -> bool:
+	if not in_bounds(o) or not in_bounds(o + Vector2i(BAZAAR_W - 1, BAZAAR_H)):
+		return false
+	for dx: int in BAZAAR_W:                                   # top beam: all wood
+		if solid.get(o + Vector2i(dx, 0), &"") != &"wood":
+			return false
+	for dy: int in range(1, BAZAAR_H):                         # posts wood, interior open
+		if solid.get(o + Vector2i(0, dy), &"") != &"wood":
+			return false
+		if solid.get(o + Vector2i(BAZAAR_W - 1, dy), &"") != &"wood":
+			return false
+		for ix: int in range(1, BAZAAR_W - 1):
+			if solid.has(o + Vector2i(ix, dy)):
+				return false
+	for ix: int in range(1, BAZAAR_W - 1):                     # interior floor: real solid ground
+		var floor_cell: Vector2i = o + Vector2i(ix, BAZAAR_H)
+		if not solid.has(floor_cell) or _is_foliage(solid[floor_cell]):
+			return false
+	return true
+
+
+## All valid bazaar frames in the world (their top-left origins). A whole-world scan — cheap enough to
+## call on demand (e.g. when the player opens the craft screen), not per-frame. Deterministic ordering.
+func find_bazaars() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y: int in range(0, GRID_ROWS - BAZAAR_H):
+		for x: int in range(0, GRID_COLS - BAZAAR_W + 1):
+			if is_bazaar_at(Vector2i(x, y)):
+				out.append(Vector2i(x, y))
+	return out
+
+
+## The interior-centre cell of a bazaar at origin `o` (where the NPC stands / the "here" marker sits).
+func bazaar_center(o: Vector2i) -> Vector2i:
+	return o + Vector2i(BAZAAR_W / 2, BAZAAR_H - 1)
+
+
+## True if any active bazaar's interior is within `radius` cells of `cell` — the gate for crafting
+## (you craft AT the bazaar). Scans the detected frames; cheap on demand.
+func near_bazaar(cell: Vector2i, radius: int) -> bool:
+	for o: Vector2i in find_bazaars():
+		var c: Vector2i = bazaar_center(o)
+		if absi(c.x - cell.x) <= radius and absi(c.y - cell.y) <= radius:
+			return true
+	return false
+
+
 ## Take one unit from `cell`'s deposit pool (default 1 if untracked). Returns true when the pool is now
 ## EMPTY (the caller clears the ore block). Shared by hand-mining and the Drill so both drain identically.
 func _drain_deposit(cell: Vector2i) -> bool:

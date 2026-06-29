@@ -15,6 +15,7 @@ var sim: FactorySim
 var _base_produced: Dictionary = {}
 var _base_consumed: Dictionary = {}
 var _base_machines: int = 0
+var _base_bazaars: int = 0
 var _done: Dictionary = {}              ## step id -> true once achieved (latched)
 var _all_done_time: float = -1.0        ## seconds the chain has been fully complete (for HUD auto-hide)
 
@@ -27,6 +28,7 @@ var steps: Array[Dictionary] = [
 	{"id": &"craft", "label": "Press E for the crafting screen, then 1 for a Processor", "goal": "Craft a machine"},
 	{"id": &"build", "label": "Place it with RMB on open ground below",            "goal": "Build a machine"},
 	{"id": &"auto",  "label": "Watch product fall & pile up — walk over to grab it", "goal": "Automate"},
+	{"id": &"bazaar", "label": "Finish the abandoned Bazaar near spawn — select wood, RMB the gap in its frame", "goal": "Raise the Bazaar"},
 ]
 
 
@@ -35,6 +37,7 @@ func _init(factory: FactorySim) -> void:
 	_base_produced = factory.total_produced.duplicate()
 	_base_consumed = factory.total_consumed.duplicate()
 	_base_machines = factory.machines.size()
+	_base_bazaars = factory.find_bazaars().size()
 
 
 ## Call every frame: latch any newly-achieved step. Cheap (a handful of dict reads).
@@ -78,6 +81,7 @@ func _achieved(id: StringName) -> bool:
 		&"craft": return _consumed(&"ingot") >= 1                 # only crafting spends ingots
 		&"build": return sim.machines.size() - _base_machines >= 1
 		&"auto":  return not sim.ground.is_empty()                # gravity dropped product into a pile
+		&"bazaar": return sim.find_bazaars().size() > _base_bazaars  # completed a wood frame this session
 	return false
 
 

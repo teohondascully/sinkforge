@@ -55,6 +55,12 @@ const DEEPSLATE_ROW: int = 26
 const TREE_CHANCE: float = 0.20
 const TREE_GAP: int = 3
 
+## The abandoned Bazaar RUIN: an almost-complete wood frame stamped on flat ground near spawn. Finishing
+## it (placing the one missing block) activates it — the onboarding for "build a Bazaar", the first lore
+## ("someone was here"), and a worked example of the pattern (docs/CRAFTING.md). Sits clear of the player
+## (col 3) and forge (col 6), just past the flat spawn band.
+const RUIN_X: int = 10
+
 
 func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# Start from the heightmap base (surface + earth/stone blocks + matching walls), then enrich.
@@ -66,6 +72,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
 	_plant_trees(world, rng)
+	_stamp_bazaar_ruin(world)
 	return world
 
 
@@ -210,3 +217,30 @@ func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 			if leaf.y >= 0 and leaf.x >= 0 and leaf.x < world.cols and not world.blocks.has(leaf):
 				world.blocks[leaf] = &"leaves"
 		last = col
+
+
+## Stamp the near-complete bazaar ruin (see RUIN_X). Flatten its footprint to FLAT_SURFACE_ROW, then lay
+## the wood frame MINUS one block (the bottom-right post) for the player to finish — the moment it
+## completes, FactorySim.find_bazaars detects it and the Bazaars view plays the transform.
+func _stamp_bazaar_ruin(world: WorldData) -> void:
+	var ground: int = FLAT_SURFACE_ROW
+	var w: int = FactorySim.BAZAAR_W
+	var h: int = FactorySim.BAZAAR_H
+	for cx: int in range(RUIN_X, RUIN_X + w):                  # flatten + clear the footprint
+		for ry: int in range(0, ground):
+			world.blocks.erase(Vector2i(cx, ry))              # remove any bump / tree above the ground line
+		for ry: int in range(ground, ground + 4):
+			if not world.blocks.has(Vector2i(cx, ry)):
+				world.blocks[Vector2i(cx, ry)] = &"earth"     # ensure solid ground to stand + build on
+				world.walls[Vector2i(cx, ry)] = &"dirt_wall"
+	var o := Vector2i(RUIN_X, ground - h)                     # frame top-left
+	var missing := o + Vector2i(w - 1, h - 1)                 # the one block the player places to finish
+	for dx: int in w:
+		world.blocks[o + Vector2i(dx, 0)] = &"wood"           # top beam
+	for dy: int in range(1, h):                               # posts (both sides), minus the gap
+		for px: int in [0, w - 1]:
+			var c := o + Vector2i(px, dy)
+			if c != missing:
+				world.blocks[c] = &"wood"
+		for ix: int in range(1, w - 1):                       # keep the interior open
+			world.blocks.erase(o + Vector2i(ix, dy))

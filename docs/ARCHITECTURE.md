@@ -42,6 +42,11 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   buffer — `_run_drill` bores the first ore cell within `DRILL_REACH` straight below, drains its
   finite `deposits` pool (`_drain_deposit`, shared with hand-`mine`), and spits ore down its column
   like an ordinary machine (docs/MINING.md).
+- **Block placement + the Bazaar:** `place_block(cell, material)` is the Terraria build primitive
+  (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
+  is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
+  a distinctive 4×3 wood frame with an open interior — "active" is derived from the world, no state. The
+  decorated look + the block-by-block transform on completion live in the `Bazaars` view (docs/CRAFTING.md).
 - **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
   ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
   by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT

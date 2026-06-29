@@ -316,7 +316,7 @@ func _draw_help_overlay() -> void:
 		"jump        SPACE / W",
 		"mine        LMB (hold)",
 		"select      1–8  ·  mouse wheel",
-		"place / pick  RMB",
+		"place / pick  RMB  (machine, or wood block)",
 		"drop / feed  Q  (gravity feeds it in)",
 		"craft       E  (crafting screen)",
 		"map         M",

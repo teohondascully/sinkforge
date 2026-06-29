@@ -45,6 +45,8 @@ var _aim: Vector2i = Vector2i(-99, -99)
 var _aim_in_reach: bool = false
 var _aim_placeable: bool = false
 var _ghost_def: MachineDef = null
+var _ghost_material: StringName = &""                ## a building material selected for block placement
+var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 
 var _dark: LightLayer
 var _lights: LightLayer
@@ -82,7 +84,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 
 
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
-func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: MachineDef) -> void:
+func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: MachineDef, ghost_material: StringName = &"") -> void:
+	_ghost_material = ghost_material
 	_aim = cell
 	_aim_in_reach = in_reach
 	_aim_placeable = placeable
@@ -113,6 +116,8 @@ func _draw() -> void:
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
+	if bazaars != null:
+		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
 	if particles != null:
 		particles.draw(self)
 	_draw_aim()
@@ -250,13 +255,19 @@ func _draw_aim() -> void:
 	if sim.machine_at(_aim) != null:
 		draw_rect(inner, Color(0.95, 0.45, 0.40, 0.9), false, 2.0)  # pick-up affordance
 		return
-	if _ghost_def == null:
-		return  # the active hotbar item isn't a placeable machine — nothing to ghost
-	# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own (4b critique).
-	var ghost: Color = Visuals.machine_color(_ghost_def).lerp(Color.WHITE, 0.20)
-	ghost.a = 0.55
-	draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
-	Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
+	if _ghost_def != null:
+		# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own (4b critique).
+		var ghost: Color = Visuals.machine_color(_ghost_def).lerp(Color.WHITE, 0.20)
+		ghost.a = 0.55
+		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
+		Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
+	elif _ghost_material != &"":
+		# Block-placement preview: a translucent material-tinted fill (the Terraria build cursor).
+		var bg: Color = _material(_ghost_material).base_color
+		bg.a = 0.55
+		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), bg)
+	else:
+		return  # the active hotbar item isn't placeable — nothing to ghost
 	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
 	var border := Color(0.97, 0.98, 1.0, 0.95) if _aim_placeable else Color(0.95, 0.45, 0.40, 0.95)
 	draw_rect(inner, border, false, 2.5)

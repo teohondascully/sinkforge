@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_lift()
 	_test_finite_deposit_and_drill()
 	_test_trees_and_wood()
+	_test_block_placement_and_bazaar()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -540,3 +541,38 @@ func _test_trees_and_wood() -> void:
 	_check(not sim.is_solid(Vector2i(5, 3)) and not sim.is_solid(Vector2i(5, 2)), "the whole tree is gone (no floating canopy)")
 	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives")
 	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")
+
+
+## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).
+func _test_block_placement_and_bazaar() -> void:
+	print("- block placement + bazaar")
+	var sim: FactorySim = FactorySim.new()
+	# place_block consumes a carried material into an open cell; conservation holds (consumed, then
+	# mining it back is produced).
+	sim.inventory[&"wood"] = 3
+	sim.total_produced[&"wood"] = 3                     # pretend these were chopped, so net starts balanced
+	_check(sim.place_block(Vector2i(2, 2), &"wood"), "placed a wood block from the pack")
+	_check(sim.is_solid(Vector2i(2, 2)) and int(sim.inventory.get(&"wood", 0)) == 2, "block is solid, pack spent one")
+	_check(not sim.place_block(Vector2i(2, 2), &"wood"), "cannot place onto an occupied cell")
+	var net: int = int(sim.total_produced.get(&"wood", 0)) - int(sim.total_consumed.get(&"wood", 0))
+	_check(_items_present(sim, &"wood") == net, "wood conserved across placement (place = consume)")
+
+	# Build a valid bazaar frame on solid ground and detect it.
+	var b: FactorySim = FactorySim.new()
+	var o := Vector2i(10, 6)                            # top-left of the 4×3 frame
+	for ix: int in 4:                                  # ground row under the whole footprint
+		b.set_solid(o + Vector2i(ix, 3), &"earth")
+	b.set_solid(o + Vector2i(0, 0), &"wood"); b.set_solid(o + Vector2i(1, 0), &"wood")
+	b.set_solid(o + Vector2i(2, 0), &"wood"); b.set_solid(o + Vector2i(3, 0), &"wood")  # top beam
+	b.set_solid(o + Vector2i(0, 1), &"wood"); b.set_solid(o + Vector2i(3, 1), &"wood")  # posts
+	b.set_solid(o + Vector2i(0, 2), &"wood")
+	_check(not b.is_bazaar_at(o), "frame missing one post is NOT yet a bazaar")
+	b.set_solid(o + Vector2i(3, 2), &"wood")           # the completing block
+	_check(b.is_bazaar_at(o), "completing the frame forms a valid bazaar")
+	var found: Array[Vector2i] = b.find_bazaars()
+	_check(found.size() == 1 and found[0] == o, "find_bazaars locates exactly it")
+	_check(b.near_bazaar(b.bazaar_center(o), 3), "near_bazaar true at the interior")
+	_check(not b.near_bazaar(o + Vector2i(40, 0), 3), "near_bazaar false far away")
+	# A wood block dropped INTO the interior breaks it (no longer open).
+	b.set_solid(o + Vector2i(1, 1), &"wood")
+	_check(not b.is_bazaar_at(o), "a blocked interior is no longer a valid bazaar")
