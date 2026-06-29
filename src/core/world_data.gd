@@ -17,6 +17,11 @@ var seed: int = 0
 var blocks: Dictionary = {}
 ## Background layer: cell (Vector2i) -> material id. Walls behind dug-out cells (Terraria-style).
 var walls: Dictionary = {}
+## Ore deposit richness: cell (Vector2i) -> remaining yield (how many ore the cell holds). Sparse —
+## only ore cells appear, and an ore cell ABSENT here is read as amount 1 by the sim (so a generator
+## that doesn't fill this still produces today's one-hit ore). The gen→sim channel for finite,
+## depth-scaled deposits (docs/MINING.md): generation decides how rich each vein cell is.
+var amounts: Dictionary = {}
 
 
 func in_bounds(cell: Vector2i) -> bool:

@@ -19,6 +19,9 @@ const GRID_ROWS: int = 40
 ## Items/tick a LIFT carries UP its column — the throughput "cost" of fighting gravity (real power is
 ## deferred; slowness IS the asymmetry for now). Below this rate, a backlog piles at the lift.
 const LIFT_THROUGHPUT: int = 2
+## How many cells straight DOWN a Drill reaches for ore (docs/MINING.md). It bores the first ore cell
+## within this range, stopping at any non-ore rock — so you place it with a clear shot at the vein.
+const DRILL_REACH: int = 4
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
@@ -32,6 +35,11 @@ var solid: Dictionary = {}
 ## cell is solid. Mining a block leaves its wall (Terraria-style). Read-only to the view (wall_at);
 ## written only by load_world / set_wall. Not collision (you walk through walls), not "items present".
 var wall: Dictionary = {}
+## Ore deposit pools (cell -> remaining yield), the finite-deposit layer over ore cells (docs/MINING.md).
+## An ORE cell ABSENT here counts as amount 1, so a world that never set richness behaves as before
+## (one hit = one ore = cleared). Drained by hand-`mine` and by a Drill; latent world resource, NOT
+## "items present" — depleting it is conservation-neutral (the ore it yields is total_produced, as ever).
+var deposits: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -158,12 +166,16 @@ func set_wall(cell: Vector2i, material: StringName = &"") -> void:
 func load_world(world: WorldData) -> void:
 	solid.clear()
 	wall.clear()
+	deposits.clear()
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
 			solid[cell] = world.blocks[cell]
 	for cell: Vector2i in world.walls:
 		if in_bounds(cell):
 			wall[cell] = world.walls[cell]
+	for cell: Vector2i in world.amounts:
+		if in_bounds(cell):
+			deposits[cell] = int(world.amounts[cell])
 
 
 ## Player action: dig out a solid cell. Returns the material mined (&"earth"/&"ore"), or &"" if the
@@ -174,11 +186,27 @@ func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
 	var material: StringName = solid[cell]
-	solid.erase(cell)
 	if material == &"ore":
+		# A finite deposit: each hit yields 1 ore and drains the pool; the block only clears (wall kept)
+		# once the pool is empty. A cell with no pool entry holds 1 → one hit, exactly as before.
 		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + 1
 		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + 1
+		if _drain_deposit(cell):
+			solid.erase(cell)
+		return material
+	solid.erase(cell)
 	return material
+
+
+## Take one unit from `cell`'s deposit pool (default 1 if untracked). Returns true when the pool is now
+## EMPTY (the caller clears the ore block). Shared by hand-mining and the Drill so both drain identically.
+func _drain_deposit(cell: Vector2i) -> bool:
+	var left: int = int(deposits.get(cell, 1)) - 1
+	if left > 0:
+		deposits[cell] = left
+		return false
+	deposits.erase(cell)
+	return true
 
 
 ## The carried pack as an ordered list of {item, count} for the inventory hotbar UI. Dictionaries
@@ -324,6 +352,9 @@ func _run_machine(machine: MachineState) -> void:
 	if machine.def.behavior == &"splitter":
 		_run_splitter(machine)
 		return
+	if machine.def.behavior == &"drill":
+		_run_drill(machine)
+		return
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
@@ -380,6 +411,42 @@ func _run_splitter(machine: MachineState) -> void:
 	for item: StringName in machine.input_buffer:
 		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + int(machine.input_buffer[item])
 	machine.input_buffer.clear()
+
+
+## A DRILL automates the by-hand ore mine (docs/MINING.md): it draws from the WORLD, not an input buffer.
+## Each cycle (recipe.time) it bores the first ore cell straight below it, drains one unit from that
+## deposit (clearing the block when empty — wall kept), and emits recipe.outputs (1 ore) into its output
+## buffer, which _flow then drops down the column like any machine. No reachable ore → it idles (progress
+## doesn't advance, so it resumes cleanly when a new vein comes into reach as the shaft bores deeper). The
+## ore is genuinely produced from the world → total_produced (the same accounting as hand-mining).
+func _run_drill(machine: MachineState) -> void:
+	var recipe: RecipeDef = machine.def.recipe
+	if recipe == null:
+		return
+	var target: Vector2i = _drill_target(machine.cell)
+	if target.x < 0:
+		return                          # nothing to bore in reach — idle, hold progress
+	machine.progress += SECONDS_PER_TICK
+	if machine.progress < recipe.time:
+		return
+	machine.progress -= recipe.time
+	if _drain_deposit(target):
+		solid.erase(target)             # deposit exhausted — clear the block (wall kept), bore deeper next
+	for item: StringName in recipe.outputs:
+		var n: int = int(recipe.outputs[item])
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + n
+		total_produced[item] = int(total_produced.get(item, 0)) + n
+
+
+## The cell a drill bores: scanning straight DOWN from the drill within DRILL_REACH, the first SOLID cell
+## — returned only if it's ore (else the drill is blocked by plain rock and idles). Open air above the
+## vein is skipped (the drill string reaches through it). Returns (-1,-1) when no ore is in reach.
+func _drill_target(origin: Vector2i) -> Vector2i:
+	for row: int in range(origin.y + 1, mini(origin.y + 1 + DRILL_REACH, GRID_ROWS)):
+		var cell := Vector2i(origin.x, row)
+		if solid.has(cell):
+			return cell if solid[cell] == &"ore" else Vector2i(-1, -1)
+	return Vector2i(-1, -1)
 
 
 ## Gravity + routing: each machine's output is handed to its destination(s). An ordinary machine

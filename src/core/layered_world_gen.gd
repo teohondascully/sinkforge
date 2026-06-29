@@ -39,6 +39,10 @@ const ORE_CHANCE_DEEP: float = 0.85
 ## Vein size grows from this many cells (shallow) toward +ORE_SIZE_DEPTH_BONUS (deep) — richer down low.
 const ORE_SIZE_MIN: int = 2
 const ORE_SIZE_DEPTH_BONUS: int = 6
+## Per-cell DEPOSIT richness (how many ore one cell holds; finite deposits, docs/MINING.md). A shallow
+## vein cell holds 1 (one hit, like before); a bottom-of-world cell holds 1+this — so deep deposits are
+## the rich ones a Drill is worth building for. Depth-scaled, same depth_frac as size/chance.
+const ORE_AMOUNT_DEPTH_BONUS: int = 4
 
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
@@ -144,16 +148,19 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
 		if rng.randf() > depth_frac * ORE_CHANCE_DEEP:
 			continue                            # rejected — most shallow seeds die here (the band)
 		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS)))
-		_grow_vein(world, rng, Vector2i(cx, cy), size)
+		var richness: int = 1 + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS)))
+		_grow_vein(world, rng, Vector2i(cx, cy), size, richness)
 
 
 ## Grow one vein as a random-walk blob from a seed cell, converting solid rock to ore as it wanders.
-func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int) -> void:
+## Each converted cell is stamped with the vein's depth-scaled `richness` (its finite deposit amount).
+func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int) -> void:
 	var cell: Vector2i = seed_cell
 	for _step: int in size:
 		var here: StringName = world.blocks.get(cell, &"")
 		if here == &"earth" or here == &"stone" or here == &"deepslate":
 			world.blocks[cell] = &"ore"
+			world.amounts[cell] = richness
 		var dir: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][rng.randi_range(0, 3)]
 		cell += dir
 		if not world.in_bounds(cell):

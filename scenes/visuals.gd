@@ -8,8 +8,10 @@ extends RefCounted
 
 # --- machines ----------------------------------------------------------------
 
-## The icon "kind" of a machine: lift / fork (splitter) / furnace (no-input source) / gear (everything).
+## The icon "kind" of a machine: drill / lift / fork (splitter) / furnace (no-input source) / gear.
 static func machine_kind(def: MachineDef) -> String:
+	if def.behavior == &"drill":
+		return "drill"
 	if def.behavior == &"lift":
 		return "lift"
 	if def.behavior == &"splitter":
@@ -21,6 +23,8 @@ static func machine_kind(def: MachineDef) -> String:
 
 ## The casing colour of a machine (the riveted body the glyph sits on).
 static func machine_color(def: MachineDef) -> Color:
+	if def.behavior == &"drill":
+		return Color(0.72, 0.56, 0.30)  # steel-amber — "ore extraction tech", distinct from the forge
 	if def.behavior == &"lift":
 		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
 	if def.behavior == &"splitter":
@@ -45,6 +49,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_lift(canvas, center, s, active, t)
 		"fork":
 			_fork(canvas, center, s)
+		"drill":
+			_drill(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -79,6 +85,26 @@ static func _lift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 		var col := Color(up.r, up.g, up.b, a)
 		canvas.draw_line(c + Vector2(-6.0 * s, oy + 4.0 * s), c + Vector2(0.0, oy - 2.0 * s), col, 2.0)
 		canvas.draw_line(c + Vector2(0.0, oy - 2.0 * s), c + Vector2(6.0 * s, oy + 4.0 * s), col, 2.0)
+
+
+## Drill: a boxy housing over a downward-pointing bit with helical flutes. The bit BOBS down and the
+## flutes MARCH while boring — the "it's chewing into the rock below" read (mirrors what _run_drill does).
+static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var steel := Color(0.16, 0.18, 0.22)
+	var edge := Color(0.78, 0.66, 0.40)
+	var bob: float = (sin(t * 14.0) * 0.9 if active else 0.0) * s   # the hammer-judder of drilling
+	# Housing (the motor block up top).
+	canvas.draw_rect(Rect2(c.x - 6.5 * s, c.y - 8.0 * s, 13.0 * s, 6.0 * s), steel)
+	canvas.draw_rect(Rect2(c.x - 6.5 * s, c.y - 8.0 * s, 13.0 * s, 1.5 * s), edge)
+	# Bit: a tapering shaft to a point, with flute ticks that scroll downward while active.
+	var tip := Vector2(c.x, c.y + 9.0 * s + bob)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - 4.0 * s, c.y - 2.0 * s), Vector2(c.x + 4.0 * s, c.y - 2.0 * s), tip]), steel)
+	var march: float = fmod(t * 16.0, 4.0) * s if active else 0.0
+	for k: int in 3:
+		var fy: float = c.y - 1.0 * s + float(k) * 3.2 * s + march + bob
+		if fy < c.y + 7.5 * s:
+			canvas.draw_line(Vector2(c.x - 3.0 * s, fy), Vector2(c.x + 3.0 * s, fy - 1.4 * s), edge, 1.0)
 
 
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.

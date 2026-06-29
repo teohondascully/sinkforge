@@ -68,6 +68,7 @@ func _ready() -> void:
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
 		load("res://src/data/machines/lift.tres"),
+		load("res://src/data/machines/drill.tres"),  # automates ore extraction (docs/MINING.md)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -251,7 +252,7 @@ func _seed_world() -> void:
 ## NOTE: the head-lamp glow and forge embers are LIGHTING effects on the miner/machines, not carryable
 ## items — there's nothing to put in the pack for those; they appear automatically in play.
 func _dev_seed_pack() -> void:
-	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"processor": 2, &"splitter": 2, &"lift": 1}
+	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1}
 	for item: StringName in kit:
 		sim.inventory[item] = int(sim.inventory.get(item, 0)) + int(kit[item])
 		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(kit[item])

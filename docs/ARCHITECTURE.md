@@ -37,7 +37,16 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   runs no recipe — it passes its incoming stream through and `_flow` divides it evenly between
   TWO destinations (down + the column to its right), dealt round-robin via the machine's
   `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
-  (PROVISIONAL edge, see docs/RISKS.md).
+  (PROVISIONAL edge, see docs/RISKS.md). A **lift** (`behavior == &"lift"`) routes UP (`_column_rise`)
+  rate-limited by `LIFT_THROUGHPUT`; a **drill** (`behavior == &"drill"`) draws from the WORLD, not a
+  buffer — `_run_drill` bores the first ore cell within `DRILL_REACH` straight below, drains its
+  finite `deposits` pool (`_drain_deposit`, shared with hand-`mine`), and spits ore down its column
+  like an ordinary machine (docs/MINING.md).
+- **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
+  ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
+  by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT
+  counted as "items present" — the ore it yields is `total_produced` (conservation-neutral). Seeded
+  from `WorldData.amounts` in `load_world`.
 - **Depends on:** `MachineState`, and the data Resources (`MachineDef`/`RecipeDef`).
 - **Used by:** `MainView` (reads it to draw; drives it via `advance`/place/remove).
 

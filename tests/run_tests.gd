@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_worldgen()
 	_test_layered_worldgen()
 	_test_lift()
+	_test_finite_deposit_and_drill()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -470,3 +471,38 @@ func _test_lift() -> void:
 	var pile: Dictionary = sim.ground.get(Vector2i(5, 0), {})
 	_check(int(pile.get(&"ore", 0)) == 5, "all 5 ore arrived at the TOP of the shaft")
 	_check(_items_present(sim, &"ore") == 5, "ore conserved across lifting (present=5)")
+
+
+## Finite ore deposits + the Drill (docs/MINING.md). A deposit cell holds a POOL: hand-mining drains it
+## a unit at a time, clearing the block only when empty (a cell with no pool = 1 = today's one-hit). A
+## placed Drill bores the vein straight below it, spitting ore down the column, and STOPS when the vein
+## is exhausted — proving extraction is finite (no infinite-ore machine).
+func _test_finite_deposit_and_drill() -> void:
+	print("- finite deposit + drill")
+	var sim: FactorySim = FactorySim.new()
+	var cell := Vector2i(4, 6)
+	sim.set_solid(cell, &"ore")
+	sim.deposits[cell] = 3                              # a rich cell: three ore before it clears
+	_check(sim.mine(cell) == &"ore" and sim.is_solid(cell), "hit 1 yields ore, deposit not yet empty (cell remains)")
+	_check(sim.mine(cell) == &"ore" and sim.is_solid(cell), "hit 2 yields ore, cell still ore")
+	_check(sim.mine(cell) == &"ore" and not sim.is_solid(cell), "hit 3 empties the deposit and clears the block")
+	_check(int(sim.inventory.get(&"ore", 0)) == 3, "all 3 ore drained into the pack")
+	_check(sim.mine(cell) == &"", "an emptied deposit cell is gone")
+
+	# The DRILL: a 2-cell vertical vein (2 ore each) right below it, stone floor under that.
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(8, 5), &"ore"); s2.deposits[Vector2i(8, 5)] = 2
+	s2.set_solid(Vector2i(8, 6), &"ore"); s2.deposits[Vector2i(8, 6)] = 2
+	s2.set_solid(Vector2i(8, 8), &"stone")             # floor: catches the spat ore + stops the drill
+	var drill: MachineState = s2.place_machine(drill_def, Vector2i(8, 4))
+	_check(drill != null and drill.def.behavior == &"drill", "placed a drill")
+	for _i: int in 100:                                # 4 ore × 20 ticks/extraction, plenty of slack
+		s2.tick()
+	_check(not s2.is_solid(Vector2i(8, 5)) and not s2.is_solid(Vector2i(8, 6)), "drill bored through both vein cells")
+	_check(int(s2.total_produced.get(&"ore", 0)) == 4, "drill produced exactly the 4 ore the deposits held")
+	_check(_items_present(s2, &"ore") == 4, "drilled ore conserved (present=4)")
+	var before: int = int(s2.total_produced.get(&"ore", 0))
+	for _i: int in 40:
+		s2.tick()
+	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")

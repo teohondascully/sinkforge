@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MachineDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/data/machine_def.gd" id="1_machine"]
+[ext_resource type="Resource" path="res://src/data/recipes/mine_ore.tres" id="2_recipe"]
+
+[resource]
+script = ExtResource("1_machine")
+id = &"drill"
+display_name = "Drill"
+recipe = ExtResource("2_recipe")
+behavior = &"drill"
+craft_cost = {
+&"ingot": 2
+}
