@@ -244,18 +244,45 @@ func _make_mote_texture() -> GradientTexture2D:
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
-## HOW the world is made — swap the generator and nothing here changes. Then place the lone Processor
-## forge the player hand-feeds (a machine, not terrain — stays MainView's concern).
+## HOW the world is made — swap the generator and nothing here changes. Then stamp the two starter
+## fixtures the Rung-1 loop needs: the hand-feed FORGE (with a collection pit) and the abandoned
+## MINESHAFT (a pre-carved shaft over a rich vein) the player drops the self-feeding line into.
+const FORGE_CELL := Vector2i(6, 4)          ## the surface forge the player hand-feeds to bootstrap ingots
+const MINESHAFT_COL: int = 8                ## the abandoned shaft (drop a forge+drill in → first automation)
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
 	sim.load_world(world)
-	var processor: MachineDef = load("res://src/data/machines/processor.tres")
-	# The forge sits ON the surface (row 4, resting on the row-5 grass), not floating in the sky. It's
-	# fed ONLY by ore you dig + deposit; forged ingots pile in its own cell to be walked over.
-	sim.place_machine(processor, Vector2i(6, 4))
+	_seed_forge_station()
+	_seed_tutorial_mineshaft()
 	if dev_start:
 		_dev_seed_pack()
+
+
+## The hand-feed forge + a 1-cell COLLECTION PIT beneath it. Gravity carries smelted ingots straight
+## down, so without the pit they'd pile in the forge's own (un-standable) cell — you could smelt but
+## never collect, a dead end in a clean playthrough. The pit drops them one cell to a floor you can
+## step into and scoop. You stand beside the forge and toss ore in (Q); ingots collect in the pit.
+func _seed_forge_station() -> void:
+	var processor: MachineDef = load("res://src/data/machines/processor.tres")
+	sim.place_machine(processor, FORGE_CELL)                       # (6,4), resting on the row-5 grass
+	sim.set_solid(FORGE_CELL + Vector2i(0, 1), &"")               # carve the pit cell (6,5) — ingots land here
+	sim.set_solid(FORGE_CELL + Vector2i(0, 2), &"earth")          # keep a floor (6,6) under the pit
+
+
+## An ABANDONED MINESHAFT near spawn: a pre-carved vertical shaft (walls kept = a Terraria carved room,
+## so daylight pours down it) bottomed by a rich ore vein on a rock floor. It's the foolproof stage for
+## the first automation — the player drops a forge then a drill into the shaft mouth (reachable from the
+## surface beside it) and the self-feeding line runs (drill bores the vein → ore falls into the forge →
+## ingots pile). Sinking this exact shaft by hand is fragile (you'd mine the very vein you want to drill),
+## so the world provides it; the player's digging agency lives in step 1 and everywhere else.
+func _seed_tutorial_mineshaft() -> void:
+	var c: int = MINESHAFT_COL
+	for row: int in range(5, 9):                                   # carve the shaft (rows 5–8 open, walls stay)
+		sim.set_solid(Vector2i(c, row), &"")
+	sim.set_solid(Vector2i(c, 9), &"ore")                         # the vein at the bottom (drill's target)
+	sim.deposits[Vector2i(c, 9)] = 12                            # rich — runs the whole loop, then exhausts
+	sim.set_solid(Vector2i(c, 10), &"earth")                      # floor under the vein (catches ingots)
 
 
 ## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
