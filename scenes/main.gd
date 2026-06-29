@@ -446,8 +446,11 @@ func _select_slot(idx: int) -> void:
 
 
 ## DROP the selected stack (Q): gravity is the conveyor, so feeding is DROPPING — you don't insert into
-## a machine, you let go above its column and it falls in (or onto the floor). Drops at the body's own
-## cell; the sim cascades it down via drop_item. Returns whether anything fell.
+## a machine, you let go above its column and it falls in (or onto the floor). It TOSSES forward (the
+## Minecraft arc): the stack lands in the cell you're FACING-and-below — so you stand beside a forge and
+## toss ore in, or fling it over a ledge into the next shaft. If that facing cell is a wall (you can't
+## toss through rock), it falls back to a straight drop down your own column (so feeding a shaft you
+## stand over still works). The body's cell is the visual launch origin; the sim cascades the landing.
 func try_drop() -> bool:
 	if _player == null:
 		return false
@@ -457,10 +460,14 @@ func try_drop() -> bool:
 	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
 	var item: StringName = slots[sel]["item"]
 	var carried: int = int(slots[sel]["count"])
-	var cell: Vector2i = _cell_at(_player.position)
-	var dropped: int = sim.drop_item(cell, item, carried)
+	var here: Vector2i = _cell_at(_player.position)
+	var face: Vector2i = here + Vector2i(_player.facing, 0)
+	# Toss forward into the facing column when it's clear (open air or a machine to feed); a solid wall
+	# blocks the toss, so drop straight down instead. Landing is sim-truth; `here` is the launch origin.
+	var target: Vector2i = face if (sim.in_bounds(face) and not sim.is_solid(face)) else here
+	var dropped: int = sim.drop_item(target, item, carried, here)
 	if dropped > 0:
-		_particles.pop(_cell_center(cell), Visuals.item_color(item))
+		_particles.pop(_cell_center(target), Visuals.item_color(item))
 	return dropped > 0
 
 

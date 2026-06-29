@@ -56,12 +56,23 @@ func motes() -> Array[Dictionary]:
 	return out
 
 
-## The world position of a drop: down its column with a small launch-hop (reads as SPAT OUT, then gravity).
+## The world position of a drop along its ballistic arc (the ONE authority — the trail samples it too).
 func _pos(f: Dictionary) -> Vector2:
-	var t: float = clampf(float(f["t"]), 0.0, 1.0)
-	var p: Vector2 = (f["from"] as Vector2).lerp(f["to"], t)
-	p.y -= sin(t * PI) * 10.0
-	return p
+	return _sample(f["from"], f["to"], float(f["t"]))
+
+
+## A point on the toss arc from `from` to `to` at progress `t`. Horizontal eases OUT (a tossed item
+## shoots forward early, then settles into its landing column); vertical descends linearly minus an
+## upward BOW (the launch hop) that grows with the toss distance. A straight-down spit (from.x == to.x)
+## keeps the original ~10px pop unchanged — so machine output is visually identical, only sideways
+## tosses arc. This is the Minecraft forward-and-down throw expressed over the column landing.
+func _sample(from: Vector2, to: Vector2, t: float) -> Vector2:
+	t = clampf(t, 0.0, 1.0)
+	var ex: float = 1.0 - (1.0 - t) * (1.0 - t)        # ease-out horizontal
+	var x: float = lerpf(from.x, to.x, ex)
+	var bow: float = 10.0 + absf(to.x - from.x) * 0.28  # launch hop, taller the further it's tossed
+	var y: float = lerpf(from.y, to.y, t) - sin(t * PI) * bow
+	return Vector2(x, y)
 
 
 ## Paint the stream on `canvas`: a fading comet-trail + a chunky glowing nugget with a vertical motion-
@@ -75,8 +86,7 @@ func draw(canvas: CanvasItem) -> void:
 		var trail: int = 5
 		for i: int in range(trail, 0, -1):
 			var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
-			var pp: Vector2 = from.lerp(to, tt)
-			pp.y -= sin(tt * PI) * 10.0
+			var pp: Vector2 = _sample(from, to, tt)
 			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
 			var sz: float = 5.5 - float(i) * 0.6
 			canvas.draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))

@@ -360,15 +360,19 @@ func deposit(cell: Vector2i, item: StringName, count: int) -> int:
 ## straight down `cell`'s column from the player's row and land in the first machine below (feeding its
 ## input), else on the first floor as a ground pile (re-collectable), else the void sink. Returns how
 ## many dropped. Conservation holds: items only MOVE pack→(machine|ground|sink), none made or destroyed.
-func drop_item(cell: Vector2i, item: StringName, count: int) -> int:
+## `from_cell` is the VISUAL launch origin for the cosmetic toss (the body's cell when you toss ore into
+## the next column over) — it only colours the flow_event's `from`, which the sim never reads back, so
+## the production landing is unaffected. Default sentinel (-1,-1) means "launch from `cell`" (straight drop).
+func drop_item(cell: Vector2i, item: StringName, count: int, from_cell: Vector2i = Vector2i(-1, -1)) -> int:
 	var have: int = int(inventory.get(item, 0))
 	var n: int = mini(have, count)
 	if n <= 0:
 		return 0
 	_take_from_pack(item, n)
+	var origin: Vector2i = cell if from_cell == Vector2i(-1, -1) else from_cell
 	var dest: Dictionary = _column_landing(cell.x, cell.y)
 	dest["target"][item] = int(dest["target"].get(item, 0)) + n
-	flow_events.append({"item": item, "from": cell, "to": dest["to_cell"], "count": n})
+	flow_events.append({"item": item, "from": origin, "to": dest["to_cell"], "count": n})
 	return n
 
 
