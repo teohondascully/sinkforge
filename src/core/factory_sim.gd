@@ -587,25 +587,34 @@ func power_throttle(cell: Vector2i, demand: float) -> float:
 ## Finally each conduit cell writes into the field and BLEEDS to its neighbours so adjacent machines draw.
 func _flow_power_through_conduits() -> void:
 	var carried: Dictionary = {}                       # conduit cell -> power it carries this tick
-	for y: int in range(0, GRID_ROWS):
+	# Touch only ACTUAL conduit cells, grouped by row, so a sparse network costs O(conduits), not O(grid).
+	var by_row: Dictionary = {}                         # y -> Array[int] of conduit x's in that row
+	for cell: Variant in conduit:
+		var c: Vector2i = cell
+		if not by_row.has(c.y):
+			by_row[c.y] = ([] as Array[int])
+		(by_row[c.y] as Array[int]).append(c.x)
+	var rows: Array = by_row.keys()
+	rows.sort()                                         # top→bottom: each row finalized before the next reads it
+	for y: int in rows:
+		var xs: Array[int] = by_row[y]
+		xs.sort()
 		# (1) vertical inflow from the row above (additive merge, capacity-clamped).
-		for x: int in range(0, GRID_COLS):
-			var cell := Vector2i(x, y)
-			if not conduit.has(cell):
-				continue
+		for x: int in xs:
 			var vin: float = 0.0
 			for dx: int in [-1, 0, 1]:
 				vin += _power_out_of(Vector2i(x + dx, y - 1), carried) * CONDUIT_V_KEEP
-			carried[cell] = minf(vin, CONDUIT_CAPACITY)
-		# (2) horizontal spread within the row: L→R then R→L lossy MAX (the same-row tie-break).
-		for x: int in range(1, GRID_COLS):
-			var cell := Vector2i(x, y)
-			if conduit.has(cell) and conduit.has(Vector2i(x - 1, y)):
-				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(x - 1, y)]) * CONDUIT_H_KEEP)
-		for x: int in range(GRID_COLS - 2, -1, -1):
-			var cell := Vector2i(x, y)
-			if conduit.has(cell) and conduit.has(Vector2i(x + 1, y)):
-				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(x + 1, y)]) * CONDUIT_H_KEEP)
+			carried[Vector2i(x, y)] = minf(vin, CONDUIT_CAPACITY)
+		# (2) horizontal spread within the row: L→R then R→L lossy MAX (the same-row tie-break), only
+		# transferring between conduits that are actually adjacent in this row.
+		for i: int in range(1, xs.size()):
+			if xs[i] == xs[i - 1] + 1:
+				var cell := Vector2i(xs[i], y)
+				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(xs[i - 1], y)]) * CONDUIT_H_KEEP)
+		for i: int in range(xs.size() - 2, -1, -1):
+			if xs[i] == xs[i + 1] - 1:
+				var cell := Vector2i(xs[i], y)
+				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(xs[i + 1], y)]) * CONDUIT_H_KEEP)
 	# Merge the carried power into the field, and bleed it to neighbours so a machine beside a tube draws.
 	for cell: Vector2i in carried:
 		var v: float = float(carried[cell])

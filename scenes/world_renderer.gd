@@ -134,7 +134,7 @@ func _draw_conduits() -> void:
 	for cell: Variant in sim.conduit:
 		var c: Vector2i = cell
 		var center: Vector2 = Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
-		var lvl: float = clampf(sim.power_at(c) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+		var lvl: float = _conduit_level(c)
 		var glow: Color = Color(0.26, 0.22, 0.17).lerp(Color(1.0, 0.85, 0.40), lvl)
 		var stubs: Array[Vector2] = []
 		for d: Vector2i in DIRS:
@@ -151,6 +151,12 @@ func _draw_conduits() -> void:
 		draw_circle(center, 2.2, glow)
 		for s: Vector2 in stubs:
 			draw_line(center, s, glow, 3.0)
+
+
+## A conduit's power as a 0..1 fraction of tube capacity — the shared "how lit is this tube" reading the
+## copper channel draw and the emitted light pool both key off (so the tube and its glow never disagree).
+func _conduit_level(cell: Vector2i) -> float:
+	return clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
 
 
 func _draw_terrain() -> void:
@@ -558,7 +564,7 @@ func _paint_lights(layer: LightLayer) -> void:
 	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft
 	# (the in-world tube is drawn under the veil; this is what makes its power read from across the room).
 	for cell: Variant in sim.conduit:
-		var lvl: float = clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+		var lvl: float = _conduit_level(cell)
 		if lvl > 0.04:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
 	for m: Dictionary in falling.motes():
