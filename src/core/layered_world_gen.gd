@@ -49,6 +49,12 @@ const ORE_AMOUNT_DEPTH_BONUS: int = 4
 ## so descending crosses distinct material zones (the "deeper = different place" read).
 const DEEPSLATE_ROW: int = 26
 
+# --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
+## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
+## 3-wide canopies mostly read as separate trees). Sparse — the surface reads as wooded, not a wall.
+const TREE_CHANCE: float = 0.20
+const TREE_GAP: int = 3
+
 
 func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# Start from the heightmap base (surface + earth/stone blocks + matching walls), then enrich.
@@ -59,6 +65,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_carve_caves(world, seed)
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
+	_plant_trees(world, rng)
 	return world
 
 
@@ -165,3 +172,41 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 		cell += dir
 		if not world.in_bounds(cell):
 			break
+
+
+## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,
+## docs/CRAFTING.md). A tree is a 1-wide trunk of &"wood" under a 3-wide rounded &"leaves" canopy,
+## stamped in the AIR above a column's ground cell. The spawn/forge band (cols ≤ FLAT_COLS) is left clear
+## so a tree never traps the player or buries the forge. Foliage is solid + choppable but excluded from
+## the walkable silhouette (FactorySim.surface_row), so trees don't ramp; chopping one fells it (→wood).
+func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var last: int = -99
+	for col: int in range(FLAT_COLS + 1, world.cols):
+		if col - last < TREE_GAP or rng.randf() > TREE_CHANCE:
+			continue
+		var ground: int = _surface_row(col)
+		if not world.blocks.has(Vector2i(col, ground)):
+			continue                                   # column has no solid surface here (cave mouth) — skip
+		var trunk: int = rng.randi_range(2, 3)
+		if ground - trunk - 2 < 0:
+			continue                                   # not enough sky above for trunk + canopy
+		var blocked: bool = false
+		for h: int in range(1, trunk + 1):
+			if world.blocks.has(Vector2i(col, ground - h)):
+				blocked = true                         # a hill cell already occupies the trunk space — skip
+				break
+		if blocked:
+			continue
+		for h: int in range(1, trunk + 1):
+			world.blocks[Vector2i(col, ground - h)] = &"wood"
+		# Rounded canopy: a 3-wide band beside/above the trunk top, with a single leaf crowning it.
+		var ttr: int = ground - trunk                  # row of the topmost trunk cell
+		var canopy: Array[Vector2i] = [
+			Vector2i(col, ttr - 1), Vector2i(col, ttr - 2),
+			Vector2i(col - 1, ttr - 1), Vector2i(col + 1, ttr - 1),
+			Vector2i(col - 1, ttr), Vector2i(col + 1, ttr),
+		]
+		for leaf: Vector2i in canopy:
+			if leaf.y >= 0 and leaf.x >= 0 and leaf.x < world.cols and not world.blocks.has(leaf):
+				world.blocks[leaf] = &"leaves"
+		last = col

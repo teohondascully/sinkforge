@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_layered_worldgen()
 	_test_lift()
 	_test_finite_deposit_and_drill()
+	_test_trees_and_wood()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -506,3 +507,36 @@ func _test_finite_deposit_and_drill() -> void:
 	for _i: int in 40:
 		s2.tick()
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
+
+
+## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
+## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping any tree cell fells
+## the whole 1-wide tree and yields one wood per trunk cell, conserved.
+func _test_trees_and_wood() -> void:
+	print("- trees + wood")
+	# Generation stamps real trees on the surface.
+	var gen := LayeredWorldGen.new()
+	var world: WorldData = gen.generate(72, 40, 1337)
+	var wood_cells: int = 0
+	var leaf_cells: int = 0
+	for cell: Vector2i in world.blocks:
+		if world.blocks[cell] == &"wood":
+			wood_cells += 1
+		elif world.blocks[cell] == &"leaves":
+			leaf_cells += 1
+	_check(wood_cells > 0 and leaf_cells > 0, "worldgen planted trees (wood=%d, leaves=%d)" % [wood_cells, leaf_cells])
+
+	# A hand-built tree: 2 wood trunk + 1 leaf crown on a grass column.
+	var sim: FactorySim = FactorySim.new()
+	sim.set_solid(Vector2i(5, 5), &"earth")            # ground
+	sim.set_solid(Vector2i(5, 4), &"wood")
+	sim.set_solid(Vector2i(5, 3), &"wood")
+	sim.set_solid(Vector2i(5, 2), &"leaves")
+	_check(sim.surface_row(5) == 5, "foliage is NOT the walkable surface — the ground row is (trees don't ramp)")
+	_check(sim.is_solid(Vector2i(5, 3)), "a trunk cell is solid (you collide with / can chop it)")
+	# Chop any cell → the whole tree falls, yielding one wood per trunk cell.
+	_check(sim.mine(Vector2i(5, 4)) == &"wood", "chopping a trunk cell returns wood material")
+	_check(int(sim.inventory.get(&"wood", 0)) == 2, "felling the tree yielded both trunk cells as wood")
+	_check(not sim.is_solid(Vector2i(5, 3)) and not sim.is_solid(Vector2i(5, 2)), "the whole tree is gone (no floating canopy)")
+	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives")
+	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")

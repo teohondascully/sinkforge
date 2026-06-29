@@ -62,6 +62,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 		"res://src/data/materials/ore.tres",
 		"res://src/data/materials/stone.tres",
 		"res://src/data/materials/deepslate.tres",
+		"res://src/data/materials/wood.tres",
+		"res://src/data/materials/leaves.tres",
 		"res://src/data/materials/dirt_wall.tres",
 		"res://src/data/materials/stone_wall.tres",
 		"res://src/data/materials/deepslate_wall.tres",

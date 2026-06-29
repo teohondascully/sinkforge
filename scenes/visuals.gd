@@ -123,6 +123,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.88, 0.52, 0.24)
 	if item == &"ingot":
 		return Color(0.97, 0.85, 0.42)
+	if item == &"wood":
+		return Color(0.55, 0.38, 0.22)
 	return Color.WHITE
 
 
@@ -144,4 +146,8 @@ static func terrain_dust(material: StringName) -> Color:
 		return Color(0.34, 0.37, 0.44)
 	if material == &"ore":
 		return Color(0.62, 0.45, 0.26)
+	if material == &"wood":
+		return Color(0.45, 0.30, 0.17)        # woodchips
+	if material == &"leaves":
+		return Color(0.28, 0.44, 0.22)        # leaf flecks
 	return Color(0.40, 0.30, 0.20)            # earth (default)

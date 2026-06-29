@@ -111,11 +111,20 @@ func material_at(cell: Vector2i) -> StringName:
 ## these, so what you SEE is exactly what you WALK — no phantom invisible ramps, no un-ramped stone.
 
 ## Topmost solid terrain row in a column (the exposed surface), or GRID_ROWS if the column is all air.
+## FOLIAGE (trees: wood/leaves) is SKIPPED — it's solid for collision + mineable, but it is not walkable
+## ground, so it must not become the silhouette (else a tree would draw a grass cap on its canopy and the
+## avatar would try to ramp up the trunk). Same exclusion machines get: present, but not the terrain top.
 func surface_row(col: int) -> int:
 	for row: int in range(0, GRID_ROWS):
-		if solid.has(Vector2i(col, row)):
+		var cell := Vector2i(col, row)
+		if solid.has(cell) and not _is_foliage(solid[cell]):
 			return row
 	return GRID_ROWS
+
+
+## Tree materials — solid + mineable, but excluded from the walkable surface silhouette (see surface_row).
+func _is_foliage(material: StringName) -> bool:
+	return material == &"wood" or material == &"leaves"
 
 
 ## Slope of the exposed surface at a column: +1 rising to the right, -1 rising to the left, 0 flat.
@@ -194,8 +203,39 @@ func mine(cell: Vector2i) -> StringName:
 		if _drain_deposit(cell):
 			solid.erase(cell)
 		return material
+	if _is_foliage(material):
+		# Chop a tree: one hit FELLS the whole tree (no floating canopy), yielding 1 wood per trunk cell.
+		var got: int = _fell_tree(cell)
+		if got > 0:
+			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + got
+			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + got
+		return material
 	solid.erase(cell)
 	return material
+
+
+## Fell the tree containing `cell`: flood-fill the connected foliage (trunk + the 3-wide canopy), clear
+## it all, and return how many WOOD cells it held (leaves yield nothing). The fill stops at the ground
+## (earth isn't foliage) so it never eats terrain, and is capped so a pathological foliage mass can't run
+## away. Cleared cells become open air again (a tree has no wall behind it).
+const _FELL_CAP: int = 64
+func _fell_tree(cell: Vector2i) -> int:
+	var wood: int = 0
+	var seen: Dictionary = {}
+	var stack: Array[Vector2i] = [cell]
+	while not stack.is_empty() and seen.size() < _FELL_CAP:
+		var c: Vector2i = stack.pop_back()
+		if seen.has(c) or not _is_foliage(solid.get(c, &"")):
+			continue
+		seen[c] = true
+		if solid[c] == &"wood":
+			wood += 1
+		solid.erase(c)
+		stack.append(c + Vector2i(1, 0))
+		stack.append(c + Vector2i(-1, 0))
+		stack.append(c + Vector2i(0, 1))
+		stack.append(c + Vector2i(0, -1))
+	return wood
 
 
 ## Take one unit from `cell`'s deposit pool (default 1 if untracked). Returns true when the pool is now
