@@ -234,6 +234,7 @@ func mine(cell: Vector2i) -> StringName:
 		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + 1
 		if _drain_deposit(cell):
 			solid.erase(cell)
+			_resettle_pile_above(cell)      # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
 		# Chop a tree: one hit FELLS the whole tree (no floating canopy), yielding 1 wood per trunk cell.
@@ -243,6 +244,7 @@ func mine(cell: Vector2i) -> StringName:
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + got
 		return material
 	solid.erase(cell)
+	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
 	return material
 
 
@@ -729,6 +731,7 @@ func _run_drill(machine: MachineState) -> void:
 	machine.progress -= recipe.time
 	if _drain_deposit(target):
 		solid.erase(target)             # deposit exhausted — clear the block (wall kept), bore deeper next
+		_resettle_pile_above(target)    # any pile resting on the spent vein falls with it
 	for item: StringName in recipe.outputs:
 		var n: int = int(recipe.outputs[item])
 		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + n
@@ -855,6 +858,25 @@ func _ground_pile(cell: Vector2i) -> Dictionary:
 	if not ground.has(cell):
 		ground[cell] = {}
 	return ground[cell]
+
+
+## When the solid floor under a resting pile is removed (mined out, ore/vein exhausted, drilled), the
+## pile can't hang in mid-air — gravity re-drops it. If a pile rests directly on top of `cell`, cascade
+## it down `cell`'s now-open column to the next machine/floor below and emit a flow_event so it visibly
+## streams. Conservation-neutral: items only MOVE pile→(machine|lower pile|sink). Call AFTER erasing cell.
+func _resettle_pile_above(cell: Vector2i) -> void:
+	var above := cell + Vector2i(0, -1)
+	if not ground.has(above):
+		return
+	var pile: Dictionary = ground[above]
+	ground.erase(above)
+	var dest: Dictionary = _column_landing(cell.x, cell.y)
+	for item: StringName in pile:
+		var n: int = int(pile[item])
+		if n <= 0:
+			continue
+		dest["target"][item] = int(dest["target"].get(item, 0)) + n
+		flow_events.append({"item": item, "from": above, "to": dest["to_cell"], "count": n})
 
 
 ## Player action: walk over a resting pile and scoop it all into the pack. Returns how many items

@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_hand_built_chain()
 	_test_inventory_slots()
 	_test_spit_and_collect()
+	_test_pile_falls_when_floor_mined()
 	_test_craft_and_build()
 	_test_worldgen()
 	_test_layered_worldgen()
@@ -335,6 +336,37 @@ func _test_spit_and_collect() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across spit+collect (present=%d, net=%d)" % [item, present, net])
+
+
+## Gravity for resting product: a pile sitting on a solid floor must FALL when that floor is removed —
+## mining the block under a pile re-drops it to the next floor below (and into a machine if one is there),
+## never leaving it hanging. Conservation holds across the re-settle (items only move).
+func _test_pile_falls_when_floor_mined() -> void:
+	print("- pile falls when floor mined")
+	var sim: FactorySim = FactorySim.new()
+	# A two-deep floor stack: a pile rests on the upper block; a lower block sits beneath it.
+	sim.set_solid(Vector2i(2, 5), &"earth")            # the block the pile rests on
+	sim.set_solid(Vector2i(2, 7), &"earth")            # the floor below it (the pile's next landing)
+	sim.ground[Vector2i(2, 4)] = {&"ingot": 3}         # the resting pile, on top of the (2,5) block
+	sim.total_produced[&"ingot"] = 3                   # account for the injected pile so conservation checks
+	_check(sim.mine(Vector2i(2, 5)) == &"earth", "mined the block under the pile")
+	_check(not sim.ground.has(Vector2i(2, 4)), "the pile no longer hangs where its floor was")
+	var landed := Vector2i(2, 6)                        # on top of the (2,7) floor
+	_check(int((sim.ground.get(landed, {}) as Dictionary).get(&"ingot", 0)) == 3, "the pile fell to the floor below")
+	_check(not sim.flow_events.is_empty(), "a flow_event was emitted so the fall animates")
+	# Mining INTO a machine: a pile above a freshly-dug cell with a machine below feeds the machine.
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	sim.place_machine(proc_def, Vector2i(5, 8))
+	sim.set_solid(Vector2i(5, 4), &"earth")
+	sim.ground[Vector2i(5, 3)] = {&"ore": 2}
+	sim.total_produced[&"ore"] = 2
+	sim.mine(Vector2i(5, 4))
+	var mach: MachineState = sim.machine_at(Vector2i(5, 8))
+	_check(int(mach.input_buffer.get(&"ore", 0)) == 2, "a pile falling onto a machine feeds its input")
+	for item: StringName in [&"ingot", &"ore"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved across the re-settle (present=%d, net=%d)" % [item, present, net])
 
 
 ## Factorio-style building: craft a machine ITEM from carried ingots (spending them, counted as
