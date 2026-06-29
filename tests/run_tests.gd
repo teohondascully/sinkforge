@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_trees_and_wood()
 	_test_block_placement_and_bazaar()
 	_test_power_field()
+	_test_conduit_network()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -609,3 +610,42 @@ func _test_power_field() -> void:
 	var present: int = _items_present(sim, &"coal")
 	var net: int = int(sim.total_produced.get(&"coal", 0)) - int(sim.total_consumed.get(&"coal", 0))
 	_check(present == net, "coal conserved across burning (present=%d, net=%d)" % [present, net])
+
+
+## CONDUITS (docs/POWER.md): power floods DOWN + LATERAL through tubes, never UP (a U delivers as an L);
+## the place/remove API moves a carried conduit in/out of the layer. Geometry: a generator at (8,4) feeds
+## a down-leg, a lateral bottom, and an up-leg — the up-leg must stay dark even directly above live power.
+func _test_conduit_network() -> void:
+	print("- conduit network")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var sim: FactorySim = FactorySim.new()
+	var g: MachineState = sim.place_machine(gen_def, Vector2i(8, 4))
+	g.input_buffer[&"coal"] = 5
+	sim.total_produced[&"coal"] = 5
+	# A U: down the 8-column, across the bottom at row 12, up the 10-column.
+	for y: int in range(5, 13):
+		sim.conduit[Vector2i(8, y)] = 1            # down leg
+	sim.conduit[Vector2i(9, 12)] = 1               # bottom lateral
+	sim.conduit[Vector2i(10, 12)] = 1
+	for y: int in range(5, 12):
+		sim.conduit[Vector2i(10, y)] = 1           # up leg
+	for _i: int in 3:
+		sim.tick()                                  # fuel up + let the field settle
+	_check(sim.power_at(Vector2i(8, 8)) > 0.0, "power reaches down the conduit, past the generator's aura")
+	_check(sim.power_at(Vector2i(8, 5)) > sim.power_at(Vector2i(8, 11)), "power attenuates down the trunk")
+	_check(sim.power_at(Vector2i(10, 12)) > 0.0, "power carries ACROSS the lateral bottom of the U")
+	# The up-leg tube carries NOTHING upward (a U delivers as an L). The corner's immediate up-neighbour
+	# gets only a faint 1-cell aura bleed (like a generator's), so test from two cells up where even that
+	# is gone — the tube itself never climbs.
+	_check(sim.power_at(Vector2i(10, 9)) == 0.0, "the up-leg carries no power (U delivers as L)")
+	_check(sim.power_at(Vector2i(10, 8)) == 0.0, "no power climbs the up-leg (never flows up)")
+	# place / remove API (carried conduit item ⇄ the layer).
+	var s2: FactorySim = FactorySim.new()
+	s2.inventory[&"conduit"] = 2
+	_check(s2.place_conduit(Vector2i(3, 3)), "place a carried conduit into an open cell")
+	_check(s2.has_conduit(Vector2i(3, 3)), "the cell now holds a conduit")
+	_check(int(s2.inventory.get(&"conduit", 0)) == 1, "placing spent one conduit from the pack")
+	s2.set_solid(Vector2i(4, 3), &"earth")
+	_check(not s2.place_conduit(Vector2i(4, 3)), "cannot run a conduit through solid rock")
+	_check(s2.remove_conduit(Vector2i(3, 3)), "pick the conduit back up")
+	_check(not s2.has_conduit(Vector2i(3, 3)) and int(s2.inventory.get(&"conduit", 0)) == 2, "it returned to the pack")

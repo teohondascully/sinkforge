@@ -30,6 +30,16 @@ const DRILL_REACH: int = 4
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
 const POWER_AURA: int = 2               ## innate radius (cells) a generator powers WITHOUT any conduit
+## CONDUITS carry power further than the aura — DOWN + LATERAL, never UP (a U-shape delivers as an L).
+## That "no up" rule makes the network acyclic top-to-bottom, so the field resolves in a SINGLE downward
+## sweep (no iterative solver — docs/POWER.md §7). Vertical feeders SUM (merge two trunks → thicker),
+## clamped by the tube's CAPACITY (tier); the clamp also bounds any branch-relattice amplification, so
+## additive merge can never run away. Horizontal spread is a lossy MAX delivery (carry power across, e.g.
+## the bottom of an L). Per-step keep factors set the reach a single tier covers before it fades.
+const CONDUIT_CAPACITY: float = 12.0    ## max power a tier-1 tube carries (caps the additive merge)
+const CONDUIT_V_KEEP: float = 0.92      ## fraction kept crossing ONE cell DOWN (sets vertical reach)
+const CONDUIT_H_KEEP: float = 0.80      ## fraction kept crossing ONE cell SIDEWAYS (lateral is lossier)
+const CONDUIT_BLEED: float = 0.6        ## fraction a conduit shares to adjacent cells (so machines draw it)
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
@@ -80,6 +90,10 @@ var flow_events: Array[Dictionary] = []
 ## from fueled generators (+ conduits, later). NOT authoritative state — a pure function of placement +
 ## fuel, like updraft_at — so it can never desync. Consumers read it via power_at(); the view tints it.
 var power: Dictionary = {}
+## Placed POWER CONDUITS: cell -> tier (int). A THIRD world layer alongside `solid` and `wall` — NOT a
+## machine (so item-flow, collision, and the tick never touch it; the player walks through tubes). Carries
+## power down+lateral in _compute_power. Authoritative state, mutated only by place_conduit/remove_conduit.
+var conduit: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
@@ -263,6 +277,40 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	_take_from_pack(material, 1)
 	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
 	solid[cell] = material
+	return true
+
+
+## --- POWER CONDUITS (docs/POWER.md) — a placed layer, not a machine. The carried &"conduit" item is
+## crafted at the bazaar/forge like a machine; placing it routes here (the controller branches on the
+## def's &"conduit" behavior) instead of into `grid`, so conduits never enter item-flow or collision. ---
+
+func has_conduit(cell: Vector2i) -> bool:
+	return conduit.has(cell)
+
+
+## The tier of the conduit at a cell (0 = none). One tier for now; deeper materials raise it later.
+func conduit_tier(cell: Vector2i) -> int:
+	return int(conduit.get(cell, 0))
+
+
+## Place a carried conduit into an open cell (mirrors build_from_pack: spend one &"conduit" from the pack).
+## Refuses solid/occupied/already-piped/out-of-bounds cells. Returns whether it went down.
+func place_conduit(cell: Vector2i) -> bool:
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or conduit.has(cell):
+		return false
+	if int(inventory.get(&"conduit", 0)) <= 0:
+		return false
+	_take_from_pack(&"conduit", 1)
+	conduit[cell] = 1                       # tier 1 (the only tier for now)
+	return true
+
+
+## Pick a placed conduit back up into the pack (mirrors pickup_machine). Returns whether one was there.
+func remove_conduit(cell: Vector2i) -> bool:
+	if not conduit.has(cell):
+		return false
+	conduit.erase(cell)
+	inventory[&"conduit"] = int(inventory.get(&"conduit", 0)) + 1
 	return true
 
 
@@ -480,14 +528,16 @@ func tick() -> void:
 	_flow()
 
 
-## Rebuild the power field from scratch (docs/POWER.md): every FUELED generator stamps its innate aura.
-## Pure derived state — cleared and recomputed each tick so it never desyncs from placement/fuel. Conduits
-## extend this field in a later slice; for now a generator powers only the diamond of cells around it.
+## Rebuild the power field from scratch (docs/POWER.md): every FUELED generator stamps its innate aura,
+## then power floods further out through the conduit network (down+lateral, never up). Pure derived state —
+## cleared and recomputed each tick so it never desyncs from placement/fuel.
 func _compute_power() -> void:
 	power.clear()
 	for machine: MachineState in machines:
 		if machine.def.behavior == &"generator" and machine.fuel > 0:
 			_emit_aura(machine.cell, GENERATOR_POWER)
+	if not conduit.is_empty():
+		_flow_power_through_conduits()
 
 
 ## Stamp a generator's innate aura: an attenuating diamond (manhattan radius POWER_AURA) of power around
@@ -510,6 +560,57 @@ func _emit_aura(origin: Vector2i, amount: float) -> void:
 ## the view tints it. Pure read — no mutation, determinism untouched (mirrors updraft_at / material_at).
 func power_at(cell: Vector2i) -> float:
 	return float(power.get(cell, 0.0))
+
+
+## Flood power through the conduit network in ONE top-to-bottom sweep (docs/POWER.md §7). Because power
+## only flows DOWN + LATERAL (never up), the network is acyclic by row, so each row is finalized before
+## the next reads it — no iterative solver. Per row: (1) VERTICAL inflow = the SUM of the feeders in the
+## row above (generators + conduits), so two trunks merging make a thicker stream, clamped to the tube's
+## CAPACITY (which also bounds any branch amplification). (2) HORIZONTAL spread = a lossy MAX delivery
+## both ways along the row's conduits (carry power across, e.g. the foot of an L) — the L→R then R→L
+## order is the deterministic tie-break that stops two side-by-side tubes from forming a same-row loop.
+## Finally each conduit cell writes into the field and BLEEDS to its neighbours so adjacent machines draw.
+func _flow_power_through_conduits() -> void:
+	var carried: Dictionary = {}                       # conduit cell -> power it carries this tick
+	for y: int in range(0, GRID_ROWS):
+		# (1) vertical inflow from the row above (additive merge, capacity-clamped).
+		for x: int in range(0, GRID_COLS):
+			var cell := Vector2i(x, y)
+			if not conduit.has(cell):
+				continue
+			var vin: float = 0.0
+			for dx: int in [-1, 0, 1]:
+				vin += _power_out_of(Vector2i(x + dx, y - 1), carried) * CONDUIT_V_KEEP
+			carried[cell] = minf(vin, CONDUIT_CAPACITY)
+		# (2) horizontal spread within the row: L→R then R→L lossy MAX (the same-row tie-break).
+		for x: int in range(1, GRID_COLS):
+			var cell := Vector2i(x, y)
+			if conduit.has(cell) and conduit.has(Vector2i(x - 1, y)):
+				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(x - 1, y)]) * CONDUIT_H_KEEP)
+		for x: int in range(GRID_COLS - 2, -1, -1):
+			var cell := Vector2i(x, y)
+			if conduit.has(cell) and conduit.has(Vector2i(x + 1, y)):
+				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(x + 1, y)]) * CONDUIT_H_KEEP)
+	# Merge the carried power into the field, and bleed it to neighbours so a machine beside a tube draws.
+	for cell: Vector2i in carried:
+		var v: float = float(carried[cell])
+		power[cell] = maxf(float(power.get(cell, 0.0)), v)
+		for nb: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cell + nb
+			if in_bounds(n):
+				power[n] = maxf(float(power.get(n, 0.0)), v * CONDUIT_BLEED)
+
+
+## How much power a cell feeds DOWN into the conduit below it: a fueled generator pours its full output;
+## a conduit passes the power it carries; anything else feeds nothing. Read during the top-down sweep, so
+## a conduit feeder's `carried` value is already final (the row above was processed first).
+func _power_out_of(cell: Vector2i, carried: Dictionary) -> float:
+	if conduit.has(cell):
+		return float(carried.get(cell, 0.0))
+	var m: MachineState = grid.get(cell, null)
+	if m != null and m.def.behavior == &"generator" and m.fuel > 0:
+		return GENERATOR_POWER
+	return 0.0
 
 
 func _run_machine(machine: MachineState) -> void:

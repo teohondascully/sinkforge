@@ -112,6 +112,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
 	_draw_drop_paths()
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
+	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
 	_draw_ground()
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
@@ -121,6 +122,35 @@ func _draw() -> void:
 	if particles != null:
 		particles.draw(self)
 	_draw_aim()
+
+
+## Draw the placed power conduits (docs/POWER.md): each tube is a copper segment with stubs to whatever
+## it couples to (adjacent conduits, the generator feeding it, a machine drawing from it), and an inner
+## CHANNEL that glows from dim to gold by the live power it carries — so a powered trunk reads as a bright
+## line pouring down the shaft and a dead tube reads dark. The power level is the derived field, read-only.
+func _draw_conduits() -> void:
+	const COPPER := Color(0.46, 0.32, 0.20)
+	const DIRS: Array[Vector2i] = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]
+	for cell: Variant in sim.conduit:
+		var c: Vector2i = cell
+		var center: Vector2 = Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
+		var lvl: float = clampf(sim.power_at(c) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+		var glow: Color = Color(0.26, 0.22, 0.17).lerp(Color(1.0, 0.85, 0.40), lvl)
+		var stubs: Array[Vector2] = []
+		for d: Vector2i in DIRS:
+			var nb: Vector2i = c + d
+			if sim.has_conduit(nb) or sim.machine_at(nb) != null:
+				stubs.append(center + Vector2(d) * float(CELL) * 0.5)
+		# Copper casing: the centre node + a stub toward each coupling (default to a short vertical nub).
+		draw_circle(center, 4.5, COPPER)
+		if stubs.is_empty():
+			stubs = [center + Vector2(0.0, float(CELL) * 0.5), center - Vector2(0.0, float(CELL) * 0.5)]
+		for s: Vector2 in stubs:
+			draw_line(center, s, COPPER, 7.0)
+		# Inner channel glow over the same casing, lit by the power it carries.
+		draw_circle(center, 2.2, glow)
+		for s: Vector2 in stubs:
+			draw_line(center, s, glow, 3.0)
 
 
 func _draw_terrain() -> void:

@@ -18,6 +18,8 @@ static func machine_kind(def: MachineDef) -> String:
 		return "fork"
 	if def.behavior == &"generator":
 		return "generator"
+	if def.behavior == &"conduit":
+		return "conduit"
 	if def.recipe != null and def.recipe.inputs.is_empty():
 		return "furnace"
 	return "gear"
@@ -33,6 +35,8 @@ static func machine_color(def: MachineDef) -> Color:
 		return Color(0.58, 0.42, 0.78)
 	if def.behavior == &"generator":
 		return Color(0.80, 0.66, 0.26)  # warm electric gold — "burns fuel, makes power"
+	if def.behavior == &"conduit":
+		return Color(0.66, 0.47, 0.30)  # copper — the power-tube material
 	var recipe: RecipeDef = def.recipe
 	if recipe != null and recipe.inputs.is_empty():
 		return Color(0.82, 0.45, 0.20)
@@ -57,6 +61,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_drill(canvas, center, s, active, t)
 		"generator":
 			_generator(canvas, center, s, active, t)
+		"conduit":
+			_conduit(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -132,6 +138,21 @@ static func _generator(canvas: CanvasItem, c: Vector2, s: float, active: bool, t
 		c + Vector2(0.8 * s, -1.5 * s), c + Vector2(-1.8 * s, 4.5 * s)])
 	for i: int in pts.size() - 1:
 		canvas.draw_line(pts[i], pts[i + 1], bolt, w)
+
+
+## Conduit (power tube): a copper pipe with end couplings + an inner channel that GLOWS and a spark that
+## travels DOWN it while power flows (active) — the "power pours down this tube" read. Used for the hotbar
+## icon; the in-world tube is drawn by WorldRenderer (it knows orientation + the live power level).
+static func _conduit(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var copper := Color(0.46, 0.32, 0.20)
+	canvas.draw_rect(Rect2(c.x - 3.5 * s, c.y - 8.0 * s, 7.0 * s, 16.0 * s), copper)
+	canvas.draw_rect(Rect2(c.x - 5.0 * s, c.y - 8.0 * s, 10.0 * s, 2.2 * s), copper)   # top coupling
+	canvas.draw_rect(Rect2(c.x - 5.0 * s, c.y + 5.8 * s, 10.0 * s, 2.2 * s), copper)   # bottom coupling
+	var glow := Color(1.0, 0.85, 0.40, 0.85) if active else Color(0.30, 0.26, 0.20, 0.7)
+	canvas.draw_rect(Rect2(c.x - 1.4 * s, c.y - 7.0 * s, 2.8 * s, 14.0 * s), glow)     # inner channel
+	if active:                                                                          # a spark falling down it
+		var sy: float = c.y - 6.0 * s + fmod(t * 26.0, 12.0) * s
+		canvas.draw_circle(Vector2(c.x, sy), 1.7 * s, Color(1.0, 0.96, 0.7))
 
 
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.

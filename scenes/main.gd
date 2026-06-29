@@ -76,6 +76,7 @@ func _ready() -> void:
 		load("res://src/data/machines/lift.tres"),
 		load("res://src/data/machines/drill.tres"),  # automates ore extraction (docs/MINING.md)
 		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
+		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -260,7 +261,7 @@ func _seed_world() -> void:
 ## NOTE: the head-lamp glow and forge embers are LIGHTING effects on the miner/machines, not carryable
 ## items — there's nothing to put in the pack for those; they appear automatically in play.
 func _dev_seed_pack() -> void:
-	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"wood": 10, &"coal": 20, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1, &"generator": 1}
+	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"wood": 10, &"coal": 20, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1, &"generator": 1, &"conduit": 10}
 	for item: StringName in kit:
 		sim.inventory[item] = int(sim.inventory.get(item, 0)) + int(kit[item])
 		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(kit[item])
@@ -481,7 +482,14 @@ func try_build(cell: Vector2i) -> bool:
 		return false
 	if sim.machine_at(cell) != null:
 		return sim.pickup_machine(cell)  # pick your machine back up into the pack
+	if sim.has_conduit(cell):
+		return sim.remove_conduit(cell)  # pick a power tube back up into the pack
 	var def: MachineDef = _selected_machine_def()
+	if def != null and def.behavior == &"conduit":
+		var laid: bool = sim.place_conduit(cell)  # power tube → the conduit layer (not a machine)
+		if laid:
+			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
+		return laid
 	if def != null and _placeable(cell):
 		var built: bool = sim.build_from_pack(def, cell) != null
 		if built:
@@ -565,7 +573,7 @@ func _selected_build_material() -> StringName:
 ## cell the body is standing in — so you can never seal yourself inside a machine you place.
 func _placeable(cell: Vector2i) -> bool:
 	return sim.in_bounds(cell) and not sim.is_solid(cell) \
-		and sim.machine_at(cell) == null and not _player_occupies(cell)
+		and sim.machine_at(cell) == null and not sim.has_conduit(cell) and not _player_occupies(cell)
 
 
 func _player_occupies(cell: Vector2i) -> bool:
