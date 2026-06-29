@@ -358,7 +358,9 @@ func _cost_text(cost: Dictionary) -> String:
 ## (mouse-wheel) is highlighted; it's the item E deposits. Reads `sim.inventory_slots()`.
 func _draw_inventory() -> void:
 	var slots: Array[Dictionary] = sim.inventory_slots()
-	var n: int = FactorySim.INVENTORY_SLOTS
+	# Show ONLY the slots you actually carry, not a fixed row of empty wells — a trailing empty slot reads
+	# as "broken / what goes here?". The bar grows/shrinks with your pack (min 1 so it never vanishes).
+	var n: int = clampi(slots.size(), 1, FactorySim.INVENTORY_SLOTS)
 	var sel: int = int(inv_selected_getter.call()) if inv_selected_getter.is_valid() else 0
 	var total_w: float = n * SLOT + (n - 1) * SLOT_GAP
 	var x0: float = (CANVAS.x - total_w) * 0.5

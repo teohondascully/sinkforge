@@ -25,11 +25,12 @@ const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 const SURFACE_LINE: int = 5                         ## reference daylight row; sky attenuates with depth past it
 const SKY_REACH: int = 10                           ## tiles of open air sunlight reaches before going dark
 const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
-const AMBIENT_DARK: float = 0.945                   ## underground ambient (near-black, but a readability
-                                                   ## floor — faint shapes read in the dark; the lamp still matters)
-const SHADOW_COLOR := Color(0.03, 0.04, 0.075)      ## the cool blue-black the underworld sits in
+const AMBIENT_DARK: float = 0.62                    ## underground ambient — DIM but visible (Terraria), not
+                                                   ## pitch black. You can read the terrain everywhere; light
+                                                   ## sources add warmth + clarity rather than being the ONLY way to see.
+const SHADOW_COLOR := Color(0.05, 0.06, 0.10)       ## the cool blue-black the underworld sits in
 const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
-const LAMP_RADIUS: float = CELL * 5.0
+const LAMP_RADIUS: float = CELL * 4.0               ## a focused warm pool, not a screen-filling white disc
 
 var sim: FactorySim
 var player: Player
@@ -542,10 +543,10 @@ func _paint_lights(layer: LightLayer) -> void:
 	if player != null:
 		var f: float = float(player.facing)
 		# A faint flicker so the lamp reads as a live flame, not a static disc.
-		var flick: float = 0.8 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
+		var flick: float = 0.55 + 0.03 * sin(_anim_time * 11.0) + 0.02 * sin(_anim_time * 27.0)
 		_draw_glow(layer, player.position + Vector2(f * float(CELL) * 0.7, -float(CELL) * 0.2),
 			LAMP_RADIUS, LAMP_COLOR, flick)
-		_draw_glow(layer, player.position, float(CELL) * 1.7, LAMP_COLOR, 0.24)  # close body glow
+		_draw_glow(layer, player.position, float(CELL) * 1.4, LAMP_COLOR, 0.12)  # faint close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)

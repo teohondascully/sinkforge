@@ -20,7 +20,10 @@ const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
 const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
-const CAMERA_ZOOM: float = 0.7     ## camera zoom (provisional, tuned by eye); smaller = further out
+## Zoom levels cycled by Z (Terraria-style). Default is zoomed OUT so you see the world you're working in,
+## not just your feet. Smaller = further out. _current_zoom() reads the active level everywhere.
+const ZOOM_LEVELS: Array[float] = [0.42, 0.6, 0.85]
+var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
 ## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
 ## bazaar build material; the list grows as more buildables land (log/stone/etc).
@@ -91,7 +94,7 @@ func _ready() -> void:
 	_camera = Camera2D.new()
 	# Zoom: 0.7 frames the body as a readable character while keeping enough world to see a vertical
 	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
-	_camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
+	_camera.zoom = Vector2(_current_zoom(), _current_zoom())
 	_camera.position_smoothing_enabled = true
 	_camera.position_smoothing_speed = 8.0
 	# CENTERED on the body — no dead-zone. The avatar is the player's anchor and must always be the
@@ -195,7 +198,7 @@ func _setup_post_fx() -> void:
 ## z 45, BELOW the lighting veil (z 50) + light pools (z 51), so a mote is dark in the gloom and lit
 ## warm where the lamp/glow reaches — "dust catching the light." Pure atmosphere; never touches the sim.
 func _setup_ambient_motes() -> void:
-	var view: Vector2 = Vector2(Hud.CANVAS) / CAMERA_ZOOM    # world area the camera shows
+	var view: Vector2 = Vector2(Hud.CANVAS) / _current_zoom()    # world area the camera shows
 	var mat := ParticleProcessMaterial.new()
 	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	mat.emission_box_extents = Vector3(view.x * 0.6, view.y * 0.6, 1.0)  # a touch wider than the view
@@ -289,7 +292,7 @@ func _process(delta: float) -> void:
 		_hud.show_help = _show_help
 		if _player != null:
 			_hud.minimap_focus = _player.position
-			_hud.minimap_view = Vector2(Hud.CANVAS) / CAMERA_ZOOM  # world area the camera shows
+			_hud.minimap_view = Vector2(Hud.CANVAS) / _current_zoom()  # world area the camera shows
 
 
 ## Reconcile the Bazaar view against the sim's detected frames. When one COMPLETES this frame, throw a
@@ -346,9 +349,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_show_help = false
 	elif event.is_action_pressed(Controls.BUILD):
 		try_build(_aim)
-	elif event.is_action_pressed(Controls.CYCLE_NEXT):
-		_cycle_inventory(1)
-	elif event.is_action_pressed(Controls.CYCLE_PREV):
+	elif event.is_action_pressed(Controls.ZOOM):
+		_cycle_zoom()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		_cycle_inventory(1)   # direct wheel handling (reliable) — the hotbar scroll select
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		_cycle_inventory(-1)
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode >= KEY_1 and event.keycode <= KEY_9:
@@ -429,6 +434,18 @@ func _collect_ground_under_player() -> void:
 			var item: StringName = pile.keys()[0]
 			if sim.collect_ground(cell):
 				_particles.pop(_cell_center(cell), Visuals.item_color(item))  # walk-over pickup pop
+
+
+## The active camera zoom level (Z cycles the index). Read everywhere the view-size matters.
+func _current_zoom() -> float:
+	return ZOOM_LEVELS[_zoom_idx]
+
+
+## Cycle to the next zoom level (Z) and apply it to the camera — Terraria-style zoom-out/in.
+func _cycle_zoom() -> void:
+	_zoom_idx = (_zoom_idx + 1) % ZOOM_LEVELS.size()
+	if _camera != null:
+		_camera.zoom = Vector2(_current_zoom(), _current_zoom())
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.

@@ -25,6 +25,7 @@ const PAUSE := &"sf_pause"
 const CLOSE := &"sf_close"
 const CYCLE_NEXT := &"sf_cycle_next"
 const CYCLE_PREV := &"sf_cycle_prev"
+const ZOOM := &"sf_zoom"
 
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
@@ -42,6 +43,7 @@ static func defaults() -> Dictionary:
 		CLOSE: [{"key": KEY_ESCAPE}],
 		CYCLE_NEXT: [{"button": MOUSE_BUTTON_WHEEL_DOWN}],
 		CYCLE_PREV: [{"button": MOUSE_BUTTON_WHEEL_UP}],
+		ZOOM: [{"key": KEY_Z}],
 	}
 
 
