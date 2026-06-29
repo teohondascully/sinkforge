@@ -50,13 +50,19 @@ var facing: int = 1
 
 ## Cosmetic feedback MainView reads to spawn juice (dust / shake) — never touches the sim.
 var landed_hard: bool = false        ## one-shot: set the frame the body lands from a real fall
+## Animation state (Phase C — drives sprite-frame selection only; pure representation). `digging` is a
+## brief held flag MainView pokes via note_dig() each time a cell is mined, so the dig pose shows across
+## the gaps between mine ticks. Both the walk clock and this clock pick frames; absent art they do nothing.
+var digging: bool = false
 
 var _jump_request: bool = false
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
 var _was_on_floor: bool = false
 var _squash: float = 0.0             ## 0..1 landing squash, decays — pure visual
-var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / future anim-frame pick
+var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / walk anim-frame pick
+var _anim_time: float = 0.0          ## free-running clock for non-walk frame cycling (the dig loop)
+var _dig_hold: float = 0.0           ## seconds the dig pose stays latched after the last mined cell
 var _step_grounded: bool = false     ## set per-step: may the horizontal resolve auto-step UP this frame?
 var _stepped: bool = false           ## set BY the resolve when it auto-stepped up onto a ledge this frame
 
@@ -81,6 +87,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func request_jump() -> void:
 	_jump_request = true
+
+
+## MainView pokes this each time a cell is actually mined (Phase-C dig anim). Latches the dig pose for a
+## beat (so it reads across the mine-cooldown gaps) and, when the body is standing still, turns it to face
+## the dug cell — so hand-mining a vein to your side looks like you're swinging at it. Cosmetic only.
+func note_dig(face: int) -> void:
+	_dig_hold = 0.18
+	if input_dir == 0.0 and face != 0:
+		facing = face
 
 
 ## One physics step: horizontal (with slope follow) then vertical, each integrated and collided.
@@ -149,6 +164,9 @@ func _step(delta: float) -> void:
 	_was_on_floor = on_floor
 	_squash = move_toward(_squash, 0.0, delta * 5.0)
 	_walk_phase += (absf(velocity.x) * delta * 0.06) if on_floor else 0.0
+	_anim_time += delta
+	_dig_hold = maxf(0.0, _dig_hold - delta)
+	digging = _dig_hold > 0.0
 
 	_coyote = COYOTE_TIME if on_floor else _coyote - delta
 
@@ -303,9 +321,24 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
 
 
-## The MINER. Draws `assets/sprites/miner.png` if present (feet-anchored, flipped by facing, landing
-## squash applied), else the code-drawn fallback figure. Squash (flatten + widen on landing, + a tiny
-## walk bob) is the first scrap of game-feel juice and applies to either path.
+## The logical sprite-frame key for the body's current motion state (Phase C). Priority: digging > airborne
+## > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2 off the free clock. The
+## caller falls back to the idle "miner" frame for any state whose art hasn't been drawn yet, so dropping
+## in only a subset of frames still works (and with NO frames present, every key misses → primitive path).
+func _sprite_key() -> String:
+	if digging:
+		return "miner_dig_0" if int(_anim_time * 8.0) % 2 == 0 else "miner_dig_1"
+	if not on_floor:
+		return "miner_jump"
+	if absf(velocity.x) > 10.0:
+		return "miner_walk_%d" % (int(_walk_phase) % 4)
+	return "miner"
+
+
+## The MINER. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present (feet-anchored,
+## flipped by facing, landing squash applied), falling back to the idle frame and then the code-drawn
+## figure. Squash (flatten + widen on landing, + a tiny walk bob) is the first scrap of game-feel juice
+## and applies to either path.
 func _draw() -> void:
 	var f: float = float(facing)
 	# Contact shadow — a soft dark ellipse at the feet so the body sits ON the ground, not floating.
@@ -317,7 +350,10 @@ func _draw() -> void:
 	var sxq: float = 1.0 + 0.18 * _squash             # landing squash widens X
 	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
 	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
-	var tex: Texture2D = Art.tex("miner")
+	var key: String = _sprite_key()
+	var tex: Texture2D = Art.tex(key)
+	if tex == null and key != "miner":
+		tex = Art.tex("miner")          # graceful fall back to the idle frame until this state's art lands
 	if tex != null:
 		var w: float = float(tex.get_width()) * sxq
 		var h: float = float(tex.get_height()) * syq

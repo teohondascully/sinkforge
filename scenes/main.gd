@@ -364,6 +364,8 @@ func try_mine(cell: Vector2i) -> bool:
 	if mined != &"":
 		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 10)  # break-debris puff
 		_shake = maxf(_shake, 1.4)
+		if _player != null:                                    # Phase-C dig anim: latch the pose, face the cell
+			_player.note_dig(int(signf(_cell_center(cell).x - _player.position.x)))
 	return mined != &""
 
 
