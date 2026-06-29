@@ -244,45 +244,52 @@ func _make_mote_texture() -> GradientTexture2D:
 
 ## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
-## HOW the world is made — swap the generator and nothing here changes. Then stamp the two starter
-## fixtures the Rung-1 loop needs: the hand-feed FORGE (with a collection pit) and the abandoned
-## MINESHAFT (a pre-carved shaft over a rich vein) the player drops the self-feeding line into.
-const FORGE_CELL := Vector2i(6, 4)          ## the surface forge the player hand-feeds to bootstrap ingots
-const MINESHAFT_COL: int = 8                ## the abandoned shaft (drop a forge+drill in → first automation)
+## HOW the world is made — swap the generator and nothing here changes. Then stamp the Rung-1 fixtures:
+## a starter ORE vein beside spawn, and the MINESHAFT — a shallow carved shaft over a rich vein with a
+## FORGE already in its mouth. You hand-feed that forge to bootstrap, then cap it with a Drill so it
+## feeds itself: the forge is constant; you automate the FEEDING you were doing by hand.
+const MINESHAFT_COL: int = 8
+const MINESHAFT_FORGE_CELL := Vector2i(8, 5)   ## the forge in the shaft mouth — hand-fed, then drill-fed
+const MINESHAFT_DRILL_CELL := Vector2i(8, 4)   ## where the player caps it with the Drill (directly above)
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
 	sim.load_world(world)
-	_seed_forge_station()
+	_seed_starter_vein()
 	_seed_tutorial_mineshaft()
 	if dev_start:
 		_dev_seed_pack()
 
 
-## The hand-feed forge + a 1-cell COLLECTION PIT beneath it. Gravity carries smelted ingots straight
-## down, so without the pit they'd pile in the forge's own (un-standable) cell — you could smelt but
-## never collect, a dead end in a clean playthrough. The pit drops them one cell to a floor you can
-## step into and scoop. You stand beside the forge and toss ore in (Q); ingots collect in the pit.
-func _seed_forge_station() -> void:
-	var processor: MachineDef = load("res://src/data/machines/processor.tres")
-	sim.place_machine(processor, FORGE_CELL)                       # (6,4), resting on the row-5 grass
-	sim.set_solid(FORGE_CELL + Vector2i(0, 1), &"")               # carve the pit cell (6,5) — ingots land here
-	sim.set_solid(FORGE_CELL + Vector2i(0, 2), &"earth")          # keep a floor (6,6) under the pit
+## A rich ORE cell breaching the surface right beside spawn — the visible "orange-flecked rock" the first
+## objective points at, and the bootstrap ore for the hand-smelted ingots (depth-banded worldgen leaves
+## the shallow surface near-bare, so onboarding can't rely on finding a vein). ONE deep cell, not a
+## vertical run: mining it leaves only a 1-tile pit you step straight back out of, instead of a deep hole
+## you'd have to jump from. Distinct from the mineshaft's drill-vein so hand-mining never eats it.
+const STARTER_VEIN_CELL := Vector2i(4, 5)
+func _seed_starter_vein() -> void:
+	sim.set_solid(STARTER_VEIN_CELL, &"ore")
+	sim.deposits[STARTER_VEIN_CELL] = 6                            # ~3 ingots' worth — bootstrap + margin
 
 
-## An ABANDONED MINESHAFT near spawn: a pre-carved vertical shaft (walls kept = a Terraria carved room,
-## so daylight pours down it) bottomed by a rich ore vein on a rock floor. It's the foolproof stage for
-## the first automation — the player drops a forge then a drill into the shaft mouth (reachable from the
-## surface beside it) and the self-feeding line runs (drill bores the vein → ore falls into the forge →
-## ingots pile). Sinking this exact shaft by hand is fragile (you'd mine the very vein you want to drill),
-## so the world provides it; the player's digging agency lives in step 1 and everywhere else.
+## An ABANDONED MINESHAFT near spawn with a FORGE already in its mouth — the whole Rung-1 stage in one
+## shallow fixture. Layout (col 8), daylight pouring down the carved shaft (walls kept):
+##   row 5  FORGE      (placed) — you hand-feed it by tossing ore down the shaft, later the drill feeds it
+##   row 6  open gap   — smelted ingots land here on the vein below; you drop in (1 tile) to scoop them
+##   row 7  ORE vein   (rich) — the drill's target once you cap the forge
+##   row 8  rock floor
+## The drill goes ABOVE the forge at (8,4), floating one cell over the surface. The shaft is only 1 tile
+## deep where you stand to collect, so you step straight back out — no trap. Sinking this exact shaft by
+## hand is fragile (you'd mine the vein you mean to drill), so the world provides it; digging agency
+## lives in the starter vein (step 1) and everywhere else.
 func _seed_tutorial_mineshaft() -> void:
 	var c: int = MINESHAFT_COL
-	for row: int in range(5, 9):                                   # carve the shaft (rows 5–8 open, walls stay)
-		sim.set_solid(Vector2i(c, row), &"")
-	sim.set_solid(Vector2i(c, 9), &"ore")                         # the vein at the bottom (drill's target)
-	sim.deposits[Vector2i(c, 9)] = 12                            # rich — runs the whole loop, then exhausts
-	sim.set_solid(Vector2i(c, 10), &"earth")                      # floor under the vein (catches ingots)
+	sim.set_solid(Vector2i(c, 5), &"")                             # shaft mouth (forge goes here)
+	sim.set_solid(Vector2i(c, 6), &"")                             # collect gap (ingots land on the vein)
+	sim.set_solid(Vector2i(c, 7), &"ore")                         # the vein (drill's target)
+	sim.deposits[Vector2i(c, 7)] = 12                            # rich — runs the loop, then exhausts (finite)
+	sim.set_solid(Vector2i(c, 8), &"earth")                      # floor under the vein
+	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)
 
 
 ## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
@@ -444,23 +451,24 @@ func try_craft(def: MachineDef) -> bool:
 	return sim.craft(def)
 
 
-## Scoop up any resting product pile in a cell the body overlaps — Factorio/Terraria-style "walk
-## over items to grab them". Pure discrete sim edit (collect_ground); the avatar only triggers it.
+## Scoop up resting product piles NEAR the body — Factorio/Terraria "walk over items to grab them",
+## widened to a short REACH so a machine's output flows to you when you stand at it. A pure downward
+## conveyor (gravity) drops a forge's ingots into the cell below it, which the body often can't stand IN
+## (the machine caps it); collecting within reach — the same reach the body mines/builds with — means you
+## just stand at your line and its output comes to you, instead of needing to occupy the exact landing
+## cell. Pure discrete sim edit (collect_ground); the avatar only triggers it.
+const COLLECT_REACH_CELLS: float = 2.5
 func _collect_ground_under_player() -> void:
 	if _player == null or sim.ground.is_empty():
 		return
-	var half := Vector2(Player.WIDTH, Player.HEIGHT) * 0.5
-	var lo: Vector2i = _cell_at(_player.position - half)
-	var hi: Vector2i = _cell_at(_player.position + half)
-	for cy: int in range(lo.y, hi.y + 1):
-		for cx: int in range(lo.x, hi.x + 1):
-			var cell := Vector2i(cx, cy)
-			var pile: Dictionary = sim.ground.get(cell, {})
-			if pile.is_empty():
-				continue
-			var item: StringName = pile.keys()[0]
-			if sim.collect_ground(cell):
-				_particles.pop(_cell_center(cell), Visuals.item_color(item))  # walk-over pickup pop
+	var reach_sq: float = pow(COLLECT_REACH_CELLS * float(CELL), 2.0)
+	for cell: Variant in sim.ground.keys():                          # keys() copies — safe to collect mid-iter
+		var c: Vector2i = cell
+		if _player.position.distance_squared_to(_cell_center(c)) > reach_sq:
+			continue
+		var item: StringName = (sim.ground[c] as Dictionary).keys()[0]
+		if sim.collect_ground(c):
+			_particles.pop(_cell_center(c), Visuals.item_color(item))  # pickup pop
 
 
 ## The active camera zoom level (Z cycles the index). Read everywhere the view-size matters.

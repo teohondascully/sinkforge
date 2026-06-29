@@ -21,16 +21,17 @@ var _base_consumed: Dictionary = {}
 var _base_machines: int = 0
 var _done: Dictionary = {}              ## step id -> true once achieved (latched)
 var _all_done_time: float = -1.0        ## seconds the chain has been fully complete (for HUD auto-hide)
+var _ingots_at_line: int = -1           ## ingots produced the moment the drill→forge line was assembled
 
 ## The Rung-1 ladder. Each step: stable id, an imperative label (what to DO), and a short goal tag (the
 ## win condition, shown as the chip). Order IS the tutorial path — each step is doable from the state the
 ## previous one leaves you in. Predicates live in `_achieved`.
 var steps: Array[Dictionary] = [
-	{"id": &"mine",  "label": "Dig ore — hold LMB on the orange-flecked rock", "goal": "Mine 4 ore"},
-	{"id": &"smelt", "label": "Toss ore into the forge (face it, press Q), then step into the pit to grab the ingots", "goal": "Forge 2 ingots"},
+	{"id": &"mine",  "label": "Dig ore — hold LMB on the orange-flecked rock by spawn", "goal": "Mine 4 ore"},
+	{"id": &"smelt", "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
 	{"id": &"craft", "label": "Press E, then the Drill key, to craft a Drill", "goal": "Craft a Drill"},
-	{"id": &"build", "label": "Drop your forge then the Drill into the mineshaft (RMB) — drill on top", "goal": "Build the line"},
-	{"id": &"auto",  "label": "Stand back — the line mines & smelts on its own. Grab the ingots it pours!", "goal": "First automation"},
+	{"id": &"build", "label": "Cap the forge with the Drill — place it (RMB) directly on top", "goal": "Build the line"},
+	{"id": &"auto",  "label": "Stand back — the Drill now feeds the forge for you. First automation!", "goal": "First automation"},
 ]
 
 
@@ -80,7 +81,7 @@ func _achieved(id: StringName) -> bool:
 		&"smelt": return _produced(&"ingot") >= 2 and int(sim.inventory.get(&"ingot", 0)) >= 2  # smelted AND collected
 		&"craft": return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
 		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
-		&"auto":  return _line_is_pouring()                                                       # the line has spat ingots on its own
+		&"auto":  return _line_has_run()                                                          # the line forged an ingot on its own
 	return false
 
 
@@ -97,18 +98,17 @@ func _find_line() -> Dictionary:
 	return {}
 
 
-## True once a built line has actually POURED ingots on its own: a line exists and an ingot pile rests in
-## its column below the forge (only the running line puts ingots there — proof of hands-free automation).
-func _line_is_pouring() -> bool:
-	var line: Dictionary = _find_line()
-	if line.is_empty():
+## True once a built line has forged an ingot ON ITS OWN. We snapshot the ingot count the moment the
+## drill→forge stack first exists, then latch when production passes it — so it proves the DRILL (not the
+## player's hand) fed the forge, and works whether the poured ingots pile up or get auto-collected by a
+## body standing in the shaft (a ground pile is transient, production is monotonic).
+func _line_has_run() -> bool:
+	if _find_line().is_empty():
 		return false
-	var proc: Vector2i = line["proc"]
-	for cell: Variant in sim.ground:
-		var c: Vector2i = cell
-		if c.x == proc.x and c.y >= proc.y and int((sim.ground[c] as Dictionary).get(&"ingot", 0)) > 0:
-			return true
-	return false
+	if _ingots_at_line < 0:
+		_ingots_at_line = _produced(&"ingot")   # the line just appeared — mark the baseline, not done yet
+		return false
+	return _produced(&"ingot") > _ingots_at_line
 
 
 func _has_drill_machine() -> bool:

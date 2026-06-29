@@ -15,6 +15,7 @@ extends SceneTree
 const SCENE: String = "res://scenes/main.tscn"
 const AGENT := preload("res://tools/play_agent.gd")
 const PROC: String = "res://src/data/machines/processor.tres"
+const DRILL: String = "res://src/data/machines/drill.tres"
 
 var _failures: int = 0
 var _agent: PlayAgent = null      # current agent
@@ -37,6 +38,7 @@ func _run() -> void:
 		["craft a machine", _goal_craft_a_machine],
 		["build a machine", _goal_build_a_machine],
 		["feed the forge & smelt", _goal_feed_and_smelt],
+		["RUNG 1 — reach first automation", _goal_reach_first_automation],
 	]:
 		if not await _attempt(goal[0], goal[1]):
 			_failures += 1
@@ -145,6 +147,124 @@ func _goal_feed_and_smelt() -> bool:
 	var forged: int = int(agent.sim.total_produced.get(&"ingot", 0)) - forged_before
 	return await _finish(agent, beside and dropped and forged >= 1,
 		"agent stood beside the forge, tossed ore into its column; it fed and smelted (forged %d)" % forged)
+
+
+## RUNG 1 — the headline integration play-test. Booting with NOTHING, the agent follows the on-screen
+## objective ladder (scenes/objectives.gd) step by step, doing ONLY what each signpost says through the
+## real reach-gated verbs, and must reach FIRST AUTOMATION: a self-feeding drill→forge line pouring ingots
+## on its own. This is "is the game playable to its first goal?" made executable — if any signposted step
+## can't be performed from where the player stands, or doing it never advances the chain, it FAILS with
+## which step dead-ended. That failure is the "there's nothing to do" complaint, caught by a test.
+func _goal_reach_first_automation() -> bool:
+	var agent: PlayAgent = await _boot()
+	var obj: Objectives = agent.main._objectives
+	for step: Dictionary in obj.steps:
+		var id: StringName = step["id"]
+		if obj.is_done(id):
+			continue                                                  # already satisfied — move to the next signpost
+		agent._note("step '%s': %s" % [id, step["label"]])
+		var acted: bool = await _do_step(agent, id)
+		if not acted:
+			return await _finish(agent, false, "could NOT perform signposted step '%s' from where the body stands" % id)
+		var t: int = 0
+		while not obj.is_done(id) and t < 240:                        # give the chain a beat to latch
+			await physics_frame
+			t += 1
+		if not obj.is_done(id):
+			return await _finish(agent, false, "did the action for '%s' but the objective never ticked — the player gets no signal they progressed" % id)
+	return await _finish(agent, obj.all_done(),
+		"followed the signposts all the way to FIRST AUTOMATION (%d steps)" % obj.steps.size())
+
+
+## Perform the real-verb action a single objective step asks for. Each branch uses only what a player has:
+## the body, reach, and the hotbar. Returns whether the action could be carried out at all.
+func _do_step(agent: PlayAgent, id: StringName) -> bool:
+	match id:
+		&"mine":  return await _step_mine(agent)
+		&"smelt": return await _step_smelt(agent)
+		&"craft": return _step_craft(agent)
+		&"build": return await _step_build(agent)
+		&"auto":  return await _step_auto(agent)
+	return false
+
+
+## Step 1 — hand-dig the bootstrap ore (4) from the starter vein near spawn, never the mineshaft's vein.
+func _step_mine(agent: PlayAgent) -> bool:
+	var guard: int = 0
+	while int(agent.sim.inventory.get(&"ore", 0)) < 4 and guard < 8:
+		guard += 1
+		var ore: Vector2i = _nearest_ore_not_shaft(agent)
+		if ore.x < 0:
+			return false
+		await agent.dig_down_to(ore)
+	agent._note("  mine: carried ore=%d, produced ore=%d" % [int(agent.sim.inventory.get(&"ore", 0)), int(agent.sim.total_produced.get(&"ore", 0))])
+	return int(agent.sim.inventory.get(&"ore", 0)) >= 4
+
+
+## Step 2 — stand beside the forge, toss the ore into it (Q feeds gravity), let it smelt, then step into
+## the collection pit to scoop the 2 bootstrap ingots.
+func _step_smelt(agent: PlayAgent) -> bool:
+	if not await agent.select_item(&"ore"):
+		return false
+	var c: int = MainView.MINESHAFT_COL
+	if not await agent.walk_to_column(c - 1):                        # stand on the surface beside the shaft mouth
+		return false
+	agent.player.facing = 1
+	agent.main.try_drop()                                            # fling the ore down the shaft into the forge
+	# Drop into the 1-tile shaft and wait for the forge to pour ingots, auto-scooping each as it lands.
+	var guard: int = 0
+	while int(agent.sim.inventory.get(&"ingot", 0)) < 2 and guard < 30:
+		guard += 1
+		await agent.walk_to_column(c)                               # in the shaft gap, under the forge — auto-collects
+		for _i: int in 20:
+			await physics_frame
+	agent._note("  smelt: produced=%d carried=%d body@%s" % [
+		int(agent.sim.total_produced.get(&"ingot", 0)), int(agent.sim.inventory.get(&"ingot", 0)),
+		agent.main._cell_at(agent.player.position)])
+	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
+
+
+## Step 3 — craft a Drill from the 2 carried ingots.
+func _step_craft(agent: PlayAgent) -> bool:
+	return agent.craft(load(DRILL))
+
+
+## Step 4 — cap the shaft forge with the Drill: place it directly above the forge so the drill's bored ore
+## falls straight into it. (The forge is already in the shaft — you automate the feeding you did by hand.)
+func _step_build(agent: PlayAgent) -> bool:
+	if not await agent.select_item(&"drill"):
+		agent._note("  build: no drill in pack (have %d)" % int(agent.sim.inventory.get(&"drill", 0)))
+		return false
+	await agent.walk_to_column(MainView.MINESHAFT_COL - 2)          # stand clear of the drill cell, still in reach
+	var d: Vector2i = MainView.MINESHAFT_DRILL_CELL
+	if not await agent.build_at(d):                                 # drill directly on top of the forge
+		agent._note("  build: failed at %s — drill cell %s reach=%s placeable=%s" % [
+			agent.main._cell_at(agent.player.position), d, agent.main._can_reach(d), agent.main._placeable(d)])
+		return false
+	return agent.sim.machine_at(d) != null
+
+
+## Step 5 — stand back and let the line run until it pours ingots on its own (no further input).
+func _step_auto(agent: PlayAgent) -> bool:
+	for _i: int in 200:
+		await physics_frame
+	return true
+
+
+## The nearest solid ORE cell to the body that is NOT in the mineshaft column — so hand-mining the
+## bootstrap never eats the vein the automated line will drill.
+func _nearest_ore_not_shaft(agent: PlayAgent) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_d: float = INF
+	for cell: Variant in agent.sim.solid:
+		var c: Vector2i = cell
+		if agent.sim.solid[c] != &"ore" or c.x == MainView.MINESHAFT_COL:
+			continue
+		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
+		if d < best_d:
+			best_d = d
+			best = c
+	return best
 
 
 # --- scaffolding ----------------------------------------------------------------------------------
