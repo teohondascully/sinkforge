@@ -269,17 +269,25 @@ func _step_craft(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"drill", 0)) >= 1 or _has_drill(agent)
 
 
-## Step 4 — cap the shaft forge with the Drill: place it directly above the forge so the drill's bored ore
-## falls straight into it. (The forge is already in the shaft — you automate the feeding you did by hand.)
+## Step 4 — expose + cap the deposit (cavity model): hand-mine the mineshaft ore BLOCK to reveal its wall
+## deposit, then place the Drill ON that cavity so its pulled ore falls into the forge below. We reach in
+## from the shaft EDGE (col-1) so we never drop into the very cell we're about to drill.
 func _step_build(agent: PlayAgent) -> bool:
+	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):  # stand on the surface beside the shaft, in reach
+		return false
+	var d: Vector2i = MainView.MINESHAFT_DRILL_CELL
+	if agent.sim.is_solid(d):
+		await agent.mine_cell(d)                                    # break the ore block → exposes the deposit
+	if agent.sim.ore_deposit_at(d) <= 0:
+		agent._note("  build: no exposed deposit at %s (deposit=%d, solid=%s)" % [
+			d, agent.sim.ore_deposit_at(d), agent.sim.is_solid(d)])
+		return false
 	if not await agent.select_item(&"drill"):
 		agent._note("  build: no drill in pack (have %d)" % int(agent.sim.inventory.get(&"drill", 0)))
 		return false
-	await agent.walk_to_column(MainView.MINESHAFT_COL - 2)          # stand clear of the drill cell, still in reach
-	var d: Vector2i = MainView.MINESHAFT_DRILL_CELL
-	if not await agent.build_at(d):                                 # drill directly on top of the forge
-		agent._note("  build: failed at %s — drill cell %s reach=%s placeable=%s" % [
-			agent.main._cell_at(agent.player.position), d, agent.main._can_reach(d), agent.main._placeable(d)])
+	if not await agent.build_at(d):                                 # cap the cavity with the drill
+		agent._note("  build: failed to place drill at %s (reach=%s placeable=%s)" % [
+			d, agent.main._can_reach(d), agent.main._placeable(d)])
 		return false
 	return agent.sim.machine_at(d) != null
 

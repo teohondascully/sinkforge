@@ -32,8 +32,8 @@ var steps: Array[Dictionary] = [
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
-	{"id": &"build",  "label": "Drop into the mineshaft and cap the ore chunk with the Drill (RMB, directly on top)", "goal": "Build the line"},
-	{"id": &"auto",   "label": "Stand back — the Drill mines the chunk into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"build",  "label": "Mine the mineshaft ore to expose its deposit, then place the Drill ON the cavity (RMB)", "goal": "Build the line"},
+	{"id": &"auto",   "label": "Stand back — the Drill pulls the deposit into the forge below. First automation!", "goal": "First automation"},
 ]
 
 
@@ -96,12 +96,12 @@ func _achieved(id: StringName) -> bool:
 	return false
 
 
-## The SELF-FEEDING LINE, detected anywhere in the world: a DRILL placed directly on top of an ORE body (so
-## it taps the chunk and the drained ore falls toward a forge below). Returns {drill} cell, or {} if none.
-## Location-independent — capping the mineshaft chunk OR any ore body the player finds counts.
+## The SELF-FEEDING LINE, detected anywhere in the world: a DRILL placed ON an exposed ore DEPOSIT (the
+## cavity-model — the drill taps `ore_deposits` at its own cell and the ore falls toward a forge below).
+## Returns {drill} cell, or {} if none. Location-independent — any deposit the player caps counts.
 func _find_line() -> Dictionary:
 	for m: MachineState in sim.machines:
-		if m.def.behavior == &"drill" and sim.material_at(m.cell + Vector2i(0, 1)) == &"ore":
+		if m.def.behavior == &"drill" and sim.ore_deposit_at(m.cell) > 0:
 			return {"drill": m.cell}
 	return {}
 

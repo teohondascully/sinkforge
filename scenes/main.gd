@@ -261,8 +261,9 @@ func _make_mote_texture() -> GradientTexture2D:
 const SURFACE := HeightmapWorldGen.FLAT_SURFACE_ROW
 const MINESHAFT_COL: int = 8
 const MINESHAFT_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE)       ## bootstrap forge at the shaft mouth — HAND-fed (toss ore down)
-const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## where the player places the Drill — directly ON TOP of the ore chunk
-const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 5)        ## the AUTO line's forge — below the chunk, fed by the drill's fall
+const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)   ## the rich ore block: hand-mine it → cavity+deposit → cap with the Drill
+const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 3)        ## the AUTO line's forge — directly below the drill, catches its fall
+const MINESHAFT_ORE_RICHNESS: int = 24                               ## rich enough that a hand-burst leaves a fat deposit to drill
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
@@ -319,13 +320,12 @@ func _seed_tutorial_tree() -> void:
 func _seed_tutorial_mineshaft() -> void:
 	var c: int = MINESHAFT_COL
 	sim.set_solid(Vector2i(c, SURFACE), &"")                       # shaft mouth (bootstrap forge goes here)
-	sim.set_solid(Vector2i(c, SURFACE + 1), &"")                   # collect / drill spot
-	for r: int in [SURFACE + 2, SURFACE + 3, SURFACE + 4]:         # the ore chunk the drill taps
-		sim.set_solid(Vector2i(c, r), &"ore")
-		sim.deposits[Vector2i(c, r)] = 4                          # 12 ore total — runs the loop, finite
-	sim.set_solid(Vector2i(c, SURFACE + 5), &"")                   # carve the cell the AUTO forge sits in
-	sim.set_solid(Vector2i(c, SURFACE + 6), &"")                   # gap under the auto forge (ingots land)
-	sim.set_solid(Vector2i(c, SURFACE + 7), &"earth")            # rock floor
+	sim.set_solid(Vector2i(c, SURFACE + 1), &"")                   # drop in / collect bootstrap ingots
+	sim.set_solid(MINESHAFT_DRILL_CELL, &"ore")                   # the rich ore BLOCK: hand-mine → cavity + deposit
+	sim.deposits[MINESHAFT_DRILL_CELL] = MINESHAFT_ORE_RICHNESS    # ~6 hand-burst, ~18 left as a drillable deposit
+	sim.set_solid(AUTO_FORGE_CELL, &"")                           # carve the cell the AUTO forge sits in
+	sim.set_solid(Vector2i(c, SURFACE + 4), &"")                   # gap under the auto forge (ingots land)
+	sim.set_solid(Vector2i(c, SURFACE + 5), &"earth")            # rock floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
 	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
 
@@ -679,6 +679,12 @@ func _hover_info() -> Dictionary:
 		return {}
 	var m: MachineState = sim.machine_at(_aim)
 	if m == null:
+		# A bare exposed wall deposit (a mined-out ore cavity) — show how much ore is left + the nudge to
+		# automate it. The cavity-model readout the user asked for ("hover to see how much ore is left").
+		var dep: int = sim.ore_deposit_at(_aim)
+		if dep > 0:
+			return {"name": "Ore Deposit", "in": [], "out": [], "holding": [],
+				"mode": "%d ore left — cap it with a Drill" % dep}
 		return {}
 	var info: Dictionary = {"name": m.def.display_name}
 	var recipe: RecipeDef = m.def.recipe
@@ -698,6 +704,11 @@ func _hover_info() -> Dictionary:
 			info["mode"] = "splits the flow DOWN + RIGHT"
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
+		&"drill":
+			var dep2: int = sim.ore_deposit_at(m.cell)
+			var rate: String = ("%.1fs/ore" % recipe.time) if recipe != null and recipe.time > 0.0 else ""
+			info["mode"] = ("drilling — %d ore left  (%s)" % [dep2, rate]) if dep2 > 0 \
+				else "idle — no deposit here (relocate over a mined ore cavity)"
 		_:
 			if recipe != null and recipe.inputs.is_empty():
 				info["mode"] = "ore source"

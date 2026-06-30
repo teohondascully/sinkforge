@@ -517,53 +517,46 @@ func _test_lift() -> void:
 ## placed Drill bores the vein straight below it, spitting ore down the column, and STOPS when the vein
 ## is exhausted — proving extraction is finite (no infinite-ore machine).
 func _test_finite_deposit_and_drill() -> void:
-	print("- finite deposit + drill")
+	print("- cavity mining + drill")
+	# Hand-mining an ore BLOCK (cavity model, docs/MINING.md): ONE strike clears the whole block, drops a
+	# 3-8 BURST into the pack, and exposes the leftover richness as a wall DEPOSIT a drill can tap.
 	var sim: FactorySim = FactorySim.new()
 	var cell := Vector2i(4, 6)
 	sim.set_solid(cell, &"ore")
-	sim.deposits[cell] = 3                              # a rich cell: three ore before it clears
-	_check(sim.mine(cell) == &"ore" and sim.is_solid(cell), "hit 1 yields ore, deposit not yet empty (cell remains)")
-	_check(sim.mine(cell) == &"ore" and sim.is_solid(cell), "hit 2 yields ore, cell still ore")
-	_check(sim.mine(cell) == &"ore" and not sim.is_solid(cell), "hit 3 empties the deposit and clears the block")
-	_check(int(sim.inventory.get(&"ore", 0)) == 3, "all 3 ore drained into the pack")
-	_check(sim.mine(cell) == &"", "an emptied deposit cell is gone")
+	sim.deposits[cell] = 12                             # a rich block: a hand-burst + a fat deposit left over
+	var mat: StringName = sim.mine(cell)
+	var burst: int = int(sim.inventory.get(&"ore", 0))
+	_check(mat == &"ore" and not sim.is_solid(cell), "one strike breaks the whole ore block")
+	_check(burst >= 3 and burst <= 8, "hand-mining drops a 3-8 burst (got %d)" % burst)
+	_check(sim.ore_deposit_at(cell) == 12 - burst, "the leftover richness is exposed as a wall deposit")
+	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "burst ore conserved (the deposit is latent)")
+	# A THIN vein (richness 3) is a pure hand-grab — the burst takes it all, nothing left to drill.
+	var thin := Vector2i(9, 9)
+	sim.set_solid(thin, &"ore"); sim.deposits[thin] = 3
+	sim.mine(thin)
+	_check(sim.ore_deposit_at(thin) == 0, "a thin vein leaves no deposit (fully hand-grabbed)")
 
-	# The DRILL: a 2-cell vertical vein (2 ore each) right below it, stone floor under that.
+	# The DRILL caps an exposed deposit and pulls it DOWN to a forge/floor, stopping when the deposit is dry.
 	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
 	var s2: FactorySim = FactorySim.new()
-	s2.set_solid(Vector2i(8, 5), &"ore"); s2.deposits[Vector2i(8, 5)] = 2
-	s2.set_solid(Vector2i(8, 6), &"ore"); s2.deposits[Vector2i(8, 6)] = 2
-	s2.set_solid(Vector2i(8, 8), &"stone")             # floor: catches the spat ore + stops the drill
-	var drill: MachineState = s2.place_machine(drill_def, Vector2i(8, 4))
-	_check(drill != null and drill.def.behavior == &"drill", "placed a drill")
-	for _i: int in 100:                                # 4 ore × 20 ticks/extraction, plenty of slack
+	var ore := Vector2i(8, 5)
+	s2.set_solid(ore, &"ore"); s2.deposits[ore] = 14
+	s2.set_solid(Vector2i(8, 8), &"stone")             # floor: catches the spat ore
+	s2.mine(ore)                                       # hand-mine → burst + reveal deposit
+	var hand: int = int(s2.inventory.get(&"ore", 0))
+	var pool: int = s2.ore_deposit_at(ore)
+	_check(pool > 0, "mining the rich block exposed a drillable deposit (%d)" % pool)
+	var drill: MachineState = s2.place_machine(drill_def, ore)   # cap the cavity (now an open cell)
+	_check(drill != null and drill.def.behavior == &"drill", "placed a drill on the cavity")
+	for _i: int in 100 + pool * 25:                    # plenty of ticks to drain the whole pool
 		s2.tick()
-	_check(not s2.is_solid(Vector2i(8, 5)) and not s2.is_solid(Vector2i(8, 6)), "drill bored through both vein cells")
-	_check(int(s2.total_produced.get(&"ore", 0)) == 4, "drill produced exactly the 4 ore the deposits held")
-	_check(_items_present(s2, &"ore") == 4, "drilled ore conserved (present=4)")
+	_check(s2.ore_deposit_at(ore) == 0, "the drill drained the deposit dry")
+	_check(int(s2.total_produced.get(&"ore", 0)) == hand + pool, "total ore = hand burst + the drilled deposit")
+	_check(_items_present(s2, &"ore") == int(s2.total_produced.get(&"ore", 0)), "all ore conserved (hand + drilled)")
 	var before: int = int(s2.total_produced.get(&"ore", 0))
 	for _i: int in 40:
 		s2.tick()
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
-
-	# Drill-over-CHUNK drains BOTTOM-UP (the user's model): a 3-cell vertical stack (1 each), drill on top,
-	# clears the LOWEST cell first, then up to the top one it sits on — ore ejecting below the body each time.
-	var s3: FactorySim = FactorySim.new()
-	for r: int in [5, 6, 7]:
-		s3.set_solid(Vector2i(3, r), &"ore"); s3.deposits[Vector2i(3, r)] = 1   # top=5, mid=6, bottom=7
-	s3.set_solid(Vector2i(3, 9), &"stone")             # floor below (gap at row 8 catches the ejected ore)
-	s3.place_machine(drill_def, Vector2i(3, 4))        # on top of the chunk
-	for _i: int in 20:
-		s3.tick()
-	_check(not s3.is_solid(Vector2i(3, 7)) and s3.is_solid(Vector2i(3, 6)) and s3.is_solid(Vector2i(3, 5)),
-		"after one extraction the BOTTOM cell is gone, the two above remain (drains bottom-up)")
-	for _i: int in 20:
-		s3.tick()
-	_check(not s3.is_solid(Vector2i(3, 6)) and s3.is_solid(Vector2i(3, 5)), "next extraction takes the middle cell")
-	for _i: int in 40:
-		s3.tick()
-	_check(not s3.is_solid(Vector2i(3, 5)), "finally the top cell (the one the drill sits on) is drained")
-	_check(int(s3.total_produced.get(&"ore", 0)) == 3 and _items_present(s3, &"ore") == 3, "all 3 ore extracted + conserved")
 
 
 ## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
@@ -775,16 +768,15 @@ func _test_automated_line() -> void:
 	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
 	var sim: FactorySim = FactorySim.new()
 	var col: int = 8
-	# Stack (top→bottom): drill → 3-cell ore chunk → gap → forge → gap → floor. The drill eats the chunk
-	# from the bottom, ore ejects below it and falls into the forge; ingots land on the floor.
-	sim.place_machine(drill_def, Vector2i(col, 4))
-	for r: int in [5, 6, 7]:
-		sim.set_solid(Vector2i(col, r), &"ore")
-		sim.deposits[Vector2i(col, r)] = 4                   # 12 ore total in the chunk
-	sim.place_machine(proc_def, Vector2i(col, 9))            # forge directly below the chunk (gap at row 8)
-	sim.set_solid(Vector2i(col, 11), &"stone")              # floor under the forge's output gap (row 10)
-	# Run hands-free — the player does NOTHING after building it.
-	for _i: int in 400:
+	# Cavity model: hand-mine a rich ore block → it exposes a deposit → cap the cavity with a drill →
+	# the drill pulls the deposit DOWN into a forge directly below → ingots land on the floor. Hands-free after.
+	var ore := Vector2i(col, 4)
+	sim.set_solid(ore, &"ore"); sim.deposits[ore] = 30
+	sim.place_machine(proc_def, Vector2i(col, 5))            # forge directly below the cavity (catches the drill's fall)
+	sim.set_solid(Vector2i(col, 7), &"stone")               # floor under the forge's output gap (row 6)
+	sim.mine(ore)                                            # hand-mine the block → exposes the deposit
+	sim.place_machine(drill_def, ore)                       # cap the cavity — the player does NOTHING after this
+	for _i: int in 600:
 		sim.tick()
 	var ingots: int = int(sim.total_produced.get(&"ingot", 0))
 	_check(ingots > 0, "the line forged ingots with NO hand intervention (%d)" % ingots)

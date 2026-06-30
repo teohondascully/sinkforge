@@ -55,11 +55,15 @@ var solid: Dictionary = {}
 ## cell is solid. Mining a block leaves its wall (Terraria-style). Read-only to the view (wall_at);
 ## written only by load_world / set_wall. Not collision (you walk through walls), not "items present".
 var wall: Dictionary = {}
-## Ore deposit pools (cell -> remaining yield), the finite-deposit layer over ore cells (docs/MINING.md).
-## An ORE cell ABSENT here counts as amount 1, so a world that never set richness behaves as before
-## (one hit = one ore = cleared). Drained by hand-`mine` and by a Drill; latent world resource, NOT
-## "items present" — depleting it is conservation-neutral (the ore it yields is total_produced, as ever).
+## Ore-block RICHNESS (cell -> total yield), over SOLID ore cells (docs/MINING.md). Absent ore cell = 1.
+## When you HAND-mine an ore block you get a burst of it (3-8) and the REMAINDER is revealed as a wall
+## deposit (`ore_deposits`) a drill taps. Latent world resource, NOT "items present" — conservation-neutral.
 var deposits: Dictionary = {}
+## Exposed wall DEPOSITS (cell -> remaining yield), the cavity model: hand-mining an ore block clears the
+## block and, if richness was left over, reveals a glittering deposit IN THE WALL of the now-open cell. A
+## Drill placed on that open cell drains the pool, ejecting ore down its column until it runs dry. Also a
+## latent pool (conservation-neutral); the ore is total_produced only as the drill actually extracts it.
+var ore_deposits: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -205,6 +209,7 @@ func load_world(world: WorldData) -> void:
 	solid.clear()
 	wall.clear()
 	deposits.clear()
+	ore_deposits.clear()
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
 			solid[cell] = world.blocks[cell]
@@ -225,13 +230,20 @@ func mine(cell: Vector2i) -> StringName:
 		return &""
 	var material: StringName = solid[cell]
 	if material == &"ore":
-		# A finite deposit: each hit yields 1 ore and drains the pool; the block only clears (wall kept)
-		# once the pool is empty. A cell with no pool entry holds 1 → one hit, exactly as before.
-		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + 1
-		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + 1
-		if _drain_deposit(cell):
-			solid.erase(cell)
-			_resettle_pile_above(cell)      # the floor under any resting pile just vanished — it falls
+		# CAVITY model (docs/MINING.md): one strike breaks the whole ore BLOCK. You pocket a juicy BURST
+		# (3-8, capped by the vein's richness), the block clears (wall kept), and any RICHNESS left over is
+		# revealed as a glittering wall DEPOSIT a drill can tap. Thin surface veins are a pure hand-grab (no
+		# remainder → no deposit); deep rich veins leave a big deposit to automate (deeper = richer).
+		var richness: int = int(deposits.get(cell, 1))
+		var burst: int = mini(richness, _ore_burst(cell))
+		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + burst
+		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + burst
+		deposits.erase(cell)
+		solid.erase(cell)
+		var remainder: int = richness - burst
+		if remainder > 0:
+			ore_deposits[cell] = remainder
+		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
 		# Foliage chops BLOCK-BY-BLOCK (Terraria/Minecraft), never flood-felling the whole tree on one hit —
@@ -405,15 +417,18 @@ func near_bazaar(cell: Vector2i, radius: int) -> bool:
 	return false
 
 
-## Take one unit from `cell`'s deposit pool (default 1 if untracked). Returns true when the pool is now
-## EMPTY (the caller clears the ore block). Shared by hand-mining and the Drill so both drain identically.
-func _drain_deposit(cell: Vector2i) -> bool:
-	var left: int = int(deposits.get(cell, 1)) - 1
-	if left > 0:
-		deposits[cell] = left
-		return false
-	deposits.erase(cell)
-	return true
+## The hand-mined BURST size for an ore cell — a juicy 3-8, deterministic per cell (a stable hash, no RNG
+## → determinism-safe) so a given vein always drops the same amount. The actual drop is capped by the
+## vein's richness (a thin vein gives less).
+func _ore_burst(cell: Vector2i) -> int:
+	var h: int = (int(cell.x) * 73856093) ^ (int(cell.y) * 19349663)
+	return 3 + (absi(h) % 6)   # 3..8
+
+
+## Remaining yield of the exposed wall deposit at `cell` (0 if none) — read by the Drill, the hover
+## inspector, and the renderer's glitter so all three agree on "how much ore is left in this cavity".
+func ore_deposit_at(cell: Vector2i) -> int:
+	return int(ore_deposits.get(cell, 0))
 
 
 ## The carried pack as an ordered list of {item, count} for the inventory hotbar UI. Dictionaries
@@ -735,34 +750,36 @@ func _run_splitter(machine: MachineState) -> void:
 	machine.input_buffer.clear()
 
 
-## A DRILL automates the by-hand ore mine (docs/MINING.md): placed directly ON TOP of an ore body (the cell
-## below it must be ore), it taps that whole CONNECTED chunk and drains it BOTTOM-UP — the lowest ore cell
-## first, all the way up to the cell touching the drill last (the user's model). Each cycle (recipe.time) it
-## drains one unit from the body's current lowest cell, clears that cell when its deposit empties (the body
-## is eaten from the bottom), and EJECTS one ore into the cell just below the drained cell — always clear
-## space below the body — where gravity carries it down to a forge/collection. Off ore → it idles. The ore
-## is genuinely produced from the world → total_produced (the same accounting as hand-mining). It draws from
-## the WORLD, not an input buffer, so its output is ejected here, not via the normal output-buffer _flow.
+## A DRILL automates the by-hand ore mine (docs/MINING.md, cavity model): you hand-mine an ore block first
+## (the friction that earns the automation), exposing a wall DEPOSIT; placed ON that open cavity cell, the
+## drill taps `ore_deposits` AT ITS OWN CELL, draining one unit per cycle and ejecting one ore DOWN its
+## column (gravity carries it to a forge/collection). Off a deposit → it idles. When the deposit runs dry
+## the drill goes quiet ("patch exhausted — relocate it"). The ore is genuinely produced from the world →
+## total_produced (same accounting as hand-mining); it draws from the WORLD, not an input buffer, so its
+## output is ejected here, not via the normal output-buffer _flow.
 func _run_drill(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
-	var lowest: Vector2i = _drill_body_lowest(machine.cell)
-	if lowest.x < 0:
-		return                          # no ore directly below the drill — idle, hold progress
+	var pool: int = int(ore_deposits.get(machine.cell, 0))
+	if pool <= 0:
+		return                          # not on an exposed deposit — idle, hold progress
 	machine.progress += SECONDS_PER_TICK
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
-	if _drain_deposit(lowest):
-		solid.erase(lowest)             # this cell's deposit is spent — clear it (wall kept); body shrinks up
-	# Eject the freed ore into the cell just BELOW the drained one — below the body, so it falls cleanly.
+	pool -= 1
+	if pool > 0:
+		ore_deposits[machine.cell] = pool
+	else:
+		ore_deposits.erase(machine.cell)   # deposit spent — drill idles next cycle
+	# Eject the freed ore DOWN the drill's own column, where gravity carries it to a forge/collection.
 	for item: StringName in recipe.outputs:
 		var n: int = int(recipe.outputs[item])
 		total_produced[item] = int(total_produced.get(item, 0)) + n
-		var dest: Dictionary = _column_landing(lowest.x, lowest.y + 1)
+		var dest: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
 		dest["target"][item] = int(dest["target"].get(item, 0)) + n
-		flow_events.append({"item": item, "from": lowest, "to": dest["to_cell"], "count": n})
+		flow_events.append({"item": item, "from": machine.cell, "to": dest["to_cell"], "count": n})
 
 
 ## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;
@@ -781,32 +798,6 @@ func _run_generator(machine: MachineState) -> void:
 			machine.input_buffer.erase(&"coal")
 		total_consumed[&"coal"] = int(total_consumed.get(&"coal", 0)) + 1
 		machine.fuel = GENERATOR_FUEL_TICKS
-
-
-## The cell the drill drains THIS cycle: the LOWEST cell of the connected ore body directly below the drill.
-## The drill must sit right on the body (drill+(0,1) is ore); from there it flood-finds the whole connected
-## ore chunk and returns its lowest cell (max y; tie-break min x for determinism), so the body drains
-## bottom-up and the freed ore always ejects into clear space beneath it. (-1,-1) if no ore is below.
-const _DRILL_BODY_CAP: int = 64
-func _drill_body_lowest(drill_cell: Vector2i) -> Vector2i:
-	var first: Vector2i = drill_cell + Vector2i(0, 1)
-	if solid.get(first, &"") != &"ore":
-		return Vector2i(-1, -1)
-	var seen: Dictionary = {}
-	var stack: Array[Vector2i] = [first]
-	var lowest: Vector2i = first
-	while not stack.is_empty() and seen.size() < _DRILL_BODY_CAP:
-		var c: Vector2i = stack.pop_back()
-		if seen.has(c) or solid.get(c, &"") != &"ore":
-			continue
-		seen[c] = true
-		if c.y > lowest.y or (c.y == lowest.y and c.x < lowest.x):
-			lowest = c
-		stack.append(c + Vector2i(1, 0))
-		stack.append(c + Vector2i(-1, 0))
-		stack.append(c + Vector2i(0, 1))
-		stack.append(c + Vector2i(0, -1))
-	return lowest
 
 
 ## Gravity + routing: each machine's output is handed to its destination(s). An ordinary machine
