@@ -32,8 +32,8 @@ var steps: Array[Dictionary] = [
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
-	{"id": &"build",  "label": "Cap the forge with the Drill — place it (RMB) directly on top", "goal": "Build the line"},
-	{"id": &"auto",   "label": "Stand back — the Drill now feeds the forge for you. First automation!", "goal": "First automation"},
+	{"id": &"build",  "label": "Drop into the mineshaft and cap the ore chunk with the Drill (RMB, directly on top)", "goal": "Build the line"},
+	{"id": &"auto",   "label": "Stand back — the Drill mines the chunk into the forge below. First automation!", "goal": "First automation"},
 ]
 
 
@@ -96,23 +96,20 @@ func _achieved(id: StringName) -> bool:
 	return false
 
 
-## The SELF-FEEDING LINE, detected anywhere in the world: a drill with a processor directly below it (so
-## the drill's bored ore falls straight into the forge). Returns {drill, proc} cells, or {} if none. This
-## is location-independent — building the stack in the mineshaft OR anywhere else counts.
+## The SELF-FEEDING LINE, detected anywhere in the world: a DRILL placed directly on top of an ORE body (so
+## it taps the chunk and the drained ore falls toward a forge below). Returns {drill} cell, or {} if none.
+## Location-independent — capping the mineshaft chunk OR any ore body the player finds counts.
 func _find_line() -> Dictionary:
 	for m: MachineState in sim.machines:
-		if m.def.behavior == &"drill":
-			var below: Vector2i = m.cell + Vector2i(0, 1)
-			var p: MachineState = sim.machine_at(below)
-			if p != null and p.def.id == &"processor":
-				return {"drill": m.cell, "proc": p.cell}
+		if m.def.behavior == &"drill" and sim.material_at(m.cell + Vector2i(0, 1)) == &"ore":
+			return {"drill": m.cell}
 	return {}
 
 
-## True once a built line has forged an ingot ON ITS OWN. We snapshot the ingot count the moment the
-## drill→forge stack first exists, then latch when production passes it — so it proves the DRILL (not the
-## player's hand) fed the forge, and works whether the poured ingots pile up or get auto-collected by a
-## body standing in the shaft (a ground pile is transient, production is monotonic).
+## True once a built line has forged an ingot ON ITS OWN. We snapshot the ingot count the moment a drill is
+## first capping an ore body, then latch when production passes it — so it proves the DRILL (not the
+## player's hand) drove the smelt, and works whether the poured ingots pile up or get auto-collected (a
+## ground pile is transient, production is monotonic).
 func _line_has_run() -> bool:
 	if _find_line().is_empty():
 		return false

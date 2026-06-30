@@ -256,8 +256,9 @@ func _make_mote_texture() -> GradientTexture2D:
 ## to it, so pushing the surface down for sky moves them all together. Mirrors HeightmapWorldGen's constant.
 const SURFACE := HeightmapWorldGen.FLAT_SURFACE_ROW
 const MINESHAFT_COL: int = 8
-const MINESHAFT_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE)       ## the forge in the shaft mouth — hand-fed, then drill-fed
-const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE - 1)   ## where the player caps it with the Drill (directly above)
+const MINESHAFT_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE)       ## bootstrap forge at the shaft mouth — HAND-fed (toss ore down)
+const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## where the player places the Drill — directly ON TOP of the ore chunk
+const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 5)        ## the AUTO line's forge — below the chunk, fed by the drill's fall
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
@@ -269,15 +270,17 @@ func _seed_world() -> void:
 		_dev_seed_pack()
 
 
-## A rich ORE cell breaching the surface right beside spawn — the visible "orange-flecked rock" the first
-## objective points at, and the bootstrap ore for the hand-smelted ingots (depth-banded worldgen leaves
-## the shallow surface near-bare, so onboarding can't rely on finding a vein). ONE deep cell, not a
-## vertical run: mining it leaves only a 1-tile pit you step straight back out of, instead of a deep hole
-## you'd have to jump from. Distinct from the mineshaft's drill-vein so hand-mining never eats it.
+## A visible ORE VEIN breaching the surface beside spawn — the "orange-flecked rock" the first objective
+## points at, and the bootstrap ore you HAND-mine for the first ingots (depth-banded worldgen leaves the
+## shallow surface near-bare, so onboarding can't rely on finding a vein). A 1-tall, 3-wide band so it READS
+## as a deposit (the drill model: ore comes in chunks) yet mining it leaves only a SHALLOW (1-tile) trench
+## you step straight out of — a 2-deep pit would trap the body (step-up climbs one tile). Distinct column
+## from the mineshaft so hand-mining never eats the drill's chunk.
 const STARTER_VEIN_CELL := Vector2i(4, SURFACE)
 func _seed_starter_vein() -> void:
-	sim.set_solid(STARTER_VEIN_CELL, &"ore")
-	sim.deposits[STARTER_VEIN_CELL] = 6                            # ~3 ingots' worth — bootstrap + margin
+	for cell: Vector2i in [Vector2i(4, SURFACE), Vector2i(5, SURFACE), Vector2i(6, SURFACE)]:
+		sim.set_solid(cell, &"ore")
+		sim.deposits[cell] = 3                                     # 9 ore total — plenty to bootstrap (need ~4)
 
 
 ## A guaranteed TUTORIAL TREE on the surface, LEFT of spawn — the wood source the bazaar step needs
@@ -296,24 +299,30 @@ func _seed_tutorial_tree() -> void:
 			sim.set_solid(leaf, &"leaves")                       # crown — marks it a tree, fells to wood
 
 
-## An ABANDONED MINESHAFT near spawn with a FORGE already in its mouth — the whole Rung-1 stage in one
-## shallow fixture. Layout (col 8), relative to the surface row, daylight pouring down the carved shaft:
-##   SURFACE    FORGE     (placed) — you hand-feed it by tossing ore down the shaft, later the drill feeds it
-##   SURFACE+1  open gap  — smelted ingots land here on the vein below; you drop in (1 tile) to scoop them
-##   SURFACE+2  ORE vein  (rich) — the drill's target once you cap the forge
-##   SURFACE+3  rock floor
-## The drill goes ABOVE the forge at (8, SURFACE-1), floating one cell over the surface. The shaft is only 1
-## tile deep where you stand to collect, so you step straight back out — no trap. Sinking this exact shaft by
-## hand is fragile (you'd mine the vein you mean to drill), so the world provides it; digging agency
-## lives in the starter vein (step 1) and everywhere else.
+## The MINESHAFT (col 8) — the whole Rung-1 stage stacked in one shaft (top → bottom, surface-relative).
+## It teaches "hand-smelt to bootstrap, then build the line that does the mining-and-feeding for you":
+##   SURFACE    BOOTSTRAP FORGE  — phase 2: toss ore down the open mouth → ingots (hand-fed)
+##   SURFACE+1  open             — bootstrap ingots land here (collect); phase 4 you place the DRILL here
+##   SURFACE+2  ORE chunk        ┐
+##   SURFACE+3  ORE chunk        ├ a 3-cell ore body the drill (above it) drains BOTTOM-UP
+##   SURFACE+4  ORE chunk        ┘
+##   SURFACE+5  AUTO FORGE       — the drained ore falls in here → ingots, hands-free
+##   SURFACE+6  open             — auto ingots land (collecting them at depth = the R2 lift)
+##   SURFACE+7  rock floor
+## Two forges: the top one you hand-feed to bootstrap the drill's ingots; the bottom one the drill feeds
+## once you cap the ore chunk with it (the drill can't feed the top one — the chunk would block its mouth).
 func _seed_tutorial_mineshaft() -> void:
 	var c: int = MINESHAFT_COL
-	sim.set_solid(Vector2i(c, SURFACE), &"")                       # shaft mouth (forge goes here)
-	sim.set_solid(Vector2i(c, SURFACE + 1), &"")                   # collect gap (ingots land on the vein)
-	sim.set_solid(Vector2i(c, SURFACE + 2), &"ore")               # the vein (drill's target)
-	sim.deposits[Vector2i(c, SURFACE + 2)] = 12                  # rich — runs the loop, then exhausts (finite)
-	sim.set_solid(Vector2i(c, SURFACE + 3), &"earth")            # floor under the vein
-	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)
+	sim.set_solid(Vector2i(c, SURFACE), &"")                       # shaft mouth (bootstrap forge goes here)
+	sim.set_solid(Vector2i(c, SURFACE + 1), &"")                   # collect / drill spot
+	for r: int in [SURFACE + 2, SURFACE + 3, SURFACE + 4]:         # the ore chunk the drill taps
+		sim.set_solid(Vector2i(c, r), &"ore")
+		sim.deposits[Vector2i(c, r)] = 4                          # 12 ore total — runs the loop, finite
+	sim.set_solid(Vector2i(c, SURFACE + 5), &"")                   # carve the cell the AUTO forge sits in
+	sim.set_solid(Vector2i(c, SURFACE + 6), &"")                   # gap under the auto forge (ingots land)
+	sim.set_solid(Vector2i(c, SURFACE + 7), &"earth")            # rock floor
+	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
+	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
 
 
 ## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
@@ -744,11 +753,9 @@ func _guide_targets() -> Array[Dictionary]:
 			if gap.x >= 0:
 				out.append({"cell": gap, "mode": "ghost"})
 		&"build":
-			var f: Vector2i = _first_forge()
-			if f.x >= 0:
-				var cap: Vector2i = f + Vector2i(0, -1)   # the drill caps the forge from directly above
-				if sim.machine_at(cap) == null and not sim.is_solid(cap):
-					out.append({"cell": cap, "mode": "ghost"})
+			var spot: Vector2i = MINESHAFT_DRILL_CELL     # the drill caps the ore chunk from directly above
+			if sim.machine_at(spot) == null and not sim.is_solid(spot) and sim.material_at(spot + Vector2i(0, 1)) == &"ore":
+				out.append({"cell": spot, "mode": "ghost"})
 	return out
 
 

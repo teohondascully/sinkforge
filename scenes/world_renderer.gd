@@ -195,7 +195,12 @@ func _draw_terrain() -> void:
 			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
 			draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
 		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
-			for nug: Vector2 in _cell_speckles(c, def.nugget_count):
+			# Speck DENSITY tracks the remaining deposit (docs/MINING.md): a rich body sparkles thickly, a
+			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
+			# bottom-up visibly fades. (Cells with no pool entry = amount 1 = today's sparse look.)
+			var richness: int = int(sim.deposits.get(c, 1))
+			var nug_n: int = clampi(def.nugget_count + richness - 1, def.nugget_count, def.nugget_count + 7)
+			for nug: Vector2 in _cell_speckles(c, nug_n):
 				draw_circle(pos + nug, 2.0, def.nugget_color)
 				draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
 		_draw_edge_ao(c, pos)  # carved depth: ambient occlusion on faces that border open air

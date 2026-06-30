@@ -545,6 +545,25 @@ func _test_finite_deposit_and_drill() -> void:
 		s2.tick()
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
 
+	# Drill-over-CHUNK drains BOTTOM-UP (the user's model): a 3-cell vertical stack (1 each), drill on top,
+	# clears the LOWEST cell first, then up to the top one it sits on — ore ejecting below the body each time.
+	var s3: FactorySim = FactorySim.new()
+	for r: int in [5, 6, 7]:
+		s3.set_solid(Vector2i(3, r), &"ore"); s3.deposits[Vector2i(3, r)] = 1   # top=5, mid=6, bottom=7
+	s3.set_solid(Vector2i(3, 9), &"stone")             # floor below (gap at row 8 catches the ejected ore)
+	s3.place_machine(drill_def, Vector2i(3, 4))        # on top of the chunk
+	for _i: int in 20:
+		s3.tick()
+	_check(not s3.is_solid(Vector2i(3, 7)) and s3.is_solid(Vector2i(3, 6)) and s3.is_solid(Vector2i(3, 5)),
+		"after one extraction the BOTTOM cell is gone, the two above remain (drains bottom-up)")
+	for _i: int in 20:
+		s3.tick()
+	_check(not s3.is_solid(Vector2i(3, 6)) and s3.is_solid(Vector2i(3, 5)), "next extraction takes the middle cell")
+	for _i: int in 40:
+		s3.tick()
+	_check(not s3.is_solid(Vector2i(3, 5)), "finally the top cell (the one the drill sits on) is drained")
+	_check(int(s3.total_produced.get(&"ore", 0)) == 3 and _items_present(s3, &"ore") == 3, "all 3 ore extracted + conserved")
+
 
 ## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
 ## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping any tree cell fells
@@ -727,24 +746,25 @@ func _test_powered_lift() -> void:
 
 
 ## RUNG 1 — the SELF-FEEDING LINE (docs/PROGRESSION.md, the first automation milestone). The mechanical
-## spec the guided objective chain + the R1 agent-play-test drive the player to build: a Drill stacked
-## directly above a Processor forge, over an ore vein within drill reach, a rock floor beneath. The drill
-## bores the vein; its ore FALLS into the forge (gravity is the conveyor, the locked hook); the forge
-## smelts; ingots pile on the floor — all with ZERO hand-mining or hand-feeding once placed. If this ever
-## breaks, the rung the player is being guided toward is unbuildable. Conservation must hold throughout.
+## spec the guided objective chain + the R1 agent-play-test drive the player to build: a Drill on TOP of an
+## ore CHUNK, with a Processor forge directly below the chunk. The drill drains the chunk bottom-up and its
+## ore FALLS into the forge (gravity is the conveyor, the locked hook); the forge smelts; ingots pile on the
+## floor — all with ZERO hand-mining or hand-feeding once placed. If this breaks, the rung the player is
+## being guided toward is unbuildable. Conservation must hold throughout.
 func _test_automated_line() -> void:
 	print("- automated ore→ingot line (Rung 1)")
 	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
 	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
 	var sim: FactorySim = FactorySim.new()
 	var col: int = 8
-	var drill_row: int = 4
-	# Stack: drill (row 4) → forge (row 5) → 2-cell air gap → vein (row 8, dist 4 = drill reach) → floor.
-	sim.place_machine(drill_def, Vector2i(col, drill_row))
-	sim.place_machine(proc_def, Vector2i(col, drill_row + 1))
-	sim.set_solid(Vector2i(col, drill_row + 4), &"ore")
-	sim.deposits[Vector2i(col, drill_row + 4)] = 12          # rich enough to run the whole window
-	sim.set_solid(Vector2i(col, drill_row + 5), &"stone")    # floor: catches ingots, stops the drill
+	# Stack (top→bottom): drill → 3-cell ore chunk → gap → forge → gap → floor. The drill eats the chunk
+	# from the bottom, ore ejects below it and falls into the forge; ingots land on the floor.
+	sim.place_machine(drill_def, Vector2i(col, 4))
+	for r: int in [5, 6, 7]:
+		sim.set_solid(Vector2i(col, r), &"ore")
+		sim.deposits[Vector2i(col, r)] = 4                   # 12 ore total in the chunk
+	sim.place_machine(proc_def, Vector2i(col, 9))            # forge directly below the chunk (gap at row 8)
+	sim.set_solid(Vector2i(col, 11), &"stone")              # floor under the forge's output gap (row 10)
 	# Run hands-free — the player does NOTHING after building it.
 	for _i: int in 400:
 		sim.tick()

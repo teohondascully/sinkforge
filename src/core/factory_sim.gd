@@ -24,9 +24,6 @@ const GRID_ROWS: int = 80
 const LIFT_THROUGHPUT: int = 2          ## unpowered baseline (L1), also the floor under brownout
 const LIFT_POWERED_THROUGHPUT: int = 6  ## items/tick at FULL power — the governed deep-frontier rate
 const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full boost (less → proportional)
-## How many cells straight DOWN a Drill reaches for ore (docs/MINING.md). It bores the first ore cell
-## within this range, stopping at any non-ore rock — so you place it with a clear shot at the vein.
-const DRILL_REACH: int = 4
 ## --- POWER (the L2 twist, docs/POWER.md): power FALLS on the hook. A fueled GENERATOR burns coal and
 ## pours power into the cells around it (its innate aura — conduits will extend the reach down+lateral
 ## in a later slice); consumers draw from the field to run. The field is a DERIVED quantity recomputed
@@ -788,30 +785,34 @@ func _run_splitter(machine: MachineState) -> void:
 	machine.input_buffer.clear()
 
 
-## A DRILL automates the by-hand ore mine (docs/MINING.md): it draws from the WORLD, not an input buffer.
-## Each cycle (recipe.time) it bores the first ore cell straight below it, drains one unit from that
-## deposit (clearing the block when empty — wall kept), and emits recipe.outputs (1 ore) into its output
-## buffer, which _flow then drops down the column like any machine. No reachable ore → it idles (progress
-## doesn't advance, so it resumes cleanly when a new vein comes into reach as the shaft bores deeper). The
-## ore is genuinely produced from the world → total_produced (the same accounting as hand-mining).
+## A DRILL automates the by-hand ore mine (docs/MINING.md): placed directly ON TOP of an ore body (the cell
+## below it must be ore), it taps that whole CONNECTED chunk and drains it BOTTOM-UP — the lowest ore cell
+## first, all the way up to the cell touching the drill last (the user's model). Each cycle (recipe.time) it
+## drains one unit from the body's current lowest cell, clears that cell when its deposit empties (the body
+## is eaten from the bottom), and EJECTS one ore into the cell just below the drained cell — always clear
+## space below the body — where gravity carries it down to a forge/collection. Off ore → it idles. The ore
+## is genuinely produced from the world → total_produced (the same accounting as hand-mining). It draws from
+## the WORLD, not an input buffer, so its output is ejected here, not via the normal output-buffer _flow.
 func _run_drill(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
-	var target: Vector2i = _drill_target(machine.cell)
-	if target.x < 0:
-		return                          # nothing to bore in reach — idle, hold progress
+	var lowest: Vector2i = _drill_body_lowest(machine.cell)
+	if lowest.x < 0:
+		return                          # no ore directly below the drill — idle, hold progress
 	machine.progress += SECONDS_PER_TICK
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
-	if _drain_deposit(target):
-		solid.erase(target)             # deposit exhausted — clear the block (wall kept), bore deeper next
-		_resettle_pile_above(target)    # any pile resting on the spent vein falls with it
+	if _drain_deposit(lowest):
+		solid.erase(lowest)             # this cell's deposit is spent — clear it (wall kept); body shrinks up
+	# Eject the freed ore into the cell just BELOW the drained one — below the body, so it falls cleanly.
 	for item: StringName in recipe.outputs:
 		var n: int = int(recipe.outputs[item])
-		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + n
 		total_produced[item] = int(total_produced.get(item, 0)) + n
+		var dest: Dictionary = _column_landing(lowest.x, lowest.y + 1)
+		dest["target"][item] = int(dest["target"].get(item, 0)) + n
+		flow_events.append({"item": item, "from": lowest, "to": dest["to_cell"], "count": n})
 
 
 ## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;
@@ -832,15 +833,30 @@ func _run_generator(machine: MachineState) -> void:
 		machine.fuel = GENERATOR_FUEL_TICKS
 
 
-## The cell a drill bores: scanning straight DOWN from the drill within DRILL_REACH, the first SOLID cell
-## — returned only if it's ore (else the drill is blocked by plain rock and idles). Open air above the
-## vein is skipped (the drill string reaches through it). Returns (-1,-1) when no ore is in reach.
-func _drill_target(origin: Vector2i) -> Vector2i:
-	for row: int in range(origin.y + 1, mini(origin.y + 1 + DRILL_REACH, GRID_ROWS)):
-		var cell := Vector2i(origin.x, row)
-		if solid.has(cell):
-			return cell if solid[cell] == &"ore" else Vector2i(-1, -1)
-	return Vector2i(-1, -1)
+## The cell the drill drains THIS cycle: the LOWEST cell of the connected ore body directly below the drill.
+## The drill must sit right on the body (drill+(0,1) is ore); from there it flood-finds the whole connected
+## ore chunk and returns its lowest cell (max y; tie-break min x for determinism), so the body drains
+## bottom-up and the freed ore always ejects into clear space beneath it. (-1,-1) if no ore is below.
+const _DRILL_BODY_CAP: int = 64
+func _drill_body_lowest(drill_cell: Vector2i) -> Vector2i:
+	var first: Vector2i = drill_cell + Vector2i(0, 1)
+	if solid.get(first, &"") != &"ore":
+		return Vector2i(-1, -1)
+	var seen: Dictionary = {}
+	var stack: Array[Vector2i] = [first]
+	var lowest: Vector2i = first
+	while not stack.is_empty() and seen.size() < _DRILL_BODY_CAP:
+		var c: Vector2i = stack.pop_back()
+		if seen.has(c) or solid.get(c, &"") != &"ore":
+			continue
+		seen[c] = true
+		if c.y > lowest.y or (c.y == lowest.y and c.x < lowest.x):
+			lowest = c
+		stack.append(c + Vector2i(1, 0))
+		stack.append(c + Vector2i(-1, 0))
+		stack.append(c + Vector2i(0, 1))
+		stack.append(c + Vector2i(0, -1))
+	return lowest
 
 
 ## Gravity + routing: each machine's output is handed to its destination(s). An ordinary machine
