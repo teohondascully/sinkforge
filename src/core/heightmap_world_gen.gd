@@ -9,7 +9,10 @@ extends WorldGen
 
 ## Spawn/forge region (columns <= this) is kept flat so the player + harness have stable ground.
 const FLAT_COLS: int = 8
-const FLAT_SURFACE_ROW: int = 5
+## The surface sits well DOWN the world so a tall SKY band fills the space above it — the camera, centred
+## on the body, then frames the player in the middle of the screen (Terraria) instead of jamming them at
+## the top against the limit. Everything below is underground; the rows above (0..FLAT_SURFACE_ROW-1) are sky.
+const FLAT_SURFACE_ROW: int = 20
 ## Earth turns to STONE this many tiles below the surface — sells depth, and demonstrates a new
 ## material dropped into generation without touching sim or renderer.
 const STONE_DEPTH: int = 8
@@ -58,5 +61,6 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 func _surface_row(col: int) -> int:
 	if col <= FLAT_COLS:
 		return FLAT_SURFACE_ROW
-	var h: float = 5.0 - 2.2 * sin(float(col) * 0.30) - 1.1 * sin(float(col) * 0.11 + 1.7)
-	return clampi(int(round(h)), 3, 11)
+	# Gentle layered-sine hills around the flat surface row (so steps render as smooth diagonal slopes).
+	var h: float = float(FLAT_SURFACE_ROW) - 2.2 * sin(float(col) * 0.30) - 1.1 * sin(float(col) * 0.11 + 1.7)
+	return clampi(int(round(h)), FLAT_SURFACE_ROW - 3, FLAT_SURFACE_ROW + 5)

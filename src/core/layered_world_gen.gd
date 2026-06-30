@@ -47,7 +47,7 @@ const ORE_AMOUNT_DEPTH_BONUS: int = 4
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
 ## so descending crosses distinct material zones (the "deeper = different place" read).
-const DEEPSLATE_ROW: int = 26
+const DEEPSLATE_ROW: int = 52
 
 # --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
 ## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
@@ -188,7 +188,11 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 ## the walkable silhouette (FactorySim.surface_row), so trees don't ramp; chopping one fells it (→wood).
 func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var last: int = -99
-	for col: int in range(FLAT_COLS + 1, world.cols):
+	# Keep the spawn → bazaar band clear of worldgen trees (a tree just past the 3-tall bazaar frame would be
+	# the "nearest" tree but unreachable behind the wall). The tutorial tree (seeded left of spawn) is the
+	# early wood source; natural trees start past the ruin + a buffer.
+	var start: int = maxi(FLAT_COLS + 1, RUIN_X + FactorySim.BAZAAR_W + 3)
+	for col: int in range(start, world.cols):
 		if col - last < TREE_GAP or rng.randf() > TREE_CHANCE:
 			continue
 		var ground: int = _surface_row(col)

@@ -14,8 +14,8 @@ const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
 ## A larger world so a zoomed-out (3×) camera has real terrain to show and scroll through — hills,
 ## depth, room to explore (presentation sprint). Provisional size; real worldgen is still deferred.
-const GRID_COLS: int = 72
-const GRID_ROWS: int = 40
+const GRID_COLS: int = 96
+const GRID_ROWS: int = 80
 ## Items/tick a LIFT carries UP its column with NO power — its hand-cranked baseline (the L1 rate, before
 ## power exists). Below this rate, a backlog piles at the lift. Power is what lifts it past this baseline:
 ## a fully-powered lift reaches LIFT_POWERED_THROUGHPUT, scaled by the power reaching its cell (docs/POWER.md
