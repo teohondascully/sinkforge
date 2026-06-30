@@ -50,10 +50,11 @@ var _ghost_material: StringName = &""                ## a building material sele
 var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 
+var _terrain: LightLayer                             ## STATIC terrain/walls/surface — repainted only on terrain change, not per frame
 var _dark: LightLayer
 var _lights: LightLayer
 var _glow_tex: GradientTexture2D
-var _last_solid_count: int = -1                      ## repaint the skylight only when terrain (digging) changes
+var _terrain_sig: Array = []                          ## last terrain signature; repaint terrain + skylight only when it changes
 
 
 ## Wire the renderer to the session it draws (called once by MainView after the sim + player exist).
@@ -74,6 +75,14 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	]:
 		var def: MaterialDef = load(path)
 		_materials[def.id] = def
+	# A STATIC terrain canvas BELOW this renderer's dynamic draw (z -10): it carries the heavy ~7700-cell
+	# immediate-mode terrain + wall + surface pass, repainted ONLY when the terrain changes (dig / place /
+	# a drill draining a deposit) instead of every frame. Between changes the GPU replays its retained
+	# buffer for free — the single biggest perf win, since the bottleneck was GDScript re-issuing the
+	# whole world's draw commands 60×/second (the sim itself does almost nothing).
+	_terrain = LightLayer.new()
+	_terrain.setup(-10, false, _paint_terrain)
+	add_child(_terrain)
 	# Two world-space canvases ABOVE this renderer's draw — the skylight/darkness veil, then light pools.
 	_glow_tex = _make_glow_texture()
 	_dark = LightLayer.new()
@@ -82,7 +91,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_lights = LightLayer.new()
 	_lights.setup(51, true, _paint_lights)
 	add_child(_lights)
-	_dark.queue_redraw()  # the skylight veil changes only when you DIG — repaint on terrain change, not per-frame
+	_terrain.queue_redraw()
+	_dark.queue_redraw()  # terrain + skylight veil change only when you DIG — repaint on terrain change, not per-frame
 
 
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
@@ -105,19 +115,24 @@ func _process(delta: float) -> void:
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
-	# Skylight depends on terrain: when you DIG (solid count drops), daylight can reach further down a
-	# new shaft — so repaint the static veil then, not every frame.
-	if _dark != null and sim.solid.size() != _last_solid_count:
-		_last_solid_count = sim.solid.size()
-		_dark.queue_redraw()
+	# Terrain + skylight depend on the dug world, NOT the cosmetic clock: repaint them ONLY when the
+	# terrain actually changes (dig / place / a drill draining a deposit) — so the heavy full-world cell
+	# pass runs on a dig, not 60×/second. Between changes each layer's retained GPU buffer is replayed.
+	var sig: Array = _terrain_signature()
+	if sig != _terrain_sig:
+		_terrain_sig = sig
+		if _terrain != null:
+			_terrain.queue_redraw()
+		if _dark != null:
+			_dark.queue_redraw()
 
 
 # --- draw sequence (WORLD space; the Camera2D provides the view transform) ----
 
 func _draw() -> void:
-	_draw_background()  # sky above the surface; dark-dirt BACK WALL behind every dug-out cell + depth
-	_draw_terrain()
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
+	# Terrain + background walls + the world border + the smoothed surface are STATIC: drawn once by the
+	# _terrain LightLayer (below this, z -10) and repainted only on terrain change. This per-frame pass
+	# draws ONLY the live/sparse content (machines, items, conduits, cursor) — no full-world cell loop.
 	_draw_drop_paths()
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
@@ -131,6 +146,27 @@ func _draw() -> void:
 		particles.draw(self)
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_aim()
+
+
+## Painter for the STATIC terrain layer (the _terrain LightLayer at z -10): background walls, terrain
+## cells, the world border, and the smoothed surface — everything that changes only when you dig/place.
+## Runs on a terrain-signature change, not per frame. It draws onto the layer it's handed (`ci`), NOT
+## this node, so the heavy cell pass lands on a canvas the GPU can replay for free between digs.
+func _paint_terrain(ci: CanvasItem) -> void:
+	_draw_background(ci)  # sky above the surface; dark-dirt BACK WALL behind every dug-out cell + depth
+	_draw_terrain(ci)     # (ends with the smoothed surface pass)
+	ci.draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)
+
+
+## A cheap dirty-key for the static terrain layers: it changes iff the DRAWN terrain could change —
+## block count (dig/place), wall count, and the summed remaining ore (so the nugget-density "vein
+## draining" read still updates as a drill eats a deposit, before the cell finally clears). RNG-free,
+## O(deposits) per frame (a handful of cells), no false negatives for any in-play terrain mutation.
+func _terrain_signature() -> Array:
+	var dep: int = 0
+	for v: int in sim.deposits.values():
+		dep += int(v)
+	return [sim.solid.size(), sim.wall.size(), dep]
 
 
 ## Draw the placed power conduits (docs/POWER.md): each tube is a copper segment with stubs to whatever
@@ -168,7 +204,7 @@ func _conduit_level(cell: Vector2i) -> float:
 	return clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
 
 
-func _draw_terrain() -> void:
+func _draw_terrain(ci: CanvasItem) -> void:
 	for cell: Variant in sim.solid:
 		var c: Vector2i = cell
 		var pos := Vector2(c) * float(CELL)
@@ -177,7 +213,7 @@ func _draw_terrain() -> void:
 		# (still draw the surface cap/ramp pass below). Phase B of docs/ART_SPEC.md.
 		var tile: Texture2D = Art.tex("tile_" + String(def.id))
 		if tile != null:
-			draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
+			ci.draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
 			continue
 		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
@@ -186,14 +222,14 @@ func _draw_terrain() -> void:
 		# biggest flat-fill tell. A stable hash nudges each cell's value a few percent up or down.
 		var j: float = _cell_jitter(c)
 		col = col.lightened(j) if j > 0.0 else col.darkened(-j)
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
+		ci.draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
 		if def.grain:
 			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
 			# surface reads as textured rock rather than a colour swatch.
 			var sp: Array[Vector2] = _cell_speckles(c, 3)
-			draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
-			draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
-			draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
+			ci.draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
+			ci.draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
+			ci.draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
 		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
 			# Speck DENSITY tracks the remaining deposit (docs/MINING.md): a rich body sparkles thickly, a
 			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
@@ -201,10 +237,10 @@ func _draw_terrain() -> void:
 			var richness: int = int(sim.deposits.get(c, 1))
 			var nug_n: int = clampi(def.nugget_count + richness - 1, def.nugget_count, def.nugget_count + 7)
 			for nug: Vector2 in _cell_speckles(c, nug_n):
-				draw_circle(pos + nug, 2.0, def.nugget_color)
-				draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
-		_draw_edge_ao(c, pos)  # carved depth: ambient occlusion on faces that border open air
-	_draw_terrain_surface()
+				ci.draw_circle(pos + nug, 2.0, def.nugget_color)
+				ci.draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
+		_draw_edge_ao(ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
+	_draw_terrain_surface(ci)
 
 
 ## A SMOOTH, spatially-coherent value nudge (~[-0.06, +0.06]) — low-frequency sines so neighbouring
@@ -219,7 +255,7 @@ func _cell_jitter(c: Vector2i) -> float:
 
 ## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
 ## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
-func _draw_edge_ao(c: Vector2i, pos: Vector2) -> void:
+func _draw_edge_ao(ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
 	const STEPS: int = 3
 	for i: int in STEPS:
 		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
@@ -227,13 +263,13 @@ func _draw_edge_ao(c: Vector2i, pos: Vector2) -> void:
 		var o: float = float(i) * 2.0
 		var s := 2.0
 		if not sim.is_solid(c + Vector2i(0, -1)):  # top face exposed
-			draw_rect(Rect2(pos.x, pos.y + o, float(CELL), s), sh)
+			ci.draw_rect(Rect2(pos.x, pos.y + o, float(CELL), s), sh)
 		if not sim.is_solid(c + Vector2i(0, 1)):   # bottom face exposed (a ceiling from below)
-			draw_rect(Rect2(pos.x, pos.y + float(CELL) - o - s, float(CELL), s), sh)
+			ci.draw_rect(Rect2(pos.x, pos.y + float(CELL) - o - s, float(CELL), s), sh)
 		if not sim.is_solid(c + Vector2i(-1, 0)):  # left face exposed
-			draw_rect(Rect2(pos.x + o, pos.y, s, float(CELL)), sh)
+			ci.draw_rect(Rect2(pos.x + o, pos.y, s, float(CELL)), sh)
 		if not sim.is_solid(c + Vector2i(1, 0)):   # right face exposed
-			draw_rect(Rect2(pos.x + float(CELL) - o - s, pos.y, s, float(CELL)), sh)
+			ci.draw_rect(Rect2(pos.x + float(CELL) - o - s, pos.y, s, float(CELL)), sh)
 
 
 ## A cell's MaterialDef via the registry, or a safe fallback so an unknown id still renders.
@@ -264,7 +300,7 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 ## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
 ## sim.ramp_dir) so the diagonal we DRAW is exactly the one the avatar WALKS. The ramp GEOMETRY is
 ## universal (every material slopes); only the EDGE PAINT is material-specific (grass cap vs stone lip).
-func _draw_terrain_surface() -> void:
+func _draw_terrain_surface(ci: CanvasItem) -> void:
 	for col: int in range(FactorySim.GRID_COLS):
 		var r: int = sim.surface_row(col)
 		if r >= FactorySim.GRID_ROWS:
@@ -277,15 +313,15 @@ func _draw_terrain_surface() -> void:
 			1:  # rising to the right — fill the air corner above with a 45° slope
 				var lo := Vector2(px, py)
 				var hi := Vector2(px + CELL, py - CELL)
-				draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
-				draw_line(lo, hi, edge, 3.0)
+				ci.draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
+				ci.draw_line(lo, hi, edge, 3.0)
 			-1:  # rising to the left
 				var lo2 := Vector2(px + CELL, py)
 				var hi2 := Vector2(px, py - CELL)
-				draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
-				draw_line(lo2, hi2, edge, 3.0)
+				ci.draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
+				ci.draw_line(lo2, hi2, edge, 3.0)
 			_:  # flat top: a capped lip
-				draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
+				ci.draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
 
 
 ## The current objective's WHERE-cell(s), drawn as a breathing beacon so a new player can't miss where to
@@ -352,8 +388,8 @@ func _draw_aim() -> void:
 
 ## Sky + the REAL background WALL layer (sim.wall). Open sky fills the top; each wall cell paints its
 ## material colour (depth-darkened) BEHIND the terrain, so a dug-out cell reveals the carved-room backing.
-func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), SKY_COLOR)
+func _draw_background(ci: CanvasItem) -> void:
+	ci.draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), SKY_COLOR)
 	for cell_v: Variant in sim.wall:
 		var c: Vector2i = cell_v
 		var def: MaterialDef = _material(sim.wall[c])
@@ -361,10 +397,10 @@ func _draw_background() -> void:
 		# Sprite-ready: a tile_<wall-id>.png (e.g. tile_dirt_wall.png) replaces the flat fill.
 		var wtex: Texture2D = Art.tex("tile_" + String(def.id))
 		if wtex != null:
-			draw_texture_rect(wtex, Rect2(wpos, Vector2(CELL, CELL)), false)
+			ci.draw_texture_rect(wtex, Rect2(wpos, Vector2(CELL, CELL)), false)
 			continue
 		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		draw_rect(Rect2(wpos, Vector2(CELL, CELL)), def.base_color.darkened(depth * def.depth_darken))
+		ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)), def.base_color.darkened(depth * def.depth_darken))
 
 
 func _draw_drop_paths() -> void:
