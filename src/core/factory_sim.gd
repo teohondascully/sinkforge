@@ -234,69 +234,19 @@ func mine(cell: Vector2i) -> StringName:
 			_resettle_pile_above(cell)      # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
-		# A TREE (wood crowned with connected leaves) FELLS whole on one hit. But PLACED wood — the bazaar
-		# frame, any structure you build — is NOT a tree (no leaves); mining it removes just that one block,
-		# so chopping near your bazaar can't flood-collapse it. (A distinct `log` material is the eventual
-		# clean split; until then "has leaves" is the tree test — docs/CRAFTING.md.)
-		if material == &"leaves" or _foliage_has_leaves(cell):
-			var got: int = _fell_tree(cell)
-			if got > 0:
-				inventory[&"wood"] = int(inventory.get(&"wood", 0)) + got
-				total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + got
-			return material
-		# A bare wood block (built structure): recover one wood (mirrors place_block's consume → conserved).
+		# Foliage chops BLOCK-BY-BLOCK (Terraria/Minecraft), never flood-felling the whole tree on one hit —
+		# you carve a tree down trunk by trunk. Wood yields one wood per block (a built structure, e.g. the
+		# bazaar frame, behaves identically — mirrors place_block's consume, so conservation holds); leaves
+		# yield nothing. The whole-tree fell was removed (it read as "broke one block, the whole thing broke").
 		solid.erase(cell)
-		inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
-		total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
+		if material == &"wood":
+			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
+			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
 		_resettle_pile_above(cell)
 		return material
 	solid.erase(cell)
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
 	return material
-
-
-## Fell the tree containing `cell`: flood-fill the connected foliage (trunk + the 3-wide canopy), clear
-## it all, and return how many WOOD cells it held (leaves yield nothing). The fill stops at the ground
-## (earth isn't foliage) so it never eats terrain, and is capped so a pathological foliage mass can't run
-## away. Cleared cells become open air again (a tree has no wall behind it).
-## Is the connected foliage mass at `cell` an actual TREE (contains leaves), versus a bare wood structure
-## (the bazaar frame / a built wall)? Flood the connected foliage; true the instant a leaves cell is found.
-## Cheap, capped, and the discriminator that keeps placed wood from felling like a tree.
-func _foliage_has_leaves(cell: Vector2i) -> bool:
-	var seen: Dictionary = {}
-	var stack: Array[Vector2i] = [cell]
-	while not stack.is_empty() and seen.size() < _FELL_CAP:
-		var c: Vector2i = stack.pop_back()
-		if seen.has(c) or not _is_foliage(solid.get(c, &"")):
-			continue
-		seen[c] = true
-		if solid[c] == &"leaves":
-			return true
-		stack.append(c + Vector2i(1, 0))
-		stack.append(c + Vector2i(-1, 0))
-		stack.append(c + Vector2i(0, 1))
-		stack.append(c + Vector2i(0, -1))
-	return false
-
-
-const _FELL_CAP: int = 64
-func _fell_tree(cell: Vector2i) -> int:
-	var wood: int = 0
-	var seen: Dictionary = {}
-	var stack: Array[Vector2i] = [cell]
-	while not stack.is_empty() and seen.size() < _FELL_CAP:
-		var c: Vector2i = stack.pop_back()
-		if seen.has(c) or not _is_foliage(solid.get(c, &"")):
-			continue
-		seen[c] = true
-		if solid[c] == &"wood":
-			wood += 1
-		solid.erase(c)
-		stack.append(c + Vector2i(1, 0))
-		stack.append(c + Vector2i(-1, 0))
-		stack.append(c + Vector2i(0, 1))
-		stack.append(c + Vector2i(0, -1))
-	return wood
 
 
 ## Player action: PLACE a building-material block from the pack into an open cell (the Terraria build

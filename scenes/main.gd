@@ -18,7 +18,6 @@ extends Node2D
 
 const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
-const MINE_TIME: float = 0.12      ## seconds between mined cells while holding
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 ## Zoom levels cycled by Z (Terraria-style). Default is zoomed OUT so you see the world you're working in,
 ## not just your feet. Smaller = further out. _current_zoom() reads the active level everywhere.
@@ -31,9 +30,10 @@ const BUILD_MATERIALS: Array[StringName] = [&"wood"]
 ## How close (chebyshev cells, around a bazaar's centre) you must stand to craft machines — the Bazaar is
 ## the crafting hub (Minecraft crafting-table proximity). Away from it, the E screen shows the pack only.
 const BAZAAR_RADIUS: int = 3
-## Dev: start with a stocked pack (ore/ingots/machines) for testing. A static so the headless harness
-## can force a CLEAN start (it asserts exact counts) by setting MainView.dev_start = false before boot.
-static var dev_start: bool = true
+## Dev: start with a stocked pack (ore/ingots/machines) for testing. OFF by default — a new game now
+## begins REALISTICALLY (an empty pack but for the two starter tools), so the painful by-hand bootstrap
+## that motivates automation is the actual first experience. Flip on for quick build/automation testing.
+static var dev_start: bool = false
 
 var sim: FactorySim
 var _player: Player
@@ -47,7 +47,11 @@ var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); craft
                                     ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
 var _show_minimap: bool = false
 var _show_help: bool = false
-var _mine_cooldown: float = 0.0
+## Timed-mining (the friction): holding LMB CHARGES the aimed cell; it breaks when the charge reaches the
+## material's hardness (scaled by your best tool's speed). _mine_target tracks which cell is charging so
+## moving the cursor to a new block resets it. The charge fraction is pushed to the renderer (crack viz).
+var _mine_target: Vector2i = Vector2i(-999, -999)
+var _mine_charge: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
 ## The machines you can CRAFT (1/2 keys → craft one into the pack, spending ingots). The ore_vent (a
 ## SOURCE) is deliberately absent — you remain the ore source by hand (manual→automated pillar; see
@@ -266,6 +270,7 @@ func _seed_world() -> void:
 	_seed_starter_vein()
 	_seed_tutorial_tree()
 	_seed_tutorial_mineshaft()
+	_seed_starter_kit()
 	if dev_start:
 		_dev_seed_pack()
 
@@ -323,6 +328,16 @@ func _seed_tutorial_mineshaft() -> void:
 	sim.set_solid(Vector2i(c, SURFACE + 7), &"earth")            # rock floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
 	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
+
+
+## The STARTER TOOLS every new game begins with — a bad wooden pickaxe + a bad wooden axe (MiningRules
+## .STARTER_TOOLS). They're the ONLY things in a fresh pack: you need the pick to grind through rock to
+## ore and the axe to chop trees, and their badness (tier-1 speed) is what makes the early grind ache for
+## a drill. Spawned → counted as produced so conservation holds. Always seeded (independent of dev_start).
+func _seed_starter_kit() -> void:
+	for tool: StringName in MiningRules.STARTER_TOOLS:
+		sim.inventory[tool] = int(sim.inventory.get(tool, 0)) + 1
+		sim.total_produced[tool] = int(sim.total_produced.get(tool, 0)) + 1
 
 
 ## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
@@ -436,14 +451,38 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
 
+## Timed mining: holding LMB CHARGES the aimed block (time scaled by your best tool vs the rock's
+## hardness — docs/MINING.md). The block only breaks when the charge fills, so early hand-mining is a
+## deliberate grind (the friction that sells automation). The charge fraction drives the crack overlay.
+## (The wall-clock timing lives HERE; the tool-GATE lives in try_mine, the verb the play-harness drives.)
 func _update_mining(delta: float) -> void:
-	_mine_cooldown = maxf(0.0, _mine_cooldown - delta)
 	_aim = _effective_aim(get_global_mouse_position())
-	if _paused:
+	var holding: bool = not _paused and Input.is_action_pressed(Controls.MINE) \
+		and sim.is_solid(_aim) and _can_reach(_aim)
+	if not holding:
+		_mine_target = Vector2i(-999, -999)
+		_mine_charge = 0.0
+		if _renderer != null:
+			_renderer.set_mine_progress(Vector2i(-999, -999), 0.0)
 		return
-	if Input.is_action_pressed(Controls.MINE) and _mine_cooldown <= 0.0 \
-			and try_mine(_aim):
-		_mine_cooldown = MINE_TIME
+	var mat: StringName = sim.material_at(_aim)
+	if not MiningRules.can_mine(mat, sim.inventory):
+		# You lack the tool for this rock — no progress (a hint reads it as "you need a better pick").
+		_mine_target = _aim
+		_mine_charge = 0.0
+		_renderer.set_mine_progress(_aim, 0.0)
+		return
+	if _aim != _mine_target:                                  # moved to a fresh block → restart the charge
+		_mine_target = _aim
+		_mine_charge = 0.0
+	var cls: StringName = MiningRules.required_tool(mat)
+	var speed: float = MiningRules.best_speed(cls, sim.inventory) if cls != &"" else 1.0
+	_mine_charge += delta * speed
+	var hard: float = MiningRules.hardness(mat)
+	_renderer.set_mine_progress(_aim, clampf(_mine_charge / hard, 0.0, 1.0))
+	if _mine_charge >= hard:
+		_mine_charge = 0.0
+		try_mine(_aim)                                       # charge full → land the breaking blow
 
 
 ## Terraria-style mining reach: you don't have to land the cursor exactly on a reachable cell. When you
@@ -492,6 +531,8 @@ func try_mine(cell: Vector2i) -> bool:
 	if _paused or not _can_reach(cell) or not sim.is_solid(cell):
 		return false
 	var mat: StringName = sim.material_at(cell)
+	if not MiningRules.can_mine(mat, sim.inventory):
+		return false                                           # no tool for this rock — the gate the test drives
 	var mined: StringName = sim.mine(cell)
 	if mined != &"":
 		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 10)  # break-debris puff
@@ -509,8 +550,8 @@ func try_deposit() -> bool:
 	var sel: int = clampi(_inv_selected, 0, slots.size() - 1)
 	var item: StringName = slots[sel]["item"]
 	var carried: int = int(slots[sel]["count"])
-	if carried <= 0:
-		return false
+	if carried <= 0 or MiningRules.is_tool_item(item):
+		return false                                           # tools are equipment — never fed into a machine
 	for machine: MachineState in sim.machines:
 		if _can_reach(machine.cell):
 			return sim.deposit(machine.cell, item, carried) > 0

@@ -175,6 +175,10 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.55, 0.38, 0.22)
 	if item == &"coal":
 		return Color(0.24, 0.25, 0.29)        # dark slate-black — the generator's fuel
+	if item == &"wood_pickaxe":
+		return Color(0.62, 0.46, 0.30)        # starter tools — a wood-handle brown
+	if item == &"wood_axe":
+		return Color(0.70, 0.52, 0.32)
 	return Color.WHITE
 
 

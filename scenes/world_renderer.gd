@@ -48,6 +48,8 @@ var _aim_placeable: bool = false
 var _ghost_def: MachineDef = null
 var _ghost_material: StringName = &""                ## a building material selected for block placement
 var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
+var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mined (cracks drawn on it; pushed by MainView)
+var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block — the felt-friction read
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 
 var _terrain: LightLayer                             ## STATIC terrain/walls/surface — repainted only on terrain change, not per frame
@@ -110,6 +112,13 @@ func set_guide_targets(targets: Array[Dictionary]) -> void:
 	_guide_targets = targets
 
 
+## The controller pushes which block is being charge-mined and how far along (0..1) each frame, so the
+## renderer can spider cracks across it — the visible friction that says "this is taking effort". Cosmetic.
+func set_mine_progress(cell: Vector2i, frac: float) -> void:
+	_mine_cell = cell
+	_mine_frac = frac
+
+
 func _process(delta: float) -> void:
 	_anim_time += delta
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
@@ -144,8 +153,36 @@ func _draw() -> void:
 		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
 	if particles != null:
 		particles.draw(self)
+	_draw_mine_cracks()    # spider cracks on the block you're charge-mining (the felt friction)
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_aim()
+
+
+## Spider cracks across the block currently being charge-mined, growing with the break progress (pushed
+## via set_mine_progress) — so hand-mining reads as effortful work on a specific block, not an instant
+## pop. Deterministic crack angles per cell (no RNG) + a darkening overlay so the rock visibly weakens.
+func _draw_mine_cracks() -> void:
+	if _mine_frac <= 0.001 or not sim.is_solid(_mine_cell):
+		return
+	var pos := Vector2(_mine_cell) * float(CELL)
+	var center := pos + Vector2(CELL, CELL) * 0.5
+	draw_rect(Rect2(pos, Vector2(CELL, CELL)), Color(0.0, 0.0, 0.0, 0.22 * _mine_frac))  # weakening shade
+	var n: int = 2 + int(_mine_frac * 5.0)
+	# Light fractures (with a dark underlay) so they read on ANY material in the dark underground — the
+	# "this block is breaking" tell. Brighten + lengthen with the charge; a bright impact pip near full.
+	var shadow := Color(0.0, 0.0, 0.0, 0.45 * _mine_frac)
+	var crack := Color(0.92, 0.94, 1.0, 0.30 + 0.6 * _mine_frac)
+	var base_ang: float = float(_mine_cell.x) * 0.7 + float(_mine_cell.y) * 1.3
+	for i: int in n:
+		var ang: float = TAU * float(i) / float(n) + base_ang
+		var length: float = float(CELL) * (0.18 + 0.34 * _mine_frac)
+		var elbow := center + Vector2(cos(ang), sin(ang)) * length * 0.5
+		var tip := center + Vector2(cos(ang + 0.4), sin(ang + 0.4)) * length
+		draw_line(center, elbow, shadow, 3.0)
+		draw_line(elbow, tip, shadow, 3.0)
+		draw_line(center, elbow, crack, 1.5)
+		draw_line(elbow, tip, crack, 1.5)
+	draw_circle(center, 1.5 + 2.0 * _mine_frac, Color(1.0, 0.96, 0.85, 0.5 * _mine_frac))  # impact pip
 
 
 ## Painter for the STATIC terrain layer (the _terrain LightLayer at z -10): background walls, terrain

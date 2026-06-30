@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_lift()
 	_test_finite_deposit_and_drill()
 	_test_trees_and_wood()
+	_test_mining_rules()
 	_test_block_placement_and_bazaar()
 	_test_power_field()
 	_test_conduit_network()
@@ -566,8 +567,8 @@ func _test_finite_deposit_and_drill() -> void:
 
 
 ## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
-## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping any tree cell fells
-## the whole 1-wide tree and yields one wood per trunk cell, conserved.
+## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping is BLOCK-BY-BLOCK
+## (no whole-tree fell — docs/MINING.md), one wood per wood cell, leaves yield nothing, conserved.
 func _test_trees_and_wood() -> void:
 	print("- trees + wood")
 	# Generation stamps real trees on the surface.
@@ -590,22 +591,39 @@ func _test_trees_and_wood() -> void:
 	sim.set_solid(Vector2i(5, 2), &"leaves")
 	_check(sim.surface_row(5) == 5, "foliage is NOT the walkable surface — the ground row is (trees don't ramp)")
 	_check(sim.is_solid(Vector2i(5, 3)), "a trunk cell is solid (you collide with / can chop it)")
-	# Chop any cell → the whole tree falls, yielding one wood per trunk cell.
+	# Chop ONE trunk cell → only that block clears, the rest of the tree stands (block-by-block).
 	_check(sim.mine(Vector2i(5, 4)) == &"wood", "chopping a trunk cell returns wood material")
-	_check(int(sim.inventory.get(&"wood", 0)) == 2, "felling the tree yielded both trunk cells as wood")
-	_check(not sim.is_solid(Vector2i(5, 3)) and not sim.is_solid(Vector2i(5, 2)), "the whole tree is gone (no floating canopy)")
+	_check(int(sim.inventory.get(&"wood", 0)) == 1, "chopping one trunk cell yields exactly ONE wood (no flood-fell)")
+	_check(not sim.is_solid(Vector2i(5, 4)), "the chopped cell is now clear")
+	_check(sim.is_solid(Vector2i(5, 3)) and sim.is_solid(Vector2i(5, 2)), "the rest of the tree still stands")
+	# Chopping a leaf cell clears it but yields no wood.
+	_check(sim.mine(Vector2i(5, 2)) == &"leaves", "chopping a leaf returns leaves material")
+	_check(int(sim.inventory.get(&"wood", 0)) == 1, "leaves yield no wood")
 	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives")
 	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")
 
-	# PLACED wood (a structure with no leaves, e.g. the bazaar frame) is NOT a tree: mining one block
-	# removes only that block (no flood-fell), so chopping near a built bazaar can't collapse it.
-	var s2: FactorySim = FactorySim.new()
-	for c: Vector2i in [Vector2i(2, 2), Vector2i(3, 2), Vector2i(2, 3), Vector2i(3, 3)]:
-		s2.set_solid(c, &"wood")                       # a bare 2×2 wood structure — no leaves
-	_check(s2.mine(Vector2i(2, 2)) == &"wood", "mining built wood returns wood")
-	_check(int(s2.inventory.get(&"wood", 0)) == 1, "mining built wood yields exactly ONE block, not a flood")
-	_check(s2.is_solid(Vector2i(3, 2)) and s2.is_solid(Vector2i(2, 3)) and s2.is_solid(Vector2i(3, 3)),
-		"the rest of the structure stands (no tree-fell on placed wood)")
+
+## Manual-mining friction rules (docs/MINING.md): the GATE (own a tool that breaks this) and the felt
+## time (hardness / tool speed). Pure static logic, no sim — the same table the controller + try_mine use.
+func _test_mining_rules() -> void:
+	print("- mining rules (tools + friction)")
+	var bare: Dictionary = {}
+	var pick: Dictionary = {&"wood_pickaxe": 1}
+	var axe: Dictionary = {&"wood_axe": 1}
+	var kit: Dictionary = {&"wood_pickaxe": 1, &"wood_axe": 1}
+	# Gate: rock needs a pick, wood needs an axe, dirt is hand-mineable.
+	_check(not MiningRules.can_mine(&"stone", bare), "can't crack stone bare-handed")
+	_check(MiningRules.can_mine(&"stone", pick), "the pickaxe cracks stone")
+	_check(not MiningRules.can_mine(&"wood", pick), "a pickaxe can't chop wood (needs an axe)")
+	_check(MiningRules.can_mine(&"wood", axe), "the axe chops wood")
+	_check(MiningRules.can_mine(&"earth", bare), "dirt is always hand-mineable")
+	_check(MiningRules.can_mine(&"ore", kit), "the starter kit can mine ore")
+	# Friction: harder rock takes longer; no tool = unbreakable (INF); deepslate out-grinds stone.
+	_check(MiningRules.mine_seconds(&"stone", bare) == INF, "no pick → stone never breaks")
+	_check(MiningRules.mine_seconds(&"stone", pick) > 0.0, "with a pick stone takes finite time")
+	_check(MiningRules.mine_seconds(&"deepslate", pick) > MiningRules.mine_seconds(&"stone", pick),
+		"deepslate is a harder grind than stone")
+	_check(MiningRules.is_tool_item(&"wood_pickaxe") and not MiningRules.is_tool_item(&"ore"), "tools are distinguished from resources")
 
 
 ## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).

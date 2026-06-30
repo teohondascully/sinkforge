@@ -230,8 +230,8 @@ func _step_smelt(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
 
 
-## Step 3 — chop a tree for wood (the bazaar's build material). Fell the base of the nearest tree; one
-## hit fells the whole tree into wood.
+## Step 3 — chop a tree for wood (the bazaar's build material). Chop one trunk block of the nearest tree
+## (block-by-block now — docs/MINING.md); one wood is enough to claim the bazaar.
 func _step_wood(agent: PlayAgent) -> bool:
 	var base: Vector2i = _nearest_tree_base(agent)
 	if base.x < 0:
