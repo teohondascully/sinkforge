@@ -33,27 +33,28 @@ const TUNNEL_RADIUS: int = 1
 # --- ore ---
 ## Vein-seed attempts ≈ this × columns. Each is accepted by a depth-weighted roll, so most surviving
 ## veins land deep — the band. Tuned to a touch richer overall than the old flat 0.3/col scatter.
-const ORE_ATTEMPTS_PER_COL: float = 1.6
+const ORE_ATTEMPTS_PER_COL: float = 0.9
 ## A vein seed at the very bottom is accepted this often; at the surface, ~0. Linear in depth.
 const ORE_CHANCE_DEEP: float = 0.85
-## Vein size grows from this many cells (shallow) toward +ORE_SIZE_DEPTH_BONUS (deep) — richer down low.
-const ORE_SIZE_MIN: int = 2
-const ORE_SIZE_DEPTH_BONUS: int = 6
+## Vein BODY size (cells in the accretion blob) grows from this (shallow) toward +BONUS (deep) — deeper =
+## fatter bodies you can array more drills across. Big enough to be a real patch, not a fleck.
+const ORE_SIZE_MIN: int = 8
+const ORE_SIZE_DEPTH_BONUS: int = 44
 ## COAL veins — the drill's FUEL (docs/MINING.md). Mined the same cavity way as ore; a touch more common
 ## and a bit shallower-reaching than ore (you need a steady coal supply once you automate), still depth-banded.
-const COAL_ATTEMPTS_PER_COL: float = 1.2
+const COAL_ATTEMPTS_PER_COL: float = 0.8
 const COAL_CHANCE_DEEP: float = 0.95
-const COAL_SIZE_MIN: int = 2
-const COAL_SIZE_DEPTH_BONUS: int = 5
-const COAL_AMOUNT_BASE: int = 200        # Factorio-scale (hundreds shallow → thousands deep), like ore
-const COAL_AMOUNT_DEPTH_BONUS: int = 2300
-## Per-cell ore-block CHUNK (the drillable deposit one block exposes; the cavity model, docs/MINING.md).
-## Hand-mining the block pockets a 3-6 loose burst AND exposes this whole chunk as a wall deposit a Drill
-## runs on. Factorio-scale + depth-scaled: a shallow cell ~BASE (HUNDREDS), a bottom-of-world cell ~BASE+BONUS
-## (THOUSANDS — a fat patch a Drill mines for a very long time; deeper = richer = the automation pull). Same
-## depth_frac as vein size/chance.
-const ORE_AMOUNT_BASE: int = 250
-const ORE_AMOUNT_DEPTH_BONUS: int = 2750
+const COAL_SIZE_MIN: int = 6
+const COAL_SIZE_DEPTH_BONUS: int = 30
+const COAL_AMOUNT_BASE: int = 30         # modest PER-CELL (the drill bores cell by cell); big BODIES give the
+const COAL_AMOUNT_DEPTH_BONUS: int = 170 # long-lasting TOTAL (hundreds shallow → thousands deep per body)
+## Per-CELL ore deposit (docs/MINING.md). MODEST now (the boring Drill drains a cell then sinks to the next,
+## so a huge per-cell number would pin the drill on one cell forever); the LONG-LASTING supply comes from the
+## fat multi-cell BODY (ORE_SIZE_*): body total = cells × per-cell ≈ hundreds shallow → thousands deep, the
+## Factorio patch that feeds a drill ARRAY for a long time (deeper = richer = the automation pull). Same
+## depth_frac as body size/chance.
+const ORE_AMOUNT_BASE: int = 30
+const ORE_AMOUNT_DEPTH_BONUS: int = 170
 
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
@@ -197,19 +198,27 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator) -> void:
 		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, &"coal")
 
 
-## Grow one vein as a random-walk blob from a seed cell, converting solid rock to `material` as it wanders.
-## Each converted cell is stamped with the vein's depth-scaled `richness` (its finite deposit amount).
+## Grow one vein as a compact ACCRETION BLOB (not a thin random walk): repeatedly fill a random frontier
+## cell and add its rock neighbours, so the body comes out fat + contiguous — a real ore BODY you can line
+## the top of with a row of drills, each boring its own column down through it (the scaling supply loop).
+## Every converted cell carries the vein's depth-scaled `richness` (its finite per-cell deposit).
 func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int, material: StringName = &"ore") -> void:
-	var cell: Vector2i = seed_cell
-	for _step: int in size:
+	var filled: Dictionary = {}
+	var frontier: Array[Vector2i] = [seed_cell]
+	var placed: int = 0
+	while placed < size and not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
+		if filled.has(cell) or not world.in_bounds(cell):
+			continue
 		var here: StringName = world.blocks.get(cell, &"")
-		if here == &"earth" or here == &"stone" or here == &"deepslate":
-			world.blocks[cell] = material
-			world.amounts[cell] = richness
-		var dir: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][rng.randi_range(0, 3)]
-		cell += dir
-		if not world.in_bounds(cell):
-			break
+		if here != &"earth" and here != &"stone" and here != &"deepslate":
+			continue                                # only replace SOLID rock (never fill a carved cave)
+		world.blocks[cell] = material
+		world.amounts[cell] = richness
+		filled[cell] = true
+		placed += 1
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			frontier.append(cell + d)
 
 
 ## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,
