@@ -41,6 +41,11 @@ const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (th
 ## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
 const MAX_STEP: float = CELL * 1.3
 const MAX_DROP: float = CELL * 1.3
+## Physics integrates in chunks no larger than this, so a big frame delta — the fast-forward game clock
+## (Engine.time_scale > 1) or a real frame-drop — can't let the body skip past a tile between collision
+## resolves (tunnel). At time_scale 1 a normal 1/60 frame is a single substep, so play feel is unchanged;
+## only large deltas split. Matches the sim's own fixed-tick discipline (a step is a step).
+const MAX_SUBSTEP: float = 1.0 / 60.0
 
 var sim: FactorySim                  ## set by MainView; read-only use (collision queries)
 ## When true (normal play) the controller samples the keyboard. The harness sets it false and
@@ -77,7 +82,13 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
-	_step(delta)
+	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
+	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
+	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
+	var remaining: float = delta
+	while remaining > 0.0:
+		_step(minf(remaining, MAX_SUBSTEP))
+		remaining -= MAX_SUBSTEP
 	queue_redraw()
 
 
@@ -103,7 +114,6 @@ func note_dig(face: int) -> void:
 
 ## One physics step: horizontal (with slope follow) then vertical, each integrated and collided.
 func _step(delta: float) -> void:
-	landed_hard = false
 	# Accelerate toward the input target / rub off speed with friction — not instant (which reads stiff).
 	if input_dir != 0.0:
 		velocity.x = move_toward(velocity.x, input_dir * RUN_SPEED, ACCEL * delta)
