@@ -327,11 +327,11 @@ func _seed_tutorial_coal() -> void:
 		sim.deposits[cell] = 200                                   # a hundreds-scale coal patch — fuels the drill for a long time
 
 
-## A guaranteed TUTORIAL TREE on the surface, RIGHT of spawn — the wood source the bazaar step needs
-## (depth-banded worldgen plants trees out past the ruin, unreachable on the surface early; and a solid
-## tree ON the path would wall it — trunk blocks the torso, canopy blocks a jump). Placed left of spawn it
-## is an ENDPOINT: the body walks to it, chops from beside it, and the whole rightward tutorial path
-## (vein → mineshaft → bazaar) stays clear. Crowned with leaves so it reads + fells as a real tree.
+## A guaranteed TUTORIAL TREE on the surface between spawn and the shaft — the wood source the bazaar step
+## needs (depth-banded worldgen plants trees out past the ruin, unreachable on the surface early). Trees are
+## Terraria-style WALK-THROUGH (Player._blocked passes wood/leaves), so the trunk sitting on the tutorial
+## path is fine — the body strolls through it and chops it in passing, no walling even for the taller body.
+## Crowned with leaves so it reads + fells as a real tree.
 const TUTORIAL_TREE_COL := 51
 func _seed_tutorial_tree() -> void:
 	var g: int = sim.surface_row(TUTORIAL_TREE_COL)               # ground top row (solid at g); trunk above it

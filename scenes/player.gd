@@ -20,9 +20,12 @@ extends Node2D
 ## intended by the harness (tools/measure_player.gd) and tuned by taste — see docs/HARNESS.md.
 
 const CELL: int = 32
-## Body AABB (smaller than a cell so it fits through 1-wide dug tunnels later).
-const WIDTH: float = 18.0
-const HEIGHT: float = 26.0
+## Body AABB. A real PERSON, not a sub-tile slab: ~1.4 tiles tall so it MATCHES the 32×48 miner sprite
+## (feet-anchored; the hardhat crown overhangs the top a touch) and reads as embodied — and, being taller
+## than a cell, it needs TWO tiles of clearance to stand, so a 1-tall gap is an honest squeeze you must dig
+## out (Terraria-ish), not a crawlspace. WIDTH stays under a cell so it still fits down a 1-wide dug shaft.
+const WIDTH: float = 20.0
+const HEIGHT: float = 44.0
 
 ## --- feel constants (placeholder; harness measures these vs intent) ---
 const RUN_SPEED: float = 150.0       ## px/s horizontal top speed
@@ -137,7 +140,7 @@ func _step(delta: float) -> void:
 	position.x += velocity.x * delta
 	var glided: bool = false
 	if grounded and velocity.y >= 0.0 and sim.ramp_dir(_cell_of(position).x) != 0:
-		glided = _follow_slope()
+		glided = _follow_slope(delta)
 	_step_grounded = grounded          # let the horizontal resolve auto-step ≤1-tile walls when grounded
 	_stepped = false
 	_resolve_axis(true)
@@ -176,7 +179,7 @@ func _step(delta: float) -> void:
 ## higher of the two — but only within one tile of rise (taller = a wall, left for the resolve to
 ## block) or drop (bigger = a real fall, left for gravity). Climbs are rejected if the new position
 ## would push the head into a ceiling (a tight gap is a wall, not a step).
-func _follow_slope() -> bool:
+func _follow_slope(delta: float) -> bool:
 	var rect: Rect2 = _aabb()
 	# The box rests on the HIGHEST ground under its footprint — sample both bottom corners + centre.
 	var target: float = minf(_surface_y(rect.position.x + 1.0),
@@ -191,6 +194,12 @@ func _follow_slope() -> bool:
 		if _blocked(_cell_of(Vector2(rect.position.x + 1.0, top_y))) \
 				or _blocked(_cell_of(Vector2(rect.end.x - 1.0, top_y))):
 			return false
+		# Cap the per-frame UPWARD glide to what horizontal travel warrants (a 45° ramp rises ≈ as fast as
+		# you walk) plus a small crest allowance. Without this, MOUNTING a ramp (where the sampled surface
+		# jumps a tile as the leading foot crosses into the higher column) is a one-frame pop — worse the
+		# taller the body. Clamping keeps the climb a smooth glide at ANY body size (guarded by check_stepup).
+		var max_rise: float = absf(velocity.x) * delta + 3.0
+		ny = maxf(ny, position.y - max_rise)   # limit this frame's rise (position.y is the current centre)
 	position.y = ny
 	return true
 
@@ -271,10 +280,14 @@ func _blocked(cell: Vector2i) -> bool:
 		return true
 	if cell.y < 0:
 		return false
-	# The bazaar is a walk-THROUGH stall: pass through its wood frame (you enter the shop), but everything
-	# else solid — including the bazaar's own interior floor — still blocks. Machines block too.
-	if sim.is_solid(cell) and not sim.is_bazaar_frame_cell(cell):
-		return true
+	# WOOD + LEAVES are Terraria-style walk-THROUGH: tree trunks and foliage never wall the body (you pass
+	# them and chop them), and the bazaar's wood frame is a shop you ENTER — one rule covers both. Its earth
+	# interior floor is NOT wood, so it still blocks (you stand inside). Everything else solid blocks; a body
+	# taller than a tile would otherwise be walled by any surface trunk it can't duck under. Machines block.
+	if sim.is_solid(cell):
+		var m: StringName = sim.material_at(cell)
+		if m != &"wood" and m != &"leaves":
+			return true
 	return sim.machine_at(cell) != null
 
 
