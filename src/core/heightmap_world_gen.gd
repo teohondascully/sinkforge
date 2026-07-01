@@ -7,8 +7,11 @@ extends WorldGen
 ## proves extending generation is a localized change), and seeded ore veins scattered in the rock.
 ## Walls are filled in Slice 3. Deterministic in (cols, rows, seed) via a seeded RNG.
 
-## Spawn/forge region (columns <= this) is kept flat so the player + harness have stable ground.
-const FLAT_COLS: int = 8
+## The spawn cluster sits on a flat plateau CENTRED on the map (cols [FLAT_START, FLAT_END]) so the
+## player-follow camera frames the base in the middle of the screen — not jammed against the left edge
+## with everything shifted right. Gentle layered-sine hills roll away on both sides. Harness-stable ground.
+const FLAT_START: int = 30
+const FLAT_END: int = 66
 ## The surface sits well DOWN the world so a tall SKY band fills the space above it — the camera, centred
 ## on the body, then frames the player in the middle of the screen (Terraria) instead of jamming them at
 ## the top against the limit. Everything below is underground; the rows above (0..FLAT_SURFACE_ROW-1) are sky.
@@ -59,7 +62,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 ## beyond (so steps render as smooth diagonal slopes). Seed-independent for now — a future generator
 ## can make the surface seeded; the seam already supports it.
 func _surface_row(col: int) -> int:
-	if col <= FLAT_COLS:
+	if col >= FLAT_START and col <= FLAT_END:
 		return FLAT_SURFACE_ROW
 	# Gentle layered-sine hills around the flat surface row (so steps render as smooth diagonal slopes).
 	var h: float = float(FLAT_SURFACE_ROW) - 2.2 * sin(float(col) * 0.30) - 1.1 * sin(float(col) * 0.11 + 1.7)

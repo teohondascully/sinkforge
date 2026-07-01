@@ -31,6 +31,7 @@ const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full
 ## so determinism is untouched and it can never desync.
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
+const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine (docs/MINING.md)
 const POWER_AURA: int = 2               ## innate radius (cells) a generator powers WITHOUT any conduit
 ## CONDUITS carry power further than the aura — DOWN + LATERAL, never UP (a U-shape delivers as an L).
 ## That "no up" rule makes the network acyclic top-to-bottom, so the field resolves in a SINGLE downward
@@ -64,6 +65,9 @@ var deposits: Dictionary = {}
 ## Drill placed on that open cell drains the pool, ejecting ore down its column until it runs dry. Also a
 ## latent pool (conservation-neutral); the ore is total_produced only as the drill actually extracts it.
 var ore_deposits: Dictionary = {}
+## What each exposed deposit YIELDS (cell -> item, &"ore"/&"coal"). Set when the block is mined, read by the
+## Drill so it ejects the right material — so a drill on a coal cavity makes coal, on an ore cavity makes ore.
+var deposit_item: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -210,6 +214,7 @@ func load_world(world: WorldData) -> void:
 	wall.clear()
 	deposits.clear()
 	ore_deposits.clear()
+	deposit_item.clear()
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
 			solid[cell] = world.blocks[cell]
@@ -229,20 +234,22 @@ func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
 	var material: StringName = solid[cell]
-	if material == &"ore":
-		# CAVITY model (docs/MINING.md): one strike breaks the whole ore BLOCK. You pocket a juicy BURST
-		# (3-8, capped by the vein's richness), the block clears (wall kept), and any RICHNESS left over is
-		# revealed as a glittering wall DEPOSIT a drill can tap. Thin surface veins are a pure hand-grab (no
-		# remainder → no deposit); deep rich veins leave a big deposit to automate (deeper = richer).
+	if _is_ore_like(material):
+		# CAVITY model (docs/MINING.md): one strike breaks the whole ORE-LIKE block (ore or coal — both drop
+		# their own item the same way). You pocket a juicy BURST (3-8, capped by the vein's richness), the
+		# block clears (wall kept), and any RICHNESS left over is revealed as a glittering wall DEPOSIT a
+		# drill can tap (it remembers the material via deposit_item). Thin surface veins are a pure hand-grab
+		# (no remainder → no deposit); deep rich veins leave a big deposit to automate (deeper = richer).
 		var richness: int = int(deposits.get(cell, 1))
 		var burst: int = mini(richness, _ore_burst(cell))
-		inventory[&"ore"] = int(inventory.get(&"ore", 0)) + burst
-		total_produced[&"ore"] = int(total_produced.get(&"ore", 0)) + burst
+		inventory[material] = int(inventory.get(material, 0)) + burst
+		total_produced[material] = int(total_produced.get(material, 0)) + burst
 		deposits.erase(cell)
 		solid.erase(cell)
 		var remainder: int = richness - burst
 		if remainder > 0:
 			ore_deposits[cell] = remainder
+			deposit_item[cell] = material
 		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
@@ -256,7 +263,12 @@ func mine(cell: Vector2i) -> StringName:
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
 		_resettle_pile_above(cell)
 		return material
+	# Plain terrain (earth/stone/deepslate): Terraria dig-and-carry — pocket the block as a placeable item
+	# so you can re-place it to bridge a gap, backfill, or PILLAR out of a hole. Produced from the world +
+	# consumed on placement (place_block) → conservation holds, symmetric with mining a placed block back.
 	solid.erase(cell)
+	inventory[material] = int(inventory.get(material, 0)) + 1
+	total_produced[material] = int(total_produced.get(material, 0)) + 1
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
 	return material
 
@@ -415,6 +427,12 @@ func near_bazaar(cell: Vector2i, radius: int) -> bool:
 		if absi(c.x - cell.x) <= radius and absi(c.y - cell.y) <= radius:
 			return true
 	return false
+
+
+## Materials that mine as a "vein" (cavity model): a hand-burst + a drillable wall deposit, dropping their
+## own item. Ore and coal both. (Coal is mined the same painful way → the demand-web, docs/MINING.md.)
+func _is_ore_like(material: StringName) -> bool:
+	return material == &"ore" or material == &"coal"
 
 
 ## The hand-mined BURST size for an ore cell — a juicy 3-8, deterministic per cell (a stable hash, no RNG
@@ -764,22 +782,37 @@ func _run_drill(machine: MachineState) -> void:
 	var pool: int = int(ore_deposits.get(machine.cell, 0))
 	if pool <= 0:
 		return                          # not on an exposed deposit — idle, hold progress
+	# FUEL: the drill burns COAL to run (the demand-web — automating ore creates demand for coal). Burn one
+	# tick of the current coal; when it's spent, refuel from the coal in its input buffer. No fuel + no coal
+	# → the drill goes quiet (idle, holds progress) until you feed it more coal.
+	if machine.fuel <= 0:
+		if int(machine.input_buffer.get(&"coal", 0)) > 0:
+			var left: int = int(machine.input_buffer[&"coal"]) - 1
+			if left > 0:
+				machine.input_buffer[&"coal"] = left
+			else:
+				machine.input_buffer.erase(&"coal")
+			total_consumed[&"coal"] = int(total_consumed.get(&"coal", 0)) + 1
+			machine.fuel = DRILL_FUEL_TICKS
+		else:
+			return                      # out of fuel, no coal → idle ("feed me coal")
+	machine.fuel -= 1
 	machine.progress += SECONDS_PER_TICK
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
+	var item: StringName = StringName(deposit_item.get(machine.cell, &"ore"))   # the deposit's own material
 	pool -= 1
 	if pool > 0:
 		ore_deposits[machine.cell] = pool
 	else:
 		ore_deposits.erase(machine.cell)   # deposit spent — drill idles next cycle
-	# Eject the freed ore DOWN the drill's own column, where gravity carries it to a forge/collection.
-	for item: StringName in recipe.outputs:
-		var n: int = int(recipe.outputs[item])
-		total_produced[item] = int(total_produced.get(item, 0)) + n
-		var dest: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
-		dest["target"][item] = int(dest["target"].get(item, 0)) + n
-		flow_events.append({"item": item, "from": machine.cell, "to": dest["to_cell"], "count": n})
+		deposit_item.erase(machine.cell)
+	# Eject the freed material DOWN the drill's own column, where gravity carries it to a forge/collection.
+	total_produced[item] = int(total_produced.get(item, 0)) + 1
+	var dest: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
+	dest["target"][item] = int(dest["target"].get(item, 0)) + 1
+	flow_events.append({"item": item, "from": machine.cell, "to": dest["to_cell"], "count": 1})
 
 
 ## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;

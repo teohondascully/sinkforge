@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_layered_worldgen()
 	_test_lift()
 	_test_finite_deposit_and_drill()
+	_test_coal_and_fuel()
 	_test_trees_and_wood()
 	_test_mining_rules()
 	_test_block_placement_and_bazaar()
@@ -548,6 +549,7 @@ func _test_finite_deposit_and_drill() -> void:
 	_check(pool > 0, "mining the rich block exposed a drillable deposit (%d)" % pool)
 	var drill: MachineState = s2.place_machine(drill_def, ore)   # cap the cavity (now an open cell)
 	_check(drill != null and drill.def.behavior == &"drill", "placed a drill on the cavity")
+	drill.input_buffer[&"coal"] = pool                 # fuel it generously (the drill burns coal to run)
 	for _i: int in 100 + pool * 25:                    # plenty of ticks to drain the whole pool
 		s2.tick()
 	_check(s2.ore_deposit_at(ore) == 0, "the drill drained the deposit dry")
@@ -559,6 +561,55 @@ func _test_finite_deposit_and_drill() -> void:
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
 
 
+## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:
+## no coal → it idles; fed coal → it runs and burns the coal. A drill on a COAL deposit yields coal.
+func _test_coal_and_fuel() -> void:
+	print("- coal mining + drill fuel")
+	# Coal mines via the cavity model: a 3-8 COAL burst + a coal deposit that remembers it yields coal.
+	var sim: FactorySim = FactorySim.new()
+	var cc := Vector2i(3, 4)
+	sim.set_solid(cc, &"coal"); sim.deposits[cc] = 12
+	sim.mine(cc)
+	var cb: int = int(sim.inventory.get(&"coal", 0))
+	_check(cb >= 3 and cb <= 8, "mining coal drops a 3-8 coal burst (got %d)" % cb)
+	_check(sim.ore_deposit_at(cc) == 12 - cb, "coal leaves a drillable deposit")
+	_check(StringName(sim.deposit_item.get(cc, &"")) == &"coal", "the deposit remembers it yields coal")
+	_check(_items_present(sim, &"coal") == int(sim.total_produced.get(&"coal", 0)), "coal conserved")
+
+	# The drill is FUEL-GATED: on an ore deposit with NO coal it produces nothing; fed coal it runs + burns it.
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var s2: FactorySim = FactorySim.new()
+	var ore := Vector2i(8, 5)
+	s2.set_solid(ore, &"ore"); s2.deposits[ore] = 20
+	s2.set_solid(Vector2i(8, 8), &"stone")
+	s2.mine(ore)
+	var pool: int = s2.ore_deposit_at(ore)
+	var d: MachineState = s2.place_machine(drill_def, ore)
+	var base: int = int(s2.total_produced.get(&"ore", 0))
+	for _i: int in 80:
+		s2.tick()
+	_check(int(s2.total_produced.get(&"ore", 0)) == base, "an UNFUELED drill produces nothing (needs coal)")
+	_check(s2.ore_deposit_at(ore) == pool, "the deposit is untouched without coal")
+	d.input_buffer[&"coal"] = 10
+	for _i: int in 200:
+		s2.tick()
+	_check(int(s2.total_produced.get(&"ore", 0)) > base, "fed coal, the drill pulls ore")
+	_check(int(s2.total_consumed.get(&"coal", 0)) > 0, "the drill burned coal to run")
+
+	# Material-aware: a drill on a COAL deposit produces COAL (so coal can be automated too).
+	var s3: FactorySim = FactorySim.new()
+	var coalcell := Vector2i(4, 5)
+	s3.set_solid(coalcell, &"coal"); s3.deposits[coalcell] = 20
+	s3.set_solid(Vector2i(4, 8), &"stone")
+	s3.mine(coalcell)
+	var d3: MachineState = s3.place_machine(drill_def, coalcell)
+	d3.input_buffer[&"coal"] = 5
+	var coal_before: int = int(s3.total_produced.get(&"coal", 0))
+	for _i: int in 200:
+		s3.tick()
+	_check(int(s3.total_produced.get(&"coal", 0)) > coal_before, "a drill on a COAL deposit produces coal (material-aware)")
+
+
 ## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
 ## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping is BLOCK-BY-BLOCK
 ## (no whole-tree fell — docs/MINING.md), one wood per wood cell, leaves yield nothing, conserved.
@@ -566,7 +617,9 @@ func _test_trees_and_wood() -> void:
 	print("- trees + wood")
 	# Generation stamps real trees on the surface.
 	var gen := LayeredWorldGen.new()
-	var world: WorldData = gen.generate(72, 40, 1337)
+	# Generate at the REAL world size — worldgen trees start past the centred plateau (FLAT_END), so an
+	# undersized test world leaves them no room; this asserts against the dimensions the game actually ships.
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337)
 	var wood_cells: int = 0
 	var leaf_cells: int = 0
 	for cell: Vector2i in world.blocks:
@@ -775,7 +828,8 @@ func _test_automated_line() -> void:
 	sim.place_machine(proc_def, Vector2i(col, 5))            # forge directly below the cavity (catches the drill's fall)
 	sim.set_solid(Vector2i(col, 7), &"stone")               # floor under the forge's output gap (row 6)
 	sim.mine(ore)                                            # hand-mine the block → exposes the deposit
-	sim.place_machine(drill_def, ore)                       # cap the cavity — the player does NOTHING after this
+	var line_drill: MachineState = sim.place_machine(drill_def, ore)   # cap the cavity
+	line_drill.input_buffer[&"coal"] = 30                   # fuel it (the drill burns coal); player does NOTHING after
 	for _i: int in 600:
 		sim.tick()
 	var ingots: int = int(sim.total_produced.get(&"ingot", 0))

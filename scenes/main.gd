@@ -26,7 +26,7 @@ var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
 ## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
 ## bazaar build material; the list grows as more buildables land (log/stone/etc).
-const BUILD_MATERIALS: Array[StringName] = [&"wood"]
+const BUILD_MATERIALS: Array[StringName] = [&"wood", &"earth", &"stone", &"deepslate"]
 ## How close (chebyshev cells, around a bazaar's centre) you must stand to craft machines — the Bazaar is
 ## the crafting hub (Minecraft crafting-table proximity). Away from it, the E screen shows the pack only.
 const BAZAAR_RADIUS: int = 3
@@ -95,7 +95,7 @@ func _ready() -> void:
 
 	_player = Player.new()
 	_player.sim = sim
-	_player.position = _cell_center(Vector2i(3, SURFACE - 2))  # just above the surface, near the forge (falls onto it)
+	_player.position = _cell_center(Vector2i(SPAWN_COL, SURFACE - 2))  # just above the centred plateau (falls onto it)
 	_player.z_index = 60  # above the light layers (50/51) so the miner stays crisp inside his lamp pool
 	add_child(_player)
 
@@ -259,16 +259,29 @@ func _make_mote_texture() -> GradientTexture2D:
 ## The flat spawn surface row — every spawn-side fixture (mineshaft, vein, tree, forge) is placed relative
 ## to it, so pushing the surface down for sky moves them all together. Mirrors HeightmapWorldGen's constant.
 const SURFACE := HeightmapWorldGen.FLAT_SURFACE_ROW
-const MINESHAFT_COL: int = 8
-const MINESHAFT_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE)       ## bootstrap forge at the shaft mouth — HAND-fed (toss ore down)
-const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)   ## the rich ore block: hand-mine it → cavity+deposit → cap with the Drill
-const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 3)        ## the AUTO line's forge — directly below the drill, catches its fall
+## The spawn cluster is laid out on the map-centred plateau so the two BLOCKING endpoints sit on OPPOSITE
+## sides of the hand-work and are each approached from the SPAWN side — neither ever traps the body:
+##   BAZAAR (cols 40-43) is the LEFT endpoint, claimed from its RIGHT post (col 44) so completing it never
+##     walls the body off from the shaft; the open SHAFT (col 56) is the RIGHT endpoint, only ever reached
+##     from its left edge (col 55). Everything between is benign to walk (dug vein, step-over forge, coal-on-top).
+##   The TREE (col 51) is FULLY felled for wood before the rightward shaft trip, so it leaves no blocking stump.
+##   col 40-43 BAZAAR ruin · col 46 FORGE · cols 47-48 VEIN · col 49 SPAWN · col 51 TREE · col 54 COAL · col 56 SHAFT
+const SPAWN_COL: int = 49
+const MINESHAFT_COL: int = 56
+const MINESHAFT_FORGE_CELL := Vector2i(46, SURFACE)                  ## bootstrap forge — a shallow SURFACE pocket (toss ore in from col 45, collect ingots below). OFF the shaft so it stays an open drop.
+## REACH INVARIANT: the ore/drill cell sits at SURFACE+1 (not deeper) so the body operates the whole shaft
+## from the surface EDGE (col 55) with a comfortable reach margin — it hand-mines the ore, caps it with the
+## drill, and tosses coal down the mouth all WITHOUT entering the pit. Placing it at SURFACE+2 left only a
+## ~4px reach margin, tipping the body into the shaft where it got trapped (the old fuel-step dead-end).
+const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## the rich ore block: hand-mine it → cavity+deposit → cap with the Drill
+const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)        ## the AUTO line's forge — directly below the drill, catches its fall
 const MINESHAFT_ORE_RICHNESS: int = 24                               ## rich enough that a hand-burst leaves a fat deposit to drill
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
 	sim.load_world(world)
 	_seed_starter_vein()
+	_seed_tutorial_coal()
 	_seed_tutorial_tree()
 	_seed_tutorial_mineshaft()
 	_seed_starter_kit()
@@ -282,19 +295,31 @@ func _seed_world() -> void:
 ## as a deposit (the drill model: ore comes in chunks) yet mining it leaves only a SHALLOW (1-tile) trench
 ## you step straight out of — a 2-deep pit would trap the body (step-up climbs one tile). Distinct column
 ## from the mineshaft so hand-mining never eats the drill's chunk.
-const STARTER_VEIN_CELL := Vector2i(4, SURFACE)
+const STARTER_VEIN_CELL := Vector2i(47, SURFACE)
 func _seed_starter_vein() -> void:
-	for cell: Vector2i in [Vector2i(4, SURFACE), Vector2i(5, SURFACE), Vector2i(6, SURFACE)]:
+	for cell: Vector2i in [Vector2i(47, SURFACE), Vector2i(48, SURFACE)]:   # just left of spawn (49), right of the forge pocket (46)
 		sim.set_solid(cell, &"ore")
-		sim.deposits[cell] = 3                                     # 9 ore total — plenty to bootstrap (need ~4)
+		sim.deposits[cell] = 3                                     # ~6 ore (burst 3 each) — plenty to bootstrap (need ~4)
 
 
-## A guaranteed TUTORIAL TREE on the surface, LEFT of spawn — the wood source the bazaar step needs
+## A guaranteed surface COAL block between the shaft and the bazaar — the drill's FUEL (docs/MINING.md).
+## Once you cap the deposit with a drill, it won't run without coal; this is the "go mine coal" target that
+## closes the demand-web. Placed at col 54 — one left of the shaft's edge (55) on the rightward path, so
+## mining it then tossing coal down the open shaft (56) is a short step. Rich enough that one hand-burst
+## (3-8) fuels the drill well past its deposit.
+const TUTORIAL_COAL_CELLS: Array[Vector2i] = [Vector2i(54, SURFACE)]
+func _seed_tutorial_coal() -> void:
+	for cell: Vector2i in TUTORIAL_COAL_CELLS:
+		sim.set_solid(cell, &"coal")
+		sim.deposits[cell] = 10                                    # hand-burst of 3-8 coal — plenty to fuel the drill
+
+
+## A guaranteed TUTORIAL TREE on the surface, RIGHT of spawn — the wood source the bazaar step needs
 ## (depth-banded worldgen plants trees out past the ruin, unreachable on the surface early; and a solid
 ## tree ON the path would wall it — trunk blocks the torso, canopy blocks a jump). Placed left of spawn it
 ## is an ENDPOINT: the body walks to it, chops from beside it, and the whole rightward tutorial path
 ## (vein → mineshaft → bazaar) stays clear. Crowned with leaves so it reads + fells as a real tree.
-const TUTORIAL_TREE_COL := 1
+const TUTORIAL_TREE_COL := 51
 func _seed_tutorial_tree() -> void:
 	var g: int = sim.surface_row(TUTORIAL_TREE_COL)               # ground top row (solid at g); trunk above it
 	sim.set_solid(Vector2i(TUTORIAL_TREE_COL, g - 1), &"wood")    # trunk base
@@ -305,28 +330,34 @@ func _seed_tutorial_tree() -> void:
 			sim.set_solid(leaf, &"leaves")                       # crown — marks it a tree, fells to wood
 
 
-## The MINESHAFT (col 8) — the whole Rung-1 stage stacked in one shaft (top → bottom, surface-relative).
-## It teaches "hand-smelt to bootstrap, then build the line that does the mining-and-feeding for you":
-##   SURFACE    BOOTSTRAP FORGE  — phase 2: toss ore down the open mouth → ingots (hand-fed)
-##   SURFACE+1  open             — bootstrap ingots land here (collect); phase 4 you place the DRILL here
-##   SURFACE+2  ORE chunk        ┐
-##   SURFACE+3  ORE chunk        ├ a 3-cell ore body the drill (above it) drains BOTTOM-UP
-##   SURFACE+4  ORE chunk        ┘
-##   SURFACE+5  AUTO FORGE       — the drained ore falls in here → ingots, hands-free
-##   SURFACE+6  open             — auto ingots land (collecting them at depth = the R2 lift)
-##   SURFACE+7  rock floor
-## Two forges: the top one you hand-feed to bootstrap the drill's ingots; the bottom one the drill feeds
-## once you cap the ore chunk with it (the drill can't feed the top one — the chunk would block its mouth).
+## The RUNG-1 stage: a shallow BOOTSTRAP forge pocket (col 46) + the DRILL SHAFT (col 56). Split into two
+## columns so the shaft stays a clean OPEN drop — you toss ore/coal straight down it and gravity delivers
+## to whatever's at the bottom of that column (the forge, or the drill once you place it). Layout:
+##   col 46 SURFACE   BOOTSTRAP FORGE  — toss surface ore in (from col 45); ingots fall to SURFACE+1 (collect)
+##   col 46 SURFACE+1 open             — bootstrap ingots land here
+##   col 46 SURFACE+2 floor
+##   col 56 SURFACE   open        — the OPEN shaft mouth: toss ore/coal in here; gravity delivers it below
+##   col 56 SURFACE+1 ORE block   — hand-mine it → cavity + a drillable deposit; then place the DRILL here
+##                                  (SURFACE+1 so it's comfortably in reach from the col-55 surface edge)
+##   col 56 SURFACE+2 AUTO FORGE  — catches the drill's pulled ore → ingots, hands-free
+##   col 56 SURFACE+3 open        — auto ingots land
+##   col 56 SURFACE+4 rock floor
+## The drill needs COAL (docs/MINING.md) — you drop coal down the open shaft onto it to run it.
 func _seed_tutorial_mineshaft() -> void:
 	var c: int = MINESHAFT_COL
-	sim.set_solid(Vector2i(c, SURFACE), &"")                       # shaft mouth (bootstrap forge goes here)
-	sim.set_solid(Vector2i(c, SURFACE + 1), &"")                   # drop in / collect bootstrap ingots
-	sim.set_solid(MINESHAFT_DRILL_CELL, &"ore")                   # the rich ore BLOCK: hand-mine → cavity + deposit
-	sim.deposits[MINESHAFT_DRILL_CELL] = MINESHAFT_ORE_RICHNESS    # ~6 hand-burst, ~18 left as a drillable deposit
-	sim.set_solid(AUTO_FORGE_CELL, &"")                           # carve the cell the AUTO forge sits in
-	sim.set_solid(Vector2i(c, SURFACE + 4), &"")                   # gap under the auto forge (ingots land)
-	sim.set_solid(Vector2i(c, SURFACE + 5), &"earth")            # rock floor
+	# Bootstrap forge pocket (col 46) — a shallow 1-deep well, OFF the drill shaft.
+	var bf: int = MINESHAFT_FORGE_CELL.x
+	sim.set_solid(Vector2i(bf, SURFACE), &"")                      # carve the forge cell
+	sim.set_solid(Vector2i(bf, SURFACE + 1), &"")                  # ingots land / collect
+	sim.set_solid(Vector2i(bf, SURFACE + 2), &"earth")            # floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
+	# Drill shaft (col 56) — OPEN mouth so tossed ore/coal drops straight down onto the drill.
+	sim.set_solid(Vector2i(c, SURFACE), &"")                       # open mouth (drop access)
+	sim.set_solid(MINESHAFT_DRILL_CELL, &"ore")                   # SURFACE+1 ore BLOCK: hand-mine → cavity + deposit
+	sim.deposits[MINESHAFT_DRILL_CELL] = MINESHAFT_ORE_RICHNESS    # ~6 hand-burst, ~18 left as a drillable deposit
+	sim.set_solid(AUTO_FORGE_CELL, &"")                           # SURFACE+2: carve the cell the AUTO forge sits in
+	sim.set_solid(Vector2i(c, SURFACE + 3), &"")                   # gap under the auto forge (ingots land)
+	sim.set_solid(Vector2i(c, SURFACE + 4), &"earth")            # rock floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
 
 
@@ -706,9 +737,14 @@ func _hover_info() -> Dictionary:
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"drill":
 			var dep2: int = sim.ore_deposit_at(m.cell)
-			var rate: String = ("%.1fs/ore" % recipe.time) if recipe != null and recipe.time > 0.0 else ""
-			info["mode"] = ("drilling — %d ore left  (%s)" % [dep2, rate]) if dep2 > 0 \
-				else "idle — no deposit here (relocate over a mined ore cavity)"
+			var coal: int = int(m.input_buffer.get(&"coal", 0))
+			var fueled: bool = m.fuel > 0 or coal > 0
+			if dep2 <= 0:
+				info["mode"] = "idle — no deposit here (relocate over a mined ore cavity)"
+			elif not fueled:
+				info["mode"] = "OUT OF COAL — drop coal on it to run  (%d ore left)" % dep2
+			else:
+				info["mode"] = "drilling — %d ore left  ·  coal %d" % [dep2, coal]
 		_:
 			if recipe != null and recipe.inputs.is_empty():
 				info["mode"] = "ore source"

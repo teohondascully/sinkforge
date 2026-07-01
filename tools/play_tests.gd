@@ -59,15 +59,16 @@ func _attempt(name: String, fn: Callable) -> bool:
 	print("- goal: %s" % name)
 	for try_i: int in TRIES:
 		var met: bool = await fn.call()
+		var st: String = _agent.stats() if _agent != null else ""      # behaviour trace, ALWAYS logged
 		if met:
-			print("  PASS: %s%s" % [name, "  (try %d)" % (try_i + 1) if try_i > 0 else ""])
+			print("  PASS: %s%s   [%s]" % [name, "  (try %d)" % (try_i + 1) if try_i > 0 else "", st])
 			return true
 		if try_i < TRIES - 1:
-			print("  ... missed (try %d/%d); retrying (real-time physics)" % [try_i + 1, TRIES])
+			print("  ... missed (try %d/%d)  [%s]; retrying (real-time physics)" % [try_i + 1, TRIES, st])
 	if not _last_trace.is_empty():
 		for line: String in _last_trace:
 			printerr("        · %s" % line)
-	printerr("  FAIL: %s (missed twice)" % name)
+	printerr("  FAIL: %s (missed twice)  [%s]" % [name, _agent.stats() if _agent != null else ""])
 	return false
 
 
@@ -190,6 +191,7 @@ func _do_step(agent: PlayAgent, id: StringName) -> bool:
 		&"bazaar": return await _step_bazaar(agent)
 		&"craft":  return await _step_craft(agent)
 		&"build":  return await _step_build(agent)
+		&"fuel":   return await _step_fuel(agent)
 		&"auto":   return await _step_auto(agent)
 	return false
 
@@ -207,21 +209,21 @@ func _step_mine(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"ore", 0)) >= 4
 
 
-## Step 2 — stand beside the forge, toss the ore into it (Q feeds gravity), let it smelt, then step into
-## the collection pit to scoop the 2 bootstrap ingots.
+## Step 2 — toss the surface ore into the bootstrap forge pocket (col 46) from beside it (col 45), let it
+## smelt, and stand by the pocket to reach-collect the 2 bootstrap ingots.
 func _step_smelt(agent: PlayAgent) -> bool:
 	if not await agent.select_item(&"ore"):
 		return false
-	var c: int = MainView.MINESHAFT_COL
-	if not await agent.walk_to_column(c - 1):                        # stand on the surface beside the shaft mouth
+	var bf: Vector2i = MainView.MINESHAFT_FORGE_CELL                 # (6, SURFACE) — the bootstrap forge
+	if not await agent.walk_to_column(bf.x - 1):                     # stand on the surface beside the forge (col 5)
 		return false
 	agent.player.facing = 1
-	agent.main.try_drop()                                            # fling the ore down the shaft into the forge
-	# Drop into the 1-tile shaft and wait for the forge to pour ingots, auto-scooping each as it lands.
+	agent.main.try_drop()                                            # fling the ore right into the forge
+	var collect: Vector2i = bf + Vector2i(0, 1)                      # (6, SURFACE+1) — where ingots land
 	var guard: int = 0
 	while int(agent.sim.inventory.get(&"ingot", 0)) < 2 and guard < 30:
 		guard += 1
-		await agent.walk_to_column(c)                               # in the shaft gap, under the forge — auto-collects
+		await agent.approach(collect)                               # stand within reach → auto-collect
 		for _i: int in 20:
 			await physics_frame
 	agent._note("  smelt: produced=%d carried=%d body@%s" % [
@@ -292,7 +294,61 @@ func _step_build(agent: PlayAgent) -> bool:
 	return agent.sim.machine_at(d) != null
 
 
-## Step 5 — stand back and let the line run until it pours ingots on its own (no further input).
+## Step 5 — fuel the Drill: mine the coal vein (right of the shaft), then drop coal down the open shaft so
+## it lands in the drill (the demand-web — the drill won't pull ore without coal, docs/MINING.md).
+func _step_fuel(agent: PlayAgent) -> bool:
+	agent._note("  fuel: START body@%s (coal target=%s)" % [
+		agent.main._cell_at(agent.player.position), _nearest_coal(agent)])
+	var guard: int = 0
+	while int(agent.sim.inventory.get(&"coal", 0)) < 3 and guard < 6:
+		guard += 1
+		var coal: Vector2i = _nearest_coal(agent)
+		if coal.x < 0:
+			break
+		await agent.dig_down_to(coal)
+	if int(agent.sim.inventory.get(&"coal", 0)) < 1:
+		agent._note("  fuel: no coal mined")
+		return false
+	if not await agent.select_item(&"coal"):
+		return false
+	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):   # col 7, beside the open shaft
+		return false
+	agent.player.facing = 1
+	var guard2: int = 0
+	while not _drill_has_fuel(agent) and guard2 < 14:                # toss coal down the shaft onto the drill
+		guard2 += 1
+		agent.main.try_drop()
+		for _i: int in 6:
+			await physics_frame
+	agent._note("  fuel: drill_fueled=%s coal_carried=%d" % [
+		_drill_has_fuel(agent), int(agent.sim.inventory.get(&"coal", 0))])
+	return _drill_has_fuel(agent)
+
+
+## The nearest COAL vein cell to the body (the drill's fuel source).
+func _nearest_coal(agent: PlayAgent) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var bd: float = INF
+	for cell: Variant in agent.sim.solid:
+		var c: Vector2i = cell
+		if agent.sim.solid[c] != &"coal":
+			continue
+		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
+		if d < bd:
+			bd = d
+			best = c
+	return best
+
+
+## Whether a placed Drill has coal to burn (fuel mid-burn, or coal waiting in its buffer).
+func _drill_has_fuel(agent: PlayAgent) -> bool:
+	for m: MachineState in agent.sim.machines:
+		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
+			return true
+	return false
+
+
+## Step 6 — stand back and let the fueled line run until it pours ingots on its own (no further input).
 func _step_auto(agent: PlayAgent) -> bool:
 	for _i: int in 200:
 		await physics_frame
@@ -339,26 +395,35 @@ func _walk_to_bazaar(agent: PlayAgent) -> bool:
 	var bzs: Array[Vector2i] = agent.sim.find_bazaars()
 	if bzs.is_empty():
 		return false
-	# Stand just OUTSIDE the frame on the spawn side — the 3-tall frame is a wall you can't enter, but the
-	# craft radius reaches its interior from beside it, so don't waste frames trying to climb in.
-	await agent.walk_to_column(bzs[0].x - 1)
+	# Stand just OUTSIDE the frame on the RIGHT (spawn/shaft) side — the 3-tall frame is a wall you can't
+	# enter, and the whole hand-work + shaft lie to its right, so craft from that side to avoid getting
+	# walled off. The craft radius reaches the interior from beside it.
+	await agent.walk_to_column(bzs[0].x + FactorySim.BAZAAR_W)
 	return agent.main._near_bazaar()
 
 
 ## Setup hatch for the isolated craft/build goals: claim the seeded ruin with an injected wood block, then
 ## stand at the stall so crafting is unlocked. (The RUNG-1 goal does this for real via the wood+bazaar steps.)
 func _claim_and_approach_bazaar(agent: PlayAgent) -> bool:
+	agent.give(&"earth", 8)   # setup: a handful of dirt so the agent can bridge/climb the shaft en route
 	var gap: Vector2i = agent.sim.bazaar_completion_cell()
+	agent._note("  claim: body@%s gap=%s" % [agent.main._cell_at(agent.player.position), gap])
 	if gap.x >= 0:
 		agent.give(&"wood", 1)
 		agent.sim.total_produced[&"wood"] = int(agent.sim.total_produced.get(&"wood", 0)) + 1  # account the injected block
 		if not await agent.select_item(&"wood"):
 			return false
-		if not await agent.build_at(gap):
+		var built: bool = await agent.build_at(gap)
+		agent._note("  claim: build_at(gap) -> %s, body now@%s reach=%s placeable=%s" % [
+			built, agent.main._cell_at(agent.player.position), agent.main._can_reach(gap), agent.main._placeable(gap)])
+		if not built:
 			return false
 	if agent.sim.find_bazaars().is_empty():
+		agent._note("  claim: no bazaar detected after build")
 		return false
-	return await _walk_to_bazaar(agent)
+	var near: bool = await _walk_to_bazaar(agent)
+	agent._note("  claim: walk_to_bazaar -> near=%s body@%s" % [near, agent.main._cell_at(agent.player.position)])
+	return near
 
 
 ## The nearest solid ORE cell to the body that is NOT in the mineshaft column — so hand-mining the

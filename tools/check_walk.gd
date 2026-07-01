@@ -40,18 +40,19 @@ func _phys() -> void:
 	if _player == null:
 		_player = _main._player
 		_player.auto_input = false
-		# Stand on the surface at the far left (col 2) so a long rightward walk crosses the forge (col 6)
-		# and the undulating hills beyond.
+		# Stand on the surface at the far left (col 2) so a long rightward walk crosses the western hills, the
+		# centred flat plateau (with its fixtures), and the eastern hills — exercising every surface type.
 		var sx: int = 2
 		var sy: int = _main.sim.surface_row(sx)
 		_player.position = _main._cell_center(Vector2i(sx, sy - 1))
 		_player.velocity = Vector2.ZERO
 		_prev_x = _player.position.x
-		# Put a machine ON the flat surface in the walking path. Machines aren't in the slope authority,
-		# so the body can't GLIDE over a 1-tile machine the way it glides over a 1-tile terrain step — it
-		# hits the box head-on. This is the prime suspect for "walking and I get snapped back".
+		# Put a machine ON the flat plateau in the walking path (its clear left lane, left of the bazaar).
+		# Machines aren't in the slope authority, so the body can't GLIDE over a 1-tile machine the way it
+		# glides over a 1-tile terrain step — it hits the box head-on. Prime suspect for "walking + snapped back".
 		var proc: MachineDef = load("res://src/data/machines/processor.tres")
-		var pc := Vector2i(10, _main.sim.surface_row(10) - 1)
+		var mcol: int = HeightmapWorldGen.FLAT_START + 4
+		var pc := Vector2i(mcol, _main.sim.surface_row(mcol) - 1)
 		_main.sim.place_machine(proc, pc)
 		print("  placed a test machine at %s (surface walk path)" % pc)
 		return

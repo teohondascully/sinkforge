@@ -39,6 +39,14 @@ const ORE_CHANCE_DEEP: float = 0.85
 ## Vein size grows from this many cells (shallow) toward +ORE_SIZE_DEPTH_BONUS (deep) — richer down low.
 const ORE_SIZE_MIN: int = 2
 const ORE_SIZE_DEPTH_BONUS: int = 6
+## COAL veins — the drill's FUEL (docs/MINING.md). Mined the same cavity way as ore; a touch more common
+## and a bit shallower-reaching than ore (you need a steady coal supply once you automate), still depth-banded.
+const COAL_ATTEMPTS_PER_COL: float = 1.2
+const COAL_CHANCE_DEEP: float = 0.95
+const COAL_SIZE_MIN: int = 2
+const COAL_SIZE_DEPTH_BONUS: int = 5
+const COAL_AMOUNT_BASE: int = 5
+const COAL_AMOUNT_DEPTH_BONUS: int = 30
 ## Per-cell ore-block RICHNESS (total ore in one cell; the cavity model, docs/MINING.md). Hand-mining the
 ## block pockets a 3-8 BURST and reveals the REMAINDER as a drillable wall deposit, so richness must exceed
 ## the burst for deep veins to leave something worth automating. Depth-scaled: a shallow cell ~BASE (mostly
@@ -60,9 +68,10 @@ const TREE_GAP: int = 3
 
 ## The abandoned Bazaar RUIN: an almost-complete wood frame stamped on flat ground near spawn. Finishing
 ## it (placing the one missing block) activates it — the onboarding for "build a Bazaar", the first lore
-## ("someone was here"), and a worked example of the pattern (docs/CRAFTING.md). Sits clear of the player
-## (col 3) and forge (col 6), just past the flat spawn band.
-const RUIN_X: int = 10
+## ("someone was here"), and a worked example of the pattern (docs/CRAFTING.md). It is the LEFT endpoint of
+## the centred plateau (cols 40-43); its missing post is the bottom-RIGHT one, so it's claimed from the
+## SPAWN side (col 44) and completing it never walls the body off from the hand-work + shaft to its right.
+const RUIN_X: int = 40
 
 
 func generate(cols: int, rows: int, seed: int) -> WorldData:
@@ -74,6 +83,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_carve_caves(world, seed)
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
+	_scatter_coal(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
 	return world
@@ -169,14 +179,32 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
 		_grow_vein(world, rng, Vector2i(cx, cy), size, richness)
 
 
-## Grow one vein as a random-walk blob from a seed cell, converting solid rock to ore as it wanders.
+## A depth-banded COAL pass — the drill's fuel. Same machinery as ore veins (cavity model), its own
+## depth-weighted commonness/size/richness, stamping &"coal" blocks the player mines for coal.
+func _scatter_coal(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var attempts: int = int(round(float(world.cols) * COAL_ATTEMPTS_PER_COL))
+	for _i: int in attempts:
+		var cx: int = rng.randi_range(0, world.cols - 1)
+		var top: int = _surface_row(cx)
+		if top + 1 >= world.rows:
+			continue
+		var cy: int = rng.randi_range(top + 1, world.rows - 1)
+		var depth_frac: float = float(cy - top) / float(maxi(1, world.rows - top))
+		if rng.randf() > depth_frac * COAL_CHANCE_DEEP:
+			continue
+		var size: int = COAL_SIZE_MIN + int(round(depth_frac * float(COAL_SIZE_DEPTH_BONUS)))
+		var richness: int = COAL_AMOUNT_BASE + int(round(depth_frac * float(COAL_AMOUNT_DEPTH_BONUS)))
+		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, &"coal")
+
+
+## Grow one vein as a random-walk blob from a seed cell, converting solid rock to `material` as it wanders.
 ## Each converted cell is stamped with the vein's depth-scaled `richness` (its finite deposit amount).
-func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int) -> void:
+func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int, material: StringName = &"ore") -> void:
 	var cell: Vector2i = seed_cell
 	for _step: int in size:
 		var here: StringName = world.blocks.get(cell, &"")
 		if here == &"earth" or here == &"stone" or here == &"deepslate":
-			world.blocks[cell] = &"ore"
+			world.blocks[cell] = material
 			world.amounts[cell] = richness
 		var dir: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][rng.randi_range(0, 3)]
 		cell += dir
@@ -186,7 +214,7 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 
 ## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,
 ## docs/CRAFTING.md). A tree is a 1-wide trunk of &"wood" under a 3-wide rounded &"leaves" canopy,
-## stamped in the AIR above a column's ground cell. The spawn/forge band (cols ≤ FLAT_COLS) is left clear
+## stamped in the AIR above a column's ground cell. The centred flat plateau (the spawn cluster) is left clear
 ## so a tree never traps the player or buries the forge. Foliage is solid + choppable but excluded from
 ## the walkable silhouette (FactorySim.surface_row), so trees don't ramp; chopping one fells it (→wood).
 func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
@@ -194,7 +222,7 @@ func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 	# Keep the spawn → bazaar band clear of worldgen trees (a tree just past the 3-tall bazaar frame would be
 	# the "nearest" tree but unreachable behind the wall). The tutorial tree (seeded left of spawn) is the
 	# early wood source; natural trees start past the ruin + a buffer.
-	var start: int = maxi(FLAT_COLS + 1, RUIN_X + FactorySim.BAZAAR_W + 3)
+	var start: int = maxi(FLAT_END + 2, RUIN_X + FactorySim.BAZAAR_W + 3)
 	for col: int in range(start, world.cols):
 		if col - last < TREE_GAP or rng.randf() > TREE_CHANCE:
 			continue
@@ -227,7 +255,7 @@ func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 
 
 ## Stamp the near-complete bazaar ruin (see RUIN_X). Flatten its footprint to FLAT_SURFACE_ROW, then lay
-## the wood frame MINUS one block (the bottom-right post) for the player to finish — the moment it
+## the wood frame MINUS one block (the bottom-right post, facing spawn) for the player to finish — the moment it
 ## completes, FactorySim.find_bazaars detects it and the Bazaars view plays the transform.
 func _stamp_bazaar_ruin(world: WorldData) -> void:
 	var ground: int = FLAT_SURFACE_ROW
@@ -247,9 +275,10 @@ func _stamp_bazaar_ruin(world: WorldData) -> void:
 				world.blocks[fc] = &"earth"
 				world.walls[fc] = &"dirt_wall"
 	var o := Vector2i(RUIN_X, ground - h)                     # frame top-left
-	var missing := o + Vector2i(0, h - 1)                     # bottom-LEFT post — the gap faces spawn, so the
-	                                                          # player can walk up and place the finishing block
-	                                                          # (the far side is behind the 3-tall frame wall)
+	var missing := o + Vector2i(w - 1, h - 1)                 # bottom-RIGHT post — the gap faces spawn (which is
+	                                                          # RIGHT of the ruin), so the player walks up from the
+	                                                          # hand-work side to place the finishing block, and ends
+	                                                          # up on the shaft side (never walled off by the frame)
 	for dx: int in w:
 		world.blocks[o + Vector2i(dx, 0)] = &"wood"           # top beam
 	for dy: int in range(1, h):                               # posts (both sides), minus the gap

@@ -41,7 +41,9 @@ func _phys() -> void:
 	if _player == null:
 		_player = _main._player
 		_player.auto_input = false
-		_player.position = _main._cell_center(Vector2i(3, 3))  # on the open surface: clear sky above, earth below
+		# Start in the plateau's clear LEFT flat lane (left of the bazaar at col 40): genuine flat ground with
+		# clear sky above and room to run left, so run-speed/jump-apex aren't contaminated by hill slopes.
+		_player.position = _main._cell_center(Vector2i(HeightmapWorldGen.FLAT_START + 6, 3))
 		_player.velocity = Vector2.ZERO
 		return
 

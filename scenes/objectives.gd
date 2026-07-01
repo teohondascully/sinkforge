@@ -33,7 +33,8 @@ var steps: Array[Dictionary] = [
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
 	{"id": &"build",  "label": "Mine the mineshaft ore to expose its deposit, then place the Drill ON the cavity (RMB)", "goal": "Build the line"},
-	{"id": &"auto",   "label": "Stand back — the Drill pulls the deposit into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
+	{"id": &"auto",   "label": "Stand back — the fueled Drill pulls the deposit into the forge below. First automation!", "goal": "First automation"},
 ]
 
 
@@ -92,6 +93,7 @@ func _achieved(id: StringName) -> bool:
 		&"bazaar": return not sim.find_bazaars().is_empty()                                       # a frame is complete + claimed
 		&"craft":  return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
 		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
+		&"fuel":  return _drill_fueled()                                                          # the drill has coal to burn
 		&"auto":  return _line_has_run()                                                          # the line forged an ingot on its own
 	return false
 
@@ -122,6 +124,15 @@ func _line_has_run() -> bool:
 func _has_drill_machine() -> bool:
 	for m: MachineState in sim.machines:
 		if m.def.behavior == &"drill":
+			return true
+	return false
+
+
+## Has a placed Drill been fueled with coal (burning now, or coal waiting in its buffer)? The demand-web
+## beat: the drill won't pull ore until you've mined coal and fed it (docs/MINING.md).
+func _drill_fueled() -> bool:
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
 			return true
 	return false
 

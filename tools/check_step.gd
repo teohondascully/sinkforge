@@ -79,7 +79,7 @@ func _phys() -> void:
 
 ## A: dig a 1-wide pit on a flat run and drop the body INTO it, then walk toward the far wall.
 func _setup_pit() -> void:
-	# Search well past the surface forge (placed at col 6) so the pit is dug in clean terrain — a pit
+	# Search for a clean flat run (the centred plateau) so the pit is dug in clear terrain — a pit
 	# under a machine is (correctly) unclimbable, which would be a bogus failure.
 	var f: int = _flat_run(12, 5)
 	if f < 0:

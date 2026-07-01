@@ -24,6 +24,28 @@ var player: Player
 ## A running narration of what the agent did — printed by the harness so a failure is legible.
 var trace: Array[String] = []
 
+## Behaviour instrumentation (printed per goal so we ANALYZE how the agent moved, not just pass/fail):
+## how many times it jumped, bridged a gap, built a stair, and how many frames it spent making no progress.
+## Runaway counts here are a red flag (e.g. thrashing/jumping in place) even when a goal passes.
+var jumps: int = 0
+var builds: int = 0
+var stuck_frames: int = 0
+var _jump_cool: int = 0
+
+
+## Jump, rate-limited + counted — so the agent can't thrash by jumping every frame (and so we can SEE it).
+func _do_jump() -> void:
+	if _jump_cool > 0:
+		return
+	player.request_jump()
+	jumps += 1
+	_jump_cool = 14
+
+
+## One-line behaviour summary for the harness to log + me to read.
+func stats() -> String:
+	return "jumps=%d builds=%d stuck_frames=%d" % [jumps, builds, stuck_frames]
+
 
 func _init(scene_tree: SceneTree, main_view: MainView) -> void:
 	tree = scene_tree
@@ -48,35 +70,82 @@ func wait(frames: int) -> void:
 ## Hold a jump for a couple of frames.
 func jump() -> void:
 	player.request_jump()
+	jumps += 1
 	await wait(2)
 
 
-## Walk toward a cell until it's within reach, jumping when bumped against a wall. Returns whether the
-## cell ended up reachable (a real failure if the terrain genuinely blocks the route — same as a player).
-func approach(cell: Vector2i, budget: int = 720) -> bool:
-	var target_x: float = main._cell_center(cell).x
+## Walk toward a cell until it's within reach — and when walking alone fails, BUILD the way there
+## (Terraria dig-and-build, the behaviour the play-tester expects a smart agent to have): bridge a gap the
+## body would fall into, and build a stair up a wall / out of a pit. Uses the dirt the agent has dug (every
+## mined block is now a placeable item). Returns whether the cell ended up reachable — a real failure only
+## when even building can't get there (out of blocks, or genuinely walled).
+func approach(cell: Vector2i, budget: int = 600) -> bool:
 	var last_x: float = player.position.x
-	var stuck: int = 0
+	var still: int = 0                                 # consecutive frames with ~no horizontal progress
 	var t: int = 0
 	while t < budget:
 		if main._can_reach(cell):
 			player.input_dir = 0.0
 			return true
-		var dx: float = target_x - player.position.x
-		player.input_dir = signf(dx) if absf(dx) > 3.0 else 0.0
-		# Bumped a wall (not moving though we want to) → try to hop it.
-		if player.on_floor and absf(player.position.x - last_x) < 0.4 and absf(dx) > 3.0:
-			stuck += 1
-			if stuck >= 5:
-				player.request_jump()
-				stuck = 0
+		var dx: float = main._cell_center(cell).x - player.position.x
+		var dir: int = signi(int(dx)) if absf(dx) > 3.0 else 0
+		player.input_dir = float(dir)
+		_jump_cool = maxi(0, _jump_cool - 1)
+		# Only ever jump/build for a REASON (a gap or a wall in the way) — never blindly, so the agent
+		# can't thrash by hopping in place. Everything is on a jump cooldown + counted.
+		if player.on_floor and dir != 0:
+			var here: Vector2i = main._cell_at(player.position)
+			var ahead: Vector2i = here + Vector2i(dir, 0)
+			var ahead_floor: Vector2i = here + Vector2i(dir, 1)
+			var progressing: bool = absf(player.position.x - last_x) > 0.4
+			if not sim.is_solid(ahead) and not sim.is_solid(ahead_floor):
+				# A GAP ahead: jump it if there's a landing within a short hop, else bridge it with a block.
+				if sim.is_solid(here + Vector2i(dir * 2, 1)) or sim.is_solid(here + Vector2i(dir * 3, 1)):
+					_do_jump()
+				elif _select_block() and main._can_reach(ahead_floor) and main._placeable(ahead_floor):
+					main.try_build(ahead_floor)
+					builds += 1
+			elif not progressing and sim.is_solid(ahead):
+				# A WALL/step ahead we're not getting past.
+				var up: Vector2i = here + Vector2i(dir, -1)     # the cell diagonally up-forward
+				if not sim.is_solid(up):
+					_do_jump()                             # 1-tall step → the AABB step-up lands it
+				elif _select_block():
+					if main._can_reach(up) and main._placeable(up):
+						_do_jump()                         # taller step → build a stair up-forward and hop on
+						await wait(3)
+						main.try_build(up)
+						builds += 1
+					elif cell.y <= here.y:
+						# Boxed in below the target (a pit whose side is solid ground) → PILLAR straight up:
+						# jump, then drop a block into the cell just vacated under the feet, and land on it.
+						_do_jump()
+						await wait(5)
+						var under: Vector2i = main._cell_at(player.position) + Vector2i(0, 1)
+						if main._can_reach(under) and main._placeable(under):
+							main.try_build(under)
+							builds += 1
+		if absf(player.position.x - last_x) < 0.3 and player.on_floor:
+			still += 1
+			stuck_frames += 1
 		else:
-			stuck = 0
+			still = 0
 		last_x = player.position.x
 		await tree.physics_frame
 		t += 1
+		if still > 150:                                    # ~2.5s of genuinely no progress → stop wasting budget
+			break
 	player.input_dir = 0.0
 	return main._can_reach(cell)
+
+
+## Select any placeable BLOCK the agent is carrying (dug dirt/stone/wood), so it can bridge/pillar. Returns
+## whether one got selected. Prefers plentiful dirt/stone over the scarcer wood.
+func _select_block() -> bool:
+	for item: StringName in [&"earth", &"stone", &"deepslate", &"wood"]:
+		if int(sim.inventory.get(item, 0)) > 0:
+			return select_item(item)
+	return false
 
 
 # --- game verbs (each goes through MainView's reach-gated surface) ---------------------------------
@@ -96,28 +165,38 @@ func mine_cell(cell: Vector2i, budget: int = 720) -> bool:
 
 ## Walk along the surface until the body's own column is `col` (and it's standing, not mid-air). The
 ## prerequisite for sinking a straight shaft — you have to be standing over it first.
-func walk_to_column(col: int, budget: int = 720) -> bool:
+func walk_to_column(col: int, budget: int = 600) -> bool:
 	var col_x: float = main._cell_center(Vector2i(col, 0)).x
 	var last_x: float = player.position.x
-	var stuck: int = 0
+	var still: int = 0
 	var t: int = 0
 	while t < budget:
-		var here: int = main._cell_at(player.position).x
-		if here == col and player.on_floor:
+		var here_cell: Vector2i = main._cell_at(player.position)
+		if here_cell.x == col and player.on_floor:
 			player.input_dir = 0.0
 			return true
-		player.input_dir = signf(col_x - player.position.x)
-		# Bumped an obstacle (a machine on the surface, a 1-tile step) → hop it, like a player would.
-		if player.on_floor and absf(player.position.x - last_x) < 0.4:
-			stuck += 1
-			if stuck >= 4:
-				player.request_jump()
-				stuck = 0
+		var dir: int = signi(int(col_x - player.position.x))
+		player.input_dir = float(dir)
+		_jump_cool = maxi(0, _jump_cool - 1)
+		if player.on_floor and dir != 0:
+			var ahead: Vector2i = here_cell + Vector2i(dir, 0)
+			var ahead_floor: Vector2i = here_cell + Vector2i(dir, 1)
+			var progressing: bool = absf(player.position.x - last_x) > 0.4
+			# Gap ahead → hop it (there's almost always a near landing on the surface); wall ahead + stuck → hop.
+			if not sim.is_solid(ahead) and not sim.is_solid(ahead_floor):
+				_do_jump()
+			elif not progressing and sim.is_solid(ahead):
+				_do_jump()
+		if absf(player.position.x - last_x) < 0.3 and player.on_floor:
+			still += 1
+			stuck_frames += 1
 		else:
-			stuck = 0
+			still = 0
 		last_x = player.position.x
 		await tree.physics_frame
 		t += 1
+		if still > 150:
+			break
 	player.input_dir = 0.0
 	return main._cell_at(player.position).x == col
 
