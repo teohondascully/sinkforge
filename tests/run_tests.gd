@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_coal_and_fuel()
 	_test_trees_and_wood()
 	_test_mining_rules()
+	_test_drop_toss()
 	_test_block_placement_and_bazaar()
 	_test_power_field()
 	_test_conduit_network()
@@ -718,6 +719,44 @@ func _test_mining_rules() -> void:
 	var poor: FactorySim = FactorySim.new()
 	poor.inventory[&"stone"] = 2
 	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
+
+
+## DROP / TOSS (the central "gravity is the conveyor" feeding verb): letting go of a stack above a column
+## cascades it DOWN to the first machine (feeds its input) else the first floor (a re-collectable pile) else
+## the void — and the cosmetic toss origin (from_cell) never changes WHERE it lands. Conservation holds:
+## items only MOVE pack→(machine|ground), none made or destroyed.
+func _test_drop_toss() -> void:
+	print("- drop / toss (gravity feed)")
+	# Case 1: drop above a forge in the same column → it feeds the forge's input buffer.
+	var sim: FactorySim = FactorySim.new()
+	var forge: MachineState = sim.place_machine(load("res://src/data/machines/processor.tres"), Vector2i(5, 6))
+	sim.inventory[&"ore"] = 5
+	sim.total_produced[&"ore"] = 5
+	var fed: int = sim.drop_item(Vector2i(5, 2), &"ore", 3)          # let go 3 ore above the forge's column
+	_check(fed == 3, "dropped 3 ore into the column")
+	_check(int(forge.input_buffer.get(&"ore", 0)) == 3, "the ore fell into the forge's input buffer")
+	_check(int(sim.inventory.get(&"ore", 0)) == 2, "the dropped ore left the pack")
+	_check(_items_present(sim, &"ore") == 5, "ore conserved through the drop (2 pack + 3 in forge)")
+
+	# Case 2: drop above just a floor → it rests as a re-collectable ground pile (no machine to catch it).
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(3, 9), &"stone")                          # a floor to land on
+	s2.inventory[&"ingot"] = 4
+	s2.total_produced[&"ingot"] = 4
+	var d2: int = s2.drop_item(Vector2i(3, 1), &"ingot", 4)
+	_check(d2 == 4, "dropped 4 ingot down an open column")
+	var landed := Vector2i(3, 8)                                    # rests on top of the row-9 floor
+	_check(int((s2.ground.get(landed, {}) as Dictionary).get(&"ingot", 0)) == 4, "the ingots rest as a ground pile on the floor")
+	_check(_items_present(s2, &"ingot") == 4, "ingot conserved as a ground pile")
+
+	# Case 3: the toss ORIGIN (from_cell, cosmetic) does not change the landing — a tossed stack lands by the
+	# target column's gravity, not where it was flung from.
+	var s3: FactorySim = FactorySim.new()
+	var f3: MachineState = s3.place_machine(load("res://src/data/machines/processor.tres"), Vector2i(7, 5))
+	s3.inventory[&"ore"] = 2
+	s3.total_produced[&"ore"] = 2
+	s3.drop_item(Vector2i(7, 1), &"ore", 2, Vector2i(4, 1))         # flung from col 4, aimed at col 7
+	_check(int(f3.input_buffer.get(&"ore", 0)) == 2, "a tossed stack lands by the target column, not the throw origin")
 
 
 ## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).

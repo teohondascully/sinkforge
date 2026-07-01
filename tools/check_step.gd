@@ -5,6 +5,8 @@ extends SceneTree
 ## hides exactly these bugs). Two real-world cases the heightmap slope-follow can't cover:
 ##   A. climb OUT of a dug 1-wide pit you fell into (a valley → ramp_dir 0)
 ##   B. walk OVER one of your own 1-tile machines
+##   C. walk THROUGH a tree trunk (wood is Terraria-style walk-through; guards the taller body vs. a
+##      2-tall trunk that would otherwise wall it on a surface path)
 ## HEADED:  /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_step.gd
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -18,6 +20,7 @@ var _budget: int = 0
 var _fails: int = 0
 var _pit := Vector2i(-1, -1)
 var _mach_col: int = -1
+var _tree_col: int = -1
 
 
 func _initialize() -> void:
@@ -69,10 +72,19 @@ func _phys() -> void:
 	elif _phase == 1:                # B: walk over a machine
 		if _player.position.x > float((_mach_col + 2) * 32):
 			print("  PASS: walked OVER a 1-tile machine (x=%.0f)" % _player.position.x)
-			_done()
+			_setup_tree()
 		elif _budget <= 0:
 			printerr("  FAIL: stuck against the machine — walked to x=%.0f, never passed col %d"
 				% [_player.position.x, _mach_col])
+			_fails += 1
+			_setup_tree()
+	elif _phase == 2:                # C: walk THROUGH a tree trunk (wood is walk-through)
+		if _player.position.x > float((_tree_col + 2) * 32):
+			print("  PASS: walked THROUGH a 2-tall tree trunk (x=%.0f)" % _player.position.x)
+			_done()
+		elif _budget <= 0:
+			printerr("  FAIL: walled by the tree trunk — walked to x=%.0f, never passed col %d (wood must be walk-through)"
+				% [_player.position.x, _tree_col])
 			_fails += 1
 			_done()
 
@@ -111,6 +123,25 @@ func _setup_machine() -> void:
 	_phase = 1
 	_budget = 220
 	print("  placed a machine at col %d; body left of it" % _mach_col)
+
+
+## C: plant a 2-tall WOOD trunk (rows r-1, r-2) on a fresh flat run — a wall taller than the body — and
+## walk into it from the left. A blocking trunk would trap the taller body; walk-through wood lets it pass.
+func _setup_tree() -> void:
+	var g: int = _flat_run(maxi(4, _mach_col + 4), 5)
+	if g < 0:
+		printerr("  (no flat run found to test the tree — skipping C)")
+		_done()
+		return
+	var r: int = _sim.surface_row(g)
+	_tree_col = g + 2
+	_sim.set_solid(Vector2i(_tree_col, r - 1), &"wood")         # trunk base (at head height for the body)
+	_sim.set_solid(Vector2i(_tree_col, r - 2), &"wood")         # trunk top → a 2-tall wall if wood blocked
+	_player.position = Vector2(float(g * 32 + 16), float(r * 32) - Player.HEIGHT * 0.5)
+	_player.velocity = Vector2.ZERO
+	_phase = 2
+	_budget = 220
+	print("  planted a 2-tall wood trunk at col %d; body left of it" % _tree_col)
 
 
 func _done() -> void:
