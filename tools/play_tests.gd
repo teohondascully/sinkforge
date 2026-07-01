@@ -22,8 +22,19 @@ var _agent: PlayAgent = null      # current agent
 var _last_trace: Array[String] = []  # the failing try's narration, printed only if both tries miss
 
 
+## Fast-forward the whole suite with the game clock (Engine.time_scale): the body moves proportionally
+## more per physics frame, so goals are reached in a fraction of the frames — the play-tests run faster.
+## Kept MODERATE: the agent's arrival tolerance is ~3px, so too large a per-frame step overshoots targets
+## and the heuristic navigation oscillates. 2x is the MEASURED sweet spot — clean 6/6 at 29s vs 39s at 1x;
+## 3x+ overshoots and gets SLOWER (32s) from oscillation, 4x misses goals. (The gain is sub-linear because
+## per-goal scene boot/teardown is fixed overhead the clock can't touch.) Override with SINKFORGE_PLAY_SCALE.
+const PLAY_TIME_SCALE: float = 2.0
+
 func _initialize() -> void:
 	print("== Sinkforge scripted play-tests ==")
+	var env: String = OS.get_environment("SINKFORGE_PLAY_SCALE")
+	Engine.time_scale = float(env) if env.is_valid_float() and float(env) > 0.0 else PLAY_TIME_SCALE
+	print("(game clock: %.0fx)" % Engine.time_scale)
 	MainView.dev_start = false      # these goals assert exact counts — boot a CLEAN pack, not the dev kit
 	_run()
 
