@@ -714,7 +714,7 @@ func _hover_info() -> Dictionary:
 		var dep: int = sim.ore_deposit_at(_aim)
 		if dep > 0:
 			return {"name": "Ore Deposit", "in": [], "out": [], "holding": [],
-				"mode": "%d ore left — cap it with a Drill" % dep}
+				"mode": "%d ore left — cap with a Drill (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
 		return {}
 	var info: Dictionary = {"name": m.def.display_name}
 	var recipe: RecipeDef = m.def.recipe
@@ -743,7 +743,7 @@ func _hover_info() -> Dictionary:
 			elif not fueled:
 				info["mode"] = "OUT OF COAL — drop coal on it to run  (%d ore left)" % dep2
 			else:
-				info["mode"] = "drilling — %d ore left  ·  coal %d" % [dep2, coal]
+				info["mode"] = "drilling %s — %d ore left  ·  coal %d" % [_rate_eta(_drill_rate(), dep2), dep2, coal]
 		_:
 			if recipe != null and recipe.inputs.is_empty():
 				info["mode"] = "ore source"
@@ -850,6 +850,25 @@ func _guide_targets() -> Array[Dictionary]:
 ## crafting hub gate (docs/CRAFTING.md): away from it, the E screen shows the pack but no recipes.
 func _near_bazaar() -> bool:
 	return _player != null and sim.near_bazaar(_cell_at(_player.position), BAZAAR_RADIUS)
+
+
+## The nominal extraction RATE of a Drill in ore/second (1 unit per recipe cycle). Read off the drill def
+## so it tracks the recipe, not a magic number — the throughput the hover inspector surfaces.
+func _drill_rate() -> float:
+	var drill: MachineDef = _machine_defs_by_id.get(&"drill", null)
+	if drill == null or drill.recipe == null or drill.recipe.time <= 0.0:
+		return 0.0
+	return 1.0 / drill.recipe.time
+
+
+## Format a rate + an ETA-to-empty for a deposit — "1.0/s, ~4m left" — so the player reads throughput AND
+## how long the patch lasts at that rate (the "is this worth automating?" answer). Rate 0 → amount only.
+func _rate_eta(rate: float, amount: int) -> String:
+	if rate <= 0.0:
+		return "%d left" % amount
+	var secs: int = int(round(float(amount) / rate))
+	var span: String = ("~%dm left" % (secs / 60)) if secs >= 90 else ("~%ds left" % secs)
+	return "%.1f/s · %s" % [rate, span]
 
 
 ## The cell of the first FORGE (processor) placed in the world, or (-1,-1) if none — the smelt/build guide
