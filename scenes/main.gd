@@ -47,6 +47,11 @@ var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); craft
                                     ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
 var _show_minimap: bool = false
 var _show_help: bool = false
+## Fast-forward game clock: "." cycles Engine.time_scale through this exponential ladder so the whole
+## game (sim ticks AND the body) runs faster — watch a factory fill, or (headless) speed up play-tests.
+## The body integrates in substeps (Player.MAX_SUBSTEP) so it can't tunnel at the high multipliers.
+const TIME_SCALES: Array[float] = [1.0, 2.0, 4.0, 8.0]
+var _time_scale_idx: int = 0
 ## Timed-mining (the friction): holding LMB CHARGES the aimed cell; it breaks when the charge reaches the
 ## material's hardness (scaled by your best tool's speed). _mine_target tracks which cell is charging so
 ## moving the cursor to a new block resets it. The charge fraction is pushed to the renderer (crack viz).
@@ -419,6 +424,7 @@ func _process(delta: float) -> void:
 		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
 		_hud.show_minimap = _show_minimap
 		_hud.show_help = _show_help
+		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
 			_hud.minimap_focus = _player.position
 			_hud.minimap_view = Vector2(Hud.CANVAS) / _current_zoom()  # world area the camera shows
@@ -480,6 +486,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		try_build(_aim)
 	elif event.is_action_pressed(Controls.ZOOM):
 		_cycle_zoom()
+	elif event.is_action_pressed(Controls.SPEED):
+		_cycle_speed()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		_cycle_inventory(1)   # direct wheel handling (reliable) — the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -652,6 +660,13 @@ func _cycle_zoom() -> void:
 	_zoom_idx = (_zoom_idx + 1) % ZOOM_LEVELS.size()
 	if _camera != null:
 		_camera.zoom = Vector2(_current_zoom(), _current_zoom())
+
+
+## Cycle the fast-forward game clock (".") and apply it. Engine.time_scale scales BOTH the sim's
+## tick accumulator (the factory runs faster) and the body's physics (which substeps, so no tunnel).
+func _cycle_speed() -> void:
+	_time_scale_idx = (_time_scale_idx + 1) % TIME_SCALES.size()
+	Engine.time_scale = TIME_SCALES[_time_scale_idx]
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.

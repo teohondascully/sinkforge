@@ -23,6 +23,7 @@ const MAP := &"sf_map"
 const HELP := &"sf_help"
 const PAUSE := &"sf_pause"
 const CLOSE := &"sf_close"
+const SPEED := &"sf_speed"
 const CYCLE_NEXT := &"sf_cycle_next"
 const CYCLE_PREV := &"sf_cycle_prev"
 const ZOOM := &"sf_zoom"
@@ -41,6 +42,7 @@ static func defaults() -> Dictionary:
 		HELP: [{"key": KEY_H}, {"key": KEY_SLASH}],
 		PAUSE: [{"key": KEY_P}],
 		CLOSE: [{"key": KEY_ESCAPE}],
+		SPEED: [{"key": KEY_PERIOD}],   # "." — cycle the fast-forward game clock (1x -> 2x -> 4x -> 8x)
 		CYCLE_NEXT: [{"button": MOUSE_BUTTON_WHEEL_DOWN}],
 		CYCLE_PREV: [{"button": MOUSE_BUTTON_WHEEL_UP}],
 		ZOOM: [{"key": KEY_Z}],

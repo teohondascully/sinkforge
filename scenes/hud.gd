@@ -22,6 +22,9 @@ const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
 var paused_getter: Callable
+## Fast-forward game clock (set by MainView). >1 draws a small "▶▶ Nx" chip top-left so you know the
+## world is running fast; 1.0 draws nothing (the calm-screen default).
+var time_scale: float = 1.0
 ## The tutorial chain (representation-layer legibility — answers "how do I play?"). Set by MainView.
 var objectives: Objectives
 ## Craftable machines for the CRAFT strip (set by MainView): [{name: String, cost: {item->count}}].
@@ -80,6 +83,21 @@ func _draw() -> void:
 		_panel(p, true)
 		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
+
+
+## Fast-forward chip (top-left): a small "▶▶ Nx" tag shown ONLY while the game clock is sped up, so the
+## world visibly racing has an on-screen cause. Hidden at 1x to keep the default screen calm. Press "."
+## to cycle. Uses the shared accented panel skin.
+func _draw_fastforward() -> void:
+	if time_scale <= 1.0:
+		return
+	var label: String = "▶▶ %dx" % int(time_scale)
+	var tw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var chip := Rect2(10.0, 8.0, tw + 24.0, 22.0)
+	_panel(chip, true)
+	draw_string(_font, chip.position + Vector2(12.0, 15.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 
 
 ## FORGED production chip (top-right): an ingot swatch + the lifetime ingot count, in a small panel —
@@ -373,6 +391,7 @@ func _draw_help_overlay() -> void:
 		"drop / feed  Q  (gravity feeds it in)",
 		"pack        E  (inventory · craft at Bazaar)",
 		"map         M",
+		"fast-fwd    .     (1x → 2x → 4x → 8x)",
 		"pause       P     ·   help   H",
 	]
 	var w: float = 244.0
