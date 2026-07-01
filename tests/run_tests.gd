@@ -246,18 +246,20 @@ func _test_mining_and_deposit() -> void:
 	sim.set_solid(Vector2i(2, 2), &"ore")
 	sim.set_solid(Vector2i(2, 3), &"ore")
 	_check(sim.mine(Vector2i(2, 2)) == &"ore", "mining a vein returns ore")
-	_check(int(sim.inventory.get(&"ore", 0)) == 1, "mined ore goes into the pack")
+	var after_one: int = int(sim.inventory.get(&"ore", 0))
+	_check(after_one >= 3 and after_one <= 6, "mining a vein drops a 3-6 loose burst into the pack (got %d)" % after_one)
 	sim.mine(Vector2i(2, 3))
-	_check(int(sim.inventory.get(&"ore", 0)) == 2, "pack accumulates")
+	var carried: int = int(sim.inventory.get(&"ore", 0))
+	_check(carried > after_one, "the pack accumulates across mines (%d)" % carried)
 	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "mined ore conserved")
 	# Deposit into a processor and let it smelt — the by-hand loop drives production.
 	var proc: MachineState = sim.place_machine(proc_def, Vector2i(2, 5))
-	_check(sim.deposit(Vector2i(2, 5), &"ore", 2) == 2, "deposited both ore into the processor")
-	_check(sim.inventory.is_empty(), "pack emptied after depositing")
-	_check(int(proc.input_buffer.get(&"ore", 0)) == 2, "processor received the ore")
-	for _i: int in 80:
+	_check(sim.deposit(Vector2i(2, 5), &"ore", carried) == carried, "deposited all carried ore into the processor")
+	_check(sim.inventory.is_empty(), "pack emptied after depositing all")
+	_check(int(proc.input_buffer.get(&"ore", 0)) == carried, "processor received the ore")
+	for _i: int in 200:
 		sim.tick()
-	_check(int(sim.sink.get(&"ingot", 0)) == 1, "hand-fed ore forged one ingot")
+	_check(int(sim.sink.get(&"ingot", 0)) >= 1, "hand-fed ore forged at least one ingot (%d)" % int(sim.sink.get(&"ingot", 0)))
 	for item: StringName in [&"ore", &"ingot"]:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
@@ -277,11 +279,12 @@ func _test_hand_built_chain() -> void:
 	_check(sim.place_machine(split_def, Vector2i(6, 2)) != null, "placed a splitter by hand")
 	_check(sim.place_machine(proc_def, Vector2i(6, 4)) != null, "placed a processor under the down branch")
 	_check(sim.place_machine(proc_def, Vector2i(7, 4)) != null, "placed a processor under the right branch")
-	for v: int in 8:  # dig a stock of ore into the pack
+	for v: int in 8:  # dig a stock of ore into the pack (each block a 3-6 burst)
 		sim.set_solid(Vector2i(0, v), &"ore")
 		sim.mine(Vector2i(0, v))
-	_check(int(sim.inventory.get(&"ore", 0)) == 8, "dug 8 ore into the pack")
-	_check(sim.deposit(Vector2i(6, 2), &"ore", 8) == 8, "hand-fed all 8 ore into the splitter")
+	var stock: int = int(sim.inventory.get(&"ore", 0))
+	_check(stock >= 8, "dug a stock of ore into the pack (%d)" % stock)
+	_check(sim.deposit(Vector2i(6, 2), &"ore", stock) == stock, "hand-fed all the ore into the splitter")
 	for _i: int in 200:
 		sim.tick()
 	_check(int(sim.sink.get(&"ingot", 0)) > 0, "the hand-built chain forged ingots (%d)" % int(sim.sink.get(&"ingot", 0)))
@@ -303,9 +306,10 @@ func _test_inventory_slots() -> void:
 	sim.set_solid(Vector2i(1, 2), &"ore")
 	sim.mine(Vector2i(1, 1))
 	sim.mine(Vector2i(1, 2))
+	var carried: int = int(sim.inventory.get(&"ore", 0))
 	var slots: Array[Dictionary] = sim.inventory_slots()
-	_check(slots.size() == 1, "two ore = one stack")
-	_check(slots[0]["item"] == &"ore" and int(slots[0]["count"]) == 2, "ore stack shows count 2")
+	_check(slots.size() == 1, "two mined ore blocks = one stack")
+	_check(slots[0]["item"] == &"ore" and int(slots[0]["count"]) == carried, "the ore stack shows the carried count (%d)" % carried)
 	sim.inventory[&"ingot"] = 3  # a second item type appears as a second slot, after ore
 	slots = sim.inventory_slots()
 	_check(slots.size() == 2, "second item type = second slot")
@@ -393,11 +397,12 @@ func _test_craft_and_build() -> void:
 	sim.set_solid(Vector2i(9, 1), &"ore")
 	sim.mine(Vector2i(9, 0))
 	sim.mine(Vector2i(9, 1))
-	sim.deposit(Vector2i(4, 4), &"ore", 2)
+	var held: int = int(sim.inventory.get(&"ore", 0))
+	sim.deposit(Vector2i(4, 4), &"ore", held)
 	_check(int(sim.inventory.get(&"ore", 0)) == 0, "ore handed into the machine left the pack")
 	_check(sim.pickup_machine(Vector2i(4, 4)), "picked the machine back up")
 	_check(int(sim.inventory.get(&"processor", 0)) == 1, "the machine item returned to the pack")
-	_check(int(sim.inventory.get(&"ore", 0)) == 2, "the machine's held ore was salvaged back to the pack")
+	_check(int(sim.inventory.get(&"ore", 0)) == held, "the machine's held ore was salvaged back to the pack (%d)" % held)
 	for item: StringName in [&"ore", &"ingot"]:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
@@ -520,22 +525,27 @@ func _test_lift() -> void:
 func _test_finite_deposit_and_drill() -> void:
 	print("- cavity mining + drill")
 	# Hand-mining an ore BLOCK (cavity model, docs/MINING.md): ONE strike clears the whole block, drops a
-	# 3-8 BURST into the pack, and exposes the leftover richness as a wall DEPOSIT a drill can tap.
+	# 3-6 loose BURST into the pack, and exposes the block's whole CHUNK as a wall DEPOSIT a drill can tap.
 	var sim: FactorySim = FactorySim.new()
 	var cell := Vector2i(4, 6)
 	sim.set_solid(cell, &"ore")
-	sim.deposits[cell] = 12                             # a rich block: a hand-burst + a fat deposit left over
+	sim.deposits[cell] = 12                             # the block's chunk — the deposit exposed for the drill
 	var mat: StringName = sim.mine(cell)
 	var burst: int = int(sim.inventory.get(&"ore", 0))
 	_check(mat == &"ore" and not sim.is_solid(cell), "one strike breaks the whole ore block")
-	_check(burst >= 3 and burst <= 8, "hand-mining drops a 3-8 burst (got %d)" % burst)
-	_check(sim.ore_deposit_at(cell) == 12 - burst, "the leftover richness is exposed as a wall deposit")
+	_check(burst >= 3 and burst <= 6, "hand-mining drops a 3-6 loose burst (got %d)" % burst)
+	_check(sim.ore_deposit_at(cell) == 12, "the whole chunk is exposed as a deposit, independent of the burst")
 	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "burst ore conserved (the deposit is latent)")
-	# A THIN vein (richness 3) is a pure hand-grab — the burst takes it all, nothing left to drill.
-	var thin := Vector2i(9, 9)
-	sim.set_solid(thin, &"ore"); sim.deposits[thin] = 3
-	sim.mine(thin)
-	_check(sim.ore_deposit_at(thin) == 0, "a thin vein leaves no deposit (fully hand-grabbed)")
+	# CONSISTENCY — the near-spawn-vs-deep confusion: EVERY ore block leaves a deposit, a small one and a big
+	# one alike; there is no "this vein gives nothing" special case (a seeded-small cell + an UNSEEDED cell).
+	var small := Vector2i(9, 9)
+	sim.set_solid(small, &"ore"); sim.deposits[small] = 4
+	sim.mine(small)
+	_check(sim.ore_deposit_at(small) == 4, "a SMALL vein still exposes its full deposit (consistent with rich ones)")
+	var bare := Vector2i(11, 9)                          # an ore cell with NO seeded richness
+	sim.set_solid(bare, &"ore")
+	sim.mine(bare)
+	_check(sim.ore_deposit_at(bare) == FactorySim.DEFAULT_ORE_DEPOSIT, "an unseeded ore cell exposes the default chunk (never zero)")
 
 	# The DRILL caps an exposed deposit and pulls it DOWN to a forge/floor, stopping when the deposit is dry.
 	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
@@ -565,14 +575,14 @@ func _test_finite_deposit_and_drill() -> void:
 ## no coal → it idles; fed coal → it runs and burns the coal. A drill on a COAL deposit yields coal.
 func _test_coal_and_fuel() -> void:
 	print("- coal mining + drill fuel")
-	# Coal mines via the cavity model: a 3-8 COAL burst + a coal deposit that remembers it yields coal.
+	# Coal mines via the cavity model: a 3-6 COAL burst + the full coal chunk as a deposit that yields coal.
 	var sim: FactorySim = FactorySim.new()
 	var cc := Vector2i(3, 4)
 	sim.set_solid(cc, &"coal"); sim.deposits[cc] = 12
 	sim.mine(cc)
 	var cb: int = int(sim.inventory.get(&"coal", 0))
-	_check(cb >= 3 and cb <= 8, "mining coal drops a 3-8 coal burst (got %d)" % cb)
-	_check(sim.ore_deposit_at(cc) == 12 - cb, "coal leaves a drillable deposit")
+	_check(cb >= 3 and cb <= 6, "mining coal drops a 3-6 coal burst (got %d)" % cb)
+	_check(sim.ore_deposit_at(cc) == 12, "coal exposes its full chunk as a drillable deposit")
 	_check(StringName(sim.deposit_item.get(cc, &"")) == &"coal", "the deposit remembers it yields coal")
 	_check(_items_present(sim, &"coal") == int(sim.total_produced.get(&"coal", 0)), "coal conserved")
 

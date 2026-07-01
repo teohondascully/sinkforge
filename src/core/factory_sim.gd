@@ -56,14 +56,21 @@ var solid: Dictionary = {}
 ## cell is solid. Mining a block leaves its wall (Terraria-style). Read-only to the view (wall_at);
 ## written only by load_world / set_wall. Not collision (you walk through walls), not "items present".
 var wall: Dictionary = {}
-## Ore-block RICHNESS (cell -> total yield), over SOLID ore cells (docs/MINING.md). Absent ore cell = 1.
-## When you HAND-mine an ore block you get a burst of it (3-8) and the REMAINDER is revealed as a wall
-## deposit (`ore_deposits`) a drill taps. Latent world resource, NOT "items present" — conservation-neutral.
+## Ore-block CHUNK size (cell -> drillable yield), over SOLID ore cells (docs/MINING.md). When you HAND-mine
+## an ore block you grab a LOOSE burst (3-6) AND this whole chunk is exposed as a wall deposit (`ore_deposits`)
+## a drill taps — deeper blocks carry bigger chunks. Latent world resource, NOT "items present" — conservation-
+## neutral (realized only as the drill extracts it). Absent ore cell defaults to DEFAULT_ORE_DEPOSIT.
 var deposits: Dictionary = {}
+## The chunk a hand-mined ore block exposes when it had no explicit richness seeded — so EVERY ore block
+## leaves a drillable deposit, near-spawn and deep alike (no confusing "this one vein gives nothing" case).
+## Factorio-scale: deposits are in the HUNDREDS near spawn, THOUSANDS deep — the factory feeds off them for
+## a long time (the 3-6 hand burst is just a taste; the drill mines the patch).
+const DEFAULT_ORE_DEPOSIT: int = 250
 ## Exposed wall DEPOSITS (cell -> remaining yield), the cavity model: hand-mining an ore block clears the
-## block and, if richness was left over, reveals a glittering deposit IN THE WALL of the now-open cell. A
-## Drill placed on that open cell drains the pool, ejecting ore down its column until it runs dry. Also a
-## latent pool (conservation-neutral); the ore is total_produced only as the drill actually extracts it.
+## block and ALWAYS reveals its chunk as a glittering deposit IN THE WALL of the now-open cell (near-spawn
+## and deep alike — no "this vein gives nothing" case). A Drill placed on that open cell drains the pool,
+## ejecting ore down its column until it runs dry. Latent pool (conservation-neutral); the ore is
+## total_produced only as the drill actually extracts it.
 var ore_deposits: Dictionary = {}
 ## What each exposed deposit YIELDS (cell -> item, &"ore"/&"coal"). Set when the block is mined, read by the
 ## Drill so it ejects the right material — so a drill on a coal cavity makes coal, on an ore cavity makes ore.
@@ -236,20 +243,20 @@ func mine(cell: Vector2i) -> StringName:
 	var material: StringName = solid[cell]
 	if _is_ore_like(material):
 		# CAVITY model (docs/MINING.md): one strike breaks the whole ORE-LIKE block (ore or coal — both drop
-		# their own item the same way). You pocket a juicy BURST (3-8, capped by the vein's richness), the
-		# block clears (wall kept), and any RICHNESS left over is revealed as a glittering wall DEPOSIT a
-		# drill can tap (it remembers the material via deposit_item). Thin surface veins are a pure hand-grab
-		# (no remainder → no deposit); deep rich veins leave a big deposit to automate (deeper = richer).
-		var richness: int = int(deposits.get(cell, 1))
-		var burst: int = mini(richness, _ore_burst(cell))
+		# their own item the same way). You pocket a handful of LOOSE ore (a 3-6 burst), and the block's whole
+		# CHUNK is exposed as a glittering wall DEPOSIT (wall kept) that a drill taps over time (it remembers
+		# the material via deposit_item). This happens for EVERY ore block — the near-spawn vein and the deep
+		# rich veins alike (deeper just carries a bigger chunk) — so breaking ore ALWAYS leaves something to
+		# automate. The burst is a loose-ore bonus, SEPARATE from the chunk; both count as produced when they
+		# actually enter the pack / are drilled, so conservation holds (the un-drilled chunk stays latent).
+		var chunk: int = int(deposits.get(cell, DEFAULT_ORE_DEPOSIT))
+		var burst: int = _ore_burst(cell)
 		inventory[material] = int(inventory.get(material, 0)) + burst
 		total_produced[material] = int(total_produced.get(material, 0)) + burst
 		deposits.erase(cell)
 		solid.erase(cell)
-		var remainder: int = richness - burst
-		if remainder > 0:
-			ore_deposits[cell] = remainder
-			deposit_item[cell] = material
+		ore_deposits[cell] = chunk
+		deposit_item[cell] = material
 		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
@@ -440,7 +447,7 @@ func _is_ore_like(material: StringName) -> bool:
 ## vein's richness (a thin vein gives less).
 func _ore_burst(cell: Vector2i) -> int:
 	var h: int = (int(cell.x) * 73856093) ^ (int(cell.y) * 19349663)
-	return 3 + (absi(h) % 6)   # 3..8
+	return 3 + (absi(h) % 4)   # 3..6 loose ore grabbed by hand (the chunk itself is the drill's job)
 
 
 ## Remaining yield of the exposed wall deposit at `cell` (0 if none) — read by the Drill, the hover

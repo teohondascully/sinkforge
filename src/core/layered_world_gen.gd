@@ -45,15 +45,15 @@ const COAL_ATTEMPTS_PER_COL: float = 1.2
 const COAL_CHANCE_DEEP: float = 0.95
 const COAL_SIZE_MIN: int = 2
 const COAL_SIZE_DEPTH_BONUS: int = 5
-const COAL_AMOUNT_BASE: int = 5
-const COAL_AMOUNT_DEPTH_BONUS: int = 30
-## Per-cell ore-block RICHNESS (total ore in one cell; the cavity model, docs/MINING.md). Hand-mining the
-## block pockets a 3-8 BURST and reveals the REMAINDER as a drillable wall deposit, so richness must exceed
-## the burst for deep veins to leave something worth automating. Depth-scaled: a shallow cell ~BASE (mostly
-## a hand-grab, thin/zero deposit); a bottom-of-world cell ~BASE+BONUS (a fat deposit a Drill runs on for a
-## long time — deeper = richer = the automation pull). Same depth_frac as vein size/chance.
-const ORE_AMOUNT_BASE: int = 6
-const ORE_AMOUNT_DEPTH_BONUS: int = 44
+const COAL_AMOUNT_BASE: int = 200        # Factorio-scale (hundreds shallow → thousands deep), like ore
+const COAL_AMOUNT_DEPTH_BONUS: int = 2300
+## Per-cell ore-block CHUNK (the drillable deposit one block exposes; the cavity model, docs/MINING.md).
+## Hand-mining the block pockets a 3-6 loose burst AND exposes this whole chunk as a wall deposit a Drill
+## runs on. Factorio-scale + depth-scaled: a shallow cell ~BASE (HUNDREDS), a bottom-of-world cell ~BASE+BONUS
+## (THOUSANDS — a fat patch a Drill mines for a very long time; deeper = richer = the automation pull). Same
+## depth_frac as vein size/chance.
+const ORE_AMOUNT_BASE: int = 250
+const ORE_AMOUNT_DEPTH_BONUS: int = 2750
 
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
