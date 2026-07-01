@@ -628,6 +628,42 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 	_draw_machine_io(machine, pos)
+	_draw_machine_status(machine, pos)
+
+
+## Factorio-style legibility: a small STATUS LAMP on every machine (green working / red no-fuel /
+## amber starved / grey idle) + a blinking floating NEED bubble carrying the missing item's glyph when
+## a machine is stalled (no fuel → coal, starved → its input). Reads FactorySim.machine_status (the sim's
+## own run-gates, so it can't lie). Pure cosmetic — drawn glyphs, no emojis. The direct fix for "why has
+## my drill gone quiet?" — the answer is now ON the machine, like Factorio.
+func _draw_machine_status(machine: MachineState, pos: Vector2) -> void:
+	var status: StringName = sim.machine_status(machine)
+	var lamp: Color
+	match status:
+		&"working": lamp = Color(0.35, 0.92, 0.42)
+		&"no_fuel": lamp = Color(0.96, 0.26, 0.20)
+		&"no_input": lamp = Color(0.97, 0.72, 0.22)
+		_: lamp = Color(0.52, 0.55, 0.62)          # idle
+	# Status lamp: a rimmed dot in the machine's top-left corner (mirrors Factorio's entity status light).
+	var lamp_c: Vector2 = pos + Vector2(5.5, 5.5)
+	draw_circle(lamp_c, 4.2, Color(0.03, 0.03, 0.05, 0.9))
+	draw_circle(lamp_c, 3.1, lamp)
+	if status == &"working":
+		return                                       # green = fine; no floating alarm
+	if status == &"idle":
+		return                                       # benign (empty mover); lamp is enough
+	# Stalled (no_fuel / no_input) → a blinking bubble floats above the machine carrying WHAT it needs.
+	var need: StringName = &"ore"
+	if status == &"no_fuel":
+		need = &"coal"
+	elif machine.def.recipe != null and not machine.def.recipe.inputs.is_empty():
+		need = machine.def.recipe.inputs.keys()[0]
+	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
+	var bob: float = sin(_anim_time * 3.0) * 1.5
+	var bc: Vector2 = pos + Vector2(float(CELL) * 0.5, -24.0 + bob)
+	draw_circle(bc, 9.0, Color(0.05, 0.04, 0.06, 0.82 * pulse))
+	draw_arc(bc, 9.0, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
+	Visuals.draw_item(self, bc, 11.0, need)
 
 
 ## A small NAME plate centred just above the machine (FORGE / DRILL / LIFT / GENERATOR), so a new player

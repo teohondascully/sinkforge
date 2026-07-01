@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_conduit_network()
 	_test_powered_lift()
 	_test_automated_line()
+	_test_machine_status()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -965,6 +966,49 @@ func _test_powered_lift() -> void:
 ## ore FALLS into the forge (gravity is the conveyor, the locked hook); the forge smelts; ingots pile on the
 ## floor — all with ZERO hand-mining or hand-feeding once placed. If this breaks, the rung the player is
 ## being guided toward is unbuildable. Conservation must hold throughout.
+## machine_status is the read-only legibility mirror of the run-gates (Slice A). It must report exactly
+## what _run_machine would do THIS tick — no fuel/no input/idle/working — so the on-machine status lamp
+## can't lie. Pure query, no mutation.
+func _test_machine_status() -> void:
+	print("- machine status (legibility mirror)")
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var hopper_def: MachineDef = load("res://src/data/machines/hopper.tres")
+
+	# Drill on ore, no coal → no_fuel; fed coal → working.
+	var sim: FactorySim = FactorySim.new()
+	var ore := Vector2i(6, 4)
+	sim.set_solid(ore, &"ore"); sim.deposits[ore] = 20
+	sim.set_solid(Vector2i(6, 8), &"stone")
+	sim.mine(ore)
+	var drill: MachineState = sim.place_machine(drill_def, ore)
+	_check(sim.machine_status(drill) == &"no_fuel", "unfueled drill on ore reads no_fuel")
+	drill.input_buffer[&"coal"] = 5
+	_check(sim.machine_status(drill) == &"working", "fueled drill on ore reads working")
+
+	# Drill with nothing borable below (over plain stone) → no_input.
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(3, 6), &"stone")
+	var idle_drill: MachineState = s2.place_machine(drill_def, Vector2i(3, 5))
+	idle_drill.input_buffer[&"coal"] = 5
+	_check(s2.machine_status(idle_drill) == &"no_input", "drill with no ore below reads no_input")
+
+	# Forge: starved → no_input; fed its ingredient → working.
+	var s3: FactorySim = FactorySim.new()
+	var forge: MachineState = s3.place_machine(proc_def, Vector2i(4, 3))
+	_check(s3.machine_status(forge) == &"no_input", "starved forge reads no_input")
+	var need: StringName = proc_def.recipe.inputs.keys()[0]
+	forge.input_buffer[need] = int(proc_def.recipe.inputs[need])
+	_check(s3.machine_status(forge) == &"working", "fed forge reads working")
+
+	# Hopper: empty → idle (benign); holding items → working.
+	var s4: FactorySim = FactorySim.new()
+	var hopper: MachineState = s4.place_machine(hopper_def, Vector2i(2, 2))
+	_check(s4.machine_status(hopper) == &"idle", "empty hopper reads idle")
+	hopper.input_buffer[&"ore"] = 3
+	_check(s4.machine_status(hopper) == &"working", "loaded hopper reads working")
+
+
 func _test_automated_line() -> void:
 	print("- automated ore→ingot line (Rung 1)")
 	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")

@@ -134,6 +134,34 @@ func machine_at(cell: Vector2i) -> MachineState:
 	return grid.get(cell, null)
 
 
+## Read-only status of a machine THIS tick, mirroring the run-gates in _run_machine (so legibility can't
+## drift from reality). Pure derivation — no mutation, determinism untouched — the representation reads it to
+## draw a Factorio-style status dot + a "needs-X" glyph. One of:
+##   &"working"  — actively doing its job (producing / moving / burning)
+##   &"no_fuel"  — a drill/generator with no fuel and no coal to burn (the load-bearing one: "feed me coal")
+##   &"no_input" — a recipe machine (forge) starved of ingredients, or a drill with nothing borable below
+##   &"idle"     — a mover (lift/hopper/splitter) with nothing in it right now (benign, not broken)
+func machine_status(machine: MachineState) -> StringName:
+	var b: StringName = machine.def.behavior
+	if b == &"drill":
+		if drill_target(machine.cell).x < 0:
+			return &"no_input"                                    # no ore/cavity below to bore
+		if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
+			return &"no_fuel"
+		return &"working"
+	if b == &"generator":
+		if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
+			return &"no_fuel"
+		return &"working"
+	if b == &"lift" or b == &"hopper" or b == &"splitter":
+		return &"working" if not machine.input_buffer.is_empty() else &"idle"
+	# ordinary recipe machine (e.g. the forge)
+	var recipe: RecipeDef = machine.def.recipe
+	if recipe == null:
+		return &"idle"
+	return &"working" if _has_inputs(machine, recipe) else &"no_input"
+
+
 ## Is this cell solid (any material)? (Representation reads this for collision; sim mutates it only
 ## via set_solid / mine.)
 func is_solid(cell: Vector2i) -> bool:
