@@ -254,13 +254,7 @@ func _draw_terrain(ci: CanvasItem) -> void:
 		if tile != null:
 			ci.draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
 			continue
-		# Darken with depth so the lower world reads as DEEPER, not one flat fill.
-		var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-		var col: Color = def.base_color.darkened(depth * def.depth_darken)
-		# Per-cell tonal jitter (deterministic) so a field of earth isn't ONE flat colour — the single
-		# biggest flat-fill tell. A stable hash nudges each cell's value a few percent up or down.
-		var j: float = _cell_jitter(c)
-		col = col.lightened(j) if j > 0.0 else col.darkened(-j)
+		var col: Color = _cell_fill_color(c, def)
 		ci.draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
 		if def.grain:
 			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
@@ -280,6 +274,17 @@ func _draw_terrain(ci: CanvasItem) -> void:
 				ci.draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
 		_draw_edge_ao(ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
 	_draw_terrain_surface(ci)
+
+
+## The final fill colour for a terrain cell: the material's base, DARKENED with depth (the lower world
+## reads as deeper, not one flat fill) then nudged by the deterministic tonal jitter (so a field of earth
+## isn't ONE flat colour — the biggest flat-fill tell). Extracted so the surface RAMP wedge fills with the
+## exact same colour as the cell body below it — the slope is the same earth mass, not a sticker on top.
+func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
+	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
+	var col: Color = def.base_color.darkened(depth * def.depth_darken)
+	var j: float = _cell_jitter(c)
+	return col.lightened(j) if j > 0.0 else col.darkened(-j)
 
 
 ## A SMOOTH, spatially-coherent value nudge (~[-0.06, +0.06]) — low-frequency sines so neighbouring
@@ -344,23 +349,53 @@ func _draw_terrain_surface(ci: CanvasItem) -> void:
 		var r: int = sim.surface_row(col)
 		if r >= FactorySim.GRID_ROWS:
 			continue  # empty column, no surface
-		var def: MaterialDef = _material(sim.material_at(Vector2i(col, r)))
+		var cell := Vector2i(col, r)
+		var def: MaterialDef = _material(sim.material_at(cell))
 		var edge: Color = def.cap_color if def.has_cap() else def.base_color.lightened(0.18)
 		var px := float(col * CELL)
 		var py := float(r * CELL)
-		match sim.ramp_dir(col):
-			1:  # rising to the right — fill the air corner above with a 45° slope
-				var lo := Vector2(px, py)
-				var hi := Vector2(px + CELL, py - CELL)
-				ci.draw_colored_polygon([lo, Vector2(px + CELL, py), hi], def.base_color)
-				ci.draw_line(lo, hi, edge, 3.0)
-			-1:  # rising to the left
-				var lo2 := Vector2(px + CELL, py)
-				var hi2 := Vector2(px, py - CELL)
-				ci.draw_colored_polygon([lo2, Vector2(px, py), hi2], def.base_color)
-				ci.draw_line(lo2, hi2, edge, 3.0)
-			_:  # flat top: a capped lip
-				ci.draw_rect(Rect2(px, py, float(CELL), 4.0), edge)
+		var dir: int = sim.ramp_dir(col)
+		if dir == 0:
+			ci.draw_rect(Rect2(px, py, float(CELL), 4.0), edge)  # flat top: a capped lip
+			continue
+		# A 45° ramp wedge over the air corner. It's the SAME earth mass as the cell below, so it fills with
+		# the cell's own body colour (not flat base_color) and carries a CONCAVE scoop: a per-vertex gradient
+		# lights the top cap edge and pools shadow at the inner base corner, so the slope reads as a rounded,
+		# carved earth shoulder instead of a flat triangular sticker. The WALKED hypotenuse (cap edge) stays
+		# exactly on the 45° line the sim authority defines — only shading is added, never the geometry.
+		var body: Color = _cell_fill_color(cell, def)
+		var foot := Vector2(px, py) if dir == 1 else Vector2(px + CELL, py)         # the low (flat-side) corner
+		var outer := Vector2(px + CELL, py) if dir == 1 else Vector2(px, py)        # bottom corner under the peak
+		var peak := Vector2(px + CELL, py - CELL) if dir == 1 else Vector2(px, py - CELL)  # the raised cap corner
+		# draw_polygon lets each vertex carry its own colour → the gradient. Cap corners lit, base pooled dark.
+		var lit: Color = body.lightened(0.10)
+		var pooled: Color = body.darkened(0.16)
+		ci.draw_polygon(PackedVector2Array([foot, outer, peak]),
+			PackedColorArray([pooled, pooled, lit]))
+		# A second, tighter shadow triangle hugging the inner (base) corner deepens the concave scoop.
+		var mid := (foot + outer) * 0.5
+		ci.draw_polygon(PackedVector2Array([foot, mid, outer]),
+			PackedColorArray([Color(0,0,0,0.14), Color(0,0,0,0.05), Color(0,0,0,0.14)]))
+		# A couple of grain speckles so the wedge carries the same rock texture as the body (not a smooth face).
+		# The wedge occupies the CELL-box ABOVE the cell top (py-CELL..py); speckles are placed there and kept
+		# only if they fall under the diagonal (inside the triangle), so no fleck floats out over open air.
+		if def.grain:
+			var wedge_top := Vector2(px, py - CELL)
+			for sp: Vector2 in _cell_speckles(cell, 2):
+				if _in_ramp(sp, dir):
+					ci.draw_rect(Rect2(wedge_top + sp - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body.darkened(0.22))
+		# The cap edge (grass/lip) rides the diagonal, with a soft dark liner just under it for a carved rim.
+		ci.draw_line(foot, peak, edge.darkened(0.35), 4.0)
+		ci.draw_line(foot, peak, edge, 3.0)
+
+
+## True when a local point (0..CELL within the wedge's upper box) falls UNDER the 45° diagonal — i.e. inside
+## the filled ramp triangle. Keeps grain speckles on the earth and off the open-air side. Mirrors the two
+## ramp orientations: rising-right fills where x+y ≥ CELL; rising-left where y ≥ x.
+func _in_ramp(local: Vector2, dir: int) -> bool:
+	if dir == 1:
+		return local.x + local.y >= float(CELL)
+	return local.y >= local.x
 
 
 ## The current objective's WHERE-cell(s), drawn as a breathing beacon so a new player can't miss where to
