@@ -32,6 +32,11 @@ const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
 const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine (docs/MINING.md)
+## How far STRAIGHT DOWN (cells, incl. the drill's own cell) a Drill reaches for an exposed deposit to bore.
+## The drill is a vertical borer — it taps the first exposed `ore_deposits` cavity in its own column within
+## this reach, so you can drop it anywhere in the shaft ABOVE a cavity instead of hitting the exact cell
+## (the old exact-cell-only model felt finicky). Stays on the gravity hook (down-only) + single-cell drain.
+const DRILL_REACH: int = 4
 const POWER_AURA: int = 2               ## innate radius (cells) a generator powers WITHOUT any conduit
 ## CONDUITS carry power further than the aura — DOWN + LATERAL, never UP (a U-shape delivers as an L).
 ## That "no up" rule makes the network acyclic top-to-bottom, so the field resolves in a SINGLE downward
@@ -793,20 +798,34 @@ func _run_splitter(machine: MachineState) -> void:
 	machine.input_buffer.clear()
 
 
+## The exposed deposit a Drill at `cell` bores — the first cell with a live `ore_deposits` pool scanning
+## STRAIGHT DOWN from the drill's own cell through DRILL_REACH cells. (-1,-1) if none in reach. This is the
+## forgiving-placement fix: a drill dropped anywhere in the shaft above a cavity finds it, instead of
+## demanding the exact cell. Down-only keeps it on the gravity hook; the caller drains ONE unit/cycle so
+## it never becomes a multi-cell harvester (the deferred lateral feature). Pure read — hover + sim share it.
+func drill_target(cell: Vector2i) -> Vector2i:
+	for dy: int in range(0, DRILL_REACH):
+		var c := Vector2i(cell.x, cell.y + dy)
+		if int(ore_deposits.get(c, 0)) > 0:
+			return c
+	return Vector2i(-1, -1)
+
+
 ## A DRILL automates the by-hand ore mine (docs/MINING.md, cavity model): you hand-mine an ore block first
-## (the friction that earns the automation), exposing a wall DEPOSIT; placed ON that open cavity cell, the
-## drill taps `ore_deposits` AT ITS OWN CELL, draining one unit per cycle and ejecting one ore DOWN its
-## column (gravity carries it to a forge/collection). Off a deposit → it idles. When the deposit runs dry
-## the drill goes quiet ("patch exhausted — relocate it"). The ore is genuinely produced from the world →
-## total_produced (same accounting as hand-mining); it draws from the WORLD, not an input buffer, so its
-## output is ejected here, not via the normal output-buffer _flow.
+## (the friction that earns the automation), exposing a wall DEPOSIT; placed anywhere in the shaft above
+## that cavity (within DRILL_REACH), the drill BORES STRAIGHT DOWN to the first exposed `ore_deposits`
+## cavity in its column, draining one unit per cycle and ejecting one ore DOWN from there (gravity carries
+## it to a forge/collection). No cavity in reach → it idles. When the deposit runs dry the drill goes quiet
+## ("patch exhausted — relocate it"). The ore is genuinely produced from the world → total_produced (same
+## accounting as hand-mining); it draws from the WORLD, not an input buffer, so its output is ejected here.
 func _run_drill(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
-	var pool: int = int(ore_deposits.get(machine.cell, 0))
-	if pool <= 0:
-		return                          # not on an exposed deposit — idle, hold progress
+	var target: Vector2i = drill_target(machine.cell)
+	if target.x < 0:
+		return                          # no exposed deposit in reach below — idle, hold progress
+	var pool: int = int(ore_deposits.get(target, 0))
 	# FUEL: the drill burns COAL to run (the demand-web — automating ore creates demand for coal). Burn one
 	# tick of the current coal; when it's spent, refuel from the coal in its input buffer. No fuel + no coal
 	# → the drill goes quiet (idle, holds progress) until you feed it more coal.
@@ -826,18 +845,19 @@ func _run_drill(machine: MachineState) -> void:
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
-	var item: StringName = StringName(deposit_item.get(machine.cell, &"ore"))   # the deposit's own material
+	var item: StringName = StringName(deposit_item.get(target, &"ore"))   # the tapped deposit's own material
 	pool -= 1
 	if pool > 0:
-		ore_deposits[machine.cell] = pool
+		ore_deposits[target] = pool
 	else:
-		ore_deposits.erase(machine.cell)   # deposit spent — drill idles next cycle
-		deposit_item.erase(machine.cell)
-	# Eject the freed material DOWN the drill's own column, where gravity carries it to a forge/collection.
+		ore_deposits.erase(target)         # deposit spent — drill idles next cycle (unless another is in reach)
+		deposit_item.erase(target)
+	# Eject the freed material DOWN from the tapped cavity (still the drill's own column), where gravity
+	# carries it to a forge/collection. `from` = the cavity so the falling-item visual pours from the vein.
 	total_produced[item] = int(total_produced.get(item, 0)) + 1
-	var dest: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
+	var dest: Dictionary = _column_landing(target.x, target.y + 1)
 	dest["target"][item] = int(dest["target"].get(item, 0)) + 1
-	flow_events.append({"item": item, "from": machine.cell, "to": dest["to_cell"], "count": 1})
+	flow_events.append({"item": item, "from": target, "to": dest["to_cell"], "count": 1})
 
 
 ## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;

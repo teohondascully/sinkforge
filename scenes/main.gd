@@ -735,11 +735,12 @@ func _hover_info() -> Dictionary:
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"drill":
-			var dep2: int = sim.ore_deposit_at(m.cell)
+			var tgt: Vector2i = sim.drill_target(m.cell)         # the cavity it bores (own cell or below, in reach)
+			var dep2: int = sim.ore_deposit_at(tgt) if tgt.x >= 0 else 0
 			var coal: int = int(m.input_buffer.get(&"coal", 0))
 			var fueled: bool = m.fuel > 0 or coal > 0
 			if dep2 <= 0:
-				info["mode"] = "idle — no deposit here (relocate over a mined ore cavity)"
+				info["mode"] = "idle — no deposit below in reach (place it over a mined ore cavity)"
 			elif not fueled:
 				info["mode"] = "OUT OF COAL — drop coal on it to run  (%d ore left)" % dep2
 			else:

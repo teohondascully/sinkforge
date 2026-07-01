@@ -570,6 +570,26 @@ func _test_finite_deposit_and_drill() -> void:
 		s2.tick()
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
 
+	# FORGIVING PLACEMENT (the "finicky radius" fix): a drill dropped in the shaft ABOVE a cavity (not on the
+	# exact cell) still BORES STRAIGHT DOWN to it within DRILL_REACH — you don't have to hit the pixel-cell.
+	var s3: FactorySim = FactorySim.new()
+	var vein := Vector2i(6, 10)
+	s3.set_solid(vein, &"ore"); s3.deposits[vein] = 8
+	s3.set_solid(Vector2i(6, 13), &"stone")            # floor below the vein
+	s3.mine(vein)                                      # expose the cavity at row 10
+	var above := Vector2i(6, 10 - 2)                   # place the drill TWO cells up the open shaft
+	_check(s3.drill_target(above) == vein, "a drill above the cavity finds it straight down (forgiving reach)")
+	var d3: MachineState = s3.place_machine(drill_def, above)
+	d3.input_buffer[&"coal"] = 20
+	var pool3: int = s3.ore_deposit_at(vein)
+	for _i: int in 100 + pool3 * 25:
+		s3.tick()
+	_check(s3.ore_deposit_at(vein) == 0, "the offset drill drained the deposit below it dry")
+	_check(_items_present(s3, &"ore") == int(s3.total_produced.get(&"ore", 0)), "ore conserved through the offset drill")
+	# ...but a cavity BEYOND the reach is not tapped (down-only, bounded — no teleporting harvest).
+	var far := Vector2i(6, 10 + FactorySim.DRILL_REACH + 1)
+	_check(s3.drill_target(far) == Vector2i(-1, -1), "a drill far above the cavity (past reach) finds nothing")
+
 
 ## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:
 ## no coal → it idles; fed coal → it runs and burns the coal. A drill on a COAL deposit yields coal.
