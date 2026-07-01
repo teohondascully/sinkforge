@@ -91,6 +91,7 @@ func _ready() -> void:
 		load("res://src/data/machines/splitter.tres"),
 		load("res://src/data/machines/lift.tres"),
 		load("res://src/data/machines/drill.tres"),  # automates ore extraction (docs/MINING.md)
+		load("res://src/data/machines/hopper.tres"),  # stockpiles + meters gravity-fed output (the 'chest')
 		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
 		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
 	]
@@ -763,6 +764,11 @@ func _hover_info() -> Dictionary:
 			info["mode"] = "lifts goods + you UP" + ("  (POWERED ×%.1f)" % (1.0 + (float(FactorySim.LIFT_POWERED_THROUGHPUT) / float(FactorySim.LIFT_THROUGHPUT) - 1.0) * m.power_factor) if m.power_factor > 0.05 else "  (unpowered baseline)")
 		&"splitter":
 			info["mode"] = "splits the flow DOWN + RIGHT"
+		&"hopper":
+			var stock: int = 0
+			for it: StringName in m.input_buffer:
+				stock += int(m.input_buffer[it])
+			info["mode"] = "stockpiles %d — banks what falls in, feeds a machine below" % stock
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"drill":

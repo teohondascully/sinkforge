@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_coal_and_fuel()
 	_test_trees_and_wood()
 	_test_mining_rules()
+	_test_hopper()
 	_test_drop_toss()
 	_test_block_placement_and_bazaar()
 	_test_power_field()
@@ -735,6 +736,44 @@ func _test_mining_rules() -> void:
 	var poor: FactorySim = FactorySim.new()
 	poor.inventory[&"stone"] = 2
 	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
+
+
+## HOPPER (storage + metered feed): the missing 'chest'. It stockpiles what falls in, meters it DOWN to a
+## machine below with BACK-PRESSURE (holds once the consumer is backed up), and HOLDS everything when there
+## is no consumer below (pure storage). Items only move → conservation holds throughout.
+func _test_hopper() -> void:
+	print("- hopper (storage + metered feed)")
+	var hopper_def: MachineDef = load("res://src/data/machines/hopper.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	# Metered feed: a hopper above a forge banks a burst of ore and trickles it down; the forge smelts it,
+	# and back-pressure keeps the forge's buffer small (the bulk stays banked in the hopper).
+	var sim: FactorySim = FactorySim.new()
+	var hopper: MachineState = sim.place_machine(hopper_def, Vector2i(3, 4))
+	var forge: MachineState = sim.place_machine(proc_def, Vector2i(3, 6))
+	sim.set_solid(Vector2i(3, 9), &"stone")            # floor: ingots land as a pile
+	hopper.input_buffer[&"ore"] = 20                   # dump a burst in
+	sim.total_produced[&"ore"] = 20                    # account it
+	var forge_peak: int = 0
+	for _i: int in 300:
+		sim.tick()
+		forge_peak = maxi(forge_peak, int(forge.input_buffer.get(&"ore", 0)))
+	_check(int(hopper.input_buffer.get(&"ore", 0)) < 20, "the hopper released its stockpile downward over time")
+	_check(int(sim.total_produced.get(&"ingot", 0)) > 0, "metered ore reached the forge and got smelted")
+	_check(forge_peak <= FactorySim.HOPPER_FEED_CAP + FactorySim.HOPPER_RELEASE,
+		"back-pressure kept the forge's buffer small (peak=%d) — the bulk stayed banked" % forge_peak)
+	for item: StringName in [&"ore", &"ingot"]:
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(_items_present(sim, item) == net, "%s conserved through the hopper (present=%d, net=%d)" % [item, _items_present(sim, item), net])
+	# Storage mode: a hopper with NO machine below (just floor) HOLDS its whole stockpile — it never spills.
+	var s2: FactorySim = FactorySim.new()
+	var store: MachineState = s2.place_machine(hopper_def, Vector2i(5, 4))
+	s2.set_solid(Vector2i(5, 6), &"stone")             # a floor below, but no machine to feed
+	store.input_buffer[&"ore"] = 10
+	s2.total_produced[&"ore"] = 10
+	for _i: int in 100:
+		s2.tick()
+	_check(int(store.input_buffer.get(&"ore", 0)) == 10, "with no consumer below, the hopper HOLDS its whole stockpile (storage)")
+	_check(_items_present(s2, &"ore") == 10, "the held stockpile is conserved")
 
 
 ## DROP / TOSS (the central "gravity is the conveyor" feeding verb): letting go of a stack above a column

@@ -32,6 +32,12 @@ const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
 const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine (docs/MINING.md)
+## HOPPER (storage): it STOCKPILES what falls into it (input_buffer = the store, unbounded) and meters it
+## back DOWN to a machine below with BACK-PRESSURE — only feeding while the consumer's buffer is under
+## FEED_CAP, so the stockpile stays in the hopper (a visible bank) instead of overflowing the forge. No
+## consumer below → it just holds. The missing 'chest': drills funnel here, it buffers bursts, feeds steady.
+const HOPPER_RELEASE: int = 1           ## items released downward per tick when the consumer has room
+const HOPPER_FEED_CAP: int = 3          ## hold releasing once the machine below is backed up to this many
 ## How far STRAIGHT DOWN (cells, incl. the drill's own cell) a Drill reaches for an exposed deposit to bore.
 ## The drill is a vertical borer — it taps the first exposed `ore_deposits` cavity in its own column within
 ## this reach, so you can drop it anywhere in the shaft ABOVE a cavity instead of hitting the exact cell
@@ -744,6 +750,9 @@ func _run_machine(machine: MachineState) -> void:
 	if machine.def.behavior == &"generator":
 		_run_generator(machine)
 		return
+	if machine.def.behavior == &"hopper":
+		_run_hopper(machine)
+		return
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
@@ -802,6 +811,50 @@ func _run_splitter(machine: MachineState) -> void:
 	for item: StringName in machine.input_buffer:
 		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + int(machine.input_buffer[item])
 	machine.input_buffer.clear()
+
+
+## A HOPPER stockpiles what falls into it (its input_buffer IS the store — unbounded, the missing 'chest')
+## and meters it back DOWN to feed a machine below, with BACK-PRESSURE: it only releases while the consumer
+## below is under HOPPER_FEED_CAP, so the bulk stays banked in the hopper instead of overflowing the forge.
+## No consumer below → it holds everything (pure storage). Items only MOVE (input→output→the machine below),
+## none created/destroyed → conservation holds; the stockpile counts as present (machine buffers do). Many
+## drills funnel here (route their columns together with splitters), it absorbs the burst + feeds steady.
+func _run_hopper(machine: MachineState) -> void:
+	if machine.input_buffer.is_empty():
+		return
+	var below: MachineState = _first_machine_below(machine.cell)
+	if below == null:
+		return                              # nothing to feed → hold the stockpile (storage)
+	var load: int = 0
+	for it: StringName in below.input_buffer:
+		load += int(below.input_buffer[it])
+	if load >= HOPPER_FEED_CAP:
+		return                              # consumer backed up → hold (back-pressure keeps the bank full)
+	var moved: int = 0
+	for item: StringName in machine.input_buffer.keys():
+		if moved >= HOPPER_RELEASE:
+			break
+		var take: int = mini(int(machine.input_buffer[item]), HOPPER_RELEASE - moved)
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + take
+		var left: int = int(machine.input_buffer[item]) - take
+		if left > 0:
+			machine.input_buffer[item] = left
+		else:
+			machine.input_buffer.erase(item)
+		moved += take
+
+
+## The first machine straight below `cell` before any solid floor — the hopper's consumer (or null if a
+## floor/nothing is below). Used for the hopper's feed + back-pressure decision.
+func _first_machine_below(cell: Vector2i) -> MachineState:
+	for row: int in range(cell.y + 1, GRID_ROWS):
+		var c := Vector2i(cell.x, row)
+		var m: MachineState = grid.get(c, null)
+		if m != null:
+			return m
+		if solid.has(c):
+			return null                     # a floor before any machine → nothing to feed
+	return null
 
 
 ## The ore cell a Drill at `cell` bores — scanning STRAIGHT DOWN its own column for the first ore SOURCE:

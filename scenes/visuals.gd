@@ -20,6 +20,8 @@ static func machine_kind(def: MachineDef) -> String:
 		return "generator"
 	if def.behavior == &"conduit":
 		return "conduit"
+	if def.behavior == &"hopper":
+		return "hopper"
 	if def.recipe != null and def.recipe.inputs.is_empty():
 		return "furnace"
 	return "gear"
@@ -37,6 +39,8 @@ static func machine_color(def: MachineDef) -> Color:
 		return Color(0.80, 0.66, 0.26)  # warm electric gold — "burns fuel, makes power"
 	if def.behavior == &"conduit":
 		return Color(0.66, 0.47, 0.30)  # copper — the power-tube material
+	if def.behavior == &"hopper":
+		return Color(0.40, 0.44, 0.52)  # cool gunmetal — a storage bin
 	var recipe: RecipeDef = def.recipe
 	if recipe != null and recipe.inputs.is_empty():
 		return Color(0.82, 0.45, 0.20)
@@ -63,6 +67,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_generator(canvas, center, s, active, t)
 		"conduit":
 			_conduit(canvas, center, s, active, t)
+		"hopper":
+			_hopper(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -153,6 +159,30 @@ static func _conduit(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 	if active:                                                                          # a spark falling down it
 		var sy: float = c.y - 6.0 * s + fmod(t * 26.0, 12.0) * s
 		canvas.draw_circle(Vector2(c.x, sy), 1.7 * s, Color(1.0, 0.96, 0.7))
+
+
+## Hopper (storage bin): an inverted funnel mouth over a bin that holds a MOUND of stockpiled goods, with a
+## chute at the base metering a bit DOWN while feeding (active). The mound + the falling nub read "it banks
+## what pours in and trickles it out" — the chest of the gravity factory.
+static func _hopper(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var steel := Color(0.30, 0.34, 0.42)
+	var lip := Color(0.52, 0.57, 0.66)
+	# Funnel mouth (wide top tapering in) — the catch.
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-8.0 * s, -8.0 * s), c + Vector2(8.0 * s, -8.0 * s),
+		c + Vector2(4.5 * s, -2.0 * s), c + Vector2(-4.5 * s, -2.0 * s)]), steel)
+	canvas.draw_line(c + Vector2(-8.0 * s, -8.0 * s), c + Vector2(8.0 * s, -8.0 * s), lip, 1.6)
+	# Bin body holding a heaped mound of goods.
+	canvas.draw_rect(Rect2(c.x - 4.5 * s, c.y - 2.0 * s, 9.0 * s, 8.0 * s), steel.darkened(0.15))
+	var gold := Color(0.86, 0.66, 0.30)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-4.0 * s, 5.0 * s), c + Vector2(-1.0 * s, 0.5 * s),
+		c + Vector2(1.5 * s, 2.0 * s), c + Vector2(4.0 * s, 5.0 * s)]), gold)  # the stockpile mound
+	# Chute at the base + a nub of goods trickling out while feeding.
+	canvas.draw_rect(Rect2(c.x - 1.6 * s, c.y + 5.5 * s, 3.2 * s, 2.5 * s), steel)
+	if active:
+		var fy: float = c.y + 8.0 * s + fmod(t * 18.0, 5.0) * s
+		canvas.draw_circle(Vector2(c.x, fy), 1.5 * s, gold.lightened(0.2))
 
 
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
