@@ -714,6 +714,14 @@ func _test_block_placement_and_bazaar() -> void:
 	_check(found.size() == 1 and found[0] == o, "find_bazaars locates exactly it")
 	_check(b.near_bazaar(b.bazaar_center(o), 3), "near_bazaar true at the interior")
 	_check(not b.near_bazaar(o + Vector2i(40, 0), 3), "near_bazaar false far away")
+	# WALK-THROUGH: the bazaar is a stall you enter, so its wood FRAME cells (posts + beam) don't block the
+	# body, but its interior FLOOR (plain ground) does, and a lone wood block (e.g. a tree) is never a frame.
+	_check(b.is_bazaar_frame_cell(o + Vector2i(0, 0)), "a top-beam cell is a walk-through frame cell")
+	_check(b.is_bazaar_frame_cell(o + Vector2i(0, 1)), "a post cell is a walk-through frame cell")
+	_check(b.is_bazaar_frame_cell(o + Vector2i(3, 2)), "the completing post is a walk-through frame cell")
+	_check(not b.is_bazaar_frame_cell(o + Vector2i(1, 3)), "the interior FLOOR is solid ground, not a frame cell (you stand on it)")
+	b.set_solid(Vector2i(50, 10), &"wood")             # a lone trunk, no frame around it
+	_check(not b.is_bazaar_frame_cell(Vector2i(50, 10)), "a lone wood block (tree) is NOT a bazaar frame cell (trees still block)")
 	# A wood block dropped INTO the interior breaks it (no longer open).
 	b.set_solid(o + Vector2i(1, 1), &"wood")
 	_check(not b.is_bazaar_at(o), "a blocked interior is no longer a valid bazaar")

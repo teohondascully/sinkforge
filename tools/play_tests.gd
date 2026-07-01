@@ -395,9 +395,9 @@ func _walk_to_bazaar(agent: PlayAgent) -> bool:
 	var bzs: Array[Vector2i] = agent.sim.find_bazaars()
 	if bzs.is_empty():
 		return false
-	# Stand just OUTSIDE the frame on the RIGHT (spawn/shaft) side — the 3-tall frame is a wall you can't
-	# enter, and the whole hand-work + shaft lie to its right, so craft from that side to avoid getting
-	# walled off. The craft radius reaches the interior from beside it.
+	# Stand just outside the frame on the RIGHT (spawn/shaft) side — the whole hand-work + shaft lie to its
+	# right, so crafting from that side keeps the agent on the working side. (The frame is walk-through now,
+	# so this is about staying near the work, not avoiding a wall.) The craft radius reaches the interior.
 	await agent.walk_to_column(bzs[0].x + FactorySim.BAZAAR_W)
 	return agent.main._near_bazaar()
 

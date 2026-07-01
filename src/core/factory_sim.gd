@@ -375,6 +375,24 @@ func find_bazaars() -> Array[Vector2i]:
 	return out
 
 
+## True if `cell` is a WOOD FRAME cell (post or top beam) of a COMPLETED bazaar — the walls of the stall you
+## walk INTO. The body passes through these (the bazaar is a walk-through shop, not a solid box), while the
+## bazaar's interior FLOOR (plain ground, not a frame cell) stays solid so you stand inside it. O(1): only
+## wood cells can qualify, and a cell can belong to at most a BAZAAR_W×BAZAAR_H window of candidate origins.
+func is_bazaar_frame_cell(cell: Vector2i) -> bool:
+	if solid.get(cell, &"") != &"wood":
+		return false
+	for oy: int in range(cell.y - BAZAAR_H + 1, cell.y + 1):
+		for ox: int in range(cell.x - BAZAAR_W + 1, cell.x + 1):
+			if not is_bazaar_at(Vector2i(ox, oy)):
+				continue
+			var rx: int = cell.x - ox
+			var ry: int = cell.y - oy
+			if ry == 0 or rx == 0 or rx == BAZAAR_W - 1:   # top beam, or a side post
+				return true
+	return false
+
+
 ## The interior-centre cell of a bazaar at origin `o` (where the NPC stands / the "here" marker sits).
 func bazaar_center(o: Vector2i) -> Vector2i:
 	return o + Vector2i(BAZAAR_W / 2, BAZAAR_H - 1)

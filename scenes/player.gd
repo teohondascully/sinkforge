@@ -271,7 +271,11 @@ func _blocked(cell: Vector2i) -> bool:
 		return true
 	if cell.y < 0:
 		return false
-	return sim.is_solid(cell) or sim.machine_at(cell) != null
+	# The bazaar is a walk-THROUGH stall: pass through its wood frame (you enter the shop), but everything
+	# else solid — including the bazaar's own interior floor — still blocks. Machines block too.
+	if sim.is_solid(cell) and not sim.is_bazaar_frame_cell(cell):
+		return true
+	return sim.machine_at(cell) != null
 
 
 ## Hug descending terrain WITHOUT the heightmap: after a grounded move that left the body hanging just

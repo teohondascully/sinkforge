@@ -259,12 +259,11 @@ func _make_mote_texture() -> GradientTexture2D:
 ## The flat spawn surface row — every spawn-side fixture (mineshaft, vein, tree, forge) is placed relative
 ## to it, so pushing the surface down for sky moves them all together. Mirrors HeightmapWorldGen's constant.
 const SURFACE := HeightmapWorldGen.FLAT_SURFACE_ROW
-## The spawn cluster is laid out on the map-centred plateau so the two BLOCKING endpoints sit on OPPOSITE
-## sides of the hand-work and are each approached from the SPAWN side — neither ever traps the body:
-##   BAZAAR (cols 40-43) is the LEFT endpoint, claimed from its RIGHT post (col 44) so completing it never
-##     walls the body off from the shaft; the open SHAFT (col 56) is the RIGHT endpoint, only ever reached
-##     from its left edge (col 55). Everything between is benign to walk (dug vein, step-over forge, coal-on-top).
-##   The TREE (col 51) is FULLY felled for wood before the rightward shaft trip, so it leaves no blocking stump.
+## The spawn cluster is laid out on the map-centred plateau, left→right, so nothing ever traps the body:
+##   BAZAAR (cols 40-43) is a WALK-THROUGH stall (its wood frame doesn't collide — you enter the shop), on
+##     the LEFT; claimed from its RIGHT post (col 44) so the finishing block faces spawn. The open SHAFT
+##     (col 56) is the one real blocking endpoint, only ever reached from its left edge (col 55). Everything
+##     between is benign to walk (dug vein, step-over forge, coal-on-top). The TREE (col 51) is felled for wood.
 ##   col 40-43 BAZAAR ruin · col 46 FORGE · cols 47-48 VEIN · col 49 SPAWN · col 51 TREE · col 54 COAL · col 56 SHAFT
 const SPAWN_COL: int = 49
 const MINESHAFT_COL: int = 56
