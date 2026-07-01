@@ -571,8 +571,8 @@ func _test_finite_deposit_and_drill() -> void:
 		s2.tick()
 	_check(int(s2.total_produced.get(&"ore", 0)) == before, "an exhausted drill stops producing (extraction is finite)")
 
-	# FORGIVING PLACEMENT (the "finicky radius" fix): a drill dropped in the shaft ABOVE a cavity (not on the
-	# exact cell) still BORES STRAIGHT DOWN to it within DRILL_REACH — you don't have to hit the pixel-cell.
+	# FORGIVING PLACEMENT: a drill dropped in the shaft ABOVE a cavity (not on the exact cell) still bores
+	# straight down to it — you don't have to hit the pixel-cell.
 	var s3: FactorySim = FactorySim.new()
 	var vein := Vector2i(6, 10)
 	s3.set_solid(vein, &"ore"); s3.deposits[vein] = 8
@@ -587,9 +587,25 @@ func _test_finite_deposit_and_drill() -> void:
 		s3.tick()
 	_check(s3.ore_deposit_at(vein) == 0, "the offset drill drained the deposit below it dry")
 	_check(_items_present(s3, &"ore") == int(s3.total_produced.get(&"ore", 0)), "ore conserved through the offset drill")
-	# ...but a cavity BEYOND the reach is not tapped (down-only, bounded — no teleporting harvest).
-	var far := Vector2i(6, 10 + FactorySim.DRILL_REACH + 1)
-	_check(s3.drill_target(far) == Vector2i(-1, -1), "a drill far above the cavity (past reach) finds nothing")
+	# BORING through SOLID ore (the scaling drill): a drill placed on an OPEN cell above a solid ore COLUMN
+	# eats down through it — draining + CLEARING each cell (carving its shaft) — until it hits rock below.
+	var s4: FactorySim = FactorySim.new()
+	for y: int in range(6, 10):                        # a 4-tall solid ore column at col 5, rows 6..9
+		s4.set_solid(Vector2i(5, y), &"ore"); s4.deposits[Vector2i(5, y)] = 3
+	s4.set_solid(Vector2i(5, 10), &"stone")            # rock floor under the body (the drill stops here)
+	var drill_top := Vector2i(5, 5)                    # placed on the OPEN cell right above the body
+	_check(s4.drill_target(drill_top) == Vector2i(5, 6), "the boring drill targets the solid ore below it")
+	var d4: MachineState = s4.place_machine(drill_def, drill_top)
+	d4.input_buffer[&"coal"] = 60
+	var body_total: int = 4 * 3                         # 4 cells × 3 each
+	for _i: int in 100 + body_total * 25:
+		s4.tick()
+	for y: int in range(6, 10):
+		_check(not s4.is_solid(Vector2i(5, y)), "bored-out ore cell (5,%d) is now carved open" % y)
+	_check(s4.is_solid(Vector2i(5, 10)), "the drill stopped at the rock floor (didn't bore through rock)")
+	_check(int(s4.total_produced.get(&"ore", 0)) == body_total, "the whole ore body's deposit was extracted (%d)" % body_total)
+	_check(_items_present(s4, &"ore") == body_total, "ore conserved through boring the solid body")
+	_check(s4.drill_target(drill_top) == Vector2i(-1, -1), "a spent, fully-bored body leaves the drill nothing (idles)")
 
 
 ## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:

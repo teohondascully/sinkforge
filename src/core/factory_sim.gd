@@ -804,34 +804,61 @@ func _run_splitter(machine: MachineState) -> void:
 	machine.input_buffer.clear()
 
 
-## The exposed deposit a Drill at `cell` bores — the first cell with a live `ore_deposits` pool scanning
-## STRAIGHT DOWN from the drill's own cell through DRILL_REACH cells. (-1,-1) if none in reach. This is the
-## forgiving-placement fix: a drill dropped anywhere in the shaft above a cavity finds it, instead of
-## demanding the exact cell. Down-only keeps it on the gravity hook; the caller drains ONE unit/cycle so
-## it never becomes a multi-cell harvester (the deferred lateral feature). Pure read — hover + sim share it.
+## The ore cell a Drill at `cell` bores — scanning STRAIGHT DOWN its own column for the first ore SOURCE:
+## an exposed `ore_deposits` cavity OR a SOLID ore-like block (the boring drill eats solid ore, carving its
+## own shaft — you don't pre-clear space, so many drills line the top of an ore BODY and each sinks a
+## parallel column). Skips already-carved open cells (the shaft it made); STOPS at solid ROCK (the body
+## bottomed out) or another MACHINE below (the collection point — don't bore into your hopper/forge).
+## (-1,-1) if nothing borable. Down-only = on the gravity hook. Pure read — hover + sim share it.
 func drill_target(cell: Vector2i) -> Vector2i:
-	for dy: int in range(0, DRILL_REACH):
+	for dy: int in range(0, GRID_ROWS):
 		var c := Vector2i(cell.x, cell.y + dy)
+		if not in_bounds(c):
+			break
 		if int(ore_deposits.get(c, 0)) > 0:
-			return c
+			return c                    # an exposed cavity (incl. the drill's own cell, the tutorial case)
+		if solid.has(c):
+			return c if _is_ore_like(solid[c]) else Vector2i(-1, -1)  # solid ore → bore it; rock → blocked
+		if dy > 0 and grid.has(c):
+			return Vector2i(-1, -1)     # a machine below → stop (that's where the ore is collected)
 	return Vector2i(-1, -1)
 
 
-## A DRILL automates the by-hand ore mine (docs/MINING.md, cavity model): you hand-mine an ore block first
-## (the friction that earns the automation), exposing a wall DEPOSIT; placed anywhere in the shaft above
-## that cavity (within DRILL_REACH), the drill BORES STRAIGHT DOWN to the first exposed `ore_deposits`
-## cavity in its column, draining one unit per cycle and ejecting one ore DOWN from there (gravity carries
-## it to a forge/collection). No cavity in reach → it idles. When the deposit runs dry the drill goes quiet
-## ("patch exhausted — relocate it"). The ore is genuinely produced from the world → total_produced (same
-## accounting as hand-mining); it draws from the WORLD, not an input buffer, so its output is ejected here.
+## Total ore a drill at `cell` can still bore from its whole column — the sum of every borable unit straight
+## down (exposed cavities + solid ore cells' deposits) until rock or a machine stops it. The "how much is
+## left for this drill" the hover surfaces, so a drill on a fat body reads its real remaining supply.
+func drill_column_remaining(cell: Vector2i) -> int:
+	var total: int = 0
+	for dy: int in range(0, GRID_ROWS):
+		var c := Vector2i(cell.x, cell.y + dy)
+		if not in_bounds(c):
+			break
+		if int(ore_deposits.get(c, 0)) > 0:
+			total += int(ore_deposits[c])
+		elif solid.has(c):
+			if _is_ore_like(solid[c]):
+				total += int(deposits.get(c, DEFAULT_ORE_DEPOSIT))
+			else:
+				break                       # solid rock → the column bottoms out
+		elif dy > 0 and grid.has(c):
+			break                           # a machine below → collection point, stop counting
+	return total
+
+
+## A DRILL automates the by-hand ore mine (docs/MINING.md). It BORES STRAIGHT DOWN its column into the first
+## ore source below it (an exposed cavity, or a SOLID ore block it eats through — carving its shaft as it
+## goes, so you place it on TOP of an ore body and never hunt for the exact bottom cell). Each cycle it
+## drains ONE unit and ejects it DOWN; when a solid ore cell's deposit empties, the cell is CLEARED (the
+## shaft deepens) and the drill reaches the next ore below. It stops at rock/a machine, and goes quiet when
+## the body is spent ("relocate it"). Fuel-gated on COAL (the demand-web). The ore is genuinely produced
+## from the world → total_produced (same accounting as hand-mining), drawn from the WORLD not a buffer.
 func _run_drill(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
 	var target: Vector2i = drill_target(machine.cell)
 	if target.x < 0:
-		return                          # no exposed deposit in reach below — idle, hold progress
-	var pool: int = int(ore_deposits.get(target, 0))
+		return                          # nothing borable below — idle, hold progress
 	# FUEL: the drill burns COAL to run (the demand-web — automating ore creates demand for coal). Burn one
 	# tick of the current coal; when it's spent, refuel from the coal in its input buffer. No fuel + no coal
 	# → the drill goes quiet (idle, holds progress) until you feed it more coal.
@@ -851,15 +878,28 @@ func _run_drill(machine: MachineState) -> void:
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
-	var item: StringName = StringName(deposit_item.get(target, &"ore"))   # the tapped deposit's own material
-	pool -= 1
-	if pool > 0:
-		ore_deposits[target] = pool
+	# Drain one unit from the target — either an exposed cavity, or a solid ore cell (which is CLEARED when
+	# its deposit empties, carving the shaft). Either way the freed material is produced + ejected DOWN.
+	var item: StringName
+	if int(ore_deposits.get(target, 0)) > 0:
+		item = StringName(deposit_item.get(target, &"ore"))
+		var pool: int = int(ore_deposits[target]) - 1
+		if pool > 0:
+			ore_deposits[target] = pool
+		else:
+			ore_deposits.erase(target)
+			deposit_item.erase(target)
 	else:
-		ore_deposits.erase(target)         # deposit spent — drill idles next cycle (unless another is in reach)
-		deposit_item.erase(target)
-	# Eject the freed material DOWN from the tapped cavity (still the drill's own column), where gravity
-	# carries it to a forge/collection. `from` = the cavity so the falling-item visual pours from the vein.
+		item = solid[target]                                  # a solid ore block the drill bores into
+		var amt: int = int(deposits.get(target, DEFAULT_ORE_DEPOSIT)) - 1
+		if amt > 0:
+			deposits[target] = amt
+		else:
+			deposits.erase(target)
+			solid.erase(target)                               # cell bored out → the shaft deepens
+			_resettle_pile_above(target)                      # gravity: anything resting above now falls
+	# Eject the freed material DOWN from the bored cell (still the drill's own column), where gravity carries
+	# it to a hopper/forge/collection. `from` = the bored cell so the falling-item visual pours from the vein.
 	total_produced[item] = int(total_produced.get(item, 0)) + 1
 	var dest: Dictionary = _column_landing(target.x, target.y + 1)
 	dest["target"][item] = int(dest["target"].get(item, 0)) + 1
