@@ -694,12 +694,30 @@ func _test_mining_rules() -> void:
 	_check(MiningRules.can_mine(&"wood", axe), "the axe chops wood")
 	_check(MiningRules.can_mine(&"earth", bare), "dirt is always hand-mineable")
 	_check(MiningRules.can_mine(&"ore", kit), "the starter kit can mine ore")
-	# Friction: harder rock takes longer; no tool = unbreakable (INF); deepslate out-grinds stone.
+	# Friction: harder rock takes longer; no tool = unbreakable (INF).
 	_check(MiningRules.mine_seconds(&"stone", bare) == INF, "no pick → stone never breaks")
 	_check(MiningRules.mine_seconds(&"stone", pick) > 0.0, "with a pick stone takes finite time")
-	_check(MiningRules.mine_seconds(&"deepslate", pick) > MiningRules.mine_seconds(&"stone", pick),
-		"deepslate is a harder grind than stone")
 	_check(MiningRules.is_tool_item(&"wood_pickaxe") and not MiningRules.is_tool_item(&"ore"), "tools are distinguished from resources")
+	# TIER DEPTH-GATE: deepslate (the deep band) needs a tier-2 pick — the starter wood pick (tier 1) bounces.
+	var stone_pick: Dictionary = {&"stone_pickaxe": 1}
+	_check(MiningRules.required_tier(&"deepslate") == 2, "deepslate requires a tier-2 pick")
+	_check(MiningRules.required_tier(&"stone") == 1, "ordinary rock is tier-1 (any pick)")
+	_check(not MiningRules.can_mine(&"deepslate", pick), "the wood pick (tier 1) can't crack deepslate")
+	_check(MiningRules.can_mine(&"deepslate", stone_pick), "the stone pick (tier 2) cracks deepslate")
+	_check(MiningRules.mine_seconds(&"deepslate", pick) == INF, "wood pick → deepslate never breaks (gated)")
+	_check(MiningRules.mine_seconds(&"deepslate", stone_pick) > 0.0, "stone pick → deepslate takes finite time")
+	_check(MiningRules.best_tier(&"pick", stone_pick) == 2 and MiningRules.best_tier(&"pick", pick) == 1, "best_tier reads the pack's top pick")
+	# CRAFTING the upgrade: the Stone Pickaxe is crafted from its TOOL_RECIPE (stone+wood), spending them.
+	var s: FactorySim = FactorySim.new()
+	s.inventory[&"stone"] = 10
+	s.inventory[&"wood"] = 5
+	_check(s.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "craft a Stone Pickaxe with enough stone+wood")
+	_check(int(s.inventory.get(&"stone_pickaxe", 0)) == 1, "the stone pickaxe is now in the pack")
+	_check(int(s.inventory.get(&"stone", 0)) == 2 and int(s.inventory.get(&"wood", 0)) == 2, "crafting spent the recipe cost (8 stone, 3 wood)")
+	_check(MiningRules.can_mine(&"deepslate", s.inventory), "with the crafted pick, deepslate is now mineable")
+	var poor: FactorySim = FactorySim.new()
+	poor.inventory[&"stone"] = 2
+	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
 
 
 ## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).

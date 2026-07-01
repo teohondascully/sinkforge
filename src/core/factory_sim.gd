@@ -531,19 +531,25 @@ func drop_item(cell: Vector2i, item: StringName, count: int, from_cell: Vector2i
 
 
 ## Player action: CRAFT one machine item into the pack, spending its `craft_cost` from inventory.
-## Returns true if crafted. Spent items are counted as consumed so conservation holds (crafting is
-## a real ingot sink). The machine item (keyed by def.id) lives in the same pack as ore/ingots.
 func craft(def: MachineDef) -> bool:
-	if def.craft_cost.is_empty():
+	return craft_item(def.id, def.craft_cost)
+
+
+## The generic craft primitive: spend `cost` (item->count) from the pack, add one `output` item. Returns
+## true if crafted (enough ingredients). Spent items count as consumed so conservation holds (crafting is a
+## real sink); the output (machine id OR a tool id) lives in the same pack as ore/ingots. One path for both
+## machines (craft) and tools (MiningRules.TOOL_RECIPES) so the Bazaar screen crafts them identically.
+func craft_item(output: StringName, cost: Dictionary) -> bool:
+	if cost.is_empty():
 		return false
-	for item: StringName in def.craft_cost:
-		if int(inventory.get(item, 0)) < int(def.craft_cost[item]):
+	for item: StringName in cost:
+		if int(inventory.get(item, 0)) < int(cost[item]):
 			return false
-	for item: StringName in def.craft_cost:
-		var n: int = int(def.craft_cost[item])
+	for item: StringName in cost:
+		var n: int = int(cost[item])
 		_take_from_pack(item, n)
 		total_consumed[item] = int(total_consumed.get(item, 0)) + n
-	inventory[def.id] = int(inventory.get(def.id, 0)) + 1
+	inventory[output] = int(inventory.get(output, 0)) + 1
 	return true
 
 

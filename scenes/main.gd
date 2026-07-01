@@ -59,6 +59,11 @@ var _aim: Vector2i = Vector2i(-99, -99)
 ## selected machine item can be placed.
 var _craftable: Array[MachineDef] = []
 var _machine_defs_by_id: Dictionary = {}
+## Craftable TOOLS (id + display name; cost lives in MiningRules.TOOL_RECIPES) shown in the Bazaar craft
+## screen after the machines. The Stone Pickaxe is the first depth-unlocking upgrade (docs/MINING.md).
+const CRAFT_TOOLS: Array[Dictionary] = [
+	{"id": &"stone_pickaxe", "name": "Stone Pickaxe"},
+]
 ## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
 ## item is what E deposits (a resource) or RMB places (a machine) — the unified Factorio-style hotbar.
 var _inv_selected: int = 0
@@ -123,11 +128,20 @@ func _ready() -> void:
 	hud.sim = sim
 	hud.paused_getter = func() -> bool: return _paused
 	var craft_opts: Array[Dictionary] = []
+	var craft_ids: Array[StringName] = []
 	var machine_icons: Dictionary = {}
 	for def: MachineDef in _craftable:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
+		craft_ids.append(def.id)
 		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def), "name": def.display_name}
+	# Craftable TOOLS listed AFTER machines (the Bazaar crafts both — docs/MINING.md). Not placeable, so
+	# they're not in machine_icons (the craft panel renders them via their item glyph instead).
+	for t: Dictionary in CRAFT_TOOLS:
+		var tid: StringName = t["id"]
+		craft_opts.append({"name": t["name"], "cost": MiningRules.TOOL_RECIPES.get(tid, {})})
+		craft_ids.append(tid)
 	hud.craft_options = craft_opts
+	hud.craft_ids = craft_ids
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
 	# Tutorial chain — built AFTER the world is seeded (so its baseline includes any dev-start kit) and
@@ -474,7 +488,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var idx: int = event.keycode - KEY_1            # the fixed hotbar number row
 		if _inventory_open:
 			if idx < _craftable.size():
-				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT (gated to the Bazaar)
+				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT a machine (Bazaar-gated)
+			elif idx < _craftable.size() + CRAFT_TOOLS.size():
+				try_craft_tool(CRAFT_TOOLS[idx - _craftable.size()]["id"])   # …or a tool (same gate)
 		else:
 			_select_slot(idx)                           # otherwise they SELECT the hotbar slot
 
@@ -596,6 +612,15 @@ func try_craft(def: MachineDef) -> bool:
 	return sim.craft(def)
 
 
+## Craft a TOOL (e.g. the Stone Pickaxe) from carried materials — same Bazaar gate + same generic sink as
+## machine crafting (sim.craft_item). The pickaxe-tier upgrade path (docs/MINING.md): craft it here, and it
+## unlocks the deeper rock its tier gates. Verb-surfaced so the play-harness can drive tool crafting too.
+func try_craft_tool(tool_id: StringName) -> bool:
+	if not _near_bazaar():
+		return false
+	return sim.craft_item(tool_id, MiningRules.TOOL_RECIPES.get(tool_id, {}))
+
+
 ## Scoop up resting product piles NEAR the body — Factorio/Terraria "walk over items to grab them",
 ## widened to a short REACH so a machine's output flows to you when you stand at it. A pure downward
 ## conveyor (gravity) drops a forge's ingots into the cell below it, which the body often can't stand IN
@@ -715,6 +740,12 @@ func _hover_info() -> Dictionary:
 		if dep > 0:
 			return {"name": "Ore Deposit", "in": [], "out": [], "holding": [],
 				"mode": "%d ore left — cap with a Drill (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
+		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
+		if sim.is_solid(_aim):
+			var rock: StringName = sim.material_at(_aim)
+			if not MiningRules.can_mine(rock, sim.inventory):
+				return {"name": String(rock).capitalize(), "in": [], "out": [], "holding": [],
+					"mode": "too hard for your pick — craft a Stone Pickaxe (tier %d)" % MiningRules.required_tier(rock)}
 		return {}
 	var info: Dictionary = {"name": m.def.display_name}
 	var recipe: RecipeDef = m.def.recipe

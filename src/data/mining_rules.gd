@@ -27,6 +27,14 @@ const REQUIRED_TOOL: Dictionary = {
 	&"leaves": &"axe",
 }
 
+## Material id -> the minimum tool TIER (of its required class) needed to break it. Absent class-gated
+## material defaults to tier 1 (any tool of the class). This is the DEPTH GATE: deepslate (the deep band,
+## rows ≥ DEEPSLATE_ROW) needs a tier-2 pick, so the starter wood pick (tier 1) bounces off it — you must
+## craft a Stone Pickaxe before you can dig the deep third. Grows as the tier ladder deepens (docs/MINING.md).
+const REQUIRED_TIER: Dictionary = {
+	&"deepslate": 2,
+}
+
 ## Material id -> base SECONDS to break with a tier-1 tool (or by hand). Eye-tuned so shallow dirt is
 ## quick, stone/ore is a real grind, deepslate is brutal — the deeper you go the more you want a drill.
 const HARDNESS: Dictionary = {
@@ -40,11 +48,22 @@ const HARDNESS: Dictionary = {
 }
 const DEFAULT_HARDNESS: float = 0.50
 
-## Tool item id -> {class, speed}. Speed scales the break rate (2.0 = twice as fast = half the seconds).
-## The starter kit is the two wood tools at tier-1 speed; better picks/axes slot in here later.
+## Tool item id -> {class, tier, speed}. Speed scales the break rate (2.0 = twice as fast = half the
+## seconds); TIER gates which materials the tool may break at all (see REQUIRED_TIER). The starter kit is
+## the two wood tools (tier 1); the Stone Pickaxe (tier 2) is the first depth-unlocking upgrade, crafted at
+## the Bazaar (TOOL_RECIPES) — it's both faster AND the key to the deepslate band. Ladder grows demand-pull.
 const TOOLS: Dictionary = {
-	&"wood_pickaxe": {&"class": &"pick", &"speed": 1.0},
-	&"wood_axe": {&"class": &"axe", &"speed": 1.0},
+	&"wood_pickaxe": {&"class": &"pick", &"tier": 1, &"speed": 1.0},
+	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.7},
+	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
+}
+
+## Craftable tools -> their ingredient cost (spent from the pack, at the Bazaar). Mirrors MachineDef
+## .craft_cost so the Bazaar craft screen lists tools alongside machines. The Stone Pickaxe is stone + wood
+## — both hand-mineable with the starter pick, so the upgrade is a natural surface-tier craft that then
+## unlocks the deep band (the Terraria wood→stone→… tool progression, expressed through our Bazaar hub).
+const TOOL_RECIPES: Dictionary = {
+	&"stone_pickaxe": {&"stone": 8, &"wood": 3},
 }
 
 ## The two tools every new game begins with — a bad pick + a bad axe (seeded by MainView into the pack).
@@ -54,6 +73,24 @@ const STARTER_TOOLS: Array[StringName] = [&"wood_pickaxe", &"wood_axe"]
 ## The tool class a material needs, or &"" when it's hand-mineable.
 static func required_tool(material: StringName) -> StringName:
 	return REQUIRED_TOOL.get(material, &"")
+
+
+## The minimum tool TIER (of the required class) needed to break this material — the depth gate. 0 for a
+## hand-mineable material; otherwise REQUIRED_TIER (default 1, so ordinary rock takes any tool of its class).
+static func required_tier(material: StringName) -> int:
+	if required_tool(material) == &"":
+		return 0
+	return int(REQUIRED_TIER.get(material, 1))
+
+
+## The best (highest) TIER among the owned tools of `tool_class`, or 0 if the pack holds none. Compared
+## against required_tier to gate mining a material (a wood pick, tier 1, can't crack tier-2 deepslate).
+static func best_tier(tool_class: StringName, inventory: Dictionary) -> int:
+	var best: int = 0
+	for tid: StringName in TOOLS:
+		if TOOLS[tid][&"class"] == tool_class and int(inventory.get(tid, 0)) > 0:
+			best = maxi(best, int(TOOLS[tid][&"tier"]))
+	return best
 
 
 static func hardness(material: StringName) -> float:
@@ -77,12 +114,13 @@ static func best_speed(tool_class: StringName, inventory: Dictionary) -> float:
 
 
 ## Can the pack break this material at all? Hand-mineable materials are always true; class-gated ones
-## require owning a matching tool. This is the GATE try_mine enforces, so reach + tool are both real.
+## require owning a matching tool OF SUFFICIENT TIER. This is the GATE try_mine enforces, so reach, tool,
+## AND depth-tier are all real (a deep deepslate block bounces the starter pick until you upgrade).
 static func can_mine(material: StringName, inventory: Dictionary) -> bool:
 	var cls: StringName = required_tool(material)
 	if cls == &"":
 		return true
-	return best_speed(cls, inventory) > 0.0
+	return best_tier(cls, inventory) >= required_tier(material)
 
 
 ## Seconds of HOLDING to break this material with the pack's best matching tool. INF when you lack the
@@ -91,6 +129,8 @@ static func mine_seconds(material: StringName, inventory: Dictionary) -> float:
 	var cls: StringName = required_tool(material)
 	if cls == &"":
 		return hardness(material)
+	if not can_mine(material, inventory):
+		return INF                                # lacking the tool OR the required tier → it won't yield
 	var spd: float = best_speed(cls, inventory)
 	if spd <= 0.0:
 		return INF

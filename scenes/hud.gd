@@ -28,6 +28,10 @@ var objectives: Objectives
 var craft_options: Array[Dictionary] = []
 ## Machine item id -> {color: Color, tag: String}, so machine items in the hotbar read as machines.
 var machine_icons: Dictionary = {}
+## The item id per craft row (parallel to craft_options), set by MainView — machines then tools. Lets the
+## craft panel render a machine (casing + glyph) or a tool (item glyph) per row without a fragile
+## insertion-order dependency between two structures.
+var craft_ids: Array[StringName] = []
 ## The active carried-item slot in the inventory hotbar (set by MainView; mouse-wheel cycles it).
 var inv_selected_getter: Callable
 ## When you aim at one of your machines in reach, MainView pushes its inspector info here (name, recipe
@@ -335,6 +339,8 @@ func _draw_inventory_overlay() -> void:
 				draw_rect(icon2, machine_icons[id]["color"])
 				Visuals.draw_machine_glyph(self, icon2.position + icon2.size * 0.5,
 					str(machine_icons[id]["kind"]), icon2.size.y / 20.0, false, 0.0)
+		elif id != &"":
+			Visuals.draw_item(self, icon2.position + icon2.size * 0.5, icon2.size.y, id)  # a tool: its item glyph
 		var tcol: Color = UI_TEXT if afford else Color(0.45, 0.47, 0.53)
 		draw_string(_font, rr.position + Vector2(34.0, 19.0),
 			"[%d]  %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tcol)
@@ -345,9 +351,12 @@ func _draw_inventory_overlay() -> void:
 		y += row_h
 
 
-## The id of the i-th craftable (its icon key). machine_icons is keyed by id; craft_options is parallel,
-## so the i-th icon key is the i-th machine_icons key in insertion order (both built from _craftable).
+## The id of the i-th craftable — supplied explicitly by MainView (craft_ids, parallel to craft_options),
+## so machines and tools can interleave without relying on machine_icons insertion order. Falls back to the
+## old machine_icons-keys derivation if craft_ids wasn't set (defensive).
 func _craft_id(i: int) -> StringName:
+	if i < craft_ids.size():
+		return craft_ids[i]
 	var keys: Array = machine_icons.keys()
 	return keys[i] if i < keys.size() else &""
 
