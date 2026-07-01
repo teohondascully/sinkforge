@@ -201,11 +201,16 @@ func _paint_terrain(ci: CanvasItem) -> void:
 ## block count (dig/place), wall count, and the summed remaining ore (so the nugget-density "vein
 ## draining" read still updates as a drill eats a deposit, before the cell finally clears). RNG-free,
 ## O(deposits) per frame (a handful of cells), no false negatives for any in-play terrain mutation.
+## What the STATIC terrain layer's appearance depends on, cheaply: the block + wall cell counts. The
+## terrain look changes only when a cell is added or removed (dig / place / a drill boring out an
+## exhausted cell / felling a tree) — all of which move a count. It does NOT depend on deposit AMOUNTS:
+## a drill draining a vein from 200→199 leaves the ore cell looking identical (richness isn't drawn), so
+## summing deposits here (the old code) forced a full-world terrain+skylight repaint EVERY drill cycle —
+## ~160×/second under the 8× game clock, the source of the fast-forward lag/heat. Within one sim advance
+## `solid` only ever SHRINKS (the tick erases, never adds; only the player adds a block, once per frame in
+## input), so a bare size delta can't miss a change between frames. O(1), no per-frame dictionary sweep.
 func _terrain_signature() -> Array:
-	var dep: int = 0
-	for v: int in sim.deposits.values():
-		dep += int(v)
-	return [sim.solid.size(), sim.wall.size(), dep]
+	return [sim.solid.size(), sim.wall.size()]
 
 
 ## Draw the placed power conduits (docs/POWER.md): each tube is a copper segment with stubs to whatever
