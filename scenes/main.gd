@@ -549,9 +549,12 @@ func _update_mining(delta: float) -> void:
 func _effective_aim(mouse_world: Vector2) -> Vector2i:
 	var raw: Vector2i = _cell_at(mouse_world)
 	var building: bool = _selected_machine_def() != null or _selected_build_material() != &""
-	if building or _can_reach(raw):
+	if building:
+		return raw                          # placement wants the exact cell (it has its own _placeable gate)
+	# Mining/interaction: an OPEN cell in reach, or a SOLID block you have LINE OF SIGHT to, is the aim as-is.
+	if _can_reach(raw) and (not sim.is_solid(raw) or _line_of_sight_clear(_body_cell(), raw)):
 		return raw
-	return _nearest_reachable_solid(mouse_world, raw)
+	return _nearest_reachable_solid(mouse_world, raw)   # else snap to the nearest block you can actually carve
 
 
 ## The reachable SOLID cell whose centre is closest to `point` (the cursor) — the block Terraria-reach
@@ -569,7 +572,7 @@ func _nearest_reachable_solid(point: Vector2, fallback: Vector2i) -> Vector2i:
 	for dy: int in range(-span, span + 1):
 		for dx: int in range(-span, span + 1):
 			var c: Vector2i = center + Vector2i(dx, dy)
-			if not sim.is_solid(c) or not _can_reach(c):
+			if not sim.is_solid(c) or not _can_reach(c) or not _line_of_sight_clear(center, c):
 				continue
 			var d: float = _cell_center(c).distance_squared_to(point)
 			if d < best_d and d <= tol_sq:
@@ -585,7 +588,7 @@ func _nearest_reachable_solid(point: Vector2, fallback: Vector2i) -> Vector2i:
 
 ## Mine the aimed cell if it's solid and within reach. (Cooldown is input pacing, not part of the verb.)
 func try_mine(cell: Vector2i) -> bool:
-	if _paused or not _can_reach(cell) or not sim.is_solid(cell):
+	if _paused or not _mineable(cell):     # reach + LINE OF SIGHT: can't dig through solid rock to a hidden block
 		return false
 	var mat: StringName = sim.material_at(cell)
 	if not MiningRules.can_mine(mat, sim.inventory):
@@ -857,6 +860,59 @@ func _can_reach(cell: Vector2i) -> bool:
 	if _player == null:
 		return false
 	return _player.position.distance_to(_cell_center(cell)) <= REACH_CELLS * float(CELL)
+
+
+## The grid cell the body occupies — the origin for mining line-of-sight.
+func _body_cell() -> Vector2i:
+	return _cell_at(_player.position)
+
+
+## Can the body actually MINE `cell`? Reach radius is not enough — you can't dig THROUGH solid rock to a
+## block behind it (the "I mined 3,0 while 1,0 and 2,0 were still wall" bug). A block is mineable only if a
+## straight line from the body to it is CLEAR of other solid cells — so you carve the exposed FACE of a wall
+## one layer at a time (mine the face → the pocket grows → the next layer is exposed). The dig becomes
+## carving, not poking a radius blob. Building/hover keep the plain reach test; this gates mining only.
+func _mineable(cell: Vector2i) -> bool:
+	return sim.is_solid(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)
+
+
+## Is the straight segment from cell `a` to cell `b` clear of SOLID cells strictly between them? A grid
+## voxel-walk (Amanatides–Woo DDA) from a toward b: the first solid cell entered BEFORE reaching b blocks
+## the ray. The target b itself may be solid (it's what you're mining); adjacent cells are always clear
+## (no cell between). Pure read of sim.is_solid — deterministic, no allocation.
+func _line_of_sight_clear(a: Vector2i, b: Vector2i) -> bool:
+	if a == b:
+		return true
+	var ox: float = float(a.x) + 0.5
+	var oy: float = float(a.y) + 0.5                     # ray origin = centre of cell a (in cell units)
+	var dx: float = (float(b.x) + 0.5) - ox
+	var dy: float = (float(b.y) + 0.5) - oy
+	var cx: int = a.x
+	var cy: int = a.y
+	var step_x: int = signi(dx)
+	var step_y: int = signi(dy)
+	var t_max_x: float = INF
+	var t_delta_x: float = INF
+	if dx != 0.0:
+		t_delta_x = absf(1.0 / dx)
+		t_max_x = ((float(cx + (1 if step_x > 0 else 0))) - ox) / dx
+	var t_max_y: float = INF
+	var t_delta_y: float = INF
+	if dy != 0.0:
+		t_delta_y = absf(1.0 / dy)
+		t_max_y = ((float(cy + (1 if step_y > 0 else 0))) - oy) / dy
+	for _guard: int in 512:                              # bounded by grid size; can't loop forever
+		if t_max_x < t_max_y:
+			cx += step_x
+			t_max_x += t_delta_x
+		else:
+			cy += step_y
+			t_max_y += t_delta_y
+		if cx == b.x and cy == b.y:
+			return true                                 # reached the target → nothing solid in the way
+		if sim.is_solid(Vector2i(cx, cy)):
+			return false                                # a solid cell before the target blocks the dig
+	return true
 
 
 # --- helpers -----------------------------------------------------------------
