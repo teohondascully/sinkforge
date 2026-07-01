@@ -146,7 +146,6 @@ func _draw() -> void:
 	_draw_drop_paths()
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
-	_draw_ore_deposits()  # glittering exposed ore in a mined-out cavity — what a drill taps (cavity model)
 	_draw_ground()
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
@@ -482,25 +481,6 @@ func _draw_background(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)), def.base_color.darkened(depth * def.depth_darken))
 
 
-## Exposed wall DEPOSITS (docs/MINING.md, cavity model): once you hand-mine an ore block, the leftover
-## richness glitters in the open cavity — a recessed cluster of ore nuggets a Drill taps. Speck density
-## tracks the remaining yield, so the deposit visibly thins as a drill eats it. Drawn UNDER machines (the
-## drill sits over it) on the dynamic layer (it changes each drill cycle). A warm glint is added in the lights.
-func _draw_ore_deposits() -> void:
-	for cell_v: Variant in sim.ore_deposits:
-		var c: Vector2i = cell_v
-		var remaining: int = int(sim.ore_deposits[c])
-		var item: StringName = StringName(sim.deposit_item.get(c, &"ore"))
-		var ndef: MaterialDef = _material(item)
-		var nug: Color = ndef.nugget_color if ndef.has_nuggets() else Visuals.item_color(item)
-		var pos := Vector2(c) * float(CELL)
-		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(CELL - 6, CELL - 6)), Color(0.05, 0.05, 0.06, 0.55))  # recessed backing
-		var n: int = clampi(2 + remaining / 3, 3, 12)
-		for p: Vector2 in _cell_speckles(c, n):
-			draw_circle(pos + p, 2.4, nug)
-			draw_circle(pos + p - Vector2(0.7, 0.7), 1.0, nug.lightened(0.55))  # glint
-
-
 func _draw_drop_paths() -> void:
 	var guide := Color(0.45, 0.55, 0.68, 0.20)
 	for machine: MachineState in sim.machines:
@@ -796,11 +776,6 @@ func _paint_lights(layer: LightLayer) -> void:
 		var lvl: float = _conduit_level(cell)
 		if lvl > 0.04:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
-	# Exposed ORE deposits glint warmly in the dark — the "shiny vein revealed" read (cavity model). Coal
-	# deposits stay dark (no glow) — they read as black seams, not gold.
-	for cell_v: Variant in sim.ore_deposits:
-		if StringName(sim.deposit_item.get(cell_v, &"ore")) == &"ore":
-			_draw_glow(layer, _cell_center(cell_v), float(CELL) * 1.15, Color(1.0, 0.62, 0.32), 0.22)
 	for m: Dictionary in falling.motes():
 		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
 

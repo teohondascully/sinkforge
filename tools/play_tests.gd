@@ -282,23 +282,21 @@ func _step_craft(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"drill", 0)) >= 1 or _has_drill(agent)
 
 
-## Step 4 — expose + cap the deposit (cavity model): hand-mine the mineshaft ore BLOCK to reveal its wall
-## deposit, then place the Drill ON that cavity so its pulled ore falls into the forge below. We reach in
-## from the shaft EDGE (col-1) so we never drop into the very cell we're about to drill.
+## Step 4 — drop the Drill above the vein (boring model): the mineshaft has a VISIBLE solid ore vein with an
+## OPEN cell above it; place the Drill in that open cell and it bores DOWN into the ore, whose pull falls into
+## the forge below. We reach in from the shaft EDGE (col-1) so we never drop into the very cell we're placing.
 func _step_build(agent: PlayAgent) -> bool:
 	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):  # stand on the surface beside the shaft, in reach
 		return false
 	var d: Vector2i = MainView.MINESHAFT_DRILL_CELL
-	if agent.sim.is_solid(d):
-		await agent.mine_cell(d)                                    # break the ore block → exposes the deposit
-	if agent.sim.ore_deposit_at(d) <= 0:
-		agent._note("  build: no exposed deposit at %s (deposit=%d, solid=%s)" % [
-			d, agent.sim.ore_deposit_at(d), agent.sim.is_solid(d)])
+	if agent.sim.drill_column_remaining(d) <= 0:
+		agent._note("  build: no ore vein below the drill cell %s (remaining=%d)" % [
+			d, agent.sim.drill_column_remaining(d)])
 		return false
 	if not await agent.select_item(&"drill"):
 		agent._note("  build: no drill in pack (have %d)" % int(agent.sim.inventory.get(&"drill", 0)))
 		return false
-	if not await agent.build_at(d):                                 # cap the cavity with the drill
+	if not await agent.build_at(d):                                 # drop the drill above the vein
 		agent._note("  build: failed to place drill at %s (reach=%s placeable=%s)" % [
 			d, agent.main._can_reach(d), agent.main._placeable(d)])
 		return false

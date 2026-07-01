@@ -32,9 +32,9 @@ var steps: Array[Dictionary] = [
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
-	{"id": &"build",  "label": "Mine the mineshaft ore to expose its deposit, then place the Drill ON the cavity (RMB)", "goal": "Build the line"},
+	{"id": &"build",  "label": "Drop the Drill into the shaft just ABOVE the ore vein (RMB) — it bores down into it", "goal": "Build the line"},
 	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
-	{"id": &"auto",   "label": "Stand back — the fueled Drill pulls the deposit into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"auto",   "label": "Stand back — the fueled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
 ]
 
 
@@ -98,12 +98,12 @@ func _achieved(id: StringName) -> bool:
 	return false
 
 
-## The SELF-FEEDING LINE, detected anywhere in the world: a DRILL placed ON an exposed ore DEPOSIT (the
-## cavity-model — the drill taps `ore_deposits` at its own cell and the ore falls toward a forge below).
-## Returns {drill} cell, or {} if none. Location-independent — any deposit the player caps counts.
+## The SELF-FEEDING LINE, detected anywhere in the world: a DRILL placed above a SOLID ore vein (it bores
+## down the column into the ore, which falls toward a forge below). Returns {drill} cell, or {} if none.
+## Location-independent — any drill sitting over ore it can still bore counts.
 func _find_line() -> Dictionary:
 	for m: MachineState in sim.machines:
-		if m.def.behavior == &"drill" and sim.ore_deposit_at(m.cell) > 0:
+		if m.def.behavior == &"drill" and sim.drill_column_remaining(m.cell) > 0:
 			return {"drill": m.cell}
 	return {}
 

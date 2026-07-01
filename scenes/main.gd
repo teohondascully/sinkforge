@@ -288,12 +288,12 @@ const SURFACE := HeightmapWorldGen.FLAT_SURFACE_ROW
 const SPAWN_COL: int = 49
 const MINESHAFT_COL: int = 56
 const MINESHAFT_FORGE_CELL := Vector2i(46, SURFACE)                  ## bootstrap forge — a shallow SURFACE pocket (toss ore in from col 45, collect ingots below). OFF the shaft so it stays an open drop.
-## REACH INVARIANT: the ore/drill cell sits at SURFACE+1 (not deeper) so the body operates the whole shaft
-## from the surface EDGE (col 55) with a comfortable reach margin — it hand-mines the ore, caps it with the
-## drill, and tosses coal down the mouth all WITHOUT entering the pit. Placing it at SURFACE+2 left only a
-## ~4px reach margin, tipping the body into the shaft where it got trapped (the old fuel-step dead-end).
-const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## the rich ore block: hand-mine it → cavity+deposit → cap with the Drill
-const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)        ## the AUTO line's forge — directly below the drill, catches its fall
+## REACH INVARIANT: the DRILL cell sits at SURFACE+1 (not deeper) so the body places the drill + tosses coal
+## down the mouth from the surface EDGE (col 55) with a comfortable reach margin, WITHOUT entering the pit.
+## Placing it deeper left only a ~4px reach margin, tipping the body into the shaft where it got trapped.
+const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## OPEN cell: drop the Drill here, ABOVE the ore vein
+const MINESHAFT_ORE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)     ## the visible SOLID ore vein the drill bores down into
+const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 3)        ## the AUTO line's forge — below the ore, catches the bored ore's fall
 const MINESHAFT_ORE_RICHNESS: int = 400                              ## a rich starter-automation patch (hundreds) the drill runs on for a long time
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
@@ -310,15 +310,15 @@ func _seed_world() -> void:
 
 ## A visible ORE VEIN breaching the surface beside spawn — the "orange-flecked rock" the first objective
 ## points at, and the bootstrap ore you HAND-mine for the first ingots (depth-banded worldgen leaves the
-## shallow surface near-bare, so onboarding can't rely on finding a vein). A 1-tall, 3-wide band so it READS
-## as a deposit (the drill model: ore comes in chunks) yet mining it leaves only a SHALLOW (1-tile) trench
-## you step straight out of — a 2-deep pit would trap the body (step-up climbs one tile). Distinct column
-## from the mineshaft so hand-mining never eats the drill's chunk.
+## shallow surface near-bare, so onboarding can't rely on finding a vein). A 1-tall, 2-wide band so it READS
+## as a vein yet mining it leaves only a SHALLOW (1-tile) trench you step straight out of — a 2-deep pit
+## would trap the body (step-up climbs one tile). Hand-mined for the first few ore (the drill mines the deep
+## veins in the mineshaft, not this surface strip).
 const STARTER_VEIN_CELL := Vector2i(47, SURFACE)
 func _seed_starter_vein() -> void:
 	for cell: Vector2i in [Vector2i(47, SURFACE), Vector2i(48, SURFACE)]:   # just left of spawn (49), right of the forge pocket (46)
 		sim.set_solid(cell, &"ore")
-		sim.deposits[cell] = 200                                  # a HUNDREDS-scale starter deposit: hand-grab a few, drill the rest for a long time
+		sim.deposits[cell] = 200                                  # richness for the hover readout; hand-mining grabs a loose burst
 
 
 ## A guaranteed surface COAL block between the shaft and the bazaar — the drill's FUEL (docs/MINING.md).
@@ -370,13 +370,15 @@ func _seed_tutorial_mineshaft() -> void:
 	sim.set_solid(Vector2i(bf, SURFACE + 1), &"")                  # ingots land / collect
 	sim.set_solid(Vector2i(bf, SURFACE + 2), &"earth")            # floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
-	# Drill shaft (col 56) — OPEN mouth so tossed ore/coal drops straight down onto the drill.
+	# Drill shaft (col 56) — OPEN mouth + drill cell so tossed coal drops straight down onto the drill, with a
+	# VISIBLE solid ore vein just below the drill cell for the drill to bore into.
 	sim.set_solid(Vector2i(c, SURFACE), &"")                       # open mouth (drop access)
-	sim.set_solid(MINESHAFT_DRILL_CELL, &"ore")                   # SURFACE+1 ore BLOCK: hand-mine → cavity + deposit
-	sim.deposits[MINESHAFT_DRILL_CELL] = MINESHAFT_ORE_RICHNESS    # hand-grab a few, expose a hundreds-scale deposit to drill
-	sim.set_solid(AUTO_FORGE_CELL, &"")                           # SURFACE+2: carve the cell the AUTO forge sits in
-	sim.set_solid(Vector2i(c, SURFACE + 3), &"")                   # gap under the auto forge (ingots land)
-	sim.set_solid(Vector2i(c, SURFACE + 4), &"earth")            # rock floor
+	sim.set_solid(MINESHAFT_DRILL_CELL, &"")                       # SURFACE+1: OPEN — the player drops the Drill here
+	sim.set_solid(MINESHAFT_ORE_CELL, &"ore")                     # SURFACE+2: the visible ore vein the drill bores down into
+	sim.deposits[MINESHAFT_ORE_CELL] = MINESHAFT_ORE_RICHNESS      # a hundreds-scale vein the drill runs on for a long time
+	sim.set_solid(AUTO_FORGE_CELL, &"")                           # SURFACE+3: carve the cell the AUTO forge sits in
+	sim.set_solid(Vector2i(c, SURFACE + 4), &"")                   # gap under the auto forge (ingots land)
+	sim.set_solid(Vector2i(c, SURFACE + 5), &"earth")            # rock floor
 	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
 
 
@@ -750,12 +752,12 @@ func _hover_info() -> Dictionary:
 		return {}
 	var m: MachineState = sim.machine_at(_aim)
 	if m == null:
-		# A bare exposed wall deposit (a mined-out ore cavity) — show how much ore is left + the nudge to
-		# automate it. The cavity-model readout the user asked for ("hover to see how much ore is left").
+		# A visible SOLID ore vein — show how much ore is in it + the nudge to automate it. The readout the
+		# user asked for ("hover to see how much ore is left"), now on the vein itself (no cavity to explain).
 		var dep: int = sim.ore_deposit_at(_aim)
 		if dep > 0:
-			return {"name": "Ore Deposit", "in": [], "out": [], "holding": [],
-				"mode": "%d ore left — cap with a Drill (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
+			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],
+				"mode": "%d ore — drop a Drill just above it (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
 		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
 		if sim.is_solid(_aim):
 			var rock: StringName = sim.material_at(_aim)
@@ -787,12 +789,12 @@ func _hover_info() -> Dictionary:
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"drill":
-			var tgt: Vector2i = sim.drill_target(m.cell)         # the ore it bores (cavity or solid ore below)
+			var tgt: Vector2i = sim.drill_target(m.cell)         # the solid ore vein it bores below
 			var dep2: int = sim.drill_column_remaining(m.cell) if tgt.x >= 0 else 0
 			var coal: int = int(m.input_buffer.get(&"coal", 0))
 			var fueled: bool = m.fuel > 0 or coal > 0
 			if dep2 <= 0:
-				info["mode"] = "idle — no deposit below in reach (place it over a mined ore cavity)"
+				info["mode"] = "idle — no ore below (drop it into a shaft above an ore vein)"
 			elif not fueled:
 				info["mode"] = "OUT OF COAL — drop coal on it to run  (%d ore left)" % dep2
 			else:
