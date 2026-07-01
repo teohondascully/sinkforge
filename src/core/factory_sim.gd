@@ -615,13 +615,25 @@ func remove_machine(cell: Vector2i) -> void:
 	machines.erase(state)
 
 
+## The most whole ticks one advance() will run, so a slow frame can't trigger a catch-up spiral: if the
+## frame took long, delta is big (× the fast-forward clock, bigger still), which would queue many ticks,
+## which take longer, which grows the next delta — a runaway. Past the cap we drop the excess sim-time
+## (the accumulator is trimmed) rather than chase it: the factory momentarily runs slow-motion instead of
+## locking up. 6 ticks = 3× the ~2.66 ticks/frame an 8× clock needs at 60fps, so normal fast-forward is
+## unaffected — this only ever bites a genuine hitch. Determinism per tick is untouched (a tick is a tick).
+const MAX_TICKS_PER_ADVANCE: int = 6
+
 ## Advance by real elapsed time, running only whole fixed ticks (deterministic, framerate-
 ## independent). The game loop calls this; tests call tick() directly.
 func advance(delta: float) -> void:
 	_tick_accumulator += delta
-	while _tick_accumulator >= SECONDS_PER_TICK:
+	var ran: int = 0
+	while _tick_accumulator >= SECONDS_PER_TICK and ran < MAX_TICKS_PER_ADVANCE:
 		_tick_accumulator -= SECONDS_PER_TICK
 		tick()
+		ran += 1
+	if _tick_accumulator > SECONDS_PER_TICK:
+		_tick_accumulator = 0.0        # fell behind the cap → drop the backlog, don't spiral chasing it
 
 
 ## One deterministic logical step: derive the power field, every machine runs (consumers read the field),
