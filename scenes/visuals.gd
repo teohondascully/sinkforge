@@ -185,15 +185,96 @@ static func item_color(item: StringName) -> Color:
 
 
 ## Draw an item icon centred at `center`, `size` px square. Sprite-ready: an item_<id>.png
-## (docs/ART_SPEC.md) replaces the flat colour chip the moment it exists; absent → today's look.
-## One helper so ground piles, the hotbar, and anything else share the same swap.
+## (docs/ART_SPEC.md) replaces the procedural glyph the moment it exists; absent → a drawn glyph that
+## actually READS as the thing (a pickaxe looks like a pickaxe, an ingot like a bar). One helper so ground
+## piles, the hotbar, the craft screen, and anything else share the same look + the same sprite swap.
 static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: StringName) -> void:
-	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
 	var tex: Texture2D = Art.tex("item_" + String(item))
 	if tex != null:
-		canvas.draw_texture_rect(tex, rect, false)
-	else:
-		canvas.draw_rect(rect, item_color(item))
+		canvas.draw_texture_rect(tex, Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), false)
+		return
+	match item:
+		&"ore":
+			_item_ore(canvas, center, size)
+		&"ingot":
+			_item_ingot(canvas, center, size)
+		&"coal":
+			_item_coal(canvas, center, size)
+		&"wood":
+			_item_wood(canvas, center, size)
+		&"wood_pickaxe":
+			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47))
+		&"stone_pickaxe":
+			_item_pickaxe(canvas, center, size, Color(0.50, 0.37, 0.23), Color(0.60, 0.64, 0.71))
+		&"wood_axe":
+			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
+		_:
+			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
+
+
+## Polygon helper: points given as size-fractions from the centre (y+ down), filled `fill` with a crisp
+## darker outline so a glyph reads at small hotbar scale. Keeps the item drawers terse + consistent.
+static func _poly(canvas: CanvasItem, c: Vector2, size: float, frac: Array, fill: Color) -> void:
+	var pts := PackedVector2Array()
+	for f: Vector2 in frac:
+		pts.append(c + f * size)
+	canvas.draw_colored_polygon(pts, fill)
+	canvas.draw_polyline(pts + PackedVector2Array([pts[0]]), fill.darkened(0.45), maxf(1.0, size * 0.03), true)
+
+
+## ORE — a rough rock nugget with bright amber ore flecks embedded (reads as "metal IN rock").
+static func _item_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
+		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.44, 0.46, 0.52))
+	for f: Vector2 in [Vector2(-0.10, 0.02), Vector2(0.14, -0.10), Vector2(-0.02, 0.18)]:
+		canvas.draw_circle(c + f * size, size * 0.06, Color(0.90, 0.56, 0.24))
+		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.82, 0.5))
+
+
+## INGOT — a trapezoidal cast metal bar with a bright top face (the classic ingot silhouette).
+static func _item_ingot(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var gold := Color(0.93, 0.78, 0.36)
+	_poly(canvas, c, size, [Vector2(-0.26, -0.16), Vector2(0.26, -0.16), Vector2(0.40, 0.18),
+		Vector2(-0.40, 0.18)], gold)
+	_poly(canvas, c, size, [Vector2(-0.26, -0.16), Vector2(0.26, -0.16), Vector2(0.20, -0.06),
+		Vector2(-0.20, -0.06)], gold.lightened(0.28))   # lit top face
+
+
+## COAL — a dark faceted lump with a cool sheen highlight (distinct from the rounded ore nugget).
+static func _item_coal(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	_poly(canvas, c, size, [Vector2(-0.30, -0.10), Vector2(-0.06, -0.32), Vector2(0.30, -0.18),
+		Vector2(0.34, 0.16), Vector2(0.02, 0.34), Vector2(-0.32, 0.16)], Color(0.20, 0.21, 0.25))
+	_poly(canvas, c, size, [Vector2(-0.06, -0.32), Vector2(0.14, -0.06), Vector2(-0.10, 0.00)],
+		Color(0.34, 0.36, 0.42))   # a lit facet
+
+
+## WOOD — a short LOG: a brown bar capped by round ends, with concentric end-grain rings on the left face.
+static func _item_wood(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var bark := Color(0.52, 0.36, 0.20)
+	canvas.draw_rect(Rect2(c - Vector2(size * 0.30, size * 0.16), Vector2(size * 0.60, size * 0.32)), bark)
+	canvas.draw_circle(c + Vector2(size * 0.30, 0.0), size * 0.16, bark)
+	canvas.draw_circle(c - Vector2(size * 0.30, 0.0), size * 0.16, bark.lightened(0.10))   # left end face
+	canvas.draw_arc(c - Vector2(size * 0.30, 0.0), size * 0.10, 0.0, TAU, 12, bark.darkened(0.25), maxf(1.0, size * 0.03))
+	canvas.draw_circle(c - Vector2(size * 0.30, 0.0), size * 0.035, bark.darkened(0.30))
+
+
+## PICKAXE — a wood handle with a curved double-pointed head at the top (points sweeping down-and-out).
+## `handle`/`head` colours let one drawer serve the wood pick and the grey stone pick.
+static func _item_pickaxe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, head: Color) -> void:
+	canvas.draw_line(c + Vector2(size * 0.10, size * 0.42), c + Vector2(-0.02 * size, -0.16 * size),
+		handle, maxf(1.5, size * 0.12))                              # the shaft
+	_poly(canvas, c, size, [Vector2(-0.44, -0.04), Vector2(-0.16, -0.30), Vector2(0.16, -0.30),
+		Vector2(0.44, -0.04), Vector2(0.12, -0.16), Vector2(-0.12, -0.16)], head)   # the curved head
+
+
+## AXE — a wood handle with a fanned blade on the upper right + a bright cutting edge.
+static func _item_axe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, blade: Color) -> void:
+	canvas.draw_line(c + Vector2(size * 0.06, size * 0.42), c + Vector2(-0.10 * size, -0.34 * size),
+		handle, maxf(1.5, size * 0.12))                              # the shaft
+	_poly(canvas, c, size, [Vector2(-0.14, -0.34), Vector2(0.30, -0.36), Vector2(0.40, -0.02),
+		Vector2(-0.06, -0.02)], blade)                              # the blade fanning right
+	canvas.draw_line(c + Vector2(0.30 * size, -0.36 * size), c + Vector2(0.40 * size, -0.02 * size),
+		blade.lightened(0.4), maxf(1.0, size * 0.04))              # honed cutting edge
 
 
 ## Debris/dust colour for a mined terrain material (juice particles) — roughly its rock tone.
