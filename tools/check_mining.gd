@@ -83,3 +83,22 @@ func _run() -> void:
 	_check(not _main._mineable(d2), "the cell two-below (through solid) is NOT mineable")
 	_check(_main.try_mine(d1), "mining straight down one cell succeeds")
 	_check(_main._mineable(d2), "after digging one down, the next-down IS exposed (shaft deepens one at a time)")
+
+	# REGRESSION — the "cracks loop forever without breaking" bug: the mine ANIMATION gate (_update_mining's
+	# `holding`) is now the SAME _mineable predicate try_mine enforces. So the effective aim can never be a
+	# cell that would spider a full charge yet refuse to break. Point the cursor PAST a fresh wall and assert
+	# the hold-gate never reads a LOS-blocked block as mineable (the old gate checked reach only → the loop).
+	var wcol: int = 44
+	for y: int in range(row - 2, row + 3):
+		_sim.set_solid(Vector2i(wcol - 1, y), &"")            # a pocket to stand in
+	for x: int in range(wcol, wcol + 4):
+		_sim.set_solid(Vector2i(x, row), &"stone")            # a fresh solid wall
+	_main._player.position = _main._cell_center(Vector2i(wcol - 1, row))
+	var buried := Vector2i(wcol + 2, row)                     # two behind the wall face
+	var eff: Vector2i = _main._effective_aim(_main._cell_center(buried))
+	if _sim.is_solid(eff) and not _main._line_of_sight_clear(_main._body_cell(), eff):
+		_check(not _main._mineable(eff),
+			"a LOS-blocked block is never 'mineable' → the hold-gate won't charge it (no phantom crack loop)")
+	else:
+		_check(_main._mineable(eff),
+			"the aim snapped to an exposed face → you dig the PATH toward the buried block (no phantom)")

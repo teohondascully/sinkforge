@@ -514,8 +514,12 @@ func _unhandled_input(event: InputEvent) -> void:
 ## (The wall-clock timing lives HERE; the tool-GATE lives in try_mine, the verb the play-harness drives.)
 func _update_mining(delta: float) -> void:
 	_aim = _effective_aim(get_global_mouse_position())
-	var holding: bool = not _paused and Input.is_action_pressed(Controls.MINE) \
-		and sim.is_solid(_aim) and _can_reach(_aim)
+	# The charge/crack animation runs ONLY on a cell you can actually break — the SAME _mineable predicate
+	# try_mine enforces (solid + in reach + LINE OF SIGHT). Without the LOS term the cracks would spider a
+	# full charge, try_mine would refuse (no clear path), and it'd loop forever — reading as a bug. If the
+	# aim is a block behind rock, _effective_aim already snaps to the nearest EXPOSED face toward the cursor,
+	# so you dig the PATH toward a buried target; when no reachable face exists, nothing animates (no phantom).
+	var holding: bool = not _paused and Input.is_action_pressed(Controls.MINE) and _mineable(_aim)
 	if not holding:
 		_mine_target = Vector2i(-999, -999)
 		_mine_charge = 0.0
