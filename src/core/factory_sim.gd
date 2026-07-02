@@ -101,6 +101,11 @@ var total_consumed: Dictionary = {}
 ## falling sprites. The sim NEVER reads this back — clearing it changes no production. The
 ## representation layer drains it each frame. Each entry: {item, from: Vector2i, to: Vector2i, count}.
 var flow_events: Array[Dictionary] = []
+## Cosmetic channel like flow_events: cells whose TERRAIN (solid/wall) changed since the view last drained
+## this. The chunked terrain renderer repaints ONLY the affected chunks instead of the whole 7700-cell world
+## (the ~300ms per-dig freeze). The sim writes on every terrain edit (mine/place/drill-bore/fell/set_solid);
+## the view reads + clears it each frame; the sim never reads it back (clearing changes no production).
+var terrain_dirty: Array[Vector2i] = []
 ## DERIVED power field (cell -> available power units), rebuilt from scratch every tick by _compute_power
 ## from fueled generators (+ conduits, later). NOT authoritative state — a pure function of placement +
 ## fuel, like updraft_at — so it can never desync. Consumers read it via power_at(); the view tints it.
@@ -225,6 +230,7 @@ func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 		solid.erase(cell)
 	else:
 		solid[cell] = material
+	terrain_dirty.append(cell)
 
 
 ## The background wall material in a cell (e.g. &"stone_wall"), or &"" if none. View reads this to
@@ -241,6 +247,7 @@ func set_wall(cell: Vector2i, material: StringName = &"") -> void:
 		wall.erase(cell)
 	else:
 		wall[cell] = material
+	terrain_dirty.append(cell)
 
 
 ## Ingest a generated world (the gen→sim handshake): replace terrain with the WorldData's two grids.
@@ -268,6 +275,7 @@ func load_world(world: WorldData) -> void:
 func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
+	terrain_dirty.append(cell)          # the block is about to clear on every branch below → repaint its chunk
 	var material: StringName = solid[cell]
 	if _is_ore_like(material):
 		# HAND-mining an ore-like block (ore or coal) is a quick, inefficient grab: one strike clears the whole
@@ -316,6 +324,7 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	_take_from_pack(material, 1)
 	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
 	solid[cell] = material
+	terrain_dirty.append(cell)
 	return true
 
 
@@ -1022,6 +1031,7 @@ func _run_drill(machine: MachineState) -> void:
 	else:
 		deposits.erase(target)
 		solid.erase(target)                                   # cell bored out → the shaft deepens
+		terrain_dirty.append(target)                          # repaint the chunk the shaft just deepened into
 		_resettle_pile_above(target)                          # gravity: anything resting above now falls
 	# Eject the freed material DOWN from the bored cell (still the drill's own column), where gravity carries
 	# it to a hopper/forge/collection. `from` = the bored cell so the falling-item visual pours from the vein.
