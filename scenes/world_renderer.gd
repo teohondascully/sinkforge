@@ -505,10 +505,12 @@ func _draw_drill_preview() -> void:
 	var flow := Color(1.0, 0.80, 0.30, 0.95)              # warm gold: "here's the ore, it'll flow"
 	var warn := Color(0.98, 0.45, 0.38, 0.95)             # red-amber: no drain below
 	var tint: Color = warn if blocked else flow
-	# A faint tint on each ore cell the drill will bore, so "the relevant column" pops out of the dark rock.
-	var fill := Color(tint.r, tint.g, tint.b, 0.16)
+	# Tint each cell the drill will bore by ITS OWN material — so a MIXED column (e.g. ore stacked on coal)
+	# reads honestly as mixed: the drill bores straight down through both and pours a MIXED stream, and now
+	# you SEE that before committing (ore cells glow amber, coal cells dark) rather than one uniform gold.
 	for oc: Variant in ore_cells:
-		draw_rect(Rect2(Vector2(oc) * float(CELL), Vector2(CELL, CELL)), fill)
+		var mat_col: Color = _material(sim.material_at(oc)).nugget_color
+		draw_rect(Rect2(Vector2(oc) * float(CELL), Vector2(CELL, CELL)), Color(mat_col.r, mat_col.g, mat_col.b, 0.22))
 	# Dashed box hugging the whole ore column (topmost ore .. bottommost ore, one cell wide).
 	var top: Vector2i = ore_cells[0]
 	var bot: Vector2i = ore_cells[-1]
