@@ -50,6 +50,13 @@ func _run() -> void:
 		["build a machine", _goal_build_a_machine],
 		["feed the forge & smelt", _goal_feed_and_smelt],
 		["RUNG 1 — reach first automation", _goal_reach_first_automation],
+		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
+		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
+		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
+		["friction: round-trip to a buried vein", _goal_round_trip_to_vein],
+		["friction: descend, build a drill, climb out", _goal_descend_build_return],
+		["friction: escape a deep pit (not trapped)", _goal_escape_deep_pit],
+		["friction: cross a jagged tunnel", _goal_cross_jagged_tunnel],
 	]:
 		if not await _attempt(goal[0], goal[1]):
 			_failures += 1
@@ -190,6 +197,114 @@ func _goal_reach_first_automation() -> bool:
 			return await _finish(agent, false, "did the action for '%s' but the objective never ticked — the player gets no signal they progressed" % id)
 	return await _finish(agent, obj.all_done(),
 		"followed the signposts all the way to FIRST AUTOMATION (%d steps)" % obj.steps.size())
+
+
+# --- FRICTION journeys ----------------------------------------------------------------------------
+# These model the WHOLE realistic user experience, not just the headline verb. A player who wants to
+# "drill a buried vein" doesn't teleport there — they dig DOWN to it (byproduct), do the thing, then
+# claw their way back UP (the big one). We PLAY those byproduct steps and print the effort (friction())
+# so we can SEE the game get less painful as mobility tools land. Blocks are topped up (setup hatch) so a
+# journey measures TRAVERSAL friction, not resource starvation — the pit/shaft is what we're testing.
+
+## Fill a clean vertical column of earth from the surface down to `depth` below it and bury an ore vein at
+## the bottom — a deterministic shaft to dig, so the friction numbers are comparable run to run.
+func _bury_vein(agent: PlayAgent, col: int, depth: int) -> Vector2i:
+	var target := Vector2i(col, MainView.SURFACE + depth)
+	for y: int in range(MainView.SURFACE, target.y):
+		agent.sim.set_solid(Vector2i(col, y), &"earth")     # a clean earthen column (no caves/gaps to complicate)
+	agent.sim.set_solid(target, &"ore")
+	agent.sim.deposits[target] = 40
+	agent.sim.set_solid(Vector2i(col, target.y + 1), &"stone")  # a floor under the vein
+	return target
+
+
+## Round-trip: dig DOWN to a buried vein, mine it, and climb back to the SURFACE. The most common real loop
+## and the friction the user named — "mine down, then mine a staircase back up". Pass = ore in hand AND body
+## back on the surface (not stranded). Friction printed so we watch it drop when the rope lands.
+func _goal_round_trip_to_vein() -> bool:
+	var agent: PlayAgent = await _boot()
+	var col: int = 34                                        # a clean plateau column, clear of the fixtures (40-56)
+	var vein: Vector2i = _bury_vein(agent, col, 8)
+	agent.give(&"earth", 12)                                 # buffer so "out of blocks" can't mask traversal friction
+	var before: int = int(agent.sim.inventory.get(&"ore", 0))
+	var dug: bool = await agent.dig_down_to(vein)
+	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
+	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
+	print("  friction: %s  (down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
+	return await _finish(agent, dug and got >= 1 and up,
+		"dug to the buried vein, mined it, and climbed back to the surface")
+
+
+## A DEEP round-trip — the same journey as the shallow one but to a vein twice as far down, so the friction
+## SCALES visibly with depth (deeper = a longer, more punishing climb back). This is the number that must not
+## explode as the game asks you to go deeper: it's the argument for the lift over the rope. Pass = ore in
+## hand AND back on the surface; the friction() print is the depth-scaling read.
+func _goal_descend_build_return() -> bool:
+	var agent: PlayAgent = await _boot()
+	var col: int = 62                                        # a clean plateau column, clear of the fixtures (40-56)
+	var vein: Vector2i = _bury_vein(agent, col, 14)          # DEEP — twice the shallow round-trip
+	agent.give(&"earth", 20)                                 # buffer so traversal friction, not resource, is measured
+	var before: int = int(agent.sim.inventory.get(&"ore", 0))
+	var dug: bool = await agent.dig_down_to(vein)
+	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
+	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
+	print("  friction: %s  (depth=14 down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
+	return await _finish(agent, dug and got >= 1 and up,
+		"dug 14 deep to a vein, mined it, and climbed all the way back out")
+
+
+## The pure "am I TRAPPED?" test: drop the body into a deep 1-wide pit (walls solid both sides) with blocks
+## in the pack, and require it to get out. If it can't, the player is stranded at the bottom of their own
+## shaft — the worst friction this game could ship, and exactly what the rope must prevent. Fail = trapped.
+func _goal_escape_deep_pit() -> bool:
+	var agent: PlayAgent = await _boot()
+	var col: int = 37                                        # a clean plateau column, clear of the fixtures (40-56)
+	var depth: int = 6
+	# Solid ground both sides + below; a 1-wide open pit the body stands at the bottom of.
+	for y: int in range(MainView.SURFACE, MainView.SURFACE + depth + 2):
+		agent.sim.set_solid(Vector2i(col - 1, y), &"stone")
+		agent.sim.set_solid(Vector2i(col + 1, y), &"stone")
+	for y: int in range(MainView.SURFACE, MainView.SURFACE + depth):
+		agent.sim.set_solid(Vector2i(col, y), &"")          # carve the pit
+	agent.sim.set_solid(Vector2i(col, MainView.SURFACE + depth), &"stone")  # pit floor
+	agent.player.position = agent.main._cell_center(Vector2i(col, MainView.SURFACE + depth - 1))
+	agent.give(&"stone", 12)
+	for _i: int in 20:                                      # let it settle at the bottom
+		await physics_frame
+	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
+	print("  friction: %s  (escaped=%s)" % [agent.friction(), up])
+	return await _finish(agent, up, "climbed out of a %d-deep pit (must not be trapped)" % depth)
+
+
+## Cross a JAGGED horizontal tunnel (up-and-down 1-tile steps, like a natural cave floor) — the finicky
+## cave-traversal the user flagged as feeling bad. Pass = reaches the far end; the friction (stuck_frames,
+## jumps) is the read on how AGILE lateral cave movement feels.
+func _goal_cross_jagged_tunnel() -> bool:
+	var agent: PlayAgent = await _boot()
+	var start_col: int = 57                                  # clean plateau, right of the fixtures; length stays < FLAT_END
+	var length: int = 8
+	var base: int = MainView.SURFACE + 4
+	# Carve a corridor with a FLAT ceiling well above the highest lump and a FLOOR that jitters ±1 tile each
+	# column (a lumpy cave floor). The ceiling clears rows down to the highest lump so undulating floors never
+	# leave original terrain protruding into the walk path — the body only ever meets ±1 floor steps.
+	var ceiling: int = base - 4                              # above the highest possible lump (base-1)
+	for i: int in range(length):
+		var c: int = start_col + i
+		var floor_row: int = base + (1 if i % 3 == 1 else 0) - (1 if i % 4 == 3 else 0)
+		for y: int in range(ceiling, floor_row):
+			agent.sim.set_solid(Vector2i(c, y), &"")        # open headroom (flat ceiling → lumpy floor)
+		for y: int in range(floor_row, base + 3):
+			agent.sim.set_solid(Vector2i(c, y), &"stone")   # the lumpy floor + fill below
+	agent.player.position = agent.main._cell_center(Vector2i(start_col, base - 1))
+	agent.give(&"stone", 8)
+	for _i: int in 20:
+		await physics_frame
+	# Just WALK it (hold toward the far column, hop only when genuinely stuck) — the way a player crosses a
+	# lumpy floor. This isolates the BODY's step-up/snap-down over ±1 lumps from the pathfinder's cleverness.
+	var far_col: int = start_col + length - 1
+	var reached: bool = await agent.walk_to_column(far_col, 1200)
+	print("  friction: %s  (reached=%s at col %d)" % [agent.friction(), reached, agent.main._cell_at(agent.player.position).x])
+	return await _finish(agent, reached, "walked a %d-cell jagged tunnel end to end" % length)
 
 
 ## Perform the real-verb action a single objective step asks for. Each branch uses only what a player has:

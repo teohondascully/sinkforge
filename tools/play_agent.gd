@@ -30,6 +30,12 @@ var trace: Array[String] = []
 var jumps: int = 0
 var builds: int = 0
 var stuck_frames: int = 0
+## FRICTION metrics — the byproduct-effort a real player spends getting places (not just did-the-goal-happen).
+## A high count here is the friction the user feels: mines = blocks broken, places = blocks laid (staircases/
+## pillars to get back up), frames = time spent. The mobility tools (rope/lift) should make these PLUMMET.
+var mines: int = 0
+var places: int = 0
+var frames: int = 0
 var _jump_cool: int = 0
 
 
@@ -45,6 +51,33 @@ func _do_jump() -> void:
 ## One-line behaviour summary for the harness to log + me to read.
 func stats() -> String:
 	return "jumps=%d builds=%d stuck_frames=%d" % [jumps, builds, stuck_frames]
+
+
+## Friction summary — the byproduct effort spent this journey (the play-FEEL numbers, not pass/fail).
+func friction() -> String:
+	return "mines=%d places=%d jumps=%d frames=%d stuck=%d" % [mines, places, jumps, frames, stuck_frames]
+
+
+## A COUNTED frame-wait (used by journey code so `frames` measures how long a byproduct step really took).
+func step() -> void:
+	await tree.physics_frame
+	frames += 1
+
+
+## Mine a cell through the real verb, counting it as friction. Returns whether the strike landed.
+func do_mine(cell: Vector2i) -> bool:
+	var ok: bool = main.try_mine(cell)
+	if ok:
+		mines += 1
+	return ok
+
+
+## Place the selected item at a cell through the real verb, counting it as friction. Returns success.
+func do_build(cell: Vector2i) -> bool:
+	var ok: bool = main.try_build(cell)
+	if ok:
+		places += 1
+	return ok
 
 
 func _init(scene_tree: SceneTree, main_view: MainView) -> void:
@@ -157,7 +190,8 @@ func mine_cell(cell: Vector2i, budget: int = 720) -> bool:
 		return false
 	var t: int = 0
 	while sim.is_solid(cell) and t < 30:
-		main.try_mine(cell)
+		if main.try_mine(cell):
+			mines += 1
 		await wait(2)
 		t += 1
 	return not sim.is_solid(cell)
@@ -223,14 +257,68 @@ func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
 		if centred:
 			var feet: Vector2i = main._cell_at(player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0))
 			if feet.x == col and sim.is_solid(feet) and main._can_reach(feet):
-				main.try_mine(feet)
+				if main.try_mine(feet):
+					mines += 1
 			if main._can_reach(cell):
-				main.try_mine(cell)
+				if main.try_mine(cell):
+					mines += 1
 		await tree.physics_frame
 		t += 1
 	player.input_dir = 0.0
 	_note("ran out of budget digging to %s (stuck near %s)" % [cell, main._cell_at(player.position)])
 	return not sim.is_solid(cell)
+
+
+## Climb from the bottom of a shaft back UP to the surface — the BYPRODUCT step a player MUST do after
+## digging down, and today the friction hotspot: with no rope/ladder, the only way up a straight shaft is
+## PILLAR-JUMPING (jump, drop a block into the cell just vacated under your feet, land on it, repeat). This
+## models exactly that, so the friction metrics (places/jumps/frames) measure how painful getting back up
+## is. Returns whether the body reached the surface. Fails if it runs out of blocks or genuinely can't rise
+## (= "the player is TRAPPED down there", the worst-case friction we must never ship). When a rope/ladder
+## lands, this primitive should prefer it → the same journeys pass with a fraction of the effort.
+func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
+	var t: int = 0
+	var stall: int = 0
+	while t < budget:
+		var bc: Vector2i = main._cell_at(player.position)
+		if bc.y <= target_row and player.on_floor:
+			player.input_dir = 0.0
+			return true                                  # back on the surface
+		player.input_dir = 0.0                           # stay plumb so we land back on the pillar
+		if not player.on_floor:
+			await step(); t += 1
+			continue
+		if not _select_block():
+			_note("climb: out of blocks to pillar with at %s" % bc)
+			return false
+		# PILLAR up one cell: jump, and the MOMENT the feet clear the cell we were standing in, drop a block
+		# into it — the body then falls onto that block, one cell higher. This is the fiddly timing a player
+		# fights by hand; the agent nails it, so the friction shows up as sheer COUNT (jumps/places), not luck.
+		var stand: Vector2i = main._cell_at(player.position + Vector2(0.0, Player.HEIGHT * 0.5 - 2.0))
+		player.request_jump()
+		jumps += 1
+		var placed: bool = false
+		for _w: int in 24:
+			await step(); t += 1
+			var feet_y: float = player.position.y + Player.HEIGHT * 0.5
+			if feet_y <= float(stand.y * CELL) - 4.0:    # feet risen clear above the stand cell → safe to fill it
+				if main._placeable(stand) and main._can_reach(stand):
+					placed = do_build(stand)
+				break
+		for _l: int in 16:                               # settle back down onto the new block
+			await step(); t += 1
+			if player.on_floor:
+				break
+		if main._cell_at(player.position).y < bc.y:
+			stall = 0                                    # rose a cell → progress
+		else:
+			stall += 1
+			stuck_frames += 1
+			if stall > 8:                                # several cycles, no ascent → genuinely trapped
+				_note("climb: STALLED at %s (placed=%s) — couldn't get back up (trapped)" % [bc, placed])
+				return false
+	_note("climb: ran out of budget at %s" % main._cell_at(player.position))
+	return main._cell_at(player.position).y <= target_row
 
 
 ## Select the carried slot holding `item_id`. Returns whether it's now the active slot.
