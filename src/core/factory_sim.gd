@@ -926,6 +926,31 @@ func _drill_blocked(target: Vector2i) -> bool:
 	return solid.has(below)            # solid rock caps it → blocked; open air → drains free
 
 
+## Read-only PLACEMENT PREVIEW for a drill hovered at `cell` — what the representation draws so a player
+## sees, before committing, exactly which ore the drill will bore and where it will pour. Returns the ore
+## cells it would extract (its whole column, top to bottom), the DROP cell just below the deepest ore (the
+## out-point), and whether that drop is blocked. Empty ore_cells = not over any ore. Pure derivation.
+func drill_preview(cell: Vector2i) -> Dictionary:
+	var ore_cells: Array[Vector2i] = []
+	for dy: int in range(0, GRID_ROWS):
+		var c := Vector2i(cell.x, cell.y + dy)
+		if not in_bounds(c):
+			break
+		if solid.has(c):
+			if _is_ore_like(solid[c]):
+				ore_cells.append(c)
+			else:
+				break                  # solid rock caps the column
+		elif dy > 0 and grid.has(c):
+			break                      # a machine below → collection point, stop
+	var deepest: Vector2i = ore_cells[-1] if not ore_cells.is_empty() else Vector2i(-1, -1)
+	return {
+		"ore_cells": ore_cells,
+		"drop_cell": (deepest + Vector2i(0, 1)) if deepest.x >= 0 else Vector2i(-1, -1),
+		"blocked": _drill_blocked(deepest),
+	}
+
+
 ## Total ore a drill at `cell` can still bore from its whole column — the sum of every solid ore cell's
 ## remaining deposit straight down until rock or a machine stops it. The "how much is left for this drill"
 ## the hover surfaces, so a drill on a fat body reads its real remaining supply.

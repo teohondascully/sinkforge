@@ -640,6 +640,19 @@ func _test_finite_deposit_and_drill() -> void:
 	_check(int(s5.total_produced.get(&"ore", 0)) == 5, "with a drain, the once-blocked drill drains the full vein")
 	_check(_items_present(s5, &"ore") == int(s5.total_produced.get(&"ore", 0)), "ore conserved after unblocking")
 
+	# PLACEMENT PREVIEW (what the overlay draws): the ore column the drill would bore, the drop cell, blocked flag.
+	var s6: FactorySim = FactorySim.new()
+	for y: int in range(4, 7):                          # a 3-tall vein at col 2, rows 4..6
+		s6.set_solid(Vector2i(2, y), &"ore")
+	s6.set_solid(Vector2i(2, 8), &"stone")              # open drain (row 7) then a catch-floor
+	var pv: Dictionary = s6.drill_preview(Vector2i(2, 3))  # hover the open cell above the vein
+	_check((pv["ore_cells"] as Array).size() == 3, "preview lists all 3 ore cells the drill would bore")
+	_check(pv["ore_cells"][0] == Vector2i(2, 4) and pv["ore_cells"][-1] == Vector2i(2, 6), "preview spans top→bottom of the vein")
+	_check(pv["drop_cell"] == Vector2i(2, 7), "preview drop cell is just below the deepest ore")
+	_check(not pv["blocked"], "preview reads NOT blocked when a drain is open below")
+	var pv_empty: Dictionary = s6.drill_preview(Vector2i(9, 3))  # nowhere near ore
+	_check((pv_empty["ore_cells"] as Array).is_empty(), "preview over no ore lists nothing")
+
 
 ## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:
 ## no coal → it idles; fed coal → it runs and burns the coal. A drill on a COAL deposit yields coal.

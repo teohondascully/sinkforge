@@ -452,6 +452,8 @@ func _draw_aim() -> void:
 		ghost.a = 0.55
 		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
 		Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
+		if _ghost_def.behavior == &"drill" and _aim_placeable:
+			_draw_drill_preview()  # dashed ore column + out-arrow: show what this drill will bore & where it pours
 	elif _ghost_material != &"":
 		# Block-placement preview: a translucent material-tinted fill (the Terraria build cursor).
 		var bg: Color = _material(_ghost_material).base_color
@@ -462,6 +464,62 @@ func _draw_aim() -> void:
 	# A bright WHITE box hovering over the target cell (Terraria placement cursor); red when blocked.
 	var border := Color(0.97, 0.98, 1.0, 0.95) if _aim_placeable else Color(0.95, 0.45, 0.40, 0.95)
 	draw_rect(inner, border, false, 2.5)
+
+
+## When holding a Drill and hovering a valid spot, preview WHAT it will bore: a dashed outline around the
+## ore column it'll drain (top→bottom of the vein straight below) + a downward OUT-ARROW under the bottommost
+## ore marking where the ore pours. Teaches the player to hunt tall, vertical veins (longer automation) and
+## warns (amber, "dig a drain") when the vein bottoms on rock with nowhere to drop. Pure overlay.
+func _draw_drill_preview() -> void:
+	var pv: Dictionary = sim.drill_preview(_aim)
+	var ore_cells: Array = pv["ore_cells"]
+	if ore_cells.is_empty():
+		return                                            # not over any ore — nothing to preview
+	var blocked: bool = pv["blocked"]
+	var flow := Color(1.0, 0.80, 0.30, 0.95)              # warm gold: "here's the ore, it'll flow"
+	var warn := Color(0.98, 0.45, 0.38, 0.95)             # red-amber: no drain below
+	var tint: Color = warn if blocked else flow
+	# A faint tint on each ore cell the drill will bore, so "the relevant column" pops out of the dark rock.
+	var fill := Color(tint.r, tint.g, tint.b, 0.16)
+	for oc: Variant in ore_cells:
+		draw_rect(Rect2(Vector2(oc) * float(CELL), Vector2(CELL, CELL)), fill)
+	# Dashed box hugging the whole ore column (topmost ore .. bottommost ore, one cell wide).
+	var top: Vector2i = ore_cells[0]
+	var bot: Vector2i = ore_cells[-1]
+	var box := Rect2(Vector2(top) * float(CELL) + Vector2(1, 1),
+		Vector2(CELL - 2, float((bot.y - top.y + 1) * CELL) - 2))
+	_draw_dashed_rect(box, tint, 6.0, 2.5)
+	# The OUT-ARROW: a downward chevron in the cell just below the bottommost ore — where the ore pours out.
+	var drop: Vector2i = pv["drop_cell"]
+	if sim.in_bounds(drop):
+		var cx: float = float(drop.x * CELL) + float(CELL) * 0.5
+		var top_y: float = float(drop.y * CELL) + 3.0
+		var bot_y: float = top_y + float(CELL) * 0.55
+		draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
+		var head: float = 6.0
+		draw_line(Vector2(cx, bot_y), Vector2(cx - head, bot_y - head), tint, 2.5)
+		draw_line(Vector2(cx, bot_y), Vector2(cx + head, bot_y - head), tint, 2.5)
+
+
+## A dashed rectangle outline — perimeter walked clockwise, laying `dash`-length ticks every other `dash`.
+## Used by the drill preview; keeps the overlay reading as a PLAN (dashed) vs a solid selection box.
+func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> void:
+	var corners: Array[Vector2] = [
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0),
+		rect.position + rect.size,
+		rect.position + Vector2(0, rect.size.y),
+	]
+	for i: int in 4:
+		var a: Vector2 = corners[i]
+		var b: Vector2 = corners[(i + 1) % 4]
+		var seg: float = a.distance_to(b)
+		var dir: Vector2 = (b - a).normalized()
+		var t: float = 0.0
+		while t < seg:
+			var t2: float = minf(t + dash, seg)
+			draw_line(a + dir * t, a + dir * t2, color, width)
+			t += dash * 2.0
 
 
 ## Sky + the REAL background WALL layer (sim.wall). Open sky fills the top; each wall cell paints its
