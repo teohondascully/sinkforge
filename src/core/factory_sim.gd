@@ -597,6 +597,7 @@ func pickup_machine(cell: Vector2i) -> bool:
 	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
 		for item: StringName in buffer:
 			inventory[item] = int(inventory.get(item, 0)) + int(buffer[item])
+		buffer.clear()   # salvaged into the pack — cleared so remove_machine has nothing left to destroy
 	inventory[state.def.id] = int(inventory.get(state.def.id, 0)) + 1
 	remove_machine(cell)
 	return true
@@ -621,11 +622,18 @@ func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
 	return state
 
 
-## Remove the machine at a cell (if any). Its buffered items are discarded.
+## Remove the machine at a cell (if any). Any items still in its buffers are DESTROYED with the machine —
+## credited to total_consumed so the conservation invariant (present == produced - consumed) holds. (The
+## player-facing pickup_machine SALVAGES buffers into the pack and clears them first, so it reaches here
+## with empty buffers and destroys nothing; a raw remove_machine — a test, a future demolish verb — credits
+## whatever it discards. Fuel/progress aren't items, so they're not credited.)
 func remove_machine(cell: Vector2i) -> void:
 	var state: MachineState = grid.get(cell, null)
 	if state == null:
 		return
+	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
+		for item: StringName in buffer:
+			total_consumed[item] = int(total_consumed.get(item, 0)) + int(buffer[item])
 	grid.erase(cell)
 	machines.erase(state)
 

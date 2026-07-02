@@ -295,8 +295,24 @@ func _test_hand_built_chain() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved in the hand-built chain (present=%d, net=%d)" % [item, present, net])
-	sim.remove_machine(Vector2i(7, 4))  # pick a machine back up
+	sim.remove_machine(Vector2i(7, 4))  # raw removal (demolish) — buffered items are destroyed, not salvaged
 	_check(sim.machine_at(Vector2i(7, 4)) == null, "picked the processor back up (cell is buildable again)")
+	# CONSERVATION survives a raw remove_machine: the destroyed buffer is credited to total_consumed, so
+	# present == produced - consumed still holds (the old bug leaked the buffer here).
+	for item: StringName in [&"ore", &"ingot"]:
+		var present2: int = _items_present(sim, item)
+		var net2: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present2 == net2, "%s conserved after raw removal (present=%d, net=%d)" % [item, present2, net2])
+	# pickup_machine SALVAGES instead of destroying: the held items come back to the pack, none consumed.
+	var s2: FactorySim = FactorySim.new()
+	var proc_def2: MachineDef = load("res://src/data/machines/processor.tres")
+	var held: MachineState = s2.place_machine(proc_def2, Vector2i(3, 3))
+	held.input_buffer[&"ore"] = 4
+	s2.total_produced[&"ore"] = 4                      # pretend those 4 ore were produced into it
+	_check(s2.pickup_machine(Vector2i(3, 3)), "picked up a machine holding ore")
+	_check(int(s2.inventory.get(&"ore", 0)) == 4, "the 4 held ore were salvaged into the pack")
+	_check(int(s2.total_consumed.get(&"ore", 0)) == 0, "salvage consumed nothing (pickup ≠ destroy)")
+	_check(_items_present(s2, &"ore") == 4 and int(s2.total_produced.get(&"ore", 0)) == 4, "salvaged ore conserved")
 
 
 ## The carried pack surfaces as an ordered slot list for the hotbar — one stack per item type, in
