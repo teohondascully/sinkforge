@@ -675,6 +675,18 @@ func tick() -> void:
 	for machine: MachineState in machines:
 		_run_machine(machine)
 	_flow()
+	_prune_empty_ground()
+
+
+## Drop any ground cell whose pile emptied. `_column_landing`/`_column_rise` create a pile dict EAGERLY for
+## a landing they might not fill — a splitter routing all of a tick's items one way, or a resettle of an empty
+## pile — leaving an empty `{}` in `ground`. An empty pile is a phantom: it crashes walk-over collect
+## (`keys()[0]`) and draws a ghost guide. Conservation-neutral (0 items) + not in the determinism signature,
+## so pruning is safe. Ground is small, so this is cheap.
+func _prune_empty_ground() -> void:
+	for cell: Variant in ground.keys():
+		if (ground[cell] as Dictionary).is_empty():
+			ground.erase(cell)
 
 
 ## Rebuild the power field from scratch (docs/POWER.md): every FUELED generator stamps its innate aura,
@@ -1169,6 +1181,7 @@ func _resettle_pile_above(cell: Vector2i) -> void:
 			continue
 		dest["target"][item] = int(dest["target"].get(item, 0)) + n
 		flow_events.append({"item": item, "from": above, "to": dest["to_cell"], "count": n})
+	_prune_empty_ground()   # _column_landing may have created an empty landing pile it didn't fill
 
 
 ## Player action: walk over a resting pile and scoop it all into the pack. Returns how many items

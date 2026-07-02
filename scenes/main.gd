@@ -652,9 +652,12 @@ func _collect_ground_under_player() -> void:
 	var reach_sq: float = pow(COLLECT_REACH_CELLS * float(CELL), 2.0)
 	for cell: Variant in sim.ground.keys():                          # keys() copies — safe to collect mid-iter
 		var c: Vector2i = cell
+		var pile: Dictionary = sim.ground[c]
+		if pile.is_empty():                                          # a pruned-but-lingering empty pile: skip
+			continue
 		if _player.position.distance_squared_to(_cell_center(c)) > reach_sq:
 			continue
-		var item: StringName = (sim.ground[c] as Dictionary).keys()[0]
+		var item: StringName = pile.keys()[0]
 		if sim.collect_ground(c):
 			_particles.pop(_cell_center(c), Visuals.item_color(item))  # pickup pop
 

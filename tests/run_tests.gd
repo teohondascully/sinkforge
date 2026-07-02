@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_powered_lift()
 	_test_automated_line()
 	_test_machine_status()
+	_test_no_empty_ground_piles()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1062,6 +1063,47 @@ func _test_machine_status() -> void:
 	_check(s4.machine_status(hopper) == &"idle", "empty hopper reads idle")
 	hopper.input_buffer[&"ore"] = 3
 	_check(s4.machine_status(hopper) == &"working", "loaded hopper reads working")
+
+
+## The `sim.ground` map must never retain an EMPTY pile dict — an empty {} crashed walk-over collect
+## (`pile.keys()[0]`) and drew phantom guides. A SPLITTER leaks them: _destinations builds the landing pile
+## for BOTH columns, but a tick that routes all items one way leaves the other column's pile empty. Assert
+## _prune_empty_ground keeps `ground` clean, and that the surviving piles are conserved.
+func _test_no_empty_ground_piles() -> void:
+	print("- no empty ground piles (splitter leak guard)")
+	var split_def: MachineDef = load("res://src/data/machines/splitter.tres")
+	var sim: FactorySim = FactorySim.new()
+	# A splitter over TWO open columns, each with a stone floor a few cells down so items land as GROUND piles.
+	var sc := Vector2i(5, 3)
+	var splitter: MachineState = sim.place_machine(split_def, sc)
+	sim.set_solid(Vector2i(sc.x, sc.y + 4), &"stone")       # floor under the DOWN column
+	sim.set_solid(Vector2i(sc.x + 1, sc.y + 4), &"stone")   # floor under the RIGHT column
+	# Feed a SINGLE ore unit each tick — the splitter routes it to ONE column, so the OTHER column's
+	# freshly-created landing pile is empty right when the tick returns (the frame's collect step runs THEN
+	# and crashed on it). Check for empties immediately after EACH tick — the transient the prune must erase.
+	var empties: int = 0
+	for _i: int in 6:
+		splitter.input_buffer[&"ore"] = 1
+		sim.total_produced[&"ore"] = int(sim.total_produced.get(&"ore", 0)) + 1
+		sim.tick()
+		for cell: Variant in sim.ground.keys():
+			if (sim.ground[cell] as Dictionary).is_empty():
+				empties += 1
+	_check(empties == 0, "no empty ground pile lingers when the tick returns (splitter routes one way; found %d)" % empties)
+	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the splitter to ground")
+	# The resettle path: a pile on a block whose floor is mined must not leave an empty landing pile either.
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(2, 5), &"stone")                  # a block with a pile resting on top of it
+	s2.ground[Vector2i(2, 4)] = {&"ingot": 2}
+	s2.total_produced[&"ingot"] = 2
+	s2.set_solid(Vector2i(2, 8), &"stone")                  # a lower floor to catch the cascade
+	s2.mine(Vector2i(2, 5))                                 # remove the floor → the pile resettles down
+	var e2: int = 0
+	for cell: Variant in s2.ground.keys():
+		if (s2.ground[cell] as Dictionary).is_empty():
+			e2 += 1
+	_check(e2 == 0, "resettling a pile leaves no empty landing pile behind (found %d)" % e2)
+	_check(_items_present(s2, &"ingot") == 2, "ingot conserved through the resettle cascade")
 
 
 func _test_automated_line() -> void:
