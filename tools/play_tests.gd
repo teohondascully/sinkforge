@@ -231,7 +231,8 @@ func _goal_round_trip_to_vein() -> bool:
 	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
-	return await _finish(agent, dug and got >= 1 and up,
+	var within: bool = _within_ceilings(agent, {"mines": 15, "places": 15, "jumps": 18, "frames": 320})
+	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug to the buried vein, mined it, and climbed back to the surface")
 
 
@@ -249,7 +250,8 @@ func _goal_descend_build_return() -> bool:
 	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (depth=14 down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
-	return await _finish(agent, dug and got >= 1 and up,
+	var within: bool = _within_ceilings(agent, {"mines": 24, "places": 24, "jumps": 26, "frames": 520})
+	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug 14 deep to a vein, mined it, and climbed all the way back out")
 
 
@@ -273,7 +275,8 @@ func _goal_escape_deep_pit() -> bool:
 		await physics_frame
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (escaped=%s)" % [agent.friction(), up])
-	return await _finish(agent, up, "climbed out of a %d-deep pit (must not be trapped)" % depth)
+	var within: bool = _within_ceilings(agent, {"places": 12, "jumps": 12, "frames": 220})
+	return await _finish(agent, up and within, "climbed out of a %d-deep pit (must not be trapped)" % depth)
 
 
 ## Cross a JAGGED horizontal tunnel (up-and-down 1-tile steps, like a natural cave floor) — the finicky
@@ -304,7 +307,8 @@ func _goal_cross_jagged_tunnel() -> bool:
 	var far_col: int = start_col + length - 1
 	var reached: bool = await agent.walk_to_column(far_col, 1200)
 	print("  friction: %s  (reached=%s at col %d)" % [agent.friction(), reached, agent.main._cell_at(agent.player.position).x])
-	return await _finish(agent, reached, "walked a %d-cell jagged tunnel end to end" % length)
+	var within: bool = _within_ceilings(agent, {"jumps": 8, "stuck_frames": 40})
+	return await _finish(agent, reached and within, "walked a %d-cell jagged tunnel end to end" % length)
 
 
 ## Perform the real-verb action a single objective step asks for. Each branch uses only what a player has:
@@ -594,6 +598,21 @@ func _open_cell_near(agent: PlayAgent) -> Vector2i:
 		if agent.main._placeable(c) and agent.main._can_reach(c):
 			return c
 	return Vector2i(-1, -1)
+
+
+## Assert a friction journey's byproduct-effort stays under its ceiling — so a MOVEMENT REGRESSION (digging
+## and climbing back gets more punishing) FAILS the harness, not just prints a bigger number. Ceilings sit
+## ~1.6× above today's baseline: normal real-time variance passes, a doubling trips. RATCHET these DOWN as
+## the mobility tools (rope/lift) land and these numbers should plummet — that's the whole point of them.
+func _within_ceilings(agent: PlayAgent, ceilings: Dictionary) -> bool:
+	var ok: bool = true
+	for metric: String in ceilings:
+		var val: int = int(agent.get(metric))
+		var cap: int = int(ceilings[metric])
+		if val > cap:
+			printerr("    friction CEILING breached: %s=%d > %d (movement got more punishing)" % [metric, val, cap])
+			ok = false
+	return ok
 
 
 ## Record this try's verdict, tear the scene down, and return whether the goal was met. On a miss it
