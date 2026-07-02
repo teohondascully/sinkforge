@@ -41,6 +41,14 @@ const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (th
 ## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
 const MAX_STEP: float = CELL * 1.3
 const MAX_DROP: float = CELL * 1.3
+## Floor-snap (hugging a descending step / catching a fast drop) applies when the body is genuinely MOVING —
+## walking sideways down stairs, or falling fast onto a ledge. What it must NOT do is fire when a ~stationary
+## body loses the floor from under it (you MINED it): that's not a step-down, it's the start of a FALL, so
+## gravity must take over and the body drops naturally instead of teleporting onto the next surface. The bug
+## case is the ONLY one stationary in BOTH axes, so we snap only if moving in one: sideways OR falling fast.
+const SNAP_WALK_MIN: float = 8.0     ## px/s of horizontal motion that counts as "walking" (stair-hug)
+const SNAP_FALL_MIN: float = 250.0   ## px/s of downward speed that counts as a real "drop" (fast-fall catch)
+const SNAP_STABILIZE: float = 4.0    ## a snap THIS small just keeps a resting body grounded (no flicker) — always allowed
 ## Physics integrates in chunks no larger than this, so a big frame delta — the fast-forward game clock
 ## (Engine.time_scale > 1) or a real frame-drop — can't let the body skip past a tile between collision
 ## resolves (tunnel). At time_scale 1 a normal 1/60 frame is a single substep, so play feel is unchanged;
@@ -167,8 +175,13 @@ func _step(delta: float) -> void:
 		position.y += velocity.y * delta
 		on_floor = false
 		_resolve_axis(false)
+		# Snap-hug the terrain below. A tiny snap always fires (keeps a resting body grounded, no flicker); a
+		# full STEP-DOWN only fires when the body is genuinely moving (walking down stairs, or falling fast).
+		# So when a ~stationary body loses its floor (you MINED it), there's no near floor to stabilize on and
+		# no motion to justify the step — it FALLS naturally instead of teleporting onto the next surface.
 		if grounded and not on_floor and velocity.y >= 0.0:
-			_snap_to_floor()
+			var allow_step: bool = absf(velocity.x) > SNAP_WALK_MIN or velocity.y > SNAP_FALL_MIN
+			_snap_to_floor(allow_step)
 
 	# Landing squash + a one-shot "landed hard" signal for juice, on touching ground after a real fall.
 	if on_floor and not _was_on_floor and impact_v > 240.0:
@@ -305,8 +318,10 @@ func _blocked(cell: Vector2i) -> bool:
 ## above a lower step (a 1-tile drop, a descending stair, the lip of a pit), snap the feet down onto the
 ## nearest solid within MAX_DROP so walking down reads smooth. A real drop (nothing within range) finds
 ## no floor and lets gravity take over. Mirror of the auto step-up; together they replace the heightmap
-## glide on all non-ramp terrain.
-func _snap_to_floor() -> void:
+## glide on all non-ramp terrain. `allow_step`: whether a full-tile step-DOWN is permitted (only while
+## moving) — a tiny stabilizing snap always is, so a stationary body that lost its floor (mined out) neither
+## stabilizes nor steps → it falls naturally (the mine-under-yourself fix).
+func _snap_to_floor(allow_step: bool) -> void:
 	var rect: Rect2 = _aabb()
 	var feet: float = rect.end.y
 	var best: float = feet + MAX_DROP + 1.0
@@ -322,9 +337,11 @@ func _snap_to_floor() -> void:
 					best = top
 				break                       # first solid going down in this column = its floor
 	if best <= feet + MAX_DROP:
-		position.y += best - feet
-		on_floor = true
-		velocity.y = 0.0
+		var drop: float = best - feet
+		if drop <= SNAP_STABILIZE or allow_step:   # tiny = stabilize (always); full step-down only while moving
+			position.y += drop
+			on_floor = true
+			velocity.y = 0.0
 
 
 ## True if any blocked cell overlaps `box` — the head-clearance check that gates an auto step-up (don't
