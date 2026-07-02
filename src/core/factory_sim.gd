@@ -127,12 +127,16 @@ func machine_at(cell: Vector2i) -> MachineState:
 ##   &"working"  — actively doing its job (producing / moving / burning)
 ##   &"no_fuel"  — a drill/generator with no fuel and no coal to burn (the load-bearing one: "feed me coal")
 ##   &"no_input" — a recipe machine (forge) starved of ingredients, or a drill with nothing borable below
+##   &"blocked"  — a drill whose ore has no drain below (rock/floor directly under the vein): "dig a drain below"
 ##   &"idle"     — a mover (lift/hopper/splitter) with nothing in it right now (benign, not broken)
 func machine_status(machine: MachineState) -> StringName:
 	var b: StringName = machine.def.behavior
 	if b == &"drill":
-		if drill_target(machine.cell).x < 0:
-			return &"no_input"                                    # no ore/cavity below to bore
+		var t: Vector2i = drill_target(machine.cell)
+		if t.x < 0:
+			return &"no_input"                                    # no solid ore below to bore (spent/relocate)
+		if _drill_blocked(t):
+			return &"blocked"                                     # ore has no drain below — "dig a drain below"
 		if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
 			return &"no_fuel"
 		return &"working"
@@ -883,19 +887,43 @@ func _first_machine_below(cell: Vector2i) -> MachineState:
 ## The ore cell a Drill at `cell` bores — scanning STRAIGHT DOWN its own column for the first ore SOURCE:
 ## the first SOLID ore-like block straight down from `cell` (the boring drill eats solid ore, carving its
 ## own shaft — you place it in the open cell ABOVE a visible ore vein and it sinks a column into it; many
-## drills line the top of an ore BODY and each sinks a parallel column). Skips already-carved open cells (the
-## shaft it made); STOPS at solid ROCK (the body bottomed out) or another MACHINE below (the collection point
-## — don't bore into your hopper/forge). (-1,-1) if nothing borable. Down-only = on the gravity hook.
+## drills line the top of an ore BODY and each sinks a parallel column). It UNDERMINES: it targets the
+## DEEPEST solid ore in its column (the one just above open space / a collector), so draining eats the body
+## BOTTOM-UP and each freed unit falls FREE into the shaft below — never trapped under still-solid ore above
+## it (the old top-down bug). Skips already-carved open cells (the shaft it made); STOPS at solid ROCK (the
+## body bottomed out) or another MACHINE below (the collection point — don't bore into your hopper/forge).
+## (-1,-1) if nothing borable. Down-only = on the gravity hook. Design read: the deeper/taller & richer a
+## vein is, the longer the drill runs — so you hunt VERTICAL, high-quality deposits for lasting automation.
 func drill_target(cell: Vector2i) -> Vector2i:
+	var deepest := Vector2i(-1, -1)
 	for dy: int in range(0, GRID_ROWS):
 		var c := Vector2i(cell.x, cell.y + dy)
 		if not in_bounds(c):
 			break
 		if solid.has(c):
-			return c if _is_ore_like(solid[c]) else Vector2i(-1, -1)  # solid ore → bore it; rock → blocked
-		if dy > 0 and grid.has(c):
-			return Vector2i(-1, -1)     # a machine below → stop (that's where the ore is collected)
-	return Vector2i(-1, -1)
+			if _is_ore_like(solid[c]):
+				deepest = c            # remember it, keep scanning deeper for the true bottom of the body
+			else:
+				break                  # solid rock caps the column — the body bottomed out here
+		elif dy > 0 and grid.has(c):
+			break                      # a machine below → collection point, stop scanning
+		# else: an open cell (the drill's own shaft, or an air gap) — keep sinking through it
+	return deepest
+
+
+## True when the deepest ore has nowhere to DRAIN — the cell directly below it is solid rock (or the world
+## floor), so a freed unit can't fall out of the shaft and would pile against the body. The drill STALLS and
+## reports &"blocked" ("dig a drain below") rather than mine into a dead pocket. (The cell below the deepest
+## ore is never ore — if it were, it'd be the deeper target — so it's open air, a machine, or rock.)
+func _drill_blocked(target: Vector2i) -> bool:
+	if target.x < 0:
+		return false
+	var below := target + Vector2i(0, 1)
+	if not in_bounds(below):
+		return true                    # the world floor is directly under the ore → nowhere to drop
+	if grid.has(below):
+		return false                   # a machine sits below → it collects the ore (a valid drain)
+	return solid.has(below)            # solid rock caps it → blocked; open air → drains free
 
 
 ## Total ore a drill at `cell` can still bore from its whole column — the sum of every solid ore cell's
@@ -931,6 +959,8 @@ func _run_drill(machine: MachineState) -> void:
 	var target: Vector2i = drill_target(machine.cell)
 	if target.x < 0:
 		return                          # nothing borable below — idle, hold progress
+	if _drill_blocked(target):
+		return                          # ore has no drain below — stall (status shows "blocked: dig a drain")
 	# FUEL: the drill burns COAL to run (the demand-web — automating ore creates demand for coal). Burn one
 	# tick of the current coal; when it's spent, refuel from the coal in its input buffer. No fuel + no coal
 	# → the drill goes quiet (idle, holds progress) until you feed it more coal.

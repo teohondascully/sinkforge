@@ -584,25 +584,61 @@ func _test_finite_deposit_and_drill() -> void:
 		s3.tick()
 	_check(not s3.is_solid(vein), "the offset drill bored the vein below it out")
 	_check(_items_present(s3, &"ore") == int(s3.total_produced.get(&"ore", 0)), "ore conserved through the offset drill")
-	# BORING through SOLID ore (the scaling drill): a drill placed on an OPEN cell above a solid ore COLUMN
-	# eats down through it — draining + CLEARING each cell (carving its shaft) — until it hits rock below.
+	# BORING through SOLID ore, BOTTOM-UP (the scaling drill, undermine model): a drill on an OPEN cell above a
+	# solid ore COLUMN eats it from the BOTTOM up — targeting the DEEPEST ore first — so every freed unit falls
+	# into the open shaft below and is never trapped under still-solid ore (the old top-down stuck-ore bug).
 	var s4: FactorySim = FactorySim.new()
 	for y: int in range(6, 10):                        # a 4-tall solid ore column at col 5, rows 6..9
 		s4.set_solid(Vector2i(5, y), &"ore"); s4.deposits[Vector2i(5, y)] = 3
-	s4.set_solid(Vector2i(5, 10), &"stone")            # rock floor under the body (the drill stops here)
+	# a DRAIN below the body: an open cell (5,10) then a stone catch-floor (5,12) — so the deepest ore has
+	# somewhere to drop (not "blocked"), and the extracted ore piles in the reachable shaft, never buried.
+	s4.set_solid(Vector2i(5, 12), &"stone")
 	var drill_top := Vector2i(5, 5)                    # placed on the OPEN cell right above the body
-	_check(s4.drill_target(drill_top) == Vector2i(5, 6), "the boring drill targets the solid ore below it")
+	_check(s4.drill_target(drill_top) == Vector2i(5, 9), "the boring drill undermines: it targets the DEEPEST ore")
 	var d4: MachineState = s4.place_machine(drill_def, drill_top)
 	d4.input_buffer[&"coal"] = 60
 	var body_total: int = 4 * 3                         # 4 cells × 3 each
+	# Assert INVARIANT every tick: no LOOSE ore pile (`ground`) is ever left resting ON TOP of still-solid ore
+	# — that was the top-down stuck-ore bug (freed ore trapped under the body it hadn't bored through yet).
+	# Bottom-up undermining ejects only BELOW the deepest ore, so a freed unit always has open space to fall.
+	var never_stranded: bool = true
 	for _i: int in 100 + body_total * 25:
 		s4.tick()
+		for gcell: Variant in s4.ground.keys():
+			var gc: Vector2i = gcell
+			if int((s4.ground[gc] as Dictionary).get(&"ore", 0)) <= 0:
+				continue
+			var under := gc + Vector2i(0, 1)
+			if s4.is_solid(under) and s4._is_ore_like(s4.solid[under]):
+				never_stranded = false                 # an ore pile sits on top of unmined solid ore → stuck
+	_check(never_stranded, "no loose ore pile is ever stranded on top of unmined ore (drains bottom-up)")
 	for y: int in range(6, 10):
 		_check(not s4.is_solid(Vector2i(5, y)), "bored-out ore cell (5,%d) is now carved open" % y)
-	_check(s4.is_solid(Vector2i(5, 10)), "the drill stopped at the rock floor (didn't bore through rock)")
 	_check(int(s4.total_produced.get(&"ore", 0)) == body_total, "the whole ore body's deposit was extracted (%d)" % body_total)
 	_check(_items_present(s4, &"ore") == body_total, "ore conserved through boring the solid body")
 	_check(s4.drill_target(drill_top) == Vector2i(-1, -1), "a spent, fully-bored body leaves the drill nothing (idles)")
+
+	# BLOCKED: a body resting DIRECTLY on rock (no drain) — the drill must STALL and report "blocked", not
+	# mine ore into a dead pocket. The fix for "I dropped a drill but nothing flows": dig a drain below.
+	var s5: FactorySim = FactorySim.new()
+	s5.set_solid(Vector2i(3, 6), &"ore"); s5.deposits[Vector2i(3, 6)] = 5
+	s5.set_solid(Vector2i(3, 7), &"stone")             # rock DIRECTLY under the ore → no drain path
+	var d5: MachineState = s5.place_machine(drill_def, Vector2i(3, 5))
+	d5.input_buffer[&"coal"] = 20
+	_check(s5.drill_target(d5.cell) == Vector2i(3, 6), "the blocked drill still SEES the ore below it")
+	_check(s5.machine_status(d5) == &"blocked", "a drill with rock directly under the vein reads 'blocked'")
+	for _i: int in 200:
+		s5.tick()
+	_check(int(s5.total_produced.get(&"ore", 0)) == 0, "a blocked drill produces NOTHING (stalls, no dead-pocket mining)")
+	_check(s5.is_solid(Vector2i(3, 6)), "the blocked drill left the vein intact (didn't bore into a dead pocket)")
+	# open a drain: clear the rock below → the same drill now flows.
+	s5.set_solid(Vector2i(3, 7), &"")
+	s5.set_solid(Vector2i(3, 9), &"stone")             # a catch-floor two cells down
+	_check(s5.machine_status(d5) == &"working", "once a drain is dug below, the drill reads 'working'")
+	for _i: int in 200:
+		s5.tick()
+	_check(int(s5.total_produced.get(&"ore", 0)) == 5, "with a drain, the once-blocked drill drains the full vein")
+	_check(_items_present(s5, &"ore") == int(s5.total_produced.get(&"ore", 0)), "ore conserved after unblocking")
 
 
 ## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:
