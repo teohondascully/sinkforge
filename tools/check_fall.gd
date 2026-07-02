@@ -1,9 +1,10 @@
 extends SceneTree
 
 ## Guards the "mine the floor from under yourself" bug (user report): standing on a block and breaking the
-## block beneath your feet must make you FALL under gravity — a gradual drop — NOT teleport instantly onto
-## the next surface below. The old floor-SNAP grabbed the next floor within a tile and yanked the body down;
-## the fix only lets a full-tile snap fire while MOVING, so a stationary body whose floor vanished falls.
+## block beneath your feet must make you FALL under gravity — NOT teleport instantly onto the next surface,
+## and NOT creep down mushily from zero velocity (the "laggy/glitchy" fall the user then reported). Beyond
+## the no-teleport correctness, this asserts the fall FEEL: the drop starts PROMPTLY (a couple frames, not a
+## visible hang) and descends SMOOTHLY (monotone, no upward stutter, no single-frame tile jump).
 ##   HEADED:  /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_fall.gd
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -18,6 +19,12 @@ var _stand := Vector2i(-1, -1)
 var _y_at_mine: float = 0.0
 var _first_step_dy: float = -1.0
 var _budget: int = 0
+var _prev_y: float = 0.0
+var _frames_since_mine: int = 0
+var _drop_by_frame5: float = -1.0
+var _max_upward_stutter: float = 0.0
+var _max_frame_jump: float = 0.0
+var _fall_frames: int = 0
 
 
 func _initialize() -> void:
@@ -63,6 +70,8 @@ func _phys() -> void:
 			if _player.on_floor and absf(_player.velocity.x) < 1.0:
 				_check(_player.on_floor, "body is standing on the block")
 				_y_at_mine = _player.position.y
+				_prev_y = _player.position.y
+				_frames_since_mine = 0
 				_sim.mine(_stand)                              # break the block beneath the feet
 				_phase = 2
 				_budget = 0
@@ -77,11 +86,30 @@ func _phys() -> void:
 			_phase = 3
 			_budget = 0
 		3:
-			# Over the next frames it should FALL and land on the catch floor 3 tiles down (a real gravity drop).
+			# Over the next frames it FALLS and lands on the catch floor 3 tiles down, while we sample the FEEL:
+			# prompt onset (drop by frame 5), smooth descent (no upward stutter, no single-frame tile jump).
 			_budget += 1
+			_frames_since_mine += 1
+			var dy: float = _player.position.y - _prev_y
+			if not _player.on_floor:
+				_fall_frames += 1
+				_max_frame_jump = maxf(_max_frame_jump, dy)          # biggest single-frame drop (teleport guard)
+				_max_upward_stutter = maxf(_max_upward_stutter, -dy) # any UPWARD jerk mid-fall (glitch guard)
+			if _frames_since_mine == 5:
+				_drop_by_frame5 = _player.position.y - _y_at_mine
+			_prev_y = _player.position.y
 			if _player.on_floor and _player.position.y > _y_at_mine + 40.0:
 				_check(true, "fell under gravity and landed on the floor below (dropped %.0fpx)"
 					% (_player.position.y - _y_at_mine))
+				# FEEL: onset is prompt — a zero-velocity creep drops only ~4px in 5 frames; the fall-kick clears 8.
+				_check(_drop_by_frame5 >= 8.0,
+					"fall STARTS promptly — dropped %.1fpx within 5 frames (no laggy creep)" % _drop_by_frame5)
+				# FEEL: smooth — the body never jerks UPWARD mid-fall (a stutter/glitch would show a negative dy).
+				_check(_max_upward_stutter < 1.0,
+					"fall is smooth — no upward stutter mid-drop (worst %.2fpx)" % _max_upward_stutter)
+				# FEEL: no teleport — no single airborne frame skips more than a tile.
+				_check(_max_frame_jump <= float(Player.CELL),
+					"no single-frame teleport during the fall (worst %.1fpx, tile=%d)" % [_max_frame_jump, Player.CELL])
 				_finish()
 			elif _budget > 180:
 				_check(false, "never fell/landed after the floor was mined (dropped %.0fpx)"

@@ -49,6 +49,11 @@ const MAX_DROP: float = CELL * 1.3
 const SNAP_WALK_MIN: float = 8.0     ## px/s of horizontal motion that counts as "walking" (stair-hug)
 const SNAP_FALL_MIN: float = 250.0   ## px/s of downward speed that counts as a real "drop" (fast-fall catch)
 const SNAP_STABILIZE: float = 4.0    ## a snap THIS small just keeps a resting body grounded (no flicker) — always allowed
+## The instant a resting body loses its floor (you MINED it out, or ran off a ledge), a fall that begins from
+## velocity.y = 0 creeps down under gravity for ~0.15s before it visibly moves — a mushy, "laggy" drop. Seed
+## this brisk minimum downward speed on that grounded→airborne edge so the descent reads IMMEDIATELY (Terraria-
+## snappy). It never touches jump arcs: a jump sets velocity.y NEGATIVE, so this max() leaves it untouched.
+const FALL_START: float = 150.0      ## px/s minimum fall speed seeded when a grounded body starts falling
 ## Physics integrates in chunks no larger than this, so a big frame delta — the fast-forward game clock
 ## (Engine.time_scale > 1) or a real frame-drop — can't let the body skip past a tile between collision
 ## resolves (tunnel). At time_scale 1 a normal 1/60 frame is a single substep, so play feel is unchanged;
@@ -182,6 +187,13 @@ func _step(delta: float) -> void:
 		if grounded and not on_floor and velocity.y >= 0.0:
 			var allow_step: bool = absf(velocity.x) > SNAP_WALK_MIN or velocity.y > SNAP_FALL_MIN
 			_snap_to_floor(allow_step)
+
+	# FALL KICK: the frame a resting body loses its floor (mined out from under it, or ran off a ledge) it
+	# would otherwise creep down from zero velocity — the reported "laggy" drop. Seed a brisk minimum fall so
+	# the descent starts on the very next frame. Gated to the grounded→airborne edge (was_on_floor, now not)
+	# and to genuine falls (velocity.y >= 0 — a jump is negative here, so its arc is never altered).
+	if _was_on_floor and not on_floor and velocity.y >= 0.0:
+		velocity.y = maxf(velocity.y, FALL_START)
 
 	# Landing squash + a one-shot "landed hard" signal for juice, on touching ground after a real fall.
 	if on_floor and not _was_on_floor and impact_v > 240.0:
