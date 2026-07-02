@@ -231,6 +231,7 @@ func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 	else:
 		solid[cell] = material
 	terrain_dirty.append(cell)
+	_bazaars_dirty = true
 
 
 ## The background wall material in a cell (e.g. &"stone_wall"), or &"" if none. View reads this to
@@ -276,6 +277,7 @@ func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
 	terrain_dirty.append(cell)          # the block is about to clear on every branch below → repaint its chunk
+	_bazaars_dirty = true               # a mined block can break a bazaar frame → rescan lazily
 	var material: StringName = solid[cell]
 	if _is_ore_like(material):
 		# HAND-mining an ore-like block (ore or coal) is a quick, inefficient grab: one strike clears the whole
@@ -325,6 +327,7 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
 	solid[cell] = material
 	terrain_dirty.append(cell)
+	_bazaars_dirty = true               # a placed block can COMPLETE a bazaar frame → rescan lazily
 	return true
 
 
@@ -399,13 +402,22 @@ func is_bazaar_at(o: Vector2i) -> bool:
 
 ## All valid bazaar frames in the world (their top-left origins). A whole-world scan — cheap enough to
 ## call on demand (e.g. when the player opens the craft screen), not per-frame. Deterministic ordering.
+## CACHED: this is a full-grid scan (~7700 cells × a 4×3 window) and the representation calls it several
+## times PER FRAME (the bazaar transform view + the near-bazaar craft gate) — ~10ms/frame of pure waste, a
+## real steady-state stutter. Bazaars are made of blocks, so the result only changes on a terrain edit; the
+## mutators flip `_bazaars_dirty` and we rescan lazily. O(1) amortized between digs.
+var _bazaars_cache: Array[Vector2i] = []
+var _bazaars_dirty: bool = true
 func find_bazaars() -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
+	if not _bazaars_dirty:
+		return _bazaars_cache
+	_bazaars_cache = []
 	for y: int in range(0, GRID_ROWS - BAZAAR_H):
 		for x: int in range(0, GRID_COLS - BAZAAR_W + 1):
 			if is_bazaar_at(Vector2i(x, y)):
-				out.append(Vector2i(x, y))
-	return out
+				_bazaars_cache.append(Vector2i(x, y))
+	_bazaars_dirty = false
+	return _bazaars_cache
 
 
 ## True if `cell` is a WOOD FRAME cell (post or top beam) of a COMPLETED bazaar — the walls of the stall you
@@ -1044,6 +1056,7 @@ func _run_drill(machine: MachineState) -> void:
 		deposits.erase(target)
 		solid.erase(target)                                   # cell bored out → the shaft deepens
 		terrain_dirty.append(target)                          # repaint the chunk the shaft just deepened into
+		_bazaars_dirty = true                                 # solid changed → invalidate the bazaar cache
 		_resettle_pile_above(target)                          # gravity: anything resting above now falls
 	# Eject the freed material DOWN from the bored cell (still the drill's own column), where gravity carries
 	# it to a hopper/forge/collection. `from` = the bored cell so the falling-item visual pours from the vein.
