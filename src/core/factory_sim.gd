@@ -50,6 +50,28 @@ const CONDUIT_V_KEEP: float = 0.92      ## fraction kept crossing ONE cell DOWN 
 const CONDUIT_H_KEEP: float = 0.80      ## fraction kept crossing ONE cell SIDEWAYS (lateral is lossier)
 const CONDUIT_BLEED: float = 0.6        ## fraction a conduit shares to adjacent cells (so machines draw it)
 
+## --- THE BEHAVIOR REGISTRY ---------------------------------------------------------------------
+## The ONE sim-side table wiring a MachineDef.behavior tag into the tick (was ~5 scattered
+## if-ladders that each had to be found + extended per new machine). Entries (all optional):
+##   run          — its per-tick work (method name, called with the MachineState)
+##   status       — the legibility derivation machine_status() reads (MUST mirror run's gates)
+##   dests        — where _flow routes its output (absent = the default: straight down its column)
+##   updraft      — true: a clear open column above it is a rideable updraft (the lift)
+##   power_source — true: while fueled it pours GENERATOR_POWER into the network (the generator)
+## A def with no entry (empty tag) is the default named recipe-runner. Adding a machine behavior =
+## its functions + ONE entry here + a Visuals.MACHINE_STYLE entry for its look — never a new ladder.
+## Entries hold method NAMES (dispatched via call()), not bound Callables: a Callable bound to self
+## stored on self would give every RefCounted sim a reference cycle (a leak per session/test).
+const _BEHAVIORS: Dictionary = {
+	&"lift": {"run": &"_run_lift", "status": &"_status_mover", "dests": &"_destinations_lift",
+		"updraft": true},
+	&"splitter": {"run": &"_run_splitter", "status": &"_status_mover",
+		"dests": &"_destinations_splitter"},
+	&"drill": {"run": &"_run_drill", "status": &"_status_drill"},
+	&"generator": {"run": &"_run_generator", "status": &"_status_generator", "power_source": true},
+	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
+}
+
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
 ## Solid terrain cells (cell -> material StringName, e.g. &"earth" / &"ore"). The ground the
@@ -135,27 +157,45 @@ func machine_at(cell: Vector2i) -> MachineState:
 ##   &"blocked"  — a drill whose ore has no drain below (rock/floor directly under the vein): "dig a drain below"
 ##   &"idle"     — a mover (lift/hopper/splitter) with nothing in it right now (benign, not broken)
 func machine_status(machine: MachineState) -> StringName:
-	var b: StringName = machine.def.behavior
-	if b == &"drill":
-		var t: Vector2i = drill_target(machine.cell)
-		if t.x < 0:
-			return &"no_input"                                    # no solid ore below to bore (spent/relocate)
-		if _drill_blocked(t):
-			return &"blocked"                                     # ore has no drain below — "dig a drain below"
-		if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
-			return &"no_fuel"
-		return &"working"
-	if b == &"generator":
-		if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
-			return &"no_fuel"
-		return &"working"
-	if b == &"lift" or b == &"hopper" or b == &"splitter":
-		return &"working" if not machine.input_buffer.is_empty() else &"idle"
+	var entry: Dictionary = _BEHAVIORS.get(machine.def.behavior, {})
+	if entry.has("status"):
+		var status: StringName = call(entry["status"], machine)
+		return status
 	# ordinary recipe machine (e.g. the forge)
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return &"idle"
 	return &"working" if _has_inputs(machine, recipe) else &"no_input"
+
+
+## DRILL status — mirrors _run_drill's exact gates, in order: something to bore → a drain → fuel.
+func _status_drill(machine: MachineState) -> StringName:
+	var t: Vector2i = drill_target(machine.cell)
+	if t.x < 0:
+		return &"no_input"                                    # no solid ore below to bore (spent/relocate)
+	if _drill_blocked(t):
+		return &"blocked"                                     # ore has no drain below — "dig a drain below"
+	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
+		return &"no_fuel"
+	return &"working"
+
+
+## GENERATOR status — burning (or holding coal to burn) = working, else the load-bearing "feed me coal".
+func _status_generator(machine: MachineState) -> StringName:
+	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
+		return &"no_fuel"
+	return &"working"
+
+
+## A MOVER (lift/hopper/splitter) — "working" while goods are in it, benign "idle" when empty.
+func _status_mover(machine: MachineState) -> StringName:
+	return &"working" if not machine.input_buffer.is_empty() else &"idle"
+
+
+## Does this def's behavior entry set `flag`? The registry-flag read for one-off behavior queries
+## (updraft_at, the power sweep) — so a future second lift-like or generator-like machine works free.
+func _behavior_flag(def: MachineDef, flag: StringName) -> bool:
+	return bool((_BEHAVIORS.get(def.behavior, {}) as Dictionary).get(flag, false))
 
 
 ## Is this cell solid (any material)? (Representation reads this for collision; sim mutates it only
@@ -174,7 +214,7 @@ func updraft_at(cell: Vector2i) -> bool:
 			return false  # a floor breaks the draft
 		var m: MachineState = grid.get(here, null)
 		if m != null:
-			return m.def.behavior == &"lift"  # first machine below is a lift → in its updraft
+			return _behavior_flag(m.def, &"updraft")  # first machine below an updraft source → in its draft
 	return false
 
 
@@ -707,7 +747,7 @@ func _prune_empty_ground() -> void:
 func _compute_power() -> void:
 	power.clear()
 	for machine: MachineState in machines:
-		if machine.def.behavior == &"generator" and machine.fuel > 0:
+		if _behavior_flag(machine.def, &"power_source") and machine.fuel > 0:
 			_emit_aura(machine.cell, GENERATOR_POWER)
 	if not conduit.is_empty():
 		_flow_power_through_conduits()
@@ -800,27 +840,24 @@ func _power_out_of(cell: Vector2i, carried: Dictionary) -> float:
 	if conduit.has(cell):
 		return float(carried.get(cell, 0.0))
 	var m: MachineState = grid.get(cell, null)
-	if m != null and m.def.behavior == &"generator" and m.fuel > 0:
+	if m != null and _behavior_flag(m.def, &"power_source") and m.fuel > 0:
 		return GENERATOR_POWER
 	return 0.0
 
 
+## Dispatch a machine's per-tick work through THE BEHAVIOR REGISTRY (_BEHAVIORS); no entry = the
+## default named recipe-runner.
 func _run_machine(machine: MachineState) -> void:
-	if machine.def.behavior == &"lift":
-		_run_lift(machine)
+	var entry: Dictionary = _BEHAVIORS.get(machine.def.behavior, {})
+	if entry.has("run"):
+		call(entry["run"], machine)
 		return
-	if machine.def.behavior == &"splitter":
-		_run_splitter(machine)
-		return
-	if machine.def.behavior == &"drill":
-		_run_drill(machine)
-		return
-	if machine.def.behavior == &"generator":
-		_run_generator(machine)
-		return
-	if machine.def.behavior == &"hopper":
-		_run_hopper(machine)
-		return
+	_run_recipe(machine)
+
+
+## The DEFAULT machine: a named recipe-runner — consume the recipe's inputs over its cycle time,
+## produce its outputs (the only place items are created/destroyed, so conservation holds).
+func _run_recipe(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
@@ -1123,22 +1160,29 @@ func _deliver(machine: MachineState, dest: Dictionary, bundle: Dictionary) -> vo
 
 
 ## Where a machine's output goes. Each destination is {to_cell: Vector2i, target: Dictionary}.
-## Default: one destination straight down. Splitter: down + the column to the right. A splitter
-## hard against the right wall has no second column, so it degrades to a plain pass-through (down
-## only) — provisional edge behaviour, see docs/RISKS.md.
+## Routed through THE BEHAVIOR REGISTRY (`dests`); no entry = the default: straight down its column.
 func _destinations(machine: MachineState) -> Array[Dictionary]:
-	var x: int = machine.cell.x
-	var y: int = machine.cell.y
-	if machine.def.behavior == &"lift":
-		return [_column_rise(x, y - 1)]  # the inverse of gravity: this machine's output goes UP
-	var down: Dictionary = _column_landing(x, y + 1)
-	if machine.def.behavior != &"splitter":
-		return [down]
-	var right_col: int = x + 1
+	var entry: Dictionary = _BEHAVIORS.get(machine.def.behavior, {})
+	if entry.has("dests"):
+		var routed: Array[Dictionary] = call(entry["dests"], machine)
+		return routed
+	return [_column_landing(machine.cell.x, machine.cell.y + 1)]
+
+
+## LIFT routing: the inverse of gravity — its output goes UP its column.
+func _destinations_lift(machine: MachineState) -> Array[Dictionary]:
+	return [_column_rise(machine.cell.x, machine.cell.y - 1)]
+
+
+## SPLITTER routing: down + the column to the RIGHT. Hard against the right wall it has no second
+## column, so it degrades to a plain pass-through (down only) — provisional edge, see docs/RISKS.md.
+func _destinations_splitter(machine: MachineState) -> Array[Dictionary]:
+	var down: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
+	var right_col: int = machine.cell.x + 1
 	if right_col >= GRID_COLS:
 		return [down]
 	# Diverted items move sideways into the right column at the splitter's row, then fall.
-	return [down, _column_landing(right_col, y)]
+	return [down, _column_landing(right_col, machine.cell.y)]
 
 
 ## Where a spat product lands, scanning down `col` from `start_row`: the first machine below catches

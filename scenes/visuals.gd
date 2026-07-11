@@ -8,20 +8,25 @@ extends RefCounted
 
 # --- machines ----------------------------------------------------------------
 
-## The icon "kind" of a machine: drill / lift / fork (splitter) / generator / furnace (no-input source) / gear.
+## THE MACHINE STYLE REGISTRY — the representation-side twin of FactorySim._BEHAVIORS: the ONE
+## table wiring a behavior tag to its LOOK (glyph kind + casing colour), replacing two parallel
+## if-ladders that had to be extended in lock-step. A def with no entry falls back on its recipe:
+## a no-input source reads as a furnace, anything else as a gear (the generic runner). Adding a
+## machine = one entry here (+ a drawer in draw_machine_glyph if its kind is genuinely new).
+const MACHINE_STYLE: Dictionary = {
+	&"drill": {"kind": "drill", "color": Color(0.72, 0.56, 0.30)},        # steel-amber — ore-extraction tech
+	&"lift": {"kind": "lift", "color": Color(0.26, 0.66, 0.62)},          # teal — anti-gravity tech
+	&"splitter": {"kind": "fork", "color": Color(0.58, 0.42, 0.78)},
+	&"generator": {"kind": "generator", "color": Color(0.80, 0.66, 0.26)},# electric gold — burns fuel → power
+	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper — the power-tube material
+	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal — a storage bin
+}
+
+
+## The icon "kind" of a machine: its style entry, else furnace (no-input source) / gear (runner).
 static func machine_kind(def: MachineDef) -> String:
-	if def.behavior == &"drill":
-		return "drill"
-	if def.behavior == &"lift":
-		return "lift"
-	if def.behavior == &"splitter":
-		return "fork"
-	if def.behavior == &"generator":
-		return "generator"
-	if def.behavior == &"conduit":
-		return "conduit"
-	if def.behavior == &"hopper":
-		return "hopper"
+	if MACHINE_STYLE.has(def.behavior):
+		return (MACHINE_STYLE[def.behavior] as Dictionary)["kind"]
 	if def.recipe != null and def.recipe.inputs.is_empty():
 		return "furnace"
 	return "gear"
@@ -29,22 +34,12 @@ static func machine_kind(def: MachineDef) -> String:
 
 ## The casing colour of a machine (the riveted body the glyph sits on).
 static func machine_color(def: MachineDef) -> Color:
-	if def.behavior == &"drill":
-		return Color(0.72, 0.56, 0.30)  # steel-amber — "ore extraction tech", distinct from the forge
-	if def.behavior == &"lift":
-		return Color(0.26, 0.66, 0.62)  # teal — reads as "anti-gravity tech"
-	if def.behavior == &"splitter":
-		return Color(0.58, 0.42, 0.78)
-	if def.behavior == &"generator":
-		return Color(0.80, 0.66, 0.26)  # warm electric gold — "burns fuel, makes power"
-	if def.behavior == &"conduit":
-		return Color(0.66, 0.47, 0.30)  # copper — the power-tube material
-	if def.behavior == &"hopper":
-		return Color(0.40, 0.44, 0.52)  # cool gunmetal — a storage bin
+	if MACHINE_STYLE.has(def.behavior):
+		return (MACHINE_STYLE[def.behavior] as Dictionary)["color"]
 	var recipe: RecipeDef = def.recipe
 	if recipe != null and recipe.inputs.is_empty():
-		return Color(0.82, 0.45, 0.20)
-	return Color(0.30, 0.55, 0.75)
+		return Color(0.82, 0.45, 0.20)   # ember-orange — the furnace/source family
+	return Color(0.30, 0.55, 0.75)       # steel-blue — the generic processor
 
 
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,

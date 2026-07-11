@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_test_automated_line()
 	_test_machine_status()
 	_test_no_empty_ground_piles()
+	_test_behavior_registry()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1133,3 +1134,31 @@ func _test_automated_line() -> void:
 		var present_i: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present_i == net, "%s conserved in the automated line (present=%d, net=%d)" % [item, present_i, net])
+
+
+## THE BEHAVIOR REGISTRY contract (FactorySim._BEHAVIORS): every entry's hook names resolve to real
+## sim methods (a typo'd entry would silently dead-letter that machine), every registered behavior
+## has a Visuals.MACHINE_STYLE look (the representation twin can't drift), and a def with an UNKNOWN
+## tag falls through to the default recipe-runner — the registry's fallback keeps future/modded tags
+## alive instead of dead.
+func _test_behavior_registry() -> void:
+	print("- behavior registry")
+	var sim: FactorySim = FactorySim.new()
+	for tag: StringName in FactorySim._BEHAVIORS:
+		var entry: Dictionary = FactorySim._BEHAVIORS[tag]
+		for hook: String in ["run", "status", "dests"]:
+			if entry.has(hook):
+				_check(sim.has_method(entry[hook]), "%s.%s resolves to a sim method" % [tag, hook])
+		_check(Visuals.MACHINE_STYLE.has(tag), "%s has a MACHINE_STYLE look" % tag)
+	var def := MachineDef.new()
+	def.id = &"registry_probe"
+	def.display_name = "Probe"
+	def.behavior = &"experimental_tag"                       # NOT in the registry
+	def.recipe = load("res://src/data/recipes/smelt_ingot.tres")
+	var probe: MachineState = sim.place_machine(def, Vector2i(4, 5))
+	probe.input_buffer[&"ore"] = 6
+	for _i: int in 200:
+		sim.tick()
+	_check(int(sim.total_produced.get(&"ingot", 0)) > 0,
+		"an unknown behavior tag falls through to the default recipe-runner")
+	_check(sim.machine_status(probe) != &"", "unknown tag still derives a status")

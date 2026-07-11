@@ -42,6 +42,14 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   buffer — `_run_drill` bores the first ore cell within `DRILL_REACH` straight below, drains its
   finite `deposits` pool (`_drain_deposit`, shared with hand-`mine`), and spits ore down its column
   like an ordinary machine (docs/MINING.md).
+- **THE BEHAVIOR REGISTRY (`_BEHAVIORS`):** the ONE sim-side table wiring a `behavior` tag into the
+  tick — per-tag `run` / `status` / `dests` hook method-names (dispatched via `call()`; names, not
+  bound Callables, so a RefCounted sim never self-references) plus semantic flags (`updraft`,
+  `power_source`) read by `updraft_at` and the power sweep. No entry = the default named
+  recipe-runner (`_run_recipe`). **Adding a machine behavior = its functions + one `_BEHAVIORS`
+  entry + one `Visuals.MACHINE_STYLE` entry (its look) + a `.tres`** — never a scattered if-ladder.
+  Behavior-SPECIFIC view reads (renderer `_machine_active`/`_draw_machine_io`, the hover `mode`
+  text in `MainView`) keep sane defaults, so most new machines never touch them.
 - **Block placement + the Bazaar:** `place_block(cell, material)` is the Terraria build primitive
   (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
   is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
@@ -133,9 +141,10 @@ production state — delete them and the numbers are unchanged):
   material + you-here + viewport rect; rebuilt only when `sim.solid` changes; terrain colour via the
   renderer's `material_color` Callable), the FORGED chip, and the unified craft+hotbar "pack". Reads
   the sim + a few pushed values; never mutates.
-- **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: machine kind/colour,
-  the scalable animated machine glyph (drawn by both the world + the HUD, so they never drift), item
-  colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
+- **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: the
+  `MACHINE_STYLE` registry (behavior tag → glyph kind + casing colour, the representation twin of
+  the sim's `_BEHAVIORS`), the scalable animated machine glyph (drawn by both the world + the HUD,
+  so they never drift), item glyphs/colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
   layer (state + spawn-from-`flow_events` + advance + draw + light-motes). **`LightLayer`**
   (`scenes/light_layer.gd`) — a thin canvas giving each lighting pass its own blend mode.
 - **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
@@ -150,18 +159,6 @@ production state — delete them and the numbers are unchanged):
   added no determinism/boundary change** — placement/removal/craft are discrete sim calls; reach +
   "where allowed" are representation concerns, so the sim API stays position-agnostic and the
   determinism boundary holds.
-- **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
-  the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
-  a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
-  machine item on an in-reach open cell (consumes it) or picks one of your machines back up
-  (returns it + salvages its buffers); **E** deposits the selected resource into an in-reach
-  machine; **P** pause. You also **auto-collect** product piles by walking over them. The cursor is
-  context-sensitive (`_draw_aim`): a solid cell shows a MINE box; an open in-reach cell shows a
-  BUILD ghost of the selected machine item (green = placeable) — only when a machine is selected.
-  The Ore Vent is excluded from crafting so you stay the ore source by hand. **The economy added no
-  determinism/boundary change** — placement/removal/craft are discrete sim calls;
-  reach + "where allowed" are representation concerns (like deposit), so the sim API stays
-  position-agnostic and the determinism boundary holds.
 
 ### Dev harness (Track B)
 - **Location:** `tests/run_tests.gd` (headless sim tests), `tools/capture.gd` (visual capture).
