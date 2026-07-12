@@ -22,8 +22,12 @@ const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 ## down (it follows your digging), the dirt beside it stays dark, and an enclosed cave is pitch black
 ## until you bring a lamp. Warm artificial LIGHT pools (head-lamp, forge embers, machine glow) are the
 ## only light in the deep — your claimed territory in the black. (Recomputed when terrain changes.)
-const SURFACE_LINE: int = 5                         ## reference daylight row; sky attenuates with depth past it
-const SKY_REACH: int = 10                           ## tiles of open air sunlight reaches before going dark
+## Tuned to the MEASURED world (LayeredWorldGen surfaces sit at rows ~17-23): full daylight down to the
+## valley floor, then sunlight penetrates ~a dozen tiles into a dug shaft before the dark takes over.
+## (The old 5/10 was tuned for the 40-row world — the grown world's surface sat PAST where daylight died,
+## rendering the whole game in permanent dusk.)
+const SURFACE_LINE: int = 22                        ## reference daylight row; sky attenuates with depth past it
+const SKY_REACH: int = 12                           ## tiles of open air sunlight reaches before going dark
 const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
 const AMBIENT_DARK: float = 0.62                    ## underground ambient — DIM but visible (Terraria), not
                                                    ## pitch black. You can read the terrain everywhere; light
@@ -962,6 +966,7 @@ func _skylight_alpha(row: int, surf: int) -> float:
 ## The additive LIGHT pools that punch back through the veil: the miner's head-lamp + a glow per machine
 ## + a glow per falling drop (the gravity stream made loud).
 func _paint_lights(layer: LightLayer) -> void:
+	_paint_godrays(layer)  # under the pools: daylight SHAFTS pouring down dug columns
 	if player != null:
 		var f: float = float(player.facing)
 		# A faint flicker so the lamp reads as a live flame, not a static disc.
@@ -992,6 +997,50 @@ func _paint_lights(layer: LightLayer) -> void:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
 	for m: Dictionary in falling.motes():
 		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
+
+
+## GODRAYS (FABLE_50 #12) — the signature shot: where a dug shaft admits the sky below the enclosing
+## ground, a soft daylight BEAM pours down it, fading exactly where the skylight veil fades (SKY_REACH),
+## with a slow shimmer. A column qualifies when its sky-lit air drops ≥2 rows below an adjacent surface
+## edge (dug shafts + carved notches; 1-row slope steps stay clean). Per-vertex alpha polygons on the
+## additive layer; reads only sim.surface_row. Pure cosmetics.
+func _paint_godrays(layer: LightLayer) -> void:
+	var cell_f: float = float(CELL)
+	const RAY := Color(1.0, 0.95, 0.76)
+	for col: int in range(FactorySim.GRID_COLS):
+		var surf: int = sim.surface_row(col)
+		# The beam mouth = the SHALLOWER neighbouring surface (light pours past that edge) — min, not
+		# max, so a 2-wide shaft still beams (its partner column is deep; the outer rim is the edge).
+		var mouth: int = mini(sim.surface_row(maxi(col - 1, 0)),
+			sim.surface_row(mini(col + 1, FactorySim.GRID_COLS - 1)))
+		mouth = maxi(mouth, SURFACE_LINE)
+		if surf - mouth < 2:
+			continue                                        # no real shaft below the enclosure
+		var mouth_light: float = 1.0 - clampf(float(mouth - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0)
+		if mouth_light <= 0.05:
+			continue                                        # the sky never reaches this deep a mouth
+		var end_row: int = mini(surf, SURFACE_LINE + SKY_REACH + 2)
+		var floor_light: float = 1.0 - clampf(float(end_row - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0)
+		var x: float = float(col) * cell_f
+		var y0: float = float(mouth) * cell_f
+		var y1: float = float(end_row) * cell_f + (cell_f * 0.4 if end_row == surf else 0.0)
+		var shimmer: float = 0.85 + 0.15 * sin(_anim_time * 0.7 + float(col) * 1.3)
+		# Two nested beams: a wide faint wash + a narrow bright core, each fading top -> bottom.
+		for pass_i: int in 2:
+			var half_w: float = (cell_f * 0.46) if pass_i == 0 else (cell_f * 0.24)
+			var a: float = (0.10 if pass_i == 0 else 0.14) * mouth_light * shimmer
+			var a_end: float = a * (floor_light / maxf(mouth_light, 0.01)) * 0.5
+			var cx: float = x + cell_f * 0.5
+			var pts := PackedVector2Array([
+				Vector2(cx - half_w, y0), Vector2(cx + half_w, y0),
+				Vector2(cx + half_w * 0.8, y1), Vector2(cx - half_w * 0.8, y1)])
+			var cols := PackedColorArray([
+				Color(RAY, a), Color(RAY, a), Color(RAY, a_end), Color(RAY, a_end)])
+			layer.draw_polygon(pts, cols)
+		# A soft landing pool where the beam actually MEETS the floor while still lit.
+		if end_row == surf and floor_light > 0.06:
+			_draw_glow(layer, Vector2(x + cell_f * 0.5, float(surf) * cell_f),
+				cell_f * 1.6, RAY, 0.18 * floor_light * shimmer)
 
 
 ## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
