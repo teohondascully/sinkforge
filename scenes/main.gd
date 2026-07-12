@@ -100,6 +100,7 @@ func _ready() -> void:
 		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
 		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
 		load("res://src/data/machines/rope.tres"),        # the placeable climb — unrolls down a shaft
+		load("res://src/data/machines/descent_engine.tres"),  # the L1→L2 gate-breacher (docs/PROGRESSION.md)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -498,8 +499,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		_cycle_inventory(-1)
 	elif event is InputEventKey and event.pressed and not event.echo \
-			and event.keycode >= KEY_1 and event.keycode <= KEY_9:
-		var idx: int = event.keycode - KEY_1            # the fixed hotbar number row
+			and ((event.keycode >= KEY_1 and event.keycode <= KEY_9) or event.keycode == KEY_0):
+		# The fixed hotbar number row; 0 is the TENTH slot (the craft list outgrew 1-9).
+		var idx: int = (event.keycode - KEY_1) if event.keycode != KEY_0 else 9
 		if _inventory_open:
 			if idx < _craftable.size():
 				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT a machine (Bazaar-gated)
@@ -792,6 +794,10 @@ func _hover_info() -> Dictionary:
 		if dep > 0:
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],
 				"mode": "%d ore — drop a Drill just above it (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
+		# THE SEAL is its own answer: no pick ever opens it — the Descent Engine does (docs/PROGRESSION.md).
+		if sim.material_at(_aim) == &"sealrock":
+			return {"name": "The Seal", "in": [], "out": [], "holding": [],
+				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
 		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
 		if sim.is_solid(_aim):
 			var rock: StringName = sim.material_at(_aim)
@@ -822,6 +828,13 @@ func _hover_info() -> Dictionary:
 			info["mode"] = "stockpiles %d — banks what falls in, feeds a machine below" % stock
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
+		&"descent":
+			if m.fed >= FactorySim.DESCENT_QUOTA:
+				info["mode"] = "BREACHED — the way down is open"
+			elif sim.machine_status(m) == &"blocked":
+				info["mode"] = "stand it ON the seal (nothing to breach below)"
+			else:
+				info["mode"] = "fed %d/%d ingots — drop them in (gravity feeds it)" % [m.fed, FactorySim.DESCENT_QUOTA]
 		&"drill":
 			var tgt: Vector2i = sim.drill_target(m.cell)         # the solid ore vein it bores below
 			var dep2: int = sim.drill_column_remaining(m.cell) if tgt.x >= 0 else 0

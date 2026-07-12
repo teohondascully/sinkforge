@@ -1,8 +1,11 @@
 # PROGRESSION — the Sinkforge spine
 
 > **Update 2026-07-11:** §5's research engine is BUILT (first slice) — the Bazaar bench + the L1 tech
-> ladder (`automation` → `power`), analyze-the-new + ingot price, sim-gated crafting, in the tutorial
-> chain. See `ResearchRules` + DECISIONS 2026-07-11. The rest below remains design.
+> ladder (`automation` → `power` → `descent`), analyze-the-new + ingot price, sim-gated crafting, in the
+> tutorial chain. **§2/§9's first GATE is BUILT too:** THE SEAL (unbreakable worldgen band at rows 56-57)
+> + the DESCENT ENGINE (feed it 40 gravity-dropped ingots on the seal → it breaches into Stonereach,
+> where IRON waits) — the throughput wall is live and RUNG-2 play-tested. See `ResearchRules`,
+> `_run_descent`, DECISIONS 2026-07-11. The rest below remains design.
 
 > **Status: DESIGNED (2026-06-28), via a guided brainstorm with the user. Not yet built.** This is the
 > progression backbone the whole game hangs on — the resolution of the long-open "what is the Sinkforge /

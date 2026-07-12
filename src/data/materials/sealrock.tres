@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MaterialDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/material_def.gd" id="1_mat"]
+
+[resource]
+script = ExtResource("1_mat")
+id = &"sealrock"
+display_name = "The Seal"
+layer = &"block"
+base_color = Color(0.10, 0.08, 0.16, 1)
+grain = true
+cap_color = Color(0, 0, 0, 0)
+nugget_color = Color(0.45, 0.30, 0.62, 1)
+nugget_count = 3
+depth_darken = 0.15

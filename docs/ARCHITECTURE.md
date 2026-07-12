@@ -50,6 +50,12 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   entry + one `Visuals.MACHINE_STYLE` entry (its look) + a `.tres`** — never a scattered if-ladder.
   Behavior-SPECIFIC view reads (renderer `_machine_active`/`_draw_machine_io`, the hover `mode`
   text in `MainView`) keep sane defaults, so most new machines never touch them.
+- **The DESCENT ENGINE (`behavior == &"descent"`, docs/PROGRESSION.md §2):** the L1→L2 gate-breacher.
+  Standing over THE SEAL (an unbroken worldgen band of unmineable `sealrock`, `LayeredWorldGen.SEAL_TOP`
+  rows 56-57, with a mineable deepslate SHELF above and IRON only below), `_run_descent` EATS gravity-fed
+  `DESCENT_EATS` (ingots) toward `DESCENT_QUOTA` (40, `MachineState.fed`) — the throughput WALL — passing
+  every other item through; at quota it BREACHES the contiguous seal below (`set_solid` + pile resettle).
+  Misplaced = `blocked` and everything passes. Research-locked behind the `descent` tech.
 - **Placed layers (conduit / rope):** two sparse world layers beside `solid`/`wall`, NOT machines —
   item-flow, collision, and the tick never see them. `conduit` carries power (docs/POWER.md). `rope`
   (`is_climbable`/`place_rope`/`remove_rope`) is the placeable climb: `place_rope(anchor)` UNROLLS down

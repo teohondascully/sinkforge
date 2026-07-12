@@ -30,10 +30,17 @@ const TECHS: Dictionary = {
 		"cost": {&"ingot": 12},
 		"unlocks": [&"generator", &"conduit", &"lift"],
 	},
+	&"descent": {
+		"name": "Descent",
+		"requires": &"power",
+		"sample": &"deepslate",                # mined off the SHELF above the seal (needs the stone pick)
+		"cost": {&"ingot": 8},
+		"unlocks": [&"descent_engine"],        # the gate-breacher — feed it DESCENT_QUOTA ingots on the seal
+	},
 }
 
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit).
-const ORDER: Array[StringName] = [&"automation", &"power"]
+const ORDER: Array[StringName] = [&"automation", &"power", &"descent"]
 
 
 static func tech(id: StringName) -> Dictionary:

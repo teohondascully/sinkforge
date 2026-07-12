@@ -70,7 +70,15 @@ const _BEHAVIORS: Dictionary = {
 	&"drill": {"run": &"_run_drill", "status": &"_status_drill"},
 	&"generator": {"run": &"_run_generator", "status": &"_status_generator", "power_source": true},
 	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
+	&"descent": {"run": &"_run_descent", "status": &"_status_descent"},
 }
+
+## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
+## gravity-fed ingots (a true sink) and, at its quota, BREACHES the seal below — boring the shaft into
+## Stonereach. The quota is a THROUGHPUT WALL: hand-feeding 40 ingots (80 hand-mined ore, smelted, hauled)
+## aches by design; a drill→forge line pours it in — the factory is how you descend.
+const DESCENT_QUOTA: int = 40
+const DESCENT_EATS: StringName = &"ingot"
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
 var grid: Dictionary = {}
@@ -596,7 +604,7 @@ func near_bazaar(cell: Vector2i, radius: int) -> bool:
 ## Materials that mine as a "vein" (cavity model): a hand-burst + a drillable wall deposit, dropping their
 ## own item. Ore and coal both. (Coal is mined the same painful way → the demand-web, docs/MINING.md.)
 func _is_ore_like(material: StringName) -> bool:
-	return material == &"ore" or material == &"coal"
+	return material == &"ore" or material == &"coal" or material == &"iron"
 
 
 ## The hand-mined BURST size for an ore cell — a juicy 3-8, deterministic per cell (a stable hash, no RNG
@@ -1049,6 +1057,61 @@ func _run_hopper(machine: MachineState) -> void:
 		else:
 			machine.input_buffer.erase(item)
 		moved += take
+
+
+## THE DESCENT ENGINE runner (the L1→L2 gate): eat DESCENT_EATS from the input buffer toward the quota
+## (total_consumed — a true sink), pass every OTHER item through to the output so it falls on down (the
+## engine is a filter, never a trap). At quota, BREACH: open the contiguous sealrock straight below
+## (walls kept — a carved shaft into Stonereach). With no seal below (misplaced, or already breached) it
+## eats nothing and passes everything.
+func _run_descent(machine: MachineState) -> void:
+	var face: Vector2i = _seal_below(machine.cell)
+	for item: StringName in machine.input_buffer.keys():
+		var n: int = int(machine.input_buffer[item])
+		var eat: int = 0
+		if item == DESCENT_EATS and face.x >= 0:
+			eat = mini(n, DESCENT_QUOTA - machine.fed)
+		if eat > 0:
+			machine.fed += eat
+			total_consumed[item] = int(total_consumed.get(item, 0)) + eat
+			machine.progress = 0.5                    # a short "chewing" window the status/anim reads
+		var through: int = n - eat
+		if through > 0:
+			machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + through
+		machine.input_buffer.erase(item)
+	machine.progress = maxf(0.0, machine.progress - SECONDS_PER_TICK)
+	if face.x >= 0 and machine.fed >= DESCENT_QUOTA:
+		var c: Vector2i = face
+		while in_bounds(c) and solid.get(c, &"") == &"sealrock":
+			set_solid(c, &"")                         # the BREACH: bore the shaft through the seal band
+			_resettle_pile_above(c)                   # goods that rested on the seal fall on down (gravity)
+			c += Vector2i(0, 1)
+
+
+## DESCENT ENGINE status — mirrors _run_descent's gates: quota met → idle (done, benign — the way is
+## open), no seal below → blocked ("stand it ON the seal"), chewing → working, hungry → no_input (the
+## need bubble asks for its ingots).
+func _status_descent(machine: MachineState) -> StringName:
+	if machine.fed >= DESCENT_QUOTA:
+		return &"idle"
+	if _seal_below(machine.cell).x < 0:
+		return &"blocked"
+	if machine.progress > 0.0 or not machine.input_buffer.is_empty():
+		return &"working"
+	return &"no_input"
+
+
+## The first SOLID cell straight below `cell` (scanning through open air, stopped by any machine), IF it
+## is sealrock — the seal face a Descent Engine breaches. (-1,-1) when the column's first solid isn't the
+## seal (misplaced engine, or the shaft is already bored).
+func _seal_below(cell: Vector2i) -> Vector2i:
+	for row: int in range(cell.y + 1, GRID_ROWS):
+		var c := Vector2i(cell.x, row)
+		if grid.has(c):
+			return Vector2i(-1, -1)
+		if solid.has(c):
+			return c if solid[c] == &"sealrock" else Vector2i(-1, -1)
+	return Vector2i(-1, -1)
 
 
 ## The first machine straight below `cell` before any solid floor — the hopper's consumer (or null if a

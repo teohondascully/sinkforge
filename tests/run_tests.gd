@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_test_behavior_registry()
 	_test_rope()
 	_test_research()
+	_test_descent_gate()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1257,3 +1258,91 @@ func _test_research() -> void:
 		for uid: StringName in (ResearchRules.TECHS[tid]["unlocks"] as Array):
 			var path: String = "res://src/data/machines/%s.tres" % uid
 			_check(ResourceLoader.exists(path), "%s unlock '%s' is a real machine def" % [tid, uid])
+
+
+## THE DESCENT GATE — the L1→L2 throughput wall (docs/PROGRESSION.md §2/§9). Worldgen guarantees an
+## UNBROKEN sealrock band with a mineable deepslate SHELF above and IRON only below; no pick opens it;
+## the Descent Engine eats gravity-fed ingots on the seal (a true sink, quota-capped), passes every
+## other item through, and at quota BREACHES the shaft down — piles on the seal falling with it.
+func _test_descent_gate() -> void:
+	print("- the descent gate (L1→L2)")
+	var gen: LayeredWorldGen = LayeredWorldGen.new()
+	var world: WorldData = gen.generate(96, 80, 1337)
+	var holes: int = 0
+	for row: int in range(LayeredWorldGen.SEAL_TOP, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS):
+		for col: int in world.cols:
+			if world.blocks.get(Vector2i(col, row), &"") != &"sealrock":
+				holes += 1
+	_check(holes == 0, "the seal band is UNBROKEN across the world (holes=%d)" % holes)
+	var iron_below: int = 0
+	var iron_above: int = 0
+	var shelf: int = 0
+	for cell: Vector2i in world.blocks:
+		if world.blocks[cell] == &"iron":
+			if cell.y >= LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS:
+				iron_below += 1
+			else:
+				iron_above += 1
+		elif world.blocks[cell] == &"deepslate" and cell.y < LayeredWorldGen.SEAL_TOP:
+			shelf += 1
+	_check(iron_below > 0 and iron_above == 0,
+		"IRON seeds only below the seal (below=%d above=%d)" % [iron_below, iron_above])
+	_check(shelf > 0, "a mineable deepslate SHELF sits above the seal (%d cells — the Descent sample)" % shelf)
+	_check(not MiningRules.can_mine(&"sealrock", {&"stone_pickaxe": 1, &"wood_pickaxe": 1}),
+		"no pick can mine sealrock — the wall is not a tool gate")
+	# The engine, in a fixture: seal at rows 10-11, engine hung above it, an L2 floor at 14.
+	var eng_def: MachineDef = load("res://src/data/machines/descent_engine.tres")
+	var sim: FactorySim = FactorySim.new()
+	var col2: int = 5
+	sim.set_solid(Vector2i(col2, 10), &"sealrock")
+	sim.set_solid(Vector2i(col2, 11), &"sealrock")
+	sim.set_solid(Vector2i(col2, 14), &"stone")
+	var eng: MachineState = sim.place_machine(eng_def, Vector2i(col2, 8))
+	sim.inventory[&"ingot"] = FactorySim.DESCENT_QUOTA + 5
+	sim.total_produced[&"ingot"] = FactorySim.DESCENT_QUOTA + 5
+	sim.inventory[&"coal"] = 2
+	sim.total_produced[&"coal"] = 2
+	sim.deposit(Vector2i(col2, 8), &"coal", 2)
+	sim.deposit(Vector2i(col2, 8), &"ingot", 10)
+	for _i: int in 30:
+		sim.tick()
+	_check(eng.fed == 10, "the engine ate the first ingots (fed=%d/10)" % eng.fed)
+	_check(sim.is_solid(Vector2i(col2, 10)), "the seal holds below quota")
+	var coal_rest: int = int((sim.ground.get(Vector2i(col2, 9), {}) as Dictionary).get(&"coal", 0))
+	_check(coal_rest == 2, "non-ingot goods pass THROUGH the engine and pile on the seal (%d coal)" % coal_rest)
+	sim.deposit(Vector2i(col2, 8), &"ingot", FactorySim.DESCENT_QUOTA - 10 + 5)   # the rest + 5 over
+	for _i: int in 30:
+		sim.tick()
+	_check(eng.fed == FactorySim.DESCENT_QUOTA, "the quota fills and CAPS (fed=%d)" % eng.fed)
+	_check(not sim.is_solid(Vector2i(col2, 10)) and not sim.is_solid(Vector2i(col2, 11)),
+		"THE BREACH: the seal bored open straight down")
+	_check(sim.machine_status(eng) == &"idle", "a breached engine reads done (idle)")
+	var l2_pile: Dictionary = sim.ground.get(Vector2i(col2, 13), {}) as Dictionary
+	_check(int(l2_pile.get(&"coal", 0)) == 2 and int(l2_pile.get(&"ingot", 0)) == 5,
+		"the seal-top pile + the overfeed FELL through the breach to the L2 floor (%s)" % str(l2_pile))
+	for item: StringName in [&"ingot", &"coal"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through the gate (present=%d, net=%d)" % [item, present, net])
+	# A misplaced engine (no seal below) eats NOTHING — everything passes through; status says so.
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(3, 6), &"stone")
+	var lost: MachineState = s2.place_machine(eng_def, Vector2i(3, 3))
+	s2.inventory[&"ingot"] = 4
+	s2.total_produced[&"ingot"] = 4
+	s2.deposit(Vector2i(3, 3), &"ingot", 4)
+	for _i: int in 20:
+		s2.tick()
+	_check(lost.fed == 0, "a misplaced engine eats nothing")
+	_check(s2.machine_status(lost) == &"blocked", "…and reads blocked (stand it ON the seal)")
+	_check(int((s2.ground.get(Vector2i(3, 5), {}) as Dictionary).get(&"ingot", 0)) == 4,
+		"…and its ingots pass through untouched")
+	# The craft gate: the engine stays locked until Descent is researched (power → descent ladder).
+	var s3: FactorySim = FactorySim.new()
+	_check(not s3.craft_unlocked(&"descent_engine"), "the engine is locked at boot")
+	s3.inventory = {&"ore": 1, &"coal": 1, &"deepslate": 1, &"ingot": 40}
+	s3.total_produced = {&"ore": 1, &"coal": 1, &"deepslate": 1, &"ingot": 40}
+	s3.research_tech(&"automation")
+	s3.research_tech(&"power")
+	_check(s3.research_tech(&"descent"), "Descent researches after Power (deepslate sample + ingots)")
+	_check(s3.craft_unlocked(&"descent_engine"), "…and unlocks the engine")

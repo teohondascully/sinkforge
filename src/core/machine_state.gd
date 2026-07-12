@@ -27,6 +27,9 @@ var fuel: int = 0
 ## its unpowered baseline, 1 = fully powered. Set by the consumer's runner from the power field; the view
 ## reads it to show the machine labouring vs surging (brownout). 1.0 default = "not power-gated / nominal".
 var power_factor: float = 1.0
+## Descent-Engine-only: refined goods it has EATEN toward its breach quota (DESCENT_QUOTA). The gate's
+## throughput-wall progress. Same composition-over-inheritance stance as route_toggle/fuel.
+var fed: int = 0
 
 
 func _init(machine_def: MachineDef, machine_cell: Vector2i) -> void:

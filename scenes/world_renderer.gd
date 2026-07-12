@@ -77,6 +77,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 		"res://src/data/materials/deepslate.tres",
 		"res://src/data/materials/wood.tres",
 		"res://src/data/materials/leaves.tres",
+		"res://src/data/materials/sealrock.tres",
+		"res://src/data/materials/iron.tres",
 		"res://src/data/materials/dirt_wall.tres",
 		"res://src/data/materials/stone_wall.tres",
 		"res://src/data/materials/deepslate_wall.tres",
@@ -780,6 +782,8 @@ func _draw_machine_status(machine: MachineState, pos: Vector2) -> void:
 	var need: StringName = &"ore"
 	if status == &"no_fuel":
 		need = &"coal"
+	elif machine.def.behavior == &"descent":
+		need = FactorySim.DESCENT_EATS              # the gate eats ingots, not ore
 	elif machine.def.recipe != null and not machine.def.recipe.inputs.is_empty():
 		need = machine.def.recipe.inputs.keys()[0]
 	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)

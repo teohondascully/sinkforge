@@ -50,6 +50,7 @@ func _run() -> void:
 		["build a machine", _goal_build_a_machine],
 		["feed the forge & smelt", _goal_feed_and_smelt],
 		["RUNG 1 — reach first automation", _goal_reach_first_automation],
+		["RUNG 2 — breach the seal into L2", _goal_breach_the_seal],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -197,6 +198,89 @@ func _goal_reach_first_automation() -> bool:
 			return await _finish(agent, false, "did the action for '%s' but the objective never ticked — the player gets no signal they progressed" % id)
 	return await _finish(agent, obj.all_done(),
 		"followed the signposts all the way to FIRST AUTOMATION (%d steps)" % obj.steps.size())
+
+
+## RUNG 2 — the L1→L2 GATE is playable end-to-end (docs/PROGRESSION.md §2): descend a shaft to THE SEAL,
+## stand a Descent Engine ON it, climb out, FEED it by tossing ingots down the shaft (gravity is the
+## feeder — the hook working as the gate's conveyor), watch the BREACH open, drop through into
+## Stonereach, mine an IRON sample (the new material), and climb all the way home. Research/crafting the
+## engine are proven by the headless suite + RUNG 1's bench flow; the setup hatch supplies the loadout so
+## THIS goal measures the gate journey itself.
+func _goal_breach_the_seal() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	var col: int = 70                                        # clear of every other fixture (they end at 64)
+	var top: int = mini(sim.surface_row(col), sim.surface_row(col + 1))
+	# A pre-dug 2-wide access shaft down to the seal's face (digging is the round-trip journeys' business).
+	for x: int in [col, col + 1]:
+		for y: int in range(top, LayeredWorldGen.SEAL_TOP):
+			sim.set_solid(Vector2i(x, y), &"")
+	sim.set_solid(Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS), &"iron")
+	sim.deposits[Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS)] = 40
+	agent.give(&"rope", 250)                                 # BOTH ~36-row shafts want a full hang each, plus
+	                                                         # exit-cycle re-anchors — rope economy isn't what
+	                                                         # this goal measures, the GATE is
+	sim.place_rope(Vector2i(col, top - 1))                   # the way back up, hung at the mouth
+	agent.give(&"descent_engine", 1)
+	agent.give(&"stone_pickaxe", 1)                          # iron is tier-2 rock
+	agent.give(&"ingot", FactorySim.DESCENT_QUOTA + 4)
+	sim.research[&"automation"] = true                       # setup hatch: the bench flow is proven elsewhere
+	sim.research[&"power"] = true
+	sim.research[&"descent"] = true
+	# 1. DESCEND: walk over the shaft mouth and let gravity take you to the seal floor.
+	if not await agent.walk_to_column(col, 1800):
+		return await _finish(agent, false, "never reached the seal floor down the access shaft")
+	var seal_floor := Vector2i(col, LayeredWorldGen.SEAL_TOP - 1)
+	if agent.main._cell_at(agent.player.position).y < seal_floor.y - 1:
+		return await _finish(agent, false, "stopped short of the seal floor")
+	# 2. Stand the ENGINE on the seal, in the neighbour column (your own column holds the climb rope).
+	if not await agent.select_item(&"descent_engine"):
+		return await _finish(agent, false, "no engine in the pack")
+	if not await agent.build_at(Vector2i(col + 1, LayeredWorldGen.SEAL_TOP - 1)):
+		return await _finish(agent, false, "could not stand the engine on the seal")
+	# 3. Climb home, then FEED the gate from the surface: toss the ingots down its shaft. (Home = the
+	# mouth row `top`, not top-1 — the neighbouring ground can naturally sit a row lower than the mouth.)
+	if not await agent.climb_to_surface(top):
+		return await _finish(agent, false, "could not climb back out before feeding")
+	if not await agent.walk_to_column(col + 2, 900):
+		return await _finish(agent, false, "could not stand at the shaft mouth to feed")
+	if not await agent.select_item(&"ingot"):
+		return await _finish(agent, false, "no ingots to feed")
+	agent.player.facing = -1                                 # face the shaft; the toss arcs the stack in
+	agent.main.try_drop()
+	var breach := Vector2i(col + 1, LayeredWorldGen.SEAL_TOP)
+	var t: int = 0
+	while sim.is_solid(breach) and t < 600:
+		await agent.step(); t += 1
+	if sim.is_solid(breach):
+		return await _finish(agent, false, "fed the engine but the seal never breached (fed=%d)" % _engine_fed(agent))
+	agent._note("  BREACH after %d frames" % t)
+	# 4. Down again: reclaim the engine (RMB), step into the bored shaft, drop into STONEREACH.
+	if not await agent.walk_to_column(col, 900):
+		return await _finish(agent, false, "could not descend again after the breach")
+	if not await agent.build_at(Vector2i(col + 1, LayeredWorldGen.SEAL_TOP - 1)):
+		return await _finish(agent, false, "could not reclaim the engine off the seal")
+	if not await agent.walk_to_column(col + 1, 600):
+		return await _finish(agent, false, "could not drop through the breach into L2")
+	# 5. The prize: mine the IRON under your feet — the first touch of L2's new material.
+	var iron := Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS)
+	var g: int = 0
+	while sim.is_solid(iron) and g < 40:
+		agent.do_mine(iron)
+		await agent.wait(4); g += 1
+	if int(sim.inventory.get(&"iron", 0)) < 1:
+		return await _finish(agent, false, "stood in L2 but could not mine the iron")
+	# 6. And home — the whole loop closes on the surface.
+	var home: bool = await agent.climb_to_surface(top, 6000)
+	print("  gate: %s  (iron=%d home=%s)" % [agent.friction(), int(sim.inventory.get(&"iron", 0)), home])
+	return await _finish(agent, home, "breached the seal, mined L2 iron, and returned to the surface")
+
+
+func _engine_fed(agent: PlayAgent) -> int:
+	for m: MachineState in agent.sim.machines:
+		if m.def.behavior == &"descent":
+			return m.fed
+	return -1
 
 
 # --- FRICTION journeys ----------------------------------------------------------------------------

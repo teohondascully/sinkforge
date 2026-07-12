@@ -61,6 +61,22 @@ const ORE_AMOUNT_DEPTH_BONUS: int = 170
 ## so descending crosses distinct material zones (the "deeper = different place" read).
 const DEEPSLATE_ROW: int = 52
 
+## THE SEAL — the L1→L2 gate (docs/PROGRESSION.md §2/§9): an UNBROKEN band of unmineable sealrock across
+## the world's full width, stamped LAST so no cave/tunnel/vein can hole it. It sits a few rows INTO the
+## deepslate zone, leaving a mineable deepslate SHELF above it (rows DEEPSLATE_ROW..SEAL_TOP-1, the
+## stone-pick tier gate) — the shelf is where you sample deepslate for the Descent research. Below the
+## seal is STONEREACH (L2): richer veins + IRON, reachable only by feeding a Descent Engine its
+## throughput quota (the wall that makes the factory mandatory — no pick opens it).
+const SEAL_TOP: int = 56
+const SEAL_ROWS: int = 2
+
+## IRON — L2's signature material (the analyze-sample for the next tech tier), seeded ONLY below the
+## seal. Rich fat bodies (it's the reward), same accretion machinery as ore/coal.
+const IRON_ATTEMPTS_PER_COL: float = 0.5
+const IRON_SIZE_MIN: int = 10
+const IRON_SIZE_DEPTH_BONUS: int = 30
+const IRON_AMOUNT: int = 220
+
 # --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
 ## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
 ## 3-wide canopies mostly read as separate trees). Sparse — the surface reads as wooded, not a wall.
@@ -85,8 +101,10 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng)
 	_scatter_coal(world, rng)
+	_scatter_iron(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
+	_stamp_seal(world)          # LAST: the gate band overwrites everything, so nothing can hole it
 	return world
 
 
@@ -219,6 +237,34 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 		placed += 1
 		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			frontier.append(cell + d)
+
+
+## IRON bodies — L2's reward, seeded ONLY below the seal (depth position within L2 sets size richness).
+## Replaces solid rock exactly like ore/coal veins; the drill bores it the same way.
+func _scatter_iron(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var l2_top: int = SEAL_TOP + SEAL_ROWS
+	if l2_top >= world.rows - 1:
+		return
+	var attempts: int = int(round(float(world.cols) * IRON_ATTEMPTS_PER_COL))
+	for _i: int in attempts:
+		var cx: int = rng.randi_range(0, world.cols - 1)
+		var cy: int = rng.randi_range(l2_top, world.rows - 1)
+		var depth_frac: float = float(cy - l2_top) / float(maxi(1, world.rows - l2_top))
+		var size: int = IRON_SIZE_MIN + int(round(depth_frac * float(IRON_SIZE_DEPTH_BONUS)))
+		_grow_vein(world, rng, Vector2i(cx, cy), size, IRON_AMOUNT, &"iron")
+
+
+## Stamp THE SEAL: an unbroken full-width sealrock band (rows SEAL_TOP..+SEAL_ROWS-1), filling even
+## carved cells — the one thing worldgen guarantees solid. Backed by deepslate wall so the breach shaft
+## reads as carved rock, not void.
+func _stamp_seal(world: WorldData) -> void:
+	for row: int in range(SEAL_TOP, mini(SEAL_TOP + SEAL_ROWS, world.rows)):
+		for col: int in world.cols:
+			var cell := Vector2i(col, row)
+			world.blocks[cell] = &"sealrock"
+			world.amounts.erase(cell)                 # a vein cell overwritten by the seal keeps no deposit
+			if not world.walls.has(cell):
+				world.walls[cell] = &"deepslate_wall"
 
 
 ## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,

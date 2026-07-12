@@ -23,6 +23,8 @@ const REQUIRED_TOOL: Dictionary = {
 	&"ore": &"pick",
 	&"coal": &"pick",
 	&"deepslate": &"pick",
+	&"iron": &"pick",
+	&"sealrock": &"pick",
 	&"wood": &"axe",
 	&"leaves": &"axe",
 }
@@ -33,6 +35,9 @@ const REQUIRED_TOOL: Dictionary = {
 ## craft a Stone Pickaxe before you can dig the deep third. Grows as the tier ladder deepens (docs/MINING.md).
 const REQUIRED_TIER: Dictionary = {
 	&"deepslate": 2,
+	&"iron": 2,          # L2's ore lives in the deepslate zone — the same pick works both
+	&"sealrock": 99,     # THE SEAL is un-hand-mineable by ANY pick, forever: the L1→L2 gate is a
+	                     # THROUGHPUT wall — only a fed Descent Engine breaches it (docs/PROGRESSION.md §2)
 }
 
 ## Material id -> base SECONDS to break with a tier-1 tool (or by hand). Eye-tuned so shallow dirt is
@@ -43,6 +48,7 @@ const HARDNESS: Dictionary = {
 	&"ore": 1.50,
 	&"coal": 1.50,
 	&"deepslate": 2.80,
+	&"iron": 3.0,
 	&"wood": 0.70,
 	&"leaves": 0.10,
 }

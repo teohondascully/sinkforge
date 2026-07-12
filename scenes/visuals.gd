@@ -21,6 +21,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper — the power-tube material
 	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal — a storage bin
 	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
+	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze — the gate-breacher
 }
 
 
@@ -67,6 +68,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_hopper(canvas, center, s, active, t)
 		"rope":
 			_rope(canvas, center, s)
+		"descent":
+			_descent(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -183,6 +186,26 @@ static func _hopper(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 		canvas.draw_circle(Vector2(c.x, fy), 1.5 * s, gold.lightened(0.2))
 
 
+## Descent Engine (the L1→L2 gate-breacher): a heavy cross-braced housing over a massive down-RAM that
+## POUNDS while it's eating goods — the "it's hammering the seal open" read. A pale progress core glows
+## in the housing as the quota fills (the view scales it via the machine's fed fraction elsewhere; the
+## glyph itself just breathes).
+static func _descent(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var housing := Color(0.16, 0.12, 0.20)
+	var brace := Color(0.55, 0.42, 0.62)
+	var pound: float = (absf(sin(t * 10.0)) * 2.2 if active else 0.0) * s
+	canvas.draw_rect(Rect2(c.x - 8.0 * s, c.y - 9.0 * s, 16.0 * s, 7.0 * s), housing)
+	canvas.draw_line(c + Vector2(-8.0 * s, -9.0 * s), c + Vector2(8.0 * s, -2.0 * s), brace, 1.4)
+	canvas.draw_line(c + Vector2(8.0 * s, -9.0 * s), c + Vector2(-8.0 * s, -2.0 * s), brace, 1.4)
+	# The RAM: a thick shaft into a broad wedge head, driven downward while pounding.
+	canvas.draw_rect(Rect2(c.x - 2.2 * s, c.y - 2.0 * s, 4.4 * s, 5.0 * s + pound), housing.lightened(0.15))
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-6.5 * s, 3.0 * s + pound), c + Vector2(6.5 * s, 3.0 * s + pound),
+		c + Vector2(0.0, 8.5 * s + pound)]), brace)
+	var core: float = 0.9 if active else 0.4
+	canvas.draw_circle(c + Vector2(0.0, -5.5 * s), 2.0 * s, Color(0.85, 0.70, 1.0, core))  # the quota core
+
+
 ## Rope (the placeable climb): a hanging line with rung KNOTS + a coiled spare at the top — reads as
 ## "this unrolls down a shaft". Static (a rope doesn't animate); the in-world hang is drawn by
 ## WorldRenderer per cell, this glyph is the hotbar/craft-panel icon.
@@ -223,6 +246,10 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade — cold stone-grey (unlocks deepslate)
 	if item == &"rope":
 		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
+	if item == &"iron":
+		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
+	if item == &"deepslate":
+		return Color(0.28, 0.31, 0.40)
 	return Color.WHITE
 
 
@@ -238,6 +265,8 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 	match item:
 		&"ore":
 			_item_ore(canvas, center, size)
+		&"iron":
+			_item_iron(canvas, center, size)
 		&"ingot":
 			_item_ingot(canvas, center, size)
 		&"coal":
@@ -271,6 +300,16 @@ static func _item_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	for f: Vector2 in [Vector2(-0.10, 0.02), Vector2(0.14, -0.10), Vector2(-0.02, 0.18)]:
 		canvas.draw_circle(c + f * size, size * 0.06, Color(0.90, 0.56, 0.24))
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.82, 0.5))
+
+
+## IRON — the ore nugget silhouette in cold deepslate tones with pale steel flecks (L2's new find —
+## visibly kin to ore, visibly NOT copper).
+static func _item_iron(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
+		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.30, 0.33, 0.42))
+	for f: Vector2 in [Vector2(-0.10, 0.02), Vector2(0.14, -0.10), Vector2(-0.02, 0.18)]:
+		canvas.draw_circle(c + f * size, size * 0.06, Color(0.78, 0.82, 0.92))
+		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(0.95, 0.97, 1.0))
 
 
 ## INGOT — a trapezoidal cast metal bar with a bright top face (the classic ingot silhouette).
@@ -323,6 +362,10 @@ static func _item_axe(canvas: CanvasItem, c: Vector2, size: float, handle: Color
 static func terrain_dust(material: StringName) -> Color:
 	if material == &"stone":
 		return Color(0.34, 0.37, 0.44)
+	if material == &"iron":
+		return Color(0.55, 0.58, 0.68)
+	if material == &"deepslate":
+		return Color(0.24, 0.27, 0.36)
 	if material == &"ore":
 		return Color(0.62, 0.45, 0.26)
 	if material == &"wood":

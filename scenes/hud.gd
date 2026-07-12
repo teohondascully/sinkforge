@@ -378,8 +378,9 @@ func _draw_inventory_overlay() -> void:
 		var cw: float = _font.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
 		# Clip the name to the space LEFT of the right-hand price/lock text (long names would collide).
 		var name_w: float = rr.size.x - (row_h - 1.0) - cw - 10.0
+		var keycap: String = "0" if i == 9 else str(i + 1)   # the tenth row crafts on the 0 key
 		draw_string(_font, rr.position + Vector2(row_h - 1.0, 15.0),
-			"[%d] %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, name_w, 11, name_col)
+			"[%s] %s" % [keycap, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, name_w, 11, name_col)
 		draw_string(_font, rr.position + Vector2(rr.size.x - cw - 5.0, 15.0), right,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, right_col)
 	y += float(int(ceilf(float(craft_options.size()) / 2.0))) * row_h
