@@ -860,6 +860,19 @@ func _hover_info() -> Dictionary:
 	for it: StringName in hold:
 		holding.append({"item": it, "count": int(hold[it])})
 	info["holding"] = holding
+	# The factory-wide make-rate of this machine's product (sim.production_rate — the "12/min" read).
+	# Recipe machines rate their first output; a drill rates the material it's boring.
+	var rate_item: StringName = &""
+	if recipe != null and not recipe.outputs.is_empty():
+		rate_item = recipe.outputs.keys()[0]
+	elif m.def.behavior == &"drill":
+		var bore: Vector2i = sim.drill_target(m.cell)
+		if bore.x >= 0:
+			rate_item = sim.material_at(bore)
+	if rate_item != &"":
+		var per_min: float = sim.production_rate(rate_item)
+		if per_min > 0.05:
+			info["rate"] = "factory makes %.1f %s/min" % [per_min, String(rate_item)]
 	return info
 
 

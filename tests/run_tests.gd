@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_conservation()
 	_test_determinism()
 	_test_production()
+	_test_production_rate()
 	_test_splitter()
 	_test_terrain()
 	_test_surface_silhouette()
@@ -152,6 +153,27 @@ func _test_production() -> void:
 	var consumed_ore: int = int(sim.total_consumed.get(&"ore", 0))
 	_check(ingots > 0, "produced ingots (%d after 400 ticks)" % ingots)
 	_check(ingots * 2 == consumed_ore, "2 ore per ingot (ingots=%d, consumed_ore=%d)" % [ingots, consumed_ore])
+
+
+## production_rate: the X/min legibility read off the tick-driven ring buffer. A lone vent makes
+## 1 ore/s (mine_ore time=1.0) → the rate must settle near 60/min; unknown items read 0; a fresh
+## sim (no history) reads 0. Derived bookkeeping only — asserts it never perturbs conservation.
+func _test_production_rate() -> void:
+	print("- production rate (X/min)")
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(sim.production_rate(&"ore") == 0.0, "no history -> rate 0")
+	sim.place_machine(vent_def, Vector2i(6, 0))
+	for _i: int in 200:                                   # 10s of steady 1 ore/s production
+		sim.tick()
+	var rate: float = sim.production_rate(&"ore")
+	_check(absf(rate - 60.0) < 10.0, "steady vent reads ~60 ore/min (got %.1f)" % rate)
+	_check(sim.production_rate(&"mystery") == 0.0, "unknown item -> rate 0")
+	var tops: Array[Dictionary] = sim.production_rates()
+	_check(tops.size() == 1 and tops[0]["item"] == &"ore", "production_rates lists the one flowing item")
+	var made: int = int(sim.total_produced.get(&"ore", 0))
+	var present: int = _items_present(sim, &"ore")
+	_check(made == present, "rate sampling is conservation-neutral (made=%d present=%d)" % [made, present])
 
 
 ## A splitter divides its incoming ore between two columns. Down-branch ore falls clear to the

@@ -174,8 +174,9 @@ func _draw_hover() -> void:
 	var holding: Array = hover_info.get("holding", [])
 	var has_recipe: bool = not ins.is_empty() or not outs.is_empty()
 	var has_mode: bool = hover_info.has("mode") and str(hover_info["mode"]) != ""
+	var has_rate: bool = hover_info.has("rate")
 	var width: float = 218.0
-	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty())
+	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate)
 	var pad: float = 9.0
 	var line_h: float = 18.0
 	# Sits below whatever occupies the top-right column: the minimap if it's shown, else just the FORGED
@@ -201,6 +202,10 @@ func _draw_hover() -> void:
 	if not holding.is_empty():
 		var hx: float = draw_string_pos(x0, y, "holds")
 		_chips(hx, y, holding)
+		y += line_h
+	if has_rate:
+		draw_string(_font, Vector2(x0, y), str(hover_info["rate"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.85, 0.72, 0.42))
 
 
 ## Draw a run of item chips (a colour swatch + count) left-to-right; returns the x just past them.
@@ -298,7 +303,10 @@ func _draw_inventory_overlay() -> void:
 	var row_h: float = 24.0
 	var craft_lines: int = int(ceilf(float(craft_options.size()) / 2.0)) if can_craft else 1
 	var w: float = 360.0
-	var head: float = 30.0
+	# The live production summary ("making ore 8.2/min · ingot 4.1/min") gets its own header line
+	# when anything is flowing — the factory's pulse, read at a glance (sim.production_rates).
+	var rates: Array[Dictionary] = sim.production_rates()
+	var head: float = 30.0 + (15.0 if not rates.is_empty() else 0.0)
 	var craft_head: float = 24.0
 	# The RESEARCH BENCH section (only at the Bazaar): one row per tech in the tree.
 	var research_h: float = (craft_head + float(ResearchRules.ORDER.size()) * row_h) if can_craft else 0.0
@@ -308,6 +316,12 @@ func _draw_inventory_overlay() -> void:
 	draw_string(_font, origin + Vector2(14.0, 23.0), "PACK", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
 	draw_string(_font, origin + Vector2(w - 116.0, 22.0), "E / Esc to close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	if not rates.is_empty():
+		var parts: PackedStringArray = []
+		for i: int in mini(3, rates.size()):     # top three — a pulse line, not a spreadsheet
+			parts.append("%s %.1f/min" % [_item_label(rates[i]["item"]), float(rates[i]["rate"])])
+		draw_string(_font, origin + Vector2(14.0, 38.0), "making  " + " · ".join(parts),
+			HORIZONTAL_ALIGNMENT_LEFT, w - 28.0, 10, Color(0.85, 0.72, 0.42))
 	# --- the full pack as an icon grid ---
 	var gx: float = origin.x + 10.0
 	var gy: float = origin.y + head

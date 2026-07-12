@@ -157,6 +157,15 @@ var research: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
+## PRODUCTION-RATE sampling (legibility, Factorio's "X/min" read): a ring buffer of total_produced
+## snapshots taken on a fixed tick cadence, so production_rate() can answer "how fast is the factory
+## making X right now" over a sliding ~60s window. Tick-driven bookkeeping — deterministic, derived,
+## never read back by production logic (conservation/flow untouched).
+const RATE_SAMPLE_TICKS: int = 20        # one snapshot per simulated second
+const RATE_WINDOW_SAMPLES: int = 61      # ~60s of history
+var _rate_tick: int = 0
+var _rate_samples: Array[Dictionary] = []   # each: {"tick": int, "totals": Dictionary}
+
 
 func in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.x < GRID_COLS and cell.y >= 0 and cell.y < GRID_ROWS
@@ -838,6 +847,43 @@ func tick() -> void:
 		_run_machine(machine)
 	_flow()
 	_prune_empty_ground()
+	_sample_production()
+
+
+## Push a total_produced snapshot into the rate ring buffer once per RATE_SAMPLE_TICKS. Hand-mined
+## bursts land in total_produced too, so the rate reads your whole income — by hand AND by machine.
+func _sample_production() -> void:
+	_rate_tick += 1
+	if _rate_tick % RATE_SAMPLE_TICKS != 0:
+		return
+	_rate_samples.append({"tick": _rate_tick, "totals": total_produced.duplicate()})
+	while _rate_samples.size() > RATE_WINDOW_SAMPLES:
+		_rate_samples.pop_front()
+
+
+## How fast `item` is being produced right now, in items PER MINUTE, measured over the sampling
+## window (up to ~60s). 0.0 until a second of history exists. Pure read on the ring buffer.
+func production_rate(item: StringName) -> float:
+	if _rate_samples.is_empty():
+		return 0.0
+	var oldest: Dictionary = _rate_samples[0]
+	var span_ticks: int = _rate_tick - int(oldest["tick"])
+	if span_ticks < RATE_SAMPLE_TICKS:
+		return 0.0
+	var made: int = int(total_produced.get(item, 0)) - int((oldest["totals"] as Dictionary).get(item, 0))
+	return float(made) / (float(span_ticks) * SECONDS_PER_TICK) * 60.0
+
+
+## Every item with a live production rate, sorted fastest-first: [{item, rate}, ...]. The HUD's
+## "making ore 8.2/min · ingot 4.1/min" summary reads this.
+func production_rates() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for item: StringName in total_produced:
+		var r: float = production_rate(item)
+		if r > 0.05:
+			out.append({"item": item, "rate": r})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["rate"]) > float(b["rate"]))
+	return out
 
 
 ## Drop any ground cell whose pile emptied. `_column_landing`/`_column_rise` create a pile dict EAGERLY for
