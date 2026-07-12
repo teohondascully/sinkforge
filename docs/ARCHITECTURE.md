@@ -56,14 +56,21 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   `DESCENT_EATS` (ingots) toward `DESCENT_QUOTA` (40, `MachineState.fed`) — the throughput WALL — passing
   every other item through; at quota it BREACHES the contiguous seal below (`set_solid` + pile resettle).
   Misplaced = `blocked` and everything passes. Research-locked behind the `descent` tech.
-- **Placed layers (conduit / rope):** two sparse world layers beside `solid`/`wall`, NOT machines —
+- **Placed layers (conduit / rope / torch):** sparse world layers beside `solid`/`wall`, NOT machines —
   item-flow, collision, and the tick never see them. `conduit` carries power (docs/POWER.md). `rope`
   (`is_climbable`/`place_rope`/`remove_rope`) is the placeable climb: `place_rope(anchor)` UNROLLS down
   the open column one carried segment per cell (a stranded digger aims above themself and the rope drops
   to them); `remove_rope` cuts that segment + the hanging tail. The avatar reads `is_climbable` to climb
-  (representation-only, like the updraft). ALL placed layers use symmetric ledger accounting (place =
-  consumed, remove = produced) — **the ledger is total: every item id satisfies present == produced −
-  consumed** (craft outputs count produced; placed machines count consumed; pickups produce back).
+  (representation-only, like the updraft). `torch` (`has_torch`/`place_torch`/`remove_torch`, FABLE_50
+  #26) is placeable LIGHT: mounts only on a BACKED open cell (wall behind or a solid neighbour); the
+  warm pool it casts is pure representation (`_paint_lights`). ALL placed layers use symmetric ledger
+  accounting (place = consumed, remove = produced) — **the ledger is total: every item id satisfies
+  present == produced − consumed** (craft outputs count produced; placed machines count consumed;
+  pickups produce back).
+- **Production rate (legibility):** a tick-driven ring buffer of `total_produced` snapshots (1/s, ~60s
+  window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
+  bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
+  hover "factory makes X/min" row + the pack header's "making …" pulse line read it.
 - **Research — the PULL (docs/PROGRESSION.md §5):** `research` (tech id → true) is sim state mutated only
   by `research_tech(id)` — a discrete call that consumes an analyze-SAMPLE of the tech's signature
   material + its refined-goods cost (both ledgered). The tree is static data in **`ResearchRules`**
