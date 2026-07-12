@@ -293,12 +293,16 @@ func _draw_inventory_overlay() -> void:
 	var cols: int = 6
 	var cell: float = 34.0
 	var grid_h: float = ceilf(maxf(1.0, float(slots.size())) / float(cols)) * cell + 6.0
-	var craft_rows: int = craft_options.size() if can_craft else 1
-	var row_h: float = 30.0
-	var w: float = 280.0
-	var head: float = 34.0
-	var craft_head: float = 26.0
-	var h: float = head + grid_h + craft_head + float(craft_rows) * row_h + 14.0
+	# Craftables draw TWO-UP (the list outgrew a 360px-tall canvas as machines accrued); research rows
+	# stay full-width. Away from the Bazaar there's just the one hint line.
+	var row_h: float = 24.0
+	var craft_lines: int = int(ceilf(float(craft_options.size()) / 2.0)) if can_craft else 1
+	var w: float = 360.0
+	var head: float = 30.0
+	var craft_head: float = 24.0
+	# The RESEARCH BENCH section (only at the Bazaar): one row per tech in the tree.
+	var research_h: float = (craft_head + float(ResearchRules.ORDER.size()) * row_h) if can_craft else 0.0
+	var h: float = head + grid_h + craft_head + float(craft_lines) * row_h + research_h + 12.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
 	draw_string(_font, origin + Vector2(14.0, 23.0), "PACK", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
@@ -341,13 +345,15 @@ func _draw_inventory_overlay() -> void:
 		return
 	draw_string(_font, Vector2(origin.x + 14.0, cy + 19.0), "CRAFT  (at the Bazaar)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	var y: float = cy + craft_head
+	var half_w: float = (w - 16.0) * 0.5
 	for i: int in craft_options.size():
 		var opt: Dictionary = craft_options[i]
 		var afford: bool = _can_afford(opt["cost"])
-		var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 4.0)
+		var rr := Rect2(origin.x + 6.0 + float(i % 2) * (half_w + 4.0), y + float(i / 2) * row_h,
+			half_w, row_h - 3.0)
 		draw_rect(rr, UI_SLOT)
 		draw_rect(rr, UI_EDGE, false, 1.0)
-		var icon2 := Rect2(rr.position + Vector2(6.0, 4.0), Vector2(row_h - 12.0, row_h - 12.0))
+		var icon2 := Rect2(rr.position + Vector2(4.0, 3.0), Vector2(row_h - 9.0, row_h - 9.0))
 		var id: StringName = _craft_id(i)
 		if machine_icons.has(id):
 			var spr: Texture2D = Art.tex("machine_" + String(id))
@@ -359,13 +365,67 @@ func _draw_inventory_overlay() -> void:
 					str(machine_icons[id]["kind"]), icon2.size.y / 20.0, false, 0.0)
 		elif id != &"":
 			Visuals.draw_item(self, icon2.position + icon2.size * 0.5, icon2.size.y, id)  # a tool: its item glyph
-		var tcol: Color = UI_TEXT if afford else Color(0.45, 0.47, 0.53)
-		draw_string(_font, rr.position + Vector2(34.0, 19.0),
-			"[%d]  %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tcol)
-		var cost: String = _cost_text(opt["cost"])
-		var cw: float = _font.get_string_size(cost, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		draw_string(_font, rr.position + Vector2(rr.size.x - cw - 8.0, 19.0), cost,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+		# A machine still locked behind unresearched tech: dim the row and say WHAT unlocks it (the PULL
+		# made legible — you see the drill, you see the bench row that opens it).
+		var lock: StringName = ResearchRules.locking_tech(id)
+		var locked: bool = lock != &"" and not sim.is_researched(lock)
+		var name_col: Color = Color(0.40, 0.42, 0.48) if locked else (UI_TEXT if afford else Color(0.45, 0.47, 0.53))
+		var right: String = ("needs %s" % str(ResearchRules.tech(lock)["name"])) if locked else _cost_text(opt["cost"])
+		var right_col: Color = Color(0.62, 0.50, 0.34) if locked \
+			else (UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+		if locked:
+			draw_rect(rr, Color(0.0, 0.0, 0.0, 0.35))
+		var cw: float = _font.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		# Clip the name to the space LEFT of the right-hand price/lock text (long names would collide).
+		var name_w: float = rr.size.x - (row_h - 1.0) - cw - 10.0
+		draw_string(_font, rr.position + Vector2(row_h - 1.0, 15.0),
+			"[%d] %s" % [i + 1, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, name_w, 11, name_col)
+		draw_string(_font, rr.position + Vector2(rr.size.x - cw - 5.0, 15.0), right,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, right_col)
+	y += float(int(ceilf(float(craft_options.size()) / 2.0))) * row_h
+	_draw_research_bench(origin, w, y, row_h, craft_head)
+
+
+## The RESEARCH BENCH rows (the Bazaar's other half — docs/PROGRESSION.md §5): the linear tech ladder,
+## one row per tech. ✓ done techs dim; the NEXT tech is lit with its analyze-sample + ingot price and the
+## [R] key; future techs show which prereq opens them. Reads the sim + ResearchRules directly.
+func _draw_research_bench(origin: Vector2, w: float, y0: float, row_h: float, head_h: float) -> void:
+	var y: float = y0 + 5.0
+	draw_line(Vector2(origin.x + 8.0, y - 2.0), Vector2(origin.x + w - 8.0, y - 2.0), UI_EDGE, 1.0)
+	draw_string(_font, Vector2(origin.x + 14.0, y + 14.0), "RESEARCH  (the bench)",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+	y += head_h - 5.0
+	var next: StringName = ResearchRules.next_tech(sim.research)
+	for tid: StringName in ResearchRules.ORDER:
+		var t: Dictionary = ResearchRules.tech(tid)
+		var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 3.0)
+		draw_rect(rr, UI_SLOT)
+		draw_rect(rr, UI_EDGE, false, 1.0)
+		if sim.is_researched(tid):
+			draw_circle(rr.position + Vector2(12.0, 10.5), 3.2, Color(0.38, 0.78, 0.44))  # done-lamp
+			draw_string(_font, rr.position + Vector2(21.0, 15.0), str(t["name"]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.62, 0.48))
+			var done_txt: String = "researched"
+			var dw: float = _font.get_string_size(done_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+			draw_string(_font, rr.position + Vector2(rr.size.x - dw - 5.0, 15.0), done_txt,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.42, 0.52, 0.45))
+		elif tid == next:
+			var sample: StringName = t.get("sample", &"")
+			var afford: bool = _can_afford(t["cost"]) and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
+			var price: String = ("analyze %s + " % _item_label(sample) if sample != &"" else "") + _cost_text(t["cost"])
+			draw_string(_font, rr.position + Vector2(8.0, 15.0), "[R]  Research %s" % str(t["name"]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT if afford else Color(0.45, 0.47, 0.53))
+			var pw: float = _font.get_string_size(price, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+			draw_string(_font, rr.position + Vector2(rr.size.x - pw - 5.0, 15.0), price,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+		else:
+			draw_rect(rr, Color(0.0, 0.0, 0.0, 0.35))
+			draw_string(_font, rr.position + Vector2(8.0, 15.0), str(t["name"]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.40, 0.42, 0.48))
+			var req: String = "after %s" % str(ResearchRules.tech(t.get("requires", &""))["name"])
+			var qw: float = _font.get_string_size(req, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+			draw_string(_font, rr.position + Vector2(rr.size.x - qw - 5.0, 15.0), req,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.45, 0.47, 0.53))
 		y += row_h
 
 
@@ -384,12 +444,14 @@ func _draw_help_overlay() -> void:
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.45))
 	var lines: Array[String] = [
 		"move        A / D  (or ← →)",
-		"jump        SPACE / W",
+		"jump        SPACE",
+		"climb       W / S  on a rope (release = hang)",
 		"mine        LMB (hold)",
-		"select      1–8  ·  mouse wheel",
-		"place / pick  RMB  (machine, or wood block)",
+		"select      1–9  ·  mouse wheel",
+		"place / pick  RMB  (machine, rope, or block)",
 		"drop / feed  Q  (gravity feeds it in)",
 		"pack        E  (inventory · craft at Bazaar)",
+		"research    R  (in the pack screen, at the bench)",
 		"map         M",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
 		"pause       P     ·   help   H",

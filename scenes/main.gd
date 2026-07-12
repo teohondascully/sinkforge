@@ -485,6 +485,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.CLOSE):
 		_inventory_open = false
 		_show_help = false
+	elif event.is_action_pressed(Controls.RESEARCH) and _inventory_open:
+		try_research(ResearchRules.next_tech(sim.research))   # R at the bench: research the next tech
 	elif event.is_action_pressed(Controls.BUILD):
 		try_build(_aim)
 	elif event.is_action_pressed(Controls.ZOOM):
@@ -638,6 +640,20 @@ func try_craft_tool(tool_id: StringName) -> bool:
 	if not _near_bazaar():
 		return false
 	return sim.craft_item(tool_id, MiningRules.TOOL_RECIPES.get(tool_id, {}))
+
+
+## RESEARCH a tech at the Bazaar bench (R in the pack screen) — the demand-side PULL: analyze a sample
+## of the tech's signature material + spend refined ingots to UNLOCK crafting its machines
+## (docs/PROGRESSION.md §5). Bazaar proximity is the bench (same gate as crafting); the spend itself is
+## the sim's discrete research_tech. Verb-surfaced so the play-harness researches like a player.
+func try_research(tech_id: StringName) -> bool:
+	if not _near_bazaar():
+		return false
+	var done: bool = sim.research_tech(tech_id)
+	if done and _player != null:
+		_particles.spark(_player.position, Color(0.55, 0.85, 1.0))  # a cool "insight" burst at the bench
+		_shake = maxf(_shake, 2.0)
+	return done
 
 
 ## Scoop up resting product piles NEAR the body — Factorio/Terraria "walk over items to grab them",

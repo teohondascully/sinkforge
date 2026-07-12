@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_no_empty_ground_piles()
 	_test_behavior_registry()
 	_test_rope()
+	_test_research()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1220,3 +1221,39 @@ func _test_rope() -> void:
 	var present_r: int = _items_present(sim, &"rope")
 	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
 	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])
+
+
+## THE PULL — research at the Bazaar bench (docs/PROGRESSION.md §5): locked machines refuse to craft
+## until their tech is researched; researching consumes an analyze-SAMPLE + refined ingots (both
+## ledgered); prereqs order the ladder; and every tech's unlock list points at a real machine def.
+func _test_research() -> void:
+	print("- research (the PULL)")
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var sim: FactorySim = FactorySim.new()
+	sim.inventory[&"ingot"] = 20; sim.total_produced[&"ingot"] = 20
+	sim.inventory[&"ore"] = 2;    sim.total_produced[&"ore"] = 2
+	_check(not sim.craft(drill_def), "the drill refuses to craft before Automation is researched")
+	_check(not sim.research_tech(&"power"), "power refuses before its prereq (automation)")
+	_check(not sim.research_tech(&"bogus_tech"), "an unknown tech refuses")
+	var s2: FactorySim = FactorySim.new()
+	s2.inventory[&"ingot"] = 20; s2.total_produced[&"ingot"] = 20
+	_check(not s2.research_tech(&"automation"), "research refuses WITHOUT the analyze-sample (no ore held)")
+	_check(sim.research_tech(&"automation"), "automation researches with an ore sample + the ingot price")
+	_check(sim.is_researched(&"automation"), "the tech is recorded")
+	_check(int(sim.inventory.get(&"ore", 0)) == 1, "analyzing consumed ONE ore sample")
+	_check(int(sim.inventory.get(&"ingot", 0)) == 18, "the bench consumed the ingot price")
+	_check(not sim.research_tech(&"automation"), "a researched tech refuses a second spend")
+	_check(sim.craft(drill_def), "the drill crafts once Automation is researched")
+	_check(not sim.craft_unlocked(&"generator"), "the generator stays locked behind Power")
+	sim.inventory[&"coal"] = 1; sim.total_produced[&"coal"] = 1
+	_check(sim.research_tech(&"power"), "power researches after automation (coal sample + 12 ingots)")
+	_check(sim.craft_unlocked(&"generator") and sim.craft_unlocked(&"lift"), "power opened its branch")
+	for item: StringName in [&"ore", &"ingot", &"coal", &"drill"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through the research flow (present=%d, net=%d)" % [item, present, net])
+	# Tree contract: every unlock id resolves to a real machine def (a typo'd id would gate nothing).
+	for tid: StringName in ResearchRules.TECHS:
+		for uid: StringName in (ResearchRules.TECHS[tid]["unlocks"] as Array):
+			var path: String = "res://src/data/machines/%s.tres" % uid
+			_check(ResourceLoader.exists(path), "%s unlock '%s' is a real machine def" % [tid, uid])

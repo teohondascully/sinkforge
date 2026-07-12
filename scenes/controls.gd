@@ -21,6 +21,7 @@ const MINE := &"sf_mine"
 const BUILD := &"sf_build"
 const DROP := &"sf_drop"
 const CRAFT := &"sf_craft"
+const RESEARCH := &"sf_research"
 const MAP := &"sf_map"
 const HELP := &"sf_help"
 const PAUSE := &"sf_pause"
@@ -44,6 +45,8 @@ static func defaults() -> Dictionary:
 		BUILD: [{"button": MOUSE_BUTTON_RIGHT}],
 		DROP: [{"key": KEY_Q}],
 		CRAFT: [{"key": KEY_E}],
+		RESEARCH: [{"key": KEY_R}],   # in the pack screen at the Bazaar: research the next tech
+
 		MAP: [{"key": KEY_M}],
 		HELP: [{"key": KEY_H}, {"key": KEY_SLASH}],
 		PAUSE: [{"key": KEY_P}],

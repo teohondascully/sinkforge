@@ -1,5 +1,9 @@
 # PROGRESSION — the Sinkforge spine
 
+> **Update 2026-07-11:** §5's research engine is BUILT (first slice) — the Bazaar bench + the L1 tech
+> ladder (`automation` → `power`), analyze-the-new + ingot price, sim-gated crafting, in the tutorial
+> chain. See `ResearchRules` + DECISIONS 2026-07-11. The rest below remains design.
+
 > **Status: DESIGNED (2026-06-28), via a guided brainstorm with the user. Not yet built.** This is the
 > progression backbone the whole game hangs on — the resolution of the long-open "what is the Sinkforge /
 > tech graph / endgame" questions (GDD Open Questions; DECISIONS same date). It UNBLOCKS the crafter

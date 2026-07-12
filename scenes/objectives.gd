@@ -31,6 +31,7 @@ var steps: Array[Dictionary] = [
 	{"id": &"smelt",  "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
+	{"id": &"research", "label": "Research AUTOMATION at the Bazaar — press E by the stall, then R (needs an ore sample + 2 ingots)", "goal": "Research Automation"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
 	{"id": &"build",  "label": "Drop the Drill into the shaft just ABOVE the ore vein (RMB) — it bores down into it", "goal": "Build the line"},
 	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
@@ -91,6 +92,7 @@ func _achieved(id: StringName) -> bool:
 		&"smelt":  return _produced(&"ingot") >= 2 and int(sim.inventory.get(&"ingot", 0)) >= 2  # smelted AND collected
 		&"wood":   return _produced(&"wood") >= 1                                                 # felled a tree this session
 		&"bazaar": return not sim.find_bazaars().is_empty()                                       # a frame is complete + claimed
+		&"research": return sim.is_researched(&"automation")                                      # the bench unlocked the drill
 		&"craft":  return int(sim.inventory.get(&"drill", 0)) >= 1 or _has_drill_machine()        # a Drill in pack or placed
 		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
 		&"fuel":  return _drill_fueled()                                                          # the drill has coal to burn

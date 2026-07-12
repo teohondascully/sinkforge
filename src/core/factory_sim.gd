@@ -142,6 +142,10 @@ var conduit: Dictionary = {}
 ## strands you", and the first rung of the manual→automated ladders→lifts→elevators arc. Authoritative
 ## state, mutated only by place_rope/remove_rope (discrete player calls — determinism untouched).
 var rope: Dictionary = {}
+## RESEARCHED techs (tech id -> true) — the demand-side PULL (docs/PROGRESSION.md §5). The tree lives in
+## ResearchRules (static data); this is the per-session unlock state. Mutated ONLY by research_tech (a
+## discrete player call at the Bazaar bench), read by the craft gate — deterministic + serializable.
+var research: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
@@ -664,8 +668,48 @@ func drop_item(cell: Vector2i, item: StringName, count: int, from_cell: Vector2i
 
 ## Player action: CRAFT a machine item into the pack, spending its `craft_cost` from inventory.
 ## Yields `def.craft_count` per craft (1 for machines; cheap consumables like rope yield a bundle).
+## RESEARCH-GATED: a machine still locked behind an unresearched tech refuses (the PULL — your ingots
+## must first buy the unlock at the Bazaar bench; docs/PROGRESSION.md §5).
 func craft(def: MachineDef) -> bool:
+	if not craft_unlocked(def.id):
+		return false
 	return craft_item(def.id, def.craft_cost, def.craft_count)
+
+
+## Is this craftable unlocked — free (no locking tech), or its tech researched?
+func craft_unlocked(item_id: StringName) -> bool:
+	var lock: StringName = ResearchRules.locking_tech(item_id)
+	return lock == &"" or research.has(lock)
+
+
+func is_researched(tech_id: StringName) -> bool:
+	return research.has(tech_id)
+
+
+## Player action: RESEARCH a tech at the Bazaar bench (proximity is the controller's gate, like reach).
+## Analyze-the-new: consumes ONE unit of the tech's signature SAMPLE material (you must have found it)
+## plus its refined-goods cost — both ledgered as consumed, so conservation holds and research is a real
+## sink. Refuses when unknown / already researched / prereq missing / ingredients short.
+func research_tech(tech_id: StringName) -> bool:
+	var t: Dictionary = ResearchRules.tech(tech_id)
+	if t.is_empty() or research.has(tech_id) or not ResearchRules.prereq_met(tech_id, research):
+		return false
+	var sample: StringName = t.get("sample", &"")
+	if sample != &"" and int(inventory.get(sample, 0)) < 1:
+		return false
+	var cost: Dictionary = t.get("cost", {})
+	for item: StringName in cost:
+		if int(inventory.get(item, 0)) < int(cost[item]):
+			return false
+	if sample != &"":
+		_take_from_pack(sample, 1)
+		total_consumed[sample] = int(total_consumed.get(sample, 0)) + 1
+	for item: StringName in cost:
+		var n: int = int(cost[item])
+		_take_from_pack(item, n)
+		total_consumed[item] = int(total_consumed.get(item, 0)) + n
+	research[tech_id] = true
+	return true
 
 
 ## The generic craft primitive: spend `cost` (item->count) from the pack, add `count` `output` items.

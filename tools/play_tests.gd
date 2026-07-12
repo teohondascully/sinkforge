@@ -327,10 +327,72 @@ func _do_step(agent: PlayAgent, id: StringName) -> bool:
 		&"wood":   return await _step_wood(agent)
 		&"bazaar": return await _step_bazaar(agent)
 		&"craft":  return await _step_craft(agent)
+		&"research": return await _step_research(agent)
 		&"build":  return await _step_build(agent)
 		&"fuel":   return await _step_fuel(agent)
 		&"auto":   return await _step_auto(agent)
 	return false
+
+
+## Earn ingots the tutorial way: mine the starter veins for ore, toss it into the bootstrap forge, and
+## reach-collect until `want` ingots are carried. The shared acquisition loop for the bench price
+## (research) and the drill craft — both real ore→ingot labour through the real verbs.
+func _ensure_ingots(agent: PlayAgent, want: int) -> bool:
+	var guard: int = 0
+	while int(agent.sim.inventory.get(&"ingot", 0)) < want and guard < 12:
+		guard += 1
+		if int(agent.sim.inventory.get(&"ore", 0)) < 2:
+			var ore: Vector2i = _nearest_ore_not_shaft(agent)
+			if ore.x < 0:
+				return false
+			await agent.dig_down_to(ore)
+			await agent.climb_to_surface(MainView.SURFACE - 1)   # back OUT of the dig (pillar/rope), like a player
+			continue
+		if not await agent.select_item(&"ore"):
+			return false
+		if not await agent.walk_to_column(MainView.MINESHAFT_FORGE_CELL.x - 1):
+			return false
+		agent.player.facing = 1
+		agent.main.try_drop()                                        # fling the carried ore into the forge
+		var collect: Vector2i = MainView.MINESHAFT_FORGE_CELL + Vector2i(0, 1)
+		var last: int = -1
+		var settled: int = 0
+		while settled < 3 and int(agent.sim.inventory.get(&"ingot", 0)) < want:
+			await agent.approach(collect)                            # stand within reach → auto-collect
+			for _i: int in 30:
+				await physics_frame
+			var now: int = int(agent.sim.inventory.get(&"ingot", 0))
+			settled = settled + 1 if now == last else 0
+			last = now
+	return int(agent.sim.inventory.get(&"ingot", 0)) >= want
+
+
+## Step — RESEARCH Automation at the bench: earn the bench price (2 ingots), keep an ore SAMPLE to
+## analyze, then stand at the Bazaar and research. The PULL the chain funnels through — the drill stays
+## locked until the bench opens it, so this proves a player can actually pay the first unlock.
+func _step_research(agent: PlayAgent) -> bool:
+	if agent.sim.is_researched(&"automation"):
+		return true
+	var price: int = int(ResearchRules.tech(&"automation")["cost"].get(&"ingot", 0))
+	if not await _ensure_ingots(agent, price):
+		agent._note("  research: couldn't earn the %d-ingot bench price" % price)
+		return false
+	var guard: int = 0
+	while int(agent.sim.inventory.get(&"ore", 0)) < 1 and guard < 4:
+		guard += 1                                                   # top the SAMPLE back up (smelting ate it)
+		var ore: Vector2i = _nearest_ore_not_shaft(agent)
+		if ore.x < 0:
+			return false
+		await agent.dig_down_to(ore)
+		await agent.climb_to_surface(MainView.SURFACE - 1)           # back OUT of the sample dig
+	if not await _walk_to_bazaar(agent):
+		agent._note("  research: could not reach the Bazaar bench")
+		return false
+	var ok: bool = agent.main.try_research(&"automation")
+	agent._note("  research: automation=%s (ore=%d ingots=%d near=%s)" % [ok,
+		int(agent.sim.inventory.get(&"ore", 0)), int(agent.sim.inventory.get(&"ingot", 0)),
+		agent.main._near_bazaar()])
+	return ok
 
 
 ## Step 1 — hand-dig the bootstrap ore (4) from the starter vein near spawn, never the mineshaft's vein.
@@ -396,8 +458,13 @@ func _step_bazaar(agent: PlayAgent) -> bool:
 	return not agent.sim.find_bazaars().is_empty()
 
 
-## Step 5 — craft a Drill AT the Bazaar: walk to the stall (crafting is gated on proximity) and craft.
+## Step 5 — craft a Drill AT the Bazaar: earn its ingot price (research just spent the last batch), then
+## walk to the stall (crafting is gated on proximity) and craft.
 func _step_craft(agent: PlayAgent) -> bool:
+	var price: int = int((load(DRILL) as MachineDef).craft_cost.get(&"ingot", 0))
+	if not await _ensure_ingots(agent, price):
+		agent._note("  craft: couldn't earn the %d-ingot drill price" % price)
+		return false
 	if not await _walk_to_bazaar(agent):
 		agent._note("  craft: could not reach the Bazaar to craft at it")
 		return false

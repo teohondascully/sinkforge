@@ -58,6 +58,13 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   (representation-only, like the updraft). ALL placed layers use symmetric ledger accounting (place =
   consumed, remove = produced) — **the ledger is total: every item id satisfies present == produced −
   consumed** (craft outputs count produced; placed machines count consumed; pickups produce back).
+- **Research — the PULL (docs/PROGRESSION.md §5):** `research` (tech id → true) is sim state mutated only
+  by `research_tech(id)` — a discrete call that consumes an analyze-SAMPLE of the tech's signature
+  material + its refined-goods cost (both ledgered). The tree is static data in **`ResearchRules`**
+  (`src/data/research_rules.gd`, the MiningRules pattern): TECHS (requires/sample/cost/unlocks) + ORDER +
+  `next_tech`. `craft` refuses defs whose `locking_tech` isn't researched (`craft_unlocked`); the
+  controller's `try_research` adds the Bazaar-proximity gate (the bench), and `R` in the pack screen
+  researches the next tech. Adding a tech = one TECHS entry.
 - **Block placement + the Bazaar:** `place_block(cell, material)` is the Terraria build primitive
   (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
   is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
