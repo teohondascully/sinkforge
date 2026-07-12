@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_placement()
 	_test_conservation()
 	_test_determinism()
+	_test_state_canary()
 	_test_production()
 	_test_production_rate()
 	_test_splitter()
@@ -98,13 +99,32 @@ func _dict_sig(d: Dictionary) -> String:
 	return ",".join(parts)
 
 
+## The WHOLE authoritative state as one canonical string (FABLE_50 #2). Built on SaveGame.capture,
+## so the canary and the save format can never drift apart: any field added to the envelope is
+## automatically guarded here, and a field the envelope misses is a field this canary misses — one
+## list, two guards. Dictionary keys are sorted (content-based, insertion-order-proof); machine
+## ARRAY order is kept as-is because tick order is itself authoritative.
 func _state_signature(sim: FactorySim) -> String:
-	var parts: PackedStringArray = []
-	parts.append("sink:%s" % _dict_sig(sim.sink))
-	for machine: MachineState in sim.machines:
-		parts.append("in[%s]out[%s]p%.4f" % [
-			_dict_sig(machine.input_buffer), _dict_sig(machine.output_buffer), machine.progress])
-	return "|".join(parts)
+	return _canon(SaveGame.capture(sim))
+
+
+func _canon(v: Variant) -> String:
+	match typeof(v):
+		TYPE_DICTIONARY:
+			var d: Dictionary = v
+			var keys: Array = d.keys()
+			keys.sort_custom(func(a: Variant, b: Variant) -> bool: return str(a) < str(b))
+			var parts: PackedStringArray = []
+			for k: Variant in keys:
+				parts.append("%s=%s" % [str(k), _canon(d[k])])
+			return "{%s}" % ",".join(parts)
+		TYPE_ARRAY:
+			var parts: PackedStringArray = []
+			for e: Variant in (v as Array):
+				parts.append(_canon(e))
+			return "[%s]" % ",".join(parts)
+		_:
+			return str(v)
 
 
 # --- tests -------------------------------------------------------------------
@@ -146,6 +166,33 @@ func _test_determinism() -> void:
 		a.tick()
 		b.tick()
 	_check(_state_signature(a) == _state_signature(b), "identical state after 200 ticks")
+
+
+## The canary must SEE every authoritative layer: for each one, mutate a fresh sim in just that
+## layer and assert the signature moves. A layer that can drift silently (the old canary saw only
+## sink + machine buffers) is a whole class of leak the determinism test can't catch.
+func _test_state_canary() -> void:
+	print("- determinism canary covers the whole state")
+	var base: String = _state_signature(_build_sim())
+	var probes: Dictionary = {
+		"solid": func(s: FactorySim) -> void: s.set_solid(Vector2i(1, 1), &"earth"),
+		"wall": func(s: FactorySim) -> void: s.set_wall(Vector2i(1, 1), &"earth_wall"),
+		"deposits": func(s: FactorySim) -> void: s.deposits[Vector2i(1, 1)] = 5,
+		"inventory": func(s: FactorySim) -> void: s.inventory[&"ore"] = 3,
+		"ground": func(s: FactorySim) -> void: s.ground[Vector2i(1, 1)] = {&"ore": 1},
+		"conduit": func(s: FactorySim) -> void: s.conduit[Vector2i(1, 1)] = true,
+		"rope": func(s: FactorySim) -> void: s.rope[Vector2i(1, 1)] = true,
+		"torch": func(s: FactorySim) -> void: s.torch[Vector2i(1, 1)] = true,
+		"research": func(s: FactorySim) -> void: s.research[&"automation"] = true,
+		"ledger": func(s: FactorySim) -> void: s.total_produced[&"ore"] = 9,
+		"machine facing": func(s: FactorySim) -> void: s.machines[0].facing = -1,
+		"machine filter": func(s: FactorySim) -> void: s.machines[0].filter = &"ore",
+		"machine mode": func(s: FactorySim) -> void: s.machines[0].mode = 2,
+	}
+	for probe_name: String in probes:
+		var s: FactorySim = _build_sim()
+		(probes[probe_name] as Callable).call(s)
+		_check(_state_signature(s) != base, "canary sees %s" % probe_name)
 
 
 ## Sanity: the chain actually produces ingots, and the recipe ratio holds (2 ore per ingot).
