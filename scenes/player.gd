@@ -32,7 +32,10 @@ const RUN_SPEED: float = 150.0       ## px/s horizontal top speed
 const ACCEL: float = 1700.0          ## px/s^2 toward top speed (~0.09s) — quick, but not instant (less stiff)
 const FRICTION: float = 2200.0       ## px/s^2 rubbed off when no input (snappy stop)
 const GRAVITY: float = 900.0         ## px/s^2
-const JUMP_VELOCITY: float = -330.0  ## px/s instantaneous on jump  (apex ~= 330^2/(2*900) ~= 60px)
+## Jump apex ~= v^2/(2g) ~= 74px — comfortably clears a TWO-tile (64px) wall. It was -330 (apex 60px),
+## which made a 2-block ledge a 4px-short bounce-off — the reported "stalling on a 2-high jump". A ≥3-tile
+## wall stays honest (jump can't beat it; that's what ropes/digging are for).
+const JUMP_VELOCITY: float = -365.0
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
 const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
@@ -173,6 +176,12 @@ func _step(delta: float) -> void:
 	# climbing down onto a floor lands you.
 	if climbing:
 		velocity.y = -input_climb * CLIMB_SPEED
+		# TOP-OF-ROPE HOLD: with no rope above this cell, rising further would push the centre off the
+		# rope → un-grip → fall → re-grip — a jittering stall at the anchor (the reported bug). Clamp the
+		# rise so the grip HOLDS just inside the top segment; leave by jumping (Space) or side-stepping.
+		if input_climb > 0.0 and not sim.is_climbable(_cell_of(position) + Vector2i(0, -1)):
+			var top_hold: float = float(_cell_of(position).y * CELL) + 6.0
+			velocity.y = clampf((top_hold - position.y) / delta, velocity.y, 0.0)
 
 	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
 	# that trapped you in a dug 1-pit): on a GENUINE rendered ramp (ramp_dir≠0) the heightmap glides the

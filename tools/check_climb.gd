@@ -21,6 +21,9 @@ var _t: float = 0.0
 var _y_prev: float = 0.0
 var _hang_y: float = 0.0
 var _max_jump: float = 0.0      ## biggest single-frame rise while climbing (teleport tripwire)
+var _hold_y: float = 0.0        ## position when the top-of-rope hold watch began
+var _hold_frames: int = 0
+var _hold_drift: float = 0.0    ## how far the body wandered while holding UP at the rope top
 var _failures: int = 0
 
 
@@ -89,7 +92,24 @@ func _phys() -> void:
 				_check(absf(_player.position.y - _hang_y) < 3.0,
 					"releasing mid-rope HANGS in place (drift %.1fpx)" % absf(_player.position.y - _hang_y))
 				_phase = 3; _t = 0.0
-		3:                                                   # TOP + EXIT: climb to the lip, walk off sideways
+		3:                                                   # TOP HOLD: keep pressing UP at the rope's end —
+			_player.input_climb = 1.0                         # the grip must HOLD, never un-grip/fall/jitter
+			_t += 1.0 / 60.0                                  # (the live-play "stalling at the anchor" bug)
+			var row: int = int(_player.position.y) / CELL
+			if row <= PIT_TOP - 1:
+				_hold_frames += 1
+				if _hold_frames == 20:
+					_hold_y = _player.position.y              # settled at the top — start the drift watch
+				elif _hold_frames > 20:
+					_hold_drift = maxf(_hold_drift, absf(_player.position.y - _hold_y))
+				if _hold_frames >= 65:
+					_check(_hold_drift < 3.0,
+						"holding UP at the rope top HOLDS steady — no un-grip jitter (drift %.1fpx)" % _hold_drift)
+					_phase = 4; _t = 0.0
+			if _t >= 4.0:
+				_check(false, "never reached the rope top (stuck at row %d)" % row)
+				_phase = 5
+		4:                                                   # EXIT: walk off sideways at the lip
 			_t += 1.0 / 60.0
 			var c: Vector2i = _main._cell_at(_player.position)
 			if c.x != PIT_COL and _player.on_floor:
@@ -97,16 +117,14 @@ func _phys() -> void:
 				_player.input_climb = 0.0
 				_check(c.y == PIT_TOP - 1,
 					"walked off the rope onto the surface (at %s)" % c)
-				_phase = 4
+				_phase = 5
 				return
-			_player.input_climb = 1.0
-			if _player.climbing and int(_player.position.y) / CELL <= PIT_TOP - 1:
-				_player.input_climb = 0.0
-				_player.input_dir = 1.0                       # at the lip → walk off the rope onto the surface
+			_player.input_climb = 0.0
+			_player.input_dir = 1.0
 			if _t >= 4.0:
 				_check(false, "never exited the shaft at the lip (stuck at %s)" % c)
-				_phase = 4
-		4:
+				_phase = 5
+		5:
 			if _failures == 0:
 				print("CLIMB OK"); quit(0)
 			else:

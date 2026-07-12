@@ -83,6 +83,19 @@ func _phys() -> void:
 					"glided up the ramp (max single-frame rise %.1fpx — a teleport would be ~32)" % _max_rise)
 				_check(stopped_at_wall,
 					"the 2-tile wall stopped the body (x=%.0f, wall at %d)" % [_player.position.x, 15 * 32])
+				_phase = 2; _t = 0.0
+		2:  # a 2-tile wall must be JUMPABLE (walking never auto-climbs it, but a jump clears it — the
+			# live-play "stalling on a 2-high jump" fix: apex ~74px > 64px). Keep walking + jump.
+			_player.input_dir = 1.0
+			_t += 1.0 / 60.0
+			if fmod(_t, 0.6) < 1.0 / 60.0:
+				_player.request_jump()
+			if _player.position.x > float(16 * 32) and _player.on_floor:
+				_check(true, "jumped the 2-tile wall and landed on top (x=%.0f)" % _player.position.x)
+				_player.input_dir = 0.0
+				_phase = 3
+			elif _t >= 4.0:
+				_check(false, "could not jump the 2-tile wall (x=%.0f)" % _player.position.x)
 				_phase = 3
 		3:
 			if _failures == 0:

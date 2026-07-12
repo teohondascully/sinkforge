@@ -297,8 +297,10 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 				do_build(anchor)                          # hang it — it unrolls down to us
 		if sim.is_climbable(bc):
 			if bc.y <= target_row:
-				player.input_climb = 0.0                  # at the lip — step off sideways onto the ground
-				player.input_dir = _exit_dir(bc)
+				player.input_climb = 0.0                  # at the lip — LEAP off toward the exit side (the
+				player.input_dir = _exit_dir(bc)          # human move; walking can ping-pong between two
+				if player.climbing:                        # adjacent roped shaft mouths)
+					_do_jump()
 			else:
 				player.input_dir = 0.0
 				player.input_climb = 1.0                  # ride up
@@ -308,7 +310,17 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 			else:
 				rope_stall += 1
 				stuck_frames += 1
-				if rope_stall > 90:                       # ~1.5s pinned mid-rope → genuinely wedged
+				if rope_stall == 35:                      # pinned at a rope top that can't extend (e.g. a
+					var d: float = _exit_dir(bc)           # tree trunk caps the column) → LEAP off sideways
+					_do_jump()                             # and continue from wherever that lands
+					for _r: int in 30:
+						player.input_climb = 0.0
+						player.input_dir = d
+						await step(); t += 1
+					player.input_dir = 0.0
+					prev = player.position
+					continue
+				if rope_stall > 90:                       # ~1.5s pinned even after the leap → genuinely wedged
 					_note("climb: rope-stalled at %s" % main._cell_at(player.position))
 					return false
 			prev = player.position
@@ -366,9 +378,15 @@ func _rope_anchor_above(bc: Vector2i) -> Vector2i:
 	return best
 
 
-## Which way to step OFF a rope at the lip: toward an open side cell (prefer right). Used once the body
-## has climbed to the target row and needs to stand on ground instead of hanging.
+## Which way to step OFF a rope at the lip: prefer an open side cell WITH A FLOOR under it (stepping
+## into the open mouth of a neighbouring shaft would just drop you back down); fall back to any open
+## side. Used once the body has climbed to the target row and needs to stand on ground.
 func _exit_dir(bc: Vector2i) -> float:
+	for d: int in [1, -1]:
+		var side := Vector2i(bc.x + d, bc.y)
+		if sim.in_bounds(side) and not sim.is_solid(side) and sim.machine_at(side) == null \
+				and sim.is_solid(side + Vector2i(0, 1)):
+			return float(d)
 	for d: int in [1, -1]:
 		var side := Vector2i(bc.x + d, bc.y)
 		if sim.in_bounds(side) and not sim.is_solid(side) and sim.machine_at(side) == null:
