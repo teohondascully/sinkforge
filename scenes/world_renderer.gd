@@ -184,6 +184,7 @@ func _draw() -> void:
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
+	_draw_torches()   # mounted torches guttering on the walls — placed light, claimed territory
 	_draw_ground()
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
@@ -354,6 +355,13 @@ func _draw_ropes() -> void:
 			draw_arc(top + Vector2(0.0, 3.0), 3.2, 0.0, TAU, 10, HEMP, 2.0)          # the hitch loop
 		if is_tail:
 			draw_line(bot, bot + Vector2(sway * 2.0, -5.0), HEMP.darkened(0.1), 1.6)  # frayed tail curl
+
+
+## Draw the mounted torches (FABLE_50 #26): the shared Visuals glyph, live-guttering on the cosmetic
+## clock. The warm pool each one casts is painted by _paint_lights; here is just the stick + flame.
+func _draw_torches() -> void:
+	for cell: Variant in sim.torch:
+		Visuals.draw_machine_glyph(self, _cell_center(cell), "torch", 1.0, true, _anim_time)
 
 
 func _draw_terrain(ci: CanvasItem, rect: Rect2i) -> void:
@@ -989,6 +997,15 @@ func _paint_lights(layer: LightLayer) -> void:
 			col = Color(0.55, 0.82, 0.98)                  # cool machine glow
 		if pulse > 0.0:
 			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+	# Torches: the placeable light (FABLE_50 #26). Each mounted torch casts a warm guttering pool —
+	# smaller than the head-lamp, but it STAYS: dropped along a dig, they mark the route home, and a
+	# lit cave reads as claimed territory in the black.
+	for cell: Variant in sim.torch:
+		var tc: Vector2i = cell
+		var gutter: float = 0.42 + 0.05 * sin(_anim_time * 9.0 + float(tc.x) * 1.7) \
+			+ 0.03 * sin(_anim_time * 23.0 + float(tc.y))
+		_draw_glow(layer, _cell_center(tc) + Vector2(1.2, -6.0), float(CELL) * 3.1,
+			Color(1.0, 0.72, 0.38), gutter)
 	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft
 	# (the in-world tube is drawn under the veil; this is what makes its power read from across the room).
 	for cell: Variant in sim.conduit:

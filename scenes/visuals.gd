@@ -21,6 +21,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper — the power-tube material
 	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal — a storage bin
 	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
+	&"torch": {"kind": "torch", "color": Color(0.86, 0.60, 0.26)},        # flame amber — placeable light
 	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze — the gate-breacher
 }
 
@@ -68,6 +69,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_hopper(canvas, center, s, active, t)
 		"rope":
 			_rope(canvas, center, s)
+		"torch":
+			_torch(canvas, center, s, active, t)
 		"descent":
 			_descent(canvas, center, s, active, t)
 
@@ -218,6 +221,20 @@ static func _rope(canvas: CanvasItem, c: Vector2, s: float) -> void:
 		canvas.draw_line(c + Vector2(-1.8 * s, ky), c + Vector2(1.8 * s, ky), hemp.darkened(0.18), 1.6)
 
 
+## Torch (placeable light): a leaning stick with a live FLAME that gutters on the clock — the in-world
+## mount and the hotbar icon share it. `active` full flame; still icons burn steady + small.
+static func _torch(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var stick := Color(0.46, 0.32, 0.18)
+	var tip := c + Vector2(1.2 * s, -3.5 * s)
+	canvas.draw_line(c + Vector2(-1.8 * s, 7.5 * s), tip, stick, 2.4 * maxf(s, 0.6))
+	canvas.draw_line(c + Vector2(-1.8 * s, 7.5 * s), tip, stick.lightened(0.18), 1.0 * maxf(s, 0.6))
+	var gutter: float = (0.82 + 0.18 * sin(t * 9.0 + c.x * 0.13) + 0.06 * sin(t * 23.0)) if active else 0.9
+	var flame := tip + Vector2(0.0, -1.6 * s)
+	canvas.draw_circle(flame, 3.0 * s * gutter, Color(1.0, 0.55, 0.16, 0.85))       # outer lick
+	canvas.draw_circle(flame + Vector2(0.0, -0.8 * s), 1.6 * s * gutter, Color(1.0, 0.86, 0.42))  # hot core
+	canvas.draw_circle(tip, 1.3 * s, Color(0.16, 0.10, 0.06))                        # the charred wrap
+
+
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
 static func _fork(canvas: CanvasItem, c: Vector2, s: float) -> void:
 	var fork := Color(0.93, 0.88, 1.0)
@@ -246,6 +263,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade — cold stone-grey (unlocks deepslate)
 	if item == &"rope":
 		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
+	if item == &"torch":
+		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
 	if item == &"iron":
 		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
 	if item == &"deepslate":

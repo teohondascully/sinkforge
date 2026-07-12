@@ -150,6 +150,10 @@ var conduit: Dictionary = {}
 ## strands you", and the first rung of the manual→automated ladders→lifts→elevators arc. Authoritative
 ## state, mutated only by place_rope/remove_rope (discrete player calls — determinism untouched).
 var rope: Dictionary = {}
+## Mounted TORCHES: cell -> true. A placed layer like `rope` — not solid, not a machine; items fall
+## straight through. The sim owns placement + the item ledger; the warm light pool is representation
+## (docs/FABLE_50.md #26). Mutated only by place_torch/remove_torch (discrete player calls).
+var torch: Dictionary = {}
 ## RESEARCHED techs (tech id -> true) — the demand-side PULL (docs/PROGRESSION.md §5). The tree lives in
 ## ResearchRules (static data); this is the per-session unlock state. Mutated ONLY by research_tech (a
 ## discrete player call at the Bazaar bench), read by the craft gate — deterministic + serializable.
@@ -386,7 +390,7 @@ func mine(cell: Vector2i) -> StringName:
 ## crafting, the spent item is counted as CONSUMED, and mining it back counts as produced, so conservation
 ## holds across build/dig (terrain isn't "items present"). Refuses solid/occupied/out-of-bounds cells.
 func place_block(cell: Vector2i, material: StringName) -> bool:
-	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell):
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell) or torch.has(cell):
 		return false          # a roped cell refuses rock (cut the rope first — no rope-in-stone)
 	if int(inventory.get(material, 0)) <= 0:
 		return false
@@ -474,6 +478,44 @@ func remove_rope(cell: Vector2i) -> int:
 		cut += 1
 		c += Vector2i(0, 1)
 	return cut
+
+
+## --- TORCHES (FABLE_50 #26) — placeable LIGHT, another placed layer like rope/conduit. Not solid,
+## not a machine: items fall through, collision never sees it. The sim only owns placement + the
+## ledger; the WARM POOL it casts is pure representation (the renderer lights torch cells). Light is
+## claimed territory in the black — the first light you can leave behind, before power arrives. ---
+
+func has_torch(cell: Vector2i) -> bool:
+	return torch.has(cell)
+
+
+## Mount a carried &"torch" on an open cell. Needs a BACKING to hang from — a real wall behind the
+## cell or any solid neighbour (no torches floating in open sky). Consumed into the ledger; removal
+## produces it back, so the total ledger holds.
+func place_torch(cell: Vector2i) -> bool:
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or torch.has(cell):
+		return false
+	if int(inventory.get(&"torch", 0)) <= 0:
+		return false
+	var backed: bool = wall_at(cell) != &""
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		backed = backed or solid.has(cell + d)
+	if not backed:
+		return false
+	_take_from_pack(&"torch", 1)
+	total_consumed[&"torch"] = int(total_consumed.get(&"torch", 0)) + 1
+	torch[cell] = true
+	return true
+
+
+## Take a mounted torch back into the pack (the mirror of place_torch).
+func remove_torch(cell: Vector2i) -> bool:
+	if not torch.has(cell):
+		return false
+	torch.erase(cell)
+	inventory[&"torch"] = int(inventory.get(&"torch", 0)) + 1
+	total_produced[&"torch"] = int(total_produced.get(&"torch", 0)) + 1
+	return true
 
 
 ## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
@@ -794,7 +836,7 @@ func _take_from_pack(item: StringName, n: int) -> void:
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
 ## inside solid earth.
 func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
-	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false) or rope.has(cell):
+	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false) or rope.has(cell) or torch.has(cell):
 		return null           # a roped cell refuses a machine too (cut the rope first)
 	var state: MachineState = MachineState.new(def, cell)
 	grid[cell] = state

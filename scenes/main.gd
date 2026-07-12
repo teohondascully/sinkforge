@@ -102,6 +102,7 @@ func _ready() -> void:
 		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
 		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
 		load("res://src/data/machines/rope.tres"),        # the placeable climb — unrolls down a shaft
+		load("res://src/data/machines/torch.tres"),       # placeable LIGHT — claimed territory in the black
 		load("res://src/data/machines/descent_engine.tres"),  # the L1→L2 gate-breacher (docs/PROGRESSION.md)
 	]
 	for def: MachineDef in _craftable:
@@ -505,6 +506,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# The fixed hotbar number row; 0 is the TENTH slot (the craft list outgrew 1-9).
 		var idx: int = (event.keycode - KEY_1) if event.keycode != KEY_0 else 9
 		if _inventory_open:
+			if event.shift_pressed:
+				idx += 10                               # SHIFT+digit = craft rows 11-20 (until the real tech panel)
 			if idx < _craftable.size():
 				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT a machine (Bazaar-gated)
 			elif idx < _craftable.size() + CRAFT_TOOLS.size():
@@ -780,7 +783,14 @@ func try_build(cell: Vector2i) -> bool:
 		return sim.remove_conduit(cell)  # pick a power tube back up into the pack
 	if sim.is_climbable(cell):
 		return sim.remove_rope(cell) > 0  # CUT the rope here — it and everything hanging below returns
+	if sim.has_torch(cell):
+		return sim.remove_torch(cell)    # take a mounted torch back into the pack
 	var def: MachineDef = _selected_machine_def()
+	if def != null and def.behavior == &"torch":
+		var lit: bool = sim.place_torch(cell)     # mounts on a wall-backed / rock-adjacent open cell
+		if lit:
+			_particles.spark(_cell_center(cell), Color(1.0, 0.78, 0.42))
+		return lit
 	if def != null and def.behavior == &"conduit":
 		var laid: bool = sim.place_conduit(cell)  # power tube → the conduit layer (not a machine)
 		if laid:

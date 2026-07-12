@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_test_no_empty_ground_piles()
 	_test_behavior_registry()
 	_test_rope()
+	_test_torch()
 	_test_research()
 	_test_descent_gate()
 	if _failures == 0:
@@ -1244,6 +1245,38 @@ func _test_rope() -> void:
 	var present_r: int = _items_present(sim, &"rope")
 	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
 	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])
+
+
+## TORCHES (FABLE_50 #26) — the placeable light, a placed layer like rope: mounts only on a backed
+## open cell (wall behind or a solid neighbour — no floating lights in the sky), refuses solids/
+## machines/doubles, blocks solids/machines from its cell, returns to the pack on removal, and the
+## item satisfies the total ledger. The light it casts is representation — nothing here to test.
+func _test_torch() -> void:
+	print("- torches (placeable light)")
+	var sim: FactorySim = FactorySim.new()
+	sim.set_solid(Vector2i(8, 10), &"stone")                  # a cave floor
+	var spot := Vector2i(8, 9)                                # open, atop the floor (solid neighbour below)
+	_check(not sim.place_torch(spot), "no torch carried -> refused")
+	sim.inventory[&"torch"] = 3
+	sim.total_produced[&"torch"] = 3
+	_check(not sim.place_torch(Vector2i(3, 2)), "a floating sky cell refuses (nothing to mount on)")
+	sim.set_wall(Vector2i(3, 2), &"earth")
+	_check(sim.place_torch(Vector2i(3, 2)), "a wall-backed open cell mounts")
+	_check(sim.place_torch(spot), "a rock-adjacent open cell mounts")
+	_check(not sim.place_torch(spot), "no double-mount")
+	_check(not sim.place_torch(Vector2i(8, 10)), "cannot mount inside solid rock")
+	_check(int(sim.inventory.get(&"torch", 0)) == 1, "each mount spent one carried torch")
+	sim.inventory[&"earth"] = 1
+	sim.total_produced[&"earth"] = 1
+	_check(not sim.place_block(spot, &"earth"), "a block cannot be placed into a torch cell")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	_check(sim.place_machine(proc_def, spot) == null, "a machine cannot be placed into a torch cell")
+	_check(sim.remove_torch(spot), "removal takes the torch back")
+	_check(not sim.has_torch(spot) and int(sim.inventory.get(&"torch", 0)) == 2, "…into the pack")
+	_check(ResearchRules.locking_tech(&"torch") == &"", "torches are research-UNGATED (never lock the light)")
+	var present_t: int = _items_present(sim, &"torch")
+	var net_t: int = int(sim.total_produced.get(&"torch", 0)) - int(sim.total_consumed.get(&"torch", 0))
+	_check(present_t == net_t, "torch conserved through mount+remove (present=%d, net=%d)" % [present_t, net_t])
 
 
 ## THE PULL — research at the Bazaar bench (docs/PROGRESSION.md §5): locked machines refuse to craft
