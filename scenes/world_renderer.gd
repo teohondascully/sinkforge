@@ -54,6 +54,7 @@ var _ghost_material: StringName = &""                ## a building material sele
 var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
 var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mined (cracks drawn on it; pushed by MainView)
 var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block — the felt-friction read
+var _dig_marks: Dictionary = {}                       ## the dig PLAN (live ref from MainView) — hatched overlay
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 var _seal_rows: Array[int] = []                       ## world rows holding THE SEAL (lazy-scanned for its pulse)
 var _seal_rows_scanned: bool = false
@@ -154,6 +155,12 @@ func set_mine_progress(cell: Vector2i, frac: float) -> void:
 	_mine_frac = frac
 
 
+## The controller hands over its dig-plan dict ONCE as a live reference (cell -> true); the overlay
+## tracks paints/clears without a per-frame push. Read-only here — the plan is the controller's.
+func set_dig_marks(marks: Dictionary) -> void:
+	_dig_marks = marks
+
+
 func _process(delta: float) -> void:
 	_anim_time += delta
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
@@ -209,9 +216,33 @@ func _draw() -> void:
 		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
 	if particles != null:
 		particles.draw(self)
+	_draw_dig_marks()      # the painted dig PLAN — corner-bracketed cells waiting for the pick
 	_draw_mine_cracks()    # spider cracks on the block you're charge-mining (the felt friction)
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_aim()
+
+
+## The painted dig PLAN (FABLE_50 #24): each marked cell wears amber corner brackets + a whisper of
+## fill, breathing gently so the plan reads as "queued for the pick", quieter than the aim cursor and
+## the objective rings. Marks are the controller's live dict; stale entries are its job to prune.
+func _draw_dig_marks() -> void:
+	if _dig_marks.is_empty():
+		return
+	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var pulse: float = 0.65 + 0.35 * sin(_anim_time * 2.6)
+	var edge := Color(0.95, 0.72, 0.30, 0.30 + 0.25 * pulse)
+	var fill := Color(0.95, 0.72, 0.30, 0.05)
+	var arm: float = float(CELL) * 0.28
+	for key: Variant in _dig_marks:
+		var pos := Vector2(key as Vector2i) * float(CELL)
+		if not view.has_point(pos):
+			continue
+		draw_rect(Rect2(pos + Vector2.ONE * 2.0, Vector2.ONE * float(CELL - 4)), fill)
+		for corner: Vector2 in [Vector2.ZERO, Vector2(1, 0), Vector2(0, 1), Vector2.ONE]:
+			var c: Vector2 = pos + corner * float(CELL) + (Vector2.ONE * 0.5 - corner) * 4.0
+			var dir := Vector2.ONE * 0.5 - corner   # points inward
+			draw_line(c, c + Vector2(signf(dir.x) * arm, 0.0), edge, 1.5)
+			draw_line(c, c + Vector2(0.0, signf(dir.y) * arm), edge, 1.5)
 
 
 ## Spider cracks across the block currently being charge-mined, growing with the break progress (pushed

@@ -59,6 +59,14 @@ var _time_scale_idx: int = 0
 var _mine_target: Vector2i = Vector2i(-999, -999)
 var _mine_charge: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
+## The DIG PLAN (FABLE_50 #24 — smart mining): dragging LMB across rock PAINTS marks (cell -> true),
+## a plan that persists after release; while LMB is held and the cursor isn't on a workable block, the
+## miner works the nearest MARKED cell in reach instead — so you sketch a shaft once and hold, rather
+## than re-aiming every block. Player INTENT, not production state: lives here (controller) + a renderer
+## overlay, never enters the sim, isn't saved. Reach/LOS/tool gates are the same ones try_mine enforces.
+var _dig_marks: Dictionary = {}
+var _last_paint_world: Vector2 = Vector2.INF   ## last cursor world-pos while painting (sweep interpolation)
+const MAX_DIG_MARKS: int = 200
 ## The machines you can CRAFT (1/2 keys → craft one into the pack, spending ingots). The ore_vent (a
 ## SOURCE) is deliberately absent — you remain the ore source by hand (manual→automated pillar; see
 ## DECISIONS 2026-06-27). `_machine_defs_by_id` resolves a carried hotbar item back to its def so a
@@ -182,6 +190,7 @@ func _ready() -> void:
 	_renderer.setup(sim, _falling, _player)
 	_renderer.particles = _particles
 	_renderer.bazaars = _bazaars
+	_renderer.set_dig_marks(_dig_marks)   # a LIVE reference — the overlay tracks the plan as it's painted
 	add_child(_renderer)
 
 	# Hand the HUD minimap a material-colour lookup (the renderer owns the MaterialDef registry) so the
@@ -527,6 +536,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_save_game()
 	elif event.is_action_pressed(Controls.LOAD):
 		_load_game()
+	elif event.is_action_pressed(Controls.CLEAR_MARKS):
+		if not _dig_marks.is_empty():
+			_dig_marks.clear()
+			_hud.flash("dig plan cleared")
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		_cycle_inventory(1)   # direct wheel handling (reliable) — the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -553,44 +566,53 @@ func _unhandled_input(event: InputEvent) -> void:
 ## deliberate grind (the friction that sells automation). The charge fraction drives the crack overlay.
 ## (The wall-clock timing lives HERE; the tool-GATE lives in try_mine, the verb the play-harness drives.)
 func _update_mining(delta: float) -> void:
-	_aim = _effective_aim(get_global_mouse_position())
+	var mouse_world: Vector2 = get_global_mouse_position()
+	_aim = _effective_aim(mouse_world)
+	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE)
+	if pressed:
+		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)
+	else:
+		_last_paint_world = Vector2.INF
 	# The charge/crack animation runs ONLY on a cell you can actually break — the SAME _mineable predicate
 	# try_mine enforces (solid + in reach + LINE OF SIGHT). Without the LOS term the cracks would spider a
 	# full charge, try_mine would refuse (no clear path), and it'd loop forever — reading as a bug. If the
 	# aim is a block behind rock, _effective_aim already snaps to the nearest EXPOSED face toward the cursor,
 	# so you dig the PATH toward a buried target; when no reachable face exists, nothing animates (no phantom).
-	var holding: bool = not _paused and Input.is_action_pressed(Controls.MINE) and _mineable(_aim)
+	# THE QUEUE FALLBACK (#24): when the cursor itself offers no workable block, the nearest MARKED cell in
+	# reach becomes the work target — the precise hover always wins, the plan drains whenever the hand is free.
+	var work: Vector2i = _aim
+	if pressed and not _workable(work):
+		work = _nearest_marked_workable()
+	var holding: bool = pressed and _workable(work)
 	if not holding:
 		_mine_target = Vector2i(-999, -999)
 		_mine_charge = 0.0
 		_swing_clock = SWING_PERIOD          # primed: the FIRST blow of the next charge lands instantly
 		if _renderer != null:
 			_renderer.set_mine_progress(Vector2i(-999, -999), 0.0)
+		# Tool-locked hover keeps its "no progress" read (the hint says why).
+		if pressed and _mineable(_aim) and not MiningRules.can_mine(sim.material_at(_aim), sim.inventory):
+			_mine_target = _aim
+			_renderer.set_mine_progress(_aim, 0.0)
 		return
-	var mat: StringName = sim.material_at(_aim)
-	if not MiningRules.can_mine(mat, sim.inventory):
-		# You lack the tool for this rock — no progress (a hint reads it as "you need a better pick").
-		_mine_target = _aim
-		_mine_charge = 0.0
-		_renderer.set_mine_progress(_aim, 0.0)
-		return
-	if _aim != _mine_target:                                  # moved to a fresh block → restart the charge
-		_mine_target = _aim
+	var mat: StringName = sim.material_at(work)
+	if work != _mine_target:                                  # moved to a fresh block → restart the charge
+		_mine_target = work
 		_mine_charge = 0.0
 	var cls: StringName = MiningRules.required_tool(mat)
 	var speed: float = MiningRules.best_speed(cls, sim.inventory) if cls != &"" else 1.0
 	_mine_charge += delta * speed
 	var hard: float = MiningRules.hardness(mat)
-	_renderer.set_mine_progress(_aim, clampf(_mine_charge / hard, 0.0, 1.0))
+	_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
 	# Swing FEEL (FABLE_50 #40): while charging, the body holds the dig pose facing the block, and on a
 	# steady cadence a BLOW lands — a chip of the rock's dust off the struck face + a micro-shake — so
 	# mining reads as pick-strikes landing, not a progress bar silently filling.
 	if _player != null:
-		_player.note_dig(int(signf(_cell_center(_aim).x - _player.position.x)))
+		_player.note_dig(int(signf(_cell_center(work).x - _player.position.x)))
 		_swing_clock += delta
 		if _swing_clock >= SWING_PERIOD:
 			_swing_clock = 0.0
-			var center: Vector2 = _cell_center(_aim)
+			var center: Vector2 = _cell_center(work)
 			var to_body: Vector2 = _player.position - center
 			_particles.chip(center + to_body.normalized() * (float(CELL) * 0.45),
 				Visuals.terrain_dust(mat), to_body.angle())
@@ -599,7 +621,51 @@ func _update_mining(delta: float) -> void:
 			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1, 0.8, 1.2))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
-		try_mine(_aim)                                       # charge full → land the breaking blow
+		try_mine(work)                                       # charge full → land the breaking blow
+
+
+## A cell the miner can WORK right now: breakable (solid + reach + LOS, the try_mine gate) AND the
+## carried tools are up to its rock. The single predicate both the hover target and the queue use.
+func _workable(cell: Vector2i) -> bool:
+	return _mineable(cell) and MiningRules.can_mine(sim.material_at(cell), sim.inventory)
+
+
+## Sweep-paint the dig plan: every solid cell the cursor crossed since last frame gets a mark (the
+## segment is sampled sub-cell so a fast drag doesn't skip blocks). Marks are allowed BEYOND reach —
+## the plan is where you intend to dig, reach gates the work, not the sketch. Tool-locked rock refuses
+## a mark (a plan you can't execute yet just reads as a bug later).
+func _paint_dig_marks(mouse_world: Vector2) -> void:
+	var from: Vector2 = _last_paint_world if _last_paint_world != Vector2.INF else mouse_world
+	_last_paint_world = mouse_world
+	var span: float = from.distance_to(mouse_world)
+	var steps: int = maxi(1, ceili(span / (float(CELL) * 0.5)))
+	for i: int in steps + 1:
+		var cell: Vector2i = _cell_at(from.lerp(mouse_world, float(i) / float(steps)))
+		if _dig_marks.has(cell) or _dig_marks.size() >= MAX_DIG_MARKS:
+			continue
+		if sim.is_solid(cell) and MiningRules.can_mine(sim.material_at(cell), sim.inventory):
+			_dig_marks[cell] = true
+
+
+## The marked cell nearest the body that can be worked right now. Prunes stale marks (cells already
+## dug or built over) as it scans, so the plan never points at air.
+func _nearest_marked_workable() -> Vector2i:
+	var none := Vector2i(-999, -999)
+	if _player == null or _dig_marks.is_empty():
+		return none
+	var best: Vector2i = none
+	var best_d: float = INF
+	for cell: Vector2i in _dig_marks.keys():
+		if not sim.is_solid(cell):
+			_dig_marks.erase(cell)            # dug (by hand or by the queue itself) → the mark is spent
+			continue
+		if not _workable(cell):
+			continue                          # out of reach / no LOS / tool-locked — stays in the plan
+		var d: float = _cell_center(cell).distance_squared_to(_player.position)
+		if d < best_d:
+			best_d = d
+			best = cell
+	return best
 
 
 ## Terraria-style mining reach: you don't have to land the cursor exactly on a reachable cell. When you
@@ -656,6 +722,7 @@ func try_mine(cell: Vector2i) -> bool:
 	var rich: bool = sim.ore_deposit_at(cell) > 0              # captured BEFORE the mine clears the cell
 	var mined: StringName = sim.mine(cell)
 	if mined != &"":
+		_dig_marks.erase(cell)                                 # a dug cell's mark is spent
 		var center: Vector2 = _cell_center(cell)
 		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
 		if _player != null:

@@ -496,6 +496,7 @@ func _draw_help_overlay() -> void:
 		"jump        SPACE",
 		"climb       W / S  on a rope (release = hang)",
 		"mine        LMB (hold)",
+		"dig plan    LMB drag paints it · X clears",
 		"select      1–9  ·  mouse wheel",
 		"place / pick  RMB  (machine, rope, or block)",
 		"drop / feed  Q  (gravity feeds it in)",

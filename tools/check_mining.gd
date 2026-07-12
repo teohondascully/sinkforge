@@ -102,3 +102,46 @@ func _run() -> void:
 	else:
 		_check(_main._mineable(eff),
 			"the aim snapped to an exposed face → you dig the PATH toward the buried block (no phantom)")
+
+	_run_dig_queue(row)
+
+
+## THE DIG QUEUE (FABLE_50 #24) — the executable spec: paint a plan by sweeping the cursor down a
+## column, then just HOLD the mine button with the cursor parked on open sky — the miner works the
+## nearest marked in-reach cells one after another, hands-free of re-aiming. Reach still gates: a mark
+## painted beyond reach stays queued (and undug) until you walk to it.
+func _run_dig_queue(row: int) -> void:
+	print("-- dig queue (#24 smart mining) --")
+	var col: int = 52
+	for x: int in range(col - 2, col + 12):                        # a clean stage: pocket + flat floor row
+		for y: int in range(row - 3, row + 6):
+			_sim.set_solid(Vector2i(x, y), &"")
+	for y: int in range(row + 1, row + 4):                         # a 3-cell earth column under the body (all in reach)
+		_sim.set_solid(Vector2i(col, y), &"earth")
+	var far := Vector2i(col + 9, row + 1)                          # a marked cell WAY beyond reach
+	_sim.set_solid(far, &"earth")
+	_main._player.position = _main._cell_center(Vector2i(col, row))
+	_main._dig_marks.clear()
+
+	# PAINT: one drag stroke from the column's top to its bottom (the sweep interpolates the cells
+	# between), plus a dab on the far block. Painting ignores reach — the plan is intent.
+	_main._paint_dig_marks(_main._cell_center(Vector2i(col, row + 1)))
+	_main._paint_dig_marks(_main._cell_center(Vector2i(col, row + 3)))
+	_main._last_paint_world = Vector2.INF
+	_main._paint_dig_marks(_main._cell_center(far))
+	_main._last_paint_world = Vector2.INF
+	_check(_main._dig_marks.size() == 4, "the drag stroke painted the column + the far dab (marks=%d)"
+		% _main._dig_marks.size())
+	_check(_main._dig_marks.has(far), "a block beyond reach CAN be planned (reach gates work, not intent)")
+
+	# DRAIN: hold MINE with the cursor parked far away (headless mouse sits at the viewport's top-left —
+	# open sky, nothing workable under it) and let the mining loop run. No re-aiming ever happens.
+	Input.action_press(Controls.MINE)
+	for _i: int in 300:
+		_main._update_mining(0.05)
+	Input.action_release(Controls.MINE)
+	for y: int in range(row + 1, row + 4):
+		_check(not _sim.is_solid(Vector2i(col, y)), "the queue dug (%d,%d) hands-free" % [col, y])
+	_check(_sim.is_solid(far), "the far mark is UNDUG — reach still gates the work")
+	_check(_main._dig_marks.has(far), "…and stays in the plan for when you walk over")
+	_check(not _main._dig_marks.has(Vector2i(col, row + 1)), "spent marks left the plan")
