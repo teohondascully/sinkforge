@@ -523,13 +523,34 @@ func _draw_cell_silhouette(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color
 	ci.draw_colored_polygon(pts, col)
 
 
+## DEPTH-ZONE PALETTES (FABLE_50 #13): each zone pulls the terrain toward its own temperature, eased
+## across a transition band so strata read as different PLACES, not stripes. Topsoil keeps its warm
+## material colours (no entry = no tint); Stonereach below THE SEAL chills toward cold slate-blue.
+## A new depth layer = one new row here (rows straddle the transition; strength is the held tint).
+const ZONE_TINTS: Array[Dictionary] = [
+	{"from": 50, "to": 66, "color": Color(0.42, 0.55, 0.90), "strength": 0.30},   # Stonereach (L2)
+]
+
+
+## Ease `col` toward every zone tint whose band `row` has entered. Applied to terrain AND walls (the
+## whole stratum shifts together); machines/items stay untinted — the artificial keeps its own colour.
+func _zone_tinted(col: Color, row: int) -> Color:
+	for z: Dictionary in ZONE_TINTS:
+		var lo: int = int(z["from"])
+		if row <= lo:
+			continue
+		var t: float = clampf(float(row - lo) / float(int(z["to"]) - lo), 0.0, 1.0)
+		col = col.lerp(z["color"] as Color, float(z["strength"]) * smoothstep(0.0, 1.0, t))
+	return col
+
+
 ## The final fill colour for a terrain cell: the material's base, DARKENED with depth (the lower world
 ## reads as deeper, not one flat fill) then nudged by the deterministic tonal jitter (so a field of earth
 ## isn't ONE flat colour — the biggest flat-fill tell). Extracted so the surface RAMP wedge fills with the
 ## exact same colour as the cell body below it — the slope is the same earth mass, not a sticker on top.
 func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-	var col: Color = def.base_color.darkened(depth * def.depth_darken)
+	var col: Color = _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
 	var j: float = _cell_jitter(c)
 	return col.lightened(j) if j > 0.0 else col.darkened(-j)
 
@@ -859,7 +880,8 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 				ci.draw_texture_rect(wtex, Rect2(wpos, Vector2(CELL, CELL)), false)
 				continue
 			var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-			ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)), def.base_color.darkened(depth * def.depth_darken))
+			ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)),
+				_zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y))
 
 
 func _draw_drop_paths() -> void:
