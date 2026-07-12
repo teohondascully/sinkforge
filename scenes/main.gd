@@ -99,6 +99,7 @@ func _ready() -> void:
 		load("res://src/data/machines/hopper.tres"),  # stockpiles + meters gravity-fed output (the 'chest')
 		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
 		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
+		load("res://src/data/machines/rope.tres"),        # the placeable climb — unrolls down a shaft
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -734,12 +735,19 @@ func try_build(cell: Vector2i) -> bool:
 		return sim.pickup_machine(cell)  # pick your machine back up into the pack
 	if sim.has_conduit(cell):
 		return sim.remove_conduit(cell)  # pick a power tube back up into the pack
+	if sim.is_climbable(cell):
+		return sim.remove_rope(cell) > 0  # CUT the rope here — it and everything hanging below returns
 	var def: MachineDef = _selected_machine_def()
 	if def != null and def.behavior == &"conduit":
 		var laid: bool = sim.place_conduit(cell)  # power tube → the conduit layer (not a machine)
 		if laid:
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 		return laid
+	if def != null and def.behavior == &"rope":
+		var hung: int = sim.place_rope(cell)      # anchors here and UNROLLS down the open column
+		if hung > 0:
+			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
+		return hung > 0
 	if def != null and _placeable(cell):
 		var built: bool = sim.build_from_pack(def, cell) != null
 		if built:
@@ -851,7 +859,8 @@ func _selected_build_material() -> StringName:
 ## cell the body is standing in — so you can never seal yourself inside a machine you place.
 func _placeable(cell: Vector2i) -> bool:
 	return sim.in_bounds(cell) and not sim.is_solid(cell) \
-		and sim.machine_at(cell) == null and not sim.has_conduit(cell) and not _player_occupies(cell)
+		and sim.machine_at(cell) == null and not sim.has_conduit(cell) \
+		and not sim.is_climbable(cell) and not _player_occupies(cell)
 
 
 func _player_occupies(cell: Vector2i) -> bool:

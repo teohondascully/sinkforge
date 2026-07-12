@@ -136,6 +136,12 @@ var power: Dictionary = {}
 ## machine (so item-flow, collision, and the tick never touch it; the player walks through tubes). Carries
 ## power down+lateral in _compute_power. Authoritative state, mutated only by place_conduit/remove_conduit.
 var conduit: Dictionary = {}
+## Placed ROPE: cell -> true. Another placed layer like `conduit` — NOT solid, NOT a machine, so
+## item-flow, collision, updrafts, and the tick never see it (falling ore pours straight through a
+## roped shaft). The avatar reads is_climbable() to CLIMB it — the manual answer to "digging down
+## strands you", and the first rung of the manual→automated ladders→lifts→elevators arc. Authoritative
+## state, mutated only by place_rope/remove_rope (discrete player calls — determinism untouched).
+var rope: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
@@ -359,8 +365,8 @@ func mine(cell: Vector2i) -> StringName:
 ## crafting, the spent item is counted as CONSUMED, and mining it back counts as produced, so conservation
 ## holds across build/dig (terrain isn't "items present"). Refuses solid/occupied/out-of-bounds cells.
 func place_block(cell: Vector2i, material: StringName) -> bool:
-	if not in_bounds(cell) or solid.has(cell) or grid.has(cell):
-		return false
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell):
+		return false          # a roped cell refuses rock (cut the rope first — no rope-in-stone)
 	if int(inventory.get(material, 0)) <= 0:
 		return false
 	_take_from_pack(material, 1)
@@ -385,13 +391,16 @@ func conduit_tier(cell: Vector2i) -> int:
 
 
 ## Place a carried conduit into an open cell (mirrors build_from_pack: spend one &"conduit" from the pack).
-## Refuses solid/occupied/already-piped/out-of-bounds cells. Returns whether it went down.
+## Refuses solid/occupied/already-piped/out-of-bounds cells. Returns whether it went down. The spent item
+## counts as CONSUMED and removal counts as PRODUCED (the same symmetric accounting as place_block/mine),
+## so a placed layer never silently leaks the conservation invariant.
 func place_conduit(cell: Vector2i) -> bool:
 	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or conduit.has(cell):
 		return false
 	if int(inventory.get(&"conduit", 0)) <= 0:
 		return false
 	_take_from_pack(&"conduit", 1)
+	total_consumed[&"conduit"] = int(total_consumed.get(&"conduit", 0)) + 1
 	conduit[cell] = 1                       # tier 1 (the only tier for now)
 	return true
 
@@ -402,7 +411,48 @@ func remove_conduit(cell: Vector2i) -> bool:
 		return false
 	conduit.erase(cell)
 	inventory[&"conduit"] = int(inventory.get(&"conduit", 0)) + 1
+	total_produced[&"conduit"] = int(total_produced.get(&"conduit", 0)) + 1
 	return true
+
+
+## --- ROPE (the placeable climb) — a placed layer like the conduit, read by the avatar to climb. ---
+
+func is_climbable(cell: Vector2i) -> bool:
+	return rope.has(cell)
+
+
+## Player action: hang a rope at `anchor` and let it UNROLL DOWN the open column (one carried &"rope"
+## item per segment) until it hits solid ground / a machine / an existing rope / the world floor, or the
+## pack runs out. ONE placement ropes a whole shaft — and because the anchor can be any open in-reach
+## cell ABOVE you, a player stranded at the bottom of their own dig aims up, places, and the rope
+## unrolls down TO them. Each segment counts as CONSUMED (symmetric with remove_rope's produced), so
+## the total ledger holds. Returns the number of segments hung (0 = refused: bad anchor / no rope).
+func place_rope(anchor: Vector2i) -> int:
+	var hung: int = 0
+	var c: Vector2i = anchor
+	while in_bounds(c) and not solid.has(c) and not grid.has(c) and not rope.has(c) \
+			and int(inventory.get(&"rope", 0)) > 0:
+		_take_from_pack(&"rope", 1)
+		total_consumed[&"rope"] = int(total_consumed.get(&"rope", 0)) + 1
+		rope[c] = true
+		hung += 1
+		c += Vector2i(0, 1)
+	return hung
+
+
+## Player action: cut the rope at `cell`. A rope HANGS, so cutting a segment takes that segment and
+## every connected segment BELOW it (the tail can't float); all return to the pack (produced — the
+## mirror of place_rope's consumed). Returns how many segments came back.
+func remove_rope(cell: Vector2i) -> int:
+	var cut: int = 0
+	var c: Vector2i = cell
+	while rope.has(c):
+		rope.erase(c)
+		inventory[&"rope"] = int(inventory.get(&"rope", 0)) + 1
+		total_produced[&"rope"] = int(total_produced.get(&"rope", 0)) + 1
+		cut += 1
+		c += Vector2i(0, 1)
+	return cut
 
 
 ## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
@@ -612,17 +662,20 @@ func drop_item(cell: Vector2i, item: StringName, count: int, from_cell: Vector2i
 	return n
 
 
-## Player action: CRAFT one machine item into the pack, spending its `craft_cost` from inventory.
+## Player action: CRAFT a machine item into the pack, spending its `craft_cost` from inventory.
+## Yields `def.craft_count` per craft (1 for machines; cheap consumables like rope yield a bundle).
 func craft(def: MachineDef) -> bool:
-	return craft_item(def.id, def.craft_cost)
+	return craft_item(def.id, def.craft_cost, def.craft_count)
 
 
-## The generic craft primitive: spend `cost` (item->count) from the pack, add one `output` item. Returns
-## true if crafted (enough ingredients). Spent items count as consumed so conservation holds (crafting is a
-## real sink); the output (machine id OR a tool id) lives in the same pack as ore/ingots. One path for both
-## machines (craft) and tools (MiningRules.TOOL_RECIPES) so the Bazaar screen crafts them identically.
-func craft_item(output: StringName, cost: Dictionary) -> bool:
-	if cost.is_empty():
+## The generic craft primitive: spend `cost` (item->count) from the pack, add `count` `output` items.
+## Returns true if crafted (enough ingredients). THE LEDGER IS TOTAL: spent items count as consumed and
+## the output counts as produced — every item id (resources, machine items, tools) satisfies
+## present == produced − consumed at all times, so conservation can be asserted on anything. The output
+## (machine id OR a tool id) lives in the same pack as ore/ingots. One path for both machines (craft)
+## and tools (MiningRules.TOOL_RECIPES) so the Bazaar screen crafts them identically.
+func craft_item(output: StringName, cost: Dictionary, count: int = 1) -> bool:
+	if cost.is_empty() or count <= 0:
 		return false
 	for item: StringName in cost:
 		if int(inventory.get(item, 0)) < int(cost[item]):
@@ -631,12 +684,15 @@ func craft_item(output: StringName, cost: Dictionary) -> bool:
 		var n: int = int(cost[item])
 		_take_from_pack(item, n)
 		total_consumed[item] = int(total_consumed.get(item, 0)) + n
-	inventory[output] = int(inventory.get(output, 0)) + 1
+	inventory[output] = int(inventory.get(output, 0)) + count
+	total_produced[output] = int(total_produced.get(output, 0)) + count
 	return true
 
 
 ## Player action: place a machine you CARRY — consumes one machine item (def.id) from the pack and
 ## places it. Returns the MachineState, or null if you don't carry one or the cell is blocked.
+## The spent item counts as CONSUMED (a placed machine isn't "present"); pickup_machine mirrors it
+## back as produced — the same symmetric accounting as blocks and conduits, so the ledger stays total.
 func build_from_pack(def: MachineDef, cell: Vector2i) -> MachineState:
 	if int(inventory.get(def.id, 0)) <= 0:
 		return null
@@ -644,6 +700,7 @@ func build_from_pack(def: MachineDef, cell: Vector2i) -> MachineState:
 	if state == null:
 		return null
 	_take_from_pack(def.id, 1)
+	total_consumed[def.id] = int(total_consumed.get(def.id, 0)) + 1
 	return state
 
 
@@ -660,6 +717,7 @@ func pickup_machine(cell: Vector2i) -> bool:
 			inventory[item] = int(inventory.get(item, 0)) + int(buffer[item])
 		buffer.clear()   # salvaged into the pack — cleared so remove_machine has nothing left to destroy
 	inventory[state.def.id] = int(inventory.get(state.def.id, 0)) + 1
+	total_produced[state.def.id] = int(total_produced.get(state.def.id, 0)) + 1  # mirrors build's consume
 	remove_machine(cell)
 	return true
 
@@ -675,8 +733,8 @@ func _take_from_pack(item: StringName, n: int) -> void:
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
 ## inside solid earth.
 func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
-	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false):
-		return null
+	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false) or rope.has(cell):
+		return null           # a roped cell refuses a machine too (cut the rope first)
 	var state: MachineState = MachineState.new(def, cell)
 	grid[cell] = state
 	machines.append(state)

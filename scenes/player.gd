@@ -37,6 +37,7 @@ const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
 const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
 const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (the paid inverse of gravity)
+const CLIMB_SPEED: float = 110.0     ## px/s the body travels a gripped rope (hold W/S; release = hang)
 ## Slope follow: a single-tile rise is walked as a 45° ramp (glide, not teleport); a taller rise is a
 ## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
 const MAX_STEP: float = CELL * 1.3
@@ -65,8 +66,10 @@ var sim: FactorySim                  ## set by MainView; read-only use (collisio
 ## drives input_dir / request_jump() directly to measure motion deterministically.
 var auto_input: bool = true
 var input_dir: float = 0.0           ## -1 left, +1 right
+var input_climb: float = 0.0         ## +1 up, -1 down — the rope-climb axis (W/S; harness-drivable)
 var velocity: Vector2 = Vector2.ZERO
 var on_floor: bool = false
+var climbing: bool = false           ## gripping a rope this step (read by the sprite/juice; repr-only)
 var facing: int = 1
 
 ## Cosmetic feedback MainView reads to spawn juice (dust / shake) — never touches the sim.
@@ -95,6 +98,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
+		input_climb = Input.get_axis(Controls.DOWN, Controls.UP)   # W/S — grab + ride a rope
 	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
 	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
 	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
@@ -135,13 +139,22 @@ func _step(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 
 	velocity.y = minf(velocity.y + GRAVITY * delta, MAX_FALL)
-	var grounded: bool = on_floor or _coyote > 0.0
+	# ROPE GRIP (representation-only, like the updraft): overlapping a placed rope, a climb press (W/S)
+	# grabs it; the grip holds until the body leaves the rope or jumps off. Gripping counts as GROUNDED
+	# below, so Space always jumps you off a rope and sideways-at-the-lip gets the auto step-up out.
+	var on_rope: bool = sim.is_climbable(_cell_of(position))
+	if not on_rope:
+		climbing = false
+	elif input_climb != 0.0:
+		climbing = true
+	var grounded: bool = on_floor or _coyote > 0.0 or climbing
 	if _jump_request:
 		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant we land (forgiving)
 	_jump_request = false
 	if _jump_buffer > 0.0 and grounded:
 		velocity.y = JUMP_VELOCITY
 		on_floor = false
+		climbing = false                    # a jump lets GO of the rope (Space = off, W = up: distinct verbs)
 		_coyote = 0.0
 		grounded = false
 		_jump_buffer = 0.0
@@ -154,6 +167,13 @@ func _step(delta: float) -> void:
 		velocity.y = minf(velocity.y, -LIFT_RISE_SPEED)
 		grounded = false
 
+	# THE CLIMB: while gripping, gravity is REPLACED by direct travel — hold W/S to ride up/down the
+	# rope, release to HANG in place. Runs after the updraft so a gripped rope wins over a draft (your
+	# hands are on it). The vertical resolve below still applies: climbing up into a ceiling stops you,
+	# climbing down onto a floor lands you.
+	if climbing:
+		velocity.y = -input_climb * CLIMB_SPEED
+
 	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
 	# that trapped you in a dug 1-pit): on a GENUINE rendered ramp (ramp_dir≠0) the heightmap glides the
 	# feet up/down the 45° hypotenuse for a smooth slope; EVERYWHERE ELSE (flat, pits, valleys, caves,
@@ -162,8 +182,8 @@ func _step(delta: float) -> void:
 	# pit / over a machine instead of wedging against it.
 	position.x += velocity.x * delta
 	var glided: bool = false
-	if grounded and velocity.y >= 0.0 and sim.ramp_dir(_cell_of(position).x) != 0:
-		glided = _follow_slope(delta)
+	if grounded and not climbing and velocity.y >= 0.0 and sim.ramp_dir(_cell_of(position).x) != 0:
+		glided = _follow_slope(delta)   # never slope-yank a body hanging on a rope above a ramp
 	_step_grounded = grounded          # let the horizontal resolve auto-step ≤1-tile walls when grounded
 	_stepped = false
 	_resolve_axis(true)
@@ -384,6 +404,8 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 func _sprite_key() -> String:
 	if digging:
 		return "miner_dig_0" if int(_anim_time * 8.0) % 2 == 0 else "miner_dig_1"
+	if climbing:
+		return "miner_climb"       # no art yet → falls back to the idle frame (better than the jump pose)
 	if not on_floor:
 		return "miner_jump"
 	if absf(velocity.x) > 10.0:

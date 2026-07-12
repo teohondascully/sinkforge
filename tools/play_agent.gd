@@ -270,20 +270,52 @@ func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
 
 
 ## Climb from the bottom of a shaft back UP to the surface — the BYPRODUCT step a player MUST do after
-## digging down, and today the friction hotspot: with no rope/ladder, the only way up a straight shaft is
-## PILLAR-JUMPING (jump, drop a block into the cell just vacated under your feet, land on it, repeat). This
-## models exactly that, so the friction metrics (places/jumps/frames) measure how painful getting back up
-## is. Returns whether the body reached the surface. Fails if it runs out of blocks or genuinely can't rise
-## (= "the player is TRAPPED down there", the worst-case friction we must never ship). When a rope/ladder
-## lands, this primitive should prefer it → the same journeys pass with a fraction of the effort.
+## digging down. TWO strategies, in the order a real player reaches for them:
+##   1. THE ROPE (the placeable climb): hang a rope from the highest in-reach open cell straight above —
+##      it UNROLLS down to the body — and RIDE it up, re-anchoring as the reach extends. A deep climb
+##      costs a handful of places and ZERO jumps: the friction fix, measured.
+##   2. PILLAR-JUMPING (the rope-less fallback): jump, drop a block into the cell just vacated under the
+##      feet, land on it, repeat — kept so a rope-less loadout still escapes (never TRAPPED), and so the
+##      pit journey still measures how bad the pre-rope loop is.
+## Returns whether the body reached the surface.
 func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 	var t: int = 0
 	var stall: int = 0
+	var rope_stall: int = 0
+	var prev: Vector2 = player.position
 	while t < budget:
 		var bc: Vector2i = main._cell_at(player.position)
 		if bc.y <= target_row and player.on_floor:
 			player.input_dir = 0.0
+			player.input_climb = 0.0
 			return true                                  # back on the surface
+		# --- strategy 1: the rope. (Re-)anchor when the cell above the body isn't roped yet, then ride.
+		if bc.y > target_row and int(sim.inventory.get(&"rope", 0)) > 0 and select_item(&"rope") \
+				and not (sim.is_climbable(bc) and sim.is_climbable(bc + Vector2i(0, -1))):
+			var anchor: Vector2i = _rope_anchor_above(bc)
+			if anchor.y >= 0:
+				do_build(anchor)                          # hang it — it unrolls down to us
+		if sim.is_climbable(bc):
+			if bc.y <= target_row:
+				player.input_climb = 0.0                  # at the lip — step off sideways onto the ground
+				player.input_dir = _exit_dir(bc)
+			else:
+				player.input_dir = 0.0
+				player.input_climb = 1.0                  # ride up
+			await step(); t += 1
+			if (player.position - prev).length() > 0.8:
+				rope_stall = 0
+			else:
+				rope_stall += 1
+				stuck_frames += 1
+				if rope_stall > 90:                       # ~1.5s pinned mid-rope → genuinely wedged
+					_note("climb: rope-stalled at %s" % main._cell_at(player.position))
+					return false
+			prev = player.position
+			continue
+		player.input_climb = 0.0
+		rope_stall = 0
+		prev = player.position
 		player.input_dir = 0.0                           # stay plumb so we land back on the pillar
 		if not player.on_floor:
 			await step(); t += 1
@@ -319,6 +351,29 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 				return false
 	_note("climb: ran out of budget at %s" % main._cell_at(player.position))
 	return main._cell_at(player.position).y <= target_row
+
+
+## The highest open, in-reach cell straight above `bc` that a rope could anchor at — or (x, -1) when
+## there's nothing to add (sealed above, out of reach, or that whole reachable stretch is already roped).
+func _rope_anchor_above(bc: Vector2i) -> Vector2i:
+	var best := Vector2i(bc.x, -1)
+	var c: Vector2i = bc
+	while sim.in_bounds(c) and not sim.is_solid(c) and sim.machine_at(c) == null and main._can_reach(c):
+		best = c
+		c += Vector2i(0, -1)
+	if best.y >= 0 and sim.is_climbable(best):
+		return Vector2i(bc.x, -1)                        # the reachable stretch is already roped
+	return best
+
+
+## Which way to step OFF a rope at the lip: toward an open side cell (prefer right). Used once the body
+## has climbed to the target row and needs to stand on ground instead of hanging.
+func _exit_dir(bc: Vector2i) -> float:
+	for d: int in [1, -1]:
+		var side := Vector2i(bc.x + d, bc.y)
+		if sim.in_bounds(side) and not sim.is_solid(side) and sim.machine_at(side) == null:
+			return float(d)
+	return 1.0
 
 
 ## Select the carried slot holding `item_id`. Returns whether it's now the active slot.

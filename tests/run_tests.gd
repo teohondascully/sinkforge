@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_machine_status()
 	_test_no_empty_ground_piles()
 	_test_behavior_registry()
+	_test_rope()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -424,7 +425,9 @@ func _test_craft_and_build() -> void:
 	_check(sim.pickup_machine(Vector2i(4, 4)), "picked the machine back up")
 	_check(int(sim.inventory.get(&"processor", 0)) == 1, "the machine item returned to the pack")
 	_check(int(sim.inventory.get(&"ore", 0)) == held, "the machine's held ore was salvaged back to the pack (%d)" % held)
-	for item: StringName in [&"ore", &"ingot"]:
+	# THE LEDGER IS TOTAL: the machine ITEM itself satisfies conservation through its whole life —
+	# crafted (produced) → placed (consumed, not "present") → picked back up (produced again).
+	for item: StringName in [&"ore", &"ingot", &"processor"]:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across craft+pickup (present=%d, net=%d)" % [item, present, net])
@@ -980,6 +983,7 @@ func _test_conduit_network() -> void:
 	# place / remove API (carried conduit item ⇄ the layer).
 	var s2: FactorySim = FactorySim.new()
 	s2.inventory[&"conduit"] = 2
+	s2.total_produced[&"conduit"] = 2      # seed the ledger too, so the conservation assert below is honest
 	_check(s2.place_conduit(Vector2i(3, 3)), "place a carried conduit into an open cell")
 	_check(s2.has_conduit(Vector2i(3, 3)), "the cell now holds a conduit")
 	_check(int(s2.inventory.get(&"conduit", 0)) == 1, "placing spent one conduit from the pack")
@@ -987,6 +991,12 @@ func _test_conduit_network() -> void:
 	_check(not s2.place_conduit(Vector2i(4, 3)), "cannot run a conduit through solid rock")
 	_check(s2.remove_conduit(Vector2i(3, 3)), "pick the conduit back up")
 	_check(not s2.has_conduit(Vector2i(3, 3)) and int(s2.inventory.get(&"conduit", 0)) == 2, "it returned to the pack")
+	# Symmetric placed-layer accounting: place = consumed, remove = produced, so present == net holds
+	# with conduits mid-placed too (they were the one item that silently skipped the ledger).
+	s2.place_conduit(Vector2i(3, 3))
+	var present_c: int = _items_present(s2, &"conduit")
+	var net_c: int = int(s2.total_produced.get(&"conduit", 0)) - int(s2.total_consumed.get(&"conduit", 0))
+	_check(present_c == net_c, "conduit conserved with one placed (present=%d, net=%d)" % [present_c, net_c])
 
 
 ## POWER governs the lift (docs/POWER.md): unpowered it runs at LIFT_THROUGHPUT (proved by _test_lift);
@@ -1162,3 +1172,51 @@ func _test_behavior_registry() -> void:
 	_check(int(sim.total_produced.get(&"ingot", 0)) > 0,
 		"an unknown behavior tag falls through to the default recipe-runner")
 	_check(sim.machine_status(probe) != &"", "unknown tag still derives a status")
+
+
+## The ROPE (the placeable climb — docs/DECISIONS 2026-07-11): ONE placement anchors at the aim cell and
+## UNROLLS DOWN the open column (a segment per cell) until floor/machine/rope/world-bottom or the pack
+## runs dry; cutting a segment takes it AND everything hanging below; solids/machines refuse roped cells;
+## items still fall STRAIGHT THROUGH a roped shaft (the rope never enters item-flow); and the &"rope"
+## item satisfies the total ledger through place/cut.
+func _test_rope() -> void:
+	print("- rope")
+	var sim: FactorySim = FactorySim.new()
+	var col: int = 12
+	sim.set_solid(Vector2i(col, 10), &"stone")               # the shaft floor
+	sim.inventory[&"rope"] = 20
+	sim.total_produced[&"rope"] = 20
+	var hung: int = sim.place_rope(Vector2i(col, 4))
+	_check(hung == 6, "rope unrolled from the anchor down to the floor (hung %d/6)" % hung)
+	_check(sim.is_climbable(Vector2i(col, 4)) and sim.is_climbable(Vector2i(col, 9)), "anchor + bottom are climbable")
+	_check(not sim.is_climbable(Vector2i(col, 10)), "the floor itself is not roped")
+	_check(int(sim.inventory.get(&"rope", 0)) == 14, "each segment spent one carried rope")
+	_check(sim.place_rope(Vector2i(col, 4)) == 0, "an already-roped anchor refuses (no double-hang)")
+	sim.set_solid(Vector2i(col + 1, 3), &"earth")
+	_check(sim.place_rope(Vector2i(col + 1, 3)) == 0, "cannot anchor inside solid rock")
+	# The pack caps the unroll: with 2 segments left, a deep shaft gets only 2.
+	var s3: FactorySim = FactorySim.new()
+	s3.inventory[&"rope"] = 2
+	s3.total_produced[&"rope"] = 2
+	_check(s3.place_rope(Vector2i(5, 0)) == 2, "unroll stops when the pack runs out")
+	# Solids/machines refuse roped cells (cut the rope first — no rope-in-stone).
+	sim.inventory[&"earth"] = 1
+	sim.total_produced[&"earth"] = 1
+	_check(not sim.place_block(Vector2i(col, 6), &"earth"), "a block cannot be placed into a roped cell")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	_check(sim.place_machine(proc_def, Vector2i(col, 6)) == null, "a machine cannot be placed into a roped cell")
+	# Items fall THROUGH a roped shaft: a drop from above the rope lands on the floor pile, not mid-rope.
+	sim.inventory[&"ore"] = 1
+	sim.total_produced[&"ore"] = 1
+	sim.drop_item(Vector2i(col, 2), &"ore", 1)
+	var rest: Vector2i = Vector2i(col, 9)                     # the open cell on top of the floor
+	_check(int((sim.ground.get(rest, {}) as Dictionary).get(&"ore", 0)) == 1,
+		"a dropped item falls straight through the rope to the floor")
+	# CUT mid-rope: the segment and everything below return; the rope above stays hung.
+	var cut: int = sim.remove_rope(Vector2i(col, 7))
+	_check(cut == 3, "cutting mid-rope takes it + the tail below (%d/3)" % cut)
+	_check(sim.is_climbable(Vector2i(col, 6)) and not sim.is_climbable(Vector2i(col, 8)), "the rope above the cut stays")
+	_check(int(sim.inventory.get(&"rope", 0)) == 17, "cut segments returned to the pack")
+	var present_r: int = _items_present(sim, &"rope")
+	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
+	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])

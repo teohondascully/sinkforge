@@ -23,3 +23,6 @@ extends Resource
 ## Empty = not hand-craftable. Drives the Factorio-style build economy: forge ingots → craft a
 ## machine item into the pack → place it. PROVISIONAL numbers, tuned by feel.
 @export var craft_cost: Dictionary = {}
+## How many items ONE craft yields (default 1). Machines yield 1; cheap consumables placed in bulk
+## (rope segments) yield a bundle so one craft covers a real shaft.
+@export var craft_count: int = 1

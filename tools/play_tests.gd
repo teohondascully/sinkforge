@@ -226,12 +226,15 @@ func _goal_round_trip_to_vein() -> bool:
 	var col: int = 34                                        # a clean plateau column, clear of the fixtures (40-56)
 	var vein: Vector2i = _bury_vein(agent, col, 8)
 	agent.give(&"earth", 12)                                 # buffer so "out of blocks" can't mask traversal friction
+	agent.give(&"rope", 25)                                  # the era's loadout: rope makes the climb cheap
 	var before: int = int(agent.sim.inventory.get(&"ore", 0))
 	var dug: bool = await agent.dig_down_to(vein)
 	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
-	var within: bool = _within_ceilings(agent, {"mines": 15, "places": 15, "jumps": 18, "frames": 320})
+	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope this cost places=15/jumps=18/frames=320 of
+	# pillar-jumping; the rope ride measures places=3 jumps=1 frames=58 — locked in so it can't regress).
+	var within: bool = _within_ceilings(agent, {"mines": 15, "places": 6, "jumps": 4, "frames": 120})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug to the buried vein, mined it, and climbed back to the surface")
 
@@ -245,19 +248,23 @@ func _goal_descend_build_return() -> bool:
 	var col: int = 62                                        # a clean plateau column, clear of the fixtures (40-56)
 	var vein: Vector2i = _bury_vein(agent, col, 14)          # DEEP — twice the shallow round-trip
 	agent.give(&"earth", 20)                                 # buffer so traversal friction, not resource, is measured
+	agent.give(&"rope", 25)                                  # the era's loadout: rope makes the climb cheap
 	var before: int = int(agent.sim.inventory.get(&"ore", 0))
 	var dug: bool = await agent.dig_down_to(vein)
 	var got: int = int(agent.sim.inventory.get(&"ore", 0)) - before
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (depth=14 down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
-	var within: bool = _within_ceilings(agent, {"mines": 24, "places": 24, "jumps": 26, "frames": 520})
+	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope places=24/jumps=26/frames=520; the rope ride
+	# measures places=6 jumps=1 frames=111 — the deep climb no longer scales in pain, locked in).
+	var within: bool = _within_ceilings(agent, {"mines": 24, "places": 10, "jumps": 4, "frames": 200})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug 14 deep to a vein, mined it, and climbed all the way back out")
 
 
 ## The pure "am I TRAPPED?" test: drop the body into a deep 1-wide pit (walls solid both sides) with blocks
 ## in the pack, and require it to get out. If it can't, the player is stranded at the bottom of their own
-## shaft — the worst friction this game could ship, and exactly what the rope must prevent. Fail = trapped.
+## shaft — the worst friction this game could ship. DELIBERATELY ROPE-LESS: this journey guards the
+## pillar-jump fallback (the worst-case loadout), while the round-trip journeys measure the rope era.
 func _goal_escape_deep_pit() -> bool:
 	var agent: PlayAgent = await _boot()
 	var col: int = 37                                        # a clean plateau column, clear of the fixtures (40-56)

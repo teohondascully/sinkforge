@@ -14,6 +14,8 @@ extends RefCounted
 
 const LEFT := &"sf_left"
 const RIGHT := &"sf_right"
+const UP := &"sf_up"
+const DOWN := &"sf_down"
 const JUMP := &"sf_jump"
 const MINE := &"sf_mine"
 const BUILD := &"sf_build"
@@ -33,7 +35,11 @@ static func defaults() -> Dictionary:
 	return {
 		LEFT: [{"key": KEY_A}, {"key": KEY_LEFT}],
 		RIGHT: [{"key": KEY_D}, {"key": KEY_RIGHT}],
-		JUMP: [{"key": KEY_SPACE}, {"key": KEY_W}, {"key": KEY_UP}],
+		# W/↑ and S/↓ are the CLIMB axis (grab + ride a rope); JUMP is Space alone now, so climbing
+		# up a rope (W) and jumping off it (Space) stay distinct verbs.
+		UP: [{"key": KEY_W}, {"key": KEY_UP}],
+		DOWN: [{"key": KEY_S}, {"key": KEY_DOWN}],
+		JUMP: [{"key": KEY_SPACE}],
 		MINE: [{"button": MOUSE_BUTTON_LEFT}],
 		BUILD: [{"button": MOUSE_BUTTON_RIGHT}],
 		DROP: [{"key": KEY_Q}],

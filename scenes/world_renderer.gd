@@ -174,6 +174,7 @@ func _draw() -> void:
 	_draw_drop_paths()
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
+	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
 	_draw_ground()
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
@@ -256,6 +257,31 @@ func _draw_conduits() -> void:
 ## copper channel draw and the emitted light pool both key off (so the tube and its glow never disagree).
 func _conduit_level(cell: Vector2i) -> float:
 	return clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+
+
+## Draw the placed ropes: each cell is a taut hemp line down the middle with rung KNOTS every few px,
+## a hitch loop on the top (anchor) cell, and a loose frayed tail on the bottom one — so a roped shaft
+## reads instantly as "climbable" against the dark. Sways very gently (cosmetic clock) like a hung line.
+func _draw_ropes() -> void:
+	const HEMP := Color(0.76, 0.63, 0.42)
+	const SHADE := Color(0.42, 0.33, 0.20)
+	for cell: Variant in sim.rope:
+		var c: Vector2i = cell
+		var x: float = float(c.x * CELL) + float(CELL) * 0.5
+		var top := Vector2(x, float(c.y * CELL))
+		var sway: float = sin(_anim_time * 1.6 + float(c.y) * 0.7) * 0.8
+		var is_anchor: bool = not sim.rope.has(c + Vector2i(0, -1))
+		var is_tail: bool = not sim.rope.has(c + Vector2i(0, 1))
+		var bot := Vector2(x + sway, float((c.y + 1) * CELL))
+		draw_line(top + Vector2(1.2, 0), bot + Vector2(1.2, 0), SHADE, 2.6)         # back shade = depth
+		draw_line(top, bot, HEMP, 1.8)
+		for k: int in 3:                                                             # rung knots
+			var ky: float = float(c.y * CELL) + 5.0 + float(k) * 10.5
+			draw_line(Vector2(x - 3.0, ky), Vector2(x + 3.0, ky), HEMP.darkened(0.15), 2.0)
+		if is_anchor:
+			draw_arc(top + Vector2(0.0, 3.0), 3.2, 0.0, TAU, 10, HEMP, 2.0)          # the hitch loop
+		if is_tail:
+			draw_line(bot, bot + Vector2(sway * 2.0, -5.0), HEMP.darkened(0.1), 1.6)  # frayed tail curl
 
 
 func _draw_terrain(ci: CanvasItem, rect: Rect2i) -> void:
@@ -480,6 +506,8 @@ func _draw_aim() -> void:
 		Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
 		if _ghost_def.behavior == &"drill" and _aim_placeable:
 			_draw_drill_preview()  # dashed ore column + out-arrow: show what this drill will bore & where it pours
+		if _ghost_def.behavior == &"rope" and _aim_placeable:
+			_draw_rope_preview()   # ghost line down the shaft: how far the rope will unroll from here
 	elif _ghost_material != &"":
 		# Block-placement preview: a translucent material-tinted fill (the Terraria build cursor).
 		var bg: Color = _material(_ghost_material).base_color
@@ -527,6 +555,32 @@ func _draw_drill_preview() -> void:
 		var head: float = 6.0
 		draw_line(Vector2(cx, bot_y), Vector2(cx - head, bot_y - head), tint, 2.5)
 		draw_line(Vector2(cx, bot_y), Vector2(cx + head, bot_y - head), tint, 2.5)
+
+
+## When holding Rope over a valid anchor, preview the UNROLL: a translucent hemp line from the anchor
+## down every open cell it will rope (capped by how many segments you carry), ending in a tick at the
+## floor it reaches. Sells the one-placement-ropes-the-shaft verb before you commit. Pure overlay.
+func _draw_rope_preview() -> void:
+	var carried: int = int(sim.inventory.get(&"rope", 0))
+	if carried <= 0:
+		return
+	var c: Vector2i = _aim
+	var hung: int = 0
+	while sim.in_bounds(c) and not sim.is_solid(c) and sim.machine_at(c) == null \
+			and not sim.is_climbable(c) and hung < carried:
+		hung += 1
+		c += Vector2i(0, 1)
+	if hung <= 0:
+		return
+	var x: float = float(_aim.x * CELL) + float(CELL) * 0.5
+	var top := Vector2(x, float(_aim.y * CELL) + 4.0)
+	var bot := Vector2(x, float((_aim.y + hung) * CELL) - 2.0)
+	var ghost := Color(0.90, 0.78, 0.52, 0.55)
+	draw_line(top, bot, ghost, 1.8)
+	for k: int in range(1, hung):                       # a faint knot at each cell it will rope
+		var ky: float = float((_aim.y + k) * CELL)
+		draw_line(Vector2(x - 3.0, ky), Vector2(x + 3.0, ky), ghost, 1.5)
+	draw_line(bot + Vector2(-5.0, 0.0), bot + Vector2(5.0, 0.0), ghost, 2.2)   # the floor it reaches
 
 
 ## A dashed rectangle outline — perimeter walked clockwise, laying `dash`-length ticks every other `dash`.

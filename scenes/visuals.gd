@@ -20,6 +20,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"generator": {"kind": "generator", "color": Color(0.80, 0.66, 0.26)},# electric gold — burns fuel → power
 	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper — the power-tube material
 	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal — a storage bin
+	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
 }
 
 
@@ -64,6 +65,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_conduit(canvas, center, s, active, t)
 		"hopper":
 			_hopper(canvas, center, s, active, t)
+		"rope":
+			_rope(canvas, center, s)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -180,6 +183,18 @@ static func _hopper(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 		canvas.draw_circle(Vector2(c.x, fy), 1.5 * s, gold.lightened(0.2))
 
 
+## Rope (the placeable climb): a hanging line with rung KNOTS + a coiled spare at the top — reads as
+## "this unrolls down a shaft". Static (a rope doesn't animate); the in-world hang is drawn by
+## WorldRenderer per cell, this glyph is the hotbar/craft-panel icon.
+static func _rope(canvas: CanvasItem, c: Vector2, s: float) -> void:
+	var hemp := Color(0.78, 0.66, 0.44)
+	canvas.draw_arc(c + Vector2(0.0, -5.5 * s), 3.4 * s, 0.0, TAU, 14, hemp, 2.0)      # the coil
+	canvas.draw_line(c + Vector2(0.0, -2.2 * s), c + Vector2(0.0, 8.5 * s), hemp, 1.8)  # the hanging line
+	for k: int in 3:
+		var ky: float = 0.5 * s + float(k) * 3.2 * s
+		canvas.draw_line(c + Vector2(-1.8 * s, ky), c + Vector2(1.8 * s, ky), hemp.darkened(0.18), 1.6)
+
+
 ## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
 static func _fork(canvas: CanvasItem, c: Vector2, s: float) -> void:
 	var fork := Color(0.93, 0.88, 1.0)
@@ -206,6 +221,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.70, 0.52, 0.32)
 	if item == &"stone_pickaxe":
 		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade — cold stone-grey (unlocks deepslate)
+	if item == &"rope":
+		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
 	return Color.WHITE
 
 

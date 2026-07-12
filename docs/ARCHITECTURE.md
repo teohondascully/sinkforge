@@ -50,6 +50,14 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   entry + one `Visuals.MACHINE_STYLE` entry (its look) + a `.tres`** — never a scattered if-ladder.
   Behavior-SPECIFIC view reads (renderer `_machine_active`/`_draw_machine_io`, the hover `mode`
   text in `MainView`) keep sane defaults, so most new machines never touch them.
+- **Placed layers (conduit / rope):** two sparse world layers beside `solid`/`wall`, NOT machines —
+  item-flow, collision, and the tick never see them. `conduit` carries power (docs/POWER.md). `rope`
+  (`is_climbable`/`place_rope`/`remove_rope`) is the placeable climb: `place_rope(anchor)` UNROLLS down
+  the open column one carried segment per cell (a stranded digger aims above themself and the rope drops
+  to them); `remove_rope` cuts that segment + the hanging tail. The avatar reads `is_climbable` to climb
+  (representation-only, like the updraft). ALL placed layers use symmetric ledger accounting (place =
+  consumed, remove = produced) — **the ledger is total: every item id satisfies present == produced −
+  consumed** (craft outputs count produced; placed machines count consumed; pickups produce back).
 - **Block placement + the Bazaar:** `place_block(cell, material)` is the Terraria build primitive
   (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
   is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
@@ -147,7 +155,8 @@ production state — delete them and the numbers are unchanged):
   so they never drift), item glyphs/colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
   layer (state + spawn-from-`flow_events` + advance + draw + light-motes). **`LightLayer`**
   (`scenes/light_layer.gd`) — a thin canvas giving each lighting pass its own blend mode.
-- **Input (embodied, Factorio-style):** ←→/AD move, Space jump (handled by `Player`); **LMB mine**
+- **Input (embodied, Factorio-style):** ←→/AD move, **Space jump**, **W/↑ + S/↓ climb** a rope (grab +
+  ride; release hangs; Space jumps off — handled by `Player`); **LMB mine**
   the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
   a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
   machine item on an in-reach open cell (consumes it) or picks one of your machines back up
