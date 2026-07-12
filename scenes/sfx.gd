@@ -17,6 +17,10 @@ var _pool_idx: int = 0
 var _ui_player: AudioStreamPlayer
 var _hum_player: AudioStreamPlayer
 var _hum_level: float = 0.0                   # smoothed 0..1
+## Headless (the harness): the Dummy audio driver never steps its mixer, so a started voice is never
+## reaped and trips the ObjectDB leak warning at quit. Playback is a NO-OP there — synthesis still
+## runs (keeps the code path warm), nothing ever plays. Real runs are untouched.
+var _muted: bool = DisplayServer.get_name() == "headless"
 
 
 func _ready() -> void:
@@ -48,22 +52,28 @@ func _ready() -> void:
 	_hum_player.stream = hum
 	_hum_player.volume_db = -60.0
 	add_child(_hum_player)
-	_hum_player.play()
+	if not _muted:
+		_hum_player.play()
 
 
 ## Stop every voice on teardown — a stream still playing at quit leaves its playback object alive in
 ## the mixer and trips the ObjectDB leak warning on exit (harness noise we refuse to normalize).
+## Dropping the stream refs too matters under the headless Dummy driver, whose mixer never steps and
+## so never reaps a stopped voice on its own.
 func _exit_tree() -> void:
 	_hum_player.stop()
+	_hum_player.stream = null
 	_ui_player.stop()
+	_ui_player.stream = null
 	for p: AudioStreamPlayer2D in _pool:
 		p.stop()
+		p.stream = null
 
 
 ## One positional sound at a world position. `pitch` jitters a hair on top so repeats don't machine-gun.
 func play(name: StringName, pos: Vector2, pitch: float = 1.0, vol_db: float = 0.0) -> void:
 	var stream: AudioStreamWAV = _streams.get(name, null)
-	if stream == null:
+	if stream == null or _muted:
 		return
 	var p: AudioStreamPlayer2D = _pool[_pool_idx]
 	_pool_idx = (_pool_idx + 1) % POOL
@@ -77,7 +87,7 @@ func play(name: StringName, pos: Vector2, pitch: float = 1.0, vol_db: float = 0.
 ## A non-positional interface sound (craft ding, research chime).
 func ui(name: StringName, pitch: float = 1.0) -> void:
 	var stream: AudioStreamWAV = _streams.get(name, null)
-	if stream == null:
+	if stream == null or _muted:
 		return
 	_ui_player.stream = stream
 	_ui_player.pitch_scale = pitch
