@@ -89,6 +89,9 @@ var _objectives: Objectives
 ## GPU ambient dust motes (docs/MODERN_FEEL.md) — a continuous GPUParticles2D haze that drifts in the
 ## air and catches the lamp light. Pure atmosphere; follows the camera each frame.
 var _motes: GPUParticles2D
+## Procedural audio (FABLE_50 #8) — synthesized SFX + the factory hum. Poked from the same verb hooks
+## that fire particles; never touches the sim.
+var _sfx: Sfx
 
 
 func _ready() -> void:
@@ -114,6 +117,9 @@ func _ready() -> void:
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
 	_seed_world()
+
+	_sfx = Sfx.new()
+	add_child(_sfx)
 
 	_player = Player.new()
 	_player.sim = sim
@@ -452,17 +458,29 @@ func _update_bazaars(delta: float) -> void:
 		_particles.spark(c + Vector2(0.0, -CELL), Color(0.93, 0.84, 0.60))
 		_particles.pop(c + Vector2(0.0, -CELL), Color(0.30, 0.62, 0.60))
 		_shake = maxf(_shake, 3.6)
+		_sfx.ui(&"chime", 1.2)
 
 
 ## Drive the cosmetic juice: advance particles, kick dust on a hard landing + periodic footsteps, and
 ## decay the screenshake into the camera offset. None of this touches the sim.
 func _update_juice(delta: float) -> void:
 	_particles.advance(delta)
+	# The factory HEARTBEAT: the hum swells with how much machinery is WORKING near you — walk away
+	# and it fades; the base you built is a presence you can hear before you see it.
+	if _player != null and _sfx != null:
+		var working: float = 0.0
+		var near_sq: float = pow(14.0 * float(CELL), 2.0)
+		for m: MachineState in sim.machines:
+			if _player.position.distance_squared_to(_cell_center(m.cell)) < near_sq \
+					and sim.machine_status(m) == &"working":
+				working += 1.0
+		_sfx.set_hum(working / 5.0, delta)
 	if _player != null:
 		var feet: Vector2 = _player.position + Vector2(0.0, Player.HEIGHT * 0.5)
 		if _player.landed_hard:
 			_particles.dust(feet, Color(0.42, 0.32, 0.22), 12)
 			_shake = maxf(_shake, 3.2)
+			_sfx.play(&"thump", feet, 0.75, -5.0)
 		# Footstep puffs while running on the ground — one every ~22px travelled.
 		if _player.on_floor and absf(_player.velocity.x) > 20.0:
 			_step_dist += absf(_player.velocity.x) * delta
@@ -577,6 +595,8 @@ func _update_mining(delta: float) -> void:
 			_particles.chip(center + to_body.normalized() * (float(CELL) * 0.45),
 				Visuals.terrain_dust(mat), to_body.angle())
 			_shake = maxf(_shake, 0.7)
+			# Harder rock strikes a deeper note (hardness 1..4 → pitch ~1.15..0.85).
+			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1, 0.8, 1.2))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
 		try_mine(_aim)                                       # charge full → land the breaking blow
@@ -648,6 +668,7 @@ func try_mine(cell: Vector2i) -> bool:
 		if rich:
 			_particles.spark(center, Visuals.item_color(mat).lightened(0.35))
 		_shake = maxf(_shake, 2.2 if rich else 1.7)
+		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
 	return mined != &""
 
 
@@ -677,6 +698,7 @@ func try_configure(cell: Vector2i) -> bool:
 		return false
 	_hud.flash(label)
 	_particles.spark(_cell_center(cell), Color(0.75, 0.85, 0.98))
+	_sfx.play(&"pop", _cell_center(cell), 1.4)
 	return true
 
 
@@ -685,7 +707,10 @@ func try_configure(cell: Vector2i) -> bool:
 func try_craft(def: MachineDef) -> bool:
 	if not _near_bazaar():
 		return false
-	return sim.craft(def)
+	var made: bool = sim.craft(def)
+	if made:
+		_sfx.ui(&"ding")
+	return made
 
 
 ## Craft a TOOL (e.g. the Stone Pickaxe) from carried materials — same Bazaar gate + same generic sink as
@@ -694,7 +719,10 @@ func try_craft(def: MachineDef) -> bool:
 func try_craft_tool(tool_id: StringName) -> bool:
 	if not _near_bazaar():
 		return false
-	return sim.craft_item(tool_id, MiningRules.TOOL_RECIPES.get(tool_id, {}))
+	var made: bool = sim.craft_item(tool_id, MiningRules.TOOL_RECIPES.get(tool_id, {}))
+	if made:
+		_sfx.ui(&"ding", 1.1)
+	return made
 
 
 ## RESEARCH a tech at the Bazaar bench (R in the pack screen) — the demand-side PULL: analyze a sample
@@ -708,6 +736,7 @@ func try_research(tech_id: StringName) -> bool:
 	if done and _player != null:
 		_particles.spark(_player.position, Color(0.55, 0.85, 1.0))  # a cool "insight" burst at the bench
 		_shake = maxf(_shake, 2.0)
+		_sfx.ui(&"chime")
 	return done
 
 
@@ -732,6 +761,7 @@ func _collect_ground_under_player() -> void:
 		var item: StringName = pile.keys()[0]
 		if sim.collect_ground(c):
 			_particles.pop(_cell_center(c), Visuals.item_color(item))  # pickup pop
+			_sfx.play(&"pop", _cell_center(c), 1.0, -4.0)
 
 
 ## The active camera zoom level (Z cycles the index). Read everywhere the view-size matters.
@@ -825,28 +855,43 @@ func try_build(cell: Vector2i) -> bool:
 	if _paused or not _can_reach(cell):
 		return false
 	if sim.machine_at(cell) != null:
-		return sim.pickup_machine(cell)  # pick your machine back up into the pack
+		if sim.pickup_machine(cell):     # pick your machine back up into the pack
+			_sfx.play(&"clunk", _cell_center(cell), 0.85)
+			return true
+		return false
 	if sim.has_conduit(cell):
-		return sim.remove_conduit(cell)  # pick a power tube back up into the pack
+		if sim.remove_conduit(cell):     # pick a power tube back up into the pack
+			_sfx.play(&"clunk", _cell_center(cell), 1.15)
+			return true
+		return false
 	if sim.is_climbable(cell):
-		return sim.remove_rope(cell) > 0  # CUT the rope here — it and everything hanging below returns
+		if sim.remove_rope(cell) > 0:    # CUT the rope here — it and everything hanging below returns
+			_sfx.play(&"pop", _cell_center(cell), 0.8)
+			return true
+		return false
 	if sim.has_torch(cell):
-		return sim.remove_torch(cell)    # take a mounted torch back into the pack
+		if sim.remove_torch(cell):       # take a mounted torch back into the pack
+			_sfx.play(&"pop", _cell_center(cell), 0.9)
+			return true
+		return false
 	var def: MachineDef = _selected_machine_def()
 	if def != null and def.behavior == &"torch":
 		var lit: bool = sim.place_torch(cell)     # mounts on a wall-backed / rock-adjacent open cell
 		if lit:
 			_particles.spark(_cell_center(cell), Color(1.0, 0.78, 0.42))
+			_sfx.play(&"pop", _cell_center(cell), 1.15)
 		return lit
 	if def != null and def.behavior == &"conduit":
 		var laid: bool = sim.place_conduit(cell)  # power tube → the conduit layer (not a machine)
 		if laid:
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
+			_sfx.play(&"clunk", _cell_center(cell), 1.2)
 		return laid
 	if def != null and def.behavior == &"rope":
 		var hung: int = sim.place_rope(cell)      # anchors here and UNROLLS down the open column
 		if hung > 0:
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
+			_sfx.play(&"pop", _cell_center(cell), 0.85)
 		return hung > 0
 	if def != null and _placeable(cell):
 		var placed: MachineState = sim.build_from_pack(def, cell)
@@ -855,11 +900,13 @@ func try_build(cell: Vector2i) -> bool:
 			placed.facing = _player.facing if _player != null else 1
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 			_shake = maxf(_shake, 2.2)
+			_sfx.play(&"clunk", _cell_center(cell))
 		return placed != null
 	# Block placement (the Terraria build primitive): the selected hotbar item is a building material.
 	var mat: StringName = _selected_build_material()
 	if mat != &"" and _placeable(cell) and sim.place_block(cell, mat):
 		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 6)
+		_sfx.play(&"crunch", _cell_center(cell), 0.75)
 		return true
 	return false
 
