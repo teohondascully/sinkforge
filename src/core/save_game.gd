@@ -26,7 +26,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 			"in": m.input_buffer.duplicate(), "out": m.output_buffer.duplicate(),
 			"progress": m.progress, "route_toggle": m.route_toggle,
 			"fuel": m.fuel, "power_factor": m.power_factor, "fed": m.fed,
-			"facing": m.facing,
+			"facing": m.facing, "mode": m.mode, "filter": String(m.filter),
 		})
 	return {
 		"version": VERSION,
@@ -67,7 +67,9 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 		m.fuel = int(entry["fuel"])
 		m.power_factor = float(entry["power_factor"])
 		m.fed = int(entry["fed"])
-		m.facing = int(entry.get("facing", 1))   # additive field: absent in older v1 saves, default 1
+		m.facing = int(entry.get("facing", 1))   # additive fields: absent in older v1 saves → defaults
+		m.mode = int(entry.get("mode", 0))
+		m.filter = StringName(str(entry.get("filter", "")))
 		rebuilt.append(m)
 	sim.solid = (data["solid"] as Dictionary).duplicate()
 	sim.wall = (data["wall"] as Dictionary).duplicate()

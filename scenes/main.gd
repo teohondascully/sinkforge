@@ -497,6 +497,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_show_help = false
 	elif event.is_action_pressed(Controls.RESEARCH) and _inventory_open:
 		try_research(ResearchRules.next_tech(sim.research))   # R at the bench: research the next tech
+	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
+		try_configure(_aim)                                   # R in the world: configure the aimed machine
 	elif event.is_action_pressed(Controls.BUILD):
 		try_build(_aim)
 	elif event.is_action_pressed(Controls.ZOOM):
@@ -663,6 +665,19 @@ func try_deposit() -> bool:
 		if _can_reach(machine.cell):
 			return sim.deposit(machine.cell, item, carried) > 0
 	return false
+
+
+## Configure the aimed machine (R outside the pack screen, FABLE_50 #49): cycle a splitter's ratio,
+## clear a hopper's filter. Reach-gated like every world verb; the sim returns the toast text.
+func try_configure(cell: Vector2i) -> bool:
+	if _paused or not _can_reach(cell):
+		return false
+	var label: String = sim.configure_machine(cell)
+	if label == "":
+		return false
+	_hud.flash(label)
+	_particles.spark(_cell_center(cell), Color(0.75, 0.85, 0.98))
+	return true
 
 
 ## Craft a machine item from carried ingots into the pack — GATED on standing near a claimed Bazaar
@@ -889,12 +904,17 @@ func _hover_info() -> Dictionary:
 		&"lift":
 			info["mode"] = "lifts goods + you UP" + ("  (POWERED ×%.1f)" % (1.0 + (float(FactorySim.LIFT_POWERED_THROUGHPUT) / float(FactorySim.LIFT_THROUGHPUT) - 1.0) * m.power_factor) if m.power_factor > 0.05 else "  (unpowered baseline)")
 		&"splitter":
-			info["mode"] = "splits the flow DOWN + RIGHT"
+			info["mode"] = ["splits DOWN + RIGHT evenly (R: ratio)",
+				"splits 2:1 favouring DOWN (R: ratio)",
+				"splits 1:2 favouring RIGHT (R: ratio)"][m.mode % 3]
 		&"hopper":
 			var stock: int = 0
 			for it: StringName in m.input_buffer:
 				stock += int(m.input_buffer[it])
-			info["mode"] = "stockpiles %d — banks what falls in, feeds a machine below" % stock
+			if m.filter == &"":
+				info["mode"] = "stockpiles %d — keeps the FIRST thing it tastes, passes the rest" % stock
+			else:
+				info["mode"] = "banks %s (%d) — passes everything else (R: re-taste)" % [String(m.filter), stock]
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"descent":

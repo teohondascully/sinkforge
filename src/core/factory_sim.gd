@@ -1070,6 +1070,14 @@ func _run_recipe(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
+	# PASS-THROUGH (FABLE_50 #49, the descent engine's rule generalized): every machine is a filter
+	# for what its recipe WANTS — anything else moves on through to the output and falls on down the
+	# column. A mixed drill stream sorts ITSELF down a machine stack (the forge keeps ore, the coal
+	# pours past into the generator below); junk can never clog an input buffer. Conservation-neutral.
+	for item: StringName in machine.input_buffer.keys():
+		if not recipe.inputs.has(item):
+			machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + int(machine.input_buffer[item])
+			machine.input_buffer.erase(item)
 	if not _has_inputs(machine, recipe):
 		return
 	machine.progress += SECONDS_PER_TICK
@@ -1135,6 +1143,19 @@ func _run_splitter(machine: MachineState) -> void:
 ## drills funnel here (route their columns together with splitters), it absorbs the burst + feeds steady.
 func _run_hopper(machine: MachineState) -> void:
 	if machine.input_buffer.is_empty():
+		return
+	# THE FILTER (FABLE_50 #49): a hopper KEEPS the first thing it tastes — the filter auto-latches on
+	# the first item it banks (shown in the hover; R clears it to re-taste). Everything ELSE passes
+	# straight through to the output and falls on down. So a CHAIN of hoppers unzips a mixed drill
+	# stream with zero configuration: each one keeps a different ingredient as the stream pours past.
+	if machine.filter == &"":
+		machine.filter = machine.input_buffer.keys()[0]     # deterministic: insertion order
+	for item: StringName in machine.input_buffer.keys():
+		if item == machine.filter:
+			continue                                        # the banked good — metered below
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + int(machine.input_buffer[item])
+		machine.input_buffer.erase(item)
+	if not machine.input_buffer.has(machine.filter):
 		return
 	var below: MachineState = _first_machine_below(machine.cell)
 	if below == null:
@@ -1508,20 +1529,51 @@ func _flow() -> void:
 		if dests.size() == 1:
 			_deliver(machine, dests[0], machine.output_buffer)
 		else:
-			# Split: deal each item unit to the next destination round-robin via route_toggle.
+			# Split: deal each item unit along the machine's deal PATTERN via route_toggle — an even
+			# round-robin by default; the splitter's R-cycled ratio mode weights it (FABLE_50 #49).
 			var n: int = dests.size()
+			var pattern: Array = _split_pattern(machine, n)
 			var portions: Array[Dictionary] = []
 			for _i: int in n:
 				portions.append({})
 			for item: StringName in machine.output_buffer:
 				for _c: int in int(machine.output_buffer[item]):
-					var idx: int = machine.route_toggle % n
+					var idx: int = int(pattern[machine.route_toggle % pattern.size()])
 					machine.route_toggle += 1
 					portions[idx][item] = int(portions[idx].get(item, 0)) + 1
 			for i: int in n:
 				if not portions[i].is_empty():
 					_deliver(machine, dests[i], portions[i])
 		machine.output_buffer.clear()
+
+
+## The splitter's three R-cycled ratios: even, favour DOWN 2:1, favour RIGHT 1:2. (Dest 0 = down.)
+const _SPLIT_PATTERNS: Array = [[0, 1], [0, 0, 1], [0, 1, 1]]
+
+
+## The deal pattern for a multi-destination machine: which destination each successive unit takes.
+## The splitter reads its configured ratio; anything else deals evenly across its destinations.
+func _split_pattern(machine: MachineState, n: int) -> Array:
+	if machine.def.behavior == &"splitter" and n == 2:
+		return _SPLIT_PATTERNS[machine.mode % _SPLIT_PATTERNS.size()]
+	return range(n)
+
+
+## Player action (R aimed at a machine): cycle its configuration — the splitter's ratio, a hopper's
+## filter reset (clear → it re-latches on the next item it banks). Returns a short human label of the
+## new state for the HUD toast, or "" when the machine has nothing to configure. Discrete + ledger-free.
+func configure_machine(cell: Vector2i) -> String:
+	var m: MachineState = grid.get(cell, null)
+	if m == null:
+		return ""
+	match m.def.behavior:
+		&"splitter":
+			m.mode = (m.mode + 1) % _SPLIT_PATTERNS.size()
+			return ["splitter: even 1:1", "splitter: 2:1 DOWN", "splitter: 1:2 RIGHT"][m.mode]
+		&"hopper":
+			m.filter = &""
+			return "hopper: filter cleared — it keeps the next thing it tastes"
+	return ""
 
 
 ## Move a bundle of items from `machine` into one destination, logging the cosmetic flow event.

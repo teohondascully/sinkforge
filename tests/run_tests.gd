@@ -48,6 +48,7 @@ func _initialize() -> void:
 	_test_save_load()
 	_test_iron_chain()
 	_test_h_drill()
+	_test_filter_ratio_passthrough()
 	_test_research()
 	_test_descent_gate()
 	if _failures == 0:
@@ -1306,6 +1307,76 @@ func _test_iron_chain() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through the chain (present=%d, net=%d)" % [item, present, net])
+
+
+## FILTERS, RATIOS & PASS-THROUGH (FABLE_50 #49 — the routing kit): (a) every recipe machine passes
+## through what its recipe doesn't want (a mixed stream sorts ITSELF down a machine stack); (b) a
+## hopper keeps the FIRST thing it tastes and passes the rest (R re-tastes); (c) the splitter's
+## R-cycled ratio deals 2:1 / 1:2. Conservation everywhere.
+func _test_filter_ratio_passthrough() -> void:
+	print("- filters, ratios & pass-through")
+	var hopper_def: MachineDef = load("res://src/data/machines/hopper.tres")
+	var split_def: MachineDef = load("res://src/data/machines/splitter.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	# (a) PASS-THROUGH: ore+coal poured down one column; the forge keeps ore, coal pours past into
+	# the generator below and BURNS. The stack sorts the stream with zero routing hardware.
+	var sim: FactorySim = FactorySim.new()
+	sim.set_solid(Vector2i(6, 9), &"stone")
+	sim.place_machine(proc_def, Vector2i(6, 3))
+	sim.place_machine(gen_def, Vector2i(6, 6))
+	sim.inventory[&"ore"] = 4;  sim.total_produced[&"ore"] = 4
+	sim.inventory[&"coal"] = 2; sim.total_produced[&"coal"] = 2
+	sim.drop_item(Vector2i(6, 0), &"ore", 4)
+	sim.drop_item(Vector2i(6, 0), &"coal", 2)
+	for _i: int in 140:
+		sim.tick()
+	var forge: MachineState = sim.machine_at(Vector2i(6, 3))
+	_check(not forge.input_buffer.has(&"coal"), "the forge PASSED the coal it can't smelt")
+	_check(int(sim.total_consumed.get(&"coal", 0)) >= 1, "…and the generator below caught it and burns")
+	_check(int(sim.total_produced.get(&"ingot", 0)) == 2, "the ore still smelted (2 ingots)")
+	# (b) THE FILTER: the hopper keeps the first thing it tastes, passes the rest; R re-tastes.
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(3, 7), &"stone")
+	s2.place_machine(hopper_def, Vector2i(3, 3))
+	s2.inventory[&"ore"] = 3;  s2.total_produced[&"ore"] = 3
+	s2.inventory[&"coal"] = 3; s2.total_produced[&"coal"] = 3
+	s2.drop_item(Vector2i(3, 0), &"ore", 3)
+	for _i: int in 6:
+		s2.tick()
+	s2.drop_item(Vector2i(3, 0), &"coal", 3)
+	for _i: int in 30:
+		s2.tick()
+	var hop: MachineState = s2.machine_at(Vector2i(3, 3))
+	_check(hop.filter == &"ore", "the hopper latched the FIRST thing it tasted")
+	_check(int(hop.input_buffer.get(&"ore", 0)) == 3, "…banks it (nothing below -> holds the stock)")
+	_check(not hop.input_buffer.has(&"coal"), "…and passed the coal")
+	_check(int((s2.ground.get(Vector2i(3, 6), {}) as Dictionary).get(&"coal", 0)) == 3,
+		"the passed coal fell on down the column")
+	_check(s2.configure_machine(Vector2i(3, 3)) != "", "R clears the filter (re-taste)")
+	_check(hop.filter == &"", "…cleared")
+	# (c) THE RATIO: 12 units through a 2:1-DOWN splitter = exactly 8 down, 4 right.
+	var s3: FactorySim = FactorySim.new()
+	s3.set_solid(Vector2i(6, 9), &"stone")
+	s3.set_solid(Vector2i(7, 9), &"stone")
+	s3.place_machine(split_def, Vector2i(6, 2))
+	var label: String = s3.configure_machine(Vector2i(6, 2))
+	_check(label.contains("2:1"), "R cycles the splitter ratio (%s)" % label)
+	s3.inventory[&"ore"] = 12; s3.total_produced[&"ore"] = 12
+	s3.drop_item(Vector2i(6, 0), &"ore", 12)
+	for _i: int in 80:
+		s3.tick()
+	var down_n: int = int((s3.ground.get(Vector2i(6, 8), {}) as Dictionary).get(&"ore", 0))
+	var right_n: int = int((s3.ground.get(Vector2i(7, 8), {}) as Dictionary).get(&"ore", 0))
+	_check(down_n == 8 and right_n == 4, "2:1 DOWN dealt exactly 8/4 (got %d/%d)" % [down_n, right_n])
+	_check(s3.configure_machine(Vector2i(6, 2)).contains("1:2"), "…cycles on to 1:2 RIGHT")
+	_check(s3.configure_machine(Vector2i(6, 2)).contains("even"), "…and wraps to even")
+	for pair: Array in [[sim, &"ore"], [sim, &"coal"], [s2, &"ore"], [s2, &"coal"], [s3, &"ore"]]:
+		var s: FactorySim = pair[0]
+		var item: StringName = pair[1]
+		var present: int = _items_present(s, item)
+		var net: int = int(s.total_produced.get(item, 0)) - int(s.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved (present=%d, net=%d)" % [item, present, net])
 
 
 ## THE HORIZONTAL DRILL / the Borer (FABLE_50 #46, the user's spec): bores sideways along its facing,

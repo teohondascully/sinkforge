@@ -33,6 +33,12 @@ var fed: int = 0
 ## Directional machines only (the horizontal drill): which way it works, ±1. Set once at placement
 ## (the builder's facing — a discrete call, so determinism holds). 1 for machines that don't care.
 var facing: int = 1
+## Configurable machines only (the splitter's ratio, for now): a small mode index cycled by the
+## player's R-configure verb (a discrete call). 0 = the machine's default behaviour.
+var mode: int = 0
+## Hopper-only: the ONE item id this hopper banks (FABLE_50 #49). Auto-latches on the first item it
+## banks ("keeps the first thing it tastes"); everything else passes through. &"" = not yet latched.
+var filter: StringName = &""
 
 
 func _init(machine_def: MachineDef, machine_cell: Vector2i) -> void:

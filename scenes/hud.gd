@@ -501,6 +501,7 @@ func _draw_help_overlay() -> void:
 		"drop / feed  Q  (gravity feeds it in)",
 		"pack        E  (inventory · craft at Bazaar)",
 		"research    R  (in the pack screen, at the bench)",
+		"configure   R  (aimed at a splitter / hopper)",
 		"map         M",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
 		"save / load  F5 / F9",
