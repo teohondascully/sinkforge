@@ -23,6 +23,12 @@ const MACHINE_STYLE: Dictionary = {
 	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
 	&"torch": {"kind": "torch", "color": Color(0.86, 0.60, 0.26)},        # flame amber — placeable light
 	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze — the gate-breacher
+	# The L2 crafter modules (docs/CRAFTING.md): recipe-runners wearing their OWN faces — the behavior
+	# tags have no _BEHAVIORS entry (they fall through to the recipe runner), they exist so each module
+	# visibly announces its one product (per-item legibility, the modules' whole point).
+	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace — smelts iron
+	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey — presses plates
+	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
 }
 
 
@@ -71,6 +77,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_rope(canvas, center, s)
 		"torch":
 			_torch(canvas, center, s, active, t)
+		"press":
+			_press(canvas, center, s, active, t)
 		"descent":
 			_descent(canvas, center, s, active, t)
 
@@ -221,6 +229,21 @@ static func _rope(canvas: CanvasItem, c: Vector2, s: float) -> void:
 		canvas.draw_line(c + Vector2(-1.8 * s, ky), c + Vector2(1.8 * s, ky), hemp.darkened(0.18), 1.6)
 
 
+## Press (the plate press): a heavy frame over a piston RAM that strokes down onto a glowing slab
+## while working — the "it stamps plates" read (mirrors what its recipe does).
+static func _press(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var frame := Color(0.13, 0.15, 0.20)
+	canvas.draw_rect(Rect2(c.x - 7.5 * s, c.y - 9.0 * s, 15.0 * s, 3.0 * s), frame)     # the head beam
+	canvas.draw_rect(Rect2(c.x - 7.5 * s, c.y - 9.0 * s, 2.5 * s, 16.0 * s), frame)     # posts
+	canvas.draw_rect(Rect2(c.x + 5.0 * s, c.y - 9.0 * s, 2.5 * s, 16.0 * s), frame)
+	var stroke: float = (0.5 + 0.5 * sin(t * 5.0)) if active else 0.15                  # the ram's travel
+	var ram_y: float = c.y - 6.0 * s + stroke * 6.5 * s
+	canvas.draw_rect(Rect2(c.x - 1.6 * s, c.y - 7.0 * s, 3.2 * s, ram_y - (c.y - 7.0 * s)), Color(0.42, 0.46, 0.55))
+	canvas.draw_rect(Rect2(c.x - 4.5 * s, ram_y, 9.0 * s, 2.4 * s), Color(0.60, 0.65, 0.75))  # the die
+	var slab := Color(0.85, 0.62, 0.35).lightened(0.2 * stroke) if active else Color(0.45, 0.48, 0.56)
+	canvas.draw_rect(Rect2(c.x - 5.5 * s, c.y + 5.2 * s, 11.0 * s, 1.8 * s), slab)      # the worked sheet
+
+
 ## Torch (placeable light): a leaning stick with a live FLAME that gutters on the clock — the in-world
 ## mount and the hotbar icon share it. `active` full flame; still icons burn steady + small.
 static func _torch(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
@@ -267,6 +290,12 @@ static func item_color(item: StringName) -> Color:
 		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
 	if item == &"iron":
 		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
+	if item == &"iron_ingot":
+		return Color(0.80, 0.84, 0.92)        # refined steel bar — the L2 chain's base good
+	if item == &"plate":
+		return Color(0.66, 0.71, 0.80)        # rolled sheet — the press's product
+	if item == &"gear":
+		return Color(0.82, 0.68, 0.34)        # bronze-toothed cog — the mill's product
 	if item == &"deepslate":
 		return Color(0.28, 0.31, 0.40)
 	return Color.WHITE
@@ -288,6 +317,12 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_iron(canvas, center, size)
 		&"ingot":
 			_item_ingot(canvas, center, size)
+		&"iron_ingot":
+			_item_iron_ingot(canvas, center, size)
+		&"plate":
+			_item_plate(canvas, center, size)
+		&"gear":
+			_item_gear(canvas, center, size)
 		&"coal":
 			_item_coal(canvas, center, size)
 		&"wood":
@@ -319,6 +354,36 @@ static func _item_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	for f: Vector2 in [Vector2(-0.10, 0.02), Vector2(0.14, -0.10), Vector2(-0.02, 0.18)]:
 		canvas.draw_circle(c + f * size, size * 0.06, Color(0.90, 0.56, 0.24))
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.82, 0.5))
+
+
+## IRON INGOT — the ingot-bar silhouette in cold refined steel (visibly kin to the copper ingot,
+## visibly the L2 metal).
+static func _item_iron_ingot(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var steel := Color(0.74, 0.79, 0.88)
+	_poly(canvas, c, size, [Vector2(-0.26, -0.16), Vector2(0.26, -0.16), Vector2(0.40, 0.18),
+		Vector2(-0.40, 0.18)], steel)
+	_poly(canvas, c, size, [Vector2(-0.26, -0.16), Vector2(0.26, -0.16), Vector2(0.20, -0.06),
+		Vector2(-0.20, -0.06)], steel.lightened(0.25))   # lit top face
+
+
+## PLATE — a rolled steel sheet lying at a slight skew, a lit edge on top (reads flat + manufactured).
+static func _item_plate(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var sheet := Color(0.62, 0.67, 0.77)
+	_poly(canvas, c, size, [Vector2(-0.38, -0.10), Vector2(0.30, -0.24), Vector2(0.38, 0.10),
+		Vector2(-0.30, 0.24)], sheet)
+	canvas.draw_line(c + Vector2(-0.38, -0.10) * size, c + Vector2(0.30, -0.24) * size,
+		sheet.lightened(0.30), maxf(1.0, size * 0.05))
+
+
+## GEAR — a toothed cog with a punched hub (the mill's product; also the generic-machine motif).
+static func _item_gear(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var bronze := Color(0.80, 0.64, 0.30)
+	canvas.draw_circle(c, size * 0.26, bronze)
+	for i: int in 7:
+		var a: float = TAU * float(i) / 7.0
+		canvas.draw_circle(c + Vector2(cos(a), sin(a)) * size * 0.30, size * 0.08, bronze)
+	canvas.draw_circle(c, size * 0.24, bronze.darkened(0.12))
+	canvas.draw_circle(c, size * 0.10, Color(0.16, 0.13, 0.08))   # the punched hub
 
 
 ## IRON — the ore nugget silhouette in cold deepslate tones with pale steel flecks (L2's new find —

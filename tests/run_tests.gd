@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_rope()
 	_test_torch()
 	_test_save_load()
+	_test_iron_chain()
 	_test_research()
 	_test_descent_gate()
 	if _failures == 0:
@@ -1246,6 +1247,64 @@ func _test_rope() -> void:
 	var present_r: int = _items_present(sim, &"rope")
 	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
 	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])
+
+
+## THE L2 IRON CHAIN (FABLE_50 #47, PROGRESSION §5 medium chains, CRAFTING.md modules): the two new
+## techs gate the modules; the modules are pure recipe-runners behind their style tags; the chain runs
+## GRAVITY-FED — iron dropped down a column smelts to iron ingots which fall into the press and come
+## out plates on the floor; the gear mill is the first MULTI-INPUT module (iron + copper ingot must
+## merge in one column — the vertical merge puzzle); conservation holds across the whole chain.
+func _test_iron_chain() -> void:
+	print("- the L2 iron chain (crafter modules)")
+	var forge_def: MachineDef = load("res://src/data/machines/iron_forge.tres")
+	var press_def: MachineDef = load("res://src/data/machines/plate_press.tres")
+	var mill_def: MachineDef = load("res://src/data/machines/gear_mill.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(ResearchRules.locking_tech(&"iron_forge") == &"ironworks", "the iron forge gates on Ironworks")
+	_check(ResearchRules.locking_tech(&"plate_press") == &"machining"
+		and ResearchRules.locking_tech(&"gear_mill") == &"machining", "the modules gate on Machining")
+	sim.inventory[&"ingot"] = 40; sim.total_produced[&"ingot"] = 40
+	sim.inventory[&"iron"] = 12;  sim.total_produced[&"iron"] = 12
+	_check(not sim.craft(forge_def), "the iron forge refuses before Ironworks")
+	_check(not sim.research_tech(&"ironworks"), "Ironworks refuses before the L1 ladder is done")
+	for t: StringName in [&"automation", &"power", &"descent"]:
+		sim.research[t] = true
+	_check(sim.research_tech(&"ironworks"), "Ironworks researches (iron sample + 10 ingots)")
+	_check(sim.craft(forge_def), "the iron forge crafts")
+	sim.inventory[&"iron_ingot"] = 7; sim.total_produced[&"iron_ingot"] = 7
+	_check(sim.research_tech(&"machining"), "Machining researches — iron pays for iron")
+	_check(sim.craft_unlocked(&"plate_press") and sim.craft_unlocked(&"gear_mill"),
+		"Machining opens the module branch")
+	# THE GRAVITY CHAIN: forge over press in ONE column; raw iron dropped in the top comes out plates
+	# on the floor. (8 iron -> 4 iron ingots -> 2 plates, all falling stage to stage.)
+	sim.set_solid(Vector2i(6, 8), &"stone")
+	sim.place_machine(forge_def, Vector2i(6, 2))
+	sim.place_machine(press_def, Vector2i(6, 5))
+	sim.drop_item(Vector2i(6, 0), &"iron", 8)
+	for _i: int in 500:
+		sim.tick()
+	var pile: Dictionary = sim.ground.get(Vector2i(6, 7), {})
+	_check(int(pile.get(&"plate", 0)) == 2, "iron poured in the top comes out PLATES on the floor (%s)" % str(pile))
+	# The MULTI-INPUT module: the mill waits until BOTH streams (iron ingot + copper ingot) have merged
+	# into its column — CRAFTING.md's vertical merge puzzle, and the L1 copper line's continuing job.
+	sim.set_solid(Vector2i(10, 5), &"stone")
+	sim.place_machine(mill_def, Vector2i(10, 2))
+	sim.inventory[&"iron_ingot"] = int(sim.inventory.get(&"iron_ingot", 0)) + 2
+	sim.total_produced[&"iron_ingot"] = int(sim.total_produced.get(&"iron_ingot", 0)) + 2
+	sim.drop_item(Vector2i(10, 0), &"iron_ingot", 2)
+	for _i: int in 80:
+		sim.tick()
+	var mill_pile: Dictionary = sim.ground.get(Vector2i(10, 4), {})
+	_check(int(mill_pile.get(&"gear", 0)) == 0, "the mill WAITS for both streams (starved on iron alone)")
+	sim.drop_item(Vector2i(10, 0), &"ingot", 2)
+	for _i: int in 200:
+		sim.tick()
+	mill_pile = sim.ground.get(Vector2i(10, 4), {})
+	_check(int(mill_pile.get(&"gear", 0)) == 4, "iron+copper merged -> 2 gears per craft (%s)" % str(mill_pile))
+	for item: StringName in [&"iron", &"iron_ingot", &"plate", &"gear", &"ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through the chain (present=%d, net=%d)" % [item, present, net])
 
 
 ## SAVE/LOAD (FABLE_50 #1) — capture → restore must round-trip the WHOLE authoritative state, and

@@ -37,10 +37,25 @@ const TECHS: Dictionary = {
 		"cost": {&"ingot": 8},
 		"unlocks": [&"descent_engine"],        # the gate-breacher — feed it DESCENT_QUOTA ingots on the seal
 	},
+	# --- the L2 (Stonereach) tier: iron, the medium chains (docs/PROGRESSION.md §5) ---
+	&"ironworks": {
+		"name": "Ironworks",
+		"requires": &"descent",
+		"sample": &"iron",                     # analyze L2's signature ore — you must breach to hold one
+		"cost": {&"ingot": 10},
+		"unlocks": [&"iron_forge"],            # smelts iron -> iron ingots (the L2 forge)
+	},
+	&"machining": {
+		"name": "Machining",
+		"requires": &"ironworks",
+		"sample": &"iron_ingot",               # analyze your own first refined iron
+		"cost": {&"iron_ingot": 6},            # the first NON-copper research price — iron pays for iron
+		"unlocks": [&"plate_press", &"gear_mill"],   # the per-item crafter modules (docs/CRAFTING.md)
+	},
 }
 
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit).
-const ORDER: Array[StringName] = [&"automation", &"power", &"descent"]
+const ORDER: Array[StringName] = [&"automation", &"power", &"descent", &"ironworks", &"machining"]
 
 
 static func tech(id: StringName) -> Dictionary:

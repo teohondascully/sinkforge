@@ -105,6 +105,10 @@ func _ready() -> void:
 		load("res://src/data/machines/rope.tres"),        # the placeable climb — unrolls down a shaft
 		load("res://src/data/machines/torch.tres"),       # placeable LIGHT — claimed territory in the black
 		load("res://src/data/machines/descent_engine.tres"),  # the L1→L2 gate-breacher (docs/PROGRESSION.md)
+		# The L2 crafter modules (docs/CRAFTING.md — per-item, gravity-fed): the iron chain.
+		load("res://src/data/machines/iron_forge.tres"),
+		load("res://src/data/machines/plate_press.tres"),
+		load("res://src/data/machines/gear_mill.tres"),
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def

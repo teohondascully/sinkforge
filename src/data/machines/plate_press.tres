@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MachineDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/data/machine_def.gd" id="1_machine"]
+[ext_resource type="Resource" path="res://src/data/recipes/press_plate.tres" id="2_recipe"]
+
+[resource]
+script = ExtResource("1_machine")
+id = &"plate_press"
+display_name = "Plate Press"
+behavior = &"plate_press"
+recipe = ExtResource("2_recipe")
+craft_cost = {
+&"iron_ingot": 2,
+&"ingot": 2
+}

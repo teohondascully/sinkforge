@@ -51,6 +51,7 @@ func _run() -> void:
 		["feed the forge & smelt", _goal_feed_and_smelt],
 		["RUNG 1 — reach first automation", _goal_reach_first_automation],
 		["RUNG 2 — breach the seal into L2", _goal_breach_the_seal],
+		["RUNG 3 — the L2 iron chain", _goal_l2_chain],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -281,6 +282,62 @@ func _engine_fed(agent: PlayAgent) -> int:
 		if m.def.behavior == &"descent":
 			return m.fed
 	return -1
+
+
+## RUNG 3 — the L2 IRON CHAIN is playable embodied (FABLE_50 #47, CRAFTING.md modules): with the iron
+## tier researched and the modules in the pack (bench/craft flows proven headless + in RUNG 1), the
+## agent DIGS a socket pit, stands the gravity chain in it — Iron Forge over Plate Press — pours raw
+## iron into the open column above, and must end up holding a PLATE: dig, place, toss, collect, all
+## through the real reach-gated verbs from where a body can actually stand.
+func _goal_l2_chain() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	var col: int = 75                                        # clear of every fixture (they end at 71)
+	for t: StringName in ResearchRules.ORDER:                # setup hatch: the bench flow is proven elsewhere
+		sim.research[t] = true
+	agent.give(&"iron_forge", 1)
+	agent.give(&"plate_press", 1)
+	agent.give(&"iron", 8)
+	if not await agent.walk_to_column(col, 1200):
+		return await _finish(agent, false, "never reached the build site")
+	var top: int = sim.surface_row(col)
+	# Dig the 2-deep socket from ON TOP of it — each cut is straight below the feet (always in line of
+	# sight; a perfect-diagonal cut is honestly corner-blocked), riding the hole down as it deepens.
+	for y: int in range(top, top + 2):
+		var cell := Vector2i(col, y)
+		var g: int = 0
+		while sim.is_solid(cell) and g < 40:
+			agent.do_mine(cell)
+			await agent.wait(4); g += 1
+		if sim.is_solid(cell):
+			return await _finish(agent, false, "could not dig the module socket at %s" % str(cell))
+		await agent.wait(20)                                 # fall to the new floor before the next cut
+	# Out of the socket (a 2-tile wall — exactly what the jump clears) and to its lip.
+	if not await agent.walk_to_column(col + 1, 900):
+		return await _finish(agent, false, "could not jump out of the socket")
+	# The chain: press at the socket bottom, forge stacked on it flush with the ground — the open air
+	# above the forge is the feed mouth.
+	if not await agent.select_item(&"plate_press"):
+		return await _finish(agent, false, "no press in the pack")
+	if not await agent.build_at(Vector2i(col, top + 1)):
+		return await _finish(agent, false, "could not stand the press in the socket")
+	if not await agent.select_item(&"iron_forge"):
+		return await _finish(agent, false, "no iron forge in the pack")
+	if not await agent.build_at(Vector2i(col, top)):
+		return await _finish(agent, false, "could not stack the forge on the press")
+	# Feed it: face the column and toss the whole iron stack in — gravity is the feeder.
+	if not await agent.select_item(&"iron"):
+		return await _finish(agent, false, "no iron to pour in")
+	agent.player.facing = -1 if agent.main._cell_at(agent.player.position).x > col else 1
+	agent.main.try_drop()
+	# The chain runs hands-free; the plate pile lands at the press and reach-collection hands it over.
+	var t2: int = 0
+	while int(sim.inventory.get(&"plate", 0)) < 1 and t2 < 2400:
+		await agent.step(); t2 += 1
+	var plates: int = int(sim.inventory.get(&"plate", 0))
+	print("  chain: %s  (plates=%d frames=%d)" % [agent.friction(), plates, t2])
+	return await _finish(agent, plates >= 1,
+		"dug the socket, stood the iron chain, poured iron in the top, walked away holding a plate")
 
 
 # --- FRICTION journeys ----------------------------------------------------------------------------
