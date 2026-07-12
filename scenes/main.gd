@@ -109,6 +109,7 @@ func _ready() -> void:
 		load("res://src/data/machines/iron_forge.tres"),
 		load("res://src/data/machines/plate_press.tres"),
 		load("res://src/data/machines/gear_mill.tres"),
+		load("res://src/data/machines/h_drill.tres"),     # the Borer — sideways extraction (FABLE_50 #46)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -833,11 +834,13 @@ func try_build(cell: Vector2i) -> bool:
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 		return hung > 0
 	if def != null and _placeable(cell):
-		var built: bool = sim.build_from_pack(def, cell) != null
-		if built:
+		var placed: MachineState = sim.build_from_pack(def, cell)
+		if placed != null:
+			# Directional machines work the way YOU faced when placing (the Borer bores that way).
+			placed.facing = _player.facing if _player != null else 1
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 			_shake = maxf(_shake, 2.2)
-		return built
+		return placed != null
 	# Block placement (the Terraria build primitive): the selected hotbar item is a building material.
 	var mat: StringName = _selected_build_material()
 	if mat != &"" and _placeable(cell) and sim.place_block(cell, mat):
@@ -901,6 +904,22 @@ func _hover_info() -> Dictionary:
 				info["mode"] = "stand it ON the seal (nothing to breach below)"
 			else:
 				info["mode"] = "fed %d/%d ingots — drop them in (gravity feeds it)" % [m.fed, FactorySim.DESCENT_QUOTA]
+		&"h_drill":
+			var btgt: Vector2i = sim.h_drill_target(m.cell, m.facing)
+			var belly: int = 0
+			for it2: StringName in m.output_buffer:
+				belly += int(m.output_buffer[it2])
+			var bcoal: int = int(m.input_buffer.get(&"coal", 0))
+			match sim.machine_status(m):
+				&"no_input":
+					info["mode"] = "gallery spent — carry it to a new rock face"
+				&"blocked":
+					info["mode"] = "belly FULL (%d) — dig a drain below it, or pick it up" % belly
+				&"no_fuel":
+					info["mode"] = "OUT OF COAL — it burns coal to bore (drop some on it)"
+				_:
+					info["mode"] = "boring %s %s — belly %d · coal %d" % [
+						String(sim.material_at(btgt)), ("→" if m.facing > 0 else "←"), belly, bcoal]
 		&"drill":
 			var tgt: Vector2i = sim.drill_target(m.cell)         # the solid ore vein it bores below
 			var dep2: int = sim.drill_column_remaining(m.cell) if tgt.x >= 0 else 0

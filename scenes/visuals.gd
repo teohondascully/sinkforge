@@ -29,6 +29,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace — smelts iron
 	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey — presses plates
 	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
+	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
 }
 
 
@@ -54,8 +55,9 @@ static func machine_color(def: MachineDef) -> Color:
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,
 ## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation — a gear
 ## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.
+## `flip` mirrors DIRECTIONAL glyphs (the Borer bores left when its machine faces -1); others ignore it.
 static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String, s: float,
-		active: bool, t: float) -> void:
+		active: bool, t: float, flip: bool = false) -> void:
 	match kind:
 		"furnace":
 			_furnace(canvas, center, s, active, t)
@@ -79,6 +81,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_torch(canvas, center, s, active, t)
 		"press":
 			_press(canvas, center, s, active, t)
+		"h_drill":
+			_h_drill(canvas, center, s, active, t, flip)
 		"descent":
 			_descent(canvas, center, s, active, t)
 
@@ -135,6 +139,31 @@ static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 		var fy: float = c.y - 1.0 * s + float(k) * 3.2 * s + march + bob
 		if fy < c.y + 7.5 * s:
 			canvas.draw_line(Vector2(c.x - 3.0 * s, fy), Vector2(c.x + 3.0 * s, fy - 1.4 * s), edge, 1.0)
+
+
+## The Borer (horizontal drill): the vertical drill's cousin turned on its side — a motor block with a
+## tapering bit pointing along its FACING (flip mirrors it), flutes scrolling forward + a judder while
+## it chews, and a little coal-fire dot for its self-feeding bunker.
+static func _h_drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, flip: bool) -> void:
+	var f: float = -1.0 if flip else 1.0
+	var steel := Color(0.16, 0.18, 0.22)
+	var edge := Color(0.72, 0.60, 0.38)
+	var bob: float = (sin(t * 14.0) * 0.9 if active else 0.0) * s        # forward judder while boring
+	# The motor block sits on the REAR side (opposite the bit); a lit strip marks its back plate.
+	var bx: float = (c.x - 8.0 * s) if f > 0.0 else (c.x - 2.0 * s)
+	canvas.draw_rect(Rect2(bx, c.y - 6.5 * s, 10.0 * s, 13.0 * s), steel)
+	canvas.draw_rect(Rect2(bx if f > 0.0 else bx + 8.5 * s, c.y - 6.5 * s, 1.5 * s, 13.0 * s), edge)
+	# The bit: a tapering shaft to a point along the facing, flutes scrolling forward while it chews.
+	var tip := Vector2(c.x + (9.0 * s + bob) * f, c.y)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x + 2.0 * s * f, c.y - 4.0 * s), Vector2(c.x + 2.0 * s * f, c.y + 4.0 * s), tip]), steel)
+	var march: float = fmod(t * 16.0, 4.0) * s if active else 0.0
+	for k: int in 3:
+		var fx: float = c.x + (1.0 * s + float(k) * 3.2 * s + march) * f
+		if absf(fx - c.x) < 7.5 * s:
+			canvas.draw_line(Vector2(fx, c.y - 3.0 * s), Vector2(fx - 1.4 * s * f, c.y + 3.0 * s), edge, 1.0)
+	var fire: float = (0.7 + 0.3 * sin(t * 7.0)) if active else 0.3     # the coal bunker's fire dot
+	canvas.draw_circle(c + Vector2(-4.5 * s * f, 4.0 * s), 1.6 * s, Color(1.0, 0.55, 0.18, 0.4 + 0.5 * fire))
 
 
 ## Generator (coal burner → power): a steel housing with a coal-fire at its base that BREATHES while

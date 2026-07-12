@@ -52,6 +52,7 @@ func _run() -> void:
 		["RUNG 1 — reach first automation", _goal_reach_first_automation],
 		["RUNG 2 — breach the seal into L2", _goal_breach_the_seal],
 		["RUNG 3 — the L2 iron chain", _goal_l2_chain],
+		["RUNG 4 — the Borer ferret loop", _goal_borer],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -282,6 +283,65 @@ func _engine_fed(agent: PlayAgent) -> int:
 		if m.def.behavior == &"descent":
 			return m.fed
 	return -1
+
+
+## RUNG 4 — the BORER is playable embodied (FABLE_50 #46): dig a socket at a rock face, stand the
+## Borer in it facing the wall, feed it coal by toss, let it chew the face into its belly (it sits
+## sealed — the on-hook rule pools the haul), then PICK IT BACK UP and walk away with the haul in the
+## pack (pickup salvages buffers). The manual "send the ferret into the wall, bring it back full"
+## loop, all through real verbs.
+func _goal_borer() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	var col: int = 84                                        # clear of every fixture
+	for t: StringName in ResearchRules.ORDER:                # setup hatch — the bench flow is proven elsewhere
+		sim.research[t] = true
+	agent.give(&"h_drill", 1)
+	agent.give(&"coal", 4)
+	if not await agent.walk_to_column(col, 1600):
+		return await _finish(agent, false, "never reached the rock face")
+	var top: int = sim.surface_row(col)
+	for x: int in range(col + 1, col + 5):
+		sim.set_solid(Vector2i(x, top + 1), &"earth")        # a guaranteed face at socket depth
+	# Dig the 2-deep socket riding down (straight-below cuts), then jump out to its lip.
+	for y: int in range(top, top + 2):
+		var cell := Vector2i(col, y)
+		var g: int = 0
+		while sim.is_solid(cell) and g < 40:
+			agent.do_mine(cell)
+			await agent.wait(4); g += 1
+		if sim.is_solid(cell):
+			return await _finish(agent, false, "could not dig the borer socket at %s" % str(cell))
+		await agent.wait(20)
+	if not await agent.walk_to_column(col - 1, 900):
+		return await _finish(agent, false, "could not jump out of the socket")
+	# Stand the Borer at the socket bottom FACING the wall, then toss its coal in.
+	if not await agent.select_item(&"h_drill"):
+		return await _finish(agent, false, "no borer in the pack")
+	agent.player.facing = 1                                  # it bores the way YOU face when placing
+	if not await agent.build_at(Vector2i(col, top + 1)):
+		return await _finish(agent, false, "could not stand the borer in the socket")
+	if not await agent.select_item(&"coal"):
+		return await _finish(agent, false, "no coal to feed it")
+	agent.player.facing = 1
+	agent.main.try_drop()
+	# It chews the face into its belly (sealed below — the haul POOLS, nothing spills).
+	var t2: int = 0
+	var borer: MachineState = sim.machine_at(Vector2i(col, top + 1))
+	if borer == null or borer.facing != 1:
+		return await _finish(agent, false, "the borer did not take the builder's facing")
+	while int(borer.output_buffer.get(&"earth", 0)) < 3 and t2 < 1800:
+		await agent.step(); t2 += 1
+	if int(borer.output_buffer.get(&"earth", 0)) < 3:
+		return await _finish(agent, false, "the borer never filled its belly (bellied %d)"
+			% int(borer.output_buffer.get(&"earth", 0)))
+	# Bring the ferret home: pick it up — the salvage lands its belly in YOUR pack.
+	if not await agent.build_at(Vector2i(col, top + 1)):
+		return await _finish(agent, false, "could not reclaim the borer")
+	var haul: int = int(sim.inventory.get(&"earth", 0))
+	print("  borer: %s  (haul=%d frames=%d)" % [agent.friction(), haul, t2])
+	return await _finish(agent, haul >= 3 and int(sim.inventory.get(&"h_drill", 0)) == 1,
+		"sent the borer into the wall and brought it back full (haul=%d)" % haul)
 
 
 ## RUNG 3 — the L2 IRON CHAIN is playable embodied (FABLE_50 #47, CRAFTING.md modules): with the iron

@@ -32,6 +32,16 @@ const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
 const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine (docs/MINING.md)
+
+## THE HORIZONTAL DRILL / the Borer (FABLE_50 #46 — the user's spec): bores SIDEWAYS through rock.
+const H_DRILL_RANGE: int = 8            ## cells of gallery one placement can reach — move it to bore on
+const H_DRILL_CYCLE: float = 1.5        ## seconds per bite (slower than the vertical drill)
+const H_DRILL_FUEL_TICKS: int = 60      ## ticks one coal burns — with the slower cycle, ~2 bites/coal
+                                        ## vs the vertical drill's 3 (laterality is priced in coal)
+const H_DRILL_COAL_STOCK: int = 8       ## its self-feeding fuel bunker's cap (bored coal beyond it → belly)
+const H_DRILL_BELLY_STACKS: int = 5     ## distinct item stacks the belly holds (the "5 slots")
+const H_DRILL_BELLY_TOTAL: int = 40     ## total items across those stacks
+const H_DRILL_TIER: int = 2             ## chews what a stone pick could; harder rock ends the gallery
 ## HOPPER (storage): it STOCKPILES what falls into it (input_buffer = the store, unbounded) and meters it
 ## back DOWN to a machine below with BACK-PRESSURE — only feeding while the consumer's buffer is under
 ## FEED_CAP, so the stockpile stays in the hopper (a visible bank) instead of overflowing the forge. No
@@ -71,6 +81,7 @@ const _BEHAVIORS: Dictionary = {
 	&"generator": {"run": &"_run_generator", "status": &"_status_generator", "power_source": true},
 	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
 	&"descent": {"run": &"_run_descent", "status": &"_status_descent"},
+	&"h_drill": {"run": &"_run_h_drill", "status": &"_status_h_drill", "dests": &"_destinations_h_drill"},
 }
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
@@ -1356,6 +1367,115 @@ func _run_drill(machine: MachineState) -> void:
 	flow_events.append({"item": item, "from": target, "to": dest["to_cell"], "count": 1})
 
 
+## The next solid cell the borer at `cell` (facing ±1) would chew: scan its row from the face outward
+## to H_DRILL_RANGE, skipping the open cells of the gallery it already carved. (-1,-1) = nothing
+## borable in range — the gallery is spent, another machine walls it, rock too hard for its bit, or
+## the world edge. Pure read (the hover + placement preview share it with the runner).
+func h_drill_target(cell: Vector2i, facing: int) -> Vector2i:
+	for k: int in range(1, H_DRILL_RANGE + 1):
+		var c := Vector2i(cell.x + facing * k, cell.y)
+		if not in_bounds(c) or grid.has(c):
+			return Vector2i(-1, -1)
+		if not solid.has(c):
+			continue                                     # already carved — reach deeper
+		if MiningRules.required_tier(solid[c]) > H_DRILL_TIER:
+			return Vector2i(-1, -1)                      # too hard for the bit — the gallery ends here
+		return c
+	return Vector2i(-1, -1)
+
+
+## Would one more `item` overflow the borer's 5-slot belly? Full = at the total cap, or already
+## holding 5 distinct stacks and this would start a sixth.
+func _h_belly_full(machine: MachineState, item: StringName) -> bool:
+	var total: int = 0
+	for it: StringName in machine.output_buffer:
+		total += int(machine.output_buffer[it])
+	if total >= H_DRILL_BELLY_TOTAL:
+		return true
+	return machine.output_buffer.size() >= H_DRILL_BELLY_STACKS and not machine.output_buffer.has(item)
+
+
+## THE HORIZONTAL DRILL (FABLE_50 #46, the user's spec): a coal-hungry sideways borer. Each cycle it
+## bites the next solid cell along its facing — ore-like cells drain one unit per bite (a rich vein
+## takes many), plain rock clears in one bite yielding its block-item. Bored COAL feeds its OWN fuel
+## bunker first (self-sustaining while the seam lasts); everything else fills the 5-slot belly. The
+## ON-HOOK rule lives in _destinations_h_drill: the haul exits DOWN its own column only — no drain
+## below and the belly pools until it stalls (`blocked`: "dig a drain"). Extraction may be lateral;
+## logistics stays gravity-vertical.
+func _run_h_drill(machine: MachineState) -> void:
+	var target: Vector2i = h_drill_target(machine.cell, machine.facing)
+	if target.x < 0:
+		return                                           # gallery spent — carry it to a new face (no_input)
+	var item: StringName = solid[target]
+	var to_bunker: bool = item == &"coal" and int(machine.input_buffer.get(&"coal", 0)) < H_DRILL_COAL_STOCK
+	if not to_bunker and _h_belly_full(machine, item):
+		return                                           # belly full, no drain taking it — stall (blocked)
+	if machine.fuel <= 0:                                # the drill's coal-burn pattern, hungrier
+		if int(machine.input_buffer.get(&"coal", 0)) > 0:
+			var left: int = int(machine.input_buffer[&"coal"]) - 1
+			if left > 0:
+				machine.input_buffer[&"coal"] = left
+			else:
+				machine.input_buffer.erase(&"coal")
+			total_consumed[&"coal"] = int(total_consumed.get(&"coal", 0)) + 1
+			machine.fuel = H_DRILL_FUEL_TICKS
+		else:
+			return                                       # dark until coal lands on it (no_fuel)
+	machine.fuel -= 1
+	machine.progress += SECONDS_PER_TICK
+	if machine.progress < H_DRILL_CYCLE:
+		return
+	machine.progress -= H_DRILL_CYCLE
+	# THE BITE: ore-like cells drain unit by unit (cleared when the pool empties); plain rock clears
+	# in one, yielding its block-item (bored earth/stone feed block-building — nothing is waste).
+	if _is_ore_like(item):
+		var amt: int = int(deposits.get(target, DEFAULT_ORE_DEPOSIT)) - 1
+		if amt > 0:
+			deposits[target] = amt
+		else:
+			deposits.erase(target)
+			solid.erase(target)
+			terrain_dirty.append(target)
+			_bazaars_dirty = true
+			_resettle_pile_above(target)
+	else:
+		solid.erase(target)
+		terrain_dirty.append(target)
+		_bazaars_dirty = true
+		_resettle_pile_above(target)
+	total_produced[item] = int(total_produced.get(item, 0)) + 1
+	if to_bunker:
+		machine.input_buffer[&"coal"] = int(machine.input_buffer.get(&"coal", 0)) + 1
+	else:
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + 1
+	flow_events.append({"item": item, "from": target, "to": machine.cell, "count": 1})
+
+
+## Borer status, mirroring _run_h_drill's gates exactly (legibility can't drift from reality).
+func _status_h_drill(machine: MachineState) -> StringName:
+	var target: Vector2i = h_drill_target(machine.cell, machine.facing)
+	if target.x < 0:
+		return &"no_input"                               # gallery spent — move it
+	var item: StringName = solid[target]
+	var to_bunker: bool = item == &"coal" and int(machine.input_buffer.get(&"coal", 0)) < H_DRILL_COAL_STOCK
+	if not to_bunker and _h_belly_full(machine, item):
+		return &"blocked"                                # "empty me / dig a drain below"
+	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
+		return &"no_fuel"
+	return &"working"
+
+
+## Borer routing — THE ON-HOOK RULE: its haul drops straight down its OWN column, and only when a
+## drain exists (the cell directly below is open air or a machine). Sitting sealed on solid rock the
+## belly POOLS — no piles conjured inside the tunnel floor — until the player digs the drop-shaft
+## under it (the borer's version of the vertical drill's "dig a drain below").
+func _destinations_h_drill(machine: MachineState) -> Array[Dictionary]:
+	var below := machine.cell + Vector2i(0, 1)
+	if solid.has(below) and not grid.has(below):
+		return []
+	return [_column_landing(machine.cell.x, machine.cell.y + 1)]
+
+
 ## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;
 ## when that runs out it consumes one coal from its input buffer to reburn for GENERATOR_FUEL_TICKS. No
 ## fuel left and no coal → it goes dark (fuel stays 0, so _compute_power emits nothing for it). Coal is
@@ -1383,6 +1503,8 @@ func _flow() -> void:
 		if machine.output_buffer.is_empty():
 			continue
 		var dests: Array[Dictionary] = _destinations(machine)
+		if dests.is_empty():
+			continue                # no drain (a borer on solid rock): the haul POOLS in its belly
 		if dests.size() == 1:
 			_deliver(machine, dests[0], machine.output_buffer)
 		else:

@@ -50,7 +50,8 @@ const TECHS: Dictionary = {
 		"requires": &"ironworks",
 		"sample": &"iron_ingot",               # analyze your own first refined iron
 		"cost": {&"iron_ingot": 6},            # the first NON-copper research price — iron pays for iron
-		"unlocks": [&"plate_press", &"gear_mill"],   # the per-item crafter modules (docs/CRAFTING.md)
+		"unlocks": [&"plate_press", &"gear_mill", &"h_drill"],   # the crafter modules + the Borer
+		                                       # (the Borer is machining's PAYOFF: priced in plates+gears)
 	},
 }
 

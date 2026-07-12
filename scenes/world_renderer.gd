@@ -674,6 +674,8 @@ func _draw_aim() -> void:
 			_draw_drill_preview()  # dashed ore column + out-arrow: show what this drill will bore & where it pours
 		if _ghost_def.behavior == &"rope" and _aim_placeable:
 			_draw_rope_preview()   # ghost line down the shaft: how far the rope will unroll from here
+		if _ghost_def.behavior == &"h_drill" and _aim_placeable:
+			_draw_h_drill_preview()  # the gallery it will chew + where the haul drains (or won't)
 	elif _ghost_material != &"":
 		# Block-placement preview: a translucent material-tinted fill (the Terraria build cursor).
 		var bg: Color = _material(_ghost_material).base_color
@@ -721,6 +723,44 @@ func _draw_drill_preview() -> void:
 		var head: float = 6.0
 		draw_line(Vector2(cx, bot_y), Vector2(cx - head, bot_y - head), tint, 2.5)
 		draw_line(Vector2(cx, bot_y), Vector2(cx + head, bot_y - head), tint, 2.5)
+
+
+## When holding the Borer, preview its GALLERY: tint every solid cell it can chew along the facing
+## (the builder's facing — it bores the way YOU are looking), a dashed box around the run, and the
+## down out-arrow under its own cell — gold when a drain exists below, red-amber when it would sit
+## sealed on rock and pool ("dig a drain first"). Mirrors _draw_drill_preview's language sideways.
+func _draw_h_drill_preview() -> void:
+	var facing: int = player.facing if player != null else 1
+	var cells: Array[Vector2i] = []
+	for k: int in range(1, FactorySim.H_DRILL_RANGE + 1):
+		var c := Vector2i(_aim.x + facing * k, _aim.y)
+		if not sim.in_bounds(c) or sim.machine_at(c) != null:
+			break
+		if not sim.is_solid(c):
+			continue
+		if MiningRules.required_tier(sim.material_at(c)) > FactorySim.H_DRILL_TIER:
+			break
+		cells.append(c)
+	if cells.is_empty():
+		return
+	var below := _aim + Vector2i(0, 1)
+	var drained: bool = not sim.is_solid(below) or sim.machine_at(below) != null
+	var tint := Color(1.0, 0.80, 0.30, 0.95) if drained else Color(0.98, 0.45, 0.38, 0.95)
+	for c: Vector2i in cells:
+		var mat_col: Color = _material(sim.material_at(c)).nugget_color
+		draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)), Color(mat_col.r, mat_col.g, mat_col.b, 0.22))
+	var lo: int = mini(cells[0].x, cells[-1].x)
+	var hi: int = maxi(cells[0].x, cells[-1].x)
+	var box := Rect2(Vector2(float(lo * CELL) + 1.0, float(_aim.y * CELL) + 1.0),
+		Vector2(float((hi - lo + 1) * CELL) - 2.0, float(CELL) - 2.0))
+	_draw_dashed_rect(box, tint, 6.0, 2.5)
+	# The out-arrow under the borer's OWN cell — the on-hook rule made visible before you commit.
+	var cx: float = float(_aim.x * CELL) + float(CELL) * 0.5
+	var top_y: float = float(below.y * CELL) + 3.0
+	var bot_y: float = top_y + float(CELL) * 0.55
+	draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
+	draw_line(Vector2(cx, bot_y), Vector2(cx - 6.0, bot_y - 6.0), tint, 2.5)
+	draw_line(Vector2(cx, bot_y), Vector2(cx + 6.0, bot_y - 6.0), tint, 2.5)
 
 
 ## When holding Rope over a valid anchor, preview the UNROLL: a translucent hemp line from the anchor
@@ -900,7 +940,8 @@ func _draw_machine(machine: MachineState) -> void:
 		var clock: float = _anim_time
 		if machine.def.behavior == &"lift":
 			clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
-		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock)
+		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock,
+			machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
 	_draw_machine_label(machine, pos)
 

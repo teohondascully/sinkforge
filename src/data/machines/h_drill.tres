@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MachineDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/machine_def.gd" id="1_machine"]
+
+[resource]
+script = ExtResource("1_machine")
+id = &"h_drill"
+display_name = "Borer"
+behavior = &"h_drill"
+craft_cost = {
+&"plate": 2,
+&"gear": 2,
+&"ingot": 2
+}

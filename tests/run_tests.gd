@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_test_torch()
 	_test_save_load()
 	_test_iron_chain()
+	_test_h_drill()
 	_test_research()
 	_test_descent_gate()
 	if _failures == 0:
@@ -1305,6 +1306,71 @@ func _test_iron_chain() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through the chain (present=%d, net=%d)" % [item, present, net])
+
+
+## THE HORIZONTAL DRILL / the Borer (FABLE_50 #46, the user's spec): bores sideways along its facing,
+## burns coal per bite, feeds bored COAL to its own fuel bunker, bellies everything else, and honours
+## the ON-HOOK rule — its haul exits DOWN its own column only; sealed on rock it POOLS (never spills
+## into the tunnel), and stalls at the 5-slot belly cap. Conservation across the whole gallery.
+func _test_h_drill() -> void:
+	print("- the horizontal drill (the Borer)")
+	var hd_def: MachineDef = load("res://src/data/machines/h_drill.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(ResearchRules.locking_tech(&"h_drill") == &"machining", "the Borer gates on Machining")
+	# A sealed tunnel: the borer sits on solid rock (NO drain), a 4-cell face to its right with a
+	# 2-unit coal seam in the middle.
+	sim.set_solid(Vector2i(6, 6), &"stone")
+	for x: int in range(7, 11):
+		sim.set_solid(Vector2i(x, 5), &"earth")
+	sim.set_solid(Vector2i(8, 5), &"coal")
+	sim.deposits[Vector2i(8, 5)] = 2
+	var m: MachineState = sim.place_machine(hd_def, Vector2i(6, 5))
+	m.facing = 1
+	_check(sim.machine_status(m) == &"no_fuel", "dark without coal")
+	for _i: int in 80:
+		sim.tick()
+	_check(sim.is_solid(Vector2i(7, 5)), "no coal, no boring")
+	sim.inventory[&"coal"] = 3; sim.total_produced[&"coal"] = 3
+	sim.deposit(Vector2i(6, 5), &"coal", 3)                  # hand-feed the bunker
+	for _i: int in 40:                                       # one 1.5s cycle + slack
+		sim.tick()
+	_check(not sim.is_solid(Vector2i(7, 5)), "the first bite cleared the face")
+	_check(int(m.output_buffer.get(&"earth", 0)) == 1, "the haul sits in the BELLY (no drain below)")
+	_check(sim.ground.is_empty(), "nothing spilled onto the tunnel floor (on-hook: no lateral piles)")
+	for _i: int in 260:                                      # the rest of the gallery (6 bites total)
+		sim.tick()
+	_check(not sim.is_solid(Vector2i(8, 5)) and not sim.is_solid(Vector2i(10, 5)),
+		"the gallery ran through the coal seam to its last cell")
+	_check(int(m.output_buffer.get(&"earth", 0)) == 3, "belly holds the bored earth")
+	_check(not m.output_buffer.has(&"coal"), "bored coal fed the FUEL BUNKER, not the belly")
+	_check(sim.machine_status(m) == &"no_input", "gallery spent -> idle (carry it to a new face)")
+	# THE DRAIN: open the floor under it and the belly pours down its OWN column (the on-hook rule).
+	sim.set_solid(Vector2i(6, 8), &"stone")                  # a catch floor two below
+	sim.set_solid(Vector2i(6, 6), &"")
+	for _i: int in 3:
+		sim.tick()
+	_check(m.output_buffer.is_empty(), "the belly drained the moment a drain opened")
+	_check(int((sim.ground.get(Vector2i(6, 7), {}) as Dictionary).get(&"earth", 0)) == 3,
+		"…straight down its own column onto the catch floor")
+	for item: StringName in [&"earth", &"coal"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through the gallery (present=%d, net=%d)" % [item, present, net])
+	# The 5-slot belly cap + facing LEFT, on a second rig.
+	var s2: FactorySim = FactorySim.new()
+	s2.set_solid(Vector2i(3, 3), &"stone")                   # sealed floor
+	s2.set_solid(Vector2i(2, 2), &"earth")                   # a face to the LEFT
+	var m2: MachineState = s2.place_machine(hd_def, Vector2i(3, 2))
+	m2.facing = -1
+	m2.input_buffer[&"coal"] = 1
+	s2.total_produced[&"coal"] = 1; s2.inventory[&"coal"] = 0
+	for it: StringName in [&"a", &"b", &"c", &"d", &"e"]:    # five stacks already in the belly
+		m2.output_buffer[it] = 1
+	_check(s2.machine_status(m2) == &"blocked", "a full 5-slot belly stalls the bit (blocked: empty me)")
+	m2.output_buffer.clear()
+	for _i: int in 40:
+		s2.tick()
+	_check(not s2.is_solid(Vector2i(2, 2)), "facing -1 bores LEFT")
 
 
 ## SAVE/LOAD (FABLE_50 #1) — capture → restore must round-trip the WHOLE authoritative state, and

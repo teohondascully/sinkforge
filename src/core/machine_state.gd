@@ -30,6 +30,9 @@ var power_factor: float = 1.0
 ## Descent-Engine-only: refined goods it has EATEN toward its breach quota (DESCENT_QUOTA). The gate's
 ## throughput-wall progress. Same composition-over-inheritance stance as route_toggle/fuel.
 var fed: int = 0
+## Directional machines only (the horizontal drill): which way it works, ±1. Set once at placement
+## (the builder's facing — a discrete call, so determinism holds). 1 for machines that don't care.
+var facing: int = 1
 
 
 func _init(machine_def: MachineDef, machine_cell: Vector2i) -> void:
