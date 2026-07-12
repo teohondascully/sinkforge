@@ -81,6 +81,8 @@ var _bazaars := Bazaars.new()
 var _particles := Particles.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
+const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
+var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
 var _objectives: Objectives
 ## GPU ambient dust motes (docs/MODERN_FEEL.md) — a continuous GPUParticles2D haze that drifts in the
@@ -528,6 +530,7 @@ func _update_mining(delta: float) -> void:
 	if not holding:
 		_mine_target = Vector2i(-999, -999)
 		_mine_charge = 0.0
+		_swing_clock = SWING_PERIOD          # primed: the FIRST blow of the next charge lands instantly
 		if _renderer != null:
 			_renderer.set_mine_progress(Vector2i(-999, -999), 0.0)
 		return
@@ -546,6 +549,19 @@ func _update_mining(delta: float) -> void:
 	_mine_charge += delta * speed
 	var hard: float = MiningRules.hardness(mat)
 	_renderer.set_mine_progress(_aim, clampf(_mine_charge / hard, 0.0, 1.0))
+	# Swing FEEL (FABLE_50 #40): while charging, the body holds the dig pose facing the block, and on a
+	# steady cadence a BLOW lands — a chip of the rock's dust off the struck face + a micro-shake — so
+	# mining reads as pick-strikes landing, not a progress bar silently filling.
+	if _player != null:
+		_player.note_dig(int(signf(_cell_center(_aim).x - _player.position.x)))
+		_swing_clock += delta
+		if _swing_clock >= SWING_PERIOD:
+			_swing_clock = 0.0
+			var center: Vector2 = _cell_center(_aim)
+			var to_body: Vector2 = _player.position - center
+			_particles.chip(center + to_body.normalized() * (float(CELL) * 0.45),
+				Visuals.terrain_dust(mat), to_body.angle())
+			_shake = maxf(_shake, 0.7)
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
 		try_mine(_aim)                                       # charge full → land the breaking blow
@@ -602,12 +618,21 @@ func try_mine(cell: Vector2i) -> bool:
 	var mat: StringName = sim.material_at(cell)
 	if not MiningRules.can_mine(mat, sim.inventory):
 		return false                                           # no tool for this rock — the gate the test drives
+	var rich: bool = sim.ore_deposit_at(cell) > 0              # captured BEFORE the mine clears the cell
 	var mined: StringName = sim.mine(cell)
 	if mined != &"":
-		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 10)  # break-debris puff
-		_shake = maxf(_shake, 1.4)
-		if _player != null:                                    # Phase-C dig anim: latch the pose, face the cell
-			_player.note_dig(int(signf(_cell_center(cell).x - _player.position.x)))
+		var center: Vector2 = _cell_center(cell)
+		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
+		if _player != null:
+			# The breaking blow's payoff (FABLE_50 #40): chunky debris kicked out of the shattered face
+			# toward the digger, a heavier kick than a mid-charge chip — and a vein pays out a bright
+			# fleck-spray in its own colour, so breaking ore FEELS richer than breaking dirt.
+			_particles.debris(center, Visuals.terrain_dust(mat).lightened(0.12),
+				(_player.position - center).angle())
+			_player.note_dig(int(signf(center.x - _player.position.x)))
+		if rich:
+			_particles.spark(center, Visuals.item_color(mat).lightened(0.35))
+		_shake = maxf(_shake, 2.2 if rich else 1.7)
 	return mined != &""
 
 
