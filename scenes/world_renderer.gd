@@ -166,10 +166,13 @@ func _process(delta: float) -> void:
 	if not sim.terrain_dirty.is_empty():
 		var dirty: Dictionary = {}                    # chunk index -> true (dedup)
 		for cell: Vector2i in sim.terrain_dirty:
-			for d: Vector2i in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var idx: int = _chunk_index(cell + d)
-				if idx >= 0:
-					dirty[idx] = true
+			# All 8 neighbours + self: edge-AO/caps read orthogonally, and the autotile chamfer/fillet
+			# passes (#9) read across CORNERS too — a dig at a chunk corner must repaint the diagonal chunk.
+			for dy: int in range(-1, 2):
+				for dx: int in range(-1, 2):
+					var idx: int = _chunk_index(cell + Vector2i(dx, dy))
+					if idx >= 0:
+						dirty[idx] = true
 		for idx: int in dirty:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
@@ -384,7 +387,43 @@ func _draw_terrain(ci: CanvasItem, rect: Rect2i) -> void:
 			if not sim.solid.has(c):
 				continue
 			_draw_terrain_cell(ci, c)
+	_draw_inner_fillets(ci, rect)   # concave junctions rounded into the open cells (autotile #9)
 	_draw_terrain_surface(ci, rect)
+
+
+## The concave half of the autotile (FABLE_50 #9): wherever an OPEN cell's corner meets two solid
+## orthogonal faces (a floor meeting a wall, a ceiling meeting a pillar), a quarter-round shoulder of
+## the supporting rock's own colour fills that corner — carved junctions read as worn rock, not Lego
+## seams. Bottom corners take the FLOOR cell's colour, top corners the CEILING's. Runs per chunk after
+## the cells; the surface cap/ramp pass paints after (over) it, so the walked line stays authoritative.
+func _draw_inner_fillets(ci: CanvasItem, rect: Rect2i) -> void:
+	const R: float = 7.0
+	var s: float = float(CELL)
+	# Per corner: offsets of the two solid supports, the corner point in the open cell's box, the fan's
+	# start angle (degrees), and which support paints it (its own body colour).
+	var corners: Array = [
+		{"a": Vector2i(0, -1), "b": Vector2i(-1, 0), "pt": Vector2(0.0, 0.0), "deg": 0.0, "src": Vector2i(0, -1)},
+		{"a": Vector2i(0, -1), "b": Vector2i(1, 0), "pt": Vector2(s, 0.0), "deg": 90.0, "src": Vector2i(0, -1)},
+		{"a": Vector2i(0, 1), "b": Vector2i(1, 0), "pt": Vector2(s, s), "deg": 180.0, "src": Vector2i(0, 1)},
+		{"a": Vector2i(0, 1), "b": Vector2i(-1, 0), "pt": Vector2(0.0, s), "deg": 270.0, "src": Vector2i(0, 1)},
+	]
+	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
+		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
+			var c := Vector2i(cx, cy)
+			if sim.solid.has(c) or not sim.in_bounds(c):
+				continue
+			var pos := Vector2(c) * s
+			for k: Dictionary in corners:
+				if not sim.is_solid(c + (k["a"] as Vector2i)) or not sim.is_solid(c + (k["b"] as Vector2i)):
+					continue
+				var src: Vector2i = c + (k["src"] as Vector2i)
+				var col: Color = _cell_fill_color(src, _material(sim.material_at(src)))
+				var corner: Vector2 = pos + (k["pt"] as Vector2)
+				var fan := PackedVector2Array([corner])
+				for i: int in 4:
+					var a: float = deg_to_rad(float(k["deg"]) + 90.0 * float(i) / 3.0)
+					fan.append(corner + Vector2(cos(a), sin(a)) * R)
+				ci.draw_colored_polygon(fan, col)
 
 
 ## One solid terrain cell: fill, grain, ore nuggets, and carved-edge AO. Split out of the cell loop so the
@@ -399,7 +438,7 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 			ci.draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
 			return
 		var col: Color = _cell_fill_color(c, def)
-		ci.draw_rect(Rect2(pos, Vector2(CELL, CELL)), col)
+		_draw_cell_silhouette(ci, c, pos, col)
 		if def.grain:
 			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
 			# surface reads as textured rock rather than a colour swatch.
@@ -417,6 +456,40 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 				ci.draw_circle(pos + nug, 2.0, def.nugget_color)
 				ci.draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
 		_draw_edge_ao(ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
+
+
+## The cell's body FILL, autotiled (FABLE_50 #9): instead of a flat square, the silhouette CHAMFERS
+## every convex corner — a 45° cut wherever two adjacent faces are both open — so free edges read as
+## weathered earth, a lone block reads as a boulder, and cave mouths lose the Lego. The 45° echoes the
+## ramp language (one diagonal vocabulary everywhere). The cut is skipped on the top corners of the
+## column's walkable surface cell: the cap/ramp pass owns that edge, and the seen line must stay
+## exactly the walked line. Sprite tiles (tile_<id>.png) bypass this — art brings its own edges.
+func _draw_cell_silhouette(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
+	const R: float = 7.0
+	var open_u: bool = not sim.is_solid(c + Vector2i(0, -1))
+	var open_d: bool = not sim.is_solid(c + Vector2i(0, 1))
+	var open_l: bool = not sim.is_solid(c + Vector2i(-1, 0))
+	var open_r: bool = not sim.is_solid(c + Vector2i(1, 0))
+	var keep_top: bool = sim.surface_row(c.x) == c.y     # the walk line — the cap/ramp pass owns it
+	var s: float = float(CELL)
+	var pts := PackedVector2Array()
+	if open_u and open_l and not keep_top:               # top-left
+		pts.append(pos + Vector2(0.0, R)); pts.append(pos + Vector2(R, 0.0))
+	else:
+		pts.append(pos)
+	if open_u and open_r and not keep_top:               # top-right
+		pts.append(pos + Vector2(s - R, 0.0)); pts.append(pos + Vector2(s, R))
+	else:
+		pts.append(pos + Vector2(s, 0.0))
+	if open_d and open_r:                                # bottom-right
+		pts.append(pos + Vector2(s, s - R)); pts.append(pos + Vector2(s - R, s))
+	else:
+		pts.append(pos + Vector2(s, s))
+	if open_d and open_l:                                # bottom-left
+		pts.append(pos + Vector2(R, s)); pts.append(pos + Vector2(0.0, s - R))
+	else:
+		pts.append(pos + Vector2(0.0, s))
+	ci.draw_colored_polygon(pts, col)
 
 
 ## The final fill colour for a terrain cell: the material's base, DARKENED with depth (the lower world
