@@ -18,6 +18,7 @@ extends Node2D
 
 const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
+const SAVE_PATH: String = "user://sinkforge.save"   ## the F5/F9 quicksave slot (SaveGame envelope)
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 ## Zoom levels cycled by Z (Terraria-style). Default is zoomed OUT so you see the world you're working in,
 ## not just your feet. Smaller = further out. _current_zoom() reads the active level everywhere.
@@ -497,6 +498,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cycle_zoom()
 	elif event.is_action_pressed(Controls.SPEED):
 		_cycle_speed()
+	elif event.is_action_pressed(Controls.SAVE):
+		_save_game()
+	elif event.is_action_pressed(Controls.LOAD):
+		_load_game()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		_cycle_inventory(1)   # direct wheel handling (reliable) — the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -726,6 +731,28 @@ func _cycle_zoom() -> void:
 func _cycle_speed() -> void:
 	_time_scale_idx = (_time_scale_idx + 1) % TIME_SCALES.size()
 	Engine.time_scale = TIME_SCALES[_time_scale_idx]
+
+
+## F5 quicksave (FABLE_50 #1): the sim capture + the body's position, one versioned file.
+func _save_game() -> void:
+	var data: Dictionary = SaveGame.capture(sim)
+	data["player_pos"] = _player.position
+	_hud.flash("SAVED" if SaveGame.write(SAVE_PATH, data) else "save FAILED")
+
+
+## F9 quickload: restore in place (sim object survives, so every live reference stays valid), put the
+## body back, and repaint the retained view caches wholesale. A missing/bad file never touches the game.
+func _load_game() -> void:
+	var data: Dictionary = SaveGame.read(SAVE_PATH)
+	if data.is_empty() or not SaveGame.restore(sim, data):
+		_hud.flash("no save to load")
+		return
+	var pp: Variant = data.get("player_pos")
+	if pp is Vector2:
+		_player.position = pp
+		_player.velocity = Vector2.ZERO
+	_renderer.repaint_world()
+	_hud.flash("LOADED")
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.

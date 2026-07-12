@@ -39,6 +39,7 @@ run "check_fastforward"              "res://tools/check_fastforward.gd"
 run "check_mining"                   "res://tools/check_mining.gd"
 run "check_fall"                     "res://tools/check_fall.gd"
 run "check_climb"                    "res://tools/check_climb.gd"
+run "check_saveload"                 "res://tools/check_saveload.gd"
 run "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 
 rm -f "$log"

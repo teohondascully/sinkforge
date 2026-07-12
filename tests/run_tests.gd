@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_test_behavior_registry()
 	_test_rope()
 	_test_torch()
+	_test_save_load()
 	_test_research()
 	_test_descent_gate()
 	if _failures == 0:
@@ -1245,6 +1246,76 @@ func _test_rope() -> void:
 	var present_r: int = _items_present(sim, &"rope")
 	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
 	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])
+
+
+## SAVE/LOAD (FABLE_50 #1) — capture → restore must round-trip the WHOLE authoritative state, and
+## determinism is the verifier: a restored sim ticked N times must match the original ticked N times,
+## signature + dict for dict. Also: the version gate, the unknown-def gate (both leave the sim
+## untouched), and a real disk round-trip through the binary Variant format.
+func _test_save_load() -> void:
+	print("- save/load (versioned, determinism-verified)")
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var sim: FactorySim = FactorySim.new()
+	# A busy little world: terrain + wall + a deposit, a producing line, a fueled generator,
+	# conduit/rope/torch layers, research, pack + ground items.
+	sim.set_solid(Vector2i(6, 8), &"stone")
+	sim.set_solid(Vector2i(7, 8), &"ore")
+	sim.set_wall(Vector2i(6, 7), &"earth")
+	sim.deposits[Vector2i(7, 8)] = 123
+	sim.place_machine(vent_def, Vector2i(6, 0))
+	sim.place_machine(proc_def, Vector2i(6, 3))
+	sim.place_machine(gen_def, Vector2i(9, 8))
+	sim.inventory[&"coal"] = 3;  sim.total_produced[&"coal"] = 3
+	sim.deposit(Vector2i(9, 8), &"coal", 2)
+	sim.inventory[&"conduit"] = 2; sim.total_produced[&"conduit"] = 2
+	sim.place_conduit(Vector2i(9, 7))
+	sim.inventory[&"rope"] = 4;  sim.total_produced[&"rope"] = 4
+	sim.place_rope(Vector2i(6, 6))
+	sim.inventory[&"torch"] = 1; sim.total_produced[&"torch"] = 1
+	sim.place_torch(Vector2i(6, 7))
+	sim.inventory[&"ore"] = 3;   sim.total_produced[&"ore"] = 3
+	sim.research[&"automation"] = true      # state set directly — research_tech's costs aren't the subject
+	for _i: int in 90:
+		sim.tick()
+	var data: Dictionary = SaveGame.capture(sim)
+	# Version gate + unknown-def gate: both refuse and leave the target untouched.
+	var fresh: FactorySim = FactorySim.new()
+	var bad_ver: Dictionary = data.duplicate(true); bad_ver["version"] = 99
+	_check(not SaveGame.restore(fresh, bad_ver), "an unknown save version refuses")
+	var bad_def: Dictionary = data.duplicate(true)
+	(bad_def["machines"] as Array)[0]["def"] = "bogus_machine"
+	_check(not SaveGame.restore(fresh, bad_def), "an unknown machine def refuses")
+	_check(fresh.machines.is_empty() and fresh.solid.is_empty(), "a refused restore leaves the sim untouched")
+	# The real round-trip — through DISK, not just memory.
+	var path: String = "user://test_sinkforge.save"
+	_check(SaveGame.write(path, data), "the envelope writes to disk")
+	var back: Dictionary = SaveGame.read(path)
+	_check(not back.is_empty(), "…and reads back")
+	var sim2: FactorySim = FactorySim.new()
+	_check(SaveGame.restore(sim2, back), "the restore lands")
+	_check(sim2.solid == sim.solid and sim2.wall == sim.wall and sim2.deposits == sim.deposits,
+		"terrain + walls + deposits round-trip")
+	_check(sim2.inventory == sim.inventory and sim2.ground == sim.ground and sim2.sink == sim.sink,
+		"pack + ground + sink round-trip")
+	_check(sim2.conduit == sim.conduit and sim2.rope == sim.rope and sim2.torch == sim.torch,
+		"the placed layers round-trip")
+	_check(sim2.research == sim.research, "research round-trips")
+	_check(sim2.machines.size() == sim.machines.size(), "every machine came back")
+	var gen2: MachineState = sim2.machine_at(Vector2i(9, 8))
+	var gen1: MachineState = sim.machine_at(Vector2i(9, 8))
+	_check(gen2 != null and gen2.def.id == &"generator" and gen2.fuel == gen1.fuel,
+		"machine runtime state (fuel mid-burn) survives")
+	# THE determinism proof: both sims run on, in lockstep, forever.
+	for _i: int in 120:
+		sim.tick()
+		sim2.tick()
+	_check(_state_signature(sim) == _state_signature(sim2),
+		"restored sim stays in LOCKSTEP with the original (120 ticks on)")
+	_check(sim.sink == sim2.sink and sim.total_produced == sim2.total_produced,
+		"…down to the ledgers")
+	DirAccess.remove_absolute(path)
 
 
 ## TORCHES (FABLE_50 #26) — the placeable light, a placed layer like rope: mounts only on a backed

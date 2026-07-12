@@ -59,8 +59,19 @@ var can_craft: bool = false        ## are we near a claimed Bazaar? gates the cr
 var show_minimap: bool = false
 var show_help: bool = false
 
+## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
+var _flash_text: String = ""
+var _flash_life: float = 0.0
 
-func _process(_delta: float) -> void:
+
+## Show a short transient notice centred under the objective banner (~2s, fades).
+func flash(text: String) -> void:
+	_flash_text = text
+	_flash_life = 2.2
+
+
+func _process(delta: float) -> void:
+	_flash_life = maxf(0.0, _flash_life - delta)
 	queue_redraw()
 
 
@@ -84,6 +95,21 @@ func _draw() -> void:
 		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
+	_draw_flash()          # transient toast (save/load feedback)
+
+
+## The transient toast: a small accented chip centred under the objective line, fading out over its
+## last half-second. Cheap, reusable feedback for one-shot actions (F5 save / F9 load).
+func _draw_flash() -> void:
+	if _flash_life <= 0.0 or _flash_text == "":
+		return
+	var a: float = clampf(_flash_life / 0.5, 0.0, 1.0)
+	var w: float = _font.get_string_size(_flash_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 28.0
+	var p := Rect2(CANVAS.x * 0.5 - w * 0.5, 46.0, w, 24.0)
+	draw_rect(p, Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
+	draw_rect(p, Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, a), false, 1.0)
+	draw_string(_font, p.position + Vector2(14.0, 17.0), _flash_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.88, 0.62, a))
 
 
 ## Fast-forward chip (top-left): a small "▶▶ Nx" tag shown ONLY while the game clock is sped up, so the
@@ -477,6 +503,7 @@ func _draw_help_overlay() -> void:
 		"research    R  (in the pack screen, at the bench)",
 		"map         M",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
+		"save / load  F5 / F9",
 		"pause       P     ·   help   H",
 	]
 	var w: float = 244.0

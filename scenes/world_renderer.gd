@@ -119,6 +119,19 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_dark.queue_redraw()  # skylight veil changes only when you DIG — repaint on terrain change, not per-frame
 
 
+## Full-world repaint, for when the terrain changed WHOLESALE under the retained caches (loading a
+## save). Requeues every terrain chunk + the skylight veil and drops the lazy seal-row cache. The
+## incremental terrain_dirty path stays the per-dig fast lane; this is the load-time reset.
+func repaint_world() -> void:
+	for chunk: LightLayer in _chunks:
+		chunk.queue_redraw()
+	if _dark != null:
+		_dark.queue_redraw()
+	sim.terrain_dirty.clear()
+	_seal_rows.clear()
+	_seal_rows_scanned = false
+
+
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
 func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: MachineDef, ghost_material: StringName = &"") -> void:
 	_ghost_material = ghost_material

@@ -71,6 +71,18 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
   bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
   hover "factory makes X/min" row + the pack header's "making …" pulse line read it.
+- **Save/load — `SaveGame` (`src/core/save_game.gd`, FABLE_50 #1):** the sim being plain data makes a
+  save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
+  ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),
+  in one VERSIONED envelope written with the binary Variant serializer (Vector2i keys round-trip; no
+  JSON mangling). DERIVED state (grid, power, flow_events, terrain_dirty, the rate buffer) is not saved
+  — it rebuilds next tick. `restore(sim, data)` mutates IN PLACE (live references survive) and is
+  all-or-nothing: an unknown version or missing def refuses without touching the sim. The controller
+  owns the file (F5/F9 → `_save_game`/`_load_game`, `user://sinkforge.save`, + `player_pos` in the
+  envelope) and calls `WorldRenderer.repaint_world()` (requeue all retained chunks + veil, drop lazy
+  caches) after a load. **Determinism is the verifier:** capture → restore → tick both 120× →
+  identical signatures (`_test_save_load`), plus the live-scene layer `tools/check_saveload.gd`
+  (harness layer 12: save, scar the world, load, exact heal + conservation).
 - **Research — the PULL (docs/PROGRESSION.md §5):** `research` (tech id → true) is sim state mutated only
   by `research_tech(id)` — a discrete call that consumes an analyze-SAMPLE of the tech's signature
   material + its refined-goods cost (both ledgered). The tree is static data in **`ResearchRules`**

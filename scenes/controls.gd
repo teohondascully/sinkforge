@@ -30,6 +30,8 @@ const SPEED := &"sf_speed"
 const CYCLE_NEXT := &"sf_cycle_next"
 const CYCLE_PREV := &"sf_cycle_prev"
 const ZOOM := &"sf_zoom"
+const SAVE := &"sf_save"
+const LOAD := &"sf_load"
 
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
@@ -55,6 +57,8 @@ static func defaults() -> Dictionary:
 		CYCLE_NEXT: [{"button": MOUSE_BUTTON_WHEEL_DOWN}],
 		CYCLE_PREV: [{"button": MOUSE_BUTTON_WHEEL_UP}],
 		ZOOM: [{"key": KEY_Z}],
+		SAVE: [{"key": KEY_F5}],        # classic quicksave/quickload
+		LOAD: [{"key": KEY_F9}],
 	}
 
 
