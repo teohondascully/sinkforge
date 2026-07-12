@@ -51,6 +51,8 @@ var _guide_targets: Array[Dictionary] = []           ## current objective's WHER
 var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mined (cracks drawn on it; pushed by MainView)
 var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block — the felt-friction read
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
+var _seal_rows: Array[int] = []                       ## world rows holding THE SEAL (lazy-scanned for its pulse)
+var _seal_rows_scanned: bool = false
 
 ## STATIC terrain/walls/surface, split into a GRID of chunk canvases so a dig repaints only the affected
 ## chunk(s) (~64 cells) instead of the whole 7700-cell world (the ~300ms freeze). Each chunk owns a
@@ -174,6 +176,7 @@ func _draw() -> void:
 	# sparse content (machines, items, conduits, cursor) — no full-world cell loop.
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)  # world border
 	_draw_drop_paths()
+	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
@@ -215,6 +218,69 @@ func _draw_mine_cracks() -> void:
 		draw_line(center, elbow, crack, 1.5)
 		draw_line(elbow, tip, crack, 1.5)
 	draw_circle(center, 1.5 + 2.0 * _mine_frac, Color(1.0, 0.96, 0.85, 0.5 * _mine_frac))  # impact pip
+
+
+## Living veins (FABLE_50 #19): one fleck per ore cell FLARES briefly on a slow per-cell staggered
+## schedule, so a vein glitters in the lamplight and discovery reads from across a dark cavern. Walks
+## sim.deposits (the sparse seeded-vein index — never the whole world) clipped to the camera view.
+## THE SEAL gets its own tell: a slow faint violet breath along its two rows (lazy row scan). Pure
+## cosmetics on the free-running clock; the sim never sees any of it.
+func _draw_ore_glints() -> void:
+	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	const PERIOD: float = 3.4
+	const FLARE_LEN: float = 0.5
+	for key: Variant in sim.deposits:
+		var c: Vector2i = key
+		var pos := Vector2(c) * float(CELL)
+		if not view.has_point(pos) or not sim.is_solid(c):
+			continue
+		var def: MaterialDef = _material(sim.material_at(c))
+		if not def.has_nuggets():
+			continue
+		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 19349663)) & 0x7fffffff
+		var offset: float = float(h % 997) / 997.0 * PERIOD
+		var t: float = fmod(_anim_time + offset, PERIOD)
+		if t > FLARE_LEN:
+			continue
+		var flare: float = sin(t / FLARE_LEN * PI)              # 0 -> 1 -> 0 across the flare window
+		var nubs: Array[Vector2] = _cell_speckles(c, def.nugget_count)
+		var cycle: int = int((_anim_time + offset) / PERIOD)    # a different fleck flares each cycle
+		var p: Vector2 = pos + nubs[cycle % nubs.size()]
+		var col: Color = def.nugget_color.lightened(0.65)
+		col.a = 0.85 * flare
+		var r: float = 2.0 + 2.5 * flare                        # a little 4-point star, not a lens flare
+		draw_line(p + Vector2(-r, 0.0), p + Vector2(r, 0.0), col, 1.2)
+		draw_line(p + Vector2(0.0, -r), p + Vector2(0.0, r), col, 1.2)
+		draw_circle(p, 1.1 + 0.8 * flare, Color(col, minf(1.0, col.a + 0.15)))
+	_draw_seal_pulse(view)
+
+
+## THE SEAL's slow violet breath: the unbreakable band reads as dormant power, not just dark rock.
+## Rows found once by scanning a couple of probe columns per row (the band is full-width by
+## construction); each visible still-solid sealrock cell breathes a faint wash on a long cycle.
+func _draw_seal_pulse(view: Rect2) -> void:
+	if not _seal_rows_scanned:
+		_seal_rows_scanned = true
+		var probe: int = FactorySim.GRID_COLS / 2
+		for row: int in FactorySim.GRID_ROWS:
+			if sim.material_at(Vector2i(0, row)) == &"sealrock" \
+					or sim.material_at(Vector2i(probe, row)) == &"sealrock":
+				_seal_rows.append(row)
+	if _seal_rows.is_empty():
+		return
+	var col_lo: int = maxi(0, int(view.position.x / float(CELL)))
+	var col_hi: int = mini(FactorySim.GRID_COLS - 1, int(view.end.x / float(CELL)))
+	for row: int in _seal_rows:
+		var ry: float = float(row) * float(CELL)
+		if ry + float(CELL) < view.position.y or ry > view.end.y:
+			continue
+		for cx: int in range(col_lo, col_hi + 1):
+			var c := Vector2i(cx, row)
+			if sim.material_at(c) != &"sealrock":
+				continue
+			var breath: float = 0.5 + 0.5 * sin(_anim_time * 0.9 + float(cx) * 0.35)
+			draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)),
+				Color(0.42, 0.22, 0.66, 0.05 + 0.09 * breath))
 
 
 ## Painter for ONE terrain chunk (bound to its cell `rect`): background walls, terrain cells, and the
