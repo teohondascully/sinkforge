@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_descent_gate()
 	_test_hints()
 	_test_falling_pool()
+	_test_scanner()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1635,11 +1636,13 @@ func _test_research() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through the research flow (present=%d, net=%d)" % [item, present, net])
-	# Tree contract: every unlock id resolves to a real machine def (a typo'd id would gate nothing).
+	# Tree contract: every unlock id resolves to a real machine def OR a tool recipe (a typo'd id
+	# would gate nothing). The scanner is the first TOOL unlock (Prospecting).
 	for tid: StringName in ResearchRules.TECHS:
 		for uid: StringName in (ResearchRules.TECHS[tid]["unlocks"] as Array):
 			var path: String = "res://src/data/machines/%s.tres" % uid
-			_check(ResourceLoader.exists(path), "%s unlock '%s' is a real machine def" % [tid, uid])
+			_check(ResourceLoader.exists(path) or MiningRules.TOOL_RECIPES.has(uid),
+				"%s unlock '%s' resolves to a machine def or a tool recipe" % [tid, uid])
 
 
 ## THE DESCENT GATE — the L1→L2 throughput wall (docs/PROGRESSION.md §2/§9). Worldgen guarantees an
@@ -1798,3 +1801,34 @@ func _test_falling_pool() -> void:
 	var m: Dictionary = falling.motes()[0]
 	_check(m["color"] == Color.RED and (m["pos"] as Vector2).y > 0.0,
 		"a reused drop carries ITS OWN fields, not the retired one's")
+
+
+## THE SCANNER (FABLE_50 #27): the first TOOL behind research — Prospecting (the tree's first branch)
+## gates crafting it via the SAME sim-level craft_unlocked gate machines use; ungated tools stay free.
+## The scan itself is a pure query (zero sim state), so what's testable headless is the gate + pacing.
+func _test_scanner() -> void:
+	print("[scanner]")
+	var sim: FactorySim = FactorySim.new()
+	var recipe: Dictionary = MiningRules.TOOL_RECIPES[&"scanner"]
+	sim.inventory = {&"ingot": 20, &"ore": 3, &"coal": 3}
+	sim.total_produced = {&"ingot": 20, &"ore": 3, &"coal": 3}
+	_check(not sim.craft_item(&"scanner", recipe), "the scanner refuses to craft before Prospecting")
+	sim.inventory[&"stone"] = 8
+	sim.inventory[&"wood"] = 3
+	sim.total_produced[&"stone"] = 8
+	sim.total_produced[&"wood"] = 3
+	_check(sim.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]),
+		"a research-free tool still crafts on materials alone (the gate touches only locked ids)")
+	_check(sim.research_tech(&"automation"), "automation researches")
+	_check(ResearchRules.next_tech(sim.research) == &"prospecting",
+		"the bench's next rung after Automation is Prospecting (before the Power wall)")
+	_check(sim.research_tech(&"prospecting"), "prospecting researches (ore sample + 4 ingots)")
+	_check(sim.craft_item(&"scanner", recipe), "…and the scanner crafts")
+	_check(int(sim.inventory.get(&"scanner", 0)) == 1, "one scanner in the pack")
+	_check(MiningRules.is_tool_item(&"scanner"), "the scanner is EQUIPMENT (never machine-feedable)")
+	_check(not MiningRules.can_mine(&"stone", {&"scanner": 1}),
+		"…and its class never satisfies a pick gate (a lone scanner can't crack stone)")
+	for item: StringName in [&"ingot", &"ore", &"coal", &"stone", &"wood", &"scanner"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through research + craft (present=%d, net=%d)" % [item, present, net])

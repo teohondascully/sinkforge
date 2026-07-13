@@ -791,6 +791,8 @@ func research_tech(tech_id: StringName) -> bool:
 func craft_item(output: StringName, cost: Dictionary, count: int = 1) -> bool:
 	if cost.is_empty() or count <= 0:
 		return false
+	if not craft_unlocked(output):
+		return false                # the research gate, same as machine-craft (tools with no locking tech pass)
 	for item: StringName in cost:
 		if int(inventory.get(item, 0)) < int(cost[item]):
 			return false

@@ -92,6 +92,14 @@ var _mine_frac: float = 0.0                           ## 0..1 break-charge of th
 var _dig_marks: Dictionary = {}                       ## the dig PLAN (live ref from MainView) — hatched overlay
 var _ping_world: Vector2 = Vector2.INF                ## the map-click PING (INF = none) — in-world beacon
 var _daylight_step: int = -1                          ## quantized daylight — veil repaint trigger (#29)
+## THE SCANNER pulse (FABLE_50 #27, pushed by try_scan): origin + age drive an expanding wavefront;
+## each echo ({pos, dist, material}) lights up as the front passes its true distance, lingers, fades.
+const SCAN_WAVE_SPEED: float = 260.0                  ## wavefront px/s — the controller staggers audio off it
+const SCAN_ECHO_LINGER: float = 4.0                   ## seconds an echo stays readable after its hit
+var _scan_origin: Vector2 = Vector2.INF
+var _scan_age: float = -1.0                           ## -1 = no scan live
+var _scan_echoes: Array[Dictionary] = []
+var _scan_range: float = 0.0
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 var _seal_rows: Array[int] = []                       ## world rows holding THE SEAL (lazy-scanned for its pulse)
 var _seal_rows_scanned: bool = false
@@ -215,8 +223,22 @@ func set_ping(world: Vector2) -> void:
 	_ping_world = world
 
 
+## Begin a SONAR pulse (FABLE_50 #27): the controller computed the echoes (a pure deposits query);
+## from here the wavefront + echo lifecycle are cosmetic clockwork.
+func start_scan(origin: Vector2, echoes: Array[Dictionary]) -> void:
+	_scan_origin = origin
+	_scan_age = 0.0
+	_scan_echoes = echoes
+	_scan_range = MainView.SCAN_RANGE_CELLS * float(CELL)
+
+
 func _process(delta: float) -> void:
 	_anim_time += delta
+	if _scan_age >= 0.0:
+		_scan_age += delta
+		if _scan_age > _scan_range / SCAN_WAVE_SPEED + SCAN_ECHO_LINGER:
+			_scan_age = -1.0    # pulse spent, every echo faded — the scan is over
+			_scan_echoes = []
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
@@ -286,7 +308,41 @@ func _draw() -> void:
 	_draw_mine_cracks()    # spider cracks on the block you're charge-mining (the felt friction)
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_ping()           # the map-click beacon — the spot you marked, findable on foot
+	_draw_scan()           # the sonar pulse + vein echoes (the scanner's whole voice)
 	_draw_aim()
+
+
+## THE SONAR (FABLE_50 #27): an expanding wavefront ring from the body, and — as it passes each vein's
+## true distance — an ECHO: a pip + expanding ring in the vein's own nugget colour, glowing THROUGH the
+## rock, lingering a few seconds then gone. Prospecting, not a map reveal: transient, local, and it
+## only ever shows deposits that were in range when you fired.
+func _draw_scan() -> void:
+	if _scan_age < 0.0:
+		return
+	var front: float = _scan_age * SCAN_WAVE_SPEED
+	if front <= _scan_range:                                # the pulse itself, while it still travels
+		var edge: float = clampf(1.0 - front / _scan_range, 0.0, 1.0)
+		var wc := Color(0.45, 0.95, 1.0, 0.10 + 0.30 * edge)
+		draw_arc(_scan_origin, front, 0.0, TAU, 64, wc, 2.0)
+		draw_arc(_scan_origin, maxf(front - 9.0, 0.0), 0.0, TAU, 64,
+			Color(wc.r, wc.g, wc.b, wc.a * 0.4), 1.2)
+	for e: Dictionary in _scan_echoes:
+		var since_hit: float = _scan_age - float(e["dist"]) / SCAN_WAVE_SPEED
+		if since_hit < 0.0 or since_hit > SCAN_ECHO_LINGER:
+			continue
+		var fade: float = 1.0 - since_hit / SCAN_ECHO_LINGER
+		var pos: Vector2 = e["pos"]
+		var col: Color = _material(e["material"] as StringName).nugget_color
+		var ring: float = fmod(since_hit, 1.1) / 1.1        # each echo keeps re-ringing as it fades
+		draw_arc(pos, 5.0 + ring * 16.0, 0.0, TAU, 20,
+			Color(col.r, col.g, col.b, 0.9 * fade * (1.0 - ring)), 2.0)
+		# The return itself: a diamond pip big enough to read in DAYLIGHT (the additive glow only
+		# carries it in the dark), white-cored so it reads "signal", not "another ore fleck".
+		var r: float = 4.5 + 1.0 * fade
+		draw_colored_polygon(PackedVector2Array([pos + Vector2(0.0, -r), pos + Vector2(r, 0.0),
+			pos + Vector2(0.0, r), pos + Vector2(-r, 0.0)]),
+			Color(col.r, col.g, col.b, 0.55 + 0.4 * fade))
+		draw_circle(pos, 1.6, Color(1.0, 1.0, 1.0, 0.55 + 0.4 * fade))
 
 
 ## The in-world PING beacon (FABLE_50 #34): a cyan pin bobbing over the marked spot + an expanding
@@ -1407,6 +1463,16 @@ func _skylight_alpha(row: int, surf: int) -> float:
 ## + a glow per falling drop (the gravity stream made loud).
 func _paint_lights(layer: LightLayer) -> void:
 	_paint_godrays(layer)  # under the pools: daylight SHAFTS pouring down dug columns
+	# Sonar echoes GLOW through the darkness veil (#27) — an answer from inside unlit rock must read
+	# in the black, or the scanner is useless exactly where prospecting matters.
+	if _scan_age >= 0.0:
+		for e: Dictionary in _scan_echoes:
+			var since_hit: float = _scan_age - float(e["dist"]) / SCAN_WAVE_SPEED
+			if since_hit < 0.0 or since_hit > SCAN_ECHO_LINGER:
+				continue
+			var fade: float = 1.0 - since_hit / SCAN_ECHO_LINGER
+			_draw_glow(layer, e["pos"], float(CELL) * 2.1,
+				_material(e["material"] as StringName).nugget_color, 0.65 * fade)
 	if player != null:
 		var f: float = float(player.facing)
 		# A faint flicker so the lamp reads as a live flame, not a static disc.

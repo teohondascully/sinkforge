@@ -63,6 +63,10 @@ const TOOLS: Dictionary = {
 	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.7},
 	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 2.6},
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
+	# The SCANNER (FABLE_50 #27) is EQUIPMENT, not a breaker: its own class so it never enters a
+	# pick/axe speed query, speed 0 (no material requires &"scanner"). Listed here so is_tool_item
+	# treats it as gear — it can't be fed into a machine like a resource.
+	&"scanner": {&"class": &"scanner", &"tier": 1, &"speed": 0.0},
 }
 
 ## Craftable tools -> their ingredient cost (spent from the pack, at the Bazaar). Mirrors MachineDef
@@ -77,6 +81,9 @@ const TOOL_RECIPES: Dictionary = {
 	# band will gate on (docs/MINING.md — no sub-L2 band exists yet, so nothing bounces a stone pick
 	# that this one opens; that arrives with L3 worldgen, demand-pull).
 	&"iron_pickaxe": {&"iron_ingot": 6, &"wood": 3},
+	# The sonar (FABLE_50 #27): cheap in materials, gated by PROSPECTING research instead (the sim's
+	# craft_item refuses it until the tech is in — ResearchRules.locking_tech drives the gate).
+	&"scanner": {&"ingot": 2, &"coal": 1},
 }
 
 ## The two tools every new game begins with — a bad pick + a bad axe (seeded by MainView into the pack).

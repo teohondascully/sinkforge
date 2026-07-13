@@ -27,6 +27,8 @@ var _defs: Array[Dictionary] = [
 		"text": "ROPE — RMB an open cell above a drop and it unrolls DOWN to you. W/S climbs it, SPACE leaps off."},
 	{"id": &"torch", "item": &"torch",
 		"text": "TORCH — RMB mounts it on a wall-backed cell (or beside rock). Its light STAYS — claim the dark."},
+	{"id": &"scanner", "item": &"scanner",
+		"text": "SCANNER — select it and RMB fires a sonar pulse: every vein in range echoes through the rock."},
 	{"id": &"generator", "item": &"generator",
 		"text": "GENERATOR — place it, then drop COAL on it (Q). It radiates POWER to machines nearby."},
 	{"id": &"conduit", "item": &"conduit",

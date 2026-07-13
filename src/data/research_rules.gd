@@ -23,6 +23,14 @@ const TECHS: Dictionary = {
 		"cost": {&"ingot": 2},
 		"unlocks": [&"drill", &"hopper"],
 	},
+	&"prospecting": {
+		"name": "Prospecting",
+		"requires": &"automation",             # the tree's first BRANCH (same tier as Power in the graph)
+		"sample": &"ore",                      # analyze a vein — learn what its echo sounds like
+		"cost": {&"ingot": 4},
+		"unlocks": [&"scanner"],               # the handheld sonar (FABLE_50 #27) — finds the veins that
+		                                       # pay the 12-ingot Power wall right after
+	},
 	&"power": {
 		"name": "Power",
 		"requires": &"automation",
@@ -55,8 +63,10 @@ const TECHS: Dictionary = {
 	},
 }
 
-## Display/keybinding order for the bench rows (explicit, not dict-order-implicit).
-const ORDER: Array[StringName] = [&"automation", &"power", &"descent", &"ironworks", &"machining"]
+## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
+## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
+## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining"]
 
 
 static func tech(id: StringName) -> Dictionary:

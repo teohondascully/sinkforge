@@ -319,6 +319,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
 	if item == &"torch":
 		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
+	if item == &"scanner":
+		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld (FABLE_50 #27)
 	if item == &"iron":
 		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
 	if item == &"iron_ingot":
@@ -358,6 +360,8 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_coal(canvas, center, size)
 		&"wood":
 			_item_wood(canvas, center, size)
+		&"scanner":
+			_item_scanner(canvas, center, size)
 		&"wood_pickaxe":
 			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47))
 		&"stone_pickaxe":
@@ -409,6 +413,25 @@ static func _item_plate(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 
 ## GEAR — a toothed cog with a punched hub (the mill's product; also the generic-machine motif).
+## The SCANNER (FABLE_50 #27): a dark handheld with a cyan screen, a stub antenna, and sonar arcs —
+## reads as "a device that listens" at hotbar size.
+static func _item_scanner(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var s: float = size * 0.5
+	var body := Color(0.20, 0.24, 0.30)
+	var glow := Color(0.45, 0.85, 0.95)
+	canvas.draw_rect(Rect2(c + Vector2(-s * 0.42, -s * 0.30), Vector2(s * 0.84, s * 1.05)), body)
+	canvas.draw_rect(Rect2(c + Vector2(-s * 0.42, -s * 0.30), Vector2(s * 0.84, s * 1.05)),
+		Color(0.0, 0.0, 0.0, 0.4), false, 1.0)
+	canvas.draw_rect(Rect2(c + Vector2(-s * 0.28, -s * 0.14), Vector2(s * 0.56, s * 0.44)),
+		Color(glow.r, glow.g, glow.b, 0.85))                                    # the screen
+	canvas.draw_circle(c + Vector2(0.0, s * 0.52), s * 0.10, glow)              # the blink lamp
+	canvas.draw_line(c + Vector2(s * 0.22, -s * 0.30), c + Vector2(s * 0.38, -s * 0.72), body, 2.0)
+	canvas.draw_circle(c + Vector2(s * 0.38, -s * 0.72), s * 0.09, glow)        # antenna tip
+	for i: int in 2:                                                            # sonar arcs off the antenna
+		canvas.draw_arc(c + Vector2(s * 0.38, -s * 0.72), s * (0.28 + 0.22 * float(i)),
+			-PI * 0.55, PI * 0.05, 8, Color(glow.r, glow.g, glow.b, 0.7 - 0.25 * float(i)), 1.2)
+
+
 static func _item_gear(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var bronze := Color(0.80, 0.64, 0.30)
 	canvas.draw_circle(c, size * 0.26, bronze)

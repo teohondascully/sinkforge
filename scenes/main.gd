@@ -84,7 +84,14 @@ var _machine_defs_by_id: Dictionary = {}
 const CRAFT_TOOLS: Array[Dictionary] = [
 	{"id": &"stone_pickaxe", "name": "Stone Pickaxe"},
 	{"id": &"iron_pickaxe", "name": "Iron Pickaxe"},
+	{"id": &"scanner", "name": "Scanner"},
 ]
+## THE SCANNER (FABLE_50 #27): with it selected, RMB fires a sonar pulse from the body — ore bodies in
+## range answer with echo rings THROUGH the rock (transient, localized: prospecting, not a map reveal).
+const SCAN_RANGE_CELLS: float = 14.0
+const SCAN_COOLDOWN: float = 1.6           ## pacing between pulses (feel, not economy)
+var _scan_cooldown: float = 0.0
+var _scan_dings: Array[Dictionary] = []    ## scheduled sonar returns: {at: seconds-from-now, pos, near}
 ## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
 ## item is what E deposits (a resource) or RMB places (a machine) — the unified Factorio-style hotbar.
 var _inv_selected: int = 0
@@ -502,6 +509,15 @@ func _update_bazaars(delta: float) -> void:
 ## decay the screenshake into the camera offset. None of this touches the sim.
 func _update_juice(delta: float) -> void:
 	_particles.advance(delta)
+	# Sonar pacing + the staggered returns: each scheduled ding fires when the wavefront (whose speed
+	# the renderer owns) actually reaches its vein — you HEAR the distance.
+	_scan_cooldown = maxf(0.0, _scan_cooldown - delta)
+	for i: int in range(_scan_dings.size() - 1, -1, -1):
+		var d: Dictionary = _scan_dings[i]
+		d["at"] = float(d["at"]) - delta
+		if float(d["at"]) <= 0.0:
+			_sfx.play(&"ding", d["pos"], 1.7, -10.0)
+			_scan_dings.remove_at(i)
 	# The factory HEARTBEAT: the hum swells with how much machinery is WORKING near you — walk away
 	# and it fades; the base you built is a presence you can hear before you see it.
 	if _player != null and _sfx != null:
@@ -576,7 +592,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		try_configure(_aim)                                   # R in the world: configure the aimed machine
 	elif event.is_action_pressed(Controls.BUILD):
 		if not _cursor_on_minimap():                          # the open map is UI — clicks on it never build
-			try_build(_aim)
+			if _selected_item() == &"scanner":
+				try_scan()                                    # the selected item defines RMB: sonar, not build
+			else:
+				try_build(_aim)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_minimap():
 		_toggle_ping(get_viewport().get_mouse_position())     # click the map → set/clear the ping
@@ -831,6 +850,38 @@ func try_craft(def: MachineDef) -> bool:
 	if made:
 		_sfx.ui(&"ding")
 	return made
+
+
+## Fire the SONAR (FABLE_50 #27): a pulse expands from the body; every still-solid deposit in range
+## answers with an echo ring through the rock (the renderer draws it) and a distance-staggered return
+## chirp — literal sonar. Requires carrying a Scanner; a short cooldown paces it. Pure QUERY: reads
+## deposits, mutates nothing — the whole feature adds ZERO sim state.
+func try_scan() -> bool:
+	if _paused or _scan_cooldown > 0.0 or _player == null:
+		return false
+	if int(sim.inventory.get(&"scanner", 0)) <= 0:
+		return false
+	var origin: Vector2 = _player.position
+	var echoes: Array[Dictionary] = []
+	var range_px: float = SCAN_RANGE_CELLS * float(CELL)
+	for cell_v: Variant in sim.deposits:
+		var cell: Vector2i = cell_v
+		if not sim.is_solid(cell) or sim.ore_deposit_at(cell) <= 0:
+			continue
+		var pos: Vector2 = _cell_center(cell)
+		var dist: float = origin.distance_to(pos)
+		if dist <= range_px:
+			echoes.append({"cell": cell, "pos": pos, "dist": dist, "material": sim.material_at(cell)})
+	echoes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["dist"]) < float(b["dist"]))
+	_scan_cooldown = SCAN_COOLDOWN
+	_renderer.start_scan(origin, echoes)
+	_sfx.ui(&"pop", 0.55)                                     # the low fire chirp
+	for i: int in mini(echoes.size(), 6):                     # returns, staggered by true distance
+		_scan_dings.append({"at": float(echoes[i]["dist"]) / WorldRenderer.SCAN_WAVE_SPEED,
+			"pos": echoes[i]["pos"]})
+	if echoes.is_empty():
+		_hud.flash("no echoes — nothing in range")
+	return true
 
 
 ## Craft a TOOL (e.g. the Stone Pickaxe) from carried materials — same Bazaar gate + same generic sink as
@@ -1178,6 +1229,14 @@ func _hover_info() -> Dictionary:
 		if per_min > 0.05:
 			info["rate"] = "factory makes %.1f %s/min" % [per_min, String(rate_item)]
 	return info
+
+
+## The item id in the active hotbar slot, or &"" when the pack is empty.
+func _selected_item() -> StringName:
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return &""
+	return slots[clampi(_inv_selected, 0, slots.size() - 1)]["item"]
 
 
 ## The machine def for the active hotbar slot, or null if the selected item isn't a placeable
