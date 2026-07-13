@@ -13,7 +13,14 @@ extends Node2D
 
 const CELL: int = 32
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
-const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
+const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface (the gradient's mid tone)
+## PARALLAX ridgeline layers (FABLE_50 #10): factor = how world-locked (1 = terrain speed, 0 = pinned
+## to the camera — smaller reads further away), drop = px below the horizon band the ridge crests sit,
+## amp = crest height. Far hills are lighter (atmospheric haze), near hills darker.
+const RIDGES: Array[Dictionary] = [
+	{"factor": 0.22, "drop": 150.0, "amp": 150.0, "freq": 0.006, "color": Color(0.145, 0.165, 0.225)},
+	{"factor": 0.42, "drop": 55.0, "amp": 110.0, "freq": 0.010, "color": Color(0.062, 0.072, 0.112)},
+]
 
 ## --- Lighting (the mood lever) -----------------------------------------------------------------
 ## The model is SKYLIGHT + ambient, not a depth gradient: the underground is near-black EVERYWHERE,
@@ -66,6 +73,7 @@ const CHUNK: int = 8                                  ## cells per chunk side (8
 var _chunks: Array[LightLayer] = []                  ## row-major grid, size _chunk_cols × _chunk_rows
 var _chunk_cols: int = 0
 var _chunk_rows: int = 0
+var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 var _dark: LightLayer
 var _lights: LightLayer
 var _glow_tex: GradientTexture2D
@@ -106,6 +114,13 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 			chunk.setup(-10, false, _paint_terrain_chunk.bind(rect))  # painter(ci, rect) draws only this block
 			add_child(chunk)
 			_chunks.append(chunk)
+	# The PARALLAX BACKDROP (FABLE_50 #10) sits BELOW the terrain chunks (z -20), repainted per frame:
+	# a vertical sky gradient + two drifting ridgelines + slow clouds. The chunk background pass no
+	# longer fills opaque sky, so the vista shows wherever no wall backs a cell (above ground); the
+	# walls hide it underground for free.
+	_back = LightLayer.new()
+	_back.setup(-20, false, _paint_backdrop)
+	add_child(_back)
 	# Two world-space canvases ABOVE this renderer's draw — the skylight/darkness veil, then light pools.
 	_glow_tex = _make_glow_texture()
 	_dark = LightLayer.new()
@@ -166,6 +181,8 @@ func _process(delta: float) -> void:
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
+	if _back != null:
+		_back.queue_redraw()    # the parallax vista slides against the camera (a few polygons — cheap)
 	# Terrain depends on the dug world, NOT the cosmetic clock. Repaint ONLY the chunks whose cells actually
 	# changed this frame (sim.terrain_dirty) — a dig rebuilds ~64 cells, not the whole 7700-cell world (the
 	# old ~300ms freeze). A changed cell also dirties its 4 neighbour chunks, since edge-AO + the surface cap
@@ -862,11 +879,62 @@ func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> 
 			t += dash * 2.0
 
 
-## Sky + the REAL background WALL layer (sim.wall). Open sky fills the top; each wall cell paints its
-## material colour (depth-darkened) BEHIND the terrain, so a dug-out cell reveals the carved-room backing.
+## THE PARALLAX BACKDROP (FABLE_50 #10): what the sky IS when nothing backs a cell. A vertical
+## gradient (deep night up top, warming toward the horizon), two ridgeline silhouettes sliding at
+## sub-terrain speed (the depth read: hills further than the world), and a few slow clouds. Fully
+## deterministic per frame from the camera + the cosmetic clock — no state, no nodes, four polygons.
+func _paint_backdrop(ci: CanvasItem) -> void:
+	var view: Rect2 = (ci.get_canvas_transform().affine_inverse() * ci.get_viewport_rect()).grow(96.0)
+	var cam: Vector2 = view.get_center()
+	var horizon: float = float(SURFACE_LINE) * float(CELL)
+	var top_c := Color(0.045, 0.06, 0.105)             # zenith: deeper night than the old flat fill
+	var hor_c := Color(0.125, 0.135, 0.185)            # horizon: a breath lighter (distant airglow)
+	var grad_top: float = horizon - 420.0
+	ci.draw_rect(Rect2(view.position, Vector2(view.size.x, maxf(0.0, grad_top - view.position.y))), top_c)
+	var quad := PackedVector2Array([Vector2(view.position.x, grad_top), Vector2(view.end.x, grad_top),
+		Vector2(view.end.x, horizon), Vector2(view.position.x, horizon)])
+	ci.draw_polygon(quad, PackedColorArray([top_c, top_c, hor_c, hor_c]))
+	if view.end.y > horizon:
+		ci.draw_rect(Rect2(Vector2(view.position.x, horizon),
+			Vector2(view.size.x, view.end.y - horizon)), hor_c)
+	# Clouds: soft three-lobe blobs drifting with the wind, barely lighter than the sky. Each wraps
+	# through the visible span on its own phase so the cover never visibly loops.
+	var span: float = view.size.x + 500.0
+	for i: int in 5:
+		var h: float = float((i * 2654435761) % 1000) / 1000.0
+		var p: float = 0.10 + h * 0.06                                  # nearly pinned = far away
+		var cx: float = view.position.x - 250.0 + fposmod(
+			h * 4000.0 + _anim_time * (4.0 + h * 3.0) + cam.x * (1.0 - p) - view.position.x, span)
+		var cy: float = horizon - 300.0 - h * 130.0 + cam.y * (1.0 - p) * 0.25
+		var cc := Color(0.42, 0.47, 0.58, 0.05 + h * 0.02)
+		var r: float = 26.0 + h * 30.0
+		ci.draw_circle(Vector2(cx, cy), r, cc)
+		ci.draw_circle(Vector2(cx - r * 0.9, cy + r * 0.25), r * 0.7, cc)
+		ci.draw_circle(Vector2(cx + r * 0.9, cy + r * 0.22), r * 0.75, cc)
+	# Ridgelines: far-to-near silhouettes. Sampled in FEATURE space (x shifted by the camera's
+	# unparallaxed remainder) so crests slide slower than the terrain — the whole depth illusion.
+	for ridge: Dictionary in RIDGES:
+		var f: float = float(ridge["factor"])
+		var amp: float = float(ridge["amp"])
+		var freq: float = float(ridge["freq"])
+		var base_y: float = horizon - float(ridge["drop"]) + cam.y * (1.0 - f) * 0.30
+		var pts := PackedVector2Array()
+		var x: float = view.position.x
+		while x <= view.end.x + 24.0:
+			var u: float = (x - cam.x * (1.0 - f)) * freq
+			var crest: float = sin(u * TAU) * 0.55 + sin(u * TAU * 2.31 + 1.7) * 0.30 \
+				+ sin(u * TAU * 0.47 + 0.6) * 0.35
+			pts.append(Vector2(x, base_y - (crest * 0.5 + 0.5) * amp))
+			x += 24.0
+		pts.append(Vector2(view.end.x + 24.0, horizon + 320.0))
+		pts.append(Vector2(view.position.x, horizon + 320.0))
+		ci.draw_colored_polygon(pts, ridge["color"] as Color)
+
+
+## The REAL background WALL layer (sim.wall): each wall cell paints its material colour (depth-
+## darkened) BEHIND the terrain, so a dug-out cell reveals the carved-room backing. Cells with NO wall
+## stay transparent — the parallax backdrop (z -20) shows through, which is what makes open sky sky.
 func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
-	# Sky base for just this chunk's box (open air shows it; walls paint over it below).
-	ci.draw_rect(Rect2(Vector2(rect.position) * float(CELL), Vector2(rect.size) * float(CELL)), SKY_COLOR)
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
 			var c := Vector2i(cx, cy)
