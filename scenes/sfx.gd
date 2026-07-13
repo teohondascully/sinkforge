@@ -17,6 +17,11 @@ var _pool_idx: int = 0
 var _ui_player: AudioStreamPlayer
 var _hum_player: AudioStreamPlayer
 var _hum_level: float = 0.0                   # smoothed 0..1
+var _wind_player: AudioStreamPlayer           # ambience bed: surface wind
+var _cave_player: AudioStreamPlayer           # ambience bed: deep cave-air
+var _wind_level: float = 0.0                  # smoothed 0..1
+var _cave_level: float = 0.0
+var _drip_in: float = 4.0                     # seconds until the next cave drip
 ## Headless (the harness): the Dummy audio driver never steps its mixer, so a started voice is never
 ## reaped and trips the ObjectDB leak warning at quit. Playback is a NO-OP there — synthesis still
 ## runs (keeps the code path warm), nothing ever plays. Real runs are untouched.
@@ -32,6 +37,8 @@ func _ready() -> void:
 	_streams[&"ding"] = _wav(_gen_ding())
 	_streams[&"chime"] = _wav(_gen_chime())
 	_streams[&"pop"] = _wav(_gen_pop())
+	_streams[&"drip"] = _wav(_gen_drip())
+	_streams[&"boom"] = _wav(_gen_boom(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -52,8 +59,14 @@ func _ready() -> void:
 	_hum_player.stream = hum
 	_hum_player.volume_db = -60.0
 	add_child(_hum_player)
+	# AMBIENCE BEDS (audio slice 2): two more loops — surface WIND and deep CAVE-AIR — crossfaded by
+	# where the body is (set_ambience). Underground you hear the earth, on top you hear the sky.
+	_wind_player = _make_loop_player(_gen_wind(rng))
+	_cave_player = _make_loop_player(_gen_cave(rng))
 	if not _muted:
 		_hum_player.play()
+		_wind_player.play()
+		_cave_player.play()
 
 
 ## Stop every voice on teardown — a stream still playing at quit leaves its playback object alive in
@@ -61,10 +74,9 @@ func _ready() -> void:
 ## Dropping the stream refs too matters under the headless Dummy driver, whose mixer never steps and
 ## so never reaps a stopped voice on its own.
 func _exit_tree() -> void:
-	_hum_player.stop()
-	_hum_player.stream = null
-	_ui_player.stop()
-	_ui_player.stream = null
+	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _ui_player]:
+		bed.stop()
+		bed.stream = null
 	for p: AudioStreamPlayer2D in _pool:
 		p.stop()
 		p.stream = null
@@ -99,6 +111,50 @@ func ui(name: StringName, pitch: float = 1.0) -> void:
 func set_hum(level: float, delta: float) -> void:
 	_hum_level = move_toward(_hum_level, clampf(level, 0.0, 1.0), delta * 0.8)
 	_hum_player.volume_db = lerpf(-60.0, -22.0, _hum_level)
+
+
+## The AMBIENCE crossfade (audio slice 2): `surface` 0..1 drives the wind bed, `cave` 0..1 the
+## cave-air bed — the controller derives both from how deep the body sits below its column's surface,
+## so descending trades sky for earth across a few rows. Deep enough, the dark starts DRIPPING:
+## intermittent water blips placed randomly around the listener, more frequent the deeper you are.
+func set_ambience(surface: float, cave: float, listener: Vector2, delta: float) -> void:
+	_wind_level = move_toward(_wind_level, clampf(surface, 0.0, 1.0), delta * 0.6)
+	_cave_level = move_toward(_cave_level, clampf(cave, 0.0, 1.0), delta * 0.6)
+	_wind_player.volume_db = lerpf(-60.0, -26.0, _wind_level)
+	_cave_player.volume_db = lerpf(-60.0, -21.0, _cave_level)
+	_drip_in -= delta
+	if _drip_in <= 0.0:
+		_drip_in = randf_range(3.0, 9.0)
+		if _cave_level > 0.3:
+			play(&"drip", listener + Vector2(randf_range(-160.0, 160.0), randf_range(-90.0, 90.0)),
+				randf_range(0.85, 1.25), -6.0)
+
+
+## A silent looping non-positional bed from a sample buffer (the ambience beds + the hum share this shape).
+func _make_loop_player(samples: PackedFloat32Array) -> AudioStreamPlayer:
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = RATE
+	w.data = _to_pcm(samples)
+	w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	w.loop_end = samples.size()
+	var p := AudioStreamPlayer.new()
+	p.stream = w
+	p.volume_db = -60.0
+	add_child(p)
+	return p
+
+
+## Crossfade a buffer's tail into its head (~90ms) so a noise-based loop closes without a click —
+## pure sines loop on exact cycles, but filtered noise never lands back where it started.
+func _loopify(samples: PackedFloat32Array) -> PackedFloat32Array:
+	var fade: int = mini(int(RATE * 0.09), samples.size() / 4)
+	var n: int = samples.size() - fade
+	for i: int in fade:
+		var t: float = float(i) / float(fade)
+		samples[i] = lerpf(samples[n + i], samples[i], t)
+	samples.resize(n)
+	return samples
 
 
 # --- synthesis (all at boot; ~1s of audio total) -----------------------------------------------
@@ -178,6 +234,74 @@ func _gen_pop() -> PackedFloat32Array:
 		phase += TAU * lerpf(350.0, 950.0, t) / float(RATE)
 		out[i] = sin(phase) * (1.0 - t) * 0.55
 	return out
+
+## Surface WIND: gusting band-limited noise — two chained one-pole lowpasses (a soft band around the
+## breathy low-mids) under a slow two-sine gust LFO, loopified. The sky as a sound.
+func _gen_wind(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 3
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp1: float = 0.0
+	var lp2: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		lp1 += 0.12 * (rng.randf_range(-1.0, 1.0) - lp1)
+		lp2 += 0.20 * (lp1 - lp2)
+		var gust: float = 0.6 + 0.25 * sin(TAU * 0.13 * t) + 0.15 * sin(TAU * 0.071 * t + 1.7)
+		out[i] = lp2 * gust * 2.6
+	return _loopify(out)
+
+
+## Deep CAVE-AIR: a sub drone (a slow-beating 38/57 Hz pair) over a whisper of brown-ish noise, with a
+## very slow swell so the dark feels like it breathes. Loopified.
+func _gen_cave(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 3
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		lp += 0.03 * (rng.randf_range(-1.0, 1.0) - lp)
+		var swell: float = 0.75 + 0.25 * sin(TAU * 0.09 * t)
+		out[i] = (sin(TAU * 38.0 * t) * 0.30 + sin(TAU * 57.0 * t) * 0.16 + lp * 0.5) * swell
+	return _loopify(out)
+
+
+## A cave DRIP: a fast pitch-falling blip and its fainter echo — water finding the floor in the dark.
+func _gen_drip() -> PackedFloat32Array:
+	var n: int = int(RATE * 0.34)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		phase += TAU * lerpf(1500.0, 620.0, clampf(t / 0.05, 0.0, 1.0)) / float(RATE)
+		var s: float = sin(phase) * exp(-t * 26.0) * 0.7
+		if t > 0.14:                                    # the echo: same blip, further away
+			var te: float = t - 0.14
+			s += sin(TAU * 900.0 * te) * exp(-te * 30.0) * 0.22
+		out[i] = s
+	return out
+
+
+## The BREACH stinger: a sub-bass glide (85 -> 26 Hz) under a rock-burst of noise on the front — the
+## seal giving way beneath a hundred tonnes of quota. Big on purpose; it marks a once-per-world event.
+func _gen_boom(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 1.4)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase: float = 0.0
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		var tt: float = float(i) / float(RATE)
+		phase += TAU * lerpf(85.0, 26.0, sqrt(t)) / float(RATE)
+		var s: float = sin(phase) * pow(1.0 - t, 1.2)
+		lp += 0.35 * (rng.randf_range(-1.0, 1.0) - lp)
+		s += lp * exp(-tt * 9.0) * 0.9                  # the shattering front, gone in ~a third of a second
+		out[i] = clampf(s, -1.0, 1.0)
+	return out
+
 
 ## The hum loop: one seamless second of low drone (55 + 110 Hz) with a whisper of noise floor.
 func _gen_hum(rng: RandomNumberGenerator) -> PackedFloat32Array:

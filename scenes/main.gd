@@ -102,6 +102,9 @@ var _motes: GPUParticles2D
 ## Procedural audio (FABLE_50 #8) — synthesized SFX + the factory hum. Poked from the same verb hooks
 ## that fire particles; never touches the sim.
 var _sfx: Sfx
+## Descent engines whose breach we've already sounded (cell -> true). Primed on seed/load so an engine
+## that breached before this session doesn't boom retroactively; a live breach booms exactly once.
+var _breach_heard: Dictionary = {}
 
 
 func _ready() -> void:
@@ -200,6 +203,7 @@ func _ready() -> void:
 	hud.minimap_color = _renderer.material_color
 
 	_setup_post_fx()
+	_prime_breach_watch()   # fixtures may seed pre-breached engines; they don't boom at boot
 
 
 ## Modern-rendering layer (docs/MODERN_FEEL.md): a WorldEnvironment post-process that gives the scene
@@ -487,6 +491,22 @@ func _update_juice(delta: float) -> void:
 					and sim.machine_status(m) == &"working":
 				working += 1.0
 		_sfx.set_hum(working / 5.0, delta)
+		# AMBIENCE BEDS (audio slice 2): where the body IS, heard. Wind above ground, dying within a
+		# few rows of descent; cave-air (+ intermittent drips) swelling to full ~10 rows under the
+		# surface of your column. Crossfaded inside Sfx, so climbing a shaft trades earth for sky.
+		var below: float = float(_body_cell().y - sim.surface_row(_body_cell().x))
+		_sfx.set_ambience(clampf(1.0 - below / 4.0, 0.0, 1.0), clampf(below / 10.0, 0.0, 1.0),
+			_player.position, delta)
+		# THE BREACH stinger: a Descent Engine reaching quota bores the seal open — a once-per-world
+		# event that deserves a sound the size of the moment. Edge-latched per engine; _prime_breach
+		# marks engines that were ALREADY breached (fresh seed / loaded save), so only a breach that
+		# happens on your watch booms.
+		for m: MachineState in sim.machines:
+			if m.def.behavior == &"descent" and m.fed >= FactorySim.DESCENT_QUOTA \
+					and not _breach_heard.has(m.cell):
+				_breach_heard[m.cell] = true
+				_sfx.play(&"boom", _cell_center(m.cell), 1.0, 8.0)
+				_shake = maxf(_shake, 7.0)
 	if _player != null:
 		var feet: Vector2 = _player.position + Vector2(0.0, Player.HEIGHT * 0.5)
 		if _player.landed_hard:
@@ -875,7 +895,17 @@ func _load_game() -> void:
 		_player.position = pp
 		_player.velocity = Vector2.ZERO
 	_renderer.repaint_world()
+	_prime_breach_watch()   # a breach that happened before this save doesn't boom retroactively
 	_hud.flash("LOADED")
+
+
+## Mark every ALREADY-breached descent engine as heard, so the breach stinger fires only for a breach
+## that happens on the player's watch (fresh session start + after every load).
+func _prime_breach_watch() -> void:
+	_breach_heard.clear()
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"descent" and m.fed >= FactorySim.DESCENT_QUOTA:
+			_breach_heard[m.cell] = true
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.
