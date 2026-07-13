@@ -8,9 +8,17 @@ extends RefCounted
 ## update tick + draw, so MainView stays a controller, not a particle system.
 
 const FALL_DURATION: float = 0.30
+## HARD CAP on live discrete drops (FABLE_50 #5): the abstract flow layer is authoritative — production
+## math never depends on these — so past the cap a new drop adds churn and screen noise, not information
+## (a pouring column at 240 reads identically to one at 400). Spawns beyond it simply aren't visualized.
+const MAX_ITEMS: int = 240
 
 ## Each drop: {from, to: Vector2 (world), t: 0..1 progress, color: Color}.
 var _items: Array[Dictionary] = []
+## Retired drop dicts, reused by the next spawn — the high-churn pooling the principles doc asks for
+## (docs/ARCHITECTURE_PRINCIPLES.md): steady-state streaming allocates NOTHING per event.
+var _pool: Array[Dictionary] = []
+var _motes_scratch: Array[Dictionary] = []   ## reused motes() output (the light pass calls it per frame)
 
 
 ## Turn this tick's sim flow_events into drops (and consume them). `cell_center` maps a cell → world
@@ -23,37 +31,65 @@ func spawn_from_events(sim: FactorySim, cell_center: Callable) -> void:
 		var count: int = int(ev["count"])
 		for i: int in count:
 			var jitter := Vector2((float(i) - float(count - 1) * 0.5) * 4.0, 0.0)
-			_items.append({"from": from + jitter, "to": to + jitter, "t": 0.0, "color": color})
+			_spawn(from + jitter, to + jitter, color, 0.0)
 	sim.flow_events.clear()
 
 
 ## Inject a drop directly (staged visual captures / tests bypass the sim event channel); `t` seeds its
 ## progress so a capture can stage a spread-out stream in one frame.
 func inject(from: Vector2, to: Vector2, color: Color, t: float = 0.0) -> void:
-	_items.append({"from": from, "to": to, "t": t, "color": color})
+	_spawn(from, to, color, t)
 
 
-## Advance every drop along its fall; retire the ones that have arrived.
+## One drop into flight: from the pool when it has one (overwrite in place), a fresh dict only while
+## the pool is still warming up. Refused (silently — cosmetic layer) once MAX_ITEMS are in the air.
+func _spawn(from: Vector2, to: Vector2, color: Color, t: float) -> void:
+	if _items.size() >= MAX_ITEMS:
+		return
+	var f: Dictionary
+	if _pool.is_empty():
+		f = {"from": from, "to": to, "t": t, "color": color}
+	else:
+		f = _pool.pop_back()
+		f["from"] = from
+		f["to"] = to
+		f["t"] = t
+		f["color"] = color
+	_items.append(f)
+
+
+## Advance every drop along its fall; retire arrivals into the pool. In-place swap-remove (no rebuilt
+## array per frame) — draw order between two falling nuggets is imperceptible, so the shuffle is free.
 func advance(delta: float) -> void:
-	var keep: Array[Dictionary] = []
-	for f: Dictionary in _items:
+	var i: int = _items.size() - 1
+	while i >= 0:
+		var f: Dictionary = _items[i]
 		var t: float = float(f["t"]) + delta / FALL_DURATION
 		if t < 1.0:
 			f["t"] = t
-			keep.append(f)
-	_items = keep
+		else:
+			_items[i] = _items[_items.size() - 1]
+			_items.resize(_items.size() - 1)
+			_pool.append(f)
+		i -= 1
 
 
 func size() -> int:
 	return _items.size()
 
 
-## Current {pos, color} of each drop — MainView's light pass turns these into glowing motes.
+## Current {pos, color} of each drop — MainView's light pass turns these into glowing motes. Returns a
+## REUSED scratch array (valid until the next call): the per-frame caller iterates and forgets it.
 func motes() -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	for f: Dictionary in _items:
-		out.append({"pos": _pos(f), "color": f["color"]})
-	return out
+	if _motes_scratch.size() > _items.size():
+		_motes_scratch.resize(_items.size())
+	while _motes_scratch.size() < _items.size():
+		_motes_scratch.append({"pos": Vector2.ZERO, "color": Color.WHITE})
+	for i: int in _items.size():
+		var m: Dictionary = _motes_scratch[i]
+		m["pos"] = _pos(_items[i])
+		m["color"] = _items[i]["color"]
+	return _motes_scratch
 
 
 ## The world position of a drop along its ballistic arc (the ONE authority — the trail samples it too).

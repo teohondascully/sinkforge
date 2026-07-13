@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_test_research()
 	_test_descent_gate()
 	_test_hints()
+	_test_falling_pool()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1772,3 +1773,28 @@ func _test_hints() -> void:
 	s2.inventory[&"splitter"] = 2
 	h2.refresh(0.016)
 	_check(h2.active_text().begins_with("SPLITTER"), "resync re-arms edges for what comes after")
+
+
+## FALLING-ITEM POOLING + CAP (FABLE_50 #5 — scenes/falling_items.gd, cosmetic layer): live drops are
+## HARD-CAPPED (the abstract flow layer is authoritative, extra visuals are pure churn); retired drops
+## recycle through a pool; the motes() scratch tracks the live count. Behavioral only — no allocation
+## probes, just the observable contract the pool must keep.
+func _test_falling_pool() -> void:
+	print("[falling pool]")
+	var falling: FallingItems = FallingItems.new()
+	for i: int in FallingItems.MAX_ITEMS + 50:
+		falling.inject(Vector2.ZERO, Vector2(0.0, 64.0), Color.WHITE)
+	_check(falling.size() == FallingItems.MAX_ITEMS,
+		"live drops hard-cap at MAX_ITEMS (%d)" % falling.size())
+	_check(falling.motes().size() == FallingItems.MAX_ITEMS, "motes track the live count")
+	falling.advance(FallingItems.FALL_DURATION * 0.5)
+	_check(falling.size() == FallingItems.MAX_ITEMS, "mid-flight drops survive advance")
+	falling.advance(FallingItems.FALL_DURATION)
+	_check(falling.size() == 0, "arrived drops all retire")
+	_check(falling.motes().is_empty(), "…and the motes scratch drains with them")
+	# Retired drops feed the next spawns (the pool path) with the same observable behavior.
+	falling.inject(Vector2.ZERO, Vector2(0.0, 32.0), Color.RED, 0.25)
+	_check(falling.size() == 1, "post-retire spawns fly again (pool reuse path)")
+	var m: Dictionary = falling.motes()[0]
+	_check(m["color"] == Color.RED and (m["pos"] as Vector2).y > 0.0,
+		"a reused drop carries ITS OWN fields, not the retired one's")
