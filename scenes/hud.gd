@@ -58,6 +58,7 @@ var inventory_open: bool = false   ## E — the PACK screen (full carried invent
 var can_craft: bool = false        ## are we near a claimed Bazaar? gates the craft panel inside the pack screen
 var show_minimap: bool = false
 var show_help: bool = false
+var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
 
 ## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
 var _flash_text: String = ""
@@ -87,6 +88,8 @@ func _draw() -> void:
 		_draw_minimap()    # M — top-right world map
 	if inventory_open:
 		_draw_inventory_overlay()  # E — the PACK screen: full inventory + (at the Bazaar) the craft panel
+	if show_tech:
+		_draw_tech_overlay()      # T — the research ladder as a graph (the PULL's face)
 	if show_help:
 		_draw_help_overlay()      # H / ? — the full controls list
 	if paused_getter.is_valid() and bool(paused_getter.call()):
@@ -334,8 +337,10 @@ func _draw_inventory_overlay() -> void:
 	var rates: Array[Dictionary] = sim.production_rates()
 	var head: float = 30.0 + (15.0 if not rates.is_empty() else 0.0)
 	var craft_head: float = 24.0
-	# The RESEARCH BENCH section (only at the Bazaar): one row per tech in the tree.
-	var research_h: float = (craft_head + float(ResearchRules.ORDER.size()) * row_h) if can_craft else 0.0
+	# The RESEARCH BENCH section (only at the Bazaar): ONE summary row — the next tech + the [T] tree
+	# pointer. The full ladder lives in the tech-tree overlay now (FABLE_50 #30), so the pack stays
+	# this height no matter how many tiers the tree grows.
+	var research_h: float = (craft_head + row_h) if can_craft else 0.0
 	var h: float = head + grid_h + craft_head + float(craft_lines) * row_h + research_h + 12.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
@@ -435,47 +440,155 @@ func _draw_inventory_overlay() -> void:
 	_draw_research_bench(origin, w, y, row_h, craft_head)
 
 
-## The RESEARCH BENCH rows (the Bazaar's other half — docs/PROGRESSION.md §5): the linear tech ladder,
-## one row per tech. ✓ done techs dim; the NEXT tech is lit with its analyze-sample + ingot price and the
-## [R] key; future techs show which prereq opens them. Reads the sim + ResearchRules directly.
+## The RESEARCH BENCH summary (the Bazaar's other half — docs/PROGRESSION.md §5): ONE row for the NEXT
+## researchable tech ([R] + its analyze-sample + price), or a done-line when the tree is exhausted. The
+## full ladder is the TECH TREE overlay's job now ([T], FABLE_50 #30) — this row is the bench's handle
+## on it, and the pack screen stops growing a row per tier.
 func _draw_research_bench(origin: Vector2, w: float, y0: float, row_h: float, head_h: float) -> void:
 	var y: float = y0 + 5.0
 	draw_line(Vector2(origin.x + 8.0, y - 2.0), Vector2(origin.x + w - 8.0, y - 2.0), UI_EDGE, 1.0)
 	draw_string(_font, Vector2(origin.x + 14.0, y + 14.0), "RESEARCH  (the bench)",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+	var tree_hint: String = "[T] tech tree"
+	var tw: float = _font.get_string_size(tree_hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(_font, Vector2(origin.x + w - tw - 13.0, y + 14.0), tree_hint,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
 	y += head_h - 5.0
 	var next: StringName = ResearchRules.next_tech(sim.research)
+	var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 3.0)
+	draw_rect(rr, UI_SLOT)
+	draw_rect(rr, UI_EDGE, false, 1.0)
+	if next == &"":
+		draw_circle(rr.position + Vector2(12.0, 10.5), 3.2, Color(0.38, 0.78, 0.44))
+		draw_string(_font, rr.position + Vector2(21.0, 15.0), "every tech researched",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.62, 0.48))
+		return
+	var t: Dictionary = ResearchRules.tech(next)
+	var sample: StringName = t.get("sample", &"")
+	var afford: bool = _can_afford(t["cost"]) and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
+	var price: String = ("analyze %s + " % _item_label(sample) if sample != &"" else "") + _cost_text(t["cost"])
+	draw_string(_font, rr.position + Vector2(8.0, 15.0), "[R]  Research %s" % str(t["name"]),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT if afford else Color(0.45, 0.47, 0.53))
+	var pw: float = _font.get_string_size(price, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(_font, rr.position + Vector2(rr.size.x - pw - 5.0, 15.0), price,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+
+
+## THE TECH TREE (FABLE_50 #30, [T]): the research PULL's face — the ladder drawn as a GRAPH. Tiers
+## derive from each tech's `requires` chain, so when the tree branches (a wide tier), its chips simply
+## stack in their column — zero layout changes. Chip states: DONE (green lamp, settled), NEXT (gold
+## edge + [R] + live afford-price), LOCKED (dimmed; the arrow already says what opens it). Each chip
+## shows its analyze-sample, its price, and the machine glyphs it unlocks — what you're buying, visible
+## before you can afford it. Viewable anywhere; the research VERB stays at the Bazaar bench.
+func _draw_tech_overlay() -> void:
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))
+	# --- tiers by prerequisite-chain depth ---
+	var tiers: Array = []                                  # tier index -> Array[StringName]
 	for tid: StringName in ResearchRules.ORDER:
-		var t: Dictionary = ResearchRules.tech(tid)
-		var rr := Rect2(origin.x + 6.0, y, w - 12.0, row_h - 3.0)
-		draw_rect(rr, UI_SLOT)
+		var d: int = 0
+		var cur: StringName = ResearchRules.tech(tid).get("requires", &"")
+		while cur != &"":
+			d += 1
+			cur = ResearchRules.tech(cur).get("requires", &"")
+		while tiers.size() <= d:
+			tiers.append([])
+		(tiers[d] as Array).append(tid)
+	# --- geometry ---
+	var chip := Vector2(102.0, 74.0)
+	var gap_x: float = 14.0
+	var gap_y: float = 8.0
+	var tallest: int = 1
+	for tier: Array in tiers:
+		tallest = maxi(tallest, tier.size())
+	var body_w: float = float(tiers.size()) * chip.x + float(tiers.size() - 1) * gap_x
+	var body_h: float = float(tallest) * chip.y + float(tallest - 1) * gap_y
+	var w: float = body_w + 24.0
+	var h: float = body_h + 58.0
+	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
+	_panel(Rect2(origin, Vector2(w, h)), true)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "TECH TREE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(w - 110.0, 21.0), "T / Esc to close",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	var rects: Dictionary = {}                             # tech id -> chip Rect2
+	for ti: int in tiers.size():
+		var tier: Array = tiers[ti]
+		var col_h: float = float(tier.size()) * chip.y + float(tier.size() - 1) * gap_y
+		for ni: int in tier.size():
+			rects[tier[ni]] = Rect2(origin + Vector2(12.0 + float(ti) * (chip.x + gap_x),
+				30.0 + (body_h - col_h) * 0.5 + float(ni) * (chip.y + gap_y)), chip)
+	# --- arrows first (under the chips): prereq's right edge -> dependent's left edge ---
+	var next: StringName = ResearchRules.next_tech(sim.research)
+	for tid: StringName in ResearchRules.ORDER:
+		var req: StringName = ResearchRules.tech(tid).get("requires", &"")
+		if req == &"" or not rects.has(req):
+			continue
+		var a: Rect2 = rects[req]
+		var b: Rect2 = rects[tid]
+		var p0 := Vector2(a.end.x, a.position.y + a.size.y * 0.5)
+		var p1 := Vector2(b.position.x, b.position.y + b.size.y * 0.5)
+		var lit: bool = sim.is_researched(req)             # the path you've already walked glows
+		var lc: Color = Color(0.55, 0.75, 0.55, 0.8) if lit else Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, 0.8)
+		draw_line(p0, p1, lc, 1.5)
+		var tip := PackedVector2Array([p1, p1 + Vector2(-5.0, -3.5), p1 + Vector2(-5.0, 3.5)])
+		draw_colored_polygon(tip, lc)
+	# --- the chips ---
+	for tid: StringName in ResearchRules.ORDER:
+		_draw_tech_chip(tid, rects[tid], tid == next)
+	# --- footer: where the verb lives ---
+	var foot: String
+	if next == &"":
+		foot = "every tech researched — the tree is yours"
+	elif can_craft:
+		foot = "R  research %s" % str(ResearchRules.tech(next)["name"])
+	else:
+		foot = "research happens at the Bazaar bench — stand by it and press R"
+	draw_string(_font, origin + Vector2(14.0, h - 10.0), foot, HORIZONTAL_ALIGNMENT_LEFT, w - 28.0, 10,
+		UI_ACCENT if (next != &"" and can_craft) else UI_TEXT_DIM)
+
+
+## One tech chip: lamp + name / analyze-sample / price / the unlocked machines as mini-glyphs.
+func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool) -> void:
+	var t: Dictionary = ResearchRules.tech(tid)
+	var done: bool = sim.is_researched(tid)
+	draw_rect(rr, UI_SLOT)
+	if is_next:
+		draw_rect(rr.grow(1.0), UI_ACCENT, false, 1.5)     # the lit rung — where R lands
+	else:
 		draw_rect(rr, UI_EDGE, false, 1.0)
-		if sim.is_researched(tid):
-			draw_circle(rr.position + Vector2(12.0, 10.5), 3.2, Color(0.38, 0.78, 0.44))  # done-lamp
-			draw_string(_font, rr.position + Vector2(21.0, 15.0), str(t["name"]),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.45, 0.62, 0.48))
-			var done_txt: String = "researched"
-			var dw: float = _font.get_string_size(done_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-			draw_string(_font, rr.position + Vector2(rr.size.x - dw - 5.0, 15.0), done_txt,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.42, 0.52, 0.45))
-		elif tid == next:
-			var sample: StringName = t.get("sample", &"")
-			var afford: bool = _can_afford(t["cost"]) and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
-			var price: String = ("analyze %s + " % _item_label(sample) if sample != &"" else "") + _cost_text(t["cost"])
-			draw_string(_font, rr.position + Vector2(8.0, 15.0), "[R]  Research %s" % str(t["name"]),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT if afford else Color(0.45, 0.47, 0.53))
-			var pw: float = _font.get_string_size(price, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-			draw_string(_font, rr.position + Vector2(rr.size.x - pw - 5.0, 15.0), price,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
+	var name_col: Color = Color(0.45, 0.62, 0.48) if done else (UI_TEXT if is_next else Color(0.40, 0.42, 0.48))
+	draw_circle(rr.position + Vector2(10.0, 11.0), 3.2,
+		Color(0.38, 0.78, 0.44) if done else (UI_ACCENT if is_next else Color(0.22, 0.24, 0.30)))
+	draw_string(_font, rr.position + Vector2(18.0, 15.0), str(t["name"]),
+		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 24.0, 11, name_col)
+	# The price: what you analyze + what you pour in. Dim on done (paid), gold-if-affordable on next.
+	var sample: StringName = t.get("sample", &"")
+	var afford: bool = _can_afford(t["cost"]) and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
+	var line_col: Color = Color(0.42, 0.52, 0.45) if done \
+		else ((UI_ACCENT if afford else Color(0.62, 0.52, 0.34)) if is_next else Color(0.40, 0.42, 0.48))
+	if sample != &"":
+		draw_string(_font, rr.position + Vector2(8.0, 30.0), "analyze %s" % _item_label(sample),
+			HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 14.0, 8, line_col)
+	draw_string(_font, rr.position + Vector2(8.0, 42.0), "+ " + _cost_text(t["cost"]),
+		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 14.0, 8, line_col)
+	# What it buys: the unlocked machines' faces, dimmed until the tech is live.
+	var ux: float = rr.position.x + 8.0
+	for uid: StringName in (t.get("unlocks", []) as Array):
+		var box := Rect2(ux, rr.position.y + 50.0, 16.0, 16.0)
+		if machine_icons.has(uid):
+			var spr: Texture2D = Art.tex("machine_" + String(uid))
+			if spr != null:
+				draw_texture_rect(spr, box, false)
+			else:
+				draw_rect(box, machine_icons[uid]["color"])
+				Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
+					str(machine_icons[uid]["kind"]), box.size.y / 20.0, false, 0.0)
 		else:
-			draw_rect(rr, Color(0.0, 0.0, 0.0, 0.35))
-			draw_string(_font, rr.position + Vector2(8.0, 15.0), str(t["name"]),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.40, 0.42, 0.48))
-			var req: String = "after %s" % str(ResearchRules.tech(t.get("requires", &""))["name"])
-			var qw: float = _font.get_string_size(req, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-			draw_string(_font, rr.position + Vector2(rr.size.x - qw - 5.0, 15.0), req,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.45, 0.47, 0.53))
-		y += row_h
+			Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, uid)
+		if not done:
+			draw_rect(box, Color(0.0, 0.0, 0.0, 0.25 if is_next else 0.45))
+		ux += 19.0
+	if not done and not is_next:
+		draw_rect(rr, Color(0.0, 0.0, 0.0, 0.30))          # locked: the whole chip recedes
 
 
 ## The id of the i-th craftable — supplied explicitly by MainView (craft_ids, parallel to craft_options),
@@ -502,6 +615,7 @@ func _draw_help_overlay() -> void:
 		"drop / feed  Q  (gravity feeds it in)",
 		"pack        E  (inventory · craft at Bazaar)",
 		"research    R  (in the pack screen, at the bench)",
+		"tech tree   T",
 		"configure   R  (aimed at a splitter / hopper)",
 		"map         M",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
@@ -536,7 +650,7 @@ func _can_afford(cost: Dictionary) -> bool:
 func _cost_text(cost: Dictionary) -> String:
 	var parts: PackedStringArray = []
 	for item: StringName in cost:
-		parts.append("%d %s" % [int(cost[item]), item])
+		parts.append("%d %s" % [int(cost[item]), _item_label(item)])   # "6 Iron Ingot", never a raw id
 	return " ".join(parts)
 
 

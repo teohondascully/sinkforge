@@ -48,6 +48,8 @@ var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); craft
                                     ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
 var _show_minimap: bool = false
 var _show_help: bool = false
+var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
+                                    ## the research VERB (R) stays Bazaar-gated like the bench
 ## Fast-forward game clock: "." cycles Engine.time_scale through this exponential ladder so the whole
 ## game (sim ticks AND the body) runs faster — watch a factory fill, or (headless) speed up play-tests.
 ## The body integrates in substeps (Player.MAX_SUBSTEP) so it can't tunnel at the high multipliers.
@@ -452,6 +454,7 @@ func _process(delta: float) -> void:
 		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
 		_hud.show_minimap = _show_minimap
 		_hud.show_help = _show_help
+		_hud.show_tech = _show_tech
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
 			_hud.minimap_focus = _player.position
@@ -519,11 +522,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_show_minimap = not _show_minimap
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
+	elif event.is_action_pressed(Controls.TECH):
+		_show_tech = not _show_tech
 	elif event.is_action_pressed(Controls.CLOSE):
 		_inventory_open = false
 		_show_help = false
-	elif event.is_action_pressed(Controls.RESEARCH) and _inventory_open:
-		try_research(ResearchRules.next_tech(sim.research))   # R at the bench: research the next tech
+		_show_tech = false
+	elif event.is_action_pressed(Controls.RESEARCH) and (_inventory_open or _show_tech):
+		try_research(ResearchRules.next_tech(sim.research))   # R at the bench/tree: research the next tech
 	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
 		try_configure(_aim)                                   # R in the world: configure the aimed machine
 	elif event.is_action_pressed(Controls.BUILD):

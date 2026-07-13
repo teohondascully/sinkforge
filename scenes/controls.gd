@@ -33,6 +33,7 @@ const ZOOM := &"sf_zoom"
 const SAVE := &"sf_save"
 const LOAD := &"sf_load"
 const CLEAR_MARKS := &"sf_clear_marks"
+const TECH := &"sf_tech"
 
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
@@ -61,6 +62,7 @@ static func defaults() -> Dictionary:
 		SAVE: [{"key": KEY_F5}],        # classic quicksave/quickload
 		LOAD: [{"key": KEY_F9}],
 		CLEAR_MARKS: [{"key": KEY_X}],  # wipe the painted dig plan
+		TECH: [{"key": KEY_T}],         # the tech-tree overlay
 	}
 
 
