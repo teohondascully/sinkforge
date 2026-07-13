@@ -74,6 +74,45 @@ var hint_text: String = ""
 var hint_anchor: Vector2 = Vector2.ZERO   ## canvas-space point the tail points at (above the head)
 var hint_alpha: float = 0.0
 
+## ITEM TOOLTIPS (FABLE_50 #33): hover a hotbar/pack slot → what this item is FOR. One line per id —
+## the reference card behind the one-shot acquisition hints. Machines answer "what does placing it buy";
+## resources answer "what wants this". Absent id = no purpose line (name + count still show).
+const ITEM_PURPOSE: Dictionary = {
+	&"ore": "smeltable — a Forge turns it into ingots (toss it in, Q)",
+	&"ingot": "the L1 metal — pays for crafting, research, the Engine's toll",
+	&"coal": "FUEL — generators, drills and borers burn it (drop it on them)",
+	&"wood": "placeable block (RMB) — crafts ropes, torches, the Bazaar frame",
+	&"stone": "placeable block — and the Stone Pickaxe's making",
+	&"earth": "placeable block — plug a pit, bridge a gap",
+	&"deepslate": "the deep rock — the sample that unlocks DESCENT research",
+	&"iron": "L2 ore — the Iron Forge smelts it into iron ingots",
+	&"iron_ingot": "the L2 metal — plates, gears and the Iron Pickaxe",
+	&"plate": "pressed iron sheet — the Borer's frame wants them",
+	&"gear": "milled cog (iron + ingot) — the Borer's works want them",
+	&"wood_pickaxe": "breaks tier-1 rock (earth · stone · ore · coal) — hold LMB",
+	&"stone_pickaxe": "tier-2 pick — opens deepslate and iron, and digs faster",
+	&"iron_pickaxe": "tier-3 pick — the fastest made; keyed for what waits under L2",
+	&"wood_axe": "fells trees — hold LMB on a trunk, the whole tree drops as wood",
+	&"rope": "RMB above a drop — it unrolls down; W/S climbs it",
+	&"torch": "RMB on a wall-backed cell — light that STAYS",
+	&"conduit": "RMB lays power tube — power flows down + sideways, never up",
+	&"processor": "the Forge — smelts what falls into it (ore → ingots)",
+	&"splitter": "routes falling items DOWN + RIGHT (aim R at it: ratio)",
+	&"lift": "hauls goods — and YOU — up its column; power multiplies it",
+	&"drill": "bores straight down through an ore vein — burns coal",
+	&"hopper": "banks what falls in, meters it DOWN — keeps the first item it tastes",
+	&"generator": "burns coal into POWER for the machines around it",
+	&"descent_engine": "stand it ON the seal, feed it ingots — it breaches the way down",
+	&"iron_forge": "smelts iron ore into iron ingots (the L2 chain's base)",
+	&"plate_press": "presses iron ingots into plates",
+	&"gear_mill": "mills iron ingots + ingots into gears (two inputs, one column)",
+	&"h_drill": "the Borer — chews sideways the way you faced; its haul drops below it",
+}
+## The hovered slot this frame (captured while drawing the hotbar/pack grid, drawn last, on top).
+var _tooltip_item: StringName = &""
+var _tooltip_count: int = 0
+var _tooltip_anchor: Vector2 = Vector2.ZERO   ## top-centre of the hovered slot
+
 
 ## Show a short transient notice centred under the objective banner (~2s, fades).
 func flash(text: String) -> void:
@@ -87,6 +126,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	_tooltip_item = &""    # re-captured by whichever slot the cursor sits on this frame
 	# --- always on (minimal): the anchor furniture only ---
 	_draw_forged()         # top-right production chip (small)
 	_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
@@ -111,6 +151,7 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
 	_draw_flash()          # transient toast (save/load feedback)
+	_draw_item_tooltip()   # hovered-slot tooltip — drawn last so it rides over every panel
 
 
 ## The transient toast: a small accented chip centred under the objective line, fading out over its
@@ -458,6 +499,11 @@ func _draw_inventory_overlay() -> void:
 		draw_rect(box, UI_SLOT)
 		draw_rect(box, UI_EDGE, false, 1.0)
 		var item: StringName = slots[i]["item"]
+		if box.has_point(get_viewport().get_mouse_position()):   # hovered → tooltip (drawn last)
+			draw_rect(box, UI_EDGE_HI, false, 1.0)
+			_tooltip_item = item
+			_tooltip_count = int(slots[i]["count"])
+			_tooltip_anchor = Vector2(box.get_center().x, box.position.y)
 		var icon := Rect2(box.position + Vector2(5.0, 4.0), Vector2(box.size.x - 10.0, box.size.y - 12.0))
 		if machine_icons.has(item):
 			var mspr: Texture2D = Art.tex("machine_" + String(item))
@@ -765,6 +811,10 @@ func _draw_inventory() -> void:
 		var sx: float = x0 + float(i) * (SLOT + SLOT_GAP)
 		var slot_rect := Rect2(sx, y, SLOT, SLOT)
 		var active: bool = i == sel
+		if i < slots.size() and slot_rect.has_point(get_viewport().get_mouse_position()):
+			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip
+			_tooltip_count = int(slots[i]["count"])
+			_tooltip_anchor = Vector2(slot_rect.get_center().x, slot_rect.position.y)
 		if active:
 			draw_rect(slot_rect.grow(2.0), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.18))  # selection glow
 		draw_rect(slot_rect, UI_SLOT)                                                            # well
@@ -805,6 +855,33 @@ func _draw_inventory() -> void:
 		var ly: float = y - 12.0
 		draw_rect(Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0), Color(0.05, 0.06, 0.09, 0.88))
 		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
+
+
+## The hovered slot's TOOLTIP (FABLE_50 #33): the item's name, the count you hold, and one purpose
+## line — "what is this FOR" answered where the question is asked. Captured by the hotbar/pack-grid
+## slot loops this frame; drawn last, above every panel, clamped on-canvas above the hovered slot.
+func _draw_item_tooltip() -> void:
+	if _tooltip_item == &"":
+		return
+	var name_line: String = "%s  ×%d" % [_item_label(_tooltip_item), _tooltip_count]
+	var purpose: String = str(ITEM_PURPOSE.get(_tooltip_item, ""))
+	var fs: int = 10
+	var wrap_w: float = 200.0
+	var name_w: float = _font.get_string_size(name_line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var body: Vector2 = _font.get_multiline_string_size(purpose, HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs) \
+		if purpose != "" else Vector2.ZERO
+	var w: float = maxf(name_w, minf(body.x, wrap_w)) + 18.0
+	var h: float = 22.0 + (body.y + 4.0 if purpose != "" else 0.0)
+	var origin := Vector2(clampf(_tooltip_anchor.x - w * 0.5, 6.0, CANVAS.x - w - 6.0),
+		maxf(_tooltip_anchor.y - h - 6.0, 6.0))
+	var rect := Rect2(origin, Vector2(w, h))
+	draw_rect(rect, Color(UI_BG.r, UI_BG.g, UI_BG.b, 0.96))
+	draw_rect(rect, UI_EDGE, false, 1.0)
+	draw_rect(Rect2(rect.position, Vector2(2.0, rect.size.y)), UI_ACCENT)   # a gold spine, not a cap
+	draw_string(_font, origin + Vector2(9.0, 15.0), name_line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
+	if purpose != "":
+		draw_multiline_string(_font, origin + Vector2(9.0, 29.0), purpose,
+			HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.78, 0.74, 0.62))
 
 
 ## Human-readable name for a carried item: a machine item uses its def's display name (Forge/Drill/…),
