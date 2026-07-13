@@ -390,6 +390,19 @@ func _draw_minimap() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.72, 0.60, 0.75))
 		draw_string(_font, Vector2(origin.x + 5.0, seal_y + seal_h + 10.0), "STONEREACH",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.55, 0.65, 0.90, 0.75))
+	# --- FRONTIER REACH (FABLE_50 #28): where the factory's POWER and placed LIGHT actually extend —
+	# "your reach is how deep you can survive" read straight off the map. Power = a warm amber wash
+	# per powered cell (brighter = more units, live off the derived sim.power field); placed torches =
+	# small warm halos. Subtle alphas so terrain stays readable under the claim.
+	for pcell_v: Variant in sim.power:
+		var pcell: Vector2i = pcell_v
+		var lvl: float = clampf(float(sim.power[pcell]) / FactorySim.GENERATOR_POWER, 0.12, 1.0)
+		draw_rect(Rect2(origin + Vector2(pcell) * scale, scale.ceil()),
+			Color(1.0, 0.70, 0.22, 0.10 + 0.24 * lvl))
+	var halo: float = maxf(scale.x, scale.y) * 2.6
+	for tcell_v: Variant in sim.torch:
+		draw_circle(origin + (Vector2(tcell_v as Vector2i) + Vector2(0.5, 0.5)) * scale, halo,
+			Color(1.0, 0.80, 0.42, 0.16))
 	# --- your placed machines ---
 	var dot := Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0))
 	for m: MachineState in sim.machines:
