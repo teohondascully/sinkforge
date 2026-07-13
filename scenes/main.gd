@@ -97,6 +97,8 @@ const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mi
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
 var _objectives: Objectives
+## Just-in-time hint bubbles (FABLE_50 #35): first rope in the pack → "RMB above a drop", etc. Reads the sim.
+var _hints: Hints
 ## GPU ambient dust motes (docs/MODERN_FEEL.md) — a continuous GPUParticles2D haze that drifts in the
 ## air and catches the lamp light. Pure atmosphere; follows the camera each frame.
 var _motes: GPUParticles2D
@@ -185,6 +187,8 @@ func _ready() -> void:
 	# handed to the HUD to render. It only reads the sim; MainView refreshes it each frame.
 	_objectives = Objectives.new(sim)
 	hud.objectives = _objectives
+	# Hint bubbles — same pattern: built after seeding (a pre-stocked pack fires nothing at boot).
+	_hints = Hints.new(sim)
 	_hud = hud
 	layer.add_child(hud)
 	add_child(layer)
@@ -450,6 +454,8 @@ func _process(delta: float) -> void:
 		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
 	if _objectives != null:
 		_objectives.refresh(delta)
+	if _hints != null and not _paused:
+		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def(), _selected_build_material())
 	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
@@ -464,6 +470,14 @@ func _process(delta: float) -> void:
 		if _player != null:
 			_hud.minimap_focus = _player.position
 			_hud.minimap_view = Vector2(Hud.CANVAS) / _current_zoom()  # world area the camera shows
+		# The hint bubble: text + fade from the tracker, anchored just over the miner's head. The
+		# native viewport IS the HUD canvas (640×360), so the canvas transform maps world → HUD space.
+		if _hints != null:
+			_hud.hint_text = _hints.active_text()
+			_hud.hint_alpha = _hints.active_alpha()
+			if _player != null:
+				_hud.hint_anchor = get_viewport().get_canvas_transform() \
+					* (_player.position + Vector2(0.0, -Player.HEIGHT * 0.5 - 6.0))
 
 
 ## Reconcile the Bazaar view against the sim's detected frames. When one COMPLETES this frame, throw a
@@ -897,6 +911,8 @@ func _load_game() -> void:
 		_player.velocity = Vector2.ZERO
 	_renderer.repaint_world()
 	_prime_breach_watch()   # a breach that happened before this save doesn't boom retroactively
+	if _hints != null:
+		_hints.resync()     # whatever the save already carries is old news, not a fresh acquisition
 	_hud.flash("LOADED")
 
 

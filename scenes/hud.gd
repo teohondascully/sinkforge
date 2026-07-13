@@ -64,6 +64,12 @@ var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
 var _flash_text: String = ""
 var _flash_life: float = 0.0
 
+## The just-in-time HINT BUBBLE (FABLE_50 #35, pushed by MainView from the Hints tracker): a small
+## speech bubble anchored NEAR THE BODY teaching a newly-acquired item's use. Empty text = none.
+var hint_text: String = ""
+var hint_anchor: Vector2 = Vector2.ZERO   ## canvas-space point the tail points at (above the head)
+var hint_alpha: float = 0.0
+
 
 ## Show a short transient notice centred under the objective banner (~2s, fades).
 func flash(text: String) -> void:
@@ -83,6 +89,8 @@ func _draw() -> void:
 	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
 	_draw_inventory()      # bottom-centre hotbar
 	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
+	if not (inventory_open or show_tech or show_help):
+		_draw_hint_bubble()  # just-in-time teaching near the body (hidden while a menu dims the world)
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
 		_draw_minimap()    # M — top-right world map
@@ -113,6 +121,35 @@ func _draw_flash() -> void:
 	draw_rect(p, Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, a), false, 1.0)
 	draw_string(_font, p.position + Vector2(14.0, 17.0), _flash_text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.88, 0.62, a))
+
+
+## The just-in-time HINT BUBBLE: a small speech bubble with a tail pointing down at the body, teaching
+## the item that just landed in the pack (FABLE_50 #35). Word-wrapped, gold-capped like every panel,
+## faded by the tracker's envelope. Clamped on-canvas so a body near a world edge still gets taught.
+func _draw_hint_bubble() -> void:
+	if hint_text == "" or hint_alpha <= 0.01:
+		return
+	var fs: int = 11
+	var wrap_w: float = 230.0
+	var text_size: Vector2 = _font.get_multiline_string_size(hint_text, HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs)
+	var w: float = minf(text_size.x, wrap_w) + 20.0
+	var h: float = text_size.y + 13.0
+	var tail := Vector2(clampf(hint_anchor.x, 8.0, CANVAS.x - 8.0), clampf(hint_anchor.y, 60.0, CANVAS.y - 12.0))
+	var origin := Vector2(clampf(tail.x - w * 0.5, 6.0, CANVAS.x - w - 6.0), tail.y - 7.0 - h)
+	if origin.y < 38.0:                       # never under the objective line — flip below the anchor
+		origin.y = tail.y + 7.0
+	var a: float = hint_alpha
+	var rect := Rect2(origin, Vector2(w, h))
+	draw_rect(rect, Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
+	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, a))
+	draw_rect(rect, Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, a), false, 1.0)
+	var tip_y: float = tail.y if origin.y < tail.y else origin.y - 1.0   # tail reaches toward the body
+	var base_y: float = (origin.y + h) if origin.y < tail.y else origin.y
+	var tx: float = clampf(tail.x, origin.x + 10.0, origin.x + w - 10.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(tx - 5.0, base_y), Vector2(tx + 5.0, base_y),
+		Vector2(tx, tip_y)]), Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
+	draw_multiline_string(_font, origin + Vector2(10.0, 6.0 + 10.0), hint_text,
+		HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.95, 0.90, 0.72, a))
 
 
 ## Fast-forward chip (top-left): a small "▶▶ Nx" tag shown ONLY while the game clock is sped up, so the

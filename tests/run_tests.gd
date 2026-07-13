@@ -52,6 +52,7 @@ func _initialize() -> void:
 	_test_filter_ratio_passthrough()
 	_test_research()
 	_test_descent_gate()
+	_test_hints()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -1726,3 +1727,48 @@ func _test_descent_gate() -> void:
 	s3.research_tech(&"power")
 	_check(s3.research_tech(&"descent"), "Descent researches after Power (deepslate sample + ingots)")
 	_check(s3.craft_unlocked(&"descent_engine"), "…and unlocks the engine")
+
+
+## HINT BUBBLES (FABLE_50 #35 — scenes/hints.gd, representation-only): a hint fires exactly once, on the
+## acquisition EDGE (0 → >0 this session); pre-stocked packs fire nothing; simultaneous triggers queue
+## one-at-a-time; resync() (after a load) re-arms the snapshot without re-teaching.
+func _test_hints() -> void:
+	print("[hints]")
+	var sim: FactorySim = FactorySim.new()
+	var hints: Hints = Hints.new(sim)
+	hints.refresh(0.016)
+	_check(hints.active_text() == "", "no hint on an empty pack")
+	sim.inventory[&"rope"] = 1
+	hints.refresh(0.016)
+	_check(hints.active_text().begins_with("ROPE"), "first rope in the pack teaches the rope")
+	hints.refresh(0.1)   # the fade-in starts at 0 on the activation frame — advance into it
+	_check(hints.active_alpha() > 0.0, "…with a live fade envelope")
+	hints.refresh(Hints.SHOW_SECONDS + 1.0)
+	_check(hints.active_text() == "", "the bubble expires")
+	sim.inventory.erase(&"rope")
+	hints.refresh(0.016)
+	sim.inventory[&"rope"] = 3
+	hints.refresh(0.016)
+	_check(hints.active_text() == "", "re-acquiring never re-teaches (latched)")
+	# Two acquisitions in one frame queue: the second shows after the first expires.
+	sim.inventory[&"torch"] = 4
+	sim.inventory[&"generator"] = 1
+	hints.refresh(0.016)
+	_check(hints.active_text().begins_with("TORCH"), "simultaneous triggers show one bubble at a time")
+	hints.refresh(Hints.SHOW_SECONDS + 1.0)
+	hints.refresh(0.016)
+	_check(hints.active_text().begins_with("GENERATOR"), "…the second queues behind it")
+	# A pre-stocked pack (dev kit / loaded save) fires nothing at construction.
+	var s2: FactorySim = FactorySim.new()
+	s2.inventory[&"lift"] = 1
+	var h2: Hints = Hints.new(s2)
+	h2.refresh(0.016)
+	_check(h2.active_text() == "", "a pre-stocked pack fires nothing at boot")
+	s2.inventory[&"hopper"] = 1
+	h2.refresh(0.016)
+	_check(h2.active_text().begins_with("HOPPER"), "…but a genuinely new item still teaches")
+	h2.resync()
+	_check(h2.active_text() == "", "resync clears the live bubble (post-load)")
+	s2.inventory[&"splitter"] = 2
+	h2.refresh(0.016)
+	_check(h2.active_text().begins_with("SPLITTER"), "resync re-arms edges for what comes after")
