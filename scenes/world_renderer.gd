@@ -798,8 +798,28 @@ func _draw_guide_targets() -> void:
 		draw_colored_polygon([tip + Vector2(0, 7), tip + Vector2(-6, -4), tip + Vector2(6, -4)], arrow)
 
 
+## An INTERACTABLE outline pulse (FABLE_50 #21): a breathing coloured outline + solid corner brackets
+## around the hovered thing — the modern "you can act on this" affordance, in the thing's OWN colour so
+## a drill pulses steel and an ore vein pulses ore. Drawn, not shadered: machines and terrain here are
+## procedural canvas paint, so there's no texture a shader outline could sample — the drawn pulse is
+## the same visual language at zero pipeline cost.
+func _draw_interact_pulse(rect: Rect2, col: Color) -> void:
+	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)
+	var r: Rect2 = rect.grow(2.0 + pulse * 2.5)
+	draw_rect(r, Color(col.r, col.g, col.b, 0.28 + 0.42 * pulse), false, 2.0)
+	var arm: float = float(CELL) * 0.22
+	var solid := Color(col.r, col.g, col.b, 0.95)
+	for corner: int in 4:
+		var c := Vector2(r.position.x if corner % 2 == 0 else r.end.x,
+			r.position.y if corner < 2 else r.end.y)
+		var d := Vector2(1.0 if corner % 2 == 0 else -1.0, 1.0 if corner < 2 else -1.0)
+		draw_line(c, c + Vector2(arm * d.x, 0.0), solid, 2.0)
+		draw_line(c, c + Vector2(0.0, arm * d.y), solid, 2.0)
+
+
 ## The cursor cell, drawn by context (using the affordances MainView pushed via set_aim):
-##   solid earth -> MINE box (white; faint out of reach) · your machine -> PICK-UP outline ·
+##   solid earth -> MINE box (white; faint out of reach; a VEIN adds an ore-coloured interact pulse) ·
+##   your machine -> interact pulse in its own colour (RMB picks up, R configures) ·
 ##   open cell -> BUILD ghost of the selected machine (green outline = placeable, red = blocked).
 func _draw_aim() -> void:
 	if not sim.in_bounds(_aim):
@@ -808,12 +828,16 @@ func _draw_aim() -> void:
 	if sim.is_solid(_aim):
 		var col := Color(1, 1, 1, 0.85) if _aim_in_reach else Color(1, 1, 1, 0.18)
 		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
+		if _aim_in_reach and sim.ore_deposit_at(_aim) > 0:   # a rich vein reads as a THING, not just rock
+			_draw_interact_pulse(Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2)),
+				_material(sim.material_at(_aim)).nugget_color)
 		return
 	if not _aim_in_reach:
 		return
 	var inner := Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2))
-	if sim.machine_at(_aim) != null:
-		draw_rect(inner, Color(0.95, 0.45, 0.40, 0.9), false, 2.0)  # pick-up affordance
+	var m: MachineState = sim.machine_at(_aim)
+	if m != null:
+		_draw_interact_pulse(inner, Visuals.machine_color(m.def).lightened(0.25))
 		return
 	if _ghost_def != null:
 		# A brighter, more opaque tint so the ghost reads as a translucent PREVIEW on its own (4b critique).
