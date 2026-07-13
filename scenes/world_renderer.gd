@@ -76,6 +76,8 @@ var _chunk_rows: int = 0
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 var _dark: LightLayer
 var _lights: LightLayer
+var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
+var _leaf_cache_dirty: bool = true
 var _glow_tex: GradientTexture2D
 
 
@@ -146,6 +148,7 @@ func repaint_world() -> void:
 	sim.terrain_dirty.clear()
 	_seal_rows.clear()
 	_seal_rows_scanned = false
+	_leaf_cache_dirty = true
 
 
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
@@ -200,6 +203,7 @@ func _process(delta: float) -> void:
 		for idx: int in dirty:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
+		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
 		# The skylight veil also depends on the surface line the dig may have moved — cheap (0.7ms), repaint it.
 		if _dark != null:
 			_dark.queue_redraw()
@@ -226,6 +230,7 @@ func _draw() -> void:
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
 	_draw_torches()   # mounted torches guttering on the walls — placed light, claimed territory
 	_draw_ground()
+	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
 		_draw_machine(machine)
@@ -294,6 +299,57 @@ func _draw_mine_cracks() -> void:
 ## sim.deposits (the sparse seeded-vein index — never the whole world) clipped to the camera view.
 ## THE SEAL gets its own tell: a slow faint violet breath along its two rows (lazy row scan). Pure
 ## cosmetics on the free-running clock; the sim never sees any of it.
+## SURFACE LIFE (FABLE_50 #15): the top of the world stops reading static. Each canopy cell sheds a
+## drifting leaf on its own long cycle (stateless — position is a pure function of the cosmetic clock,
+## the ore-glint trick), and every so often a bird crosses the sky. Zero allocations, zero sim reads
+## beyond the cached canopy list (rebuilt only when terrain changes — a felled tree stops shedding).
+func _draw_surface_life() -> void:
+	if _leaf_cache_dirty:
+		_leaf_cache_dirty = false
+		_leaf_cells.clear()
+		for key: Variant in sim.solid:
+			if sim.solid[key] == &"leaves":
+				_leaf_cells.append(key)
+	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL) * 4.0)
+	const FALL_T: float = 5.0
+	for c: Vector2i in _leaf_cells:
+		var pos := Vector2(c) * float(CELL)
+		if not view.has_point(pos):
+			continue
+		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 83492791)) & 0x7fffffff
+		var period: float = 9.0 + float(h % 800) / 100.0
+		var t: float = fmod(_anim_time + float(h % 997) / 997.0 * period, period)
+		if t > FALL_T:
+			continue
+		var f: float = t / FALL_T                                  # 0..1 through the fall
+		var sway: float = sin(t * 2.2 + float(h)) * 9.0
+		var p := Vector2(pos.x + float(CELL) * 0.5 + sway + f * 14.0,
+			pos.y + float(CELL) * 0.6 + f * 3.4 * float(CELL))
+		var leaf_c := Color(0.32, 0.52, 0.26).lerp(Color(0.55, 0.48, 0.22), float(h % 100) / 100.0)
+		leaf_c.a = 0.9 * (1.0 - maxf(0.0, f - 0.8) * 5.0)          # fade out on landing
+		draw_set_transform(p, t * 2.6 + float(h % 7), Vector2.ONE)
+		draw_rect(Rect2(Vector2(-2.4, -1.4), Vector2(4.8, 2.8)), leaf_c)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# The bird: one silhouette crossing the whole world's sky on a long cycle, direction and altitude
+	# picked per crossing. Two flapping wing-strokes — unmistakable at any distance, three draw calls.
+	const CYCLE: float = 47.0
+	const CROSS_T: float = 16.0
+	var cyc: int = int(_anim_time / CYCLE)
+	var ct: float = fmod(_anim_time, CYCLE)
+	if ct < CROSS_T:
+		var bh: int = (cyc * 2654435761) & 0x7fffffff
+		var frac: float = ct / CROSS_T
+		var span: float = float(FactorySim.GRID_COLS * CELL)
+		var bx: float = lerpf(-80.0, span + 80.0, frac if bh % 2 == 0 else 1.0 - frac)
+		var by: float = float(SURFACE_LINE * CELL) - 190.0 - float(bh % 90) \
+			+ sin(ct * 1.3) * 10.0
+		if view.has_point(Vector2(bx, by)):
+			var flap: float = absf(sin(ct * 9.0)) * 5.0
+			var bc := Color(0.16, 0.18, 0.24)
+			draw_line(Vector2(bx - 6.0, by - flap + 2.0), Vector2(bx, by), bc, 1.6)
+			draw_line(Vector2(bx, by), Vector2(bx + 6.0, by - flap + 2.0), bc, 1.6)
+
+
 func _draw_ore_glints() -> void:
 	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
 	const PERIOD: float = 3.4
