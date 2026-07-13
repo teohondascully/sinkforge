@@ -61,6 +61,7 @@ const DEFAULT_HARDNESS: float = 0.50
 const TOOLS: Dictionary = {
 	&"wood_pickaxe": {&"class": &"pick", &"tier": 1, &"speed": 1.0},
 	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.7},
+	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 2.6},
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
 }
 
@@ -70,6 +71,12 @@ const TOOLS: Dictionary = {
 ## unlocks the deep band (the Terraria wood→stone→… tool progression, expressed through our Bazaar hub).
 const TOOL_RECIPES: Dictionary = {
 	&"stone_pickaxe": {&"stone": 8, &"wood": 3},
+	# The tier-3 pick is priced in the L2 chain's own product (iron ingots want the Iron Forge, which
+	# wants Ironworks research, which wants the breach) — the MATERIALS gate it, research doesn't need
+	# to. Its value today is SPEED (deepslate 1.65s -> 1.08s); tier 3 is the ladder rung L3's rock
+	# band will gate on (docs/MINING.md — no sub-L2 band exists yet, so nothing bounces a stone pick
+	# that this one opens; that arrives with L3 worldgen, demand-pull).
+	&"iron_pickaxe": {&"iron_ingot": 6, &"wood": 3},
 }
 
 ## The two tools every new game begins with — a bad pick + a bad axe (seeded by MainView into the pack).

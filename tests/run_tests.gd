@@ -874,6 +874,17 @@ func _test_mining_rules() -> void:
 	var poor: FactorySim = FactorySim.new()
 	poor.inventory[&"stone"] = 2
 	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
+	# THE IRON PICKAXE (tier 3, FABLE_50 #37): priced in the L2 chain's own product — the MATERIALS
+	# gate it (iron ingots want the Iron Forge, which wants the breach). Its value today is SPEED;
+	# tier 3 is the rung L3's rock band will gate on.
+	var smith: FactorySim = FactorySim.new()
+	smith.inventory[&"iron_ingot"] = 6
+	smith.inventory[&"wood"] = 3
+	_check(smith.craft_item(&"iron_pickaxe", MiningRules.TOOL_RECIPES[&"iron_pickaxe"]), "craft an Iron Pickaxe from 6 iron ingots + 3 wood")
+	_check(MiningRules.best_tier(&"pick", smith.inventory) == 3, "the iron pick is tier 3")
+	_check(MiningRules.mine_seconds(&"deepslate", smith.inventory)
+		< MiningRules.mine_seconds(&"deepslate", stone_pick), "…and chews deepslate faster than the stone pick")
+	_check(not MiningRules.can_mine(&"sealrock", smith.inventory), "even tier 3 cannot hand-mine THE SEAL")
 
 
 ## HOPPER (storage + metered feed): the missing 'chest'. It stockpiles what falls in, meters it DOWN to a

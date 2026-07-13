@@ -79,6 +79,7 @@ var _machine_defs_by_id: Dictionary = {}
 ## screen after the machines. The Stone Pickaxe is the first depth-unlocking upgrade (docs/MINING.md).
 const CRAFT_TOOLS: Array[Dictionary] = [
 	{"id": &"stone_pickaxe", "name": "Stone Pickaxe"},
+	{"id": &"iron_pickaxe", "name": "Iron Pickaxe"},
 ]
 ## Which carried-item slot is active in the inventory hotbar (mouse-wheel cycles it). The selected
 ## item is what E deposits (a resource) or RMB places (a machine) — the unified Factorio-style hotbar.

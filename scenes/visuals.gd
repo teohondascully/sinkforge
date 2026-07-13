@@ -313,6 +313,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.70, 0.52, 0.32)
 	if item == &"stone_pickaxe":
 		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade — cold stone-grey (unlocks deepslate)
+	if item == &"iron_pickaxe":
+		return Color(0.78, 0.82, 0.92)        # the tier-3 upgrade — bright steel (the L2 chain's edge)
 	if item == &"rope":
 		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
 	if item == &"torch":
@@ -360,6 +362,8 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47))
 		&"stone_pickaxe":
 			_item_pickaxe(canvas, center, size, Color(0.50, 0.37, 0.23), Color(0.60, 0.64, 0.71))
+		&"iron_pickaxe":
+			_item_pickaxe(canvas, center, size, Color(0.42, 0.32, 0.22), Color(0.80, 0.84, 0.94))
 		&"wood_axe":
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
 		_:
