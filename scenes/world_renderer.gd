@@ -43,6 +43,34 @@ const SHADOW_COLOR := Color(0.05, 0.06, 0.10)       ## the cool blue-black the u
 const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
 const LAMP_RADIUS: float = CELL * 4.0               ## a focused warm pool, not a screen-filling white disc
 
+## --- Day/night (FABLE_50 #29, cosmetic-first) ---------------------------------------------------
+## A slow surface rhythm off the cosmetic clock: the backdrop sky, the skylight veil, the godrays and
+## the bird all breathe with it; the UNDERGROUND is untouched (no sun down there anyway — its ambient
+## is the same by day or night, so the moody deep stays the moody deep). At night the surface dims
+## toward (not into) the underground ambient — moonlight, not a cave — which makes placed torches
+## matter above ground too. Purely representational: the sim never reads any of it. Later this clock
+## is the hook for a surface threat rhythm (the backlog's note), which WILL want sim state — not this.
+const DAY_SECONDS: float = 480.0                    ## one full cycle (8 min — long enough to live in)
+const DAY_START_PHASE: float = 0.10                 ## boot mid-morning (fixtures + first sessions read day)
+const NIGHT_DARK: float = 0.40                      ## how dark the night sky veils the surface (< AMBIENT_DARK)
+
+
+## 0..1 through the cycle: 0.00-0.40 day · 0.40-0.55 dusk · 0.55-0.90 night · 0.90-1.00 dawn.
+func day_phase() -> float:
+	return fmod(_anim_time / DAY_SECONDS + DAY_START_PHASE, 1.0)
+
+
+## How much daylight the sky holds right now: 1 at noon, 0 at deep night, smooth through dusk/dawn.
+func daylight() -> float:
+	var p: float = day_phase()
+	if p < 0.40:
+		return 1.0
+	if p < 0.55:
+		return 1.0 - smoothstep(0.40, 0.55, p)
+	if p < 0.90:
+		return 0.0
+	return smoothstep(0.90, 1.0, p)
+
 var sim: FactorySim
 var player: Player
 var falling: FallingItems
@@ -63,6 +91,7 @@ var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mine
 var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block — the felt-friction read
 var _dig_marks: Dictionary = {}                       ## the dig PLAN (live ref from MainView) — hatched overlay
 var _ping_world: Vector2 = Vector2.INF                ## the map-click PING (INF = none) — in-world beacon
+var _daylight_step: int = -1                          ## quantized daylight — veil repaint trigger (#29)
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 var _seal_rows: Array[int] = []                       ## world rows holding THE SEAL (lazy-scanned for its pulse)
 var _seal_rows_scanned: bool = false
@@ -193,6 +222,14 @@ func _process(delta: float) -> void:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
 	if _back != null:
 		_back.queue_redraw()    # the parallax vista slides against the camera (a few polygons — cheap)
+	# The day/night veil (#29): the skylight darkness is repainted only on terrain change, so the slow
+	# sky cycle nudges it by quantized steps — ~one cheap repaint every few seconds through dusk/dawn,
+	# none at all mid-day or deep night (the step only moves while the light is actually changing).
+	var dstep: int = int(daylight() * 24.0)
+	if dstep != _daylight_step:
+		_daylight_step = dstep
+		if _dark != null:
+			_dark.queue_redraw()
 	# Terrain depends on the dug world, NOT the cosmetic clock. Repaint ONLY the chunks whose cells actually
 	# changed this frame (sim.terrain_dirty) — a dig rebuilds ~64 cells, not the whole 7700-cell world (the
 	# old ~300ms freeze). A changed cell also dirties its 4 neighbour chunks, since edge-AO + the surface cap
@@ -358,11 +395,12 @@ func _draw_surface_life() -> void:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# The bird: one silhouette crossing the whole world's sky on a long cycle, direction and altitude
 	# picked per crossing. Two flapping wing-strokes — unmistakable at any distance, three draw calls.
+	# Birds fly by DAY (#29) — after dusk the sky belongs to the stars.
 	const CYCLE: float = 47.0
 	const CROSS_T: float = 16.0
 	var cyc: int = int(_anim_time / CYCLE)
 	var ct: float = fmod(_anim_time, CYCLE)
-	if ct < CROSS_T:
+	if ct < CROSS_T and daylight() > 0.5:
 		var bh: int = (cyc * 2654435761) & 0x7fffffff
 		var frac: float = ct / CROSS_T
 		var span: float = float(FactorySim.GRID_COLS * CELL)
@@ -985,16 +1023,21 @@ func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> 
 			t += dash * 2.0
 
 
-## THE PARALLAX BACKDROP (FABLE_50 #10): what the sky IS when nothing backs a cell. A vertical
-## gradient (deep night up top, warming toward the horizon), two ridgeline silhouettes sliding at
-## sub-terrain speed (the depth read: hills further than the world), and a few slow clouds. Fully
-## deterministic per frame from the camera + the cosmetic clock — no state, no nodes, four polygons.
+## THE PARALLAX BACKDROP (FABLE_50 #10 + the #29 day/night sky): what the sky IS when nothing backs a
+## cell. A vertical gradient breathing between DAY and NIGHT palettes on the day clock, a sun/moon
+## riding its arc, stars fading in after dusk, two ridgeline silhouettes sliding at sub-terrain speed,
+## and a few slow clouds. Fully deterministic per frame from the camera + the cosmetic clock.
 func _paint_backdrop(ci: CanvasItem) -> void:
 	var view: Rect2 = (ci.get_canvas_transform().affine_inverse() * ci.get_viewport_rect()).grow(96.0)
 	var cam: Vector2 = view.get_center()
 	var horizon: float = float(SURFACE_LINE) * float(CELL)
-	var top_c := Color(0.045, 0.06, 0.105)             # zenith: deeper night than the old flat fill
-	var hor_c := Color(0.125, 0.135, 0.185)            # horizon: a breath lighter (distant airglow)
+	var dl: float = daylight()
+	# Sky palette: the original moody night, eased toward a subdued day blue (overcast-underworld, not
+	# beach postcard) by the daylight level. Dusk/dawn pass through a brief warm blush at the horizon.
+	var top_c: Color = Color(0.045, 0.06, 0.105).lerp(Color(0.21, 0.32, 0.50), dl)
+	var hor_c: Color = Color(0.125, 0.135, 0.185).lerp(Color(0.46, 0.55, 0.66), dl)
+	var blush: float = clampf(1.0 - absf(dl - 0.5) * 2.0, 0.0, 1.0)     # peaks mid-transition
+	hor_c = hor_c.lerp(Color(0.62, 0.42, 0.34), blush * 0.35)           # dusk/dawn ember at the horizon
 	var grad_top: float = horizon - 420.0
 	ci.draw_rect(Rect2(view.position, Vector2(view.size.x, maxf(0.0, grad_top - view.position.y))), top_c)
 	var quad := PackedVector2Array([Vector2(view.position.x, grad_top), Vector2(view.end.x, grad_top),
@@ -1003,22 +1046,53 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 	if view.end.y > horizon:
 		ci.draw_rect(Rect2(Vector2(view.position.x, horizon),
 			Vector2(view.size.x, view.end.y - horizon)), hor_c)
+	# STARS: a hashed field in near-pinned sky space, fading in as the daylight dies; each twinkles on
+	# its own phase. Stateless — the ore-glint trick pointed at the sky.
+	if dl < 0.85:
+		var star_a: float = (1.0 - dl) * 0.9
+		for i: int in 42:
+			var sh: int = i * 2654435761
+			var sx: float = view.position.x + fposmod(float(sh % 4093) + cam.x * 0.04, view.size.x)
+			var sy: float = grad_top - 60.0 + float((sh / 7) % 380)
+			if sy > horizon - 90.0:
+				continue
+			var tw: float = 0.55 + 0.45 * sin(_anim_time * (1.1 + float(sh % 13) * 0.13) + float(i))
+			ci.draw_circle(Vector2(sx, sy), 1.1 + float(sh % 3) * 0.4,
+				Color(0.85, 0.88, 0.95, star_a * tw * 0.8))
+	# SUN / MOON: each rides a low arc across the view during its half of the cycle, pinned to the
+	# camera like any celestial thing. The sun is a warm bloom; the moon a small pale disc.
+	var p: float = day_phase()
+	var arc: float = (p + 0.05) / 0.60 if p < 0.55 else (p - 0.55) / 0.45   # 0..1 across its transit
+	var is_sun: bool = p < 0.55
+	if arc >= 0.0 and arc <= 1.0:
+		var body := Vector2(cam.x + (arc - 0.5) * 760.0,
+			(horizon - 130.0) - sin(arc * PI) * 240.0 + cam.y * 0.05)
+		if is_sun:
+			ci.draw_circle(body, 46.0, Color(1.0, 0.88, 0.62, 0.10 + 0.10 * dl))
+			ci.draw_circle(body, 22.0, Color(1.0, 0.92, 0.70, 0.30 + 0.25 * dl))
+			ci.draw_circle(body, 13.0, Color(1.0, 0.97, 0.85, 0.85))
+		else:
+			ci.draw_circle(body, 18.0, Color(0.80, 0.85, 0.95, 0.12))
+			ci.draw_circle(body, 10.0, Color(0.88, 0.91, 0.97, 0.85))
+			ci.draw_circle(body + Vector2(3.5, -2.5), 8.0, top_c.lerp(Color(0.82, 0.86, 0.94), 0.25))  # the shadowed limb
 	# Clouds: soft three-lobe blobs drifting with the wind, barely lighter than the sky. Each wraps
-	# through the visible span on its own phase so the cover never visibly loops.
+	# through the visible span on its own phase so the cover never visibly loops. Lit by the daylight.
 	var span: float = view.size.x + 500.0
 	for i: int in 5:
 		var h: float = float((i * 2654435761) % 1000) / 1000.0
-		var p: float = 0.10 + h * 0.06                                  # nearly pinned = far away
+		var p2: float = 0.10 + h * 0.06                                 # nearly pinned = far away
 		var cx: float = view.position.x - 250.0 + fposmod(
-			h * 4000.0 + _anim_time * (4.0 + h * 3.0) + cam.x * (1.0 - p) - view.position.x, span)
-		var cy: float = horizon - 300.0 - h * 130.0 + cam.y * (1.0 - p) * 0.25
-		var cc := Color(0.42, 0.47, 0.58, 0.05 + h * 0.02)
+			h * 4000.0 + _anim_time * (4.0 + h * 3.0) + cam.x * (1.0 - p2) - view.position.x, span)
+		var cy: float = horizon - 300.0 - h * 130.0 + cam.y * (1.0 - p2) * 0.25
+		var cc: Color = Color(0.42, 0.47, 0.58, 0.05 + h * 0.02) \
+			.lerp(Color(0.78, 0.82, 0.88, 0.10 + h * 0.03), dl)
 		var r: float = 26.0 + h * 30.0
 		ci.draw_circle(Vector2(cx, cy), r, cc)
 		ci.draw_circle(Vector2(cx - r * 0.9, cy + r * 0.25), r * 0.7, cc)
 		ci.draw_circle(Vector2(cx + r * 0.9, cy + r * 0.22), r * 0.75, cc)
 	# Ridgelines: far-to-near silhouettes. Sampled in FEATURE space (x shifted by the camera's
 	# unparallaxed remainder) so crests slide slower than the terrain — the whole depth illusion.
+	# By day they haze toward the sky (aerial perspective); by night they sink back to silhouette.
 	for ridge: Dictionary in RIDGES:
 		var f: float = float(ridge["factor"])
 		var amp: float = float(ridge["amp"])
@@ -1034,7 +1108,7 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 			x += 24.0
 		pts.append(Vector2(view.end.x + 24.0, horizon + 320.0))
 		pts.append(Vector2(view.position.x, horizon + 320.0))
-		ci.draw_colored_polygon(pts, ridge["color"] as Color)
+		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * (0.42 - f * 0.5)))
 
 
 ## The REAL background WALL layer (sim.wall): each wall cell paints its material colour (depth-
@@ -1316,13 +1390,17 @@ func _paint_darkness(layer: LightLayer) -> void:
 
 ## Darkness alpha for one cell, given its column's first-solid row. Open air above the rock is lit by
 ## sky (attenuating with absolute depth past SURFACE_LINE); the exposed surface + SKY_FADE tiles below
-## get shallow scatter; everything deeper is full ambient.
+## get shallow scatter; everything deeper is full ambient. The DAY/NIGHT floor (#29): at night the sky
+## itself dims, so everywhere sky-driven darkens toward NIGHT_DARK (moonlight, not a cave) — the deep
+## ambient is already darker than that, so the underground never changes.
 func _skylight_alpha(row: int, surf: int) -> float:
-	var atten: float = clampf(float(row - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0)
+	var night_floor: float = NIGHT_DARK * (1.0 - daylight())
+	var sky: float = maxf(AMBIENT_DARK * clampf(float(row - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0),
+		night_floor)
 	if row <= surf:
-		return AMBIENT_DARK * atten                     # sky-lit open air / exposed ground, dimming with depth
+		return sky                                      # sky-lit open air / exposed ground
 	var scatter: float = clampf(float(row - surf) / float(SKY_FADE), 0.0, 1.0)
-	return lerpf(AMBIENT_DARK * atten, AMBIENT_DARK, scatter)
+	return lerpf(sky, AMBIENT_DARK, scatter)
 
 
 ## The additive LIGHT pools that punch back through the veil: the miner's head-lamp + a glow per machine
@@ -1378,6 +1456,9 @@ func _paint_lights(layer: LightLayer) -> void:
 func _paint_godrays(layer: LightLayer) -> void:
 	var cell_f: float = float(CELL)
 	const RAY := Color(1.0, 0.95, 0.76)
+	var dl: float = daylight()                              # no sun, no shafts (#29): rays die at night
+	if dl <= 0.03:
+		return
 	for col: int in range(FactorySim.GRID_COLS):
 		var surf: int = sim.surface_row(col)
 		# The beam mouth = the SHALLOWER neighbouring surface (light pours past that edge) — min, not
@@ -1399,7 +1480,7 @@ func _paint_godrays(layer: LightLayer) -> void:
 		# Two nested beams: a wide faint wash + a narrow bright core, each fading top -> bottom.
 		for pass_i: int in 2:
 			var half_w: float = (cell_f * 0.46) if pass_i == 0 else (cell_f * 0.24)
-			var a: float = (0.10 if pass_i == 0 else 0.14) * mouth_light * shimmer
+			var a: float = (0.10 if pass_i == 0 else 0.14) * mouth_light * shimmer * dl
 			var a_end: float = a * (floor_light / maxf(mouth_light, 0.01)) * 0.5
 			var cx: float = x + cell_f * 0.5
 			var pts := PackedVector2Array([
@@ -1411,7 +1492,7 @@ func _paint_godrays(layer: LightLayer) -> void:
 		# A soft landing pool where the beam actually MEETS the floor while still lit.
 		if end_row == surf and floor_light > 0.06:
 			_draw_glow(layer, Vector2(x + cell_f * 0.5, float(surf) * cell_f),
-				cell_f * 1.6, RAY, 0.18 * floor_light * shimmer)
+				cell_f * 1.6, RAY, 0.18 * floor_light * shimmer * dl)
 
 
 ## One soft radial light pool (the shared glow texture, tinted + faded), added over the darkness.
