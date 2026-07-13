@@ -57,6 +57,10 @@ const CELL: float = 32.0
 var inventory_open: bool = false   ## E — the PACK screen (full carried inventory + the craft panel)
 var can_craft: bool = false        ## are we near a claimed Bazaar? gates the craft panel inside the pack screen
 var show_minimap: bool = false
+var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden (FABLE_50 #34)
+## The player's PING marker in world coords (Vector2.INF = none) — set by clicking the open map;
+## MainView owns it and pushes it here + to the renderer (which draws the in-world beacon).
+var ping_world: Vector2 = Vector2.INF
 var show_help: bool = false
 var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
 
@@ -245,10 +249,10 @@ func _draw_hover() -> void:
 	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate)
 	var pad: float = 9.0
 	var line_h: float = 18.0
-	# Sits below whatever occupies the top-right column: the minimap if it's shown, else just the FORGED
-	# chip — so the inspector never collides and doesn't leave a gap when the map is hidden.
+	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
+	# is centred, off this column), else just the FORGED chip — so the inspector never collides.
 	var mini_bottom: float = (MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)) \
-		if show_minimap else 34.0
+		if (show_minimap and not minimap_large) else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_panel(Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0)))
 	var x0: float = origin.x + pad
@@ -302,10 +306,24 @@ func draw_string_pos(x: float, y: float, text: String) -> float:
 	return x + _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 8.0
 
 
-## The MINIMAP (bottom-right): a cached image of the whole world — solid cells in their material
-## colour, carved/dug cells as a dim wall backing, open sky as void — with your machines, YOU, and the
-## visible window overlaid live. The terrain image rebuilds only when you DIG (sim.solid changes), so
-## per-frame cost is one textured blit + a few dots. Navigation legibility for the cave-rich world (#9).
+## Where the minimap sits RIGHT NOW (canvas space) — corner (top-right, small) or LARGE (centred).
+## Public: MainView uses it to route map-clicks to the PING and to keep world verbs off the map.
+func minimap_frame() -> Rect2:
+	var cols: float = float(FactorySim.GRID_COLS)
+	var rows: float = float(FactorySim.GRID_ROWS)
+	if minimap_large:
+		var mh: float = 272.0
+		var mw: float = mh * cols / rows
+		return Rect2(Vector2((CANVAS.x - mw) * 0.5, (CANVAS.y - mh) * 0.5), Vector2(mw, mh))
+	return Rect2(Vector2(CANVAS.x - MINI_W - 12.0, MINI_TOP), Vector2(MINI_W, MINI_W * rows / cols))
+
+
+## The MINIMAP (M — corner; M again — LARGE): a cached image of the whole world — solid cells in their
+## material colour, carved/dug cells as a dim wall backing, open sky as void — with the live overlays of
+## Minimap 2.0 (FABLE_50 #34): DEPTH BANDS (the violet seal line + the cold Stonereach wash below it),
+## your machines, BAZAAR diamonds, a pulsing BREACH marker on every opened way down, your PING (click
+## the map to set/clear it — the in-world beacon is the renderer's), the visible window, and YOU. The
+## terrain image rebuilds only when you DIG (sim.solid changes), so per-frame cost is one textured blit.
 func _draw_minimap() -> void:
 	if sim == null or not minimap_color.is_valid():
 		return
@@ -314,16 +332,42 @@ func _draw_minimap() -> void:
 		_rebuild_minimap()
 	var cols: float = float(FactorySim.GRID_COLS)
 	var rows: float = float(FactorySim.GRID_ROWS)
-	var mw: float = MINI_W
-	var mh: float = mw * rows / cols
-	var origin := Vector2(CANVAS.x - mw - 12.0, MINI_TOP)
-	var frame := Rect2(origin, Vector2(mw, mh))
-	_panel(Rect2(origin - Vector2(3.0, 3.0), Vector2(mw + 6.0, mh + 6.0)))
+	var frame: Rect2 = minimap_frame()
+	var origin: Vector2 = frame.position
+	_panel(frame.grow(3.0))
 	draw_texture_rect(_minimap_tex, frame, false)
-	var scale := Vector2(mw / cols, mh / rows)
+	var scale := Vector2(frame.size.x / cols, frame.size.y / rows)
+	var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)   # cosmetic clock — HUD only
+	# --- depth bands: the layer ladder made legible at a glance ---
+	var seal_y: float = origin.y + float(LayeredWorldGen.SEAL_TOP) * scale.y
+	var seal_h: float = maxf(float(LayeredWorldGen.SEAL_ROWS) * scale.y, 1.5)
+	draw_rect(Rect2(origin.x, seal_y + seal_h, frame.size.x, frame.end.y - (seal_y + seal_h)),
+		Color(0.35, 0.50, 0.95, 0.10))                                  # Stonereach: a cold wash
+	draw_rect(Rect2(origin.x, seal_y, frame.size.x, seal_h), Color(0.62, 0.42, 0.85, 0.55))  # THE SEAL
+	if minimap_large:
+		draw_string(_font, Vector2(origin.x + 5.0, seal_y - 4.0), "TOPSOIL",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.72, 0.60, 0.75))
+		draw_string(_font, Vector2(origin.x + 5.0, seal_y + seal_h + 10.0), "STONEREACH",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.55, 0.65, 0.90, 0.75))
+	# --- your placed machines ---
 	var dot := Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0))
-	for m: MachineState in sim.machines:                       # your placed machines
+	for m: MachineState in sim.machines:
 		draw_rect(Rect2(origin + Vector2(m.cell) * scale, dot), Visuals.machine_color(m.def))
+	# --- bazaars: the crafting hubs wear a gold diamond ---
+	for o: Vector2i in sim.find_bazaars():
+		_map_diamond(origin + (Vector2(o) + Vector2(float(FactorySim.BAZAAR_W) * 0.5, 1.0)) * scale,
+			3.5, Color(0.98, 0.84, 0.35))
+	# --- breach markers: every opened way down pulses violet (find it again from anywhere) ---
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"descent" and m.fed >= FactorySim.DESCENT_QUOTA:
+			_map_diamond(origin + (Vector2(m.cell) + Vector2(0.5, 0.5)) * scale,
+				3.0 + pulse * 2.5, Color(0.80, 0.55, 1.0, 0.55 + 0.45 * pulse))
+	# --- your ping ---
+	if ping_world.x != INF:
+		var pc: Vector2 = origin + ping_world / CELL * scale
+		draw_line(pc + Vector2(-4.0, 0.0), pc + Vector2(4.0, 0.0), Color(0.45, 0.95, 1.0), 1.0)
+		draw_line(pc + Vector2(0.0, -4.0), pc + Vector2(0.0, 4.0), Color(0.45, 0.95, 1.0), 1.0)
+		draw_arc(pc, 4.0 + pulse * 3.0, 0.0, TAU, 20, Color(0.45, 0.95, 1.0, 0.9 - pulse * 0.5), 1.0)
 	if minimap_view.length() > 1.0:                            # the visible window
 		var half: Vector2 = minimap_view * 0.5 / CELL
 		var fc: Vector2 = minimap_focus / CELL
@@ -332,6 +376,18 @@ func _draw_minimap() -> void:
 	var you := origin + minimap_focus / CELL * scale           # you-are-here marker
 	draw_rect(Rect2(you - Vector2(2.5, 2.5), Vector2(5.0, 5.0)), Color(0.97, 0.86, 0.36))
 	draw_rect(Rect2(you - Vector2(2.5, 2.5), Vector2(5.0, 5.0)), Color(0.10, 0.08, 0.0), false, 1.0)
+	if minimap_large:
+		var cap: String = "click the map to ping · M cycles size"
+		var cw: float = _font.get_string_size(cap, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		draw_rect(Rect2(origin.x + 3.0, frame.end.y - 17.0, cw + 10.0, 14.0), Color(0.05, 0.06, 0.09, 0.8))
+		draw_string(_font, Vector2(origin.x + 8.0, frame.end.y - 6.0), cap,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+
+
+## A small filled diamond — the minimap's icon shape (reads at 3-5px where a square blurs into terrain).
+func _map_diamond(c: Vector2, r: float, col: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -r), c + Vector2(r, 0.0),
+		c + Vector2(0.0, r), c + Vector2(-r, 0.0)]), col)
 
 
 ## Rebuild the cached terrain image: one pixel per cell — solid = material colour, dug-but-walled = a
@@ -654,7 +710,7 @@ func _draw_help_overlay() -> void:
 		"research    R  (in the pack screen, at the bench)",
 		"tech tree   T",
 		"configure   R  (aimed at a splitter / hopper)",
-		"map         M",
+		"map         M  (again: LARGE · click it = ping)",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
 		"save / load  F5 / F9",
 		"pause       P     ·   help   H",

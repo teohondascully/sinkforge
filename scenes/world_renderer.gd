@@ -62,6 +62,7 @@ var _guide_targets: Array[Dictionary] = []           ## current objective's WHER
 var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mined (cracks drawn on it; pushed by MainView)
 var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block — the felt-friction read
 var _dig_marks: Dictionary = {}                       ## the dig PLAN (live ref from MainView) — hatched overlay
+var _ping_world: Vector2 = Vector2.INF                ## the map-click PING (INF = none) — in-world beacon
 var bazaars: Bazaars = null                          ## the Bazaar view layer (set by MainView); may be null
 var _seal_rows: Array[int] = []                       ## world rows holding THE SEAL (lazy-scanned for its pulse)
 var _seal_rows_scanned: bool = false
@@ -179,6 +180,12 @@ func set_dig_marks(marks: Dictionary) -> void:
 	_dig_marks = marks
 
 
+## The player's PING (FABLE_50 #34 — set by clicking the minimap; Vector2.INF = none): drawn in-world
+## as a pulsing beacon so "the spot I marked on the map" is findable when you walk up to it.
+func set_ping(world: Vector2) -> void:
+	_ping_world = world
+
+
 func _process(delta: float) -> void:
 	_anim_time += delta
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
@@ -241,7 +248,26 @@ func _draw() -> void:
 	_draw_dig_marks()      # the painted dig PLAN — corner-bracketed cells waiting for the pick
 	_draw_mine_cracks()    # spider cracks on the block you're charge-mining (the felt friction)
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
+	_draw_ping()           # the map-click beacon — the spot you marked, findable on foot
 	_draw_aim()
+
+
+## The in-world PING beacon (FABLE_50 #34): a cyan pin bobbing over the marked spot + an expanding
+## sonar ring, so the bookmark you clicked on the map is visible from across a cavern when you arrive.
+func _draw_ping() -> void:
+	if _ping_world.x == INF:
+		return
+	var ring: float = fmod(_anim_time, 1.6) / 1.6
+	var col := Color(0.45, 0.95, 1.0)
+	draw_arc(_ping_world, 6.0 + ring * 26.0, 0.0, TAU, 28,
+		Color(col.r, col.g, col.b, 0.5 * (1.0 - ring)), 2.0)
+	var bob: float = sin(_anim_time * 3.0) * 2.5
+	var tip: Vector2 = _ping_world + Vector2(0.0, -4.0 + bob)
+	draw_line(tip, tip + Vector2(0.0, -10.0), Color(col.r, col.g, col.b, 0.85), 1.5)
+	var head: Vector2 = tip + Vector2(0.0, -13.0)
+	draw_colored_polygon(PackedVector2Array([head + Vector2(0.0, -4.5), head + Vector2(4.0, 0.0),
+		head + Vector2(0.0, 4.5), head + Vector2(-4.0, 0.0)]), col)
+	draw_circle(head, 1.4, Color(0.06, 0.10, 0.14))
 
 
 ## The painted dig PLAN (FABLE_50 #24): each marked cell wears amber corner brackets + a whisper of

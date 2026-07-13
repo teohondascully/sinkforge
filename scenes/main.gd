@@ -46,7 +46,11 @@ var _paused: bool = false
 ## help (H/?) are summoned, not permanent. Pushed to the HUD each frame so it knows what to draw.
 var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); crafting lives inside it, but
                                     ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
-var _show_minimap: bool = false
+## Minimap mode (FABLE_50 #34): 0 hidden · 1 corner · 2 LARGE (centred). M cycles; Esc closes.
+var _minimap_mode: int = 0
+## The player's PING marker in world coords (Vector2.INF = none): click the open map to set it, click
+## it again to clear. A navigation bookmark — pushed to the HUD (map dot) + renderer (in-world beacon).
+var _ping_world: Vector2 = Vector2.INF
 var _show_help: bool = false
 var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
                                     ## the research VERB (R) stays Bazaar-gated like the bench
@@ -463,7 +467,9 @@ func _process(delta: float) -> void:
 		_hud.hover_info = _hover_info()
 		_hud.inventory_open = _inventory_open
 		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
-		_hud.show_minimap = _show_minimap
+		_hud.show_minimap = _minimap_mode > 0
+		_hud.minimap_large = _minimap_mode == 2
+		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
 		_hud.show_tech = _show_tech
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
@@ -554,7 +560,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.DROP):
 		try_drop()
 	elif event.is_action_pressed(Controls.MAP):
-		_show_minimap = not _show_minimap
+		_minimap_mode = (_minimap_mode + 1) % 3          # hidden → corner → LARGE → hidden
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.TECH):
@@ -563,12 +569,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_inventory_open = false
 		_show_help = false
 		_show_tech = false
+		_minimap_mode = 0
 	elif event.is_action_pressed(Controls.RESEARCH) and (_inventory_open or _show_tech):
 		try_research(ResearchRules.next_tech(sim.research))   # R at the bench/tree: research the next tech
 	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
 		try_configure(_aim)                                   # R in the world: configure the aimed machine
 	elif event.is_action_pressed(Controls.BUILD):
-		try_build(_aim)
+		if not _cursor_on_minimap():                          # the open map is UI — clicks on it never build
+			try_build(_aim)
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
+			and _cursor_on_minimap():
+		_toggle_ping(get_viewport().get_mouse_position())     # click the map → set/clear the ping
 	elif event.is_action_pressed(Controls.ZOOM):
 		_cycle_zoom()
 	elif event.is_action_pressed(Controls.SPEED):
@@ -609,7 +620,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _update_mining(delta: float) -> void:
 	var mouse_world: Vector2 = get_global_mouse_position()
 	_aim = _effective_aim(mouse_world)
-	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE)
+	# The open minimap is UI: while the cursor sits on it, LMB pings the map, never swings the pick.
+	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE) and not _cursor_on_minimap()
 	if pressed:
 		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)
 	else:
@@ -923,6 +935,26 @@ func _prime_breach_watch() -> void:
 	for m: MachineState in sim.machines:
 		if m.def.behavior == &"descent" and m.fed >= FactorySim.DESCENT_QUOTA:
 			_breach_heard[m.cell] = true
+
+
+## Is the cursor over the OPEN minimap? While it is, the map owns the mouse: LMB pings it and no world
+## verb (mine/build) fires underneath — the "clicks on visible UI don't hit the world" rule.
+func _cursor_on_minimap() -> bool:
+	return _minimap_mode > 0 and _hud != null \
+		and _hud.minimap_frame().grow(3.0).has_point(get_viewport().get_mouse_position())
+
+
+## Set/clear the PING from a click on the map (canvas coords → world). Clicking on (or next to) the
+## existing ping clears it; anywhere else moves it. The HUD draws the map dot, the renderer the beacon.
+func _toggle_ping(canvas_pos: Vector2) -> void:
+	var frame: Rect2 = _hud.minimap_frame()
+	var world: Vector2 = (canvas_pos - frame.position) / frame.size * WORLD_SIZE
+	if _ping_world.x != INF and _ping_world.distance_to(world) < 2.5 * float(CELL):
+		_ping_world = Vector2.INF
+		_hud.flash("ping cleared")
+	else:
+		_ping_world = world.clamp(Vector2.ZERO, WORLD_SIZE)
+	_renderer.set_ping(_ping_world)
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.
