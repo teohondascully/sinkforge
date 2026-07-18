@@ -94,6 +94,8 @@ var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
 var _was_on_floor: bool = false
 var _squash: float = 0.0             ## 0..1 landing squash, decays — pure visual
+var _land_hold: float = 0.0          ## seconds the landing-impact frame is held (#42)
+var _climb_phase: float = 0.0        ## climb-cycle clock, advanced by rope travel (#42)
 var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / walk anim-frame pick
 var _anim_time: float = 0.0          ## free-running clock for non-walk frame cycling (the dig loop)
 var _dig_hold: float = 0.0           ## seconds the dig pose stays latched after the last mined cell
@@ -242,6 +244,10 @@ func _step(delta: float) -> void:
 		_squash = 1.0
 		landed_hard = true
 		last_impact = impact_v           # the consumer scales dust/shake/thump by how hard (#43)
+		_land_hold = 0.14                # hold the landing-impact frame a beat (#42)
+	_land_hold = maxf(0.0, _land_hold - delta)
+	if climbing:
+		_climb_phase += absf(velocity.y) * delta * 0.055   # hand-over-hand cadence tracks climb speed
 	_was_on_floor = on_floor
 	_squash = move_toward(_squash, 0.0, delta * 5.0)
 	_walk_phase += (absf(velocity.x) * delta * 0.06) if on_floor else 0.0
@@ -424,16 +430,44 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 ## > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2 off the free clock. The
 ## caller falls back to the idle "miner" frame for any state whose art hasn't been drawn yet, so dropping
 ## in only a subset of frames still works (and with NO frames present, every key misses → primitive path).
+## Frame fallback chains (FABLE_50 #42): a state whose art hasn't landed borrows the nearest drawn
+## pose, ending at the idle frame — so the artist can land climb_0 alone, or nothing, and every state
+## still shows SOMETHING sensible.
+const SPRITE_FALLBACKS: Dictionary = {
+	"miner_climb_0": "miner_climb", "miner_climb_1": "miner_climb",
+	"miner_hang": "miner_climb", "miner_climb": "miner", "miner_land": "miner",
+}
+
+
 func _sprite_key() -> String:
 	if digging:
 		return "miner_dig_0" if int(_anim_time * 8.0) % 2 == 0 else "miner_dig_1"
 	if climbing:
-		return "miner_climb"       # no art yet → falls back to the idle frame (better than the jump pose)
+		# Moving on the rope cycles the climb; a still grip HANGS (a distinct held pose).
+		if absf(velocity.y) > 6.0:
+			return "miner_climb_%d" % (int(_climb_phase) % 2)
+		return "miner_hang"
 	if not on_floor:
 		return "miner_jump"
+	if _land_hold > 0.0:
+		return "miner_land"        # the landing-impact beat, right after touchdown
 	if absf(velocity.x) > 10.0:
 		return "miner_walk_%d" % (int(_walk_phase) % 4)
 	return "miner"
+
+
+## The best drawn texture for a state key: walk its fallback chain, ending at the idle frame (null
+## only when NO miner art exists at all — then the code-drawn figure takes over).
+func _resolve_tex(key: String) -> Texture2D:
+	var k: String = key
+	while true:
+		var t: Texture2D = Art.tex(k)
+		if t != null:
+			return t
+		if not SPRITE_FALLBACKS.has(k):
+			break
+		k = SPRITE_FALLBACKS[k]
+	return Art.tex("miner")
 
 
 ## The MINER. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present (feet-anchored,
@@ -451,10 +485,7 @@ func _draw() -> void:
 	var sxq: float = 1.0 + 0.18 * _squash             # landing squash widens X
 	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
 	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
-	var key: String = _sprite_key()
-	var tex: Texture2D = Art.tex(key)
-	if tex == null and key != "miner":
-		tex = Art.tex("miner")          # graceful fall back to the idle frame until this state's art lands
+	var tex: Texture2D = _resolve_tex(_sprite_key())
 	if tex != null:
 		var w: float = float(tex.get_width()) * sxq
 		var h: float = float(tex.get_height()) * syq
