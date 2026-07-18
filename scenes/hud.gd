@@ -40,6 +40,8 @@ var inv_selected_getter: Callable
 ## When you aim at one of your machines in reach, MainView pushes its inspector info here (name, recipe
 ## in→out, routing mode, what it's holding). Empty = nothing hovered. Drawn top-right under FORGED.
 var hover_info: Dictionary = {}
+var _hover_rect: Rect2 = Rect2()          ## the inspector's canvas rect this frame (#32 — pin region)
+var _knob_hits: Array[Dictionary] = []    ## clickable knob chips this frame: [{rect, payload}]
 ## Minimap inputs (pushed by MainView): a material-id → colour lookup (the renderer's, handed over as a
 ## Callable so the HUD stays decoupled), the camera focus (player world pos) and the world-space view
 ## size, so the minimap can mark "you are here" + the visible window. The terrain image is cached and
@@ -279,17 +281,26 @@ func _panel(rect: Rect2, accent: bool = false) -> void:
 ## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
 ## reach. Names it and shows its recipe as item chips (inputs → outputs) or its routing mode, plus what
 ## it's currently holding. The "where does this eat / spit / what does it make" answer without a manual.
+## CONFIG PANEL (FABLE_50 #32): machines with a knob also draw CLICKABLE rows — the splitter's three
+## ratio chips, a filtered hopper's [clear] chip — and machines with a fill draw a real BAR (the
+## engine's quota). MainView PINS the hover while the cursor crosses onto this panel, so the knobs are
+## reachable; clicks land through hover_click() (every mutation stays a discrete sim call out there).
 func _draw_hover() -> void:
+	_knob_hits.clear()
+	_hover_rect = Rect2()
 	if hover_info.is_empty():
 		return
 	var ins: Array = hover_info.get("in", [])
 	var outs: Array = hover_info.get("out", [])
 	var holding: Array = hover_info.get("holding", [])
+	var knobs: Array = hover_info.get("knobs", [])
+	var bar: Dictionary = hover_info.get("bar", {})
 	var has_recipe: bool = not ins.is_empty() or not outs.is_empty()
 	var has_mode: bool = hover_info.has("mode") and str(hover_info["mode"]) != ""
 	var has_rate: bool = hover_info.has("rate")
 	var width: float = 218.0
-	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate)
+	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate) \
+		+ knobs.size() + int(not bar.is_empty())
 	var pad: float = 9.0
 	var line_h: float = 18.0
 	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
@@ -297,7 +308,8 @@ func _draw_hover() -> void:
 	var mini_bottom: float = (MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)) \
 		if (show_minimap and not minimap_large) else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
-	_panel(Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0)))
+	_hover_rect = Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0))
+	_panel(_hover_rect)
 	var x0: float = origin.x + pad
 	var y: float = origin.y + 8.0 + 12.0
 	draw_string(_font, Vector2(x0, y), str(hover_info.get("name", "")),
@@ -319,6 +331,61 @@ func _draw_hover() -> void:
 	if has_rate:
 		draw_string(_font, Vector2(x0, y), str(hover_info["rate"]),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.85, 0.72, 0.42))
+		y += line_h
+	if not bar.is_empty():
+		var br := Rect2(x0, y - 11.0, width - pad * 2.0, 12.0)
+		draw_rect(br, Color(0.0, 0.0, 0.0, 0.45))
+		draw_rect(Rect2(br.position, Vector2(br.size.x * clampf(float(bar.get("frac", 0.0)), 0.0, 1.0),
+			br.size.y)), Color(0.62, 0.42, 0.95, 0.85))
+		draw_rect(br, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
+		draw_string(_font, Vector2(x0 + 3.0, y - 1.0), str(bar.get("label", "")),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.95, 0.94, 0.99))
+		y += line_h
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	for knob: Variant in knobs:
+		var k: Dictionary = knob
+		var x: float = x0
+		if k.get("kind", "") == "choice":
+			x = draw_string_pos(x, y, str(k.get("label", "")))
+			var options: Array = k.get("options", [])
+			for i: int in options.size():
+				var text: String = str(options[i])
+				var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 10.0
+				var chip := Rect2(x, y - 12.0, w, 15.0)
+				var current: bool = i == int(k.get("current", -1))
+				var lit: bool = chip.has_point(mouse)
+				draw_rect(chip, Color(0.93, 0.78, 0.30) if current
+					else (Color(0.30, 0.34, 0.44) if lit else Color(0.16, 0.18, 0.24)))
+				draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
+				draw_string(_font, Vector2(x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+					Color(0.10, 0.10, 0.12) if current else Color(0.90, 0.92, 0.96))
+				_knob_hits.append({"rect": chip, "payload": {"knob": "choice", "index": i}})
+				x += w + 5.0
+		elif k.get("kind", "") == "action":
+			var text2: String = str(k.get("label", ""))
+			var w2: float = _font.get_string_size(text2, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 12.0
+			var chip2 := Rect2(x, y - 12.0, w2, 15.0)
+			draw_rect(chip2, Color(0.34, 0.30, 0.22) if chip2.has_point(mouse) else Color(0.22, 0.20, 0.16))
+			draw_rect(chip2, Color(0.93, 0.78, 0.30, 0.55), false, 1.0)
+			draw_string(_font, Vector2(x + 6.0, y), text2, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+				Color(0.95, 0.88, 0.62))
+			_knob_hits.append({"rect": chip2, "payload": {"knob": "action", "id": k.get("id", "")}})
+		y += line_h
+
+
+## The inspector's on-canvas rect this frame (Rect2() = not shown). MainView uses it to PIN the hover
+## while the cursor travels onto the panel — the same "the open map is UI" rule the minimap follows.
+func hover_panel_rect() -> Rect2:
+	return _hover_rect
+
+
+## The knob payload under a canvas point ({} = none). Read by MainView on LMB — the HUD never touches
+## the sim; the controller turns the payload into a discrete sim call.
+func hover_click(canvas_pos: Vector2) -> Dictionary:
+	for hit: Dictionary in _knob_hits:
+		if (hit["rect"] as Rect2).has_point(canvas_pos):
+			return hit["payload"]
+	return {}
 
 
 ## Draw a run of item chips (a colour swatch + count) left-to-right; returns the x just past them.

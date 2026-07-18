@@ -51,6 +51,7 @@ var _minimap_mode: int = 0
 ## The player's PING marker in world coords (Vector2.INF = none): click the open map to set it, click
 ## it again to clear. A navigation bookmark — pushed to the HUD (map dot) + renderer (in-world beacon).
 var _ping_world: Vector2 = Vector2.INF
+var _hover_latch: Vector2i = Vector2i(-9999, -9999)   ## the machine the config panel is pinned to (#32)
 var _show_help: bool = false
 var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
                                     ## the research VERB (R) stays Bazaar-gated like the bench
@@ -471,7 +472,14 @@ func _process(delta: float) -> void:
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def(), _selected_build_material())
 	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
 	if _hud != null:
-		_hud.hover_info = _hover_info()
+		# The config-panel PIN (#32): while the cursor sits on the inspector itself, keep showing the
+		# machine it opened for (else reaching for a knob would move the aim and close the panel).
+		if _cursor_on_hover_panel() and sim.machine_at(_hover_latch) != null:
+			_hud.hover_info = _hover_info_at(_hover_latch)
+		else:
+			_hud.hover_info = _hover_info()
+			var hm: MachineState = sim.machine_at(_aim)
+			_hover_latch = hm.cell if (hm != null and not _hud.hover_info.is_empty()) else Vector2i(-9999, -9999)
 		_hud.inventory_open = _inventory_open
 		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
 		_hud.show_minimap = _minimap_mode > 0
@@ -593,7 +601,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
 		try_configure(_aim)                                   # R in the world: configure the aimed machine
 	elif event.is_action_pressed(Controls.BUILD):
-		if not _cursor_on_minimap():                          # the open map is UI — clicks on it never build
+		if not _cursor_on_minimap() and not _cursor_on_hover_panel():   # UI panels eat the click
 			if _selected_item() == &"scanner":
 				try_scan()                                    # the selected item defines RMB: sonar, not build
 			else:
@@ -601,6 +609,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_minimap():
 		_toggle_ping(get_viewport().get_mouse_position())     # click the map → set/clear the ping
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
+			and _cursor_on_hover_panel():
+		_apply_knob(_hud.hover_click(get_viewport().get_mouse_position()))   # config-panel chips (#32)
 	elif event.is_action_pressed(Controls.ZOOM):
 		_cycle_zoom()
 	elif event.is_action_pressed(Controls.SPEED):
@@ -641,8 +652,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _update_mining(delta: float) -> void:
 	var mouse_world: Vector2 = get_global_mouse_position()
 	_aim = _effective_aim(mouse_world)
-	# The open minimap is UI: while the cursor sits on it, LMB pings the map, never swings the pick.
-	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE) and not _cursor_on_minimap()
+	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
+	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE) \
+		and not _cursor_on_minimap() and not _cursor_on_hover_panel()
 	if pressed:
 		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)
 	else:
@@ -997,6 +1009,33 @@ func _cursor_on_minimap() -> bool:
 		and _hud.minimap_frame().grow(3.0).has_point(get_viewport().get_mouse_position())
 
 
+## Is the cursor over the machine inspector/config panel? While it is, LMB hits panel knobs and the
+## world verbs stay holstered (the same "UI eats the click" rule as the open minimap).
+func _cursor_on_hover_panel() -> bool:
+	if _hud == null:
+		return false
+	var r: Rect2 = _hud.hover_panel_rect()
+	return r.size.x > 0.0 and r.has_point(get_viewport().get_mouse_position())
+
+
+## Turn a clicked config-panel chip (#32) into the discrete sim call it stands for. The HUD only
+## reports WHAT was clicked; every mutation happens here, through the sim's public surface.
+func _apply_knob(payload: Dictionary) -> void:
+	if payload.is_empty() or sim.machine_at(_hover_latch) == null:
+		return
+	var label: String = ""
+	match str(payload.get("knob", "")):
+		"choice":
+			label = sim.set_split_mode(_hover_latch, int(payload.get("index", 0)))
+		"action":
+			if str(payload.get("id", "")) == "clear_filter":
+				label = sim.configure_machine(_hover_latch)
+	if label != "":
+		_hud.flash(label)
+		_particles.spark(_cell_center(_hover_latch), Color(0.75, 0.85, 0.98))
+		_sfx.play(&"pop", _cell_center(_hover_latch), 1.4)
+
+
 ## Set/clear the PING from a click on the map (canvas coords → world). Clicking on (or next to) the
 ## existing ping clears it; anywhere else moves it. The HUD draws the map dot, the renderer the beacon.
 func _toggle_ping(canvas_pos: Vector2) -> void:
@@ -1132,27 +1171,33 @@ func try_build(cell: Vector2i) -> bool:
 ## its name, recipe (inputs → outputs as item lists), routing mode, and what it currently holds. The
 ## HUD renders it. Pure read of the sim — the legibility answer to "where does this eat / spit / make".
 func _hover_info() -> Dictionary:
-	if not _can_reach(_aim):
+	return _hover_info_at(_aim)
+
+
+## The same read for an explicit cell — the config panel PIN (#32) re-reads the latched machine while
+## the cursor is off exploring the panel's own knobs.
+func _hover_info_at(aim: Vector2i) -> Dictionary:
+	if not _can_reach(aim):
 		return {}
-	var m: MachineState = sim.machine_at(_aim)
+	var m: MachineState = sim.machine_at(aim)
 	if m == null:
 		# A visible SOLID ore vein — show how much ore is in it + the nudge to automate it. The readout the
 		# user asked for ("hover to see how much ore is left"), now on the vein itself (no cavity to explain).
-		var dep: int = sim.ore_deposit_at(_aim)
+		var dep: int = sim.ore_deposit_at(aim)
 		if dep > 0:
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],
 				"mode": "%d ore — drop a Drill just above it (%s)" % [dep, _rate_eta(_drill_rate(), dep)]}
 		# THE SEAL is its own answer: no pick ever opens it — the Descent Engine does (docs/PROGRESSION.md).
-		if sim.material_at(_aim) == &"sealrock":
+		if sim.material_at(aim) == &"sealrock":
 			return {"name": "The Seal", "in": [], "out": [], "holding": [],
 				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
 		# A hanging rope: its coil count + the one-action recovery affordance (FABLE_50 #39).
-		if sim.is_climbable(_aim):
+		if sim.is_climbable(aim):
 			return {"name": "Rope", "in": [], "out": [], "holding": [],
-				"mode": "%d segments hung — RMB takes the whole rope back" % sim.rope_length(_aim)}
+				"mode": "%d segments hung — RMB takes the whole rope back" % sim.rope_length(aim)}
 		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
-		if sim.is_solid(_aim):
-			var rock: StringName = sim.material_at(_aim)
+		if sim.is_solid(aim):
+			var rock: StringName = sim.material_at(aim)
 			if not MiningRules.can_mine(rock, sim.inventory):
 				return {"name": String(rock).capitalize(), "in": [], "out": [], "holding": [],
 					"mode": "too hard for your pick — craft a Stone Pickaxe (tier %d)" % MiningRules.required_tier(rock)}
@@ -1172,9 +1217,12 @@ func _hover_info() -> Dictionary:
 		&"lift":
 			info["mode"] = "lifts goods + you UP" + ("  (POWERED ×%.1f)" % (1.0 + (float(FactorySim.LIFT_POWERED_THROUGHPUT) / float(FactorySim.LIFT_THROUGHPUT) - 1.0) * m.power_factor) if m.power_factor > 0.05 else "  (unpowered baseline)")
 		&"splitter":
-			info["mode"] = ["splits DOWN + RIGHT evenly (R: ratio)",
-				"splits 2:1 favouring DOWN (R: ratio)",
-				"splits 1:2 favouring RIGHT (R: ratio)"][m.mode % 3]
+			info["mode"] = ["splits DOWN + RIGHT evenly",
+				"splits 2:1 favouring DOWN",
+				"splits 1:2 favouring RIGHT"][m.mode % 3]
+			# The config panel's clickable ratio chips (#32) — R still cycles for keyboard hands.
+			info["knobs"] = [{"kind": "choice", "label": "ratio",
+				"options": ["1:1", "2:1 v", "1:2 >"], "current": m.mode % 3}]
 		&"hopper":
 			var stock: int = 0
 			for it: StringName in m.input_buffer:
@@ -1182,7 +1230,9 @@ func _hover_info() -> Dictionary:
 			if m.filter == &"":
 				info["mode"] = "stockpiles %d — keeps the FIRST thing it tastes, passes the rest" % stock
 			else:
-				info["mode"] = "banks %s (%d) — passes everything else (R: re-taste)" % [String(m.filter), stock]
+				info["mode"] = "banks %s (%d) — passes everything else" % [String(m.filter), stock]
+				info["knobs"] = [{"kind": "action", "id": "clear_filter",
+					"label": "[ clear filter — re-taste ]"}]
 		&"generator":
 			info["mode"] = "burns coal → POWER" + ("  (running)" if m.fuel > 0 else "  (out of fuel)")
 		&"descent":
@@ -1191,7 +1241,9 @@ func _hover_info() -> Dictionary:
 			elif sim.machine_status(m) == &"blocked":
 				info["mode"] = "stand it ON the seal (nothing to breach below)"
 			else:
-				info["mode"] = "fed %d/%d ingots — drop them in (gravity feeds it)" % [m.fed, FactorySim.DESCENT_QUOTA]
+				info["mode"] = "drop ingots in — gravity feeds it"
+				info["bar"] = {"frac": float(m.fed) / float(FactorySim.DESCENT_QUOTA),
+					"label": "quota %d / %d ingots" % [m.fed, FactorySim.DESCENT_QUOTA]}
 		&"h_drill":
 			var btgt: Vector2i = sim.h_drill_target(m.cell, m.facing)
 			var belly: int = 0

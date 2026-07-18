@@ -1708,12 +1708,21 @@ func configure_machine(cell: Vector2i) -> String:
 		return ""
 	match m.def.behavior:
 		&"splitter":
-			m.mode = (m.mode + 1) % _SPLIT_PATTERNS.size()
-			return ["splitter: even 1:1", "splitter: 2:1 DOWN", "splitter: 1:2 RIGHT"][m.mode]
+			return set_split_mode(cell, (m.mode + 1) % _SPLIT_PATTERNS.size())
 		&"hopper":
 			m.filter = &""
 			return "hopper: filter cleared — it keeps the next thing it tastes"
 	return ""
+
+
+## Set a splitter's ratio DIRECTLY (the config panel's clickable chips, FABLE_50 #32 — R still cycles
+## through configure_machine above). A discrete call like every player mutation. "" = not a splitter.
+func set_split_mode(cell: Vector2i, mode: int) -> String:
+	var m: MachineState = grid.get(cell, null)
+	if m == null or m.def.behavior != &"splitter":
+		return ""
+	m.mode = clampi(mode, 0, _SPLIT_PATTERNS.size() - 1)
+	return ["splitter: even 1:1", "splitter: 2:1 DOWN", "splitter: 1:2 RIGHT"][m.mode]
 
 
 ## Move a bundle of items from `machine` into one destination, logging the cosmetic flow event.

@@ -261,6 +261,14 @@ func _test_splitter() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through splitter (present=%d, net=%d)" % [item, present, net])
+	# Direct ratio SET (FABLE_50 #32 — the config panel's clickable chips; R still cycles).
+	var sm: MachineState = sim.machine_at(Vector2i(6, 2))
+	_check(sim.set_split_mode(Vector2i(6, 2), 2) != "", "the panel can set a splitter's ratio directly")
+	_check(sm.mode == 2, "…and the mode landed (1:2 RIGHT)")
+	sim.set_split_mode(Vector2i(6, 2), 0)
+	sim.set_split_mode(Vector2i(6, 2), 99)
+	_check(sm.mode == 2, "an out-of-range mode clamps to a real pattern")
+	_check(sim.set_split_mode(Vector2i(7, 4), 1) == "", "a non-splitter refuses the ratio knob")
 	# Determinism with a router in the chain.
 	var a: FactorySim = FactorySim.new()
 	var b: FactorySim = FactorySim.new()
