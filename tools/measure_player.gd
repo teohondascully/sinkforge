@@ -63,6 +63,23 @@ func _phys() -> void:
 				var height: float = _floor_y - _apex
 				var intended: float = Player.JUMP_VELOCITY * Player.JUMP_VELOCITY / (2.0 * Player.GRAVITY)
 				_report("jump apex px", height, intended, JUMP_TOL)
+				_phase = 10; _t = 0.0
+		10:  # TAP jump (#43 variable height): release the key the instant it fires → the short hop
+			if _player.on_floor:
+				_floor_y = _player.position.y
+				_apex = _player.position.y
+				_player.request_jump()
+				_player.jump_held = false      # a tap: released before the first rising frame
+				_phase = 11; _t = 0.0
+		11:  # track the tap's apex — the cut arc must be a real fraction of the full one
+			_t += dt
+			_apex = minf(_apex, _player.position.y)
+			if _player.on_floor and _t > 0.15:
+				var hop: float = _floor_y - _apex
+				var full: float = Player.JUMP_VELOCITY * Player.JUMP_VELOCITY / (2.0 * Player.GRAVITY)
+				var intended_hop: float = full / Player.JUMP_CUT_GRAVITY
+				_report("tap-hop apex px", hop, intended_hop, 0.30)
+				_player.jump_held = true       # restore the drivers' full-arc default
 				_phase = 2; _t = 0.0; _x0 = 0.0  # _x0 set once the body is up to speed (phase 2)
 		2:  # spin up to top speed (~0.2s of accel), THEN measure STEADY-STATE speed over a window — we
 			# want the intended top speed, not the average-from-rest (which accel would drag below).

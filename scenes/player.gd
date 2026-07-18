@@ -36,6 +36,11 @@ const GRAVITY: float = 900.0         ## px/s^2
 ## which made a 2-block ledge a 4px-short bounce-off — the reported "stalling on a 2-high jump". A ≥3-tile
 ## wall stays honest (jump can't beat it; that's what ropes/digging are for).
 const JUMP_VELOCITY: float = -365.0
+## VARIABLE JUMP (FABLE_50 #43): while RISING with Space released, gravity is multiplied by this —
+## a tap gives a short hop (~1/2 tile), a held press the full 2-tile arc. Feel-standard platformer
+## control; never touches falls (velocity.y >= 0) or rope climbs. Harness drivers that don't model
+## the key default jump_held=true, so every measured/scripted jump stays the FULL arc.
+const JUMP_CUT_GRAVITY: float = 2.1
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
 const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
@@ -77,6 +82,8 @@ var facing: int = 1
 
 ## Cosmetic feedback MainView reads to spawn juice (dust / shake) — never touches the sim.
 var landed_hard: bool = false        ## one-shot: set the frame the body lands from a real fall
+var last_impact: float = 0.0         ## the landing's downward speed (px/s) — juice scales with it (#43)
+var jump_held: bool = true           ## is the jump key still down (auto_input polls it; drivers may set)
 ## Animation state (Phase C — drives sprite-frame selection only; pure representation). `digging` is a
 ## brief held flag MainView pokes via note_dig() each time a cell is mined, so the dig pose shows across
 ## the gaps between mine ticks. Both the walk clock and this clock pick frames; absent art they do nothing.
@@ -102,6 +109,7 @@ func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
 		input_climb = Input.get_axis(Controls.DOWN, Controls.UP)   # W/S — grab + ride a rope
+		jump_held = Input.is_action_pressed(Controls.JUMP)         # release early = shorter hop (#43)
 	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
 	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
 	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
@@ -121,6 +129,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func request_jump() -> void:
 	_jump_request = true
+	jump_held = true    # a requested jump implies the key is down NOW — polling (or a driver wanting a
+	                    # tap) may release it on any later frame; guards drivers against a stale false
 
 
 ## MainView pokes this each time a cell is actually mined (Phase-C dig anim). Latches the dig pose for a
@@ -142,6 +152,9 @@ func _step(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 
 	velocity.y = minf(velocity.y + GRAVITY * delta, MAX_FALL)
+	# Variable jump height (#43): rising with the jump key released → extra gravity clips the arc.
+	if velocity.y < 0.0 and not jump_held and not climbing:
+		velocity.y = minf(velocity.y + GRAVITY * (JUMP_CUT_GRAVITY - 1.0) * delta, MAX_FALL)
 	# ROPE GRIP (representation-only, like the updraft): overlapping a placed rope, a climb press (W/S)
 	# grabs it; the grip holds until the body leaves the rope or jumps off. Gripping counts as GROUNDED
 	# below, so Space always jumps you off a rope and sideways-at-the-lip gets the auto step-up out.
@@ -228,6 +241,7 @@ func _step(delta: float) -> void:
 	if on_floor and not _was_on_floor and impact_v > 240.0:
 		_squash = 1.0
 		landed_hard = true
+		last_impact = impact_v           # the consumer scales dust/shake/thump by how hard (#43)
 	_was_on_floor = on_floor
 	_squash = move_toward(_squash, 0.0, delta * 5.0)
 	_walk_phase += (absf(velocity.x) * delta * 0.06) if on_floor else 0.0

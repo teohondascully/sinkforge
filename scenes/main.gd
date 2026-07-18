@@ -547,9 +547,11 @@ func _update_juice(delta: float) -> void:
 	if _player != null:
 		var feet: Vector2 = _player.position + Vector2(0.0, Player.HEIGHT * 0.5)
 		if _player.landed_hard:
-			_particles.dust(feet, Color(0.42, 0.32, 0.22), 12)
-			_shake = maxf(_shake, 3.2)
-			_sfx.play(&"thump", feet, 0.75, -5.0)
+			# Landing juice SCALES with impact (#43): a step-off puffs, a terminal drop thuds + kicks.
+			var imp: float = clampf((_player.last_impact - 240.0) / (Player.MAX_FALL - 240.0), 0.0, 1.0)
+			_particles.dust(feet, Color(0.42, 0.32, 0.22), 6 + int(imp * 14.0))
+			_shake = maxf(_shake, 1.8 + imp * 3.4)
+			_sfx.play(&"thump", feet, 0.6 + imp * 0.5, -5.0)
 		# Footstep puffs while running on the ground — one every ~22px travelled.
 		if _player.on_floor and absf(_player.velocity.x) > 20.0:
 			_step_dist += absf(_player.velocity.x) * delta
