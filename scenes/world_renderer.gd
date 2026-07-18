@@ -760,21 +760,82 @@ func _cell_jitter(c: Vector2i) -> float:
 
 ## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
 ## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
+## CORNER-AWARE (FABLE_50 #14): each strip INSETS where the silhouette chamfered that corner (no AO
+## sliver floating over the 45° cut), and where a face DEAD-ENDS into an overhang (perpendicular
+## neighbour solid but the diagonal past it solid too — a concave inside corner) a nested SCOOP patch
+## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
+## cells at a junction patch their own face, so the scoop is symmetric with zero cross-cell drawing.
 func _draw_edge_ao(ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
 	const STEPS: int = 3
+	const CH: float = 7.0                              # the silhouette's chamfer radius — keep in lockstep
+	var open_u: bool = not sim.is_solid(c + Vector2i(0, -1))
+	var open_d: bool = not sim.is_solid(c + Vector2i(0, 1))
+	var open_l: bool = not sim.is_solid(c + Vector2i(-1, 0))
+	var open_r: bool = not sim.is_solid(c + Vector2i(1, 0))
+	var keep_top: bool = sim.surface_row(c.x) == c.y   # top corners uncut there — the cap pass owns them
+	var cs: float = float(CELL)
 	for i: int in STEPS:
 		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
 		var sh := Color(0.0, 0.0, 0.0, a)
 		var o: float = float(i) * 2.0
 		var s := 2.0
-		if not sim.is_solid(c + Vector2i(0, -1)):  # top face exposed
-			ci.draw_rect(Rect2(pos.x, pos.y + o, float(CELL), s), sh)
-		if not sim.is_solid(c + Vector2i(0, 1)):   # bottom face exposed (a ceiling from below)
-			ci.draw_rect(Rect2(pos.x, pos.y + float(CELL) - o - s, float(CELL), s), sh)
-		if not sim.is_solid(c + Vector2i(-1, 0)):  # left face exposed
-			ci.draw_rect(Rect2(pos.x + o, pos.y, s, float(CELL)), sh)
-		if not sim.is_solid(c + Vector2i(1, 0)):   # right face exposed
-			ci.draw_rect(Rect2(pos.x + float(CELL) - o - s, pos.y, s, float(CELL)), sh)
+		if open_u:
+			var x0: float = CH if (open_l and not keep_top) else 0.0
+			var x1: float = cs - (CH if (open_r and not keep_top) else 0.0)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + o, x1 - x0, s), sh)
+		if open_d:
+			var x0: float = CH if open_l else 0.0
+			var x1: float = cs - (CH if open_r else 0.0)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + cs - o - s, x1 - x0, s), sh)
+		if open_l:
+			var y0: float = CH if (open_u and not keep_top) else 0.0
+			var y1: float = cs - (CH if open_d else 0.0)
+			ci.draw_rect(Rect2(pos.x + o, pos.y + y0, s, y1 - y0), sh)
+		if open_r:
+			var y0: float = CH if (open_u and not keep_top) else 0.0
+			var y1: float = cs - (CH if open_d else 0.0)
+			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0), sh)
+	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops)
+	# AND the diagonal past it is solid too (an overhang roofs the junction). Each scoop: two nested
+	# rects hugging that end of the face, stacking extra dark onto the strips already there.
+	var solid_ul: bool = sim.is_solid(c + Vector2i(-1, -1))
+	var solid_ur: bool = sim.is_solid(c + Vector2i(1, -1))
+	var solid_dl: bool = sim.is_solid(c + Vector2i(-1, 1))
+	var solid_dr: bool = sim.is_solid(c + Vector2i(1, 1))
+	if open_u:
+		if not open_l and solid_ul:
+			_ao_scoop(ci, pos + Vector2(0.0, 0.0), Vector2(1.0, 0.0), true)
+		if not open_r and solid_ur:
+			_ao_scoop(ci, pos + Vector2(cs, 0.0), Vector2(-1.0, 0.0), true)
+	if open_d:
+		if not open_l and solid_dl:
+			_ao_scoop(ci, pos + Vector2(0.0, cs), Vector2(1.0, 0.0), false)
+		if not open_r and solid_dr:
+			_ao_scoop(ci, pos + Vector2(cs, cs), Vector2(-1.0, 0.0), false)
+	if open_l:
+		if not open_u and solid_ul:
+			_ao_scoop(ci, pos + Vector2(0.0, 0.0), Vector2(0.0, 1.0), true)
+		if not open_d and solid_dl:
+			_ao_scoop(ci, pos + Vector2(0.0, cs), Vector2(0.0, -1.0), true)
+	if open_r:
+		if not open_u and solid_ur:
+			_ao_scoop(ci, pos + Vector2(cs, 0.0), Vector2(0.0, 1.0), false)
+		if not open_d and solid_dr:
+			_ao_scoop(ci, pos + Vector2(cs, cs), Vector2(0.0, -1.0), false)
+
+
+## One concave-junction scoop: nested darkening rects growing from `corner` along `along` (the face
+## direction), hugging the face surface. `near_edge` = the face lies on the min side of the perpendicular
+## axis (top/left faces) vs the max side (bottom/right). Alphas stack on the face strips beneath.
+func _ao_scoop(ci: CanvasItem, corner: Vector2, along: Vector2, near_edge: bool) -> void:
+	const DEPTH: float = 6.0                           # matches the strip stack (3 steps x 2 px)
+	for ext: float in [9.0, 5.0]:                      # two nested patches = a cheap gradient
+		var run: Vector2 = along * ext
+		var thick := Vector2(DEPTH, DEPTH) - along.abs() * DEPTH
+		if not near_edge:
+			thick = -thick
+		var r := Rect2(corner, run + thick).abs()
+		ci.draw_rect(r, Color(0.0, 0.0, 0.0, 0.11))
 
 
 ## A cell's MaterialDef via the registry, or a safe fallback so an unknown id still renders.
