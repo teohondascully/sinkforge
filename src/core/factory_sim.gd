@@ -476,6 +476,36 @@ func place_rope(anchor: Vector2i) -> int:
 	return hung
 
 
+## The topmost segment of the connected rope through `cell` — its ANCHOR end (ropes are vertical runs).
+func rope_anchor(cell: Vector2i) -> Vector2i:
+	var c: Vector2i = cell
+	while rope.has(c + Vector2i(0, -1)):
+		c += Vector2i(0, -1)
+	return c
+
+
+## How many segments hang in the connected rope through `cell` (0 = no rope there).
+func rope_length(cell: Vector2i) -> int:
+	if not rope.has(cell):
+		return 0
+	var c: Vector2i = rope_anchor(cell)
+	var n: int = 0
+	while rope.has(c):
+		n += 1
+		c += Vector2i(0, 1)
+	return n
+
+
+## Player action (FABLE_50 #39): RETRACT the whole rope through `cell` — walk up to its anchor, then
+## take every segment back. One action recovers the entire hang no matter which segment you aim at
+## (the old top-segment aim demand was pure precision friction); the niche "cut here, keep the upper
+## half" is covered by retract + re-place (rope crafts as a cheap bundle). Returns segments recovered.
+func retract_rope(cell: Vector2i) -> int:
+	if not rope.has(cell):
+		return 0
+	return remove_rope(rope_anchor(cell))
+
+
 ## Player action: cut the rope at `cell`. A rope HANGS, so cutting a segment takes that segment and
 ## every connected segment BELOW it (the tail can't float); all return to the pack (produced — the
 ## mirror of place_rope's consumed). Returns how many segments came back.

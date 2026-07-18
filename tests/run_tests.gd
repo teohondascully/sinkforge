@@ -1302,14 +1302,24 @@ func _test_rope() -> void:
 	var rest: Vector2i = Vector2i(col, 9)                     # the open cell on top of the floor
 	_check(int((sim.ground.get(rest, {}) as Dictionary).get(&"ore", 0)) == 1,
 		"a dropped item falls straight through the rope to the floor")
+	# Rope QoL (FABLE_50 #39): length + anchor read from ANY segment; retract from any segment recovers ALL.
+	_check(sim.rope_length(Vector2i(col, 8)) == 6, "rope_length counts the whole connected run from any segment")
+	_check(sim.rope_anchor(Vector2i(col, 8)) == Vector2i(col, 4), "rope_anchor walks up to the top segment")
+	_check(sim.rope_length(Vector2i(col, 10)) == 0, "no rope -> length 0")
 	# CUT mid-rope: the segment and everything below return; the rope above stays hung.
 	var cut: int = sim.remove_rope(Vector2i(col, 7))
 	_check(cut == 3, "cutting mid-rope takes it + the tail below (%d/3)" % cut)
 	_check(sim.is_climbable(Vector2i(col, 6)) and not sim.is_climbable(Vector2i(col, 8)), "the rope above the cut stays")
 	_check(int(sim.inventory.get(&"rope", 0)) == 17, "cut segments returned to the pack")
+	# RETRACT-ALL (#39): aim at the BOTTOM of the remaining hang — the whole rope comes back anyway.
+	var got: int = sim.retract_rope(Vector2i(col, 6))
+	_check(got == 3, "retract from a low segment recovers the whole hang via the anchor (%d/3)" % got)
+	_check(not sim.is_climbable(Vector2i(col, 4)), "nothing left hanging after retract-all")
+	_check(sim.retract_rope(Vector2i(col, 6)) == 0, "retracting where there is no rope is a no-op")
+	_check(int(sim.inventory.get(&"rope", 0)) == 20, "every segment came home")
 	var present_r: int = _items_present(sim, &"rope")
 	var net_r: int = int(sim.total_produced.get(&"rope", 0)) - int(sim.total_consumed.get(&"rope", 0))
-	_check(present_r == net_r, "rope conserved through place+cut (present=%d, net=%d)" % [present_r, net_r])
+	_check(present_r == net_r, "rope conserved through place+cut+retract (present=%d, net=%d)" % [present_r, net_r])
 
 
 ## THE L2 IRON CHAIN (FABLE_50 #47, PROGRESSION §5 medium chains, CRAFTING.md modules): the two new

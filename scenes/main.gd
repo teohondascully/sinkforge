@@ -1068,7 +1068,7 @@ func try_build(cell: Vector2i) -> bool:
 			return true
 		return false
 	if sim.is_climbable(cell):
-		if sim.remove_rope(cell) > 0:    # CUT the rope here — it and everything hanging below returns
+		if sim.retract_rope(cell) > 0:   # RMB any segment → the WHOLE rope returns (retract-all, #39)
 			_sfx.play(&"pop", _cell_center(cell), 0.8)
 			return true
 		return false
@@ -1132,6 +1132,10 @@ func _hover_info() -> Dictionary:
 		if sim.material_at(_aim) == &"sealrock":
 			return {"name": "The Seal", "in": [], "out": [], "holding": [],
 				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
+		# A hanging rope: its coil count + the one-action recovery affordance (FABLE_50 #39).
+		if sim.is_climbable(_aim):
+			return {"name": "Rope", "in": [], "out": [], "holding": [],
+				"mode": "%d segments hung — RMB takes the whole rope back" % sim.rope_length(_aim)}
 		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
 		if sim.is_solid(_aim):
 			var rock: StringName = sim.material_at(_aim)
