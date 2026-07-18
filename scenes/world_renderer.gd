@@ -42,6 +42,7 @@ const AMBIENT_DARK: float = 0.62                    ## underground ambient — D
 const SHADOW_COLOR := Color(0.05, 0.06, 0.10)       ## the cool blue-black the underworld sits in
 const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
 const LAMP_RADIUS: float = CELL * 4.0               ## a focused warm pool, not a screen-filling white disc
+const LAMP_LEAD: float = CELL * 1.9                 ## how far the beam pool leads toward the aim (#44)
 
 ## --- Day/night (FABLE_50 #29, cosmetic-first) ---------------------------------------------------
 ## A slow surface rhythm off the cosmetic clock: the backdrop sky, the skylight veil, the godrays and
@@ -84,6 +85,7 @@ var _materials: Dictionary = {}                      ## id -> MaterialDef (world
 var _aim: Vector2i = Vector2i(-99, -99)
 var _aim_in_reach: bool = false
 var _aim_placeable: bool = false
+var _lamp_offset: Vector2 = Vector2.ZERO   ## eased head→beam-pool offset (the aim-following lamp, #44)
 var _ghost_def: MachineDef = null
 var _ghost_material: StringName = &""                ## a building material selected for block placement
 var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
@@ -239,6 +241,16 @@ func _process(delta: float) -> void:
 		if _scan_age > _scan_range / SCAN_WAVE_SPEED + SCAN_ECHO_LINGER:
 			_scan_age = -1.0    # pulse spent, every echo faded — the scan is over
 			_scan_echoes = []
+	# The head-lamp FOLLOWS THE AIM (FABLE_50 #44): the pool leads from the head toward the cursor
+	# (capped), eased so a mouse flick swings the beam like a worn lamp, not a snapped spotlight.
+	# Cursor on/next to the body → fall back to plain facing so the light never collapses onto you.
+	if player != null:
+		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+		var to_aim: Vector2 = _cell_center(_aim) - head
+		var target: Vector2 = Vector2(float(player.facing) * float(CELL) * 0.7, -float(CELL) * 0.2)
+		if to_aim.length() > float(CELL) * 0.9:
+			target = to_aim.limit_length(LAMP_LEAD)
+		_lamp_offset = _lamp_offset.lerp(target, 1.0 - exp(-9.0 * delta))
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
@@ -1566,11 +1578,13 @@ func _paint_lights(layer: LightLayer) -> void:
 			_draw_glow(layer, e["pos"], float(CELL) * 2.1,
 				_material(e["material"] as StringName).nugget_color, 0.65 * fade)
 	if player != null:
-		var f: float = float(player.facing)
 		# A faint flicker so the lamp reads as a live flame, not a static disc.
 		var flick: float = 0.55 + 0.03 * sin(_anim_time * 11.0) + 0.02 * sin(_anim_time * 27.0)
-		_draw_glow(layer, player.position + Vector2(f * float(CELL) * 0.7, -float(CELL) * 0.2),
-			LAMP_RADIUS, LAMP_COLOR, flick)
+		# The AIM-FOLLOWING beam (#44): a bright cast pool where you're looking + a dimmer throat pool
+		# between it and the head — two glows along one line read as a directed beam, no shader needed.
+		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, LAMP_COLOR, flick)
+		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, LAMP_COLOR, flick * 0.45)
 		_draw_glow(layer, player.position, float(CELL) * 1.4, LAMP_COLOR, 0.12)  # faint close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
