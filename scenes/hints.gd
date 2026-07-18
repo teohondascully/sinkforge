@@ -29,6 +29,8 @@ var _defs: Array[Dictionary] = [
 		"text": "TORCH — RMB mounts it on a wall-backed cell (or beside rock). Its light STAYS — claim the dark."},
 	{"id": &"scanner", "item": &"scanner",
 		"text": "SCANNER — select it and RMB fires a sonar pulse: every vein in range echoes through the rock."},
+	{"id": &"sapling", "item": &"sapling",
+		"text": "SAPLING — RMB plants it on grassy ground. It grows into a NEW TREE: wood is renewable."},
 	{"id": &"generator", "item": &"generator",
 		"text": "GENERATOR — place it, then drop COAL on it (Q). It radiates POWER to machines nearby."},
 	{"id": &"conduit", "item": &"conduit",

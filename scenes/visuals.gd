@@ -321,6 +321,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
 	if item == &"scanner":
 		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld (FABLE_50 #27)
+	if item == &"sapling":
+		return Color(0.44, 0.66, 0.30)        # young leaf-green — the renewable-wood seed (#38)
 	if item == &"iron":
 		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
 	if item == &"iron_ingot":
@@ -362,6 +364,8 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_wood(canvas, center, size)
 		&"scanner":
 			_item_scanner(canvas, center, size)
+		&"sapling":
+			_item_sapling(canvas, center, size)
 		&"wood_pickaxe":
 			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47))
 		&"stone_pickaxe":
@@ -372,6 +376,16 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
 		_:
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
+
+
+## SAPLING (#38) — a sprout in a root ball: two young leaves on a stem, the seed of a new tree.
+static func _item_sapling(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var stem := Color(0.48, 0.36, 0.22)
+	var leaf := Color(0.44, 0.66, 0.30)
+	canvas.draw_circle(c + Vector2(0.0, size * 0.24), size * 0.16, stem.darkened(0.25))   # root ball
+	canvas.draw_rect(Rect2(c + Vector2(-size * 0.03, -size * 0.10), Vector2(size * 0.06, size * 0.36)), stem)
+	_poly(canvas, c, size, [Vector2(0.0, -0.08), Vector2(-0.26, -0.22), Vector2(-0.10, -0.34)], leaf)
+	_poly(canvas, c, size, [Vector2(0.0, -0.14), Vector2(0.24, -0.30), Vector2(0.30, -0.12)], leaf.lightened(0.12))
 
 
 ## Polygon helper: points given as size-fractions from the centre (y+ down), filled `fill` with a crisp

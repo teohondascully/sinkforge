@@ -430,10 +430,10 @@ func _seed_tutorial_mineshaft() -> void:
 	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
 
 
-## The STARTER TOOLS every new game begins with — a bad wooden pickaxe + a bad wooden axe (MiningRules
-## .STARTER_TOOLS). They're the ONLY things in a fresh pack: you need the pick to grind through rock to
-## ore and the axe to chop trees, and their badness (tier-1 speed) is what makes the early grind ache for
-## a drill. Spawned → counted as produced so conservation holds. Always seeded (independent of dev_start).
+## The STARTER TOOL every new game begins with — one bad wooden pickaxe (MiningRules.STARTER_TOOLS).
+## It's the ONLY thing in a fresh pack: it grinds rock AND chops trees (the axe was deleted, #38), and
+## its badness (tier-1 speed) is what makes the early grind ache for a drill. Spawned → counted as
+## produced so conservation holds. Always seeded (independent of dev_start).
 func _seed_starter_kit() -> void:
 	for tool: StringName in MiningRules.STARTER_TOOLS:
 		sim.inventory[tool] = int(sim.inventory.get(tool, 0)) + 1
@@ -1079,6 +1079,18 @@ func try_build(cell: Vector2i) -> bool:
 			_sfx.play(&"pop", _cell_center(cell), 0.9)
 			return true
 		return false
+	if sim.sapling.has(cell):
+		if sim.remove_sapling(cell):     # take a planted sapling back (growth so far is forfeit)
+			_sfx.play(&"pop", _cell_center(cell), 1.1)
+			return true
+		return false
+	# PLANT a carried sapling on soil (#38 — the renewable-wood verb). Selected sapling + open ground.
+	if _selected_item() == &"sapling":
+		var rooted: bool = sim.plant_sapling(cell)
+		if rooted:
+			_particles.dust(_cell_center(cell) + Vector2(0.0, 8.0), Color(0.35, 0.55, 0.25), 5)
+			_sfx.play(&"pop", _cell_center(cell), 1.3)
+		return rooted
 	var def: MachineDef = _selected_machine_def()
 	if def != null and def.behavior == &"torch":
 		var lit: bool = sim.place_torch(cell)     # mounts on a wall-backed / rock-adjacent open cell

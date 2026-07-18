@@ -307,6 +307,7 @@ func _draw() -> void:
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
 	_draw_torches()   # mounted torches guttering on the walls — placed light, claimed territory
+	_draw_saplings()  # planted sprouts growing on the sim's tick (#38 — renewable wood)
 	_draw_ground()
 	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
 	falling.draw(self)
@@ -614,6 +615,25 @@ func _draw_ropes() -> void:
 func _draw_torches() -> void:
 	for cell: Variant in sim.torch:
 		Visuals.draw_machine_glyph(self, _cell_center(cell), "torch", 1.0, true, _anim_time)
+
+
+## Draw the planted saplings (#38): a sprout rooted at the cell's floor that grows visibly taller with
+## its progress — a just-planted seed is a nub, a nearly-grown one already brushes the cell above. The
+## sway is cosmetic; growth itself is sim state (FactorySim.sapling ticks).
+func _draw_saplings() -> void:
+	for cell: Variant in sim.sapling:
+		var c: Vector2i = cell
+		var t: float = clampf(float(sim.sapling[c]) / float(FactorySim.SAPLING_GROW_TICKS), 0.0, 1.0)
+		var foot := Vector2(float(c.x * CELL) + float(CELL) * 0.5, float((c.y + 1) * CELL) - 1.0)
+		var h: float = 6.0 + t * 22.0
+		var sway: float = sin(_anim_time * 2.2 + float(c.x) * 1.3) * (1.0 + t * 1.5)
+		var tip := foot + Vector2(sway, -h)
+		var stem := Color(0.48, 0.36, 0.22)
+		var leaf := Color(0.40, 0.62, 0.28)
+		draw_line(foot, tip, stem, 1.6 + t * 1.4)
+		draw_circle(tip, 2.0 + t * 3.5, leaf)
+		draw_circle(tip + Vector2(-2.0 - t * 2.0, 1.0), 1.6 + t * 2.2, leaf.darkened(0.15))
+		draw_circle(tip + Vector2(2.0 + t * 2.0, 0.5), 1.6 + t * 2.2, leaf.lightened(0.10))
 
 
 func _draw_terrain(ci: CanvasItem, rect: Rect2i) -> void:

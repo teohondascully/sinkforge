@@ -17,7 +17,9 @@ extends RefCounted
 ## and hardness onto MaterialDef when the tier ladder grows past wood (demand-pull).
 
 ## Material id -> the tool CLASS required to break it. Absent = hand-mineable (no tool needed, e.g. dirt
-## you can always dig out of a jam). Rock/ore want a pick; foliage wants an axe.
+## you can always dig out of a jam). Rock, ore AND foliage all want the pick — the axe was DELETED
+## (FABLE_50 #38, DECISIONS 2026-07-17): tool gates read the whole PACK, not a wielded item, so the axe
+## was never a verb — just a phantom key rattling in the pack. One tool, one slot, same chopping.
 const REQUIRED_TOOL: Dictionary = {
 	&"stone": &"pick",
 	&"ore": &"pick",
@@ -25,8 +27,8 @@ const REQUIRED_TOOL: Dictionary = {
 	&"deepslate": &"pick",
 	&"iron": &"pick",
 	&"sealrock": &"pick",
-	&"wood": &"axe",
-	&"leaves": &"axe",
+	&"wood": &"pick",
+	&"leaves": &"pick",
 }
 
 ## Material id -> the minimum tool TIER (of its required class) needed to break it. Absent class-gated
@@ -62,6 +64,8 @@ const TOOLS: Dictionary = {
 	&"wood_pickaxe": {&"class": &"pick", &"tier": 1, &"speed": 1.0},
 	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.7},
 	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 2.6},
+	# The wood_axe entry stays ONLY so a pre-#38 save carrying one still renders (glyph/tooltip);
+	# it is no longer seeded, required by any material, or craftable.
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
 	# The SCANNER (FABLE_50 #27) is EQUIPMENT, not a breaker: its own class so it never enters a
 	# pick/axe speed query, speed 0 (no material requires &"scanner"). Listed here so is_tool_item
@@ -86,8 +90,9 @@ const TOOL_RECIPES: Dictionary = {
 	&"scanner": {&"ingot": 2, &"coal": 1},
 }
 
-## The two tools every new game begins with — a bad pick + a bad axe (seeded by MainView into the pack).
-const STARTER_TOOLS: Array[StringName] = [&"wood_pickaxe", &"wood_axe"]
+## What every new game begins with — ONE bad wooden pick (seeded by MainView into the pack). It digs,
+## it chops; its tier-1 slowness is what makes the early grind ache for a drill.
+const STARTER_TOOLS: Array[StringName] = [&"wood_pickaxe"]
 
 
 ## The tool class a material needs, or &"" when it's hand-mineable.

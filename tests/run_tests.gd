@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_test_no_empty_ground_piles()
 	_test_behavior_registry()
 	_test_rope()
+	_test_saplings()
 	_test_torch()
 	_test_save_load()
 	_test_iron_chain()
@@ -187,6 +188,7 @@ func _test_state_canary() -> void:
 		"rope": func(s: FactorySim) -> void: s.rope[Vector2i(1, 1)] = true,
 		"torch": func(s: FactorySim) -> void: s.torch[Vector2i(1, 1)] = true,
 		"research": func(s: FactorySim) -> void: s.research[&"automation"] = true,
+		"sapling": func(s: FactorySim) -> void: s.sapling[Vector2i(1, 1)] = 7,
 		"ledger": func(s: FactorySim) -> void: s.total_produced[&"ore"] = 9,
 		"machine facing": func(s: FactorySim) -> void: s.machines[0].facing = -1,
 		"machine filter": func(s: FactorySim) -> void: s.machines[0].filter = &"ore",
@@ -838,6 +840,73 @@ func _test_trees_and_wood() -> void:
 	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")
 
 
+## SAPLINGS (FABLE_50 #38 — the renewable-wood loop): chopped canopies hide seeds (deterministic per
+## cell), planting wants soil, the TICK grows a real tree, occupation crushes / lost soil uproots,
+## and the ledger stays total through chop → plant → grow → chop.
+func _test_saplings() -> void:
+	print("- saplings (renewable wood)")
+	var sim: FactorySim = FactorySim.new()
+	# Chopping leaves drops the deterministic per-cell share of saplings (~1 in 3, hash-set, no RNG).
+	# A 30-cell grove: the share must be real (not zero, not every leaf) and exactly the hash's own count.
+	var canopy: Array[Vector2i] = []
+	for lx: int in range(18, 24):
+		for ly: int in range(2, 7):
+			canopy.append(Vector2i(lx, ly))
+	var expect: int = 0
+	for lc: Vector2i in canopy:
+		sim.set_solid(lc, &"leaves")
+		if sim.leaf_drops_sapling(lc):
+			expect += 1
+	for lc: Vector2i in canopy:
+		sim.mine(lc)
+	var got_s: int = int(sim.inventory.get(&"sapling", 0))
+	_check(expect > 0 and expect < canopy.size(), "the grove hides SOME seeds (%d/30 — a share, not all/none)" % expect)
+	_check(got_s == expect, "chopping the grove dropped exactly the hash-share (%d/%d)" % [got_s, expect])
+	# Planting wants OPEN cell + SOIL below; anything else refuses.
+	sim.set_solid(Vector2i(30, 10), &"earth")
+	sim.set_solid(Vector2i(31, 10), &"stone")
+	sim.inventory[&"sapling"] = int(sim.inventory.get(&"sapling", 0)) + 2
+	sim.total_produced[&"sapling"] = int(sim.total_produced.get(&"sapling", 0)) + 2
+	_check(not sim.plant_sapling(Vector2i(30, 5)), "mid-air (no soil below) refuses")
+	_check(not sim.plant_sapling(Vector2i(31, 9)), "stone is not soil")
+	_check(sim.plant_sapling(Vector2i(30, 9)), "open cell on earth roots the sapling")
+	_check(not sim.plant_sapling(Vector2i(30, 9)), "an occupied sapling cell refuses a second seed")
+	# The un-plant mirror: RMB takes it back; growth restarts from zero on replant.
+	_check(sim.remove_sapling(Vector2i(30, 9)), "a planted sapling can be taken back")
+	_check(sim.plant_sapling(Vector2i(30, 9)), "…and replanted")
+	# GROWTH: run the sim to maturity — a real tree stands (trunk wood + a canopy), the sapling retires.
+	for _i: int in FactorySim.SAPLING_GROW_TICKS + 1:
+		sim.tick()
+	_check(not sim.sapling.has(Vector2i(30, 9)), "the grown sapling retired")
+	_check(sim.material_at(Vector2i(30, 9)) == &"wood", "a trunk stands where it was planted")
+	var leaves_n: int = 0
+	for c: Variant in sim.solid:
+		if sim.solid[c] == &"leaves":
+			leaves_n += 1
+	_check(leaves_n >= 4, "the tree grew a canopy (%d leaf cells)" % leaves_n)
+	# CRUSH: a sapling built over dies silently on the next tick.
+	sim.set_solid(Vector2i(40, 10), &"earth")
+	sim.inventory[&"sapling"] = int(sim.inventory.get(&"sapling", 0)) + 2
+	sim.total_produced[&"sapling"] = int(sim.total_produced.get(&"sapling", 0)) + 2
+	_check(sim.plant_sapling(Vector2i(40, 9)), "plant the crush candidate")
+	sim.set_solid(Vector2i(40, 9), &"stone")            # built straight over the seedling
+	sim.tick()
+	_check(not sim.sapling.has(Vector2i(40, 9)), "a built-over sapling is crushed")
+	# UPROOT: mine the soil out — the seed drops free as a ground item (back in the world, ledgered).
+	sim.set_solid(Vector2i(50, 10), &"earth")
+	_check(sim.plant_sapling(Vector2i(50, 9)), "plant the uproot candidate")
+	sim.mine(Vector2i(50, 10))
+	sim.tick()
+	_check(not sim.sapling.has(Vector2i(50, 9)), "losing the soil uproots the sapling")
+	var freed: int = 0
+	for pile: Variant in sim.ground.values():
+		freed += int((pile as Dictionary).get(&"sapling", 0))
+	_check(freed == 1, "the uprooted seed dropped as a ground item")
+	var present_s: int = _items_present(sim, &"sapling")
+	var net_s: int = int(sim.total_produced.get(&"sapling", 0)) - int(sim.total_consumed.get(&"sapling", 0))
+	_check(present_s == net_s, "saplings conserved through the whole loop (present=%d, net=%d)" % [present_s, net_s])
+
+
 ## Manual-mining friction rules (docs/MINING.md): the GATE (own a tool that breaks this) and the felt
 ## time (hardness / tool speed). Pure static logic, no sim — the same table the controller + try_mine use.
 func _test_mining_rules() -> void:
@@ -845,14 +914,16 @@ func _test_mining_rules() -> void:
 	var bare: Dictionary = {}
 	var pick: Dictionary = {&"wood_pickaxe": 1}
 	var axe: Dictionary = {&"wood_axe": 1}
-	var kit: Dictionary = {&"wood_pickaxe": 1, &"wood_axe": 1}
-	# Gate: rock needs a pick, wood needs an axe, dirt is hand-mineable.
+	# Gate: rock AND wood want the pick (the axe was DELETED, #38 — one tool, one slot); dirt is
+	# hand-mineable. A legacy axe in a pre-#38 save opens nothing.
 	_check(not MiningRules.can_mine(&"stone", bare), "can't crack stone bare-handed")
 	_check(MiningRules.can_mine(&"stone", pick), "the pickaxe cracks stone")
-	_check(not MiningRules.can_mine(&"wood", pick), "a pickaxe can't chop wood (needs an axe)")
-	_check(MiningRules.can_mine(&"wood", axe), "the axe chops wood")
+	_check(MiningRules.can_mine(&"wood", pick), "the pickaxe chops wood too (the axe is gone)")
+	_check(not MiningRules.can_mine(&"wood", axe), "a legacy axe is a keepsake, not a key")
 	_check(MiningRules.can_mine(&"earth", bare), "dirt is always hand-mineable")
-	_check(MiningRules.can_mine(&"ore", kit), "the starter kit can mine ore")
+	_check(MiningRules.can_mine(&"ore", pick), "the starter pick can mine ore")
+	_check(MiningRules.STARTER_TOOLS.size() == 1 and MiningRules.STARTER_TOOLS[0] == &"wood_pickaxe",
+		"one starter tool: the wooden pick")
 	# Friction: harder rock takes longer; no tool = unbreakable (INF).
 	_check(MiningRules.mine_seconds(&"stone", bare) == INF, "no pick → stone never breaks")
 	_check(MiningRules.mine_seconds(&"stone", pick) > 0.0, "with a pick stone takes finite time")

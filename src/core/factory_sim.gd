@@ -169,6 +169,13 @@ var torch: Dictionary = {}
 ## ResearchRules (static data); this is the per-session unlock state. Mutated ONLY by research_tech (a
 ## discrete player call at the Bazaar bench), read by the craft gate — deterministic + serializable.
 var research: Dictionary = {}
+## Planted SAPLINGS: cell -> growth ticks so far (FABLE_50 #38 — the renewable-wood answer). A placed
+## layer like `torch`, but the TICK grows it: at SAPLING_GROW_TICKS the cell sprouts a real tree
+## (trunk + canopy, the worldgen shape) into whatever space is still open. Saplings drop from chopped
+## canopies (a deterministic per-cell share of leaves), so wood — which ropes, torches and tool
+## handles all eat — renews instead of dead-ending when the worldgen trees run out. Authoritative,
+## mutated by plant_sapling + the tick's growth sweep.
+var sapling: Dictionary = {}
 
 var _tick_accumulator: float = 0.0
 
@@ -378,12 +385,16 @@ func mine(cell: Vector2i) -> StringName:
 	if _is_foliage(material):
 		# Foliage chops BLOCK-BY-BLOCK (Terraria/Minecraft), never flood-felling the whole tree on one hit —
 		# you carve a tree down trunk by trunk. Wood yields one wood per block (a built structure, e.g. the
-		# bazaar frame, behaves identically — mirrors place_block's consume, so conservation holds); leaves
-		# yield nothing. The whole-tree fell was removed (it read as "broke one block, the whole thing broke").
+		# bazaar frame, behaves identically — mirrors place_block's consume, so conservation holds); a share
+		# of LEAVES hide a SAPLING (deterministic per cell — no RNG), the seed of the renewable-wood loop
+		# (#38): plant it on soil and a new tree grows. The whole-tree fell stays removed.
 		solid.erase(cell)
 		if material == &"wood":
 			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
+		elif material == &"leaves" and leaf_drops_sapling(cell):
+			inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
+			total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
 		_resettle_pile_above(cell)
 		return material
 	# Plain terrain (earth/stone/deepslate): Terraria dig-and-carry — pocket the block as a placeable item
@@ -557,6 +568,102 @@ func remove_torch(cell: Vector2i) -> bool:
 	inventory[&"torch"] = int(inventory.get(&"torch", 0)) + 1
 	total_produced[&"torch"] = int(total_produced.get(&"torch", 0)) + 1
 	return true
+
+
+## --- SAPLINGS (FABLE_50 #38) — the renewable-wood loop. Chopped canopies hide seeds; plant one on
+## soil and the TICK grows it into a real tree (the worldgen shape), so wood never dead-ends. A placed
+## layer like `torch` — not solid, not a machine, items fall through; the sprout is drawn by the view. ---
+
+const SAPLING_GROW_TICKS: int = 2400          ## 20 Hz × 120 s — a tree in two minutes (bank a grove)
+const SAPLING_SOILS: Array[StringName] = [&"earth"]   ## what a sapling can root in
+
+## Does chopping this LEAVES cell yield a sapling? Deterministic per cell (a stable hash, no RNG — the
+## same canopy always hides its seeds in the same corners): about one leaf in three. Public so tests +
+## the mine() drop share one truth.
+func leaf_drops_sapling(cell: Vector2i) -> bool:
+	return ((int(cell.x) * 73856093) ^ (int(cell.y) * 19349663)) % 3 == 0
+
+
+## Plant a carried &"sapling" on open ground: the cell must be open (no solid/machine/rope/torch) and
+## sit ON soil (SAPLING_SOILS). Consumed into the ledger; the eventual tree is world matter (yields
+## produced wood when chopped, like worldgen trees), so the ledger stays total.
+func plant_sapling(cell: Vector2i) -> bool:
+	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell) \
+			or torch.has(cell) or sapling.has(cell):
+		return false
+	if int(inventory.get(&"sapling", 0)) <= 0:
+		return false
+	if not SAPLING_SOILS.has(solid.get(cell + Vector2i(0, 1), &"")):
+		return false
+	_take_from_pack(&"sapling", 1)
+	total_consumed[&"sapling"] = int(total_consumed.get(&"sapling", 0)) + 1
+	sapling[cell] = 0
+	return true
+
+
+## Take a planted sapling back into the pack (the mirror of plant_sapling — growth so far is forfeit).
+func remove_sapling(cell: Vector2i) -> bool:
+	if not sapling.has(cell):
+		return false
+	sapling.erase(cell)
+	inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
+	total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
+	return true
+
+
+## The tick's growth sweep: every sapling ages one tick; a sapling whose cell got built over is CRUSHED
+## (gone), one whose soil vanished is dropped as a ground item (it falls with the pile physics); at
+## SAPLING_GROW_TICKS it sprouts a TREE — trunk height from the cell hash, the worldgen canopy shape —
+## stamped only into cells still open, then the sapling entry retires.
+func _grow_saplings() -> void:
+	if sapling.is_empty():
+		return
+	var grown: Array[Vector2i] = []
+	var dead: Array[Vector2i] = []
+	var uprooted: Array[Vector2i] = []
+	for cv: Variant in sapling:
+		var c: Vector2i = cv
+		if solid.has(c) or grid.has(c):
+			dead.append(c)                              # built over — crushed
+		elif not SAPLING_SOILS.has(solid.get(c + Vector2i(0, 1), &"")):
+			uprooted.append(c)                          # soil mined out — the seed drops free
+		else:
+			sapling[c] = int(sapling[c]) + 1
+			if int(sapling[c]) >= SAPLING_GROW_TICKS:
+				grown.append(c)
+	for c: Vector2i in dead:
+		sapling.erase(c)
+	for c: Vector2i in uprooted:
+		sapling.erase(c)
+		var pile: Dictionary = ground.get(c, {})
+		pile[&"sapling"] = int(pile.get(&"sapling", 0)) + 1
+		ground[c] = pile
+		total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1   # back in play → ledgered
+	for c: Vector2i in grown:
+		sapling.erase(c)
+		_stamp_tree(c)
+
+
+## Stamp a tree with its trunk base at `base` (the sapling's cell): a 2-3 tall &"wood" trunk (height
+## from the cell hash — deterministic) under the worldgen's rounded 3-wide &"leaves" canopy. Only cells
+## still OPEN are stamped (a roof/machine simply prunes the tree). Stamped cells are world matter —
+## chopping them produces wood/saplings, exactly like a worldgen tree.
+func _stamp_tree(base: Vector2i) -> void:
+	var trunk: int = 2 + absi((int(base.x) * 40503) ^ int(base.y)) % 2
+	for h: int in range(0, trunk):
+		var t: Vector2i = base + Vector2i(0, -h)
+		if in_bounds(t) and not solid.has(t) and not grid.has(t) and not rope.has(t) and not torch.has(t):
+			solid[t] = &"wood"
+			terrain_dirty.append(t)
+	var ttr: int = base.y - trunk + 1                   # row of the topmost trunk cell
+	for leaf: Vector2i in [
+			Vector2i(base.x, ttr - 1), Vector2i(base.x, ttr - 2),
+			Vector2i(base.x - 1, ttr - 1), Vector2i(base.x + 1, ttr - 1),
+			Vector2i(base.x - 1, ttr), Vector2i(base.x + 1, ttr)]:
+		if in_bounds(leaf) and not solid.has(leaf) and not grid.has(leaf) \
+				and not rope.has(leaf) and not torch.has(leaf):
+			solid[leaf] = &"leaves"
+			terrain_dirty.append(leaf)
 
 
 ## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
@@ -931,6 +1038,7 @@ func tick() -> void:
 	for machine: MachineState in machines:
 		_run_machine(machine)
 	_flow()
+	_grow_saplings()
 	_prune_empty_ground()
 	_sample_production()
 
