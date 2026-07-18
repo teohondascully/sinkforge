@@ -1272,6 +1272,31 @@ func _machine_active(machine: MachineState) -> bool:
 			return _held(machine) > 0 or machine.progress > 0.0
 
 
+## The drop-in ANIMATION standard (docs/ART_SPEC.md Phase C): how fast the 2-frame working cycle chugs.
+## One shared cadence so a bank of machines reads as one factory, not a zoo of tempos; the lift's frames
+## ride its surged clock so power still visibly speeds it up.
+const WORK_ANIM_FPS: float = 4.0
+
+
+## The sprite for a machine's CURRENT state, or null → the code-drawn casing+glyph. Fallback chain per
+## frame: working + work_0/work_1 drawn → cycle them; working + ONLY work_0 drawn → alternate idle↔work_0
+## (a 2-frame chug from one extra PNG); idle or no work frames → the static machine_<id>. Partial sets
+## always degrade gracefully — the artist can land frames one at a time.
+func _machine_sprite(machine: MachineState, active: bool, clock: float) -> Texture2D:
+	var base: String = "machine_" + String(machine.def.id)
+	var idle: Texture2D = Art.tex(base)
+	if idle == null:
+		return null
+	if active:
+		var work_0: Texture2D = Art.tex(base + "_work_0")
+		if work_0 != null:
+			if int(clock * WORK_ANIM_FPS) % 2 == 1:
+				var work_1: Texture2D = Art.tex(base + "_work_1")
+				return work_1 if work_1 != null else idle
+			return work_0
+	return idle
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
@@ -1280,11 +1305,22 @@ func _draw_machine(machine: MachineState) -> void:
 	draw_set_transform(pos + Vector2(float(CELL) * 0.5, float(CELL) - 1.0), 0.0, Vector2(1.0, 0.26))
 	draw_circle(Vector2.ZERO, float(CELL) * 0.46, Color(0.0, 0.0, 0.0, 0.30))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	# Sprite-ready: a machine_<id>.png replaces the code-drawn casing+glyph (docs/ART_SPEC.md, Phase A);
-	# the badge / progress bar / I/O ports below still overlay it. Absent → today's primitive look.
-	var spr: Texture2D = Art.tex("machine_" + String(machine.def.id))
+	# A machine reads as ALIVE while it's working (behavior-aware), and a powered LIFT marches faster.
+	var active: bool = _machine_active(machine)
+	var clock: float = _anim_time
+	if machine.def.behavior == &"lift":
+		clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
+	# Sprite-ready: a machine_<id>.png replaces the code-drawn casing+glyph, and while WORKING the
+	# 2-frame machine_<id>_work_0/1 cycle plays (docs/ART_SPEC.md Phase A + C); the badge / progress
+	# bar / I/O ports below still overlay it. Absent → today's primitive look.
+	var spr: Texture2D = _machine_sprite(machine, active, clock)
 	if spr != null:
-		draw_texture_rect(spr, Rect2(pos, Vector2(CELL, CELL)), false)
+		if machine.facing < 0:   # directional machines (the Borer) mirror when facing left, like glyphs
+			draw_set_transform(center, 0.0, Vector2(-1.0, 1.0))
+			draw_texture_rect(spr, Rect2(Vector2(CELL, CELL) * -0.5, Vector2(CELL, CELL)), false)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		else:
+			draw_texture_rect(spr, Rect2(pos, Vector2(CELL, CELL)), false)
 	else:
 		var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
 		draw_rect(body, Visuals.machine_color(machine.def))
@@ -1292,11 +1328,6 @@ func _draw_machine(machine: MachineState) -> void:
 		for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
 				Vector2(CELL - 4, CELL - 4)]:
 			draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))  # bolts
-		# A machine reads as ALIVE while it's working (behavior-aware), and a powered LIFT marches faster.
-		var active: bool = _machine_active(machine)
-		var clock: float = _anim_time
-		if machine.def.behavior == &"lift":
-			clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
 		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock,
 			machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
