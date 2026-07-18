@@ -42,6 +42,8 @@ var inv_selected_getter: Callable
 var hover_info: Dictionary = {}
 var _hover_rect: Rect2 = Rect2()          ## the inspector's canvas rect this frame (#32 — pin region)
 var _knob_hits: Array[Dictionary] = []    ## clickable knob chips this frame: [{rect, payload}]
+## THE TITLE / NEW-GAME card (#6 + #45): {} = closed; else {seed, tint, tint_name, tints, has_save}.
+var title_info: Dictionary = {}
 ## Minimap inputs (pushed by MainView): a material-id → colour lookup (the renderer's, handed over as a
 ## Callable so the HUD stays decoupled), the camera focus (player world pos) and the world-space view
 ## size, so the minimap can mark "you are here" + the visible window. The terrain image is cached and
@@ -131,6 +133,10 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	_tooltip_item = &""    # re-captured by whichever slot the cursor sits on this frame
+	# THE TITLE (#6): while it's open nothing else matters — the veil + the new-game card ARE the screen.
+	if not title_info.is_empty():
+		_draw_title()
+		return
 	# --- always on (minimal): the anchor furniture only ---
 	_draw_forged()         # top-right production chip (small)
 	_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
@@ -156,6 +162,63 @@ func _draw() -> void:
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
 	_draw_flash()          # transient toast (save/load feedback)
 	_draw_item_tooltip()   # hovered-slot tooltip — drawn last so it rides over every panel
+
+
+## THE TITLE / NEW-GAME screen (#6 + #45): a dark veil over the live (paused) world, the game's name,
+## and the two choices that make this world YOURS — its seed and your lamp's colour. Deliberately
+## spare: the world glowing behind the veil is the real menu art.
+func _draw_title() -> void:
+	draw_rect(Rect2(Vector2.ZERO, Vector2(CANVAS)), Color(0.03, 0.035, 0.06, 0.82))
+	var cx: float = CANVAS.x * 0.5
+	var y: float = CANVAS.y * 0.30
+	# The name — tracked out wide, with the accent rule under it.
+	var title: String = "S I N K F O R G E"
+	var tw: float = _font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 30).x
+	draw_string(_font, Vector2(cx - tw * 0.5, y), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 30,
+		Color(0.97, 0.90, 0.62))
+	draw_rect(Rect2(cx - tw * 0.5, y + 7.0, tw, 2.0), UI_ACCENT)
+	var tag: String = "the way is down"
+	var gw: float = _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+	draw_string(_font, Vector2(cx - gw * 0.5, y + 24.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+		Color(0.64, 0.70, 0.80))
+	# The choices card.
+	y += 48.0
+	var card := Rect2(cx - 128.0, y, 256.0, 84.0)
+	_panel(card, true)
+	var x0: float = card.position.x + 14.0
+	var ly: float = y + 22.0
+	draw_string(_font, Vector2(x0, ly), "world seed", HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+		Color(0.62, 0.66, 0.74))
+	draw_string(_font, Vector2(x0 + 78.0, ly), "%d" % int(title_info.get("seed", 0)),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.92, 0.80))
+	draw_string(_font, Vector2(card.end.x - 92.0, ly), "[TAB] reroll", HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		Color(0.55, 0.60, 0.70))
+	ly += 26.0
+	draw_string(_font, Vector2(x0, ly), "lamp", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.62, 0.66, 0.74))
+	var tints: Array = title_info.get("tints", [])
+	var sel: int = int(title_info.get("tint", 0))
+	var sx: float = x0 + 44.0
+	for i: int in tints.size():
+		var sw := Rect2(sx, ly - 11.0, 14.0, 14.0)
+		draw_rect(sw, (tints[i] as Dictionary)["color"])
+		if i == sel:
+			draw_rect(sw.grow(2.0), UI_ACCENT, false, 1.5)
+		sx += 20.0
+	draw_string(_font, Vector2(card.end.x - 92.0, ly), "[<-/->] pick", HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		Color(0.55, 0.60, 0.70))
+	ly += 20.0
+	draw_string(_font, Vector2(x0 + 44.0, ly), str(title_info.get("tint_name", "")),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.72, 0.76, 0.84))
+	# The verbs.
+	y = card.end.y + 26.0
+	var go: String = "[ENTER]  descend"
+	var gow: float = _font.get_string_size(go, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_string(_font, Vector2(cx - gow * 0.5, y), go, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	if bool(title_info.get("has_save", false)):
+		var cont: String = "[C]  continue your last save"
+		var cw: float = _font.get_string_size(cont, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		draw_string(_font, Vector2(cx - cw * 0.5, y + 18.0), cont, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+			Color(0.70, 0.76, 0.86))
 
 
 ## The transient toast: a small accented chip centred under the objective line, fading out over its

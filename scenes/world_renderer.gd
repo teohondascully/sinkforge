@@ -86,6 +86,7 @@ var _aim: Vector2i = Vector2i(-99, -99)
 var _aim_in_reach: bool = false
 var _aim_placeable: bool = false
 var _lamp_offset: Vector2 = Vector2.ZERO   ## eased head→beam-pool offset (the aim-following lamp, #44)
+var lamp_color: Color = LAMP_COLOR         ## the picked lamp TINT (#45 — set from the title screen)
 var _ghost_def: MachineDef = null
 var _ghost_material: StringName = &""                ## a building material selected for block placement
 var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
@@ -1603,9 +1604,9 @@ func _paint_lights(layer: LightLayer) -> void:
 		# The AIM-FOLLOWING beam (#44): a bright cast pool where you're looking + a dimmer throat pool
 		# between it and the head — two glows along one line read as a directed beam, no shader needed.
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
-		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, LAMP_COLOR, flick)
-		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, LAMP_COLOR, flick * 0.45)
-		_draw_glow(layer, player.position, float(CELL) * 1.4, LAMP_COLOR, 0.12)  # faint close body glow
+		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
+		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.45)
+		_draw_glow(layer, player.position, float(CELL) * 1.4, lamp_color, 0.12)  # faint close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)

@@ -24,7 +24,29 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 ## not just your feet. Smaller = further out. _current_zoom() reads the active level everywhere.
 const ZOOM_LEVELS: Array[float] = [0.42, 0.6, 0.85]
 var _zoom_idx: int = 0
-const WORLD_SEED: int = 1337       ## fixed gen seed (provisional; expose to a new-game UI later)
+const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
+
+## --- THE TITLE / NEW-GAME screen (FABLE_50 #6 + #45) -------------------------------------------
+## Opens on a REAL boot only: every harness fixture and play-test launches with `--script`, which
+## suppresses it — so scripted drivers land in the live world instantly and ZERO fixtures change.
+## Pick a world seed (TAB rerolls) and your lamp tint (←/→), ENTER descends. A changed seed reboots
+## the scene through the statics below (they survive reload_current_scene); an unchanged one just
+## drops the veil. C continues the F5/F9 save.
+var _title_open: bool = false
+var _title_seed: int = WORLD_SEED
+var _title_tint: int = 0
+var _world_seed: int = WORLD_SEED           ## the seed THIS world was actually built with
+static var boot_seed: int = -1              ## >=0: the next boot generates with this seed
+static var boot_tint: int = 0               ## the picked lamp tint index (persists across reloads)
+static var boot_skip_title: bool = false    ## set before a new-world reload: land straight in the game
+## Your LAMP is your identity in the deep (#45): the tint colours the head-lamp's pools everywhere.
+const LAMP_TINTS: Array[Dictionary] = [
+	{"name": "miner's gold", "color": Color(1.0, 0.90, 0.66)},
+	{"name": "carbide white", "color": Color(0.92, 0.96, 1.0)},
+	{"name": "ember orange", "color": Color(1.0, 0.74, 0.44)},
+	{"name": "willow green", "color": Color(0.80, 1.0, 0.72)},
+	{"name": "violet arc", "color": Color(0.88, 0.74, 1.0)},
+]
 ## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
 ## bazaar build material; the list grows as more buildables land (log/stone/etc).
 const BUILD_MATERIALS: Array[StringName] = [&"wood", &"earth", &"stone", &"deepslate"]
@@ -222,6 +244,53 @@ func _ready() -> void:
 	_setup_post_fx()
 	_prime_breach_watch()   # fixtures may seed pre-breached engines; they don't boom at boot
 
+	# The lamp tint (#45) survives reloads via the static; apply it to the view.
+	_renderer.lamp_color = LAMP_TINTS[clampi(MainView.boot_tint, 0, LAMP_TINTS.size() - 1)]["color"]
+	# THE TITLE (#6): a real boot opens on the new-game screen; every scripted boot (harness, fixtures,
+	# play-tests — all launched with --script) lands straight in the live world.
+	if not _is_scripted_boot() and not MainView.boot_skip_title:
+		_open_title()
+	MainView.boot_skip_title = false
+
+
+## Was this process launched to run a script (harness fixture / play-test) rather than the game?
+static func _is_scripted_boot() -> bool:
+	for arg: String in OS.get_cmdline_args():
+		if arg == "--script" or arg == "-s":
+			return true
+	return false
+
+
+func _open_title() -> void:
+	_title_open = true
+	_paused = true
+	_title_seed = _world_seed
+	_title_tint = clampi(MainView.boot_tint, 0, LAMP_TINTS.size() - 1)
+	if _player != null:
+		_player.auto_input = false        # the miner stands still behind the veil
+
+
+## ENTER on the title: an unchanged seed just drops the veil; a new seed rebuilds the whole session
+## through the boot statics (they survive reload_current_scene).
+func _confirm_title() -> void:
+	MainView.boot_tint = _title_tint
+	if _title_seed != _world_seed:
+		MainView.boot_seed = _title_seed
+		MainView.boot_skip_title = true
+		get_tree().reload_current_scene()
+		return
+	_dismiss_title()
+
+
+## Close the title veil over THIS world (no reboot) and hand control to the body.
+func _dismiss_title() -> void:
+	MainView.boot_tint = _title_tint
+	_renderer.lamp_color = LAMP_TINTS[_title_tint]["color"]
+	_title_open = false
+	_paused = false
+	if _player != null:
+		_player.auto_input = true
+
 
 ## Modern-rendering layer (docs/MODERN_FEEL.md): a WorldEnvironment post-process that gives the scene
 ## its "2026 sheen" — BLOOM on our additive light pools (head-lamp, ore stream, machine glow, forge
@@ -346,7 +415,8 @@ const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 3)        ## the AUTO
 const MINESHAFT_ORE_RICHNESS: int = 400                              ## a rich starter-automation patch (hundreds) the drill runs on for a long time
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
-	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, WORLD_SEED)
+	_world_seed = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, _world_seed)
 	sim.load_world(world)
 	_seed_starter_vein()
 	_seed_tutorial_coal()
@@ -487,6 +557,12 @@ func _process(delta: float) -> void:
 		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
 		_hud.show_tech = _show_tech
+		_hud.title_info = {} if not _title_open else {
+			"seed": _title_seed, "tint": _title_tint,
+			"tint_name": str(LAMP_TINTS[_title_tint]["name"]),
+			"tints": LAMP_TINTS,
+			"has_save": FileAccess.file_exists(SAVE_PATH),
+		}
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
 			_hud.minimap_focus = _player.position
@@ -579,6 +655,23 @@ func _update_juice(delta: float) -> void:
 ## not deposit — so E is free for the crafting screen. The numeric row stays a direct keycode (a fixed
 ## convention); every other binding routes through Controls so a settings page can rebind it.
 func _unhandled_input(event: InputEvent) -> void:
+	# THE TITLE eats all input while open (#6): TAB rerolls the seed, ←/→ picks the lamp, ENTER/SPACE
+	# descends, C continues the save. Everything else waits behind the veil.
+	if _title_open:
+		if event is InputEventKey and event.pressed and not event.echo:
+			match event.keycode:
+				KEY_TAB:
+					_title_seed = randi() % 1000000
+				KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+					_confirm_title()
+				KEY_C:
+					_dismiss_title()   # continue = the save brings its OWN world; seed rerolls are moot
+					_load_game()
+			if event.keycode == KEY_LEFT or event.keycode == KEY_A:
+				_title_tint = (_title_tint + LAMP_TINTS.size() - 1) % LAMP_TINTS.size()
+			elif event.keycode == KEY_RIGHT or event.keycode == KEY_D:
+				_title_tint = (_title_tint + 1) % LAMP_TINTS.size()
+		return
 	if event.is_action_pressed(Controls.PAUSE):
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):
@@ -972,6 +1065,8 @@ func _cycle_speed() -> void:
 func _save_game() -> void:
 	var data: Dictionary = SaveGame.capture(sim)
 	data["player_pos"] = _player.position
+	data["lamp_tint"] = MainView.boot_tint          # representation keys ride beside the sim envelope
+	data["world_seed"] = _world_seed
 	_hud.flash("SAVED" if SaveGame.write(SAVE_PATH, data) else "save FAILED")
 
 
@@ -986,6 +1081,8 @@ func _load_game() -> void:
 	if pp is Vector2:
 		_player.position = pp
 		_player.velocity = Vector2.ZERO
+	MainView.boot_tint = clampi(int(data.get("lamp_tint", MainView.boot_tint)), 0, LAMP_TINTS.size() - 1)
+	_renderer.lamp_color = LAMP_TINTS[MainView.boot_tint]["color"]
 	_renderer.repaint_world()
 	_prime_breach_watch()   # a breach that happened before this save doesn't boom retroactively
 	if _hints != null:
