@@ -117,6 +117,7 @@ var _chunk_rows: int = 0
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 var _dark: LightLayer
 var _lights: LightLayer
+var _haze: LightLayer      ## the shared DISTORTION pass (#20) — heat shimmer now, water/L4 later
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
 var _leaf_cache_dirty: bool = true
 var _glow_tex: GradientTexture2D
@@ -172,6 +173,15 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_lights = LightLayer.new()
 	_lights.setup(51, true, _paint_lights)
 	add_child(_lights)
+	# THE DISTORTION PASS (FABLE_50 #20): one shared screen-warp shader; consumers draw masked quads.
+	# Proven here on machine heat-haze. Sits ABOVE the world + veil but UNDER the additive light pools
+	# (hot air bends the scene, lamplight stays crisp).
+	_haze = LightLayer.new()
+	_haze.setup(46, false, _paint_heat_haze)
+	var haze_mat := ShaderMaterial.new()
+	haze_mat.shader = load("res://scenes/heat_haze.gdshader")
+	_haze.material = haze_mat
+	add_child(_haze)
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()  # initial full paint (once); thereafter only dirtied chunks repaint
 	sim.terrain_dirty.clear()  # drop any dirt from world-seeding — the initial paint above already covers it
@@ -255,6 +265,8 @@ func _process(delta: float) -> void:
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
+	if _haze != null:
+		_haze.queue_redraw()    # working furnaces convect (#20 — the shader's TIME drives the ripple)
 	if _back != null:
 		_back.queue_redraw()    # the parallax vista slides against the camera (a few polygons — cheap)
 	# The day/night veil (#29): the skylight darkness is repainted only on terrain change, so the slow
@@ -1582,6 +1594,29 @@ func _skylight_alpha(row: int, surf: int) -> float:
 		return sky                                      # sky-lit open air / exposed ground
 	var scatter: float = clampf(float(row - surf) / float(SKY_FADE), 0.0, 1.0)
 	return lerpf(sky, AMBIENT_DARK, scatter)
+
+
+## The heat-haze quads (#20): every working furnace/generator gets a plume quad above its casing whose
+## vertex alpha (the shader's strength mask) is full at the machine top and fades to nothing ~2 cells
+## up — the shader displaces whatever the screen already shows there, so the plume warps terrain,
+## walls, items and the machine's own smoke alike. Recipe-runners have behavior &""; the furnace check
+## keys on the glyph kind so only HOT machines (forge/iron forge) shimmer, not every module.
+func _paint_heat_haze(layer: LightLayer) -> void:
+	for machine: MachineState in sim.machines:
+		var kind: String = Visuals.machine_kind(machine.def)
+		var hot: bool = kind == "furnace" or kind == "generator"
+		if not hot or not _machine_active(machine):
+			continue
+		var top := Vector2(float(machine.cell.x) * CELL + float(CELL) * 0.5,
+			float(machine.cell.y) * CELL + 2.0)
+		var w: float = float(CELL) * 0.72
+		var h: float = float(CELL) * 2.1
+		var pts := PackedVector2Array([
+			top + Vector2(-w * 0.5, 0.0), top + Vector2(w * 0.5, 0.0),
+			top + Vector2(w * 0.34, -h), top + Vector2(-w * 0.34, -h)])
+		var cols := PackedColorArray([
+			Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)])
+		layer.draw_polygon(pts, cols)
 
 
 ## The additive LIGHT pools that punch back through the veil: the miner's head-lamp + a glow per machine
