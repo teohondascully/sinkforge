@@ -1275,16 +1275,20 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 		var amp: float = float(ridge["amp"])
 		var freq: float = float(ridge["freq"])
 		var base_y: float = horizon - float(ridge["drop"]) + cam.y * (1.0 - f) * 0.30
+		# Deep underground the camera drags base_y BELOW the polygon's fixed bottom edge — the crest
+		# line would dip under the floor line (a self-intersecting polygon, triangulation fails).
+		# Clamp the crests above the floor: invisible either way (walls cover the backdrop down there).
+		var floor_y: float = horizon + 320.0
 		var pts := PackedVector2Array()
 		var x: float = view.position.x
 		while x <= view.end.x + 24.0:
 			var u: float = (x - cam.x * (1.0 - f)) * freq
 			var crest: float = sin(u * TAU) * 0.55 + sin(u * TAU * 2.31 + 1.7) * 0.30 \
 				+ sin(u * TAU * 0.47 + 0.6) * 0.35
-			pts.append(Vector2(x, base_y - (crest * 0.5 + 0.5) * amp))
+			pts.append(Vector2(x, minf(base_y - (crest * 0.5 + 0.5) * amp, floor_y - 4.0)))
 			x += 24.0
-		pts.append(Vector2(view.end.x + 24.0, horizon + 320.0))
-		pts.append(Vector2(view.position.x, horizon + 320.0))
+		pts.append(Vector2(view.end.x + 24.0, floor_y))
+		pts.append(Vector2(view.position.x, floor_y))
 		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * (0.42 - f * 0.5)))
 
 
