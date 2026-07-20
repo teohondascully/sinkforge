@@ -67,6 +67,13 @@ var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hi
 var ping_world: Vector2 = Vector2.INF
 var show_help: bool = false
 var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
+## THE SETTINGS page (FABLE_50 #36): ESC on a calm screen. Values are read straight off the Settings
+## statics (representation reading representation); every control click returns a payload through
+## settings_click() for MainView to act on — the HUD never touches InputMap, audio or the config file.
+var settings_open: bool = false
+var settings_capture: StringName = &""     ## the action awaiting its new key ("press a key…")
+var _settings_hits: Array[Dictionary] = [] ## clickable controls this frame: [{rect, payload}]
+var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this frame (drag support)
 
 ## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
 var _flash_text: String = ""
@@ -145,7 +152,7 @@ func _draw() -> void:
 	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
 	_draw_inventory()      # bottom-centre hotbar
 	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
-	if not (inventory_open or show_tech or show_help):
+	if not (inventory_open or show_tech or show_help or settings_open):
 		_draw_hint_bubble()  # just-in-time teaching near the body (hidden while a menu dims the world)
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
@@ -156,6 +163,8 @@ func _draw() -> void:
 		_draw_tech_overlay()      # T — the research ladder as a graph (the PULL's face)
 	if show_help:
 		_draw_help_overlay()      # H / ? — the full controls list
+	if settings_open:
+		_draw_settings_overlay()  # ESC — audio / feel / the remap page (FABLE_50 #36)
 	if paused_getter.is_valid() and bool(paused_getter.call()):
 		var p := Rect2(CANVAS.x * 0.5 - 52.0, 8.0, 104.0, 26.0)
 		_panel(p, true)
@@ -908,6 +917,7 @@ func _draw_help_overlay() -> void:
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
 		"save / load  F5 / F9",
 		"pause       P     ·   help   H",
+		"settings    ESC  (audio · shake · remap keys)",
 	]
 	var w: float = 244.0
 	var h: float = 30.0 + float(lines.size()) * 16.0 + 10.0
@@ -918,6 +928,119 @@ func _draw_help_overlay() -> void:
 	for ln: String in lines:
 		draw_string(_font, Vector2(origin.x + 16.0, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
 		y += 16.0
+
+
+## THE SETTINGS page (FABLE_50 #36): audio sliders + feel chips on the left, the full REMAP list on
+## the right (the page the Controls foundation was built for). Every interactive control registers a
+## hit-rect + payload; MainView routes clicks through settings_click() — the knob pattern (#32).
+const REMAP_ROWS: Array[Array] = [
+	[Controls.LEFT, "move left"], [Controls.RIGHT, "move right"],
+	[Controls.UP, "climb up"], [Controls.DOWN, "climb down"],
+	[Controls.JUMP, "jump"], [Controls.MINE, "mine (hold)"],
+	[Controls.BUILD, "build / place"], [Controls.DROP, "drop / feed"],
+	[Controls.CRAFT, "pack"], [Controls.RESEARCH, "research / config"],
+	[Controls.MAP, "map"], [Controls.TECH, "tech tree"],
+	[Controls.HELP, "help"], [Controls.PAUSE, "pause"],
+	[Controls.SPEED, "game speed"], [Controls.ZOOM, "zoom"],
+	[Controls.SAVE, "quicksave"], [Controls.LOAD, "quickload"],
+	[Controls.CLEAR_MARKS, "clear dig plan"],
+]
+
+
+func _draw_settings_overlay() -> void:
+	_settings_hits.clear()
+	_slider_rects.clear()
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.55))
+	var panel := Rect2(90.0, 14.0, 460.0, 332.0)
+	_panel(panel, true)
+	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, panel.position + Vector2(panel.size.x - 78.0, 24.0), "ESC closes",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	# --- left column: AUDIO + FEEL ---
+	var x0: float = panel.position.x + 16.0
+	draw_string(_font, Vector2(x0, 58.0), "AUDIO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	_settings_slider(x0, 78.0, "master", "master", Settings.master)
+	_settings_slider(x0, 98.0, "sound", "sound", Settings.sound)
+	_settings_slider(x0, 118.0, "ambience", "ambience", Settings.ambience)
+	draw_string(_font, Vector2(x0, 150.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	draw_string(_font, Vector2(x0, 170.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 170.0, "ON" if Settings.screen_shake else "OFF",
+		{"toggle": "shake"}, Settings.screen_shake, mouse)
+	draw_string(_font, Vector2(x0, 190.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 190.0, "%.2fx" % MainView.ZOOM_LEVELS[
+		clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)], {"cycle": "zoom"}, false, mouse)
+	_settings_chip(x0, panel.position.y + panel.size.y - 20.0, "RESET KEYS TO DEFAULTS",
+		{"reset": true}, false, mouse)
+	draw_string(_font, Vector2(x0, panel.position.y + panel.size.y - 38.0),
+		"click a binding, then press its new key", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	# --- right column: CONTROLS (the remap page) ---
+	var x1: float = panel.position.x + 212.0
+	var chip_right: float = panel.position.x + panel.size.x - 16.0
+	draw_string(_font, Vector2(x1, 58.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	var y: float = 74.0
+	for row: Array in REMAP_ROWS:
+		var action: StringName = row[0]
+		var label: String = str(row[1])
+		draw_string(_font, Vector2(x1, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+		var capturing: bool = settings_capture == action
+		var bind_text: String = "press a key…" if capturing else Settings.binding_label(action)
+		var bw: float = _font.get_string_size(bind_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
+		var chip := Rect2(chip_right - bw, y - 10.0, bw, 13.0)
+		var lit: bool = chip.has_point(mouse)
+		draw_rect(chip, UI_ACCENT if capturing else (Color(0.30, 0.34, 0.44) if lit else UI_SLOT))
+		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
+		draw_string(_font, Vector2(chip.position.x + 5.0, y), bind_text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, 10, Color(0.10, 0.10, 0.12) if capturing else UI_TEXT)
+		_settings_hits.append({"rect": chip, "payload": {"bind": String(action)}})
+		y += 13.8
+
+
+## One slider row: label + a clickable/drag-able bar + the live percentage.
+func _settings_slider(x0: float, y: float, id: String, label: String, value: float) -> void:
+	draw_string(_font, Vector2(x0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	var bar := Rect2(x0 + 62.0, y - 9.0, 100.0, 10.0)
+	_slider_rects[id] = bar
+	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.5))
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(value, 0.0, 1.0), bar.size.y)), UI_ACCENT)
+	draw_rect(bar, UI_EDGE, false, 1.0)
+	draw_string(_font, Vector2(bar.position.x + bar.size.x + 8.0, y), "%d%%" % int(round(value * 100.0)),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	# The whole bar (with a touch of slop) is the hit zone; the payload carries the clicked fraction.
+	_settings_hits.append({"rect": bar.grow(3.0), "payload": {"slider": id}})
+
+
+func _settings_chip(x: float, y: float, text: String, payload: Dictionary, active: bool,
+		mouse: Vector2) -> void:
+	var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 12.0
+	var chip := Rect2(x, y - 11.0, w, 15.0)
+	draw_rect(chip, UI_ACCENT if active else (Color(0.30, 0.34, 0.44) if chip.has_point(mouse) else UI_SLOT))
+	draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
+	draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		Color(0.10, 0.10, 0.12) if active else UI_TEXT)
+	_settings_hits.append({"rect": chip, "payload": payload})
+
+
+## The control payload under a canvas point ({} = none) — sliders add the clicked fraction so a
+## single press already sets the value (drag then refines it via settings_slider_frac).
+func settings_click(canvas_pos: Vector2) -> Dictionary:
+	for hit: Dictionary in _settings_hits:
+		if (hit["rect"] as Rect2).has_point(canvas_pos):
+			var payload: Dictionary = (hit["payload"] as Dictionary).duplicate()
+			if payload.has("slider"):
+				payload["frac"] = settings_slider_frac(str(payload["slider"]), canvas_pos.x)
+			return payload
+	return {}
+
+
+## Fraction along a slider's bar for a canvas x — used by click AND drag (MainView keeps updating
+## through mouse motion while the button stays down, even if the cursor drifts off the bar).
+func settings_slider_frac(id: String, canvas_x: float) -> float:
+	var bar: Rect2 = _slider_rects.get(id, Rect2())
+	if bar.size.x <= 0.0:
+		return 0.0
+	return clampf((canvas_x - bar.position.x) / bar.size.x, 0.0, 1.0)
 
 
 ## A tiny dim hint, bottom-left — the toggle keys, so the player knows the menus exist without the old

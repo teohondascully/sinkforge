@@ -74,6 +74,13 @@ var _minimap_mode: int = 0
 ## it again to clear. A navigation bookmark — pushed to the HUD (map dot) + renderer (in-world beacon).
 var _ping_world: Vector2 = Vector2.INF
 var _hover_latch: Vector2i = Vector2i(-9999, -9999)   ## the machine the config panel is pinned to (#32)
+## THE SETTINGS overlay (FABLE_50 #36): ESC (with nothing else open) summons it — audio sliders,
+## screen-shake, zoom, and the remap page the Controls foundation was built for. While it's open it
+## eats all input (the "open map is UI" rule, page-sized). _capture_action = the action awaiting its
+## new key ("press a key…"); _settings_drag = the slider id being dragged.
+var _settings_open: bool = false
+var _capture_action: StringName = &""
+var _settings_drag: String = ""
 var _show_help: bool = false
 var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
                                     ## the research VERB (R) stays Bazaar-gated like the bench
@@ -145,7 +152,13 @@ var _breach_heard: Dictionary = {}
 
 
 func _ready() -> void:
-	Controls.register()    # register the remappable InputMap actions (foundation for a settings page)
+	Controls.register()    # register the remappable InputMap actions (the settings page rebinds them)
+	if not _is_scripted_boot():
+		# Machine-local prefs (FABLE_50 #36) — REAL boots only: fixtures/tests always run on pure
+		# defaults and can never read or clobber the dev's settings file (harness determinism).
+		Settings.persist = true
+		Settings.load_settings()
+		_zoom_idx = clampi(Settings.zoom_idx, 0, ZOOM_LEVELS.size() - 1)
 	sim = FactorySim.new()
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),
@@ -558,6 +571,8 @@ func _process(delta: float) -> void:
 		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
 		_hud.show_tech = _show_tech
+		_hud.settings_open = _settings_open
+		_hud.settings_capture = _capture_action
 		_hud.title_info = {} if not _title_open else {
 			"seed": _title_seed, "tint": _title_tint,
 			"tint_name": str(LAMP_TINTS[_title_tint]["name"]),
@@ -647,7 +662,8 @@ func _update_juice(delta: float) -> void:
 			_step_dist = 0.0
 	_shake = move_toward(_shake, 0.0, delta * 24.0)
 	if _camera != null:
-		_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) if _shake > 0.05 else Vector2.ZERO
+		_camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake)) \
+			if _shake > 0.05 and Settings.screen_shake else Vector2.ZERO
 
 
 ## Terraria/Minecraft-convention controls, all via REMAPPABLE InputMap actions (see Controls): 1–8
@@ -673,6 +689,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif event.keycode == KEY_RIGHT or event.keycode == KEY_D:
 				_title_tint = (_title_tint + 1) % LAMP_TINTS.size()
 		return
+	# THE SETTINGS overlay (#36) eats all input while open — sliders, chips, and the key-capture flow.
+	if _settings_open:
+		_settings_input(event)
+		return
 	if event.is_action_pressed(Controls.PAUSE):
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):
@@ -686,10 +706,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.TECH):
 		_show_tech = not _show_tech
 	elif event.is_action_pressed(Controls.CLOSE):
-		_inventory_open = false
-		_show_help = false
-		_show_tech = false
-		_minimap_mode = 0
+		# ESC closes whatever's open; with a CALM screen it opens SETTINGS (the pause-menu convention).
+		if _inventory_open or _show_help or _show_tech or _minimap_mode != 0:
+			_inventory_open = false
+			_show_help = false
+			_show_tech = false
+			_minimap_mode = 0
+		else:
+			_settings_open = true
 	elif event.is_action_pressed(Controls.RESEARCH) and (_inventory_open or _show_tech):
 		try_research(ResearchRules.next_tech(sim.research))   # R at the bench/tree: research the next tech
 	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
@@ -737,6 +761,62 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_slot(idx)                           # otherwise they SELECT the hotbar slot
 
 
+## Input while THE SETTINGS overlay is open (#36). Two modes: normally clicks land on the page's
+## controls (via Hud.settings_click payloads — the knob pattern); while CAPTURING, the very next key
+## or mouse button becomes the chosen action's new binding (ESC cancels). The HUD never touches
+## InputMap or the config file — every mutation goes through Settings here in the controller.
+func _settings_input(event: InputEvent) -> void:
+	if _capture_action != &"":
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_ESCAPE:
+				_capture_action = &""                    # cancel — keep the old binding
+			else:
+				var code: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+				Settings.rebind(_capture_action, {"key": code})
+				_capture_action = &""
+		elif event is InputEventMouseButton and event.pressed:
+			Settings.rebind(_capture_action, {"button": event.button_index})
+			_capture_action = &""
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		_settings_open = false
+		_settings_drag = ""
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_apply_setting(_hud.settings_click(get_viewport().get_mouse_position()))
+		else:
+			_settings_drag = ""                          # slider drag ends with the button
+	elif event is InputEventMouseMotion and _settings_drag != "":
+		_set_volume(_settings_drag,
+			_hud.settings_slider_frac(_settings_drag, get_viewport().get_mouse_position().x))
+
+
+func _apply_setting(payload: Dictionary) -> void:
+	if payload.has("slider"):
+		_settings_drag = str(payload["slider"])          # press starts a drag; motion keeps updating it
+		_set_volume(_settings_drag, float(payload.get("frac", 0.0)))
+	elif payload.get("toggle", "") == "shake":
+		Settings.screen_shake = not Settings.screen_shake
+		Settings.save_settings()
+	elif payload.get("cycle", "") == "zoom":
+		_cycle_zoom()
+	elif payload.has("bind"):
+		_capture_action = StringName(str(payload["bind"]))
+	elif payload.has("reset"):
+		Settings.reset_bindings()
+		_hud.flash("bindings reset to defaults")
+
+
+func _set_volume(id: String, frac: float) -> void:
+	match id:
+		"master": Settings.master = clampf(frac, 0.0, 1.0)
+		"sound": Settings.sound = clampf(frac, 0.0, 1.0)
+		"ambience": Settings.ambience = clampf(frac, 0.0, 1.0)
+	Settings.apply_audio()
+	Settings.save_settings()
+
+
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
 
 ## Timed mining: holding LMB CHARGES the aimed block (time scaled by your best tool vs the rock's
@@ -747,7 +827,7 @@ func _update_mining(delta: float) -> void:
 	var mouse_world: Vector2 = get_global_mouse_position()
 	_aim = _effective_aim(mouse_world)
 	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
-	var pressed: bool = not _paused and Input.is_action_pressed(Controls.MINE) \
+	var pressed: bool = not _paused and not _settings_open and Input.is_action_pressed(Controls.MINE) \
 		and not _cursor_on_minimap() and not _cursor_on_hover_panel()
 	if pressed:
 		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)
@@ -1049,10 +1129,13 @@ func _current_zoom() -> float:
 
 
 ## Cycle to the next zoom level (Z) and apply it to the camera — Terraria-style zoom-out/in.
+## The pick persists as a setting (real boots restore it; save is a no-op on scripted boots).
 func _cycle_zoom() -> void:
 	_zoom_idx = (_zoom_idx + 1) % ZOOM_LEVELS.size()
 	if _camera != null:
 		_camera.zoom = Vector2(_current_zoom(), _current_zoom())
+	Settings.zoom_idx = _zoom_idx
+	Settings.save_settings()
 
 
 ## Cycle the fast-forward game clock (".") and apply it. Engine.time_scale scales BOTH the sim's

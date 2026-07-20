@@ -181,6 +181,15 @@ production state — delete them and the numbers are unchanged):
   material + you-here + viewport rect; rebuilt only when `sim.solid` changes; terrain colour via the
   renderer's `material_color` Callable), the FORGED chip, and the unified craft+hotbar "pack". Reads
   the sim + a few pushed values; never mutates.
+- **`Settings`** (`scenes/settings.gd`, static) — machine-local **player preferences** (FABLE_50
+  #36): audio levels (master → the Master bus; sound/ambience → dB offsets `Sfx` adds lazily),
+  screen-shake toggle, zoom index, and key-binding OVERRIDES rebound into `InputMap` over the
+  `Controls` defaults. Persists to `user://settings.cfg` (ConfigFile) — deliberately SEPARATE from
+  `SaveGame`: a save is a world, settings are this machine. HARNESS RULE: `persist` is false by
+  default and only a real (unscripted) boot loads/saves the file, so every fixture runs on pure
+  defaults (`tools/check_settings.gd` = harness layer 13, on its own temp path). The UI is a drawn
+  HUD page (ESC on a calm screen): sliders/chips/remap rows return payloads through
+  `Hud.settings_click()`; `MainView` turns them into `Settings` calls — the knob pattern.
 - **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: the
   `MACHINE_STYLE` registry (behavior tag → glyph kind + casing colour, the representation twin of
   the sim's `_BEHAVIORS`), the scalable animated machine glyph (drawn by both the world + the HUD,

@@ -92,7 +92,7 @@ func play(name: StringName, pos: Vector2, pitch: float = 1.0, vol_db: float = 0.
 	p.stream = stream
 	p.global_position = pos
 	p.pitch_scale = pitch * randf_range(0.96, 1.04)
-	p.volume_db = -8.0 + vol_db
+	p.volume_db = -8.0 + vol_db + Settings.sound_db()
 	p.play()
 
 
@@ -103,6 +103,7 @@ func ui(name: StringName, pitch: float = 1.0) -> void:
 		return
 	_ui_player.stream = stream
 	_ui_player.pitch_scale = pitch
+	_ui_player.volume_db = -10.0 + Settings.sound_db()
 	_ui_player.play()
 
 
@@ -110,7 +111,7 @@ func ui(name: StringName, pitch: float = 1.0) -> void:
 ## near-silence and a felt presence, smoothed so machines starting/stopping breathe rather than snap.
 func set_hum(level: float, delta: float) -> void:
 	_hum_level = move_toward(_hum_level, clampf(level, 0.0, 1.0), delta * 0.8)
-	_hum_player.volume_db = lerpf(-60.0, -22.0, _hum_level)
+	_hum_player.volume_db = lerpf(-60.0, -22.0, _hum_level) + Settings.ambience_db()
 
 
 ## The AMBIENCE crossfade (audio slice 2): `surface` 0..1 drives the wind bed, `cave` 0..1 the
@@ -120,8 +121,8 @@ func set_hum(level: float, delta: float) -> void:
 func set_ambience(surface: float, cave: float, listener: Vector2, delta: float) -> void:
 	_wind_level = move_toward(_wind_level, clampf(surface, 0.0, 1.0), delta * 0.6)
 	_cave_level = move_toward(_cave_level, clampf(cave, 0.0, 1.0), delta * 0.6)
-	_wind_player.volume_db = lerpf(-60.0, -26.0, _wind_level)
-	_cave_player.volume_db = lerpf(-60.0, -21.0, _cave_level)
+	_wind_player.volume_db = lerpf(-60.0, -26.0, _wind_level) + Settings.ambience_db()
+	_cave_player.volume_db = lerpf(-60.0, -21.0, _cave_level) + Settings.ambience_db()
 	_drip_in -= delta
 	if _drip_in <= 0.0:
 		_drip_in = randf_range(3.0, 9.0)
