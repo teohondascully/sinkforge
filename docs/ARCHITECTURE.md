@@ -155,14 +155,19 @@ production state — delete them and the numbers are unchanged):
   drop guides, updrafts, the aim cursor) **and** the lighting passes (owns the `MaterialDef` registry,
   the cosmetic clock, the two `LightLayer` canvases + glow textures). One-way data flow: it derives
   what it can from the sim and reads the pushed aim state; it never reaches back into the controller.
-  - **Lighting model — SKYLIGHT + ambient (not a depth gradient).** The `_dark` LightLayer paints a
-    near-black underground ambient EVERYWHERE, lifted only where open air connects a cell to the sky:
-    daylight floods DOWN each column's open air (`_skylight_alpha`, attenuating with depth via
-    `SKY_REACH`), blocked by the first solid rock (`sim.surface_row`). So a dug shaft pours daylight
-    down (the veil repaints when `sim.solid` changes = you dug), the rock beside it stays dark, and an
-    enclosed cave is near-black until lit. The `_lights` LightLayer (additive) punches warm pools back:
-    the miner's flickering head-lamp, a warm ember per furnace / cool glow per other machine, a glow
-    per falling drop. Warm artificial light vs cold dark = the deliberate vibe.
+  - **Lighting model — SKYLIGHT + ambient (not a depth gradient), as a LIGHTMAP TEXTURE (#17).**
+    The darkness is a small texture — ONE TEXEL PER CELL (RGB = SHADOW_COLOR, A = darkness) —
+    stretched over the whole world by the `_dark` LightLayer with LINEAR filtering, so light grades
+    smoothly in every direction (the old pass drew a rect per cell: hard edges on every lit shaft).
+    The skylight/ambient BASE (`_bake_veil_base`, ~0.5 ms) rebakes only when terrain or the
+    quantized daylight changes: daylight floods DOWN each column's open air (attenuating via
+    `SKY_REACH`), blocked by the first solid rock (`sim.surface_row`), with a night floor above
+    ground. Each frame `_update_veil` (~0.04–0.4 ms) copies the base and the live sources CUT
+    radial holes in the alpha — lamp, torches, working machines, powered conduits, falling drops —
+    so where light falls the veil OPENS and the world shows its true colours; the `_lights`
+    LightLayer (additive) then lays the warm pools on top (flicker/pulse stays additive-only; the
+    cuts are steady). Warm artificial light vs cold dark = the deliberate vibe, now with light that
+    REVEALS rather than just tints.
   - **Post-FX (modern-rendering, docs/MODERN_FEEL.md).** `MainView._setup_post_fx()` adds a
     `WorldEnvironment` (selective softlight GLOW on the bright cores + a gentle colour grade) and a
     full-screen LENS pass — `scenes/post_fx.gdshader` (vignette + film grain + edge chromatic

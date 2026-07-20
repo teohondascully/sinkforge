@@ -116,6 +116,17 @@ var _chunk_cols: int = 0
 var _chunk_rows: int = 0
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 var _dark: LightLayer
+## THE LIGHTMAP VEIL (FABLE_50 #17): the darkness is a small texture — ONE TEXEL PER CELL (RGB =
+## the shadow colour, zone-tinted; A = darkness) — stretched over the whole world with LINEAR
+## filtering, so light grades smoothly in EVERY direction instead of stepping cell to cell. The
+## skylight/ambient BASE bakes only when terrain or the daylight step changes (_veil_dirty); each
+## frame the base is copied and the live light sources CUT holes in it (lamp/torches/machines/
+## conduits/falling drops), so where light falls the veil OPENS and the world shows its true
+## colours under the additive warmth — light reveals, not just tints.
+var _veil_img: Image
+var _veil_tex: ImageTexture
+var _veil_base: PackedByteArray
+var _veil_dirty: bool = true
 var _lights: LightLayer
 var _haze: LightLayer      ## the shared DISTORTION pass (#20) — heat shimmer now, water/L4 later
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
@@ -169,6 +180,12 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_glow_tex = _make_glow_texture()
 	_dark = LightLayer.new()
 	_dark.setup(50, false, _paint_darkness)
+	# The lightmap veil (#17): the darkness texture is tiny (one texel per cell) and the LINEAR
+	# filter on the stretch is what turns per-cell values into smooth gradients across the world.
+	_dark.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_dark.texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED
+	_veil_img = Image.create(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8)
+	_veil_tex = ImageTexture.create_from_image(_veil_img)
 	add_child(_dark)
 	_lights = LightLayer.new()
 	_lights.setup(51, true, _paint_lights)
@@ -185,7 +202,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()  # initial full paint (once); thereafter only dirtied chunks repaint
 	sim.terrain_dirty.clear()  # drop any dirt from world-seeding — the initial paint above already covers it
-	_dark.queue_redraw()  # skylight veil changes only when you DIG — repaint on terrain change, not per-frame
+	_dark.queue_redraw()  # the veil's ONE draw command (the stretched lightmap); content updates via the texture
 
 
 ## Full-world repaint, for when the terrain changed WHOLESALE under the retained caches (loading a
@@ -194,8 +211,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 func repaint_world() -> void:
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()
-	if _dark != null:
-		_dark.queue_redraw()
+	_veil_dirty = true
 	sim.terrain_dirty.clear()
 	_seal_rows.clear()
 	_seal_rows_scanned = false
@@ -263,6 +279,7 @@ func _process(delta: float) -> void:
 			target = to_aim.limit_length(LAMP_LEAD)
 		_lamp_offset = _lamp_offset.lerp(target, 1.0 - exp(-9.0 * delta))
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
+	_update_veil()              # the lightmap veil (#17): rebake the base if dirty, re-cut the live lights
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
 	if _haze != null:
@@ -275,8 +292,7 @@ func _process(delta: float) -> void:
 	var dstep: int = int(daylight() * 24.0)
 	if dstep != _daylight_step:
 		_daylight_step = dstep
-		if _dark != null:
-			_dark.queue_redraw()
+		_veil_dirty = true
 	# Terrain depends on the dug world, NOT the cosmetic clock. Repaint ONLY the chunks whose cells actually
 	# changed this frame (sim.terrain_dirty) — a dig rebuilds ~64 cells, not the whole 7700-cell world (the
 	# old ~300ms freeze). A changed cell also dirties its 4 neighbour chunks, since edge-AO + the surface cap
@@ -295,9 +311,8 @@ func _process(delta: float) -> void:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
-		# The skylight veil also depends on the surface line the dig may have moved — cheap (0.7ms), repaint it.
-		if _dark != null:
-			_dark.queue_redraw()
+		# The skylight base also depends on the surface line the dig may have moved — rebake it.
+		_veil_dirty = true
 
 
 ## The row-major index of the chunk owning `cell`, or -1 if the cell is out of the world.
@@ -1558,27 +1573,118 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 # --- Lighting passes (painted by the LightLayer children; pure visuals) -------
 
-## The SKYLIGHT veil (per column): daylight floods DOWN each column's open air, attenuating with depth
-## (SKY_REACH) and BLOCKED by the first solid rock — below that it's full underground ambient, plus a
-## couple tiles of shallow scatter just under the exposed surface. So an open/dug shaft is lit down its
-## length, the rock beside it is dark, and an enclosed cave is near-black. Painted only on terrain change.
+## THE LIGHTMAP VEIL (FABLE_50 #17): the whole darkness is ONE stretched texture draw — one texel
+## per cell, linear-filtered over the world, so light grades smoothly sideways as well as down (the
+## old pass drew a rect per cell: hard vertical edges on every lit shaft). Content lives in the
+## texture; this draw command never re-issues.
 func _paint_darkness(layer: LightLayer) -> void:
-	var cell_f: float = float(CELL)
-	for col: int in range(FactorySim.GRID_COLS):
-		var surf: int = sim.surface_row(col)            # first solid going down = where sky is blocked
-		var x: float = float(col) * cell_f
-		var ambient_from: int = surf + SKY_FADE         # below the shallow-scatter band → pure ambient
-		for row: int in range(FactorySim.GRID_ROWS):
-			var a: float = _skylight_alpha(row, surf)
-			if a <= 0.004:
-				continue                                # full daylight — let the world show through
-			if row >= ambient_from:                     # collapse the uniform deep ambient into one rect
-				layer.draw_rect(Rect2(x, float(row) * cell_f, cell_f,
-					float(FactorySim.GRID_ROWS - row) * cell_f),
-					Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, a))
-				break
-			layer.draw_rect(Rect2(x, float(row) * cell_f, cell_f, cell_f),
-				Color(SHADOW_COLOR.r, SHADOW_COLOR.g, SHADOW_COLOR.b, a))
+	layer.draw_texture_rect(_veil_tex,
+		Rect2(0.0, 0.0, float(FactorySim.GRID_COLS * CELL), float(FactorySim.GRID_ROWS * CELL)), false)
+
+
+## Bake the veil's BASE — the skylight/ambient model, unchanged: daylight floods DOWN each column's
+## open air (attenuating past SURFACE_LINE), is BLOCKED by the first solid rock, scatters SKY_FADE
+## tiles under the exposed surface, and everything deeper sits in full ambient (with the #29 night
+## floor above ground). RGB per texel = SHADOW_COLOR exactly (NOT zone-tinted — the #13 palette
+## lerps toward a bright terrain temperature that would wash the near-black veil out; the zones
+## already read through the tinted terrain the veil dims); A = darkness. Runs only when terrain or
+## the quantized daylight changes.
+func _bake_veil_base() -> void:
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	if _veil_base.size() != cols * rows * 4:
+		# The RGB bytes are SHADOW_COLOR everywhere, forever — written once here; every rebake
+		# below touches ONLY the alpha byte per cell (a quarter of the writes).
+		_veil_base.resize(cols * rows * 4)
+		var sr: int = int(SHADOW_COLOR.r * 255.0)
+		var sg: int = int(SHADOW_COLOR.g * 255.0)
+		var sb: int = int(SHADOW_COLOR.b * 255.0)
+		for i: int in range(cols * rows):
+			_veil_base[i * 4] = sr
+			_veil_base[i * 4 + 1] = sg
+			_veil_base[i * 4 + 2] = sb
+	# Above its column's surface the sky alpha depends on the ROW alone — table it once per bake
+	# instead of a function call per cell (the bake's dominant cost at 7.7k cells).
+	var sky_byte: PackedInt32Array = PackedInt32Array()
+	sky_byte.resize(rows)
+	var night_floor: float = NIGHT_DARK * (1.0 - daylight())
+	for row: int in range(rows):
+		var sky: float = maxf(AMBIENT_DARK * clampf(float(row - SURFACE_LINE) / float(SKY_REACH), 0.0, 1.0),
+			night_floor)
+		sky_byte[row] = int(clampf(sky, 0.0, 1.0) * 255.0)
+	var ambient_byte: int = int(AMBIENT_DARK * 255.0)
+	for col: int in range(cols):
+		var surf: int = sim.surface_row(col)
+		var scatter_end: int = mini(surf + SKY_FADE, rows - 1)
+		for row: int in range(rows):
+			var a: int = ambient_byte
+			if row <= surf:
+				a = sky_byte[row]
+			elif row <= scatter_end:                        # the shallow-scatter band under the surface
+				var t: float = float(row - surf) / float(SKY_FADE)
+				a = int(lerpf(float(sky_byte[row]), float(ambient_byte), t))
+			_veil_base[(row * cols + col) * 4 + 3] = a
+
+
+## Per frame: copy the baked base and let every live light CUT its pool out of the darkness —
+## multiplicative (each source scales the REMAINING veil), so stacked lights deepen the opening
+## without over-subtracting. Where light falls the world shows its true colours through the hole;
+## the additive pools then lay their warmth on top. The falling stream cuts too — the gravity pour
+## visibly opens the dark as it falls.
+func _update_veil() -> void:
+	if _veil_dirty:
+		_veil_dirty = false
+		_bake_veil_base()
+	var bytes: PackedByteArray = _veil_base.duplicate()
+	if player != null:
+		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+		_veil_cut(bytes, head + _lamp_offset, 4.2, 0.8)          # the aimed beam pool
+		_veil_cut(bytes, head + _lamp_offset * 0.45, 2.6, 0.45)  # the beam throat
+		_veil_cut(bytes, player.position, 1.6, 0.2)              # faint close body glow
+	for machine: MachineState in sim.machines:
+		var kind: String = Visuals.machine_kind(machine.def)
+		var s: float = 0.32                                      # cool working glow
+		if kind == "generator":
+			s = 0.55 if machine.fuel > 0 else 0.0                # dark when it runs dry
+		elif kind == "furnace":
+			s = 0.5
+		elif kind == "lift":
+			s = 0.18 + 0.35 * machine.power_factor
+		if s > 0.0:
+			_veil_cut(bytes, _cell_center(machine.cell), 2.4, s)
+	for cell: Variant in sim.torch:
+		_veil_cut(bytes, _cell_center(cell as Vector2i), 3.2, 0.6)
+	for cell: Variant in sim.conduit:
+		var lvl: float = _conduit_level(cell as Vector2i)
+		if lvl > 0.04:
+			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.6, lvl * 0.4)
+	for m: Dictionary in falling.motes():
+		_veil_cut(bytes, m["pos"], 1.4, 0.45)
+	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
+	_veil_tex.update(_veil_img)
+
+
+## Scale down the veil alpha in a radial falloff around a world position (radius in CELLS).
+func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: float) -> void:
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	var cx: float = world.x / float(CELL)
+	var cy: float = world.y / float(CELL)
+	var c0: int = maxi(0, int(cx - radius))
+	var c1: int = mini(cols - 1, int(cx + radius))
+	var r0: int = maxi(0, int(cy - radius))
+	var r1: int = mini(rows - 1, int(cy + radius))
+	for row: int in range(r0, r1 + 1):
+		for col: int in range(c0, c1 + 1):
+			var dx: float = float(col) + 0.5 - cx
+			var dy: float = float(row) + 0.5 - cy
+			var d: float = sqrt(dx * dx + dy * dy)
+			if d >= radius:
+				continue
+			var f: float = 1.0 - d / radius
+			var keep: float = 1.0 - strength * f * f             # quadratic falloff = a soft-edged pool
+			var idx: int = (row * cols + col) * 4 + 3
+			bytes[idx] = int(float(bytes[idx]) * keep)
 
 
 ## Darkness alpha for one cell, given its column's first-solid row. Open air above the rock is lit by
