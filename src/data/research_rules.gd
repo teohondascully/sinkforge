@@ -61,12 +61,19 @@ const TECHS: Dictionary = {
 		"unlocks": [&"plate_press", &"gear_mill", &"h_drill"],   # the crafter modules + the Borer
 		                                       # (the Borer is machining's PAYOFF: priced in plates+gears)
 	},
+	&"enrichment": {
+		"name": "Enrichment",
+		"requires": &"machining",
+		"sample": &"rich_ore",                 # analyze the sparkling rock you spotted on the shelf (#48)
+		"cost": {&"iron_ingot": 4},
+		"unlocks": [&"blast_furnace"],         # 1 rich ore -> 2 ingots — the quality axis pays out
+	},
 }
 
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
 ## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
 ## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
-const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining"]
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"enrichment"]
 
 
 static func tech(id: StringName) -> Dictionary:

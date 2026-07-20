@@ -26,6 +26,7 @@ const REQUIRED_TOOL: Dictionary = {
 	&"coal": &"pick",
 	&"deepslate": &"pick",
 	&"iron": &"pick",
+	&"rich_ore": &"pick",
 	&"sealrock": &"pick",
 	&"wood": &"pick",
 	&"leaves": &"pick",
@@ -38,6 +39,7 @@ const REQUIRED_TOOL: Dictionary = {
 const REQUIRED_TIER: Dictionary = {
 	&"deepslate": 2,
 	&"iron": 2,          # L2's ore lives in the deepslate zone — the same pick works both
+	&"rich_ore": 2,      # the high-grade veins live in/below the deepslate band (#48) — same honest gate
 	&"sealrock": 99,     # THE SEAL is un-hand-mineable by ANY pick, forever: the L1→L2 gate is a
 	                     # THROUGHPUT wall — only a fed Descent Engine breaches it (docs/PROGRESSION.md §2)
 }
@@ -51,6 +53,7 @@ const HARDNESS: Dictionary = {
 	&"coal": 1.50,
 	&"deepslate": 2.80,
 	&"iron": 3.0,
+	&"rich_ore": 2.4,
 	&"wood": 0.70,
 	&"leaves": 0.10,
 }

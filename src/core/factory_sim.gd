@@ -803,7 +803,7 @@ func near_bazaar(cell: Vector2i, radius: int) -> bool:
 ## Materials that mine as a "vein" (cavity model): a hand-burst + a drillable wall deposit, dropping their
 ## own item. Ore and coal both. (Coal is mined the same painful way → the demand-web, docs/MINING.md.)
 func _is_ore_like(material: StringName) -> bool:
-	return material == &"ore" or material == &"coal" or material == &"iron"
+	return material == &"ore" or material == &"coal" or material == &"iron" or material == &"rich_ore"
 
 
 ## The hand-mined BURST size for an ore cell — a juicy 3-8, deterministic per cell (a stable hash, no RNG

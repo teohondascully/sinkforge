@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_torch()
 	_test_save_load()
 	_test_iron_chain()
+	_test_rich_ore()
 	_test_h_drill()
 	_test_filter_ratio_passthrough()
 	_test_research()
@@ -1457,6 +1458,54 @@ func _test_iron_chain() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through the chain (present=%d, net=%d)" % [item, present, net])
+
+
+## ORE QUALITY (FABLE_50 #48): vein seeds landing in/below the deepslate band come up RICH — a distinct
+## material (it READS in-world) whose chunk the Enrichment-gated BLAST FURNACE smelts 1 → 2 ingots.
+## Deeper = richer gains its second axis: deep veins aren't just bigger, they're better.
+func _test_rich_ore() -> void:
+	print("- rich ore + the blast furnace (#48)")
+	# Worldgen: rich veins exist, and only around/below the deepslate band (seeds are band-gated; a
+	# grown blob may crest a few rows above its seed, never further).
+	var gen := LayeredWorldGen.new()
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 4242)
+	var rich_cells: int = 0
+	var too_shallow: int = 0
+	for cell: Vector2i in world.blocks:
+		if world.blocks[cell] == &"rich_ore":
+			rich_cells += 1
+			if cell.y < LayeredWorldGen.DEEPSLATE_ROW - 8:
+				too_shallow += 1
+	_check(rich_cells > 0, "worldgen seeded rich veins (%d cells)" % rich_cells)
+	_check(too_shallow == 0, "rich ore stays a DEEP find (none far above the band; %d strays)" % too_shallow)
+	_check(MiningRules.required_tier(&"rich_ore") == 2, "rich ore wants the tier-2 pick (the shelf's own gate)")
+	# The research gate: the Blast Furnace crafts only once ENRICHMENT is in.
+	var sim: FactorySim = FactorySim.new()
+	var bf_def: MachineDef = load("res://src/data/machines/blast_furnace.tres")
+	_check(ResearchRules.locking_tech(&"blast_furnace") == &"enrichment", "the Blast Furnace gates on Enrichment")
+	sim.inventory[&"plate"] = 2; sim.total_produced[&"plate"] = 2
+	sim.inventory[&"gear"] = 1; sim.total_produced[&"gear"] = 1
+	_check(not sim.craft(bf_def), "the Blast Furnace refuses before Enrichment")
+	for t: StringName in [&"automation", &"power", &"descent", &"ironworks", &"machining"]:
+		sim.research[t] = true
+	sim.inventory[&"rich_ore"] = 1; sim.total_produced[&"rich_ore"] = 1
+	sim.inventory[&"iron_ingot"] = 4; sim.total_produced[&"iron_ingot"] = 4
+	_check(sim.research_tech(&"enrichment"), "Enrichment researches (rich-ore sample + 4 iron ingots)")
+	_check(sim.craft(bf_def), "…and the Blast Furnace crafts (2 plate + 1 gear)")
+	# 1 rich ore → 2 ingots, gravity-fed, conserved (double the plain forge's 2-ore-per-ingot density).
+	sim.set_solid(Vector2i(6, 6), &"stone")
+	sim.place_machine(bf_def, Vector2i(6, 3))
+	sim.inventory[&"rich_ore"] = int(sim.inventory.get(&"rich_ore", 0)) + 3
+	sim.total_produced[&"rich_ore"] = int(sim.total_produced.get(&"rich_ore", 0)) + 3
+	sim.drop_item(Vector2i(6, 1), &"rich_ore", 3)
+	for _i: int in 400:
+		sim.tick()
+	var pile: Dictionary = sim.ground.get(Vector2i(6, 5), {})
+	_check(int(pile.get(&"ingot", 0)) == 6, "3 rich ore poured in came out 6 ingots (%s)" % str(pile))
+	for item: StringName in [&"rich_ore", &"ingot", &"plate", &"gear", &"iron_ingot"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through enrichment (present=%d, net=%d)" % [item, present, net])
 
 
 ## FILTERS, RATIOS & PASS-THROUGH (FABLE_50 #49 — the routing kit): (a) every recipe machine passes

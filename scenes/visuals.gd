@@ -27,6 +27,7 @@ const MACHINE_STYLE: Dictionary = {
 	# tags have no _BEHAVIORS entry (they fall through to the recipe runner), they exist so each module
 	# visibly announces its one product (per-item legibility, the modules' whole point).
 	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace — smelts iron
+	&"blast_furnace": {"kind": "furnace", "color": Color(0.82, 0.60, 0.28)}, # white-gold heat — 1 rich ore → 2 ingots (#48)
 	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey — presses plates
 	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
 	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
@@ -323,6 +324,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld (FABLE_50 #27)
 	if item == &"sapling":
 		return Color(0.44, 0.66, 0.30)        # young leaf-green — the renewable-wood seed (#38)
+	if item == &"rich_ore":
+		return Color(1.0, 0.86, 0.46)         # white-gold — the high-grade vein's chunk (#48)
 	if item == &"iron":
 		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
 	if item == &"iron_ingot":
@@ -348,6 +351,8 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 	match item:
 		&"ore":
 			_item_ore(canvas, center, size)
+		&"rich_ore":
+			_item_rich_ore(canvas, center, size)
 		&"iron":
 			_item_iron(canvas, center, size)
 		&"ingot":
@@ -376,6 +381,16 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
 		_:
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
+
+
+## RICH ORE (#48) — the same rough nugget, crowded with brighter white-gold flecks: quality READS.
+static func _item_rich_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
+		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.40, 0.40, 0.46))
+	for f: Vector2 in [Vector2(-0.14, 0.00), Vector2(0.10, -0.14), Vector2(0.20, 0.10),
+			Vector2(-0.02, 0.20), Vector2(-0.04, -0.20)]:
+		canvas.draw_circle(c + f * size, size * 0.06, Color(1.0, 0.86, 0.46))
+		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.97, 0.80))
 
 
 ## SAPLING (#38) — a sprout in a root ball: two young leaves on a stem, the seed of a new tree.

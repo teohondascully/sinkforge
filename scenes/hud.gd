@@ -98,6 +98,8 @@ const ITEM_PURPOSE: Dictionary = {
 	&"iron_pickaxe": "tier-3 pick — the fastest made; keyed for what waits under L2",
 	&"wood_axe": "an old hatchet — your pick chops trees now; this is a keepsake",
 	&"sapling": "RMB plants it on grassy ground — a new tree grows (renewable wood)",
+	&"rich_ore": "high-grade ore from the deep shelf — a Blast Furnace pours 2 ingots from 1",
+	&"blast_furnace": "smelts RICH ore 1 → 2 ingots — the deep veins' payoff",
 	&"scanner": "sonar — select it, RMB pulses: nearby veins echo through the rock",
 	&"rope": "RMB above a drop — it unrolls down; W/S climbs it",
 	&"torch": "RMB on a wall-backed cell — light that STAYS",

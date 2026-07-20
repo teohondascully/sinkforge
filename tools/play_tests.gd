@@ -361,17 +361,19 @@ func _goal_l2_chain() -> bool:
 	if not await agent.walk_to_column(col, 1200):
 		return await _finish(agent, false, "never reached the build site")
 	var top: int = sim.surface_row(col)
-	# Dig the 2-deep socket from ON TOP of it — each cut is straight below the feet (always in line of
-	# sight; a perfect-diagonal cut is honestly corner-blocked), riding the hole down as it deepens.
-	for y: int in range(top, top + 2):
-		var cell := Vector2i(col, y)
-		var g: int = 0
-		while sim.is_solid(cell) and g < 40:
-			agent.do_mine(cell)
-			await agent.wait(4); g += 1
-		if sim.is_solid(cell):
-			return await _finish(agent, false, "could not dig the module socket at %s" % str(cell))
-		await agent.wait(20)                                 # fall to the new floor before the next cut
+	# Guarantee the socket site (the RUNG-4 pattern): the column must be SOLID down through the socket
+	# + its floor — a worldgen cave/tunnel under this col (pure vein-RNG luck, it shifts whenever a
+	# gen pass changes) would drop the body out of reach mid-dig. The dig itself stays the tested verb.
+	for y: int in range(top, top + 3):
+		if not sim.is_solid(Vector2i(col, y)):
+			sim.set_solid(Vector2i(col, y), &"earth")
+	# Sink the 2-deep socket exactly like a player does — the proven dig_down_to loop (stay CENTRED
+	# over the column, cut under the feet, fall in, repeat). The old hand-rolled version could stall
+	# with the feet straddling the socket lip: a cell-match stop leaves the body standing on the
+	# neighbour floor, never falling in, and the second cut corner-blocks forever.
+	if not await agent.dig_down_to(Vector2i(col, top + 1)):
+		return await _finish(agent, false, "could not dig the module socket at %s" % str(Vector2i(col, top + 1)))
+	await agent.wait(20)                                     # settle on the socket floor
 	# Out of the socket (a 2-tile wall — exactly what the jump clears) and to its lip.
 	if not await agent.walk_to_column(col + 1, 900):
 		return await _finish(agent, false, "could not jump out of the socket")

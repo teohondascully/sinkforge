@@ -253,11 +253,16 @@ func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
 		var dx: float = col_x - player.position.x
 		var centred: bool = absf(dx) < 6.0
 		player.input_dir = 0.0 if centred else signf(dx)
-		# Only sink while plumb over the column — mine the block under the feet, and the vein once reachable.
-		if centred:
-			var feet: Vector2i = main._cell_at(player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0))
-			if feet.x == col and sim.is_solid(feet) and main._can_reach(feet):
-				if main.try_mine(feet):
+		# Only sink while plumb over the column. The cell to cut is the first SOLID cell straight DOWN
+		# the column from the body — asking the COLUMN, not the toes: a feet-probe lies whenever the
+		# body is held up by a surface ramp or a straddled ledge (the walkable surface can float the
+		# body a full row above the column's own solid, and the probe reads open air forever).
+		if centred and player.on_floor:
+			var work := Vector2i(col, main._cell_at(player.position).y + 1)
+			while work.y < cell.y and not sim.is_solid(work):
+				work.y += 1
+			if sim.is_solid(work) and main._can_reach(work):
+				if main.try_mine(work):
 					mines += 1
 			if main._can_reach(cell):
 				if main.try_mine(cell):

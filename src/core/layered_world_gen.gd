@@ -55,6 +55,10 @@ const COAL_AMOUNT_DEPTH_BONUS: int = 170 # long-lasting TOTAL (hundreds shallow 
 ## depth_frac as body size/chance.
 const ORE_AMOUNT_BASE: int = 30
 const ORE_AMOUNT_DEPTH_BONUS: int = 170
+## ORE QUALITY (#48): vein seeds landing in/below the deepslate band roll this often into RICH ORE
+## (the high-grade variant — Blast Furnace smelts 1 → 2 ingots), carrying more per-cell deposit too.
+const RICH_CHANCE: float = 0.45
+const RICH_AMOUNT_MULT: float = 1.5
 
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
@@ -195,7 +199,14 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
 			continue                            # rejected — most shallow seeds die here (the band)
 		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS)))
 		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS)))
-		_grow_vein(world, rng, Vector2i(cx, cy), size, richness)
+		# ORE QUALITY (FABLE_50 #48): a vein seeded in/below the deepslate band may come up RICH — a
+		# visibly denser high-grade variant (1 rich ore smelts 2 ingots in the Blast Furnace). Deeper =
+		# richer gains a second axis: down there veins aren't just bigger, they're better.
+		var material: StringName = &"ore"
+		if cy >= DEEPSLATE_ROW and rng.randf() < RICH_CHANCE:
+			material = &"rich_ore"
+			richness = int(round(float(richness) * RICH_AMOUNT_MULT))
+		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, material)
 
 
 ## A depth-banded COAL pass — the drill's fuel. Same machinery as ore veins (cavity model), its own
@@ -220,13 +231,17 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator) -> void:
 ## cell and add its rock neighbours, so the body comes out fat + contiguous — a real ore BODY you can line
 ## the top of with a row of drills, each boring its own column down through it (the scaling supply loop).
 ## Every converted cell carries the vein's depth-scaled `richness` (its finite per-cell deposit).
-func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int, material: StringName = &"ore") -> void:
+## `min_row` floors the blob: a frontier cell above it is refused — IRON must never crest through the
+## seal rows onto the pre-breach shelf (a latent leak surfaced when #48's rich roll shifted the RNG
+## sequence: a blob seeded just under the seal could climb through rows the seal stamp later re-fills
+## and leave its crest ABOVE them, handing out L2's signature ore before the breach).
+func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int, material: StringName = &"ore", min_row: int = 0) -> void:
 	var filled: Dictionary = {}
 	var frontier: Array[Vector2i] = [seed_cell]
 	var placed: int = 0
 	while placed < size and not frontier.is_empty():
 		var cell: Vector2i = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
-		if filled.has(cell) or not world.in_bounds(cell):
+		if filled.has(cell) or not world.in_bounds(cell) or cell.y < min_row:
 			continue
 		var here: StringName = world.blocks.get(cell, &"")
 		if here != &"earth" and here != &"stone" and here != &"deepslate":
@@ -251,7 +266,7 @@ func _scatter_iron(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var cy: int = rng.randi_range(l2_top, world.rows - 1)
 		var depth_frac: float = float(cy - l2_top) / float(maxi(1, world.rows - l2_top))
 		var size: int = IRON_SIZE_MIN + int(round(depth_frac * float(IRON_SIZE_DEPTH_BONUS)))
-		_grow_vein(world, rng, Vector2i(cx, cy), size, IRON_AMOUNT, &"iron")
+		_grow_vein(world, rng, Vector2i(cx, cy), size, IRON_AMOUNT, &"iron", l2_top)
 
 
 ## Stamp THE SEAL: an unbroken full-width sealrock band (rows SEAL_TOP..+SEAL_ROWS-1), filling even
