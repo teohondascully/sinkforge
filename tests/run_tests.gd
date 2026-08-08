@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_production()
 	_test_production_rate()
 	_test_machine_census()
+	_test_machine_problems()
 	_test_splitter()
 	_test_terrain()
 	_test_surface_silhouette()
@@ -261,6 +262,27 @@ func _test_machine_census() -> void:
 	_check(int(vent_row.get("count", 0)) == 2, "two vents counted (got %d)" % int(vent_row.get("count", 0)))
 	_check(int(vent_row.get("working", 0)) == 2, "both vents read WORKING (got %d)" % int(vent_row.get("working", 0)))
 	_check(census[0]["id"] == vent_def.id, "sorted most-numerous-first (vents lead)")
+
+
+## machine_problems: the alert stack's data. A generator with no coal reads no_fuel → it's an ALERT; a
+## steadily-producing vent is NOT (working machines never alert); starvation (no_input) is excluded.
+func _test_machine_problems() -> void:
+	print("- machine problems (alerts)")
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(sim.machine_problems().is_empty(), "healthy world -> no alerts")
+	sim.place_machine(vent_def, Vector2i(4, 0))               # always working -> must NOT alert
+	sim.place_machine(gen_def, Vector2i(8, 0))                # no coal -> no_fuel -> an alert
+	sim.place_machine(gen_def, Vector2i(10, 0))               # second starving generator -> grouped
+	for _i: int in 5:
+		sim.tick()
+	var probs: Array[Dictionary] = sim.machine_problems()
+	_check(probs.size() == 1, "one grouped alert (both generators, one row) — got %d" % probs.size())
+	if probs.size() == 1:
+		_check(probs[0]["id"] == gen_def.id and probs[0]["status"] == &"no_fuel", "the alert is generator/no_fuel")
+		_check(int(probs[0]["count"]) == 2, "both starving generators counted (got %d)" % int(probs[0]["count"]))
+		_check(sim.grid.has(probs[0]["cell"]), "carries a real representative cell to ping")
 
 
 ## A splitter divides its incoming ore between two columns. Down-branch ore falls clear to the

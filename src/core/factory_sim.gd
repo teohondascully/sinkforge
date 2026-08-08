@@ -1101,6 +1101,33 @@ func machine_census() -> Array[Dictionary]:
 	return out
 
 
+## FACTORY ALERTS (legibility — the alert stack, FABLE_NEXT_50 #29): machines that were meant to RUN but
+## stalled — output has no drain (`blocked`) or fuel ran dry (`no_fuel`). Grouped by (id, status); each
+## entry carries one representative cell so the HUD can ping the culprit (the camera is body-locked, so
+## "take me there" = a beacon, not a jump). Pure read over grid — starvation (`no_input`) is deliberately
+## OUT: it's usually "not hooked up yet", not a breakdown, and would fire on every just-placed machine.
+## [{id, name, def, status, count, cell}], worst (most-numerous) first.
+const _ALERT_STATUSES: Array[StringName] = [&"blocked", &"no_fuel"]
+func machine_problems() -> Array[Dictionary]:
+	var by: Dictionary = {}                                    # "id|status" -> entry
+	for cell: Vector2i in grid:
+		var m: MachineState = grid[cell]
+		var st: StringName = machine_status(m)
+		if not _ALERT_STATUSES.has(st):
+			continue
+		var key: String = "%s|%s" % [m.def.id, st]
+		if not by.has(key):
+			by[key] = {"id": m.def.id, "name": m.def.display_name, "def": m.def,
+				"status": st, "count": 0, "cell": cell}
+		var e: Dictionary = by[key]
+		e["count"] = int(e["count"]) + 1
+	var out: Array[Dictionary] = []
+	for k: String in by:
+		out.append(by[k])
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["count"]) > int(b["count"]))
+	return out
+
+
 ## Drop any ground cell whose pile emptied. `_column_landing`/`_column_rise` create a pile dict EAGERLY for
 ## a landing they might not fill — a splitter routing all of a tick's items one way, or a resettle of an empty
 ## pile — leaving an empty `{}` in `ground`. An empty pile is a phantom: it crashes walk-over collect

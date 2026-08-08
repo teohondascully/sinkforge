@@ -42,6 +42,16 @@ var inv_selected_getter: Callable
 var hover_info: Dictionary = {}
 var _hover_rect: Rect2 = Rect2()          ## the inspector's canvas rect this frame (#32 — pin region)
 var _knob_hits: Array[Dictionary] = []    ## clickable knob chips this frame: [{rect, payload}]
+## FACTORY ALERTS (FABLE_NEXT_50 #29): stalled machines from sim.machine_problems(), pushed each frame.
+## A compact LEFT-edge stack that appears ONLY when something's stuck (calm-by-default), each row
+## clickable to ping the culprit. _alert_hits = this frame's clickable rects [{rect, cell}].
+var alerts: Array[Dictionary] = []
+var _alert_hits: Array[Dictionary] = []
+const ALERT_REASON: Dictionary = {
+	&"blocked": "output blocked — dig a drain",
+	&"no_fuel": "out of coal — feed it",
+	&"no_input": "starved — nothing feeding it",
+}
 ## THE TITLE / NEW-GAME card (#6 + #45): {} = closed; else {seed, tint, tint_name, tints, has_save}.
 var title_info: Dictionary = {}
 ## Minimap inputs (pushed by MainView): a material-id → colour lookup (the renderer's, handed over as a
@@ -143,6 +153,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	_tooltip_item = &""    # re-captured by whichever slot the cursor sits on this frame
+	_alert_hits.clear()    # stale unless _draw_alerts repopulates it this frame (menus suppress it)
 	# THE TITLE (#6): while it's open nothing else matters — the veil + the new-game card ARE the screen.
 	if not title_info.is_empty():
 		_draw_title()
@@ -155,6 +166,7 @@ func _draw() -> void:
 	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
 	if not (inventory_open or show_tech or show_help or settings_open or show_dashboard):
 		_draw_hint_bubble()  # just-in-time teaching near the body (hidden while a menu dims the world)
+		_draw_alerts()       # left-edge stalled-machine stack (only when something's stuck)
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
 		_draw_minimap()    # M — top-right world map
@@ -276,6 +288,65 @@ func _draw_hint_bubble() -> void:
 		Vector2(tx, tip_y)]), Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
 	draw_multiline_string(_font, origin + Vector2(10.0, 6.0 + 10.0), hint_text,
 		HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.95, 0.90, 0.72, a))
+
+
+## FACTORY ALERTS (FABLE_NEXT_50 #29): a compact left-edge stack of stalled machines, shown ONLY when
+## something's actually stuck (calm-by-default — a healthy factory draws nothing here). Each row names
+## the machine + count + why, and is CLICKABLE to drop a ping on the culprit so you can walk to it (the
+## camera is body-locked; a beacon is the honest "take me there"). MainView pushes `alerts` + routes the
+## click through alert_click(). Capped at 5 rows so a cascading failure can't wallpaper the screen.
+func _draw_alerts() -> void:
+	if alerts.is_empty():
+		return
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	var w: float = 184.0
+	var rh: float = 22.0
+	var x: float = 10.0
+	var y: float = 100.0
+	var tri := Vector2(x + 5.0, y - 8.0)                       # a small warning triangle (font-safe glyph)
+	draw_colored_polygon(PackedVector2Array([tri + Vector2(-4.0, 3.0), tri + Vector2(4.0, 3.0),
+		tri + Vector2(0.0, -4.0)]), Color(0.95, 0.60, 0.30))
+	draw_string(_font, Vector2(x + 13.0, y - 4.0), "ALERTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+		Color(0.94, 0.64, 0.44))
+	for i: int in mini(5, alerts.size()):
+		var a: Dictionary = alerts[i]
+		var rect := Rect2(x, y, w, rh - 3.0)
+		var lit: bool = rect.has_point(mouse)
+		draw_rect(rect, Color(0.20, 0.11, 0.10, 0.95) if lit else Color(0.15, 0.09, 0.09, 0.92))
+		draw_rect(rect, Color(0.78, 0.40, 0.32, 0.7 if lit else 0.45), false, 1.0)
+		draw_rect(Rect2(x, y, 2.5, rh - 3.0), Color(0.96, 0.46, 0.30))          # the warning edge
+		var mdef: MachineDef = a["def"]
+		var box := Rect2(x + 6.0, y + 2.5, 13.0, 13.0)
+		draw_rect(box, Visuals.machine_color(mdef))
+		Visuals.draw_machine_glyph(self, box.position + box.size * 0.5, Visuals.machine_kind(mdef),
+			box.size.y / 20.0, false, 0.0)
+		var cnt: int = int(a["count"])
+		var nm: String = str(a["name"]) + ("  ×%d" % cnt if cnt > 1 else "")
+		draw_string(_font, Vector2(x + 24.0, y + 8.0), nm, HORIZONTAL_ALIGNMENT_LEFT, w - 28.0, 9,
+			Color(0.96, 0.86, 0.78))
+		draw_string(_font, Vector2(x + 24.0, y + 16.0), str(ALERT_REASON.get(a["status"], str(a["status"]))),
+			HORIZONTAL_ALIGNMENT_LEFT, w - 28.0, 8, Color(0.82, 0.62, 0.54))
+		_alert_hits.append({"rect": rect, "cell": a["cell"]})
+		y += rh
+	draw_string(_font, Vector2(x + 2.0, y + 5.0), "click one → mark it on the map",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_DIM)
+
+
+## Route a click at `mouse` (canvas coords) to the alert it hit → {cell: Vector2i} to ping, or {} if the
+## click missed the stack. MainView owns the ping; the HUD only reports the hit (the minimap-click rule).
+func alert_click(mouse: Vector2) -> Dictionary:
+	for hit: Dictionary in _alert_hits:
+		if (hit["rect"] as Rect2).has_point(mouse):
+			return {"cell": hit["cell"]}
+	return {}
+
+
+## Is `mouse` over the alert stack this frame? (MainView holsters the pick over it, like the minimap.)
+func cursor_on_alerts(mouse: Vector2) -> bool:
+	for hit: Dictionary in _alert_hits:
+		if (hit["rect"] as Rect2).has_point(mouse):
+			return true
+	return false
 
 
 ## Fast-forward chip (top-left): a small "▶▶ Nx" tag shown ONLY while the game clock is sped up, so the

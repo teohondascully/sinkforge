@@ -75,6 +75,10 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   `def.id` with a live `machine_status`-derived working-count (`[{id, name, def, count, working}]`,
   most-numerous-first). Same role as `production_rates()` for the machine side; no state, never ticks.
   The PRODUCTION DASHBOARD ([G], FABLE_NEXT_50 #28) draws both together — throughput bars + this census.
+- **Factory alerts (legibility):** `machine_problems()` — a pure read over `grid` for machines that
+  STALLED (`blocked`/`no_fuel`, grouped by id+status, worst-first, each carrying a representative cell;
+  starvation `no_input` excluded as "not hooked up yet"). Drives the calm-by-default alert stack
+  ([FABLE_NEXT_50 #29]); clicking a row pings the culprit (`set_ping`), since the camera is body-locked.
 - **Save/load — `SaveGame` (`src/core/save_game.gd`, FABLE_50 #1):** the sim being plain data makes a
   save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
   ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),

@@ -573,6 +573,7 @@ func _process(delta: float) -> void:
 		_hud.show_help = _show_help
 		_hud.show_tech = _show_tech
 		_hud.show_dashboard = _show_dashboard
+		_hud.alerts = sim.machine_problems()    # stalled machines → the left-edge alert stack (#29)
 		_hud.settings_open = _settings_open
 		_hud.settings_capture = _capture_action
 		_hud.title_info = {} if not _title_open else {
@@ -730,6 +731,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				try_build(_aim)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
+			and _cursor_on_alerts():
+		_ping_alert(get_viewport().get_mouse_position())      # click an alert → mark the culprit
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_minimap():
 		_toggle_ping(get_viewport().get_mouse_position())     # click the map → set/clear the ping
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
@@ -833,7 +837,7 @@ func _update_mining(delta: float) -> void:
 	_aim = _effective_aim(mouse_world)
 	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
 	var pressed: bool = not _paused and not _settings_open and Input.is_action_pressed(Controls.MINE) \
-		and not _cursor_on_minimap() and not _cursor_on_hover_panel()
+		and not _cursor_on_minimap() and not _cursor_on_hover_panel() and not _cursor_on_alerts()
 	if pressed:
 		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)
 	else:
@@ -1220,6 +1224,23 @@ func _apply_knob(payload: Dictionary) -> void:
 		_hud.flash(label)
 		_particles.spark(_cell_center(_hover_latch), Color(0.75, 0.85, 0.98))
 		_sfx.play(&"pop", _cell_center(_hover_latch), 1.4)
+
+
+## Is the cursor over the alert stack this frame? While it is, LMB marks the alert and the pick stays
+## holstered (same "UI eats the click" rule as the open minimap / config panel).
+func _cursor_on_alerts() -> bool:
+	return _hud != null and _hud.cursor_on_alerts(get_viewport().get_mouse_position())
+
+
+## Click an alert (#29) → drop the PING on the stalled machine so its in-world beacon + map dot lead you
+## there (the camera is body-locked, so this is the honest "take me to it"). MainView owns the ping.
+func _ping_alert(canvas_pos: Vector2) -> void:
+	var payload: Dictionary = _hud.alert_click(canvas_pos)
+	if payload.is_empty():
+		return
+	_ping_world = _cell_center(payload["cell"]).clamp(Vector2.ZERO, WORLD_SIZE)
+	_renderer.set_ping(_ping_world)
+	_hud.flash("marked — follow the beacon")
 
 
 ## Set/clear the PING from a click on the map (canvas coords → world). Clicking on (or next to) the
