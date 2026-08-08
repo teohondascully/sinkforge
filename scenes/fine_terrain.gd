@@ -92,6 +92,18 @@ var _huex: FastNoiseLite                               ## region hue field, x ax
 var _huey: FastNoiseLite                               ## region hue field, y axis (diff-04 #3)
 var _img: Image
 var _tex: ImageTexture
+# Persisted caches so a per-dig rebake can patch a SUB-RECT instead of the whole grid (#102 dirty-chunks).
+# The full rebake fills them; rebake_region refreshes only the changed cells + reads neighbours from these.
+var _data: PackedByteArray = PackedByteArray()          ## the baked pixel bytes (region rebakes overwrite a sub-rect)
+var _fine_solid: PackedByteArray = PackedByteArray()    ## the real fine solid/air grid (neighbours for region AO/moss)
+var _solid_mask: PackedFloat32Array = PackedFloat32Array()  ## coarse solidity 0/1
+var _mat_col: PackedColorArray = PackedColorArray()     ## coarse body colour (solid cells)
+var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall colour
+var _surf_row: PackedInt32Array = PackedInt32Array()    ## walkable surface row per column (cap band)
+var last_baked_cells: int = 0                           ## fine cells the LAST bake touched — the dig-hitch friction gauge (#103)
+## Fine-cell dilation for a region rebake: must cover the widest neighbour reach any paint term reads so a
+## patched region is byte-identical to a full bake — MOSS_DEPTH(5 up) / HANG_DEPTH(3 down) / SUBDIV(4, accretion).
+const REGION_MARGIN: int = 6
 
 
 func _init(cols: int, rows: int, seed: int) -> void:
@@ -170,152 +182,199 @@ const SURFACE_KEEP: int = 2
 ## P2 (docs/FINE_TERRAIN.md): the fine SHAPE now comes from the sim's real fine grid (fine_solid_at) instead
 ## of a molded field computed here from the coarse mask — real fine DATA reads crunchier + carries whatever
 ## detail worldgen put there. The renderer keeps ownership of the LOOK (AO, grain, moss, rim, palette).
-## Runs the full fine grid once; called only on terrain change (see WorldRenderer._fine_dirty).
+## Runs the WHOLE fine grid; called on the initial paint + a wholesale change (load/repaint_world). The
+## per-dig fast lane is rebake_region (dirty-chunks, #102). Fills the persisted caches, then paints every
+## fine cell via _paint_fine (shared with the region path).
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
 		surface_at: Callable) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
-	var surf_row: PackedInt32Array = PackedInt32Array()
-	surf_row.resize(_cols)
+	_surf_row.resize(_cols)
 	for cx: int in _cols:
-		surf_row[cx] = int(surface_at.call(cx))
-	# Precompute the coarse solid mask (0.0/1.0) padded by one cell so bilinear sampling at the world
-	# edge reads "air" outside — a single dictionary lookup per coarse cell instead of SUBDIV² per fine.
-	var solid_mask: PackedFloat32Array = PackedFloat32Array()
-	solid_mask.resize(_cols * _rows)
+		_surf_row[cx] = int(surface_at.call(cx))
+	# Coarse solid mask (0.0/1.0): a single lookup per coarse cell instead of SUBDIV² per fine.
+	_solid_mask.resize(_cols * _rows)
 	for cy: int in _rows:
 		for cx: int in _cols:
-			solid_mask[cy * _cols + cx] = 1.0 if bool(solid_at.call(Vector2i(cx, cy))) else 0.0
+			_solid_mask[cy * _cols + cx] = 1.0 if bool(solid_at.call(Vector2i(cx, cy))) else 0.0
 	# Cache coarse colours once per cell (reused by all SUBDIV² children).
-	var mat_col: PackedColorArray = PackedColorArray()
-	var wall_col: PackedColorArray = PackedColorArray()
-	mat_col.resize(_cols * _rows)
-	wall_col.resize(_cols * _rows)
+	_mat_col.resize(_cols * _rows)
+	_wall_col.resize(_cols * _rows)
 	for cy: int in _rows:
 		for cx: int in _cols:
 			var idx: int = cy * _cols + cx
-			if solid_mask[idx] > 0.5:
-				mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
-			wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
-
-	var data: PackedByteArray = PackedByteArray()
-	data.resize(_fcols * _frows * 4)
-	# First pass: read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding now lives in
-	# the sim's fine DATA, not a field computed here), stashed so pass two can read neighbours for fine AO.
-	var fine_solid: PackedByteArray = PackedByteArray()
-	fine_solid.resize(_fcols * _frows)
+			if _solid_mask[idx] > 0.5:
+				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
+			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
+	_data.resize(_fcols * _frows * 4)
+	# Read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding lives in the sim's fine
+	# DATA), stashed so the paint can read neighbours for fine AO.
+	_fine_solid.resize(_fcols * _frows)
 	for fy: int in _frows:
 		for fx: int in _fcols:
-			fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
-
-	# Second pass: paint. Solid fine cell → its parent's molded body colour, with fine-scale AO (darker
-	# where it borders air = rounded/carved read) + a low-freq tonal drift. Eroded fine cell (parent was
-	# solid, now air) → the back-wall colour so the blocky terrain fill beneath never peeks through the
-	# curve. Fine cell over genuinely-open coarse air → transparent (backdrop/existing walls unchanged).
+			_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
 	for fy: int in _frows:
 		for fx: int in _fcols:
-			var i4: int = (fy * _fcols + fx) * 4
-			var pcol: int = fx / SUBDIV
-			var prow: int = fy / SUBDIV
-			var cidx: int = prow * _cols + pcol
-			# Leave the coarse surface CAP band uncovered: the top SURFACE_KEEP fine rows of a column's
-			# walkable surface cell stay transparent so the grass/lip + ramp cap (z -10) reads through and
-			# the SEEN top line stays exactly the WALKED line. Rock below the cap is still fully molded.
-			if prow == surf_row[pcol] and (fy - prow * SUBDIV) < SURFACE_KEEP:
-				data[i4 + 3] = 0
-				continue
-			var here_solid: bool = fine_solid[fy * _fcols + fx] == 1
-			var parent_solid: bool = solid_mask[cidx] > 0.5
-			if here_solid:
-				var col: Color = mat_col[cidx] if parent_solid else _accreted_color(mat_col, wall_col, solid_mask, fx, fy, cidx)
-				# ROCK HUE VARIATION (diff-04 #3): pull the body colour a hair toward a region-picked hue
-				# pole (teal / faint brown / faint violet) so a broad rock face carries its own subtle tint
-				# and the frame stops reading as one monochrome blue-grey. Very-low-freq → whole faces share
-				# a tone; a two-noise pick keeps neighbouring regions from all landing on the same pole.
-				var hx: float = _huex.get_noise_2d(float(fx), float(fy))
-				var hy: float = _huey.get_noise_2d(float(fx), float(fy))
-				var pole: Color = HUE_TEAL if hx < -0.15 else (HUE_BROWN if hx > 0.20 else HUE_VIOLET)
-				col = col.lerp(pole, HUE_AMP * clampf(0.5 + 0.5 * hy, 0.15, 1.0))
-				# Fine AO: air among the 4 orthogonal AND 4 diagonal fine neighbours; each open cell darkens
-				# the fill toward that edge, so a lone fine nub reads round and an exposed face reads deeply
-				# carved (the shadow that sells molded rock). Diagonals count half so corners round smoothly.
-				# Interior AO DEEPENED (diff 7): 0.085 → 0.16 per air neighbour so exposed faces go far darker
-				# (toward black cores), reading rounded + carved against the near-black veil.
-				var air_n: float = _air_weight(fine_solid, fx, fy)
-				var shade: float = 1.0 - 0.125 * air_n
-				if air_n > 0.5:                         # COOL SHADOW (fix-2 diff 3): carved rock tints cold teal-blue
-					col = col.lerp(SHADOW_TEAL, clampf(air_n / 6.0, 0.0, 1.0) * 0.34)
-				# A low-frequency tonal drift so a broad rock face isn't one flat colour + interiors deepen.
-				var drift: float = _noise.get_noise_2d(float(fx) * 0.35 + 500.0, float(fy) * 0.35) * 0.07
-				# BROAD TONAL PATCHES (diff-04 #1): a big soft low-freq value swing so wide areas of rock read
-				# as lighter/darker patches, not one flat tone — the reference's mottled interiors.
-				drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP
-				# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it
-				# reads granular. Multiplicative on value so it rides the material's own colour.
-				var grain: float = _grain.get_noise_2d(float(fx), float(fy)) * GRAIN_AMP \
-					+ _grain2.get_noise_2d(float(fx), float(fy)) * (GRAIN_AMP * 0.55)
-				# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole
-				# cluster into an embedded darker stone; a ridged near-zero band of a second field cuts a thin
-				# dark crack seam. Both are value darkenings folded into the grain term so they ride the fill.
-				var stone: float = _stone.get_noise_2d(float(fx), float(fy))
-				if stone > STONE_THRESH:
-					grain -= STONE_DARKEN * clampf((stone - STONE_THRESH) * 4.0, 0.0, 1.0)
-				var crackv: float = absf(_crack.get_noise_2d(float(fx) * 1.4, float(fy)))
-				if crackv < 0.05:
-					grain -= CRACK_DARKEN * (1.0 - crackv / 0.05)
-				# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches
-				# a bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
-				var rim: float = 0.0
-				var rim_warm: float = 0.0
-				if _fine_air(fine_solid, fx, fy - 1) and not _fine_air(fine_solid, fx, fy + 1):
-					rim = 0.17
-					rim_warm = 0.04
-				var vmul: float = shade + grain
-				var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
-					col.b * vmul + drift + rim, 1.0)
-				# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open
-				# air above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked),
-				# fading down. Denser + greener now (deeper band, brighter olive) so ledges CARPET.
-				var top_dist: int = _top_air_distance(fine_solid, fx, fy)
-				if top_dist >= 0 and top_dist < MOSS_DEPTH:
-					var patch: float = _moss.get_noise_2d(float(fx), float(fy) * 0.6)
-					if patch > -0.28:                       # diff-04 #2: wider accept → more coverage
-						var band: float = (1.0 - float(top_dist) / float(MOSS_DEPTH)) \
-							* clampf((patch + 0.28) * 1.5, 0.0, 1.0)
-						out = out.lerp(MOSS_COLOR, 0.88 * band)   # diff-04 #2: stronger tint = a real carpet
-				else:
-					# HANGING MOSS TUFTS (diff-04 #2): the top rows just BELOW a down-facing overhang lip grow
-					# a few moss pixels dripping into the air — the reference's hanging tufts under ledges.
-					var hang: int = _bottom_air_distance(fine_solid, fx, fy)
-					if hang >= 0 and hang < HANG_DEPTH:
-						var hp: float = _moss.get_noise_2d(float(fx) * 1.3, float(fy) * 1.3 + 90.0)
-						if hp > HANG_GATE:
-							var hband: float = (1.0 - float(hang) / float(HANG_DEPTH)) \
-								* clampf((hp - HANG_GATE) * 3.0, 0.0, 1.0)
-							out = out.lerp(MOSS_COLOR.darkened(0.12), 0.85 * hband)
-				data[i4] = int(clampf(out.r, 0.0, 1.0) * 255.0)
-				data[i4 + 1] = int(clampf(out.g, 0.0, 1.0) * 255.0)
-				data[i4 + 2] = int(clampf(out.b, 0.0, 1.0) * 255.0)
-				data[i4 + 3] = 255
-			elif parent_solid:
-				# Eroded: this fine cell WAS rock, molding opened it → paint the RECESSED BACK-ROCK behind
-				# so the blocky coarse fill can't show through the organic curve. This is the depth layer
-				# (fix-2 diff 6): a darker, COOLER version of the wall that reads as rock set BEHIND the
-				# foreground shelf — not a flat near-black void (pass-1 crushed it to 0.55 and lost the 3D
-				# read). Darken 0.55 → 0.42 (still clearly recessed, but legible) + a cool teal shift so it
-				# sits back in the same cold palette as the shadowed rock. A touch of fine AO from the
-				# air-facing side keeps the pocket reading scooped.
-				var wc: Color = wall_col[cidx].darkened(0.42).lerp(BACKROCK_COOL, 0.30)
-				var back_ao: float = 1.0 - 0.10 * _air_weight(fine_solid, fx, fy)
-				data[i4] = int(clampf(wc.r * back_ao, 0.0, 1.0) * 255.0)
-				data[i4 + 1] = int(clampf(wc.g * back_ao, 0.0, 1.0) * 255.0)
-				data[i4 + 2] = int(clampf(wc.b * back_ao, 0.0, 1.0) * 255.0)
-				data[i4 + 3] = 255
-			else:
-				data[i4 + 3] = 0   # genuine open air — transparent, the world below shows unchanged
-
-	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, data)
+			_paint_fine(fx, fy)
+	last_baked_cells = _fcols * _frows
+	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, _data)
 	_tex.update(_img)
+
+
+## THE PER-DIG FAST LANE (#102 dirty-chunks — the mining micro-freeze fix). Rebake ONLY the fine cells under
+## the changed coarse cells [cmin..cmax], DILATED by REGION_MARGIN so every neighbour-reading paint term
+## (AO / moss / accretion / rim) recomputes exactly as a full bake would → the output is byte-identical to
+## rebake() but touches ~256 cells for a single dig, not the whole ~120k grid. Falls back to a full rebake
+## if the grid was never fully baked (nothing cached to patch). Callables match rebake()'s.
+func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_solid_at: Callable,
+		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable) -> void:
+	if _data.size() != _fcols * _frows * 4:
+		rebake(solid_at, fine_solid_at, material_color_at, wall_color_at, surface_at)
+		return
+	cmin.x = maxi(cmin.x, 0)
+	cmin.y = maxi(cmin.y, 0)
+	cmax.x = mini(cmax.x, _cols - 1)
+	cmax.y = mini(cmax.y, _rows - 1)
+	if cmin.x > cmax.x or cmin.y > cmax.y:
+		return
+	# 1) Refresh the coarse caches for the changed cells only (a handful — cheap). Neighbour coarse cells the
+	#    dilated paint reads keep their persisted values (they didn't change).
+	for cx: int in range(cmin.x, cmax.x + 1):
+		_surf_row[cx] = int(surface_at.call(cx))
+	for cy: int in range(cmin.y, cmax.y + 1):
+		for cx: int in range(cmin.x, cmax.x + 1):
+			var idx: int = cy * _cols + cx
+			var s: bool = bool(solid_at.call(Vector2i(cx, cy)))
+			_solid_mask[idx] = 1.0 if s else 0.0
+			if s:
+				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
+			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
+	# 2) Refresh the real fine solid/air shape for the changed cells' fine footprint.
+	var fx0c: int = cmin.x * SUBDIV
+	var fy0c: int = cmin.y * SUBDIV
+	var fx1c: int = (cmax.x + 1) * SUBDIV - 1
+	var fy1c: int = (cmax.y + 1) * SUBDIV - 1
+	for fy: int in range(fy0c, fy1c + 1):
+		for fx: int in range(fx0c, fx1c + 1):
+			_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
+	# 3) Repaint the footprint DILATED by the neighbour reach so border AO/moss/accretion recompute right.
+	var fx0: int = maxi(fx0c - REGION_MARGIN, 0)
+	var fy0: int = maxi(fy0c - REGION_MARGIN, 0)
+	var fx1: int = mini(fx1c + REGION_MARGIN, _fcols - 1)
+	var fy1: int = mini(fy1c + REGION_MARGIN, _frows - 1)
+	var painted: int = 0
+	for fy: int in range(fy0, fy1 + 1):
+		for fx: int in range(fx0, fx1 + 1):
+			_paint_fine(fx, fy)
+			painted += 1
+	last_baked_cells = painted
+	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, _data)
+	_tex.update(_img)
+
+
+## Fully-transparent texel (all 4 bytes zeroed) so region and full bakes stay byte-identical on air/cap
+## cells — no stale RGB lingering under A=0 from a prior bake.
+func _clear_fine(i4: int) -> void:
+	_data[i4] = 0
+	_data[i4 + 1] = 0
+	_data[i4 + 2] = 0
+	_data[i4 + 3] = 0
+
+
+## Paint ONE fine cell into _data from the cached coarse + fine grids — the per-cell body shared by the full
+## rebake and the region fast lane. Solid → the parent's molded body colour with fine AO/hue/grain/moss/rim;
+## eroded (parent solid, now fine-air) → recessed back-rock; genuine open air / surface cap → transparent.
+func _paint_fine(fx: int, fy: int) -> void:
+	var i4: int = (fy * _fcols + fx) * 4
+	var pcol: int = fx / SUBDIV
+	var prow: int = fy / SUBDIV
+	var cidx: int = prow * _cols + pcol
+	# Leave the coarse surface CAP band uncovered: the top SURFACE_KEEP fine rows of a column's walkable
+	# surface cell stay transparent so the grass/lip + ramp cap (z -10) reads through and the SEEN top line
+	# stays exactly the WALKED line. Rock below the cap is still fully molded.
+	if prow == _surf_row[pcol] and (fy - prow * SUBDIV) < SURFACE_KEEP:
+		_clear_fine(i4)
+		return
+	var here_solid: bool = _fine_solid[fy * _fcols + fx] == 1
+	var parent_solid: bool = _solid_mask[cidx] > 0.5
+	if here_solid:
+		var col: Color = _mat_col[cidx] if parent_solid else _accreted_color(_mat_col, _wall_col, _solid_mask, fx, fy, cidx)
+		# ROCK HUE VARIATION (diff-04 #3): pull the body colour a hair toward a region-picked hue pole
+		# (teal / faint brown / faint violet) so a broad rock face carries its own subtle tint and the frame
+		# stops reading as one monochrome blue-grey. Very-low-freq → whole faces share a tone; a two-noise
+		# pick keeps neighbouring regions from all landing on the same pole.
+		var hx: float = _huex.get_noise_2d(float(fx), float(fy))
+		var hy: float = _huey.get_noise_2d(float(fx), float(fy))
+		var pole: Color = HUE_TEAL if hx < -0.15 else (HUE_BROWN if hx > 0.20 else HUE_VIOLET)
+		col = col.lerp(pole, HUE_AMP * clampf(0.5 + 0.5 * hy, 0.15, 1.0))
+		# Fine AO: air among the 4 orthogonal AND 4 diagonal fine neighbours; each open cell darkens the
+		# fill toward that edge, so a lone fine nub reads round and an exposed face reads deeply carved.
+		var air_n: float = _air_weight(_fine_solid, fx, fy)
+		var shade: float = 1.0 - 0.125 * air_n
+		if air_n > 0.5:                         # COOL SHADOW (fix-2 diff 3): carved rock tints cold teal-blue
+			col = col.lerp(SHADOW_TEAL, clampf(air_n / 6.0, 0.0, 1.0) * 0.34)
+		# A low-frequency tonal drift so a broad rock face isn't one flat colour + interiors deepen.
+		var drift: float = _noise.get_noise_2d(float(fx) * 0.35 + 500.0, float(fy) * 0.35) * 0.07
+		# BROAD TONAL PATCHES (diff-04 #1): a big soft low-freq value swing so wide areas of rock read as
+		# lighter/darker patches, not one flat tone — the reference's mottled interiors.
+		drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP
+		# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it reads
+		# granular. Multiplicative on value so it rides the material's own colour.
+		var grain: float = _grain.get_noise_2d(float(fx), float(fy)) * GRAIN_AMP \
+			+ _grain2.get_noise_2d(float(fx), float(fy)) * (GRAIN_AMP * 0.55)
+		# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole cluster
+		# into an embedded darker stone; a ridged near-zero band of a second field cuts a thin dark crack.
+		var stone: float = _stone.get_noise_2d(float(fx), float(fy))
+		if stone > STONE_THRESH:
+			grain -= STONE_DARKEN * clampf((stone - STONE_THRESH) * 4.0, 0.0, 1.0)
+		var crackv: float = absf(_crack.get_noise_2d(float(fx) * 1.4, float(fy)))
+		if crackv < 0.05:
+			grain -= CRACK_DARKEN * (1.0 - crackv / 0.05)
+		# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches a
+		# bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
+		var rim: float = 0.0
+		var rim_warm: float = 0.0
+		if _fine_air(_fine_solid, fx, fy - 1) and not _fine_air(_fine_solid, fx, fy + 1):
+			rim = 0.17
+			rim_warm = 0.04
+		var vmul: float = shade + grain
+		var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
+			col.b * vmul + drift + rim, 1.0)
+		# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open air
+		# above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked), fading down.
+		var top_dist: int = _top_air_distance(_fine_solid, fx, fy)
+		if top_dist >= 0 and top_dist < MOSS_DEPTH:
+			var patch: float = _moss.get_noise_2d(float(fx), float(fy) * 0.6)
+			if patch > -0.28:                       # diff-04 #2: wider accept → more coverage
+				var band: float = (1.0 - float(top_dist) / float(MOSS_DEPTH)) \
+					* clampf((patch + 0.28) * 1.5, 0.0, 1.0)
+				out = out.lerp(MOSS_COLOR, 0.88 * band)   # diff-04 #2: stronger tint = a real carpet
+		else:
+			# HANGING MOSS TUFTS (diff-04 #2): the top rows just BELOW a down-facing overhang lip grow a few
+			# moss pixels dripping into the air — the reference's hanging tufts under ledges.
+			var hang: int = _bottom_air_distance(_fine_solid, fx, fy)
+			if hang >= 0 and hang < HANG_DEPTH:
+				var hp: float = _moss.get_noise_2d(float(fx) * 1.3, float(fy) * 1.3 + 90.0)
+				if hp > HANG_GATE:
+					var hband: float = (1.0 - float(hang) / float(HANG_DEPTH)) \
+						* clampf((hp - HANG_GATE) * 3.0, 0.0, 1.0)
+					out = out.lerp(MOSS_COLOR.darkened(0.12), 0.85 * hband)
+		_data[i4] = int(clampf(out.r, 0.0, 1.0) * 255.0)
+		_data[i4 + 1] = int(clampf(out.g, 0.0, 1.0) * 255.0)
+		_data[i4 + 2] = int(clampf(out.b, 0.0, 1.0) * 255.0)
+		_data[i4 + 3] = 255
+	elif parent_solid:
+		# Eroded: this fine cell WAS rock, molding opened it → paint the RECESSED BACK-ROCK behind so the
+		# blocky coarse fill can't show through the organic curve (fix-2 diff 6): a darker, COOLER wall that
+		# reads as rock set BEHIND the foreground shelf, + a touch of fine AO so the pocket reads scooped.
+		var wc: Color = _wall_col[cidx].darkened(0.42).lerp(BACKROCK_COOL, 0.30)
+		var back_ao: float = 1.0 - 0.10 * _air_weight(_fine_solid, fx, fy)
+		_data[i4] = int(clampf(wc.r * back_ao, 0.0, 1.0) * 255.0)
+		_data[i4 + 1] = int(clampf(wc.g * back_ao, 0.0, 1.0) * 255.0)
+		_data[i4 + 2] = int(clampf(wc.b * back_ao, 0.0, 1.0) * 255.0)
+		_data[i4 + 3] = 255
+	else:
+		_clear_fine(i4)   # genuine open air — transparent, the world below shows unchanged
 
 
 ## Weighted OPEN-air neighbour count around a solid fine cell — the fine AO term. Orthogonal neighbours

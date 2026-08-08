@@ -158,7 +158,12 @@ var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines +
 ## on terrain change (_fine_dirty), never per frame — the same repaint-on-change discipline as the veil.
 var _fine: FineTerrain
 var _fine_layer: LightLayer
-var _fine_dirty: bool = true
+var _fine_dirty: bool = true                     ## FULL rebake pending (initial paint / load) — the slow lane
+## THE PER-DIG FAST LANE (#102): a dig accumulates the coarse bounding box of this frame's changed cells so
+## the fine baker patches only that region (dirty-chunks), instead of re-processing the whole ~120k grid.
+var _fine_region_pending: bool = false
+var _fine_dirty_min: Vector2i = Vector2i.ZERO
+var _fine_dirty_max: Vector2i = Vector2i.ZERO
 var _dark: LightLayer
 ## THE LIGHTMAP VEIL (FABLE_50 #17): the darkness is a small texture — ONE TEXEL PER CELL (RGB =
 ## the shadow colour, zone-tinted; A = darkness) — stretched over the whole world with LINEAR
@@ -367,7 +372,11 @@ func _process(delta: float) -> void:
 	# on a neighbouring cell read across the boundary. Between changes each chunk's retained buffer is replayed.
 	if not sim.terrain_dirty.is_empty():
 		var dirty: Dictionary = {}                    # chunk index -> true (dedup)
+		var rmin := Vector2i(1 << 30, 1 << 30)        # coarse bounding box of the changed cells (fine fast lane)
+		var rmax := Vector2i(-(1 << 30), -(1 << 30))
 		for cell: Vector2i in sim.terrain_dirty:
+			rmin.x = mini(rmin.x, cell.x); rmin.y = mini(rmin.y, cell.y)
+			rmax.x = maxi(rmax.x, cell.x); rmax.y = maxi(rmax.y, cell.y)
 			# All 8 neighbours + self: edge-AO/caps read orthogonally, and the autotile chamfer/fillet
 			# passes (#9) read across CORNERS too — a dig at a chunk corner must repaint the diagonal chunk.
 			for dy: int in range(-1, 2):
@@ -379,11 +388,18 @@ func _process(delta: float) -> void:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
-		_fine_dirty = true         # the mold follows the dug shape; rebake the fine terrain (below)
+		# The mold follows the dug shape — but patch ONLY the changed region's fine cells (dirty-chunks,
+		# #102), not the whole grid: the per-dig freeze was the full fine rebake this used to trigger.
+		_fine_region_pending = true
+		_fine_dirty_min = rmin
+		_fine_dirty_max = rmax
 		# The skylight base also depends on the surface line the dig may have moved — rebake it.
 		_veil_dirty = true
 	if _fine_dirty:
-		_bake_fine_terrain()   # rebuild the molded terrain texture (only on a terrain change)
+		_bake_fine_terrain()          # FULL rebake (initial / load) — the slow lane
+	elif _fine_region_pending:
+		_bake_fine_region(_fine_dirty_min, _fine_dirty_max)   # the per-dig fast lane
+		_fine_region_pending = false
 
 
 ## The row-major index of the chunk owning `cell`, or -1 if the cell is out of the world.
@@ -1922,6 +1938,22 @@ func _bake_fine_terrain() -> void:
 	_fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),   # P2: the sim's real fine grid
+		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
+		_wall_fill_color,
+		func(col: int) -> int: return sim.surface_row(col))
+	if _fine_layer != null:
+		_fine_layer.queue_redraw()
+
+
+## THE PER-DIG FAST LANE (#102 dirty-chunks): patch only the fine cells under the changed coarse region
+## [cmin..cmax] instead of the whole grid — the mining micro-freeze fix. Same palette/wall/surface
+## authorities as the full bake, so the patched region is byte-identical to a full rebake (check_dig_hitch).
+func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
+	if _fine == null:
+		return
+	_fine.rebake_region(cmin, cmax,
+		func(c: Vector2i) -> bool: return sim.is_solid(c),
+		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),
 		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
 		_wall_fill_color,
 		func(col: int) -> int: return sim.surface_row(col))
