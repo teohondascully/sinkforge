@@ -61,6 +61,10 @@ static var dev_start: bool = false
 var sim: FactorySim
 var _player: Player
 var _camera: Camera2D
+## The camera's un-snapped follow position (smoothed toward the body each frame); the value ACTUALLY
+## assigned to the camera is snap_to_pixel'd off this, so motion stays soft but the render is crisp.
+var _cam_pos: Vector2 = Vector2.ZERO
+const CAMERA_FOLLOW_SPEED: float = 8.0   ## matches the old position_smoothing_speed (soft follow)
 var _renderer: WorldRenderer       ## the VIEW: all world-space drawing + lighting (we push it aim state)
 var _hud: Hud                      ## screen-space HUD (we push it objectives + the machine inspector)
 var _paused: bool = false
@@ -196,11 +200,16 @@ func _ready() -> void:
 	# Zoom: 0.7 frames the body as a readable character while keeping enough world to see a vertical
 	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
 	_camera.zoom = Vector2(_current_zoom(), _current_zoom())
-	_camera.position_smoothing_enabled = true
-	_camera.position_smoothing_speed = 8.0
+	# PIXEL-SNAP the follow (playtest: "texture blurs while running"). The built-in position_smoothing
+	# renders the camera at a fractional position, so every terrain texel samples between screen pixels
+	# each frame → shimmer/blur in motion. Instead we smooth toward the body OURSELVES (same soft feel)
+	# and round the RESULT to a whole screen pixel via snap_to_pixel — crisp terrain, soft follow. That
+	# needs top_level so we own the camera's global position outright, not the body's transform.
+	_camera.position_smoothing_enabled = false
+	_camera.top_level = true
 	# CENTERED on the body — no dead-zone. The avatar is the player's anchor and must always be the
 	# focal point; the old drag margins let it drift into a screen corner (and under the HUD), which read
-	# as "I can't find my character". Position smoothing alone eases the follow so motion stays soft.
+	# as "I can't find my character". Our manual smoothing eases the follow so motion stays soft.
 	_camera.drag_horizontal_enabled = false
 	_camera.drag_vertical_enabled = false
 	_camera.limit_left = 0
@@ -208,6 +217,8 @@ func _ready() -> void:
 	_camera.limit_right = int(WORLD_SIZE.x)
 	_camera.limit_bottom = int(WORLD_SIZE.y)
 	_player.add_child(_camera)
+	_cam_pos = _player.global_position
+	_camera.global_position = snap_to_pixel(_cam_pos, _current_zoom())
 	_camera.make_current()
 
 	var layer := CanvasLayer.new()
@@ -548,6 +559,16 @@ func _process(delta: float) -> void:
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_bazaars(delta)
 	_update_juice(delta)
+	if _camera != null:
+		# Soft follow toward the body, then PIXEL-SNAP the render so the terrain doesn't shimmer in motion.
+		# A big jump (spawn / F9 load / a teleport) SNAPS instead of panning across the whole world — which
+		# also keeps capture fixtures centred the instant they reposition the body.
+		var target: Vector2 = _player.global_position
+		if _cam_pos.distance_to(target) > Hud.CANVAS.x / _current_zoom() * 0.5:
+			_cam_pos = target
+		else:
+			_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-CAMERA_FOLLOW_SPEED * delta))
+		_camera.global_position = snap_to_pixel(_cam_pos, _current_zoom())
 	if _motes != null and _camera != null:
 		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
 	if _objectives != null:
@@ -1158,6 +1179,17 @@ func _collect_ground_under_player() -> void:
 		if sim.collect_ground(c):
 			_particles.pop(_cell_center(c), Visuals.item_color(item))  # pickup pop
 			_sfx.play(&"pop", _cell_center(c), 1.0, -4.0)
+
+
+## Snap a world position so it lands on a whole SCREEN pixel at the given zoom — the pixel-art camera
+## fix (playtest: "texture blurs while running"). A fractional camera offset makes every terrain texel
+## sample between screen pixels each frame → shimmer/blur in motion. Rounding the camera to the
+## screen-pixel grid removes the sub-pixel jitter while the smoothing keeps the follow soft. Static +
+## pure so the harness (check_pixel_snap) can assert the grid alignment without a live scene.
+static func snap_to_pixel(world_pos: Vector2, zoom: float) -> Vector2:
+	if zoom <= 0.0:
+		return world_pos
+	return (world_pos * zoom).round() / zoom
 
 
 ## The active camera zoom level (Z cycles the index). Read everywhere the view-size matters.

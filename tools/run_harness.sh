@@ -43,6 +43,7 @@ run "check_saveload"                 "res://tools/check_saveload.gd"
 run "check_settings"                 "res://tools/check_settings.gd"
 run "check_controls"                 "res://tools/check_controls.gd"
 run "check_pack_layout"              "res://tools/check_pack_layout.gd"
+run "check_pixel_snap"               "res://tools/check_pixel_snap.gd"
 run "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 
 rm -f "$log"
