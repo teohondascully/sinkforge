@@ -60,6 +60,32 @@ const ORE_AMOUNT_DEPTH_BONUS: int = 170
 const RICH_CHANCE: float = 0.45
 const RICH_AMOUNT_MULT: float = 1.5
 
+# --- HORIZONTAL richness (the FRONTIER pull) ---
+## The bug this fixes: ore used to scale with DEPTH ONLY, so at a fixed depth every column was
+## statistically identical and the cheapest fresh vein was always straight DOWN — "you must leave
+## spawn" was never true. This term makes richness vary across X at a fixed depth so richer FRONTIER
+## zones fan out AWAY from spawn, pulling the extraction frontier outward-and-down instead of straight down.
+##
+## The field is a deterministic multiplier centred on 1.0, per column, combining two seeded pieces:
+##   (a) a smooth low-frequency FastNoiseLite band (organic pockets of rich/lean rock across the width), and
+##   (b) a gentle distance-from-spawn ramp (the RICHEST bands live away from the spawn plateau).
+## It multiplies into the vein ACCEPTANCE chance, blob SIZE, and per-cell RICHNESS — so a rich x-band is
+## more likely to spawn a vein, and that vein is fatter and denser. SUBTLE by construction: the multiplier
+## is clamped to [1 - HORIZONTAL_STRENGTH, 1 + HORIZONTAL_STRENGTH], so near-spawn ore is thinned, never
+## nuked, and the deep core pull is untouched (it stacks multiplicatively on the depth term).
+##
+## TUNE via HORIZONTAL_STRENGTH: 0.0 = the old depth-only world (no horizontal variation); higher = a
+## sharper contrast between lean and rich x-bands (0.55 = the frontier is meaningfully richer, spawn still
+## productive). HORIZONTAL_FREQ sets how WIDE the bands are (smaller = broader zones you commit to walking to);
+## FRONTIER_BIAS sets how much the field tilts toward distance-from-spawn vs pure noise (1.0 = all distance,
+## 0.0 = all noise). The field is seeded off the world seed (+ an offset so it doesn't correlate with caves).
+const HORIZONTAL_STRENGTH: float = 0.55
+const HORIZONTAL_FREQ: float = 0.045
+const FRONTIER_BIAS: float = 0.5
+## The spawn column the distance-ramp measures from (centre of the flat plateau) — near here the ramp
+## contributes ~0; the map edges contribute ~+1 (the richest frontier).
+const SPAWN_COL: int = (FLAT_START + FLAT_END) / 2
+
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
 ## so descending crosses distinct material zones (the "deeper = different place" read).
@@ -100,16 +126,42 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	var world: WorldData = super.generate(cols, rows, seed)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
+	# Per-column horizontal richness multiplier (the frontier pull) — built once, reused by ore + coal.
+	var hfield: PackedFloat32Array = _horizontal_field(cols, seed)
 	_band_deepslate(world)
 	_carve_caves(world, seed)
 	_carve_tunnels(world, rng)
-	_scatter_veins(world, rng)
-	_scatter_coal(world, rng)
+	_scatter_veins(world, rng, hfield)
+	_scatter_coal(world, rng, hfield)
 	_scatter_iron(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
 	_stamp_seal(world)          # LAST: the gate band overwrites everything, so nothing can hole it
 	return world
+
+
+## Build the per-column HORIZONTAL richness multiplier (the frontier pull, see HORIZONTAL_STRENGTH).
+## Deterministic in (cols, seed): a seeded low-frequency noise band mixed with a distance-from-spawn ramp,
+## normalised to [0,1] then mapped to a multiplier in [1 - STRENGTH, 1 + STRENGTH]. Some x-bands come out
+## rich (>1), some lean (<1), and the ramp tilts the richest ones AWAY from spawn — so the cheapest fat
+## fresh vein at a given depth is out on the frontier, not straight down the spawn column.
+func _horizontal_field(cols: int, seed: int) -> PackedFloat32Array:
+	var noise := FastNoiseLite.new()
+	noise.seed = seed + 91_331               # offset so the richness band doesn't correlate with the caves
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = HORIZONTAL_FREQ
+	# Farthest any column sits from spawn — normalises the distance ramp so an edge column reaches ~1.
+	var max_dist: float = float(maxi(1, maxi(SPAWN_COL, cols - 1 - SPAWN_COL)))
+	var field := PackedFloat32Array()
+	field.resize(cols)
+	for col: int in cols:
+		# (a) organic noise band in [0,1]; (b) distance-from-spawn ramp in [0,1] (0 at spawn, 1 at the edge).
+		var band: float = (noise.get_noise_2d(float(col), 0.0) + 1.0) * 0.5
+		var ramp: float = float(abs(col - SPAWN_COL)) / max_dist
+		var mix: float = lerpf(band, ramp, FRONTIER_BIAS)   # tilt toward the frontier ramp per FRONTIER_BIAS
+		# Map the [0,1] mix onto a symmetric multiplier around 1.0, bounded by STRENGTH (keeps it subtle).
+		field[col] = 1.0 + (mix * 2.0 - 1.0) * HORIZONTAL_STRENGTH
+	return field
 
 
 ## Convert the deep band (rows ≥ DEEPSLATE_ROW) of stone to deepslate, in both grids, so a dug-out deep
@@ -186,7 +238,7 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 ## Depth-banded ore: many vein-seed attempts, each kept by a depth-weighted roll (deep seeds survive,
 ## shallow ones rarely do), then grown into a blob whose size also scales with depth. Ore only replaces
 ## SOLID rock (earth/stone) — never fills a carved cave, though a vein can sit exposed in a cave wall.
-func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
+func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
 	var attempts: int = int(round(float(world.cols) * ORE_ATTEMPTS_PER_COL))
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
@@ -195,10 +247,13 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
 			continue
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
 		var depth_frac: float = float(cy - top) / float(maxi(1, world.rows - top))
-		if rng.randf() > depth_frac * ORE_CHANCE_DEEP:
+		# HORIZONTAL richness (the frontier pull): a rich x-band lifts acceptance/size/deposit above the
+		# depth baseline, a lean band drops them below — so at a fixed depth the fat fresh veins fan OUT.
+		var hmul: float = hfield[cx]
+		if rng.randf() > depth_frac * ORE_CHANCE_DEEP * hmul:
 			continue                            # rejected — most shallow seeds die here (the band)
-		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS)))
-		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS)))
+		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS) * hmul))
+		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS) * hmul))
 		# ORE QUALITY (FABLE_50 #48): a vein seeded in/below the deepslate band may come up RICH — a
 		# visibly denser high-grade variant (1 rich ore smelts 2 ingots in the Blast Furnace). Deeper =
 		# richer gains a second axis: down there veins aren't just bigger, they're better.
@@ -211,7 +266,7 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator) -> void:
 
 ## A depth-banded COAL pass — the drill's fuel. Same machinery as ore veins (cavity model), its own
 ## depth-weighted commonness/size/richness, stamping &"coal" blocks the player mines for coal.
-func _scatter_coal(world: WorldData, rng: RandomNumberGenerator) -> void:
+func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
 	var attempts: int = int(round(float(world.cols) * COAL_ATTEMPTS_PER_COL))
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
@@ -220,10 +275,11 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator) -> void:
 			continue
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
 		var depth_frac: float = float(cy - top) / float(maxi(1, world.rows - top))
-		if rng.randf() > depth_frac * COAL_CHANCE_DEEP:
+		var hmul: float = hfield[cx]            # same frontier pull as ore (coal fans out too)
+		if rng.randf() > depth_frac * COAL_CHANCE_DEEP * hmul:
 			continue
-		var size: int = COAL_SIZE_MIN + int(round(depth_frac * float(COAL_SIZE_DEPTH_BONUS)))
-		var richness: int = COAL_AMOUNT_BASE + int(round(depth_frac * float(COAL_AMOUNT_DEPTH_BONUS)))
+		var size: int = COAL_SIZE_MIN + int(round(depth_frac * float(COAL_SIZE_DEPTH_BONUS) * hmul))
+		var richness: int = COAL_AMOUNT_BASE + int(round(depth_frac * float(COAL_AMOUNT_DEPTH_BONUS) * hmul))
 		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, &"coal")
 
 

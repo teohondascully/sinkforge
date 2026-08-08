@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_craft_and_build()
 	_test_worldgen()
 	_test_layered_worldgen()
+	_test_horizontal_ore_pull()
 	_test_lift()
 	_test_finite_deposit_and_drill()
 	_test_coal_and_fuel()
@@ -735,6 +736,74 @@ func _test_layered_worldgen() -> void:
 	_check(probe.x >= 0, "found a carved cave cell to probe")
 	_check(not sim.is_solid(probe), "a carved cave loads as open (not solid)")
 	_check(sim.wall_at(probe) != &"", "the carved cave still shows its background wall")
+
+
+## HORIZONTAL ore pull (the frontier fix): ore richness varies across X at a fixed depth, with the richest
+## bands AWAY from spawn — so the cheapest fresh vein isn't always straight down the spawn column. Asserts
+## the distribution is NOT uniform across x (there exist frontier x-regions statistically richer than the
+## spawn region), AND that the horizontal term is fully deterministic (same seed → identical world).
+func _test_horizontal_ore_pull() -> void:
+	print("- horizontal ore pull (frontier richness)")
+	var gen := LayeredWorldGen.new()
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	var world: WorldData = gen.generate(cols, rows, 20260807)
+
+	# DETERMINISM: the whole world (blocks + amounts) reproduces bit-for-bit, so the new horizontal field
+	# introduced no time/global-random dependence.
+	var again: WorldData = gen.generate(cols, rows, 20260807)
+	_check(world.blocks == again.blocks, "same seed → identical blocks (horizontal field is deterministic)")
+	_check(world.amounts == again.amounts, "same seed → identical per-cell deposits (deterministic richness)")
+
+	# Sum ore MASS (deposit richness) per column over a FIXED depth band, so any variation is purely
+	# horizontal (depth is held constant across the comparison). Above the seal so all cells are real ore rock.
+	var band_top: int = 30
+	var band_bot: int = mini(LayeredWorldGen.SEAL_TOP, rows)
+	var col_mass: PackedInt32Array = PackedInt32Array()
+	col_mass.resize(cols)
+	for cell: Vector2i in world.blocks:
+		var m: StringName = world.blocks[cell]
+		if (m == &"ore" or m == &"rich_ore" or m == &"coal") and cell.y >= band_top and cell.y < band_bot:
+			col_mass[cell.x] += int(world.amounts.get(cell, 1))
+
+	# Region masses: a spawn-centred window vs the two frontier edges (away from spawn on either side).
+	var spawn: int = LayeredWorldGen.SPAWN_COL
+	var half: int = 8
+	var spawn_mass: int = _region_mass(col_mass, spawn - half, spawn + half)
+	var left_mass: int = _region_mass(col_mass, 0, 2 * half)                     # far-left frontier
+	var right_mass: int = _region_mass(col_mass, cols - 2 * half, cols)          # far-right frontier
+	var frontier_mass: int = maxi(left_mass, right_mass)
+
+	# NOT uniform: at a fixed depth some x-regions carry more ore than the spawn region — the frontier is
+	# meaningfully richer (the "you must leave spawn" pull). Guard against a degenerate all-empty band.
+	_check(spawn_mass + frontier_mass > 0, "the fixed depth band actually contains ore (spawn=%d, frontier=%d)"
+		% [spawn_mass, frontier_mass])
+	_check(frontier_mass > spawn_mass, "a frontier x-region is richer than spawn at a fixed depth (frontier=%d > spawn=%d)"
+		% [frontier_mass, spawn_mass])
+
+	# And the variation is a real spread, not one lucky cell: the richest window clears the spawn window by a
+	# clear margin (the field's design — bands differ by up to ~2×HORIZONTAL_STRENGTH).
+	_check(frontier_mass >= int(round(float(maxi(1, spawn_mass)) * 1.15)),
+		"the frontier richness edge is a meaningful margin, not noise (%.2fx spawn)"
+		% (float(frontier_mass) / float(maxi(1, spawn_mass))))
+
+	# The field respects its own bound (subtlety guarantee): every column multiplier is within
+	# [1-STRENGTH, 1+STRENGTH], so near-spawn ore is thinned but never nuked.
+	var hfield: PackedFloat32Array = gen._horizontal_field(cols, 20260807)
+	var in_bound: bool = true
+	for c: int in cols:
+		if hfield[c] < 1.0 - LayeredWorldGen.HORIZONTAL_STRENGTH - 0.0001 \
+				or hfield[c] > 1.0 + LayeredWorldGen.HORIZONTAL_STRENGTH + 0.0001:
+			in_bound = false
+	_check(in_bound, "the horizontal multiplier stays bounded by HORIZONTAL_STRENGTH (subtle, never nukes spawn)")
+
+
+## Sum a slice [lo, hi) of a per-column mass array, clamped to bounds. (test helper)
+func _region_mass(col_mass: PackedInt32Array, lo: int, hi: int) -> int:
+	var total: int = 0
+	for c: int in range(maxi(0, lo), mini(col_mass.size(), hi)):
+		total += col_mass[c]
+	return total
 
 
 ## The LIFT carries items UP its column (the paid inverse of gravity), rate-limited by
