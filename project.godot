@@ -16,10 +16,14 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 
 [display]
 
-; Base render resolution for 2D pixel art. 640x360 is a 16:9 low-res canvas.
-window/size/viewport_width=640
-window/size/viewport_height=360
-; Open the window at an integer 3x of the base (1920x1080) so pixels stay crisp.
+; Base render resolution for 2D pixel art. Bumped 640x360 -> 1280x720 (SCALE / Noita-feel spike):
+; 2x the render-target pixel density so the world stays crisp when the camera is zoomed WAY out to
+; show a big granular world around a small nimble avatar. The HUD authors at Hud.CANVAS (640x360); its
+; CanvasLayer is scaled 2x in main.gd so it still fills this doubled viewport (world-space is unaffected —
+; the camera applies its own zoom over the render target).
+window/size/viewport_width=1280
+window/size/viewport_height=720
+; Open the window at an integer 1.5x of the base (1920x1080) so pixels stay crisp.
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 ; canvas_items + keep = the 2D canvas scales as a whole, letterboxing to preserve aspect.

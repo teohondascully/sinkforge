@@ -20,12 +20,13 @@ extends Node2D
 ## intended by the harness (tools/measure_player.gd) and tuned by taste — see docs/HARNESS.md.
 
 const CELL: int = 32
-## Body AABB. A real PERSON, not a sub-tile slab: ~1.4 tiles tall so it MATCHES the 32×48 miner sprite
-## (feet-anchored; the hardhat crown overhangs the top a touch) and reads as embodied — and, being taller
-## than a cell, it needs TWO tiles of clearance to stand, so a 1-tall gap is an honest squeeze you must dig
-## out (Terraria-ish), not a crawlspace. WIDTH stays under a cell so it still fits down a 1-wide dug shaft.
-const WIDTH: float = 20.0
-const HEIGHT: float = 44.0
+## Body AABB. SCALE spike (Noita-feel): shrunk 20×44 → 14×34 so the avatar reads as a small nimble figure
+## in a big granular world once the camera is zoomed out (the thing we're judging by eye). Still JUST over
+## one cell tall (34 > 32), so the "needs TWO tiles of clearance; a 1-tall gap is an honest squeeze" rule
+## HOLDS — collision semantics + the step/agility harnesses are unchanged. WIDTH stays under a cell so it
+## still fits down a 1-wide dug shaft. Proportions preserved (0.65 the old, ~0.44×1.06 tiles).
+const WIDTH: float = 14.0
+const HEIGHT: float = 34.0
 
 ## --- feel constants (placeholder; harness measures these vs intent) ---
 const RUN_SPEED: float = 150.0       ## px/s horizontal top speed
@@ -509,16 +510,21 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 
-	draw_set_transform(Vector2(0.0, (HEIGHT * 0.5) * (1.0 - syq) + bob), 0.0, Vector2(sxq, syq))
+	# A subtle 1px dark edge tracing the TRUE AABB (drawn un-scaled so it hugs the collision box) — keeps the
+	# body crisp without a hard silhouette plate fighting the soft lighting.
+	var outline := Color(0.03, 0.03, 0.05, 0.5)
+	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0), outline, false, 1.0)
+
+	# The code-drawn miner (art-less fallback) was authored for the old 20×44 body; SCALE it by the current
+	# body's ratio so it shrinks WITH the AABB and its proportions are preserved at any size (feet on the
+	# AABB bottom via the y-offset below).
+	var body_scale: float = HEIGHT / 44.0
+	draw_set_transform(Vector2(0.0, (HEIGHT * 0.5) * (1.0 - syq * body_scale) + bob), 0.0,
+		Vector2(sxq * body_scale, syq * body_scale))
 	var overalls := Color(0.24, 0.40, 0.62)
 	var legs := Color(0.18, 0.20, 0.28)
 	var skin := Color(0.84, 0.66, 0.50)
 	var helmet := Color(0.95, 0.78, 0.22)
-
-	# (No hard silhouette plate: the head-lamp pool now provides the contrast — a backing rect read as
-	# a hard box fighting the soft lighting. A subtle 1px dark outline keeps edges crisp without a plate.)
-	var outline := Color(0.03, 0.03, 0.05, 0.5)
-	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0), outline, false, 1.0)
 
 	# Legs + boots.
 	draw_rect(Rect2(-5.0, 5.0, 4.0, 8.0), legs)

@@ -25,8 +25,9 @@ func _check(cond: bool, label: String) -> void:
 
 func _initialize() -> void:
 	print("== pixel-snap check ==")
-	# Every zoom the game actually uses, plus a couple of awkward fractionals.
-	var zooms: Array[float] = [0.42, 0.6, 0.85, 1.0, 0.333333]
+	# Every zoom the game actually uses (SCALE spike retuned the ladder to 0.62/0.9/1.3), plus a couple of
+	# awkward fractionals. The snap MATH is zoom-generic, so this just keeps the live zooms under coverage.
+	var zooms: Array[float] = [0.62, 0.9, 1.3, 0.42, 0.6, 0.85, 1.0, 0.333333]
 	var samples: Array[Vector2] = [
 		Vector2(0.0, 0.0), Vector2(100.3, 240.7), Vector2(-55.9, 12.1),
 		Vector2(1234.56, 789.01), Vector2(0.49, 0.51),
@@ -34,10 +35,13 @@ func _initialize() -> void:
 	for z: float in zooms:
 		for p: Vector2 in samples:
 			var s: Vector2 = MainView.snap_to_pixel(p, z)
-			# 1) grid-aligned: s*z must be whole screen pixels (no sub-pixel offset → no shimmer)
+			# 1) grid-aligned: s*z must be whole screen pixels (no sub-pixel offset → no shimmer).
+			# Threshold is 1e-3, not 1e-4: at a non-power-of-2 zoom (e.g. the new 1.3) with a large
+			# coordinate, round()/z then ×z accumulates ~1e-4 of float32 noise — 1/1000 of a screen pixel,
+			# imperceptible. A REAL grid mis-snap is a fraction of a pixel (≥0.1), still far above this.
 			var screen: Vector2 = s * z
 			var off: float = maxf(absf(screen.x - roundf(screen.x)), absf(screen.y - roundf(screen.y)))
-			_check(off < 1.0e-4, "z=%.3f p=%s → grid-aligned (off=%.2e)" % [z, str(p), off])
+			_check(off < 1.0e-3, "z=%.3f p=%s → grid-aligned (off=%.2e)" % [z, str(p), off])
 			# 3) never more than half a screen pixel from the true position
 			var world_px: float = 1.0 / z
 			_check(s.distance_to(p) <= world_px * 0.75,

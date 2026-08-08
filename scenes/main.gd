@@ -20,9 +20,16 @@ const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
 const SAVE_PATH: String = "user://sinkforge.save"   ## the F5/F9 quicksave slot (SaveGame envelope)
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
-## Zoom levels cycled by Z (Terraria-style). Default is zoomed OUT so you see the world you're working in,
-## not just your feet. Smaller = further out. _current_zoom() reads the active level everywhere.
-const ZOOM_LEVELS: Array[float] = [0.42, 0.6, 0.85]
+## The internal render viewport (project.godot). Bumped 640×360 → 1280×720 for the SCALE spike: 2× the
+## pixel density keeps the world crisp when the camera is zoomed WAY out (Noita: small avatar, big world).
+## The HUD authors in Hud.CANVAS (640×360) space; its CanvasLayer is scaled by HUD_SCALE to fill this.
+## World-area-shown math (motes/camera/minimap) reads VIEWPORT, not CANVAS, since they diverged here.
+const VIEWPORT := Vector2(1280.0, 720.0)
+const HUD_SCALE: float = VIEWPORT.x / 640.0        ## = 2.0; scales the 640×360 HUD onto the 1280×720 render
+## Zoom levels cycled by Z (Terraria-style). Zoomed WAY OUT (SCALE spike) so the avatar reads as a small
+## nimble figure in a big granular world — the Noita feel we're judging by eye. Smaller = further out.
+## _current_zoom() reads the active level everywhere. Default (index 0) is the widest, most Noita-like view.
+const ZOOM_LEVELS: Array[float] = [0.62, 0.9, 1.3]
 var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
 
@@ -223,6 +230,9 @@ func _ready() -> void:
 
 	var layer := CanvasLayer.new()
 	layer.layer = 10  # above the screen-FX lens pass (layer 5) so the HUD stays crisp, un-vignetted
+	# The HUD draws in Hud.CANVAS (640×360) space; the render viewport is now VIEWPORT (1280×720), so scale
+	# the whole HUD layer up by HUD_SCALE to fill the doubled render target (world-space is untouched).
+	layer.scale = Vector2(HUD_SCALE, HUD_SCALE)
 	var hud := Hud.new()
 	hud.sim = sim
 	hud.paused_getter = func() -> bool: return _paused
@@ -370,7 +380,7 @@ func _setup_post_fx() -> void:
 ## z 45, BELOW the lighting veil (z 50) + light pools (z 51), so a mote is dark in the gloom and lit
 ## warm where the lamp/glow reaches — "dust catching the light." Pure atmosphere; never touches the sim.
 func _setup_ambient_motes() -> void:
-	var view: Vector2 = Vector2(Hud.CANVAS) / _current_zoom()    # world area the camera shows
+	var view: Vector2 = VIEWPORT / _current_zoom()    # world area the camera shows (render viewport / zoom)
 	var mat := ParticleProcessMaterial.new()
 	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	mat.emission_box_extents = Vector3(view.x * 0.6, view.y * 0.6, 1.0)  # a touch wider than the view
@@ -564,7 +574,7 @@ func _process(delta: float) -> void:
 		# A big jump (spawn / F9 load / a teleport) SNAPS instead of panning across the whole world — which
 		# also keeps capture fixtures centred the instant they reposition the body.
 		var target: Vector2 = _player.global_position
-		if _cam_pos.distance_to(target) > Hud.CANVAS.x / _current_zoom() * 0.5:
+		if _cam_pos.distance_to(target) > VIEWPORT.x / _current_zoom() * 0.5:
 			_cam_pos = target
 		else:
 			_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-CAMERA_FOLLOW_SPEED * delta))
@@ -607,15 +617,17 @@ func _process(delta: float) -> void:
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
 			_hud.minimap_focus = _player.position
-			_hud.minimap_view = Vector2(Hud.CANVAS) / _current_zoom()  # world area the camera shows
+			_hud.minimap_view = VIEWPORT / _current_zoom()  # world area the camera shows (render viewport / zoom)
 		# The hint bubble: text + fade from the tracker, anchored just over the miner's head. The
 		# native viewport IS the HUD canvas (640×360), so the canvas transform maps world → HUD space.
 		if _hints != null:
 			_hud.hint_text = _hints.active_text()
 			_hud.hint_alpha = _hints.active_alpha()
 			if _player != null:
-				_hud.hint_anchor = get_viewport().get_canvas_transform() \
-					* (_player.position + Vector2(0.0, -Player.HEIGHT * 0.5 - 6.0))
+				# canvas transform maps world → RENDER-viewport (1280×720); the HUD draws in Hud.CANVAS
+				# (640×360) scaled by HUD_SCALE, so bring the mapped point back into HUD-draw space.
+				_hud.hint_anchor = (get_viewport().get_canvas_transform() \
+					* (_player.position + Vector2(0.0, -Player.HEIGHT * 0.5 - 6.0))) / HUD_SCALE
 
 
 ## Reconcile the Bazaar view against the sim's detected frames. When one COMPLETES this frame, throw a
