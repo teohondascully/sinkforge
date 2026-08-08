@@ -35,14 +35,40 @@ const GRAIN_FREQ: float = 0.55                         ## dense speckle — clum
 const GRAIN_FREQ2: float = 1.30                        ## crisp per-fine-cell grit
 const GRAIN_AMP: float = 0.17                          ## value swing of the grain (fix-2 diff 4: 0.14 -> 0.17 so
                                                       ## the granular pits/clods still read in the raised gloom)
+## ROCK INTERNAL TONAL VARIATION (diff-04 #1): the interiors of the reference rock are far from flat —
+## broad PATCHES of lighter/darker rock, darker EMBEDDED-STONE blobs, and faint hairline cracks. Three
+## noise scales layer on top of the fine grain so the rock reads busy/detailed EVERYWHERE, not just at
+## edges. Patch = a big soft ±value swing; stone = a mid-freq mask that, past a threshold, darkens a
+## whole cluster into an embedded stone; crack = a ridged thin dark seam.
+const PATCH_FREQ: float = 0.045                        ## big low-freq tonal patches (~22 fine cells / ~2.7 cells)
+const PATCH_AMP: float = 0.19                          ## value swing of the broad patches (lighter/darker rock)
+const STONE_FREQ: float = 0.16                         ## embedded darker-stone blobs (~6 fine cells across)
+const STONE_THRESH: float = 0.42                       ## noise above this darkens into an embedded stone
+const STONE_DARKEN: float = 0.30                       ## how much a stone blob darkens the fill
+const CRACK_FREQ: float = 0.11                         ## faint hairline cracks — ridged noise near its zero-crossing
+const CRACK_DARKEN: float = 0.26                       ## how dark a crack seam gets
+## ROCK HUE VARIATION (diff-04 #3): the reference rock isn't one blue-grey — it drifts subtly teal ↔
+## faint brown ↔ faint violet by region. A very-low-freq 2-noise field picks a hue offset per region;
+## kept DARK + subtle so it breaks the monochrome without turning the rock colourful.
+const HUE_FREQ: float = 0.028                          ## enormous regions (~36 fine cells) so a whole face shares a tint
+const HUE_AMP: float = 0.12                            ## strength of the region hue lerp (subtle)
+const HUE_TEAL := Color(0.16, 0.30, 0.34)              ## cool teal pole
+const HUE_BROWN := Color(0.30, 0.24, 0.17)             ## faint warm-brown pole
+const HUE_VIOLET := Color(0.24, 0.18, 0.30)            ## faint violet pole
 ## MOSS on exposed rock TOPS (Noita diff 5): the topmost solid fine cells of a rock face (open air above)
 ## tint toward an olive/moss green — the mossy ledges of the reference. Confined to the top MOSS_DEPTH
 ## fine rows below the exposed surface, and only where enough open air sits above (a real ledge, not a
 ## crevice ceiling). Deterministic per fine cell — no RNG, determinism-safe.
-const MOSS_COLOR := Color(0.34, 0.46, 0.18)            ## olive-moss green (fix-2 diff 5: lifted a touch so it
-                                                      ## catches the raised ambient and reads across the frame)
-const MOSS_DEPTH: int = 3                              ## fine rows of moss below an exposed top edge
+const MOSS_COLOR := Color(0.30, 0.50, 0.16)            ## olive-moss green (diff-04 #2: pushed greener/more olive +
+                                                      ## a touch darker-saturated so the carpet reads as growth)
+const MOSS_DEPTH: int = 5                              ## fine rows of moss below an exposed top edge (diff-04 #2:
+                                                      ## 3 -> 5 so the band CARPETS the ledge, not a thin line)
 const MOSS_FREQ: float = 0.9                           ## breaks the moss into organic patches, not a solid band
+## HANGING MOSS TUFTS (diff-04 #2): a few moss pixels drip BELOW down-facing overhangs (open air directly
+## below a solid fine cell). Confined to the top HANG_DEPTH fine rows below such a lip, noise-masked so
+## only the odd lip grows a tuft — the reference's hanging tufts under ledges.
+const HANG_DEPTH: int = 3                              ## fine rows a tuft hangs below an overhang lip
+const HANG_GATE: float = 0.30                          ## only lips whose moss-noise clears this hang a tuft (sparse)
 ## RECESSED BACK-ROCK (fix-2 diff 6): the cool tone the eroded/back-wall fine cells shift toward, so the
 ## rock BEHIND the carved foreground reads as a distinct, cooler, set-back layer (Noita's fore/background
 ## rock depth) instead of a flat near-black void.
@@ -59,6 +85,11 @@ var _noise: FastNoiseLite                              ## low-freq tonal drift o
 var _grain: FastNoiseLite                              ## dense speckle field (diff 4)
 var _grain2: FastNoiseLite                             ## crisp grit octave
 var _moss: FastNoiseLite                               ## moss patch mask (diff 5)
+var _patch: FastNoiseLite                              ## broad tonal patches (diff-04 #1)
+var _stone: FastNoiseLite                              ## embedded darker-stone blobs (diff-04 #1)
+var _crack: FastNoiseLite                              ## hairline crack seams (diff-04 #1)
+var _huex: FastNoiseLite                               ## region hue field, x axis (diff-04 #3)
+var _huey: FastNoiseLite                               ## region hue field, y axis (diff-04 #3)
 var _img: Image
 var _tex: ImageTexture
 
@@ -84,6 +115,28 @@ func _init(cols: int, rows: int, seed: int) -> void:
 	_moss.seed = seed ^ 0x9e3779b1
 	_moss.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	_moss.frequency = MOSS_FREQ
+	# diff-04 #1 — broad tonal patches + embedded stones + cracks (each its own seed so they don't correlate).
+	_patch = FastNoiseLite.new()
+	_patch.seed = seed ^ 0x2545f491
+	_patch.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_patch.frequency = PATCH_FREQ
+	_stone = FastNoiseLite.new()
+	_stone.seed = seed ^ 0x1b873593
+	_stone.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_stone.frequency = STONE_FREQ
+	_crack = FastNoiseLite.new()
+	_crack.seed = seed ^ 0x85ebca77
+	_crack.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_crack.frequency = CRACK_FREQ
+	# diff-04 #3 — two independent low-freq fields → a region hue offset picked per broad region.
+	_huex = FastNoiseLite.new()
+	_huex.seed = seed ^ 0xc2b2ae35
+	_huex.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_huex.frequency = HUE_FREQ
+	_huey = FastNoiseLite.new()
+	_huey.seed = seed ^ 0x27d4eb2f
+	_huey.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_huey.frequency = HUE_FREQ
 	_img = Image.create(_fcols, _frows, false, Image.FORMAT_RGBA8)
 	_tex = ImageTexture.create_from_image(_img)
 
@@ -175,6 +228,14 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 			var parent_solid: bool = solid_mask[cidx] > 0.5
 			if here_solid:
 				var col: Color = mat_col[cidx] if parent_solid else _accreted_color(mat_col, wall_col, solid_mask, fx, fy, cidx)
+				# ROCK HUE VARIATION (diff-04 #3): pull the body colour a hair toward a region-picked hue
+				# pole (teal / faint brown / faint violet) so a broad rock face carries its own subtle tint
+				# and the frame stops reading as one monochrome blue-grey. Very-low-freq → whole faces share
+				# a tone; a two-noise pick keeps neighbouring regions from all landing on the same pole.
+				var hx: float = _huex.get_noise_2d(float(fx), float(fy))
+				var hy: float = _huey.get_noise_2d(float(fx), float(fy))
+				var pole: Color = HUE_TEAL if hx < -0.15 else (HUE_BROWN if hx > 0.20 else HUE_VIOLET)
+				col = col.lerp(pole, HUE_AMP * clampf(0.5 + 0.5 * hy, 0.15, 1.0))
 				# Fine AO: air among the 4 orthogonal AND 4 diagonal fine neighbours; each open cell darkens
 				# the fill toward that edge, so a lone fine nub reads round and an exposed face reads deeply
 				# carved (the shadow that sells molded rock). Diagonals count half so corners round smoothly.
@@ -186,10 +247,22 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 					col = col.lerp(SHADOW_TEAL, clampf(air_n / 6.0, 0.0, 1.0) * 0.34)
 				# A low-frequency tonal drift so a broad rock face isn't one flat colour + interiors deepen.
 				var drift: float = _noise.get_noise_2d(float(fx) * 0.35 + 500.0, float(fy) * 0.35) * 0.07
+				# BROAD TONAL PATCHES (diff-04 #1): a big soft low-freq value swing so wide areas of rock read
+				# as lighter/darker patches, not one flat tone — the reference's mottled interiors.
+				drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP
 				# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it
 				# reads granular. Multiplicative on value so it rides the material's own colour.
 				var grain: float = _grain.get_noise_2d(float(fx), float(fy)) * GRAIN_AMP \
 					+ _grain2.get_noise_2d(float(fx), float(fy)) * (GRAIN_AMP * 0.55)
+				# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole
+				# cluster into an embedded darker stone; a ridged near-zero band of a second field cuts a thin
+				# dark crack seam. Both are value darkenings folded into the grain term so they ride the fill.
+				var stone: float = _stone.get_noise_2d(float(fx), float(fy))
+				if stone > STONE_THRESH:
+					grain -= STONE_DARKEN * clampf((stone - STONE_THRESH) * 4.0, 0.0, 1.0)
+				var crackv: float = absf(_crack.get_noise_2d(float(fx) * 1.4, float(fy)))
+				if crackv < 0.05:
+					grain -= CRACK_DARKEN * (1.0 - crackv / 0.05)
 				# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches
 				# a bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
 				var rim: float = 0.0
@@ -200,15 +273,26 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 				var vmul: float = shade + grain
 				var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
 					col.b * vmul + drift + rim, 1.0)
-				# MOSS (diff 5): tint the exposed rock TOPS toward olive-moss. A top edge = open air above;
-				# the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked), fading down.
+				# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open
+				# air above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked),
+				# fading down. Denser + greener now (deeper band, brighter olive) so ledges CARPET.
 				var top_dist: int = _top_air_distance(fine_solid, fx, fy)
 				if top_dist >= 0 and top_dist < MOSS_DEPTH:
 					var patch: float = _moss.get_noise_2d(float(fx), float(fy) * 0.6)
-					if patch > -0.1:
+					if patch > -0.28:                       # diff-04 #2: wider accept → more coverage
 						var band: float = (1.0 - float(top_dist) / float(MOSS_DEPTH)) \
-							* clampf((patch + 0.1) * 1.6, 0.0, 1.0)
-						out = out.lerp(MOSS_COLOR, 0.80 * band)   # fix-2 diff 5: moss reads stronger in the gloom
+							* clampf((patch + 0.28) * 1.5, 0.0, 1.0)
+						out = out.lerp(MOSS_COLOR, 0.88 * band)   # diff-04 #2: stronger tint = a real carpet
+				else:
+					# HANGING MOSS TUFTS (diff-04 #2): the top rows just BELOW a down-facing overhang lip grow
+					# a few moss pixels dripping into the air — the reference's hanging tufts under ledges.
+					var hang: int = _bottom_air_distance(fine_solid, fx, fy)
+					if hang >= 0 and hang < HANG_DEPTH:
+						var hp: float = _moss.get_noise_2d(float(fx) * 1.3, float(fy) * 1.3 + 90.0)
+						if hp > HANG_GATE:
+							var hband: float = (1.0 - float(hang) / float(HANG_DEPTH)) \
+								* clampf((hp - HANG_GATE) * 3.0, 0.0, 1.0)
+							out = out.lerp(MOSS_COLOR.darkened(0.12), 0.85 * hband)
 				data[i4] = int(clampf(out.r, 0.0, 1.0) * 255.0)
 				data[i4 + 1] = int(clampf(out.g, 0.0, 1.0) * 255.0)
 				data[i4 + 2] = int(clampf(out.b, 0.0, 1.0) * 255.0)
@@ -261,6 +345,16 @@ func _fine_air(fine_solid: PackedByteArray, fx: int, fy: int) -> bool:
 func _top_air_distance(fine_solid: PackedByteArray, fx: int, fy: int) -> int:
 	for d: int in range(MOSS_DEPTH):
 		if _fine_air(fine_solid, fx, fy - d - 1):
+			return d
+	return -1
+
+
+## Rows above the nearest EXPOSED bottom surface directly below this solid fine cell (0 = open air right
+## below — a down-facing overhang lip; N = N solid rows above such a lip; -1 = no open bottom within
+## HANG_DEPTH). Mirror of _top_air_distance downward; drives the hanging moss tufts (diff-04 #2).
+func _bottom_air_distance(fine_solid: PackedByteArray, fx: int, fy: int) -> int:
+	for d: int in range(HANG_DEPTH):
+		if _fine_air(fine_solid, fx, fy + d + 1):
 			return d
 	return -1
 

@@ -582,20 +582,19 @@ func _draw_surface_life() -> void:
 			draw_line(Vector2(bx, by), Vector2(bx + 6.0, by - flap + 2.0), bc, 1.6)
 
 
-## CRYSTAL/ORE GLOW (fix-2 diff 2) — Sinkforge's cool accent light. A RARE, stable subset of still-solid
-## ore/mineral cells in view read as glowing crystal seams — hash-gated to ~1 in 40 AND capped so a few
-## points of cool light punctuate the gloom (the reference has one or two saturated cool sources, not a
-## field). Walks sim.deposits (the sparse seeded-vein index) clipped to the view. Both _update_veil (cuts
-## a cool hole) and _paint_lights (lays the cyan pool) call this, so reveal + glow never disagree. NOTE:
-## deposits are DENSE in ore layers (Stonereach is seeded thick), so the gate must be tight or the frame
-## floods cyan — keep it rare on purpose.
+## CRYSTAL/ORE GLOW (fix-2 diff 2 / diff-04 #5) — Sinkforge's cool accent light. The reference's coloured
+## light lives in BIG COHESIVE features, not scattered dots, so instead of glowing isolated hash-gated
+## cells we CLUSTER nearby exposed ore into a few cohesive SEAMS: flood-connect adjacent exposed vein
+## cells, then emit ONE glow per cluster (centroid + a radius that grows with the cluster's extent). A
+## few large cool seam-glows read as crystal veins in the rock, not confetti. Both _update_veil (cuts a
+## cool hole) and _paint_lights (lays the cyan pool) call this, so reveal + glow never disagree.
 const CRYSTAL_COLOR := Color(0.34, 0.86, 1.0)          ## saturated cyan-teal — the cool pole vs the warm lamp
-const CRYSTAL_GATE: int = 7                            ## ~1 in N EXPOSED ore cells glow. The exposed-to-cavity
-                                                      ## requirement already confines the accent to carved edges
-                                                      ## (rare), so the gate can be loose — a lit vein wall reads
-                                                      ## as a crystal seam, not confetti (buried ore never glows).
-const CRYSTAL_MAX: int = 10                            ## hard cap of glowing seams on screen (taste ceiling)
-func _crystal_cells() -> Array[Vector2i]:
+const CRYSTAL_MAX: int = 6                             ## hard cap of glowing seams on screen (taste ceiling)
+const CRYSTAL_MIN_CELLS: int = 2                       ## a seam needs >= this many exposed cells to glow (kills lone specks)
+
+## The exposed-ore cells in view (still solid, has-nuggets, touching a carved cavity) — the raw material
+## a seam is built from. Split out so the clustering can walk it deterministically.
+func _exposed_ore_cells() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
 	for key: Variant in sim.deposits:
@@ -606,19 +605,55 @@ func _crystal_cells() -> Array[Vector2i]:
 		if not _material(sim.material_at(c)).has_nuggets():
 			continue
 		# Only EXPOSED ore glows: a crystal seam catches light where it meets a carved cavity, so at least
-		# one orthogonal neighbour must be open air. This confines the accent to the edges of dug/cave
-		# space (where the player is) instead of every buried vein cell — the biggest de-glitter.
+		# one orthogonal neighbour must be open air — confines the accent to carved edges (where you are).
 		if sim.is_solid(c + Vector2i(0, -1)) and sim.is_solid(c + Vector2i(0, 1)) \
 				and sim.is_solid(c + Vector2i(-1, 0)) and sim.is_solid(c + Vector2i(1, 0)):
 			continue
-		# Then hash-gate to a rare, DETERMINISTIC subset so only the odd exposed cell glows (a crystal seam).
-		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 83492791)) & 0x7fffffff
-		if h % CRYSTAL_GATE != 0:
-			continue
 		out.append(c)
-		if out.size() >= CRYSTAL_MAX:
-			break
 	return out
+
+
+## Cluster the exposed-ore cells into cohesive SEAMS (diff-04 #5). Greedy flood: pop a cell, absorb every
+## still-unclaimed cell within CLUSTER_LINK of it (chained via a growing frontier), and emit the group as
+## one glow {pos = centroid, radius = base + extent}. Deterministic (iterates a sorted cell list); a few
+## big glows instead of many dots. Lone/tiny clusters (< CRYSTAL_MIN_CELLS) are dropped as noise.
+const CLUSTER_LINK: int = 3                             ## cells within this chebyshev distance join one seam
+func _crystal_seams() -> Array[Dictionary]:
+	var cells: Array[Vector2i] = _exposed_ore_cells()
+	cells.sort()                                        # deterministic flood order
+	var seams: Array[Dictionary] = []
+	var claimed: Dictionary = {}
+	for start: Vector2i in cells:
+		if claimed.has(start):
+			continue
+		var group: Array[Vector2i] = [start]
+		claimed[start] = true
+		var i: int = 0
+		while i < group.size():                         # grow the frontier by chained proximity
+			var g: Vector2i = group[i]
+			i += 1
+			for other: Vector2i in cells:
+				if claimed.has(other):
+					continue
+				if absi(other.x - g.x) <= CLUSTER_LINK and absi(other.y - g.y) <= CLUSTER_LINK:
+					claimed[other] = true
+					group.append(other)
+		if group.size() < CRYSTAL_MIN_CELLS:
+			continue
+		var sum := Vector2.ZERO
+		var lo := Vector2(group[0])
+		var hi := Vector2(group[0])
+		for gc: Vector2i in group:
+			sum += Vector2(gc)
+			lo = lo.min(Vector2(gc))
+			hi = hi.max(Vector2(gc))
+		var centroid: Vector2 = (sum / float(group.size()) + Vector2(0.5, 0.5)) * float(CELL)
+		var extent: float = (hi - lo).length() * float(CELL)          # diagonal span of the seam
+		var radius: float = float(CELL) * 2.2 + extent * 0.55         # bigger seam -> bigger cohesive glow
+		seams.append({"pos": centroid, "radius": radius, "cells": group})
+		if seams.size() >= CRYSTAL_MAX:
+			break
+	return seams
 
 
 func _draw_ore_glints() -> void:
@@ -1986,13 +2021,12 @@ func _update_veil() -> void:
 		var lvl: float = _conduit_level(cell as Vector2i)
 		if lvl > 0.04:
 			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.8, lvl * 0.7)
-	# CRYSTAL/ORE GLOW (fix-2 diff 2): a sparse subset of still-solid ore/mineral cells reads as a
-	# glowing crystal — it cuts a small cool hole in the gloom so the vein's rock is revealed around it,
-	# and _paint_lights lays the saturated cyan pool on top. Warm lamp + cool crystal = the colour
-	# contrast the reference lives on. Sparse (hash-gated) + breathing so it's an accent, not a light rig.
-	for c: Vector2i in _crystal_cells():
-		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
-		_veil_cut(bytes, _cell_center(c), 2.4, 0.6 + 0.28 * breath)
+	# CRYSTAL/ORE SEAM GLOW (fix-2 diff 2 / diff-04 #5): a few COHESIVE seams (clustered exposed ore) each
+	# cut ONE larger cool hole in the gloom so the vein's rock is revealed around it, and _paint_lights lays
+	# the saturated cyan pool on top. Warm lamp + cool crystal = the colour contrast the reference lives on.
+	for seam: Dictionary in _crystal_seams():
+		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
+		_veil_cut(bytes, seam["pos"], float(seam["radius"]) / float(CELL), 0.62 + 0.26 * breath)
 	for m: Dictionary in falling.motes():
 		_veil_cut(bytes, m["pos"], 1.4, 0.5)
 	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
@@ -2023,7 +2057,12 @@ func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: 
 			# Textured falloff: a stable per-cell grain (RNG-free hash → sine) mottles the pool's outer
 			# region so its edge reveals rock detail; near the core (f→1) the grain vanishes so the hot
 			# centre stays clean. Small amplitude (±0.10) — a whisper of noise, not a broken pool.
-			var g: float = sin(float(col) * 1.7 + float(row) * 2.3) * 0.10 * (1.0 - f)
+			# diff-04 #4: mottle the pool's outer half HARDER (two crossed-sine scales, window peaks
+			# mid-falloff, vanishes at the hot core and the dead fringe) so light dissolves into the rock
+			# grain as it fades instead of a clean gaussian. Amplitude lifted 0.10 -> 0.22.
+			var window: float = (1.0 - f) * clampf(f * 2.2, 0.0, 1.0)
+			var g: float = (sin(float(col) * 1.7 + float(row) * 2.3) * 0.62 \
+				+ sin(float(col) * 4.1 - float(row) * 3.7) * 0.38) * 0.22 * window
 			var keep: float = 1.0 - clampf(strength * f * f + g * strength, 0.0, 1.0)  # noisy soft-edged pool
 			var idx: int = (row * cols + col) * 4 + 3
 			bytes[idx] = int(float(bytes[idx]) * keep)
@@ -2132,14 +2171,18 @@ func _paint_lights(layer: LightLayer) -> void:
 		var lvl: float = _conduit_level(cell)
 		if lvl > 0.04:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.78, 0.36), lvl * 0.7)
-	# CRYSTAL/ORE GLOW (fix-2 diff 2): a saturated cyan pool over the sparse glowing vein cells + a hot
-	# white-cyan core pip on each — the COOL accent that gives the scene warm/cool contrast like Noita's
-	# varied lights. Held modest so it accents the vein, never floods a cavern.
-	for c: Vector2i in _crystal_cells():
-		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
-		var ctr: Vector2 = _cell_center(c)
-		_draw_glow(layer, ctr, float(CELL) * 2.6, CRYSTAL_COLOR, 0.42 + 0.26 * breath)
-		layer.draw_circle(ctr, 1.8 + 0.9 * breath, Color(0.78, 0.99, 1.0, 0.60 + 0.35 * breath))  # hot crystal core
+	# CRYSTAL/ORE SEAM GLOW (fix-2 diff 2 / diff-04 #5): one saturated cyan pool per COHESIVE seam (a
+	# clustered exposed vein), sized to the seam's extent, + a hot white-cyan core pip on each exposed cell
+	# so the seam still reads as discrete crystals inside one big cohesive glow — the COOL accent that gives
+	# the scene warm/cool contrast like Noita's big coloured light features, not scattered dots.
+	for seam: Dictionary in _crystal_seams():
+		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
+		# A wider soft halo + a tighter richer core = one big cohesive cool feature (diff-04 #5), not a flat disc.
+		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 1.15, CRYSTAL_COLOR, 0.30 + 0.18 * breath)
+		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 0.60, CRYSTAL_COLOR, 0.42 + 0.24 * breath)
+		for c: Vector2i in seam["cells"]:
+			var cb: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
+			layer.draw_circle(_cell_center(c), 1.6 + 0.7 * cb, Color(0.78, 0.99, 1.0, 0.50 + 0.30 * cb))
 	for m: Dictionary in falling.motes():
 		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
 		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
