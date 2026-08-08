@@ -993,6 +993,7 @@ func try_mine(cell: Vector2i) -> bool:
 	if mined != &"":
 		_dig_marks.erase(cell)                                 # a dug cell's mark is spent
 		var center: Vector2 = _cell_center(cell)
+		_renderer.note_mined(cell, mat)                        # the block shatters away, not pops (#18)
 		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
 		if _player != null:
 			# The breaking blow's payoff (FABLE_50 #40): chunky debris kicked out of the shattered face

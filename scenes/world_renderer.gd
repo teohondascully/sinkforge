@@ -85,6 +85,13 @@ var _materials: Dictionary = {}                      ## id -> MaterialDef (world
 ## the note_dig pattern). A short one-shot assemble overlay (flash + rising scan + bracket snap) plays.
 var _construct: Dictionary = {}
 const CONSTRUCT_DUR: float = 0.38
+## MINE CRUMBLE (FABLE_NEXT_50 #18): a just-mined block shatters into four chunks that fly apart, fall
+## and fade instead of popping out of existence — the removed rock leaves with weight. MainView pokes
+## note_mined() on a real dig (the note_dig discipline). [{pos, col, age}], capped so a fast dig can't
+## pile up unbounded.
+var _crumble: Array[Dictionary] = []
+const CRUMBLE_DUR: float = 0.24
+const CRUMBLE_MAX: int = 48
 
 # Pushed by MainView each frame (the bits the renderer can't derive from the sim alone).
 var _aim: Vector2i = Vector2i(-99, -99)
@@ -275,6 +282,11 @@ func _process(delta: float) -> void:
 				_construct.erase(cell)
 			else:
 				_construct[cell] = e
+	if not _crumble.is_empty():                          # age the mine-crumbles; retire the spent ones
+		for i: int in range(_crumble.size() - 1, -1, -1):
+			_crumble[i]["age"] = float(_crumble[i]["age"]) + delta
+			if float(_crumble[i]["age"]) >= CRUMBLE_DUR:
+				_crumble.remove_at(i)
 	if _scan_age >= 0.0:
 		_scan_age += delta
 		if _scan_age > _scan_range / SCAN_WAVE_SPEED + SCAN_ECHO_LINGER:
@@ -341,6 +353,7 @@ func _draw() -> void:
 	# (below this, z -10) and repainted only on the DIG'd chunk. This per-frame pass draws ONLY the live/
 	# sparse content (machines, items, conduits, cursor) — no full-world cell loop.
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)  # world border
+	_draw_crumble()   # a just-mined block shattering away at the terrain layer (#18)
 	_draw_drop_paths()
 	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
@@ -1476,6 +1489,40 @@ func _machine_sprite(machine: MachineState, active: bool, clock: float) -> Textu
 ## plays once. Boot/load never call it → pre-existing machines never animate (the note_dig discipline).
 func note_machine_built(cell: Vector2i) -> void:
 	_construct[cell] = 0.0
+
+
+## MainView pokes this when a block is genuinely MINED so the removed rock crumbles away (#18). Carries
+## the material colour so dirt/stone/ore each shatter in their own hue. Capped — a rapid dig drops the
+## oldest crumble rather than growing without bound.
+func note_mined(cell: Vector2i, material: StringName) -> void:
+	_crumble.append({"pos": Vector2(cell) * float(CELL), "col": material_color(material), "age": 0.0})
+	if _crumble.size() > CRUMBLE_MAX:
+		_crumble.pop_front()
+
+
+## The mine-crumble overlay (#18): each fresh dig shatters the cell into four chunks that fly apart on an
+## outward+gravity arc, shrink, and fade over CRUMBLE_DUR, with a brief white break-flash at the instant
+## of impact. Sits at the terrain layer (under machines/items). Pure cosmetic — reads _crumble, no sim.
+func _draw_crumble() -> void:
+	var half: float = float(CELL) * 0.5
+	for cr: Dictionary in _crumble:
+		var pos: Vector2 = cr["pos"]
+		var col: Color = cr["col"]
+		var t: float = clampf(float(cr["age"]) / CRUMBLE_DUR, 0.0, 1.0)
+		if t < 0.28:                                     # the break FLASH — a quick warm burst inset from the
+			var fi: float = float(CELL) * (0.16 + t)     # cell edges (a pop, not a lit tile), swelling out
+			draw_rect(Rect2(pos + Vector2(fi, fi), Vector2(float(CELL) - fi * 2.0, float(CELL) - fi * 2.0)),
+				Color(1.0, 0.92, 0.72, (0.28 - t) * 1.1))
+		for qx: int in 2:
+			for qy: int in 2:
+				var qc: Vector2 = pos + Vector2((float(qx) + 0.5) * half, (float(qy) + 0.5) * half)
+				var out: Vector2 = Vector2(float(qx) - 0.5, float(qy) - 0.5).normalized()
+				var off: Vector2 = out * (t * 5.0) + Vector2(0.0, t * t * 11.0)   # spread + gravity fall
+				var sz: float = half * ((1.0 - t) * 0.86 + 0.14)                  # shrink toward nothing
+				var cc := Color(col.r, col.g, col.b, 1.0 - t)
+				draw_rect(Rect2(qc + off - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), cc)
+				draw_rect(Rect2(qc + off - Vector2(sz, sz) * 0.5, Vector2(sz, sz)),
+					Color(0.03, 0.03, 0.05, (1.0 - t) * 0.5), false, 1.0)          # dark rim for definition
 
 
 func _draw_machine(machine: MachineState) -> void:
