@@ -49,12 +49,24 @@ const SINKFORGE_SCALE: float = 1.28                  ## master size dial (imposi
 const SURFACE_LINE: int = 22                        ## reference daylight row; sky attenuates with depth past it
 const SKY_REACH: int = 12                           ## tiles of open air sunlight reaches before going dark
 const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
-const AMBIENT_DARK: float = 0.62                    ## underground ambient — DIM but visible (Terraria), not
-                                                   ## pitch black. You can read the terrain everywhere; light
-                                                   ## sources add warmth + clarity rather than being the ONLY way to see.
-const SHADOW_COLOR := Color(0.05, 0.06, 0.10)       ## the cool blue-black the underworld sits in
-const LAMP_COLOR := Color(1.0, 0.90, 0.66)          ## the miner's warm head-lamp
-const LAMP_RADIUS: float = CELL * 4.0               ## a focused warm pool, not a screen-filling white disc
+const AMBIENT_DARK: float = 0.74                    ## underground ambient — an eerie MOONLIT GLOOM, not pure black.
+                                                   ## Un-lit rock reads as dark teal-grey with VISIBLE grain across
+                                                   ## the whole frame (the reference is bathed in ambient from its
+                                                   ## many coloured lights), while lamp / machine / crystal / torch
+                                                   ## pools stay clearly brighter. THE mood lever (fix-2 diff 1):
+                                                   ## 0.87 → 0.74 — pass-1 over-crushed toward black and the rock
+                                                   ## went invisible away from the 3 pools; this raises the floor
+                                                   ## to a legible gloom while keeping VOID/back-wall pockets dark.
+const SHADOW_COLOR := Color(0.045, 0.065, 0.085)    ## the cool teal-blue gloom the underworld sits in (fix-2 diff
+                                                   ## 1/3): was near-black WARM-ish (.015/.02/.035) → a cool
+                                                   ## blue-teal so the veil, at a lower alpha, leaves unlit rock a
+                                                   ## dark TEAL-GREY (the reference's cold rock) rather than a
+                                                   ## brown murk. The RGB is the colour the veil tints TOWARD; the
+                                                   ## per-cell alpha still crushes deep voids near-black.
+const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
+                                                   ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
+                                                   ## a white wash (diff 11)
+const LAMP_RADIUS: float = CELL * 3.9               ## a warm pool with a higher-contrast falloff (was 4.0)
 const LAMP_LEAD: float = CELL * 1.9                 ## how far the beam pool leads toward the aim (#44)
 
 ## --- Day/night (FABLE_50 #29, cosmetic-first) ---------------------------------------------------
@@ -140,6 +152,13 @@ var _chunks: Array[LightLayer] = []                  ## row-major grid, size _ch
 var _chunk_cols: int = 0
 var _chunk_rows: int = 0
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
+## FINE TERRAIN MOLDING (Noita-look slice 1): the coarse 32px terrain fill re-rendered as an organic,
+## molded 8px-grain field baked to one texture (scenes/fine_terrain.gd), drawn OVER the chunk terrain
+## (which keeps drawing walls + the surface cap) so the blocky cell edges become curved. Rebuilt only
+## on terrain change (_fine_dirty), never per frame — the same repaint-on-change discipline as the veil.
+var _fine: FineTerrain
+var _fine_layer: LightLayer
+var _fine_dirty: bool = true
 var _dark: LightLayer
 ## THE LIGHTMAP VEIL (FABLE_50 #17): the darkness is a small texture — ONE TEXEL PER CELL (RGB =
 ## the shadow colour, zone-tinted; A = darkness) — stretched over the whole world with LINEAR
@@ -201,6 +220,15 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_back = LightLayer.new()
 	_back.setup(-20, false, _paint_backdrop)
 	add_child(_back)
+	# The FINE TERRAIN mold (Noita-look): baked once here, drawn stretched over the chunk terrain
+	# (z -9, above the -10 blocky fill, below all dynamic content). Nearest filter keeps the 8px fine
+	# pixels crisp. It rebuilds only when the terrain changes (_fine_dirty), like the veil below.
+	_fine = FineTerrain.new(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337)
+	_fine_layer = LightLayer.new()
+	_fine_layer.setup(-9, false, _paint_fine_terrain)
+	_fine_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(_fine_layer)
+	_bake_fine_terrain()
 	# Two world-space canvases ABOVE this renderer's draw — the skylight/darkness veil, then light pools.
 	_glow_tex = _make_glow_texture()
 	_dark = LightLayer.new()
@@ -237,6 +265,7 @@ func repaint_world() -> void:
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()
 	_veil_dirty = true
+	_fine_dirty = true
 	sim.terrain_dirty.clear()
 	_seal_rows.clear()
 	_seal_rows_scanned = false
@@ -348,8 +377,11 @@ func _process(delta: float) -> void:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
+		_fine_dirty = true         # the mold follows the dug shape; rebake the fine terrain (below)
 		# The skylight base also depends on the surface line the dig may have moved — rebake it.
 		_veil_dirty = true
+	if _fine_dirty:
+		_bake_fine_terrain()   # rebuild the molded terrain texture (only on a terrain change)
 
 
 ## The row-major index of the chunk owning `cell`, or -1 if the cell is out of the world.
@@ -548,6 +580,45 @@ func _draw_surface_life() -> void:
 			var bc := Color(0.16, 0.18, 0.24)
 			draw_line(Vector2(bx - 6.0, by - flap + 2.0), Vector2(bx, by), bc, 1.6)
 			draw_line(Vector2(bx, by), Vector2(bx + 6.0, by - flap + 2.0), bc, 1.6)
+
+
+## CRYSTAL/ORE GLOW (fix-2 diff 2) — Sinkforge's cool accent light. A RARE, stable subset of still-solid
+## ore/mineral cells in view read as glowing crystal seams — hash-gated to ~1 in 40 AND capped so a few
+## points of cool light punctuate the gloom (the reference has one or two saturated cool sources, not a
+## field). Walks sim.deposits (the sparse seeded-vein index) clipped to the view. Both _update_veil (cuts
+## a cool hole) and _paint_lights (lays the cyan pool) call this, so reveal + glow never disagree. NOTE:
+## deposits are DENSE in ore layers (Stonereach is seeded thick), so the gate must be tight or the frame
+## floods cyan — keep it rare on purpose.
+const CRYSTAL_COLOR := Color(0.34, 0.86, 1.0)          ## saturated cyan-teal — the cool pole vs the warm lamp
+const CRYSTAL_GATE: int = 7                            ## ~1 in N EXPOSED ore cells glow. The exposed-to-cavity
+                                                      ## requirement already confines the accent to carved edges
+                                                      ## (rare), so the gate can be loose — a lit vein wall reads
+                                                      ## as a crystal seam, not confetti (buried ore never glows).
+const CRYSTAL_MAX: int = 10                            ## hard cap of glowing seams on screen (taste ceiling)
+func _crystal_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	for key: Variant in sim.deposits:
+		var c: Vector2i = key
+		var pos := Vector2(c) * float(CELL)
+		if not view.has_point(pos) or not sim.is_solid(c):
+			continue
+		if not _material(sim.material_at(c)).has_nuggets():
+			continue
+		# Only EXPOSED ore glows: a crystal seam catches light where it meets a carved cavity, so at least
+		# one orthogonal neighbour must be open air. This confines the accent to the edges of dug/cave
+		# space (where the player is) instead of every buried vein cell — the biggest de-glitter.
+		if sim.is_solid(c + Vector2i(0, -1)) and sim.is_solid(c + Vector2i(0, 1)) \
+				and sim.is_solid(c + Vector2i(-1, 0)) and sim.is_solid(c + Vector2i(1, 0)):
+			continue
+		# Then hash-gate to a rare, DETERMINISTIC subset so only the odd exposed cell glows (a crystal seam).
+		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 83492791)) & 0x7fffffff
+		if h % CRYSTAL_GATE != 0:
+			continue
+		out.append(c)
+		if out.size() >= CRYSTAL_MAX:
+			break
+	return out
 
 
 func _draw_ore_glints() -> void:
@@ -1458,8 +1529,10 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 				ci.draw_texture_rect(wtex, Rect2(wpos, Vector2(CELL, CELL)), false)
 				continue
 			var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
+			# Back-wall darkened toward near-black (diff 16): the recessed cave interior reads as a Noita
+			# void, not a lit mid-grey surface — the walls sit BEHIND the play space, deep in shadow.
 			ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)),
-				_zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y))
+				_zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y).darkened(0.42))
 
 
 func _draw_drop_paths() -> void:
@@ -1794,6 +1867,41 @@ func _cell_center(cell: Vector2i) -> Vector2:
 ## per cell, linear-filtered over the world, so light grades smoothly sideways as well as down (the
 ## old pass drew a rect per cell: hard vertical edges on every lit shaft). Content lives in the
 ## texture; this draw command never re-issues.
+## Draw the baked fine-terrain mold stretched over the world (nearest filter → crisp 8px fine pixels).
+## Its ONE draw command replays for free; content only changes when _bake_fine_terrain re-uploads.
+func _paint_fine_terrain(layer: LightLayer) -> void:
+	if _fine == null:
+		return
+	layer.draw_texture_rect(_fine.texture(), _fine.world_rect(), false)
+
+
+## Rebuild the molded fine-terrain texture from the current sim.solid (via scenes/fine_terrain.gd),
+## reusing this renderer's exact material + wall palette so the mold matches the coarse pass's colours.
+## Called on terrain change only (never per frame). Cleared _fine_dirty + a redraw of the ONE quad.
+func _bake_fine_terrain() -> void:
+	_fine_dirty = false
+	if _fine == null:
+		return
+	_fine.rebake(
+		func(c: Vector2i) -> bool: return sim.is_solid(c),
+		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
+		_wall_fill_color,
+		func(col: int) -> int: return sim.surface_row(col))
+	if _fine_layer != null:
+		_fine_layer.queue_redraw()
+
+
+## The back-wall colour behind a dug/eroded cell — the same depth-darkened, zone-tinted wall fill the
+## coarse background pass paints (so an eroded fine cell shows exactly the wall it would if hand-dug).
+## Falls back to a dark dirt tone for a cell with no wall entry (unlikely on solid terrain).
+func _wall_fill_color(c: Vector2i) -> Color:
+	if not sim.wall.has(c):
+		return Color(0.06, 0.055, 0.05)
+	var def: MaterialDef = _material(sim.wall[c])
+	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
+	return _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
+
+
 func _paint_darkness(layer: LightLayer) -> void:
 	layer.draw_texture_rect(_veil_tex,
 		Rect2(0.0, 0.0, float(FactorySim.GRID_COLS * CELL), float(FactorySim.GRID_ROWS * CELL)), false)
@@ -1853,35 +1961,47 @@ func _update_veil() -> void:
 		_veil_dirty = false
 		_bake_veil_base()
 	var bytes: PackedByteArray = _veil_base.duplicate()
+	# With the moonlit-gloom base (AMBIENT_DARK 0.74) light still cuts HARD to reveal rock — the pools
+	# open a bright core that falls off tight, so lit rock pops out of the gloom (diffs 1, 11).
 	if player != null:
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
-		_veil_cut(bytes, head + _lamp_offset, 4.2, 0.8)          # the aimed beam pool
-		_veil_cut(bytes, head + _lamp_offset * 0.45, 2.6, 0.45)  # the beam throat
-		_veil_cut(bytes, player.position, 1.6, 0.2)              # faint close body glow
+		_veil_cut(bytes, head + _lamp_offset, 5.4, 0.99)         # the aimed beam pool — wide reveal, open core
+		_veil_cut(bytes, head + _lamp_offset * 0.45, 3.2, 0.8)   # the beam throat
+		_veil_cut(bytes, player.position, 2.2, 0.5)              # close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
-		var s: float = 0.32                                      # cool working glow
+		var s: float = 0.6                                       # cool working glow
 		if kind == "generator":
-			s = 0.55 if machine.fuel > 0 else 0.0                # dark when it runs dry
+			s = 0.9 if machine.fuel > 0 else 0.0                 # dark when it runs dry
 		elif kind == "furnace":
-			s = 0.5
+			s = 0.85
 		elif kind == "lift":
-			s = 0.18 + 0.35 * machine.power_factor
+			s = 0.35 + 0.55 * machine.power_factor
 		if s > 0.0:
-			_veil_cut(bytes, _cell_center(machine.cell), 2.4, s)
+			_veil_cut(bytes, _cell_center(machine.cell), 2.8, s)
 	for cell: Variant in sim.torch:
-		_veil_cut(bytes, _cell_center(cell as Vector2i), 3.2, 0.6)
+		_veil_cut(bytes, _cell_center(cell as Vector2i), 4.4, 0.94)
 	for cell: Variant in sim.conduit:
 		var lvl: float = _conduit_level(cell as Vector2i)
 		if lvl > 0.04:
-			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.6, lvl * 0.4)
+			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.8, lvl * 0.7)
+	# CRYSTAL/ORE GLOW (fix-2 diff 2): a sparse subset of still-solid ore/mineral cells reads as a
+	# glowing crystal — it cuts a small cool hole in the gloom so the vein's rock is revealed around it,
+	# and _paint_lights lays the saturated cyan pool on top. Warm lamp + cool crystal = the colour
+	# contrast the reference lives on. Sparse (hash-gated) + breathing so it's an accent, not a light rig.
+	for c: Vector2i in _crystal_cells():
+		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
+		_veil_cut(bytes, _cell_center(c), 2.4, 0.6 + 0.28 * breath)
 	for m: Dictionary in falling.motes():
-		_veil_cut(bytes, m["pos"], 1.2, 0.3)
+		_veil_cut(bytes, m["pos"], 1.4, 0.5)
 	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
 	_veil_tex.update(_veil_img)
 
 
-## Scale down the veil alpha in a radial falloff around a world position (radius in CELLS).
+## Scale down the veil alpha in a radial falloff around a world position (radius in CELLS). The falloff
+## is TEXTURED (fix-2 diff 8): a cheap per-cell value nudge breaks the pool's outer half so the light
+## reveals rock grain as it fades instead of a clean gaussian blob (the reference's noisy pool edges).
+## The core stays smooth (the nudge scales up with distance) so the bright centre is unbroken.
 func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: float) -> void:
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
@@ -1899,7 +2019,11 @@ func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: 
 			if d >= radius:
 				continue
 			var f: float = 1.0 - d / radius
-			var keep: float = 1.0 - strength * f * f             # quadratic falloff = a soft-edged pool
+			# Textured falloff: a stable per-cell grain (RNG-free hash → sine) mottles the pool's outer
+			# region so its edge reveals rock detail; near the core (f→1) the grain vanishes so the hot
+			# centre stays clean. Small amplitude (±0.10) — a whisper of noise, not a broken pool.
+			var g: float = sin(float(col) * 1.7 + float(row) * 2.3) * 0.10 * (1.0 - f)
+			var keep: float = 1.0 - clampf(strength * f * f + g * strength, 0.0, 1.0)  # noisy soft-edged pool
 			var idx: int = (row * cols + col) * 4 + 3
 			bytes[idx] = int(float(bytes[idx]) * keep)
 
@@ -1957,48 +2081,60 @@ func _paint_lights(layer: LightLayer) -> void:
 			_draw_glow(layer, e["pos"], float(CELL) * 2.1,
 				_material(e["material"] as StringName).nugget_color, 0.65 * fade)
 	if player != null:
-		# A faint flicker so the lamp reads as a live flame, not a static disc.
-		var flick: float = 0.55 + 0.03 * sin(_anim_time * 11.0) + 0.02 * sin(_anim_time * 27.0)
+		# A faint flicker so the lamp reads as a live flame, not a static disc. Bright enough to blaze
+		# against the near-black base but held at 0.66 so the WARM amber core reads (not blown to white) —
+		# the pool is the light in the deep, and it stays gold (diff 11).
+		var flick: float = 0.66 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
 		# The AIM-FOLLOWING beam (#44): a bright cast pool where you're looking + a dimmer throat pool
 		# between it and the head — two glows along one line read as a directed beam, no shader needed.
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
 		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
-		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.45)
-		_draw_glow(layer, player.position, float(CELL) * 1.4, lamp_color, 0.12)  # faint close body glow
+		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.55)
+		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.22)  # close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
-		var col: Color = Color(1.0, 0.58, 0.30)            # furnace ember (warm)
-		var pulse: float = 0.5 + 0.1 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
+		# Saturated cores (diffs 2, 9): each machine's pool blazes in its OWN colour out of the black — a
+		# hot orange forge, an amber burner, a cyan-teal lift — the coloured-pools-on-black Noita read.
+		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
+		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
 		if kind == "generator":
-			col = Color(1.0, 0.72, 0.30)                   # warm coal-burner glow
+			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
 			# Breathes while fueled, goes DARK when it runs dry — the "is it making power?" read.
-			pulse = (0.55 + 0.2 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
+			pulse = (0.85 + 0.22 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
 		elif kind == "lift":
-			col = Color(0.5, 1.0, 0.92)                    # lift teal (echoes the updraft motes)
-			pulse *= 0.4 + 0.6 * machine.power_factor      # brighter the more power it's drawing
+			col = Color(0.36, 1.0, 0.90)                   # lift teal (echoes the updraft motes)
+			pulse = (0.55 + 0.5 * machine.power_factor) * (0.85 + 0.15 * sin(_anim_time * 3.0))
 		elif kind != "furnace":
-			col = Color(0.55, 0.82, 0.98)                  # cool machine glow
+			col = Color(0.42, 0.78, 1.0)                   # cool machine glow (saturated cyan)
 		if pulse > 0.0:
-			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.3, col, pulse)
+			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.6, col, pulse)
 	# Torches: the placeable light (FABLE_50 #26). Each mounted torch casts a warm guttering pool —
 	# smaller than the head-lamp, but it STAYS: dropped along a dig, they mark the route home, and a
 	# lit cave reads as claimed territory in the black.
 	for cell: Variant in sim.torch:
 		var tc: Vector2i = cell
-		var gutter: float = 0.42 + 0.05 * sin(_anim_time * 9.0 + float(tc.x) * 1.7) \
-			+ 0.03 * sin(_anim_time * 23.0 + float(tc.y))
-		_draw_glow(layer, _cell_center(tc) + Vector2(1.2, -6.0), float(CELL) * 3.1,
-			Color(1.0, 0.72, 0.38), gutter)
+		var gutter: float = 0.68 + 0.08 * sin(_anim_time * 9.0 + float(tc.x) * 1.7) \
+			+ 0.05 * sin(_anim_time * 23.0 + float(tc.y))
+		_draw_glow(layer, _cell_center(tc) + Vector2(1.2, -6.0), float(CELL) * 3.0,
+			Color(1.0, 0.60, 0.24), gutter)
 	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft
 	# (the in-world tube is drawn under the veil; this is what makes its power read from across the room).
 	for cell: Variant in sim.conduit:
 		var lvl: float = _conduit_level(cell)
 		if lvl > 0.04:
-			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
+			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.78, 0.36), lvl * 0.7)
+	# CRYSTAL/ORE GLOW (fix-2 diff 2): a saturated cyan pool over the sparse glowing vein cells + a hot
+	# white-cyan core pip on each — the COOL accent that gives the scene warm/cool contrast like Noita's
+	# varied lights. Held modest so it accents the vein, never floods a cavern.
+	for c: Vector2i in _crystal_cells():
+		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
+		var ctr: Vector2 = _cell_center(c)
+		_draw_glow(layer, ctr, float(CELL) * 2.6, CRYSTAL_COLOR, 0.42 + 0.26 * breath)
+		layer.draw_circle(ctr, 1.8 + 0.9 * breath, Color(0.78, 0.99, 1.0, 0.60 + 0.35 * breath))  # hot crystal core
 	for m: Dictionary in falling.motes():
 		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
 		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
-		_draw_glow(layer, m["pos"], float(CELL) * 0.95, m["color"], 0.26)
+		_draw_glow(layer, m["pos"], float(CELL) * 1.0, m["color"], 0.38)
 
 
 ## GODRAYS (FABLE_50 #12) — the signature shot: where a dug shaft admits the sky below the enclosing
@@ -2058,9 +2194,11 @@ func _draw_glow(layer: LightLayer, center: Vector2, radius: float, color: Color,
 ## A 128² radial gradient (bright centre → transparent edge, soft curve) reused for every light pool.
 func _make_glow_texture() -> GradientTexture2D:
 	var g := Gradient.new()
-	# Softer core (0.72, not a clipping 0.85) so a pool shows its WARM colour instead of blowing to white.
-	g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-	g.colors = PackedColorArray([Color(1, 1, 1, 0.72), Color(1, 1, 1, 0.26), Color(1, 1, 1, 0.0)])
+	# A brighter core with a TIGHTER falloff (diffs 2, 11): light blazes out of the near-black base. The
+	# mid stop pulled in (0.42) + lower so the pool has a hot centre and a fast fade — Noita contrast,
+	# not a wide soft wash. Cores still carry their WARM tint (not clipped to pure white).
+	g.offsets = PackedFloat32Array([0.0, 0.42, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 0.92), Color(1, 1, 1, 0.22), Color(1, 1, 1, 0.0)])
 	var t := GradientTexture2D.new()
 	t.gradient = g
 	t.width = 128

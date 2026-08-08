@@ -9,15 +9,20 @@ shader_type canvas_item;
 // HUD, so the world gets the lens treatment and the UI stays crisp.
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
-uniform float vignette_strength : hint_range(0.0, 1.0) = 0.22;  // how dark the corners go (dialed back)
+uniform float vignette_strength : hint_range(0.0, 1.0) = 0.32;  // darker corners focus the light-pools-in-black
 uniform float vignette_inner : hint_range(0.0, 1.0) = 0.48;     // radius where darkening starts
 uniform float vignette_outer : hint_range(0.0, 1.5) = 0.98;     // radius of full darkening
 uniform float grain_amount : hint_range(0.0, 0.2) = 0.014;      // film-grain intensity (was 0.030 — too busy)
 uniform float aberration : hint_range(0.0, 0.01) = 0.0007;      // edge colour-fringe amount
 uniform float time_scale = 24.0;                                // grain re-seed speed
-uniform float grade_amount : hint_range(0.0, 1.0) = 0.55;       // master mix of the palette grade
-uniform float grade_curve : hint_range(0.0, 1.0) = 0.30;        // filmic S-curve strength (contrast cohesion)
-uniform float grade_saturation : hint_range(0.5, 1.5) = 1.07;   // a touch of richness, never neon
+uniform float grade_amount : hint_range(0.0, 1.0) = 0.68;       // master mix of the palette grade (up for Noita contrast)
+uniform float grade_curve : hint_range(0.0, 1.0) = 0.38;        // filmic S-curve strength (fix-2 diff 1): 0.52 →
+                                                                // 0.38 — pass-1's hard S-curve crushed the gloom
+                                                                // back toward black, undoing the raised ambient
+                                                                // floor. Softer curve keeps the light-pools popping
+                                                                // while the moonlit rock stays LEGIBLE across the
+                                                                // frame (the grade no longer fights the ambient).
+uniform float grade_saturation : hint_range(0.5, 1.5) = 1.14;   // richer light-pools (saturated cores blaze), never neon
 
 // Cheap hash noise for the grain (no texture needed).
 float hash(vec2 p) {
@@ -43,7 +48,9 @@ void fragment() {
 	float luma = dot(curved, vec3(0.299, 0.587, 0.114));
 	// Near-unity hue nudges (multiplicative), NOT crushing tints: shadows drift toward the veil's
 	// blue-black, highlights toward lamp gold — the two poles the game's light already lives between.
-	vec3 tone = mix(vec3(0.93, 0.97, 1.09), vec3(1.06, 1.00, 0.91), smoothstep(0.05, 0.85, luma));
+	// Shadow pole pulled cooler (fix-2 diff 3): shadows drift toward teal-blue (less red, a touch more
+	// green+blue) so the whole gloom reads cold; highlights stay warm gold.
+	vec3 tone = mix(vec3(0.90, 0.98, 1.12), vec3(1.06, 1.00, 0.91), smoothstep(0.05, 0.85, luma));
 	vec3 toned = curved * tone;
 	toned = mix(vec3(dot(toned, vec3(0.299, 0.587, 0.114))), toned, grade_saturation);
 	col = mix(col, toned, grade_amount);
