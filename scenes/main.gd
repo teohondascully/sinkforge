@@ -84,6 +84,7 @@ var _settings_drag: String = ""
 var _show_help: bool = false
 var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
                                     ## the research VERB (R) stays Bazaar-gated like the bench
+var _show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD (FABLE_NEXT_50 #28); non-modal read
 ## Fast-forward game clock: "." cycles Engine.time_scale through this exponential ladder so the whole
 ## game (sim ticks AND the body) runs faster — watch a factory fill, or (headless) speed up play-tests.
 ## The body integrates in substeps (Player.MAX_SUBSTEP) so it can't tunnel at the high multipliers.
@@ -571,6 +572,7 @@ func _process(delta: float) -> void:
 		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
 		_hud.show_tech = _show_tech
+		_hud.show_dashboard = _show_dashboard
 		_hud.settings_open = _settings_open
 		_hud.settings_capture = _capture_action
 		_hud.title_info = {} if not _title_open else {
@@ -705,12 +707,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.TECH):
 		_show_tech = not _show_tech
+	elif event.is_action_pressed(Controls.DASHBOARD):
+		_show_dashboard = not _show_dashboard
 	elif event.is_action_pressed(Controls.CLOSE):
 		# ESC closes whatever's open; with a CALM screen it opens SETTINGS (the pause-menu convention).
-		if _inventory_open or _show_help or _show_tech or _minimap_mode != 0:
+		if _inventory_open or _show_help or _show_tech or _show_dashboard or _minimap_mode != 0:
 			_inventory_open = false
 			_show_help = false
 			_show_tech = false
+			_show_dashboard = false
 			_minimap_mode = 0
 		else:
 			_settings_open = true

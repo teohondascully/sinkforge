@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_state_canary()
 	_test_production()
 	_test_production_rate()
+	_test_machine_census()
 	_test_splitter()
 	_test_terrain()
 	_test_surface_silhouette()
@@ -232,6 +233,34 @@ func _test_production_rate() -> void:
 	var made: int = int(sim.total_produced.get(&"ore", 0))
 	var present: int = _items_present(sim, &"ore")
 	_check(made == present, "rate sampling is conservation-neutral (made=%d present=%d)" % [made, present])
+
+
+## machine_census: the production dashboard's factory-at-a-glance read. Two vents + one processor →
+## the census tallies 2 machine TYPES, 3 machines total (== grid.size()), and the vents (always
+## producing) read as working. A pure read: it must not perturb conservation.
+func _test_machine_census() -> void:
+	print("- machine census (dashboard)")
+	var vent_def: MachineDef = load("res://src/data/machines/ore_vent.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var sim: FactorySim = FactorySim.new()
+	_check(sim.machine_census().is_empty(), "empty world -> no census")
+	sim.place_machine(vent_def, Vector2i(6, 0))
+	sim.place_machine(vent_def, Vector2i(8, 0))
+	sim.place_machine(proc_def, Vector2i(6, 3))
+	for _i: int in 60:
+		sim.tick()
+	var census: Array[Dictionary] = sim.machine_census()
+	var total: int = 0
+	var vent_row: Dictionary = {}
+	for row: Dictionary in census:
+		total += int(row["count"])
+		if row["id"] == vent_def.id:
+			vent_row = row
+	_check(census.size() == 2, "two machine TYPES tallied (got %d)" % census.size())
+	_check(total == sim.grid.size() and total == 3, "census total == grid.size() == 3 (got %d)" % total)
+	_check(int(vent_row.get("count", 0)) == 2, "two vents counted (got %d)" % int(vent_row.get("count", 0)))
+	_check(int(vent_row.get("working", 0)) == 2, "both vents read WORKING (got %d)" % int(vent_row.get("working", 0)))
+	_check(census[0]["id"] == vent_def.id, "sorted most-numerous-first (vents lead)")
 
 
 ## A splitter divides its incoming ore between two columns. Down-branch ore falls clear to the

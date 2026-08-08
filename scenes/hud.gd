@@ -67,6 +67,7 @@ var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hi
 var ping_world: Vector2 = Vector2.INF
 var show_help: bool = false
 var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
+var show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD (throughput bars + factory census)
 ## THE SETTINGS page (FABLE_50 #36): ESC on a calm screen. Values are read straight off the Settings
 ## statics (representation reading representation); every control click returns a payload through
 ## settings_click() for MainView to act on — the HUD never touches InputMap, audio or the config file.
@@ -152,7 +153,7 @@ func _draw() -> void:
 	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
 	_draw_inventory()      # bottom-centre hotbar
 	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
-	if not (inventory_open or show_tech or show_help or settings_open):
+	if not (inventory_open or show_tech or show_help or settings_open or show_dashboard):
 		_draw_hint_bubble()  # just-in-time teaching near the body (hidden while a menu dims the world)
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
@@ -161,6 +162,8 @@ func _draw() -> void:
 		_draw_inventory_overlay()  # E — the PACK screen: full inventory + (at the Bazaar) the craft panel
 	if show_tech:
 		_draw_tech_overlay()      # T — the research ladder as a graph (the PULL's face)
+	if show_dashboard:
+		_draw_dashboard_overlay()  # G — throughput bars + factory census (the flywheel made legible)
 	if show_help:
 		_draw_help_overlay()      # H / ? — the full controls list
 	if settings_open:
@@ -886,6 +889,93 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool) -> void:
 		draw_rect(rr, Color(0.0, 0.0, 0.0, 0.30))          # locked: the whole chip recedes
 
 
+## THE PRODUCTION DASHBOARD (FABLE_NEXT_50 #28, [G]): the flywheel made legible — the factory's whole
+## output at a glance so scaling is FELT, not guessed. Two columns, both pure sim reads: THROUGHPUT
+## (production_rates() → per-item /min bars, relative + absolute, sorted fastest-first, grand total) and
+## FACTORY (machine_census() → machines by type with a live working-count). Non-modal, like the tech
+## tree — a status read, never blocks the world.
+func _draw_dashboard_overlay() -> void:
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))
+	var w: float = 392.0
+	var h: float = 238.0
+	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
+	_panel(Rect2(origin, Vector2(w, h)), true)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(w - 108.0, 21.0), "G / Esc to close",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	draw_line(origin + Vector2(206.0, 34.0), origin + Vector2(206.0, h - 12.0), UI_EDGE, 1.0)  # column rule
+
+	# --- left column: THROUGHPUT (the flywheel — is output growing?) -----------------------------
+	var lx: float = origin.x + 14.0
+	var rates: Array[Dictionary] = sim.production_rates()
+	var grand: float = 0.0
+	var top: float = 0.0
+	for r: Dictionary in rates:
+		grand += float(r["rate"])
+		top = maxf(top, float(r["rate"]))
+	draw_string(_font, Vector2(lx, origin.y + 48.0), "THROUGHPUT · last 60s",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	draw_string(_font, Vector2(lx, origin.y + 66.0), "%.1f" % grand, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI_ACCENT)
+	draw_string(_font, Vector2(lx + 4.0 + _font.get_string_size("%.1f" % grand,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, origin.y + 66.0), "items/min",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	if rates.is_empty():
+		draw_string(_font, Vector2(lx, origin.y + 92.0), "nothing producing yet —",
+			HORIZONTAL_ALIGNMENT_LEFT, 184.0, 10, UI_TEXT_DIM)
+		draw_string(_font, Vector2(lx, origin.y + 106.0), "mine, or feed a machine.",
+			HORIZONTAL_ALIGNMENT_LEFT, 184.0, 10, UI_TEXT_DIM)
+	else:
+		var y: float = origin.y + 84.0
+		var bar_x: float = lx + 74.0
+		var bar_w: float = 118.0
+		for i: int in mini(9, rates.size()):                  # top nine — the panel's height budget
+			var item: StringName = rates[i]["item"]
+			var rate: float = float(rates[i]["rate"])
+			Visuals.draw_item(self, Vector2(lx + 7.0, y - 3.0), 13.0, item)
+			draw_string(_font, Vector2(lx + 16.0, y), _item_label(item), HORIZONTAL_ALIGNMENT_LEFT, 56.0, 9, UI_TEXT)
+			var frac: float = rate / top if top > 0.0 else 0.0
+			draw_rect(Rect2(bar_x, y - 8.0, bar_w, 9.0), UI_SLOT)   # bar well
+			var col: Color = Visuals.item_color(item)
+			draw_rect(Rect2(bar_x, y - 8.0, maxf(2.0, bar_w * frac), 9.0), col)
+			draw_string(_font, Vector2(bar_x + 3.0, y - 0.5), "%.1f/min" % rate,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT)
+			y += 16.6
+
+	# --- right column: FACTORY census (the empire — how big, how healthy?) ------------------------
+	var rx: float = origin.x + 218.0
+	var census: Array[Dictionary] = sim.machine_census()
+	var total_m: int = sim.grid.size()
+	var working_m: int = 0
+	for c: Dictionary in census:
+		working_m += int(c["working"])
+	draw_string(_font, Vector2(rx, origin.y + 48.0), "FACTORY · %d machine%s" % [total_m,
+		"" if total_m == 1 else "s"], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	if census.is_empty():
+		draw_string(_font, Vector2(rx, origin.y + 70.0), "no machines built yet.",
+			HORIZONTAL_ALIGNMENT_LEFT, 160.0, 10, UI_TEXT_DIM)
+		draw_string(_font, Vector2(rx, origin.y + 84.0), "craft one (E), place it (RMB).",
+			HORIZONTAL_ALIGNMENT_LEFT, 160.0, 10, UI_TEXT_DIM)
+	else:
+		draw_string(_font, Vector2(rx, origin.y + 63.0), "%d working" % working_m,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.78, 0.55))
+		var y2: float = origin.y + 84.0
+		for i: int in mini(9, census.size()):
+			var row: Dictionary = census[i]
+			var mdef: MachineDef = row["def"]
+			var box := Rect2(rx, y2 - 11.0, 15.0, 15.0)
+			draw_rect(box, Visuals.machine_color(mdef))
+			Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
+				Visuals.machine_kind(mdef), box.size.y / 20.0, false, 0.0)
+			draw_string(_font, Vector2(rx + 20.0, y2), str(row["name"]), HORIZONTAL_ALIGNMENT_LEFT, 96.0, 9, UI_TEXT)
+			# count · working — green when all are running, amber when some are stalled
+			var cnt: int = int(row["count"])
+			var wrk: int = int(row["working"])
+			var stat_col: Color = Color(0.55, 0.78, 0.55) if wrk == cnt else UI_ACCENT
+			draw_string(_font, Vector2(rx + 118.0, y2), "%d" % cnt, HORIZONTAL_ALIGNMENT_RIGHT, 24.0, 10, UI_TEXT)
+			draw_string(_font, Vector2(rx + 144.0, y2), "%d▸" % wrk, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, stat_col)
+			y2 += 16.6
+
+
 ## The id of the i-th craftable — supplied explicitly by MainView (craft_ids, parallel to craft_options),
 ## so machines and tools can interleave without relying on machine_icons insertion order. Falls back to the
 ## old machine_icons-keys derivation if craft_ids wasn't set (defensive).
@@ -911,7 +1001,7 @@ func _draw_help_overlay() -> void:
 		"drop / feed  Q  (gravity feeds it in)",
 		"pack        E  (inventory · craft at Bazaar)",
 		"research    R  (in the pack screen, at the bench)",
-		"tech tree   T",
+		"tech tree   T   ·   dashboard  G",
 		"configure   R  (aimed at a splitter / hopper)",
 		"map         M  (again: LARGE · click it = ping)",
 		"fast-fwd    .     (1x → 2x → 4x → 8x)",
@@ -940,7 +1030,8 @@ const REMAP_ROWS: Array[Array] = [
 	[Controls.BUILD, "build / place"], [Controls.DROP, "drop / feed"],
 	[Controls.CRAFT, "pack"], [Controls.RESEARCH, "research / config"],
 	[Controls.MAP, "map"], [Controls.TECH, "tech tree"],
-	[Controls.HELP, "help"], [Controls.PAUSE, "pause"],
+	[Controls.DASHBOARD, "dashboard"], [Controls.HELP, "help"],
+	[Controls.PAUSE, "pause"],
 	[Controls.SPEED, "game speed"], [Controls.ZOOM, "zoom"],
 	[Controls.SAVE, "quicksave"], [Controls.LOAD, "quickload"],
 	[Controls.CLEAR_MARKS, "clear dig plan"],

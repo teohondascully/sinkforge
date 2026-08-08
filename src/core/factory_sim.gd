@@ -1079,6 +1079,28 @@ func production_rates() -> Array[Dictionary]:
 	return out
 
 
+## FACTORY CENSUS (legibility — the production dashboard's machine side): every placed machine tallied
+## by type, with a LIVE working-count off machine_status. A pure read over `grid` (one MachineState per
+## cell), mirroring production_rates()'s role — no state, never touches the tick. Returns
+## [{id, name, count, working}, ...] sorted most-numerous-first. Total machines == grid.size().
+func machine_census() -> Array[Dictionary]:
+	var by_id: Dictionary = {}                                 # id -> {id, name, count, working}
+	for cell: Vector2i in grid:
+		var m: MachineState = grid[cell]
+		var id: StringName = m.def.id
+		if not by_id.has(id):
+			by_id[id] = {"id": id, "name": m.def.display_name, "def": m.def, "count": 0, "working": 0}
+		var e: Dictionary = by_id[id]
+		e["count"] = int(e["count"]) + 1
+		if machine_status(m) == &"working":
+			e["working"] = int(e["working"]) + 1
+	var out: Array[Dictionary] = []
+	for id: StringName in by_id:
+		out.append(by_id[id])
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["count"]) > int(b["count"]))
+	return out
+
+
 ## Drop any ground cell whose pile emptied. `_column_landing`/`_column_rise` create a pile dict EAGERLY for
 ## a landing they might not fill — a splitter routing all of a tick's items one way, or a resettle of an empty
 ## pile — leaving an empty `{}` in `ground`. An empty pile is a phantom: it crashes walk-over collect

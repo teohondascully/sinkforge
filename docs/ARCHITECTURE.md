@@ -71,6 +71,10 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
   bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
   hover "factory makes X/min" row + the pack header's "making …" pulse line read it.
+- **Factory census (legibility):** `machine_census()` — a pure read over `grid` tallying machines by
+  `def.id` with a live `machine_status`-derived working-count (`[{id, name, def, count, working}]`,
+  most-numerous-first). Same role as `production_rates()` for the machine side; no state, never ticks.
+  The PRODUCTION DASHBOARD ([G], FABLE_NEXT_50 #28) draws both together — throughput bars + this census.
 - **Save/load — `SaveGame` (`src/core/save_game.gd`, FABLE_50 #1):** the sim being plain data makes a
   save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
   ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),
