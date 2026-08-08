@@ -30,6 +30,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		})
 	return {
 		"version": VERSION,
+		"world_seed": sim.world_seed,   # the fine terrain derives from this — restore rebuilds it (not stored)
 		"solid": sim.solid.duplicate(),
 		"wall": sim.wall.duplicate(),
 		"deposits": sim.deposits.duplicate(),
@@ -72,6 +73,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 		m.mode = int(entry.get("mode", 0))
 		m.filter = StringName(str(entry.get("filter", "")))
 		rebuilt.append(m)
+	sim.world_seed = int(data.get("world_seed", 0))   # additive: absent in older v1 saves → 0 (default)
 	sim.solid = (data["solid"] as Dictionary).duplicate()
 	sim.wall = (data["wall"] as Dictionary).duplicate()
 	sim.deposits = (data["deposits"] as Dictionary).duplicate()
@@ -95,6 +97,9 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	sim.flow_events.clear()
 	sim.terrain_dirty.clear()
 	sim._bazaars_dirty = true
+	# The FINE TERRAIN grid is DERIVED (not saved) — rebuild it deterministically from the restored
+	# coarse terrain + seed, so a loaded game molds identically to when it was saved (docs/FINE_TERRAIN.md).
+	sim.rebuild_fine_terrain()
 	return true
 
 

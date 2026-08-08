@@ -181,6 +181,32 @@ var research: Dictionary = {}
 ## mutated by plant_sapling + the tick's growth sweep.
 var sapling: Dictionary = {}
 
+## --- FINE TERRAIN (the dual-grid Noita overhaul, docs/FINE_TERRAIN.md P2) -----------------------
+## A SECOND, FINER terrain layer at SUBDIV× the coarse resolution (8px fine cells vs 32px coarse). It
+## is ADDITIVE and DERIVED: the coarse `solid` dict stays the ONE authority for ALL logistics (is_solid,
+## surface_row, ramp_dir, mining, collision inputs, _column_landing, machines, flow, power all read
+## `solid` exactly as before — the fine layer never feeds them), so the locked gravity hook and every
+## existing test are byte-for-byte unaffected. What the fine grid IS for: a crunchier, molded, real-DATA
+## render now (scenes/fine_terrain.gd bakes from it), and — in later slices — fine collision (P3) and
+## brush digging (P4). Because it is a pure function of `solid` + `world_seed`, it is NOT saved: it is
+## rebuilt deterministically by rebuild_fine_terrain() after load_world / save-restore (so it can never
+## desync, and the save envelope stays small). Stored as one flat PackedByteArray (1 = solid, 0 = air),
+## sized fine_w × fine_h (~120 KB at 384×320), indexed fy * fine_w + fx.
+const SUBDIV: int = 4                              ## fine cells per coarse cell side (8px fine @ 32px cell)
+## Fine-detail worldgen tuning (deterministic — seeded FastNoiseLite + coords ONLY, no time/RNG). The
+## molding only bends the ~1-cell BOUNDARY band between solid and air; deep interior stays solid and open
+## stays open. EDGE noise erodes/accretes the boundary into organic curves; GRIT speckle + thin
+## PROTRUSIONS near surfaces add the Noita crunch. See _sync_fine_block / rebuild_fine_terrain.
+const FINE_EDGE_FREQ: float = 0.34                 ## boundary erosion/accretion — clumps ~3 fine cells wide
+const FINE_EDGE_AMP: float = 0.62                  ## how hard the edge noise bends the boundary band
+const FINE_GRIT_FREQ: float = 1.10                 ## dense per-fine-cell grit that pits/protrudes near faces
+const FINE_GRIT_BITE: float = 0.42                 ## grit strength at an exposed face (fades inward)
+const FINE_EROSION_BIAS: float = 0.04              ## tiny net-erode so cave mouths open rather than seal
+var world_seed: int = 0                            ## the seed the terrain was generated from (drives fine detail)
+var _fine_solid: PackedByteArray = PackedByteArray()   ## 1 = solid, 0 = air; size fine_w()*fine_h()
+var _fine_edge: FastNoiseLite                      ## boundary-molding noise (built lazily on first rebuild)
+var _fine_grit: FastNoiseLite                      ## grit/protrusion noise
+
 var _tick_accumulator: float = 0.0
 
 ## PRODUCTION-RATE sampling (legibility, Factorio's "X/min" read): a ring buffer of total_produced
@@ -341,7 +367,7 @@ func _fell_foliage_cell(c: Vector2i) -> void:
 	if mat == &"" or not _is_foliage(mat):
 		return
 	solid.erase(c)
-	terrain_dirty.append(c)
+	_dirty_terrain(c)
 	if mat == &"wood":
 		inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
 		total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
@@ -375,7 +401,7 @@ func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 		solid.erase(cell)
 	else:
 		solid[cell] = material
-	terrain_dirty.append(cell)
+	_dirty_terrain(cell)
 	_bazaars_dirty = true
 
 
@@ -403,6 +429,7 @@ func load_world(world: WorldData) -> void:
 	solid.clear()
 	wall.clear()
 	deposits.clear()
+	world_seed = world.seed
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
 			solid[cell] = world.blocks[cell]
@@ -412,6 +439,140 @@ func load_world(world: WorldData) -> void:
 	for cell: Vector2i in world.amounts:
 		if in_bounds(cell):
 			deposits[cell] = int(world.amounts[cell])
+	rebuild_fine_terrain()   # derive the fine grid from the freshly loaded coarse terrain (deterministic)
+
+
+## --- FINE TERRAIN accessors + build (docs/FINE_TERRAIN.md P2) ----------------------------------
+## The fine grid is DERIVED render/collision data, NOT authoritative logistics state — every accessor
+## reads the flat byte array; the sim's production math never touches it.
+
+func fine_w() -> int:
+	return GRID_COLS * SUBDIV
+
+
+func fine_h() -> int:
+	return GRID_ROWS * SUBDIV
+
+
+## Is the fine cell at (fx, fy) solid? Out of bounds reads AIR (so world edges mold as carved faces).
+func fine_is_solid(fx: int, fy: int) -> bool:
+	if fx < 0 or fy < 0 or fx >= fine_w() or fy >= fine_h():
+		return false
+	if _fine_solid.size() != fine_w() * fine_h():
+		return false
+	return _fine_solid[fy * fine_w() + fx] == 1
+
+
+## Rebuild the ENTIRE fine terrain array from the coarse `solid` grid + deterministic fine worldgen.
+## Called after load_world / save-restore (the fine grid is not saved — it derives from `solid` + seed).
+## Deterministic in (world_seed, coords) ONLY (no time, no RNG), so two loads of the same world produce
+## an identical fine array. O(fine cells) — full rebuild; incremental edits use _sync_fine_block instead.
+func rebuild_fine_terrain() -> void:
+	_ensure_fine_noise()
+	var fw: int = fine_w()
+	var fh: int = fine_h()
+	if _fine_solid.size() != fw * fh:
+		_fine_solid.resize(fw * fh)
+	for fy: int in fh:
+		for fx: int in fw:
+			_fine_solid[fy * fw + fx] = 1 if _fine_cell_solid(fx, fy) else 0
+
+
+## Re-mold ONE coarse cell's SUBDIV×SUBDIV fine block PLUS the one-cell boundary band around it (its
+## edge molding reads the coarse neighbours, so a dig must re-mold the neighbours' rims to stay organic).
+## O(local): (SUBDIV+2)² fine cells per edit — the cheap incremental path used on mine/place/bore/fell.
+func _sync_fine_block(coarse: Vector2i) -> void:
+	_ensure_fine_noise()
+	var fw: int = fine_w()
+	var fh: int = fine_h()
+	if _fine_solid.size() != fw * fh:
+		rebuild_fine_terrain()
+		return
+	# Cover this cell's SUBDIV block and one coarse cell of margin on every side (the boundary band).
+	var fx0: int = maxi(0, (coarse.x - 1) * SUBDIV)
+	var fy0: int = maxi(0, (coarse.y - 1) * SUBDIV)
+	var fx1: int = mini(fw, (coarse.x + 2) * SUBDIV)
+	var fy1: int = mini(fh, (coarse.y + 2) * SUBDIV)
+	for fy: int in range(fy0, fy1):
+		for fx: int in range(fx0, fx1):
+			_fine_solid[fy * fw + fx] = 1 if _fine_cell_solid(fx, fy) else 0
+
+
+## Decide whether a single fine cell is solid — the FINE WORLDGEN, deterministic in (world_seed, fx, fy).
+## Base solidity = its parent coarse cell's solidity. In the INTERIOR (all coarse neighbours agree) it
+## stays as-is — deep rock stays solid, open air stays open, so the hook's terrain is never punched. Only
+## at a solid/air BOUNDARY does fine detail apply: a bilinear ramp of coarse solidity is perturbed by
+## seeded edge noise (organic curves) then grit (crunch/protrusions near faces) and thresholded — so
+## rock reads Noita-crunchy, not smooth, WITHOUT any change to the coarse authority.
+func _fine_cell_solid(fx: int, fy: int) -> bool:
+	var pcx: int = fx / SUBDIV
+	var pcy: int = fy / SUBDIV
+	var parent: bool = solid.has(Vector2i(pcx, pcy))
+	# Is this fine cell in a boundary band? (any coarse neighbour differs from the parent) — only then mold.
+	var boundary: bool = false
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		if solid.has(Vector2i(pcx, pcy) + d) != parent:
+			boundary = true
+			break
+	if not boundary:
+		return parent    # deep interior / deep air — untouched, the base stays solid by construction
+	# Bilinear solidness at the fine cell centre (coarse-cell units) → a smooth 0..1 ramp across the edge.
+	var wx: float = (float(fx) + 0.5) / float(SUBDIV)
+	var wy: float = (float(fy) + 0.5) / float(SUBDIV)
+	var solidness: float = _fine_bilinear(wx, wy)
+	# EDGE noise bends the boundary (organic erosion/accretion); a slight net-erode opens cave mouths.
+	var band: float = 1.0 - absf(solidness - 0.5) * 2.0     # full swing at the 0.5 edge, 0 deep in either
+	var edge: float = _fine_edge.get_noise_2d(float(fx), float(fy)) * FINE_EDGE_AMP - FINE_EROSION_BIAS
+	solidness = clampf(solidness + edge * band, 0.0, 1.0)
+	# GRIT: near a face the rock crumbles/protrudes — high-freq noise adds bite that fades toward interior,
+	# so exposed rock gets little pits + nubs (crunch), deep rock stays whole.
+	var grit: float = _fine_grit.get_noise_2d(float(fx), float(fy)) * FINE_GRIT_BITE * band
+	solidness = clampf(solidness + grit, 0.0, 1.0)
+	return solidness >= 0.5
+
+
+## Bilinear sample of coarse solidity (0/1 per cell, out-of-bounds = 0/air) at a fractional coarse
+## position — turns the hard solid/air step into the smooth ramp the fine noise then bends.
+func _fine_bilinear(wx: float, wy: float) -> float:
+	var gx: float = wx - 0.5
+	var gy: float = wy - 0.5
+	var x0: int = int(floor(gx))
+	var y0: int = int(floor(gy))
+	var tx: float = gx - float(x0)
+	var ty: float = gy - float(y0)
+	var s00: float = 1.0 if solid.has(Vector2i(x0, y0)) else 0.0
+	var s10: float = 1.0 if solid.has(Vector2i(x0 + 1, y0)) else 0.0
+	var s01: float = 1.0 if solid.has(Vector2i(x0, y0 + 1)) else 0.0
+	var s11: float = 1.0 if solid.has(Vector2i(x0 + 1, y0 + 1)) else 0.0
+	return lerpf(lerpf(s00, s10, tx), lerpf(s01, s11, tx), ty)
+
+
+## Build the fine-detail noise fields once, seeded off world_seed (deterministic; rebuilt if the seed
+## changed under a reused sim, e.g. a title reroll → new load_world).
+func _ensure_fine_noise() -> void:
+	if _fine_edge != null and _fine_seed_built == world_seed:
+		return
+	_fine_seed_built = world_seed
+	_fine_edge = FastNoiseLite.new()
+	_fine_edge.seed = world_seed ^ 0x1f83d9ab
+	_fine_edge.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_fine_edge.frequency = FINE_EDGE_FREQ
+	_fine_grit = FastNoiseLite.new()
+	_fine_grit.seed = world_seed ^ 0x5be0cd19
+	_fine_grit.noise_type = FastNoiseLite.TYPE_VALUE       # blocky value noise = crisp per-fine-cell grit
+	_fine_grit.frequency = FINE_GRIT_FREQ
+
+
+## The seed the fine noise fields were built for (so a reused sim rebuilds them when world_seed changes).
+var _fine_seed_built: int = -0x7fffffff
+
+
+## Mark a coarse terrain cell dirty: queue the chunk repaint AND re-mold its fine block (+ boundary band).
+## The ONE place terrain edits announce a solid/wall change, so the fine grid can never drift from `solid`.
+func _dirty_terrain(cell: Vector2i) -> void:
+	terrain_dirty.append(cell)
+	_sync_fine_block(cell)
 
 
 ## Player action: dig out a solid cell. Returns the material mined (&"earth"/&"ore"), or &"" if the
@@ -421,7 +582,6 @@ func load_world(world: WorldData) -> void:
 func mine(cell: Vector2i) -> StringName:
 	if not solid.has(cell):
 		return &""
-	terrain_dirty.append(cell)          # the block is about to clear on every branch below → repaint its chunk
 	_bazaars_dirty = true               # a mined block can break a bazaar frame → rescan lazily
 	var material: StringName = solid[cell]
 	if _is_ore_like(material):
@@ -436,6 +596,7 @@ func mine(cell: Vector2i) -> StringName:
 		total_produced[material] = int(total_produced.get(material, 0)) + burst
 		deposits.erase(cell)
 		solid.erase(cell)
+		_dirty_terrain(cell)                # repaint the chunk + re-mold the fine block now the cell is air
 		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
 		return material
 	if _is_foliage(material):
@@ -445,6 +606,7 @@ func mine(cell: Vector2i) -> StringName:
 		# of LEAVES hide a SAPLING (deterministic per cell — no RNG), the seed of the renewable-wood loop
 		# (#38): plant it on soil and a new tree grows. The whole-tree fell stays removed.
 		solid.erase(cell)
+		_dirty_terrain(cell)
 		if material == &"wood":
 			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
@@ -458,6 +620,7 @@ func mine(cell: Vector2i) -> StringName:
 	# so you can re-place it to bridge a gap, backfill, or PILLAR out of a hole. Produced from the world +
 	# consumed on placement (place_block) → conservation holds, symmetric with mining a placed block back.
 	solid.erase(cell)
+	_dirty_terrain(cell)
 	inventory[material] = int(inventory.get(material, 0)) + 1
 	total_produced[material] = int(total_produced.get(material, 0)) + 1
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
@@ -493,7 +656,7 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	_take_from_pack(material, 1)
 	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
 	solid[cell] = material
-	terrain_dirty.append(cell)
+	_dirty_terrain(cell)
 	_bazaars_dirty = true               # a placed block can COMPLETE a bazaar frame → rescan lazily
 	return true
 
@@ -728,7 +891,7 @@ func _stamp_tree(base: Vector2i) -> void:
 		var t: Vector2i = base + Vector2i(0, -h)
 		if in_bounds(t) and not solid.has(t) and not grid.has(t) and not rope.has(t) and not torch.has(t):
 			solid[t] = &"wood"
-			terrain_dirty.append(t)
+			_dirty_terrain(t)
 	var ttr: int = base.y - trunk + 1                   # row of the topmost trunk cell
 	for leaf: Vector2i in [
 			Vector2i(base.x, ttr - 1), Vector2i(base.x, ttr - 2),
@@ -737,7 +900,7 @@ func _stamp_tree(base: Vector2i) -> void:
 		if in_bounds(leaf) and not solid.has(leaf) and not grid.has(leaf) \
 				and not rope.has(leaf) and not torch.has(leaf):
 			solid[leaf] = &"leaves"
-			terrain_dirty.append(leaf)
+			_dirty_terrain(leaf)
 
 
 ## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
@@ -1641,7 +1804,7 @@ func _run_drill(machine: MachineState) -> void:
 	else:
 		deposits.erase(target)
 		solid.erase(target)                                   # cell bored out → the shaft deepens
-		terrain_dirty.append(target)                          # repaint the chunk the shaft just deepened into
+		_dirty_terrain(target)                                # repaint the chunk + re-mold the fine block
 		_bazaars_dirty = true                                 # solid changed → invalidate the bazaar cache
 		_resettle_pile_above(target)                          # gravity: anything resting above now falls
 	# Eject the freed material DOWN from the bored cell (still the drill's own column), where gravity carries
@@ -1720,12 +1883,12 @@ func _run_h_drill(machine: MachineState) -> void:
 		else:
 			deposits.erase(target)
 			solid.erase(target)
-			terrain_dirty.append(target)
+			_dirty_terrain(target)
 			_bazaars_dirty = true
 			_resettle_pile_above(target)
 	else:
 		solid.erase(target)
-		terrain_dirty.append(target)
+		_dirty_terrain(target)
 		_bazaars_dirty = true
 		_resettle_pile_above(target)
 	total_produced[item] = int(total_produced.get(item, 0)) + 1

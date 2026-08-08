@@ -62,6 +62,7 @@ func _initialize() -> void:
 	_test_hints()
 	_test_falling_pool()
 	_test_scanner()
+	_test_fine_terrain()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -224,6 +225,7 @@ func _test_state_canary() -> void:
 		"torch": func(s: FactorySim) -> void: s.torch[Vector2i(1, 1)] = true,
 		"research": func(s: FactorySim) -> void: s.research[&"automation"] = true,
 		"sapling": func(s: FactorySim) -> void: s.sapling[Vector2i(1, 1)] = 7,
+		"world seed": func(s: FactorySim) -> void: s.world_seed = 4242,
 		"ledger": func(s: FactorySim) -> void: s.total_produced[&"ore"] = 9,
 		"machine facing": func(s: FactorySim) -> void: s.machines[0].facing = -1,
 		"machine filter": func(s: FactorySim) -> void: s.machines[0].filter = &"ore",
@@ -2193,3 +2195,143 @@ func _test_scanner() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through research + craft (present=%d, net=%d)" % [item, present, net])
+
+
+## FINE TERRAIN (docs/FINE_TERRAIN.md P2 — the dual-grid overhaul). The fine grid is ADDITIVE + DERIVED:
+## it must be (a) deterministic from seed, (b) NEVER change the coarse authority that ALL logistics read,
+## (c) stay in sync when a coarse cell is edited, and (d) rebuild identically after a load. If any of these
+## breaks, the locked hook or the save format is at risk — so this is a guardrail, not a feature test.
+func _test_fine_terrain() -> void:
+	print("[fine terrain]")
+	var gen: WorldGen = LayeredWorldGen.new()
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337)
+
+	# (a) DETERMINISM — same seed → identical fine array across two independent loads.
+	var s1: FactorySim = FactorySim.new()
+	s1.load_world(world)
+	var s2: FactorySim = FactorySim.new()
+	s2.load_world(gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337))
+	_check(s1.fine_w() == FactorySim.GRID_COLS * FactorySim.SUBDIV
+		and s1.fine_h() == FactorySim.GRID_ROWS * FactorySim.SUBDIV, "fine grid is SUBDIV× the coarse grid")
+	_check(_fine_checksum(s1) == _fine_checksum(s2), "same seed → identical fine array (deterministic)")
+	# The fine grid has REAL detail: some fine cells differ from a pure 4× upscale of the coarse grid
+	# (the boundary molding erodes/accretes edges) — proving it's fine DATA, not just a stretched coarse mask.
+	var molded: int = 0
+	var solid_fine: int = 0
+	for fy: int in s1.fine_h():
+		for fx: int in s1.fine_w():
+			var here: bool = s1.fine_is_solid(fx, fy)
+			if here:
+				solid_fine += 1
+			if here != s1.is_solid(Vector2i(fx / FactorySim.SUBDIV, fy / FactorySim.SUBDIV)):
+				molded += 1
+	_check(solid_fine > 0, "the fine grid has solid rock in it (%d cells)" % solid_fine)
+	_check(molded > 200, "fine molding bends the coarse boundary (%d fine cells differ from coarse)" % molded)
+
+	# (b) COARSE UNCHANGED — the coarse solid/material for a fixed seed must be IDENTICAL to what it was
+	# before the fine layer existed. We prove the fine layer is purely additive two ways: the coarse
+	# checksum matches a second independent load, and known interior cells read exactly as the coarse
+	# grid intends (a solid earth cell stays solid earth; a carved cave stays open).
+	_check(_coarse_checksum(s1) == _coarse_checksum(s2), "coarse solid grid identical across loads (fine is additive)")
+	# The world is generated at exactly GRID_COLS×GRID_ROWS, so every block is in bounds → solid == blocks.
+	_check(s1.solid == world.blocks, "coarse solid == the ingested WorldData blocks (unchanged by fine)")
+	var a_solid: Vector2i = _first_deep_solid(s1)
+	_check(a_solid.x >= 0 and s1.is_solid(a_solid), "a known coarse-solid cell is still solid")
+	_check(s1.material_at(a_solid) == world.blocks.get(a_solid, &""), "material_at unchanged by the fine layer")
+
+	# (c) SYNC — mining a coarse cell re-molds its 4×4 fine block (+ the boundary band), and the O(local)
+	# incremental sync must produce EXACTLY what a full rebuild would (the load-time path); if these ever
+	# diverge, the fine grid silently rots after digging. We mine a solid cell that has OPEN AIR right below
+	# it (a cavity/cave-edge cell) so the opening actually admits — its block drains toward air — then assert
+	# the block cleared AND that the whole grid equals a full rebuild of the identical coarse state.
+	var dug: Vector2i = _first_solid_over_air(s1)
+	_check(dug.x >= 0, "found a solid cell with open air below to mine")
+	var pre_solid: int = _fine_block_solid(s1, dug)
+	s1.mine(dug)
+	var post_solid: int = _fine_block_solid(s1, dug)
+	_check(post_solid < pre_solid, "mining re-molds the 4×4 fine block toward air (was %d, now %d)"
+		% [pre_solid, post_solid])
+	_check(not s1.is_solid(dug), "…and the coarse cell is open (coarse still authoritative)")
+	# The incremental dig-sync == a full rebuild from the same coarse grid (byte-for-byte, ANY cell).
+	var rebuilt: FactorySim = FactorySim.new()
+	rebuilt.load_world(gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337))
+	rebuilt.mine(dug)
+	rebuilt.rebuild_fine_terrain()
+	_check(_fine_bytes(s1) == _fine_bytes(rebuilt), "incremental dig-sync == a full rebuild (no drift)")
+
+	# (d) LOAD REBUILDS IDENTICAL — a save/restore round-trip through disk must produce the SAME fine
+	# terrain (it is derived, rebuilt by restore, never stored — so it can never desync or bloat the save).
+	var s3: FactorySim = FactorySim.new()
+	s3.load_world(gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337))
+	s3.mine(_first_solid_over_air(s3))             # scar it (a real dig) before saving
+	var before: PackedByteArray = _fine_bytes(s3)
+	var data: Dictionary = SaveGame.capture(s3)
+	var path: String = "user://test_fine_terrain.save"
+	SaveGame.write(path, data)
+	var s4: FactorySim = FactorySim.new()
+	_check(SaveGame.restore(s4, SaveGame.read(path)), "the scarred world restores")
+	_check(_fine_bytes(s4) == before, "load rebuilds byte-identical fine terrain (derived, unsaved)")
+	_check(s4.solid == s3.solid, "coarse terrain round-trips exactly")
+
+
+## Count of solid fine cells in a coarse cell's SUBDIV×SUBDIV block.
+func _fine_block_solid(sim: FactorySim, coarse: Vector2i) -> int:
+	var n: int = 0
+	for dy: int in FactorySim.SUBDIV:
+		for dx: int in FactorySim.SUBDIV:
+			if sim.fine_is_solid(coarse.x * FactorySim.SUBDIV + dx, coarse.y * FactorySim.SUBDIV + dy):
+				n += 1
+	return n
+
+
+## A checksum of the fine solid grid — cheap byte fold, enough to catch any divergence.
+func _fine_checksum(sim: FactorySim) -> int:
+	var h: int = 1469598103
+	for fy: int in sim.fine_h():
+		for fx: int in sim.fine_w():
+			h = (h * 33 + (1 if sim.fine_is_solid(fx, fy) else 0)) & 0x7fffffff
+	return h
+
+
+## The whole fine solid grid as bytes (for exact equality across a save/load round-trip).
+func _fine_bytes(sim: FactorySim) -> PackedByteArray:
+	var out: PackedByteArray = PackedByteArray()
+	out.resize(sim.fine_w() * sim.fine_h())
+	for fy: int in sim.fine_h():
+		for fx: int in sim.fine_w():
+			out[fy * sim.fine_w() + fx] = 1 if sim.fine_is_solid(fx, fy) else 0
+	return out
+
+
+## A checksum of the COARSE solid grid (material ids folded in) — proves the coarse authority is unchanged.
+func _coarse_checksum(sim: FactorySim) -> int:
+	var keys: Array = sim.solid.keys()
+	keys.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return (a.y * FactorySim.GRID_COLS + a.x) < (b.y * FactorySim.GRID_COLS + b.x))
+	var h: int = 2166136261
+	for k: Vector2i in keys:
+		h = (h * 33 + k.x * 31 + k.y * 17 + int(str(sim.solid[k]).hash())) & 0x7fffffff
+	return h
+
+
+## First solid cell scanning down a central column — a known-solid interior probe.
+func _first_deep_solid(sim: FactorySim) -> Vector2i:
+	var col: int = FactorySim.GRID_COLS / 2
+	for row: int in range(0, FactorySim.GRID_ROWS):
+		if sim.is_solid(Vector2i(col, row)):
+			return Vector2i(col, row)
+	return Vector2i(-1, -1)
+
+
+## First mineable solid cell that sits directly OVER open air (a cavity/cave-edge cell) — mining it
+## genuinely opens the fine block toward air (its bilinear solidness drops), the clean sync case.
+func _first_solid_over_air(sim: FactorySim) -> Vector2i:
+	for row: int in range(0, FactorySim.GRID_ROWS - 1):
+		for col: int in range(0, FactorySim.GRID_COLS):
+			var c := Vector2i(col, row)
+			if not sim.is_solid(c) or sim.is_solid(c + Vector2i(0, 1)):
+				continue
+			if str(sim.solid[c]) == "sealrock":
+				continue                                          # unmineable — skip
+			return c
+	return Vector2i(-1, -1)

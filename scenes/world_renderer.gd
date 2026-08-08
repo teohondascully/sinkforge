@@ -1884,6 +1884,7 @@ func _bake_fine_terrain() -> void:
 		return
 	_fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
+		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),   # P2: the sim's real fine grid
 		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
 		_wall_fill_color,
 		func(col: int) -> int: return sim.surface_row(col))
@@ -2108,6 +2109,12 @@ func _paint_lights(layer: LightLayer) -> void:
 			col = Color(0.42, 0.78, 1.0)                   # cool machine glow (saturated cyan)
 		if pulse > 0.0:
 			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.6, col, pulse)
+			# WHITE-HOT CORE (noita-diff-03 #6): a fire's centre is near-white, not saturated — the forge
+			# ember + coal burner get a tiny hot-white pip so the pool reads like real flame, not a flat
+			# coloured disc. Only the genuinely BURNING machines (furnace/fueled generator) blaze a core.
+			if kind == "furnace" or (kind == "generator" and machine.fuel > 0):
+				var core := Color(1.0, 0.94, 0.82).lerp(col, 0.18)   # near-white, a whisper of the pool's hue
+				layer.draw_circle(_cell_center(machine.cell), 2.4 + 1.1 * pulse, Color(core.r, core.g, core.b, 0.85 * pulse))
 	# Torches: the placeable light (FABLE_50 #26). Each mounted torch casts a warm guttering pool —
 	# smaller than the head-lamp, but it STAYS: dropped along a dig, they mark the route home, and a
 	# lit cave reads as claimed territory in the black.
@@ -2115,8 +2122,10 @@ func _paint_lights(layer: LightLayer) -> void:
 		var tc: Vector2i = cell
 		var gutter: float = 0.68 + 0.08 * sin(_anim_time * 9.0 + float(tc.x) * 1.7) \
 			+ 0.05 * sin(_anim_time * 23.0 + float(tc.y))
-		_draw_glow(layer, _cell_center(tc) + Vector2(1.2, -6.0), float(CELL) * 3.0,
-			Color(1.0, 0.60, 0.24), gutter)
+		var tpool: Vector2 = _cell_center(tc) + Vector2(1.2, -6.0)
+		_draw_glow(layer, tpool, float(CELL) * 3.0, Color(1.0, 0.60, 0.24), gutter)
+		# White-hot flame core (noita-diff-03 #6): the guttering torch flame has a bright near-white centre.
+		layer.draw_circle(tpool, 1.6 + 0.8 * gutter, Color(1.0, 0.93, 0.78, 0.8 * gutter))
 	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft
 	# (the in-world tube is drawn under the veil; this is what makes its power read from across the room).
 	for cell: Variant in sim.conduit:

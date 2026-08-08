@@ -24,11 +24,10 @@ extends RefCounted
 
 const SUBDIV: int = 4                                  ## fine cells per coarse cell side (8px fine @ 32px cell)
 const FINE: int = 8                                    ## fine cell size in world px (CELL / SUBDIV)
-const NOISE_FREQ: float = 0.085                        ## fine-cell noise frequency — clumps ~1.5 coarse cells wide
-const NOISE_AMP: float = 0.70                          ## how hard noise bends the boundary (>0.5 → can flip edge band)
-const NOISE_FREQ2: float = 0.30                        ## a second octave of finer, crisper nibble on the edge
-const NOISE_AMP2: float = 0.26
-const SOLID_THRESHOLD: float = 0.5                     ## solidness cutoff after perturbation
+## P2: the fine SHAPE (which fine cells are solid) now comes from the sim's real fine grid — the boundary
+## molding/threshold constants that computed it here are gone. What remains below is pure LOOK: grain,
+## moss, back-rock, shadow tints, and a low-freq tonal drift (_noise) painted over that real shape.
+const TONAL_FREQ: float = 0.085                        ## low-freq drift so a broad rock face isn't one flat colour
 ## GRAIN + SPECKLE (Noita diff 4): a dense high-frequency per-fine-cell noise field that pits and clods
 ## the rock so it reads granular/textured, not smooth flat-shaded. Two octaves — a fine speckle and a
 ## crisper grit — modulate each solid fine cell's value.
@@ -56,8 +55,7 @@ var _cols: int
 var _rows: int
 var _fcols: int                                        ## fine-grid width  = cols * SUBDIV
 var _frows: int                                        ## fine-grid height = rows * SUBDIV
-var _noise: FastNoiseLite
-var _noise2: FastNoiseLite
+var _noise: FastNoiseLite                              ## low-freq tonal drift over the real fine shape
 var _grain: FastNoiseLite                              ## dense speckle field (diff 4)
 var _grain2: FastNoiseLite                             ## crisp grit octave
 var _moss: FastNoiseLite                               ## moss patch mask (diff 5)
@@ -73,11 +71,7 @@ func _init(cols: int, rows: int, seed: int) -> void:
 	_noise = FastNoiseLite.new()
 	_noise.seed = seed
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_noise.frequency = NOISE_FREQ
-	_noise2 = FastNoiseLite.new()
-	_noise2.seed = seed ^ 0x5bd1e995
-	_noise2.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_noise2.frequency = NOISE_FREQ2
+	_noise.frequency = TONAL_FREQ
 	_grain = FastNoiseLite.new()
 	_grain.seed = seed ^ 0x27d4eb2f
 	_grain.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -113,14 +107,18 @@ static func CELL_PX() -> int:
 ## the grass is still fully molded.
 const SURFACE_KEEP: int = 2
 
-## Rebake the fine terrain into the Image + upload. The Callables let molding reuse the exact palette /
+## Rebake the fine terrain into the Image + upload. The Callables let the paint reuse the exact palette /
 ## surface authority the coarse pass uses:
-##   solid_at(Vector2i) -> bool
-##   material_color_at(Vector2i) -> Color   (the coarse cell's molded body colour; only called on solid cells)
-##   wall_color_at(Vector2i) -> Color       (the back-wall colour to show where solid rock is ERODED to air)
-##   surface_at(int col) -> int             (the walkable surface row of a column; its cap is left uncovered)
+##   solid_at(Vector2i) -> bool              (the COARSE cell — parent solidity, for colour + accretion source)
+##   fine_solid_at(int fx, int fy) -> bool   (P2: the REAL fine terrain grid from the sim — the molded shape)
+##   material_color_at(Vector2i) -> Color    (the coarse cell's body colour; only called on solid cells)
+##   wall_color_at(Vector2i) -> Color        (the back-wall colour to show where solid rock is ERODED to air)
+##   surface_at(int col) -> int              (the walkable surface row of a column; its cap is left uncovered)
+## P2 (docs/FINE_TERRAIN.md): the fine SHAPE now comes from the sim's real fine grid (fine_solid_at) instead
+## of a molded field computed here from the coarse mask — real fine DATA reads crunchier + carries whatever
+## detail worldgen put there. The renderer keeps ownership of the LOOK (AO, grain, moss, rim, palette).
 ## Runs the full fine grid once; called only on terrain change (see WorldRenderer._fine_dirty).
-func rebake(solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
+func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
 		surface_at: Callable) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
@@ -149,24 +147,13 @@ func rebake(solid_at: Callable, material_color_at: Callable, wall_color_at: Call
 
 	var data: PackedByteArray = PackedByteArray()
 	data.resize(_fcols * _frows * 4)
-	# First pass: decide fine solid/air for every fine cell (molded), stash it so pass two can read
-	# neighbours for fine AO without recomputing the noise.
+	# First pass: read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding now lives in
+	# the sim's fine DATA, not a field computed here), stashed so pass two can read neighbours for fine AO.
 	var fine_solid: PackedByteArray = PackedByteArray()
 	fine_solid.resize(_fcols * _frows)
-	var half: float = float(SUBDIV) * 0.5
 	for fy: int in _frows:
 		for fx: int in _fcols:
-			# The fine cell centre in COARSE-cell units (so bilinear sampling is a coarse-grid lerp).
-			var wx: float = (float(fx) + 0.5) / float(SUBDIV)
-			var wy: float = (float(fy) + 0.5) / float(SUBDIV)
-			var solidness: float = _sample_solidness(solid_mask, wx, wy)
-			# Only mold the boundary band (0 < solidness < 1). Deep interior / deep air never flip →
-			# the base stays solid by construction and open caverns stay open.
-			if solidness > 0.001 and solidness < 0.999:
-				var n: float = _noise.get_noise_2d(float(fx), float(fy)) * NOISE_AMP \
-					+ _noise2.get_noise_2d(float(fx), float(fy)) * NOISE_AMP2
-				solidness = clampf(solidness + n * _band(solidness), 0.0, 1.0)
-			fine_solid[fy * _fcols + fx] = 1 if solidness >= SOLID_THRESHOLD else 0
+			fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
 
 	# Second pass: paint. Solid fine cell → its parent's molded body colour, with fine-scale AO (darker
 	# where it borders air = rounded/carved read) + a low-freq tonal drift. Eroded fine cell (parent was
@@ -245,37 +232,6 @@ func rebake(solid_at: Callable, material_color_at: Callable, wall_color_at: Call
 
 	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, data)
 	_tex.update(_img)
-
-
-## Bilinear sample of the coarse solid mask at a fractional coarse-cell position — turns the 0/1 step
-## at a solid/air boundary into a smooth 0..1 ramp across one cell, the surface the noise then bends.
-func _sample_solidness(mask: PackedFloat32Array, wx: float, wy: float) -> float:
-	# Sample coarse-cell CENTRES: a fine cell's solidness interpolates the four coarse cells around it.
-	var gx: float = wx - 0.5
-	var gy: float = wy - 0.5
-	var x0: int = int(floor(gx))
-	var y0: int = int(floor(gy))
-	var tx: float = gx - float(x0)
-	var ty: float = gy - float(y0)
-	var s00: float = _mask_at(mask, x0, y0)
-	var s10: float = _mask_at(mask, x0 + 1, y0)
-	var s01: float = _mask_at(mask, x0, y0 + 1)
-	var s11: float = _mask_at(mask, x0 + 1, y0 + 1)
-	var top: float = lerpf(s00, s10, tx)
-	var bot: float = lerpf(s01, s11, tx)
-	return lerpf(top, bot, ty)
-
-
-func _mask_at(mask: PackedFloat32Array, cx: int, cy: int) -> float:
-	if cx < 0 or cy < 0 or cx >= _cols or cy >= _rows:
-		return 0.0   # outside the world = air
-	return mask[cy * _cols + cx]
-
-
-## Noise only bends where the surface is genuinely on the edge — full swing at solidness 0.5, tapering to
-## zero deep in solid/air so a molded flip can never punch a hole in the interior or float rock in the sky.
-func _band(solidness: float) -> float:
-	return 1.0 - absf(solidness - 0.5) * 2.0
 
 
 ## Weighted OPEN-air neighbour count around a solid fine cell — the fine AO term. Orthogonal neighbours
