@@ -21,6 +21,35 @@ const CAVE_FREQ: float = 0.11
 ## Carve where noise exceeds this. EASES toward CAVE_THRESHOLD_DEEP with depth → more open down low.
 const CAVE_THRESHOLD_TOP: float = 0.40
 const CAVE_THRESHOLD_DEEP: float = 0.12
+## ANISOTROPY (shelves + overhangs, #93): the cave noise is sampled with the X axis COMPRESSED by this
+## factor, so a noise feature spans more columns than rows → caverns come out WIDE-AND-FLAT (ledges,
+## overhanging ceilings) instead of round blobs. >1 = stretched horizontally. See _carve_caves.
+const CAVE_XSTRETCH: float = 2.1
+## OVERHANG bias: the carve threshold is nudged this much EASIER just under a strata shelf and HARDER
+## just above one, so cave roofs hang from the hard bands and floors rest on them (asymmetric = overhangs).
+const CAVE_SHELF_BIAS: float = 0.10
+
+# --- strata (horizontal rock banding, #93) ---
+## Rock is organised into stacked BANDS this many rows tall. Every few bands is a HARD SHELF (shale) that
+## resists caving and reads as a distinct layer, so descending crosses visible strata (not uniform blob rock).
+const STRATA_BAND_H: int = 4
+## 1-in-N bands is a hard shelf. Deterministic per band index (a seeded hash), so the layering is stable.
+const STRATA_SHELF_EVERY: int = 3
+## A hard shelf band adds this to the local carve threshold (harder to open) → the shelf survives as a
+## continuous ledge/bridge across most of the width, only breached where noise is strongest.
+const STRATA_SHELF_RESIST: float = 0.34
+## Below this ABSOLUTE row the strata banding stops (deepslate/seal/Stonereach own the deep look already).
+const STRATA_MAX_ROW: int = DEEPSLATE_ROW
+
+# --- big caverns (a few large cohesive chambers, #93) ---
+## Count of large seeded chambers ≈ this × columns (a handful across the width). Each is a wide flat-floored
+## ellipse deep in the rock, the "rooms" the tunnel worms then thread together.
+const CAVERN_PER_COL: float = 0.055
+## Chamber half-extents (cells). Wide + shallow → a roomy hall with a flat floor + overhanging roof, not a ball.
+const CAVERN_RX_MIN: int = 6
+const CAVERN_RX_MAX: int = 11
+const CAVERN_RY_MIN: int = 3
+const CAVERN_RY_MAX: int = 5
 
 # --- tunnels (winding caverns that connect the noise pockets into an explorable system) ---
 ## Worm count ≈ this × columns — a handful of long tunnels threading the rock.
@@ -128,8 +157,10 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	rng.seed = seed
 	# Per-column horizontal richness multiplier (the frontier pull) — built once, reused by ore + coal.
 	var hfield: PackedFloat32Array = _horizontal_field(cols, seed)
+	_band_strata(world)          # STRATA: stack hard shelf bands (shale) through the mid rock (#93)
 	_band_deepslate(world)
-	_carve_caves(world, seed)
+	_carve_caves(world, seed)    # anisotropic + shelf-aware → wide flat caverns, overhangs, ledges (#93)
+	_carve_big_caverns(world, rng)   # a few large cohesive chambers the tunnels thread together (#93)
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng, hfield)
 	_scatter_coal(world, rng, hfield)
@@ -176,8 +207,46 @@ func _band_deepslate(world: WorldData) -> void:
 			world.walls[cell] = &"deepslate_wall"
 
 
-## Carve organic caves with seeded noise. A cell opens (block erased, WALL kept) when the noise there
-## clears a depth-eased threshold — so caves are rare/small near the surface and widen with depth.
+## STRATA — is the band containing `row` a HARD SHELF band? Deterministic per band index (a cheap hash),
+## so shelf layers stack at stable depths (every STRATA_SHELF_EVERY-th band). Only within the mid-rock
+## strata zone (surface fill .. STRATA_MAX_ROW); above/below returns false (soft rock / deepslate own the look).
+func _is_shelf_band(row: int) -> bool:
+	if row >= STRATA_MAX_ROW:
+		return false
+	var band: int = row / STRATA_BAND_H
+	# A tiny deterministic scramble so the shelves aren't a rigid "every 3rd" metronome but still stable.
+	return ((band * 2654435761) >> 3) % STRATA_SHELF_EVERY == 0
+
+
+## STRATA banding: turn the HARD SHELF bands of the mid rock into &"shale" (a distinct, cave-resistant rock),
+## in BOTH grids, so descending crosses stacked layers of different rock. Only converts existing solid
+## earth/stone (never fills a cave or overwrites ore — this runs BEFORE veins/caves). The cave carver then
+## resists these bands (STRATA_SHELF_RESIST), so a shale band survives as a continuous ledge/bridge — the
+## fine renderer molds it into a shelf with an overhanging rock lip. Reads as layered rock, not blob rock.
+func _band_strata(world: WorldData) -> void:
+	for cell: Vector2i in world.blocks:
+		if cell.y >= STRATA_MAX_ROW:
+			continue
+		if not _is_shelf_band(cell.y):
+			continue
+		# Only band the STONE zone — leave the earth surface layer (grass cap + tree roots) alone, so the
+		# strata read starts below ground where the rock does.
+		if world.blocks[cell] == &"stone":
+			world.blocks[cell] = &"shale"
+			if world.walls.get(cell, &"") == &"stone_wall":
+				world.walls[cell] = &"shale_wall"
+
+
+## Carve organic caves with seeded noise, now ANISOTROPIC + STRATA-AWARE (#93) so caverns read as wide
+## flat-floored halls with overhanging ceilings and shelves — not round blobs:
+##   • X is COMPRESSED (CAVE_XSTRETCH) before sampling → noise features span more columns than rows, so the
+##     open space stretches HORIZONTALLY (ledges + overhangs, the reference's shape).
+##   • HARD SHELF bands (shale) resist carving (STRATA_SHELF_RESIST added to their threshold) → a shelf band
+##     survives as a continuous ledge/bridge that a cavern's floor rests on and its ceiling hangs from.
+##   • an asymmetric SHELF BIAS makes the cell just UNDER a shelf easier to open and just ABOVE one harder →
+##     caves undercut the hard band (overhang) and pool below it (flat floor).
+## A cell opens (block erased, WALL kept) when noise clears the (depth-eased + strata-adjusted) threshold —
+## still rarer/smaller near the surface, wider deep, and never breaching the base-safe band.
 func _carve_caves(world: WorldData, seed: int) -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed
@@ -192,8 +261,52 @@ func _carve_caves(world: WorldData, seed: int) -> void:
 				continue
 			var depth_frac: float = float(row - cave_start) / float(maxi(1, world.rows - cave_start))
 			var threshold: float = lerpf(CAVE_THRESHOLD_TOP, CAVE_THRESHOLD_DEEP, depth_frac)
-			if noise.get_noise_2d(float(col), float(row)) > threshold:
+			# STRATA resistance: a hard shelf band is much harder to open (survives as a ledge/bridge).
+			if _is_shelf_band(row):
+				threshold += STRATA_SHELF_RESIST
+			# OVERHANG bias: easier just under a shelf (undercut → overhang), harder just above one (roof pools).
+			elif _is_shelf_band(row - 1):
+				threshold -= CAVE_SHELF_BIAS
+			elif _is_shelf_band(row + 1):
+				threshold += CAVE_SHELF_BIAS
+			# Anisotropy: compress X so features span more columns than rows → wide, flat caverns.
+			if noise.get_noise_2d(float(col) / CAVE_XSTRETCH, float(row)) > threshold:
 				world.blocks.erase(cell)        # open air; the wall behind it stays (carved room)
+
+
+## BIGGER CAVERNS (#93): stamp a few large cohesive chambers deep in the rock — wide, flat-floored ellipses
+## (a hard vertical squash + a solid floor shelf kept below the centre) whose union with the tunnel worms
+## gives the world real ROOMS to explore, not just noise pockets. Each keeps its wall (carved room), never
+## breaches the base-safe band, and only opens solid rock. Deterministic via the shared rng.
+func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var count: int = maxi(2, int(round(float(world.cols) * CAVERN_PER_COL)))
+	# Chambers live in the deep-but-above-seal band so they read as big open halls in Stonereach's approach.
+	var lo_row: int = DEEPSLATE_ROW - 18
+	var hi_row: int = SEAL_TOP - 3
+	if hi_row <= lo_row:
+		return
+	for _c: int in count:
+		var cx: int = rng.randi_range(4, world.cols - 5)
+		var cy: int = rng.randi_range(lo_row, hi_row)
+		var rx: int = rng.randi_range(CAVERN_RX_MIN, CAVERN_RX_MAX)
+		var ry: int = rng.randi_range(CAVERN_RY_MIN, CAVERN_RY_MAX)
+		# Keep the bottom ~third of the ellipse SOLID → a flat floor shelf to stand on (not a floating ball).
+		var floor_cut: int = maxi(1, ry - 1)
+		for dy: int in range(-ry, ry + 1):
+			for dx: int in range(-rx, rx + 1):
+				if dy > floor_cut:
+					continue                                  # leave a flat floor below the centre
+				var ex: float = float(dx) / float(rx)
+				var ey: float = float(dy) / float(ry)
+				if ex * ex + ey * ey > 1.0:
+					continue
+				var cell := Vector2i(cx + dx, cy + dy)
+				if not world.in_bounds(cell):
+					continue
+				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+					continue                                  # protect the near-surface base
+				if world.blocks.has(cell):
+					world.blocks.erase(cell)                  # open; wall kept (carved room)
 
 
 ## Winding TUNNELS: a few worms random-walk through the rock with a horizontal bias, carving walkable
@@ -300,7 +413,7 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 		if filled.has(cell) or not world.in_bounds(cell) or cell.y < min_row:
 			continue
 		var here: StringName = world.blocks.get(cell, &"")
-		if here != &"earth" and here != &"stone" and here != &"deepslate":
+		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
 			continue                                # only replace SOLID rock (never fill a carved cave)
 		world.blocks[cell] = material
 		world.amounts[cell] = richness
