@@ -70,6 +70,13 @@ const CELL: float = 32.0
 ## (M), and the controls help (H/?) are summoned, so they never clutter the playfield.
 var inventory_open: bool = false   ## E — the PACK screen (full carried inventory + the craft panel)
 var can_craft: bool = false        ## are we near a claimed Bazaar? gates the craft panel inside the pack screen
+## The craft list can outgrow the panel (a machine per tier + tools), so it scrolls inside a bounded
+## viewport while the RESEARCH bench stays pinned at the bottom (playtest: "automation fell off the
+## bottom of the list, unreachable"). Scroll is in pixels, snapped to whole rows; the wheel drives it
+## while the pack is open (MainView routes CYCLE to scroll_craft). Reset to 0 when the pack opens.
+var _craft_scroll: float = 0.0
+var _craft_scroll_max: float = 0.0
+const CRAFT_ROW_H: float = 24.0
 var show_minimap: bool = false
 var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden (FABLE_50 #34)
 ## The player's PING marker in world coords (Vector2.INF = none) — set by clicking the open map;
@@ -685,28 +692,63 @@ func _rebuild_minimap() -> void:
 ## FULL carried inventory as a grid of icon+count chips (your whole pack, not just the hotbar row). Bottom:
 ## the CRAFT panel — but machine-crafting is the Bazaar's job, so the recipes show only when you're near a
 ## claimed Bazaar (can_craft); away from it, a hint sends you to find/claim one. E/Esc closes.
+## Pure layout math for the PACK overlay — extracted so a headless test (check_pack_layout) can assert
+## the panel always fits the screen and the research bench stays visible no matter how long the craft
+## list grows (playtest fix #75). It is ALSO the single authority the draw reads, so seen == tested.
+## Clamps _craft_scroll as a side effect (the scroll bounds depend on this same geometry).
+func _pack_geometry() -> Dictionary:
+	var grid_h: float = ceilf(maxf(1.0, float(sim.inventory_slots().size())) / 6.0) * 34.0 + 6.0
+	var row_h: float = CRAFT_ROW_H
+	# Craftables draw TWO-UP (the list outgrew a 360px-tall canvas as machines accrued); away from the
+	# Bazaar there's just the one hint line, and no research section.
+	var craft_lines: int = int(ceilf(float(craft_options.size()) / 2.0)) if can_craft else 1
+	var w: float = 360.0
+	# The live production summary gets its own header line when anything is flowing.
+	var head: float = 30.0 + (15.0 if not sim.production_rates().is_empty() else 0.0)
+	var craft_head: float = 24.0
+	# The RESEARCH BENCH: ONE summary row (next tech + [T] pointer); the full ladder is the tech tree.
+	var research_h: float = (craft_head + row_h) if can_craft else 0.0
+	# The craft list SCROLLS inside a bounded viewport so the panel never grows past the screen and the
+	# research bench is always reachable (playtest: "automation fell off the bottom, unreachable"). The
+	# fixed "chrome" is everything but the craft rows; the rows get whatever height is left, snapped to
+	# whole rows. When the list fits, viewport == content and nothing scrolls.
+	var chrome: float = head + grid_h + craft_head + research_h + 12.0
+	var content_h: float = float(craft_lines) * row_h
+	var h0: float = minf(chrome + content_h, CANVAS.y - 16.0)
+	var lines_fit: int = maxi(1, int((h0 - chrome) / row_h))
+	var viewport_h: float = (float(lines_fit) * row_h) if can_craft else content_h
+	var h: float = chrome + viewport_h                  # snap the panel to whole rows
+	_craft_scroll_max = maxf(0.0, content_h - viewport_h)
+	_craft_scroll = clampf(_craft_scroll, 0.0, _craft_scroll_max)
+	return {
+		"origin": Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5), "w": w, "h": h,
+		"head": head, "grid_h": grid_h, "row_h": row_h, "craft_head": craft_head,
+		"research_h": research_h, "content_h": content_h, "viewport_h": viewport_h,
+	}
+
+
+## The craft list can be scrolled (MainView routes the wheel here while the pack is open). Whole-row
+## snapped so no partial row ever peeks past the viewport edge.
+func scroll_craft(dir: int) -> void:
+	_craft_scroll = clampf(_craft_scroll + float(dir) * CRAFT_ROW_H, 0.0, _craft_scroll_max)
+
+
 func _draw_inventory_overlay() -> void:
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.5))  # dim the world
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	var cols: int = 6
 	var cell: float = 34.0
-	var grid_h: float = ceilf(maxf(1.0, float(slots.size())) / float(cols)) * cell + 6.0
-	# Craftables draw TWO-UP (the list outgrew a 360px-tall canvas as machines accrued); research rows
-	# stay full-width. Away from the Bazaar there's just the one hint line.
-	var row_h: float = 24.0
-	var craft_lines: int = int(ceilf(float(craft_options.size()) / 2.0)) if can_craft else 1
-	var w: float = 360.0
-	# The live production summary ("making ore 8.2/min · ingot 4.1/min") gets its own header line
-	# when anything is flowing — the factory's pulse, read at a glance (sim.production_rates).
 	var rates: Array[Dictionary] = sim.production_rates()
-	var head: float = 30.0 + (15.0 if not rates.is_empty() else 0.0)
-	var craft_head: float = 24.0
-	# The RESEARCH BENCH section (only at the Bazaar): ONE summary row — the next tech + the [T] tree
-	# pointer. The full ladder lives in the tech-tree overlay now (FABLE_50 #30), so the pack stays
-	# this height no matter how many tiers the tree grows.
-	var research_h: float = (craft_head + row_h) if can_craft else 0.0
-	var h: float = head + grid_h + craft_head + float(craft_lines) * row_h + research_h + 12.0
-	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
+	var g: Dictionary = _pack_geometry()
+	var origin: Vector2 = g["origin"]
+	var w: float = g["w"]
+	var h: float = g["h"]
+	var head: float = g["head"]
+	var grid_h: float = g["grid_h"]
+	var row_h: float = g["row_h"]
+	var craft_head: float = g["craft_head"]
+	var content_h: float = g["content_h"]
+	var viewport_h: float = g["viewport_h"]
 	_panel(Rect2(origin, Vector2(w, h)), true)
 	draw_string(_font, origin + Vector2(14.0, 23.0), "PACK", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
 	draw_string(_font, origin + Vector2(w - 116.0, 22.0), "E / Esc to close",
@@ -758,12 +800,21 @@ func _draw_inventory_overlay() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
 		return
 	draw_string(_font, Vector2(origin.x + 14.0, cy + 19.0), "CRAFT  (at the Bazaar)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
-	var y: float = cy + craft_head
+	if _craft_scroll_max > 0.0:      # the list overflows → tell the player it scrolls
+		draw_string(_font, Vector2(origin.x + w - 92.0, cy + 19.0), "⇅ wheel scrolls",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	# The craft rows scroll: top of the viewport is craft_top, bottom is view_bot; rows outside are
+	# culled (whole-row aligned, so no partial rows bleed past the edges).
+	var craft_top: float = cy + craft_head
+	var view_bot: float = craft_top + viewport_h
 	var half_w: float = (w - 16.0) * 0.5
 	for i: int in craft_options.size():
+		var line_y: float = craft_top - _craft_scroll + float(i / 2) * row_h
+		if line_y < craft_top - 0.5 or line_y + row_h > view_bot + 0.5:
+			continue                            # outside the scroll viewport
 		var opt: Dictionary = craft_options[i]
 		var afford: bool = _can_afford(opt["cost"])
-		var rr := Rect2(origin.x + 6.0 + float(i % 2) * (half_w + 4.0), y + float(i / 2) * row_h,
+		var rr := Rect2(origin.x + 6.0 + float(i % 2) * (half_w + 4.0), line_y,
 			half_w, row_h - 3.0)
 		draw_rect(rr, UI_SLOT)
 		draw_rect(rr, UI_EDGE, false, 1.0)
@@ -805,8 +856,16 @@ func _draw_inventory_overlay() -> void:
 			"[%s] %s" % [keycap, str(opt["name"])], HORIZONTAL_ALIGNMENT_LEFT, name_w, 11, name_col)
 		draw_string(_font, rr.position + Vector2(rr.size.x - cw - 5.0, 15.0), right,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, right_col)
-	y += float(int(ceilf(float(craft_options.size()) / 2.0))) * row_h
-	_draw_research_bench(origin, w, y, row_h, craft_head)
+	# The scrollbar (only when the list overflows) — track + a proportional thumb on the right edge.
+	if _craft_scroll_max > 0.0:
+		var track := Rect2(origin.x + w - 7.0, craft_top, 3.0, viewport_h)
+		draw_rect(track, Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, 0.4))
+		var thumb_h: float = maxf(14.0, viewport_h * viewport_h / content_h)
+		var thumb_y: float = craft_top + (_craft_scroll / _craft_scroll_max) * (viewport_h - thumb_h)
+		draw_rect(Rect2(track.position.x, thumb_y, 3.0, thumb_h), UI_ACCENT)
+	# The research bench is PINNED just under the scroll viewport — always on-screen no matter how long
+	# the craft list grows (the whole point of the fix).
+	_draw_research_bench(origin, w, view_bot, row_h, craft_head)
 
 
 ## The RESEARCH BENCH summary (the Bazaar's other half — docs/PROGRESSION.md §5): ONE row for the NEXT

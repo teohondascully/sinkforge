@@ -701,6 +701,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):
 		_inventory_open = not _inventory_open
+		if _inventory_open: _hud.scroll_craft(-9999)   # open at the top of the craft list (#75)
 	elif event.is_action_pressed(Controls.DROP):
 		try_drop()
 	elif event.is_action_pressed(Controls.MAP):
@@ -753,9 +754,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dig_marks.clear()
 			_hud.flash("dig plan cleared")
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		_cycle_inventory(1)   # direct wheel handling (reliable) — the hotbar scroll select
+		if _inventory_open: _hud.scroll_craft(1)   # in the PACK: the wheel scrolls the craft list (#75)
+		else: _cycle_inventory(1)                  # otherwise: the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		_cycle_inventory(-1)
+		if _inventory_open: _hud.scroll_craft(-1)
+		else: _cycle_inventory(-1)
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and ((event.keycode >= KEY_1 and event.keycode <= KEY_9) or event.keycode == KEY_0):
 		# The fixed hotbar number row; 0 is the TENTH slot (the craft list outgrew 1-9).
