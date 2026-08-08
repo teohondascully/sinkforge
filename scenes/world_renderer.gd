@@ -345,6 +345,7 @@ func _draw() -> void:
 	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
+	_draw_power_pulses()  # bright beads flowing DOWN the live network — energy visibly moving (#19)
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines + the body)
 	_draw_torches()   # mounted torches guttering on the walls — placed light, claimed territory
 	_draw_saplings()  # planted sprouts growing on the sim's tick (#38 — renewable wood)
@@ -623,6 +624,43 @@ func _draw_conduits() -> void:
 ## copper channel draw and the emitted light pool both key off (so the tube and its glow never disagree).
 func _conduit_level(cell: Vector2i) -> float:
 	return clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
+
+
+## POWER PULSES (FABLE_NEXT_50 #19): bright beads travel the LIVE conduit network so energy visibly
+## FLOWS — down every vertical link and outward (downhill) along laterals, NEVER up (the game's locked
+## hook made visible). Bead count + brightness scale with the power the tube carries; a dead tube shows
+## nothing. Pure cosmetic clockwork over the copper draw — reads the derived power field, never writes.
+const PULSE_SPEED: float = 1.7                        ## links traversed per second by a bead
+func _draw_power_pulses() -> void:
+	for cell: Variant in sim.conduit:
+		var c: Vector2i = cell
+		var lvl: float = _conduit_level(c)
+		if lvl < 0.08:                                # dead / near-dead tube: no flow to show
+			continue
+		var center: Vector2 = Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
+		# Flow links leaving THIS node: down (if coupled to a conduit or a consumer machine) + downhill
+		# laterals (toward an equal-or-lower conduit; ties go right). Never up — that would deny the hook.
+		var links: Array[Vector2i] = []
+		var below: Vector2i = c + Vector2i(0, 1)
+		if sim.has_conduit(below) or sim.machine_at(below) != null:
+			links.append(Vector2i(0, 1))
+		for dx: int in [1, -1]:
+			var nb: Vector2i = c + Vector2i(dx, 0)
+			if sim.has_conduit(nb):
+				var nl: float = _conduit_level(nb)
+				if nl < lvl or (is_equal_approx(nl, lvl) and dx == 1):
+					links.append(Vector2i(dx, 0))
+		for d: Vector2i in links:
+			var span: float = float(CELL) if sim.has_conduit(c + d) else float(CELL) * 0.5
+			var to: Vector2 = center + Vector2(d) * span
+			var beads: int = 1 + int(lvl * 2.0)      # 1..3 beads with power
+			for b: int in beads:
+				var t: float = fmod(_anim_time * PULSE_SPEED + float(b) / float(beads)
+					+ float(c.x + c.y) * 0.13, 1.0)
+				var p: Vector2 = center.lerp(to, t)
+				var a: float = (0.32 + 0.5 * lvl) * (0.35 + 0.65 * sin(t * PI))   # fade at both ends
+				draw_circle(p, 3.0, Color(1.0, 0.85, 0.45, a * 0.32))            # soft halo
+				draw_circle(p, 1.7, Color(1.0, 0.92, 0.58, a))                   # bright core
 
 
 ## Draw the placed ropes: each cell is a taut hemp line down the middle with rung KNOTS every few px,
