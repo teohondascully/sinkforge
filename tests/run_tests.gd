@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_hand_built_chain()
 	_test_inventory_slots()
 	_test_spit_and_collect()
+	_test_slope_item_flow()
 	_test_pile_falls_when_floor_mined()
 	_test_craft_and_build()
 	_test_worldgen()
@@ -535,6 +536,50 @@ func _test_spit_and_collect() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved across spit+collect (present=%d, net=%d)" % [item, present, net])
+
+
+## Items that land on a 45° SURFACE ramp roll downhill to the base — nothing perches on a slope
+## (playtest #76). Interior floors (below the surface) are square and do NOT roll.
+func _test_slope_item_flow() -> void:
+	print("- slope item flow")
+	var sim: FactorySim = FactorySim.new()
+	# A staircase DESCENDING to the right: surface rows 5,6,7,8 for cols 2..5, then flat (8) for 6,7.
+	var tops: Dictionary = {2: 5, 3: 6, 4: 7, 5: 8, 6: 8, 7: 8}
+	for col: int in tops:
+		for row: int in range(int(tops[col]), FactorySim.GRID_ROWS):
+			sim.set_solid(Vector2i(col, row), &"earth")
+	sim.inventory[&"ore"] = 3
+	sim.total_produced[&"ore"] = 3
+	# Drop onto the TOP of the ramp (col 3). It should roll to the flat base — the last column that still
+	# descends is col 5 (col 6 is level), so it settles resting on col 5's surface (row 7).
+	sim.drop_item(Vector2i(3, 0), &"ore", 1)
+	_check(sim.last_drop_landing == Vector2i(5, 7),
+		"item on a down-right ramp rolls to the base (got %s)" % str(sim.last_drop_landing))
+	_check(int((sim.ground.get(Vector2i(5, 7), {}) as Dictionary).get(&"ore", 0)) == 1,
+		"the rolled item rests at the base of the slope")
+	_check(not sim.ground.has(Vector2i(3, 5)), "nothing is left perched on the ramp top")
+
+	# FLAT ground: an item does not move.
+	sim.drop_item(Vector2i(7, 0), &"ore", 1)
+	_check(sim.last_drop_landing == Vector2i(7, 7), "an item on flat ground stays put")
+
+	# INTERIOR floor guard: a ramp on the surface, but a deep dug shaft with an interior floor far below.
+	# An item dropped into the shaft rests on the interior floor — it must NOT use the outdoor slope.
+	var sim2: FactorySim = FactorySim.new()
+	for col: int in tops:                              # same surface staircase
+		sim2.set_solid(Vector2i(col, int(tops[col])), &"earth")
+	sim2.set_solid(Vector2i(3, 20), &"earth")          # an interior floor deep under col 3 (shaft open above)
+	sim2.inventory[&"ore"] = 1
+	sim2.total_produced[&"ore"] = 1
+	sim2.drop_item(Vector2i(3, 10), &"ore", 1)         # dropped INTO the shaft, below the surface
+	_check(sim2.last_drop_landing == Vector2i(3, 19),
+		"an item on an interior floor does NOT roll along the outdoor slope (got %s)"
+		% str(sim2.last_drop_landing))
+
+	# Conservation across the rolls.
+	var present: int = _items_present(sim, &"ore")
+	var net: int = int(sim.total_produced.get(&"ore", 0)) - int(sim.total_consumed.get(&"ore", 0))
+	_check(present == net, "ore conserved across slope rolls (present=%d, net=%d)" % [present, net])
 
 
 ## Gravity for resting product: a pile sitting on a solid floor must FALL when that floor is removed —

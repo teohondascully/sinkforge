@@ -1894,9 +1894,34 @@ func _column_landing(col: int, start_row: int) -> Dictionary:
 		if m != null:
 			return {"to_cell": m.cell, "target": m.input_buffer}
 		if solid.has(Vector2i(col, row)):
-			var rest := Vector2i(col, row - 1)  # the open cell on top of the floor
+			var rest := _settle_on_slope(Vector2i(col, row - 1))  # roll off a surface ramp to its base
 			return {"to_cell": rest, "target": _ground_pile(rest)}
 	return {"to_cell": Vector2i(col, GRID_ROWS), "target": sink}
+
+
+## An item that lands on a 45° SURFACE ramp doesn't perch on it — it rolls downhill to the base (playtest:
+## "items falling on a slope should go downhill"). Only the outdoor surface has ramps (interior/cave floors
+## are square, per ramp_dir/surface_row), so this fires ONLY when `rest` is a column's surface top; an item
+## resting on a dug interior floor is untouched. Follows the slope column-by-column until it reaches flat
+## ground or a wall, guarded against non-descending steps and any loop.
+func _settle_on_slope(rest: Vector2i) -> Vector2i:
+	var guard: int = 0
+	while guard < GRID_COLS:
+		guard += 1
+		if rest.y != surface_row(rest.x) - 1:  # not the outdoor surface top → interior floor, no roll
+			break
+		var d: int = ramp_dir(rest.x)           # +1 rises right, -1 rises left; downhill is the opposite
+		if d == 0:
+			break
+		var next_col: int = rest.x - d
+		if next_col < 0 or next_col >= GRID_COLS:
+			break
+		var ns: int = surface_row(next_col)
+		var next_rest := Vector2i(next_col, ns - 1)
+		if ns <= 0 or next_rest.y <= rest.y or solid.has(next_rest):
+			break                               # only ever descend into an open cell
+		rest = next_rest
+	return rest
 
 
 ## Where a LIFTED item goes, scanning UP `col` from `start_row` (the mirror of _column_landing): the
