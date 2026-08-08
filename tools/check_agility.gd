@@ -29,6 +29,13 @@ const SCORE_FLOOR: float = 80.0
 const MAX_SLOWNESS: float = 2.0        ## frames may be up to this × the top-speed par (baseline 1.00×)
 const STALL_CAP: int = 40              ## stuck-frames tolerated before it's "awkward" (baseline 0)
 const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne (baseline 1)
+## GRANULARITY-AGILITY dimensions (#104). Fine/molded terrain + the scale (#94) and fine-collision (#88)
+## reworks all move the agility standard (proven when the P3 fine-collision change popped step-up). These
+## turn the user's "smaller char / taller jump / MID-AIR direction change" hypothesis into NUMBERS so those
+## changes are judged on data, not vibes — and so a rework can't silently kill responsiveness. Caps carry
+## headroom over today's measured baseline; ratchet them as movement improves.
+const TURN_LATENCY_CAP: int = 12       ## frames from a full-speed input FLIP to velocity crossing zero (ground snappiness)
+const AIR_CONTROL_FLOOR: float = 0.5   ## fraction of ground top-speed steer-able MID-AIR in a 12f window (1.0 = full air control)
 
 var _failures: int = 0
 
@@ -72,6 +79,14 @@ func _run() -> void:
 		str(main._player.velocity.round()), goal_col])
 
 	var jump_latency: int = await _jump_latency(main)
+	var turn_latency: int = await _turn_latency(main)
+	var air_control: float = await _air_control(main)
+	# Re-stand the body at the start so the traverse below runs from a deterministic pose.
+	main._player.position = main._cell_center(Vector2i(START_COL, BASE_ROW - 2))
+	main._player.velocity = Vector2.ZERO
+	main._player.input_dir = 0.0
+	for _i: int in 16:
+		await physics_frame
 	var m: Dictionary = await _traverse(main, goal_col)
 
 	# --- the AGILITY SCORE ---------------------------------------------------------------------------
@@ -94,6 +109,8 @@ func _run() -> void:
 
 	print("  course: dist=%.0fpx par=%.0ff  |  frames=%d slowness=%.2fx stalls=%d jumps=%d (exp %d) jump_latency=%df"
 		% [dist, par, frames, slowness, stalls, jumps, expected_jumps, jump_latency])
+	print("  granularity-agility: turn_latency=%df (cap %d)  air_control=%.2f (floor %.2f, 1.0=full)"
+		% [turn_latency, TURN_LATENCY_CAP, air_control, AIR_CONTROL_FLOOR])
 	print("  penalties: slow=-%.1f stall=-%.1f jump=-%.1f  =>  AGILITY SCORE = %.1f / 100"
 		% [slow_pen, stall_pen, jump_pen, score])
 
@@ -102,6 +119,10 @@ func _run() -> void:
 	_check(stalls <= STALL_CAP, "stalls stay under the cap (%d <= %d)" % [stalls, STALL_CAP])
 	_check(jump_latency <= JUMP_LATENCY_CAP, "jump is responsive (%d <= %df from request to airborne)"
 		% [jump_latency, JUMP_LATENCY_CAP])
+	_check(turn_latency <= TURN_LATENCY_CAP, "ground turn is snappy (%d <= %df to reverse at speed)"
+		% [turn_latency, TURN_LATENCY_CAP])
+	_check(air_control >= AIR_CONTROL_FLOOR, "mid-air direction change works (%.2f >= floor %.2f)"
+		% [air_control, AIR_CONTROL_FLOOR])
 	_check(score >= SCORE_FLOOR, "AGILITY SCORE %.1f >= floor %.1f" % [score, SCORE_FLOOR])
 
 	main.queue_free()
@@ -147,6 +168,63 @@ func _jump_latency(main: MainView) -> int:
 		if not p.on_floor and p.velocity.y < 0.0:
 			return f
 	return 99
+
+
+## GROUND TURN LATENCY (#104): frames from an input FLIP at full speed to the velocity crossing zero (i.e.
+## actually reversing). The feel of "I pressed the other way, when does the body respond?" — the ground
+## snappiness that char-size / friction / scale changes all perturb. Baseline is ~RUN_SPEED/ACCEL frames.
+func _turn_latency(main: MainView) -> int:
+	var p: Player = main._player
+	# Re-stand on the flat start stretch so the run has room and no wall to hit.
+	p.position = main._cell_center(Vector2i(START_COL, BASE_ROW - 2))
+	p.velocity = Vector2.ZERO
+	p.input_dir = 0.0
+	for _i: int in 12:
+		await physics_frame
+	# Accelerate to (near) top speed one way.
+	p.input_dir = 1.0
+	var acc: int = 0
+	while acc < 60 and p.velocity.x < Player.RUN_SPEED * 0.85:
+		await physics_frame
+		acc += 1
+	# Flip — count frames until the horizontal velocity crosses zero (now moving the other way).
+	p.input_dir = -1.0
+	var t: int = 0
+	while t < 40:
+		await physics_frame
+		t += 1
+		if p.velocity.x <= 0.0:
+			return t
+	return 99
+
+
+## AIR CONTROL (#104): the fraction of ground top-speed you can build up HORIZONTALLY while airborne, over a
+## short window from a standing jump — the user's "movement can happen mid-air so you can change direction"
+## made a number. 1.0 = full air control (steer as freely as on the ground); 0.0 = a committed leap you
+## can't redirect. Instrumentation: it tells us whether air-steer is the lever to pull for agility (today it
+## already reads ~full, so it is NOT the missing piece) and guards a rework from silently removing it.
+func _air_control(main: MainView) -> float:
+	var p: Player = main._player
+	p.position = main._cell_center(Vector2i(START_COL, BASE_ROW - 2))
+	p.velocity = Vector2.ZERO
+	p.input_dir = 0.0
+	for _i: int in 12:
+		await physics_frame
+	if not p.on_floor:
+		return 0.0
+	p.request_jump()
+	var lift: int = 0
+	while lift < 20 and p.on_floor:                      # wait until genuinely airborne
+		await physics_frame
+		lift += 1
+	var vx0: float = p.velocity.x                         # ~0 from a standing jump
+	p.input_dir = 1.0                                    # now try to steer in the air
+	for _i: int in 12:
+		if p.on_floor:
+			break
+		await physics_frame
+	var gained: float = absf(p.velocity.x - vx0)
+	return clampf(gained / Player.RUN_SPEED, 0.0, 1.5)
 
 
 ## Instrumented traversal to goal_col — the same reach-gated navigation a play-goal uses (steer toward the
