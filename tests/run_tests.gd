@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_hopper()
 	_test_drop_toss()
 	_test_block_placement_and_bazaar()
+	_test_block_supported()
 	_test_power_field()
 	_test_conduit_network()
 	_test_powered_lift()
@@ -1136,6 +1137,20 @@ func _test_drop_toss() -> void:
 	s3.total_produced[&"ore"] = 2
 	s3.drop_item(Vector2i(7, 1), &"ore", 2, Vector2i(4, 1))         # flung from col 4, aimed at col 7
 	_check(int(f3.input_buffer.get(&"ore", 0)) == 2, "a tossed stack lands by the target column, not the throw origin")
+
+
+## Block SUPPORT (the "no placing blocks in mid-air" playtest fix): a building block needs a wall behind
+## it or an orthogonal solid/machine/conduit neighbour. Machines are exempt (gated in the controller).
+func _test_block_supported() -> void:
+	print("- block support (no mid-air blocks)")
+	var sim: FactorySim = FactorySim.new()
+	sim.set_solid(Vector2i(5, 10), &"earth")
+	_check(not sim.block_supported(Vector2i(5, 2)), "isolated open-sky cell has NO support (can't float a block)")
+	_check(sim.block_supported(Vector2i(5, 9)), "on top of a solid block IS supported")
+	_check(sim.block_supported(Vector2i(6, 10)), "beside a solid block IS supported (extend a structure)")
+	_check(not sim.block_supported(Vector2i(8, 2)), "two cells from anything is still unsupported")
+	sim.set_wall(Vector2i(20, 3), &"earth")            # a dug room keeps its wall → a block can backfill it
+	_check(sim.block_supported(Vector2i(20, 3)), "a wall behind the cell supports a block (backfill a dug room)")
 
 
 ## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).

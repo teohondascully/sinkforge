@@ -554,7 +554,7 @@ func _process(delta: float) -> void:
 	if _hints != null and not _paused:
 		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
-	_renderer.set_aim(_aim, _can_reach(_aim), _placeable(_aim), _selected_machine_def(), _selected_build_material())
+	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(), _selected_build_material())
 	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
 	if _hud != null:
 		# The config-panel PIN (#32): while the cursor sits on the inspector itself, keep showing the
@@ -1369,7 +1369,7 @@ func try_build(cell: Vector2i) -> bool:
 		return placed != null
 	# Block placement (the Terraria build primitive): the selected hotbar item is a building material.
 	var mat: StringName = _selected_build_material()
-	if mat != &"" and _placeable(cell) and sim.place_block(cell, mat):
+	if mat != &"" and _placeable(cell) and sim.block_supported(cell) and sim.place_block(cell, mat):
 		_particles.dust(_cell_center(cell), Visuals.terrain_dust(mat), 6)
 		_sfx.play(&"crunch", _cell_center(cell), 0.75)
 		return true
@@ -1545,6 +1545,17 @@ func _placeable(cell: Vector2i) -> bool:
 	return sim.in_bounds(cell) and not sim.is_solid(cell) \
 		and sim.machine_at(cell) == null and not sim.has_conduit(cell) \
 		and not sim.is_climbable(cell) and not _player_occupies(cell)
+
+
+## Placeable for the CURRENT selection: a machine only needs an open cell (_placeable), but a building
+## BLOCK also needs support — no plopping rock in mid-air (the playtest fix). Drives both the ghost colour
+## and the place gate so they never disagree.
+func _placeable_here(cell: Vector2i) -> bool:
+	if not _placeable(cell):
+		return false
+	if _selected_machine_def() == null and _selected_build_material() != &"":
+		return sim.block_supported(cell)
+	return true
 
 
 func _player_occupies(cell: Vector2i) -> bool:

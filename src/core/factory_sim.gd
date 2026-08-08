@@ -465,6 +465,22 @@ func mine(cell: Vector2i) -> StringName:
 ## primitive — the inverse of mine). Consumes one `material` from the pack; the cell becomes solid. Like
 ## crafting, the spent item is counted as CONSUMED, and mining it back counts as produced, so conservation
 ## holds across build/dig (terrain isn't "items present"). Refuses solid/occupied/out-of-bounds cells.
+## Can a building block be PLACED here — the Terraria ADJACENCY rule, the fix for "placing blocks in the
+## middle of the air"? Yes if a WALL backs the cell, or an orthogonal neighbour is something to build off
+## (solid terrain, a machine, or a conduit). So you can backfill a dug room or extend a structure, but
+## can't plop a block in isolated open sky. A pure read; the CONTROLLER gates block placement on it —
+## machines are exempt (you legitimately place a lift in an open shaft), so this lives beside place_block
+## rather than inside it (worldgen + the harness still place freely).
+func block_supported(cell: Vector2i) -> bool:
+	if wall_at(cell) != &"":
+		return true
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+		var nb: Vector2i = cell + d
+		if is_solid(nb) or machine_at(nb) != null or has_conduit(nb):
+			return true
+	return false
+
+
 func place_block(cell: Vector2i, material: StringName) -> bool:
 	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell) or torch.has(cell):
 		return false          # a roped cell refuses rock (cut the rope first — no rope-in-stone)
