@@ -295,6 +295,58 @@ func _is_foliage(material: StringName) -> bool:
 	return material == &"wood" or material == &"leaves"
 
 
+## After a cell clears, FELL any foliage that just lost its ROOT. A tree stands because its base rests
+## on solid ground; cut the base trunk (or dig the earth under it) and everything above no longer touches
+## the ground — so in a gravity game it FALLS (Terraria; the user's "nothing floats" — FOLIAGE only, NOT
+## terrain: caves do NOT collapse). A connected foliage component (8-way, wood+leaves together) is ROOTED
+## iff some cell in it sits directly on non-foliage solid; an unrooted component is felled block-by-block
+## into the pack (identical accounting to hand-chopping each cell, so conservation holds exactly).
+func _settle_foliage(around: Vector2i) -> void:
+	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
+	var handled: Dictionary = {}
+	for d: Vector2i in dirs:
+		var seed: Vector2i = around + d
+		if handled.has(seed) or not (solid.has(seed) and _is_foliage(solid[seed])):
+			continue
+		var comp: Array[Vector2i] = []
+		var stack: Array[Vector2i] = [seed]
+		var seen: Dictionary = {seed: true}
+		var rooted: bool = false
+		while not stack.is_empty():
+			var c: Vector2i = stack.pop_back()
+			comp.append(c)
+			handled[c] = true
+			var below: Vector2i = c + Vector2i(0, 1)
+			if solid.has(below) and not _is_foliage(solid[below]):
+				rooted = true
+			for nd: Vector2i in dirs:
+				var nb: Vector2i = c + nd
+				if not seen.has(nb) and solid.has(nb) and _is_foliage(solid[nb]):
+					seen[nb] = true
+					stack.append(nb)
+		if not rooted:
+			for c: Vector2i in comp:
+				_fell_foliage_cell(c)
+
+
+## Remove one un-rooted foliage cell and award its yield the SAME way hand-chopping does (wood → pack; a
+## share of leaves → a sapling), so a felled tree gives you its wood and conservation stays exact.
+func _fell_foliage_cell(c: Vector2i) -> void:
+	var mat: StringName = solid.get(c, &"")
+	if mat == &"" or not _is_foliage(mat):
+		return
+	solid.erase(c)
+	terrain_dirty.append(c)
+	if mat == &"wood":
+		inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
+		total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
+	elif mat == &"leaves" and leaf_drops_sapling(c):
+		inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
+		total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
+	_resettle_pile_above(c)
+
+
 ## Slope of the exposed surface at a column: +1 rising to the right, -1 rising to the left, 0 flat.
 ## A neighbour exactly ONE tile higher reads as a 45° ramp; a bigger step is a wall (0 here → the
 ## avatar's square-collision blocks it, the renderer draws no diagonal). Terrain only — machines and
@@ -396,6 +448,7 @@ func mine(cell: Vector2i) -> StringName:
 			inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
 			total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
 		_resettle_pile_above(cell)
+		_settle_foliage(cell)          # cut the base/trunk → the rest of the tree loses its root and FALLS
 		return material
 	# Plain terrain (earth/stone/deepslate): Terraria dig-and-carry — pocket the block as a placeable item
 	# so you can re-place it to bridge a gap, backfill, or PILLAR out of a hole. Produced from the world +
@@ -404,6 +457,7 @@ func mine(cell: Vector2i) -> StringName:
 	inventory[material] = int(inventory.get(material, 0)) + 1
 	total_produced[material] = int(total_produced.get(material, 0)) + 1
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
+	_settle_foliage(cell)                    # dug the earth under a tree → the whole tree loses its root
 	return material
 
 

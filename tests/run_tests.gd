@@ -106,6 +106,35 @@ func _dict_sig(d: Dictionary) -> String:
 	return ",".join(parts)
 
 
+## Invariant behind the tree tests (the user's "nothing floats" bug): every foliage cell is ROOTED — its
+## 8-connected foliage component contains a cell resting directly on non-foliage solid ground. Mirrors
+## FactorySim._settle_foliage's rule; false ⇒ a tree is left floating in the air.
+func _no_floating_foliage(sim: FactorySim) -> bool:
+	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
+	var is_fol := func(m: StringName) -> bool: return m == &"wood" or m == &"leaves"
+	var visited: Dictionary = {}
+	for cell: Vector2i in sim.solid:
+		if not is_fol.call(sim.solid[cell]) or visited.has(cell):
+			continue
+		var stack: Array[Vector2i] = [cell]
+		visited[cell] = true
+		var rooted: bool = false
+		while not stack.is_empty():
+			var c: Vector2i = stack.pop_back()
+			var below: Vector2i = c + Vector2i(0, 1)
+			if sim.solid.has(below) and not is_fol.call(sim.solid[below]):
+				rooted = true
+			for d: Vector2i in dirs:
+				var nb: Vector2i = c + d
+				if not visited.has(nb) and sim.solid.has(nb) and is_fol.call(sim.solid[nb]):
+					visited[nb] = true
+					stack.append(nb)
+		if not rooted:
+			return false
+	return true
+
+
 ## The WHOLE authoritative state as one canonical string (FABLE_50 #2). Built on SaveGame.capture,
 ## so the canary and the save format can never drift apart: any field added to the envelope is
 ## automatically guarded here, and a field the envelope misses is a field this canary misses — one
@@ -883,21 +912,33 @@ func _test_trees_and_wood() -> void:
 	# A hand-built tree: 2 wood trunk + 1 leaf crown on a grass column.
 	var sim: FactorySim = FactorySim.new()
 	sim.set_solid(Vector2i(5, 5), &"earth")            # ground
-	sim.set_solid(Vector2i(5, 4), &"wood")
+	sim.set_solid(Vector2i(5, 4), &"wood")             # base trunk (rests on the earth = the root)
 	sim.set_solid(Vector2i(5, 3), &"wood")
 	sim.set_solid(Vector2i(5, 2), &"leaves")
 	_check(sim.surface_row(5) == 5, "foliage is NOT the walkable surface — the ground row is (trees don't ramp)")
 	_check(sim.is_solid(Vector2i(5, 3)), "a trunk cell is solid (you collide with / can chop it)")
-	# Chop ONE trunk cell → only that block clears, the rest of the tree stands (block-by-block).
-	_check(sim.mine(Vector2i(5, 4)) == &"wood", "chopping a trunk cell returns wood material")
-	_check(int(sim.inventory.get(&"wood", 0)) == 1, "chopping one trunk cell yields exactly ONE wood (no flood-fell)")
-	_check(not sim.is_solid(Vector2i(5, 4)), "the chopped cell is now clear")
-	_check(sim.is_solid(Vector2i(5, 3)) and sim.is_solid(Vector2i(5, 2)), "the rest of the tree still stands")
-	# Chopping a leaf cell clears it but yields no wood.
-	_check(sim.mine(Vector2i(5, 2)) == &"leaves", "chopping a leaf returns leaves material")
-	_check(int(sim.inventory.get(&"wood", 0)) == 1, "leaves yield no wood")
-	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives")
-	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved")
+	# NOTHING FLOATS (Terraria): cut the BASE trunk → it loses its root and the WHOLE tree falls. Chopping
+	# the base returns that block's wood; _settle_foliage fells the rest (the trunk + canopy above) into
+	# the pack too, so you get the whole tree and no leaves are left hanging in the air.
+	_check(sim.mine(Vector2i(5, 4)) == &"wood", "chopping the base trunk returns wood material")
+	_check(int(sim.inventory.get(&"wood", 0)) == 2, "the whole tree falls → BOTH trunk cells' wood (base + felled)")
+	_check(not sim.is_solid(Vector2i(5, 4)) and not sim.is_solid(Vector2i(5, 3)), "both trunk cells cleared")
+	_check(not sim.is_solid(Vector2i(5, 2)), "the CANOPY fell too — no floating leaves (nothing floats)")
+	_check(sim.is_solid(Vector2i(5, 5)), "the ground under the tree survives (terrain does NOT collapse)")
+	_check(_items_present(sim, &"wood") == int(sim.total_produced.get(&"wood", 0)), "wood conserved through the fall")
+
+	# The other route to "nothing floats": dig the EARTH out from under a standing tree → it un-roots and falls.
+	var sim2: FactorySim = FactorySim.new()
+	sim2.set_solid(Vector2i(8, 6), &"earth")
+	sim2.set_solid(Vector2i(8, 5), &"wood")
+	sim2.set_solid(Vector2i(8, 4), &"wood")
+	sim2.set_solid(Vector2i(8, 3), &"leaves")
+	_check(sim2.mine(Vector2i(8, 6)) == &"earth", "digging the earth under the tree returns earth")
+	_check(not sim2.is_solid(Vector2i(8, 5)) and not sim2.is_solid(Vector2i(8, 4))
+		and not sim2.is_solid(Vector2i(8, 3)), "the un-rooted tree fell entirely — no floating trunk or leaves")
+	# The invariant, asserted directly: after these ops, NO foliage cell floats (each has a downward path
+	# to non-foliage ground through foliage). This is the check the user's 'nothing floats' bug wanted.
+	_check(_no_floating_foliage(sim) and _no_floating_foliage(sim2), "no floating foliage remains anywhere")
 
 
 ## SAPLINGS (FABLE_50 #38 — the renewable-wood loop): chopped canopies hide seeds (deterministic per
