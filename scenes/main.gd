@@ -1361,6 +1361,7 @@ func try_build(cell: Vector2i) -> bool:
 		if placed != null:
 			# Directional machines work the way YOU faced when placing (the Borer bores that way).
 			placed.facing = _player.facing if _player != null else 1
+			_renderer.note_machine_built(cell)   # play the one-shot assemble overlay (#9)
 			_particles.spark(_cell_center(cell), Visuals.machine_color(def).lightened(0.3))
 			_shake = maxf(_shake, 2.2)
 			_sfx.play(&"clunk", _cell_center(cell))

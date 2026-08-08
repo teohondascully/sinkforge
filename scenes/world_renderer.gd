@@ -80,6 +80,11 @@ var particles: Particles                              ## cosmetic juice layer (s
 var _font: Font = ThemeDB.fallback_font
 var _anim_time: float = 0.0                          ## free-running cosmetic clock (never feeds the sim)
 var _materials: Dictionary = {}                      ## id -> MaterialDef (world-engine viz registry)
+## MACHINE CONSTRUCT ANIMATION (FABLE_NEXT_50 #9): cell -> elapsed seconds since placement. MainView
+## pokes note_machine_built() on a real build (never on boot/load — pre-existing machines don't animate,
+## the note_dig pattern). A short one-shot assemble overlay (flash + rising scan + bracket snap) plays.
+var _construct: Dictionary = {}
+const CONSTRUCT_DUR: float = 0.38
 
 # Pushed by MainView each frame (the bits the renderer can't derive from the sim alone).
 var _aim: Vector2i = Vector2i(-99, -99)
@@ -263,6 +268,13 @@ func start_scan(origin: Vector2, echoes: Array[Dictionary]) -> void:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
+	if not _construct.is_empty():                        # age the assemble overlays; drop the finished ones
+		for cell: Vector2i in _construct.keys():
+			var e: float = float(_construct[cell]) + delta
+			if e >= CONSTRUCT_DUR:
+				_construct.erase(cell)
+			else:
+				_construct[cell] = e
 	if _scan_age >= 0.0:
 		_scan_age += delta
 		if _scan_age > _scan_range / SCAN_WAVE_SPEED + SCAN_ECHO_LINGER:
@@ -1422,6 +1434,12 @@ func _machine_sprite(machine: MachineState, active: bool, clock: float) -> Textu
 	return idle
 
 
+## MainView pokes this when a machine is genuinely PLACED (try_build succeeds) so the assemble overlay
+## plays once. Boot/load never call it → pre-existing machines never animate (the note_dig discipline).
+func note_machine_built(cell: Vector2i) -> void:
+	_construct[cell] = 0.0
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
@@ -1473,6 +1491,30 @@ func _draw_machine(machine: MachineState) -> void:
 
 	_draw_machine_io(machine, pos)
 	_draw_machine_status(machine, pos)
+	if _construct.has(machine.cell):     # the one-shot assemble overlay (#9), on top of the finished draw
+		_draw_construct(pos, clampf(float(_construct[machine.cell]) / CONSTRUCT_DUR, 0.0, 1.0))
+
+
+## The one-shot ASSEMBLE overlay for a just-placed machine (FABLE_NEXT_50 #9): a settling flash that
+## fades, a bright scan line sweeping up the casing (the frame "prints" upward), and corner brackets
+## snapping inward to lock the frame. All additive/overlay — never hides the terrain. t: 0→1.
+func _draw_construct(pos: Vector2, t: float) -> void:
+	var c: float = float(CELL)
+	var e: float = 1.0 - t
+	draw_rect(Rect2(pos, Vector2(c, c)), Color(1.0, 0.94, 0.78, 0.45 * e * e))       # settling bloom
+	var ly: float = pos.y + c * (1.0 - t)                                            # scan line, bottom→top
+	draw_rect(Rect2(pos.x, ly - 1.0, c, 2.0), Color(0.82, 0.95, 1.0, 0.85 * sin(t * PI)))
+	var off: float = e * 5.0                                                         # brackets snap inward
+	var bl: float = 5.0
+	var bc := Color(0.96, 0.86, 0.52, 0.35 + 0.55 * e)
+	for cn: Array in [
+			[Vector2(-off, -off), Vector2(1.0, 0.0), Vector2(0.0, 1.0)],
+			[Vector2(c + off, -off), Vector2(-1.0, 0.0), Vector2(0.0, 1.0)],
+			[Vector2(-off, c + off), Vector2(1.0, 0.0), Vector2(0.0, -1.0)],
+			[Vector2(c + off, c + off), Vector2(-1.0, 0.0), Vector2(0.0, -1.0)]]:
+		var p: Vector2 = pos + (cn[0] as Vector2)
+		draw_line(p, p + (cn[1] as Vector2) * bl, bc, 1.5)
+		draw_line(p, p + (cn[2] as Vector2) * bl, bc, 1.5)
 
 
 ## Factorio-style legibility: a small STATUS LAMP on every machine (green working / red no-fuel /
