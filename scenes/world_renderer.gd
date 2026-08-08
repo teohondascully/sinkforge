@@ -21,6 +21,19 @@ const RIDGES: Array[Dictionary] = [
 	{"factor": 0.22, "drop": 150.0, "amp": 150.0, "freq": 0.006, "color": Color(0.145, 0.165, 0.225)},
 	{"factor": 0.42, "drop": 55.0, "amp": 110.0, "freq": 0.010, "color": Color(0.062, 0.072, 0.112)},
 ]
+## THE SINKFORGE — the endgame LANDMARK (greenlit 2026-08-07). A colossal DORMANT ancient machine whose
+## CROWN breaches the surface: a broken cog-ring on a dead industrial pylon, buttressed by leaning
+## pillars. It is the TIP of a colossus that SPANS the depth layers — its heart is at the core, many
+## layers down (the endgame), and you descend ALONGSIDE it. A faint ember breathes at the cog's core:
+## the machine is dormant, not extinct — the only warm thing on the dead crown, and the seed of the
+## later "watch it thrum" payoff. Drawn in the backdrop (z -20) at a low parallax factor so it sits far
+## on the horizon and stays roughly in view as you cross the surface (a seen destination = pilgrimage);
+## the near ridge occludes its base (rising FROM behind the hills), and the walls cover it once you
+## descend. Pure cosmetic — the sim never knows it exists. Anchored near the map-centre plateau so it
+## reads as "you begin standing on top of it; the way is down."
+const SINKFORGE_ANCHOR_X: float = 1552.0             ## world x of the crown (over the centred spawn plateau)
+const SINKFORGE_FACTOR: float = 0.20                 ## distant-hill parallax: far, always roughly on the horizon
+const SINKFORGE_SCALE: float = 1.28                  ## master size dial (imposing — the endgame megastructure)
 
 ## --- Lighting (the mood lever) -----------------------------------------------------------------
 ## The model is SKYLIGHT + ambient, not a depth gradient: the underground is near-black EVERYWHERE,
@@ -1330,6 +1343,9 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 		ci.draw_circle(Vector2(cx, cy), r, cc)
 		ci.draw_circle(Vector2(cx - r * 0.9, cy + r * 0.25), r * 0.7, cc)
 		ci.draw_circle(Vector2(cx + r * 0.9, cy + r * 0.22), r * 0.75, cc)
+	# THE SINKFORGE CROWN sits between the sky and the hills — drawn before the ridges so the near hill
+	# occludes its base, grounding the colossus rising from behind the landscape.
+	_draw_sinkforge(ci, view, cam, horizon, dl, hor_c)
 	# Ridgelines: far-to-near silhouettes. Sampled in FEATURE space (x shifted by the camera's
 	# unparallaxed remainder) so crests slide slower than the terrain — the whole depth illusion.
 	# By day they haze toward the sky (aerial perspective); by night they sink back to silhouette.
@@ -1353,6 +1369,76 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 		pts.append(Vector2(view.end.x + 24.0, floor_y))
 		pts.append(Vector2(view.position.x, floor_y))
 		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * (0.42 - f * 0.5)))
+
+
+## Draw the Sinkforge crown (see SINKFORGE_* constants). A dormant colossal machine on the far horizon:
+## a broken cog-ring on a dead pylon + leaning buttresses, with a warm ember breathing at the cog core.
+func _draw_sinkforge(ci: CanvasItem, view: Rect2, cam: Vector2, horizon: float, dl: float, hor_c: Color) -> void:
+	# Skip when the surface horizon isn't in view (deep underground the walls cover the backdrop anyway).
+	if view.position.y > horizon + 200.0:
+		return
+	var f: float = SINKFORGE_FACTOR
+	var s: float = SINKFORGE_SCALE
+	var cx: float = cam.x + (SINKFORGE_ANCHOR_X - cam.x) * f      # parallaxed screen-world x of the crown
+	var base_y: float = horizon + 30.0 + cam.y * (1.0 - f) * 0.30  # base seam just under the horizon
+	if cx < view.position.x - 360.0 * s or cx > view.end.x + 360.0 * s:
+		return
+	# Silhouette: darker + more present than the ridges (a solid mass), lightly hazed by daylight.
+	var sil: Color = Color(0.050, 0.058, 0.098).lerp(hor_c, dl * 0.28)
+	var pyl_top: float = base_y - 250.0 * s
+	# CHAINS: titanic catenaries hanging from the pylon shoulders (upper spans read above the hills).
+	for k: int in 2:
+		var off: float = (float(k) * 2.0 - 1.0) * 40.0 * s
+		var top := Vector2(cx + off, pyl_top + 20.0 * s)
+		var chpts := PackedVector2Array()
+		for j: int in 8:
+			var t: float = float(j) / 7.0
+			chpts.append(Vector2(top.x + off * 0.5 * t,
+				top.y + t * (base_y + 40.0 * s - top.y) + sin(t * PI) * 22.0 * s))
+		ci.draw_polyline(chpts, sil.darkened(0.12), 5.0 * s)
+	# BASE mesa: a broad dark industrial footing on the horizon (mostly behind the near ridge).
+	var bw: float = 150.0 * s
+	var bh: float = 70.0 * s
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(cx - bw, base_y), Vector2(cx + bw, base_y),
+		Vector2(cx + bw * 0.72, base_y - bh), Vector2(cx - bw * 0.72, base_y - bh)]), sil)
+	# Leaning BUTTRESS pillars flanking the tower (dead, off-vertical = ancient).
+	for dir: int in [-1, 1]:
+		var px: float = cx + float(dir) * 96.0 * s
+		ci.draw_colored_polygon(PackedVector2Array([
+			Vector2(px - 14.0 * s, base_y - bh + 6.0 * s), Vector2(px + 14.0 * s, base_y - bh + 6.0 * s),
+			Vector2(px + float(dir) * 22.0 * s + 8.0 * s, base_y - 150.0 * s),
+			Vector2(px + float(dir) * 22.0 * s - 8.0 * s, base_y - 150.0 * s)]), sil.darkened(0.10))
+	# Central PYLON rising to the cog.
+	var pw: float = 40.0 * s
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(cx - pw, base_y - bh + 4.0 * s), Vector2(cx + pw, base_y - bh + 4.0 * s),
+		Vector2(cx + pw * 0.6, pyl_top), Vector2(cx - pw * 0.6, pyl_top)]), sil)
+	# The broken COG-RING crowning the pylon (the machine motif, ruined: an arc + teeth missing).
+	var ring_c := Vector2(cx, pyl_top - 30.0 * s)
+	var rr: float = 78.0 * s
+	var gap0: float = 2.15      # the broken arc (radians): ring + teeth absent here
+	var gap1: float = 3.35
+	ci.draw_arc(ring_c, rr, gap1, gap0 + TAU, 40, sil, 20.0 * s)
+	var teeth: int = 16
+	for i: int in teeth:
+		var a: float = float(i) / float(teeth) * TAU
+		if a > gap0 and a < gap1:
+			continue
+		var dv := Vector2(cos(a), sin(a))
+		ci.draw_line(ring_c + dv * (rr + 6.0 * s), ring_c + dv * (rr + 22.0 * s), sil, 11.0 * s)
+	ci.draw_circle(ring_c, 22.0 * s, sil)
+	for i: int in 4:
+		var a: float = float(i) / 4.0 * TAU + 0.4
+		ci.draw_line(ring_c, ring_c + Vector2(cos(a), sin(a)) * (rr - 6.0 * s), sil, 7.0 * s)
+	# The EMBER HEART: a faint deep-red glow breathing in the cog hub — the machine is dormant, not dead.
+	# Kept subtle so it reads as a buried pulse, not a second sun (the loud "watch it thrum" is a later slice).
+	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 0.55)
+	for gi: int in 3:
+		var gr: float = (13.0 + float(gi) * 15.0) * s
+		var ga: float = (0.065 - float(gi) * 0.018) * (0.5 + 0.5 * pulse)
+		ci.draw_circle(ring_c, gr, Color(0.85, 0.30, 0.12, ga))
+	ci.draw_circle(ring_c, 6.0 * s, Color(1.0, 0.52, 0.26, 0.09 + 0.07 * pulse))
 
 
 ## The REAL background WALL layer (sim.wall): each wall cell paints its material colour (depth-
