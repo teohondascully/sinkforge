@@ -1117,6 +1117,8 @@ func _test_drop_toss() -> void:
 	_check(int(forge.input_buffer.get(&"ore", 0)) == 3, "the ore fell into the forge's input buffer")
 	_check(int(sim.inventory.get(&"ore", 0)) == 2, "the dropped ore left the pack")
 	_check(_items_present(sim, &"ore") == 5, "ore conserved through the drop (2 pack + 3 in forge)")
+	# The landing cell is exposed so the controller can grace it (no instant re-pickup — playtest fix).
+	_check(sim.last_drop_landing == Vector2i(5, 6), "drop_item records the landing cell for the pickup grace")
 
 	# Case 2: drop above just a floor → it rests as a re-collectable ground pile (no machine to catch it).
 	var s2: FactorySim = FactorySim.new()

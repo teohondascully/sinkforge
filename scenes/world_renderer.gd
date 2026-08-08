@@ -1790,7 +1790,7 @@ func _update_veil() -> void:
 		if lvl > 0.04:
 			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.6, lvl * 0.4)
 	for m: Dictionary in falling.motes():
-		_veil_cut(bytes, m["pos"], 1.4, 0.45)
+		_veil_cut(bytes, m["pos"], 1.2, 0.3)
 	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
 	_veil_tex.update(_veil_img)
 
@@ -1910,7 +1910,9 @@ func _paint_lights(layer: LightLayer) -> void:
 		if lvl > 0.04:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.82, 0.42), lvl * 0.5)
 	for m: Dictionary in falling.motes():
-		_draw_glow(layer, m["pos"], float(CELL) * 1.35, m["color"], 0.6)
+		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
+		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
+		_draw_glow(layer, m["pos"], float(CELL) * 0.95, m["color"], 0.26)
 
 
 ## GODRAYS (FABLE_50 #12) — the signature shot: where a dug shaft admits the sky below the enclosing

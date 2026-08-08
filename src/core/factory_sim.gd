@@ -142,6 +142,10 @@ var total_consumed: Dictionary = {}
 ## falling sprites. The sim NEVER reads this back — clearing it changes no production. The
 ## representation layer drains it each frame. Each entry: {item, from: Vector2i, to: Vector2i, count}.
 var flow_events: Array[Dictionary] = []
+## Where the LAST drop_item() landed (the pile cell) — a transient hint the controller reads to grant a
+## brief no-auto-pickup grace so a just-dropped item isn't instantly sucked back up (playtest fix). Not
+## authoritative state (like flow_events): reset per drop, never saved.
+var last_drop_landing: Vector2i = Vector2i(-1, -1)
 ## Cosmetic channel like flow_events: cells whose TERRAIN (solid/wall) changed since the view last drained
 ## this. The chunked terrain renderer repaints ONLY the affected chunks instead of the whole 7700-cell world
 ## (the ~300ms per-dig freeze). The sim writes on every terrain edit (mine/place/drill-bore/fell/set_solid);
@@ -940,6 +944,7 @@ func drop_item(cell: Vector2i, item: StringName, count: int, from_cell: Vector2i
 	var dest: Dictionary = _column_landing(cell.x, cell.y)
 	dest["target"][item] = int(dest["target"].get(item, 0)) + n
 	flow_events.append({"item": item, "from": origin, "to": dest["to_cell"], "count": n})
+	last_drop_landing = dest["to_cell"]     # controller graces this cell so it isn't auto-collected at once
 	return n
 
 

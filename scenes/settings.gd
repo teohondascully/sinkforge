@@ -17,6 +17,7 @@ static var master: float = 1.0          ## 0..1 — the Master bus (everything)
 static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
 static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
 static var screen_shake: bool = true
+static var auto_pickup: bool = true    ## walk-over auto-collect of ground items (playtest: make it optional)
 static var zoom_idx: int = 0            ## index into MainView.ZOOM_LEVELS
 ## action name -> Array of event specs ({"key": physical keycode} | {"button": mouse button index}),
 ## same spec shape as Controls.defaults(). Only DIVERGENT actions live here; absent = default binding.
@@ -34,6 +35,7 @@ static func load_settings() -> void:
 		sound = clampf(float(cfg.get_value("audio", "sound", sound)), 0.0, 1.0)
 		ambience = clampf(float(cfg.get_value("audio", "ambience", ambience)), 0.0, 1.0)
 		screen_shake = bool(cfg.get_value("feel", "screen_shake", screen_shake))
+		auto_pickup = bool(cfg.get_value("feel", "auto_pickup", auto_pickup))
 		zoom_idx = int(cfg.get_value("feel", "zoom_idx", zoom_idx))
 		bindings = {}
 		for key: String in cfg.get_section_keys("bindings") if cfg.has_section("bindings") else []:
@@ -50,6 +52,7 @@ static func save_settings() -> void:
 	cfg.set_value("audio", "sound", sound)
 	cfg.set_value("audio", "ambience", ambience)
 	cfg.set_value("feel", "screen_shake", screen_shake)
+	cfg.set_value("feel", "auto_pickup", auto_pickup)
 	cfg.set_value("feel", "zoom_idx", zoom_idx)
 	for action: StringName in bindings:
 		cfg.set_value("bindings", String(action), bindings[action])

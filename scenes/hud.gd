@@ -1133,6 +1133,9 @@ func _draw_settings_overlay() -> void:
 	draw_string(_font, Vector2(x0, 190.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
 	_settings_chip(x0 + 92.0, 190.0, "%.2fx" % MainView.ZOOM_LEVELS[
 		clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)], {"cycle": "zoom"}, false, mouse)
+	draw_string(_font, Vector2(x0, 210.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 210.0, "ON" if Settings.auto_pickup else "OFF",
+		{"toggle": "auto_pickup"}, Settings.auto_pickup, mouse)
 	_settings_chip(x0, panel.position.y + panel.size.y - 20.0, "RESET KEYS TO DEFAULTS",
 		{"reset": true}, false, mouse)
 	draw_string(_font, Vector2(x0, panel.position.y + panel.size.y - 38.0),

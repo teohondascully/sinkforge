@@ -543,6 +543,7 @@ func _process(delta: float) -> void:
 		sim.advance(delta)
 		_falling.spawn_from_events(sim, _cell_center)
 		_falling.advance(delta)
+		_age_drop_grace(delta)
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_bazaars(delta)
@@ -807,6 +808,9 @@ func _apply_setting(payload: Dictionary) -> void:
 		_set_volume(_settings_drag, float(payload.get("frac", 0.0)))
 	elif payload.get("toggle", "") == "shake":
 		Settings.screen_shake = not Settings.screen_shake
+		Settings.save_settings()
+	elif payload.get("toggle", "") == "auto_pickup":
+		Settings.auto_pickup = not Settings.auto_pickup
 		Settings.save_settings()
 	elif payload.get("cycle", "") == "zoom":
 		_cycle_zoom()
@@ -1116,12 +1120,32 @@ func try_research(tech_id: StringName) -> bool:
 ## just stand at your line and its output comes to you, instead of needing to occupy the exact landing
 ## cell. Pure discrete sim edit (collect_ground); the avatar only triggers it.
 const COLLECT_REACH_CELLS: float = 2.5
+## No-auto-pickup GRACE (playtest fix — a just-dropped item was instantly sucked back up): cell → seconds
+## remaining. Set on Q-drop for the landing cell, aged each frame; a graced cell is skipped by auto-collect.
+const DROP_GRACE_S: float = 1.3
+var _no_pickup: Dictionary = {}
+
+
+## Age the per-cell no-pickup grace; drop cells whose grace has elapsed so they auto-collect again.
+func _age_drop_grace(delta: float) -> void:
+	if _no_pickup.is_empty():
+		return
+	for c: Variant in _no_pickup.keys():
+		var t: float = float(_no_pickup[c]) - delta
+		if t <= 0.0:
+			_no_pickup.erase(c)
+		else:
+			_no_pickup[c] = t
+
+
 func _collect_ground_under_player() -> void:
-	if _player == null or sim.ground.is_empty():
+	if _player == null or sim.ground.is_empty() or not Settings.auto_pickup:
 		return
 	var reach_sq: float = pow(COLLECT_REACH_CELLS * float(CELL), 2.0)
 	for cell: Variant in sim.ground.keys():                          # keys() copies — safe to collect mid-iter
 		var c: Vector2i = cell
+		if _no_pickup.has(c):                                        # just dropped here — leave it a moment
+			continue
 		var pile: Dictionary = sim.ground[c]
 		if pile.is_empty():                                          # a pruned-but-lingering empty pile: skip
 			continue
@@ -1295,6 +1319,7 @@ func try_drop() -> bool:
 	var target: Vector2i = face if (sim.in_bounds(face) and not sim.is_solid(face)) else here
 	var dropped: int = sim.drop_item(target, item, carried, here)
 	if dropped > 0:
+		_no_pickup[sim.last_drop_landing] = DROP_GRACE_S   # don't instantly suck it back up (playtest fix)
 		_particles.pop(_cell_center(target), Visuals.item_color(item))
 	return dropped > 0
 
