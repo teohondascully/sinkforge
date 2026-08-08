@@ -19,8 +19,12 @@ const CAVE_MIN_DEPTH: int = 6
 ## Noise scale — smaller = larger, smoother pockets. ~0.10 gives room-sized caverns.
 const CAVE_FREQ: float = 0.11
 ## Carve where noise exceeds this. EASES toward CAVE_THRESHOLD_DEEP with depth → more open down low.
-const CAVE_THRESHOLD_TOP: float = 0.40
-const CAVE_THRESHOLD_DEEP: float = 0.12
+## RAISED (#107, dig-your-factory identity): the old 0.40/0.12 opened ~31% of the underground into air —
+## structurally "follow-the-cave." These higher thresholds keep the underground SOLID by construction
+## (~15% cave), so you CARVE your factory INTO ore-rich rock and caves are the rarer opt-in punctuation
+## (the located-danger pockets), not the medium you traverse. See PROGRESSION §10 / DESIGN_REVIEW F2.
+const CAVE_THRESHOLD_TOP: float = 0.47
+const CAVE_THRESHOLD_DEEP: float = 0.31
 ## ANISOTROPY (shelves + overhangs, #93): the cave noise is sampled with the X axis COMPRESSED by this
 ## factor, so a noise feature spans more columns than rows → caverns come out WIDE-AND-FLAT (ledges,
 ## overhanging ceilings) instead of round blobs. >1 = stretched horizontally. See _carve_caves.
@@ -44,16 +48,18 @@ const STRATA_MAX_ROW: int = DEEPSLATE_ROW
 # --- big caverns (a few large cohesive chambers, #93) ---
 ## Count of large seeded chambers ≈ this × columns (a handful across the width). Each is a wide flat-floored
 ## ellipse deep in the rock, the "rooms" the tunnel worms then thread together.
-const CAVERN_PER_COL: float = 0.055
+## LOWERED (#107): fewer big chambers so they read as rare landmark HALLS (punctuation), not the norm.
+const CAVERN_PER_COL: float = 0.035
 ## Chamber half-extents (cells). Wide + shallow → a roomy hall with a flat floor + overhanging roof, not a ball.
 const CAVERN_RX_MIN: int = 6
-const CAVERN_RX_MAX: int = 11
+const CAVERN_RX_MAX: int = 9
 const CAVERN_RY_MIN: int = 3
 const CAVERN_RY_MAX: int = 5
 
 # --- tunnels (winding caverns that connect the noise pockets into an explorable system) ---
-## Worm count ≈ this × columns — a handful of long tunnels threading the rock.
-const TUNNEL_PER_COL: float = 0.09
+## Worm count ≈ this × columns — a handful of long tunnels threading the rock. Trimmed (#107): enough to
+## connect the pockets into an explorable system, not so many the rock reads as a tunnel maze.
+const TUNNEL_PER_COL: float = 0.07
 const TUNNEL_MIN_LEN: int = 18
 const TUNNEL_MAX_LEN: int = 46
 ## Carve radius around the worm path (1 → ~3-wide walkable caverns).
@@ -61,8 +67,10 @@ const TUNNEL_RADIUS: int = 1
 
 # --- ore ---
 ## Vein-seed attempts ≈ this × columns. Each is accepted by a depth-weighted roll, so most surviving
-## veins land deep — the band. Tuned to a touch richer overall than the old flat 0.3/col scatter.
-const ORE_ATTEMPTS_PER_COL: float = 0.9
+## veins land deep — the band. Nudged up (#107): with the rock now solid-dominant (fewer caves), more
+## veins land in solid rock, so carving into the mass frequently reveals a vein (the dig-your-factory
+## pull) — but kept MODEST so ore stays a reward for carving, not wallpaper (~20% of solid, not a quarter).
+const ORE_ATTEMPTS_PER_COL: float = 1.0
 ## A vein seed at the very bottom is accepted this often; at the surface, ~0. Linear in depth.
 const ORE_CHANCE_DEEP: float = 0.85
 ## Vein BODY size (cells in the accretion blob) grows from this (shallow) toward +BONUS (deep) — deeper =

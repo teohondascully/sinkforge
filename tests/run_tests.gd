@@ -692,35 +692,50 @@ func _test_worldgen() -> void:
 func _test_layered_worldgen() -> void:
 	print("- layered worldgen")
 	var gen: WorldGen = LayeredWorldGen.new()
-	var a: WorldData = gen.generate(72, 40, 1337)
-	var b: WorldData = gen.generate(72, 40, 1337)
+	# Measure on the REAL world size: solid≫cave is a full-world property, and a truncated 40-row slice is
+	# disproportionately "deep" (its whole band sits in the low-threshold zone) so it over-reads cave.
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	var mid: int = rows / 2
+	var a: WorldData = gen.generate(cols, rows, 1337)
+	var b: WorldData = gen.generate(cols, rows, 1337)
 	_check(a.blocks == b.blocks, "same seed → identical blocks (deterministic, caves + veins)")
-	_check(gen.generate(72, 40, 99).blocks != a.blocks, "a different seed → a different world")
+	_check(gen.generate(cols, rows, 99).blocks != a.blocks, "a different seed → a different world")
 
 	# CAVES: some sub-surface cells are carved OPEN (block gone) yet still have a wall behind them —
 	# a Terraria carved room. And the near-surface base is untouched (caves only below CAVE_MIN_DEPTH).
 	var carved: int = 0
 	var carved_with_wall: int = 0
 	var breached_base: int = 0
-	for col: int in 72:
-		var top: int = HeightmapWorldGen.new()._surface_row(col)
-		for row: int in range(top, 40):
+	var solid_below: int = 0
+	var hm := HeightmapWorldGen.new()
+	for col: int in cols:
+		var top: int = hm._surface_row(col)
+		for row: int in range(top, rows):
 			var cell: Vector2i = Vector2i(col, row)
 			if not a.blocks.has(cell) and a.walls.has(cell):
 				carved += 1
 				carved_with_wall += 1
 				if row < top + LayeredWorldGen.CAVE_MIN_DEPTH:
 					breached_base += 1
+			elif row > top and a.blocks.has(cell):
+				solid_below += 1
 	_check(carved > 50, "caves carved open cells in the rock (%d)" % carved)
 	_check(carved_with_wall == carved, "every carved cell kept its wall (Terraria room, not void)")
 	_check(breached_base == 0, "no cave breached the near-surface base (stays solid by construction)")
+	# DIG-YOUR-FACTORY (#107, PROGRESSION §10 / DESIGN_REVIEW F2): the underground must be SOLID-dominant —
+	# you carve your factory INTO ore-rich rock; caves are the rarer opt-in punctuation, NOT the medium you
+	# traverse (follow-the-cave). Guard the identity so a future gen change can't silently drift it back.
+	var cave_frac: float = float(carved) / float(maxi(1, solid_below + carved))
+	_check(cave_frac < 0.25, "solid >> cave: caves stay opt-in punctuation (cave=%.1f%% of below-surface)"
+		% [cave_frac * 100.0])
 
 	# DEPTH-BANDED ORE: count ore in the top half vs the bottom half of the sub-surface column band.
 	var ore_shallow: int = 0
 	var ore_deep: int = 0
 	for cell: Vector2i in a.blocks:
 		if a.blocks[cell] == &"ore":
-			if cell.y < 24:
+			if cell.y < mid:
 				ore_shallow += 1
 			else:
 				ore_deep += 1
