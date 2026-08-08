@@ -3,7 +3,7 @@
 # The whole safety net behind autonomous sprints, in one invocation:
 #   tools/run_harness.sh
 #
-# PARALLEL by default: the 17 layers are independent Godot headless processes that
+# PARALLEL by default: the 19 layers are independent Godot headless processes that
 # write only uniquely-named user:// files (or none), so wall-clock is max(layers),
 # not sum(layers). Concurrency is bounded to the CPU count.
 #   JOBS=1   tools/run_harness.sh   # serialize (debug; old behavior)
@@ -39,6 +39,7 @@ add "check_controls"                  "res://tools/check_controls.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
+add "check_loop_health (loop score)"  "res://tools/check_loop_health.gd"
 add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 
 total="${#NAMES[@]}"
