@@ -130,3 +130,59 @@ modules (plate/gear press) + the first **throughput gate** (a Descent Engine you
 first **power** need. Gate on the **power mini-brainstorm** (§7) first, since power is the tier's twist.
 Combat (the Stonewarden guardian + frontier threat) waits on the combat brainstorm and can land as a
 follow-up slice — the logistics gate (throughput wall) is playable without it.
+
+## 10. The addiction model — how the 80% stays fun for 40 hours
+
+> Added 2026-08-08 (design synthesis, guided one-axis-at-a-time with the user; DECISIONS same date). §1-9
+> answer *what the campaign IS*; this section answers *why the moment-to-moment loop keeps you playing* —
+> the part that actually retains, and the part a beautiful campaign spine can't rescue if it's missing.
+
+- **Addiction lives in the LOOP, not the endgame.** The Sinkforge/cannon is a **lighthouse** — a fixed
+  direction on the horizon that gives every action meaning — **NOT a progress bar you watch fill for 40h**
+  (a charge-meter you stare at demoralizes; it makes the 39 hours feel like waiting). The discharge is a
+  climax you ASSEMBLE in the final act, not a number that ticks up all game. **Corollary — validate the
+  loop FIRST:** prove ~2 hours of real, human, moment-to-moment fun *before* building campaign structure.
+  Only ~15 min (RUNG 1–4, agent-validated) exists today. Content is cheap once the loop is proven; a gorgeous
+  campaign bolted onto an unfun loop is wasted work. This is why #96/#97 (grow-world / build-L3) sit BEHIND
+  a real 2-hour human playtest, not ahead of it.
+
+- **The 4-axis interlocked web.** Progression is not one track but **four axes that only move by pulling each
+  other** — this interlock is what stops any single axis from becoming a one-dimensional treadmill:
+  - **Depth** — how far your frontier reaches (the spine, §3-4).
+  - **Tools** — pickaxe/drill tiers, **SOFT-gated (the Minecraft-obsidian rule):** you *can* mine the next
+    tier's rock, but it's so punishingly slow per cell it isn't worth it until you craft a better tool; a
+    new tier then **retroactively trivializes** old rock (retroactive-relief dopamine). No hard "you
+    literally cannot" walls — **except THE SEAL** (the one built L1→L2 hard gate, which is a *narrative*
+    barrel-segment, not a material tier).
+  - **Factory** — the sandbox engine that produces the tools, the throughput, and the descent-supply.
+  - **Home** — your base **descends WITH you** (demand-pull: build the descending-home mechanic only once
+    the long-walk-back pain is genuinely felt in play, not before).
+  None advances alone: deeper needs better tools, better tools need more factory, more factory needs deeper
+  inputs. Pull one, the others must follow.
+
+- **Anti-restart: a persistent CHASSIS + slotted MODULES.** A new layer must **never feel like starting
+  over** (the user's explicit fear — restart-feel demoralizes and makes people quit). Resolution: tools
+  **harden monotonically** (a tier, once earned, is never lost — the carry-forward), and specialization to a
+  layer's twist is **swappable MODULES** (sealed / heat-shielded / gravity-anchored) you keep forever and
+  re-slot per frontier. This does harden-AND-specialize, **additive-never-substitutive**. The **shrine-camps
+  are the roguelite "shop"** — checkpoints in the located-danger pockets where you kit out with modules;
+  diegetically, the dead who descended before you.
+
+- **Novelty = a new RULE per layer, not a bigger number.** power → fluids → heat → thin-gravity (§4). Tools
+  and modules specialize to each medium, so the novelty **propagates into the whole kit** instead of being a
+  stat bump — this is the direct answer to "a game built only on soft-gating better pickaxes loses novelty
+  fast."
+
+- **Deeper = new INPUTS that still consume shallow materials** (steel = iron + heat; every deep recipe
+  reaches back up the column). So the vertical factory you already built **stays employed all 40 hours** — a
+  **living column**, not an abandoned strip-mine you left behind. This is the mechanical face of the
+  no-reset permanent-empire pillar.
+
+- **Identity: DIG-YOUR-FACTORY, not follow-the-cave.** The world is **dominated by solid, molded, ore-rich
+  earth** you MINE and CARVE your factory INTO (base safe by construction). **Solid ≫ cave.** Ore is
+  **frequent and organic** — veins/blobs, never a grid. Caves are **kept** (they read great) but **recast**
+  as the rarer, opt-in **punctuation**: located danger / reward / shrine-camp pockets you *choose* to breach
+  (the locked "danger located & opt-in" pillar). The breach moment — a dug shaft suddenly opening a cave —
+  **is** the located-danger beat. Lore fit: caves are voids/fractures in the buried cannon's body where
+  danger nests and prior descenders sheltered. (Governs worldgen tuning — see #107; codified from the
+  `dig-your-factory-identity` design memory.)

@@ -32,7 +32,7 @@ Your **production** is vertical and gravity does the work. Raw ore enters at the
 ## The Body & The World (NEW IN v0.2)
 
 - **You are a person down there.** Side-view platformer movement (walk, fall, jump, climb). The camera follows you; it pulls back when you're surveying your base.
-- **The world is a large destructible underground** — wide AND deep, with solid earth you mine through, plus pre-existing caves, dungeons, and pockets of the strange. You carve your own space; the factory is a *foothold* you grow inside a much bigger dark.
+- **The world is a large destructible underground** — wide AND deep, **dominated by solid, molded, ore-rich earth you mine and carve your factory INTO** (base safe by construction). This is **dig-your-factory, NOT follow-the-cave**: solid ≫ cave, ore frequent and organic (veins/blobs). Caves/dungeons/pockets-of-the-strange are KEPT but are the rarer, opt-in **punctuation** — located danger/reward/shrine-camps you *choose* to breach, not the medium you traverse. The factory is a *foothold* you grow inside a much bigger dark. (See PROGRESSION §10 + `docs/DESIGN_REVIEW.md`.)
 - **You share physical space with your factory.** You walk among your machines and the falling ore — stand on platforms, ride lifts, get in the path of the flow. The production is happening *around your body*, not behind a god-cursor.
 - **Why you're here: power & territory.** You descend to claim and industrialize more of the world. Deeper = richer materials = stronger you = more empire. The dopamine is conquest-by-engineering.
 
