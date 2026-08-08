@@ -111,7 +111,10 @@ func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
 		input_climb = Input.get_axis(Controls.DOWN, Controls.UP)   # W/S — grab + ride a rope
-		jump_held = Input.is_action_pressed(Controls.JUMP)         # release early = shorter hop (#43)
+		# JUMP is W or Space (playtest: Space-only was confusing; W jumps like Terraria). On a rope W
+		# CLIMBS instead (handled below), so holding either counts as "jump held" for the variable-height
+		# arc off-rope, and is harmless on-rope (the arc-cut is gated to non-climbing).
+		jump_held = Input.is_action_pressed(Controls.JUMP) or Input.is_action_pressed(Controls.UP)
 	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
 	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
 	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
@@ -127,6 +130,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed(Controls.JUMP):
 		request_jump()
+	elif event.is_action_pressed(Controls.UP) and not _on_rope():
+		request_jump()   # W jumps (Terraria) — UNLESS there's a rope here, where W climbs instead
+
+
+## Is the body gripping / standing on a placed rope right now? Gates W between "jump" (no rope) and
+## "climb up" (on a rope), so the same key does the Terraria-natural thing in both contexts.
+func _on_rope() -> bool:
+	return sim != null and sim.is_climbable(_cell_of(position))
 
 
 func request_jump() -> void:

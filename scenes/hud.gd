@@ -1062,8 +1062,8 @@ func _draw_help_overlay() -> void:
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.45))
 	var lines: Array[String] = [
 		"move        A / D  (or ← →)",
-		"jump        SPACE",
-		"climb       W / S  on a rope (release = hang)",
+		"jump        W  or  SPACE",
+		"climb       W / S  on a rope (W climbs, not jumps)",
 		"mine        LMB (hold)",
 		"dig plan    LMB drag paints it · X clears",
 		"select      1–9  ·  mouse wheel",
