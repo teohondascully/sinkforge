@@ -31,6 +31,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey — presses plates
 	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
 	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
+	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue — the powered flood-drain (L3)
 }
 
 
@@ -86,6 +87,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_h_drill(canvas, center, s, active, t, flip)
 		"descent":
 			_descent(canvas, center, s, active, t)
+		"pump":
+			_pump(canvas, center, s, active, t)
 
 
 ## Furnace (ore source / forge): a dark mouth with a glowing ember + lintel. The ember BREATHES while burning.
@@ -245,6 +248,34 @@ static func _descent(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 		c + Vector2(0.0, 8.5 * s + pound)]), brace)
 	var core: float = 0.9 if active else 0.4
 	canvas.draw_circle(c + Vector2(0.0, -5.5 * s), 2.0 * s, Color(0.85, 0.70, 1.0, core))  # the quota core
+
+
+## Pump (the powered flood-drain, L3): a steel housing with a curved down-SPOUT drawing water UP and OUT —
+## a rising water column inside the body + a bright droplet climbing the spout while it's draining (active),
+## and a piston knob up top that bobs on the clock. The "it sucks the flood out, on power" read; still + dim
+## when unpowered (nothing to pump / no power).
+static func _pump(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var steel := Color(0.16, 0.20, 0.26)
+	var water := Color(0.34, 0.62, 0.86)
+	# Housing.
+	canvas.draw_rect(Rect2(c.x - 6.0 * s, c.y - 6.0 * s, 12.0 * s, 13.0 * s), steel)
+	# The intake water column drawn up inside the body — rises while pumping.
+	var rise: float = (0.55 + 0.35 * (0.5 + 0.5 * sin(t * 6.0))) if active else 0.4
+	var col_h: float = 9.0 * s * rise
+	canvas.draw_rect(Rect2(c.x - 3.0 * s, c.y + 6.0 * s - col_h, 6.0 * s, col_h),
+		Color(water.r, water.g, water.b, 0.55 + 0.35 * (1.0 if active else 0.0)))
+	# The curved out-spout arcing over the right lip.
+	canvas.draw_line(c + Vector2(0.0, -3.0 * s), c + Vector2(7.5 * s, -3.0 * s), steel.lightened(0.2), 2.6 * s)
+	canvas.draw_line(c + Vector2(7.5 * s, -3.0 * s), c + Vector2(7.5 * s, 1.0 * s), steel.lightened(0.2), 2.6 * s)
+	# The piston knob up top — bobs while working.
+	var bob: float = (sin(t * 8.0) * 1.2 if active else 0.0) * s
+	canvas.draw_rect(Rect2(c.x - 1.4 * s, c.y - 9.0 * s + bob, 2.8 * s, 3.5 * s), steel.lightened(0.25))
+	# A droplet climbing the spout + spilling out while draining.
+	if active:
+		var dy: float = -3.0 * s - 3.0 * s * (0.5 + 0.5 * sin(t * 5.0))
+		canvas.draw_circle(c + Vector2(7.5 * s, dy), 1.6 * s, water.lightened(0.25))
+		var spill: float = c.y + 2.0 * s + fmod(t * 20.0, 5.0) * s
+		canvas.draw_circle(c + Vector2(7.5 * s, spill), 1.3 * s, water)
 
 
 ## Rope (the placeable climb): a hanging line with rung KNOTS + a coiled spare at the top — reads as

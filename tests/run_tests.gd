@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_test_power_field()
 	_test_conduit_network()
 	_test_powered_lift()
+	_test_pump()
 	_test_automated_line()
 	_test_machine_status()
 	_test_no_empty_ground_piles()
@@ -1479,6 +1480,86 @@ func _test_powered_lift() -> void:
 		"fully powered → full throughput (%d)" % carried)
 	var present: int = _items_present(sim, &"ore")
 	_check(present == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the powered lift (present=%d)" % present)
+
+
+## THE PUMP — the powered flood-drain (docs/DECISIONS.md, the L3 aquifer answer). It falls on the LOCKED
+## hook: water floods DOWN for free, pumping it back OUT costs power. This is the on-hook PROOF — a POWERED
+## pump drains a flooded pocket substantially, an identical UNPOWERED pump barely touches it. Also asserts
+## the drain is bounded/sane: no water is ever created and no cell goes negative.
+func _test_pump() -> void:
+	print("- pump (powered flood-drain, L3)")
+	var pump_def: MachineDef = load("res://src/data/machines/pump.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+
+	# Build one flooded, SEALED pocket: a walled 1-wide shaft (x=col) with a floor, brim-full of water.
+	# Returns the sim + the top-of-pocket cell the pump sits in. Sealed so no water escapes — any drop in
+	# total_water is attributable to the pump alone.
+	var build_pocket := func(col: int) -> Dictionary:
+		var s: FactorySim = FactorySim.new()
+		for row: int in range(3, 8):
+			s.set_solid(Vector2i(col - 1, row), &"stone")     # left wall
+			s.set_solid(Vector2i(col + 1, row), &"stone")     # right wall
+		s.set_solid(Vector2i(col, 7), &"stone")               # floor
+		var poured: int = 0
+		for row: int in range(3, 7):                          # fill rows 3..6 (4 open cells) to the brim
+			poured += s.add_water(Vector2i(col, row), FactorySim.WATER_MAX)
+		return {"sim": s, "top": Vector2i(col, 3), "poured": poured}
+
+	# --- POWERED: a fueled generator beside the pump pours power into its cell → it drains the pocket. ---
+	var pd: Dictionary = build_pocket.call(6)
+	var sim: FactorySim = pd["sim"]
+	var top: Vector2i = pd["top"]
+	var flooded: int = int(pd["poured"])
+	_check(flooded == FactorySim.WATER_MAX * 4 and flooded > 0, "the pocket starts brim-full (%d units)" % flooded)
+	sim.place_machine(pump_def, top)                          # the pump in the top of the flooded pocket
+	# Generator two cells left of the pocket wall (its aura reaches the pump's cell), fueled with coal.
+	var g: MachineState = sim.place_machine(gen_def, top + Vector2i(-2, 0))
+	g.input_buffer[&"coal"] = 40
+	sim.total_produced[&"coal"] = 40
+	for _i: int in 3:
+		sim.tick()                                            # warm the generator so power flows
+	_check(sim.power_at(top) > 0.0, "power reaches the pump's cell")
+	var before: int = sim.total_water()                       # after warm-up (the pump already drained a little)
+	_check(before > 0, "water still present after warm-up (%d units)" % before)
+	# Tick a while: the powered pump should drain the pocket substantially (aim: nearly dry).
+	var negative_seen: bool = false
+	for _i: int in 30:
+		sim.tick()
+		for cv: Variant in sim.water:                         # integer + clamped: no cell ever goes negative
+			if int(sim.water[cv]) < 0:
+				negative_seen = true
+	var after: int = sim.total_water()
+	_check(after < before, "a POWERED pump drains water out of the pocket (%d -> %d)" % [before, after])
+	_check(after <= before / 4, "the powered pump drains the pocket substantially (%d << %d)" % [after, before])
+	_check(not negative_seen, "no cell ever holds a negative water level")
+
+	# --- UNPOWERED: an identical flooded pocket, a pump with NO generator → it does essentially nothing. ---
+	var upd: Dictionary = build_pocket.call(16)
+	var usim: FactorySim = upd["sim"]
+	var utop: Vector2i = upd["top"]
+	var uflooded: int = int(upd["poured"])
+	usim.place_machine(pump_def, utop)                        # a pump, but no power anywhere
+	var ubefore: int = usim.total_water()
+	for _i: int in 30:
+		usim.tick()
+		_check(usim.power_at(utop) == 0.0, "no power reaches the unpowered pump")
+	var uafter: int = usim.total_water()
+	_check(uafter == ubefore, "an UNPOWERED pump drains nothing (%d -> %d) — the on-hook cost rule" % [ubefore, uafter])
+
+	# --- SANITY: the pump never CREATES water — the drained pocket's total only ever fell. ---
+	_check(after <= before and uafter <= ubefore, "the pump only ever removes water, never adds it")
+	# machine_status mirrors the runner: powered+wet reads working, unpowered reads idle ("no power").
+	var s3: Dictionary = build_pocket.call(26)
+	var wsim: FactorySim = s3["sim"]
+	var wtop: Vector2i = s3["top"]
+	var wpump: MachineState = wsim.place_machine(pump_def, wtop)
+	_check(wsim.machine_status(wpump) == &"idle", "an unpowered pump reads idle (no power)")
+	var wg: MachineState = wsim.place_machine(gen_def, wtop + Vector2i(-2, 0))
+	wg.input_buffer[&"coal"] = 20
+	wsim.total_produced[&"coal"] = 20
+	for _i: int in 3:
+		wsim.tick()
+	_check(wsim.machine_status(wpump) == &"working", "a powered pump over water reads working")
 
 
 ## RUNG 1 — the SELF-FEEDING LINE (docs/PROGRESSION.md, the first automation milestone). The mechanical

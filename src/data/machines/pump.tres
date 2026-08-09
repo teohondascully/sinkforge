@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MachineDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/machine_def.gd" id="1_machine"]
+
+[resource]
+script = ExtResource("1_machine")
+id = &"pump"
+display_name = "Pump"
+recipe = null
+behavior = &"pump"
+craft_cost = {
+&"ingot": 4
+}

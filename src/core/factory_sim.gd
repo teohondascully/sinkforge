@@ -24,6 +24,16 @@ const GRID_ROWS: int = 80
 const LIFT_THROUGHPUT: int = 2          ## unpowered baseline (L1), also the floor under brownout
 const LIFT_POWERED_THROUGHPUT: int = 6  ## items/tick at FULL power — the governed deep-frontier rate
 const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full boost (less → proportional)
+## --- THE PUMP (the L3 Aquifer answer, docs/DECISIONS.md): the flood-drain that falls on the LOCKED hook.
+## Water floods DOWN into your dig for FREE (the _flow_water gravity rule); getting it back OUT costs POWER —
+## exactly the lift's "down free, UP costs power" contract, cast onto fluid. A POWERED pump removes water
+## from its own cell + the cells straight below it (its column, a bounded reach), a power-scaled amount per
+## tick, so a flooded pocket drains over time and you RECLAIM the space for your factory. Unpowered → idle
+## (does nothing — no free drain). remove_water is an explicit accounted drain (total_water drops), NOT part
+## of _flow_water's move-only conservation — the pump is a legit sink, like a source would be.
+const PUMP_REACH: int = 4               ## cells straight down (incl. its own) a pump can pull from this tick
+const PUMP_RATE: int = 3                ## units drained per tick at FULL power (0 unpowered → the cost rule)
+const PUMP_POWER_DEMAND: float = 4.0    ## power at the pump's cell for full drain rate (less → proportional)
 ## --- POWER (the L2 twist, docs/POWER.md): power FALLS on the hook. A fueled GENERATOR burns coal and
 ## pours power into the cells around it (its innate aura — conduits will extend the reach down+lateral
 ## in a later slice); consumers draw from the field to run. The field is a DERIVED quantity recomputed
@@ -82,6 +92,7 @@ const _BEHAVIORS: Dictionary = {
 	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
 	&"descent": {"run": &"_run_descent", "status": &"_status_descent"},
 	&"h_drill": {"run": &"_run_h_drill", "status": &"_status_h_drill", "dests": &"_destinations_h_drill"},
+	&"pump": {"run": &"_run_pump", "status": &"_status_pump"},
 }
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
@@ -1729,6 +1740,43 @@ func _run_lift(machine: MachineState) -> void:
 		else:
 			machine.input_buffer.erase(item)
 		moved += take
+
+
+## THE PUMP — the fluid sibling of the lift (docs/DECISIONS.md, the L3 flood answer). It runs no recipe
+## and moves no items: while POWERED it DRAINS water out of its own cell and the cells straight below it,
+## on the locked hook — water fell in for free, pumping it back out costs power. Its drain BUDGET this tick
+## = round(PUMP_RATE × power_factor), where power_factor is the SAME cost rule the lift uses
+## (power_throttle at the pump's cell). Unpowered → power_factor 0 → budget 0 → it does nothing (idle). The
+## budget is spent TOP-DOWN over PUMP_REACH cells (own cell first, then downward), taking up to what each
+## cell holds — a solid cell or the world floor ends the reach (rock isn't watered; nothing lies below it in
+## this column). remove_water is an explicit accounted drain (total_water drops), OUTSIDE _flow_water's
+## move-only rule, so the pump is a legit sink; integer-only and clamped, so no negative levels ever appear.
+func _run_pump(machine: MachineState) -> void:
+	machine.power_factor = power_throttle(machine.cell, PUMP_POWER_DEMAND)
+	var budget: int = int(round(float(PUMP_RATE) * machine.power_factor))
+	if budget <= 0:
+		return                                   # unpowered → no free drain (the cost rule, one place)
+	for dy: int in range(0, PUMP_REACH):
+		if budget <= 0:
+			break
+		var c: Vector2i = machine.cell + Vector2i(0, dy)
+		if not in_bounds(c) or solid.has(c):
+			break                                # rock caps the column — nothing watered lies below it
+		budget -= remove_water(c, budget)        # drain up to what's left of the budget from this cell
+
+
+## PUMP status — mirrors _run_pump's gates: no power → idle ("no power"); powered but the reachable column
+## is already dry → idle (nothing to do, benign); powered with water in reach → working (draining).
+func _status_pump(machine: MachineState) -> StringName:
+	if power_throttle(machine.cell, PUMP_POWER_DEMAND) <= 0.0:
+		return &"idle"                           # unpowered — the load-bearing "no power" read
+	for dy: int in range(0, PUMP_REACH):
+		var c: Vector2i = machine.cell + Vector2i(0, dy)
+		if not in_bounds(c) or solid.has(c):
+			break
+		if water_at(c) > 0:
+			return &"working"                    # water in reach → draining
+	return &"idle"                               # powered but dry — nothing left to pump
 
 
 ## A splitter runs no recipe: it just moves whatever has fallen into it from its input into its

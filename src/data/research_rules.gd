@@ -68,12 +68,20 @@ const TECHS: Dictionary = {
 		"cost": {&"iron_ingot": 4},
 		"unlocks": [&"blast_furnace"],         # 1 rich ore -> 2 ingots — the quality axis pays out
 	},
+	# --- the L3 (Aquifer) tier: fluids — the flood is the twist, the Pump is how you defeat it (on-hook) ---
+	&"drainage": {
+		"name": "Drainage",
+		"requires": &"enrichment",
+		"sample": &"iron_ingot",               # engineered steel — you plumb the flood with iron, not by hand
+		"cost": {&"plate": 4, &"gear": 2},     # the L2 chain's products pay for the L3 tool (medium-chain sink)
+		"unlocks": [&"pump"],                  # the POWERED flood-drain: water fell in free, pumping out costs power
+	},
 }
 
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
 ## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
 ## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
-const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"enrichment"]
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"enrichment", &"drainage"]
 
 
 static func tech(id: StringName) -> Dictionary:
