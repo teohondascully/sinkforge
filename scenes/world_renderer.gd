@@ -674,7 +674,8 @@ func _exposed_ore_cells() -> Array[Vector2i]:
 		var pos := Vector2(c) * float(CELL)
 		if not view.has_point(pos) or not sim.is_solid(c):
 			continue
-		if not _material(sim.material_at(c)).has_nuggets():
+		var md: MaterialDef = _material(sim.material_at(c))
+		if not md.has_nuggets() or not md.glitters:  # coal has nuggets but does NOT glitter (it's fuel, not a gem)
 			continue
 		# Only EXPOSED ore glows: a crystal seam catches light where it meets a carved cavity, so at least
 		# one orthogonal neighbour must be open air — confines the accent to carved edges (where you are).
