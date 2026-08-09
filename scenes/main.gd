@@ -26,12 +26,14 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 ## World-area-shown math (motes/camera/minimap) reads VIEWPORT, not CANVAS, since they diverged here.
 const VIEWPORT := Vector2(1280.0, 720.0)
 const HUD_SCALE: float = VIEWPORT.x / 640.0        ## = 2.0; scales the 640×360 HUD onto the 1280×720 render
-## Zoom levels cycled by Z (Terraria-style). Zoomed OUT so the avatar reads as a small nimble figure in a
-## big granular world — the Noita feel. _current_zoom() reads the active level everywhere. Index 0 is the
-## LOCKED default 0.50× (#94 — user-picked by eye 2026-08-08 from a 0.33/0.50/0.70/0.90 comparison, the best
-## balance of a readable figure and the big-world feel; see history/63b + DECISIONS). Z cycles in tighter
-## (0.70×, inspect detail) then widest (0.33×, survey the whole base). Smaller = further out.
-const ZOOM_LEVELS: Array[float] = [0.50, 0.70, 0.33]
+## Zoom levels cycled by Z (Terraria-style). _current_zoom() reads the active level everywhere. Index 0 is
+## the default 0.70× (RE-PICKED 2026-08-09 from the blind "Sees" legibility A/B — at 0.50× a 16px cell can't
+## show rock texture (warm rock blooms into "a glow") and machine labels fall below the declutter threshold,
+## so a first-time player couldn't read the miner, the ore, or the machines; 0.70× makes the avatar a real
+## character and surfaces the FORGE labels while keeping a good chunk of the vertical shaft in frame. See
+## docs/DESIGN_REVIEW.md "Sees" + DECISIONS). Z cycles out (0.50×, the old big-world feel) then widest
+## (0.33×, survey the whole base). Smaller = further out.
+const ZOOM_LEVELS: Array[float] = [0.70, 0.50, 0.33]
 var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
 
