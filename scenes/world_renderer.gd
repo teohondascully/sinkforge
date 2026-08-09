@@ -426,6 +426,7 @@ func _draw() -> void:
 	_draw_torches()   # mounted torches guttering on the walls — placed light, claimed territory
 	_draw_saplings()  # planted sprouts growing on the sim's tick (#38 — renewable wood)
 	_draw_ground()
+	_draw_water()      # the L3 fluid layer — translucent blue pools filling each cell to its water line
 	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
 	falling.draw(self)
 	for machine: MachineState in sim.machines:
@@ -1655,6 +1656,39 @@ func _draw_ground() -> void:
 				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.04, 0.04, 0.06))
 				Visuals.draw_item(self, p, 9.0, item)  # sprite-ready (item_<id>.png) or flat chip
 				idx += 1
+
+
+## THE WATER (L3 Aquifer/fluids, slice 2 — the render of sim.water). Each watered cell (integer level
+## 1..WATER_MAX) draws a TRANSLUCENT blue fill whose HEIGHT is level/WATER_MAX of the cell, anchored at
+## the cell's BOTTOM — so a partially-full cell reads a low water line and a settled pool reads a flat
+## surface across its top. A lighter surface line makes the waterline legible. Translucent enough that
+## the terrain / back-wall behind shows through (water is see-through). Read each frame (water flows
+## every tick), never cached — the sim is authoritative; this pass never writes it. Drawn in the main
+## world pass (below the z-50 veil), so deep water reads dark and daylit water reads bright, like all
+## world content. Clipped to the camera view — most water cells are off-screen.
+const WATER_COLOR := Color(0.16, 0.42, 0.72)          ## deep cool blue — reads as water, stays see-through
+const WATER_ALPHA: float = 0.58                       ## translucent (mid of the 0.5–0.65 window)
+const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so the top edge reads
+func _draw_water() -> void:
+	if sim.water.is_empty():
+		return
+	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var fill := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, WATER_ALPHA)
+	var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, minf(1.0, WATER_ALPHA + 0.22))
+	for key: Variant in sim.water:
+		var c: Vector2i = key
+		var level: int = int(sim.water[c])
+		if level <= 0:
+			continue
+		var base := Vector2(c) * float(CELL)
+		if not view.has_point(base):
+			continue
+		# Fill height = fraction of the cell, anchored at the BOTTOM (so it fills upward from the floor).
+		var frac: float = clampf(float(level) / float(FactorySim.WATER_MAX), 0.0, 1.0)
+		var h: float = float(CELL) * frac
+		var top: float = base.y + float(CELL) - h                     # y of the water surface
+		draw_rect(Rect2(Vector2(base.x, top), Vector2(float(CELL), h)), fill)
+		draw_rect(Rect2(Vector2(base.x, top), Vector2(float(CELL), 2.0)), line)  # the waterline
 
 
 ## A machine: a riveted CASING + its animated type glyph (shared Visuals) + a held-count badge + the
