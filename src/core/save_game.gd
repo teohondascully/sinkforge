@@ -42,6 +42,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"conduit": sim.conduit.duplicate(),
 		"rope": sim.rope.duplicate(),
 		"torch": sim.torch.duplicate(),
+		"water": sim.water.duplicate(),
 		"research": sim.research.duplicate(),
 		"sapling": sim.sapling.duplicate(),
 		"machines": machines,
@@ -85,6 +86,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	sim.conduit = (data["conduit"] as Dictionary).duplicate()
 	sim.rope = (data["rope"] as Dictionary).duplicate()
 	sim.torch = (data["torch"] as Dictionary).duplicate()
+	sim.water = (data.get("water", {}) as Dictionary).duplicate()   # additive: absent in older saves → empty
 	sim.research = (data["research"] as Dictionary).duplicate()
 	sim.sapling = (data.get("sapling", {}) as Dictionary).duplicate()   # additive: absent in older saves
 	sim.machines = rebuilt
