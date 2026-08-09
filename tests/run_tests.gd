@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_test_scanner()
 	_test_fine_terrain()
 	_test_stress_invariants()
+	_test_stress_flow()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -2631,3 +2632,286 @@ func _stress_assert_invariants(sim: FactorySim, where: String) -> void:
 		if not sim.solid.has(under) and not sim.grid.has(under):
 			floating_piles += 1
 	_check(floating_piles == 0, "%s — no ground pile hangs in mid-air (%d floating)" % [where, floating_piles])
+
+
+## STRESS: the FACTORY FLOW / routing NETWORK under interleaved churn (adversarial). The sibling
+## _test_stress_invariants churns the PLACEMENT layers broadly; this one churns the FLOW: multi-stage
+## columns (drill→forge→hopper→splitter) threaded by gravity across several columns so splitters route
+## sideways, drills bore finite veins, hoppers meter with back-pressure, a borer chews its gallery — all
+## while, MID-FLOW, machines are removed + rebuilt elsewhere, splitter ratios + hopper filters are
+## reconfigured, and outputs are capped to build back-pressure cascades. After EVERY burst + at the end it
+## asserts the flow invariants: (1) conservation for every item (present == produced − consumed, counting
+## the borer's belly/bunker and every buffer); (2) back-pressure is LOSSLESS (a blocked/capped tick never
+## drops total present — items pile, never vanish); (3) no negative/NaN buffer count, no deposit below zero,
+## no buffer growing past what was produced (no runaway); (4) determinism — the whole sequence twice from
+## one seed lands on an identical final signature. If any fails, it's a real flow/route/back-pressure bug.
+func _test_stress_flow() -> void:
+	print("- STRESS: factory-flow / routing network under churn (adversarial)")
+	var final_a: String = _run_stress_flow_sequence(0xF107)      # seeded run #1 (asserts invariants inline)
+	var final_b: String = _run_stress_flow_sequence(0xF107)      # seeded run #2 (silent — determinism proof)
+	_check(final_a == final_b, "the WHOLE flow sequence is deterministic (identical final state)")
+
+
+## Item ids the flow sequence can touch (its conservation frontier — asserted after every burst). ingot is
+## FORGED by the recipe runner and the borer bellies earth/stone/coal, so the whole chain is covered.
+const _FLOW_ITEMS: Array[StringName] = [
+	&"ore", &"coal", &"ingot", &"earth", &"stone", &"wood",
+	&"drill", &"processor", &"hopper", &"splitter", &"h_drill",
+]
+
+
+## The bounded-worst-case ceiling on any single buffer: every item ever produced in a run, so a buffer
+## that grows past this is a runaway (invariant 3). The seeded pack + a few finite veins keep this small.
+func _flow_total_produced(sim: FactorySim) -> int:
+	var total: int = 0
+	for item: StringName in _FLOW_ITEMS:
+		total += int(sim.total_produced.get(item, 0))
+	return total
+
+
+## Run ONE full interleaved FLOW stress sequence under a fixed seed. Asserts invariants after every burst.
+## Returns the final _state_signature so the caller can prove two same-seed runs match (determinism).
+func _run_stress_flow_sequence(rng_seed: int) -> String:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = rng_seed                                          # FIXED seed — reproducible, no Date/global rand
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var hopper_def: MachineDef = load("res://src/data/machines/hopper.tres")
+	var split_def: MachineDef = load("res://src/data/machines/splitter.tres")
+	var hd_def: MachineDef = load("res://src/data/machines/h_drill.tres")
+
+	var sim: FactorySim = FactorySim.new()
+	# A hand-built factory floor: a stone shelf at row 22 across cols 2..40 (every column's landing), with
+	# fat finite ore + coal veins hanging above it that drills can bore. Well in-bounds (GRID 96×80).
+	for col: int in range(2, 41):
+		sim.set_solid(Vector2i(col, 22), &"stone")
+
+	# THREE multi-stage columns, gravity-threaded top→bottom, so _flow really routes stage to stage. A
+	# splitter mid-stack sends half sideways into the next column over (lateral routing under churn). All
+	# cells sit ABOVE the row-22 shelf, so every stream has a real landing (a machine, then the floor).
+	# col 6:  drill(4) → ore vein(5) → forge(7) → hopper(9) → splitter(11)   [splitter feeds col 7]
+	# col 14: drill(4) → ore vein(5) → forge(7) → hopper(9)
+	# col 20: drill(4) → coal vein(5) → hopper(8)                            [coal funnels to a store]
+	var ore_veins: Array[Vector2i] = [Vector2i(6, 5), Vector2i(14, 5)]
+	for v: Vector2i in ore_veins:
+		sim.set_solid(v, &"ore")
+		sim.deposits[v] = 24                                     # finite — the drill drains it and STOPS
+	sim.set_solid(Vector2i(20, 5), &"coal")
+	sim.deposits[Vector2i(20, 5)] = 24
+	sim.place_machine(drill_def, Vector2i(6, 4))
+	sim.place_machine(proc_def, Vector2i(6, 7))
+	sim.place_machine(hopper_def, Vector2i(6, 9))
+	sim.place_machine(split_def, Vector2i(6, 11))
+	sim.place_machine(drill_def, Vector2i(14, 4))
+	sim.place_machine(proc_def, Vector2i(14, 7))
+	sim.place_machine(hopper_def, Vector2i(14, 9))
+	sim.place_machine(drill_def, Vector2i(20, 4))
+	sim.place_machine(hopper_def, Vector2i(20, 8))
+	# A BORER on a solid rock ledge with a face to bore and (initially) NO drain — its haul pools in the
+	# belly (the on-hook rule), and it self-feeds bored coal. Rock at (30,10); a 6-cell earth face to the
+	# right with a coal seam; the drill's own fuel comes from the seam once it reaches it (seed a little).
+	sim.set_solid(Vector2i(30, 10), &"stone")
+	for x: int in range(31, 37):
+		sim.set_solid(Vector2i(x, 9), &"earth")
+	sim.set_solid(Vector2i(33, 9), &"coal")
+	sim.deposits[Vector2i(33, 9)] = 6
+	var borer: MachineState = sim.place_machine(hd_def, Vector2i(30, 9))
+	borer.facing = 1
+
+	# Seed the pack (fuel + spare machine items + material to toss/cap), booked as produced so the ledger
+	# starts balanced (present == produced - consumed).
+	var start_pack: Dictionary = {
+		&"coal": 120, &"ore": 30, &"ingot": 40, &"earth": 40, &"stone": 40, &"wood": 20,
+		&"drill": 2, &"processor": 2, &"hopper": 2, &"splitter": 2, &"h_drill": 1,
+	}
+	for item: StringName in start_pack:
+		sim.inventory[item] = int(start_pack[item])
+		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(start_pack[item])
+
+	# Fuel every drill + the borer generously so the veins actually flow under the churn.
+	for dc: Vector2i in [Vector2i(6, 4), Vector2i(14, 4), Vector2i(20, 4)]:
+		sim.machine_at(dc).input_buffer[&"coal"] = 30
+		sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 30
+	borer.input_buffer[&"coal"] = 8
+	sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 8
+
+	var loud: bool = rng_seed == 0xF107 and _flow_stress_first   # only the first run reports
+	_flow_stress_first = false
+	# Machine cells the reconfigure/rebuild ops target (real live machines, so they hit real flow paths).
+	var split_cells: Array[Vector2i] = [Vector2i(6, 11)]
+	var hopper_cells: Array[Vector2i] = [Vector2i(6, 9), Vector2i(14, 9), Vector2i(20, 8)]
+	var ops: int = 0
+	var did_save_load: bool = false
+
+	# 26 bursts of ~10 mixed FLOW ops, ticking between each — hundreds of interleaved ops, bounded ticks.
+	# The invariant BEFORE/AFTER a burst's ticks proves back-pressure is lossless (present never drops).
+	var present_before: Dictionary = _flow_present_all(sim)
+	for burst: int in 26:
+		for _k: int in 10:
+			ops += 1
+			var choice: int = rng.randi_range(0, 9)
+			match choice:
+				0:
+					# RECONFIGURE a splitter's ratio directly (the config panel's chips) — reroute mid-flow.
+					sim.set_split_mode(split_cells[rng.randi_range(0, split_cells.size() - 1)],
+						rng.randi_range(0, 3))
+				1:
+					# R-CYCLE a splitter ratio / CLEAR a hopper filter (re-taste) — the other reconfigure verb.
+					var cfg: Array[Vector2i] = split_cells + hopper_cells
+					sim.configure_machine(cfg[rng.randi_range(0, cfg.size() - 1)])
+				2:
+					# REMOVE a mid-stack machine (salvages buffers to the pack) then it can be REBUILT later —
+					# tests that tearing a stage out mid-flow salvages, doesn't leak, and re-forms a valid path.
+					var yank: Array[Vector2i] = [Vector2i(6, 9), Vector2i(14, 9), Vector2i(6, 11)]
+					sim.pickup_machine(yank[rng.randi_range(0, yank.size() - 1)])
+				3:
+					# REBUILD a hopper/splitter from the pack back into a mid-stack cell (re-close the chain).
+					var spot: Array = [[Vector2i(6, 9), hopper_def], [Vector2i(14, 9), hopper_def],
+						[Vector2i(6, 11), split_def]]
+					var pick: Array = spot[rng.randi_range(0, spot.size() - 1)]
+					sim.build_from_pack(pick[1], pick[0])       # may fail (occupied) — must not corrupt
+				4:
+					# RAW remove (demolish — discards buffers, credited to consumed) at a random stack cell.
+					var demo: Array[Vector2i] = [Vector2i(20, 8), Vector2i(14, 7), Vector2i(6, 7)]
+					sim.remove_machine(demo[rng.randi_range(0, demo.size() - 1)])
+				5:
+					# CAP an output to build BACK-PRESSURE: place a floor block just under a stack's tail so
+					# its stream jams up the buffers instead of draining (lossless-pile invariant tested by
+					# present_before/after). Or clear one to release it. Cells between the stacks + shelf.
+					var caps: Array[Vector2i] = [Vector2i(6, 13), Vector2i(14, 13), Vector2i(20, 10)]
+					var cc: Vector2i = caps[rng.randi_range(0, caps.size() - 1)]
+					if sim.is_solid(cc):
+						sim.mine(cc)                            # release the cap
+					else:
+						sim.place_block(cc, &"stone")           # jam the drain
+				6:
+					# TOSS a carried stack down a stack column — extra input for _flow to route through.
+					var col: int = [6, 14, 20][rng.randi_range(0, 2)]
+					var item: StringName = [&"ore", &"coal", &"ingot"][rng.randi_range(0, 2)]
+					sim.drop_item(Vector2i(col, 1), item, rng.randi_range(1, 4))
+				7:
+					# COLLECT the tails: scoop any ground pile at the stack feet so the floor doesn't just
+					# accumulate (keeps the sim honest that piles are re-collectable, conservation-neutral).
+					for gc: Variant in sim.ground.keys():
+						sim.collect_ground(gc)
+						break
+				8:
+					# RE-FUEL a drill / the borer mid-run (keeps the veins boring so flow is live all sequence).
+					var fc: Vector2i = [Vector2i(6, 4), Vector2i(14, 4), Vector2i(20, 4),
+						Vector2i(30, 9)][rng.randi_range(0, 3)]
+					sim.deposit(fc, &"coal", rng.randi_range(1, 3))
+				9:
+					# OPEN/close the borer's drain — cap on solid rock = belly POOLS (lossless), open = pours
+					# down its own column (the on-hook rule) onto the ledge floor.
+					var bd := Vector2i(30, 10)
+					if sim.is_solid(bd):
+						sim.set_solid(bd, &"")
+					else:
+						sim.set_solid(bd, &"stone")
+		# Step the sim so drills bore, forges smelt, hoppers meter, splitters route, the borer chews, and
+		# gravity threads it all — against the churned topology.
+		for _t: int in rng.randi_range(2, 6):
+			sim.tick()
+
+		# A save→disk→load roughly halfway; keep operating on the RESTORED sim in place (flow must survive it).
+		if burst == 13 and not did_save_load:
+			did_save_load = true
+			var data: Dictionary = SaveGame.capture(sim)
+			var path: String = "user://test_stress_flow_%d.save" % rng_seed
+			var wrote: bool = SaveGame.write(path, data)
+			var back: Dictionary = SaveGame.read(path)
+			var restored: FactorySim = FactorySim.new()
+			var ok: bool = SaveGame.restore(restored, back)
+			if loud:
+				_check(wrote and not back.is_empty() and ok, "mid-flow save→disk→load round-trips")
+				_check(_state_signature(restored) == _state_signature(sim),
+					"the restored mid-flow state is byte-identical to the live one")
+			sim = restored
+			DirAccess.remove_absolute(path)
+
+		# INVARIANTS after this burst.
+		if loud:
+			_flow_assert_invariants(sim, present_before, "burst %d (%d ops)" % [burst, ops])
+		present_before = _flow_present_all(sim)
+
+	# Final gate.
+	if loud:
+		_flow_assert_invariants(sim, present_before, "final (%d ops)" % ops)
+		_check(ops >= 200, "the flow sequence is long enough to stress interleavings (%d ops)" % ops)
+		# NON-VACUOUS: the drills actually bored their veins and the forges actually smelted — so the flow
+		# invariants were tested against a LIVE factory, not a dead one that trivially conserves nothing.
+		_check(int(sim.total_produced.get(&"ingot", 0)) > 0,
+			"the sequence really forged ingots (%d) — flow was live" % int(sim.total_produced.get(&"ingot", 0)))
+		var vein_ore: int = int(sim.total_produced.get(&"ore", 0))
+		_check(vein_ore > 30, "the drills bored real ore from the veins (%d produced)" % vein_ore)
+	return _state_signature(sim)
+
+
+## True until the first flow-stress run reports (so the determinism re-run doesn't double the log).
+var _flow_stress_first: bool = true
+
+
+## Per-item snapshot for the back-pressure invariant: {present, consumed, acc=present+consumed}. `acc` is
+## the monotone-non-decreasing quantity a lossy-flow bug would break (see _flow_assert_invariants inv. 2).
+func _flow_present_all(sim: FactorySim) -> Dictionary:
+	var out: Dictionary = {}
+	for item: StringName in _FLOW_ITEMS:
+		var present: int = _items_present(sim, item)
+		var consumed: int = int(sim.total_consumed.get(item, 0))
+		out[item] = {"present": present, "consumed": consumed, "acc": present + consumed}
+	return out
+
+
+## Assert the FLOW invariants at a checkpoint. `present_before` is the snapshot from the LAST checkpoint
+## (before this burst's edits + ticks) — used to prove back-pressure never dropped total present.
+func _flow_assert_invariants(sim: FactorySim, present_before: Dictionary, where: String) -> void:
+	# (1) CONSERVATION — every flow item: present == produced - consumed. _items_present already counts the
+	# sink, pack, ground, and ALL machine buffers (the borer's belly = output_buffer, its bunker = input_buffer).
+	var leaked: PackedStringArray = []
+	for item: StringName in _FLOW_ITEMS:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		if present != net:
+			leaked.append("%s(present=%d,net=%d)" % [item, present, net])
+	_check(leaked.is_empty(), "%s — conservation holds for every flow item%s"
+		% [where, "" if leaked.is_empty() else ": LEAKED " + ", ".join(leaked)])
+
+	# (2) BACK-PRESSURE IS LOSSLESS — across this burst's edits+ticks, no item EVAPORATES. When a downstream
+	# is capped/blocked, items must PILE in buffers, never vanish. The exact, time-ordered statement: since
+	# present == produced - consumed (inv. 1) and BOTH produced and consumed only ever GROW, the quantity
+	# (present + consumed) is monotone non-decreasing. So present may only FALL by exactly the amount that
+	# moved into `consumed` (a smelt reagent, a demolished buffer, a sink void) — a genuine lossy-flow bug
+	# (an item dropped in _flow/_deliver/routing) would drop present WITHOUT a matching consumed rise, which
+	# this catches. present_before is a snapshot of (present, consumed) from the last checkpoint.
+	var evaporated: PackedStringArray = []
+	for item: StringName in _FLOW_ITEMS:
+		var accounted_now: int = _items_present(sim, item) + int(sim.total_consumed.get(item, 0))
+		var accounted_before: int = int((present_before.get(item, {}) as Dictionary).get("acc", accounted_now))
+		if accounted_now < accounted_before:
+			evaporated.append("%s(before=%d, now=%d)" % [item, accounted_before, accounted_now])
+	_check(evaporated.is_empty(),
+		"%s — back-pressure is lossless (present+consumed never fell → nothing evaporated)%s"
+		% [where, "" if evaporated.is_empty() else ": " + ", ".join(evaporated)])
+
+	# (3) NO NEGATIVE / RUNAWAY — no machine buffer holds a negative or a count past everything ever
+	# produced, and no seeded deposit went negative. A runaway (branch-relattice amplification) or a
+	# negative (double-decrement) would trip here.
+	var ceiling: int = _flow_total_produced(sim) + 1
+	var bad_buffer: PackedStringArray = []
+	for machine: MachineState in sim.machines:
+		for buf: Dictionary in [machine.input_buffer, machine.output_buffer]:
+			for item: StringName in buf:
+				var n: int = int(buf[item])
+				if n < 0:
+					bad_buffer.append("neg %s=%d @%s" % [item, n, str(machine.cell)])
+				elif n > ceiling:
+					bad_buffer.append("runaway %s=%d>%d @%s" % [item, n, ceiling, str(machine.cell)])
+	for dcell: Variant in sim.deposits.keys():
+		if int(sim.deposits[dcell]) < 0:
+			bad_buffer.append("neg deposit @%s=%d" % [str(dcell), int(sim.deposits[dcell])])
+	for gc: Variant in sim.ground.keys():
+		for item: StringName in (sim.ground[gc] as Dictionary):
+			if int((sim.ground[gc] as Dictionary)[item]) < 0:
+				bad_buffer.append("neg pile %s @%s" % [item, str(gc)])
+	_check(bad_buffer.is_empty(), "%s — no negative/runaway buffer, deposit, or pile%s"
+		% [where, "" if bad_buffer.is_empty() else ": " + ", ".join(bad_buffer)])
