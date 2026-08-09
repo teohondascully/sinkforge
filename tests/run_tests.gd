@@ -800,6 +800,34 @@ func _test_layered_worldgen() -> void:
 				break
 	_check(water_match, "sim.water matches the generated world's water grid exactly")
 
+	# --- AQUIFER TREASURE (L3 risk/REWARD): the flood GUARDS a rich vein. Every watered cell adjacent to
+	# solid rock must have &"rich_ore" reachable in its immediate solid surround — so a player who breaches +
+	# drains + mines the drained pocket's walls is rewarded with high-grade ore. Deterministic on seed 1337.
+	var rich_neighbours: int = 0            # water cells with rich_ore in a 4-neighbour solid wall
+	var rich_deposits: int = 0             # those rich cells that carry a valid deposit amount
+	var rich_seen: Dictionary = {}
+	for wc3: Vector2i in a.water:
+		for d3: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nb3: Vector2i = wc3 + d3
+			if a.blocks.get(nb3, &"") == &"rich_ore":
+				rich_neighbours += 1
+				if not rich_seen.has(nb3):
+					rich_seen[nb3] = true
+					if int(a.amounts.get(nb3, 0)) > 0:
+						rich_deposits += 1
+				break
+	_check(rich_neighbours > 0,
+		"aquifer walls are lined with rich_ore (the reward guarded by the flood; %d water cells touch it)"
+		% rich_neighbours)
+	_check(rich_deposits > 0 and rich_deposits == rich_seen.size(),
+		"every aquifer-wall rich_ore cell carries a real deposit amount (%d cells, all valid)" % rich_deposits)
+	# The rich ore lines the SOLID rock — it is never a watered/carved cell (grows into rock, not the pocket).
+	var rich_in_water: int = 0
+	for rc: Vector2i in rich_seen:
+		if a.water.has(rc):
+			rich_in_water += 1
+	_check(rich_in_water == 0, "aquifer rich_ore is only in solid rock, never in the flooded cells")
+
 
 ## WORLDGEN FUZZ (the invariant sweep): generate MANY worlds across a matrix of seeds × sizes and assert
 ## the generation invariants hold UNIVERSALLY, not just for _test_layered_worldgen's one happy-path

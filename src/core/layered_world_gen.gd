@@ -159,6 +159,20 @@ const AQUIFER_RX_MAX: int = 4
 const AQUIFER_RY_MIN: int = 2
 const AQUIFER_RY_MAX: int = 3
 
+# --- aquifer TREASURE (L3 risk/REWARD, docs/WATER.md): the flood GUARDS a rich vein ---
+## The flooded pocket is pure hazard on its own (you wade it, you pump it). This makes it worth
+## breaching: a modest &"rich_ore" vein grows in the SOLID rock lining each pocket's walls/floor, so a
+## player who breaches the flood, pumps it dry, and mines the drained walls is paid in high-grade ore —
+## risk (flood) guarding reward (treasure). Reuses the EXISTING rich_ore variant (Blast Furnace: 1→2
+## ingots) — no new content. Seeded from a solid RIM cell so _grow_vein bores INTO the surrounding rock
+## (it only replaces solid earth/stone/deepslate/shale, never the water/air the pocket carved).
+## Vein BODY size (cells) — modest so it reads as a treasure vein, not wallpaper (a few drills' worth).
+const AQUIFER_ORE_SIZE_MIN: int = 5
+const AQUIFER_ORE_SIZE_MAX: int = 9
+## Per-cell deposit: the deep-band ore baseline (ORE_AMOUNT_BASE + full-depth bonus) × the rich multiplier,
+## mirroring _scatter_veins' rich_ore richness math (aquifers live deep, so the deep baseline is right).
+const AQUIFER_ORE_RICHNESS: int = int((ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS) * RICH_AMOUNT_MULT)
+
 # --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
 ## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
 ## 3-wide canopies mostly read as separate trees). Sparse — the surface reads as wooded, not a wall.
@@ -484,6 +498,8 @@ func _stamp_seal(world: WorldData) -> void:
 ##     column's base-safe band, the seal band, or already-open air — so the pocket is pressurised (sealed by
 ##     rock on all sides, not spliced into the cave/tunnel system), and never floods the base or holes the seal;
 ##   • fills exactly the cells it erased with WATER_MAX (water only lands in cells guaranteed carved-open).
+## RISK/REWARD (L3 treasure): after carving each pocket, a modest &"rich_ore" vein is grown into the SOLID
+## rock lining it (see _seed_aquifer_treasure) — the flood guards the reward.
 ## Deterministic via the shared rng.
 func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var count: int = maxi(2, int(round(float(world.cols) * AQUIFER_PER_COL)))
@@ -499,6 +515,7 @@ func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var cy: int = rng.randi_range(lo_row, hi_row)
 		var rx: int = rng.randi_range(AQUIFER_RX_MIN, AQUIFER_RX_MAX)
 		var ry: int = rng.randi_range(AQUIFER_RY_MIN, AQUIFER_RY_MAX)
+		var carved: Array[Vector2i] = []            # the cells THIS pocket flooded — its rim is our vein seed
 		for dy: int in range(-ry, ry + 1):
 			for dx: int in range(-rx, rx + 1):
 				var ex: float = float(dx) / float(rx)
@@ -521,6 +538,38 @@ func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 				world.blocks.erase(cell)                  # open the cell (wall kept behind it)
 				world.amounts.erase(cell)                 # a vein cell we flooded keeps no deposit
 				world.water[cell] = FactorySim.WATER_MAX  # fill the carved cell (guaranteed not solid now)
+				carved.append(cell)
+		# REWARD: line the drained pocket's walls with a rich vein (only grows into the solid rim rock).
+		_seed_aquifer_treasure(world, rng, carved)
+
+
+## Grow the aquifer's REWARD vein: a modest &"rich_ore" body in the SOLID rock immediately lining the
+## flooded pocket (its walls/floor), so breaching + draining + mining the walls pays out high-grade ore.
+## Seeds from a SOLID rim cell — a 4-neighbour of a carved (now-water) cell that is still solid rock — so
+## _grow_vein bores INTO the surrounding rock. _grow_vein only replaces solid earth/stone/deepslate/shale,
+## so it can never fill the water/air the pocket carved; passing SEAL_TOP+SEAL_ROWS as min_row floors the
+## blob at the top of Stonereach (belt-and-braces — the pocket already lives below the seal). Deterministic
+## via the shared rng. `carved` is this pocket's flooded cells (empty on a fully-blocked pocket → no vein).
+func _seed_aquifer_treasure(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vector2i]) -> void:
+	if carved.is_empty():
+		return
+	# Collect the SOLID rim: cells adjacent to a flooded cell that are still solid rock _grow_vein accepts.
+	var rim: Array[Vector2i] = []
+	var seen: Dictionary = {}
+	for wc: Vector2i in carved:
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nb: Vector2i = wc + d
+			if seen.has(nb) or not world.in_bounds(nb):
+				continue
+			seen[nb] = true
+			var here: StringName = world.blocks.get(nb, &"")
+			if here == &"earth" or here == &"stone" or here == &"deepslate" or here == &"shale":
+				rim.append(nb)
+	if rim.is_empty():
+		return                                         # pocket fully rimmed by seal/other water/air — no vein
+	var seed_cell: Vector2i = rim[rng.randi_range(0, rim.size() - 1)]
+	var size: int = rng.randi_range(AQUIFER_ORE_SIZE_MIN, AQUIFER_ORE_SIZE_MAX)
+	_grow_vein(world, rng, seed_cell, size, AQUIFER_ORE_RICHNESS, &"rich_ore", SEAL_TOP + SEAL_ROWS)
 
 
 ## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,
