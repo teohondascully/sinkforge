@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_test_descent_gate()
 	_test_descent_automation()
 	_test_hints()
+	_test_hint_water()
 	_test_falling_pool()
 	_test_scanner()
 	_test_fine_terrain()
@@ -2647,6 +2648,60 @@ func _test_hints() -> void:
 	s2.inventory[&"splitter"] = 2
 	h2.refresh(0.016)
 	_check(h2.active_text().begins_with("SPLITTER"), "resync re-arms edges for what comes after")
+
+
+## WATER STATE-EDGE HINT (L3 legibility — scenes/hints.gd, representation-only): the first time the body
+## wades into water (note_in_water true on the dry→wet edge) the AQUIFER hint fires once, teaching the
+## Pump loop; re-entering never re-teaches (latched); a body that stays dry — and a fresh boot — fire
+## nothing; resync() (post-load) doesn't refire for a body restored already in water.
+func _test_hint_water() -> void:
+	print("[hint: water]")
+	var sim: FactorySim = FactorySim.new()
+	# A dry body at boot fires nothing (the controller only pokes note_in_water while playing).
+	var hints: Hints = Hints.new(sim)
+	hints.refresh(0.016)
+	_check(hints.active_text() == "", "a dry body fires no water hint")
+	hints.note_in_water(false)
+	hints.refresh(0.016)
+	_check(hints.active_text() == "", "still dry: no water hint after a dry poke")
+	# The dry → wet EDGE fires the AQUIFER hint once.
+	hints.note_in_water(true)
+	hints.refresh(0.016)
+	_check(hints.active_text().begins_with("AQUIFER"), "wading into water teaches the AQUIFER loop")
+	# Expire it, then leave + re-enter the water: it must NOT re-teach (latched for the session).
+	hints.refresh(Hints.SHOW_SECONDS + 1.0)
+	_check(hints.active_text() == "", "the water bubble expires")
+	hints.note_in_water(false)
+	hints.refresh(0.016)
+	hints.note_in_water(true)
+	hints.refresh(0.016)
+	_check(hints.active_text() == "", "re-entering water never re-teaches (latched)")
+	# A fresh sim whose body spawns ALREADY in water (a pre-poked wet flag before the first refresh) still
+	# fires — the edge is the FIRST refresh where wet is true (there was no prior wet frame). This mirrors
+	# the pack-hint edge and is the case a mid-pool spawn hits.
+	var s2: FactorySim = FactorySim.new()
+	var h2: Hints = Hints.new(s2)
+	h2.note_in_water(true)
+	h2.refresh(0.016)
+	_check(h2.active_text().begins_with("AQUIFER"), "a body that spawns IN water teaches on the first frame")
+	# resync (post-load) with the body still wet must NOT refire the hint.
+	h2.refresh(Hints.SHOW_SECONDS + 1.0)
+	h2.note_in_water(true)
+	h2.resync()
+	h2.note_in_water(true)
+	h2.refresh(0.016)
+	_check(h2.active_text() == "", "resync with a still-wet body never re-teaches (post-load)")
+	# The water hint and pack hints share the one-bubble-at-a-time queue: a pack hint active when the water
+	# edge fires does not clobber it — the water hint waits its turn.
+	var s3: FactorySim = FactorySim.new()
+	var h3: Hints = Hints.new(s3)
+	s3.inventory[&"rope"] = 1
+	h3.note_in_water(true)
+	h3.refresh(0.016)
+	_check(h3.active_text().begins_with("ROPE"), "a simultaneous pack hint shows first; water queues behind")
+	h3.refresh(Hints.SHOW_SECONDS + 1.0)
+	h3.refresh(0.016)
+	_check(h3.active_text().begins_with("AQUIFER"), "…the queued water hint shows after the pack hint")
 
 
 ## FALLING-ITEM POOLING + CAP (FABLE_50 #5 — scenes/falling_items.gd, cosmetic layer): live drops are

@@ -50,17 +50,37 @@ var _defs: Array[Dictionary] = [
 			+ " ingots down its shaft. Gravity feeds the breach."},
 ]
 
+## STATE-EDGE hints (vs the pack-acquisition ones above): a teaching moment triggered by a body/world
+## condition rather than picking an item up. The first is the AQUIFER — the moment the body wades into
+## water it's slowed + buoyant (Player water impedance) with no on-screen reason; this teaches the L3
+## loop (a powered Pump drains it, then mine the rich walls) the instant it's actionable. Same latching:
+## fires ONCE on the rising edge (was-dry → wet), never re-teaches, and never fires at boot/load (the
+## controller only pokes note_in_water while playing, so a body that spawns dry starts un-triggered).
+const WATER_HINT_ID: StringName = &"in_water"
+const WATER_HINT_TEXT: String = \
+	"AQUIFER — water floods your dig and slows you. A POWERED PUMP drains it; then mine the rich walls."
+
 var sim: FactorySim
 var _had: Dictionary = {}           ## item -> true if the pack held it last frame (edge detection)
 var _done: Dictionary = {}          ## hint id -> true once shown (latched for the session)
 var _queue: Array[StringName] = []  ## fired-but-waiting hint ids (one bubble at a time)
 var _active: StringName = &""
 var _life: float = 0.0
+var _in_water: bool = false         ## body wet this frame (poked by note_in_water; drives the water edge)
+var _was_in_water: bool = false     ## body wet last frame — the rising-edge detector for the water hint
 
 
 func _init(factory: FactorySim) -> void:
 	sim = factory
 	_snapshot()                     # what's already in the pack at construction never fires
+
+
+## The controller pokes this each frame with whether the body is currently wading (player._in_water()).
+## Kept out of the sim: water impedance is a Player predicate, not a pack item, so the water hint rides
+## a poked flag instead of an inventory scan. Off (false) at boot/load until the controller starts
+## playing, so a dry spawn never fires the hint retroactively.
+func note_in_water(wet: bool) -> void:
+	_in_water = wet
 
 
 ## Call every frame. Detects acquisition edges, advances the active bubble's life, promotes the queue.
@@ -73,6 +93,11 @@ func refresh(delta: float) -> void:
 			_done[id] = true                          # latch at FIRE time, so a re-acquisition can't re-queue
 			_queue.append(id)
 		_had[item] = has
+	# The AQUIFER state-edge: dry → wet fires the water hint once, latched exactly like a pack hint.
+	if _in_water and not _was_in_water and not _done.has(WATER_HINT_ID):
+		_done[WATER_HINT_ID] = true
+		_queue.append(WATER_HINT_ID)
+	_was_in_water = _in_water
 	if _active != &"":
 		_life -= delta
 		if _life <= 0.0:
@@ -86,6 +111,8 @@ func refresh(delta: float) -> void:
 func active_text() -> String:
 	if _active == &"":
 		return ""
+	if _active == WATER_HINT_ID:
+		return WATER_HINT_TEXT
 	for def: Dictionary in _defs:
 		if def["id"] == _active:
 			return str(def["text"])
@@ -105,6 +132,10 @@ func active_alpha() -> float:
 func resync() -> void:
 	_queue.clear()
 	_active = &""
+	# Re-arm the water edge to the CURRENT wet state so a body restored already IN water is old news, not
+	# a fresh entry (mirrors the pack snapshot). The controller feeds the true flag next frame via
+	# note_in_water; leaving _was_in_water == _in_water here means no spurious rising edge on the resume.
+	_was_in_water = _in_water
 	_snapshot()
 
 

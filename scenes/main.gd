@@ -586,6 +586,8 @@ func _process(delta: float) -> void:
 	if _objectives != null:
 		_objectives.refresh(delta)
 	if _hints != null and not _paused:
+		if _player != null:
+			_hints.note_in_water(_player._in_water())   # feed the body's wet state for the AQUIFER edge
 		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(), _selected_build_material())
