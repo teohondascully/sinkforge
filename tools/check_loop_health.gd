@@ -53,8 +53,11 @@ const FRAMES_PER_STEP_PAR: int = 700
 
 ## Score floor + component caps — headroom under today's MEASURED baseline so real-time variance passes but
 ## a REGRESSION (the loop drags, the body thrashes, or the game stops signposting) trips the layer. RATCHET
-## the floor UP as the loop improves, exactly like the friction ceilings in play_tests.
-const SCORE_FLOOR: float = 70.0
+## the floor UP as the loop improves, exactly like the friction ceilings in play_tests. (Ratcheted 2026-08-09:
+## floor 70→90 — the arc measured 98.7 dead-stable across 3 runs, so a SMALLER dip now trips; 8.7 of margin
+## still absorbs the per-frame stall/guidance jitter. The component *_PEN_CAP bounds stay generous CLAMP
+## bounds — the SCORE_FLOOR is the meaningful ratchet; tightening the clamps risks flaking the score math.)
+const SCORE_FLOOR: float = 90.0       ## baseline 98.7, floor 90.0
 const PACE_PEN_CAP: float = 25.0
 const FRICTION_PEN_CAP: float = 25.0
 const GUIDANCE_PEN_CAP: float = 40.0

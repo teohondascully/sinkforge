@@ -623,7 +623,9 @@ func _goal_round_trip_to_vein() -> bool:
 	print("  friction: %s  (down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
 	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope this cost places=15/jumps=18/frames=320 of
 	# pillar-jumping; the rope ride measures places=3 jumps=1 frames=58 — locked in so it can't regress).
-	var within: bool = _within_ceilings(agent, {"mines": 15, "places": 6, "jumps": 4, "frames": 120})
+	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: mines=9 places=3 jumps=2 frames=82):
+	# mines 15→12 · places 6→5 · frames 120→100 (jumps kept at 4 — the loosest integer metric).
+	var within: bool = _within_ceilings(agent, {"mines": 12, "places": 5, "jumps": 4, "frames": 100})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug to the buried vein, mined it, and climbed back to the surface")
 
@@ -645,7 +647,9 @@ func _goal_descend_build_return() -> bool:
 	print("  friction: %s  (depth=14 down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
 	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope places=24/jumps=26/frames=520; the rope ride
 	# measures places=6 jumps=1 frames=111 — the deep climb no longer scales in pain, locked in).
-	var within: bool = _within_ceilings(agent, {"mines": 24, "places": 10, "jumps": 4, "frames": 200})
+	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: mines=15 places=6 jumps=2 frames=134):
+	# mines 24→20 · places 10→8 · frames 200→165 (jumps kept at 4 — the loosest integer metric).
+	var within: bool = _within_ceilings(agent, {"mines": 20, "places": 8, "jumps": 4, "frames": 165})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug 14 deep to a vein, mined it, and climbed all the way back out")
 
@@ -671,7 +675,9 @@ func _goal_escape_deep_pit() -> bool:
 		await physics_frame
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (escaped=%s)" % [agent.friction(), up])
-	var within: bool = _within_ceilings(agent, {"places": 12, "jumps": 12, "frames": 220})
+	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: places=6 jumps=6 frames=132):
+	# places 12→9 · jumps 12→9 · frames 220→175 — the pillar-jump escape now can't quietly get worse.
+	var within: bool = _within_ceilings(agent, {"places": 9, "jumps": 9, "frames": 175})
 	return await _finish(agent, up and within, "climbed out of a %d-deep pit (must not be trapped)" % depth)
 
 
@@ -703,7 +709,9 @@ func _goal_cross_jagged_tunnel() -> bool:
 	var far_col: int = start_col + length - 1
 	var reached: bool = await agent.walk_to_column(far_col, 1200)
 	print("  friction: %s  (reached=%s at col %d)" % [agent.friction(), reached, agent.main._cell_at(agent.player.position).x])
-	var within: bool = _within_ceilings(agent, {"jumps": 8, "stuck_frames": 40})
+	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: jumps=2 stuck_frames=1):
+	# jumps 8→5 · stuck_frames 40→20 — lumpy-floor lateral movement now guarded far tighter.
+	var within: bool = _within_ceilings(agent, {"jumps": 5, "stuck_frames": 20})
 	return await _finish(agent, reached and within, "walked a %d-cell jagged tunnel end to end" % length)
 
 

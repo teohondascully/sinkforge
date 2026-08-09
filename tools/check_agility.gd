@@ -22,20 +22,22 @@ const START_COL: int = 12
 const BASE_ROW: int = 14
 const CELL: int = 32
 
-## Score floor + component caps — headroom over today's MEASURED baseline (deterministic: score 96,
-## slowness 1.00×, 0 stalls, jump-latency 1f) so a real movement regression trips while the clean run
-## passes. RATCHET the floor UP as movement improves, exactly like the friction ceilings in play_tests.
-const SCORE_FLOOR: float = 80.0
-const MAX_SLOWNESS: float = 2.0        ## frames may be up to this × the top-speed par (baseline 1.00×)
-const STALL_CAP: int = 40              ## stuck-frames tolerated before it's "awkward" (baseline 0)
-const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne (baseline 1)
+## Score floor + component caps — headroom over today's MEASURED baseline (deterministic across 3 runs, ZERO
+## variance: score 95.3, slowness 1.00×, 1 stall, jump-latency 1f) so a real movement regression trips while
+## the clean run passes. RATCHET the floor UP as movement improves, exactly like the friction ceilings in
+## play_tests. (Ratcheted 2026-08-09: floor 80→90 · slowness 2.0→1.30 · stalls 40→12 — the gauge proved
+## rock-stable, so a SMALLER regression now trips; margins still absorb an integer-quantized penalty wobble.)
+const SCORE_FLOOR: float = 90.0        ## baseline 95.3, floor 90.0 (one extra thrash-jump = -4 survives)
+const MAX_SLOWNESS: float = 1.30       ## frames may be up to this × the top-speed par (baseline 1.00×)
+const STALL_CAP: int = 12              ## stuck-frames tolerated before it's "awkward" (baseline 1)
+const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne (baseline 1; kept — already tight)
 ## GRANULARITY-AGILITY dimensions (#104). Fine/molded terrain + the scale (#94) and fine-collision (#88)
 ## reworks all move the agility standard (proven when the P3 fine-collision change popped step-up). These
 ## turn the user's "smaller char / taller jump / MID-AIR direction change" hypothesis into NUMBERS so those
 ## changes are judged on data, not vibes — and so a rework can't silently kill responsiveness. Caps carry
 ## headroom over today's measured baseline; ratchet them as movement improves.
-const TURN_LATENCY_CAP: int = 12       ## frames from a full-speed input FLIP to velocity crossing zero (ground snappiness)
-const AIR_CONTROL_FLOOR: float = 0.5   ## fraction of ground top-speed steer-able MID-AIR in a 12f window (1.0 = full air control)
+const TURN_LATENCY_CAP: int = 9        ## frames from a full-speed input FLIP to velocity crossing zero (baseline 6; ratcheted 12→9)
+const AIR_CONTROL_FLOOR: float = 0.80  ## fraction of ground top-speed steer-able MID-AIR in a 12f window (baseline 1.00; ratcheted 0.5→0.80)
 
 var _failures: int = 0
 
