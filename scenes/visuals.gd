@@ -39,7 +39,9 @@ const MACHINE_STYLE: Dictionary = {
 static func machine_kind(def: MachineDef) -> String:
 	if MACHINE_STYLE.has(def.behavior):
 		return (MACHINE_STYLE[def.behavior] as Dictionary)["kind"]
-	if def.recipe != null and def.recipe.inputs.is_empty():
+	# The base Forge (processor) SMELTS ore→ingot — it's a furnace with fire, not a generic cool runner.
+	# (Classing it "gear" made it glow cold cyan and spill over the starter ore — the blind-playtest bug.)
+	if def.id == &"processor" or (def.recipe != null and def.recipe.inputs.is_empty()):
 		return "furnace"
 	return "gear"
 
@@ -49,8 +51,8 @@ static func machine_color(def: MachineDef) -> Color:
 	if MACHINE_STYLE.has(def.behavior):
 		return (MACHINE_STYLE[def.behavior] as Dictionary)["color"]
 	var recipe: RecipeDef = def.recipe
-	if recipe != null and recipe.inputs.is_empty():
-		return Color(0.82, 0.45, 0.20)   # ember-orange — the furnace/source family
+	if def.id == &"processor" or (recipe != null and recipe.inputs.is_empty()):
+		return Color(0.82, 0.45, 0.20)   # ember-orange — the furnace/source family (Forge included)
 	return Color(0.30, 0.55, 0.75)       # steel-blue — the generic processor
 
 
