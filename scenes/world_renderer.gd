@@ -1765,6 +1765,13 @@ func _draw_ground() -> void:
 const WATER_COLOR := Color(0.16, 0.42, 0.72)          ## deep cool blue — reads as water, stays see-through
 const WATER_ALPHA: float = 0.58                       ## translucent (mid of the 0.5–0.65 window)
 const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so the top edge reads
+## A faint COOL self-sheen so a flooded pocket reads as a dim blue presence in the near-black deep (the
+## flood hazard must be perceptible before you bring a lamp). Deliberately WEAK — well below a torch/
+## crystal seam/lamp — so lit + shallow water looks essentially unchanged and it never reads as a light
+## source or lava. Painted on the additive light layer, the same way crystal seams/conduits/motes do.
+const WATER_SHEEN := Color(0.32, 0.66, 0.98)          ## cool blue tint for the wet-sheen pool
+const WATER_SHEEN_BASE: float = 0.07                  ## floor intensity for a barely-wet cell
+const WATER_SHEEN_LEVEL: float = 0.11                 ## added intensity at a brim-full cell (scales by level)
 func _draw_water() -> void:
 	if sim.water.is_empty():
 		return
@@ -2386,6 +2393,26 @@ func _paint_lights(layer: LightLayer) -> void:
 		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
 		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
 		_draw_glow(layer, m["pos"], float(CELL) * 1.0, m["color"], 0.38)
+	# WATER SELF-SHEEN (L3 legibility): each on-screen water cell adds a FAINT cool bloom so a flooded
+	# pocket reads as a dim blue presence in the near-black deep — you can perceive the flood hazard before
+	# a lamp reaches it. Deliberately weak (WATER_SHEEN_BASE + level-scaled), well under a torch/crystal/
+	# lamp, so lit + shallow water looks essentially unchanged and it never reads as a light source or lava.
+	# View-culled like the passes above; scaled modestly by water level (a full cell glows a touch more).
+	if not sim.water.is_empty():
+		var wview: Rect2 = _view_world_rect()
+		for wkey: Variant in sim.water:
+			var wc: Vector2i = wkey
+			var wlevel: int = int(sim.water[wc])
+			if wlevel <= 0:
+				continue
+			var wpos := Vector2(wc) * float(CELL)
+			if not wview.has_point(wpos):
+				continue
+			var wfrac: float = clampf(float(wlevel) / float(FactorySim.WATER_MAX), 0.0, 1.0)
+			var wintensity: float = WATER_SHEEN_BASE + WATER_SHEEN_LEVEL * wfrac
+			# A faint slow shimmer so the pool reads as live water, not a painted disc — tiny amplitude.
+			var wshim: float = 0.9 + 0.1 * sin(_anim_time * 1.8 + float(wc.x) * 0.6 + float(wc.y) * 0.4)
+			_draw_glow(layer, _cell_center(wc), float(CELL) * 1.15, WATER_SHEEN, wintensity * wshim)
 
 
 ## GODRAYS (FABLE_50 #12) — the signature shot: where a dug shaft admits the sky below the enclosing
