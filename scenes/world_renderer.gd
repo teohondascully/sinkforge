@@ -1327,13 +1327,24 @@ func _draw_guide_targets() -> void:
 		else:
 			var ring := Color(1.0, 0.78, 0.30, 0.55 + 0.40 * pulse)
 			var r: float = float(CELL) * (0.62 + 0.12 * pulse)
+			# A dark backing ring first so the amber reads even INSIDE the warm head-lamp pool (the
+			# starter vein sits under the miner's lamp; warm-on-warm was washing this out).
+			draw_arc(center, r, 0.0, TAU, 28, Color(0.05, 0.04, 0.02, 0.6), 4.5)
 			draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
 			draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
-		# A bobbing down-pointer above the cell so it's obvious even off-centre.
-		var bob: float = -float(CELL) * (0.9 + 0.18 * pulse)
-		var tip := center + Vector2(0.0, bob)
-		var arrow := Color(1.0, 0.85, 0.40, 0.85)
-		draw_colored_polygon([tip + Vector2(0, 7), tip + Vector2(-6, -4), tip + Vector2(6, -4)], arrow)
+		# A bobbing down-pointer floated HIGH ABOVE the cell — out of the lamp wash, into open air —
+		# with a tether line back down to the exact rock so the eye tracks marker → target. Dark-outlined
+		# so it punches through both the bright lamp AND the bright day sky (reads on any background).
+		var lift: float = float(CELL) * (2.9 + 0.35 * pulse)
+		var tip := center + Vector2(0.0, -lift)
+		var arrow := Color(1.0, 0.85, 0.40, 0.92)
+		var dark := Color(0.05, 0.04, 0.02, 0.85)
+		# tether: marker down to the cell top
+		draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(1.0, 0.82, 0.35, 0.30 + 0.20 * pulse), 2.0)
+		# the pointer: a bold outlined chevron, ~1.6x the old size
+		var back := PackedVector2Array([tip + Vector2(0, 12), tip + Vector2(-11, -7), tip + Vector2(11, -7)])
+		draw_colored_polygon(back, dark)
+		draw_colored_polygon([tip + Vector2(0, 9), tip + Vector2(-8, -5), tip + Vector2(8, -5)], arrow)
 
 
 ## An INTERACTABLE outline pulse (FABLE_50 #21): a breathing coloured outline + solid corner brackets
