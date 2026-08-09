@@ -151,6 +151,14 @@ const CHUNK: int = 8                                  ## cells per chunk side (8
 var _chunks: Array[LightLayer] = []                  ## row-major grid, size _chunk_cols × _chunk_rows
 var _chunk_cols: int = 0
 var _chunk_rows: int = 0
+## COARSE TERRAIN BAKE (perf): the chunk painters above draw the static ~7700-cell coarse terrain, which
+## on a mature base was ~72% of the frame's draw calls (~11,882). They're STATIC-per-terrain-change, so we
+## host the chunk canvases inside a world-sized SubViewport (transparent bg) and draw its render-target as
+## ONE textured quad at z -10 — pixel-identical by construction (same draw code), ~11k fewer draw calls.
+## The viewport re-renders ONLY when a chunk was dirtied (terrain change), via render_target_update_mode
+## UPDATE_ONCE; between changes the GPU replays the single quad for free.
+var _terrain_viewport: SubViewport                    ## world-in-pixels canvas the chunk painters render into
+var _terrain_layer: LightLayer                        ## the ONE quad in the main tree that draws the bake (z -10)
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 ## FINE TERRAIN MOLDING (Noita-look slice 1): the coarse 32px terrain fill re-rendered as an organic,
 ## molded 8px-grain field baked to one texture (scenes/fine_terrain.gd), drawn OVER the chunk terrain
@@ -221,13 +229,31 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	# whole world's draw commands 60×/second (the sim itself does almost nothing).
 	_chunk_cols = ceili(float(FactorySim.GRID_COLS) / float(CHUNK))
 	_chunk_rows = ceili(float(FactorySim.GRID_ROWS) / float(CHUNK))
+	# The chunk painters render into a world-sized SubViewport (a flat 3072×2560 canvas, no camera, so a
+	# chunk's world-space draw lands 1:1 at pixel coords) with a TRANSPARENT background so the sky above
+	# ground stays see-through (the backdrop shows). update_mode DISABLED = it never re-renders on its own;
+	# we flip it to UPDATE_ONCE only when a chunk is dirtied (below), preserving the per-dig fast lane.
+	_terrain_viewport = SubViewport.new()
+	_terrain_viewport.size = Vector2i(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
+	_terrain_viewport.transparent_bg = true
+	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_terrain_viewport.disable_3d = true
+	_terrain_viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	add_child(_terrain_viewport)
 	for cy: int in _chunk_rows:
 		for cx: int in _chunk_cols:
 			var rect := Rect2i(cx * CHUNK, cy * CHUNK, CHUNK, CHUNK)
 			var chunk := LightLayer.new()
 			chunk.setup(-10, false, _paint_terrain_chunk.bind(rect))  # painter(ci, rect) draws only this block
-			add_child(chunk)
+			_terrain_viewport.add_child(chunk)                        # renders into the bake viewport, not the main tree
 			_chunks.append(chunk)
+	# The ONE quad in the main tree that draws the baked coarse terrain (where the ~7700 chunk draws were,
+	# z -10). Drawn at the world rect 1:1 with NEAREST filter so it lines up crisply with the pixel-snap
+	# camera (#77) — unlike the veil which is intentionally low-res + linear. Content updates via the viewport.
+	_terrain_layer = LightLayer.new()
+	_terrain_layer.setup(-10, false, _paint_terrain_bake)
+	_terrain_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(_terrain_layer)
 	# The PARALLAX BACKDROP (FABLE_50 #10) sits BELOW the terrain chunks (z -20), repainted per frame:
 	# a vertical sky gradient + two drifting ridgelines + slow clouds. The chunk background pass no
 	# longer fills opaque sky, so the vista shows wherever no wall backs a cell (above ground); the
@@ -269,6 +295,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	add_child(_haze)
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()  # initial full paint (once); thereafter only dirtied chunks repaint
+	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE  # bake the initial coarse terrain once
+	_terrain_layer.queue_redraw()
 	sim.terrain_dirty.clear()  # drop any dirt from world-seeding — the initial paint above already covers it
 	_dark.queue_redraw()  # the veil's ONE draw command (the stretched lightmap); content updates via the texture
 
@@ -279,6 +307,9 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 func repaint_world() -> void:
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()
+	if _terrain_viewport != null:
+		_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE  # re-bake the whole coarse terrain
+		_terrain_layer.queue_redraw()
 	_veil_dirty = true
 	_fine_dirty = true
 	sim.terrain_dirty.clear()
@@ -394,6 +425,12 @@ func _process(delta: float) -> void:
 						dirty[idx] = true
 		for idx: int in dirty:
 			_chunks[idx].queue_redraw()
+		# Re-bake the coarse-terrain viewport ONCE this frame (only the dirtied chunks actually repaint their
+		# retained buffers inside it) and re-draw the single quad that shows it. The per-dig fast lane holds:
+		# ~64 cells re-issue their draw commands into the viewport, not the whole world, and the bake is a
+		# no-op on frames with no terrain change.
+		_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		_terrain_layer.queue_redraw()
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
 		_crystal_seams_valid = false   # a dig/place near ore changes which cells are EXPOSED — reflood the seams (#4)
@@ -770,6 +807,17 @@ func _draw_seal_pulse(view: Rect2) -> void:
 func _paint_terrain_chunk(ci: CanvasItem, rect: Rect2i) -> void:
 	_draw_background(ci, rect)  # sky within this chunk; dark-dirt BACK WALL behind every dug-out cell + depth
 	_draw_terrain(ci, rect)     # solid cells in this chunk (ends with the surface cap pass for its columns)
+
+
+## Draw the baked COARSE terrain (the SubViewport render-target) as ONE quad at z -10 — the ~11,882-draw
+## chunk pass collapsed to a single textured rect. World rect 1:1, NEAREST filter so it snaps crisply with
+## the pixel-snap camera. The render-target already holds the chunk painters' exact output (same draw code),
+## so this is pixel-identical to the old per-chunk pass; it only re-renders on a terrain change.
+func _paint_terrain_bake(layer: LightLayer) -> void:
+	if _terrain_viewport == null:
+		return
+	layer.draw_texture_rect(_terrain_viewport.get_texture(),
+		Rect2(Vector2.ZERO, WORLD_SIZE), false)
 
 
 ## Draw the placed power conduits (docs/POWER.md): each tube is a copper segment with stubs to whatever
