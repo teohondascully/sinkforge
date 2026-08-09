@@ -614,6 +614,15 @@ func _draw_minimap() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.72, 0.60, 0.75))
 		draw_string(_font, Vector2(origin.x + 5.0, seal_y + seal_h + 10.0), "STONEREACH",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.55, 0.65, 0.90, 0.75))
+	# --- AQUIFERS: the flooded pockets that guard rich ore. A distinct cool cyan-blue (clear of the
+	# amber power wash, the gold bazaars, and the violet seal/breach), alpha scaling with fill so deep
+	# water reads solid, a puddle reads faint. Live overlay: water FLOWS each tick, not in the cached bake.
+	var wcell: Vector2 = Vector2(maxf(scale.x, 1.0), maxf(scale.y, 1.0)).ceil()
+	for water_cell_v: Variant in sim.water:
+		var water_cell: Vector2i = water_cell_v
+		var fill: float = clampf(float(sim.water[water_cell]) / float(FactorySim.WATER_MAX), 0.0, 1.0)
+		draw_rect(Rect2(origin + Vector2(water_cell) * scale, wcell),
+			Color(0.25, 0.62, 0.95, 0.30 + 0.45 * fill))
 	# --- FRONTIER REACH (FABLE_50 #28): where the factory's POWER and placed LIGHT actually extend —
 	# "your reach is how deep you can survive" read straight off the map. Power = a warm amber wash
 	# per powered cell (brighter = more units, live off the derived sim.power field); placed torches =
