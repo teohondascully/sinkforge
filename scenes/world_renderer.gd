@@ -175,7 +175,15 @@ var _dark: LightLayer
 var _veil_img: Image
 var _veil_tex: ImageTexture
 var _veil_base: PackedByteArray
+var _veil_scratch: PackedByteArray   ## persistent per-frame veil buffer — base memcpy'd in, holes cut (#3, no per-frame .duplicate)
 var _veil_dirty: bool = true
+## Crystal seams (#4): the O(exposed-ore^2) flood is cached across frames and shared by _update_veil +
+## _paint_lights (which both need the identical seam list). It only changes when ore EXPOSURE changes
+## (terrain dug/placed near ore) or when the culling view-rect moves (a seam pans on/off screen), so it
+## is recomputed on either signal and otherwise replayed. Invalidated in the terrain-dirty block below.
+var _crystal_seams_cache: Array[Dictionary] = []
+var _crystal_seams_valid: bool = false
+var _crystal_seams_view: Rect2 = Rect2()
 var _lights: LightLayer
 var _haze: LightLayer      ## the shared DISTORTION pass (#20) — heat shimmer now, water/L4 later
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
@@ -388,6 +396,7 @@ func _process(delta: float) -> void:
 			_chunks[idx].queue_redraw()
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
+		_crystal_seams_valid = false   # a dig/place near ore changes which cells are EXPOSED — reflood the seams (#4)
 		# The mold follows the dug shape — but patch ONLY the changed region's fine cells (dirty-chunks,
 		# #102), not the whole grid: the per-dig freeze was the full fine rebake this used to trigger.
 		_fine_region_pending = true
@@ -679,6 +688,21 @@ func _crystal_seams() -> Array[Dictionary]:
 		if seams.size() >= CRYSTAL_MAX:
 			break
 	return seams
+
+
+## The FRAME accessor for crystal seams (#4): the raw _crystal_seams() flood is O(exposed-ore^2) and was
+## run TWICE per frame (once in _update_veil, once in _paint_lights). It only changes when ore exposure
+## changes (a dig/place near ore → _crystal_seams_valid cleared) or when the culling view-rect pans (a
+## seam scrolls on/off screen). Recompute on either signal; otherwise replay the cached list, so both the
+## veil cut and the light pool read the IDENTICAL seams (they never disagree, and it floods once, not
+## twice). Note _crystal_seams() itself stays the pure compute (the profiler measures it in isolation).
+func _crystal_seams_cached() -> Array[Dictionary]:
+	var view: Rect2 = _view_world_rect()
+	if not _crystal_seams_valid or view != _crystal_seams_view:
+		_crystal_seams_cache = _crystal_seams()
+		_crystal_seams_view = view
+		_crystal_seams_valid = true
+	return _crystal_seams_cache
 
 
 func _draw_ore_glints() -> void:
@@ -2099,7 +2123,20 @@ func _update_veil() -> void:
 	if _veil_dirty:
 		_veil_dirty = false
 		_bake_veil_base()
-	var bytes: PackedByteArray = _veil_base.duplicate()
+	# PERSISTENT scratch (#3): the working buffer is a MEMBER, refilled from the freshly-baked base each
+	# frame (.duplicate() is a native memcpy — ~0.4us at this size — not the veil's cost; the real cost is
+	# the per-source cutting below + the texture upload). Cut into the member directly so nothing leaks a
+	# fresh local per frame. The base is re-copied whole each frame, so a light that scrolls off-screen and
+	# back leaves no stale hole (only THIS frame's on-screen cuts appear over a fully-dark base).
+	_veil_scratch = _veil_base.duplicate()
+	var bytes: PackedByteArray = _veil_scratch   # alias for brevity; mutating it is the intended per-frame write
+	# OFF-SCREEN CUT CULL (#3): the veil texture covers the whole world but only the on-screen portion is
+	# ever visible, so a light hole cut off-screen is invisible — skipping it is behaviour-preserving. Cull
+	# every unbounded source (machines/torches/conduits/motes) against a generously-grown view rect: the
+	# margin (6 cells) exceeds the widest of these pools (a torch's 4.4) so a source just off-screen whose
+	# glow still reaches on-screen keeps cutting. The base is re-copied each frame (fully dark), so a light
+	# that scrolls off and back leaves no stale hole. (Player lamp + seams are already on-screen by nature.)
+	var cull: Rect2 = _view_world_rect(6.0)
 	# With the moonlit-gloom base (AMBIENT_DARK 0.74) light still cuts HARD to reveal rock — the pools
 	# open a bright core that falls off tight, so lit rock pops out of the gloom (diffs 1, 11).
 	if player != null:
@@ -2108,6 +2145,9 @@ func _update_veil() -> void:
 		_veil_cut(bytes, head + _lamp_offset * 0.45, 3.2, 0.8)   # the beam throat
 		_veil_cut(bytes, player.position, 2.2, 0.5)              # close body glow
 	for machine: MachineState in sim.machines:
+		var mpos: Vector2 = _cell_center(machine.cell)
+		if not cull.has_point(mpos):
+			continue
 		var kind: String = Visuals.machine_kind(machine.def)
 		var s: float = 0.6                                       # cool working glow
 		if kind == "generator":
@@ -2117,21 +2157,29 @@ func _update_veil() -> void:
 		elif kind == "lift":
 			s = 0.35 + 0.55 * machine.power_factor
 		if s > 0.0:
-			_veil_cut(bytes, _cell_center(machine.cell), 2.8, s)
+			_veil_cut(bytes, mpos, 2.8, s)
 	for cell: Variant in sim.torch:
-		_veil_cut(bytes, _cell_center(cell as Vector2i), 4.4, 0.94)
+		var tpos: Vector2 = _cell_center(cell as Vector2i)
+		if cull.has_point(tpos):
+			_veil_cut(bytes, tpos, 4.4, 0.94)
 	for cell: Variant in sim.conduit:
+		var cpos: Vector2 = _cell_center(cell as Vector2i)
+		if not cull.has_point(cpos):
+			continue
 		var lvl: float = _conduit_level(cell as Vector2i)
 		if lvl > 0.04:
-			_veil_cut(bytes, _cell_center(cell as Vector2i), 1.8, lvl * 0.7)
+			_veil_cut(bytes, cpos, 1.8, lvl * 0.7)
 	# CRYSTAL/ORE SEAM GLOW (fix-2 diff 2 / diff-04 #5): a few COHESIVE seams (clustered exposed ore) each
 	# cut ONE larger cool hole in the gloom so the vein's rock is revealed around it, and _paint_lights lays
 	# the saturated cyan pool on top. Warm lamp + cool crystal = the colour contrast the reference lives on.
-	for seam: Dictionary in _crystal_seams():
+	# (Seams are already view-culled — _exposed_ore_cells builds only from cells inside _view_world_rect.)
+	for seam: Dictionary in _crystal_seams_cached():
 		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
 		_veil_cut(bytes, seam["pos"], float(seam["radius"]) / float(CELL), 0.62 + 0.26 * breath)
 	for m: Dictionary in falling.motes():
-		_veil_cut(bytes, m["pos"], 1.4, 0.5)
+		var fpos: Vector2 = m["pos"]
+		if cull.has_point(fpos):
+			_veil_cut(bytes, fpos, 1.4, 0.5)
 	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
 	_veil_tex.update(_veil_img)
 
@@ -2278,7 +2326,7 @@ func _paint_lights(layer: LightLayer) -> void:
 	# clustered exposed vein), sized to the seam's extent, + a hot white-cyan core pip on each exposed cell
 	# so the seam still reads as discrete crystals inside one big cohesive glow — the COOL accent that gives
 	# the scene warm/cool contrast like Noita's big coloured light features, not scattered dots.
-	for seam: Dictionary in _crystal_seams():
+	for seam: Dictionary in _crystal_seams_cached():
 		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
 		# A wider soft halo + a tighter richer core = one big cohesive cool feature (diff-04 #5), not a flat disc.
 		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 1.15, CRYSTAL_COLOR, 0.30 + 0.18 * breath)
