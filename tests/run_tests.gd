@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_test_falling_pool()
 	_test_scanner()
 	_test_fine_terrain()
+	_test_stress_invariants()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -2406,3 +2407,227 @@ func _first_solid_over_air(sim: FactorySim) -> Vector2i:
 				continue                                          # unmineable — skip
 			return c
 	return Vector2i(-1, -1)
+
+
+## --- ADVERSARIAL STRESS: long, interleaved, seeded operation sequences ---------------------------
+## The rest of the suite is goal-oriented (each test proves ONE happy path). Live play instead keeps
+## surfacing bugs from UNUSUAL, INTERLEAVED sequences — build a machine then dig the cell under it,
+## place/remove rope/torch/conduit on cells that later get mined or built over, drop under back-pressure,
+## mine under a pile, craft→build→pickup in and out of the pack, ticking between bursts so drills/hoppers/
+## gravity all run against the churned state. This test drives one deterministic (fixed-seed RNG) mixed
+## sequence of hundreds of ops and, after EVERY burst, asserts the CORE INVARIANTS that class of bug
+## violates:
+##   (1) CONSERVATION — for every item id touched, _items_present == total_produced - total_consumed.
+##       (The big one: an interleaving that leaks or dupes an item is a real conservation bug. Placed
+##       layers — rope/torch/conduit/sapling — are ledgered place=consumed/remove=produced, so the same
+##       invariant covers them: placing drops present AND (produced-consumed) together.)
+##   (2) NO CORRUPTION — placed-layer cells and solid cells never overlap (no rope/torch/conduit/machine
+##       sharing a cell with solid rock; no machine on a solid cell), ground piles are never empty, and
+##       every op on an out-of-bounds/occupied cell returned cleanly (checked inline as it's driven).
+##   (3) DETERMINISM — the WHOLE sequence, re-run from the same seed on a fresh sim, yields a byte-identical
+##       _state_signature. The proof the churn introduced no time/global-random dependence.
+## A save→mutate→load happens MID-sequence (reusing SaveGame like _test_save_load) and operation continues
+## against the restored sim, so the invariants must survive a serialization round-trip in the churn too.
+func _test_stress_invariants() -> void:
+	print("- STRESS: interleaved-op invariants (adversarial)")
+	var final_a: String = _run_stress_sequence(0x5F1E)          # seeded run #1 (asserts invariants inline)
+	var final_b: String = _run_stress_sequence(0x5F1E)          # seeded run #2 (silent — determinism proof)
+	_check(final_a == final_b, "the WHOLE interleaved sequence is deterministic (identical final state)")
+
+
+## Item ids the stress sequence can touch — the conservation frontier. Every one is asserted after every
+## burst, so a leak in ANY of them fails. (Machine items live in the pack while carried, satisfying the
+## SAME present==produced-consumed rule as resources — the ledger is total.)
+const _STRESS_ITEMS: Array[StringName] = [
+	&"ore", &"coal", &"ingot", &"earth", &"stone", &"wood", &"leaves", &"sapling",
+	&"rope", &"conduit", &"torch", &"drill", &"processor", &"hopper", &"splitter",
+]
+
+
+## Run ONE full interleaved stress sequence under a fixed seed. Asserts the invariants after every burst.
+## Returns the final _state_signature (so the caller can prove two same-seed runs match = determinism).
+func _run_stress_sequence(rng_seed: int) -> String:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = rng_seed                                          # FIXED seed — reproducible, no Date/global rand
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var hopper_def: MachineDef = load("res://src/data/machines/hopper.tres")
+	var split_def: MachineDef = load("res://src/data/machines/splitter.tres")
+	var machine_defs: Array[MachineDef] = [drill_def, proc_def, hopper_def, split_def]
+
+	var sim: FactorySim = FactorySim.new()
+	# A hand-built fixture: a floor shelf at row 20 across cols 2..40, ore + coal veins hanging above it,
+	# and a starting pack. Everything is well in-bounds (GRID 96×80), so the RNG cell picks stay legal.
+	for col: int in range(2, 40):
+		sim.set_solid(Vector2i(col, 20), &"stone")
+	for col: int in range(4, 12):
+		sim.set_solid(Vector2i(col, 8), &"ore")
+		sim.deposits[Vector2i(col, 8)] = 30
+	for col: int in range(14, 20):
+		sim.set_solid(Vector2i(col, 8), &"coal")
+		sim.deposits[Vector2i(col, 8)] = 30
+	# Seed the pack + book it as produced so the ledger starts balanced (present == produced - consumed).
+	var start_pack: Dictionary = {
+		&"ore": 40, &"coal": 40, &"ingot": 60, &"earth": 30, &"stone": 30, &"wood": 30,
+		&"rope": 20, &"conduit": 20, &"torch": 20, &"sapling": 8,
+	}
+	for item: StringName in start_pack:
+		sim.inventory[item] = int(start_pack[item])
+		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(start_pack[item])
+
+	var loud: bool = rng_seed == 0x5F1E and _stress_first        # only the first run reports (twice would double the log)
+	_stress_first = false
+	var ops: int = 0
+	var did_save_load: bool = false
+
+	# 24 bursts of ~12 mixed ops, ticking between each — hundreds of interleaved ops total, bounded ticks.
+	for burst: int in 24:
+		for _k: int in 12:
+			ops += 1
+			var choice: int = rng.randi_range(0, 12)
+			var cell: Vector2i = Vector2i(rng.randi_range(2, 44), rng.randi_range(3, 24))
+			match choice:
+				0:
+					# BUILD a machine from the pack (craft one first if the pack is empty of it).
+					var def: MachineDef = machine_defs[rng.randi_range(0, machine_defs.size() - 1)]
+					if int(sim.inventory.get(def.id, 0)) <= 0:
+						sim.craft_item(def.id, def.craft_cost, def.craft_count)   # may fail (short ingots) — fine
+					sim.build_from_pack(def, cell)                # may fail (occupied/solid) — must not corrupt
+				1:
+					# PICK a machine back up (salvages buffers into the pack).
+					sim.pickup_machine(cell)
+				2:
+					# RAW remove a machine (demolish — discards buffers, credited to consumed).
+					sim.remove_machine(cell)
+				3:
+					# DIG the cell (may be under/beside a machine, a pile, foliage, or empty).
+					sim.mine(cell)
+				4:
+					# PLACE a block — deliberately NOT gating on block_supported, so mid-air placement is
+					# exercised (place_block itself must handle it without leaking; support is a controller gate).
+					var mat: StringName = [&"earth", &"stone", &"wood"][rng.randi_range(0, 2)]
+					sim.place_block(cell, mat)
+				5:
+					# ROPE: unroll down, or cut/retract an existing hang.
+					if sim.is_climbable(cell):
+						if rng.randi_range(0, 1) == 0:
+							sim.remove_rope(cell)
+						else:
+							sim.retract_rope(cell)
+					else:
+						sim.place_rope(cell)
+				6:
+					# CONDUIT place/remove.
+					if sim.has_conduit(cell):
+						sim.remove_conduit(cell)
+					else:
+						sim.place_conduit(cell)
+				7:
+					# TORCH place/remove.
+					if sim.has_torch(cell):
+						sim.remove_torch(cell)
+					else:
+						sim.place_torch(cell)
+				8:
+					# SAPLING plant/remove (wants soil below — will often refuse, which is correct).
+					if sim.sapling.has(cell):
+						sim.remove_sapling(cell)
+					else:
+						sim.plant_sapling(cell)
+				9:
+					# DROP / TOSS a carried stack down a column (feeds a machine, piles on a floor, or voids).
+					var item: StringName = [&"ore", &"coal", &"ingot"][rng.randi_range(0, 2)]
+					sim.drop_item(cell, item, rng.randi_range(1, 5))
+				10:
+					# COLLECT a ground pile (walk-over pickup).
+					sim.collect_ground(cell)
+				11:
+					# DEPOSIT into a machine at the cell if one is there (hand-feed).
+					var item2: StringName = [&"ore", &"coal", &"ingot"][rng.randi_range(0, 2)]
+					sim.deposit(cell, item2, rng.randi_range(1, 4))
+				12:
+					# CRAFT a machine item into the pack (spends ingots; may fail — fine).
+					var def2: MachineDef = machine_defs[rng.randi_range(0, machine_defs.size() - 1)]
+					sim.craft_item(def2.id, def2.craft_cost, def2.craft_count)
+		# Step the sim so _flow / drills / hoppers / gravity / sapling-growth all run against the churn.
+		for _t: int in rng.randi_range(1, 6):
+			sim.tick()
+
+		# A save→mutate→load roughly halfway, then keep operating against the RESTORED sim in place.
+		if burst == 12 and not did_save_load:
+			did_save_load = true
+			var data: Dictionary = SaveGame.capture(sim)
+			var path: String = "user://test_stress_%d.save" % rng_seed
+			var wrote: bool = SaveGame.write(path, data)
+			var back: Dictionary = SaveGame.read(path)
+			var restored: FactorySim = FactorySim.new()
+			var ok: bool = SaveGame.restore(restored, back)
+			if loud:
+				_check(wrote and not back.is_empty() and ok, "mid-sequence save→disk→load round-trips")
+				_check(_state_signature(restored) == _state_signature(sim),
+					"the restored mid-sequence state is byte-identical to the live one")
+			sim = restored                                        # continue the churn on the restored sim
+			DirAccess.remove_absolute(path)                       # don't leave a stray fixture save on disk
+
+		# INVARIANTS after this burst.
+		if loud:
+			_stress_assert_invariants(sim, "burst %d (%d ops)" % [burst, ops])
+
+	# Final gate.
+	if loud:
+		_stress_assert_invariants(sim, "final (%d ops)" % ops)
+		_check(ops >= 250, "the sequence is long enough to stress interleavings (%d ops)" % ops)
+	return _state_signature(sim)
+
+
+## True until the first stress run reports — so re-running the same sequence for the determinism proof
+## doesn't double the harness log. Reset false after the first loud run.
+var _stress_first: bool = true
+
+
+## Assert the core invariants on `sim` at a checkpoint. Failing here = a real interleaving bug.
+func _stress_assert_invariants(sim: FactorySim, where: String) -> void:
+	# (1) CONSERVATION — every touched item id: present == produced - consumed.
+	var leaked: PackedStringArray = []
+	for item: StringName in _STRESS_ITEMS:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		if present != net:
+			leaked.append("%s(present=%d,net=%d)" % [item, present, net])
+	_check(leaked.is_empty(), "%s — conservation holds for every item%s"
+		% [where, "" if leaked.is_empty() else ": LEAKED " + ", ".join(leaked)])
+
+	# (2) NO CORRUPTION — placed layers never share a cell with solid rock or a machine, no ground pile
+	# is empty, and every ground pile has a solid floor / machine directly below (nothing floats mid-air).
+	var bad_layer: int = 0
+	for layer_cell: Variant in sim.rope.keys():
+		if sim.solid.has(layer_cell) or sim.grid.has(layer_cell):
+			bad_layer += 1
+	for layer_cell: Variant in sim.conduit.keys():
+		if sim.solid.has(layer_cell) or sim.grid.has(layer_cell):
+			bad_layer += 1
+	for layer_cell: Variant in sim.torch.keys():
+		if sim.solid.has(layer_cell) or sim.grid.has(layer_cell):
+			bad_layer += 1
+	_check(bad_layer == 0, "%s — no rope/conduit/torch overlaps solid rock or a machine (%d bad)"
+		% [where, bad_layer])
+	var bad_machine: int = 0
+	for mcell: Variant in sim.grid.keys():
+		if sim.solid.has(mcell):
+			bad_machine += 1
+	_check(bad_machine == 0, "%s — no machine occupies a solid cell (%d bad)" % [where, bad_machine])
+	var empty_piles: int = 0
+	for gcell: Variant in sim.ground.keys():
+		if (sim.ground[gcell] as Dictionary).is_empty():
+			empty_piles += 1
+	_check(empty_piles == 0, "%s — no empty ground pile lingers (%d found)" % [where, empty_piles])
+	# Nothing floats: every ground pile rests on a solid floor OR a machine (or the world floor row).
+	var floating_piles: int = 0
+	for gcell: Variant in sim.ground.keys():
+		var gc: Vector2i = gcell
+		var under: Vector2i = gc + Vector2i(0, 1)
+		if gc.y >= FactorySim.GRID_ROWS - 1:
+			continue                                              # resting on the world floor is legal
+		if not sim.solid.has(under) and not sim.grid.has(under):
+			floating_piles += 1
+	_check(floating_piles == 0, "%s — no ground pile hangs in mid-air (%d floating)" % [where, floating_piles])

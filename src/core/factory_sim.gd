@@ -652,9 +652,18 @@ func block_supported(cell: Vector2i) -> bool:
 	return false
 
 
+## Every placed layer — solid rock, a machine (grid), a conduit, a rope, a torch — is MUTUALLY EXCLUSIVE
+## per cell: no two may share one. This is the SINGLE occupancy gate every placement checks, so the layers
+## can never overlap. (A stress test caught the old per-function guards each checking a DIFFERENT subset —
+## place_block ignored conduit, place_conduit ignored rope/torch, place_machine ignored conduit, … — which
+## let a cell become solid AND piped at once, corrupting state.) A new placed layer adds ONE check here.
+func _cell_occupied(cell: Vector2i) -> bool:
+	return solid.has(cell) or grid.has(cell) or conduit.has(cell) or rope.has(cell) or torch.has(cell)
+
+
 func place_block(cell: Vector2i, material: StringName) -> bool:
-	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell) or torch.has(cell):
-		return false          # a roped cell refuses rock (cut the rope first — no rope-in-stone)
+	if not in_bounds(cell) or _cell_occupied(cell):
+		return false          # every placed layer is mutually exclusive — clear the cell first
 	if int(inventory.get(material, 0)) <= 0:
 		return false
 	_take_from_pack(material, 1)
@@ -683,7 +692,7 @@ func conduit_tier(cell: Vector2i) -> int:
 ## counts as CONSUMED and removal counts as PRODUCED (the same symmetric accounting as place_block/mine),
 ## so a placed layer never silently leaks the conservation invariant.
 func place_conduit(cell: Vector2i) -> bool:
-	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or conduit.has(cell):
+	if not in_bounds(cell) or _cell_occupied(cell):
 		return false
 	if int(inventory.get(&"conduit", 0)) <= 0:
 		return false
@@ -718,8 +727,7 @@ func is_climbable(cell: Vector2i) -> bool:
 func place_rope(anchor: Vector2i) -> int:
 	var hung: int = 0
 	var c: Vector2i = anchor
-	while in_bounds(c) and not solid.has(c) and not grid.has(c) and not rope.has(c) \
-			and int(inventory.get(&"rope", 0)) > 0:
+	while in_bounds(c) and not _cell_occupied(c) and int(inventory.get(&"rope", 0)) > 0:
 		_take_from_pack(&"rope", 1)
 		total_consumed[&"rope"] = int(total_consumed.get(&"rope", 0)) + 1
 		rope[c] = true
@@ -786,7 +794,7 @@ func has_torch(cell: Vector2i) -> bool:
 ## cell or any solid neighbour (no torches floating in open sky). Consumed into the ledger; removal
 ## produces it back, so the total ledger holds.
 func place_torch(cell: Vector2i) -> bool:
-	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or torch.has(cell):
+	if not in_bounds(cell) or _cell_occupied(cell):
 		return false
 	if int(inventory.get(&"torch", 0)) <= 0:
 		return false
@@ -1228,8 +1236,8 @@ func _take_from_pack(item: StringName, n: int) -> void:
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
 ## inside solid earth.
 func place_machine(def: MachineDef, cell: Vector2i) -> MachineState:
-	if not in_bounds(cell) or grid.has(cell) or solid.get(cell, false) or rope.has(cell) or torch.has(cell):
-		return null           # a roped cell refuses a machine too (cut the rope first)
+	if not in_bounds(cell) or _cell_occupied(cell):
+		return null           # every placed layer is mutually exclusive — clear the cell first
 	var state: MachineState = MachineState.new(def, cell)
 	grid[cell] = state
 	machines.append(state)
