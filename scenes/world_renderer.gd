@@ -2544,18 +2544,32 @@ func _paint_lights(layer: LightLayer) -> void:
 		var lvl: float = _conduit_level(cell)
 		if lvl > 0.04:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.78, 0.36), lvl * 0.7)
-	# CRYSTAL/ORE SEAM GLOW (fix-2 diff 2 / diff-04 #5): one saturated cyan pool per COHESIVE seam (a
-	# clustered exposed vein), sized to the seam's extent, + a hot white-cyan core pip on each exposed cell
-	# so the seam still reads as discrete crystals inside one big cohesive glow — the COOL accent that gives
-	# the scene warm/cool contrast like Noita's big coloured light features, not scattered dots.
+	# ORE SEAM GLOW (fix-2 diff 2 / diff-04 #5): one cohesive glow per clustered exposed vein, sized to the
+	# seam's extent, + a hot core pip on each exposed cell so the seam reads as discrete nuggets inside one
+	# big cohesive glow. The glow now takes the seam's OWN material colour (`nugget_color` pushed to
+	# saturation) instead of a hardcoded cyan — so ore glows warm orange, rich_ore gold, iron cold steel.
+	# The light AGREES with the flecks in the rock; a first-time player's eye lands on the material, not a
+	# contradicting blue pool. (Mixed seams: the first cell's material governs — good enough.)
+	# LEGIBILITY REWORK (2026-08-09): the old wide radial halo read as a LAMP / lava blob to first-time
+	# players ("is that the ore or a light?"), never as rock — a soft glow of ANY colour impersonates a
+	# light source. Ore now reads by its tinted CELL BODY + crisp chunky nuggets (drawn under the veil);
+	# here we keep only a TIGHT, dim luminous accent + bright nugget PIPS so an exposed vein SHIMMERS in
+	# the dark (discovery from across a cavern) without pretending to be a lamp.
 	for seam: Dictionary in _crystal_seams_cached():
 		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
-		# A wider soft halo + a tighter richer core = one big cohesive cool feature (diff-04 #5), not a flat disc.
-		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 1.15, CRYSTAL_COLOR, 0.30 + 0.18 * breath)
-		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 0.60, CRYSTAL_COLOR, 0.42 + 0.24 * breath)
+		var seam_glow: Color = _seam_glow_color(seam["cells"])
+		# Gate the discovery glow by how DARK the vein sits (like the lamp): a vein in daylight reads as pure
+		# rock (a glow of any strength there impersonates a lamp — the blind-playtest "is the ore a light?"),
+		# while a vein in the deep dark still SHIMMERS so it's findable across a cavern.
+		var sc := Vector2i(int(seam["pos"].x / float(CELL)), int(seam["pos"].y / float(CELL)))
+		var seam_dark: float = clampf(_skylight_alpha(sc.y, sim.surface_row(sc.x)) / AMBIENT_DARK, 0.0, 1.0)
+		if seam_dark <= 0.02:
+			continue
+		_draw_glow(layer, seam["pos"], float(seam["radius"]) * 0.42, seam_glow, (0.11 + 0.07 * breath) * seam_dark)
+		var core_pip: Color = seam_glow.lightened(0.5)
 		for c: Vector2i in seam["cells"]:
 			var cb: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
-			layer.draw_circle(_cell_center(c), 1.6 + 0.7 * cb, Color(0.78, 0.99, 1.0, 0.50 + 0.30 * cb))
+			layer.draw_circle(_cell_center(c), 1.4 + 0.6 * cb, Color(core_pip.r, core_pip.g, core_pip.b, (0.55 + 0.30 * cb) * seam_dark))
 	for m: Dictionary in falling.motes():
 		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
 		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
