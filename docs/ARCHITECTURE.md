@@ -67,6 +67,17 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   accounting (place = consumed, remove = produced) — **the ledger is total: every item id satisfies
   present == produced − consumed** (craft outputs count produced; placed machines count consumed;
   pickups produce back).
+- **Water — the fluid layer (L3 Aquifer, docs/WATER.md):** `water` (cell→integer level `1..WATER_MAX`)
+  is authoritative world state beside `solid`/`wall`/`conduit`/`rope`/`torch`/`deposits`. Discrete-cell,
+  integer-only (deliberately NOT per-pixel falling-sand — fits the discrete-cell hook). API
+  `water_at`/`add_water`/`remove_water`/`total_water`. `_flow_water()` runs each tick (after `_flow`): a
+  deterministic snapshot-based two-rule step — DOWN (gravity, the hook) then LATERAL even-fill settle —
+  that only MOVES water, so `total_water` is invariant (conserved). `add_water`/`remove_water` are the
+  explicit accounted source/drain; `set_solid`/`place_block` DISPLACE (erase) a cell's water. The **Pump**
+  (`behavior == &"pump"`, `_run_pump`/`_status_pump`) is the fluid sibling of the lift — while POWERED it
+  DRAINS its column (rate ∝ `power_throttle`, `PUMP_RATE`/`PUMP_REACH`), on-hook: water fell in free,
+  pumping out costs power. Research-locked behind the `drainage` tech. Seeded from `WorldData.water` in
+  `load_world`; rides the save envelope + the determinism canary. See **docs/WATER.md**.
 - **Production rate (legibility):** a tick-driven ring buffer of `total_produced` snapshots (1/s, ~60s
   window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
   bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
@@ -134,8 +145,10 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
     `layer` (`&"block"`/`&"wall"`) live here. The generator emits ids; the visualiser maps
     `id → MaterialDef` through `WorldRenderer`'s `_materials` registry.
   - **`WorldData`** (`RefCounted`, plain data, no engine deps) — the handshake artifact a generator
-    PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, and two grids `blocks` + `walls`
-    (cell → material id). The bounded, two-layer world.
+    PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, the two grids `blocks` + `walls`
+    (cell → material id), `amounts` (deposit richness), and `water` (cell → level, the L3 aquifer
+    grid `LayeredWorldGen._seed_aquifers` fills; ingested into `sim.water`, docs/WATER.md).
+    The bounded, two-layer world.
   - **`WorldGen`** (`RefCounted`) — `generate(cols, rows, seed) -> WorldData`, contractually
     **deterministic** (seeded RNG). Concrete: `HeightmapWorldGen` (heightmap surface, seeded ore,
     a stone layer below a depth, stone/dirt walls behind sub-surface cells); `LayeredWorldGen`
