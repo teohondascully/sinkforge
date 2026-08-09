@@ -1651,6 +1651,9 @@ func _flow_power_through_conduits() -> void:
 	# Merge the carried power into the field, and bleed it to neighbours so a machine beside a tube draws.
 	for cell: Vector2i in carried:
 		var v: float = float(carried[cell])
+		if v <= 0.0:
+			continue          # a tube carrying NO power adds no field entry — else consumers that read
+			                  # power.keys() as "lit" (minimap frontier-reach) wash an unpowered run powered
 		power[cell] = maxf(float(power.get(cell, 0.0)), v)
 		for nb: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var n: Vector2i = cell + nb

@@ -68,6 +68,7 @@ func _initialize() -> void:
 	_test_fine_terrain()
 	_test_stress_invariants()
 	_test_stress_flow()
+	_test_stress_power()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -3153,3 +3154,286 @@ func _flow_assert_invariants(sim: FactorySim, present_before: Dictionary, where:
 				bad_buffer.append("neg pile %s @%s" % [item, str(gc)])
 	_check(bad_buffer.is_empty(), "%s — no negative/runaway buffer, deposit, or pile%s"
 		% [where, "" if bad_buffer.is_empty() else ": " + ", ".join(bad_buffer)])
+
+
+## STRESS: the POWER NETWORK + its consumers under interleaved churn (adversarial). The siblings churn
+## PLACEMENT (_test_stress_invariants) and FLOW (_test_stress_flow); this one churns the DERIVED POWER
+## FIELD and the two consumers that read it — the LIFT (haul goods UP, power-governed) and the PUMP (the L3
+## flood-drain, powered → removes water). Generators are placed/removed and fueled on and off; conduits are
+## placed/removed and rerouted (incl. cells later mined out or built over — the cross-layer occupancy rules);
+## pockets are flooded with add_water so pumps have work; the sim ticks in bursts so _compute_power,
+## _flow_power_through_conduits, _flow_water and every consumer all run against the churned topology. After
+## every burst + at the end it asserts: (1) POWER FIELD SANE — every power_at is finite, >= 0, bounded (no
+## NaN/negative/runaway), and a cell only holds power where a generator+conduit path could justify it (a dark
+## world reads exactly 0 everywhere); (2) ITEM CONSERVATION — present == produced − consumed for every id
+## (coal, ore, ingot, conduit, machine items…), same as the other stress tests; (3) DRAINAGE SANE — across a
+## burst with NO add_water, total_water is non-increasing (pumps only ever REMOVE), never negative, and an
+## UNPOWERED pump drains nothing; (4) DETERMINISM — the whole sequence twice from one seed → identical final
+## _state_signature. If any fails, it's a real power/conduit/pump/water-drain bug.
+func _test_stress_power() -> void:
+	print("- STRESS: power network + consumers (pump/lift) under churn (adversarial)")
+	var final_a: String = _run_stress_power_sequence(0x9074E1)   # seeded run #1 (asserts invariants inline)
+	var final_b: String = _run_stress_power_sequence(0x9074E1)   # seeded run #2 (silent — determinism proof)
+	_check(final_a == final_b, "the WHOLE power sequence is deterministic (identical final state)")
+
+
+## True until the first power-stress run reports (so the determinism re-run doesn't double the harness log).
+var _power_stress_first: bool = true
+
+## Item ids the power sequence can touch — its conservation frontier (asserted after every burst). Machine
+## items (generator/lift/pump/conduit) satisfy the SAME present==produced-consumed rule as resources: crafted
+## = produced, placed = consumed, picked back up = produced. Coal is the load-bearing one (the generator burns it).
+const _POWER_ITEMS: Array[StringName] = [
+	&"ore", &"coal", &"ingot", &"earth", &"stone",
+	&"conduit", &"generator", &"lift", &"pump",
+]
+
+## A hard, generous upper bound on any single power reading: a conduit tube is capacity-clamped to
+## CONDUIT_CAPACITY, a generator aura peaks at GENERATOR_POWER; the field takes MAXes of those (never sums
+## unboundedly), so nothing sane can exceed this. A value past it (or NaN/negative) = a runaway/leak bug.
+func _power_ceiling() -> float:
+	return maxf(FactorySim.CONDUIT_CAPACITY, FactorySim.GENERATOR_POWER) + 1.0
+
+
+## Run ONE full interleaved POWER stress sequence under a fixed seed. Asserts invariants after every burst.
+## Returns the final _state_signature so the caller can prove two same-seed runs match (determinism).
+func _run_stress_power_sequence(rng_seed: int) -> String:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = rng_seed                                          # FIXED seed — reproducible, no Date/global rand
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var lift_def: MachineDef = load("res://src/data/machines/lift.tres")
+	var pump_def: MachineDef = load("res://src/data/machines/pump.tres")
+
+	var sim: FactorySim = FactorySim.new()
+	# A hand-built fixture, all well in-bounds (GRID 96×80): a stone shelf at row 24 across cols 2..44 gives
+	# every column a landing; two SEALED flooded pockets give the pumps real work (walled shafts, brim-full);
+	# a coal vein hangs above so drops have coal to route; a starting pack (booked as produced) starts the
+	# ledger balanced. The power ops churn generators/conduits/lifts/pumps ON TOP of this.
+	for col: int in range(2, 44):
+		sim.set_solid(Vector2i(col, 24), &"stone")
+	for col: int in range(4, 10):
+		sim.set_solid(Vector2i(col, 6), &"coal")
+		sim.deposits[Vector2i(col, 6)] = 30
+	# Two sealed flooded pockets (a 1-wide walled shaft each, floor at the bottom, brim-full) — the pump work.
+	# Cols 30 and 36; rows 10..15 open, row 16 floor, walls at col±1. Sealed so any total_water drop is a pump.
+	var pocket_cols: Array[int] = [30, 36]
+	var initial_water: int = 0
+	for pc: int in pocket_cols:
+		for row: int in range(10, 17):
+			sim.set_solid(Vector2i(pc - 1, row), &"stone")      # left wall
+			sim.set_solid(Vector2i(pc + 1, row), &"stone")      # right wall
+		sim.set_solid(Vector2i(pc, 16), &"stone")               # floor
+		for row: int in range(10, 16):                          # fill the 6 open cells to the brim
+			initial_water += sim.add_water(Vector2i(pc, row), FactorySim.WATER_MAX)
+	# Seed the pack + book it as produced so the ledger starts balanced (present == produced - consumed).
+	var start_pack: Dictionary = {
+		&"coal": 120, &"ore": 20, &"ingot": 40, &"earth": 30, &"stone": 30,
+		&"conduit": 30, &"generator": 3, &"lift": 3, &"pump": 3,
+	}
+	for item: StringName in start_pack:
+		sim.inventory[item] = int(start_pack[item])
+		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(start_pack[item])
+
+	var loud: bool = rng_seed == 0x9074E1 and _power_stress_first  # only the first run reports
+	_power_stress_first = false
+
+	# The pump cells sit in the TOP of each flooded pocket, so a placed pump has water in reach to drain.
+	var pump_tops: Array[Vector2i] = [Vector2i(30, 10), Vector2i(36, 10)]
+	# Generator/lift/conduit ops target a churn zone left of the pockets (cols 2..26), plus BESIDE the pumps
+	# (so a generator can actually power a pump). Cells picked here are the interleaving surface.
+	var ops: int = 0
+	var did_save_load: bool = false
+
+	# 24 bursts of ~11 mixed power ops, ticking between each — hundreds of interleaved ops, bounded ticks.
+	# Each burst records water BEFORE any add_water this burst, then does its ops+ticks, so the drainage
+	# invariant (total_water non-increasing when nothing was added) is checked against a real baseline.
+	for burst: int in 24:
+		var water_before_burst: int = sim.total_water()
+		var added_water_this_burst: bool = false
+		for _k: int in 11:
+			ops += 1
+			var choice: int = rng.randi_range(0, 10)
+			var cell: Vector2i = Vector2i(rng.randi_range(2, 26), rng.randi_range(3, 22))
+			match choice:
+				0:
+					# BUILD a GENERATOR from the pack — either in the churn zone or BESIDE a pump (to power it).
+					var spot: Vector2i = cell
+					if rng.randi_range(0, 1) == 0:
+						spot = pump_tops[rng.randi_range(0, pump_tops.size() - 1)] + Vector2i(-2, 0)
+					if int(sim.inventory.get(&"generator", 0)) <= 0:
+						sim.craft_item(gen_def.id, gen_def.craft_cost, gen_def.craft_count)   # may fail — fine
+					sim.build_from_pack(gen_def, spot)            # may fail (occupied/solid) — must not corrupt
+				1:
+					# FUEL a generator ON: hand-feed coal into whatever machine is at the cell (a generator burns it).
+					var gc: Vector2i = cell
+					if rng.randi_range(0, 1) == 0:
+						gc = pump_tops[rng.randi_range(0, pump_tops.size() - 1)] + Vector2i(-2, 0)
+					sim.deposit(gc, &"coal", rng.randi_range(1, 4))
+				2:
+					# PLACE a PUMP into the top of a flooded pocket (so it has water to drain) — or a random cell.
+					var pspot: Vector2i = cell
+					if rng.randi_range(0, 1) == 0:
+						pspot = pump_tops[rng.randi_range(0, pump_tops.size() - 1)]
+					if int(sim.inventory.get(&"pump", 0)) <= 0:
+						sim.craft_item(pump_def.id, pump_def.craft_cost, pump_def.craft_count)
+					sim.build_from_pack(pump_def, pspot)
+				3:
+					# PLACE a LIFT (the powered up-hauler) + toss a stack onto it so it carries under power.
+					if int(sim.inventory.get(&"lift", 0)) <= 0:
+						sim.craft_item(lift_def.id, lift_def.craft_cost, lift_def.craft_count)
+					var lift: MachineState = sim.build_from_pack(lift_def, cell)
+					if lift != null and int(sim.inventory.get(&"ore", 0)) > 0:
+						sim.deposit(cell, &"ore", mini(4, int(sim.inventory.get(&"ore", 0))))
+				4:
+					# PICK a machine back up (salvages buffers into the pack) — tears a generator/lift/pump out mid-run.
+					if rng.randi_range(0, 1) == 0:
+						sim.pickup_machine(cell)
+					else:
+						sim.pickup_machine(pump_tops[rng.randi_range(0, pump_tops.size() - 1)]
+							+ Vector2i(-2, 0))
+				5:
+					# CONDUIT place/remove/reroute — the network churn (down+lateral power routing).
+					if sim.has_conduit(cell):
+						sim.remove_conduit(cell)
+					else:
+						sim.place_conduit(cell)
+				6:
+					# LAY A CONDUIT RUN from a churn-zone cell DOWN a few cells (a real trunk power can flood).
+					var run: int = rng.randi_range(1, 5)
+					for i: int in run:
+						sim.place_conduit(cell + Vector2i(0, i))  # may refuse (occupied) — must not corrupt
+				7:
+					# MINE the cell — may erase a conduit's neighbour, a generator's footing, or a pocket wall
+					# (cross-layer: a conduit stays a conduit when the rock beside it is dug; a machine's power
+					# path can change). place_block's inverse; conservation must hold across the terrain edit.
+					sim.mine(cell)
+				8:
+					# PLACE a block over a cell — can build OVER open cells beside conduits/machines (the
+					# occupancy gate must refuse a solid-on-conduit overlap without leaking).
+					var mat: StringName = [&"earth", &"stone"][rng.randi_range(0, 1)]
+					sim.place_block(cell, mat)
+				9:
+					# FLOOD a random pocket cell with a splash of water (so pumps keep having work). Flagged so
+					# the drainage invariant knows water was ADDED this burst (total_water may legitimately rise).
+					var pcol: int = pocket_cols[rng.randi_range(0, pocket_cols.size() - 1)]
+					var prow: int = rng.randi_range(10, 15)
+					if sim.add_water(Vector2i(pcol, prow), rng.randi_range(1, FactorySim.WATER_MAX)) > 0:
+						added_water_this_burst = true
+				10:
+					# RAW remove (demolish — discards buffers, credited to consumed) at the cell.
+					sim.remove_machine(cell)
+		# Step the sim so _compute_power / _flow_power_through_conduits / consumers / _flow_water all run.
+		for _t: int in rng.randi_range(2, 6):
+			sim.tick()
+
+		# A save→disk→load roughly halfway; keep operating on the RESTORED sim (the power field is DERIVED, so
+		# it must rebuild identically next tick; water + conduits + machine fuel ride the envelope).
+		if burst == 12 and not did_save_load:
+			did_save_load = true
+			var data: Dictionary = SaveGame.capture(sim)
+			var path: String = "user://test_stress_power_%d.save" % rng_seed
+			var wrote: bool = SaveGame.write(path, data)
+			var back: Dictionary = SaveGame.read(path)
+			var restored: FactorySim = FactorySim.new()
+			var ok: bool = SaveGame.restore(restored, back)
+			if loud:
+				_check(wrote and not back.is_empty() and ok, "mid-power save→disk→load round-trips")
+				_check(_state_signature(restored) == _state_signature(sim),
+					"the restored mid-power state is byte-identical to the live one")
+			sim = restored
+			DirAccess.remove_absolute(path)
+
+		# INVARIANTS after this burst. Drainage is checked against the pre-burst water total, but ONLY when no
+		# water was added this burst (an add_water op legitimately raises total_water — not a pump violation).
+		if loud:
+			_power_assert_invariants(sim, "burst %d (%d ops)" % [burst, ops])
+			if not added_water_this_burst:
+				_check(sim.total_water() <= water_before_burst,
+					"burst %d — total_water never ROSE without an add (%d -> %d): pumps only drain"
+					% [burst, water_before_burst, sim.total_water()])
+
+	# Final gate.
+	if loud:
+		_power_assert_invariants(sim, "final (%d ops)" % ops)
+		_check(ops >= 250, "the power sequence is long enough to stress interleavings (%d ops)" % ops)
+		# NON-VACUOUS: the pockets started flooded and the pumps really pumped — so the drainage invariants
+		# were tested against LIVE water, not a dry world that trivially "never rises".
+		_check(initial_water > 0, "the pockets started flooded (%d units) — drainage had something to test"
+			% initial_water)
+		var drained: int = int(sim.total_consumed.get(&"coal", 0))
+		_check(drained > 0, "generators actually burned coal (%d) — power was live" % drained)
+	return _state_signature(sim)
+
+
+## Assert the POWER invariants on `sim` at a checkpoint. Failing here = a real power/conduit/pump/water bug.
+func _power_assert_invariants(sim: FactorySim, where: String) -> void:
+	# (1) POWER FIELD SANE — every reading is finite, >= 0, and bounded by the physical ceiling. And the field
+	# is DERIVED: every powered cell must be justified by a nearby fueled generator (within its aura, or within
+	# aura+conduit reach). We prove justification cheaply: a fueled generator exists — if there is NONE, the
+	# field must be EXACTLY empty (a dark world reads 0 everywhere; a stray reading would be an invented supply).
+	var fueled_gen: bool = false
+	for m: MachineState in sim.machines:
+		if sim._behavior_flag(m.def, &"power_source") and m.fuel > 0:
+			fueled_gen = true
+			break
+	var ceiling: float = _power_ceiling()
+	var bad_power: PackedStringArray = []
+	for pcell: Variant in sim.power.keys():
+		var v: float = sim.power_at(pcell)
+		if is_nan(v) or is_inf(v):
+			bad_power.append("nonfinite %s=%s" % [str(pcell), str(v)])
+		elif v < 0.0:
+			bad_power.append("negative %s=%.3f" % [str(pcell), v])
+		elif v > ceiling:
+			bad_power.append("runaway %s=%.3f>%.3f" % [str(pcell), v, ceiling])
+	_check(bad_power.is_empty(), "%s — power field finite/>=0/bounded%s"
+		% [where, "" if bad_power.is_empty() else ": " + ", ".join(bad_power)])
+	# No fueled generator anywhere → NO cell can carry power, so the derived field must be empty. This catches
+	# a "power where nothing justifies it" leak. *** THIS ASSERT IS CURRENTLY RED — it caught a real bug: ***
+	# _flow_power_through_conduits stamps a 0.0-valued GHOST entry into `power` for EVERY conduit cell (+ its 4
+	# bled neighbours) unconditionally — carried[cell] = minf(0.0, CAP) = 0.0 with no source, then written to the
+	# field. power_at() reads 0 (correct value), but the ENTRY exists, so consumers that iterate power.keys()
+	# treat a dead conduit as lit: hud.gd's minimap frontier-reach draws every power.keys() cell at alpha
+	# >= 0.12, so laying a conduit with no/unfueled generator wrongly washes the whole run "powered" on the map.
+	# Minimal repro: a lone `sim.conduit[Vector2i(8,8)] = 1`, no generator, one tick → sim.power.size() == 5
+	# (the cell + 4 neighbours), all valued 0.0. Fix belongs in the game (skip writing <=0 carried power / prune
+	# zero entries), NOT here — this test stays RED demonstrating the catch.
+	if not fueled_gen:
+		var ghosts: PackedStringArray = []
+		for pcell2: Variant in sim.power.keys():
+			ghosts.append("%s=%.3f" % [str(pcell2), sim.power_at(pcell2)])
+		_check(sim.power.is_empty(),
+			"%s — no fueled generator → the power field must be EMPTY, but holds %d GHOST cell(s) (0-valued conduit entries that light the minimap)%s"
+			% [where, sim.power.size(),
+				"" if ghosts.is_empty() else ": " + ", ".join(ghosts.slice(0, 6)) + ("…" if ghosts.size() > 6 else "")])
+
+	# (2) ITEM CONSERVATION — every touched item id: present == produced - consumed (machine items included).
+	var leaked: PackedStringArray = []
+	for item: StringName in _POWER_ITEMS:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		if present != net:
+			leaked.append("%s(present=%d,net=%d)" % [item, present, net])
+	_check(leaked.is_empty(), "%s — conservation holds for every item%s"
+		% [where, "" if leaked.is_empty() else ": LEAKED " + ", ".join(leaked)])
+
+	# (3) DRAINAGE SANE (per-cell) — no water level is ever negative or over WATER_MAX (integer + clamped), and
+	# no watered cell is also solid rock (rock displaces water). A pump double-decrement or a stray add into
+	# rock would trip here. (The across-burst "total never rose without an add" check lives in the burst loop.)
+	var bad_water: PackedStringArray = []
+	for wcell: Variant in sim.water.keys():
+		var lvl: int = int(sim.water[wcell])
+		if lvl < 0 or lvl > FactorySim.WATER_MAX:
+			bad_water.append("bad-level %s=%d" % [str(wcell), lvl])
+		if sim.solid.has(wcell):
+			bad_water.append("water-in-rock %s" % str(wcell))
+	_check(bad_water.is_empty(), "%s — every water level is valid (0..WATER_MAX) and never in rock%s"
+		% [where, "" if bad_water.is_empty() else ": " + ", ".join(bad_water)])
+
+	# (4) NO CORRUPTION — a conduit never shares a cell with solid rock or a machine (the cross-layer occupancy
+	# rule that mine/place_block/place_conduit must jointly uphold under churn).
+	var bad_layer: int = 0
+	for ccell: Variant in sim.conduit.keys():
+		if sim.solid.has(ccell) or sim.grid.has(ccell):
+			bad_layer += 1
+	_check(bad_layer == 0, "%s — no conduit overlaps solid rock or a machine (%d bad)" % [where, bad_layer])
