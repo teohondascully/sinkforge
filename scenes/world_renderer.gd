@@ -1051,11 +1051,17 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 			# Speck DENSITY tracks the remaining deposit (docs/MINING.md): a rich body sparkles thickly, a
 			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
 			# bottom-up visibly fades. (Cells with no pool entry = amount 1 = today's sparse look.)
+			# BLIND-PLAYTEST FIX: bigger, higher-contrast nuggets, floored at a legible CLUSTER (~5) — an ore
+			# cell must read as an obvious knot of saturated nuggets in stone even with the glow off (the way
+			# ore is unmistakable in Factorio/Noita), not tiny warm flecks the eye slides past.
 			var richness: int = int(sim.deposits.get(c, 1))
-			var nug_n: int = clampi(def.nugget_count + richness - 1, def.nugget_count, def.nugget_count + 7)
+			var nug_n: int = clampi(def.nugget_count + richness - 1, maxi(def.nugget_count, 5), def.nugget_count + 7)
+			var dark_rim: Color = def.nugget_color.darkened(0.42)   # a dark rim seats each nugget IN the rock
 			for nug: Vector2 in _cell_speckles(c, nug_n):
-				ci.draw_circle(pos + nug, 2.0, def.nugget_color)
-				ci.draw_circle(pos + nug - Vector2(0.6, 0.6), 0.9, def.nugget_color.lightened(0.4))  # glint
+				var p: Vector2 = pos + nug
+				ci.draw_circle(p + Vector2(0.5, 0.7), 4.0, dark_rim)          # embed shadow (nugget sits in a socket)
+				ci.draw_circle(p, 3.4, def.nugget_color)                     # the nugget body — big enough to read
+				ci.draw_circle(p - Vector2(1.0, 1.0), 1.5, def.nugget_color.lightened(0.5))  # hot glint highlight
 		_draw_edge_ao(ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
 
 
