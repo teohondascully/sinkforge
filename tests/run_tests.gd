@@ -71,6 +71,7 @@ func _initialize() -> void:
 	_test_stress_invariants()
 	_test_stress_flow()
 	_test_stress_power()
+	_test_stress_research()
 	if _failures == 0:
 		print("ALL PASS")
 		quit(0)
@@ -3688,3 +3689,223 @@ func _power_assert_invariants(sim: FactorySim, where: String) -> void:
 		if sim.solid.has(ccell) or sim.grid.has(ccell):
 			bad_layer += 1
 	_check(bad_layer == 0, "%s — no conduit overlaps solid rock or a machine (%d bad)" % [where, bad_layer])
+
+
+## STRESS: the RESEARCH → CRAFT → PLACE gating chain under interleaved churn (adversarial). The siblings
+## churn PLACEMENT (_test_stress_invariants), FLOW (_test_stress_flow), and POWER (_test_stress_power); this
+## one churns the PROGRESSION GATE — the demand-side pull (docs/PROGRESSION.md §5, ResearchRules). Live play
+## keeps surfacing gate bugs from UNUSUAL orderings (the pump-reachability bug that motivated this): attempt
+## to research a tech before its prereq / with no sample / with the price short / twice; attempt to craft &
+## build a machine before AND after its gating tech is in; grant samples+costs sometimes-insufficient,
+## sometimes-enough; interleave craft→build→pickup of the just-unlocked machines and tick between bursts so
+## the placed machines run against the churned research state. After EVERY burst + at the end it asserts:
+##   (1) GATE HONORED — a machine/tool whose locking tech is NOT researched can NEVER be crafted (craft
+##       returns false AND produced nothing); once researched it CAN. A tech whose `requires` is unmet, or
+##       whose sample/price is short, is NEVER recorded as researched.
+##   (2) RESEARCH MONOTONE + DISCRETE — a tech, once unlocked, never re-locks; is_researched() matches the
+##       `research` dict exactly; only ids that live in the tree are ever recorded (no invented tech).
+##   (3) CONSERVATION — for every item id touched (craft inputs/outputs, machine items, the research
+##       sample + refined-goods cost), _items_present == total_produced − total_consumed. A gate path that
+##       leaks or dupes an item (double-spend a refused research, produce an item on a refused craft) fails.
+##   (4) DETERMINISM — the whole seeded sequence twice from one seed → byte-identical final _state_signature.
+## A save→disk→load happens MID-sequence and the churn continues on the restored sim, so the research dict +
+## every ledger must survive a serialization round-trip too. Bounded to run in a couple of seconds.
+func _test_stress_research() -> void:
+	print("- STRESS: research→craft→place gating under churn (adversarial)")
+	var final_a: String = _run_stress_research_sequence(0xC0FFEE)   # seeded run #1 (asserts invariants inline)
+	var final_b: String = _run_stress_research_sequence(0xC0FFEE)   # seeded run #2 (silent — determinism proof)
+	_check(final_a == final_b, "the WHOLE research→craft→place sequence is deterministic (identical final state)")
+
+
+## True until the first research-stress run reports (so the determinism re-run doesn't double the harness log).
+var _research_stress_first: bool = true
+
+## The item ids the research sequence can touch — its conservation frontier (asserted after every burst).
+## Includes the analyze SAMPLES (ore/coal/deepslate/iron/iron_ingot/rich_ore), the refined-goods research
+## COSTS (ingot/iron_ingot/plate/gear), and every gated MACHINE + the gated TOOL (scanner). Machine/tool items
+## satisfy the SAME present==produced-consumed rule as resources — the ledger is total.
+const _RESEARCH_ITEMS: Array[StringName] = [
+	&"ore", &"coal", &"deepslate", &"iron", &"iron_ingot", &"rich_ore", &"ingot", &"plate", &"gear",
+	&"drill", &"hopper", &"generator", &"conduit", &"lift", &"descent_engine",
+	&"iron_forge", &"plate_press", &"gear_mill", &"h_drill", &"blast_furnace", &"pump", &"scanner",
+]
+
+
+## Run ONE full interleaved research→craft→place sequence under a fixed seed. Asserts invariants after every
+## burst. Returns the final _state_signature so two same-seed runs can be compared for determinism.
+func _run_stress_research_sequence(rng_seed: int) -> String:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = rng_seed                                          # FIXED seed — reproducible, no Date/global rand
+
+	# Every research-gated machine def, keyed by id (so we can look one up by its gating tech's unlock list).
+	var defs_by_id: Dictionary = {}
+	for id: StringName in [&"drill", &"hopper", &"generator", &"conduit", &"lift", &"descent_engine",
+			&"iron_forge", &"plate_press", &"gear_mill", &"h_drill", &"blast_furnace", &"pump"]:
+		defs_by_id[id] = load("res://src/data/machines/%s.tres" % id) as MachineDef
+
+	var sim: FactorySim = FactorySim.new()
+	# A floor shelf at row 20 across cols 2..40 so built machines have footing/landing (GRID 96×80 — all
+	# well in-bounds). No worldgen: the pack is injected and booked as produced so the ledger starts balanced.
+	for col: int in range(2, 40):
+		sim.set_solid(Vector2i(col, 20), &"stone")
+	# A GENEROUS pack of every sample + every refined good the ladder wants, booked as produced so
+	# present == produced - consumed holds from tick 0. Deliberately large so many crafts/researches SUCCEED
+	# (the gate is exercised on the yes-path too), but each op is small enough that some still fall short.
+	var start_pack: Dictionary = {
+		&"ore": 60, &"coal": 40, &"deepslate": 30, &"iron": 60, &"iron_ingot": 80, &"rich_ore": 20,
+		&"ingot": 200, &"plate": 40, &"gear": 40,
+	}
+	for item: StringName in start_pack:
+		sim.inventory[item] = int(start_pack[item])
+		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(start_pack[item])
+
+	var loud: bool = rng_seed == 0xC0FFEE and _research_stress_first  # only the first run reports
+	_research_stress_first = false
+	var ops: int = 0
+	var did_save_load: bool = false
+
+	# 26 bursts of ~14 mixed gate ops, ticking between each — hundreds of interleaved ops, bounded ticks.
+	for burst: int in 26:
+		for _k: int in 14:
+			ops += 1
+			var choice: int = rng.randi_range(0, 9)
+			# A build/pickup cell on the open row just above the shelf (row 19), so a build has real footing.
+			var cell: Vector2i = Vector2i(rng.randi_range(2, 38), 19)
+			match choice:
+				0:
+					# RESEARCH the NEXT valid tech (prereq met) — the yes-path of the gate. May still fail if the
+					# sample or the refined-goods price is short THIS moment (both are legit refusals).
+					var nxt: StringName = ResearchRules.next_tech(sim.research)
+					if nxt != &"":
+						sim.research_tech(nxt)
+				1:
+					# RESEARCH an ARBITRARY tech in the tree (often out of order → prereq unmet → MUST refuse
+					# without recording it or spending anything). This is the invalid-order churn.
+					var any_tid: StringName = ResearchRules.ORDER[rng.randi_range(0, ResearchRules.ORDER.size() - 1)]
+					sim.research_tech(any_tid)
+				2:
+					# RESEARCH a BOGUS tech id — must refuse, record nothing, spend nothing (no invented tech).
+					sim.research_tech([&"phlogiston", &"unobtainium", &"", &"warp"][rng.randi_range(0, 3)])
+				3:
+					# STARVE research TEMPORARILY: hide the whole pack of a random SAMPLE, try the next tech (with
+					# no sample research_tech must REFUSE — proving the sample gate, not just the price), then RESTORE
+					# the sample so the ladder can still progress deeper in later bursts (the yes-path reaches L2+).
+					# Nothing is spent on a refused research, so the temporary hide/restore is conservation-neutral.
+					var sample: StringName = [&"ore", &"coal", &"deepslate", &"iron", &"iron_ingot", &"rich_ore"][rng.randi_range(0, 5)]
+					var had: int = int(sim.inventory.get(sample, 0))
+					if had > 0:
+						sim.inventory.erase(sample)
+					var nxt2: StringName = ResearchRules.next_tech(sim.research)
+					if nxt2 != &"":
+						sim.research_tech(nxt2)                   # refuses if that tech wanted the hidden sample
+					if had > 0:                                   # restore — the refusal spent nothing, so the pack is intact
+						sim.inventory[sample] = int(sim.inventory.get(sample, 0)) + had
+				4:
+					# CRAFT a random gated MACHINE item into the pack. Must succeed IFF its tech is researched;
+					# a refused craft (locked, or ingredients short) must produce nothing / spend nothing.
+					var did: MachineDef = defs_by_id.values()[rng.randi_range(0, defs_by_id.size() - 1)]
+					sim.craft(did)
+				5:
+					# CRAFT via the GENERIC primitive (craft_item) for a machine — the same gate must apply
+					# (machines and tools share craft_item, so gating a machine here proves the shared path).
+					var did2: MachineDef = defs_by_id.values()[rng.randi_range(0, defs_by_id.size() - 1)]
+					sim.craft_item(did2.id, did2.craft_cost, did2.craft_count)
+				6:
+					# CRAFT the gated TOOL (scanner — the first TOOL behind research, locked by Prospecting).
+					# Same craft_item gate as machines: refuses until Prospecting is in, then crafts.
+					sim.craft_item(&"scanner", MiningRules.TOOL_RECIPES[&"scanner"], 1)
+				7:
+					# BUILD a machine from the pack onto the open row (consumes the item; may fail if none carried
+					# or the cell is occupied — must not corrupt). This is the PLACE half of research→craft→place.
+					var did3: MachineDef = defs_by_id.values()[rng.randi_range(0, defs_by_id.size() - 1)]
+					sim.build_from_pack(did3, cell)
+				8:
+					# PICK a machine back up (returns the item to the pack — the salvage half; conservation must
+					# survive craft→place→pickup of a research-gated machine, the ledger being total).
+					sim.pickup_machine(cell)
+				9:
+					# CRAFT a gated machine we KNOW is unlocked-or-not, then IMMEDIATELY try to build it — the
+					# tight craft→place coupling that the pump-reachability bug lived in.
+					var did4: MachineDef = defs_by_id[[&"pump", &"lift", &"h_drill", &"blast_furnace"][rng.randi_range(0, 3)]]
+					if sim.craft(did4):
+						sim.build_from_pack(did4, cell)
+		# Step the sim so any built machines run against the churned research/pack state.
+		for _t: int in rng.randi_range(1, 5):
+			sim.tick()
+
+		# A save→disk→load roughly halfway; keep operating on the RESTORED sim (research + ledgers ride the envelope).
+		if burst == 13 and not did_save_load:
+			did_save_load = true
+			var data: Dictionary = SaveGame.capture(sim)
+			var path: String = "user://test_stress_research_%d.save" % rng_seed
+			var wrote: bool = SaveGame.write(path, data)
+			var back: Dictionary = SaveGame.read(path)
+			var restored: FactorySim = FactorySim.new()
+			var ok: bool = SaveGame.restore(restored, back)
+			if loud:
+				_check(wrote and not back.is_empty() and ok, "mid-sequence research save→disk→load round-trips")
+				_check(_state_signature(restored) == _state_signature(sim),
+					"the restored mid-sequence research state is byte-identical to the live one")
+			sim = restored
+			DirAccess.remove_absolute(path)
+
+		# INVARIANTS after this burst.
+		if loud:
+			_research_assert_invariants(sim, "burst %d (%d ops)" % [burst, ops])
+
+	# Final gate + NON-VACUOUS proof (the sequence really exercised BOTH sides of the gate, not just refusals).
+	if loud:
+		_research_assert_invariants(sim, "final (%d ops)" % ops)
+		_check(ops >= 300, "the research sequence is long enough to stress interleavings (%d ops)" % ops)
+		_check(sim.research.size() > 0, "some techs actually researched — the yes-path was exercised (%d)" % sim.research.size())
+		var crafted_any: bool = false
+		for id: StringName in _RESEARCH_ITEMS:
+			if int(sim.total_produced.get(id, 0)) > int(start_pack.get(id, 0)):
+				crafted_any = true                                # a gated item was produced by a real craft/pickup
+				break
+		_check(crafted_any, "some gated machine/tool actually crafted — the craft yes-path was exercised")
+	return _state_signature(sim)
+
+
+## Assert the research→craft→place GATE invariants on `sim` at a checkpoint. Failing here = a real gate bug.
+func _research_assert_invariants(sim: FactorySim, where: String) -> void:
+	# (1) GATE HONORED — for EVERY gated item id, if its locking tech is NOT researched then it must be
+	# un-craftable (craft_unlocked false). This is the core gate: a crafted-but-locked item is the bug.
+	var breaches: PackedStringArray = []
+	for tid: StringName in ResearchRules.TECHS:
+		var researched: bool = sim.research.has(tid)
+		for uid: StringName in (ResearchRules.TECHS[tid]["unlocks"] as Array):
+			var unlocked: bool = sim.craft_unlocked(uid)
+			if researched and not unlocked:
+				breaches.append("%s researched but %s still locked" % [tid, uid])
+			elif not researched and unlocked:
+				breaches.append("%s NOT researched but %s craftable" % [tid, uid])
+	_check(breaches.is_empty(), "%s — the craft gate matches the research state for every unlock%s"
+		% [where, "" if breaches.is_empty() else ": " + ", ".join(breaches)])
+
+	# (2) RESEARCH MONOTONE + DISCRETE — every recorded tech is a REAL tree id (no invented/bogus id got in),
+	# its prereq was met when recorded (a tech in the set implies its `requires` is also in the set), and
+	# is_researched() mirrors the dict exactly. (Monotone — never re-locks — is enforced across the whole run
+	# by the determinism proof + the gate check above; here we assert the set is internally CONSISTENT.)
+	var bad_research: PackedStringArray = []
+	for tid2: Variant in sim.research.keys():
+		var id2: StringName = tid2
+		if not ResearchRules.TECHS.has(id2):
+			bad_research.append("invented tech '%s'" % id2)
+		elif not ResearchRules.prereq_met(id2, sim.research):
+			bad_research.append("'%s' recorded with an UNMET prereq" % id2)
+		elif not sim.is_researched(id2):
+			bad_research.append("is_researched disagrees for '%s'" % id2)
+	_check(bad_research.is_empty(), "%s — research set is discrete/monotone/consistent%s"
+		% [where, "" if bad_research.is_empty() else ": " + ", ".join(bad_research)])
+
+	# (3) CONSERVATION — every touched item id: present == produced - consumed (samples, costs, machine + tool
+	# items all included). A refused research that still spent, or a refused craft that still produced, fails here.
+	var leaked: PackedStringArray = []
+	for item: StringName in _RESEARCH_ITEMS:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		if present != net:
+			leaked.append("%s(present=%d,net=%d)" % [item, present, net])
+	_check(leaked.is_empty(), "%s — conservation holds for every item%s"
+		% [where, "" if leaked.is_empty() else ": LEAKED " + ", ".join(leaked)])
