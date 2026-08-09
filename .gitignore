@@ -23,6 +23,10 @@ build/
 /_capture*.png
 /_capture*.png.import
 _zoom_*.png
+# "Sees" tier canonical-moment captures (tools/sees.sh) + boot diagnostics — regenerable, never commit
+/_moment_*.png
+/_moment_*.png.import
+/_boot*.png
 
 # Godot import sidecars for reference screenshots (not game assets) + tool-script UIDs
 history/*.import
