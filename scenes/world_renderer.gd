@@ -429,7 +429,13 @@ func _draw() -> void:
 	_draw_water()      # the L3 fluid layer — translucent blue pools filling each cell to its water line
 	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
 	falling.draw(self)
+	# Cull machines whose cell is off-screen. Margin 3 cells so a partially-on-screen machine's glow,
+	# held-count badge, I/O ports, status bubble and contact shadow (all reaching past its own cell)
+	# aren't clipped at the view edge. Off-screen machines aren't visible → skipping is pixel-identical.
+	var mview: Rect2 = _view_world_rect(3.0)
 	for machine: MachineState in sim.machines:
+		if not mview.has_point(Vector2(machine.cell) * float(CELL)):
+			continue
 		_draw_machine(machine)
 	if bazaars != null:
 		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
@@ -500,7 +506,7 @@ func _draw_ping() -> void:
 func _draw_dig_marks() -> void:
 	if _dig_marks.is_empty():
 		return
-	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var view: Rect2 = _view_world_rect()
 	var pulse: float = 0.65 + 0.35 * sin(_anim_time * 2.6)
 	var edge := Color(0.95, 0.72, 0.30, 0.30 + 0.25 * pulse)
 	var fill := Color(0.95, 0.72, 0.30, 0.05)
@@ -560,7 +566,7 @@ func _draw_surface_life() -> void:
 		for key: Variant in sim.solid:
 			if sim.solid[key] == &"leaves":
 				_leaf_cells.append(key)
-	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL) * 4.0)
+	var view: Rect2 = _view_world_rect(4.0)
 	const FALL_T: float = 5.0
 	for c: Vector2i in _leaf_cells:
 		var pos := Vector2(c) * float(CELL)
@@ -615,7 +621,7 @@ const CRYSTAL_MIN_CELLS: int = 2                       ## a seam needs >= this m
 ## a seam is built from. Split out so the clustering can walk it deterministically.
 func _exposed_ore_cells() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var view: Rect2 = _view_world_rect()
 	for key: Variant in sim.deposits:
 		var c: Vector2i = key
 		var pos := Vector2(c) * float(CELL)
@@ -676,7 +682,7 @@ func _crystal_seams() -> Array[Dictionary]:
 
 
 func _draw_ore_glints() -> void:
-	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var view: Rect2 = _view_world_rect()
 	const PERIOD: float = 3.4
 	const FLARE_LEN: float = 0.5
 	for key: Variant in sim.deposits:
@@ -749,8 +755,11 @@ func _paint_terrain_chunk(ci: CanvasItem, rect: Rect2i) -> void:
 func _draw_conduits() -> void:
 	const COPPER := Color(0.46, 0.32, 0.20)
 	const DIRS: Array[Vector2i] = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell: Variant in sim.conduit:
 		var c: Vector2i = cell
+		if not view.has_point(Vector2(c) * float(CELL)):
+			continue
 		var center: Vector2 = Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
 		var lvl: float = _conduit_level(c)
 		var glow: Color = Color(0.26, 0.22, 0.17).lerp(Color(1.0, 0.85, 0.40), lvl)
@@ -783,8 +792,11 @@ func _conduit_level(cell: Vector2i) -> float:
 ## nothing. Pure cosmetic clockwork over the copper draw — reads the derived power field, never writes.
 const PULSE_SPEED: float = 1.7                        ## links traversed per second by a bead
 func _draw_power_pulses() -> void:
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell: Variant in sim.conduit:
 		var c: Vector2i = cell
+		if not view.has_point(Vector2(c) * float(CELL)):
+			continue
 		var lvl: float = _conduit_level(c)
 		if lvl < 0.08:                                # dead / near-dead tube: no flow to show
 			continue
@@ -820,8 +832,11 @@ func _draw_power_pulses() -> void:
 func _draw_ropes() -> void:
 	const HEMP := Color(0.76, 0.63, 0.42)
 	const SHADE := Color(0.42, 0.33, 0.20)
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell: Variant in sim.rope:
 		var c: Vector2i = cell
+		if not view.has_point(Vector2(c) * float(CELL)):
+			continue
 		var x: float = float(c.x * CELL) + float(CELL) * 0.5
 		var top := Vector2(x, float(c.y * CELL))
 		var sway: float = sin(_anim_time * 1.6 + float(c.y) * 0.7) * 0.8
@@ -842,7 +857,10 @@ func _draw_ropes() -> void:
 ## Draw the mounted torches (FABLE_50 #26): the shared Visuals glyph, live-guttering on the cosmetic
 ## clock. The warm pool each one casts is painted by _paint_lights; here is just the stick + flame.
 func _draw_torches() -> void:
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell: Variant in sim.torch:
+		if not view.has_point(Vector2(cell as Vector2i) * float(CELL)):
+			continue
 		Visuals.draw_machine_glyph(self, _cell_center(cell), "torch", 1.0, true, _anim_time)
 
 
@@ -850,8 +868,11 @@ func _draw_torches() -> void:
 ## its progress — a just-planted seed is a nub, a nearly-grown one already brushes the cell above. The
 ## sway is cosmetic; growth itself is sim state (FactorySim.sapling ticks).
 func _draw_saplings() -> void:
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell: Variant in sim.sapling:
 		var c: Vector2i = cell
+		if not view.has_point(Vector2(c) * float(CELL)):
+			continue
 		var t: float = clampf(float(sim.sapling[c]) / float(FactorySim.SAPLING_GROW_TICKS), 0.0, 1.0)
 		var foot := Vector2(float(c.x * CELL) + float(CELL) * 0.5, float((c.y + 1) * CELL) - 1.0)
 		var h: float = 6.0 + t * 22.0
@@ -1640,8 +1661,11 @@ func _guide_end_y(col: int, start_row: int, stub_from: float) -> float:
 ## Resting product piles on the floor (sim.ground) — what a machine has spat out, waiting to be
 ## walked over and collected. A little stack so a bigger pile reads as "more".
 func _draw_ground() -> void:
+	var view: Rect2 = _view_world_rect(2.0)
 	for cell_v: Variant in sim.ground:
 		var cell: Vector2i = cell_v
+		if not view.has_point(Vector2(cell) * float(CELL)):
+			continue
 		var pile: Dictionary = sim.ground[cell]
 		var base := Vector2(cell) * float(CELL)
 		var total: int = 0
@@ -1672,7 +1696,7 @@ const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so
 func _draw_water() -> void:
 	if sim.water.is_empty():
 		return
-	var view: Rect2 = (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL))
+	var view: Rect2 = _view_world_rect()
 	var fill := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, WATER_ALPHA)
 	var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, minf(1.0, WATER_ALPHA + 0.22))
 	for key: Variant in sim.water:
@@ -1946,6 +1970,17 @@ func _held(machine: MachineState) -> int:
 
 func _cell_center(cell: Vector2i) -> Vector2:
 	return Vector2(cell) * float(CELL) + Vector2(CELL, CELL) * 0.5
+
+
+## VIEW CULLING: the on-screen world-space rectangle, grown by `margin_cells` so partially-on-screen
+## content (and its glow / labels / shadows that reach past its cell) isn't clipped at the edge. The
+## per-frame draw passes test `if not view.has_point(Vector2(cell) * CELL): continue` BEFORE emitting
+## any draw call for an element — the same cull _draw_water/_draw_ore_glints already used inline, now
+## shared so every pass reads the identical rect. Off-screen draws aren't visible, so skipping them is
+## pixel-identical on-screen. `margin_cells` is generous (≥ 2-3) for passes whose visual overspills its
+## cell (machines have glow/badges/IO ports; a big lamp-lit item glow reaches further).
+func _view_world_rect(margin_cells: float = 1.0) -> Rect2:
+	return (get_canvas_transform().affine_inverse() * get_viewport_rect()).grow(float(CELL) * margin_cells)
 
 
 # --- Lighting passes (painted by the LightLayer children; pure visuals) -------
