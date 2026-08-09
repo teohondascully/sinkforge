@@ -1,51 +1,107 @@
-# Sinkforge
+sinkforge
 
-A 2D side-view factory automation game where **gravity is the conveyor belt.** Dig downward, discover exotic materials at each depth layer, and engineer vertical production chains that cascade resources from the surface to the depths. Part Factorio, part idle progression.
+a 2d side-view game about digging an industrial empire into a destructible
+underworld. you play a person, not a cursor: you mine by hand, carry ore in
+your pack, and feed it into machines. you can dig freely in every direction
+like terraria, but the factories you build are strictly vertical, because the
+core rule is that gravity is the conveyor belt. things fall down for free.
+moving goods — or yourself — back up costs power. deeper is richer and more
+dangerous, and there is no prestige or reset: it's one permanent vertical
+empire that grows downward.
 
-**Engine:** Godot 4.6.2 (GDScript) · **Target:** Steam (Windows/Mac/Linux) · **Dev:** macOS / Apple Silicon
+the loop
 
----
+you start with nothing but a pickaxe. dig a vein by hand, haul the ore to a
+forge, and smelt it. then you automate the work you just did yourself: drop a
+drill on the vein so it bores down on its own, cap the forge so it feeds
+itself, string hoppers and splitters to move the output, and lay copper
+conduit to carry power. once the line runs without you, you climb back out and
+go deeper. the whole game is the factorio idea of "automate what you did by
+hand," dropped into a terraria world where you share the same physical space
+as your machines and the falling ore.
 
-## For Assistant Code: Start Here
+depth and progression
 
-1. **Read `ASSISTANT.md` first** — it's the project memory anchor: current phase, locked decisions, doc pointers, and per-session hooks.
-2. Then read `docs/GDD.md` (design bible) and `docs/DECISIONS.md` (why things are the way they are).
-3. Check `docs/SESSION_LOG.md` (last 3 entries) and `docs/ARCHITECTURE.md` for current state before writing code.
-4. Current task: see `prompts/prototype-1.md`.
+the world is built as discrete depth layers. each one introduces a new
+material and a new physical twist that changes how you build: topsoil to learn
+the basics, then a stone layer where power arrives, then a flooded aquifer
+layer where water pours downhill and you need pumps to hold it back, and so on
+down. danger is located and opt-in — your carved-out base is safe by
+construction because you mined it out of solid earth, while caves and deeper
+layers are threats you choose to breach. the endgame is a single colossal
+machine at the bottom of the world, the sinkforge, that you spend the whole
+game working toward.
 
-## Repo Structure
+status
 
-```
-sinkforge/
-├── ASSISTANT.md              # Memory anchor — read every session
-├── README.md             # This file
-├── docs/
-│   ├── GDD.md            # Game design bible
-│   ├── DECISIONS.md      # Decision log (most recent wins on conflict)
-│   ├── ROADMAP.md        # Playable-milestone progress bar
-│   ├── ARCHITECTURE.md   # Technical source of truth (update as built)
-│   ├── MATERIALS.md      # Material/machine/recipe catalog
-│   ├── LAYERS.md         # Depth layer definitions
-│   ├── SESSION_LOG.md    # Dev diary (append every session)
-│   └── PLAYTEST_NOTES.md # Honest feelings from playing builds
-├── prompts/
-│   └── prototype-1.md    # Prototype 1 build prompt
-├── src/                  # (created during setup)
-├── assets/               # (created during setup)
-└── scenes/               # (created during setup)
-```
+early and in active development. the opening arc is playable end to end: dig
+by hand, build a self-feeding drill-and-forge line, wire up a coal generator
+and power, use a lift to haul goods up, breach the seal into the next layer,
+and drain an underground flood with a pump. lots of it is placeholder art and
+rough edges. expect things to change.
 
-## Core Architectural Principles (non-negotiable)
+running it
 
-1. **Data-driven everything.** Machines, materials, recipes, layers are Godot custom Resources consumed by a generic engine. Adding content = editing data, not writing classes.
-2. **Abstract flow is source of truth.** Production math runs through rate-based flow; discrete falling-item sprites are cosmetic only and never drive resource counts.
-3. **Every milestone is playable.** Infrastructure serves a playable goal. Admin tooling grows as editor plugins on demand, never speculatively.
-4. **Simulation is node-free; visuals are a separate pooled layer.** A factory sim becomes thousands of simple entities, which Godot nodes handle poorly. See `docs/ARCHITECTURE_PRINCIPLES.md` for the full anti-rot charter (fixed-tick sim, composition, typed GDScript, batched rendering).
+you need godot 4.6.2. clone the repo and either open project.godot in the
+godot editor and press play, or run it from the command line:
 
-## Source-of-Truth Hierarchy (on conflict)
+    godot --path .
 
-1. `docs/DECISIONS.md` (most recent decision wins)
-2. `docs/GDD.md`
-3. `ASSISTANT.md`
-4. `docs/ARCHITECTURE.md`
-5. Everything else
+it targets desktop (macos, windows, linux). the art is 32px pixel-art tiles.
+
+controls
+
+    a / d or left / right    walk
+    space                    jump (tap for a short hop, hold for a full one)
+    w / s                    grip and climb up or down a placed rope
+    left mouse               mine (hold to work through a painted dig plan)
+    right mouse              place, or pick back up, the selected machine/block
+    mouse wheel or 1-0       pick a hotbar slot
+    q                        drop, or feed the cell you're facing
+    e                        open your pack
+    r                        research the next tech (at a bazaar)
+    m                        map
+    t                        tech tree
+    g                        production dashboard
+    z                        cycle zoom
+    .                        toggle fast-forward
+    p                        pause
+    f5 / f9                  save / load
+    esc                      settings
+    h                        key help
+
+how it's built
+
+the simulation is a node-free, deterministic, fixed-tick model (see
+src/core/factory_sim.gd). it is the single source of truth: every machine,
+the terrain you dig, the power field, the water, and the items are all plain
+data mutated only through a small set of discrete calls, so the same inputs
+always produce the same result. the visuals and the player's body live in a
+separate representation layer that only reads the simulation and draws it —
+you could delete the player entirely and the production numbers would be
+identical. worldgen and rendering never touch each other directly; they meet
+through a small data contract (a material registry plus a two-grid world), so
+you can change how the world is generated or how it looks without disturbing
+the other.
+
+tests
+
+there's a fairly serious test harness. run the whole thing in parallel with:
+
+    bash tools/run_harness.sh
+
+it covers determinism and conservation in the simulation, movement and
+"agility" gauges that measure how the body actually moves, and agent
+play-tests that drive the real game to a goal through the same reach-gated
+verbs a human uses — so a passing run means a person could actually complete
+that goal from where they stand. it's meant to always be green.
+
+layout
+
+    scenes/     the godot scene, the player body, and all rendering
+    src/core/   the simulation (the source of truth)
+    src/data/   machine, recipe, and material definitions (godot resources)
+    tools/      the test + measurement harness
+    tests/      the determinism / conservation test suite
+    assets/     sprites
+    docs/       design notes — gdd.md, architecture.md, progression.md
