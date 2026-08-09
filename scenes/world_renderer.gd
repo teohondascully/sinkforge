@@ -2482,19 +2482,32 @@ func _paint_lights(layer: LightLayer) -> void:
 		# A faint flicker so the lamp reads as a live flame, not a static disc. Bright enough to blaze
 		# against the near-black base but held at 0.66 so the WARM amber core reads (not blown to white) —
 		# the pool is the light in the deep, and it stays gold (diff 11).
-		var flick: float = 0.66 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
+		var flick: float = 0.60 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
+		# Scale the lamp by how DARK the miner's spot actually is (blind-playtest fix): a full blaze in the
+		# deep where it IS the light, but a dim glow in daylight — at spawn the full-strength lamp was
+		# washing out the avatar AND the starter ore it sits on, so every warm thing read as "a lamp".
+		var pcell := Vector2i(int(floor(player.position.x / float(CELL))), int(floor(player.position.y / float(CELL))))
+		var pdark: float = _skylight_alpha(pcell.y, sim.surface_row(pcell.x))
+		var lamp_scale: float = lerpf(0.30, 1.0, clampf(pdark / AMBIENT_DARK, 0.0, 1.0))
+		flick *= lamp_scale
 		# The AIM-FOLLOWING beam (#44): a bright cast pool where you're looking + a dimmer throat pool
-		# between it and the head — two glows along one line read as a directed beam, no shader needed.
+		# between it and the head — two glows along one line read as a directed beam, no shader needed. The
+		# inner/body pools are held well below the main so the overlapping centres don't sum past 1 → white.
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
 		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
-		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.55)
-		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.22)  # close body glow
+		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.38)
+		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.14 * lamp_scale)  # close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		# Saturated cores (diffs 2, 9): each machine's pool blazes in its OWN colour out of the black — a
 		# hot orange forge, an amber burner, a cyan-teal lift — the coloured-pools-on-black Noita read.
 		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
 		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
+		# A COLD/idle forge barely glows — it blazes only while smelting (like the generator going dark when
+		# it runs dry). Fixes the idle spawn-forge washing warm light over the starter ore beside it, and
+		# reads truthfully: light = working. (Non-furnace runners keep their steady casing glow.)
+		if kind == "furnace" and not _machine_active(machine):
+			pulse *= 0.12
 		if kind == "generator":
 			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
 			# Breathes while fueled, goes DARK when it runs dry — the "is it making power?" read.
