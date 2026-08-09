@@ -64,6 +64,18 @@ const SNAP_STABILIZE: float = 4.0    ## a snap THIS small just keeps a resting b
 ## this brisk minimum downward speed on that grounded→airborne edge so the descent reads IMMEDIATELY (Terraria-
 ## snappy). It never touches jump arcs: a jump sets velocity.y NEGATIVE, so this max() leaves it untouched.
 const FALL_START: float = 150.0      ## px/s minimum fall speed seeded when a grounded body starts falling
+## WATER IMPEDANCE (L3 slice 3b — the located hazard the Pump later relieves). When the body's AABB
+## overlaps a water cell (sim.water_at > 0) it WADES: horizontal top-speed + accel are damped (you slog),
+## gravity is buoyantly slowed (a floaty near-neutral sink) with a gentle terminal-rise cap so you don't
+## plummet OR bob up, and the jump is weaker (harder to leap out). It's friction, NOT drowning — there's no
+## health system, so every mult keeps the body clearly MOVABLE (wade, exit, still jump). Gated ONLY on
+## _in_water(); dry-land movement (check_agility / check_walk) is untouched — the gate never leaks.
+const WATER_SPEED_MULT: float = 0.55   ## × RUN_SPEED horizontal top speed while wading
+const WATER_ACCEL_MULT: float = 0.6    ## × ACCEL/FRICTION — you build/shed speed sluggishly in water
+const WATER_GRAVITY_MULT: float = 0.45 ## × GRAVITY — buoyant slow-fall (a floaty descent, not a plummet)
+const WATER_JUMP_MULT: float = 0.7     ## × JUMP_VELOCITY — a weaker leap (harder to hop clear of a pool)
+const WATER_MAX_SINK: float = 220.0    ## px/s terminal sink in water (a slow settle, not free-fall)
+const WATER_MIN_LEVEL: int = 1         ## water_at at/above this counts the cell as "wet" (any water impedes)
 ## Physics integrates in chunks no larger than this, so a big frame delta — the fast-forward game clock
 ## (Engine.time_scale > 1) or a real frame-drop — can't let the body skip past a tile between collision
 ## resolves (tunnel). At time_scale 1 a normal 1/60 frame is a single substep, so play feel is unchanged;
@@ -158,17 +170,28 @@ func note_dig(face: int) -> void:
 
 ## One physics step: horizontal (with slope follow) then vertical, each integrated and collided.
 func _step(delta: float) -> void:
+	# WATER IMPEDANCE (L3 3b): sampled ONCE per step. When wading, top-speed/accel/gravity/jump are damped
+	# below; on dry land every mult is 1.0 so the resolve, step-up, snap, and agility are byte-for-byte
+	# unchanged. The gate is the ONLY thing gating impedance — it can't leak onto dry ground.
+	var wet: bool = _in_water()
+	var speed_top: float = RUN_SPEED * (WATER_SPEED_MULT if wet else 1.0)
+	var accel: float = ACCEL * (WATER_ACCEL_MULT if wet else 1.0)
+	var friction: float = FRICTION * (WATER_ACCEL_MULT if wet else 1.0)
+	var gravity: float = GRAVITY * (WATER_GRAVITY_MULT if wet else 1.0)
+	var max_fall: float = WATER_MAX_SINK if wet else MAX_FALL
+
 	# Accelerate toward the input target / rub off speed with friction — not instant (which reads stiff).
 	if input_dir != 0.0:
-		velocity.x = move_toward(velocity.x, input_dir * RUN_SPEED, ACCEL * delta)
+		velocity.x = move_toward(velocity.x, input_dir * speed_top, accel * delta)
 		facing = int(signf(input_dir))
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
+		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 
-	velocity.y = minf(velocity.y + GRAVITY * delta, MAX_FALL)
+	velocity.y = minf(velocity.y + gravity * delta, max_fall)
 	# Variable jump height (#43): rising with the jump key released → extra gravity clips the arc.
+	# In water the arc-cut uses the same buoyant gravity so a released hop settles gently, not sharply.
 	if velocity.y < 0.0 and not jump_held and not climbing:
-		velocity.y = minf(velocity.y + GRAVITY * (JUMP_CUT_GRAVITY - 1.0) * delta, MAX_FALL)
+		velocity.y = minf(velocity.y + gravity * (JUMP_CUT_GRAVITY - 1.0) * delta, max_fall)
 	# ROPE GRIP (representation-only, like the updraft): overlapping a placed rope, a climb press (W/S)
 	# grabs it; the grip holds until the body leaves the rope or jumps off. Gripping counts as GROUNDED
 	# below, so Space always jumps you off a rope and sideways-at-the-lip gets the auto step-up out.
@@ -182,7 +205,7 @@ func _step(delta: float) -> void:
 		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant we land (forgiving)
 	_jump_request = false
 	if _jump_buffer > 0.0 and grounded:
-		velocity.y = JUMP_VELOCITY
+		velocity.y = JUMP_VELOCITY * (WATER_JUMP_MULT if wet else 1.0)   # weaker leap out of a pool
 		on_floor = false
 		climbing = false                    # a jump lets GO of the rope (Space = off, W = up: distinct verbs)
 		_coyote = 0.0
@@ -436,6 +459,23 @@ func _aabb() -> Rect2:
 
 func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
+
+
+## Is the body wading — does any cell its AABB overlaps hold water (≥ WATER_MIN_LEVEL)? Reads the sim's
+## water grid (never writes it); pure representation, like the collision queries. Returns false with no sim
+## (standalone harness boots) or a dry world. Feet-and-body coverage: the same cell span the resolve walks,
+## so stepping the feet into a pool impedes the moment you touch it, and a body half-submerged still wades.
+func _in_water() -> bool:
+	if sim == null:
+		return false
+	var rect: Rect2 = _aabb()
+	var lo: Vector2i = _cell_of(rect.position)
+	var hi: Vector2i = _cell_of(rect.end - Vector2(0.001, 0.001))
+	for cy: int in range(lo.y, hi.y + 1):
+		for cx: int in range(lo.x, hi.x + 1):
+			if sim.water_at(Vector2i(cx, cy)) >= WATER_MIN_LEVEL:
+				return true
+	return false
 
 
 ## The logical sprite-frame key for the body's current motion state (Phase C). Priority: digging > airborne
