@@ -772,19 +772,22 @@ func _draw_ore_glints() -> void:
 		if not view.has_point(pos) or not sim.is_solid(c):
 			continue
 		var def: MaterialDef = _material(sim.material_at(c))
-		if not def.has_nuggets():
+		if not def.has_nuggets() or not def.glitters:  # coal reads as dark clusters, not glinting gems
 			continue
 		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 19349663)) & 0x7fffffff
 		var offset: float = float(h % 997) / 997.0 * PERIOD
 		var t: float = fmod(_anim_time + offset, PERIOD)
 		if t > FLARE_LEN:
 			continue
+		var glint_dark: float = clampf(_skylight_alpha(c.y, sim.surface_row(c.x)) / AMBIENT_DARK, 0.0, 1.0)
+		if glint_dark <= 0.05:                                  # a lit surface vein reads as rock, not a sparkle
+			continue
 		var flare: float = sin(t / FLARE_LEN * PI)              # 0 -> 1 -> 0 across the flare window
 		var nubs: Array[Vector2] = _cell_speckles(c, def.nugget_count)
 		var cycle: int = int((_anim_time + offset) / PERIOD)    # a different fleck flares each cycle
 		var p: Vector2 = pos + nubs[cycle % nubs.size()]
 		var col: Color = def.nugget_color.lightened(0.65)
-		col.a = 0.85 * flare
+		col.a = 0.85 * flare * glint_dark
 		var r: float = 2.0 + 2.5 * flare                        # a little 4-point star, not a lens flare
 		draw_line(p + Vector2(-r, 0.0), p + Vector2(r, 0.0), col, 1.2)
 		draw_line(p + Vector2(0.0, -r), p + Vector2(0.0, r), col, 1.2)
