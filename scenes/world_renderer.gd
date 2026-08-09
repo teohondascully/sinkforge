@@ -744,6 +744,24 @@ func _crystal_seams_cached() -> Array[Dictionary]:
 	return _crystal_seams_cache
 
 
+## The GLOW COLOUR for an ore seam — derived from the seam's OWN material so the accent light AGREES with
+## the flecks in the rock (the blind-playtest fix: no more cyan glow contradicting orange ore). Takes the
+## first cell's material `nugget_color` and pushes it toward saturation (a light source reads as a
+## purer hue than the embedded speck). A material with no nuggets falls back to the cool CRYSTAL_COLOR so
+## any genuinely-cool future material still glows cool.
+func _seam_glow_color(cells: Array) -> Color:
+	if cells.is_empty():
+		return CRYSTAL_COLOR
+	var first: Vector2i = cells[0]
+	var def: MaterialDef = _material(sim.material_at(first))
+	if not def.has_nuggets():
+		return CRYSTAL_COLOR
+	var glow: Color = def.nugget_color
+	# Push toward saturation: emitted light is a purer hue than the fleck. Nudge S up, keep V bright.
+	glow = Color.from_hsv(glow.h, minf(1.0, glow.s + 0.20), maxf(glow.v, 0.85))
+	return glow
+
+
 func _draw_ore_glints() -> void:
 	var view: Rect2 = _view_world_rect()
 	const PERIOD: float = 3.4
