@@ -1772,26 +1772,53 @@ const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so
 const WATER_SHEEN := Color(0.32, 0.66, 0.98)          ## cool blue tint for the wet-sheen pool
 const WATER_SHEEN_BASE: float = 0.07                  ## floor intensity for a barely-wet cell
 const WATER_SHEEN_LEVEL: float = 0.11                 ## added intensity at a brim-full cell (scales by level)
+## The surface y (top of the water) a cell would draw for a given integer level, anchored at the cell
+## BOTTOM. Higher level => higher surface => SMALLER y. Level 0 => the cell floor (an empty edge).
+func _water_surface_y(cell: Vector2i, level: int) -> float:
+	var frac: float = clampf(float(level) / float(FactorySim.WATER_MAX), 0.0, 1.0)
+	return float(cell.y) * float(CELL) + float(CELL) * (1.0 - frac)
+
+
 func _draw_water() -> void:
 	if sim.water.is_empty():
 		return
 	var view: Rect2 = _view_world_rect()
 	var fill := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, WATER_ALPHA)
 	var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, minf(1.0, WATER_ALPHA + 0.22))
+	var cell_f: float = float(CELL)
 	for key: Variant in sim.water:
 		var c: Vector2i = key
 		var level: int = int(sim.water[c])
 		if level <= 0:
 			continue
-		var base := Vector2(c) * float(CELL)
+		var base := Vector2(c) * cell_f
 		if not view.has_point(base):
 			continue
-		# Fill height = fraction of the cell, anchored at the BOTTOM (so it fills upward from the floor).
-		var frac: float = clampf(float(level) / float(FactorySim.WATER_MAX), 0.0, 1.0)
-		var h: float = float(CELL) * frac
-		var top: float = base.y + float(CELL) - h                     # y of the water surface
-		draw_rect(Rect2(Vector2(base.x, top), Vector2(float(CELL), h)), fill)
-		draw_rect(Rect2(Vector2(base.x, top), Vector2(float(CELL), 2.0)), line)  # the waterline
+		# Fill anchored at the BOTTOM (fills upward from the floor). The TOP EDGE is smoothed: each side of
+		# the surface is the AVERAGE of this cell's surface y and the horizontal neighbour's surface y, so a
+		# level pool draws a near-flat top and a level STEP tapers into a ramp instead of a hard stair. A
+		# side with NO water neighbour keeps this cell's own height (pool edges stay crisp).
+		var floor_y: float = base.y + cell_f
+		var mid_y: float = _water_surface_y(c, level)
+		var left_lvl: int = sim.water_at(c + Vector2i(-1, 0))
+		var right_lvl: int = sim.water_at(c + Vector2i(1, 0))
+		# Left edge = average with the left neighbour's surface (or this cell's own if there's none).
+		var left_y: float = mid_y
+		if left_lvl > 0:
+			left_y = 0.5 * (mid_y + _water_surface_y(c + Vector2i(-1, 0), left_lvl))
+		# Right edge = average with the right neighbour's surface (or this cell's own if there's none).
+		var right_y: float = mid_y
+		if right_lvl > 0:
+			right_y = 0.5 * (mid_y + _water_surface_y(c + Vector2i(1, 0), right_lvl))
+		# The fill as a quad: sloped top (left_y..right_y) down to the flat cell floor. Same colour+alpha.
+		var tl := Vector2(base.x, left_y)
+		var tr := Vector2(base.x + cell_f, right_y)
+		var br := Vector2(base.x + cell_f, floor_y)
+		var bl := Vector2(base.x, floor_y)
+		draw_colored_polygon(PackedVector2Array([tl, tr, br, bl]), fill)
+		# The brighter waterline rides the smoothed top edge (a thin quad, 2px thick, following the slope).
+		draw_colored_polygon(PackedVector2Array([
+			tl, tr, Vector2(tr.x, right_y + 2.0), Vector2(tl.x, left_y + 2.0)]), line)
 
 
 ## A machine: a riveted CASING + its animated type glyph (shared Visuals) + a held-count badge + the
