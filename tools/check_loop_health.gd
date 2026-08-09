@@ -95,7 +95,13 @@ func _initialize() -> void:
 func _run() -> void:
 	var agent: PlayAgent = await _boot()
 	var obj: Objectives = agent.main._objectives
+	# The scored arc runs THROUGH "auto" (first automation); the gentle handoff steps after it are RUNG 2's.
+	# Par must reflect the steps actually played, so measure the ladder up to and including "auto".
 	var step_count: int = obj.steps.size()
+	for i: int in obj.steps.size():
+		if obj.steps[i]["id"] == &"auto":
+			step_count = i + 1
+			break
 	var par: int = step_count * FRAMES_PER_STEP_PAR
 
 	# Install the per-physics-frame sampler INTO the live tree (ticks after MainView pushes its guide
@@ -137,13 +143,17 @@ func _run() -> void:
 	await physics_frame
 
 
-## Play the whole objective ladder, doing ONLY what each signpost says (like RUNG 1), and SAMPLING per
-## frame throughout: guidance-gap frames (a spatial step with no offered target) and the agent's own stall
-## count. Returns whether the arc reached first automation (all objectives done).
+## Play the FIRST-AUTOMATION arc, doing ONLY what each signpost says (like RUNG 1), and SAMPLING per frame
+## throughout: guidance-gap frames (a spatial step with no offered target) and the agent's own stall count.
+## Stops at the "auto" step — the gentle L1→L2 handoff steps after it (power/generator/descent/breach) are
+## RUNG 2's journey; this metric scores the loop's playability to its FIRST goal. Returns whether it reached
+## first automation.
 func _play_arc(agent: PlayAgent, obj: Objectives) -> bool:
 	for step: Dictionary in obj.steps:
 		var id: StringName = step["id"]
 		if obj.is_done(id):
+			if id == &"auto":
+				break                                             # first automation already reached
 			continue
 		var acted: bool = await _do_step(agent, id)
 		if not acted:
@@ -156,7 +166,9 @@ func _play_arc(agent: PlayAgent, obj: Objectives) -> bool:
 		if not obj.is_done(id):
 			agent._note("did '%s' but the objective never ticked" % id)
 			return false
-	return obj.all_done()
+		if id == &"auto":
+			break                                                 # first automation reached — the arc's goal
+	return obj.is_done(&"auto")
 
 
 ## Sample the CURRENT-frame feel signal: if the active objective is a spatial step (one MainView is designed

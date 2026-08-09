@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_pump()
 	_test_automated_line()
 	_test_machine_status()
+	_test_objectives_l1_l2_handoff()
 	_test_no_empty_ground_piles()
 	_test_behavior_registry()
 	_test_rope()
@@ -1807,6 +1808,62 @@ func _test_machine_status() -> void:
 	_check(s4.machine_status(hopper) == &"idle", "empty hopper reads idle")
 	hopper.input_buffer[&"ore"] = 3
 	_check(s4.machine_status(hopper) == &"working", "loaded hopper reads working")
+
+
+## The guided objective chain's L1→L2 HANDOFF steps (scenes/objectives.gd, appended after "auto"): the
+## FEW gentle nudges that bridge first-automation → the descent gate. Objectives are REPRESENTATION-layer
+## (they only READ the sim), so we drive the sim into each milestone state and assert the matching step
+## LATCHES — and, crucially, does NOT fire early (a nudge that's already "done" at boot teaches nothing).
+func _test_objectives_l1_l2_handoff() -> void:
+	print("- objectives: the L1->L2 handoff nudges (power / generator / descent / breach)")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var engine_def: MachineDef = load("res://src/data/machines/descent_engine.tres")
+	var sim: FactorySim = FactorySim.new()
+	# A short intact SEAL band (the real one is full-width sealrock; a stub suffices — Objectives snapshots
+	# every sealrock cell at construction) with an open shaft above it for the engine to breach down.
+	var seal_row: int = 40
+	for x: int in range(4, 8):
+		sim.set_solid(Vector2i(x, seal_row), &"sealrock")
+	var obj: Objectives = Objectives.new(sim)
+
+	# At boot NONE of the handoff steps should be done — the player just reached first automation.
+	obj.refresh(0.1)
+	_check(not obj.is_done(&"power") and not obj.is_done(&"generator")
+		and not obj.is_done(&"descent") and not obj.is_done(&"breach"),
+		"handoff nudges are all pending at boot (nothing fires early)")
+
+	# 1. Research POWER → the 'power' nudge latches.
+	sim.research[&"power"] = true
+	obj.refresh(0.1)
+	_check(obj.is_done(&"power"), "'power' step latches on is_researched(power)")
+
+	# 2. A placed generator only counts once BURNING (coal in it) — placed-but-empty must not tick.
+	var gen: MachineState = sim.place_machine(gen_def, Vector2i(2, 20))
+	obj.refresh(0.1)
+	_check(not obj.is_done(&"generator"), "'generator' step waits for the generator to be FUELED (not just placed)")
+	gen.input_buffer[&"coal"] = 4
+	obj.refresh(0.1)
+	_check(obj.is_done(&"generator"), "'generator' step latches when the generator is burning coal")
+
+	# 3. Research DESCENT → the 'descent' nudge latches.
+	sim.research[&"descent"] = true
+	obj.refresh(0.1)
+	_check(obj.is_done(&"descent"), "'descent' step latches on is_researched(descent)")
+
+	# 4. Breach the seal: an engine on the seal, fed the quota, bores the band open. Until then, pending.
+	_check(not obj.is_done(&"breach"), "'breach' step is pending while the seal is intact")
+	var engine: MachineState = sim.place_machine(engine_def, Vector2i(4, seal_row - 1))
+	engine.input_buffer[FactorySim.DESCENT_EATS] = FactorySim.DESCENT_QUOTA + 2
+	for _i: int in 3:
+		sim.tick()
+	_check(not sim.is_solid(Vector2i(4, seal_row)), "the fed engine bored the seal cell open (breach happened)")
+	obj.refresh(0.1)
+	_check(obj.is_done(&"breach"), "'breach' step latches once a snapshotted seal cell is opened")
+
+	# 'breach' is the LAST step — after it the ladder has nothing more to point at (no L3 nudge). (We drive
+	# only the handoff here, so the early tutorial steps stay pending; the point is the four new nudges latch
+	# on their sim conditions and that 'breach' is terminal.)
+	_check(obj.steps[obj.steps.size() - 1]["id"] == &"breach", "'breach' is the final step — the chain ends there, player self-directs")
 
 
 ## The `sim.ground` map must never retain an EMPTY pile dict — an empty {} crashed walk-over collect

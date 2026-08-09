@@ -1,10 +1,12 @@
 class_name Objectives
 extends RefCounted
 
-## REPRESENTATION-LAYER legibility (NOT sim): an ordered, guided RUNG-1 ladder that walks a new player
-## all the way to their FIRST AUTOMATION — the self-feeding ore→ingot line. It is the direct answer to
-## "what do I do?" / "how do I get to L2?": there is ALWAYS a signposted next action, and the chain only
-## completes when the player has built a drill→forge stack that mines and smelts on its own (docs/PROGRESSION.md).
+## REPRESENTATION-LAYER legibility (NOT sim): an ordered, guided ladder that walks a new player from bare
+## hands to their FIRST AUTOMATION — the self-feeding ore→ingot line — then hands off toward L2 with a FEW
+## gentle nudges (research Power → burn coal in a generator → research Descent → breach the seal into
+## Stonereach). It is the direct answer to "what do I do?" / "how do I get to L2?": there is a signposted
+## next action right up to the L1→L2 gate, after which the chain ENDS and the player self-directs via the
+## tech tree + depth (we deliberately do NOT keep nudging into L3 — docs/PROGRESSION.md).
 ## It READS the sim only (never mutates, never enters the tick), so deleting it changes no production number.
 ##
 ## It measures SESSION DELTAS from a baseline snapshot taken at construction (lifetime counters minus their
@@ -22,6 +24,7 @@ var _base_machines: int = 0
 var _done: Dictionary = {}              ## step id -> true once achieved (latched)
 var _all_done_time: float = -1.0        ## seconds the chain has been fully complete (for HUD auto-hide)
 var _ingots_at_line: int = -1           ## ingots produced the moment the drill→forge line was assembled
+var _seal_cells: Array[Vector2i] = []   ## the sealrock cells at construction — a breach opens one (below)
 
 ## The Rung-1 ladder. Each step: stable id, an imperative label (what to DO), and a short goal tag (the
 ## win condition, shown as the chip). Order IS the tutorial path — each step is doable from the state the
@@ -36,6 +39,12 @@ var steps: Array[Dictionary] = [
 	{"id": &"build",  "label": "Drop the Drill into the shaft just ABOVE the ore vein (RMB) — it bores down into it", "goal": "Build the line"},
 	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
 	{"id": &"auto",   "label": "Stand back — the fueled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
+	# --- the gentle L1→L2 handoff: research power → burn coal → research descent → breach the seal. After
+	# this the chain ENDS; the player self-directs (tech tree [T], go deeper). Deliberately NOT into L3.
+	{"id": &"power",     "label": "Research POWER at the Bazaar (press R) — the deep needs energy", "goal": "Research Power"},
+	{"id": &"generator", "label": "Craft a GENERATOR, place it, and toss coal in (Q) to burn it for power", "goal": "Burn coal for power"},
+	{"id": &"descent",   "label": "Research the DESCENT ENGINE at the Bazaar — the way down is sealed", "goal": "Research Descent"},
+	{"id": &"breach",    "label": "Feed a Descent Engine on the seal to breach into Stonereach — then explore on your own", "goal": "Breach the seal"},
 ]
 
 
@@ -44,6 +53,12 @@ func _init(factory: FactorySim) -> void:
 	_base_produced = factory.total_produced.duplicate()
 	_base_consumed = factory.total_consumed.duplicate()
 	_base_machines = factory.machines.size()
+	# Snapshot the intact SEAL (every sealrock cell). A Descent Engine's breach bores a hole straight down
+	# through this band (set_solid → open), so "the seal is breached" = any snapshotted cell is no longer
+	# sealrock. Reading the material (not a worldgen constant) keeps this decoupled from any one generator.
+	for cell: Vector2i in factory.solid.keys():
+		if factory.solid[cell] == &"sealrock":
+			_seal_cells.append(cell)
 
 
 ## Call every frame: latch any newly-achieved step. Cheap (a handful of dict reads).
@@ -97,6 +112,10 @@ func _achieved(id: StringName) -> bool:
 		&"build": return not _find_line().is_empty()                                             # the drill→forge stack exists
 		&"fuel":  return _drill_fueled()                                                          # the drill has coal to burn
 		&"auto":  return _line_has_run()                                                          # the line forged an ingot on its own
+		&"power":     return sim.is_researched(&"power")                                          # the power tech unlocked the generator
+		&"generator": return _generator_burning()                                                # a placed generator is burning coal → power
+		&"descent":   return sim.is_researched(&"descent")                                        # the descent engine is unlocked
+		&"breach":    return _seal_breached()                                                     # the seal band has been bored open
 	return false
 
 
@@ -135,6 +154,26 @@ func _has_drill_machine() -> bool:
 func _drill_fueled() -> bool:
 	for m: MachineState in sim.machines:
 		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
+			return true
+	return false
+
+
+## Is a placed GENERATOR actually BURNING (fuel loaded → pouring power)? The nudge teaches "burn coal for
+## power", so we want it FED, not merely placed — mirrors _drill_fueled's "coal in it" read. The generator
+## carries the `power_source` behavior flag (_BEHAVIORS); its behavior tag is &"generator".
+func _generator_burning() -> bool:
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"generator" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
+			return true
+	return false
+
+
+## Has the SEAL been breached? A Descent Engine at quota bores the sealrock band open straight below it
+## (set_solid → &""), so any cell that WAS sealrock at world-load but is no longer counts — the same
+## "the seal cell went open" read RUNG-2 uses at its breach column, generalized over the whole band.
+func _seal_breached() -> bool:
+	for cell: Vector2i in _seal_cells:
+		if sim.solid.get(cell, &"") != &"sealrock":
 			return true
 	return false
 

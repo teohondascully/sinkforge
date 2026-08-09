@@ -185,9 +185,14 @@ func _goal_feed_and_smelt() -> bool:
 func _goal_reach_first_automation() -> bool:
 	var agent: PlayAgent = await _boot()
 	var obj: Objectives = agent.main._objectives
+	# This rung's goal is FIRST AUTOMATION — the tutorial ladder up to and including "auto". The steps AFTER
+	# it (power/generator/descent/breach) are the gentle L1→L2 handoff, whose journey RUNG 2 plays end-to-end;
+	# stop once "auto" latches so this rung stays scoped to what it asserts (and its verbs).
 	for step: Dictionary in obj.steps:
 		var id: StringName = step["id"]
 		if obj.is_done(id):
+			if id == &"auto":
+				break                                                 # first automation reached — this rung's goal
 			continue                                                  # already satisfied — move to the next signpost
 		agent._note("step '%s': %s" % [id, step["label"]])
 		var acted: bool = await _do_step(agent, id)
@@ -199,8 +204,10 @@ func _goal_reach_first_automation() -> bool:
 			t += 1
 		if not obj.is_done(id):
 			return await _finish(agent, false, "did the action for '%s' but the objective never ticked — the player gets no signal they progressed" % id)
-	return await _finish(agent, obj.all_done(),
-		"followed the signposts all the way to FIRST AUTOMATION (%d steps)" % obj.steps.size())
+		if id == &"auto":
+			break                                                     # first automation reached — this rung's goal
+	return await _finish(agent, obj.is_done(&"auto"),
+		"followed the signposts all the way to FIRST AUTOMATION")
 
 
 ## RUNG 2 — the L1→L2 GATE is playable end-to-end (docs/PROGRESSION.md §2): descend a shaft to THE SEAL,
