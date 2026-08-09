@@ -31,6 +31,11 @@ extends Resource
 @export var nugget_count: int = 3
 ## How much the tile darkens with depth (0 = none). Sells "deeper = deeper".
 @export var depth_darken: float = 0.38
+## True when this material's exposed veins GLITTER — the luminous discovery accent + glint sparks that
+## make a metal vein catch the eye across a dark cavern. OFF for bulk fuels (coal) that should read as
+## dark textured clusters, not glowing gems. (A first-time player kept mistaking cool-glinting coal for
+## "some blue crystal" — the glitter belongs to precious ore, not fuel.)
+@export var glitters: bool = true
 
 
 ## True when `cap_color` should be drawn (a visible grass cap).
