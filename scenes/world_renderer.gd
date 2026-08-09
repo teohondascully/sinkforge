@@ -2516,7 +2516,9 @@ func _paint_lights(layer: LightLayer) -> void:
 			col = Color(0.36, 1.0, 0.90)                   # lift teal (echoes the updraft motes)
 			pulse = (0.55 + 0.5 * machine.power_factor) * (0.85 + 0.15 * sin(_anim_time * 3.0))
 		elif kind != "furnace":
-			col = Color(0.42, 0.78, 1.0)                   # cool machine glow (saturated cyan)
+			# Each machine's pool takes its OWN casing colour, so a drill / hopper / splitter read as
+			# DISTINCT devices in the dark instead of a field of identical cyan blobs (blind-playtest fix).
+			col = Visuals.machine_color(machine.def)
 		if pulse > 0.0:
 			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.6, col, pulse)
 			# WHITE-HOT CORE (noita-diff-03 #6): a fire's centre is near-white, not saturated — the forge
