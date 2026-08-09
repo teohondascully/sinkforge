@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_craft_and_build()
 	_test_worldgen()
 	_test_layered_worldgen()
+	_test_worldgen_fuzz()
 	_test_horizontal_ore_pull()
 	_test_lift()
 	_test_finite_deposit_and_drill()
@@ -798,6 +799,173 @@ func _test_layered_worldgen() -> void:
 				water_match = false
 				break
 	_check(water_match, "sim.water matches the generated world's water grid exactly")
+
+
+## WORLDGEN FUZZ (the invariant sweep): generate MANY worlds across a matrix of seeds × sizes and assert
+## the generation invariants hold UNIVERSALLY, not just for _test_layered_worldgen's one happy-path
+## size/seed. The happy path can pass while an edge seed holes the seal, an edge size breaks base-safety,
+## or a stray cell lands OOB / water sits in rock. Each world is checked structurally (pure generation,
+## no ticks) so the whole sweep stays fast. A single failing (seed,size) reports its exact offending numbers.
+##
+## Invariants asserted per world:
+##   1. In-bounds     — every blocks/walls/amounts/water key is within (cols,rows).
+##   2. Base-safe     — no carved cave AND no water within CAVE_MIN_DEPTH of the column's surface.
+##   3. Seal intact   — rows SEAL_TOP..+SEAL_ROWS-1 are full-width sealrock (only when the world contains them).
+##   4. No water in rock — no cell is both solid and watered; every water level is in 1..WATER_MAX.
+##   5. Water deep    — every water cell is below the base-safe band (aquifers never near surface).
+##   6. Determinism   — same (seed,size) twice → identical blocks/walls/amounts/water.
+##   7. Load-clean    — load_world ingests without crash; sim.total_water() matches the generated grid
+##                      (sizes are kept ≤ the sim's fixed GRID so nothing is clamped away).
+func _test_worldgen_fuzz() -> void:
+	print("- worldgen fuzz (seeds × sizes)")
+	var gen := LayeredWorldGen.new()
+	# _surface_row is seed/size-independent; a fresh heightmap gen gives us the same surface authority the
+	# generator uses internally (base-safe band = _surface_row(col) + CAVE_MIN_DEPTH).
+	var hm := HeightmapWorldGen.new()
+
+	var seeds: Array[int] = [0, 1, 7, 42, 1337, 99999, 20260807, 314159, 2, 123456789, 555, 88888]
+	# Sizes: the REAL size plus small/edge dims. All kept ≤ the sim's fixed GRID_COLS×GRID_ROWS so
+	# load_world (which clamps to that fixed grid via in_bounds) ingests every cell — a clean load check.
+	var sizes: Array[Vector2i] = [
+		Vector2i(FactorySim.GRID_COLS, FactorySim.GRID_ROWS),   # 96×80, the shipping size
+		Vector2i(72, 40),                                        # the old happy-path dims
+		Vector2i(48, 40),
+		Vector2i(32, 24),
+		Vector2i(20, 20),                                        # tiny — surface (17..25) crowds the floor
+	]
+
+	var seal_lo: int = LayeredWorldGen.SEAL_TOP
+	var seal_hi: int = LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS - 1
+	var worlds: int = 0
+
+	# Accumulated failure counts across the whole sweep — a single _check per invariant reports the FIRST
+	# offending (seed,size)+numbers, so a red is precise instead of a wall of repeats.
+	var oob_fail: String = ""
+	var basesafe_fail: String = ""
+	var seal_fail: String = ""
+	var water_rock_fail: String = ""
+	var water_level_fail: String = ""
+	var water_deep_fail: String = ""
+	var determinism_fail: String = ""
+	var load_fail: String = ""
+
+	for seed: int in seeds:
+		for dim: Vector2i in sizes:
+			var cols: int = dim.x
+			var rows: int = dim.y
+			var world: WorldData = gen.generate(cols, rows, seed)
+			worlds += 1
+			var tag: String = "(seed=%d, %dx%d)" % [seed, cols, rows]
+
+			# --- 1. IN-BOUNDS: every key of every grid sits inside (cols,rows). ---
+			if oob_fail == "":
+				for grid: Dictionary in [world.blocks, world.walls, world.amounts, world.water]:
+					for cell: Vector2i in grid:
+						if not world.in_bounds(cell):
+							oob_fail = "%s cell %s out of bounds" % [tag, str(cell)]
+							break
+					if oob_fail != "":
+						break
+
+			# --- 2/5. BASE-SAFE + WATER-DEEP: nothing carved or watered in a column's base-safe band. ---
+			# A carved cave = a cell with a wall but no block, below the surface. It (and any water) must
+			# never sit within CAVE_MIN_DEPTH of the column surface — the spawn base stays solid + dry.
+			if basesafe_fail == "":
+				for col: int in cols:
+					var top: int = hm._surface_row(col)
+					var safe_bottom: int = top + LayeredWorldGen.CAVE_MIN_DEPTH   # first cave-eligible row
+					for row: int in range(top, mini(safe_bottom, rows)):
+						var cell := Vector2i(col, row)
+						# Carved = wall present, block absent (a Terraria room). A never-filled sky cell has
+						# neither, so require the wall to distinguish a carved cave from open air above ground.
+						if world.walls.has(cell) and not world.blocks.has(cell):
+							basesafe_fail = "%s carved cave at %s within base-safe band (surface=%d)" \
+								% [tag, str(cell), top]
+							break
+						if world.water.has(cell):
+							basesafe_fail = "%s water at %s within base-safe band (surface=%d)" \
+								% [tag, str(cell), top]
+							break
+					if basesafe_fail != "":
+						break
+
+			# --- 3. SEAL INTACT: rows SEAL_TOP..seal_hi are FULL-WIDTH sealrock, only when tall enough. ---
+			if seal_fail == "" and rows > seal_hi:
+				for row: int in range(seal_lo, seal_hi + 1):
+					for col: int in cols:
+						if world.blocks.get(Vector2i(col, row), &"") != &"sealrock":
+							seal_fail = "%s seal HOLE at %s (blocks=%s)" \
+								% [tag, str(Vector2i(col, row)), str(world.blocks.get(Vector2i(col, row), &"<air>"))]
+							break
+					if seal_fail != "":
+						break
+
+			# --- 4. NO WATER IN ROCK + valid levels. ---
+			for wc: Vector2i in world.water:
+				var lvl: int = int(world.water[wc])
+				if world.blocks.has(wc) and water_rock_fail == "":
+					water_rock_fail = "%s watered cell %s is ALSO solid (%s)" \
+						% [tag, str(wc), str(world.blocks[wc])]
+				if (lvl < 1 or lvl > FactorySim.WATER_MAX) and water_level_fail == "":
+					water_level_fail = "%s water level %d at %s out of 1..%d" \
+						% [tag, lvl, str(wc), FactorySim.WATER_MAX]
+				# --- 5. WATER DEEP: below the base-safe band AND at/below the deep aquifer band. ---
+				var wtop: int = hm._surface_row(wc.x)
+				if wc.y < wtop + LayeredWorldGen.CAVE_MIN_DEPTH and water_deep_fail == "":
+					water_deep_fail = "%s water at %s within base-safe band (surface=%d)" % [tag, str(wc), wtop]
+				if wc.y < LayeredWorldGen.AQUIFER_MIN_ROW and water_deep_fail == "":
+					water_deep_fail = "%s water at %s above AQUIFER_MIN_ROW=%d" \
+						% [tag, str(wc), LayeredWorldGen.AQUIFER_MIN_ROW]
+
+			# --- 6. DETERMINISM: regenerating the same (seed,size) yields identical grids. ---
+			if determinism_fail == "":
+				var again: WorldData = gen.generate(cols, rows, seed)
+				if world.blocks != again.blocks:
+					determinism_fail = "%s blocks differ on regen" % tag
+				elif world.walls != again.walls:
+					determinism_fail = "%s walls differ on regen" % tag
+				elif world.amounts != again.amounts:
+					determinism_fail = "%s amounts differ on regen" % tag
+				elif world.water != again.water:
+					determinism_fail = "%s water differs on regen" % tag
+
+			# --- 7. LOAD-CLEAN: ingest through the real contract; total_water matches the grid. ---
+			if load_fail == "":
+				var sim: FactorySim = FactorySim.new()
+				sim.load_world(world)
+				# Sizes are ≤ the fixed sim grid, so no cell is clamped away → the water totals must match.
+				var grid_total: int = 0
+				for v: Variant in world.water.values():
+					grid_total += int(v)
+				if sim.total_water() != grid_total:
+					load_fail = "%s total_water mismatch: sim=%d grid=%d" \
+						% [tag, sim.total_water(), grid_total]
+				else:
+					# Spot conservation/sanity: a freshly loaded (un-ticked) world invents no items.
+					for it: StringName in [&"ore", &"ingot", &"iron"]:
+						if _items_present(sim, it) != int(sim.total_produced.get(it, 0)):
+							load_fail = "%s load invented %s (present=%d produced=%d)" \
+								% [tag, it, _items_present(sim, it), int(sim.total_produced.get(it, 0))]
+							break
+
+	_check(worlds == seeds.size() * sizes.size(),
+		"fuzzed the whole matrix (%d worlds = %d seeds × %d sizes)" % [worlds, seeds.size(), sizes.size()])
+	_check(oob_fail == "", "in-bounds: every grid key is within (cols,rows) — %s"
+		% ("OK" if oob_fail == "" else oob_fail))
+	_check(basesafe_fail == "", "base-safe: no cave/water in any column's near-surface band — %s"
+		% ("OK" if basesafe_fail == "" else basesafe_fail))
+	_check(seal_fail == "", "seal intact: full-width sealrock where the world contains the seal — %s"
+		% ("OK" if seal_fail == "" else seal_fail))
+	_check(water_rock_fail == "", "no water in rock: no cell is both solid and watered — %s"
+		% ("OK" if water_rock_fail == "" else water_rock_fail))
+	_check(water_level_fail == "", "water levels valid: every level in 1..WATER_MAX — %s"
+		% ("OK" if water_level_fail == "" else water_level_fail))
+	_check(water_deep_fail == "", "water deep: every water cell below the base-safe + aquifer band — %s"
+		% ("OK" if water_deep_fail == "" else water_deep_fail))
+	_check(determinism_fail == "", "determinism: same (seed,size) → identical grids — %s"
+		% ("OK" if determinism_fail == "" else determinism_fail))
+	_check(load_fail == "", "load-clean: ingests without error, water/items conserved — %s"
+		% ("OK" if load_fail == "" else load_fail))
 
 
 ## HORIZONTAL ore pull (the frontier fix): ore richness varies across X at a fixed depth, with the richest

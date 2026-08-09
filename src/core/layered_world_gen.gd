@@ -572,6 +572,11 @@ func _stamp_bazaar_ruin(world: WorldData) -> void:
 	var ground: int = FLAT_SURFACE_ROW
 	var w: int = FactorySim.BAZAAR_W
 	var h: int = FactorySim.BAZAAR_H
+	# Skip the ruin on any world too small to hold its fixed-column footprint (cols 40-43): every other gen
+	# pass in_bounds-guards its writes, but this one wrote at fixed columns unguarded → OOB on narrow worlds.
+	# The ruin is the shipping-world spawn tutorial; a tiny world simply goes without rather than a partial frame.
+	if ground - h < 0 or not world.in_bounds(Vector2i(RUIN_X + w - 1, ground + 3)):
+		return
 	for cx: int in range(RUIN_X, RUIN_X + w):                  # flatten + clear the footprint
 		for ry: int in range(0, ground):
 			world.blocks.erase(Vector2i(cx, ry))              # remove any bump / tree above the ground line
