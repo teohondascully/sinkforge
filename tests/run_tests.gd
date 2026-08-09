@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_test_filter_ratio_passthrough()
 	_test_research()
 	_test_descent_gate()
+	_test_descent_automation()
 	_test_hints()
 	_test_falling_pool()
 	_test_scanner()
@@ -2109,6 +2110,61 @@ func _test_descent_gate() -> void:
 	s3.research_tech(&"power")
 	_check(s3.research_tech(&"descent"), "Descent researches after Power (deepslate sample + ingots)")
 	_check(s3.craft_unlocked(&"descent_engine"), "…and unlocks the engine")
+
+
+## The FACTORY OUT-PRODUCES the descent WALL (Belongs F1, docs/DESIGN_REVIEW.md — the anti-speedrun pillar,
+## PROGRESSION §2). DESCENT_QUOTA is a THROUGHPUT wall you point production at, not a countable pile you
+## hand-carry. This proves that HONESTLY at the sim level: a fully AUTOMATED line — a drill boring a solid
+## ore vein → a forge smelting the ore into ingots → the Descent Engine eating them off gravity — fills the
+## quota and BREACHES the seal with NO hand intervention, well inside a bounded tick budget. Mirrors
+## _test_automated_line's drill→forge column, then stacks the engine over the seal like _test_descent_gate.
+func _test_descent_automation() -> void:
+	print("- descent gate out-produced by an automated line")
+	var drill_def: MachineDef = load("res://src/data/machines/drill.tres")
+	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
+	var eng_def: MachineDef = load("res://src/data/machines/descent_engine.tres")
+	var sim: FactorySim = FactorySim.new()
+	var col: int = 8
+	# The line, top-down in ONE column so gravity/_flow threads it (mirrors _test_automated_line):
+	#   drill (row 4) bores the solid ore vein (row 5) → ore falls into the forge (row 6) → 2 ore smelt to
+	#   1 ingot → the ingot falls into the Descent Engine (row 8) → at quota it BREACHES the seal (rows 9-10).
+	var ore := Vector2i(col, 5)
+	# A vein rich enough to yield the whole quota: 2 ore per ingot, so DESCENT_QUOTA*2 ore + a safety margin.
+	sim.set_solid(ore, &"ore"); sim.deposits[ore] = FactorySim.DESCENT_QUOTA * 2 + 20
+	var drill: MachineState = sim.place_machine(drill_def, Vector2i(col, 4))
+	sim.place_machine(proc_def, Vector2i(col, 6))            # forge below the vein, catches the bored ore
+	var eng: MachineState = sim.place_machine(eng_def, Vector2i(col, 8))  # engine catches the forge's ingots
+	sim.set_solid(Vector2i(col, 9), &"sealrock")            # THE SEAL below the engine (rows 9-10)
+	sim.set_solid(Vector2i(col, 10), &"sealrock")
+	sim.set_solid(Vector2i(col, 14), &"stone")             # an L2 floor to catch the breach spillover
+	# Fuel the drill ONCE at the start; the player does NOTHING after (the whole point — automation).
+	var coal_fuel: int = FactorySim.DESCENT_QUOTA * 2 + 40
+	drill.input_buffer[&"coal"] = coal_fuel
+	sim.total_produced[&"coal"] = coal_fuel                 # book the fuel so conservation balances
+	# Budget: the forge is the throughput floor (2.0 s/ingot = 40 ticks → 64 ingots ≈ 2560 ticks); the drill
+	# keeps pace (1.0 s/ore = 20 ticks; 128 ore ≈ 2560 ticks). 4000 ticks (~200 s @ 20 Hz) is a comfortable
+	# ceiling — legible & ratchetable via the printed actual-ticks margin below.
+	var budget: int = 4000
+	var breach_tick: int = -1
+	for t: int in budget:
+		sim.tick()
+		if eng.fed >= FactorySim.DESCENT_QUOTA:
+			breach_tick = t + 1
+			break
+	_check(breach_tick >= 0,
+		"the AUTOMATED line reached the quota within %d ticks (fed=%d/%d)" % [budget, eng.fed, FactorySim.DESCENT_QUOTA])
+	if breach_tick >= 0:
+		print("    (out-produced the gate in %d ticks — %d-tick margin under the %d budget)"
+			% [breach_tick, budget - breach_tick, budget])
+	_check(eng.fed >= FactorySim.DESCENT_QUOTA,
+		"the engine ate a full quota of ingots off gravity, hands-free (fed=%d)" % eng.fed)
+	_check(not sim.is_solid(Vector2i(col, 9)) and not sim.is_solid(Vector2i(col, 10)),
+		"THE BREACH: the automated feed bored the seal open — the factory descends")
+	# Conservation stays clean across the whole automated pipeline (nothing leaked or duplicated).
+	for item: StringName in [&"ore", &"ingot", &"coal"]:
+		var present: int = _items_present(sim, item)
+		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
+		_check(present == net, "%s conserved through the automated gate (present=%d, net=%d)" % [item, present, net])
 
 
 ## HINT BUBBLES (FABLE_50 #35 — scenes/hints.gd, representation-only): a hint fires exactly once, on the

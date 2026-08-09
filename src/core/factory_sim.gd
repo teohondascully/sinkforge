@@ -86,9 +86,13 @@ const _BEHAVIORS: Dictionary = {
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
 ## gravity-fed ingots (a true sink) and, at its quota, BREACHES the seal below — boring the shaft into
-## Stonereach. The quota is a THROUGHPUT WALL: hand-feeding 40 ingots (80 hand-mined ore, smelted, hauled)
-## aches by design; a drill→forge line pours it in — the factory is how you descend.
-const DESCENT_QUOTA: int = 40
+## Stonereach. The quota is a THROUGHPUT WALL you out-PRODUCE, not a hand-carryable toll (Belongs F1,
+## docs/DESIGN_REVIEW.md): hand-feeding 64 ingots (128 finite-deposit hand-mined ore, smelted, hauled one
+## trip at a time) aches by design — the finite-deposit system makes hand-mining that tonnage punishingly
+## slow (§2). An automated drill→forge line clears it passively while you do nothing: the factory is the
+## intended path down, and _test_descent_automation proves the line out-produces the wall. (Kept modest so
+## the game/tests never turn grindy.)
+const DESCENT_QUOTA: int = 64
 const DESCENT_EATS: StringName = &"ingot"
 
 ## cell (Vector2i) -> MachineState. Authoritative placement + flow topology.
