@@ -1959,6 +1959,22 @@ func _draw_crumble() -> void:
 					Color(0.03, 0.03, 0.05, (1.0 - t) * 0.5), false, 1.0)          # dark rim for definition
 
 
+## The zoom at/above which per-machine TEXT decorations (name label, held badge, need bubble) are legible
+## enough to draw for EVERY on-screen machine. Below it (the locked 0.50× default + the 0.33× survey view)
+## only the HOVERED/aimed machine shows its text; the rest stay clean glyphs (readable at a glance, and
+## no wall of unreadable tiny labels on a big base). The zoom is the canvas transform's scale — a camera
+## zoom of 0.70 (the inspect level) gives a canvas scale of 0.70. Threshold below 0.70, above 0.50.
+const TEXT_ZOOM: float = 0.65
+
+
+## Should this machine's TEXT decorations draw? Yes when zoomed in enough to read them, OR when it's the
+## machine the player is aiming at (so pointing at any box always reads its label/status, even zoomed out).
+func _text_visible(cell: Vector2i) -> bool:
+	if cell == _aim:
+		return true
+	return get_canvas_transform().get_scale().x >= TEXT_ZOOM
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
@@ -1993,10 +2009,18 @@ func _draw_machine(machine: MachineState) -> void:
 		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock,
 			machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
-	_draw_machine_label(machine, pos)
+	# TEXT DECORATIONS are gated (perf + de-clutter): the name label, the held-count badge, and the
+	# stalled NEED bubble are drawn ONLY when the text is actually readable (zoomed IN past _text_zoom)
+	# OR this is the HOVERED/aimed machine (so pointing at any box still reads its label/status even
+	# zoomed out). At the locked 0.50× default those labels are a few px tall — unreadable clutter — and
+	# draw_string is the priciest per-call, so on a mature base the non-hovered machines drop their text.
+	# The info isn't lost: the HUD hover inspector shows a machine's full details on hover regardless.
+	var show_text: bool = _text_visible(machine.cell)
+	if show_text:
+		_draw_machine_label(machine, pos)
 
 	var held: int = _held(machine)
-	if held > 0:
+	if show_text and held > 0:
 		var badge := Vector2(pos.x + float(CELL) - 12.0, pos.y + 4.0)
 		draw_rect(Rect2(badge, Vector2(10.0, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
 		draw_string(_font, badge + Vector2(1.5, 9.0), str(held),
@@ -2009,7 +2033,7 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 	_draw_machine_io(machine, pos)
-	_draw_machine_status(machine, pos)
+	_draw_machine_status(machine, pos, show_text)
 	if _construct.has(machine.cell):     # the one-shot assemble overlay (#9), on top of the finished draw
 		_draw_construct(pos, clampf(float(_construct[machine.cell]) / CONSTRUCT_DUR, 0.0, 1.0))
 
@@ -2041,7 +2065,7 @@ func _draw_construct(pos: Vector2, t: float) -> void:
 ## a machine is stalled (no fuel → coal, starved → its input). Reads FactorySim.machine_status (the sim's
 ## own run-gates, so it can't lie). Pure cosmetic — drawn glyphs, no emojis. The direct fix for "why has
 ## my drill gone quiet?" — the answer is now ON the machine, like Factorio.
-func _draw_machine_status(machine: MachineState, pos: Vector2) -> void:
+func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool = true) -> void:
 	var status: StringName = sim.machine_status(machine)
 	var lamp: Color
 	match status:
@@ -2050,6 +2074,8 @@ func _draw_machine_status(machine: MachineState, pos: Vector2) -> void:
 		&"no_input": lamp = Color(0.97, 0.72, 0.22)
 		_: lamp = Color(0.52, 0.55, 0.62)          # idle
 	# Status lamp: a rimmed dot in the machine's top-left corner (mirrors Factorio's entity status light).
+	# The lamp is a glanceable COLOUR (like the glyph), not text — it stays ALWAYS on so a red/amber
+	# stall still reads from across a zoomed-out base. Only the floating text-ish NEED bubble is gated.
 	var lamp_c: Vector2 = pos + Vector2(5.5, 5.5)
 	draw_circle(lamp_c, 4.2, Color(0.03, 0.03, 0.05, 0.9))
 	draw_circle(lamp_c, 3.1, lamp)
@@ -2057,6 +2083,8 @@ func _draw_machine_status(machine: MachineState, pos: Vector2) -> void:
 		return                                       # green = fine; no floating alarm
 	if status == &"idle":
 		return                                       # benign (empty mover); lamp is enough
+	if not show_bubble:
+		return                                       # zoomed out + not hovered: lamp is enough, drop the bubble
 	# Stalled (no_fuel / no_input) → a blinking bubble floats above the machine carrying WHAT it needs.
 	var need: StringName = &"ore"
 	if status == &"no_fuel":
