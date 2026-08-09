@@ -144,6 +144,21 @@ const IRON_SIZE_MIN: int = 10
 const IRON_SIZE_DEPTH_BONUS: int = 30
 const IRON_AMOUNT: int = 220
 
+# --- aquifers (L3 water pockets you BREACH, docs/WATER.md) ---
+## Sealed pressurised water pockets carved deep into SOLID rock (block erased, wall KEPT — a flooded carved
+## room), filled to WATER_MAX so digging in RELEASES them. DEEP + BASE-SAFE by construction: a pocket never
+## rises within CAVE_MIN_DEPTH of a column's surface (base stays dry) and its centre lives at/below
+## AQUIFER_MIN_ROW — the deep deepslate approach and the Stonereach band below the seal (rows ~54..bottom),
+## the "watery deep" of the depth spine. Carved ENTIRELY within solid rock (not connected to the cave/tunnel
+## system) so each reads as pressurised, not a drained cavern. Stamped LAST (after the seal) so nothing
+## re-carves or overwrites the water; a blob cell that would land in the seal band or any non-solid cell is skipped.
+const AQUIFER_PER_COL: float = 0.045       # pocket count ≈ this × cols (a handful, like the big caverns)
+const AQUIFER_MIN_ROW: int = DEEPSLATE_ROW + 2   # centres live in/below the deep deepslate + Stonereach band
+const AQUIFER_RX_MIN: int = 2
+const AQUIFER_RX_MAX: int = 4
+const AQUIFER_RY_MIN: int = 2
+const AQUIFER_RY_MAX: int = 3
+
 # --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
 ## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
 ## 3-wide canopies mostly read as separate trees). Sparse — the surface reads as wooded, not a wall.
@@ -175,7 +190,8 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_scatter_iron(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
-	_stamp_seal(world)          # LAST: the gate band overwrites everything, so nothing can hole it
+	_stamp_seal(world)          # LAST solid pass: the gate band overwrites everything, so nothing can hole it
+	_seed_aquifers(world, rng)  # AFTER the seal — carves + fills water into solid rock; no later pass touches it
 	return world
 
 
@@ -457,6 +473,54 @@ func _stamp_seal(world: WorldData) -> void:
 			world.amounts.erase(cell)                 # a vein cell overwritten by the seal keeps no deposit
 			if not world.walls.has(cell):
 				world.walls[cell] = &"deepslate_wall"
+
+
+## Seed AQUIFERS (L3, docs/WATER.md): a handful of small SEALED water pockets carved deep into solid rock,
+## filled to WATER_MAX, that you BREACH by digging in. Runs LAST (after the seal) so no later solid pass
+## overwrites the water. Each pocket:
+##   • is a small ellipse blob whose CENTRE sits at/below AQUIFER_MIN_ROW (the deep deepslate + Stonereach
+##     band) — DEEP by construction, so the near-surface base stays dry;
+##   • only ERASES SOLID rock (KEEPING the wall → a flooded carved room), and refuses any cell within the
+##     column's base-safe band, the seal band, or already-open air — so the pocket is pressurised (sealed by
+##     rock on all sides, not spliced into the cave/tunnel system), and never floods the base or holes the seal;
+##   • fills exactly the cells it erased with WATER_MAX (water only lands in cells guaranteed carved-open).
+## Deterministic via the shared rng.
+func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var count: int = maxi(2, int(round(float(world.cols) * AQUIFER_PER_COL)))
+	var seal_lo: int = SEAL_TOP
+	var seal_hi: int = SEAL_TOP + SEAL_ROWS - 1
+	# Centres span the deep band: from AQUIFER_MIN_ROW down to near the world bottom (leave room for the blob).
+	var lo_row: int = AQUIFER_MIN_ROW
+	var hi_row: int = world.rows - 2
+	if hi_row <= lo_row:
+		return
+	for _a: int in count:
+		var cx: int = rng.randi_range(3, world.cols - 4)
+		var cy: int = rng.randi_range(lo_row, hi_row)
+		var rx: int = rng.randi_range(AQUIFER_RX_MIN, AQUIFER_RX_MAX)
+		var ry: int = rng.randi_range(AQUIFER_RY_MIN, AQUIFER_RY_MAX)
+		for dy: int in range(-ry, ry + 1):
+			for dx: int in range(-rx, rx + 1):
+				var ex: float = float(dx) / float(rx)
+				var ey: float = float(dy) / float(ry)
+				if ex * ex + ey * ey > 1.0:
+					continue
+				var cell := Vector2i(cx + dx, cy + dy)
+				if not world.in_bounds(cell):
+					continue
+				# BASE-SAFE: never within CAVE_MIN_DEPTH of the column's surface (base stays dry).
+				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+					continue
+				# Never in the seal band (the seal is inviolate solid) and never above the deep aquifer band.
+				if cell.y < AQUIFER_MIN_ROW or (cell.y >= seal_lo and cell.y <= seal_hi):
+					continue
+				# Only carve SOLID rock (keep the wall → flooded carved room). Skip already-open air so the
+				# pocket is sealed by rock, not spliced into the cave/tunnel system.
+				if not world.blocks.has(cell):
+					continue
+				world.blocks.erase(cell)                  # open the cell (wall kept behind it)
+				world.amounts.erase(cell)                 # a vein cell we flooded keeps no deposit
+				world.water[cell] = FactorySim.WATER_MAX  # fill the carved cell (guaranteed not solid now)
 
 
 ## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,

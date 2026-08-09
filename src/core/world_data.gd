@@ -22,6 +22,11 @@ var walls: Dictionary = {}
 ## that doesn't fill this still produces today's one-hit ore). The gen→sim channel for finite,
 ## depth-scaled deposits (docs/MINING.md): generation decides how rich each vein cell is.
 var amounts: Dictionary = {}
+## Aquifer water (L3, docs/WATER.md): cell (Vector2i) -> level (1..FactorySim.WATER_MAX). Sparse — only
+## watered cells appear, and only in CARVED-OPEN cells deep in the rock (a generator seeds sealed pressurized
+## pockets you BREACH). Ingested by FactorySim.load_world into `sim.water`; an older WorldData without this
+## just yields a dry world (default empty). The gen→sim channel for the deep aquifers.
+var water: Dictionary = {}
 
 
 func in_bounds(cell: Vector2i) -> bool:

@@ -443,6 +443,7 @@ func load_world(world: WorldData) -> void:
 	solid.clear()
 	wall.clear()
 	deposits.clear()
+	water.clear()
 	world_seed = world.seed
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
@@ -453,6 +454,12 @@ func load_world(world: WorldData) -> void:
 	for cell: Vector2i in world.amounts:
 		if in_bounds(cell):
 			deposits[cell] = int(world.amounts[cell])
+	# AQUIFERS (L3): seeded water in carved-open pockets (generator guarantees no watered cell is solid).
+	# Guard an older WorldData that predates the water grid (default empty → dry world).
+	if world.water != null:
+		for cell: Vector2i in world.water:
+			if in_bounds(cell) and not solid.has(cell):
+				water[cell] = clampi(int(world.water[cell]), 1, WATER_MAX)
 	rebuild_fine_terrain()   # derive the fine grid from the freshly loaded coarse terrain (deterministic)
 
 

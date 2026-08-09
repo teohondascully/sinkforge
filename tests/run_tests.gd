@@ -759,6 +759,44 @@ func _test_layered_worldgen() -> void:
 	_check(not sim.is_solid(probe), "a carved cave loads as open (not solid)")
 	_check(sim.wall_at(probe) != &"", "the carved cave still shows its background wall")
 
+	# --- AQUIFERS (L3, slice 3a): deep SEALED water pockets seeded into carved rock. ---
+	_check(not a.water.is_empty(), "aquifers seeded some water (%d cells)" % a.water.size())
+	var watered: int = 0
+	var near_surface: int = 0
+	var bad_level: int = 0
+	var in_solid: int = 0
+	var seal_lo: int = LayeredWorldGen.SEAL_TOP
+	var seal_hi: int = LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS - 1
+	for wc: Vector2i in a.water:
+		watered += 1
+		var lvl: int = int(a.water[wc])
+		if lvl < 1 or lvl > FactorySim.WATER_MAX:
+			bad_level += 1
+		# DEEP + BASE-SAFE: every watered cell sits below its column's base-safe band, never near the surface.
+		if wc.y < hm._surface_row(wc.x) + LayeredWorldGen.CAVE_MIN_DEPTH:
+			near_surface += 1
+		# NO watered cell is also solid rock (water only lives in the cells the aquifer pass carved open).
+		if a.blocks.has(wc):
+			in_solid += 1
+		# ...and never inside the inviolate seal band.
+		if wc.y >= seal_lo and wc.y <= seal_hi:
+			in_solid += 1
+	_check(watered > 0, "aquifer water exists (%d watered cells)" % watered)
+	_check(near_surface == 0, "no aquifer water in the base-safe band (all deep, base stays dry)")
+	_check(bad_level == 0, "every water level is valid (1..WATER_MAX)")
+	_check(in_solid == 0, "no watered cell is solid or in the seal band (water only in carved cells)")
+	# DETERMINISM: same seed → identical water grid (seeded rng only, no time/global random).
+	_check(a.water == b.water, "same seed → identical aquifer water (deterministic)")
+	# INGEST: the sim loads the water and it survives the contract (matches the generated grid).
+	_check(sim.total_water() > 0, "load_world ingested the aquifer water (total=%d)" % sim.total_water())
+	var water_match: bool = sim.water.size() == a.water.size()
+	if water_match:
+		for wc2: Vector2i in a.water:
+			if sim.water_at(wc2) != int(a.water[wc2]):
+				water_match = false
+				break
+	_check(water_match, "sim.water matches the generated world's water grid exactly")
+
 
 ## HORIZONTAL ore pull (the frontier fix): ore richness varies across X at a fixed depth, with the richest
 ## bands AWAY from spawn — so the cheapest fresh vein isn't always straight down the spawn column. Asserts
