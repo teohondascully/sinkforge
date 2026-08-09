@@ -390,6 +390,7 @@ func _process(delta: float) -> void:
 		if to_aim.length() > float(CELL) * 0.9:
 			target = to_aim.limit_length(LAMP_LEAD)
 		_lamp_offset = _lamp_offset.lerp(target, 1.0 - exp(-9.0 * delta))
+	_spawn_water_drips(delta)   # cosmetic drips shed off pouring water — motion cue (view-culled, rate-limited)
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	_update_veil()              # the lightmap veil (#17): rebake the base if dirty, re-cut the live lights
 	if _lights != null:
@@ -1777,6 +1778,63 @@ const WATER_SHEEN_LEVEL: float = 0.11                 ## added intensity at a br
 func _water_surface_y(cell: Vector2i, level: int) -> float:
 	var frac: float = clampf(float(level) / float(FactorySim.WATER_MAX), 0.0, 1.0)
 	return float(cell.y) * float(CELL) + float(CELL) * (1.0 - frac)
+
+
+## WATER MOTION CUE (representation-only): a pouring water cell — one with open (non-solid, non-full)
+## space directly below it — occasionally sheds a cool-blue DRIP into the particle layer, and where the
+## drop lands (the first cell that isn't open air below) a tiny SPLASH. Rate-limited so a steady
+## waterfall shimmers with the odd drop, not a firehose: each on-screen pouring cell is gated by a
+## per-cell staggered phase (the ore-glint trick) so only a fraction spawn on any frame, and a hard
+## per-frame cap bounds the total. View-culled — off-screen water costs one has_point() and skips.
+## Never touches the sim (reads water/solid, writes only the cosmetic `particles` layer via randf).
+const WATER_DRIP_PERIOD: float = 0.9                  ## a cell sheds at most one drip per this window
+const WATER_DRIP_MAX_PER_FRAME: int = 6               ## hard cap so a wide sheet can't flood the pool
+func _spawn_water_drips(delta: float) -> void:
+	if particles == null or sim.water.is_empty():
+		return
+	var view: Rect2 = _view_world_rect()
+	var cell_f: float = float(CELL)
+	var spawned: int = 0
+	for key: Variant in sim.water:
+		if spawned >= WATER_DRIP_MAX_PER_FRAME:
+			break
+		var c: Vector2i = key
+		var level: int = int(sim.water[c])
+		if level <= 0:
+			continue
+		var base := Vector2(c) * cell_f
+		if not view.has_point(base):
+			continue
+		# "Pouring" = the cell below is in-bounds, not solid, and has room for more water (the sim's own
+		# fall rule). A cell sitting on a full pool or on rock is settled — no drip.
+		var below: Vector2i = c + Vector2i(0, 1)
+		if not sim.in_bounds(below) or sim.is_solid(below) or sim.water_at(below) >= FactorySim.WATER_MAX:
+			continue
+		# Per-cell staggered probabilistic gate: a stable hash phase spreads the cells across the period
+		# so they don't all pop on the same frame, and the chance scales with delta so the rate is
+		# frame-rate independent (~one drip per WATER_DRIP_PERIOD per pouring cell).
+		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 19349663)) & 0x7fffffff
+		var phase: float = float(h % 997) / 997.0
+		if randf() > delta / WATER_DRIP_PERIOD * (0.7 + 0.6 * phase):
+			continue
+		# Drip is shed at the water's own surface line, mid-cell — it then falls under gravity.
+		var surf_y: float = _water_surface_y(c, level)
+		particles.water_drip(Vector2(base.x + cell_f * 0.5, surf_y + 2.0))
+		spawned += 1
+		# A small splash where the pour LANDS: scan down the open column to the first blocker (rock or a
+		# full-water surface). Only if it's reasonably close + on-screen, so we don't chase a bottomless
+		# shaft or splash off-view. Occasional (half the drips) so it stays subtle.
+		if randf() < 0.5:
+			var land: Vector2i = below
+			var steps: int = 0
+			while steps < 8 and sim.in_bounds(land + Vector2i(0, 1)) \
+					and not sim.is_solid(land + Vector2i(0, 1)) \
+					and sim.water_at(land + Vector2i(0, 1)) < FactorySim.WATER_MAX:
+				land += Vector2i(0, 1)
+				steps += 1
+			var lpos := Vector2(land) * cell_f + Vector2(cell_f * 0.5, cell_f)
+			if view.has_point(Vector2(land) * cell_f):
+				particles.water_splash(lpos)
 
 
 func _draw_water() -> void:

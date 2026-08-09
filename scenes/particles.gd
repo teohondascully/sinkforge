@@ -57,6 +57,27 @@ func debris(pos: Vector2, color: Color, dir_ang: float) -> void:
 	burst(pos, 7, color, 150.0, 0.5, 2.8, 0.38, 300.0, -PI * 0.5 - dir_ang)
 
 
+## A single cool-blue DRIP shed off pouring water (L3): one tiny droplet nudged mostly DOWN with a hair
+## of sideways drift, falling under strong gravity, short-lived. Called sparsely per pouring cell (the
+## renderer rate-limits + view-culls) so a waterfall shimmers with the odd drop, not a firehose.
+func water_drip(pos: Vector2) -> void:
+	if _p.size() >= MAX:
+		return
+	var col := Color(0.55, 0.78, 0.98).lightened(randf_range(-0.08, 0.12))
+	_p.append({
+		"pos": pos + Vector2(randf_range(-2.0, 2.0), randf_range(-1.0, 1.0)),
+		"vel": Vector2(randf_range(-14.0, 14.0), randf_range(30.0, 70.0)),
+		"life": 0.42, "max_life": 0.42, "color": col,
+		"size": randf_range(1.4, 2.2), "grav": 420.0,
+	})
+
+
+## A tiny cool-blue SPLASH where falling water lands — a few flecks kicked UP + outward, quick, so a
+## pour reads as hitting the surface below, not vanishing. Smaller/cooler than a mining break.
+func water_splash(pos: Vector2) -> void:
+	burst(pos, 4, Color(0.62, 0.82, 0.98), 60.0, PI * 0.6, 1.8, 0.26, 340.0, PI * 0.5)
+
+
 func advance(delta: float) -> void:
 	var kept: Array[Dictionary] = []
 	for q: Dictionary in _p:
