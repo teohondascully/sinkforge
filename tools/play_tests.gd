@@ -53,6 +53,7 @@ func _run() -> void:
 		["RUNG 2 — breach the seal into L2", _goal_breach_the_seal],
 		["RUNG 3 — the L2 iron chain", _goal_l2_chain],
 		["RUNG 4 — the Borer ferret loop", _goal_borer],
+		["RUNG 5 — drain the aquifer (L3 flood loop)", _goal_drain_the_aquifer],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -342,6 +343,184 @@ func _goal_borer() -> bool:
 	print("  borer: %s  (haul=%d frames=%d)" % [agent.friction(), haul, t2])
 	return await _finish(agent, haul >= 3 and int(sim.inventory.get(&"h_drill", 0)) == 1,
 		"sent the borer into the wall and brought it back full (haul=%d)" % haul)
+
+
+## RUNG 5 — the L3 FLOOD LOOP is playable embodied (docs/DECISIONS.md, the Aquifer answer): the pump falls
+## on the LOCKED hook — water floods a dig for FREE, pumping it back OUT costs POWER. The sim tests prove
+## water/pump/reward in ISOLATION; this proves a PLAYER can actually DO it from where a body stands. In a
+## STAGED, SEALED, flooded surface pocket (a flat-floored watertight box with a pump sump — reachable
+## without the descent-and-climb, which is RUNG 2's business), the agent: (1) WADES the flood and feels the
+## impedance (_in_water); (2) builds a POWERED pump — stands a fueled generator up in the walk-space, lays a
+## conduit run that carries its power over to beside the pump's cell, and drops the pump into the sump;
+## (3) stands back while the powered pump DRAINS the pocket substantially; (4) walks to the now-exposed
+## rich_ore in the drained floor and mines it. Any step unreachable/unbuildable through the real verbs FAILS
+## with which one dead-ended — an L3 reachability gap made executable (this rung caught one: see step 2).
+func _goal_drain_the_aquifer() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	var col: int = 90                                        # clear of every fixture (they end at 84)
+	var r: int = MainView.SURFACE
+	# --- STAGE a flooded surface PUDDLE, carved clean + placed by hand (the RUNG-fixture pattern) so the
+	# geometry is deterministic run-to-run AND the whole loop sits within a standing body's reach — with NO
+	# descent-and-climb (that's RUNG 2's business). The floor is CONTINUOUS at row r+1 (the body walks along
+	# it standing at row r); the water sits in a shallow puddle IN the body's own standing row (row r),
+	# penned by 1-tile lips, so the body wades by simply walking THROUGH it and out onto dry ground — no pit
+	# to escape, no reliance on a lucky wading jump. A 1-cell SUMP under the puddle gives the pump depth. ---
+	# FIRST wipe the whole fixture footprint clean (worldgen at col 90 is past the flat plateau — its
+	# undulating surface + any seeded aquifer here would sit UNDER our stamp and lift the body / add stray
+	# water), then SEAL the box: fill everything at/below the walk floor solid (a watertight bed) and wall
+	# the box's left/right edges. This pens our puddle so a neighbouring worldgen aquifer can't leak in and
+	# dilute it — the drain we measure is our pump's alone. Rows above the floor stay open (walk-space).
+	var box_lo_x: int = col - 10
+	var box_hi_x: int = col + 7
+	for x: int in range(box_lo_x, box_hi_x + 1):
+		for y: int in range(r - 5, r + 6):
+			var c := Vector2i(x, y)
+			sim.remove_water(c, FactorySim.WATER_MAX)
+			if y >= r + 1 or x == box_lo_x or x == box_hi_x:
+				sim.set_solid(c, &"stone")                  # the watertight bed + the two edge walls
+			else:
+				sim.set_solid(c, &"")                       # open walk-space above the floor
+	# The continuous walk floor is now the top of the solid bed (row r+1). Open a SUMP under the puddle centre
+	# so the pump has drain depth: a 2-cell shaft (col r+1, r+2) above the solid sump floor at r+3. The floor
+	# is otherwise UNBROKEN and FLAT (no surface lips) — the body wades the whole span freely (wading is just
+	# slower, never blocking), so there's no lip to trip on and no pit to escape while impeded.
+	sim.set_solid(Vector2i(col, r + 1), &"")
+	sim.set_solid(Vector2i(col, r + 2), &"")
+	# THE REWARD: a rich_ore vein in the walk floor two cells left of the pump — submerged now, mineable dry
+	# once the pump exposes it. On the build side of the pump so the body never has to cross the pump (a
+	# machine walls the body) to reach it. rich_ore is tier-2 rock, so the loadout carries a stone pickaxe.
+	var reward := Vector2i(col - 2, r + 1)
+	sim.set_solid(reward, &"rich_ore")
+	sim.deposits[reward] = 20
+	# Flood the sealed box: pour brim-full into row r across the build span + the sump. Water levels out over
+	# the connected interior (penned by the box's edge walls), settling deep enough to wade across. pocket_cells
+	# = every cell that can hold this pocket's water, so the drain check reads THIS pocket alone (not the
+	# world's far-off worldgen aquifers, which sit outside the sealed box).
+	var pocket_cells: Array[Vector2i] = []
+	for x: int in range(box_lo_x + 1, box_hi_x):
+		pocket_cells.append(Vector2i(x, r))                 # the whole interior standing row
+	pocket_cells.append(Vector2i(col, r + 1))               # + the sump
+	pocket_cells.append(Vector2i(col, r + 2))
+	var poured: int = 0
+	for wet_cell: Vector2i in pocket_cells:
+		poured += sim.add_water(wet_cell, FactorySim.WATER_MAX)
+	if poured < FactorySim.WATER_MAX * 8:
+		return await _finish(agent, false, "the pocket should start deeply flooded (poured=%d)" % poured)
+	# The loadout (setup hatch — the bench/craft flow is proven in RUNG 1 + headless): a pump, a fueled
+	# generator, a run of conduit to wire them, and the tier-2 pick the rich_ore needs.
+	agent.give(&"pump", 1)
+	agent.give(&"generator", 1)
+	agent.give(&"conduit", 8)
+	agent.give(&"stone_pickaxe", 1)
+	# Set the body down on the flooded floor at the build end; it settles into the shallow flood.
+	agent.player.position = agent.main._cell_center(Vector2i(col - 5, r))
+	for _i: int in 20:
+		await physics_frame                                 # settle onto the floor
+	# --- STEP 1: the flood is a real hazard — standing in the flooded pocket, the body WADES (impedance
+	# registers). Confirm the wading gate trips (the body slogs, doesn't stroll). ---
+	var waded: bool = false
+	for _i: int in 60:
+		await physics_frame
+		if agent.player._in_water():
+			waded = true
+			break
+	if not waded:
+		return await _finish(agent, false, "stood in the flooded pocket but the body never registered as wading (_in_water false)")
+	agent._note("  wading: body in water at %s" % agent.main._cell_at(agent.player.position))
+	# --- STEP 2: build the powered pump. Standing back at the build end, the body stands the generator up in
+	# the walk-space, lays a conduit run along row r-1 that ends orthogonally BESIDE the pump, and drops the
+	# pump into the flooded sump. Power routes gen → the conduit below it → across the run → bleeds into the
+	# pump's cell (the "generator far, conduit delivers" geometry — the conduit is load-bearing, asserted
+	# below). Every placement goes through build_at on reach-valid cells; the flat flooded floor is trivially
+	# navigable (wading only slows the body, never blocks) and the body stays clear of the open sump. ---
+	if not await agent.walk_to_column(col - 5, 1200):
+		return await _finish(agent, false, "could not reach the build end of the pocket")
+	var gen_cell := Vector2i(col - 4, r - 2)                 # the generator, up in the walk-space
+	if not await agent.select_item(&"generator"):
+		return await _finish(agent, false, "no generator in the pack")
+	if not await agent.build_at(gen_cell):
+		return await _finish(agent, false, "could not stand the generator at %s" % str(gen_cell))
+	# Fuel it by hand-loading its buffer (feeding coal by toss is RUNG-1's proven verb; here the POWER
+	# WIRING is what's under test, so we hatch the fuel — the generator must actually burn to power the pump).
+	var gen: MachineState = sim.machine_at(gen_cell)
+	if gen == null:
+		return await _finish(agent, false, "the generator vanished after placement")
+	gen.input_buffer[&"coal"] = 60
+	sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 60
+	# The conduit run: it starts DIRECTLY UNDER the generator (which feeds its full output down into it), runs
+	# right along row r-1, then drops one cell to (col-1, r) — orthogonally BESIDE the pump — so its power
+	# bleeds sideways into the pump's cell. (The body builds this walking the flat flooded floor; it never has
+	# to stand over the open sump.) All r-1 cells + (col-1,r) are open, so every tube is placeable.
+	var conduit_cells: Array[Vector2i] = [Vector2i(col - 4, r - 1), Vector2i(col - 3, r - 1),
+			Vector2i(col - 2, r - 1), Vector2i(col - 1, r - 1), Vector2i(col - 1, r)]
+	if not await agent.select_item(&"conduit"):
+		return await _finish(agent, false, "no conduit in the pack")
+	for cc: Vector2i in conduit_cells:
+		if not await agent.build_at(cc):
+			return await _finish(agent, false, "could not lay a power conduit at %s" % str(cc))
+		if not sim.has_conduit(cc):
+			return await _finish(agent, false, "the conduit did not land at %s" % str(cc))
+	# The pump goes in the puddle centre over the sump (col, r): its own cell + the sump below are water; the
+	# conduit beside it (col-1, r) bleeds its power in. Reach in from col-2 on the dry-ish left so the body
+	# never stands over the open sump (which it would fall into).
+	var pump_cell := Vector2i(col, r)
+	if not await agent.select_item(&"pump"):
+		return await _finish(agent, false, "no pump in the pack")
+	if not await agent.walk_to_column(col - 2, 900):
+		return await _finish(agent, false, "could not stand beside the puddle to place the pump")
+	if not agent.main.try_build(pump_cell):                  # reach in from col-2 (in range, off the sump)
+		# If the cell is reach-valid + placeable but the build still refuses, the pump ISN'T a resolvable
+		# placeable machine — the L3 REACHABILITY GAP this rung exists to catch. The pump has a .tres, a sim
+		# behavior, a Visuals glyph, and a research unlock (ResearchRules "drainage"), but is MISSING from
+		# MainView._craftable (scenes/main.gd ~L177), the one list that feeds both the craft menu (craft_ids)
+		# AND the item→def resolver (_machine_defs_by_id) used to PLACE it. So a player who researches
+		# Drainage still cannot craft OR place a pump: the whole L3 flood-defeat loop is unreachable. FIX =
+		# add `load("res://src/data/machines/pump.tres")` to _craftable. (Verified: with the pump registered,
+		# this rung drives the full loop green — wade → power → drain → mine.)
+		var reachable: bool = agent.main._can_reach(pump_cell)
+		var placeable: bool = agent.main._placeable(pump_cell)
+		var resolves: bool = agent.main._machine_defs_by_id.has(&"pump")
+		return await _finish(agent, false,
+			"could not place the pump at %s [reach=%s placeable=%s resolves-to-def=%s] — the pump is not a placeable machine: add pump.tres to MainView._craftable (scenes/main.gd)"
+				% [str(pump_cell), reachable, placeable, resolves])
+	# --- STEP 3: warm the generator, confirm power reaches the pump, then let it DRAIN. ---
+	for _i: int in 6:
+		await agent.step()                                  # a few ticks for the generator to warm + power to flood
+	if sim.power_at(pump_cell) <= 0.0:
+		return await _finish(agent, false,
+			"the pump is placed but no power reaches its cell (power=%.2f) — the conduit wiring didn't deliver" % sim.power_at(pump_cell))
+	# Read THIS pocket's water level (the sum over its cells) so a far-off worldgen aquifer can't mask the drain.
+	var pocket_water := func() -> int:
+		var s: int = 0
+		for pc: Vector2i in pocket_cells:
+			s += sim.water_at(pc)
+		return s
+	var water_before: int = pocket_water.call()
+	var t: int = 0
+	while pocket_water.call() > water_before / 4 and t < 900:  # generous budget: the powered pump chews it down
+		await agent.step(); t += 1
+	var water_after: int = pocket_water.call()
+	agent._note("  drain: water %d -> %d over %d frames (pump power=%.2f)" % [water_before, water_after, t, sim.power_at(pump_cell)])
+	if water_after >= water_before:
+		return await _finish(agent, false, "the powered pump never drained the flood (%d -> %d)" % [water_before, water_after])
+	if water_after > water_before / 2:
+		return await _finish(agent, false, "the pump barely touched the flood (%d -> %d) — not substantially drained" % [water_before, water_after])
+	# --- STEP 4: the prize. The rich_ore in the drained floor (2 cells left of the pump) is now exposed —
+	# walk onto it and mine it dry (it sits directly under the body's feet there, in reach). ---
+	if not await agent.select_item(&"stone_pickaxe"):
+		return await _finish(agent, false, "no pickaxe to mine the reward")
+	if not await agent.walk_to_column(reward.x, 1200):     # stand over the now-drained reward cell
+		return await _finish(agent, false, "could not return to the drained reward cell")
+	var g: int = 0
+	while sim.is_solid(reward) and g < 60:
+		agent.do_mine(reward)
+		await agent.wait(4); g += 1
+	var got: int = int(sim.inventory.get(&"rich_ore", 0))
+	print("  aquifer: %s  (water %d->%d, rich_ore=%d)" % [agent.friction(), water_before, water_after, got])
+	return await _finish(agent, got >= 1,
+		"waded the flood, built a powered pump, drained the pocket (%d->%d), and mined the exposed rich_ore (%d)"
+			% [water_before, water_after, got])
 
 
 ## RUNG 3 — the L2 IRON CHAIN is playable embodied (FABLE_50 #47, CRAFTING.md modules): with the iron

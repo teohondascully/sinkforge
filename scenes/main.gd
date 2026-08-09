@@ -191,6 +191,7 @@ func _ready() -> void:
 		load("res://src/data/machines/gear_mill.tres"),
 		load("res://src/data/machines/h_drill.tres"),     # the Borer — sideways extraction (FABLE_50 #46)
 		load("res://src/data/machines/blast_furnace.tres"),   # 1 rich ore → 2 ingots (#48, Enrichment)
+		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (docs/POWER.md; Drainage)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
