@@ -676,6 +676,29 @@ func _update_juice(delta: float) -> void:
 		var below: float = float(_body_cell().y - sim.surface_row(_body_cell().x))
 		_sfx.set_ambience(clampf(1.0 - below / 4.0, 0.0, 1.0), clampf(below / 10.0, 0.0, 1.0),
 			_player.position, delta)
+		# WATER AUDIO (L3): a soft POUR bed that swells with how much falling/pouring water is near you
+		# (a waterfall you hear when close), and a wet PUMP drain while a pump near you is draining —
+		# both level-driven like the heartbeat, smoothed + fading to silence inside Sfx.set_water. Reads
+		# the same "pouring" rule the renderer's water drips use (cell below is open, not-full, not rock),
+		# so what you SEE pour is what you HEAR. Bounded: only cells within near_sq are examined.
+		var pour: float = 0.0
+		for wkey: Variant in sim.water:
+			var wc: Vector2i = wkey
+			if int(sim.water[wc]) <= 0:
+				continue
+			if _player.position.distance_squared_to(_cell_center(wc)) >= near_sq:
+				continue
+			var wbelow: Vector2i = wc + Vector2i(0, 1)
+			if sim.in_bounds(wbelow) and not sim.is_solid(wbelow) \
+					and sim.water_at(wbelow) < FactorySim.WATER_MAX:
+				pour += 1.0                                  # this cell is actively pouring near you
+		var pumping: float = 0.0
+		for m: MachineState in sim.machines:
+			if m.def.behavior == &"pump" \
+					and _player.position.distance_squared_to(_cell_center(m.cell)) < near_sq \
+					and sim.machine_status(m) == &"working":
+				pumping += 1.0
+		_sfx.set_water(clampf(pour / 4.0, 0.0, 1.0), clampf(pumping / 2.0, 0.0, 1.0), delta)
 		# THE BREACH stinger: a Descent Engine reaching quota bores the seal open — a once-per-world
 		# event that deserves a sound the size of the moment. Edge-latched per engine; _prime_breach
 		# marks engines that were ALREADY breached (fresh seed / loaded save), so only a breach that

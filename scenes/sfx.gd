@@ -21,6 +21,10 @@ var _wind_player: AudioStreamPlayer           # ambience bed: surface wind
 var _cave_player: AudioStreamPlayer           # ambience bed: deep cave-air
 var _wind_level: float = 0.0                  # smoothed 0..1
 var _cave_level: float = 0.0
+var _pour_player: AudioStreamPlayer           # ambience bed: nearby pouring/falling WATER (L3, docs/DECISIONS)
+var _pump_player: AudioStreamPlayer           # ambience bed: a working PUMP's wet mechanical drain (L3)
+var _pour_level: float = 0.0                  # smoothed 0..1 — how much pouring water is near the listener
+var _pump_level: float = 0.0                  # smoothed 0..1 — how hard a nearby pump is draining
 var _drip_in: float = 4.0                     # seconds until the next cave drip
 ## Headless (the harness): the Dummy audio driver never steps its mixer, so a started voice is never
 ## reaped and trips the ObjectDB leak warning at quit. Playback is a NO-OP there — synthesis still
@@ -63,10 +67,18 @@ func _ready() -> void:
 	# where the body is (set_ambience). Underground you hear the earth, on top you hear the sky.
 	_wind_player = _make_loop_player(_gen_wind(rng))
 	_cave_player = _make_loop_player(_gen_cave(rng))
+	# WATER BEDS (L3 audio): two more silent-until-driven loops — a soft WATER-POUR/trickle you hear as
+	# you near falling water (a small waterfall in the dark), and a working PUMP's wet mechanical drain.
+	# Both level-driven from the controller (set_water) exactly like the factory hum, so they swell with
+	# nearby activity and fade to silence when nothing's pouring/pumping — they blend under wind/cave/drips.
+	_pour_player = _make_loop_player(_gen_pour(rng))
+	_pump_player = _make_loop_player(_gen_pump(rng))
 	if not _muted:
 		_hum_player.play()
 		_wind_player.play()
 		_cave_player.play()
+		_pour_player.play()
+		_pump_player.play()
 
 
 ## Stop every voice on teardown — a stream still playing at quit leaves its playback object alive in
@@ -74,7 +86,7 @@ func _ready() -> void:
 ## Dropping the stream refs too matters under the headless Dummy driver, whose mixer never steps and
 ## so never reaps a stopped voice on its own.
 func _exit_tree() -> void:
-	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _ui_player]:
+	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _pour_player, _pump_player, _ui_player]:
 		bed.stop()
 		bed.stream = null
 	for p: AudioStreamPlayer2D in _pool:
@@ -129,6 +141,19 @@ func set_ambience(surface: float, cave: float, listener: Vector2, delta: float) 
 		if _cave_level > 0.3:
 			play(&"drip", listener + Vector2(randf_range(-160.0, 160.0), randf_range(-90.0, 90.0)),
 				randf_range(0.85, 1.25), -6.0)
+
+
+## The WATER beds (L3): `pour` 0..1 = how much pouring/falling water is near the listener (like the hum's
+## working-machine count — a lone trickle whispers, a wide sheet is felt), `pump` 0..1 = how hard a nearby
+## pump is draining. Both smoothed so approaching water / a pump spinning up breathes rather than snaps, and
+## kept SUBTLE (their ceilings sit under wind/cave) so they layer INTO the ambience, never over it. The
+## pour bed rides a hair higher in pitch as it swells so a bigger fall reads a touch louder AND brighter.
+func set_water(pour: float, pump: float, delta: float) -> void:
+	_pour_level = move_toward(_pour_level, clampf(pour, 0.0, 1.0), delta * 0.9)
+	_pump_level = move_toward(_pump_level, clampf(pump, 0.0, 1.0), delta * 0.9)
+	_pour_player.volume_db = lerpf(-60.0, -24.0, _pour_level) + Settings.ambience_db()
+	_pour_player.pitch_scale = lerpf(0.92, 1.06, _pour_level)
+	_pump_player.volume_db = lerpf(-60.0, -23.0, _pump_level) + Settings.ambience_db()
 
 
 ## A silent looping non-positional bed from a sample buffer (the ambience beds + the hum share this shape).
@@ -265,6 +290,47 @@ func _gen_cave(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		lp += 0.03 * (rng.randf_range(-1.0, 1.0) - lp)
 		var swell: float = 0.75 + 0.25 * sin(TAU * 0.09 * t)
 		out[i] = (sin(TAU * 38.0 * t) * 0.30 + sin(TAU * 57.0 * t) * 0.16 + lp * 0.5) * swell
+	return _loopify(out)
+
+
+## WATER POUR: a soft continuous trickle — the "shhh" of a small waterfall. Band-limited noise (a one-pole
+## lowpass minus a slower lowpass ≈ a band-pass keeping the airy mid-highs, not a rumble), gently amplitude-
+## modulated by a slow two-sine flutter so the sheet shimmers instead of hissing flat. Loopified. Level-driven
+## by set_water — silent until you're near falling water, then it swells like the factory hum.
+func _gen_pour(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 3
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp_fast: float = 0.0
+	var lp_slow: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var white: float = rng.randf_range(-1.0, 1.0)
+		lp_fast += 0.55 * (white - lp_fast)          # keeps up to the airy mids
+		lp_slow += 0.06 * (lp_fast - lp_slow)        # rolls off the low rumble
+		var band: float = lp_fast - lp_slow          # the breathy trickle band
+		var flutter: float = 0.72 + 0.20 * sin(TAU * 3.1 * t) + 0.08 * sin(TAU * 7.3 * t + 0.9)
+		out[i] = band * flutter * 1.9
+	return _loopify(out)
+
+
+## PUMP DRAIN: a wet mechanical gurgle cycle — a low sub (a slow-beating 62/93 Hz pair) pulsing on a ~1.7 Hz
+## drain rhythm, with a bubbly noise burst on each pulse's downstroke (water sucking through the tube). The
+## per-pulse envelope gives it the chugging "gulp… gulp" of a working pump. Loopified; level-driven by set_water
+## so it fades in only while a pump near you is draining and dies when it's dry/unpowered.
+func _gen_pump(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 3
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var pulse: float = fmod(t * 1.7, 1.0)                 # 0..1 within each drain cycle
+		var chug: float = pow(maxf(0.0, 1.0 - pulse * 1.6), 1.8)   # a firm gulp on the downstroke
+		var sub: float = sin(TAU * 62.0 * t) * 0.30 + sin(TAU * 93.0 * t) * 0.16
+		lp += 0.22 * (rng.randf_range(-1.0, 1.0) - lp)         # wet noise bubbling through the tube
+		var burst: float = lp * pow(maxf(0.0, 1.0 - pulse * 3.0), 2.0) * 0.9
+		out[i] = (sub * (0.35 + 0.65 * chug) + burst) * 1.4
 	return _loopify(out)
 
 
