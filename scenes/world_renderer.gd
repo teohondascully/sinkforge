@@ -1610,10 +1610,13 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 		var cy: float = horizon - 300.0 - h * 130.0 + cam.y * (1.0 - p2) * 0.25
 		var cc: Color = Color(0.42, 0.47, 0.58, 0.05 + h * 0.02) \
 			.lerp(Color(0.78, 0.82, 0.88, 0.10 + h * 0.03), dl)
-		var r: float = 26.0 + h * 30.0
-		ci.draw_circle(Vector2(cx, cy), r, cc)
-		ci.draw_circle(Vector2(cx - r * 0.9, cy + r * 0.25), r * 0.7, cc)
-		ci.draw_circle(Vector2(cx + r * 0.9, cy + r * 0.22), r * 0.75, cc)
+		var r: float = 22.0 + h * 24.0
+		# A WIDE, FLAT lozenge (one smooth ellipse + a smaller upper puff for form) so it reads as a
+		# drifting cloud. The old round 3-circle puff read to blind testers as a bokeh orb / lens-flare /
+		# bug; overlapping translucent circles also scallop and build alpha hotspots. Flat-fill polygons
+		# keep the alpha even, so it's a soft continuous cloud, denser only where the two puffs cross.
+		_draw_cloud_puff(ci, Vector2(cx, cy), r * 2.1, r * 0.52, cc)
+		_draw_cloud_puff(ci, Vector2(cx - r * 0.35, cy - r * 0.30), r * 1.15, r * 0.5, cc)
 	# THE SINKFORGE CROWN sits between the sky and the hills — drawn before the ridges so the near hill
 	# occludes its base, grounding the colossus rising from behind the landscape.
 	_draw_sinkforge(ci, view, cam, horizon, dl, hor_c)
@@ -1640,6 +1643,16 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 		pts.append(Vector2(view.end.x + 24.0, floor_y))
 		pts.append(Vector2(view.position.x, floor_y))
 		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * (0.42 - f * 0.5)))
+
+
+## A soft filled ellipse (flat alpha — no scalloped edge, no overlap hotspot) — one lobe of a cloud lozenge.
+func _draw_cloud_puff(ci: CanvasItem, c: Vector2, rx: float, ry: float, col: Color) -> void:
+	var poly := PackedVector2Array()
+	const N: int = 16
+	for k: int in N:
+		var a: float = float(k) / float(N) * TAU
+		poly.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+	ci.draw_colored_polygon(poly, col)
 
 
 ## Draw the Sinkforge crown (see SINKFORGE_* constants). A dormant colossal machine on the far horizon:
