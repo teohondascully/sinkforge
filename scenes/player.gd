@@ -546,6 +546,14 @@ func _draw() -> void:
 		if f > 0.0:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
 			dst.position.x = -w * 0.5
+		# STICKER OUTLINE: the sprite silhouette in near-black at 1.5px offsets (8-way), drawn BEHIND the
+		# real sprite so the miner reads against any busy background. Blind testers kept finding the body
+		# only via the guide arrow, not the sprite itself (tiny + low-contrast over the gear/hills/trees).
+		var ol := Color(0.04, 0.04, 0.06, 0.6)
+		const OW: float = 1.5
+		for d: Vector2 in [Vector2(-OW, 0.0), Vector2(OW, 0.0), Vector2(0.0, -OW), Vector2(0.0, OW),
+				Vector2(-OW, -OW), Vector2(OW, -OW), Vector2(-OW, OW), Vector2(OW, OW)]:
+			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, ol)
 		draw_texture_rect(tex, dst, false)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
