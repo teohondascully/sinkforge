@@ -468,7 +468,7 @@ func _seed_world() -> void:
 		_dev_seed_pack()
 
 
-## A visible ORE VEIN breaching the surface beside spawn — the "orange-flecked rock" the first objective
+## A visible ORE VEIN breaching the surface beside spawn — the "metal-flecked rock" the first objective
 ## points at, and the bootstrap ore you HAND-mine for the first ingots (depth-banded worldgen leaves the
 ## shallow surface near-bare, so onboarding can't rely on finding a vein). A 1-tall, 2-wide band so it READS
 ## as a vein yet mining it leaves only a SHALLOW (1-tile) trench you step straight out of — a 2-deep pit

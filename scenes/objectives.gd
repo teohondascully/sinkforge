@@ -30,7 +30,7 @@ var _seal_cells: Array[Vector2i] = []   ## the sealrock cells at construction �
 ## win condition, shown as the chip). Order IS the tutorial path — each step is doable from the state the
 ## previous one leaves you in. Predicates live in `_achieved`.
 var steps: Array[Dictionary] = [
-	{"id": &"mine",   "label": "Dig ore — hold LMB on the orange-flecked rock by spawn", "goal": "Mine 4 ore"},
+	{"id": &"mine",   "label": "Dig ore — hold LMB on the metal-flecked rock by spawn", "goal": "Mine 4 ore"},
 	{"id": &"smelt",  "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
