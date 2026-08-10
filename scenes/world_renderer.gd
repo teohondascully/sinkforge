@@ -1320,7 +1320,7 @@ func _in_ramp(local: Vector2, dir: int) -> bool:
 
 
 ## The current objective's WHERE-cell(s), drawn as a breathing beacon so a new player can't miss where to
-## act. "act" = a pulsing amber ring + a bobbing down-arrow over the target (dig this / feed this forge);
+## act. "act" = a pulsing white reticle + a bobbing down-arrow over the target (dig this / feed this forge);
 ## "ghost" = a pulsing green dashed cell showing where to place the next machine (cap the forge). Cosmetic.
 func _draw_guide_targets() -> void:
 	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)         # 0..1 breathing
@@ -1335,11 +1335,14 @@ func _draw_guide_targets() -> void:
 			var pad: float = 2.0 + 2.0 * pulse
 			draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
 		else:
-			var ring := Color(1.0, 0.78, 0.30, 0.55 + 0.40 * pulse)
+			# NEUTRAL-WHITE targeting reticle. History: amber read as a campfire (warm ring at ground level),
+			# then cyan read faintly as an "energy node" against the ore. A near-white ring on a dark backing
+			# is pure "UI marker" — never heat, never magic — and reads on any background.
+			var ring := Color(0.92, 0.96, 1.0, 0.55 + 0.40 * pulse)
 			var r: float = float(CELL) * (0.62 + 0.12 * pulse)
-			# A dark backing ring first so the amber reads even INSIDE the warm head-lamp pool (the
-			# starter vein sits under the miner's lamp; warm-on-warm was washing this out).
-			draw_arc(center, r, 0.0, TAU, 28, Color(0.05, 0.04, 0.02, 0.6), 4.5)
+			# A dark backing ring first so the cyan reads even INSIDE the warm head-lamp pool (the
+			# starter vein sits under the miner's lamp).
+			draw_arc(center, r, 0.0, TAU, 28, Color(0.02, 0.05, 0.07, 0.6), 4.5)
 			draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
 			draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
 		# A bobbing down-pointer floated HIGH ABOVE the cell — out of the lamp wash, into open air —
@@ -1347,10 +1350,10 @@ func _draw_guide_targets() -> void:
 		# so it punches through both the bright lamp AND the bright day sky (reads on any background).
 		var lift: float = float(CELL) * (2.9 + 0.35 * pulse)
 		var tip := center + Vector2(0.0, -lift)
-		var arrow := Color(1.0, 0.85, 0.40, 0.92)
-		var dark := Color(0.05, 0.04, 0.02, 0.85)
+		var arrow := Color(0.95, 0.98, 1.0, 0.94)
+		var dark := Color(0.02, 0.04, 0.06, 0.85)
 		# tether: marker down to the cell top
-		draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(1.0, 0.82, 0.35, 0.30 + 0.20 * pulse), 2.0)
+		draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(0.88, 0.93, 1.0, 0.30 + 0.20 * pulse), 2.0)
 		# the pointer: a bold outlined chevron, ~1.6x the old size
 		var back := PackedVector2Array([tip + Vector2(0, 12), tip + Vector2(-11, -7), tip + Vector2(11, -7)])
 		draw_colored_polygon(back, dark)
