@@ -237,8 +237,9 @@ production state — delete them and the numbers are unchanged):
   determinism boundary holds.
 
 ### Dev harness (Track B)
-- **Location:** `tests/run_tests.gd` (headless sim tests), `tools/capture.gd` (visual capture).
-  See docs/HARNESS.md for the full validation harness and slice-gate procedure.
+- **Location:** `tests/test_*.gd` (headless sim/worldgen/power/stress suites sharing `test_base.gd`),
+  `tools/check_*.gd` + `tools/play_tests.gd` (embodied movement + agent play-tests).
+  Run everything with `bash tools/run_harness.sh`.
 
 ---
 

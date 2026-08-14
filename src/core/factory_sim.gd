@@ -2,7 +2,7 @@ class_name FactorySim
 extends RefCounted
 
 ## THE SOURCE OF TRUTH. A node-free, fixed-tick, deterministic factory simulation. It could
-## run headless with no scene tree (and does, in tests/run_tests.gd). The representation layer
+## run headless with no scene tree (and does, in tests/test_sim.gd). The representation layer
 ## reads FROM this; it never writes to it. All production math lives here and nowhere else.
 ##
 ## TOPOLOGY: machines occupy cells on a grid (x = column, y = row, row increasing DOWNWARD).

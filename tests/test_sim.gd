@@ -1,10 +1,12 @@
 extends "res://tests/test_base.gd"
 
-## Headless validation harness — Layer 2 (sim unit tests) + tripwire #2 (determinism &
-## item conservation). The node-free sim is testable with no scene tree, which is the whole
-## point of the architecture.
+## Core sim suite — the machine / item-flow / mining / crafting / save-load / research unit tests,
+## plus the determinism + item-conservation canaries. The node-free sim is testable with no scene
+## tree, which is the whole point of the architecture. Worldgen, power/water, and the adversarial
+## stress suites are sibling files (tests/test_worldgen.gd / test_power_water.gd / test_stress.gd),
+## all sharing tests/test_base.gd.
 ##
-## Run: godot --headless --path . --script res://tests/run_tests.gd
+## Run: godot --headless --path . --script res://tests/test_sim.gd
 ## Exits 0 on all-pass, non-zero on any failure.
 
 

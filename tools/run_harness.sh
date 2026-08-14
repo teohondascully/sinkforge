@@ -22,7 +22,7 @@ JOBS="${JOBS:-$NCPU}"
 # --- the layers, in declaration order (order is cosmetic; results stream as they finish) ---
 NAMES=(); SCRIPTS=()
 add() { NAMES+=("$1"); SCRIPTS+=("$2"); }
-add "sim (determinism/conservation)"  "res://tests/run_tests.gd"
+add "sim (core/determinism)"          "res://tests/test_sim.gd"
 add "stress (invariants/flow/power)"  "res://tests/test_stress.gd"
 add "worldgen (gen/ore/fine)"         "res://tests/test_worldgen.gd"
 add "power/water (field/flood)"       "res://tests/test_power_water.gd"
