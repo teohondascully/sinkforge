@@ -52,7 +52,9 @@ static func machine_color(def: MachineDef) -> Color:
 		return (MACHINE_STYLE[def.behavior] as Dictionary)["color"]
 	var recipe: RecipeDef = def.recipe
 	if def.id == &"processor" or (recipe != null and recipe.inputs.is_empty()):
-		return Color(0.82, 0.45, 0.20)   # ember-orange — the furnace/source family (Forge included)
+		return Color(0.28, 0.23, 0.20)   # dark sooty IRON — a furnace is a dark machine; the heat is in the
+		#                                  glowing MOUTH (see _furnace), lit only while smelting. The old
+		#                                  ember-orange body out-shouted the avatar + ore (blind-playtest).
 	return Color(0.30, 0.55, 0.75)       # steel-blue — the generic processor
 
 
@@ -97,10 +99,16 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 static func _furnace(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	canvas.draw_rect(Rect2(c.x - 8.0 * s, c.y - 9.0 * s, 16.0 * s, 2.5 * s), Color(0.05, 0.05, 0.07))
 	canvas.draw_rect(Rect2(c.x - 6.5 * s, c.y - 4.0 * s, 13.0 * s, 10.0 * s), Color(0.12, 0.08, 0.05))
-	var p: float = (0.78 + 0.22 * sin(t * 6.5)) if active else 0.6
 	var ember := c + Vector2(0.0, 2.5 * s)
-	canvas.draw_circle(ember, 3.4 * s * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
-	canvas.draw_circle(ember, 1.7 * s * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
+	if active:
+		var p: float = 0.78 + 0.22 * sin(t * 6.5)          # the ember BREATHES while burning
+		canvas.draw_circle(ember, 3.4 * s * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
+		canvas.draw_circle(ember, 1.7 * s * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
+	else:
+		# COLD: a dead dark coal bed in the mouth — no glow, so an UNLIT forge reads as an off machine
+		# (light = working). The idle spawn forges no longer out-shout the avatar + ore.
+		canvas.draw_circle(ember, 2.8 * s, Color(0.30, 0.15, 0.11))
+		canvas.draw_circle(ember, 1.3 * s, Color(0.40, 0.21, 0.15))
 
 
 ## Gear (processor): a cogged dark disc with a bright hub. ROTATES while running — the "machine is on" read.
