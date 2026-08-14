@@ -17,6 +17,7 @@ extends RefCounted
 const WaterFlow := preload("res://src/core/water_flow.gd")
 const PowerFlow := preload("res://src/core/power_flow.gd")
 const Flora := preload("res://src/core/flora.gd")
+const FineTerrain := preload("res://src/core/fine_terrain.gd")
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
@@ -508,100 +509,7 @@ func fine_is_solid(fx: int, fy: int) -> bool:
 ## Deterministic in (world_seed, coords) ONLY (no time, no RNG), so two loads of the same world produce
 ## an identical fine array. O(fine cells) — full rebuild; incremental edits use _sync_fine_block instead.
 func rebuild_fine_terrain() -> void:
-	_ensure_fine_noise()
-	var fw: int = fine_w()
-	var fh: int = fine_h()
-	if _fine_solid.size() != fw * fh:
-		_fine_solid.resize(fw * fh)
-	for fy: int in fh:
-		for fx: int in fw:
-			_fine_solid[fy * fw + fx] = 1 if _fine_cell_solid(fx, fy) else 0
-
-
-## Re-mold ONE coarse cell's SUBDIV×SUBDIV fine block PLUS the one-cell boundary band around it (its
-## edge molding reads the coarse neighbours, so a dig must re-mold the neighbours' rims to stay organic).
-## O(local): (SUBDIV+2)² fine cells per edit — the cheap incremental path used on mine/place/bore/fell.
-func _sync_fine_block(coarse: Vector2i) -> void:
-	_ensure_fine_noise()
-	var fw: int = fine_w()
-	var fh: int = fine_h()
-	if _fine_solid.size() != fw * fh:
-		rebuild_fine_terrain()
-		return
-	# Cover this cell's SUBDIV block and one coarse cell of margin on every side (the boundary band).
-	var fx0: int = maxi(0, (coarse.x - 1) * SUBDIV)
-	var fy0: int = maxi(0, (coarse.y - 1) * SUBDIV)
-	var fx1: int = mini(fw, (coarse.x + 2) * SUBDIV)
-	var fy1: int = mini(fh, (coarse.y + 2) * SUBDIV)
-	for fy: int in range(fy0, fy1):
-		for fx: int in range(fx0, fx1):
-			_fine_solid[fy * fw + fx] = 1 if _fine_cell_solid(fx, fy) else 0
-
-
-## Decide whether a single fine cell is solid — the FINE WORLDGEN, deterministic in (world_seed, fx, fy).
-## Base solidity = its parent coarse cell's solidity. In the INTERIOR (all coarse neighbours agree) it
-## stays as-is — deep rock stays solid, open air stays open, so the hook's terrain is never punched. Only
-## at a solid/air BOUNDARY does fine detail apply: a bilinear ramp of coarse solidity is perturbed by
-## seeded edge noise (organic curves) then grit (crunch/protrusions near faces) and thresholded — so
-## rock reads Noita-crunchy, not smooth, WITHOUT any change to the coarse authority.
-func _fine_cell_solid(fx: int, fy: int) -> bool:
-	var pcx: int = fx / SUBDIV
-	var pcy: int = fy / SUBDIV
-	var parent: bool = solid.has(Vector2i(pcx, pcy))
-	# Is this fine cell in a boundary band? (any coarse neighbour differs from the parent) — only then mold.
-	var boundary: bool = false
-	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
-			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
-		if solid.has(Vector2i(pcx, pcy) + d) != parent:
-			boundary = true
-			break
-	if not boundary:
-		return parent    # deep interior / deep air — untouched, the base stays solid by construction
-	# Bilinear solidness at the fine cell centre (coarse-cell units) → a smooth 0..1 ramp across the edge.
-	var wx: float = (float(fx) + 0.5) / float(SUBDIV)
-	var wy: float = (float(fy) + 0.5) / float(SUBDIV)
-	var solidness: float = _fine_bilinear(wx, wy)
-	# EDGE noise bends the boundary (organic erosion/accretion); a slight net-erode opens cave mouths.
-	var band: float = 1.0 - absf(solidness - 0.5) * 2.0     # full swing at the 0.5 edge, 0 deep in either
-	var edge: float = _fine_edge.get_noise_2d(float(fx), float(fy)) * FINE_EDGE_AMP - FINE_EROSION_BIAS
-	solidness = clampf(solidness + edge * band, 0.0, 1.0)
-	# GRIT: near a face the rock crumbles/protrudes — high-freq noise adds bite that fades toward interior,
-	# so exposed rock gets little pits + nubs (crunch), deep rock stays whole.
-	var grit: float = _fine_grit.get_noise_2d(float(fx), float(fy)) * FINE_GRIT_BITE * band
-	solidness = clampf(solidness + grit, 0.0, 1.0)
-	return solidness >= 0.5
-
-
-## Bilinear sample of coarse solidity (0/1 per cell, out-of-bounds = 0/air) at a fractional coarse
-## position — turns the hard solid/air step into the smooth ramp the fine noise then bends.
-func _fine_bilinear(wx: float, wy: float) -> float:
-	var gx: float = wx - 0.5
-	var gy: float = wy - 0.5
-	var x0: int = int(floor(gx))
-	var y0: int = int(floor(gy))
-	var tx: float = gx - float(x0)
-	var ty: float = gy - float(y0)
-	var s00: float = 1.0 if solid.has(Vector2i(x0, y0)) else 0.0
-	var s10: float = 1.0 if solid.has(Vector2i(x0 + 1, y0)) else 0.0
-	var s01: float = 1.0 if solid.has(Vector2i(x0, y0 + 1)) else 0.0
-	var s11: float = 1.0 if solid.has(Vector2i(x0 + 1, y0 + 1)) else 0.0
-	return lerpf(lerpf(s00, s10, tx), lerpf(s01, s11, tx), ty)
-
-
-## Build the fine-detail noise fields once, seeded off world_seed (deterministic; rebuilt if the seed
-## changed under a reused sim, e.g. a title reroll → new load_world).
-func _ensure_fine_noise() -> void:
-	if _fine_edge != null and _fine_seed_built == world_seed:
-		return
-	_fine_seed_built = world_seed
-	_fine_edge = FastNoiseLite.new()
-	_fine_edge.seed = world_seed ^ 0x1f83d9ab
-	_fine_edge.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_fine_edge.frequency = FINE_EDGE_FREQ
-	_fine_grit = FastNoiseLite.new()
-	_fine_grit.seed = world_seed ^ 0x5be0cd19
-	_fine_grit.noise_type = FastNoiseLite.TYPE_VALUE       # blocky value noise = crisp per-fine-cell grit
-	_fine_grit.frequency = FINE_GRIT_FREQ
+	FineTerrain.rebuild(self)
 
 
 ## The seed the fine noise fields were built for (so a reused sim rebuilds them when world_seed changes).
@@ -612,7 +520,7 @@ var _fine_seed_built: int = -0x7fffffff
 ## The ONE place terrain edits announce a solid/wall change, so the fine grid can never drift from `solid`.
 func _dirty_terrain(cell: Vector2i) -> void:
 	terrain_dirty.append(cell)
-	_sync_fine_block(cell)
+	FineTerrain.sync_block(self, cell)
 
 
 ## Player action: dig out a solid cell. Returns the material mined (&"earth"/&"ore"), or &"" if the
