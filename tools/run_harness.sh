@@ -24,6 +24,7 @@ NAMES=(); SCRIPTS=()
 add() { NAMES+=("$1"); SCRIPTS+=("$2"); }
 add "sim (determinism/conservation)"  "res://tests/run_tests.gd"
 add "stress (invariants/flow/power)"  "res://tests/test_stress.gd"
+add "worldgen (gen/ore/fine)"         "res://tests/test_worldgen.gd"
 add "check_craftable_registry"        "res://tools/check_craftable_registry.gd"
 add "measure_player (motion feel)"    "res://tools/measure_player.gd"
 add "check_step"                      "res://tools/check_step.gd"
