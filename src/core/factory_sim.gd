@@ -8,7 +8,7 @@ extends RefCounted
 ## TOPOLOGY: machines occupy cells on a grid (x = column, y = row, row increasing DOWNWARD).
 ## Gravity = a machine's output falls straight down its column to the next machine below; if
 ## none, it lands in the sink. The grid size and the "straight-down only" rule are PROVISIONAL
-## (chutes / splitters / lateral routing are later slices — see docs/RISKS.md "Spatial model").
+## (chutes / splitters / lateral routing are later slices "Spatial model").
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
@@ -18,13 +18,13 @@ const GRID_COLS: int = 96
 const GRID_ROWS: int = 80
 ## Items/tick a LIFT carries UP its column with NO power — its hand-cranked baseline (the L1 rate, before
 ## power exists). Below this rate, a backlog piles at the lift. Power is what lifts it past this baseline:
-## a fully-powered lift reaches LIFT_POWERED_THROUGHPUT, scaled by the power reaching its cell (docs/POWER.md
-## — fighting gravity UP is the canonical "costs power" case). Under-supplied, it labours back toward
+## a fully-powered lift reaches LIFT_POWERED_THROUGHPUT, scaled by the power reaching its cell
+## (fighting gravity UP is the canonical "costs power" case). Under-supplied, it labours back toward
 ## baseline = brownout. Baseline kept non-zero so the lift still works pre-power and L1 is unaffected.
 const LIFT_THROUGHPUT: int = 2          ## unpowered baseline (L1), also the floor under brownout
 const LIFT_POWERED_THROUGHPUT: int = 6  ## items/tick at FULL power — the governed deep-frontier rate
 const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full boost (less → proportional)
-## --- THE PUMP (the L3 Aquifer answer, docs/DECISIONS.md): the flood-drain that falls on the LOCKED hook.
+## --- THE PUMP (the L3 Aquifer answer): the flood-drain that falls on the LOCKED hook.
 ## Water floods DOWN into your dig for FREE (the _flow_water gravity rule); getting it back OUT costs POWER —
 ## exactly the lift's "down free, UP costs power" contract, cast onto fluid. A POWERED pump removes water
 ## from its own cell + the cells straight below it (its column, a bounded reach), a power-scaled amount per
@@ -34,16 +34,16 @@ const LIFT_POWER_DEMAND: float = 4.0    ## power at the lift's cell for the full
 const PUMP_REACH: int = 4               ## cells straight down (incl. its own) a pump can pull from this tick
 const PUMP_RATE: int = 3                ## units drained per tick at FULL power (0 unpowered → the cost rule)
 const PUMP_POWER_DEMAND: float = 4.0    ## power at the pump's cell for full drain rate (less → proportional)
-## --- POWER (the L2 twist, docs/POWER.md): power FALLS on the hook. A fueled GENERATOR burns coal and
+## --- POWER (the L2 twist): power FALLS on the hook. A fueled GENERATOR burns coal and
 ## pours power into the cells around it (its innate aura — conduits will extend the reach down+lateral
 ## in a later slice); consumers draw from the field to run. The field is a DERIVED quantity recomputed
 ## every tick from machine placement + fuel — never stored authoritative state, exactly like updraft_at —
 ## so determinism is untouched and it can never desync.
 const GENERATOR_POWER: float = 6.0      ## power units a fueled generator emits at its source
 const GENERATOR_FUEL_TICKS: int = 100   ## ticks one coal burns (5s @20Hz) before the generator refuels
-const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine (docs/MINING.md)
+const DRILL_FUEL_TICKS: int = 60        ## ticks one coal runs a Drill (3s @20Hz) — the drill burns coal to mine
 
-## THE HORIZONTAL DRILL / the Borer (FABLE_50 #46 — the user's spec): bores SIDEWAYS through rock.
+## THE HORIZONTAL DRILL / the Borer (the user's spec): bores SIDEWAYS through rock.
 const H_DRILL_RANGE: int = 8            ## cells of gallery one placement can reach — move it to bore on
 const H_DRILL_CYCLE: float = 1.5        ## seconds per bite (slower than the vertical drill)
 const H_DRILL_FUEL_TICKS: int = 60      ## ticks one coal burns — with the slower cycle, ~2 bites/coal
@@ -61,7 +61,7 @@ const HOPPER_FEED_CAP: int = 3          ## hold releasing once the machine below
 const POWER_AURA: int = 2               ## innate radius (cells) a generator powers WITHOUT any conduit
 ## CONDUITS carry power further than the aura — DOWN + LATERAL, never UP (a U-shape delivers as an L).
 ## That "no up" rule makes the network acyclic top-to-bottom, so the field resolves in a SINGLE downward
-## sweep (no iterative solver — docs/POWER.md §7). Vertical feeders SUM (merge two trunks → thicker),
+## sweep (no iterative solver). Vertical feeders SUM (merge two trunks → thicker),
 ## clamped by the tube's CAPACITY (tier); the clamp also bounds any branch-relattice amplification, so
 ## additive merge can never run away. Horizontal spread is a lossy MAX delivery (carry power across, e.g.
 ## the bottom of an L). Per-step keep factors set the reach a single tier covers before it fades.
@@ -97,8 +97,8 @@ const _BEHAVIORS: Dictionary = {
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
 ## gravity-fed ingots (a true sink) and, at its quota, BREACHES the seal below — boring the shaft into
-## Stonereach. The quota is a THROUGHPUT WALL you out-PRODUCE, not a hand-carryable toll (Belongs F1,
-## docs/DESIGN_REVIEW.md): hand-feeding 64 ingots (128 finite-deposit hand-mined ore, smelted, hauled one
+## Stonereach. The quota is a THROUGHPUT WALL you out-PRODUCE, not a hand-carryable toll (Belongs F1):
+## hand-feeding 64 ingots (128 finite-deposit hand-mined ore, smelted, hauled one
 ## trip at a time) aches by design — the finite-deposit system makes hand-mining that tonnage punishingly
 ## slow (§2). An automated drill→forge line clears it passively while you do nothing: the factory is the
 ## intended path down, and _test_descent_automation proves the line out-produces the wall. (Kept modest so
@@ -112,13 +112,13 @@ var grid: Dictionary = {}
 ## player stands on and digs through. Authoritative world state, like `grid`: placement is blocked
 ## in solid cells, and it is mutated ONLY by discrete calls (set_solid / mine) — never as a side
 ## effect of the real-time avatar moving — so the sim stays deterministic and serializable. The
-## avatar lives in the representation layer and never enters the tick (docs/RISKS.md "embodied").
+## avatar lives in the representation layer and never enters the tick ("embodied").
 var solid: Dictionary = {}
 ## Background WALL layer (cell -> material id): what sits BEHIND a cell, independent of whether the
 ## cell is solid. Mining a block leaves its wall (Terraria-style). Read-only to the view (wall_at);
 ## written only by load_world / set_wall. Not collision (you walk through walls), not "items present".
 var wall: Dictionary = {}
-## Ore-vein YIELD (cell -> remaining extractable units), over SOLID ore/coal cells (docs/MINING.md). The
+## Ore-vein YIELD (cell -> remaining extractable units), over SOLID ore/coal cells. The
 ## richness of a visible ore block: a DRILL placed above it bores STRAIGHT DOWN, draining one unit per cycle
 ## and clearing the cell (carving its shaft) when the cell runs dry. HAND-mining an ore block instead grabs a
 ## quick loose burst (3-6) and clears the whole block — inefficient by hand, so you WANT a drill on the vein.
@@ -182,9 +182,9 @@ var conduit: Dictionary = {}
 var rope: Dictionary = {}
 ## Mounted TORCHES: cell -> true. A placed layer like `rope` — not solid, not a machine; items fall
 ## straight through. The sim owns placement + the item ledger; the warm light pool is representation
-## (docs/FABLE_50.md #26). Mutated only by place_torch/remove_torch (discrete player calls).
+##. Mutated only by place_torch/remove_torch (discrete player calls).
 var torch: Dictionary = {}
-## WATER (the first slice of L3 Aquifer/fluids, docs/DECISIONS.md): a discrete-cell fluid layer —
+## WATER (the first slice of L3 Aquifer/fluids): a discrete-cell fluid layer —
 ## cell -> INTEGER level (0..WATER_MAX). INTEGER only, never floats: float drift would break the
 ## deterministic-tick invariant. Water FALLS on the hook (down for free), then settles laterally toward
 ## a flat top; it never enters solid rock (displaced when a cell becomes solid). _flow_water() only MOVES
@@ -197,7 +197,7 @@ const WATER_MAX: int = 8                       ## units of water a full cell hol
 ## ResearchRules (static data); this is the per-session unlock state. Mutated ONLY by research_tech (a
 ## discrete player call at the Bazaar bench), read by the craft gate — deterministic + serializable.
 var research: Dictionary = {}
-## Planted SAPLINGS: cell -> growth ticks so far (FABLE_50 #38 — the renewable-wood answer). A placed
+## Planted SAPLINGS: cell -> growth ticks so far (the renewable-wood answer). A placed
 ## layer like `torch`, but the TICK grows it: at SAPLING_GROW_TICKS the cell sprouts a real tree
 ## (trunk + canopy, the worldgen shape) into whatever space is still open. Saplings drop from chopped
 ## canopies (a deterministic per-cell share of leaves), so wood — which ropes, torches and tool
@@ -205,7 +205,7 @@ var research: Dictionary = {}
 ## mutated by plant_sapling + the tick's growth sweep.
 var sapling: Dictionary = {}
 
-## --- FINE TERRAIN (the dual-grid Noita overhaul, docs/FINE_TERRAIN.md P2) -----------------------
+## --- FINE TERRAIN (the dual-grid Noita overhaul) -----------------------
 ## A SECOND, FINER terrain layer at SUBDIV× the coarse resolution (8px fine cells vs 32px coarse). It
 ## is ADDITIVE and DERIVED: the coarse `solid` dict stays the ONE authority for ALL logistics (is_solid,
 ## surface_row, ramp_dir, mining, collision inputs, _column_landing, machines, flow, power all read
@@ -474,7 +474,7 @@ func load_world(world: WorldData) -> void:
 	rebuild_fine_terrain()   # derive the fine grid from the freshly loaded coarse terrain (deterministic)
 
 
-## --- FINE TERRAIN accessors + build (docs/FINE_TERRAIN.md P2) ----------------------------------
+## --- FINE TERRAIN accessors + build (P2) ----------------------------------
 ## The fine grid is DERIVED render/collision data, NOT authoritative logistics state — every accessor
 ## reads the flat byte array; the sim's production math never touches it.
 
@@ -620,7 +620,7 @@ func mine(cell: Vector2i) -> StringName:
 		# HAND-mining an ore-like block (ore or coal) is a quick, inefficient grab: one strike clears the whole
 		# block and pockets a handful of LOOSE ore (a 3-6 burst). The block's larger latent yield (`deposits`) is
 		# NOT hand-extractable — that's the DRILL's job. You place a drill ABOVE a visible ore vein and it bores
-		# DOWN through the solid ore, draining each cell dry (docs/MINING.md). So hand-mining is how you grab your
+		# DOWN through the solid ore, draining each cell dry. So hand-mining is how you grab your
 		# FIRST few ore (to craft the drill); the drill is how you mine the vein. The burst counts as produced
 		# when it enters the pack; the discarded latent yield was never produced, so conservation holds.
 		var burst: int = _ore_burst(cell)
@@ -703,7 +703,7 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	return true
 
 
-## --- POWER CONDUITS (docs/POWER.md) — a placed layer, not a machine. The carried &"conduit" item is
+## --- POWER CONDUITS — a placed layer, not a machine. The carried &"conduit" item is
 ## crafted at the bazaar/forge like a machine; placing it routes here (the controller branches on the
 ## def's &"conduit" behavior) instead of into `grid`, so conduits never enter item-flow or collision. ---
 
@@ -785,7 +785,7 @@ func rope_length(cell: Vector2i) -> int:
 	return n
 
 
-## Player action (FABLE_50 #39): RETRACT the whole rope through `cell` — walk up to its anchor, then
+## Player action: RETRACT the whole rope through `cell` — walk up to its anchor, then
 ## take every segment back. One action recovers the entire hang no matter which segment you aim at
 ## (the old top-segment aim demand was pure precision friction); the niche "cut here, keep the upper
 ## half" is covered by retract + re-place (rope crafts as a cheap bundle). Returns segments recovered.
@@ -810,7 +810,7 @@ func remove_rope(cell: Vector2i) -> int:
 	return cut
 
 
-## --- TORCHES (FABLE_50 #26) — placeable LIGHT, another placed layer like rope/conduit. Not solid,
+## --- TORCHES — placeable LIGHT, another placed layer like rope/conduit. Not solid,
 ## not a machine: items fall through, collision never sees it. The sim only owns placement + the
 ## ledger; the WARM POOL it casts is pure representation (the renderer lights torch cells). Light is
 ## claimed territory in the black — the first light you can leave behind, before power arrives. ---
@@ -995,7 +995,7 @@ func _water_cell_less(a: Vector2i, b: Vector2i) -> bool:
 	return a.x < b.x
 
 
-## --- SAPLINGS (FABLE_50 #38) — the renewable-wood loop. Chopped canopies hide seeds; plant one on
+## --- SAPLINGS — the renewable-wood loop. Chopped canopies hide seeds; plant one on
 ## soil and the TICK grows it into a real tree (the worldgen shape), so wood never dead-ends. A placed
 ## layer like `torch` — not solid, not a machine, items fall through; the sprout is drawn by the view. ---
 
@@ -1091,7 +1091,7 @@ func _stamp_tree(base: Vector2i) -> void:
 			_dirty_terrain(leaf)
 
 
-## --- The BAZAAR (crafting hub, docs/CRAFTING.md) — detected as a structure in the world, not a machine.
+## --- The BAZAAR (crafting hub) — detected as a structure in the world, not a machine.
 ## A bazaar is a distinctive WOOD FRAME with an open interior, sitting on solid ground:
 ##     W W W W      top beam (all wood)
 ##     W . . W      posts + open interior
@@ -1100,7 +1100,7 @@ func _stamp_tree(base: Vector2i) -> void:
 ## "Active" is DERIVED from the world (a valid frame == active) — no persistent state, so it stays
 ## deterministic + node-free, and a bazaar you rebuild elsewhere just works. The open interior + exact
 ## shape is what stops a plain wall/house from matching. (A second `log` material for extra robustness +
-## the cozy look, and the NPC walk-in, are deferred — see docs/CRAFTING.md.)
+## the cozy look, and the NPC walk-in, are deferred.)
 const BAZAAR_W: int = 4
 const BAZAAR_H: int = 3
 
@@ -1226,7 +1226,7 @@ func near_bazaar(cell: Vector2i, radius: int) -> bool:
 
 
 ## Materials that mine as a "vein" (cavity model): a hand-burst + a drillable wall deposit, dropping their
-## own item. Ore and coal both. (Coal is mined the same painful way → the demand-web, docs/MINING.md.)
+## own item. Ore and coal both. (Coal is mined the same painful way → the demand-web.)
 func _is_ore_like(material: StringName) -> bool:
 	return material == &"ore" or material == &"coal" or material == &"iron" or material == &"rich_ore"
 
@@ -1528,7 +1528,7 @@ func machine_census() -> Array[Dictionary]:
 	return out
 
 
-## FACTORY ALERTS (legibility — the alert stack, FABLE_NEXT_50 #29): machines that were meant to RUN but
+## FACTORY ALERTS (legibility — the alert stack): machines that were meant to RUN but
 ## stalled — output has no drain (`blocked`) or fuel ran dry (`no_fuel`). Grouped by (id, status); each
 ## entry carries one representative cell so the HUD can ping the culprit (the camera is body-locked, so
 ## "take me there" = a beacon, not a jump). Pure read over grid — starvation (`no_input`) is deliberately
@@ -1566,7 +1566,7 @@ func _prune_empty_ground() -> void:
 			ground.erase(cell)
 
 
-## Rebuild the power field from scratch (docs/POWER.md): every FUELED generator stamps its innate aura,
+## Rebuild the power field from scratch: every FUELED generator stamps its innate aura,
 ## then power floods further out through the conduit network (down+lateral, never up). Pure derived state —
 ## cleared and recomputed each tick so it never desyncs from placement/fuel.
 func _compute_power() -> void:
@@ -1600,7 +1600,7 @@ func power_at(cell: Vector2i) -> float:
 	return float(power.get(cell, 0.0))
 
 
-## THE COST RULE, in one place (docs/POWER.md §7): the fraction of full speed a power consumer at `cell`
+## THE COST RULE, in one place: the fraction of full speed a power consumer at `cell`
 ## gets, = clamp(available power / its demand, 0..1). 1.0 when fully supplied, proportionally less as the
 ## supply (attenuated by distance from the source) falls short — so the deep frontier, furthest from
 ## generation, browns out first for free. Every consumer routes its draw through this and nothing else.
@@ -1610,7 +1610,7 @@ func power_throttle(cell: Vector2i, demand: float) -> float:
 	return clampf(power_at(cell) / demand, 0.0, 1.0)
 
 
-## Flood power through the conduit network in ONE top-to-bottom sweep (docs/POWER.md §7). Because power
+## Flood power through the conduit network in ONE top-to-bottom sweep. Because power
 ## only flows DOWN + LATERAL (never up), the network is acyclic by row, so each row is finalized before
 ## the next reads it — no iterative solver. Per row: (1) VERTICAL inflow = the SUM of the feeders in the
 ## row above (generators + conduits), so two trunks merging make a thicker stream, clamped to the tube's
@@ -1689,7 +1689,7 @@ func _run_recipe(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
-	# PASS-THROUGH (FABLE_50 #49, the descent engine's rule generalized): every machine is a filter
+	# PASS-THROUGH (the descent engine's rule generalized): every machine is a filter
 	# for what its recipe WANTS — anything else moves on through to the output and falls on down the
 	# column. A mixed drill stream sorts ITSELF down a machine stack (the forge keeps ore, the coal
 	# pours past into the generator below); junk can never clog an input buffer. Conservation-neutral.
@@ -1724,7 +1724,7 @@ func _has_inputs(machine: MachineState, recipe: RecipeDef) -> bool:
 	return true
 
 
-## A LIFT runs no recipe: it carries items UP its column — the paid inverse of gravity (docs/POWER.md).
+## A LIFT runs no recipe: it carries items UP its column — the paid inverse of gravity.
 ## Its throughput is POWER-GOVERNED: LIFT_THROUGHPUT at its unpowered baseline, scaling up to
 ## LIFT_POWERED_THROUGHPUT as power reaches its cell (the power_throttle cost rule). The rest stays a
 ## backlog. No items created or destroyed → conservation holds. Whatever falls onto a lift is hauled up.
@@ -1745,7 +1745,7 @@ func _run_lift(machine: MachineState) -> void:
 		moved += take
 
 
-## THE PUMP — the fluid sibling of the lift (docs/DECISIONS.md, the L3 flood answer). It runs no recipe
+## THE PUMP — the fluid sibling of the lift (the L3 flood answer). It runs no recipe
 ## and moves no items: while POWERED it DRAINS water out of its own cell and the cells straight below it,
 ## on the locked hook — water fell in for free, pumping it back out costs power. Its drain BUDGET this tick
 ## = round(PUMP_RATE × power_factor), where power_factor is the SAME cost rule the lift uses
@@ -1800,7 +1800,7 @@ func _run_splitter(machine: MachineState) -> void:
 func _run_hopper(machine: MachineState) -> void:
 	if machine.input_buffer.is_empty():
 		return
-	# THE FILTER (FABLE_50 #49): a hopper KEEPS the first thing it tastes — the filter auto-latches on
+	# THE FILTER: a hopper KEEPS the first thing it tastes — the filter auto-latches on
 	# the first item it banks (shown in the hover; R clears it to re-taste). Everything ELSE passes
 	# straight through to the output and falls on down. So a CHAIN of hoppers unzips a mixed drill
 	# stream with zero configuration: each one keeps a different ingredient as the stream pours past.
@@ -1989,7 +1989,7 @@ func drill_column_remaining(cell: Vector2i) -> int:
 	return total
 
 
-## A DRILL automates the by-hand ore mine (docs/MINING.md). It BORES STRAIGHT DOWN its column into the first
+## A DRILL automates the by-hand ore mine. It BORES STRAIGHT DOWN its column into the first
 ## SOLID ore block below it, eating through solid ore and carving its shaft as it goes — so you place it in
 ## the open cell ABOVE a visible ore vein and never hunt for the exact cell. Each cycle it drains ONE unit and
 ## ejects it DOWN; when a solid ore cell's deposit empties, the cell is CLEARED (the shaft deepens) and the
@@ -2072,7 +2072,7 @@ func _h_belly_full(machine: MachineState, item: StringName) -> bool:
 	return machine.output_buffer.size() >= H_DRILL_BELLY_STACKS and not machine.output_buffer.has(item)
 
 
-## THE HORIZONTAL DRILL (FABLE_50 #46, the user's spec): a coal-hungry sideways borer. Each cycle it
+## THE HORIZONTAL DRILL (the user's spec): a coal-hungry sideways borer. Each cycle it
 ## bites the next solid cell along its facing — ore-like cells drain one unit per bite (a rich vein
 ## takes many), plain rock clears in one bite yielding its block-item. Bored COAL feeds its OWN fuel
 ## bunker first (self-sustaining while the seam lasts); everything else fills the 5-slot belly. The
@@ -2153,7 +2153,7 @@ func _destinations_h_drill(machine: MachineState) -> Array[Dictionary]:
 	return [_column_landing(machine.cell.x, machine.cell.y + 1)]
 
 
-## A GENERATOR burns coal to pour power (docs/POWER.md). Each tick it spends one tick of its current fuel;
+## A GENERATOR burns coal to pour power. Each tick it spends one tick of its current fuel;
 ## when that runs out it consumes one coal from its input buffer to reburn for GENERATOR_FUEL_TICKS. No
 ## fuel left and no coal → it goes dark (fuel stays 0, so _compute_power emits nothing for it). Coal is
 ## genuinely consumed (total_consumed) so conservation holds. The power it makes is NOT an item — it's the
@@ -2186,7 +2186,7 @@ func _flow() -> void:
 			_deliver(machine, dests[0], machine.output_buffer)
 		else:
 			# Split: deal each item unit along the machine's deal PATTERN via route_toggle — an even
-			# round-robin by default; the splitter's R-cycled ratio mode weights it (FABLE_50 #49).
+			# round-robin by default; the splitter's R-cycled ratio mode weights it.
 			var n: int = dests.size()
 			var pattern: Array = _split_pattern(machine, n)
 			var portions: Array[Dictionary] = []
@@ -2231,7 +2231,7 @@ func configure_machine(cell: Vector2i) -> String:
 	return ""
 
 
-## Set a splitter's ratio DIRECTLY (the config panel's clickable chips, FABLE_50 #32 — R still cycles
+## Set a splitter's ratio DIRECTLY (the config panel's clickable chips — R still cycles
 ## through configure_machine above). A discrete call like every player mutation. "" = not a splitter.
 func set_split_mode(cell: Vector2i, mode: int) -> String:
 	var m: MachineState = grid.get(cell, null)
@@ -2267,7 +2267,7 @@ func _destinations_lift(machine: MachineState) -> Array[Dictionary]:
 
 
 ## SPLITTER routing: down + the column to the RIGHT. Hard against the right wall it has no second
-## column, so it degrades to a plain pass-through (down only) — provisional edge, see docs/RISKS.md.
+## column, so it degrades to a plain pass-through (down only) — provisional edge.
 func _destinations_splitter(machine: MachineState) -> Array[Dictionary]:
 	var down: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
 	var right_col: int = machine.cell.x + 1

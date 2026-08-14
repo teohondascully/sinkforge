@@ -1,7 +1,7 @@
 class_name MainView
 extends Node2D
 
-## The CONTROLLER + session root. OWNS a FactorySim (game-session-owns-sim rule, docs/RISKS.md),
+## The CONTROLLER + session root. OWNS a FactorySim (game-session-owns-sim rule),
 ## advances it, hosts the embodied Player + follow Camera2D, and translates mouse/keys into the
 ## player's reach-gated WORLD VERBS (try_mine / try_deposit / try_build / try_craft). It only READS
 ## sim production state — every edit goes through the sim's discrete API. It does NOT draw: a child
@@ -31,13 +31,13 @@ const HUD_SCALE: float = VIEWPORT.x / 640.0        ## = 2.0; scales the 640×360
 ## show rock texture (warm rock blooms into "a glow") and machine labels fall below the declutter threshold,
 ## so a first-time player couldn't read the miner, the ore, or the machines; 0.70× makes the avatar a real
 ## character and surfaces the FORGE labels while keeping a good chunk of the vertical shaft in frame. See
-## docs/DESIGN_REVIEW.md "Sees" + DECISIONS). Z cycles out (0.50×, the old big-world feel) then widest
+## "Sees" + DECISIONS). Z cycles out (0.50×, the old big-world feel) then widest
 ## (0.33×, survey the whole base). Smaller = further out.
 const ZOOM_LEVELS: Array[float] = [0.70, 0.50, 0.33]
 var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
 
-## --- THE TITLE / NEW-GAME screen (FABLE_50 #6 + #45) -------------------------------------------
+## --- THE TITLE / NEW-GAME screen -------------------------------------------
 ## Opens on a REAL boot only: every harness fixture and play-test launches with `--script`, which
 ## suppresses it — so scripted drivers land in the live world instantly and ZERO fixtures change.
 ## Pick a world seed (TAB rerolls) and your lamp tint (←/→), ENTER descends. A changed seed reboots
@@ -82,14 +82,14 @@ var _paused: bool = false
 ## On-demand UI state (the calm-screen model): the crafting screen (E), the map (M), and the controls
 ## help (H/?) are summoned, not permanent. Pushed to the HUD each frame so it knows what to draw.
 var _inventory_open: bool = false   ## E opens the PACK (Minecraft-style); crafting lives inside it, but
-                                    ## machine-crafting is GATED on standing near a claimed Bazaar (docs/CRAFTING.md)
-## Minimap mode (FABLE_50 #34): 0 hidden · 1 corner · 2 LARGE (centred). M cycles; Esc closes.
+                                    ## machine-crafting is GATED on standing near a claimed Bazaar
+## Minimap mode: 0 hidden · 1 corner · 2 LARGE (centred). M cycles; Esc closes.
 var _minimap_mode: int = 0
 ## The player's PING marker in world coords (Vector2.INF = none): click the open map to set it, click
 ## it again to clear. A navigation bookmark — pushed to the HUD (map dot) + renderer (in-world beacon).
 var _ping_world: Vector2 = Vector2.INF
 var _hover_latch: Vector2i = Vector2i(-9999, -9999)   ## the machine the config panel is pinned to (#32)
-## THE SETTINGS overlay (FABLE_50 #36): ESC (with nothing else open) summons it — audio sliders,
+## THE SETTINGS overlay: ESC (with nothing else open) summons it — audio sliders,
 ## screen-shake, zoom, and the remap page the Controls foundation was built for. While it's open it
 ## eats all input (the "open map is UI" rule, page-sized). _capture_action = the action awaiting its
 ## new key ("press a key…"); _settings_drag = the slider id being dragged.
@@ -97,9 +97,9 @@ var _settings_open: bool = false
 var _capture_action: StringName = &""
 var _settings_drag: String = ""
 var _show_help: bool = false
-var _show_tech: bool = false        ## T — the TECH TREE overlay (FABLE_50 #30); viewable anywhere,
+var _show_tech: bool = false        ## T — the TECH TREE overlay; viewable anywhere,
                                     ## the research VERB (R) stays Bazaar-gated like the bench
-var _show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD (FABLE_NEXT_50 #28); non-modal read
+var _show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD; non-modal read
 ## Fast-forward game clock: "." cycles Engine.time_scale through this exponential ladder so the whole
 ## game (sim ticks AND the body) runs faster — watch a factory fill, or (headless) speed up play-tests.
 ## The body integrates in substeps (Player.MAX_SUBSTEP) so it can't tunnel at the high multipliers.
@@ -111,7 +111,7 @@ var _time_scale_idx: int = 0
 var _mine_target: Vector2i = Vector2i(-999, -999)
 var _mine_charge: float = 0.0
 var _aim: Vector2i = Vector2i(-99, -99)
-## The DIG PLAN (FABLE_50 #24 — smart mining): dragging LMB across rock PAINTS marks (cell -> true),
+## The DIG PLAN (smart mining): dragging LMB across rock PAINTS marks (cell -> true),
 ## a plan that persists after release; while LMB is held and the cursor isn't on a workable block, the
 ## miner works the nearest MARKED cell in reach instead — so you sketch a shaft once and hold, rather
 ## than re-aiming every block. Player INTENT, not production state: lives here (controller) + a renderer
@@ -121,18 +121,18 @@ var _last_paint_world: Vector2 = Vector2.INF   ## last cursor world-pos while pa
 const MAX_DIG_MARKS: int = 200
 ## The machines you can CRAFT (1/2 keys → craft one into the pack, spending ingots). The ore_vent (a
 ## SOURCE) is deliberately absent — you remain the ore source by hand (manual→automated pillar; see
-## DECISIONS 2026-06-27). `_machine_defs_by_id` resolves a carried hotbar item back to its def so a
+## 2026-06-27). `_machine_defs_by_id` resolves a carried hotbar item back to its def so a
 ## selected machine item can be placed.
 var _craftable: Array[MachineDef] = []
 var _machine_defs_by_id: Dictionary = {}
 ## Craftable TOOLS (id + display name; cost lives in MiningRules.TOOL_RECIPES) shown in the Bazaar craft
-## screen after the machines. The Stone Pickaxe is the first depth-unlocking upgrade (docs/MINING.md).
+## screen after the machines. The Stone Pickaxe is the first depth-unlocking upgrade.
 const CRAFT_TOOLS: Array[Dictionary] = [
 	{"id": &"stone_pickaxe", "name": "Stone Pickaxe"},
 	{"id": &"iron_pickaxe", "name": "Iron Pickaxe"},
 	{"id": &"scanner", "name": "Scanner"},
 ]
-## THE SCANNER (FABLE_50 #27): with it selected, RMB fires a sonar pulse from the body — ore bodies in
+## THE SCANNER: with it selected, RMB fires a sonar pulse from the body — ore bodies in
 ## range answer with echo rings THROUGH the rock (transient, localized: prospecting, not a map reveal).
 const SCAN_RANGE_CELLS: float = 14.0
 const SCAN_COOLDOWN: float = 1.6           ## pacing between pulses (feel, not economy)
@@ -144,7 +144,7 @@ var _inv_selected: int = 0
 ## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
 var _falling := FallingItems.new()
 ## Bazaar view: detects completed wood frames (sim.find_bazaars) and plays the block-by-block transform
-## into a decorated stall + shopkeeper. Representation-only; never writes the sim (docs/CRAFTING.md).
+## into a decorated stall + shopkeeper. Representation-only; never writes the sim.
 var _bazaars := Bazaars.new()
 ## Cosmetic particle + screenshake juice (dig/land/place/collect). Pure representation.
 var _particles := Particles.new()
@@ -154,12 +154,12 @@ const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mi
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
 var _objectives: Objectives
-## Just-in-time hint bubbles (FABLE_50 #35): first rope in the pack → "RMB above a drop", etc. Reads the sim.
+## Just-in-time hint bubbles: first rope in the pack → "RMB above a drop", etc. Reads the sim.
 var _hints: Hints
-## GPU ambient dust motes (docs/MODERN_FEEL.md) — a continuous GPUParticles2D haze that drifts in the
+## GPU ambient dust motes — a continuous GPUParticles2D haze that drifts in the
 ## air and catches the lamp light. Pure atmosphere; follows the camera each frame.
 var _motes: GPUParticles2D
-## Procedural audio (FABLE_50 #8) — synthesized SFX + the factory hum. Poked from the same verb hooks
+## Procedural audio — synthesized SFX + the factory hum. Poked from the same verb hooks
 ## that fire particles; never touches the sim.
 var _sfx: Sfx
 ## Descent engines whose breach we've already sounded (cell -> true). Primed on seed/load so an engine
@@ -170,7 +170,7 @@ var _breach_heard: Dictionary = {}
 func _ready() -> void:
 	Controls.register()    # register the remappable InputMap actions (the settings page rebinds them)
 	if not _is_scripted_boot():
-		# Machine-local prefs (FABLE_50 #36) — REAL boots only: fixtures/tests always run on pure
+		# Machine-local prefs — REAL boots only: fixtures/tests always run on pure
 		# defaults and can never read or clobber the dev's settings file (harness determinism).
 		Settings.persist = true
 		Settings.load_settings()
@@ -180,20 +180,20 @@ func _ready() -> void:
 		load("res://src/data/machines/processor.tres"),
 		load("res://src/data/machines/splitter.tres"),
 		load("res://src/data/machines/lift.tres"),
-		load("res://src/data/machines/drill.tres"),  # automates ore extraction (docs/MINING.md)
+		load("res://src/data/machines/drill.tres"),  # automates ore extraction
 		load("res://src/data/machines/hopper.tres"),  # stockpiles + meters gravity-fed output (the 'chest')
-		load("res://src/data/machines/generator.tres"),  # burns coal → power (docs/POWER.md)
-		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral (docs/POWER.md)
+		load("res://src/data/machines/generator.tres"),  # burns coal → power
+		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral
 		load("res://src/data/machines/rope.tres"),        # the placeable climb — unrolls down a shaft
 		load("res://src/data/machines/torch.tres"),       # placeable LIGHT — claimed territory in the black
 		load("res://src/data/machines/descent_engine.tres"),  # the L1→L2 gate-breacher (docs/PROGRESSION.md)
-		# The L2 crafter modules (docs/CRAFTING.md — per-item, gravity-fed): the iron chain.
+		# The L2 crafter modules (— per-item, gravity-fed): the iron chain.
 		load("res://src/data/machines/iron_forge.tres"),
 		load("res://src/data/machines/plate_press.tres"),
 		load("res://src/data/machines/gear_mill.tres"),
-		load("res://src/data/machines/h_drill.tres"),     # the Borer — sideways extraction (FABLE_50 #46)
+		load("res://src/data/machines/h_drill.tres"),     # the Borer — sideways extraction
 		load("res://src/data/machines/blast_furnace.tres"),   # 1 rich ore → 2 ingots (#48, Enrichment)
-		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (docs/POWER.md; Drainage)
+		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (Drainage)
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -248,7 +248,7 @@ func _ready() -> void:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
 		craft_ids.append(def.id)
 		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def), "name": def.display_name}
-	# Craftable TOOLS listed AFTER machines (the Bazaar crafts both — docs/MINING.md). Not placeable, so
+	# Craftable TOOLS listed AFTER machines (the Bazaar crafts both). Not placeable, so
 	# they're not in machine_icons (the craft panel renders them via their item glyph instead).
 	for t: Dictionary in CRAFT_TOOLS:
 		var tid: StringName = t["id"]
@@ -333,7 +333,7 @@ func _dismiss_title() -> void:
 		_player.auto_input = true
 
 
-## Modern-rendering layer (docs/MODERN_FEEL.md): a WorldEnvironment post-process that gives the scene
+## Modern-rendering layer: a WorldEnvironment post-process that gives the scene
 ## its "2026 sheen" — BLOOM on our additive light pools (head-lamp, ore stream, machine glow, forge
 ## embers) so warm light blooms into the dark, plus a gentle colour grade (a touch more contrast +
 ## saturation). HDR-2D lets the additive pools exceed 1.0 so only genuine light blooms, not flat UI.
@@ -381,7 +381,7 @@ func _setup_post_fx() -> void:
 
 
 ## A continuous GPUParticles2D haze of dust motes drifting in the air — the modern particle lever
-## (docs/MODERN_FEEL.md). It fills the camera view (repositioned to the camera each frame) and sits at
+##. It fills the camera view (repositioned to the camera each frame) and sits at
 ## z 45, BELOW the lighting veil (z 50) + light pools (z 51), so a mote is dark in the gloom and lit
 ## warm where the lamp/glow reaches — "dust catching the light." Pure atmosphere; never touches the sim.
 func _setup_ambient_motes() -> void:
@@ -429,7 +429,7 @@ func _make_mote_texture() -> GradientTexture2D:
 	return t
 
 
-## Build the starting world through the world-engine handshake (docs/WORLDGEN.md): a swappable
+## Build the starting world through the world-engine handshake: a swappable
 ## WorldGen produces a WorldData (two material grids); the sim ingests it. MainView no longer knows
 ## HOW the world is made — swap the generator and nothing here changes. Then stamp the Rung-1 fixtures:
 ## a starter ORE vein beside spawn, and the MINESHAFT — a shallow carved shaft over a rich vein with a
@@ -481,7 +481,7 @@ func _seed_starter_vein() -> void:
 		sim.deposits[cell] = 200                                  # richness for the hover readout; hand-mining grabs a loose burst
 
 
-## A guaranteed surface COAL block between the shaft and the bazaar — the drill's FUEL (docs/MINING.md).
+## A guaranteed surface COAL block between the shaft and the bazaar — the drill's FUEL.
 ## Once you cap the deposit with a drill, it won't run without coal; this is the "go mine coal" target that
 ## closes the demand-web. Placed at col 54 — one left of the shaft's edge (55) on the rightward path, so
 ## mining it then tossing coal down the open shaft (56) is a short step. Rich enough that one hand-burst
@@ -521,7 +521,7 @@ func _seed_tutorial_tree() -> void:
 ##   col 56 SURFACE+2 AUTO FORGE  — catches the drill's pulled ore → ingots, hands-free
 ##   col 56 SURFACE+3 open        — auto ingots land
 ##   col 56 SURFACE+4 rock floor
-## The drill needs COAL (docs/MINING.md) — you drop coal down the open shaft onto it to run it.
+## The drill needs COAL — you drop coal down the open shaft onto it to run it.
 func _seed_tutorial_mineshaft() -> void:
 	var c: int = MINESHAFT_COL
 	# Bootstrap forge pocket (col 46) — a shallow 1-deep well, OFF the drill shaft.
@@ -899,7 +899,7 @@ func _set_volume(id: String, frac: float) -> void:
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---
 
 ## Timed mining: holding LMB CHARGES the aimed block (time scaled by your best tool vs the rock's
-## hardness — docs/MINING.md). The block only breaks when the charge fills, so early hand-mining is a
+## hardness). The block only breaks when the charge fills, so early hand-mining is a
 ## deliberate grind (the friction that sells automation). The charge fraction drives the crack overlay.
 ## (The wall-clock timing lives HERE; the tool-GATE lives in try_mine, the verb the play-harness drives.)
 func _update_mining(delta: float) -> void:
@@ -943,7 +943,7 @@ func _update_mining(delta: float) -> void:
 	_mine_charge += delta * speed
 	var hard: float = MiningRules.hardness(mat)
 	_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
-	# Swing FEEL (FABLE_50 #40): while charging, the body holds the dig pose facing the block, and on a
+	# Swing FEEL: while charging, the body holds the dig pose facing the block, and on a
 	# steady cadence a BLOW lands — a chip of the rock's dust off the struck face + a micro-shake — so
 	# mining reads as pick-strikes landing, not a progress bar silently filling.
 	if _player != null:
@@ -1066,7 +1066,7 @@ func try_mine(cell: Vector2i) -> bool:
 		_renderer.note_mined(cell, mat)                        # the block shatters away, not pops (#18)
 		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
 		if _player != null:
-			# The breaking blow's payoff (FABLE_50 #40): chunky debris kicked out of the shattered face
+			# The breaking blow's payoff: chunky debris kicked out of the shattered face
 			# toward the digger, a heavier kick than a mid-charge chip — and a vein pays out a bright
 			# fleck-spray in its own colour, so breaking ore FEELS richer than breaking dirt.
 			_particles.debris(center, Visuals.terrain_dust(mat).lightened(0.12),
@@ -1095,7 +1095,7 @@ func try_deposit() -> bool:
 	return false
 
 
-## Configure the aimed machine (R outside the pack screen, FABLE_50 #49): cycle a splitter's ratio,
+## Configure the aimed machine (R outside the pack screen): cycle a splitter's ratio,
 ## clear a hopper's filter. Reach-gated like every world verb; the sim returns the toast text.
 func try_configure(cell: Vector2i) -> bool:
 	if _paused or not _can_reach(cell):
@@ -1110,7 +1110,7 @@ func try_configure(cell: Vector2i) -> bool:
 
 
 ## Craft a machine item from carried ingots into the pack — GATED on standing near a claimed Bazaar
-## (the crafting hub, docs/CRAFTING.md). Refused away from it, so machine-crafting pulls you to the stall.
+## (the crafting hub). Refused away from it, so machine-crafting pulls you to the stall.
 func try_craft(def: MachineDef) -> bool:
 	if not _near_bazaar():
 		return false
@@ -1120,7 +1120,7 @@ func try_craft(def: MachineDef) -> bool:
 	return made
 
 
-## Fire the SONAR (FABLE_50 #27): a pulse expands from the body; every still-solid deposit in range
+## Fire the SONAR: a pulse expands from the body; every still-solid deposit in range
 ## answers with an echo ring through the rock (the renderer draws it) and a distance-staggered return
 ## chirp — literal sonar. Requires carrying a Scanner; a short cooldown paces it. Pure QUERY: reads
 ## deposits, mutates nothing — the whole feature adds ZERO sim state.
@@ -1153,7 +1153,7 @@ func try_scan() -> bool:
 
 
 ## Craft a TOOL (e.g. the Stone Pickaxe) from carried materials — same Bazaar gate + same generic sink as
-## machine crafting (sim.craft_item). The pickaxe-tier upgrade path (docs/MINING.md): craft it here, and it
+## machine crafting (sim.craft_item). The pickaxe-tier upgrade path: craft it here, and it
 ## unlocks the deeper rock its tier gates. Verb-surfaced so the play-harness can drive tool crafting too.
 func try_craft_tool(tool_id: StringName) -> bool:
 	if not _near_bazaar():
@@ -1256,7 +1256,7 @@ func _cycle_speed() -> void:
 	Engine.time_scale = TIME_SCALES[_time_scale_idx]
 
 
-## F5 quicksave (FABLE_50 #1): the sim capture + the body's position, one versioned file.
+## F5 quicksave: the sim capture + the body's position, one versioned file.
 func _save_game() -> void:
 	var data: Dictionary = SaveGame.capture(sim)
 	data["player_pos"] = _player.position
@@ -1502,11 +1502,11 @@ func _hover_info_at(aim: Vector2i) -> Dictionary:
 		if sim.material_at(aim) == &"sealrock":
 			return {"name": "The Seal", "in": [], "out": [], "holding": [],
 				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
-		# A hanging rope: its coil count + the one-action recovery affordance (FABLE_50 #39).
+		# A hanging rope: its coil count + the one-action recovery affordance.
 		if sim.is_climbable(aim):
 			return {"name": "Rope", "in": [], "out": [], "holding": [],
 				"mode": "%d segments hung — RMB takes the whole rope back" % sim.rope_length(aim)}
-		# Rock you can't break with your current tools — the depth-gate's "why?" answer (docs/MINING.md).
+		# Rock you can't break with your current tools — the depth-gate's "why?" answer.
 		if sim.is_solid(aim):
 			var rock: StringName = sim.material_at(aim)
 			if not MiningRules.can_mine(rock, sim.inventory):
@@ -1771,7 +1771,7 @@ func _guide_targets() -> Array[Dictionary]:
 
 
 ## True when the body stands close enough to a CLAIMED (completed) Bazaar to craft machines there. The
-## crafting hub gate (docs/CRAFTING.md): away from it, the E screen shows the pack but no recipes.
+## crafting hub gate: away from it, the E screen shows the pack but no recipes.
 func _near_bazaar() -> bool:
 	return _player != null and sim.near_bazaar(_cell_at(_player.position), BAZAAR_RADIUS)
 

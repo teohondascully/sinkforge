@@ -150,7 +150,7 @@ func _has_drill_machine() -> bool:
 
 
 ## Has a placed Drill been fueled with coal (burning now, or coal waiting in its buffer)? The demand-web
-## beat: the drill won't pull ore until you've mined coal and fed it (docs/MINING.md).
+## beat: the drill won't pull ore until you've mined coal and fed it.
 func _drill_fueled() -> bool:
 	for m: MachineState in sim.machines:
 		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):

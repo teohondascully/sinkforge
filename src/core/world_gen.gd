@@ -1,7 +1,7 @@
 class_name WorldGen
 extends RefCounted
 
-## THE SWAPPABLE PRODUCER (see docs/WORLDGEN.md). A generator turns a spec (size + seed) into a
+## THE SWAPPABLE PRODUCER. A generator turns a spec (size + seed) into a
 ## WorldData. Base interface only — concrete generators (HeightmapWorldGen, future cave/biome/
 ## structure generators) override `generate`. Improving generation = a NEW WorldGen; nothing in the
 ## sim or the renderer changes, because both speak only WorldData + material ids.

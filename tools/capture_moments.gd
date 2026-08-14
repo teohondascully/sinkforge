@@ -1,0 +1,53 @@
+extends SceneTree
+
+## LOCAL DEV TOOL — the "Sees" blind-vision instrument's renderer (NOT committed; _moment_*.png is
+## gitignored). Renders canonical game MOMENTS to _moment_<name>.png so a zero-context vision agent can
+## judge legibility from pixels the way a first-time player would. Run WITHOUT --headless (needs a real
+## GL context — headless is the dummy renderer and saves blank frames):
+##   godot --path . --script res://tools/capture_moments.gd -- boot
+##   godot --path . --script res://tools/capture_moments.gd -- boot 1   # optional zoom-index (Z levels)
+## Moments: boot (the clean new-player opening).
+
+const SCENE := "res://scenes/main.tscn"
+const SETTLE := 60
+
+
+func _initialize() -> void:
+	var uargs := OS.get_cmdline_user_args()
+	var moment := (uargs[0] if uargs.size() > 0 else "boot")
+	var zoom_idx := (int(uargs[1]) if uargs.size() > 1 else 0)
+	var ore_nug := (uargs[2] if uargs.size() > 2 else "")     # optional hex to override ore nugget colour
+	var suffix2 := (uargs[3] if uargs.size() > 3 else "")     # optional filename suffix for A/B variants
+	if ore_nug != "":
+		var ore := load("res://src/data/materials/ore.tres") as MaterialDef
+		ore.nugget_color = Color(ore_nug)                     # in-memory only (resource cache); never saved
+	await _capture(moment, zoom_idx, suffix2)
+	quit(0)
+
+
+func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
+	MainView.dev_start = false
+	var main: MainView = (load(SCENE) as PackedScene).instantiate()
+	get_root().add_child(main)
+	for _i in SETTLE:
+		await physics_frame
+
+	match moment:
+		"boot":
+			pass                              # the untouched clean opening
+		_:
+			push_warning("unknown moment '%s' — capturing boot" % moment)
+
+	var suffix := ""
+	if zoom_idx > 0:
+		for _c in zoom_idx:
+			main._cycle_zoom()
+		suffix = "_z%d" % zoom_idx
+		for _j in 12:
+			await physics_frame
+
+	await RenderingServer.frame_post_draw
+	var img := get_root().get_texture().get_image()
+	var path := "res://_moment_%s%s%s.png" % [moment, suffix, name_suffix]
+	img.save_png(path)
+	print("CAPTURED %s -> %s (%dx%d)" % [moment, ProjectSettings.globalize_path(path), img.get_width(), img.get_height()])

@@ -23,7 +23,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
 	&"torch": {"kind": "torch", "color": Color(0.86, 0.60, 0.26)},        # flame amber — placeable light
 	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze — the gate-breacher
-	# The L2 crafter modules (docs/CRAFTING.md): recipe-runners wearing their OWN faces — the behavior
+	# The L2 crafter modules: recipe-runners wearing their OWN faces — the behavior
 	# tags have no _BEHAVIORS entry (they fall through to the recipe runner), they exist so each module
 	# visibly announces its one product (per-item legibility, the modules' whole point).
 	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace — smelts iron
@@ -362,7 +362,7 @@ static func item_color(item: StringName) -> Color:
 	if item == &"torch":
 		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
 	if item == &"scanner":
-		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld (FABLE_50 #27)
+		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld
 	if item == &"sapling":
 		return Color(0.44, 0.66, 0.30)        # young leaf-green — the renewable-wood seed (#38)
 	if item == &"rich_ore":
@@ -381,7 +381,7 @@ static func item_color(item: StringName) -> Color:
 
 
 ## Draw an item icon centred at `center`, `size` px square. Sprite-ready: an item_<id>.png
-## (docs/ART_SPEC.md) replaces the procedural glyph the moment it exists; absent → a drawn glyph that
+## replaces the procedural glyph the moment it exists; absent → a drawn glyph that
 ## actually READS as the thing (a pickaxe looks like a pickaxe, an ingot like a bar). One helper so ground
 ## piles, the hotbar, the craft screen, and anything else share the same look + the same sprite swap.
 static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: StringName) -> void:
@@ -483,7 +483,7 @@ static func _item_plate(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 
 ## GEAR — a toothed cog with a punched hub (the mill's product; also the generic-machine motif).
-## The SCANNER (FABLE_50 #27): a dark handheld with a cyan screen, a stub antenna, and sonar arcs —
+## The SCANNER: a dark handheld with a cyan screen, a stub antenna, and sonar arcs —
 ## reads as "a device that listens" at hotbar size.
 static func _item_scanner(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var s: float = size * 0.5

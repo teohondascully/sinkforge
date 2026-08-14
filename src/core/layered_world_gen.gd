@@ -1,7 +1,7 @@
 class_name LayeredWorldGen
 extends HeightmapWorldGen
 
-## The RICHER generator (docs/WORLDGEN.md). Builds on HeightmapWorldGen's surface + earth/stone fill,
+## The RICHER generator. Builds on HeightmapWorldGen's surface + earth/stone fill,
 ## then layers in the two things that most change how EXPLORING feels:
 ##   1. CAVES — organic carved pockets (open block, wall KEPT → Terraria carved room, not void) whose
 ##      openness GROWS with depth. The near-surface base stays solid by construction (caves only below
@@ -77,7 +77,7 @@ const ORE_CHANCE_DEEP: float = 0.85
 ## fatter bodies you can array more drills across. Big enough to be a real patch, not a fleck.
 const ORE_SIZE_MIN: int = 8
 const ORE_SIZE_DEPTH_BONUS: int = 44
-## COAL veins — the drill's FUEL (docs/MINING.md). Mined the same cavity way as ore; a touch more common
+## COAL veins — the drill's FUEL. Mined the same cavity way as ore; a touch more common
 ## and a bit shallower-reaching than ore (you need a steady coal supply once you automate), still depth-banded.
 const COAL_ATTEMPTS_PER_COL: float = 0.8
 const COAL_CHANCE_DEEP: float = 0.95
@@ -85,7 +85,7 @@ const COAL_SIZE_MIN: int = 6
 const COAL_SIZE_DEPTH_BONUS: int = 30
 const COAL_AMOUNT_BASE: int = 30         # modest PER-CELL (the drill bores cell by cell); big BODIES give the
 const COAL_AMOUNT_DEPTH_BONUS: int = 170 # long-lasting TOTAL (hundreds shallow → thousands deep per body)
-## Per-CELL ore deposit (docs/MINING.md). MODEST now (the boring Drill drains a cell then sinks to the next,
+## Per-CELL ore deposit. MODEST now (the boring Drill drains a cell then sinks to the next,
 ## so a huge per-cell number would pin the drill on one cell forever); the LONG-LASTING supply comes from the
 ## fat multi-cell BODY (ORE_SIZE_*): body total = cells × per-cell ≈ hundreds shallow → thousands deep, the
 ## Factorio patch that feeds a drill ARRAY for a long time (deeper = richer = the automation pull). Same
@@ -144,7 +144,7 @@ const IRON_SIZE_MIN: int = 10
 const IRON_SIZE_DEPTH_BONUS: int = 30
 const IRON_AMOUNT: int = 220
 
-# --- aquifers (L3 water pockets you BREACH, docs/WATER.md) ---
+# --- aquifers (L3 water pockets you BREACH) ---
 ## Sealed pressurised water pockets carved deep into SOLID rock (block erased, wall KEPT — a flooded carved
 ## room), filled to WATER_MAX so digging in RELEASES them. DEEP + BASE-SAFE by construction: a pocket never
 ## rises within CAVE_MIN_DEPTH of a column's surface (base stays dry) and its centre lives at/below
@@ -159,7 +159,7 @@ const AQUIFER_RX_MAX: int = 4
 const AQUIFER_RY_MIN: int = 2
 const AQUIFER_RY_MAX: int = 3
 
-# --- aquifer TREASURE (L3 risk/REWARD, docs/WATER.md): the flood GUARDS a rich vein ---
+# --- aquifer TREASURE (L3 risk/REWARD): the flood GUARDS a rich vein ---
 ## The flooded pocket is pure hazard on its own (you wade it, you pump it). This makes it worth
 ## breaching: a modest &"rich_ore" vein grows in the SOLID rock lining each pocket's walls/floor, so a
 ## player who breaches the flood, pumps it dry, and mines the drained walls is paid in high-grade ore —
@@ -173,7 +173,7 @@ const AQUIFER_ORE_SIZE_MAX: int = 9
 ## mirroring _scatter_veins' rich_ore richness math (aquifers live deep, so the deep baseline is right).
 const AQUIFER_ORE_RICHNESS: int = int((ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS) * RICH_AMOUNT_MULT)
 
-# --- surface trees (wood source — the bazaar's gathering foundation, docs/CRAFTING.md) ---
+# --- surface trees (wood source — the bazaar's gathering foundation) ---
 ## A tree is planted in an eligible column this often; min columns between trunks (spacing so the
 ## 3-wide canopies mostly read as separate trees). Sparse — the surface reads as wooded, not a wall.
 const TREE_CHANCE: float = 0.20
@@ -181,7 +181,7 @@ const TREE_GAP: int = 3
 
 ## The abandoned Bazaar RUIN: an almost-complete wood frame stamped on flat ground near spawn. Finishing
 ## it (placing the one missing block) activates it — the onboarding for "build a Bazaar", the first lore
-## ("someone was here"), and a worked example of the pattern (docs/CRAFTING.md). It is the LEFT endpoint of
+## ("someone was here"), and a worked example of the pattern. It is the LEFT endpoint of
 ## the centred plateau (cols 40-43); its missing post is the bottom-RIGHT one, so it's claimed from the
 ## SPAWN side (col 44) and completing it never walls the body off from the hand-work + shaft to its right.
 const RUIN_X: int = 40
@@ -405,7 +405,7 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 			continue                            # rejected — most shallow seeds die here (the band)
 		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS) * hmul))
 		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS) * hmul))
-		# ORE QUALITY (FABLE_50 #48): a vein seeded in/below the deepslate band may come up RICH — a
+		# ORE QUALITY: a vein seeded in/below the deepslate band may come up RICH — a
 		# visibly denser high-grade variant (1 rich ore smelts 2 ingots in the Blast Furnace). Deeper =
 		# richer gains a second axis: down there veins aren't just bigger, they're better.
 		var material: StringName = &"ore"
@@ -489,7 +489,7 @@ func _stamp_seal(world: WorldData) -> void:
 				world.walls[cell] = &"deepslate_wall"
 
 
-## Seed AQUIFERS (L3, docs/WATER.md): a handful of small SEALED water pockets carved deep into solid rock,
+## Seed AQUIFERS (L3): a handful of small SEALED water pockets carved deep into solid rock,
 ## filled to WATER_MAX, that you BREACH by digging in. Runs LAST (after the seal) so no later solid pass
 ## overwrites the water. Each pocket:
 ##   • is a small ellipse blob whose CENTRE sits at/below AQUIFER_MIN_ROW (the deep deepslate + Stonereach
@@ -572,8 +572,8 @@ func _seed_aquifer_treasure(world: WorldData, rng: RandomNumberGenerator, carved
 	_grow_vein(world, rng, seed_cell, size, AQUIFER_ORE_RICHNESS, &"rich_ore", SEAL_TOP + SEAL_ROWS)
 
 
-## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation,
-## docs/CRAFTING.md). A tree is a 1-wide trunk of &"wood" under a 3-wide rounded &"leaves" canopy,
+## Plant sparse trees on the grass surface — the source of WOOD (the bazaar's gathering foundation).
+## A tree is a 1-wide trunk of &"wood" under a 3-wide rounded &"leaves" canopy,
 ## stamped in the AIR above a column's ground cell. The centred flat plateau (the spawn cluster) is left clear
 ## so a tree never traps the player or buries the forge. Foliage is solid + choppable but excluded from
 ## the walkable silhouette (FactorySim.surface_row), so trees don't ramp; chopping one fells it (→wood).

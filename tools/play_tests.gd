@@ -293,7 +293,7 @@ func _engine_fed(agent: PlayAgent) -> int:
 	return -1
 
 
-## RUNG 4 — the BORER is playable embodied (FABLE_50 #46): dig a socket at a rock face, stand the
+## RUNG 4 — the BORER is playable embodied: dig a socket at a rock face, stand the
 ## Borer in it facing the wall, feed it coal by toss, let it chew the face into its belly (it sits
 ## sealed — the on-hook rule pools the haul), then PICK IT BACK UP and walk away with the haul in the
 ## pack (pickup salvages buffers). The manual "send the ferret into the wall, bring it back full"
@@ -352,7 +352,7 @@ func _goal_borer() -> bool:
 		"sent the borer into the wall and brought it back full (haul=%d)" % haul)
 
 
-## RUNG 5 — the L3 FLOOD LOOP is playable embodied (docs/DECISIONS.md, the Aquifer answer): the pump falls
+## RUNG 5 — the L3 FLOOD LOOP is playable embodied (the Aquifer answer): the pump falls
 ## on the LOCKED hook — water floods a dig for FREE, pumping it back OUT costs POWER. The sim tests prove
 ## water/pump/reward in ISOLATION; this proves a PLAYER can actually DO it from where a body stands. In a
 ## STAGED, SEALED, flooded surface pocket (a flat-floored watertight box with a pump sump — reachable
@@ -530,7 +530,7 @@ func _goal_drain_the_aquifer() -> bool:
 			% [water_before, water_after, got])
 
 
-## RUNG 3 — the L2 IRON CHAIN is playable embodied (FABLE_50 #47, CRAFTING.md modules): with the iron
+## RUNG 3 — the L2 IRON CHAIN is playable embodied: with the iron
 ## tier researched and the modules in the pack (bench/craft flows proven headless + in RUNG 1), the
 ## agent DIGS a socket pit, stands the gravity chain in it — Iron Forge over Plate Press — pours raw
 ## iron into the open column above, and must end up holding a PLATE: dig, place, toss, collect, all
@@ -829,7 +829,7 @@ func _step_smelt(agent: PlayAgent) -> bool:
 
 
 ## Step 3 — chop a tree for wood (the bazaar's build material). Chop one trunk block of the nearest tree
-## (block-by-block now — docs/MINING.md); one wood is enough to claim the bazaar.
+## (block-by-block now); one wood is enough to claim the bazaar.
 func _step_wood(agent: PlayAgent) -> bool:
 	var base: Vector2i = _nearest_tree_base(agent)
 	if base.x < 0:
@@ -894,7 +894,7 @@ func _step_build(agent: PlayAgent) -> bool:
 
 
 ## Step 5 — fuel the Drill: mine the coal vein (right of the shaft), then drop coal down the open shaft so
-## it lands in the drill (the demand-web — the drill won't pull ore without coal, docs/MINING.md).
+## it lands in the drill (the demand-web — the drill won't pull ore without coal).
 func _step_fuel(agent: PlayAgent) -> bool:
 	agent._note("  fuel: START body@%s (coal target=%s)" % [
 		agent.main._cell_at(agent.player.position), _nearest_coal(agent)])

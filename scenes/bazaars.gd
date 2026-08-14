@@ -1,7 +1,7 @@
 class_name Bazaars
 extends RefCounted
 
-## REPRESENTATION-ONLY view of the Bazaar structures the sim detects (docs/CRAFTING.md). The sim has no
+## REPRESENTATION-ONLY view of the Bazaar structures the sim detects. The sim has no
 ## bazaar STATE — "active" is derived from the world (a valid wood frame == active, FactorySim.find_bazaars).
 ## This layer remembers which frames we've already seen so it can fire a one-shot, block-by-block COSMETIC
 ## TRANSFORMATION the instant a frame completes — plain wood visibly becoming a decorated market stall

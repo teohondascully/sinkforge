@@ -179,7 +179,7 @@ const SURFACE_KEEP: int = 2
 ##   material_color_at(Vector2i) -> Color    (the coarse cell's body colour; only called on solid cells)
 ##   wall_color_at(Vector2i) -> Color        (the back-wall colour to show where solid rock is ERODED to air)
 ##   surface_at(int col) -> int              (the walkable surface row of a column; its cap is left uncovered)
-## P2 (docs/FINE_TERRAIN.md): the fine SHAPE now comes from the sim's real fine grid (fine_solid_at) instead
+## P2: the fine SHAPE now comes from the sim's real fine grid (fine_solid_at) instead
 ## of a molded field computed here from the coarse mask — real fine DATA reads crunchier + carries whatever
 ## detail worldgen put there. The renderer keeps ownership of the LOOK (AO, grain, moss, rim, palette).
 ## Runs the WHOLE fine grid; called on the initial paint + a wholesale change (load/repaint_world). The

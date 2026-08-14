@@ -7,7 +7,7 @@ extends Node2D
 ## platformer controller with per-axis move-then-resolve AABB collision against the sim's solid cells,
 ## the machines, and the world walls/floor (safe from tunnelling at these speeds vs 32px cells; would
 ## need substep clamping only under severe frame drops) — plain GDScript so the feel is fully ours to
-## tune (custom-now, not TileMap; see docs/DECISIONS.md / prompts/prototype-2.md).
+## tune (custom-now, not TileMap).
 ##
 ## FLOOR AUTHORITY (the 2026-06 movement-rebuild fix). The heightmap slope-follow (surface_row/ramp_dir)
 ## glides smooth 45° ramps but only knows a 1-D per-column surface — it can't see cave floors, dug pits,
@@ -17,7 +17,7 @@ extends Node2D
 ## floor-SNAP a ≤1-tile descent (hug stairs/slopes without launching). Guarded by tools/check_step.gd.
 ##
 ## DESIGN-OPEN: every number here (speed, gravity, jump, size) is placeholder feel, measured vs
-## intended by the harness (tools/measure_player.gd) and tuned by taste — see docs/HARNESS.md.
+## intended by the harness (tools/measure_player.gd) and tuned by taste.
 
 const CELL: int = 32
 ## Body AABB. SCALE spike (Noita-feel): shrunk 20×44 → 14×34 so the avatar reads as a small nimble figure
@@ -37,7 +37,7 @@ const GRAVITY: float = 900.0         ## px/s^2
 ## which made a 2-block ledge a 4px-short bounce-off — the reported "stalling on a 2-high jump". A ≥3-tile
 ## wall stays honest (jump can't beat it; that's what ropes/digging are for).
 const JUMP_VELOCITY: float = -365.0
-## VARIABLE JUMP (FABLE_50 #43): while RISING with Space released, gravity is multiplied by this —
+## VARIABLE JUMP: while RISING with Space released, gravity is multiplied by this —
 ## a tap gives a short hop (~1/2 tile), a held press the full 2-tile arc. Feel-standard platformer
 ## control; never touches falls (velocity.y >= 0) or rope climbs. Harness drivers that don't model
 ## the key default jump_held=true, so every measured/scripted jump stays the FULL arc.
@@ -482,7 +482,7 @@ func _in_water() -> bool:
 ## > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2 off the free clock. The
 ## caller falls back to the idle "miner" frame for any state whose art hasn't been drawn yet, so dropping
 ## in only a subset of frames still works (and with NO frames present, every key misses → primitive path).
-## Frame fallback chains (FABLE_50 #42): a state whose art hasn't landed borrows the nearest drawn
+## Frame fallback chains: a state whose art hasn't landed borrows the nearest drawn
 ## pose, ending at the idle frame — so the artist can land climb_0 alone, or nothing, and every state
 ## still shows SOMETHING sensible.
 const SPRITE_FALLBACKS: Dictionary = {

@@ -3,11 +3,11 @@ extends Resource
 
 ## PROVISIONAL prototype data. For Prototype 1 a machine is simply a named recipe-runner:
 ## its behaviour emerges from its recipe, NOT from a machine-type enum or a capability system
-## (both deferred — the real machine model is an open question; see DECISIONS.md and
-## docs/RISKS.md). Individual placed machines hold runtime state in MachineState and share
+## (both deferred — the real machine model is an open question). Individual
+## placed machines hold runtime state in MachineState and share
 ## this definition (flyweight).
 
-## Stable identifier — saves/lookups reference this, never the file path (see docs/RISKS.md).
+## Stable identifier — saves/lookups reference this, never the file path.
 @export var id: StringName = &""
 ## Human-readable label for UI. Kept out of sim logic so it stays localizable.
 @export var display_name: String = ""
@@ -17,7 +17,7 @@ extends Resource
 ## down its column. &"splitter" = a router: it runs no recipe and instead divides whatever
 ## falls into it between two downstream columns. This is a deliberately thin, deletable label
 ## (NOT a type enum or capability system — those stay deferred); it just lets the sim branch on
-## the few machines that don't fit "named recipe-runner". See DECISIONS.md 2026-06-27.
+## the few machines that don't fit "named recipe-runner". See 2026-06-27.
 @export var behavior: StringName = &""
 ## What it costs to CRAFT one of these machine items (item StringName -> count), e.g. {&"ingot": 3}.
 ## Empty = not hand-craftable. Drives the Factorio-style build economy: forge ingots → craft a

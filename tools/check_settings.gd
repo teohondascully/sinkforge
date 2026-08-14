@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Harness layer: SETTINGS persistence + remap (FABLE_50 #36). Headless, no scene — the Settings
+## Harness layer: SETTINGS persistence + remap. Headless, no scene — the Settings
 ## class is pure statics over ConfigFile/InputMap/AudioServer, so the whole contract checks in
 ## milliseconds: values round-trip through the file, a rebind actually redirects the InputMap action
 ## (the thing every verb reads), reset restores the defaults, and the harness-isolation gate holds

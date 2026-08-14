@@ -1,7 +1,7 @@
 class_name SaveGame
 extends RefCounted
 
-## SAVE / LOAD (FABLE_50 #1). The sim is PLAIN DATA (node-free dicts + an array of MachineState),
+## SAVE / LOAD. The sim is PLAIN DATA (node-free dicts + an array of MachineState),
 ## so a save is a straight capture of its authoritative state into one versioned Dictionary, written
 ## with Godot's binary Variant serializer (Vector2i keys + StringNames round-trip natively — no JSON
 ## key-mangling). Machines serialize as def-ID + runtime fields; defs are flyweight .tres reloaded by
@@ -100,7 +100,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	sim.terrain_dirty.clear()
 	sim._bazaars_dirty = true
 	# The FINE TERRAIN grid is DERIVED (not saved) — rebuild it deterministically from the restored
-	# coarse terrain + seed, so a loaded game molds identically to when it was saved (docs/FINE_TERRAIN.md).
+	# coarse terrain + seed, so a loaded game molds identically to when it was saved.
 	sim.rebuild_fine_terrain()
 	return true
 

@@ -8,7 +8,7 @@ extends RefCounted
 ## update tick + draw, so MainView stays a controller, not a particle system.
 
 const FALL_DURATION: float = 0.30
-## HARD CAP on live discrete drops (FABLE_50 #5): the abstract flow layer is authoritative — production
+## HARD CAP on live discrete drops: the abstract flow layer is authoritative — production
 ## math never depends on these — so past the cap a new drop adds churn and screen noise, not information
 ## (a pouring column at 240 reads identically to one at 400). Spawns beyond it simply aren't visualized.
 const MAX_ITEMS: int = 240
@@ -16,7 +16,7 @@ const MAX_ITEMS: int = 240
 ## Each drop: {from, to: Vector2 (world), t: 0..1 progress, color: Color}.
 var _items: Array[Dictionary] = []
 ## Retired drop dicts, reused by the next spawn — the high-churn pooling the principles doc asks for
-## (docs/ARCHITECTURE_PRINCIPLES.md): steady-state streaming allocates NOTHING per event.
+##: steady-state streaming allocates NOTHING per event.
 var _pool: Array[Dictionary] = []
 var _motes_scratch: Array[Dictionary] = []   ## reused motes() output (the light pass calls it per frame)
 

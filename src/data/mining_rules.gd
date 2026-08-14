@@ -3,7 +3,7 @@ extends RefCounted
 
 ## The MANUAL-MINING rules: how hard each material is to break by hand, and which TOOL you need to
 ## break it at all. This is the friction layer that makes early-game hand-mining a deliberate PAIN —
-## the teacher that makes you crave automation (docs/MINING.md). It is plain static data (no node, no
+## the teacher that makes you crave automation. It is plain static data (no node, no
 ## sim, no renderer), so the controller's hold-loop, the verb-gate in try_mine, AND the headless tests
 ## all read the SAME source of truth.
 ##
@@ -18,7 +18,7 @@ extends RefCounted
 
 ## Material id -> the tool CLASS required to break it. Absent = hand-mineable (no tool needed, e.g. dirt
 ## you can always dig out of a jam). Rock, ore AND foliage all want the pick — the axe was DELETED
-## (FABLE_50 #38, DECISIONS 2026-07-17): tool gates read the whole PACK, not a wielded item, so the axe
+## (2026-07-17): tool gates read the whole PACK, not a wielded item, so the axe
 ## was never a verb — just a phantom key rattling in the pack. One tool, one slot, same chopping.
 const REQUIRED_TOOL: Dictionary = {
 	&"stone": &"pick",
@@ -35,7 +35,7 @@ const REQUIRED_TOOL: Dictionary = {
 ## Material id -> the minimum tool TIER (of its required class) needed to break it. Absent class-gated
 ## material defaults to tier 1 (any tool of the class). This is the DEPTH GATE: deepslate (the deep band,
 ## rows ≥ DEEPSLATE_ROW) needs a tier-2 pick, so the starter wood pick (tier 1) bounces off it — you must
-## craft a Stone Pickaxe before you can dig the deep third. Grows as the tier ladder deepens (docs/MINING.md).
+## craft a Stone Pickaxe before you can dig the deep third. Grows as the tier ladder deepens.
 const REQUIRED_TIER: Dictionary = {
 	&"deepslate": 2,
 	&"iron": 2,          # L2's ore lives in the deepslate zone — the same pick works both
@@ -70,7 +70,7 @@ const TOOLS: Dictionary = {
 	# The wood_axe entry stays ONLY so a pre-#38 save carrying one still renders (glyph/tooltip);
 	# it is no longer seeded, required by any material, or craftable.
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
-	# The SCANNER (FABLE_50 #27) is EQUIPMENT, not a breaker: its own class so it never enters a
+	# The SCANNER is EQUIPMENT, not a breaker: its own class so it never enters a
 	# pick/axe speed query, speed 0 (no material requires &"scanner"). Listed here so is_tool_item
 	# treats it as gear — it can't be fed into a machine like a resource.
 	&"scanner": {&"class": &"scanner", &"tier": 1, &"speed": 0.0},
@@ -85,10 +85,10 @@ const TOOL_RECIPES: Dictionary = {
 	# The tier-3 pick is priced in the L2 chain's own product (iron ingots want the Iron Forge, which
 	# wants Ironworks research, which wants the breach) — the MATERIALS gate it, research doesn't need
 	# to. Its value today is SPEED (deepslate 1.65s -> 1.08s); tier 3 is the ladder rung L3's rock
-	# band will gate on (docs/MINING.md — no sub-L2 band exists yet, so nothing bounces a stone pick
+	# band will gate on (— no sub-L2 band exists yet, so nothing bounces a stone pick
 	# that this one opens; that arrives with L3 worldgen, demand-pull).
 	&"iron_pickaxe": {&"iron_ingot": 6, &"wood": 3},
-	# The sonar (FABLE_50 #27): cheap in materials, gated by PROSPECTING research instead (the sim's
+	# The sonar: cheap in materials, gated by PROSPECTING research instead (the sim's
 	# craft_item refuses it until the tech is in — ResearchRules.locking_tech drives the gate).
 	&"scanner": {&"ingot": 2, &"coal": 1},
 }

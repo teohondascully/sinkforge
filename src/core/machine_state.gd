@@ -36,7 +36,7 @@ var facing: int = 1
 ## Configurable machines only (the splitter's ratio, for now): a small mode index cycled by the
 ## player's R-configure verb (a discrete call). 0 = the machine's default behaviour.
 var mode: int = 0
-## Hopper-only: the ONE item id this hopper banks (FABLE_50 #49). Auto-latches on the first item it
+## Hopper-only: the ONE item id this hopper banks. Auto-latches on the first item it
 ## banks ("keeps the first thing it tastes"); everything else passes through. &"" = not yet latched.
 var filter: StringName = &""
 

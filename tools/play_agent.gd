@@ -12,7 +12,7 @@ extends RefCounted
 ## with generous frame budgets and a give() hatch to INJECT resources for setup (e.g. top up ingots
 ## before testing crafting) — the user-sanctioned shortcut for "arrange the situation, then play it".
 ##
-## Used by tools/play_tests.gd (the scripted test TYPE). See docs/HARNESS.md.
+## Used by tools/play_tests.gd (the scripted test TYPE).
 
 const CELL: int = 32
 

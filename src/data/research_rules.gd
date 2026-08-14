@@ -28,7 +28,7 @@ const TECHS: Dictionary = {
 		"requires": &"automation",             # the tree's first BRANCH (same tier as Power in the graph)
 		"sample": &"ore",                      # analyze a vein — learn what its echo sounds like
 		"cost": {&"ingot": 4},
-		"unlocks": [&"scanner"],               # the handheld sonar (FABLE_50 #27) — finds the veins that
+		"unlocks": [&"scanner"],               # the handheld sonar — finds the veins that
 		                                       # pay the 12-ingot Power wall right after
 	},
 	&"power": {

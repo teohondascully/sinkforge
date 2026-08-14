@@ -149,7 +149,7 @@ func _no_floating_foliage(sim: FactorySim) -> bool:
 	return true
 
 
-## The WHOLE authoritative state as one canonical string (FABLE_50 #2). Built on SaveGame.capture,
+## The WHOLE authoritative state as one canonical string. Built on SaveGame.capture,
 ## so the canary and the save format can never drift apart: any field added to the envelope is
 ## automatically guarded here, and a field the envelope misses is a field this canary misses — one
 ## list, two guards. Dictionary keys are sorted (content-based, insertion-order-proof); machine
@@ -358,7 +358,7 @@ func _test_splitter() -> void:
 		var present: int = _items_present(sim, item)
 		var net: int = int(sim.total_produced.get(item, 0)) - int(sim.total_consumed.get(item, 0))
 		_check(present == net, "%s conserved through splitter (present=%d, net=%d)" % [item, present, net])
-	# Direct ratio SET (FABLE_50 #32 — the config panel's clickable chips; R still cycles).
+	# Direct ratio SET (the config panel's clickable chips; R still cycles).
 	var sm: MachineState = sim.machine_at(Vector2i(6, 2))
 	_check(sim.set_split_mode(Vector2i(6, 2), 2) != "", "the panel can set a splitter's ratio directly")
 	_check(sm.mode == 2, "…and the mode landed (1:2 RIGHT)")
@@ -1088,13 +1088,13 @@ func _test_lift() -> void:
 	_check(_items_present(sim, &"ore") == 5, "ore conserved across lifting (present=5)")
 
 
-## Finite ore deposits + the Drill (docs/MINING.md). A deposit cell holds a POOL: hand-mining drains it
+## Finite ore deposits + the Drill. A deposit cell holds a POOL: hand-mining drains it
 ## a unit at a time, clearing the block only when empty (a cell with no pool = 1 = today's one-hit). A
 ## placed Drill bores the vein straight below it, spitting ore down the column, and STOPS when the vein
 ## is exhausted — proving extraction is finite (no infinite-ore machine).
 func _test_finite_deposit_and_drill() -> void:
 	print("- ore mining + drill (boring model)")
-	# Hand-mining an ore BLOCK (docs/MINING.md): ONE strike clears the whole block and drops a 3-6 loose BURST
+	# Hand-mining an ore BLOCK: ONE strike clears the whole block and drops a 3-6 loose BURST
 	# into the pack — a quick, inefficient grab (the vein's larger latent yield is the DRILL's job, not the hand's).
 	var sim: FactorySim = FactorySim.new()
 	var cell := Vector2i(4, 6)
@@ -1221,7 +1221,7 @@ func _test_finite_deposit_and_drill() -> void:
 	_check((pv_empty["ore_cells"] as Array).is_empty(), "preview over no ore lists nothing")
 
 
-## COAL is a vein mined just like ore (the demand-web, docs/MINING.md), and the DRILL is FUEL-GATED on it:
+## COAL is a vein mined just like ore (the demand-web), and the DRILL is FUEL-GATED on it:
 ## no coal → it idles; fed coal → it runs and burns the coal. A drill on a COAL deposit yields coal.
 func _test_coal_and_fuel() -> void:
 	print("- coal mining + drill fuel")
@@ -1266,9 +1266,9 @@ func _test_coal_and_fuel() -> void:
 	_check(int(s3.total_produced.get(&"coal", 0)) > coal_before, "a drill over a COAL vein produces coal (material-aware)")
 
 
-## Surface trees + wood (the bazaar's gathering foundation, docs/CRAFTING.md). The generator stamps
+## Surface trees + wood (the bazaar's gathering foundation). The generator stamps
 ## trees on the grass; foliage is solid + mineable but NOT walkable surface; chopping is BLOCK-BY-BLOCK
-## (no whole-tree fell — docs/MINING.md), one wood per wood cell, leaves yield nothing, conserved.
+## (no whole-tree fell), one wood per wood cell, leaves yield nothing, conserved.
 func _test_trees_and_wood() -> void:
 	print("- trees + wood")
 	# Generation stamps real trees on the surface.
@@ -1317,7 +1317,7 @@ func _test_trees_and_wood() -> void:
 	_check(_no_floating_foliage(sim) and _no_floating_foliage(sim2), "no floating foliage remains anywhere")
 
 
-## SAPLINGS (FABLE_50 #38 — the renewable-wood loop): chopped canopies hide seeds (deterministic per
+## SAPLINGS (the renewable-wood loop): chopped canopies hide seeds (deterministic per
 ## cell), planting wants soil, the TICK grows a real tree, occupation crushes / lost soil uproots,
 ## and the ledger stays total through chop → plant → grow → chop.
 func _test_saplings() -> void:
@@ -1384,7 +1384,7 @@ func _test_saplings() -> void:
 	_check(present_s == net_s, "saplings conserved through the whole loop (present=%d, net=%d)" % [present_s, net_s])
 
 
-## Manual-mining friction rules (docs/MINING.md): the GATE (own a tool that breaks this) and the felt
+## Manual-mining friction rules: the GATE (own a tool that breaks this) and the felt
 ## time (hardness / tool speed). Pure static logic, no sim — the same table the controller + try_mine use.
 func _test_mining_rules() -> void:
 	print("- mining rules (tools + friction)")
@@ -1425,7 +1425,7 @@ func _test_mining_rules() -> void:
 	var poor: FactorySim = FactorySim.new()
 	poor.inventory[&"stone"] = 2
 	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
-	# THE IRON PICKAXE (tier 3, FABLE_50 #37): priced in the L2 chain's own product — the MATERIALS
+	# THE IRON PICKAXE (tier 3): priced in the L2 chain's own product — the MATERIALS
 	# gate it (iron ingots want the Iron Forge, which wants the breach). Its value today is SPEED;
 	# tier 3 is the rung L3's rock band will gate on.
 	var smith: FactorySim = FactorySim.new()
@@ -1530,7 +1530,7 @@ func _test_block_supported() -> void:
 	_check(sim.block_supported(Vector2i(20, 3)), "a wall behind the cell supports a block (backfill a dug room)")
 
 
-## Block placement (the Terraria build primitive) + Bazaar structure detection (docs/CRAFTING.md).
+## Block placement (the Terraria build primitive) + Bazaar structure detection.
 func _test_block_placement_and_bazaar() -> void:
 	print("- block placement + bazaar")
 	var sim: FactorySim = FactorySim.new()
@@ -1575,7 +1575,7 @@ func _test_block_placement_and_bazaar() -> void:
 	_check(not b.is_bazaar_at(o), "a blocked interior is no longer a valid bazaar")
 
 
-## POWER (docs/POWER.md): a fueled generator pours power into its aura; out of coal it goes dark; coal
+## POWER: a fueled generator pours power into its aura; out of coal it goes dark; coal
 ## is genuinely consumed (conservation). The field is derived — recomputed each tick, never stored.
 func _test_power_field() -> void:
 	print("- power field + generator")
@@ -1607,7 +1607,7 @@ func _test_power_field() -> void:
 	_check(present == net, "coal conserved across burning (present=%d, net=%d)" % [present, net])
 
 
-## CONDUITS (docs/POWER.md): power floods DOWN + LATERAL through tubes, never UP (a U delivers as an L);
+## CONDUITS: power floods DOWN + LATERAL through tubes, never UP (a U delivers as an L);
 ## the place/remove API moves a carried conduit in/out of the layer. Geometry: a generator at (8,4) feeds
 ## a down-leg, a lateral bottom, and an up-leg — the up-leg must stay dark even directly above live power.
 func _test_conduit_network() -> void:
@@ -1653,7 +1653,7 @@ func _test_conduit_network() -> void:
 	_check(present_c == net_c, "conduit conserved with one placed (present=%d, net=%d)" % [present_c, net_c])
 
 
-## POWER governs the lift (docs/POWER.md): unpowered it runs at LIFT_THROUGHPUT (proved by _test_lift);
+## POWER governs the lift: unpowered it runs at LIFT_THROUGHPUT (proved by _test_lift);
 ## with a generator beside it pouring power into its cell, it carries up to LIFT_POWERED_THROUGHPUT — the
 ## cost rule (power_throttle) routing the boost. Fighting gravity UP is the canonical "costs power" case.
 func _test_powered_lift() -> void:
@@ -1682,7 +1682,7 @@ func _test_powered_lift() -> void:
 	_check(present == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the powered lift (present=%d)" % present)
 
 
-## THE PUMP — the powered flood-drain (docs/DECISIONS.md, the L3 aquifer answer). It falls on the LOCKED
+## THE PUMP — the powered flood-drain (the L3 aquifer answer). It falls on the LOCKED
 ## hook: water floods DOWN for free, pumping it back OUT costs power. This is the on-hook PROOF — a POWERED
 ## pump drains a flooded pocket substantially, an identical UNPOWERED pump barely touches it. Also asserts
 ## the drain is bounded/sane: no water is ever created and no cell goes negative.
@@ -1964,7 +1964,7 @@ func _test_behavior_registry() -> void:
 	_check(sim.machine_status(probe) != &"", "unknown tag still derives a status")
 
 
-## The ROPE (the placeable climb — docs/DECISIONS 2026-07-11): ONE placement anchors at the aim cell and
+## The ROPE (the placeable climb — 2026-07-11): ONE placement anchors at the aim cell and
 ## UNROLLS DOWN the open column (a segment per cell) until floor/machine/rope/world-bottom or the pack
 ## runs dry; cutting a segment takes it AND everything hanging below; solids/machines refuse roped cells;
 ## items still fall STRAIGHT THROUGH a roped shaft (the rope never enters item-flow); and the &"rope"
@@ -2002,7 +2002,7 @@ func _test_rope() -> void:
 	var rest: Vector2i = Vector2i(col, 9)                     # the open cell on top of the floor
 	_check(int((sim.ground.get(rest, {}) as Dictionary).get(&"ore", 0)) == 1,
 		"a dropped item falls straight through the rope to the floor")
-	# Rope QoL (FABLE_50 #39): length + anchor read from ANY segment; retract from any segment recovers ALL.
+	# Rope QoL: length + anchor read from ANY segment; retract from any segment recovers ALL.
 	_check(sim.rope_length(Vector2i(col, 8)) == 6, "rope_length counts the whole connected run from any segment")
 	_check(sim.rope_anchor(Vector2i(col, 8)) == Vector2i(col, 4), "rope_anchor walks up to the top segment")
 	_check(sim.rope_length(Vector2i(col, 10)) == 0, "no rope -> length 0")
@@ -2022,7 +2022,7 @@ func _test_rope() -> void:
 	_check(present_r == net_r, "rope conserved through place+cut+retract (present=%d, net=%d)" % [present_r, net_r])
 
 
-## THE L2 IRON CHAIN (FABLE_50 #47, PROGRESSION §5 medium chains, CRAFTING.md modules): the two new
+## THE L2 IRON CHAIN (PROGRESSION §5 medium chains): the two new
 ## techs gate the modules; the modules are pure recipe-runners behind their style tags; the chain runs
 ## GRAVITY-FED — iron dropped down a column smelts to iron ingots which fall into the press and come
 ## out plates on the floor; the gear mill is the first MULTI-INPUT module (iron + copper ingot must
@@ -2059,7 +2059,7 @@ func _test_iron_chain() -> void:
 	var pile: Dictionary = sim.ground.get(Vector2i(6, 7), {})
 	_check(int(pile.get(&"plate", 0)) == 2, "iron poured in the top comes out PLATES on the floor (%s)" % str(pile))
 	# The MULTI-INPUT module: the mill waits until BOTH streams (iron ingot + copper ingot) have merged
-	# into its column — CRAFTING.md's vertical merge puzzle, and the L1 copper line's continuing job.
+	# into its column's vertical merge puzzle, and the L1 copper line's continuing job.
 	sim.set_solid(Vector2i(10, 5), &"stone")
 	sim.place_machine(mill_def, Vector2i(10, 2))
 	sim.inventory[&"iron_ingot"] = int(sim.inventory.get(&"iron_ingot", 0)) + 2
@@ -2080,7 +2080,7 @@ func _test_iron_chain() -> void:
 		_check(present == net, "%s conserved through the chain (present=%d, net=%d)" % [item, present, net])
 
 
-## ORE QUALITY (FABLE_50 #48): vein seeds landing in/below the deepslate band come up RICH — a distinct
+## ORE QUALITY: vein seeds landing in/below the deepslate band come up RICH — a distinct
 ## material (it READS in-world) whose chunk the Enrichment-gated BLAST FURNACE smelts 1 → 2 ingots.
 ## Deeper = richer gains its second axis: deep veins aren't just bigger, they're better.
 func _test_rich_ore() -> void:
@@ -2128,7 +2128,7 @@ func _test_rich_ore() -> void:
 		_check(present == net, "%s conserved through enrichment (present=%d, net=%d)" % [item, present, net])
 
 
-## FILTERS, RATIOS & PASS-THROUGH (FABLE_50 #49 — the routing kit): (a) every recipe machine passes
+## FILTERS, RATIOS & PASS-THROUGH (the routing kit): (a) every recipe machine passes
 ## through what its recipe doesn't want (a mixed stream sorts ITSELF down a machine stack); (b) a
 ## hopper keeps the FIRST thing it tastes and passes the rest (R re-tastes); (c) the splitter's
 ## R-cycled ratio deals 2:1 / 1:2. Conservation everywhere.
@@ -2198,7 +2198,7 @@ func _test_filter_ratio_passthrough() -> void:
 		_check(present == net, "%s conserved (present=%d, net=%d)" % [item, present, net])
 
 
-## THE HORIZONTAL DRILL / the Borer (FABLE_50 #46, the user's spec): bores sideways along its facing,
+## THE HORIZONTAL DRILL / the Borer (the user's spec): bores sideways along its facing,
 ## burns coal per bite, feeds bored COAL to its own fuel bunker, bellies everything else, and honours
 ## the ON-HOOK rule — its haul exits DOWN its own column only; sealed on rock it POOLS (never spills
 ## into the tunnel), and stalls at the 5-slot belly cap. Conservation across the whole gallery.
@@ -2263,7 +2263,7 @@ func _test_h_drill() -> void:
 	_check(not s2.is_solid(Vector2i(2, 2)), "facing -1 bores LEFT")
 
 
-## SAVE/LOAD (FABLE_50 #1) — capture → restore must round-trip the WHOLE authoritative state, and
+## SAVE/LOAD — capture → restore must round-trip the WHOLE authoritative state, and
 ## determinism is the verifier: a restored sim ticked N times must match the original ticked N times,
 ## signature + dict for dict. Also: the version gate, the unknown-def gate (both leave the sim
 ## untouched), and a real disk round-trip through the binary Variant format.
@@ -2333,7 +2333,7 @@ func _test_save_load() -> void:
 	DirAccess.remove_absolute(path)
 
 
-## TORCHES (FABLE_50 #26) — the placeable light, a placed layer like rope: mounts only on a backed
+## TORCHES — the placeable light, a placed layer like rope: mounts only on a backed
 ## open cell (wall behind or a solid neighbour — no floating lights in the sky), refuses solids/
 ## machines/doubles, blocks solids/machines from its cell, returns to the pack on removal, and the
 ## item satisfies the total ledger. The light it casts is representation — nothing here to test.
@@ -2608,7 +2608,7 @@ func _test_descent_gate() -> void:
 	_check(s3.craft_unlocked(&"descent_engine"), "…and unlocks the engine")
 
 
-## The FACTORY OUT-PRODUCES the descent WALL (Belongs F1, docs/DESIGN_REVIEW.md — the anti-speedrun pillar,
+## The FACTORY OUT-PRODUCES the descent WALL (Belongs F1 — the anti-speedrun pillar,
 ## PROGRESSION §2). DESCENT_QUOTA is a THROUGHPUT wall you point production at, not a countable pile you
 ## hand-carry. This proves that HONESTLY at the sim level: a fully AUTOMATED line — a drill boring a solid
 ## ore vein → a forge smelting the ore into ingots → the Descent Engine eating them off gravity — fills the
@@ -2663,7 +2663,7 @@ func _test_descent_automation() -> void:
 		_check(present == net, "%s conserved through the automated gate (present=%d, net=%d)" % [item, present, net])
 
 
-## HINT BUBBLES (FABLE_50 #35 — scenes/hints.gd, representation-only): a hint fires exactly once, on the
+## HINT BUBBLES (scenes/hints.gd, representation-only): a hint fires exactly once, on the
 ## acquisition EDGE (0 → >0 this session); pre-stocked packs fire nothing; simultaneous triggers queue
 ## one-at-a-time; resync() (after a load) re-arms the snapshot without re-teaching.
 func _test_hints() -> void:
@@ -2762,7 +2762,7 @@ func _test_hint_water() -> void:
 	_check(h3.active_text().begins_with("AQUIFER"), "…the queued water hint shows after the pack hint")
 
 
-## FALLING-ITEM POOLING + CAP (FABLE_50 #5 — scenes/falling_items.gd, cosmetic layer): live drops are
+## FALLING-ITEM POOLING + CAP (scenes/falling_items.gd, cosmetic layer): live drops are
 ## HARD-CAPPED (the abstract flow layer is authoritative, extra visuals are pure churn); retired drops
 ## recycle through a pool; the motes() scratch tracks the live count. Behavioral only — no allocation
 ## probes, just the observable contract the pool must keep.
@@ -2787,7 +2787,7 @@ func _test_falling_pool() -> void:
 		"a reused drop carries ITS OWN fields, not the retired one's")
 
 
-## THE SCANNER (FABLE_50 #27): the first TOOL behind research — Prospecting (the tree's first branch)
+## THE SCANNER: the first TOOL behind research — Prospecting (the tree's first branch)
 ## gates crafting it via the SAME sim-level craft_unlocked gate machines use; ungated tools stay free.
 ## The scan itself is a pure query (zero sim state), so what's testable headless is the gate + pacing.
 func _test_scanner() -> void:
@@ -2818,7 +2818,7 @@ func _test_scanner() -> void:
 		_check(present == net, "%s conserved through research + craft (present=%d, net=%d)" % [item, present, net])
 
 
-## FINE TERRAIN (docs/FINE_TERRAIN.md P2 — the dual-grid overhaul). The fine grid is ADDITIVE + DERIVED:
+## FINE TERRAIN (P2 — the dual-grid overhaul). The fine grid is ADDITIVE + DERIVED:
 ## it must be (a) deterministic from seed, (b) NEVER change the coarse authority that ALL logistics read,
 ## (c) stay in sync when a coarse cell is edited, and (d) rebuild identically after a load. If any of these
 ## breaks, the locked hook or the save format is at risk — so this is a guardrail, not a feature test.

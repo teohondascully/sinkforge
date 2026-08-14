@@ -14,7 +14,7 @@ extends Node2D
 const CELL: int = 32
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface (the gradient's mid tone)
-## PARALLAX ridgeline layers (FABLE_50 #10): factor = how world-locked (1 = terrain speed, 0 = pinned
+## PARALLAX ridgeline layers: factor = how world-locked (1 = terrain speed, 0 = pinned
 ## to the camera — smaller reads further away), drop = px below the horizon band the ridge crests sit,
 ## amp = crest height. Far hills are lighter (atmospheric haze), near hills darker.
 const RIDGES: Array[Dictionary] = [
@@ -69,7 +69,7 @@ const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lam
 const LAMP_RADIUS: float = CELL * 3.9               ## a warm pool with a higher-contrast falloff (was 4.0)
 const LAMP_LEAD: float = CELL * 1.9                 ## how far the beam pool leads toward the aim (#44)
 
-## --- Day/night (FABLE_50 #29, cosmetic-first) ---------------------------------------------------
+## --- Day/night (cosmetic-first) ---------------------------------------------------
 ## A slow surface rhythm off the cosmetic clock: the backdrop sky, the skylight veil, the godrays and
 ## the bird all breathe with it; the UNDERGROUND is untouched (no sun down there anyway — its ambient
 ## is the same by day or night, so the moody deep stays the moody deep). At night the surface dims
@@ -105,12 +105,12 @@ var particles: Particles                              ## cosmetic juice layer (s
 var _font: Font = ThemeDB.fallback_font
 var _anim_time: float = 0.0                          ## free-running cosmetic clock (never feeds the sim)
 var _materials: Dictionary = {}                      ## id -> MaterialDef (world-engine viz registry)
-## MACHINE CONSTRUCT ANIMATION (FABLE_NEXT_50 #9): cell -> elapsed seconds since placement. MainView
+## MACHINE CONSTRUCT ANIMATION: cell -> elapsed seconds since placement. MainView
 ## pokes note_machine_built() on a real build (never on boot/load — pre-existing machines don't animate,
 ## the note_dig pattern). A short one-shot assemble overlay (flash + rising scan + bracket snap) plays.
 var _construct: Dictionary = {}
 const CONSTRUCT_DUR: float = 0.38
-## MINE CRUMBLE (FABLE_NEXT_50 #18): a just-mined block shatters into four chunks that fly apart, fall
+## MINE CRUMBLE: a just-mined block shatters into four chunks that fly apart, fall
 ## and fade instead of popping out of existence — the removed rock leaves with weight. MainView pokes
 ## note_mined() on a real dig (the note_dig discipline). [{pos, col, age}], capped so a fast dig can't
 ## pile up unbounded.
@@ -132,7 +132,7 @@ var _mine_frac: float = 0.0                           ## 0..1 break-charge of th
 var _dig_marks: Dictionary = {}                       ## the dig PLAN (live ref from MainView) — hatched overlay
 var _ping_world: Vector2 = Vector2.INF                ## the map-click PING (INF = none) — in-world beacon
 var _daylight_step: int = -1                          ## quantized daylight — veil repaint trigger (#29)
-## THE SCANNER pulse (FABLE_50 #27, pushed by try_scan): origin + age drive an expanding wavefront;
+## THE SCANNER pulse (pushed by try_scan): origin + age drive an expanding wavefront;
 ## each echo ({pos, dist, material}) lights up as the front passes its true distance, lingers, fades.
 const SCAN_WAVE_SPEED: float = 260.0                  ## wavefront px/s — the controller staggers audio off it
 const SCAN_ECHO_LINGER: float = 4.0                   ## seconds an echo stays readable after its hit
@@ -173,7 +173,7 @@ var _fine_region_pending: bool = false
 var _fine_dirty_min: Vector2i = Vector2i.ZERO
 var _fine_dirty_max: Vector2i = Vector2i.ZERO
 var _dark: LightLayer
-## THE LIGHTMAP VEIL (FABLE_50 #17): the darkness is a small texture — ONE TEXEL PER CELL (RGB =
+## THE LIGHTMAP VEIL: the darkness is a small texture — ONE TEXEL PER CELL (RGB =
 ## the shadow colour, zone-tinted; A = darkness) — stretched over the whole world with LINEAR
 ## filtering, so light grades smoothly in EVERY direction instead of stepping cell to cell. The
 ## skylight/ambient BASE bakes only when terrain or the daylight step changes (_veil_dirty); each
@@ -254,7 +254,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_terrain_layer.setup(-10, false, _paint_terrain_bake)
 	_terrain_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(_terrain_layer)
-	# The PARALLAX BACKDROP (FABLE_50 #10) sits BELOW the terrain chunks (z -20), repainted per frame:
+	# The PARALLAX BACKDROP sits BELOW the terrain chunks (z -20), repainted per frame:
 	# a vertical sky gradient + two drifting ridgelines + slow clouds. The chunk background pass no
 	# longer fills opaque sky, so the vista shows wherever no wall backs a cell (above ground); the
 	# walls hide it underground for free.
@@ -284,7 +284,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_lights = LightLayer.new()
 	_lights.setup(51, true, _paint_lights)
 	add_child(_lights)
-	# THE DISTORTION PASS (FABLE_50 #20): one shared screen-warp shader; consumers draw masked quads.
+	# THE DISTORTION PASS: one shared screen-warp shader; consumers draw masked quads.
 	# Proven here on machine heat-haze. Sits ABOVE the world + veil but UNDER the additive light pools
 	# (hot air bends the scene, lamplight stays crisp).
 	_haze = LightLayer.new()
@@ -346,13 +346,13 @@ func set_dig_marks(marks: Dictionary) -> void:
 	_dig_marks = marks
 
 
-## The player's PING (FABLE_50 #34 — set by clicking the minimap; Vector2.INF = none): drawn in-world
+## The player's PING (set by clicking the minimap; Vector2.INF = none): drawn in-world
 ## as a pulsing beacon so "the spot I marked on the map" is findable when you walk up to it.
 func set_ping(world: Vector2) -> void:
 	_ping_world = world
 
 
-## Begin a SONAR pulse (FABLE_50 #27): the controller computed the echoes (a pure deposits query);
+## Begin a SONAR pulse: the controller computed the echoes (a pure deposits query);
 ## from here the wavefront + echo lifecycle are cosmetic clockwork.
 func start_scan(origin: Vector2, echoes: Array[Dictionary]) -> void:
 	_scan_origin = origin
@@ -380,7 +380,7 @@ func _process(delta: float) -> void:
 		if _scan_age > _scan_range / SCAN_WAVE_SPEED + SCAN_ECHO_LINGER:
 			_scan_age = -1.0    # pulse spent, every echo faded — the scan is over
 			_scan_echoes = []
-	# The head-lamp FOLLOWS THE AIM (FABLE_50 #44): the pool leads from the head toward the cursor
+	# The head-lamp FOLLOWS THE AIM: the pool leads from the head toward the cursor
 	# (capped), eased so a mouse flick swings the beam like a worn lamp, not a snapped spotlight.
 	# Cursor on/next to the body → fall back to plain facing so the light never collapses onto you.
 	if player != null:
@@ -496,7 +496,7 @@ func _draw() -> void:
 	_draw_aim()
 
 
-## THE SONAR (FABLE_50 #27): an expanding wavefront ring from the body, and — as it passes each vein's
+## THE SONAR: an expanding wavefront ring from the body, and — as it passes each vein's
 ## true distance — an ECHO: a pip + expanding ring in the vein's own nugget colour, glowing THROUGH the
 ## rock, lingering a few seconds then gone. Prospecting, not a map reveal: transient, local, and it
 ## only ever shows deposits that were in range when you fired.
@@ -529,7 +529,7 @@ func _draw_scan() -> void:
 		draw_circle(pos, 1.6, Color(1.0, 1.0, 1.0, 0.55 + 0.4 * fade))
 
 
-## The in-world PING beacon (FABLE_50 #34): a cyan pin bobbing over the marked spot + an expanding
+## The in-world PING beacon: a cyan pin bobbing over the marked spot + an expanding
 ## sonar ring, so the bookmark you clicked on the map is visible from across a cavern when you arrive.
 func _draw_ping() -> void:
 	if _ping_world.x == INF:
@@ -547,7 +547,7 @@ func _draw_ping() -> void:
 	draw_circle(head, 1.4, Color(0.06, 0.10, 0.14))
 
 
-## The painted dig PLAN (FABLE_50 #24): each marked cell wears amber corner brackets + a whisper of
+## The painted dig PLAN: each marked cell wears amber corner brackets + a whisper of
 ## fill, breathing gently so the plan reads as "queued for the pick", quieter than the aim cursor and
 ## the objective rings. Marks are the controller's live dict; stale entries are its job to prune.
 func _draw_dig_marks() -> void:
@@ -597,12 +597,12 @@ func _draw_mine_cracks() -> void:
 	draw_circle(center, 1.5 + 2.0 * _mine_frac, Color(1.0, 0.96, 0.85, 0.5 * _mine_frac))  # impact pip
 
 
-## Living veins (FABLE_50 #19): one fleck per ore cell FLARES briefly on a slow per-cell staggered
+## Living veins: one fleck per ore cell FLARES briefly on a slow per-cell staggered
 ## schedule, so a vein glitters in the lamplight and discovery reads from across a dark cavern. Walks
 ## sim.deposits (the sparse seeded-vein index — never the whole world) clipped to the camera view.
 ## THE SEAL gets its own tell: a slow faint violet breath along its two rows (lazy row scan). Pure
 ## cosmetics on the free-running clock; the sim never sees any of it.
-## SURFACE LIFE (FABLE_50 #15): the top of the world stops reading static. Each canopy cell sheds a
+## SURFACE LIFE: the top of the world stops reading static. Each canopy cell sheds a
 ## drifting leaf on its own long cycle (stateless — position is a pure function of the cosmetic clock,
 ## the ore-glint trick), and every so often a bird crosses the sky. Zero allocations, zero sim reads
 ## beyond the cached canopy list (rebuilt only when terrain changes — a felled tree stops shedding).
@@ -843,7 +843,7 @@ func _paint_terrain_bake(layer: LightLayer) -> void:
 		Rect2(Vector2.ZERO, WORLD_SIZE), false)
 
 
-## Draw the placed power conduits (docs/POWER.md): each tube is a copper segment with stubs to whatever
+## Draw the placed power conduits: each tube is a copper segment with stubs to whatever
 ## it couples to (adjacent conduits, the generator feeding it, a machine drawing from it), and an inner
 ## CHANNEL that glows from dim to gold by the live power it carries — so a powered trunk reads as a bright
 ## line pouring down the shaft and a dead tube reads dark. The power level is the derived field, read-only.
@@ -881,7 +881,7 @@ func _conduit_level(cell: Vector2i) -> float:
 	return clampf(sim.power_at(cell) / FactorySim.CONDUIT_CAPACITY, 0.0, 1.0)
 
 
-## POWER PULSES (FABLE_NEXT_50 #19): bright beads travel the LIVE conduit network so energy visibly
+## POWER PULSES: bright beads travel the LIVE conduit network so energy visibly
 ## FLOWS — down every vertical link and outward (downhill) along laterals, NEVER up (the game's locked
 ## hook made visible). Bead count + brightness scale with the power the tube carries; a dead tube shows
 ## nothing. Pure cosmetic clockwork over the copper draw — reads the derived power field, never writes.
@@ -949,7 +949,7 @@ func _draw_ropes() -> void:
 			draw_line(bot, bot + Vector2(sway * 2.0, -5.0), HEMP.darkened(0.1), 1.6)  # frayed tail curl
 
 
-## Draw the mounted torches (FABLE_50 #26): the shared Visuals glyph, live-guttering on the cosmetic
+## Draw the mounted torches: the shared Visuals glyph, live-guttering on the cosmetic
 ## clock. The warm pool each one casts is painted by _paint_lights; here is just the stick + flame.
 func _draw_torches() -> void:
 	var view: Rect2 = _view_world_rect(2.0)
@@ -992,7 +992,7 @@ func _draw_terrain(ci: CanvasItem, rect: Rect2i) -> void:
 	_draw_terrain_surface(ci, rect)
 
 
-## The concave half of the autotile (FABLE_50 #9): wherever an OPEN cell's corner meets two solid
+## The concave half of the autotile: wherever an OPEN cell's corner meets two solid
 ## orthogonal faces (a floor meeting a wall, a ceiling meeting a pillar), a quarter-round shoulder of
 ## the supporting rock's own colour fills that corner — carved junctions read as worn rock, not Lego
 ## seams. Bottom corners take the FLOOR cell's colour, top corners the CEILING's. Runs per chunk after
@@ -1033,7 +1033,7 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 		var pos := Vector2(c) * float(CELL)
 		var def: MaterialDef = _material(sim.solid[c])
 		# Sprite-ready: if a tile PNG exists for this material, draw it and skip the procedural fill
-		# (still draw the surface cap/ramp pass below). Phase B of docs/ART_SPEC.md.
+		# (still draw the surface cap/ramp pass below).
 		var tile: Texture2D = Art.tex("tile_" + String(def.id))
 		if tile != null:
 			ci.draw_texture_rect(tile, Rect2(pos, Vector2(CELL, CELL)), false)
@@ -1048,7 +1048,7 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 			ci.draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
 			ci.draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
 		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
-			# Speck DENSITY tracks the remaining deposit (docs/MINING.md): a rich body sparkles thickly, a
+			# Speck DENSITY tracks the remaining deposit: a rich body sparkles thickly, a
 			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
 			# bottom-up visibly fades. (Cells with no pool entry = amount 1 = today's sparse look.)
 			# BLIND-PLAYTEST FIX: a vein must read as MINERAL-IN-ROCK, not warm blobs. The instrument kept
@@ -1075,7 +1075,7 @@ func _draw_terrain_cell(ci: CanvasItem, c: Vector2i) -> void:
 		_draw_edge_ao(ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
 
 
-## The cell's body FILL, autotiled (FABLE_50 #9): instead of a flat square, the silhouette CHAMFERS
+## The cell's body FILL, autotiled: instead of a flat square, the silhouette CHAMFERS
 ## every convex corner — a 45° cut wherever two adjacent faces are both open — so free edges read as
 ## weathered earth, a lone block reads as a boulder, and cave mouths lose the Lego. The 45° echoes the
 ## ramp language (one diagonal vocabulary everywhere). The cut is skipped on the top corners of the
@@ -1109,7 +1109,7 @@ func _draw_cell_silhouette(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color
 	ci.draw_colored_polygon(pts, col)
 
 
-## DEPTH-ZONE PALETTES (FABLE_50 #13): each zone pulls the terrain toward its own temperature, eased
+## DEPTH-ZONE PALETTES: each zone pulls the terrain toward its own temperature, eased
 ## across a transition band so strata read as different PLACES, not stripes. Topsoil keeps its warm
 ## material colours (no entry = no tint); Stonereach below THE SEAL chills toward cold slate-blue.
 ## A new depth layer = one new row here (rows straddle the transition; strength is the held tint).
@@ -1153,7 +1153,7 @@ func _cell_jitter(c: Vector2i) -> float:
 
 ## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
 ## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
-## CORNER-AWARE (FABLE_50 #14): each strip INSETS where the silhouette chamfered that corner (no AO
+## CORNER-AWARE: each strip INSETS where the silhouette chamfered that corner (no AO
 ## sliver floating over the 45° cut), and where a face DEAD-ENDS into an overhang (perpendicular
 ## neighbour solid but the diagonal past it solid too — a concave inside corner) a nested SCOOP patch
 ## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
@@ -1360,7 +1360,7 @@ func _draw_guide_targets() -> void:
 		draw_colored_polygon([tip + Vector2(0, 9), tip + Vector2(-8, -5), tip + Vector2(8, -5)], arrow)
 
 
-## An INTERACTABLE outline pulse (FABLE_50 #21): a breathing coloured outline + solid corner brackets
+## An INTERACTABLE outline pulse: a breathing coloured outline + solid corner brackets
 ## around the hovered thing — the modern "you can act on this" affordance, in the thing's OWN colour so
 ## a drill pulses steel and an ore vein pulses ore. Drawn, not shadered: machines and terrain here are
 ## procedural canvas paint, so there's no texture a shader outline could sample — the drawn pulse is
@@ -1547,7 +1547,7 @@ func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> 
 			t += dash * 2.0
 
 
-## THE PARALLAX BACKDROP (FABLE_50 #10 + the #29 day/night sky): what the sky IS when nothing backs a
+## THE PARALLAX BACKDROP (day/night sky): what the sky IS when nothing backs a
 ## cell. A vertical gradient breathing between DAY and NIGHT palettes on the day clock, a sun/moon
 ## riding its arc, stars fading in after dusk, two ridgeline silhouettes sliding at sub-terrain speed,
 ## and a few slow clouds. Fully deterministic per frame from the camera + the cosmetic clock.
@@ -1959,7 +1959,7 @@ func _machine_active(machine: MachineState) -> bool:
 			return _held(machine) > 0 or machine.progress > 0.0
 
 
-## The drop-in ANIMATION standard (docs/ART_SPEC.md Phase C): how fast the 2-frame working cycle chugs.
+## The drop-in ANIMATION standard: how fast the 2-frame working cycle chugs.
 ## One shared cadence so a bank of machines reads as one factory, not a zoo of tempos; the lift's frames
 ## ride its surged clock so power still visibly speeds it up.
 const WORK_ANIM_FPS: float = 4.0
@@ -2054,7 +2054,7 @@ func _draw_machine(machine: MachineState) -> void:
 	if machine.def.behavior == &"lift":
 		clock = _anim_time * (1.0 + machine.power_factor)   # the chevrons surge when powered
 	# Sprite-ready: a machine_<id>.png replaces the code-drawn casing+glyph, and while WORKING the
-	# 2-frame machine_<id>_work_0/1 cycle plays (docs/ART_SPEC.md Phase A + C); the badge / progress
+	# 2-frame machine_<id>_work_0/1 cycle plays; the badge / progress
 	# bar / I/O ports below still overlay it. Absent → today's primitive look.
 	var spr: Texture2D = _machine_sprite(machine, active, clock)
 	if spr != null:
@@ -2103,7 +2103,7 @@ func _draw_machine(machine: MachineState) -> void:
 		_draw_construct(pos, clampf(float(_construct[machine.cell]) / CONSTRUCT_DUR, 0.0, 1.0))
 
 
-## The one-shot ASSEMBLE overlay for a just-placed machine (FABLE_NEXT_50 #9): a settling flash that
+## The one-shot ASSEMBLE overlay for a just-placed machine: a settling flash that
 ## fades, a bright scan line sweeping up the casing (the frame "prints" upward), and corner brackets
 ## snapping inward to lock the frame. All additive/overlay — never hides the terrain. t: 0→1.
 func _draw_construct(pos: Vector2, t: float) -> void:
@@ -2185,7 +2185,7 @@ func _draw_machine_label(machine: MachineState, pos: Vector2) -> void:
 ## Small item-tinted PORTS on a machine's edges: where it EATS (input mouth, top, points IN) and where
 ## it SPITS (output spout, in the flow direction — down for a recipe-runner/source, down+right for a
 ## splitter, up for a lift). Tinted by the item so you learn "orange goes in here, yellow comes out
-## there" at a glance — the in-world half of the I/O affordances (VIBE_GAP #8). Pure cosmetic.
+## there" at a glance — the in-world half of the I/O affordances. Pure cosmetic.
 func _draw_machine_io(machine: MachineState, pos: Vector2) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	var c: float = float(CELL)
@@ -2242,7 +2242,7 @@ func _view_world_rect(margin_cells: float = 1.0) -> Rect2:
 
 # --- Lighting passes (painted by the LightLayer children; pure visuals) -------
 
-## THE LIGHTMAP VEIL (FABLE_50 #17): the whole darkness is ONE stretched texture draw — one texel
+## THE LIGHTMAP VEIL: the whole darkness is ONE stretched texture draw — one texel
 ## per cell, linear-filtered over the world, so light grades smoothly sideways as well as down (the
 ## old pass drew a rect per cell: hard vertical edges on every lit shaft). Content lives in the
 ## texture; this draw command never re-issues.
@@ -2553,7 +2553,7 @@ func _paint_lights(layer: LightLayer) -> void:
 			if kind == "furnace" or (kind == "generator" and machine.fuel > 0):
 				var core := Color(1.0, 0.94, 0.82).lerp(col, 0.18)   # near-white, a whisper of the pool's hue
 				layer.draw_circle(_cell_center(machine.cell), 2.4 + 1.1 * pulse, Color(core.r, core.g, core.b, 0.85 * pulse))
-	# Torches: the placeable light (FABLE_50 #26). Each mounted torch casts a warm guttering pool —
+	# Torches: the placeable light. Each mounted torch casts a warm guttering pool —
 	# smaller than the head-lamp, but it STAYS: dropped along a dig, they mark the route home, and a
 	# lit cave reads as claimed territory in the black.
 	for cell: Variant in sim.torch:
@@ -2622,7 +2622,7 @@ func _paint_lights(layer: LightLayer) -> void:
 			_draw_glow(layer, _cell_center(wc), float(CELL) * 1.15, WATER_SHEEN, wintensity * wshim)
 
 
-## GODRAYS (FABLE_50 #12) — the signature shot: where a dug shaft admits the sky below the enclosing
+## GODRAYS — the signature shot: where a dug shaft admits the sky below the enclosing
 ## ground, a soft daylight BEAM pours down it, fading exactly where the skylight veil fades (SKY_REACH),
 ## with a slow shimmer. A column qualifies when its sky-lit air drops ≥2 rows below an adjacent surface
 ## edge (dug shafts + carved notches; 1-row slope steps stay clean). Per-vertex alpha polygons on the

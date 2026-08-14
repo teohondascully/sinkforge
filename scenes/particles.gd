@@ -45,7 +45,7 @@ func pop(pos: Vector2, color: Color) -> void:
 	burst(pos, 6, color, 70.0, 0.5, 2.6, 0.45, -40.0)
 
 
-## A tight chip off a struck rock face (the per-blow mining tick, FABLE_50 #40): a few quick flecks
+## A tight chip off a struck rock face (the per-blow mining tick): a few quick flecks
 ## flung along `dir_ang` (radians — usually back toward the digger). Smaller than a break.
 func chip(pos: Vector2, color: Color, dir_ang: float) -> void:
 	burst(pos, 3, color, 110.0, 0.7, 2.2, 0.28, 260.0, -PI * 0.5 - dir_ang)

@@ -1,7 +1,7 @@
 class_name Hints
 extends RefCounted
 
-## JUST-IN-TIME teaching (FABLE_50 #35): the first time an item that carries a non-obvious USE lands in
+## JUST-IN-TIME teaching: the first time an item that carries a non-obvious USE lands in
 ## your pack, a small bubble near the body says how to use it — "RMB above a drop: the rope unrolls down
 ## to you" — exactly when the knowledge is actionable, then never again. It extends the Objectives chain
 ## (which signposts the tutorial PATH) into the open game: research unlocks a Generator two hours in and

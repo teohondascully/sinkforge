@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Harness layer: LIVE save/load (FABLE_50 #1). Boots the REAL scene, saves via the same method F5
+## Harness layer: LIVE save/load. Boots the REAL scene, saves via the same method F5
 ## drives, damages the world (digs cells, moves the body, spends items), loads via F9's method, and
 ## asserts the world + body came back EXACTLY — the in-scene proof the sim tests can't give (renderer
 ## repaint, player restore, the user:// file round-trip inside a running game). HEADED:

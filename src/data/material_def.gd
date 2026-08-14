@@ -1,7 +1,7 @@
 class_name MaterialDef
 extends Resource
 
-## A TERRAIN MATERIAL — the shared vocabulary of the world-engine handshake (see docs/WORLDGEN.md).
+## A TERRAIN MATERIAL — the shared vocabulary of the world-engine handshake.
 ## A cell in the world holds a material `id` (StringName); everything ELSE about that material lives
 ## here. The GENERATOR emits ids only (it never imports these Resources); the VISUALISER maps
 ## `id -> MaterialDef -> appearance` through the registry. So gen and viz share only the id

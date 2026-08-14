@@ -1,6 +1,6 @@
 extends SceneTree
 
-## The MISSING traversal component (VIBE_GAP harness gap): asserts the body can climb a ≤1-tile rise by
+## The MISSING traversal component: asserts the body can climb a ≤1-tile rise by
 ## WALKING — with jumping DISABLED, so nothing masks the jam (check_walk's stuck-jump hops obstacles and
 ## hides exactly these bugs). Two real-world cases the heightmap slope-follow can't cover:
 ##   A. climb OUT of a dug 1-wide pit you fell into (a valley → ramp_dir 0)

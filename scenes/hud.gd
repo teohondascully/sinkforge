@@ -42,7 +42,7 @@ var inv_selected_getter: Callable
 var hover_info: Dictionary = {}
 var _hover_rect: Rect2 = Rect2()          ## the inspector's canvas rect this frame (#32 — pin region)
 var _knob_hits: Array[Dictionary] = []    ## clickable knob chips this frame: [{rect, payload}]
-## FACTORY ALERTS (FABLE_NEXT_50 #29): stalled machines from sim.machine_problems(), pushed each frame.
+## FACTORY ALERTS: stalled machines from sim.machine_problems(), pushed each frame.
 ## A compact LEFT-edge stack that appears ONLY when something's stuck (calm-by-default), each row
 ## clickable to ping the culprit. _alert_hits = this frame's clickable rects [{rect, cell}].
 var alerts: Array[Dictionary] = []
@@ -78,14 +78,14 @@ var _craft_scroll: float = 0.0
 var _craft_scroll_max: float = 0.0
 const CRAFT_ROW_H: float = 24.0
 var show_minimap: bool = false
-var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden (FABLE_50 #34)
+var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden
 ## The player's PING marker in world coords (Vector2.INF = none) — set by clicking the open map;
 ## MainView owns it and pushes it here + to the renderer (which draws the in-world beacon).
 var ping_world: Vector2 = Vector2.INF
 var show_help: bool = false
-var show_tech: bool = false        ## T — the TECH TREE graph (FABLE_50 #30)
+var show_tech: bool = false        ## T — the TECH TREE graph
 var show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD (throughput bars + factory census)
-## THE SETTINGS page (FABLE_50 #36): ESC on a calm screen. Values are read straight off the Settings
+## THE SETTINGS page: ESC on a calm screen. Values are read straight off the Settings
 ## statics (representation reading representation); every control click returns a payload through
 ## settings_click() for MainView to act on — the HUD never touches InputMap, audio or the config file.
 var settings_open: bool = false
@@ -97,13 +97,13 @@ var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this fr
 var _flash_text: String = ""
 var _flash_life: float = 0.0
 
-## The just-in-time HINT BUBBLE (FABLE_50 #35, pushed by MainView from the Hints tracker): a small
+## The just-in-time HINT BUBBLE (pushed by MainView from the Hints tracker): a small
 ## speech bubble anchored NEAR THE BODY teaching a newly-acquired item's use. Empty text = none.
 var hint_text: String = ""
 var hint_anchor: Vector2 = Vector2.ZERO   ## canvas-space point the tail points at (above the head)
 var hint_alpha: float = 0.0
 
-## ITEM TOOLTIPS (FABLE_50 #33): hover a hotbar/pack slot → what this item is FOR. One line per id —
+## ITEM TOOLTIPS: hover a hotbar/pack slot → what this item is FOR. One line per id —
 ## the reference card behind the one-shot acquisition hints. Machines answer "what does placing it buy";
 ## resources answer "what wants this". Absent id = no purpose line (name + count still show).
 const ITEM_PURPOSE: Dictionary = {
@@ -186,7 +186,7 @@ func _draw() -> void:
 	if show_help:
 		_draw_help_overlay()      # H / ? — the full controls list
 	if settings_open:
-		_draw_settings_overlay()  # ESC — audio / feel / the remap page (FABLE_50 #36)
+		_draw_settings_overlay()  # ESC — audio / feel / the remap page
 	if paused_getter.is_valid() and bool(paused_getter.call()):
 		var p := Rect2(CANVAS.x * 0.5 - 52.0, 8.0, 104.0, 26.0)
 		_panel(p, true)
@@ -269,7 +269,7 @@ func _draw_flash() -> void:
 
 
 ## The just-in-time HINT BUBBLE: a small speech bubble with a tail pointing down at the body, teaching
-## the item that just landed in the pack (FABLE_50 #35). Word-wrapped, gold-capped like every panel,
+## the item that just landed in the pack. Word-wrapped, gold-capped like every panel,
 ## faded by the tracker's envelope. Clamped on-canvas so a body near a world edge still gets taught.
 func _draw_hint_bubble() -> void:
 	if hint_text == "" or hint_alpha <= 0.01:
@@ -297,7 +297,7 @@ func _draw_hint_bubble() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.95, 0.90, 0.72, a))
 
 
-## FACTORY ALERTS (FABLE_NEXT_50 #29): a compact left-edge stack of stalled machines, shown ONLY when
+## FACTORY ALERTS: a compact left-edge stack of stalled machines, shown ONLY when
 ## something's actually stuck (calm-by-default — a healthy factory draws nothing here). Each row names
 ## the machine + count + why, and is CLICKABLE to drop a ping on the culprit so you can walk to it (the
 ## camera is body-locked; a beacon is the honest "take me there"). MainView pushes `alerts` + routes the
@@ -436,7 +436,7 @@ func _panel(rect: Rect2, accent: bool = false) -> void:
 ## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
 ## reach. Names it and shows its recipe as item chips (inputs → outputs) or its routing mode, plus what
 ## it's currently holding. The "where does this eat / spit / what does it make" answer without a manual.
-## CONFIG PANEL (FABLE_50 #32): machines with a knob also draw CLICKABLE rows — the splitter's three
+## CONFIG PANEL: machines with a knob also draw CLICKABLE rows — the splitter's three
 ## ratio chips, a filtered hopper's [clear] chip — and machines with a fill draw a real BAR (the
 ## engine's quota). MainView PINS the hover while the cursor crosses onto this panel, so the knobs are
 ## reachable; clicks land through hover_click() (every mutation stays a discrete sim call out there).
@@ -585,7 +585,7 @@ func minimap_frame() -> Rect2:
 
 ## The MINIMAP (M — corner; M again — LARGE): a cached image of the whole world — solid cells in their
 ## material colour, carved/dug cells as a dim wall backing, open sky as void — with the live overlays of
-## Minimap 2.0 (FABLE_50 #34): DEPTH BANDS (the violet seal line + the cold Stonereach wash below it),
+## Minimap 2.0: DEPTH BANDS (the violet seal line + the cold Stonereach wash below it),
 ## your machines, BAZAAR diamonds, a pulsing BREACH marker on every opened way down, your PING (click
 ## the map to set/clear it — the in-world beacon is the renderer's), the visible window, and YOU. The
 ## terrain image rebuilds only when you DIG (sim.solid changes), so per-frame cost is one textured blit.
@@ -623,7 +623,7 @@ func _draw_minimap() -> void:
 		var fill: float = clampf(float(sim.water[water_cell]) / float(FactorySim.WATER_MAX), 0.0, 1.0)
 		draw_rect(Rect2(origin + Vector2(water_cell) * scale, wcell),
 			Color(0.25, 0.62, 0.95, 0.30 + 0.45 * fill))
-	# --- FRONTIER REACH (FABLE_50 #28): where the factory's POWER and placed LIGHT actually extend —
+	# --- FRONTIER REACH: where the factory's POWER and placed LIGHT actually extend —
 	# "your reach is how deep you can survive" read straight off the map. Power = a warm amber wash
 	# per powered cell (brighter = more units, live off the derived sim.power field); placed torches =
 	# small warm halos. Subtle alphas so terrain stays readable under the claim.
@@ -853,7 +853,7 @@ func _draw_inventory_overlay() -> void:
 		# Clip the name to the space LEFT of the right-hand price/lock text (long names would collide).
 		var name_w: float = rr.size.x - (row_h - 1.0) - cw - 10.0
 		# Keys 1-9 then 0 cover the first ten rows; rows 11+ craft on SHIFT+digit (until the real
-		# tech-tree panel, FABLE_50 #30). The cap reads "s1" for shift-1.
+		# tech-tree panel). The cap reads "s1" for shift-1.
 		var keycap: String
 		if i < 9:
 			keycap = str(i + 1)
@@ -879,7 +879,7 @@ func _draw_inventory_overlay() -> void:
 
 ## The RESEARCH BENCH summary (the Bazaar's other half — docs/PROGRESSION.md §5): ONE row for the NEXT
 ## researchable tech ([R] + its analyze-sample + price), or a done-line when the tree is exhausted. The
-## full ladder is the TECH TREE overlay's job now ([T], FABLE_50 #30) — this row is the bench's handle
+## full ladder is the TECH TREE overlay's job now ([T]) — this row is the bench's handle
 ## on it, and the pack screen stops growing a row per tier.
 func _draw_research_bench(origin: Vector2, w: float, y0: float, row_h: float, head_h: float) -> void:
 	var y: float = y0 + 5.0
@@ -911,7 +911,7 @@ func _draw_research_bench(origin: Vector2, w: float, y0: float, row_h: float, he
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
 
 
-## THE TECH TREE (FABLE_50 #30, [T]): the research PULL's face — the ladder drawn as a GRAPH. Tiers
+## THE TECH TREE ([T]): the research PULL's face — the ladder drawn as a GRAPH. Tiers
 ## derive from each tech's `requires` chain, so when the tree branches (a wide tier), its chips simply
 ## stack in their column — zero layout changes. Chip states: DONE (green lamp, settled), NEXT (gold
 ## edge + [R] + live afford-price), LOCKED (dimmed; the arrow already says what opens it). Each chip
@@ -1028,7 +1028,7 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool) -> void:
 		draw_rect(rr, Color(0.0, 0.0, 0.0, 0.30))          # locked: the whole chip recedes
 
 
-## THE PRODUCTION DASHBOARD (FABLE_NEXT_50 #28, [G]): the flywheel made legible — the factory's whole
+## THE PRODUCTION DASHBOARD ([G]): the flywheel made legible — the factory's whole
 ## output at a glance so scaling is FELT, not guessed. Two columns, both pure sim reads: THROUGHPUT
 ## (production_rates() → per-item /min bars, relative + absolute, sorted fastest-first, grand total) and
 ## FACTORY (machine_census() → machines by type with a live working-count). Non-modal, like the tech
@@ -1159,7 +1159,7 @@ func _draw_help_overlay() -> void:
 		y += 16.0
 
 
-## THE SETTINGS page (FABLE_50 #36): audio sliders + feel chips on the left, the full REMAP list on
+## THE SETTINGS page: audio sliders + feel chips on the left, the full REMAP list on
 ## the right (the page the Controls foundation was built for). Every interactive control registers a
 ## hit-rect + payload; MainView routes clicks through settings_click() — the knob pattern (#32).
 const REMAP_ROWS: Array[Array] = [
@@ -1361,7 +1361,7 @@ func _draw_inventory() -> void:
 		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
 
 
-## The hovered slot's TOOLTIP (FABLE_50 #33): the item's name, the count you hold, and one purpose
+## The hovered slot's TOOLTIP: the item's name, the count you hold, and one purpose
 ## line — "what is this FOR" answered where the question is asked. Captured by the hotbar/pack-grid
 ## slot loops this frame; drawn last, above every panel, clamped on-canvas above the hovered slot.
 func _draw_item_tooltip() -> void:

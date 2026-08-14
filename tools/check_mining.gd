@@ -106,7 +106,7 @@ func _run() -> void:
 	_run_dig_queue(row)
 
 
-## THE DIG QUEUE (FABLE_50 #24) — the executable spec: paint a plan by sweeping the cursor down a
+## THE DIG QUEUE — the executable spec: paint a plan by sweeping the cursor down a
 ## column, then just HOLD the mine button with the cursor parked on open sky — the miner works the
 ## nearest marked in-reach cells one after another, hands-free of re-aiming. Reach still gates: a mark
 ## painted beyond reach stays queued (and undug) until you walk to it.

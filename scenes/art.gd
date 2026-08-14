@@ -1,7 +1,7 @@
 class_name Art
 extends RefCounted
 
-## Drop-in sprite loader (see docs/ART_SPEC.md). Returns a Texture2D for a logical key if its PNG exists
+## Drop-in sprite loader. Returns a Texture2D for a logical key if its PNG exists
 ## under assets/sprites/, else null so the caller falls back to its code-drawn primitive. Caches lookups
 ## (including misses) so a missing file is probed once. This is the seam that lets the user add art
 ## incrementally without touching draw code: no PNG → today's primitives; PNG present → their art.

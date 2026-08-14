@@ -1,7 +1,7 @@
 class_name Sfx
 extends Node
 
-## Procedural AUDIO — audio-lite (FABLE_50 #8, the missing sense). Every sound is SYNTHESIZED at boot
+## Procedural AUDIO — audio-lite (the missing sense). Every sound is SYNTHESIZED at boot
 ## (no assets): short 16-bit mono WAVs built from noise/sine primitives, played through a small pool of
 ## positional players, plus one looping factory HUM whose level follows how much machinery is working
 ## near you (the factory-heartbeat). Pure representation: MainView pokes play()/ui() from the same verb

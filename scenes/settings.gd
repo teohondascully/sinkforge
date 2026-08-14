@@ -1,7 +1,7 @@
 class_name Settings
 extends RefCounted
 
-## Player SETTINGS (FABLE_50 #36) — the machine-local preferences: audio levels, screen-shake, zoom,
+## Player SETTINGS — the machine-local preferences: audio levels, screen-shake, zoom,
 ## and the key BINDINGS the Controls foundation was built for. All static (any layer reads without
 ## wiring), persisted to a ConfigFile in user:// — deliberately SEPARATE from SaveGame: a save is a
 ## world, settings are this machine/person (they survive new games and never travel with a save).
