@@ -15,6 +15,7 @@ extends RefCounted
 ## the public API stay on FactorySim. Preloaded by PATH (not class_name) so the headless --script test
 ## drivers resolve them without a refreshed global-class cache. ---
 const WaterFlow := preload("res://src/core/water_flow.gd")
+const PowerFlow := preload("res://src/core/power_flow.gd")
 
 const TICKS_PER_SECOND: int = 20
 const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
@@ -1366,7 +1367,7 @@ func advance(delta: float) -> void:
 ## One deterministic logical step: derive the power field, every machine runs (consumers read the field),
 ## then items fall one stage downward.
 func tick() -> void:
-	_compute_power()
+	PowerFlow.compute(self)
 	for machine: MachineState in machines:
 		_run_machine(machine)
 	_flow()
@@ -1472,34 +1473,6 @@ func _prune_empty_ground() -> void:
 			ground.erase(cell)
 
 
-## Rebuild the power field from scratch: every FUELED generator stamps its innate aura,
-## then power floods further out through the conduit network (down+lateral, never up). Pure derived state —
-## cleared and recomputed each tick so it never desyncs from placement/fuel.
-func _compute_power() -> void:
-	power.clear()
-	for machine: MachineState in machines:
-		if _behavior_flag(machine.def, &"power_source") and machine.fuel > 0:
-			_emit_aura(machine.cell, GENERATOR_POWER)
-	if not conduit.is_empty():
-		_flow_power_through_conduits()
-
-
-## Stamp a generator's innate aura: an attenuating diamond (manhattan radius POWER_AURA) of power around
-## `origin`. Overlapping auras take the MAX (a supply reading, not a sum — two generators don't conjure
-## double power at a shared cell). The strength fades to 0 at the rim so the lit zone reads as a falloff.
-func _emit_aura(origin: Vector2i, amount: float) -> void:
-	for dy: int in range(-POWER_AURA, POWER_AURA + 1):
-		for dx: int in range(-POWER_AURA, POWER_AURA + 1):
-			var dist: int = absi(dx) + absi(dy)
-			if dist > POWER_AURA:
-				continue
-			var cell: Vector2i = origin + Vector2i(dx, dy)
-			if not in_bounds(cell):
-				continue
-			var v: float = amount * (1.0 - float(dist) / float(POWER_AURA + 1))
-			power[cell] = maxf(float(power.get(cell, 0.0)), v)
-
-
 ## Available power at a cell (the derived field; 0.0 where none reaches). Consumers read this to throttle;
 ## the view tints it. Pure read — no mutation, determinism untouched (mirrors updraft_at / material_at).
 func power_at(cell: Vector2i) -> float:
@@ -1514,69 +1487,6 @@ func power_throttle(cell: Vector2i, demand: float) -> float:
 	if demand <= 0.0:
 		return 1.0
 	return clampf(power_at(cell) / demand, 0.0, 1.0)
-
-
-## Flood power through the conduit network in ONE top-to-bottom sweep. Because power
-## only flows DOWN + LATERAL (never up), the network is acyclic by row, so each row is finalized before
-## the next reads it — no iterative solver. Per row: (1) VERTICAL inflow = the SUM of the feeders in the
-## row above (generators + conduits), so two trunks merging make a thicker stream, clamped to the tube's
-## CAPACITY (which also bounds any branch amplification). (2) HORIZONTAL spread = a lossy MAX delivery
-## both ways along the row's conduits (carry power across, e.g. the foot of an L) — the L→R then R→L
-## order is the deterministic tie-break that stops two side-by-side tubes from forming a same-row loop.
-## Finally each conduit cell writes into the field and BLEEDS to its neighbours so adjacent machines draw.
-func _flow_power_through_conduits() -> void:
-	var carried: Dictionary = {}                       # conduit cell -> power it carries this tick
-	# Touch only ACTUAL conduit cells, grouped by row, so a sparse network costs O(conduits), not O(grid).
-	var by_row: Dictionary = {}                         # y -> Array[int] of conduit x's in that row
-	for cell: Variant in conduit:
-		var c: Vector2i = cell
-		if not by_row.has(c.y):
-			by_row[c.y] = ([] as Array[int])
-		(by_row[c.y] as Array[int]).append(c.x)
-	var rows: Array = by_row.keys()
-	rows.sort()                                         # top→bottom: each row finalized before the next reads it
-	for y: int in rows:
-		var xs: Array[int] = by_row[y]
-		xs.sort()
-		# (1) vertical inflow from the row above (additive merge, capacity-clamped).
-		for x: int in xs:
-			var vin: float = 0.0
-			for dx: int in [-1, 0, 1]:
-				vin += _power_out_of(Vector2i(x + dx, y - 1), carried) * CONDUIT_V_KEEP
-			carried[Vector2i(x, y)] = minf(vin, CONDUIT_CAPACITY)
-		# (2) horizontal spread within the row: L→R then R→L lossy MAX (the same-row tie-break), only
-		# transferring between conduits that are actually adjacent in this row.
-		for i: int in range(1, xs.size()):
-			if xs[i] == xs[i - 1] + 1:
-				var cell := Vector2i(xs[i], y)
-				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(xs[i - 1], y)]) * CONDUIT_H_KEEP)
-		for i: int in range(xs.size() - 2, -1, -1):
-			if xs[i] == xs[i + 1] - 1:
-				var cell := Vector2i(xs[i], y)
-				carried[cell] = maxf(float(carried.get(cell, 0.0)), float(carried[Vector2i(xs[i + 1], y)]) * CONDUIT_H_KEEP)
-	# Merge the carried power into the field, and bleed it to neighbours so a machine beside a tube draws.
-	for cell: Vector2i in carried:
-		var v: float = float(carried[cell])
-		if v <= 0.0:
-			continue          # a tube carrying NO power adds no field entry — else consumers that read
-			                  # power.keys() as "lit" (minimap frontier-reach) wash an unpowered run powered
-		power[cell] = maxf(float(power.get(cell, 0.0)), v)
-		for nb: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var n: Vector2i = cell + nb
-			if in_bounds(n):
-				power[n] = maxf(float(power.get(n, 0.0)), v * CONDUIT_BLEED)
-
-
-## How much power a cell feeds DOWN into the conduit below it: a fueled generator pours its full output;
-## a conduit passes the power it carries; anything else feeds nothing. Read during the top-down sweep, so
-## a conduit feeder's `carried` value is already final (the row above was processed first).
-func _power_out_of(cell: Vector2i, carried: Dictionary) -> float:
-	if conduit.has(cell):
-		return float(carried.get(cell, 0.0))
-	var m: MachineState = grid.get(cell, null)
-	if m != null and _behavior_flag(m.def, &"power_source") and m.fuel > 0:
-		return GENERATOR_POWER
-	return 0.0
 
 
 ## Dispatch a machine's per-tick work through THE BEHAVIOR REGISTRY (_BEHAVIORS); no entry = the
