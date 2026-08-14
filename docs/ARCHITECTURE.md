@@ -37,11 +37,11 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   runs no recipe — it passes its incoming stream through and `_flow` divides it evenly between
   TWO destinations (down + the column to its right), dealt round-robin via the machine's
   `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
-  (PROVISIONAL edge, see docs/RISKS.md). A **lift** (`behavior == &"lift"`) routes UP (`_column_rise`)
+  (PROVISIONAL edge). A **lift** (`behavior == &"lift"`) routes UP (`_column_rise`)
   rate-limited by `LIFT_THROUGHPUT`; a **drill** (`behavior == &"drill"`) draws from the WORLD, not a
   buffer — `_run_drill` bores the first ore cell within `DRILL_REACH` straight below, drains its
   finite `deposits` pool (`_drain_deposit`, shared with hand-`mine`), and spits ore down its column
-  like an ordinary machine (docs/MINING.md).
+  like an ordinary machine.
 - **THE BEHAVIOR REGISTRY (`_BEHAVIORS`):** the ONE sim-side table wiring a `behavior` tag into the
   tick — per-tag `run` / `status` / `dests` hook method-names (dispatched via `call()`; names, not
   bound Callables, so a RefCounted sim never self-references) plus semantic flags (`updraft`,
@@ -57,17 +57,16 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   every other item through; at quota it BREACHES the contiguous seal below (`set_solid` + pile resettle).
   Misplaced = `blocked` and everything passes. Research-locked behind the `descent` tech.
 - **Placed layers (conduit / rope / torch):** sparse world layers beside `solid`/`wall`, NOT machines —
-  item-flow, collision, and the tick never see them. `conduit` carries power (docs/POWER.md). `rope`
+  item-flow, collision, and the tick never see them. `conduit` carries power. `rope`
   (`is_climbable`/`place_rope`/`remove_rope`) is the placeable climb: `place_rope(anchor)` UNROLLS down
   the open column one carried segment per cell (a stranded digger aims above themself and the rope drops
   to them); `remove_rope` cuts that segment + the hanging tail. The avatar reads `is_climbable` to climb
-  (representation-only, like the updraft). `torch` (`has_torch`/`place_torch`/`remove_torch`, FABLE_50
-  #26) is placeable LIGHT: mounts only on a BACKED open cell (wall behind or a solid neighbour); the
+  (representation-only, like the updraft). `torch` (`has_torch`/`place_torch`/`remove_torch`) is placeable LIGHT: mounts only on a BACKED open cell (wall behind or a solid neighbour); the
   warm pool it casts is pure representation (`_paint_lights`). ALL placed layers use symmetric ledger
   accounting (place = consumed, remove = produced) — **the ledger is total: every item id satisfies
   present == produced − consumed** (craft outputs count produced; placed machines count consumed;
   pickups produce back).
-- **Water — the fluid layer (L3 Aquifer, docs/WATER.md):** `water` (cell→integer level `1..WATER_MAX`)
+- **Water — the fluid layer (L3 Aquifer):** `water` (cell→integer level `1..WATER_MAX`)
   is authoritative world state beside `solid`/`wall`/`conduit`/`rope`/`torch`/`deposits`. Discrete-cell,
   integer-only (deliberately NOT per-pixel falling-sand — fits the discrete-cell hook). API
   `water_at`/`add_water`/`remove_water`/`total_water`. `_flow_water()` runs each tick (after `_flow`): a
@@ -77,7 +76,7 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   (`behavior == &"pump"`, `_run_pump`/`_status_pump`) is the fluid sibling of the lift — while POWERED it
   DRAINS its column (rate ∝ `power_throttle`, `PUMP_RATE`/`PUMP_REACH`), on-hook: water fell in free,
   pumping out costs power. Research-locked behind the `drainage` tech. Seeded from `WorldData.water` in
-  `load_world`; rides the save envelope + the determinism canary. See **docs/WATER.md**.
+  `load_world`; rides the save envelope + the determinism canary.
 - **Production rate (legibility):** a tick-driven ring buffer of `total_produced` snapshots (1/s, ~60s
   window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
   bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
@@ -85,12 +84,11 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
 - **Factory census (legibility):** `machine_census()` — a pure read over `grid` tallying machines by
   `def.id` with a live `machine_status`-derived working-count (`[{id, name, def, count, working}]`,
   most-numerous-first). Same role as `production_rates()` for the machine side; no state, never ticks.
-  The PRODUCTION DASHBOARD ([G], FABLE_NEXT_50 #28) draws both together — throughput bars + this census.
+  The PRODUCTION DASHBOARD ([G]) draws both together — throughput bars + this census.
 - **Factory alerts (legibility):** `machine_problems()` — a pure read over `grid` for machines that
   STALLED (`blocked`/`no_fuel`, grouped by id+status, worst-first, each carrying a representative cell;
-  starvation `no_input` excluded as "not hooked up yet"). Drives the calm-by-default alert stack
-  ([FABLE_NEXT_50 #29]); clicking a row pings the culprit (`set_ping`), since the camera is body-locked.
-- **Save/load — `SaveGame` (`src/core/save_game.gd`, FABLE_50 #1):** the sim being plain data makes a
+  starvation `no_input` excluded as "not hooked up yet"). Drives the calm-by-default alert stack; clicking a row pings the culprit (`set_ping`), since the camera is body-locked.
+- **Save/load — `SaveGame` (`src/core/save_game.gd`):** the sim being plain data makes a
   save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
   ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),
   in one VERSIONED envelope written with the binary Variant serializer (Vector2i keys round-trip; no
@@ -113,7 +111,7 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
   is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
   a distinctive 4×3 wood frame with an open interior — "active" is derived from the world, no state. The
-  decorated look + the block-by-block transform on completion live in the `Bazaars` view (docs/CRAFTING.md).
+  decorated look + the block-by-block transform on completion live in the `Bazaars` view.
 - **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
   ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
   by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT
@@ -133,9 +131,9 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   recipe-runner; a source = a recipe with no inputs; a thin `behavior: StringName` tag
   (default empty) lets the few non-recipe machines (currently the splitter) branch in the sim
   without a type-enum. PROVISIONAL machine model (see DECISIONS 2026-06-27 splitter entry).
-  Every def carries a stable `id: StringName` (save/reference safety, docs/RISKS.md).
+  Every def carries a stable `id: StringName` (save/reference safety).
 
-### World engine — the gen↔viz handshake (see docs/WORLDGEN.md)
+### World engine — the gen↔viz handshake
 - **Location:** `src/core/world_data.gd`, `src/core/world_gen.gd`,
   `src/core/heightmap_world_gen.gd`; `src/data/material_def.gd` + `src/data/materials/*.tres`.
 - **Responsibility:** Decouple HOW the world is generated from HOW it is visualised, so either
@@ -147,7 +145,7 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   - **`WorldData`** (`RefCounted`, plain data, no engine deps) — the handshake artifact a generator
     PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, the two grids `blocks` + `walls`
     (cell → material id), `amounts` (deposit richness), and `water` (cell → level, the L3 aquifer
-    grid `LayeredWorldGen._seed_aquifers` fills; ingested into `sim.water`, docs/WATER.md).
+    grid `LayeredWorldGen._seed_aquifers` fills; ingested into `sim.water`).
     The bounded, two-layer world.
   - **`WorldGen`** (`RefCounted`) — `generate(cols, rows, seed) -> WorldData`, contractually
     **deterministic** (seeded RNG). Concrete: `HeightmapWorldGen` (heightmap surface, seeded ore,
@@ -189,7 +187,7 @@ production state — delete them and the numbers are unchanged):
     LightLayer (additive) then lays the warm pools on top (flicker/pulse stays additive-only; the
     cuts are steady). Warm artificial light vs cold dark = the deliberate vibe, now with light that
     REVEALS rather than just tints.
-  - **Post-FX (modern-rendering, docs/MODERN_FEEL.md).** `MainView._setup_post_fx()` adds a
+  - **Post-FX (modern-rendering).** `MainView._setup_post_fx()` adds a
     `WorldEnvironment` (selective softlight GLOW on the bright cores + a gentle colour grade) and a
     full-screen LENS pass — `scenes/post_fx.gdshader` (vignette + film grain + edge chromatic
     aberration) on a ColorRect on a CanvasLayer at layer 5, BELOW the HUD (bumped to layer 10), so the
@@ -207,8 +205,7 @@ production state — delete them and the numbers are unchanged):
   material + you-here + viewport rect; rebuilt only when `sim.solid` changes; terrain colour via the
   renderer's `material_color` Callable), the FORGED chip, and the unified craft+hotbar "pack". Reads
   the sim + a few pushed values; never mutates.
-- **`Settings`** (`scenes/settings.gd`, static) — machine-local **player preferences** (FABLE_50
-  #36): audio levels (master → the Master bus; sound/ambience → dB offsets `Sfx` adds lazily),
+- **`Settings`** (`scenes/settings.gd`, static) — machine-local **player preferences**: audio levels (master → the Master bus; sound/ambience → dB offsets `Sfx` adds lazily),
   screen-shake toggle, zoom index, and key-binding OVERRIDES rebound into `InputMap` over the
   `Controls` defaults. Persists to `user://settings.cfg` (ConfigFile) — deliberately SEPARATE from
   `SaveGame`: a save is a world, settings are this machine. HARNESS RULE: `persist` is false by

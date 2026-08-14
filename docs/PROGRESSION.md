@@ -86,9 +86,9 @@ throughput governor lands here. (Its exact mechanics are an open sub-brainstorm 
   chain can coexist as accents on specific tiers.)
 - **Chain depth — medium (accessible-but-deep).** `ore → ingot → {plate, gear} → assembly`, ~2-3 stages per
   tier. Enough Factorio puzzle to satisfy; each **crafter module makes one clearly-readable thing** (the
-  legibility thesis). The per-item, gravity-fed crafter modules (docs/CRAFTING.md) are the hands that run
+  legibility thesis). The per-item, gravity-fed crafter modules are the hands that run
   these chains; this spine is the recipe GRAPH they were waiting on. **Ore quality** also gets its meaning
-  here: a deeper ore tier feeds higher-tier recipes (the demand-pull deferral in docs/MINING.md resolves —
+  here: a deeper ore tier feeds higher-tier recipes (the demand-pull deferral resolves —
   build quality WITH these tiers).
 
 ## 6. Threat model — frontier pressure
