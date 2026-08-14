@@ -1,0 +1,281 @@
+extends RefCounted
+
+## THE TERRAIN PAINTER — the coarse-terrain draw pipeline (per-cell fill/grain/ore-crystals, the autotile
+## silhouette chamfers + concave fillets, carved-edge ambient occlusion, and the walkable surface cap/ramp
+## pass), extracted from WorldRenderer so the renderer isn't carrying ~300 lines of terrain drawing.
+## Stateless: it paints onto the baked terrain CanvasItem the renderer hands it, reads terrain from r.sim,
+## and pulls each cell's APPEARANCE (colour/grain/speckles/material) from the renderer's shared helpers
+## (r._cell_fill_color / r._material / r._cell_speckles — those stay on WorldRenderer because walls,
+## fine-terrain and the minimap share them). Bake-time code (drawn once per dirty chunk into the terrain
+## SubViewport, not per frame), so the r.x reach-backs are amortized. Deterministic; purely cosmetic.
+
+## Draw the solid cells in `rect`, then the concave fillets + the surface cap/ramp pass for its columns.
+static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
+	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
+		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
+			var c := Vector2i(cx, cy)
+			if not r.sim.solid.has(c):
+				continue
+			_draw_terrain_cell(r, ci, c)
+	_draw_inner_fillets(r, ci, rect)   # concave junctions rounded into the open cells (autotile #9)
+	_draw_terrain_surface(r, ci, rect)
+
+
+## The concave half of the autotile: wherever an OPEN cell's corner meets two solid
+## orthogonal faces (a floor meeting a wall, a ceiling meeting a pillar), a quarter-round shoulder of
+## the supporting rock's own colour fills that corner — carved junctions read as worn rock, not Lego
+## seams. Bottom corners take the FLOOR cell's colour, top corners the CEILING's. Runs per chunk after
+## the cells; the surface cap/ramp pass paints after (over) it, so the walked line stays authoritative.
+static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
+	const R: float = 7.0
+	var s: float = float(WorldRenderer.CELL)
+	# Per corner: offsets of the two solid supports, the corner point in the open cell's box, the fan's
+	# start angle (degrees), and which support paints it (its own body colour).
+	var corners: Array = [
+		{"a": Vector2i(0, -1), "b": Vector2i(-1, 0), "pt": Vector2(0.0, 0.0), "deg": 0.0, "src": Vector2i(0, -1)},
+		{"a": Vector2i(0, -1), "b": Vector2i(1, 0), "pt": Vector2(s, 0.0), "deg": 90.0, "src": Vector2i(0, -1)},
+		{"a": Vector2i(0, 1), "b": Vector2i(1, 0), "pt": Vector2(s, s), "deg": 180.0, "src": Vector2i(0, 1)},
+		{"a": Vector2i(0, 1), "b": Vector2i(-1, 0), "pt": Vector2(0.0, s), "deg": 270.0, "src": Vector2i(0, 1)},
+	]
+	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
+		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
+			var c := Vector2i(cx, cy)
+			if r.sim.solid.has(c) or not r.sim.in_bounds(c):
+				continue
+			var pos := Vector2(c) * s
+			for k: Dictionary in corners:
+				if not r.sim.is_solid(c + (k["a"] as Vector2i)) or not r.sim.is_solid(c + (k["b"] as Vector2i)):
+					continue
+				var src: Vector2i = c + (k["src"] as Vector2i)
+				var col: Color = r._cell_fill_color(src, r._material(r.sim.material_at(src)))
+				var corner: Vector2 = pos + (k["pt"] as Vector2)
+				var fan := PackedVector2Array([corner])
+				for i: int in 4:
+					var a: float = deg_to_rad(float(k["deg"]) + 90.0 * float(i) / 3.0)
+					fan.append(corner + Vector2(cos(a), sin(a)) * R)
+				ci.draw_colored_polygon(fan, col)
+
+
+## One solid terrain cell: fill, grain, ore nuggets, and carved-edge AO. Split out of the cell loop so the
+## chunked painter can draw just its block's cells (was `for cell in sim.solid` over the whole world).
+static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) -> void:
+		var pos := Vector2(c) * float(WorldRenderer.CELL)
+		var def: MaterialDef = r._material(r.sim.solid[c])
+		# Sprite-ready: if a tile PNG exists for this material, draw it and skip the procedural fill
+		# (still draw the surface cap/ramp pass below).
+		var tile: Texture2D = Art.tex("tile_" + String(def.id))
+		if tile != null:
+			ci.draw_texture_rect(tile, Rect2(pos, Vector2(WorldRenderer.CELL, WorldRenderer.CELL)), false)
+			return
+		var col: Color = r._cell_fill_color(c, def)
+		_draw_cell_silhouette(r, ci, c, pos, col)
+		if def.grain:
+			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
+			# surface reads as textured rock rather than a colour swatch.
+			var sp: Array[Vector2] = r._cell_speckles(c, 3)
+			ci.draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
+			ci.draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
+			ci.draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
+		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
+			# Speck DENSITY tracks the remaining deposit: a rich body sparkles thickly, a
+			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
+			# bottom-up visibly fades. (Cells with no pool entry = amount 1 = today's sparse look.)
+			# BLIND-PLAYTEST FIX: a vein must read as MINERAL-IN-ROCK, not warm blobs. The instrument kept
+			# calling round warm flecks "embers/coals" (fire) — so the specks are now ANGULAR, dark-SOCKETED
+			# CRYSTALS (a rough faceted chip seated in a rock socket, a lit upper facet), the Terraria/Minecraft
+			# ore language. Kept below the glow HDR threshold so daylight ore does NOT bloom like an ember;
+			# the crystals glow only via the dark-gated seam pass underground.
+			var richness: int = int(r.sim.deposits.get(c, 1))
+			var nug_n: int = clampi(def.nugget_count + richness - 1, maxi(def.nugget_count, 4), def.nugget_count + 6)
+			var socket: Color = def.nugget_color.darkened(0.55)     # dark rock socket seats the crystal
+			var facet: Color = def.nugget_color.lightened(0.22)     # a hard mineral facet catching light (dim — no bloom)
+			for nug: Vector2 in r._cell_speckles(c, nug_n):
+				var p: Vector2 = pos + nug
+				const R: float = 3.2
+				# An IRREGULAR faceted chip (asymmetric quad = rough crystal, not a soft gem/blob).
+				var v0: Vector2 = p + Vector2(0.0, -R)
+				var v1: Vector2 = p + Vector2(R * 0.72, -R * 0.12)
+				var v2: Vector2 = p + Vector2(R * 0.16, R)
+				var v3: Vector2 = p + Vector2(-R * 0.72, R * 0.12)
+				var off := Vector2(0.6, 0.8)                         # socket offset (light from upper-left)
+				ci.draw_colored_polygon(PackedVector2Array([v0 + off, v1 + off, v2 + off, v3 + off]), socket)
+				ci.draw_colored_polygon(PackedVector2Array([v0, v1, v2, v3]), def.nugget_color)
+				ci.draw_colored_polygon(PackedVector2Array([v0, v1, p]), facet)  # upper-right face catches light
+		_draw_edge_ao(r, ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
+
+
+## The cell's body FILL, autotiled: instead of a flat square, the silhouette CHAMFERS
+## every convex corner — a 45° cut wherever two adjacent faces are both open — so free edges read as
+## weathered earth, a lone block reads as a boulder, and cave mouths lose the Lego. The 45° echoes the
+## ramp language (one diagonal vocabulary everywhere). The cut is skipped on the top corners of the
+## column's walkable surface cell: the cap/ramp pass owns that edge, and the seen line must stay
+## exactly the walked line. Sprite tiles (tile_<id>.png) bypass this — art brings its own edges.
+static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
+	const R: float = 7.0
+	var open_u: bool = not r.sim.is_solid(c + Vector2i(0, -1))
+	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
+	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
+	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
+	var keep_top: bool = r.sim.surface_row(c.x) == c.y     # the walk line — the cap/ramp pass owns it
+	var s: float = float(WorldRenderer.CELL)
+	var pts := PackedVector2Array()
+	if open_u and open_l and not keep_top:               # top-left
+		pts.append(pos + Vector2(0.0, R)); pts.append(pos + Vector2(R, 0.0))
+	else:
+		pts.append(pos)
+	if open_u and open_r and not keep_top:               # top-right
+		pts.append(pos + Vector2(s - R, 0.0)); pts.append(pos + Vector2(s, R))
+	else:
+		pts.append(pos + Vector2(s, 0.0))
+	if open_d and open_r:                                # bottom-right
+		pts.append(pos + Vector2(s, s - R)); pts.append(pos + Vector2(s - R, s))
+	else:
+		pts.append(pos + Vector2(s, s))
+	if open_d and open_l:                                # bottom-left
+		pts.append(pos + Vector2(R, s)); pts.append(pos + Vector2(0.0, s - R))
+	else:
+		pts.append(pos + Vector2(0.0, s))
+	ci.draw_colored_polygon(pts, col)
+
+
+## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
+## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
+## CORNER-AWARE: each strip INSETS where the silhouette chamfered that corner (no AO
+## sliver floating over the 45° cut), and where a face DEAD-ENDS into an overhang (perpendicular
+## neighbour solid but the diagonal past it solid too — a concave inside corner) a nested SCOOP patch
+## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
+## cells at a junction patch their own face, so the scoop is symmetric with zero cross-cell drawing.
+static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
+	const STEPS: int = 3
+	const CH: float = 7.0                              # the silhouette's chamfer radius — keep in lockstep
+	var open_u: bool = not r.sim.is_solid(c + Vector2i(0, -1))
+	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
+	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
+	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
+	var keep_top: bool = r.sim.surface_row(c.x) == c.y   # top corners uncut there — the cap pass owns them
+	var cs: float = float(WorldRenderer.CELL)
+	for i: int in STEPS:
+		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
+		var sh := Color(0.0, 0.0, 0.0, a)
+		var o: float = float(i) * 2.0
+		var s := 2.0
+		if open_u:
+			var x0: float = CH if (open_l and not keep_top) else 0.0
+			var x1: float = cs - (CH if (open_r and not keep_top) else 0.0)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + o, x1 - x0, s), sh)
+		if open_d:
+			var x0: float = CH if open_l else 0.0
+			var x1: float = cs - (CH if open_r else 0.0)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + cs - o - s, x1 - x0, s), sh)
+		if open_l:
+			var y0: float = CH if (open_u and not keep_top) else 0.0
+			var y1: float = cs - (CH if open_d else 0.0)
+			ci.draw_rect(Rect2(pos.x + o, pos.y + y0, s, y1 - y0), sh)
+		if open_r:
+			var y0: float = CH if (open_u and not keep_top) else 0.0
+			var y1: float = cs - (CH if open_d else 0.0)
+			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0), sh)
+	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops)
+	# AND the diagonal past it is solid too (an overhang roofs the junction). Each scoop: two nested
+	# rects hugging that end of the face, stacking extra dark onto the strips already there.
+	var solid_ul: bool = r.sim.is_solid(c + Vector2i(-1, -1))
+	var solid_ur: bool = r.sim.is_solid(c + Vector2i(1, -1))
+	var solid_dl: bool = r.sim.is_solid(c + Vector2i(-1, 1))
+	var solid_dr: bool = r.sim.is_solid(c + Vector2i(1, 1))
+	if open_u:
+		if not open_l and solid_ul:
+			_ao_scoop(ci, pos + Vector2(0.0, 0.0), Vector2(1.0, 0.0), true)
+		if not open_r and solid_ur:
+			_ao_scoop(ci, pos + Vector2(cs, 0.0), Vector2(-1.0, 0.0), true)
+	if open_d:
+		if not open_l and solid_dl:
+			_ao_scoop(ci, pos + Vector2(0.0, cs), Vector2(1.0, 0.0), false)
+		if not open_r and solid_dr:
+			_ao_scoop(ci, pos + Vector2(cs, cs), Vector2(-1.0, 0.0), false)
+	if open_l:
+		if not open_u and solid_ul:
+			_ao_scoop(ci, pos + Vector2(0.0, 0.0), Vector2(0.0, 1.0), true)
+		if not open_d and solid_dl:
+			_ao_scoop(ci, pos + Vector2(0.0, cs), Vector2(0.0, -1.0), true)
+	if open_r:
+		if not open_u and solid_ur:
+			_ao_scoop(ci, pos + Vector2(cs, 0.0), Vector2(0.0, 1.0), false)
+		if not open_d and solid_dr:
+			_ao_scoop(ci, pos + Vector2(cs, cs), Vector2(0.0, -1.0), false)
+
+
+## One concave-junction scoop: nested darkening rects growing from `corner` along `along` (the face
+## direction), hugging the face surface. `near_edge` = the face lies on the min side of the perpendicular
+## axis (top/left faces) vs the max side (bottom/right). Alphas stack on the face strips beneath.
+static func _ao_scoop(ci: CanvasItem, corner: Vector2, along: Vector2, near_edge: bool) -> void:
+	const DEPTH: float = 6.0                           # matches the strip stack (3 steps x 2 px)
+	for ext: float in [9.0, 5.0]:                      # two nested patches = a cheap gradient
+		var run: Vector2 = along * ext
+		var thick := Vector2(DEPTH, DEPTH) - along.abs() * DEPTH
+		if not near_edge:
+			thick = -thick
+		var rc := Rect2(corner, run + thick).abs()
+		ci.draw_rect(rc, Color(0.0, 0.0, 0.0, 0.11))
+
+
+## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
+## sim.ramp_dir) so the diagonal we DRAW is exactly the one the avatar WALKS. The ramp GEOMETRY is
+## universal (every material slopes); only the EDGE PAINT is material-specific (grass cap vs stone lip).
+static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
+	for col: int in range(rect.position.x, rect.position.x + rect.size.x):
+		if col >= FactorySim.GRID_COLS:
+			break
+		var row: int = r.sim.surface_row(col)
+		if row >= FactorySim.GRID_ROWS:
+			continue  # empty column, no surface
+		# Only THIS chunk's rows own the cap. (The wedge reaches one cell up into the chunk above, which is
+		# harmless — chunks aren't clipped — and that neighbour is dirtied on a dig so stale caps clear.)
+		if row < rect.position.y or row >= rect.position.y + rect.size.y:
+			continue
+		var cell := Vector2i(col, row)
+		var def: MaterialDef = r._material(r.sim.material_at(cell))
+		var edge: Color = def.cap_color if def.has_cap() else def.base_color.lightened(0.18)
+		var px := float(col * WorldRenderer.CELL)
+		var py := float(row * WorldRenderer.CELL)
+		var dir: int = r.sim.ramp_dir(col)
+		if dir == 0:
+			ci.draw_rect(Rect2(px, py, float(WorldRenderer.CELL), 4.0), edge)  # flat top: a capped lip
+			continue
+		# A 45° ramp wedge over the air corner. It's the SAME earth mass as the cell below, so it fills with
+		# the cell's own body colour (not flat base_color) and carries a CONCAVE scoop: a per-vertex gradient
+		# lights the top cap edge and pools shadow at the inner base corner, so the slope reads as a rounded,
+		# carved earth shoulder instead of a flat triangular sticker. The WALKED hypotenuse (cap edge) stays
+		# exactly on the 45° line the sim authority defines — only shading is added, never the geometry.
+		var body: Color = r._cell_fill_color(cell, def)
+		var foot := Vector2(px, py) if dir == 1 else Vector2(px + WorldRenderer.CELL, py)         # the low (flat-side) corner
+		var outer := Vector2(px + WorldRenderer.CELL, py) if dir == 1 else Vector2(px, py)        # bottom corner under the peak
+		var peak := Vector2(px + WorldRenderer.CELL, py - WorldRenderer.CELL) if dir == 1 else Vector2(px, py - WorldRenderer.CELL)  # the raised cap corner
+		# draw_polygon lets each vertex carry its own colour → the gradient. Cap corners lit, base pooled dark.
+		var lit: Color = body.lightened(0.10)
+		var pooled: Color = body.darkened(0.16)
+		ci.draw_polygon(PackedVector2Array([foot, outer, peak]),
+			PackedColorArray([pooled, pooled, lit]))
+		# A second, tighter shadow triangle hugging the inner (base) corner deepens the concave scoop.
+		var mid := (foot + outer) * 0.5
+		ci.draw_polygon(PackedVector2Array([foot, mid, outer]),
+			PackedColorArray([Color(0,0,0,0.14), Color(0,0,0,0.05), Color(0,0,0,0.14)]))
+		# A couple of grain speckles so the wedge carries the same rock texture as the body (not a smooth face).
+		# The wedge occupies the CELL-box ABOVE the cell top (py-CELL..py); speckles are placed there and kept
+		# only if they fall under the diagonal (inside the triangle), so no fleck floats out over open air.
+		if def.grain:
+			var wedge_top := Vector2(px, py - WorldRenderer.CELL)
+			for sp: Vector2 in r._cell_speckles(cell, 2):
+				if _in_ramp(sp, dir):
+					ci.draw_rect(Rect2(wedge_top + sp - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body.darkened(0.22))
+		# The cap edge (grass/lip) rides the diagonal, with a soft dark liner just under it for a carved rim.
+		ci.draw_line(foot, peak, edge.darkened(0.35), 4.0)
+		ci.draw_line(foot, peak, edge, 3.0)
+
+
+## True when a local point (0..CELL within the wedge's upper box) falls UNDER the 45° diagonal — i.e. inside
+## the filled ramp triangle. Keeps grain speckles on the earth and off the open-air side. Mirrors the two
+## ramp orientations: rising-right fills where x+y ≥ CELL; rising-left where y ≥ x.
+static func _in_ramp(local: Vector2, dir: int) -> bool:
+	if dir == 1:
+		return local.x + local.y >= float(WorldRenderer.CELL)
+	return local.y >= local.x
