@@ -454,114 +454,39 @@ const MINESHAFT_DRILL_CELL := Vector2i(MINESHAFT_COL, SURFACE + 1)   ## OPEN cel
 const MINESHAFT_ORE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 2)     ## the visible SOLID ore vein the drill bores down into
 const AUTO_FORGE_CELL := Vector2i(MINESHAFT_COL, SURFACE + 3)        ## the AUTO line's forge — below the ore, catches the bored ore's fall
 const MINESHAFT_ORE_RICHNESS: int = 400                              ## a rich starter-automation patch (hundreds) the drill runs on for a long time
-func _seed_world() -> void:
-	var gen: WorldGen = LayeredWorldGen.new()
-	_world_seed = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
-	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, _world_seed)
-	sim.load_world(world)
-	_seed_starter_vein()
-	_seed_tutorial_coal()
-	_seed_tutorial_tree()
-	_seed_tutorial_mineshaft()
-	_seed_starter_kit()
-	if dev_start:
-		_dev_seed_pack()
-
-
 ## A visible ORE VEIN breaching the surface beside spawn — the "metal-flecked rock" the first objective
 ## points at, and the bootstrap ore you HAND-mine for the first ingots (depth-banded worldgen leaves the
 ## shallow surface near-bare, so onboarding can't rely on finding a vein). A 1-tall, 2-wide band so it READS
 ## as a vein yet mining it leaves only a SHALLOW (1-tile) trench you step straight out of — a 2-deep pit
 ## would trap the body (step-up climbs one tile). Hand-mined for the first few ore (the drill mines the deep
-## veins in the mineshaft, not this surface strip).
+## veins in the mineshaft, not this surface strip). Realized by WorldSeeder.
 const STARTER_VEIN_CELL := Vector2i(47, SURFACE)
-func _seed_starter_vein() -> void:
-	for cell: Vector2i in [Vector2i(47, SURFACE), Vector2i(48, SURFACE)]:   # just left of spawn (49), right of the forge pocket (46)
-		sim.set_solid(cell, &"ore")
-		sim.deposits[cell] = 200                                  # richness for the hover readout; hand-mining grabs a loose burst
-
-
 ## A guaranteed surface COAL block between the shaft and the bazaar — the drill's FUEL.
 ## Once you cap the deposit with a drill, it won't run without coal; this is the "go mine coal" target that
 ## closes the demand-web. Placed at col 54 — one left of the shaft's edge (55) on the rightward path, so
 ## mining it then tossing coal down the open shaft (56) is a short step. Rich enough that one hand-burst
-## (3-8) fuels the drill well past its deposit.
+## (3-8) fuels the drill well past its deposit. Realized by WorldSeeder.
 const TUTORIAL_COAL_CELLS: Array[Vector2i] = [Vector2i(54, SURFACE)]
-func _seed_tutorial_coal() -> void:
-	for cell: Vector2i in TUTORIAL_COAL_CELLS:
-		sim.set_solid(cell, &"coal")
-		sim.deposits[cell] = 200                                   # a hundreds-scale coal patch — fuels the drill for a long time
-
-
 ## A guaranteed TUTORIAL TREE on the surface between spawn and the shaft — the wood source the bazaar step
 ## needs (depth-banded worldgen plants trees out past the ruin, unreachable on the surface early). Trees are
 ## Terraria-style WALK-THROUGH (Player._blocked passes wood/leaves), so the trunk sitting on the tutorial
 ## path is fine — the body strolls through it and chops it in passing, no walling even for the taller body.
-## Crowned with leaves so it reads + fells as a real tree.
+## Crowned with leaves so it reads + fells as a real tree. Realized by WorldSeeder.
 const TUTORIAL_TREE_COL := 51
-func _seed_tutorial_tree() -> void:
-	var g: int = sim.surface_row(TUTORIAL_TREE_COL)               # ground top row (solid at g); trunk above it
-	sim.set_solid(Vector2i(TUTORIAL_TREE_COL, g - 1), &"wood")    # trunk base
-	sim.set_solid(Vector2i(TUTORIAL_TREE_COL, g - 2), &"wood")    # trunk top
-	for leaf: Vector2i in [Vector2i(TUTORIAL_TREE_COL, g - 3), Vector2i(TUTORIAL_TREE_COL, g - 4),
-			Vector2i(TUTORIAL_TREE_COL + 1, g - 3)]:
-		if not sim.is_solid(leaf):
-			sim.set_solid(leaf, &"leaves")                       # crown — marks it a tree, fells to wood
+
+## The world builder. MainView owns the layout constants above (the canonical contract the play-tests assert
+## against); scenes/world_seeder.gd is the procedure that realizes them — the tutorial fixtures, the starter
+## kit, and the optional dev pack — onto the freshly-loaded sim. Preloaded by PATH (not class_name) so the
+## headless test drivers resolve it without a refreshed global-class cache.
+const WorldSeeder := preload("res://scenes/world_seeder.gd")
 
 
-## The RUNG-1 stage: a shallow BOOTSTRAP forge pocket (col 46) + the DRILL SHAFT (col 56). Split into two
-## columns so the shaft stays a clean OPEN drop — you toss ore/coal straight down it and gravity delivers
-## to whatever's at the bottom of that column (the forge, or the drill once you place it). Layout:
-##   col 46 SURFACE   BOOTSTRAP FORGE  — toss surface ore in (from col 45); ingots fall to SURFACE+1 (collect)
-##   col 46 SURFACE+1 open             — bootstrap ingots land here
-##   col 46 SURFACE+2 floor
-##   col 56 SURFACE   open        — the OPEN shaft mouth: toss ore/coal in here; gravity delivers it below
-##   col 56 SURFACE+1 ORE block   — hand-mine it → cavity + a drillable deposit; then place the DRILL here
-##                                  (SURFACE+1 so it's comfortably in reach from the col-55 surface edge)
-##   col 56 SURFACE+2 AUTO FORGE  — catches the drill's pulled ore → ingots, hands-free
-##   col 56 SURFACE+3 open        — auto ingots land
-##   col 56 SURFACE+4 rock floor
-## The drill needs COAL — you drop coal down the open shaft onto it to run it.
-func _seed_tutorial_mineshaft() -> void:
-	var c: int = MINESHAFT_COL
-	# Bootstrap forge pocket (col 46) — a shallow 1-deep well, OFF the drill shaft.
-	var bf: int = MINESHAFT_FORGE_CELL.x
-	sim.set_solid(Vector2i(bf, SURFACE), &"")                      # carve the forge cell
-	sim.set_solid(Vector2i(bf, SURFACE + 1), &"")                  # ingots land / collect
-	sim.set_solid(Vector2i(bf, SURFACE + 2), &"earth")            # floor
-	sim.place_machine(load("res://src/data/machines/processor.tres"), MINESHAFT_FORGE_CELL)   # bootstrap forge
-	# Drill shaft (col 56) — OPEN mouth + drill cell so tossed coal drops straight down onto the drill, with a
-	# VISIBLE solid ore vein just below the drill cell for the drill to bore into.
-	sim.set_solid(Vector2i(c, SURFACE), &"")                       # open mouth (drop access)
-	sim.set_solid(MINESHAFT_DRILL_CELL, &"")                       # SURFACE+1: OPEN — the player drops the Drill here
-	sim.set_solid(MINESHAFT_ORE_CELL, &"ore")                     # SURFACE+2: the visible ore vein the drill bores down into
-	sim.deposits[MINESHAFT_ORE_CELL] = MINESHAFT_ORE_RICHNESS      # a hundreds-scale vein the drill runs on for a long time
-	sim.set_solid(AUTO_FORGE_CELL, &"")                           # SURFACE+3: carve the cell the AUTO forge sits in
-	sim.set_solid(Vector2i(c, SURFACE + 4), &"")                   # gap under the auto forge (ingots land)
-	sim.set_solid(Vector2i(c, SURFACE + 5), &"earth")            # rock floor
-	sim.place_machine(load("res://src/data/machines/processor.tres"), AUTO_FORGE_CELL)        # auto-line forge
-
-
-## The STARTER TOOL every new game begins with — one bad wooden pickaxe (MiningRules.STARTER_TOOLS).
-## It's the ONLY thing in a fresh pack: it grinds rock AND chops trees (the axe was deleted, #38), and
-## its badness (tier-1 speed) is what makes the early grind ache for a drill. Spawned → counted as
-## produced so conservation holds. Always seeded (independent of dev_start).
-func _seed_starter_kit() -> void:
-	for tool: StringName in MiningRules.STARTER_TOOLS:
-		sim.inventory[tool] = int(sim.inventory.get(tool, 0)) + 1
-		sim.total_produced[tool] = int(sim.total_produced.get(tool, 0)) + 1
-
-
-## Dev-testing kit: start with a stocked pack so you can immediately exercise the build/automation loop
-## (place machines, feed, smelt) without first hand-mining a stack of ore. Items are SPAWNED, so they
-## count as produced to keep the conservation invariant true. Flip DEV_START off for a clean playthrough.
-## NOTE: the head-lamp glow and forge embers are LIGHTING effects on the miner/machines, not carryable
-## items — there's nothing to put in the pack for those; they appear automatically in play.
-func _dev_seed_pack() -> void:
-	var kit: Dictionary = {&"ore": 20, &"ingot": 20, &"wood": 10, &"coal": 20, &"processor": 2, &"splitter": 2, &"lift": 1, &"drill": 1, &"generator": 1, &"conduit": 10}
-	for item: StringName in kit:
-		sim.inventory[item] = int(sim.inventory.get(item, 0)) + int(kit[item])
-		sim.total_produced[item] = int(sim.total_produced.get(item, 0)) + int(kit[item])
+func _seed_world() -> void:
+	var gen: WorldGen = LayeredWorldGen.new()
+	_world_seed = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, _world_seed)
+	sim.load_world(world)
+	WorldSeeder.seed_tutorial(sim, dev_start)
 
 
 func _process(delta: float) -> void:
