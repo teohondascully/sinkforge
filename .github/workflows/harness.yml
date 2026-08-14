@@ -1,0 +1,42 @@
+# CI: run the full verification harness (determinism, conservation, movement
+# gauges, and agent play-tests) on every push to main and every PR. The harness
+# is meant to always be green; this enforces it. All layers run headless — no
+# display/GPU needed (Godot --headless uses the dummy renderer).
+name: harness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same ref supersedes an in-flight run.
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    name: run harness (Godot 4.6.2 headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.6.2 (headless linux)
+        run: |
+          set -euo pipefail
+          V=4.6.2-stable
+          wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          BIN="$PWD/Godot_v${V}_linux.x86_64"
+          chmod +x "$BIN"
+          echo "GODOT=$BIN" >> "$GITHUB_ENV"
+          "$BIN" --version
+
+      # Build .godot/ — including the global class-name cache the harness's
+      # `class_name` references resolve through under `--script`.
+      - name: Import project
+        run: "$GODOT --headless --import"
+
+      - name: Run the harness
+        run: bash tools/run_harness.sh
