@@ -19,6 +19,9 @@ build/
 .vscode/
 .idea/
 
+# Local agent state (Assistant Code scheduler locks, etc.)
+.assistant/
+
 # Dev harness — generated screenshots (+ their Godot import sidecars)
 /_capture*.png
 /_capture*.png.import
