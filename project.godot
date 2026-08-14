@@ -10,7 +10,7 @@ config_version=5
 [application]
 
 config/name="Sinkforge"
-config/description="2D vertical factory automation where gravity is the conveyor belt. Prototype 1 — gravity-flow feel test."
+config/description="A 2D side-view game about digging an industrial empire into a destructible underworld. Mine by hand, automate what you did yourself, and descend — gravity is the conveyor belt (down is free; up costs power)."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
