@@ -104,4 +104,4 @@ layout
     tools/      the test + measurement harness
     tests/      the determinism / conservation test suite
     assets/     sprites
-    docs/       design notes — gdd.md, architecture.md, progression.md
+    docs/       design notes — GDD.md, ARCHITECTURE.md, PROGRESSION.md
