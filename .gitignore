@@ -28,6 +28,6 @@ _zoom_*.png
 /_moment_*.png.import
 /_boot*.png
 
-# Godot import sidecars for reference screenshots (not game assets) + tool-script UIDs
-history/*.import
+# Tool-script UIDs — tools/ scripts run by path (never referenced via uid://), so
+# their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
