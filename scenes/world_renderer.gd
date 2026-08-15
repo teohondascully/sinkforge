@@ -56,20 +56,26 @@ const SINKFORGE_SCALE: float = 1.28                  ## master size dial (imposi
 const SURFACE_LINE: int = 22                        ## reference daylight row; sky attenuates with depth past it
 const SKY_REACH: int = 12                           ## tiles of open air sunlight reaches before going dark
 const SKY_FADE: int = 3                             ## tiles of shallow light-scatter just under the surface
-const AMBIENT_DARK: float = 0.74                    ## underground ambient — an eerie MOONLIT GLOOM, not pure black.
-                                                   ## Un-lit rock reads as dark teal-grey with VISIBLE grain across
-                                                   ## the whole frame (the reference is bathed in ambient from its
-                                                   ## many coloured lights), while lamp / machine / crystal / torch
-                                                   ## pools stay clearly brighter. THE mood lever (fix-2 diff 1):
-                                                   ## 0.87 → 0.74 — pass-1 over-crushed toward black and the rock
-                                                   ## went invisible away from the 3 pools; this raises the floor
-                                                   ## to a legible gloom while keeping VOID/back-wall pockets dark.
-const SHADOW_COLOR := Color(0.045, 0.065, 0.085)    ## the cool teal-blue gloom the underworld sits in (fix-2 diff
-                                                   ## 1/3): was near-black WARM-ish (.015/.02/.035) → a cool
-                                                   ## blue-teal so the veil, at a lower alpha, leaves unlit rock a
-                                                   ## dark TEAL-GREY (the reference's cold rock) rather than a
-                                                   ## brown murk. The RGB is the colour the veil tints TOWARD; the
-                                                   ## per-cell alpha still crushes deep voids near-black.
+const AMBIENT_DARK: float = 0.66                    ## underground ambient veil OPACITY — an eerie GLOOM, not pure
+                                                   ## black. LOWER = more of the crisp terrain shows through, so the
+                                                   ## strata + cave voids READ as layered earth (not one murk) while
+                                                   ## the deep stays clearly dark and the lamp/machine/crystal pools
+                                                   ## still cut this to ~0 (the "bring your own light" pillar holds —
+                                                   ## lit rock pops hard out of the gloom). History: 0.87 (rock
+                                                   ## invisible) → 0.74 (structure lost in the murk) → 0.66 (a modest
+                                                   ## lift so strata/voids read at a glance); paired with the hue-
+                                                   ## preserving shadow RGB below so what shows keeps its material
+                                                   ## colour (dark BROWN topsoil, dark GREY stone) instead of one fog.
+const SHADOW_COLOR := Color(0.045, 0.065, 0.085)    ## the cool teal-blue gloom the underworld sits in. Now only a
+                                                   ## WHISPER mixed into each cell's own shadow (below) + the open-air
+                                                   ## night veil — no longer the single colour every cell washes to.
+## HUE-PRESERVING SHADOW (rock-in-shadow): the veil sinks each cell toward its OWN colour darkened, not
+## toward one fixed blue — so unlit rock keeps its material identity (dark BROWN earth, dark GREY ore)
+## instead of collapsing to uniform fog. Same darkness as before (the alpha is untouched); only the hue
+## the veil tints TOWARD changes. SHADOW_DARKEN = how far the cell sinks toward black; SHADOW_COOL = the
+## whisper of SHADOW_COLOR mixed back so the whole deep still reads as one cool world.
+const SHADOW_DARKEN: float = 0.82
+const SHADOW_COOL: float = 0.16
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
                                                    ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
                                                    ## a white wash (diff 11)
@@ -192,6 +198,7 @@ var _veil_tex: ImageTexture
 var _veil_base: PackedByteArray
 var _veil_scratch: PackedByteArray   ## persistent per-frame veil buffer — base memcpy'd in, holes cut (#3, no per-frame .duplicate)
 var _veil_dirty: bool = true
+var _veil_rgb_dirty: bool = true   ## per-cell shadow RGB needs a full rebake (first run / load); digs patch incrementally
 ## Crystal seams (#4): the O(exposed-ore^2) flood is cached across frames and shared by _update_veil +
 ## _paint_lights (which both need the identical seam list). It only changes when ore EXPOSURE changes
 ## (terrain dug/placed near ore) or when the culling view-rect moves (a seam pans on/off screen), so it
@@ -318,6 +325,7 @@ func repaint_world() -> void:
 		_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE  # re-bake the whole coarse terrain
 		_terrain_layer.queue_redraw()
 	_veil_dirty = true
+	_veil_rgb_dirty = true   # every cell's material may have changed under the retained veil — rebake its shadow RGB
 	_fine_dirty = true
 	sim.terrain_dirty.clear()
 	_seal_rows.clear()
@@ -447,6 +455,8 @@ func _process(delta: float) -> void:
 		_fine_region_pending = true
 		_fine_dirty_min = rmin
 		_fine_dirty_max = rmax
+		# The veil's per-cell shadow colour follows the dug material — patch just this region (fast lane).
+		_patch_veil_rgb(rmin, rmax)
 		# The skylight base also depends on the surface line the dig may have moved — rebake it.
 		_veil_dirty = true
 	if _fine_dirty:
@@ -1883,16 +1893,14 @@ func _bake_veil_base() -> void:
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
 	if _veil_base.size() != cols * rows * 4:
-		# The RGB bytes are SHADOW_COLOR everywhere, forever — written once here; every rebake
-		# below touches ONLY the alpha byte per cell (a quarter of the writes).
 		_veil_base.resize(cols * rows * 4)
-		var sr: int = int(SHADOW_COLOR.r * 255.0)
-		var sg: int = int(SHADOW_COLOR.g * 255.0)
-		var sb: int = int(SHADOW_COLOR.b * 255.0)
-		for i: int in range(cols * rows):
-			_veil_base[i * 4] = sr
-			_veil_base[i * 4 + 1] = sg
-			_veil_base[i * 4 + 2] = sb
+		_veil_rgb_dirty = true
+	# The veil RGB is each cell's OWN colour sunk toward black (hue kept — rock reads as rock-in-shadow,
+	# not one flat blue fog). Baked whole only on first run / load; a dig PATCHES just its region below
+	# (~64 cells, not 7700), so the per-dig cost stays the cheap alpha loop that follows.
+	if _veil_rgb_dirty:
+		_veil_rgb_dirty = false
+		_bake_veil_rgb_all()
 	# Above its column's surface the sky alpha depends on the ROW alone — table it once per bake
 	# instead of a function call per cell (the bake's dominant cost at 7.7k cells).
 	var sky_byte: PackedInt32Array = PackedInt32Array()
@@ -1914,6 +1922,54 @@ func _bake_veil_base() -> void:
 				var t: float = float(row - surf) / float(SKY_FADE)
 				a = int(lerpf(float(sky_byte[row]), float(ambient_byte), t))
 			_veil_base[(row * cols + col) * 4 + 3] = a
+
+
+## The colour the veil sinks a cell TOWARD in full shadow: the cell's OWN terrain/wall colour darkened
+## hard (same hue, ~a fifth of its lit value) with a whisper of SHADOW_COLOR so the whole deep still
+## reads as one cool world. This is what keeps unlit rock reading as ROCK — dark BROWN earth, dark GREY
+## ore — where the old fixed-blue veil washed every material to the same fog. Solid cells sink toward
+## their fill; dug cells toward the darker back-wall (so carved space reads darker than solid rock).
+func _veil_shadow_rgb(c: Vector2i) -> Color:
+	var true_col: Color
+	if sim.solid.has(c):
+		true_col = _cell_fill_color(c, _material(sim.solid[c]))
+	elif sim.wall.has(c):
+		true_col = _wall_fill_color(c)
+	else:
+		return SHADOW_COLOR                       # open air — the (night) sky veil keeps its cool tone
+	return true_col.darkened(SHADOW_DARKEN).lerp(SHADOW_COLOR, SHADOW_COOL)
+
+
+func _write_veil_rgb(c: Vector2i, cols: int) -> void:
+	var rgb: Color = _veil_shadow_rgb(c)
+	var i: int = (c.y * cols + c.x) * 4
+	_veil_base[i] = int(clampf(rgb.r, 0.0, 1.0) * 255.0)
+	_veil_base[i + 1] = int(clampf(rgb.g, 0.0, 1.0) * 255.0)
+	_veil_base[i + 2] = int(clampf(rgb.b, 0.0, 1.0) * 255.0)
+
+
+## Full shadow-RGB bake (first run / load-time reset). Alpha stays owned by _bake_veil_base.
+func _bake_veil_rgb_all() -> void:
+	var cols: int = FactorySim.GRID_COLS
+	for row: int in range(FactorySim.GRID_ROWS):
+		for col: int in range(cols):
+			_write_veil_rgb(Vector2i(col, row), cols)
+
+
+## Patch the shadow RGB for just the dug region — the per-dig fast lane, mirroring the chunk/fine-mesh
+## dirty-region patch. Grown one cell so a cell whose neighbour was dug re-reads its edge-shifted fill.
+func _patch_veil_rgb(rmin: Vector2i, rmax: Vector2i) -> void:
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	if _veil_base.size() != cols * rows * 4:
+		return                                    # not baked yet — the first full bake will cover it
+	var x0: int = maxi(rmin.x - 1, 0)
+	var y0: int = maxi(rmin.y - 1, 0)
+	var x1: int = mini(rmax.x + 1, cols - 1)
+	var y1: int = mini(rmax.y + 1, rows - 1)
+	for row: int in range(y0, y1 + 1):
+		for col: int in range(x0, x1 + 1):
+			_write_veil_rgb(Vector2i(col, row), cols)
 
 
 ## Per frame: copy the baked base and let every live light CUT its pool out of the darkness —
