@@ -262,7 +262,7 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		var py := float(row * WorldRenderer.CELL)
 		var dir: int = r.sim.ramp_dir(col)
 		if dir == 0:
-			ci.draw_rect(Rect2(px, py, float(WorldRenderer.CELL), 4.0), edge)  # flat top: a capped lip
+			_draw_flat_cap(ci, px, py, edge, col)
 			continue
 		# A 45° ramp wedge over the air corner. It's the SAME earth mass as the cell below, so it fills with
 		# the cell's own body colour (not flat base_color) and carries a CONCAVE scoop: a per-vertex gradient
@@ -293,6 +293,45 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		# The cap edge (grass/lip) rides the diagonal, with a soft dark liner just under it for a carved rim.
 		ci.draw_line(foot, peak, edge.darkened(0.35), 4.0)
 		ci.draw_line(foot, peak, edge, 3.0)
+
+
+## THE FLAT CAP, RAGGED (#A5). A flat surface cell used to take one uniform 4px bar of cap colour, and a
+## run of flat columns therefore drew a single ruled line the full width of the world — the loudest
+## remaining piece of "blocky", and the thing that made the ground read as a cardboard cut-out laid over
+## the sky. Nothing here moves the WALKED line: the sim's surface row is still exactly `py`, and the
+## avatar walks it. Only the paint is broken up, in three ways that each attack a different straight
+## edge:
+##   * the cap's THICKNESS varies per 8px slice, so the grass/earth boundary underneath stops being a
+##     rule and starts being an interface;
+##   * ROOTS finger a few px further down out of some slices, so that interface interlocks rather than
+##     butting;
+##   * TUFTS overhang a few px into the air above the line, which is what actually kills the razor.
+##     They are cosmetic overhang into a neighbouring chunk's box, which the chunk bake tolerates (the
+##     fillet pass already reaches a full cell up).
+## Deterministic per column — the same column always grows the same fringe, so nothing shimmers when a
+## chunk rebakes after a dig.
+static func _draw_flat_cap(ci: CanvasItem, px: float, py: float, edge: Color, col: int) -> void:
+	const SLICES: int = 4
+	var sw: float = float(WorldRenderer.CELL) / float(SLICES)
+	var root: Color = edge.darkened(0.34)
+	for i: int in SLICES:
+		var h: int = _fringe_hash(col, i)
+		var thick: float = 3.0 + float(h % 4)                     # 3..6 px of cap
+		ci.draw_rect(Rect2(px + float(i) * sw, py, sw, thick), edge)
+		if h % 5 == 0:                                            # a root fingering down into the earth
+			var rx: float = px + float(i) * sw + float((h >> 3) % 5)
+			ci.draw_rect(Rect2(rx, py + thick, 2.0, 2.0 + float((h >> 6) % 3)), root)
+		if h % 3 == 0:                                            # a blade overhanging the line
+			var tx: float = px + float(i) * sw + float((h >> 9) % 6)
+			ci.draw_rect(Rect2(tx, py - 2.0 - float((h >> 12) % 3), 2.0, 4.0), edge)
+
+
+## A stable scramble of (column, slice) — the fringe's only source of variation. Same shape as
+## _cell_speckles' hash and equally RNG-free, so a rebaked chunk is byte-identical to the first bake.
+static func _fringe_hash(col: int, slice: int) -> int:
+	var h: int = (col * 374761393) ^ (slice * 668265263)
+	h = (h ^ (h >> 13)) * 1274126177
+	return (h ^ (h >> 16)) & 0x7fffffff
 
 
 ## True when a local point (0..CELL within the wedge's upper box) falls UNDER the 45° diagonal — i.e. inside
