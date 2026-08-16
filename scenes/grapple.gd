@@ -375,6 +375,43 @@ func resolve_velocity(pos: Vector2, vel: Vector2) -> Vector2:
 	return vel - n * radial
 
 
+## THE PUMP, and it is the line of physics this whole tool was missing.
+##
+## REEL_SPEED's own comment claims "the arc's speed comes from conserved tangential momentum". It did not.
+## constrain_position clamped the body to a circle and resolve_velocity killed the outward radial part, and
+## between them nothing ever noticed that the RADIUS had changed — so hauling the line in at the bottom of
+## an arc, the single most basic thing anyone does on a rope, did nothing at all to how fast the arc went.
+## Every swing was worth exactly the height you fell into it from, and the winch was a lift.
+##
+## Angular momentum says otherwise: L = m·v·r is conserved, so halving the radius doubles the tangential
+## speed. That one identity is the entire skill of a grapple game. Reel at the BOTTOM, where the velocity
+## is nearly all tangential and the gain is nearly all of it; pay out at the TOP, where it is nearly all
+## radial and costs almost nothing. In phase, an arc winds itself up out of nothing. Out of phase, it dies.
+## Nobody has to be told the rule — it is a swing, and everyone has been on a swing.
+##
+## Symmetric on purpose: paying out scales tangential speed DOWN by the same law, which makes S a real
+## brake and swinging wide a real decision rather than a free way to cover ground.
+##
+## Driven off `hauled` (px the reel took in this frame) rather than off the radius itself, so a pivot
+## appearing or releasing — which changes the free length by a whole cell in one frame — cannot be mistaken
+## for a haul and fire a spike. Clamped per frame for the same reason: near the anchor the ratio runs away.
+const PUMP_CLAMP: float = 1.05       ## most one frame may multiply tangential speed by, either direction
+
+
+func pump(pos: Vector2, vel: Vector2) -> Vector2:
+	if not taut or hauled == 0.0:
+		return vel
+	var d: Vector2 = pos - hitch()
+	var r: float = d.length()
+	var before: float = r + hauled    # hauled is negative while paying out, so this works both ways
+	if r < 0.001 or before < 0.001:
+		return vel
+	var n: Vector2 = d.normalized()
+	var radial: Vector2 = n * vel.dot(n)
+	var tangent: Vector2 = vel - radial
+	return radial + tangent * clampf(before / r, 1.0 / PUMP_CLAMP, PUMP_CLAMP)
+
+
 ## The line's current sag, 0 (bar-taut) .. 1 (fully slack). Pure representation: the renderer bows the
 ## rope by this so a live-but-loose line reads as rope rather than as a laser.
 func slack(from: Vector2) -> float:

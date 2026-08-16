@@ -475,6 +475,10 @@ func _step(delta: float) -> void:
 		if grapple.taut:
 			position = swung
 			velocity = grapple.resolve_velocity(position, velocity)
+			# THE PUMP, before the winch: a shorter line carries the same angular momentum at a higher
+			# tangential speed, which is why reeling at the bottom of an arc winds it up. resolve_velocity
+			# has just made the velocity purely tangential, so this scales exactly the part it should.
+			velocity = grapple.pump(position, velocity)
 			velocity = _winch_drive(delta)
 			velocity -= velocity * SWING_DRAG * delta      # a rope has losses; a frictionless one feels fake
 			velocity = velocity.limit_length(SWING_MAX_SPEED)

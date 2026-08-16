@@ -717,6 +717,22 @@ func _update_juice(delta: float) -> void:
 			_shake = maxf(_shake, 1.6)
 		elif g.just_cut:
 			_sfx.play(&"pop", _player.position, 1.7, -12.0)
+		# THE HELD voices. The drum while it hauls and the fibre singing under load are level-driven BEDS,
+		# not one-shots, so they are pushed EVERY frame — including the frames where the level is zero,
+		# which is what lets them go quiet instead of hanging on. This wiring is the whole reason they
+		# exist: the generators, the streams and the set_line driver all shipped and nothing ever called
+		# it, so the winch and the line were silent in the game while the audio layer went green on
+		# buffers it poked by hand. tools/check_pump now plays a real swing and listens to the mix.
+		var haul: float = 0.0
+		if g.state == Grapple.State.ANCHORED and delta > 0.0:
+			haul = clampf((g.hauled / delta) / Grapple.REEL_SPEED, 0.0, 1.0)
+		_sfx.set_line(haul, _line_load(g), delta)
+		# A CATCH — the line taking a new corner. The rising edge of the pivot count IS the event, and it
+		# is the one rope event with no other tell: the rope silently changes shape and your arc with it.
+		if g.pivots.size() > _line_pivots:
+			_sfx.play(&"catch", g.hitch(), 1.0, -7.0)
+			_particles.spark(g.hitch(), Color(0.82, 0.76, 0.60))
+		_line_pivots = g.pivots.size()
 	# Sonar pacing + the staggered returns: each scheduled ding fires when the wavefront (whose speed
 	# the renderer owns) actually reaches its vein — you HEAR the distance.
 	_scan_cooldown = maxf(0.0, _scan_cooldown - delta)
@@ -993,6 +1009,32 @@ func _apply_setting(payload: Dictionary) -> void:
 const CHAIN_HINT_SPEED: float = Player.RUN_SPEED * 1.4    ## a release below this was not going anywhere
 
 
+## WHAT THE LINE IS CARRYING, which is not the same thing as how fast the body happens to be going.
+##
+## Tension on a pendulum is m·v²/r plus the component of weight along the line, and both halves matter to
+## the ear. The v²/r term peaks at the BOTTOM of an arc — exactly where reeling pays, because that is where
+## the velocity is all tangential — so a creak driven by real tension tells you when to pull without a
+## single word of UI. Driving it off raw speed instead would have peaked in the same places by accident and
+## meant nothing: a body falling straight down a slack line is fast and carrying nothing at all.
+const TENSION_FULL: float = Player.GRAVITY * 2.6   ## the load at which the fibre is singing flat out
+
+
+func _line_load(g: Grapple) -> float:
+	if not g.taut or _player == null:
+		return 0.0
+	var d: Vector2 = _player.position - g.hitch()
+	var r: float = d.length()
+	if r < 1.0:
+		return 0.0
+	var centripetal: float = _player.velocity.length_squared() / r
+	var weight: float = Player.GRAVITY * maxf(0.0, d.y / r)   # only the part hanging BELOW the hitch pulls
+	return clampf((centripetal + weight) / TENSION_FULL, 0.0, 1.0)
+
+
+## How near straight-down the body has to be for reeling to be the thing worth teaching. cos(~32°): far
+## enough into the bottom of the arc that a haul is nearly all tangential gain.
+const PUMP_HINT_DOWN: float = 0.85
+
 var _was_anchored: bool = false      ## line held last frame — the falling edge is a RELEASE
 
 
@@ -1007,6 +1049,13 @@ func _note_rope_moments() -> void:
 		_was_anchored and not anchored and not _player.on_floor
 			and _player.velocity.length() > CHAIN_HINT_SPEED)
 	_was_anchored = anchored
+	# THE PUMP: taut, quick, and near the bottom of the arc — the one instant where hauling the line in
+	# converts almost entirely into speed. Teaching it anywhere else would be teaching a rule; teaching it
+	# here is pointing at what the player's hands are already doing.
+	var d: Vector2 = _player.position - g.hitch()
+	_hints.note(&"pump",
+		g.taut and _player.velocity.length() > CHAIN_HINT_SPEED
+			and d.length() > 1.0 and d.y / d.length() > PUMP_HINT_DOWN)
 	_hints.note(&"wrapped", not g.pivots.is_empty())
 	_hints.note(&"hard_landing", _player.stagger > 0.0)
 

@@ -76,6 +76,9 @@ var _defs: Array[Dictionary] = [
 ##   deep_enough  the tool is in the miner's kit from the first frame, which means nothing at all if
 ##                nobody ever presses F. Ten rows down is where a player stops thinking about the hole
 ##                and starts thinking about the climb, so that is where the game mentions the winch.
+##   pump         THE SKILL CEILING. A shorter line carries the same angular momentum at a higher speed,
+##                so reeling at the bottom of an arc winds it up and paying out at the top costs nothing.
+##                Fired at the bottom of a fast arc, which is the instant the hands are already there.
 ##   chain        THE ONE THAT MAKES IT A MOVEMENT SYSTEM. tools/check_traverse measures the rope
 ##                crossing a gallery half again as fast as a full stride — but only for a player who
 ##                knows the arc does not have to end. Fired the frame a line is released at speed in
@@ -91,6 +94,9 @@ var _moments: Array[Dictionary] = [
 	{"id": &"deep_enough",
 		"text": "GRAPPLE — F fires the winch at whatever you're aiming at. W reels you UP it, "
 			+ "SPACE leaps off. The climb back is the swing."},
+	{"id": &"pump",
+		"text": "PUMP IT — reel W at the BOTTOM of the arc: a shorter line swings faster. Pay S back out "
+			+ "at the top. In rhythm, the swing winds itself up."},
 	{"id": &"chain",
 		"text": "CHAIN IT — you never have to land. F again in mid-air plants the next line, "
 			+ "and the speed you left with is the speed you keep."},
