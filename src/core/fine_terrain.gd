@@ -99,11 +99,17 @@ static func _ensure_noise(sim: FactorySim) -> void:
 	if sim._fine_edge != null and sim._fine_seed_built == sim.world_seed:
 		return
 	sim._fine_seed_built = sim.world_seed
+	# SINGLE OCTAVE, both fields. FastNoiseLite defaults to 5-octave FBM and each octave doubles the
+	# frequency, so a field whose base frequency resolves on the fine grid still ships octaves that do
+	# not — and an aliased octave mixed into a SHAPE field is not texture, it is the boundary flipping
+	# in and out on every single cell. That is what printed a rock lip as a one-pixel dither.
 	sim._fine_edge = FastNoiseLite.new()
 	sim._fine_edge.seed = sim.world_seed ^ 0x1f83d9ab
 	sim._fine_edge.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	sim._fine_edge.fractal_type = FastNoiseLite.FRACTAL_NONE
 	sim._fine_edge.frequency = FactorySim.FINE_EDGE_FREQ
 	sim._fine_grit = FastNoiseLite.new()
 	sim._fine_grit.seed = sim.world_seed ^ 0x5be0cd19
 	sim._fine_grit.noise_type = FastNoiseLite.TYPE_VALUE       # blocky value noise = crisp per-fine-cell grit
+	sim._fine_grit.fractal_type = FastNoiseLite.FRACTAL_NONE
 	sim._fine_grit.frequency = FactorySim.FINE_GRIT_FREQ

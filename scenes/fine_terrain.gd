@@ -44,8 +44,8 @@ const TONAL_FREQ: float = 0.085                        ## low-freq drift so a br
 ## sedimentary rock's grain is horizontal. Sampling with the X axis compressed makes every feature wider
 ## than it is tall, so the grain lies down into bedding and the eye reads a face of layered rock instead
 ## of a field of dots. Same trick CAVE_XSTRETCH plays on the cave noise, one scale down.
-const GRAIN_FREQ: float = 0.34                         ## dense speckle — clumps ~3 fine cells (24px)
-const GRAIN_FREQ2: float = 0.85                        ## crisper grit, still above the sample rate
+const GRAIN_FREQ: float = 0.26                         ## dense speckle — clumps ~4 fine cells (32px)
+const GRAIN_FREQ2: float = 0.30                        ## crisper grit — the FINEST this grid can carry
 const GRAIN_XSTRETCH: float = 0.38                     ## <1 = features stretch HORIZONTALLY (bedding)
 const GRAIN_AMP: float = 0.15                          ## value swing of the grain
 ## ROCK INTERNAL TONAL VARIATION (diff-04 #1): the interiors of the reference rock are far from flat —
@@ -84,7 +84,7 @@ const MOSS_DEPTH: int = 3                              ## fine rows of moss belo
 const RIM_DEPTH: int = 2                               ## fine rows the lit lip fades over (1 = a dotted line)
 const MOSS_LUSH_ROW: int = 22                          ## full moss down to here — the damp shallow ledges
 const MOSS_DEAD_ROW: int = 34                          ## ...and none below here (14 m: roots and daylight end)
-const MOSS_FREQ: float = 0.9                           ## breaks the moss into organic patches, not a solid band
+const MOSS_FREQ: float = 0.30                          ## breaks the moss into organic patches, not a solid band
 ## HANGING MOSS TUFTS (diff-04 #2): a few moss pixels drip BELOW down-facing overhangs (open air directly
 ## below a solid fine cell). Confined to the top HANG_DEPTH fine rows below such a lip, noise-masked so
 ## only the odd lip grows a tuft — the reference's hanging tufts under ledges.
@@ -128,40 +128,37 @@ var last_baked_cells: int = 0                           ## fine cells the LAST b
 const REGION_MARGIN: int = 6
 
 
+## Build one texture field, with its FRACTAL TAIL CAPPED. FastNoiseLite defaults to 5-octave FBM, and
+## each octave doubles the frequency — so a field whose BASE frequency resolves on the fine grid still
+## ships three or four octaves that do not, and those octaves are white noise mixed straight into the
+## result. That default is the systemic cause of "the rock reads as static": every field here was quietly
+## carrying an aliased tail. `octaves` is chosen per field so its HIGHEST octave still has a period of
+## more than two samples; check_texture measures the result rather than trusting the arithmetic.
+static func _field(seed: int, salt: int, type: FastNoiseLite.NoiseType, freq: float,
+		octaves: int = 1) -> FastNoiseLite:
+	var n := FastNoiseLite.new()
+	n.seed = seed ^ salt
+	n.noise_type = type
+	n.frequency = freq
+	n.fractal_type = FastNoiseLite.FRACTAL_NONE if octaves <= 1 else FastNoiseLite.FRACTAL_FBM
+	n.fractal_octaves = maxi(octaves, 1)
+	return n
+
+
 func _init(cols: int, rows: int, seed: int) -> void:
 	_cols = cols
 	_rows = rows
 	_fcols = cols * SUBDIV
 	_frows = rows * SUBDIV
-	_noise = FastNoiseLite.new()
-	_noise.seed = seed
-	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_noise.frequency = TONAL_FREQ
-	_grain = FastNoiseLite.new()
-	_grain.seed = seed ^ 0x27d4eb2f
-	_grain.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_grain.frequency = GRAIN_FREQ
-	_grain2 = FastNoiseLite.new()
-	_grain2.seed = seed ^ 0x165667b1
-	_grain2.noise_type = FastNoiseLite.TYPE_VALUE      ## blocky value noise = crisp per-pixel grit
-	_grain2.frequency = GRAIN_FREQ2
-	_moss = FastNoiseLite.new()
-	_moss.seed = seed ^ 0x9e3779b1
-	_moss.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_moss.frequency = MOSS_FREQ
+	# Octave budgets: a field is allowed as many octaves as keep its top one resolvable on this grid.
+	_noise = _field(seed, 0, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, TONAL_FREQ, 3)
+	_grain = _field(seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX, GRAIN_FREQ)
+	_grain2 = _field(seed, 0x165667b1, FastNoiseLite.TYPE_VALUE, GRAIN_FREQ2)   ## crisper grit
+	_moss = _field(seed, 0x9e3779b1, FastNoiseLite.TYPE_SIMPLEX, MOSS_FREQ)
 	# diff-04 #1 — broad tonal patches + embedded stones + cracks (each its own seed so they don't correlate).
-	_patch = FastNoiseLite.new()
-	_patch.seed = seed ^ 0x2545f491
-	_patch.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_patch.frequency = PATCH_FREQ
-	_stone = FastNoiseLite.new()
-	_stone.seed = seed ^ 0x1b873593
-	_stone.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_stone.frequency = STONE_FREQ
-	_crack = FastNoiseLite.new()
-	_crack.seed = seed ^ 0x85ebca77
-	_crack.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	_crack.frequency = CRACK_FREQ
+	_patch = _field(seed, 0x2545f491, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, PATCH_FREQ, 3)
+	_stone = _field(seed, 0x1b873593, FastNoiseLite.TYPE_SIMPLEX, STONE_FREQ, 2)
+	_crack = _field(seed, 0x85ebca77, FastNoiseLite.TYPE_SIMPLEX, CRACK_FREQ, 2)
 	# diff-04 #3 — two independent low-freq fields → a region hue offset picked per broad region.
 	_huex = FastNoiseLite.new()
 	_huex.seed = seed ^ 0xc2b2ae35
