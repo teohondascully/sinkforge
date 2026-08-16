@@ -51,6 +51,32 @@ const FAR_AMP_A: float = 1.60
 const FAR_FREQ_A: float = 0.30
 const FAR_AMP_B: float = 0.90
 const FAR_FREQ_B: float = 0.11
+
+## THE SCARPS — and the reason the budget above cannot deliver a landscape on its own.
+##
+## |dh/dx| <= sum(amp x freq) is exact, which means amplitude is bought with WAVELENGTH: a six-row hill
+## that never steps more than a row needs about sixty-three columns to rise over. The world is a hundred
+## and twenty-eight columns wide. There is room for two such hills, and that is the whole ceiling on
+## walkable relief here — no tuning gets past it, because it is arithmetic and a map size, not a choice.
+##
+## So the relief that MATTERS stops pretending to be a hill and becomes a step. A handful of deliberate
+## scarps, each a face too tall to walk up, splitting the surface into terraces at different heights.
+## Everything between them stays under the budget and is walked exactly as before; the faces themselves are
+## the exception, and they are an exception the game now has answers to — a jump for the short ones, the
+## rope for the rest. That is the same shape as the sinkhole mouths: a rule kept everywhere by construction,
+## broken only at a few marked places, with the marking recorded so a test can tell design from noise.
+##
+## Fixed columns rather than seeded ones, following the bazaar ruin's precedent: these are landmarks, the
+## world is a fixed size, and a skyline you can learn is worth more here than one that is merely different
+## every time. Placed clear of the base pad and its ramps on both sides.
+const SCARP_COLS: Array[int] = [17, 79, 107]
+## Rows the ground steps DOWN at each scarp (negative steps up), read left to right. Chosen for what each
+## one asks of a player LEAVING the base, which is the direction every one of them is met from: a five-row
+## headland wall to the west, a four-row drop off the eastern edge of the home terrace, and a six-row wall
+## beyond it. Two of the three are climbs, so wandering out of the base is not uniformly free in either
+## direction; the drop is the one that commits you, because it costs nothing to take and the rope to undo.
+const SCARP_STEPS: Array[int] = [5, 4, -6]
+const SCARP_SPAN: int = 2            ## columns the face takes to fall — 2 keeps it a face, not a ramp
 ## The surface sits well DOWN the world so a tall SKY band fills the space above it — the camera, centred
 ## on the body, then frames the player in the middle of the screen (Terraria) instead of jamming them at
 ## the top against the limit. Everything below is underground; the rows above (0..FLAT_SURFACE_ROW-1) are sky.
@@ -116,4 +142,39 @@ func _surface_row(col: int) -> int:
 		- NEAR_AMP * sin(float(col) * NEAR_FREQ + 0.5) * near \
 		- (FAR_AMP_A * sin(float(col) * FAR_FREQ_A)
 			+ FAR_AMP_B * sin(float(col) * FAR_FREQ_B + 1.7)) * far
-	return clampi(int(round(h)), FLAT_SURFACE_ROW - 3, FLAT_SURFACE_ROW + 5)
+	return clampi(int(round(h)) + terrace(col), FLAT_SURFACE_ROW - 9, FLAT_SURFACE_ROW + 11)
+
+
+## The accumulated scarp offset at a column: which terrace this ground belongs to. Public because the
+## worldgen guard needs to tell a designed face apart from a hillside the budget failed to keep walkable,
+## and because a scarp is the one place the every-step-is-walkable contract is deliberately broken.
+##
+## Measured FROM THE PAD, and that subtraction is the whole difference between a landscape and a bug. The
+## first version accumulated from column zero, which left the fixtures' flat ground — returned above as the
+## bare datum — five rows below the terrain either side of it. The base was at the bottom of a bowl with
+## unclimbable walls: the fast-forward guard stalled at 297px walking out of it, and the worldgen guard
+## reported a stray five-row rise at column 38, one column outside the pad. Anchoring here makes the pad a
+## terrace in its own right, so its edges are continuous by construction and every discontinuity in the
+## world is one of the marked faces below.
+static func terrace(col: int) -> int:
+	return _terrace_raw(col) - _terrace_raw(BASE_PAD_START)
+
+
+static func _terrace_raw(col: int) -> int:
+	var out: int = 0
+	for i: int in SCARP_COLS.size():
+		var at: int = SCARP_COLS[i]
+		if col <= at:
+			continue
+		# Fall over SCARP_SPAN columns so the face is a face and not a single impossible cliff edge: the
+		# body can stand on it, the renderer has something to shade, and the drop is still past a jump.
+		out += int(round(float(SCARP_STEPS[i]) * clampf(float(col - at) / float(SCARP_SPAN), 0.0, 1.0)))
+	return out
+
+
+## Is this column ON a scarp face — the marked exception to the walkable-step contract?
+static func on_scarp(col: int) -> bool:
+	for at: int in SCARP_COLS:
+		if col > at and col <= at + SCARP_SPAN:
+			return true
+	return false

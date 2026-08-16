@@ -71,6 +71,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _aiming(main)
 		"land":
 			await _landing(main)
+		"scarp":
+			await _at_the_scarp(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -105,6 +107,24 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 const ARC := preload("res://tools/arc_driver.gd")
 const HAIL_WAIT := 2400              ## frames the fueled line is given to pour its first ingot
 const HAIL_PEAK := 60                ## frames after the hail — inside the plate's full-opacity dwell
+
+## THE SCARP. Walk the body west out of the base until it is standing under the headland face — the one
+## place on the surface where the ground stops being something you walk over. The terraces are the answer to
+## a hard arithmetic limit (a walkable six-row hill needs sixty-three columns to rise over, and the world is
+## a hundred and twenty-eight wide), so the relief that reads has to be a step rather than a slope. This is
+## the shot that says whether that reads as a landscape or as a bug.
+func _at_the_scarp(main: MainView) -> void:
+	# PLACED rather than walked, and the reason is itself worth recording: the mouth ranked deepest in this
+	# world opens at column 24, five columns off the headland's foot, so a body walking west out of the base
+	# to look at the scarp falls down a sinkhole on the way and this shot came back from twenty-four metres
+	# underground. That pair is good level design and a bad approach march. A photograph may stand where it
+	# likes.
+	var col: int = HeightmapWorldGen.SCARP_COLS[0] - 2
+	var top: int = main.sim.surface_row(col)
+	main._player.place(Vector2(float(col) * 32.0 + 16.0, float(top) * 32.0 - 24.0))
+	for _i: int in 30:
+		await physics_frame
+
 
 func _the_line(main: MainView) -> void:
 	var agent: PlayAgent = AGENT.new(self, main)

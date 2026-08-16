@@ -97,25 +97,42 @@ func _test_surface_walkable() -> void:
 			# counted those would be measuring how ragged a hole is instead of how many holes there are.
 			var mouths: int = 0
 			var last_cliff: int = -99
+			# The SCARPS are the surface's other marked exception, and they are marked in the generator rather
+			# than in the world, because a scarp is not a carve — it is where the heightmap itself changes
+			# terrace. So they are recognised the same way a route is and counted separately: a face you climb
+			# is not a hole you fall into, and letting them share a budget would mean adding one to the
+			# skyline silently spent a sinkhole.
+			var faces: int = 0
+			var last_face: int = -99
 			for col: int in range(world.cols - 1):
 				var step: int = absi(_surface_of(world, col + 1) - _surface_of(world, col))
 				if step <= 1:
+					continue
+				if step > worst:
+					worst = step
+					worst_col = col
+				if HeightmapWorldGen.on_scarp(col) or HeightmapWorldGen.on_scarp(col + 1):
+					if col - last_face > MOUTH_GAP:
+						faces += 1
+					last_face = col
 					continue
 				if not _route_column(world, col) and not _route_column(world, col + 1):
 					stray += 1
 				if col - last_cliff > MOUTH_GAP:
 					mouths += 1
 				last_cliff = col
-				if step > worst:
-					worst = step
-					worst_col = col
 			var name: String = gen.get_script().resource_path.get_file()
 			_check(stray == 0,
-				"%s seed %d: every un-steppable rise is the lip of a deliberate mouth (%d stray, worst %d at col %d)"
+				"%s seed %d: every un-steppable rise is the lip of a deliberate mouth or a scarp (%d stray, worst %d at col %d)"
 				% [name, seed_v, stray, worst, worst_col])
 			_check(mouths <= LayeredWorldGen.SINKHOLE_COUNT,
 				"%s seed %d: and the ground falls away in only a few PLACES (%d, cap %d)"
 				% [name, seed_v, mouths, LayeredWorldGen.SINKHOLE_COUNT])
+			# Every designed face is PRESENT, which is the half of this a step budget cannot state: a scarp
+			# quietly flattened by a clamp or eaten by a later pass would leave every assertion above green.
+			_check(faces == HeightmapWorldGen.SCARP_COLS.size(),
+				"%s seed %d: ...and every designed scarp actually stands (%d of %d)"
+				% [name, seed_v, faces, HeightmapWorldGen.SCARP_COLS.size()])
 
 
 ## Topmost GROUND row of a generated column, read from the produced WorldData (so it measures what the

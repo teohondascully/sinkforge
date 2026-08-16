@@ -23,10 +23,14 @@ extends SceneTree
 ##   THE ROPE      — the plunge is ridden TWICE, once on legs alone and once with the grapple, and the gap
 ##                   between them is the tool's reason to exist stated as a number. check_grapple proves the
 ##                   rope works on a rig built to suit it; this proves it matters in terrain nobody designed.
-##                   A hole a body walks out of does not need a rope. A hole a body CANNOT walk out of is a
-##                   trap unless it has one — and the first played descent parked in exactly such a pocket,
-##                   twelve rows down, for the whole budget, in a shaft whose walls the hook bit on every
-##                   single sample. The rock to hold was always there; the body just never reached for it.
+##                   The gap is measured on the way BACK, and that is the second thing this layer has been
+##                   wrong about. It first asked the rope to reach DEEPER, which no tool in this world can:
+##                   a sinkhole throat is cut as a plumb fall line on purpose, and nothing beats gravity at
+##                   going down. That assertion only ever passed because the mouth it happened to pick had a
+##                   ledge the legs hung up on — it was gating on a defect in the route, not a virtue of the
+##                   tool, and it went green again the moment the terraces landed and the ranking chose a
+##                   cleaner hole. Falling in is free either way. A hole a body cannot LEAVE is a trap, and
+##                   the rope is the difference between a trap and a route.
 ##
 ## What this does NOT measure is risk, because there is not yet any. That absence is the finding this layer
 ## exists to keep visible: with no stakes on a fall, a faster free route is not a choice at all.
@@ -57,7 +61,16 @@ const PURCHASE_REACH: int = 5      ## cells sideways the sample shot is aimed
 ## the mouths. Keeping the old 2.0 would only mean asserting a wish.
 const SPEEDUP_FLOOR: float = 1.0   ## ...faster than the pickaxe (measured 1.1)
 const PURCHASE_FLOOR: float = 0.50 ## ...and the rope must bite on at least this share of the way down
-const ROPE_EDGE: int = 12          ## ...and the roped ride must beat the legs-only ride by this many rows
+## Rows the rope must regain over legs on the way back. Set at MOST OF THE DEPTH rather than at some token
+## margin, because "the rope gains a few rows" and "the rope gets you home" are different claims and only
+## the second one justifies the hole. Measured 54 against 0 — the line does not merely escape the shaft, it
+## carries on up the terrain above it — so this floor has room, and it would still catch a winch that only
+## managed to lift a body off the floor of the trap it is in.
+const ROPE_EDGE: int = 20
+const LEGS_BACK_CAP: int = 3         ## rows legs alone may scramble back — past this it is not a trap
+const CLIMB_BUDGET: int = 900        ## frames to get home, generous and identical for both routes
+const CLIMB_OVER: float = 1.6        ## cells sideways the climbing throw reaches for the shaft wall
+const CLIMB_UP: float = 5.0          ## ...and cells up, so each line is a real gain of height
 
 ## THE ROPE HOP — how a stuck body gets over the lip that stopped it. Fire up and across toward the way
 ## down, reel in, lean, let go. One motion, and it is the same one a player makes.
@@ -99,6 +112,8 @@ func _run() -> void:
 		% [legs["rows"], legs["frames"], legs["mouth"]])
 	print("  the plunge, with rope:  %d rows in %d frames, %d blocks broken, %d hops"
 		% [roped["rows"], roped["frames"], roped["mines"], roped["hops"]])
+	print("  the way back:   %d rows on legs, %d rows on the rope (same budget, same hole)"
+		% [legs["back"], roped["back"]])
 	print("  the hole is %.1fx faster than the pickaxe; the rope bit on %d of %d samples on the way down"
 		% [speedup, roped["bit"], roped["shots"]])
 
@@ -112,9 +127,12 @@ func _run() -> void:
 	_check(purchase >= PURCHASE_FLOOR,
 		"...and there is rock to hold the whole way (rope bit %.0f%%, floor %.0f%%)"
 			% [purchase * 100.0, PURCHASE_FLOOR * 100.0])
-	_check(roped["rows"] >= legs["rows"] + ROPE_EDGE,
-		"...and the ROPE is what gets you down it (%d rows roped vs %d on legs, needs +%d)"
-			% [roped["rows"], legs["rows"], ROPE_EDGE])
+	_check(int(legs["back"]) <= LEGS_BACK_CAP,
+		"...and on legs alone it is a ONE-WAY door (%d rows regained, cap %d)"
+			% [legs["back"], LEGS_BACK_CAP])
+	_check(int(roped["back"]) >= int(legs["back"]) + ROPE_EDGE,
+		"...and the ROPE is what gets you back out of it (%d rows climbed vs %d on legs, needs +%d)"
+			% [roped["back"], legs["back"], ROPE_EDGE])
 
 
 ## THE PLUNGE. Find the mouth nearest the spawn, walk the real body to its lip, step off, and go down the
@@ -199,13 +217,80 @@ func _ride(with_rope: bool) -> Dictionary:
 	p.input_climb = 0.0
 	p.auto_input = true
 
+	var back: int = await _climb(main, p, sim, with_rope)
+
 	var out := {
 		"rows": deepest - start_row, "frames": frames - probed, "mines": agent.mines,
-		"mouth": lip, "shots": shots, "bit": bit, "hops": hops,
+		"mouth": lip, "shots": shots, "bit": bit, "hops": hops, "back": back,
 	}
 	main.queue_free()
 	await physics_frame
 	return out
+
+
+## THE WAY BACK, which is where the two routes actually differ.
+##
+## This layer used to assert the rope reached DEEPER than legs, and that was never a property this world
+## could have. A sinkhole throat is cut as a plumb fall line on purpose (LayeredWorldGen._cut_throat), and
+## nothing beats gravity at going down — the only reason the assertion ever passed is that the mouth it
+## happened to pick had a ledge the legs got stuck on, so it was gating on a defect in the route rather than
+## on a virtue of the tool. Both runs also stop at TARGET_ROWS, so the number was saturated at the ceiling
+## for both and could not have shown a gap even in principle.
+##
+## What the rope is for on a plunge is the RETURN. Falling in is free either way; a hole you cannot get out
+## of is a trap, and the difference between a trap and a route is the tool in your hands. So: stand the body
+## at the bottom of the hole it just rode down and give it the same budget to get home, once with legs and
+## once with a line. Legs may jump, scramble and take any opening the shaft offers — nothing is withheld.
+func _climb(main: MainView, p: Player, sim: FactorySim, with_rope: bool) -> int:
+	var bottom: int = main._cell_at(p.position).y
+	var best: int = bottom
+	# Drive the body, and say so here rather than relying on the caller: the first version of this ran after
+	# _ride had already handed control back, so the player polled real hardware every frame and wrote a zero
+	# over the winch axis on its way past. It reported the rope climbing one row out of a thirty-four row
+	# hole, which reads exactly like the tool being useless and was in fact the rig never touching it.
+	p.auto_input = false
+	p.grapple.cut()
+	p.input_climb = 0.0
+	for f: int in CLIMB_BUDGET:
+		var at: Vector2i = main._cell_at(p.position)
+		best = mini(best, at.y)
+		var side: float = _wall_dir(sim, at)
+		if with_rope:
+			if not p.grapple.live():
+				p.grapple.fire(p.hand(), p.hand()
+					+ Vector2(side * CELL * CLIMB_OVER, -CELL * CLIMB_UP))
+			elif p.grapple.state == Grapple.State.ANCHORED:
+				p.input_climb = 1.0                          # winch, and keep winching until it is spent
+				# Wound in, or level with the hook: this line has given what it has. Let go and throw the
+				# next one from higher up — that hand-over-hand is what climbing a shaft on a rope IS.
+				if p.grapple.length <= Grapple.MIN_LENGTH + 1.0 \
+						or p.position.y <= p.grapple.anchor.y + CELL * 0.5:
+					p.grapple.cut()
+					p.input_climb = 0.0
+					p.request_jump()                         # kick off the wall into the next throw
+		# Legs, both runs: lean toward whatever opening there is and jump at every chance. On the roped run
+		# this costs nothing and keeps the comparison fair — the rope is measured as an ADDITION to the body,
+		# not as a replacement for it.
+		p.input_dir = -side
+		if p.on_floor and f % 12 == 0:
+			p.request_jump()
+		await physics_frame
+	p.input_dir = 0.0
+	p.input_climb = 0.0
+	p.grapple.cut()
+	p.auto_input = true
+	return bottom - best
+
+
+## Which way the nearest wall is — the side a hook has something to bite. Ties go to the way the shaft is
+## closed, so a body in open air still throws at rock rather than into the void.
+func _wall_dir(sim: FactorySim, at: Vector2i) -> float:
+	for d: int in range(1, 5):
+		if sim.is_solid(at + Vector2i(d, 0)):
+			return 1.0
+		if sim.is_solid(at + Vector2i(-d, 0)):
+			return -1.0
+	return 1.0
 
 
 ## THE HOP. The body is on a shelf with a wall between it and the way down. Fire up and across, reel in,
