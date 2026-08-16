@@ -13,9 +13,9 @@ extends RefCounted
 ##   2. A one-time ARRIVAL, the first time you cross into a band you have not been in. HUD banner, sting.
 ##
 ## The names come straight from docs/PROGRESSION.md's layer ladder (L1 Topsoil → L2 Stonereach), plus
-## intermediate bands for the stretches the ladder does not name, because a forty-row descent needs more
-## than two waypoints. Rows line up with the worldgen constants they describe: DEEPSLATE_ROW = 52 is
-## where the deep band begins, SEAL_TOP = 56 is the seal itself.
+## intermediate bands for the stretches the ladder does not name, because a hundred-row descent needs
+## more than two waypoints. The three bands the GENERATOR owns read their rows from it rather than
+## repeating them — a world that grows must never leave the map of it behind.
 ##
 ## `depth_m` is deliberately NOT rows-below-your-own-column: it is rows below the surface datum, so two
 ## players standing at the same absolute height read the same number regardless of how they got there.
@@ -26,17 +26,19 @@ const SURFACE_ROW: int = 20            ## the datum; matches HeightmapWorldGen.F
 ## Each band: the row it BEGINS at, its name, and the colour it is announced in. Ordered top to bottom;
 ## a row belongs to the last band whose `from` it has reached.
 const BANDS: Array[Dictionary] = [
-	{"from": -99, "name": "OPEN SKY",     "color": Color(0.62, 0.76, 0.92)},
-	{"from": 20,  "name": "TOPSOIL",      "color": Color(0.72, 0.56, 0.34)},
-	{"from": 27,  "name": "THE CLAYBAND", "color": Color(0.86, 0.58, 0.30)},
-	{"from": 38,  "name": "SHALE REACH",  "color": Color(0.58, 0.64, 0.74)},
-	{"from": 52,  "name": "THE DEEPSLATE","color": Color(0.56, 0.50, 0.78)},
-	{"from": 56,  "name": "THE SEAL",     "color": Color(0.72, 0.44, 0.86)},
-	{"from": 58,  "name": "STONEREACH",   "color": Color(0.44, 0.62, 0.96)},
+	{"from": -99, "name": "OPEN SKY",      "color": Color(0.62, 0.76, 0.92)},
+	{"from": SURFACE_ROW, "name": "TOPSOIL", "color": Color(0.72, 0.56, 0.34)},
+	{"from": 30,  "name": "THE CLAYBAND",  "color": Color(0.86, 0.58, 0.30)},
+	{"from": 44,  "name": "SHALE REACH",   "color": Color(0.58, 0.64, 0.74)},
+	{"from": 60,  "name": "THE LONG DARK", "color": Color(0.52, 0.52, 0.60)},
+	{"from": LayeredWorldGen.DEEPSLATE_ROW, "name": "THE DEEPSLATE", "color": Color(0.56, 0.50, 0.78)},
+	{"from": LayeredWorldGen.SEAL_TOP, "name": "THE SEAL", "color": Color(0.72, 0.44, 0.86)},
+	{"from": LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS, "name": "STONEREACH",
+		"color": Color(0.44, 0.62, 0.96)},
 ]
 
 
-## Which band index a row is in. Always valid — row 0 lands in OPEN SKY, row 79 in STONEREACH.
+## Which band index a row is in. Always valid — row 0 lands in OPEN SKY, the bottom row in STONEREACH.
 static func band_at(row: int) -> int:
 	var out: int = 0
 	for i: int in BANDS.size():

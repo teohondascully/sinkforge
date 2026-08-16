@@ -187,7 +187,7 @@ const SPAWN_COL: int = (FLAT_START + FLAT_END) / 2
 
 ## Earth → stone happens in the heightmap base; below this ABSOLUTE row a third band turns to deepslate,
 ## so descending crosses distinct material zones (the "deeper = different place" read).
-const DEEPSLATE_ROW: int = 52
+const DEEPSLATE_ROW: int = 76
 
 ## THE SEAL — the L1→L2 gate (docs/PROGRESSION.md §2/§9): an UNBROKEN band of unmineable sealrock across
 ## the world's full width, stamped LAST so no cave/tunnel/vein can hole it. It sits a few rows INTO the
@@ -195,7 +195,7 @@ const DEEPSLATE_ROW: int = 52
 ## stone-pick tier gate) — the shelf is where you sample deepslate for the Descent research. Below the
 ## seal is STONEREACH (L2): richer veins + IRON, reachable only by feeding a Descent Engine its
 ## throughput quota (the wall that makes the factory mandatory — no pick opens it).
-const SEAL_TOP: int = 56
+const SEAL_TOP: int = 84
 const SEAL_ROWS: int = 2
 
 ## IRON — L2's signature material (the analyze-sample for the next tech tier), seeded ONLY below the

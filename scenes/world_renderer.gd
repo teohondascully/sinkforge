@@ -1033,11 +1033,13 @@ func _draw_saplings() -> void:
 ## to cold to alien: that is what going deeper looks like when you cannot see a number.
 ##
 ## A new depth layer = one new row here. Bands straddle their transition; strength is the held tint.
+## Re-spanned when the world grew to 128 rows: the same four-beat arc, stretched over a descent that is
+## now sixty rows longer, so a band is a stretch you travel rather than a step you cross.
 const ZONE_TINTS: Array[Dictionary] = [
-	{"from": 26, "to": 36, "color": Color(0.86, 0.58, 0.30), "strength": 0.22},   # Clayband — warmth to lose
-	{"from": 40, "to": 50, "color": Color(0.55, 0.58, 0.66), "strength": 0.16},   # the honest neutral middle
-	{"from": 50, "to": 66, "color": Color(0.42, 0.55, 0.90), "strength": 0.34},   # Stonereach (L2)
-	{"from": 68, "to": 79, "color": Color(0.40, 0.30, 0.62), "strength": 0.26},   # the approach to the seal
+	{"from": 30, "to": 46, "color": Color(0.86, 0.58, 0.30), "strength": 0.22},   # Clayband — warmth to lose
+	{"from": 48, "to": 62, "color": Color(0.55, 0.58, 0.66), "strength": 0.16},   # the honest neutral middle
+	{"from": 64, "to": 84, "color": Color(0.40, 0.30, 0.62), "strength": 0.26},   # the approach to the seal
+	{"from": 86, "to": 118, "color": Color(0.42, 0.55, 0.90), "strength": 0.34},  # Stonereach (L2), below the seal
 ]
 
 

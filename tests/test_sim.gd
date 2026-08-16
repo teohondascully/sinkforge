@@ -1602,7 +1602,9 @@ func _test_research() -> void:
 func _test_descent_gate() -> void:
 	print("- the descent gate (L1→L2)")
 	var gen: LayeredWorldGen = LayeredWorldGen.new()
-	var world: WorldData = gen.generate(96, 80, 1337)
+	# The real world size — the seal/iron rows are ABSOLUTE, so a hardcoded fixture size silently
+	# stops containing them the moment the world grows.
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337)
 	var holes: int = 0
 	for row: int in range(LayeredWorldGen.SEAL_TOP, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS):
 		for col: int in world.cols:
