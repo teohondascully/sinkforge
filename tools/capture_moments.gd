@@ -9,6 +9,10 @@ extends SceneTree
 ## Moments:
 ##   boot  — the clean new-player opening (the surface, first frame a player ever sees)
 ##   delve — standing at the bottom of a dug shaft, lamp-lit, rock on every side
+##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
+##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
+##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
+##           one-cell shaft can't answer that question, and the underground is played in rooms.
 ##
 ## `delve` exists because the surface is only half the game and it is the EASY half to judge: the sky
 ## does most of the composition and daylight does most of the lighting. Everything the underground
@@ -47,6 +51,9 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			pass                              # the untouched clean opening
 		"delve":
 			await _dig_in(main)
+		"room":
+			await _dig_in(main)
+			await _hollow_room(main)
 		_:
 			push_warning("unknown moment '%s' — capturing boot" % moment)
 
@@ -75,5 +82,36 @@ func _dig_in(main: MainView) -> void:
 	agent.give(&"stone_pickaxe", 1)
 	var here: Vector2i = main._cell_at(agent.player.position)
 	await agent.dig_down_to(Vector2i(here.x, main.sim.surface_row(here.x) + DELVE_ROWS))
+	# Then hollow out a small CHAMBER at the bottom — the work pocket a player cuts when they stop to
+	# set up a drill site. A one-cell shaft shows almost no back-wall, so a shaft-only shot is a bad
+	# instrument for judging the second plane: this is the view the underground is actually played in.
+	var floor_c: Vector2i = main._cell_at(agent.player.position)
+	for dy: int in range(-2, 1):
+		for dx: int in range(-2, 3):
+			main.try_mine(floor_c + Vector2i(dx, dy))
+			await physics_frame
 	for _i in 20:                             # let the body settle and the veil re-cut around the lamp
+		await physics_frame
+
+
+## Widen the delve pocket into a proper CHAMBER and hang two torches in it. Cut through sim.mine rather
+## than main.try_mine: try_mine enforces the player's 3.2-cell REACH, so a chamber wider than the miner's
+## arms silently comes out as a small blob around them — which is exactly the bug that made the first
+## three attempts at this shot unreadable. Reach is a gameplay rule, and a player builds this room by
+## walking; the shot only needs the geometry that walking would leave.
+const ROOM_W := 13
+const ROOM_H := 7
+
+
+func _hollow_room(main: MainView) -> void:
+	var c: Vector2i = main._cell_at(main._player.position)
+	var left: int = c.x - ROOM_W / 2
+	for dy: int in range(-ROOM_H + 1, 1):
+		for dx: int in range(ROOM_W):
+			main.sim.mine(Vector2i(left + dx, c.y + dy))
+		await physics_frame
+	main.sim.torch[Vector2i(left + 2, c.y - 2)] = true
+	main.sim.torch[Vector2i(left + ROOM_W - 3, c.y - 2)] = true
+	main._renderer.repaint_world()
+	for _i in 30:
 		await physics_frame

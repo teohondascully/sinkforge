@@ -14,7 +14,8 @@ extends RefCounted
 ## skylight floods), so a sky-facing top catches a warm lit lip while an underside falls into the
 ## deepest shadow in the frame and walls sit between. The SPREAD between these numbers is what gives a
 ## block a top and a bottom; flattening them back toward each other returns the sticker look.
-const LIT_LIP: float = 0.22      ## warm highlight alpha on the very edge of a sky-facing face
+const LIT_RIM: float = 0.14      ## the dimmer highlight a VERTICAL face catches from the same key light
+const LIT_LIP: float = 0.30      ## warm highlight alpha on the very edge of a sky-facing face
 const AO_TOP: float = 0.07       ## whisper of dark under that lip, just enough to give it thickness
 const AO_SIDE: float = 0.26      ## walls — the mid tone
 const AO_UNDER: float = 0.46     ## overhangs/ceilings — nothing in the world is darker
@@ -173,6 +174,11 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 	# a sky-facing top catches a warm LIT lip, an underside falls into deep shadow, and the walls sit
 	# between. Same cheap strips, same bake, but the rock finally has a top and a bottom.
 	var top_lip := Color(1.0, 0.95, 0.84, LIT_LIP)
+	# A side face catches a RIM, not a lip. Light from above grazes a vertical wall instead of striking
+	# it, so the wall gets a thin dim highlight where it meets open air — but it must get SOMETHING. A
+	# room dug into rock is read almost entirely from its silhouette, and a silhouette with lit tops and
+	# unlit sides reads as a terrace seen from above, not as a chamber seen from the side (#S3).
+	var side_rim := Color(1.0, 0.94, 0.86, LIT_RIM)
 	for i: int in STEPS:
 		var fade: float = 1.0 - float(i) / float(STEPS)
 		var o: float = float(i) * 2.0
@@ -193,12 +199,12 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 			var y0: float = CH if (open_u and not keep_top) else 0.0
 			var y1: float = cs - (CH if open_d else 0.0)
 			ci.draw_rect(Rect2(pos.x + o, pos.y + y0, s, y1 - y0),
-				Color(0.0, 0.0, 0.0, AO_SIDE * fade))
+				side_rim if i == 0 else Color(0.0, 0.0, 0.0, AO_SIDE * fade))
 		if open_r:
 			var y0: float = CH if (open_u and not keep_top) else 0.0
 			var y1: float = cs - (CH if open_d else 0.0)
 			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0),
-				Color(0.0, 0.0, 0.0, AO_SIDE * fade))
+				side_rim if i == 0 else Color(0.0, 0.0, 0.0, AO_SIDE * fade))
 	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops)
 	# AND the diagonal past it is solid too (an overhang roofs the junction). Each scoop: two nested
 	# rects hugging that end of the face, stacking extra dark onto the strips already there.
@@ -294,6 +300,46 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		# The cap edge (grass/lip) rides the diagonal, with a soft dark liner just under it for a carved rim.
 		ci.draw_line(foot, peak, edge.darkened(0.35), 4.0)
 		ci.draw_line(foot, peak, edge, 3.0)
+
+
+## THE WALL FACE (#S3) — everything that makes a back-wall cell read as a rock surface a plane behind
+## the play space, rather than as a hole punched in the world.
+##
+## Two jobs. First TEXTURE: the same grain and fracture vocabulary as the foreground rock, at reduced
+## contrast, because it is the same ground seen from further away — a wall with no texture at all is
+## indistinguishable from a void no matter what colour it is. Second, and far more important, the CAST:
+## every edge where this cell meets solid rock takes an inward shadow from it. Under a ceiling it is
+## deepest, beside a wall it is moderate, and above a floor it is light — because the world's key light
+## comes from above (#A1), so a floor stays open to the sky while an overhang does not. That directional
+## cast is the whole illusion: it is what a real recess does, and once it is there the eye stops reading
+## a rectangle and starts reading a room.
+##
+## Called from WorldRenderer._draw_background, so it runs on the chunk bake (a dig), never per frame.
+static func paint_wall_face(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
+	var cs: float = float(WorldRenderer.CELL)
+	var sp: Array[Vector2] = r._cell_speckles(c, 3)
+	ci.draw_rect(Rect2(pos + sp[0] - Vector2(2.5, 2.5), Vector2(5.0, 5.0)), col.darkened(0.16))
+	ci.draw_rect(Rect2(pos + sp[1] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.07))
+	_draw_fissure(ci, c + Vector2i(7, 3), pos, col.darkened(0.10))   # offset so it never twins the front
+	# The cast. Six steps rather than the foreground's three: a recess falls off over a longer distance
+	# than a chamfered edge does, and a short stack here reads as a drawn border instead of a shadow.
+	const STEPS: int = 6
+	for i: int in STEPS:
+		var fade: float = 1.0 - float(i) / float(STEPS)
+		var o: float = float(i) * 2.0
+		var s := 2.0
+		if r.sim.is_solid(c + Vector2i(0, -1)):
+			ci.draw_rect(Rect2(pos.x, pos.y + o, cs, s),
+				Color(0.0, 0.0, 0.0, WorldRenderer.WALL_AO_UNDER * fade))
+		if r.sim.is_solid(c + Vector2i(0, 1)):
+			ci.draw_rect(Rect2(pos.x, pos.y + cs - o - s, cs, s),
+				Color(0.0, 0.0, 0.0, WorldRenderer.WALL_AO_ABOVE * fade))
+		if r.sim.is_solid(c + Vector2i(-1, 0)):
+			ci.draw_rect(Rect2(pos.x + o, pos.y, s, cs),
+				Color(0.0, 0.0, 0.0, WorldRenderer.WALL_AO_SIDE * fade))
+		if r.sim.is_solid(c + Vector2i(1, 0)):
+			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y, s, cs),
+				Color(0.0, 0.0, 0.0, WorldRenderer.WALL_AO_SIDE * fade))
 
 
 ## FISSURES — a sparse fracture running through the rock, so a MASS of solid cells has structure of its
