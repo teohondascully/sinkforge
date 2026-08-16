@@ -470,6 +470,7 @@ func _step(delta: float) -> void:
 	# goes slack until the body swings back inside its radius. The re-resolve catches the rare case where
 	# the pull-back lands the box a pixel inside geometry.
 	if grapple.state == Grapple.State.ANCHORED:
+		grapple.update_line(sim, position)     # catch the line on corners / let it off them, then constrain
 		var swung: Vector2 = grapple.constrain_position(position)
 		if grapple.taut:
 			position = swung

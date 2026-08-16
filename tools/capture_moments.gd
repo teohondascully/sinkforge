@@ -71,6 +71,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _aiming(main)
 		"land":
 			await _landing(main)
+		"bend":
+			await _bending(main)
 		"haul":
 			await _hauling(main)
 		"scarp":
@@ -109,6 +111,42 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 const ARC := preload("res://tools/arc_driver.gd")
 const HAIL_WAIT := 2400              ## frames the fueled line is given to pour its first ingot
 const HAIL_PEAK := 60                ## frames after the hail — inside the plate's full-opacity dwell
+
+## THE BEND. A line caught on a corner — the one state that was, until now, drawn as rope passing straight
+## through solid rock. Built on the same geometry check_wrap measures: a hook in a high roof, a shelf
+## jutting out below it, and a body swung under the shelf so the line has no choice but to catch.
+func _bending(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var p: Player = main._player
+	for x: int in range(30, 59):
+		for y: int in range(20, 47):
+			sim.mine(Vector2i(x, y))
+	for y: int in range(24, 27):
+		for x: int in range(34, 37):
+			sim.set_solid(Vector2i(x, y), &"stone")
+	for x: int in range(38, 45):
+		sim.set_solid(Vector2i(x, 31), &"stone")
+	p.auto_input = false
+	p.place(Vector2(48.0 * 32.0 + 16.0, 29.0 * 32.0))
+	for _i: int in 4:
+		await physics_frame
+	p.grapple.fire(p.hand(), Vector2(36.0 * 32.0 + 16.0, 26.0 * 32.0 + 16.0))
+	for _i: int in 40:
+		await physics_frame
+		if p.grapple.state == Grapple.State.ANCHORED:
+			break
+	# Swing in until the line has actually caught, then hold that frame.
+	for _i: int in 150:
+		p.input_dir = -1.0
+		await physics_frame
+		if not p.grapple.pivots.is_empty():
+			break
+	p.input_dir = 0.0
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+
 
 ## THE HAUL. A body mid-arc in a gallery, moving faster than it can run — the thing check_traverse measures
 ## and the one state no still frame in history/ has ever shown. Everything this strike added lands in the

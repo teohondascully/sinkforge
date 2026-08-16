@@ -2215,13 +2215,29 @@ func _draw_grapple() -> void:
 	# one. Seeing them overlap for those few frames is the clearest possible statement of what chaining
 	# does — you never let go of anything.
 	if g.state == Grapple.State.ANCHORED:
-		_draw_rope(from, g.anchor, g.slack(from) * ROPE_SAG)
+		# A WRAPPED line is drawn as what it is: bar-taut around every corner it has caught on, and hanging
+		# only on the last segment. Drawing the whole thing as one chord to the hook would put rope straight
+		# through the rock it is wrapped around, which is precisely the lie the wrap exists to end.
+		var at: Vector2 = g.anchor
+		for pivot: Vector2 in g.pivots:
+			_draw_cord(at, pivot, 0.0)
+			at = pivot
+		_draw_cord(from, at, g.slack(from) * ROPE_SAG)
+		# The piton belongs at the HOOK and nowhere else, pointed back down the first span of line.
+		_draw_hook(g.pivots[0] if not g.pivots.is_empty() else from, g.anchor, 0.0)
 	if g.throwing():
 		_draw_rope(from, g.tip, 0.0)
 
 
 ## One line, bowed by `sag`, with its hook on the end.
 func _draw_rope(from: Vector2, to: Vector2, sag: float) -> void:
+	_draw_cord(from, to, sag)
+	_draw_hook(from, to, sag)
+
+
+## Just the CORD — no hook. Split out because a wrapped line is several spans and only ONE of them ends at
+## the hook; drawing the whole polyline with _draw_rope sprouted a piton at every corner it caught on.
+func _draw_cord(from: Vector2, to: Vector2, sag: float) -> void:
 	var pts := PackedVector2Array()
 	for i: int in ROPE_SEGMENTS + 1:
 		var t: float = float(i) / float(ROPE_SEGMENTS)
@@ -2238,7 +2254,15 @@ func _draw_rope(from: Vector2, to: Vector2, sag: float) -> void:
 	for i: int in ROPE_SEGMENTS:
 		if i % 2 == 0:
 			draw_line(pts[i], pts[i].lerp(pts[i + 1], 0.55), ROPE_CORE.lightened(0.35), 1.0)
-	# The hook: a wedge biting INTO the rock, oriented along the last segment so it always looks planted.
+
+## The hook: a wedge biting INTO the rock, oriented along the line's last segment so it always looks planted.
+func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
+	var pts := PackedVector2Array()
+	for i: int in ROPE_SEGMENTS + 1:
+		var t: float = float(i) / float(ROPE_SEGMENTS)
+		var p: Vector2 = from.lerp(to, t)
+		p.y += sin(t * PI) * sag
+		pts.append(p)
 	var dir: Vector2 = (pts[ROPE_SEGMENTS] - pts[ROPE_SEGMENTS - 1]).normalized()
 	var side: Vector2 = Vector2(-dir.y, dir.x)
 	var head: Vector2 = to + dir * 3.0

@@ -53,6 +53,7 @@ const RETHROW_GAP: int = 4           ## frames of empty air between letting go a
 const MIN_USEFUL: float = 2.0        ## cells — nearer than this a plant is a pin, not a hold
 const HOLD_ABOVE: float = 1.5        ## ...and it must be this far ABOVE the hand to be worth swinging from
 const FACE_BUDGET: int = 600         ## frames each attempt on the headland scarp is given
+const COAST_FRAMES: int = 22         ## frames after a release before reaching again — the jump needs room
 const STALL_FRAMES: int = 45         ## frames without gaining a column before a player would let go
 
 ## Columns of open surface the sky run is asked for. The gallery run crosses a carved corridor and can be
@@ -270,14 +271,20 @@ func _try_face(main: MainView, sim: FactorySim, foot: int, top: int, with_rope: 
 		await physics_frame
 	var goal_row: int = sim.surface_row(top)
 	var won: bool = false
+	var coast: int = 0
 	for f: int in FACE_BUDGET:
 		var at: Vector2i = main._cell_at(p.position)
-		if at.x <= top and at.y <= goal_row:
+		# STANDING on the high terrace, not merely level with it. Hanging on a wound-in line beside the lip
+		# is where an unaided winch leaves you and it is not the top of anything; requiring the boots to be
+		# down makes this the claim it was meant to be.
+		if at.x <= HeightmapWorldGen.SCARP_COLS[0] + 1 and at.y <= goal_row and p.on_floor:
 			won = true
 			break
 		p.input_dir = -1.0
 		if with_rope:
-			if not p.grapple.live():
+			if coast > 0:
+				coast -= 1
+			elif not p.grapple.live():
 				# AIM AT THE LIP, which is what the aiming ghost is for. The first version threw steeply up
 				# and across — the instinctive move, and a complete miss: a five-row plateau three columns
 				# away is CLEARED by any throw steeper than about forty-five degrees, so the hook sailed over
@@ -294,6 +301,11 @@ func _try_face(main: MainView, sim: FactorySim, foot: int, top: int, with_rope: 
 					p.grapple.cut()
 					p.input_climb = 0.0
 					p.request_jump()
+					# ...and RIDE it. Firing again on the very next frame is what kept this body pinned one
+					# row under the lip for six hundred frames: the winch hauls you to the top of the line,
+					# the jump lifts you the last cell, and a fresh hook thrown into that instant yanks you
+					# straight back down to the anchor you just left. Letting go means letting go.
+					coast = COAST_FRAMES
 		if p.on_floor and f % 10 == 0:
 			p.request_jump()
 		await physics_frame

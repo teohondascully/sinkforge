@@ -28,10 +28,23 @@ extends RefCounted
 ## Reeling in adds energy on purpose: shortening the radius while conserving tangential speed raises
 ## angular velocity, which is the pump every rope-swing game is built on.
 ##
-## WHAT IT DELIBERATELY DOESN'T DO: the line does not wrap around corners. Worms wraps; Bionic Commando
-## doesn't; neither does Spider-Man. Wrapping needs a per-frame corner search and a wrap stack, and it
-## buys realism in exchange for a rope whose behaviour the player can no longer predict from where they
-## are pointing. A straight line you can read at a glance is the better toy.
+## IT WRAPS, and this comment used to say the opposite — that a straight line you can read at a glance is
+## the better toy, that wrapping buys realism at the cost of predictability. That was the right call for the
+## tool as it then was: a way DOWN a shaft, reached for occasionally. It stopped being right when
+## tools/check_traverse measured this thing crossing a gallery half again as fast as a full stride, which
+## makes it the movement system rather than an accessory to one, and a movement system earns depth an
+## accessory does not.
+##
+## The predictability objection deserved an answer rather than a reversal, and it got two. The line is now
+## drawn as rope with visible slack instead of as a chord, so a bend is something you can SEE; and the
+## aiming ghost means the anchor is chosen deliberately rather than discovered. What is left is the part
+## worth having: a line that goes AROUND the rock instead of through it.
+##
+## The rope is a POLYLINE — anchor, then a pivot at every corner it has caught on, then the body — and the
+## constraint acts from the last of those. Wrapping SPENDS line, so the free radius shortens as you swing
+## into a corner and pays back out as you come off it; conserved tangential speed over a shorter radius is
+## a faster rotation, and tools/check_wrap measures the difference at 4.8 rad/s against 1.2. That is the
+## skill ceiling a ninja rope is supposed to have, and it is why this is a mechanic and not a render fix.
 
 const CELL: int = 32
 
@@ -140,6 +153,7 @@ func cut() -> void:
 	state = State.IDLE
 	taut = false
 	_chain = false
+	pivots.clear()
 
 
 func live() -> bool:
@@ -171,6 +185,7 @@ func advance(sim: FactorySim, from: Vector2, delta: float) -> void:
 			# hold is a chain nobody chains. Take the distance as it is and let the swing tighten it.
 			var takeup: float = 1.0 if _chain else SLACK_TAKEUP
 			length = maxf(MIN_LENGTH, from.distance_to(anchor) * takeup)
+			pivots.clear()               # a fresh bite starts a fresh line, whatever the last one caught on
 			state = State.ANCHORED
 			just_planted = true
 			_chain = false
@@ -223,18 +238,126 @@ func reel(axis: float, delta: float) -> void:
 	hauled = before - length
 
 
+## THE ROPE BENDS. A line from a hook to a body, drawn straight through whatever happens to be between
+## them, is a laser with a rope's texture: swing past the corner of a ledge and it passes through the rock
+## as though the rock were not there, and the arc you get is the arc of an anchor you can no longer see.
+##
+## So the line is a POLYLINE — the anchor, then a pivot at every corner it has caught on, then the body —
+## and the constraint acts from the last of those rather than from the hook. Two rules keep it honest:
+##
+##   WRAP    — if the rock blocks the straight run from the current hitch to the body, the line has caught
+##             on something; the corner it caught on becomes the new hitch.
+##   UNWRAP  — if the run from the PREVIOUS hitch to the body is clear again, the line has come off that
+##             corner and the pivot is dropped.
+##
+## The second rule is what makes it reversible, and it is why this is worth having beyond looking right: a
+## wrapped pivot spends line, so the free part of the rope SHORTENS as you swing into a corner and pays back
+## out as you swing off it. Conserved tangential speed over a shrinking radius is a faster arc, so catching
+## a ledge on the way past genuinely whips you around it — the whole reason a ninja rope has a skill ceiling.
+const MAX_PIVOTS: int = 6            ## a cap, not a design: runaway pivots would be a bug, not a manoeuvre
+const PIVOT_NUDGE: float = 2.0       ## px a pivot sits off its corner, so the line does not re-catch itself
+var pivots: Array[Vector2] = []      ## corners the line is currently caught on, anchor-first
+
+
+## The point the body actually pivots around: the last corner the line has caught on, or the hook itself.
+func hitch() -> Vector2:
+	return pivots[pivots.size() - 1] if not pivots.is_empty() else anchor
+
+
+## Line consumed by the fixed segments (anchor through every pivot) — unavailable to the swinging part.
+func spent() -> float:
+	var total: float = 0.0
+	var at: Vector2 = anchor
+	for p: Vector2 in pivots:
+		total += at.distance_to(p)
+		at = p
+	return total
+
+
+## The part of the line the body is actually swinging on.
+func free_length() -> float:
+	return maxf(MIN_LENGTH * 0.25, length - spent())
+
+
+## Catch the line on corners / let it off them again. Called once per physics step while ANCHORED, before
+## the constraint, with the point the constraint measures from.
+func update_line(sim: FactorySim, pos: Vector2) -> void:
+	if state != State.ANCHORED:
+		return
+	# UNWRAP first, so a line that came off a corner this step does not immediately re-catch on it.
+	while not pivots.is_empty():
+		var prev: Vector2 = pivots[pivots.size() - 2] if pivots.size() >= 2 else anchor
+		if _blocked(sim, prev, pos):
+			break
+		pivots.remove_at(pivots.size() - 1)
+	while pivots.size() < MAX_PIVOTS:
+		var corner: Vector2 = _catch(sim, hitch(), pos)
+		if corner == Vector2.INF:
+			break
+		pivots.append(corner)
+
+
+## Where the run from `from` to `to` first meets rock, expressed as the corner of the blocking cell nearest
+## the last clear point — or INF if the run is clear. Walked in the same fixed PROBE steps the hook and the
+## aiming ghost use, so all three agree about what counts as blocked.
+func _catch(sim: FactorySim, from: Vector2, to: Vector2) -> Vector2:
+	var d: Vector2 = to - from
+	var span: float = d.length()
+	if span < PROBE:
+		return Vector2.INF
+	var dir: Vector2 = d / span
+	var at: Vector2 = from
+	var last: Vector2 = from
+	var flown: float = 0.0
+	# The line legitimately BEGINS inside rock: the hook bites at the probe sample where solidity was first
+	# found, so the anchor sits up to a quarter-cell inside its own block, and a pivot is by construction a
+	# corner. A scan that took the first solid sample would therefore catch the line on the very thing it is
+	# tied to — measured as a pivot fourteen pixels from the hook, pinning the body to the roof it had just
+	# thrown at. So a catch only counts once the run has been in OPEN AIR: rock re-entered, not rock left.
+	var airborne: bool = false
+	while flown < span:
+		at += dir * PROBE
+		flown += PROBE
+		var cell := Vector2i(int(floor(at.x / float(CELL))), int(floor(at.y / float(CELL))))
+		if not sim.is_solid(cell):
+			last = at
+			airborne = true
+			continue
+		if not airborne:
+			continue
+		# The corner of the blocking cell nearest the last clear point, nudged out along the way we came so
+		# the very next step does not read the pivot itself as inside rock.
+		var best: Vector2 = Vector2.INF
+		var near: float = INF
+		for cx: int in [0, 1]:
+			for cy: int in [0, 1]:
+				var c := Vector2(float(cell.x + cx), float(cell.y + cy)) * float(CELL)
+				var far: float = c.distance_to(last)
+				if far < near:
+					near = far
+					best = c
+		return best + (last - best).normalized() * PIVOT_NUDGE
+	return Vector2.INF
+
+
+func _blocked(sim: FactorySim, from: Vector2, to: Vector2) -> bool:
+	return _catch(sim, from, to) != Vector2.INF
+
+
 ## The constraint. Returns the corrected position; mutates `vel` in place through the returned value's
 ## companion — GDScript has no out-params, so the caller reads `taut` and calls `resolve_velocity`.
 func constrain_position(pos: Vector2) -> Vector2:
 	taut = false
 	if state != State.ANCHORED:
 		return pos
-	var d: Vector2 = pos - anchor
+	var pin: Vector2 = hitch()
+	var free: float = free_length()
+	var d: Vector2 = pos - pin
 	var dist: float = d.length()
-	if dist <= length or dist < 0.001:
+	if dist <= free or dist < 0.001:
 		return pos
 	taut = true
-	return anchor + d / dist * length
+	return pin + d / dist * free
 
 
 ## Cancel the OUTWARD radial component of velocity — and only that. Everything tangential survives, which
@@ -242,7 +365,7 @@ func constrain_position(pos: Vector2) -> Vector2:
 func resolve_velocity(pos: Vector2, vel: Vector2) -> Vector2:
 	if not taut:
 		return vel
-	var d: Vector2 = pos - anchor
+	var d: Vector2 = pos - hitch()
 	if d.length() < 0.001:
 		return vel
 	var n: Vector2 = d.normalized()
@@ -257,4 +380,9 @@ func resolve_velocity(pos: Vector2, vel: Vector2) -> Vector2:
 func slack(from: Vector2) -> float:
 	if state != State.ANCHORED or length <= 0.001:
 		return 0.0
-	return clampf(1.0 - from.distance_to(anchor) / length, 0.0, 1.0)
+	# Measured on the FREE part against the HITCH, not on the whole line against the hook: a wrapped rope is
+	# bar-taut around its corners by definition, and only the last segment can hang.
+	var free: float = free_length()
+	if free <= 0.001:
+		return 0.0
+	return clampf(1.0 - from.distance_to(hitch()) / free, 0.0, 1.0)
