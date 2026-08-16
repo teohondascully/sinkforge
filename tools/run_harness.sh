@@ -62,6 +62,7 @@ add "check_grapple (swing score)"     "res://tools/check_grapple.gd"
 add "check_loop_health (loop score)"  "res://tools/check_loop_health.gd"
 add "check_pacing (session shape)"    "res://tools/check_pacing.gd"
 add "check_richness (a rich earth)"   "res://tools/check_richness.gd"
+add "check_descent (a way down)"      "res://tools/check_descent.gd"
 add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 
 total="${#NAMES[@]}"

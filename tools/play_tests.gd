@@ -300,10 +300,48 @@ func _engine_fed(agent: PlayAgent) -> int:
 ## sealed — the on-hook rule pools the haul), then PICK IT BACK UP and walk away with the haul in the
 ## pack (pickup salvages buffers). The manual "send the ferret into the wall, bring it back full"
 ## loop, all through real verbs.
+## The furthest column toward `pref` that the body can actually WALK to from `from`, and that is worth
+## building a fixture on when it gets there.
+##
+## Two conditions, and it took both: the ground has to be FOOTED — a column can be perfectly level on top
+## and open into a rift two cells down, which is level ground you cannot dig a two-deep socket into,
+## because the second cut drops the body through the floor and out of its own reach — and it has to be
+## REACHABLE, because the generator now cuts sinkhole mouths and a forty-row hole between here and there
+## is a wall, however good the ground looks on the far side of it.
+func _standing_ground(sim: FactorySim, from: int, pref: int) -> int:
+	var dir: int = 1 if pref >= from else -1
+	var best: int = from
+	var c: int = from
+	while c != pref:
+		var n: int = c + dir
+		if n < 2 or n >= FactorySim.GRID_COLS - 2:
+			break
+		if absi(sim.surface_row(n) - sim.surface_row(c)) > 1:
+			break                                            # a cliff — the body cannot walk past it
+		c = n
+		if _footed(sim, c):
+			best = c
+	return best
+
+
+## Solid rock for a socket's depth under this column's surface.
+func _footed(sim: FactorySim, col: int) -> bool:
+	var top: int = sim.surface_row(col)
+	if top > Strata.SURFACE_ROW + 8:
+		return false                                         # the floor of a hole, not the ground
+	for k: int in range(1, 7):
+		if not sim.is_solid(Vector2i(col, top + k)):
+			return false
+	return true
+
+
 func _goal_borer() -> bool:
 	var agent: PlayAgent = await _boot()
 	var sim: FactorySim = agent.sim
-	var col: int = 84                                        # clear of every fixture
+	# Clear of every fixture — and clear of the generator's sinkholes, which are the one thing that can put
+	# a forty-row hole where a hardcoded column expected a hillside. Ask for solid walkable ground near the
+	# spot rather than asserting the world still has some there.
+	var col: int = _standing_ground(sim, agent.main._cell_at(agent.player.position).x, 84)
 	for t: StringName in ResearchRules.ORDER:                # setup hatch — the bench flow is proven elsewhere
 		sim.research[t] = true
 	agent.give(&"h_drill", 1)

@@ -293,7 +293,9 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# is also a reward, which is the whole reason to walk to one. And the ore field's horizontal balance
 	# (the frontier pull) is computed on unperturbed rock, so a rift that happens to land on a frontier
 	# band can't quietly eat that band's richness — which it did, and the harness said so.
-	_mineralize(world, rng, _carve_rifts(world, rng))   # RIFTS: vertical space — and the reason to go to one
+	var rift_cells: Array[Vector2i] = _carve_rifts(world, rng)
+	_mineralize(world, rng, rift_cells)                # RIFTS: vertical space — and the reason to go to one
+	_open_sinkholes(world, rng, rift_cells)            # ...and the reason it is not sealed under a lid
 	_stud_ledges(world, rng)     # then put rock BACK: shelves, spires and rubble, so open space has form
 	_stud_spires(world, rng)
 	_scatter_rubble(world, rng)
@@ -519,12 +521,84 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
 				world.blocks.erase(cell)
+				world.routes[cell] = true          # deliberate vertical structure, not undirected cave
 				carved.append(cell)
 			x += drift
 			drift = clampf(drift + rng.randf_range(-0.10, 0.10), -RIFT_WANDER, RIFT_WANDER)
 			if x < 3.0 or x > float(world.cols - 4):
 				break
 	return carved
+
+
+## SINKHOLES — the mouths, without which none of the vertical structure above exists as far as the player
+## is concerned.
+##
+## Every carve in this generator refuses to touch the CAVE_MIN_DEPTH rows under a column's surface, which
+## is a good rule: it keeps the near-surface solid by construction, so the open dark is something you go
+## DOWN to rather than something that opens under your feet. Applied without exception, though, it seals
+## the entire underground under an unbroken lid — and tools/check_descent measured exactly that. The whole
+## connected open space of this world reached ONE row below the surface. Forty rows of chasm sat at column
+## 24, beautifully carved, mineralised walls and all, in a sealed bottle. The rifts, the halls, the caverns
+## and the grapple built to fall through them were, for a player, geometry nobody could ever arrive at.
+##
+## A handful of mouths does not undo that rule, it completes it. "Opt-in danger" is only a choice if you
+## can SEE the thing you are opting into and walk to it. A sinkhole is a landmark on the skyline, a route
+## down that costs no pickaxe and some nerve, and — because the daylight soak follows a column's surface —
+## a shaft of daylight falling into the dark, which is the single most valuable thing a mouth can be.
+##
+## Cut UP from the top of a rift rather than down from the sky, so a mouth always opens onto somewhere
+## worth arriving at, and flared toward the surface so it reads as a collapse rather than as a drilled pipe.
+const SINKHOLE_COUNT: int = 3            ## mouths in a world — landmarks, and rare enough to stay landmarks
+const SINKHOLE_MOUTH_HALF: float = 3.0   ## half-width where it meets the sky: wide enough to see from away
+const SINKHOLE_THROAT_HALF: float = 1.1  ## ...and where it joins the rift below
+const SINKHOLE_FLARE: float = 2.2        ## >1 keeps the throat narrow and opens the cone late (a collapse)
+const SINKHOLE_KEEPOUT: int = 20         ## columns either side of spawn that stay sealed (the tutorial's ground)
+const SINKHOLE_SPACING: int = 15         ## columns between mouths, so no two read as one broken region
+const SINKHOLE_WANDER: float = 0.22      ## cells of drift per row — a throat, not a drainpipe
+
+func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: Array[Vector2i]) -> void:
+	# The highest open cell in each column the rifts carved — the ceiling that has to be broken through.
+	var tops: Dictionary = {}
+	for c: Vector2i in rift_cells:
+		if not tops.has(c.x) or c.y < int(tops[c.x]):
+			tops[c.x] = c.y
+	var cols: Array = tops.keys()
+	cols.sort()
+
+	var opened: Array[int] = []
+	for col: Variant in cols:
+		if opened.size() >= SINKHOLE_COUNT:
+			break
+		var cx: int = col
+		if absi(cx - SPAWN_COL) < SINKHOLE_KEEPOUT:
+			continue
+		var clear: bool = true
+		for prev: int in opened:
+			if absi(cx - prev) < SINKHOLE_SPACING:
+				clear = false
+		if not clear:
+			continue
+		opened.append(cx)
+		_cut_throat(world, rng, cx, int(tops[cx]))
+
+
+## Carve one flaring shaft from a rift's ceiling up through the lid to daylight.
+func _cut_throat(world: WorldData, rng: RandomNumberGenerator, col: int, rift_top: int) -> void:
+	var sky: int = _surface_row(col)
+	if rift_top <= sky + 2:
+		return                                          # already open enough to be its own mouth
+	var x: float = float(col)
+	var drift: float = rng.randf_range(-SINKHOLE_WANDER, SINKHOLE_WANDER)
+	for row: int in range(rift_top, sky - 1, -1):
+		var up: float = 1.0 - float(row - sky) / float(maxi(1, rift_top - sky))   # 0 at the rift, 1 at the sky
+		var half: float = lerpf(SINKHOLE_THROAT_HALF, SINKHOLE_MOUTH_HALF, pow(up, SINKHOLE_FLARE))
+		for c: int in range(int(floor(x - half)), int(ceil(x + half)) + 1):
+			var cell := Vector2i(c, row)
+			if world.in_bounds(cell):
+				world.blocks.erase(cell)                # deliberately past CAVE_MIN_DEPTH: this IS the mouth
+				world.routes[cell] = true
+		x += drift
+		drift = clampf(drift + rng.randf_range(-0.08, 0.08), -SINKHOLE_WANDER, SINKHOLE_WANDER)
 
 
 ## THE CHASM PAYS. Walk the rift's own carved cells, look at the solid rock touching each one, and enrich
@@ -673,7 +747,7 @@ static func _banded(depth_frac: float, floor_frac: float) -> float:
 ## Blobs span several columns, so a column fixed here fixes its neighbours too — the pass reads the world
 ## it is writing, and quietly does less work the richer the surrounding rock already is.
 const DROUGHT_LIMIT: int = 18            ## rows of unbroken plain rock before the generator owes you something
-const DROUGHT_VUG_CHANCE: float = 0.34   ## ...and how often what it owes you is a cavity rather than a vein
+const DROUGHT_VUG_CHANCE: float = 0.28   ## ...and how often what it owes you is a cavity rather than a vein
 const DROUGHT_VEIN_SIZE: int = 5
 const DROUGHT_COAL_BIAS: float = 0.38    ## share of planted veins that are coal rather than ore
 const PLAIN_ROCK: Array[StringName] = [&"earth", &"stone", &"shale", &"deepslate"]

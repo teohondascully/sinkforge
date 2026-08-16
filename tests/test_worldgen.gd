@@ -80,6 +80,8 @@ func _test_surface_silhouette() -> void:
 ##
 ## Checked across several seeds and both generators, because the surface function is shared and a
 ## subclass could reasonably decide to override it.
+const MOUTH_GAP: int = 8         ## columns of walkable ground that separate one mouth from the next
+
 func _test_surface_walkable() -> void:
 	print("- surface walkability (no un-steppable rises)")
 	for gen: WorldGen in [HeightmapWorldGen.new(), LayeredWorldGen.new()] as Array[WorldGen]:
@@ -87,13 +89,33 @@ func _test_surface_walkable() -> void:
 			var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, seed_v)
 			var worst: int = 0
 			var worst_col: int = -1
+			var stray: int = 0
+			# A SINKHOLE is a hole in the ground, so of course the walked surface falls off a cliff at its
+			# lip — that is the feature, not a broken heightmap. What must stay true is that the ground is a
+			# walkable heightmap EVERYWHERE ELSE. Counted as PLACES rather than as column-steps: one mouth
+			# is several rows of irregular throat and so several un-steppable boundaries, and a test that
+			# counted those would be measuring how ragged a hole is instead of how many holes there are.
+			var mouths: int = 0
+			var last_cliff: int = -99
 			for col: int in range(world.cols - 1):
 				var step: int = absi(_surface_of(world, col + 1) - _surface_of(world, col))
+				if step <= 1:
+					continue
+				if not _route_column(world, col) and not _route_column(world, col + 1):
+					stray += 1
+				if col - last_cliff > MOUTH_GAP:
+					mouths += 1
+				last_cliff = col
 				if step > worst:
 					worst = step
 					worst_col = col
-			_check(worst <= 1, "%s seed %d: every column step is <= 1 row (worst %d at col %d)"
-				% [gen.get_script().resource_path.get_file(), seed_v, worst, worst_col])
+			var name: String = gen.get_script().resource_path.get_file()
+			_check(stray == 0,
+				"%s seed %d: every un-steppable rise is the lip of a deliberate mouth (%d stray, worst %d at col %d)"
+				% [name, seed_v, stray, worst, worst_col])
+			_check(mouths <= LayeredWorldGen.SINKHOLE_COUNT,
+				"%s seed %d: and the ground falls away in only a few PLACES (%d, cap %d)"
+				% [name, seed_v, mouths, LayeredWorldGen.SINKHOLE_COUNT])
 
 
 ## Topmost GROUND row of a generated column, read from the produced WorldData (so it measures what the
@@ -101,6 +123,14 @@ func _test_surface_walkable() -> void:
 ## bazaar ruin's timber are skipped: a tree trunk is a thing you chop, not a hill you climb, and counting
 ## a canopy as terrain reports a four-row "step" at the base of every tree.
 const _NOT_GROUND: Array[StringName] = [&"wood", &"leaves"]
+
+
+## Whether a deliberate route (a rift, or the sinkhole throat above it) passes through this column.
+func _route_column(world: WorldData, col: int) -> bool:
+	for row: int in world.rows:
+		if world.routes.has(Vector2i(col, row)):
+			return true
+	return false
 
 
 func _surface_of(world: WorldData, col: int) -> int:
@@ -165,7 +195,10 @@ func _test_layered_worldgen() -> void:
 	# a Terraria carved room. And the near-surface base is untouched (caves only below CAVE_MIN_DEPTH).
 	var carved: int = 0
 	var carved_with_wall: int = 0
+	var route_cells: int = 0
 	var breached_base: int = 0
+	var breached_off_route: int = 0
+	var mouth_cols: Dictionary = {}
 	var solid_below: int = 0
 	var hm := HeightmapWorldGen.new()
 	for col: int in cols:
@@ -175,19 +208,48 @@ func _test_layered_worldgen() -> void:
 			if not a.blocks.has(cell) and a.walls.has(cell):
 				carved += 1
 				carved_with_wall += 1
+				if a.routes.has(cell):
+					route_cells += 1
 				if row < top + LayeredWorldGen.CAVE_MIN_DEPTH:
 					breached_base += 1
+					if a.routes.has(cell):
+						mouth_cols[col] = true
+					else:
+						breached_off_route += 1
 			elif row > top and a.blocks.has(cell):
 				solid_below += 1
 	_check(carved > 50, "caves carved open cells in the rock (%d)" % carved)
 	_check(carved_with_wall == carved, "every carved cell kept its wall (Terraria room, not void)")
-	_check(breached_base == 0, "no cave breached the near-surface base (stays solid by construction)")
+
+	# THE LID, AND ITS DOORS. The near-surface band stays solid by construction — the open dark is
+	# something you go DOWN to, never something that opens under your feet — with the deliberate exception
+	# of the sinkhole mouths. Applied without exception the rule sealed the ENTIRE underground under an
+	# unbroken lid (tools/check_descent measured the whole connected open space of a world reaching one row
+	# below the surface, with forty rows of chasm in a bottle beneath it), so what is guarded now is the
+	# rule as designed: no UNDIRECTED carve may touch the base, and the doors are few and deliberate.
+	_check(breached_off_route == 0,
+		"no undirected cave breached the near-surface base (%d cells)" % breached_off_route)
+	_check(mouth_cols.size() > 0, "...but the lid does have doors in it (%d columns)" % mouth_cols.size())
+
 	# DIG-YOUR-FACTORY (#107, PROGRESSION §10 / DESIGN_REVIEW F2): the underground must be SOLID-dominant —
 	# you carve your factory INTO ore-rich rock; caves are the rarer opt-in punctuation, NOT the medium you
 	# traverse (follow-the-cave). Guard the identity so a future gen change can't silently drift it back.
-	var cave_frac: float = float(carved) / float(maxi(1, solid_below + carved))
-	_check(cave_frac < 0.25, "solid >> cave: caves stay opt-in punctuation (cave=%.1f%% of below-surface)"
-		% [cave_frac * 100.0])
+	#
+	# Measured on UNDIRECTED cave, because that is what the identity is about. A rift cut on purpose to give
+	# the world a vertical dimension, and the throat that connects it to daylight, are the opposite of the
+	# thing this guard defends against while being indistinguishable from it in a raw open-cell count — so
+	# counting them here does not protect the identity, it just makes deliberate structure unaffordable.
+	# The generator marks its own route carves (WorldData.routes); a second, looser ceiling on the TOTAL
+	# still catches a world that has simply become swiss cheese by any means.
+	var total_below: int = maxi(1, solid_below + carved)
+	var undirected: float = float(carved - route_cells) / float(total_below)
+	var open_frac: float = float(carved) / float(total_below)
+	_check(undirected < 0.25,
+		"solid >> cave: UNDIRECTED cave stays opt-in punctuation (%.1f%% of below-surface)"
+		% [undirected * 100.0])
+	_check(open_frac < 0.32,
+		"...and the underground is solid-dominant all in (%.1f%% open, routes included)"
+		% [open_frac * 100.0])
 
 	# DEPTH-BANDED ORE: count ore in the top half vs the bottom half of the sub-surface column band.
 	var ore_shallow: int = 0
@@ -357,7 +419,9 @@ func _test_worldgen_fuzz() -> void:
 						var cell := Vector2i(col, row)
 						# Carved = wall present, block absent (a Terraria room). A never-filled sky cell has
 						# neither, so require the wall to distinguish a carved cave from open air above ground.
-						if world.walls.has(cell) and not world.blocks.has(cell):
+						# ...except a sinkhole throat, which is the one carve allowed to reach daylight and
+						# is the reason the underground is reachable at all (see WorldData.routes).
+						if world.walls.has(cell) and not world.blocks.has(cell) and not world.routes.has(cell):
 							basesafe_fail = "%s carved cave at %s within base-safe band (surface=%d)" \
 								% [tag, str(cell), top]
 							break

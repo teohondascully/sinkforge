@@ -27,6 +27,16 @@ var amounts: Dictionary = {}
 ## pockets you BREACH). Ingested by FactorySim.load_world into `sim.water`; an older WorldData without this
 ## just yields a dry world (default empty). The gen→sim channel for the deep aquifers.
 var water: Dictionary = {}
+## PROVENANCE, not content: cell (Vector2i) -> true for every cell a DELIBERATE vertical route carved —
+## the rifts, and the sinkhole throats that connect them to daylight. The sim never reads it and it is
+## never saved; it exists so a test can tell designed structure apart from undirected cave.
+##
+## That distinction is not bookkeeping. The dig-your-factory identity guard asks whether the underground
+## is solid-dominant — whether caves are the MEDIUM you traverse or punctuation in rock you carve — and a
+## chasm cut on purpose to give the world a vertical dimension is the opposite of the thing that guard is
+## defending against, while being indistinguishable from it in a raw open-cell count. Without this, the
+## only way to keep the number honest is to stop building routes.
+var routes: Dictionary = {}
 
 
 func in_bounds(cell: Vector2i) -> bool:

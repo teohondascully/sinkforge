@@ -63,6 +63,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _swing(main)
 		"line":
 			await _the_line(main)
+		"mouth":
+			await _at_the_mouth(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -108,6 +110,35 @@ func _the_line(main: MainView) -> void:
 	if not main._line_hailed:
 		push_warning("the line never ran — capturing without the plate")
 	for _i in HAIL_PEAK:
+		await physics_frame
+
+
+## THE MOUTH — a sinkhole seen from its lip. The hole is FOUND in the real generated world (the deepest
+## plunge in the surface nearest the spawn) and walked to with the real body, so the shot is of terrain the
+## generator actually made rather than a hole posed for the camera. If a world ever comes out without one,
+## this warns and photographs the flat surface that replaced it.
+const MOUTH_PLUNGE: int = 6          ## rows of surface drop that make a step a MOUTH rather than a hill
+const MOUTH_STANDOFF: int = 2        ## columns back from the lip — close enough to see in, far enough to live
+const MOUTH_SETTLE: int = 30
+
+func _at_the_mouth(main: MainView) -> void:
+	var agent: PlayAgent = AGENT.new(self, main)
+	var sim: FactorySim = main.sim
+	var here: int = main._cell_at(agent.player.position).x
+	var lip: int = -1
+	for c: int in range(2, FactorySim.GRID_COLS - 2):
+		var step: int = sim.surface_row(c) - sim.surface_row(c - 1)
+		if absi(step) < MOUTH_PLUNGE:
+			continue
+		var edge: int = (c - 1) if step > 0 else c
+		if lip < 0 or absi(edge - here) < absi(lip - here):
+			lip = edge
+	if lip < 0:
+		push_warning("no sinkhole mouth in this world — capturing the plain surface")
+		return
+	var stand: int = lip + (MOUTH_STANDOFF if lip < here else -MOUTH_STANDOFF)
+	await agent.walk_to_column(clampi(stand, 2, FactorySim.GRID_COLS - 3), 1600)
+	for _i: int in MOUTH_SETTLE:
 		await physics_frame
 
 
