@@ -89,7 +89,7 @@ const AMBIENT_LIGHT := Color(0.34, 0.35, 0.42)
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
                                                    ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
                                                    ## a white wash (diff 11)
-const LAMP_RADIUS: float = CELL * 3.9               ## a warm pool with a higher-contrast falloff (was 4.0)
+const LAMP_RADIUS: float = CELL * 5.6               ## the ADDITIVE bloom halo — tracks the reveal radius
 const LAMP_LEAD: float = CELL * 1.9                 ## how far the beam pool leads toward the aim (#44)
 
 ## --- Day/night (cosmetic-first) ---------------------------------------------------
@@ -2155,7 +2155,7 @@ func _light_level(darkness: float) -> Color:
 ## how much of the source's hue survives that lift: enough to read as amber/teal at a glance, never
 ## enough to strangle a channel. This is why warm lamp + cool crystal reads as colour contrast in stone
 ## rather than as two coloured stickers.
-const LIGHT_TINT: float = 0.34
+const LIGHT_TINT: float = 0.28
 const TORCH_LIGHT := Color(1.0, 0.72, 0.34)   ## a wall torch burns hotter/oranger than the head-lamp
 const SEAM_LIGHT := Color(0.46, 0.86, 1.0)    ## exposed-ore seams answer in cold cyan
 
@@ -2193,9 +2193,19 @@ func _update_veil() -> void:
 	if player != null:
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
 		var lamp_lit: Color = _light_tint(lamp_color)
-		_veil_cut(bytes, head + _lamp_offset, 5.4, 0.99, lamp_lit)         # aimed beam — wide reveal, open core
-		_veil_cut(bytes, head + _lamp_offset * 0.45, 3.2, 0.8, lamp_lit)   # the beam throat
-		_veil_cut(bytes, player.position, 2.2, 0.5, lamp_lit)              # close body glow
+		# HOW MUCH OF THE FRAME YOU CAN SEE (#S5). The camera shows 40x22 cells. A 5.4-cell reveal lights
+		# roughly a tenth of that, so the underground was played through a keyhole: whatever the terrain
+		# passes put into the world — rifts, ledges, spires, a colour arc across the layers — the player
+		# met one lamp-width of it at a time and the other nine tenths of every frame was black.
+		#
+		# "Bring your own light" is a real pillar and it survives this: the pool still falls off hard, the
+		# deep outside it is still genuinely dark, and torches and machines still buy you territory that
+		# stays lit when you leave. What changes is that the lamp shows you the ROOM you are standing in
+		# rather than the arm's length in front of you — which is the difference between exploring a cave
+		# and feeling around one. The throat and body pools widen with it so the beam keeps its shape.
+		_veil_cut(bytes, head + _lamp_offset, 9.0, 0.99, lamp_lit)         # aimed beam — wide reveal, open core
+		_veil_cut(bytes, head + _lamp_offset * 0.45, 5.0, 0.8, lamp_lit)   # the beam throat
+		_veil_cut(bytes, player.position, 3.4, 0.5, lamp_lit)              # close body glow
 	for machine: MachineState in sim.machines:
 		var mpos: Vector2 = _cell_center(machine.cell)
 		if not cull.has_point(mpos):
@@ -2274,7 +2284,7 @@ func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: 
 			# grain as it fades instead of a clean gaussian. Amplitude lifted 0.10 -> 0.22.
 			var window: float = (1.0 - f) * clampf(f * 2.2, 0.0, 1.0)
 			var g: float = (sin(float(col) * 1.7 + float(row) * 2.3) * 0.62 \
-				+ sin(float(col) * 4.1 - float(row) * 3.7) * 0.38) * 0.22 * window
+				+ sin(float(col) * 4.1 - float(row) * 3.7) * 0.38) * 0.13 * window
 			# A cut RAISES the light level toward white rather than lowering an opacity — the same pool
 			# and the same falloff, expressed in the multiply model (#S3). Sources still stack the way
 			# they did: each lifts whatever the previous one left, so overlapping pools brighten toward
