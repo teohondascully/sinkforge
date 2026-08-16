@@ -55,6 +55,7 @@ func _run() -> void:
 		["RUNG 4 — the Borer ferret loop", _goal_borer],
 		["RUNG 5 — drain the aquifer (L3 flood loop)", _goal_drain_the_aquifer],
 		["RUNG 6 — breach a worldgen aquifer (real descent)", _goal_breach_worldgen_aquifer],
+		["RUNG 7 — pump out a worldgen aquifer (full L3 loop)", _goal_pump_out_a_worldgen_aquifer],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -673,6 +674,194 @@ func _pocket_top(cells: Array) -> int:
 	for c: Vector2i in cells:
 		t = mini(t, (c as Vector2i).y)
 	return t
+
+
+## RUNG 7 — PUMP OUT A REAL WORLDGEN AQUIFER (the FULL L3 loop, end to end on the shipping world): RUNG 6
+## proved descent + breach + release + claim; this closes the arc with the DESIGNED tool — descend → build a
+## POWERED PUMP → breach the sealed pocket (claim its guarded rich_ore) → the released flood pours in → the
+## pump DRAINS it → climb back out with the flood at your back. The aquifer is DISCOVERED dynamically, so the
+## rung guards the whole loop on real worldgen geometry. The play here is "prep, then breach": the pump loop is
+## built DRY in a small room carved into the rim rock (the pocket stays sealed, so the build is a dry walk —
+## generators/pumps aren't water-gated anyway), THEN the wall is cut so the pre-built pump immediately handles
+## the flood. Setup hatch (RUNG-3's guarantee-the-site): the room + descent shaft are carved; the DESCENT dig,
+## the gen/conduit/pump BUILDS, the breach CUT, the DRAIN, and the CLIMB-OUT are all real reach-gated verbs.
+func _goal_pump_out_a_worldgen_aquifer() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	for t: StringName in ResearchRules.ORDER:                     # setup hatch: the bench/research flow is proven elsewhere
+		sim.research[t] = true
+
+	# --- FIND the aquifer + the breach vein: a deep, substantial pocket with a rim rich_ore R that has pocket
+	# water on one side and OUTSIDE solid rock on the other, as LOW as possible (a low breach drains best — the
+	# sump sits near the pocket floor so gravity feeds the whole pocket into it). dir = toward the pocket. ---
+	var pockets: Array = _water_pockets(sim)
+	pockets.sort_custom(func(a: Array, b: Array) -> bool: return _pocket_top(a) < _pocket_top(b))
+	var pk: Array = []
+	var R: Vector2i = Vector2i(-1, -1)     # the rim rich_ore to cut: claims the treasure AND opens the seal
+	var dir: int = 0                       # +1 if the pocket is to the RIGHT of R (room to the left), else -1
+	for p: Array in pockets:
+		if _pocket_top(p) < LayeredWorldGen.AQUIFER_MIN_ROW or p.size() < 12:
+			continue
+		var wset: Dictionary = {}
+		for w: Vector2i in p:
+			wset[w] = true
+		var best: Vector2i = Vector2i(-1, -1)
+		var best_dir: int = 0
+		for w: Vector2i in p:
+			for d: int in [1, -1]:
+				var rc: Vector2i = Vector2i(w.x - d, w.y)         # rim cell just OUTSIDE this water cell (pocket is dir=d away)
+				var out_cell: Vector2i = Vector2i(w.x - 2 * d, w.y)  # one more step out = the room side
+				if wset.has(rc) or wset.has(out_cell) or not sim.in_bounds(out_cell):
+					continue
+				if sim.solid.get(rc, &"") != &"rich_ore":
+					continue
+				if best.x < 0 or rc.y > best.y:                   # LOWEST rim vein drains best
+					best = rc
+					best_dir = d
+		if best.x >= 0:
+			pk = p
+			R = best
+			dir = best_dir
+			break
+	if R.x < 0:
+		return await _finish(agent, false,
+			"worldgen produced no deep aquifer with a low breachable rim rich_ore vein (checked %d pockets)" % pockets.size())
+
+	# --- geometry: a tight room carved on the -dir (OUTSIDE) side of the breach vein R, at R's row. The body
+	# works entirely from ONE solid-floored STAND column: it breaches R across the sump gap (dist 2), drops the
+	# pump into the adjacent sump (dist 1), and the generator sits one cell ABOVE it — close enough to power the
+	# pump by its innate AURA (radius 2, no conduit) and clear of both the walk row and the climb shaft. ---
+	var r: int = R.y                                  # the room floor walk row + the breach row (level with the vein)
+	var pump_col: int = R.x - dir                     # the pump + sump: one cell out from R (floods when R is cut)
+	var gen_col: int = R.x - 2 * dir                  # the STAND column: solid floor; the body works entirely from here
+	var ds: int = gen_col                             # descend + climb THE STAND COLUMN itself (machines live on pump_col, never on it)
+	var wall_col: int = R.x - 3 * dir                 # the room's outer wall
+	var lo_x: int = mini(wall_col, pump_col)
+	var hi_x: int = maxi(wall_col, pump_col)
+
+	# Carve the DRY room (pocket stays sealed — R and the pocket water are untouched). Floor bed solid at r+1,
+	# outer wall solid, descent shaft solid (dug on the way down), the sump open under the pump with depth below.
+	const DESCENT_ROWS: int = 10
+	var settle_row: int = r - DESCENT_ROWS
+	for x: int in range(lo_x, hi_x + 1):
+		for y: int in range(r - 2, r + 4):
+			var c := Vector2i(x, y)
+			sim.remove_water(c, FactorySim.WATER_MAX)
+			if y >= r + 1 or x == wall_col or x == ds:
+				sim.set_solid(c, &"deepslate")        # bed + outer wall + the (solid, to-be-dug) descent shaft
+			else:
+				sim.set_solid(c, &"")                 # dry room walk-space
+	sim.set_solid(Vector2i(pump_col, r + 1), &"")     # the sump (drain depth under the pump)
+	sim.set_solid(Vector2i(pump_col, r + 2), &"")
+	sim.set_solid(Vector2i(pump_col, r + 3), &"deepslate")
+	for y: int in range(settle_row, r):               # the descent shaft above the room (solid, dug on the way down)
+		sim.set_solid(Vector2i(ds, y), &"deepslate")
+	sim.set_solid(Vector2i(ds, settle_row), &"")      # foothold at the top
+	sim.set_solid(Vector2i(ds, settle_row - 1), &"")
+
+	# Loadout: a pump, a generator (its aura powers the adjacent pump — no wiring; conduit delivery is RUNG 5's
+	# proof), the tier-2 pick (deepslate + rich_ore), rope for the climb out.
+	agent.give(&"pump", 1)
+	agent.give(&"generator", 1)
+	agent.give(&"stone_pickaxe", 1)
+	agent.give(&"rope", 25)
+	agent.player.position = agent.main._cell_center(Vector2i(ds, settle_row))
+	for _i: int in 20:
+		await physics_frame
+	agent._note("  aquifer %d cells, breach vein %s (dir %d), room floor row %d, descend col %d" % [pk.size(), str(R), dir, r, ds])
+
+	# --- STEP 1: DESCEND the deep shaft into the room (a real reach-gated deepslate dig). ---
+	if not await agent.select_item(&"stone_pickaxe"):
+		return await _finish(agent, false, "no pick to dig the deep")
+	if not await agent.dig_down_to(Vector2i(ds, r)):
+		return await _finish(agent, false, "could not descend into the pump room (stuck at %s)" % str(agent.main._cell_at(agent.player.position)))
+
+	# --- STEP 2: build the GENERATOR DRY (pocket still sealed), diagonally up from the stand column so it never
+	# overlaps the body, sitting one cell ABOVE the pump's cell. Fuel it; its aura powers the pump we drop below
+	# it after the breach — no wiring to lay (RUNG 5 proves conduit delivery). ---
+	if not await agent.walk_to_column(gen_col, 900):
+		return await _finish(agent, false, "could not reach the build spot in the room")
+	var gen_cell := Vector2i(pump_col, r - 1)
+	if not await agent.select_item(&"generator"):
+		return await _finish(agent, false, "no generator in the pack")
+	if not await agent.build_at(gen_cell):
+		return await _finish(agent, false, "could not stand the generator at %s" % str(gen_cell))
+	var gen: MachineState = sim.machine_at(gen_cell)
+	if gen == null:
+		return await _finish(agent, false, "the generator vanished after placement")
+	gen.input_buffer[&"coal"] = 60                    # hatch the fuel (the toss-feed verb is RUNG-1's; the loop is under test)
+	sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 60
+
+	# --- STEP 3: the BREACH + the CLAIM — cut the rim rich_ore R. One move claims the flood-guarded treasure AND
+	# opens the sealed pocket wall; the released flood pours into the room and down into the sump. Reach across the
+	# sump gap from the stand column (the body never crosses into the pocket or onto the sump). ---
+	if not await agent.walk_to_column(gen_col, 900):
+		return await _finish(agent, false, "could not reach the breach wall")
+	if not agent.main._can_reach(R):
+		return await _finish(agent, false, "at the wall, but the rim vein %s is out of reach" % str(R))
+	if not await agent.select_item(&"stone_pickaxe"):
+		return await _finish(agent, false, "lost the pick before the breach")
+	var rich_before: int = int(sim.inventory.get(&"rich_ore", 0))
+	var bg: int = 0
+	while sim.is_solid(R) and bg < 90:
+		agent.do_mine(R)
+		await agent.wait(4); bg += 1
+	if sim.is_solid(R):
+		return await _finish(agent, false, "could not cut the rim rich_ore breach at %s" % str(R))
+	var got: int = int(sim.inventory.get(&"rich_ore", 0)) - rich_before
+	if got < 1:
+		return await _finish(agent, false, "cut the aquifer wall but the rich_ore treasure didn't drop (got %d)" % got)
+
+	# --- STEP 4: drop the PUMP into the flooded sump (reach in from the dry side so the body never stands over
+	# the sump) and confirm the pre-built power reaches it. ---
+	if not await agent.walk_to_column(gen_col, 900):
+		return await _finish(agent, false, "could not step back to place the pump")
+	if not await agent.select_item(&"pump"):
+		return await _finish(agent, false, "no pump in the pack")
+	var pump_cell := Vector2i(pump_col, r)
+	if not agent.main.try_build(pump_cell):
+		return await _finish(agent, false, "could not place the pump at %s [reach=%s placeable=%s]"
+			% [str(pump_cell), agent.main._can_reach(pump_cell), agent.main._placeable(pump_cell)])
+	for _i: int in 6:
+		await agent.step()                            # warm the generator, let power flood the network
+	if sim.power_at(pump_cell) <= 0.0:
+		return await _finish(agent, false, "the pump is placed but no power reaches it (power=%.2f)" % sim.power_at(pump_cell))
+
+	# --- STEP 5: DRAIN — the pump chews the released flood down. Read the connected pocket + sump water so a
+	# far-off worldgen aquifer can't mask the drain. ---
+	var drain_cells: Array[Vector2i] = []
+	for w: Vector2i in pk:
+		drain_cells.append(w)
+	drain_cells.append(Vector2i(pump_col, r))
+	drain_cells.append(Vector2i(pump_col, r + 1))
+	drain_cells.append(Vector2i(pump_col, r + 2))
+	var pocket_water := func() -> int:
+		var s: int = 0
+		for c: Vector2i in drain_cells:
+			s += sim.water_at(c)
+		return s
+	var water_before: int = pocket_water.call()
+	var t: int = 0
+	while pocket_water.call() > water_before / 2 and t < 1200:
+		await agent.step(); t += 1
+	var water_after: int = pocket_water.call()
+	if water_after >= water_before or water_after > water_before / 2:
+		return await _finish(agent, false, "the powered pump never substantially drained the aquifer (%d -> %d)" % [water_before, water_after])
+
+	# --- STEP 6: CLIMB OUT — escape the drained pocket back up the descent shaft, the flood at your back. Step
+	# onto the (guaranteed, dug-clear) shaft column first, then rope up. The shaft is open the whole way (the
+	# body dug out its own footing on the way down), so "escaped" = climbed clear of the flooded floor back up
+	# near the top of the shaft (out of the water), not landing on a surface that no longer exists down here. ---
+	if not await agent.walk_to_column(ds, 900):
+		return await _finish(agent, false, "drained the aquifer but could not reach the shaft to climb out")
+	var climbed: bool = await agent.climb_to_surface(settle_row)
+	var out_row: int = agent.main._cell_at(agent.player.position).y
+	var escaped: bool = climbed or out_row <= settle_row + 2
+	print("  pump-out: %s  (descended %d, rich_ore=%d, water %d->%d, climbed to row %d, escaped=%s)" % [
+		agent.friction(), DESCENT_ROWS, got, water_before, water_after, out_row, escaped])
+	return await _finish(agent, escaped,
+		"descended, built a powered pump, breached a real worldgen aquifer (claimed %d rich_ore), drained it (%d->%d), and climbed out"
+			% [got, water_before, water_after])
 
 
 ## RUNG 3 — the L2 IRON CHAIN is playable embodied: with the iron
