@@ -16,6 +16,7 @@ extends RefCounted
 static var master: float = 1.0          ## 0..1 — the Master bus (everything)
 static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
 static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
+static var music: float = 1.0           ## 0..1 — the Score (the tonal beds that descend with you)
 static var screen_shake: bool = true
 static var auto_pickup: bool = true    ## walk-over auto-collect of ground items (playtest: make it optional)
 static var zoom_idx: int = 0            ## index into MainView.ZOOM_LEVELS
@@ -34,6 +35,7 @@ static func load_settings() -> void:
 		master = clampf(float(cfg.get_value("audio", "master", master)), 0.0, 1.0)
 		sound = clampf(float(cfg.get_value("audio", "sound", sound)), 0.0, 1.0)
 		ambience = clampf(float(cfg.get_value("audio", "ambience", ambience)), 0.0, 1.0)
+		music = clampf(float(cfg.get_value("audio", "music", music)), 0.0, 1.0)
 		screen_shake = bool(cfg.get_value("feel", "screen_shake", screen_shake))
 		auto_pickup = bool(cfg.get_value("feel", "auto_pickup", auto_pickup))
 		zoom_idx = int(cfg.get_value("feel", "zoom_idx", zoom_idx))
@@ -51,6 +53,7 @@ static func save_settings() -> void:
 	cfg.set_value("audio", "master", master)
 	cfg.set_value("audio", "sound", sound)
 	cfg.set_value("audio", "ambience", ambience)
+	cfg.set_value("audio", "music", music)
 	cfg.set_value("feel", "screen_shake", screen_shake)
 	cfg.set_value("feel", "auto_pickup", auto_pickup)
 	cfg.set_value("feel", "zoom_idx", zoom_idx)
@@ -72,6 +75,10 @@ static func sound_db() -> float:
 
 static func ambience_db() -> float:
 	return linear_to_db(clampf(ambience, 0.001, 1.0))
+
+
+static func music_db() -> float:
+	return linear_to_db(clampf(music, 0.001, 1.0))
 
 
 ## Rebind an action to a single event spec, apply it live, persist. The old binding is fully replaced

@@ -105,6 +105,14 @@ var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this fr
 var _flash_text: String = ""
 var _flash_life: float = 0.0
 
+## THE DESCENT readout + arrivals. `depth_row` is poked every frame by MainView; the arrival is a
+## one-shot banner MainView fires when the body first crosses into a band it has not been in.
+var depth_row: int = Strata.SURFACE_ROW
+var _arrival_text: String = ""
+var _arrival_color: Color = Color.WHITE
+var _arrival_life: float = 0.0
+const ARRIVAL_HOLD: float = 3.4          ## total life of the banner, fade included
+
 ## The just-in-time HINT BUBBLE (pushed by MainView from the Hints tracker): a small
 ## speech bubble anchored NEAR THE BODY teaching a newly-acquired item's use. Empty text = none.
 var hint_text: String = ""
@@ -161,8 +169,16 @@ func flash(text: String) -> void:
 	_flash_life = 2.2
 
 
+## Announce arrival in a new stratum — the one moment the descent gets to be an EVENT.
+func announce(text: String, color: Color) -> void:
+	_arrival_text = text
+	_arrival_color = color
+	_arrival_life = ARRIVAL_HOLD
+
+
 func _process(delta: float) -> void:
 	_flash_life = maxf(0.0, _flash_life - delta)
+	_arrival_life = maxf(0.0, _arrival_life - delta)
 	queue_redraw()
 
 
@@ -175,6 +191,7 @@ func _draw() -> void:
 		return
 	# --- always on (minimal): the anchor furniture only ---
 	_draw_forged()         # top-right production chip (small)
+	_draw_depth()          # top-left depth readout — the one number a descent game owes you
 	_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
 	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
 	_draw_inventory()      # bottom-centre hotbar
@@ -201,6 +218,7 @@ func _draw() -> void:
 		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
+	_draw_arrival()        # the stratum banner, on the frames after you first cross into one
 	_draw_flash()          # transient toast (save/load feedback)
 	_draw_item_tooltip()   # hovered-slot tooltip — drawn last so it rides over every panel
 
@@ -367,12 +385,48 @@ func cursor_on_alerts(mouse: Vector2) -> bool:
 ## Fast-forward chip (top-left): a small "▶▶ Nx" tag shown ONLY while the game clock is sped up, so the
 ## world visibly racing has an on-screen cause. Hidden at 1x to keep the default screen calm. Press "."
 ## to cycle. Uses the shared accented panel skin.
+## THE DEPTH READOUT (top-left). Metres below the surface datum, and the name of the band you are in,
+## in that band's own colour — so the number and the world's palette agree. Permanent, because in a game
+## whose entire subject is descending, "how far down am I" is not an optional overlay.
+func _draw_depth() -> void:
+	var m: int = Strata.depth_m(depth_row)
+	var label: String = ("%d m" % m) if m >= 0 else ("+%d m" % -m)
+	var band: String = Strata.name_at(depth_row)
+	var tint: Color = Strata.color_at(depth_row)
+	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	var bw: float = _font.get_string_size(band, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+	var chip := Rect2(10.0, 8.0, maxf(lw + 10.0 + bw, 96.0) + 24.0, 22.0)
+	_panel(chip)
+	var cy: float = chip.position.y + chip.size.y * 0.5
+	draw_string(_font, Vector2(chip.position.x + 12.0, cy + 6.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+	draw_string(_font, Vector2(chip.position.x + 12.0 + lw + 10.0, cy + 5.0), band,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, tint)
+
+
+## THE ARRIVAL BANNER. Large, centred, brief, and only ever the FIRST time you enter a band: the whole
+## value is that it is rare. It sits above the body rather than over it, rises a few pixels as it fades,
+## and is backed by a soft bar rather than a panel — this is a moment, not a piece of furniture.
+func _draw_arrival() -> void:
+	if _arrival_life <= 0.0:
+		return
+	var t: float = _arrival_life / ARRIVAL_HOLD
+	var a: float = clampf(minf((1.0 - t) * 6.0, t * 2.4), 0.0, 1.0)     # fast in, slow out
+	var y: float = CANVAS.y * 0.30 - (1.0 - t) * 6.0
+	var w: float = _font.get_string_size(_arrival_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+	draw_rect(Rect2(0.0, y - 26.0, CANVAS.x, 40.0), Color(0.03, 0.035, 0.06, 0.42 * a))
+	draw_line(Vector2(CANVAS.x * 0.5 - w * 0.5 - 26.0, y + 8.0),
+		Vector2(CANVAS.x * 0.5 + w * 0.5 + 26.0, y + 8.0), Color(_arrival_color, 0.55 * a), 1.0)
+	draw_string(_font, Vector2(CANVAS.x * 0.5 - w * 0.5, y), _arrival_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(_arrival_color, a))
+
+
 func _draw_fastforward() -> void:
 	if time_scale <= 1.0:
 		return
 	var label: String = "▶▶ %dx" % int(time_scale)
 	var tw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	var chip := Rect2(10.0, 8.0, tw + 24.0, 22.0)
+	var chip := Rect2(10.0, 34.0, tw + 24.0, 22.0)   # under the depth chip, which owns the corner
 	_panel(chip, true)
 	draw_string(_font, chip.position + Vector2(12.0, 15.0), label,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
@@ -1236,15 +1290,16 @@ func _draw_settings_overlay() -> void:
 	_settings_slider(x0, 78.0, "master", "master", Settings.master)
 	_settings_slider(x0, 98.0, "sound", "sound", Settings.sound)
 	_settings_slider(x0, 118.0, "ambience", "ambience", Settings.ambience)
-	draw_string(_font, Vector2(x0, 150.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	draw_string(_font, Vector2(x0, 170.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 170.0, "ON" if Settings.screen_shake else "OFF",
+	_settings_slider(x0, 138.0, "music", "music", Settings.music)
+	draw_string(_font, Vector2(x0, 170.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	draw_string(_font, Vector2(x0, 190.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 190.0, "ON" if Settings.screen_shake else "OFF",
 		{"toggle": "shake"}, Settings.screen_shake, mouse)
-	draw_string(_font, Vector2(x0, 190.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 190.0, "%.2fx" % MainView.ZOOM_LEVELS[
+	draw_string(_font, Vector2(x0, 210.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 210.0, "%.2fx" % MainView.ZOOM_LEVELS[
 		clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)], {"cycle": "zoom"}, false, mouse)
-	draw_string(_font, Vector2(x0, 210.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 210.0, "ON" if Settings.auto_pickup else "OFF",
+	draw_string(_font, Vector2(x0, 230.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, 230.0, "ON" if Settings.auto_pickup else "OFF",
 		{"toggle": "auto_pickup"}, Settings.auto_pickup, mouse)
 	_settings_chip(x0, panel.position.y + panel.size.y - 20.0, "RESET KEYS TO DEFAULTS",
 		{"reset": true}, false, mouse)

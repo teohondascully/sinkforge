@@ -43,6 +43,7 @@ func _ready() -> void:
 	_streams[&"pop"] = _wav(_gen_pop())
 	_streams[&"drip"] = _wav(_gen_drip())
 	_streams[&"boom"] = _wav(_gen_boom(rng))
+	_streams[&"step"] = _wav(_gen_step(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -184,6 +185,26 @@ func _loopify(samples: PackedFloat32Array) -> PackedFloat32Array:
 
 
 # --- synthesis (all at boot; ~1s of audio total) -----------------------------------------------
+
+## FOOTSTEP: a soft scuff — a very short noise burst, low-passed hard, with a tiny body thud under it.
+## Walking is the single most frequent thing a player does and it was silent, which is most of why the
+## body read as a sprite sliding over a picture rather than a person standing on ground. Deliberately
+## quiet and deliberately DULL: it is played several times a second, so anything bright becomes a
+## machine gun. The material underfoot varies the pitch at the call site, not here — one sample, many
+## surfaces, exactly like the crunch.
+func _gen_step(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.055)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	var phase: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		lp += 0.18 * (rng.randf_range(-1.0, 1.0) - lp)      # duller than the crunch: this is grit, not fracture
+		phase += TAU * lerpf(150.0, 78.0, t) / float(RATE)  # the weight of a boot landing
+		out[i] = (lp * 1.5 + sin(phase) * 0.5) * pow(1.0 - t, 2.8)
+	return out
+
 
 ## Mining crunch: a decaying noise burst through a one-pole lowpass — dry rock fracture.
 func _gen_crunch(rng: RandomNumberGenerator) -> PackedFloat32Array:

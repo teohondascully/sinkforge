@@ -175,6 +175,11 @@ var _particles := Particles.new()
 var _payouts := Payouts.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
+## THE DESCENT: which stratum the body was in last frame, so crossing into a NEW one can be an event.
+## Session-scoped by design — a returning player gets the arrival again, which is the right trade: the
+## banner is orientation as much as ceremony, and re-reading "STONEREACH" after a week away is welcome.
+var _band_seen: Dictionary = {}   ## band index -> true, the bands announced this session
+var _band_now: int = -1
 const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
@@ -187,6 +192,7 @@ var _motes: GPUParticles2D
 ## Procedural audio — synthesized SFX + the factory hum. Poked from the same verb hooks
 ## that fire particles; never touches the sim.
 var _sfx: Sfx
+var _score: Score
 ## Descent engines whose breach we've already sounded (cell -> true). Primed on seed/load so an engine
 ## that breached before this session doesn't boom retroactively; a live breach booms exactly once.
 var _breach_heard: Dictionary = {}
@@ -226,6 +232,8 @@ func _ready() -> void:
 
 	_sfx = Sfx.new()
 	add_child(_sfx)
+	_score = Score.new()
+	add_child(_score)
 
 	_player = Player.new()
 	_player.sim = sim
@@ -563,6 +571,7 @@ func _process(delta: float) -> void:
 			_hints.note_in_water(_player._in_water())   # feed the body's wet state for the AQUIFER edge
 			var pc: Vector2i = _cell_at(_player.position)
 			_hints.note_depth(pc.y - sim.surface_row(pc.x))   # ...and its depth, for the GRAPPLE edge
+			_note_stratum(pc.y)
 		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(), _selected_build_material())
@@ -663,6 +672,12 @@ func _update_juice(delta: float) -> void:
 		var below: float = float(_body_cell().y - sim.surface_row(_body_cell().x))
 		_sfx.set_ambience(clampf(1.0 - below / 4.0, 0.0, 1.0), clampf(below / 10.0, 0.0, 1.0),
 			_player.position, delta)
+		# THE SCORE (audio slice 3): where ambience says WHERE you are, the score says what it MEANS —
+		# and the only thing that reliably means something in a game about descending is DEPTH. So the
+		# music is a pure function of it: absolute row, not depth-below-your-column, because a shaft you
+		# dug straight down and a shaft you reached by walking into a rift are the same distance from the
+		# sky and should sound the same. Everything else (mix, key colour, pitch) lives inside Score.
+		_score.set_depth(float(_body_cell().y) / float(FactorySim.GRID_ROWS - 1), delta)
 		# WATER AUDIO (L3): a soft POUR bed that swells with how much falling/pouring water is near you
 		# (a waterfall you hear when close), and a wet PUMP drain while a pump near you is draining —
 		# both level-driven like the heartbeat, smoothed + fading to silence inside Sfx.set_water. Reads
@@ -704,12 +719,23 @@ func _update_juice(delta: float) -> void:
 			_particles.dust(feet, Color(0.42, 0.32, 0.22), 6 + int(imp * 14.0))
 			_shake = maxf(_shake, 1.8 + imp * 3.4)
 			_sfx.play(&"thump", feet, 0.6 + imp * 0.5, -5.0)
-		# Footstep puffs while running on the ground — one every ~22px travelled.
+		# FOOTSTEPS — one every ~22px travelled, and now they make a NOISE and kick the right COLOUR of
+		# dust. Walking is the most frequent thing a player ever does here and it was silent over a
+		# hardcoded brown puff, which is a big part of why the body read as a sprite sliding across a
+		# picture instead of a person standing on ground. The material underfoot drives both: harder rock
+		# scuffs higher and drier (same hardness → pitch mapping the mining crunch already uses), and the
+		# puff is that rock's own colour, so a stone floor never throws dirt.
 		if _player.on_floor and absf(_player.velocity.x) > 20.0:
 			_step_dist += absf(_player.velocity.x) * delta
 			if _step_dist >= 22.0:
 				_step_dist = 0.0
-				_particles.dust(feet, Color(0.40, 0.30, 0.20), 3)
+				var ground: StringName = sim.material_at(_cell_at(feet + Vector2(0.0, 2.0)))
+				var puff: Color = _renderer.material_color(ground) if ground != &"" \
+					else Color(0.40, 0.30, 0.20)
+				_particles.dust(feet, puff.lightened(0.10), 3)
+				# Quiet on purpose — this fires several times a second, so it has to sit under everything.
+				var scuff: float = clampf(1.35 - MiningRules.hardness(ground) * 0.09, 0.85, 1.35)
+				_sfx.play(&"step", feet, scuff, -19.0)
 		else:
 			_step_dist = 0.0
 	_shake = move_toward(_shake, 0.0, delta * 24.0)
@@ -874,11 +900,38 @@ func _apply_setting(payload: Dictionary) -> void:
 		_hud.flash("bindings reset to defaults")
 
 
+## THE DESCENT, marked. Crossing into a band for the first time this session raises a banner and a
+## sting; every frame it also pushes the current row to the HUD's permanent depth readout. Downward
+## crossings get the ceremony, upward ones do not — climbing back out is retreat, not arrival, and a
+## chime on the way up would make the whole thing feel like a scoreboard instead of a descent.
+func _note_stratum(row: int) -> void:
+	if _hud != null:
+		_hud.depth_row = row
+	var band: int = Strata.band_at(row)
+	if band == _band_now:
+		return
+	var first_look: bool = _band_now < 0            # spawning somewhere is not ARRIVING there
+	var descending: bool = band > _band_now
+	_band_now = band
+	if first_look:
+		_band_seen[band] = true
+		return
+	if _band_seen.has(band) or not descending:
+		return
+	_band_seen[band] = true
+	if _hud != null:
+		_hud.announce(str(Strata.BANDS[band]["name"]), Strata.color_at(row))
+	# Pitched DOWN as you go deeper, so the arrivals themselves form a descending line across a run —
+	# the same idea the Score runs continuously, said once and out loud.
+	_sfx.ui(&"chime", clampf(1.18 - float(band) * 0.11, 0.55, 1.2))
+
+
 func _set_volume(id: String, frac: float) -> void:
 	match id:
 		"master": Settings.master = clampf(frac, 0.0, 1.0)
 		"sound": Settings.sound = clampf(frac, 0.0, 1.0)
 		"ambience": Settings.ambience = clampf(frac, 0.0, 1.0)
+		"music": Settings.music = clampf(frac, 0.0, 1.0)
 	Settings.apply_audio()
 	Settings.save_settings()
 
