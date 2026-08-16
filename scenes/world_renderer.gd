@@ -791,6 +791,13 @@ func _draw_ore_glints() -> void:
 		var def: MaterialDef = _material(sim.material_at(c))
 		if not def.has_nuggets() or not def.glitters:  # coal reads as dark clusters, not glinting gems
 			continue
+		# Only EXPOSED ore glints — a fleck catches the light at a dug face, not buried in solid rock. Ore
+		# twinkling everywhere (incl. cells sealed inside stone) reads as a floating STARFIELD; gating to
+		# exposed faces clusters the sparkle onto the vein you've actually dug into, so it reads as a VEIN.
+		# (Discovery from across a dark cavern still works — the cohesive crystal-SEAM glows carry that.)
+		if sim.is_solid(c + Vector2i(0, -1)) and sim.is_solid(c + Vector2i(0, 1)) \
+				and sim.is_solid(c + Vector2i(-1, 0)) and sim.is_solid(c + Vector2i(1, 0)):
+			continue
 		var h: int = ((int(c.x) * 73856093) ^ (int(c.y) * 19349663)) & 0x7fffffff
 		var offset: float = float(h % 997) / 997.0 * PERIOD
 		var t: float = fmod(_anim_time + offset, PERIOD)
