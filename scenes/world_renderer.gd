@@ -1518,9 +1518,21 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 const WALL_AO_UNDER: float = 0.62    ## cast shadow on the wall under a solid ceiling — the deepest
 const WALL_AO_SIDE: float = 0.34     ## …beside a solid wall
 const WALL_AO_ABOVE: float = 0.16    ## …over a solid floor: light reaches a floor, so it stays open
+## #S15: this pass used to run over every cell in the chunk, and almost all of it was invisible — the fine
+## layer paints a walled cell opaquely, either as rock or (since #S13) as the wall itself. Almost: the mold
+## deliberately leaves the top SURFACE_KEEP fine rows of each column's surface cell transparent so the grass
+## cap can own the walked line, and a surface cell with a wall behind it shows THROUGH there. So the pass
+## survives, confined to the band where it can still be seen. Same reasoning, and the same band, as the cell
+## pass in `TerrainPainter.paint`.
 func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
+	var band: PackedInt32Array = PackedInt32Array()
+	band.resize(rect.size.x)
+	for i: int in rect.size.x:
+		band[i] = sim.surface_row(rect.position.x + i)
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
+			if absi(cy - band[cx - rect.position.x]) > 1:
+				continue
 			var c := Vector2i(cx, cy)
 			if not sim.wall.has(c):
 				continue

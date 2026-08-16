@@ -22,8 +22,21 @@ const AO_UNDER: float = 0.46     ## overhangs/ceilings — nothing in the world 
 
 ## Draw the solid cells in `rect`, then the concave fillets + the surface cap/ramp pass for its columns.
 static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
+	# #S15: only the surface band survives the fine layer, so the rest is skipped — but ROW BY ROW, in the
+	# original order. A cell's chamfers bleed past its own rect and composite against whatever was drawn
+	# before them, so the visit order is part of the picture: walking the columns instead moved 75 pixels of
+	# the frame where restricting the rows moved none. The saving is in the cells skipped, not the order.
+	# `surface_row` SCANS a column from the sky down, so it is hoisted out of the inner loop — eight calls
+	# per chunk rather than sixty-four.
+	var band: PackedInt32Array = PackedInt32Array()
+	band.resize(rect.size.x)
+	for i: int in rect.size.x:
+		band[i] = r.sim.surface_row(rect.position.x + i)
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
+			# One row either side of the walked line, so the cap's chamfers still have a neighbour to sit on.
+			if absi(cy - band[cx - rect.position.x]) > 1:
+				continue
 			var c := Vector2i(cx, cy)
 			if not r.sim.solid.has(c):
 				continue
@@ -51,6 +64,10 @@ static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) 
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
 			var c := Vector2i(cx, cy)
+			# #S15: an open cell with a wall behind it is painted by the fine layer, so its fillet would
+			# never be seen. Only open AIR — a hillside, the sky side of an arch — still shows one.
+			if r.sim.wall.has(c):
+				continue
 			if r.sim.solid.has(c) or not r.sim.in_bounds(c):
 				continue
 			var pos := Vector2(c) * s
