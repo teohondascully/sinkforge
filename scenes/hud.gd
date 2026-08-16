@@ -93,22 +93,31 @@ var can_craft: bool = false        ## are we near a claimed Bazaar? gates the VE
 ## nothing moves and nothing disappears. That is the fix for the panel that used to change shape depending on
 ## where you stood.
 ##
-## NO SCROLLING VIEWPORT. Two columns of 24px rows give twenty rows in the space eight stacked ones used to
-## need. If a list ever outgrows that the answer is a third column, not a scrollbar — `check_pack_layout`
-## asserts it rather than trusting it.
-const BAZAAR_SIZE := Vector2(600.0, 300.0)
-const BAZAAR_PAD: float = 10.0
-const BAZAAR_HEAD: float = 34.0    ## title + tab strip
-const BAZAAR_FOOT: float = 20.0    ## the carried-goods line and the key legend
-const BAZAAR_COL_HEAD: float = 18.0   ## each column's own title, ABOVE its rows rather than eating one
-## 22 rather than the old craft list's 24, and the two pixels are load-bearing: at 24 a column holds nine
-## rows and the spec's promise is twenty across the two. Ten and ten.
-const BAZAAR_ROW_H: float = 22.0
+## NO SCROLLING VIEWPORT, and no dead space either. #S34 rebuilt the SURFACE on top of that shape: the rows
+## became a dense card grid across three columns, and the space the old two-column layout wasted became a
+## DETAIL PLATE along the bottom — the thing you are about to buy, drawn large enough to want, with its
+## price and its verb in the same look. Twenty-one rows fit without scrolling; `check_pack_layout` asserts
+## it rather than trusting it.
+const BAZAAR_SIZE := Vector2(608.0, 348.0)
+const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
+const BAZAAR_PAD: float = 12.0
+const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
+const BAZAAR_FOOT: float = 16.0       ## the key legend
+const BAZAAR_DETAIL: float = 88.0     ## the detail plate along the bottom of the content
+const BAZAAR_GUTTER: float = 10.0
+## 24 again, not the 22 the two-column layout needed: three columns of eight is twenty-four rows, so the row
+## can afford the two pixels back and the type can breathe.
+const BAZAAR_ROW_H: float = 24.0
+const BAZAAR_COLS: int = 3
+## How long the counter takes to arrive. Not decoration: a panel that appears fully formed in one frame is
+## the single loudest thing separating a menu from an interface, and 0.13s of rise is cheaper than any art.
+const BAZAAR_RISE: float = 0.13
 const TAB_PACK: int = 0
 const TAB_WORKS: int = 1
 const TAB_BENCH: int = 2
 const TAB_NAMES: Array[String] = ["PACK", "WORKS", "BENCH"]
 var bazaar_tab: int = TAB_PACK
+var _bazaar_t: float = 0.0            ## 0..1 open ease, driven in _process
 ## THE RACK — the shop half of WORKS. Set by MainView beside `craft_options`, same {name, cost} shape, with
 ## `rack_ids` parallel to it. Kept a SEPARATE list rather than appended to the craft list because the two
 ## columns mean different things: the left is what you build from your own materials, the right is what you
@@ -118,13 +127,6 @@ var rack_ids: Array[StringName] = []
 ## The highlighted row on the active tab. One cursor for the whole panel: Enter acts on it, and what "acts"
 ## means is the tab's business — buy, craft, research.
 var bazaar_row: int = 0
-## The craft list can outgrow the panel (a machine per tier + tools), so it scrolls inside a bounded
-## viewport while the RESEARCH bench stays pinned at the bottom (playtest: "automation fell off the
-## bottom of the list, unreachable"). Scroll is in pixels, snapped to whole rows; the wheel drives it
-## while the pack is open (MainView routes CYCLE to scroll_craft). Reset to 0 when the pack opens.
-var _craft_scroll: float = 0.0
-var _craft_scroll_max: float = 0.0
-const CRAFT_ROW_H: float = 24.0
 var show_minimap: bool = false
 var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden
 ## The player's PING marker in world coords (Vector2.INF = none) — set by clicking the open map;
@@ -220,7 +222,18 @@ func announce(text: String, kicker: String, color: Color) -> void:
 func _process(delta: float) -> void:
 	_flash_life = maxf(0.0, _flash_life - delta)
 	_arrival_life = maxf(0.0, _arrival_life - delta)
+	# The counter's arrival. Eased OUT, so it decelerates into place rather than sliding at a constant rate —
+	# the difference between a panel that lands and a panel that is dragged on.
+	var target: float = 1.0 if inventory_open else 0.0
+	var step: float = delta / BAZAAR_RISE
+	_bazaar_t = clampf(_bazaar_t + (step if target > _bazaar_t else -step * 2.0), 0.0, 1.0)
 	queue_redraw()
+
+
+## Ease-out cubic. The counter's rise reads as arriving because it slows down at the end.
+func _bazaar_ease() -> float:
+	var u: float = 1.0 - _bazaar_t
+	return 1.0 - u * u * u
 
 
 func _draw() -> void:
@@ -959,26 +972,79 @@ func _rebuild_minimap() -> void:
 ## THE BAZAAR'S GEOMETRY — one fixed shape, computed in one place, read by both the draw and the layout
 ## test, so seen == tested. Nothing here depends on how long a list is or on whether you are standing at a
 ## counter, which is the entire point: the panel that changes shape is the panel you cannot learn.
+##
+## The shape is a rail, a head, a grid of rows, and a DETAIL PLATE across the bottom. The plate is the whole
+## argument of #S34: the old layout gave the goods a 16px glyph on a 22px row and then left a third of the
+## panel empty, so nothing in the shop was ever drawn large enough to want. Rows are for choosing between;
+## the plate is for wanting. Splitting those two jobs is also what let the rows get denser — a row no longer
+## has to carry a description, because there is somewhere for the description to live.
 func _bazaar_geometry() -> Dictionary:
 	var origin := Vector2((CANVAS.x - BAZAAR_SIZE.x) * 0.5, (CANVAS.y - BAZAAR_SIZE.y) * 0.5)
-	var content := Rect2(origin + Vector2(BAZAAR_PAD, BAZAAR_HEAD),
-		Vector2(BAZAAR_SIZE.x - BAZAAR_PAD * 2.0, BAZAAR_SIZE.y - BAZAAR_HEAD - BAZAAR_FOOT))
+	var inner_x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
+	var inner_w: float = BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0
+	var body_h: float = BAZAAR_SIZE.y - BAZAAR_HEAD - BAZAAR_FOOT
+	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w, body_h - BAZAAR_DETAIL - 8.0)
+	var detail := Rect2(inner_x, content.end.y + 8.0, inner_w, BAZAAR_DETAIL)
 	return {
-		"origin": origin, "w": BAZAAR_SIZE.x, "h": BAZAAR_SIZE.y, "content": content,
-		"col_w": (content.size.x - 12.0) * 0.5, "row_h": BAZAAR_ROW_H,
-		"rows": int((content.size.y - BAZAAR_COL_HEAD) / BAZAAR_ROW_H),
+		"origin": origin, "w": BAZAAR_SIZE.x, "h": BAZAAR_SIZE.y,
+		"content": content, "detail": detail, "cols": BAZAAR_COLS,
+		"col_w": (content.size.x - BAZAAR_GUTTER * float(BAZAAR_COLS - 1)) / float(BAZAAR_COLS),
+		"row_h": BAZAAR_ROW_H,
+		"rows": int(content.size.y / BAZAAR_ROW_H),
 	}
+
+
+## WHAT THE COUNTER WILL SELL YOU TODAY — the indices of the rows whose tech is already yours.
+##
+## #S34b: WORKS used to list the whole catalogue, sixteen machines deep, thirteen of them greyed out behind
+## techs you had not reached. That is decision paralysis dressed as content: a wall of things you cannot have
+## in the place you go to get things. The future has a home already — it is the BENCH, where every locked
+## machine sits under the rung that unlocks it, greyed, in the one screen whose whole job is "what comes
+## next". So the counter shows what you can BUILD and the ladder shows what you could build LATER, and
+## neither one has to do both jobs badly.
+func _unlocked(ids: Array[StringName], n: int) -> Array[int]:
+	var out: Array[int] = []
+	for i: int in n:
+		var id: StringName = ids[i] if i < ids.size() else &""
+		var lock: StringName = ResearchRules.locking_tech(id)
+		if lock == &"" or sim.is_researched(lock):
+			out.append(i)
+	return out
+
+
+func open_machines() -> Array[int]:
+	return _unlocked(craft_ids, craft_options.size())
+
+
+func open_rack() -> Array[int]:
+	return _unlocked(rack_ids, rack_options.size())
+
+
+## How many columns each WORKS group takes, at this row height. Groups are laid left to right and never
+## share a column, because the left list is what you BUILD from your own materials and the right is what you
+## BUY with refined goods — a player should never have to work out which is which from a row's position.
+func works_columns(rows: int) -> Dictionary:
+	var m: int = maxi(1, ceili(float(open_machines().size()) / float(maxi(rows, 1))))
+	var r: int = maxi(1, ceili(float(open_rack().size()) / float(maxi(rows, 1))))
+	# The counter has a fixed number of columns, so if the two lists ever ask for more than it has, they get
+	# SQUEEZED rather than allowed to run off the panel's edge — the group that overflows falls back to a
+	# window around the cursor, which is ugly but reachable. `check_pack_layout` asserts the squeeze is not
+	# happening today; this clamp is what makes the failure mode legible instead of invisible.
+	if m + r > BAZAAR_COLS:
+		r = clampi(r, 1, BAZAAR_COLS - 1)
+		m = BAZAAR_COLS - r
+	return {"machines": m, "rack": r, "total": m + r}
 
 
 ## How many rows the active tab offers the cursor. WORKS is the two lists end to end; BENCH is the ladder.
 func bazaar_row_count() -> int:
 	match bazaar_tab:
 		TAB_WORKS:
-			return craft_options.size() + rack_options.size()
+			return open_machines().size() + open_rack().size()
 		TAB_BENCH:
 			return ResearchRules.ORDER.size()
 		_:
-			return 0
+			return sim.inventory_slots().size()
 
 
 ## WHAT ENTER WOULD DO, as {kind, id} — kind is "machine", "rack", "tech" or "". The panel owns the cursor
@@ -990,27 +1056,35 @@ func bazaar_action() -> Dictionary:
 		TAB_WORKS:
 			if i < 0 or i >= bazaar_row_count():
 				return {}
-			if i < craft_options.size():
-				return {"kind": "machine", "id": _craft_id(i), "row": i}
-			var r: int = i - craft_options.size()
+			# The cursor walks the OPEN rows; `row` is the index into the full catalogue, because that is
+			# what MainView's verbs are keyed on. Filtering the view must never renumber the world.
+			var open_m: Array[int] = open_machines()
+			if i < open_m.size():
+				return {"kind": "machine", "id": _craft_id(open_m[i]), "row": open_m[i]}
+			var r: int = open_rack()[i - open_m.size()]
 			return {"kind": "rack", "id": rack_ids[r] if r < rack_ids.size() else &"", "row": r}
 		TAB_BENCH:
 			if i < 0 or i >= ResearchRules.ORDER.size():
 				return {}
 			return {"kind": "tech", "id": ResearchRules.ORDER[i], "row": i}
 		_:
-			return {}
+			# PACK's verb is HOLD. It was the one tab with a cursor and nothing to do with it, which is also
+			# why it read as half a screen — and holding a thing from the pack screen is exactly what the
+			# stateless bit-equipping wants (`BitRules`): what is in your hand is what you dig with.
+			var slots: Array[Dictionary] = sim.inventory_slots()
+			if i < 0 or i >= slots.size():
+				return {}
+			return {"kind": "hold", "id": slots[i]["item"], "row": i}
 
 
-## Move the cursor. `dy` steps a row; `dx` jumps a column — on WORKS that is the counter-to-Rack hop, which
-## is a real place to want to go in one keystroke rather than ten.
+## Move the cursor. `dy` steps a row; `dx` jumps a whole COLUMN, which is the same motion your eye makes and
+## is what carries you across the counter-to-Rack gap in one keystroke rather than in ten.
 func bazaar_move(dx: int, dy: int) -> void:
 	var n: int = bazaar_row_count()
 	if n <= 0:
 		return
-	if dx != 0 and bazaar_tab == TAB_WORKS:
-		var machines: int = craft_options.size()
-		bazaar_row = mini(bazaar_row + machines, n - 1) if bazaar_row < machines else maxi(bazaar_row - machines, 0)
+	if dx != 0:
+		bazaar_row = clampi(bazaar_row + dx * int(_bazaar_geometry()["rows"]), 0, n - 1)
 	bazaar_row = clampi(bazaar_row + dy, 0, n - 1)
 
 
@@ -1019,139 +1093,236 @@ func set_bazaar_tab(tab: int) -> void:
 	bazaar_row = 0
 
 
+## THE COUNTER. Drawn as a lamp-lit object rather than as a dialog box: elevation instead of a border, a
+## gradient instead of a fill, one accent doing one job, and a 0.13s rise on open so it ARRIVES.
 func _draw_inventory_overlay() -> void:
 	# DIMMED, NOT BLACKED. You are at a counter with a shopkeeper standing next to you and banners over your
 	# head — the staging `scenes/bazaars.gd` builds block by block — so the world stays legible behind the
-	# panel instead of being switched off the moment you open it.
-	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.38))
+	# panel instead of being switched off the moment you open it. MainView blurs it in the same breath
+	# (`_bazaar_blur`), which is what makes the panel read as being IN FRONT of something.
+	var t: float = _bazaar_ease()
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42 * t))
+	_bazaar_vignette(0.5 * t)
 	var g: Dictionary = _bazaar_geometry()
 	var origin: Vector2 = g["origin"]
-	var w: float = g["w"]
-	var content: Rect2 = g["content"]
-	# The counter itself is OPAQUE. The world around it stays readable — that is what the light dim above is
-	# for — but a menu you can read the world THROUGH is a menu you cannot read at all: the zone title card
-	# and the hotbar were printing straight through the price column.
-	draw_rect(Rect2(origin, Vector2(w, g["h"])), Color(0.055, 0.065, 0.085, 0.985))
-	_panel(Rect2(origin, Vector2(w, g["h"])), true)
-	draw_string(_font, origin + Vector2(14.0, 22.0), "THE BAZAAR", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
-	_draw_bazaar_tabs(origin, w)
+	var panel := Rect2(origin, Vector2(g["w"], g["h"]))
+	# The whole counter rises the last few pixels into place. One transform, so nothing below has to know.
+	draw_set_transform(Vector2(0.0, (1.0 - t) * 14.0), 0.0, Vector2.ONE)
+
+	_soft_shadow(panel, 12, 0.34)
+	_round_rect(panel, 8.0, Color(0.062, 0.070, 0.094, 0.985))
+	_panel_sheen(panel)
+	# The rail is the tab strip, turned on its side and given room to be an object. Three icons you can hit
+	# with a glance beat three words you have to read.
+	_draw_bazaar_rail(origin, g)
+	_draw_bazaar_head(origin, g)
 	match bazaar_tab:
 		TAB_WORKS:
-			_tab_works(content, g)
+			_tab_works(g)
 		TAB_BENCH:
-			_tab_bench(content)
+			_tab_bench(g)
 		_:
-			_tab_pack(content)
-	_draw_bazaar_foot(origin, w, g["h"])
+			_tab_pack(g)
+	_draw_bazaar_detail(g)
+	_draw_bazaar_foot(origin, g)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The tab strip, right of the title. The active tab is the only one drawn in full — the others recede,
-## because three equally-lit labels is three things to read and one lit one is a place you are standing.
-func _draw_bazaar_tabs(origin: Vector2, w: float) -> void:
-	var x: float = origin.x + w - 14.0
-	for i: int in range(TAB_NAMES.size() - 1, -1, -1):
-		var label: String = TAB_NAMES[i]
-		var tw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		x -= tw + 10.0
+## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The digit that selects it
+## rides under each glyph, because a key legend nobody can find is a key nobody presses.
+func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
+	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
+	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
+	for i: int in 3:
+		var y: float = rail.position.y + 62.0 + float(i) * 58.0
 		var on: bool = i == bazaar_tab
+		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
 		if on:
-			draw_rect(Rect2(x - 6.0, origin.y + 9.0, tw + 12.0, 18.0), UI_SLOT)
-			draw_line(Vector2(x - 6.0, origin.y + 27.0), Vector2(x + tw + 6.0, origin.y + 27.0), UI_ACCENT, 1.5)
-		draw_string(_font, Vector2(x, origin.y + 22.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
-			UI_TEXT if on else Color(0.42, 0.44, 0.50))
-		x -= 12.0
+			_round_rect(box, 6.0, Color(0.145, 0.129, 0.082))
+			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
+		_rail_glyph(box.get_center(), i, on)
+		var label: String = TAB_NAMES[i]
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
+		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
+		draw_string(_font, Vector2(box.position.x + 1.0, y + 10.0), str(i + 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.34, 0.30, 0.22) if on else Color(0.24, 0.26, 0.31))
 
 
-## The footer: what you are carrying that the counter cares about, and where the verbs live. The second half
-## is the fix for the panel that used to vanish when you walked away from the stall — you can read every
-## recipe and every price from the bottom of a shaft, and the panel simply tells you where to spend them.
-func _draw_bazaar_foot(origin: Vector2, w: float, h: float) -> void:
-	var y: float = origin.y + h - 7.0
-	draw_line(Vector2(origin.x + 8.0, y - 13.0), Vector2(origin.x + w - 8.0, y - 13.0), UI_EDGE, 1.0)
-	var parts: PackedStringArray = []
-	for item: StringName in [&"ingot", &"iron_ingot", &"ore", &"coal", &"stone", &"wood"]:
+## The three tab glyphs, drawn rather than lettered: a satchel, a gear, a ladder of rungs.
+func _rail_glyph(at: Vector2, kind: int, on: bool) -> void:
+	var col: Color = Color(0.949, 0.831, 0.549) if on else Color(0.40, 0.43, 0.50)
+	match kind:
+		TAB_PACK:
+			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(16.0, 11.0)), col)
+			draw_arc(at + Vector2(0.0, -3.0), 5.5, PI, TAU, 10, col, 1.8)
+		TAB_WORKS:
+			draw_arc(at, 6.5, 0.0, TAU, 20, col, 2.2)
+			for i: int in 6:
+				var a: float = TAU * float(i) / 6.0
+				draw_line(at + Vector2(cos(a), sin(a)) * 6.5, at + Vector2(cos(a), sin(a)) * 9.5, col, 1.8)
+		_:
+			for i: int in 3:
+				draw_rect(Rect2(at.x - 8.0 + float(i) * 2.0, at.y + 5.0 - float(i) * 6.0,
+					16.0 - float(i) * 4.0, 2.6), col)
+
+
+## The head: who you are talking to, which counter you are at, and — the thing the old footer buried in a
+## run-on sentence — what you are carrying, as chips you can count without reading.
+func _draw_bazaar_head(origin: Vector2, g: Dictionary) -> void:
+	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
+	_tracked("BAZAAR", Vector2(x, origin.y + 29.0), 17, 2.8, UI_TEXT)
+	_tracked(TAB_NAMES[bazaar_tab], Vector2(x + _tracked_w("BAZAAR", 17, 2.8) + 16.0, origin.y + 29.0),
+		17, 2.8, Color(0.26, 0.28, 0.34))
+	var rx: float = origin.x + float(g["w"]) - BAZAAR_PAD
+	for item: StringName in [&"wood", &"stone", &"coal", &"ore", &"iron_ingot", &"ingot"]:
 		var n: int = int(sim.inventory.get(item, 0))
-		if n > 0:
-			parts.append("%d %s" % [n, _item_label(item)])
-	draw_string(_font, Vector2(origin.x + 14.0, y), " · ".join(parts) if not parts.is_empty() else "carrying nothing",
-		HORIZONTAL_ALIGNMENT_LEFT, w - 210.0, 9, UI_TEXT_DIM)
-	var keys: String = "1/2/3 tab   E close" if can_craft else "1/2/3 tab   E close   — verbs at a claimed Bazaar"
-	var kw: float = _font.get_string_size(keys, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(_font, Vector2(origin.x + w - kw - 13.0, y), keys, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		UI_TEXT_DIM if can_craft else Color(0.58, 0.48, 0.32))
+		if n <= 0:
+			continue
+		var label: String = str(n)
+		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 25.0
+		rx -= cw + 5.0
+		if rx < x + 170.0:
+			break
+		_round_rect(Rect2(rx, origin.y + 6.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
+		Visuals.draw_item(self, Vector2(rx + 11.0, origin.y + 16.0), 13.0, item)
+		draw_string(_font, Vector2(rx + 19.0, origin.y + 20.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
 
 
-## PACK — the whole carried inventory, given the whole width. It is the same grid it always was; it simply
-## stopped sharing a 360px column with two other screens.
-func _tab_pack(content: Rect2) -> void:
+## The footer is now one line: the keys. What you are carrying moved to the head as chips, and where the
+## verbs live moved onto the verb BUTTON, where it is answering the question you are actually asking.
+func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
+	var keys: String = "arrows  pick      1 2 3  tab      E  close"
+	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0), keys,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.34, 0.37, 0.43))
+
+
+# --- the tabs -------------------------------------------------------------------------------------------
+
+## PACK — the whole carried inventory as a grid of wells, given the whole width. It is the same pack it
+## always was; it simply stopped sharing a 360px column with two other screens.
+func _tab_pack(g: Dictionary) -> void:
+	var content: Rect2 = g["content"]
 	var slots: Array[Dictionary] = sim.inventory_slots()
-	var cell: float = 34.0
-	var cols: int = maxi(1, int(content.size.x / cell))
-	var rates: Array[Dictionary] = sim.production_rates()
-	var top: float = content.position.y
-	if not rates.is_empty():
-		var parts: PackedStringArray = []
-		for i: int in mini(4, rates.size()):
-			parts.append("%s %.1f/min" % [_item_label(rates[i]["item"]), float(rates[i]["rate"])])
-		draw_string(_font, Vector2(content.position.x + 2.0, top + 10.0), "making  " + " · ".join(parts),
-			HORIZONTAL_ALIGNMENT_LEFT, content.size.x - 4.0, 10, Color(0.85, 0.72, 0.42))
-		top += 18.0
 	if slots.is_empty():
-		draw_string(_font, Vector2(content.position.x + 2.0, top + 18.0), "(empty — go dig)",
+		draw_string(_font, content.position + Vector2(2.0, 20.0), "(empty — go dig)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
 		return
+	var cell: float = 46.0
+	var cols: int = maxi(1, int(content.size.x / cell))
+	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	for i: int in slots.size():
-		var box := Rect2(content.position.x + float(i % cols) * cell, top + float(i / cols) * cell,
-			cell - 4.0, cell - 4.0)
+		var box := Rect2(content.position.x + float(i % cols) * cell, content.position.y + float(i / cols) * cell,
+			cell - 6.0, cell - 6.0)
 		if box.end.y > content.end.y:
 			break
-		draw_rect(box, UI_SLOT)
-		draw_rect(box, UI_EDGE, false, 1.0)
 		var item: StringName = slots[i]["item"]
-		if box.has_point(get_viewport().get_mouse_position()):
-			draw_rect(box, UI_EDGE_HI, false, 1.0)
+		var hot: bool = box.has_point(get_viewport().get_mouse_position())
+		var picked: bool = i == bazaar_row
+		if picked:
+			_round_rect(box, 5.0, Color(0.176, 0.153, 0.098))
+			draw_rect(Rect2(box.position + Vector2(0.0, 3.0), Vector2(2.0, box.size.y - 6.0)), UI_ACCENT)
+		else:
+			_round_rect(box, 5.0, Color(1.0, 1.0, 1.0, 0.062 if hot else 0.030))
+		if hot:
 			_tooltip_item = item
 			_tooltip_count = int(slots[i]["count"])
 			_tooltip_anchor = Vector2(box.get_center().x, box.position.y)
-		_draw_thing_icon(item, Rect2(box.position + Vector2(5.0, 4.0),
-			Vector2(box.size.x - 10.0, box.size.y - 12.0)))
-		draw_string(_font, box.position + Vector2(box.size.x - 11.0, box.size.y - 2.0),
+		_draw_thing_icon(item, Rect2(box.position + Vector2(8.0, 5.0),
+			Vector2(box.size.x - 16.0, box.size.y - 17.0)))
+		draw_string(_font, box.position + Vector2(box.size.x - 13.0, box.size.y - 4.0),
 			str(int(slots[i]["count"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+		# The thing actually in your hand wears a mark, because "what am I holding" is the question the pack
+		# screen is opened to answer and the hotbar is behind the panel while it is open.
+		if i == held:
+			draw_string(_font, box.position + Vector2(5.0, 12.0), "HELD",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.949, 0.831, 0.549))
+	_pack_ledger(content, slots)
 
 
-## WORKS — the counter (left: what you BUILD from your own materials) and the Rack (right: what you BUY with
-## refined goods). Two columns of ten rows, no scrolling, no scrollbar, no shift-digit.
-func _tab_works(content: Rect2, g: Dictionary) -> void:
-	var col_w: float = g["col_w"]
-	var rows: int = int(g["rows"])
-	_works_column(Rect2(content.position, Vector2(col_w, content.size.y)), "MACHINES",
-		craft_options, 0, rows, true)
-	_works_column(Rect2(Vector2(content.position.x + col_w + 12.0, content.position.y),
-		Vector2(col_w, content.size.y)), "THE RACK", rack_options, craft_options.size(), rows, false)
-
-
-## One column of buyable rows. `base` is where this column starts in the panel's flat cursor index, so the
-## highlight and `bazaar_action()` cannot disagree about which row is which.
-func _works_column(box: Rect2, title: String, opts: Array[Dictionary], base: int, rows: int,
-		machines: bool) -> void:
-	draw_string(_font, box.position + Vector2(4.0, 12.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
-	if opts.is_empty():
-		draw_string(_font, box.position + Vector2(4.0, 34.0), "(nothing here yet)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+## Under the grid: what the factory is making for you, as bars. The pack tab had the most empty space of the
+## three and the least reason for it — this is the one screen where "is the flywheel spinning" is worth
+## asking, because you are standing still looking at what you own.
+func _pack_ledger(content: Rect2, slots: Array[Dictionary]) -> void:
+	var cell: float = 46.0
+	var cols: int = maxi(1, int(content.size.x / cell))
+	var top: float = content.position.y + float((slots.size() + cols - 1) / cols) * cell + 14.0
+	if top > content.end.y - 30.0:
 		return
-	# Show a window around the cursor rather than truncating, so a list longer than the column can still be
-	# reached — but the window only ever moves when the cursor leaves it, so the rows do not slide about.
+	var rates: Array[Dictionary] = sim.production_rates()
+	if rates.is_empty():
+		return
+	_tracked("YOUR LINE IS MAKING", Vector2(content.position.x + 1.0, top), 8, 2.0, Color(0.451, 0.365, 0.180))
+	var fastest: float = 0.001
+	for r: Dictionary in rates:
+		fastest = maxf(fastest, float(r["rate"]))
+	var bar_w: float = minf(240.0, content.size.x * 0.5)
+	for i: int in mini(5, rates.size()):
+		var y: float = top + 12.0 + float(i) * 17.0
+		if y > content.end.y - 4.0:
+			return
+		var item: StringName = rates[i]["item"]
+		var rate: float = float(rates[i]["rate"])
+		Visuals.draw_item(self, Vector2(content.position.x + 8.0, y + 3.0), 13.0, item)
+		draw_string(_font, Vector2(content.position.x + 18.0, y + 7.0), _item_label(item),
+			HORIZONTAL_ALIGNMENT_LEFT, 80.0, 9, UI_TEXT)
+		var bx: float = content.position.x + 104.0
+		_round_rect(Rect2(bx, y - 3.0, bar_w, 10.0), 3.0, Color(1.0, 1.0, 1.0, 0.035))
+		_round_rect(Rect2(bx, y - 3.0, maxf(3.0, bar_w * (rate / fastest)), 10.0), 3.0,
+			Color(0.85, 0.72, 0.42, 0.62))
+		draw_string(_font, Vector2(bx + bar_w + 8.0, y + 6.0), "%.1f/min" % rate,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.85, 0.72, 0.42))
+
+
+## WORKS — the counter (what you BUILD from your own materials) and the Rack (what you BUY with refined
+## goods), as a dense card grid. No scrolling, no scrollbar, no shift-digit.
+func _tab_works(g: Dictionary) -> void:
+	var content: Rect2 = g["content"]
+	var rows: int = int(g["rows"])
+	var lay: Dictionary = works_columns(rows)
+	# The columns SPREAD to fill the counter. Once WORKS lists only what you can build, most of the game is
+	# two columns rather than three, and three columns' worth of narrow rows with an empty third is exactly
+	# the dead space this rebuild exists to kill. Capped, because a row wide enough to lose its price at the
+	# far end is its own problem.
+	var used: int = maxi(1, int(lay["total"]))
+	var col_w: float = minf(268.0,
+		(content.size.x - BAZAAR_GUTTER * float(used - 1)) / float(used))
+	var open_m: Array[int] = open_machines()
+	var open_r: Array[int] = open_rack()
+	_works_group(content, 0, int(lay["machines"]), col_w, rows, "MACHINES", craft_options, open_m, 0, true)
+	_works_group(content, int(lay["machines"]), int(lay["rack"]), col_w, rows, "THE RACK",
+		rack_options, open_r, open_m.size(), false)
+	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only honest
+	# if the panel still tells you there IS a locked half — otherwise the counter looks finished at four
+	# machines and the tech ladder looks optional.
+	var hidden: int = (craft_options.size() - open_m.size()) + (rack_options.size() - open_r.size())
+	if hidden > 0:
+		var line: String = "%d more wait behind research — press 3 for the BENCH" % hidden
+		draw_string(_font, Vector2(content.position.x + 1.0, content.end.y - 2.0), line,
+			HORIZONTAL_ALIGNMENT_LEFT, content.size.x, 9, Color(0.451, 0.402, 0.280))
+
+
+## One GROUP — a list poured down as many columns as it needs, left to right. `base` is where the group
+## starts in the panel's flat cursor index, so the highlight and `bazaar_action()` cannot disagree.
+func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int, title: String,
+		opts: Array[Dictionary], open_rows: Array[int], base: int, machines: bool) -> void:
+	var x0: float = content.position.x + float(col0) * (col_w + BAZAAR_GUTTER)
+	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, Color(0.451, 0.365, 0.180))
+	if open_rows.is_empty():
+		draw_string(_font, Vector2(x0 + 1.0, content.position.y + 16.0), "(nothing unlocked yet)",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+		return
+	# A group longer than its columns shows a WINDOW around the cursor rather than truncating — the safety
+	# valve, not the plan. It only moves when the cursor leaves it, so the rows never slide about.
+	var capacity: int = rows * cols
 	var first: int = 0
-	if opts.size() > rows:
-		first = clampi(bazaar_row - base - rows / 2, 0, opts.size() - rows)
-	for i: int in mini(rows, opts.size()):
-		var oi: int = first + i
-		var rr := Rect2(box.position + Vector2(0.0, BAZAAR_COL_HEAD + float(i) * BAZAAR_ROW_H),
-			Vector2(box.size.x, BAZAAR_ROW_H - 3.0))
-		_works_row(rr, opts[oi], _works_id(machines, oi), base + oi == bazaar_row)
-	if opts.size() > rows:
-		draw_string(_font, box.position + Vector2(box.size.x - 40.0, 12.0),
-			"%d/%d" % [bazaar_row - base + 1, opts.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_DIM)
+	if open_rows.size() > capacity:
+		first = clampi(bazaar_row - base - capacity / 2, 0, open_rows.size() - capacity)
+	for i: int in mini(capacity, open_rows.size()):
+		var oi: int = open_rows[first + i]
+		var rr := Rect2(x0 + float(i / rows) * (col_w + BAZAAR_GUTTER),
+			content.position.y + float(i % rows) * BAZAAR_ROW_H, col_w, BAZAAR_ROW_H - 3.0)
+		_works_row(rr, opts[oi], _works_id(machines, oi), base + first + i == bazaar_row)
 
 
 func _works_id(machines: bool, i: int) -> StringName:
@@ -1160,27 +1331,42 @@ func _works_id(machines: bool, i: int) -> StringName:
 	return rack_ids[i] if i < rack_ids.size() else &""
 
 
+## One row. A CARD, not an outlined box: a surface tint you can see through to the panel, a well for the
+## glyph, and — when it is the one the cursor is on — a brass edge and a warmer fill. Nothing is outlined,
+## because an outline around every row makes every row shout and the selected one shout no louder.
 func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> void:
-	draw_rect(rr, UI_SLOT)
-	var lock: StringName = ResearchRules.locking_tech(id)
-	var locked: bool = lock != &"" and not sim.is_researched(lock)
 	var afford: bool = _can_afford(opt["cost"])
 	if selected:
-		draw_rect(rr.grow(1.0), UI_ACCENT, false, 1.5)
+		_round_rect(rr, 4.0, Color(0.176, 0.153, 0.098))
+		draw_rect(Rect2(rr.position + Vector2(0.0, 2.0), Vector2(2.0, rr.size.y - 4.0)), UI_ACCENT)
 	else:
-		draw_rect(rr, UI_EDGE, false, 1.0)
-	_draw_thing_icon(id, Rect2(rr.position + Vector2(4.0, 2.5),
-		Vector2(BAZAAR_ROW_H - 8.0, BAZAAR_ROW_H - 8.0)))
-	if locked:
-		draw_rect(rr, Color(0.0, 0.0, 0.0, 0.35))
-	var right: String = ("needs %s" % str(ResearchRules.tech(lock)["name"])) if locked else _cost_text(opt["cost"])
-	var right_col: Color = Color(0.62, 0.50, 0.34) if locked else (UI_ACCENT if afford else Color(0.45, 0.40, 0.30))
-	var name_col: Color = Color(0.40, 0.42, 0.48) if locked else (UI_TEXT if afford else Color(0.45, 0.47, 0.53))
-	var cw: float = _font.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(_font, rr.position + Vector2(BAZAAR_ROW_H - 1.0, 14.0), str(opt["name"]),
-		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - BAZAAR_ROW_H - cw - 8.0, 11, name_col)
-	draw_string(_font, rr.position + Vector2(rr.size.x - cw - 5.0, 14.0), right,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, right_col)
+		_round_rect(rr, 4.0, Color(1.0, 1.0, 1.0, 0.030))
+	_draw_thing_icon(id, Rect2(rr.position + Vector2(6.0, 2.5), Vector2(16.0, 16.0)))
+	var name_col: Color = (Color(0.949, 0.831, 0.549) if selected else UI_TEXT) if afford \
+		else Color(0.48, 0.50, 0.56)
+	var cw: float = _cost_glyphs(rr, opt["cost"])
+	draw_string(_font, rr.position + Vector2(26.0, 14.0), str(opt["name"]),
+		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 36.0 - cw, 10, name_col)
+
+
+## The price as GLYPHS, not as prose. "6 Iron Ingot 3 Wood" is a hundred pixels of a hundred-and-seventy
+## pixel row, and it was clipping the NAME off the thing you were buying — "Iron Pickax", "Blast Furnac".
+## The same fact as two icons and two numbers is forty, and it reads faster besides: you are matching a
+## picture against the chips in the head rather than parsing a sentence. Green when the pack covers it, red
+## when it does not, per ingredient, so a short list says WHICH thing is short.
+func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
+	var w: float = 0.0
+	for item: StringName in cost:
+		w += 12.0 + _font.get_string_size(str(int(cost[item])), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
+	var x: float = rr.end.x - 5.0 - w
+	for item: StringName in cost:
+		var n: int = int(cost[item])
+		Visuals.draw_item(self, Vector2(x + 6.0, rr.position.y + 10.5), 12.0, item)
+		var label: String = str(n)
+		draw_string(_font, Vector2(x + 13.0, rr.position.y + 14.5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+			Color(0.482, 0.796, 0.518) if int(sim.inventory.get(item, 0)) >= n else Color(0.804, 0.427, 0.376))
+		x += 12.0 + _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
+	return w
 
 
 ## A machine's sprite or an item's glyph, whichever this id is. Both the pack grid, the works rows and the
@@ -1199,18 +1385,240 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 		Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, id)
 
 
+# --- the detail plate -----------------------------------------------------------------------------------
+
+## THE DETAIL PLATE. The selected thing, drawn large under a lamp, with one sentence of what it is for, its
+## price as have/need chips, and the verb as a real button carrying the key that runs it.
+##
+## This is where the panel stops being a list and starts being a shop. It also puts the three answers a
+## player is actually after — what is this, can I afford it, what do I press — in one place, at one glance,
+## instead of spread across a row, a footer and a manual.
+func _draw_bazaar_detail(g: Dictionary) -> void:
+	var box: Rect2 = g["detail"]
+	_round_rect(box, 6.0, Color(1.0, 1.0, 1.0, 0.028))
+	var art := Rect2(box.position + Vector2(10.0, 10.0), Vector2(68.0, 68.0))
+	var act: Dictionary = bazaar_action()
+	var kind: String = str(act.get("kind", ""))
+	if kind == "":
+		_detail_pack(box, art)
+		return
+	var id: StringName = act["id"]
+	if kind == "hold":
+		_detail_hold(box, art, id, int(act.get("row", 0)))
+		return
+	var title: String = ""
+	var blurb: String = ""
+	var cost: Dictionary = {}
+	var verb: String = ""
+	var ready: bool = false
+	var note: String = ""
+	if kind == "tech":
+		var t: Dictionary = ResearchRules.tech(id)
+		title = str(t["name"])
+		cost = t["cost"]
+		var sample: StringName = t.get("sample", &"")
+		# What it BUYS you, by name. A ladder that only prices its rungs is asking you to buy a number; the
+		# reason to climb is the machines waiting at the top of it, and now that WORKS lists only what you
+		# can already build, this plate is the only place those machines are named at all.
+		var names: PackedStringArray = []
+		for uid: StringName in (t.get("unlocks", []) as Array):
+			names.append(_thing_label(uid))
+		if not names.is_empty():
+			blurb = "unlocks " + " · ".join(names)
+		elif sample != &"":
+			blurb = "analyze a sample of %s, then pour in the metal" % _item_label(sample)
+		else:
+			blurb = "a rung of the ladder — spend the metal, keep the knowledge"
+		if sample != &"" and not names.is_empty():
+			blurb += "\nanalyze a sample of %s, then pour in the metal" % _item_label(sample)
+		var next: StringName = ResearchRules.next_tech(sim.research)
+		if sim.is_researched(id):
+			verb = "RESEARCHED"
+			note = "already yours"
+		elif id != next:
+			verb = "LOCKED"
+			var req: StringName = t.get("requires", &"")
+			note = "behind %s" % (str(ResearchRules.tech(req)["name"]) if req != &"" else "an earlier rung")
+		else:
+			verb = "RESEARCH"
+			ready = can_craft and _can_afford(cost) \
+				and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
+			note = "" if can_craft else "at a claimed Bazaar"
+	else:
+		var opts: Array[Dictionary] = craft_options if kind == "machine" else rack_options
+		var row: int = int(act.get("row", 0))
+		if row < 0 or row >= opts.size():
+			return
+		title = str(opts[row]["name"])
+		cost = opts[row]["cost"]
+		blurb = str(ITEM_PURPOSE.get(id, "—"))
+		var lock: StringName = ResearchRules.locking_tech(id)
+		if lock != &"" and not sim.is_researched(lock):
+			verb = "LOCKED"
+			note = "research %s first" % str(ResearchRules.tech(lock)["name"])
+		else:
+			verb = "BUILD" if kind == "machine" else "BUY"
+			ready = can_craft and _can_afford(cost)
+			note = "" if can_craft else "at a claimed Bazaar"
+
+	# The lamp. Three rings behind the goods is the whole trick, and it is what makes a 44px glyph read as
+	# lit rather than as big.
+	for k: int in 3:
+		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.045))
+	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+	if kind == "tech":
+		_draw_tech_art(id, art)
+	else:
+		_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
+
+	var tx: float = art.end.x + 14.0
+	var btn_w: float = 104.0
+	var text_w: float = box.end.x - tx - btn_w - 24.0
+	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
+	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), blurb, HORIZONTAL_ALIGNMENT_LEFT,
+		text_w, 9, 2, UI_TEXT_DIM)
+	# The price as have/need chips: "can I afford this" answered in the same glance as "what does it cost".
+	var cx: float = tx
+	for item: StringName in cost:
+		var need: int = int(cost[item])
+		var have: int = int(sim.inventory.get(item, 0))
+		cx = _detail_chip(Vector2(cx, box.position.y + 62.0), item, need, have) + 6.0
+
+	var btn := Rect2(box.end.x - btn_w - 10.0, box.position.y + box.size.y - 34.0, btn_w, 24.0)
+	if ready:
+		_round_rect(btn, 5.0, UI_ACCENT)
+		var vw: float = _tracked_w(verb, 10, 2.0)
+		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
+		draw_string(_font, Vector2(btn.position.x + 16.0 + vw, btn.position.y + 16.0), "ENTER",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
+	else:
+		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
+		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.44, 0.46, 0.52))
+	if note != "":
+		var nw: float = _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+		draw_string(_font, Vector2(btn.get_center().x - nw * 0.5, btn.position.y - 6.0), note,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.58, 0.48, 0.32))
+
+
+## A machine's display name if it is one, an item's label otherwise. The tech ladder names both.
+func _thing_label(id: StringName) -> String:
+	if machine_icons.has(id):
+		return str(machine_icons[id]["name"])
+	return _item_label(id)
+
+
+## A tech has no glyph of its own — it is knowledge — so its plate shows WHAT IT BUYS: the machines it
+## unlocks, laid out big. That is also the honest answer to "why would I research this", which a lamp icon
+## would not have been.
+func _draw_tech_art(tid: StringName, art: Rect2) -> void:
+	var unlocks: Array = ResearchRules.tech(tid).get("unlocks", [])
+	if unlocks.is_empty():
+		Visuals.draw_item(self, art.get_center(), 40.0, &"ingot")
+		return
+	var n: int = mini(4, unlocks.size())
+	if n == 1:
+		_draw_thing_icon(unlocks[0], Rect2(art.get_center() - Vector2(21.0, 21.0), Vector2(42.0, 42.0)))
+		return
+	var cell: float = 25.0
+	var cols: int = 2
+	var span := Vector2(float(cols) * cell, float((n + cols - 1) / cols) * cell)
+	var at: Vector2 = art.get_center() - span * 0.5
+	for i: int in n:
+		_draw_thing_icon(unlocks[i], Rect2(at + Vector2(float(i % cols) * cell + 2.0,
+			float(i / cols) * cell + 2.0), Vector2(cell - 4.0, cell - 4.0)))
+
+
+## The plate for a thing you are CARRYING: what it is for, how many you have, and the one verb the pack
+## screen has — put it in your hand.
+func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
+	for k: int in 3:
+		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.045))
+	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+	_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
+	var tx: float = art.end.x + 14.0
+	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8,
+		Color(0.949, 0.831, 0.549))
+	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), str(ITEM_PURPOSE.get(id, "—")),
+		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 260.0, 9, 2, UI_TEXT_DIM)
+	var carried: int = int(sim.inventory.get(id, 0))
+	var made: int = int(sim.total_produced.get(id, 0))
+	draw_string(_font, Vector2(tx, box.position.y + 76.0),
+		"carrying %d   ·   %d gathered all told" % [carried, made],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
+	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
+	var btn := Rect2(box.end.x - 114.0, box.position.y + box.size.y - 34.0, 104.0, 24.0)
+	if row == held:
+		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
+		_tracked("IN HAND", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0,
+			Color(0.44, 0.46, 0.52))
+	else:
+		_round_rect(btn, 5.0, UI_ACCENT)
+		_tracked("HOLD", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
+		draw_string(_font, Vector2(btn.position.x + 58.0, btn.position.y + 16.0), "ENTER",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
+
+
+## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
+## factory actually making for you while you stand here.
+func _detail_pack(box: Rect2, art: Rect2) -> void:
+	for k: int in 3:
+		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.035))
+	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+	Visuals.draw_item(self, art.get_center(), 40.0, &"ingot")
+	var tx: float = art.end.x + 14.0
+	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
+	var rates: Array[Dictionary] = sim.production_rates()
+	if rates.is_empty():
+		draw_string(_font, Vector2(tx, box.position.y + 42.0),
+			"nothing is running — build a Forge at the WORKS tab and feed it ore",
+			HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 120.0, 9, UI_TEXT_DIM)
+		return
+	draw_string(_font, Vector2(tx, box.position.y + 42.0), "your line is making",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	var cx: float = tx
+	for i: int in mini(5, rates.size()):
+		var item: StringName = rates[i]["item"]
+		var label: String = "%.1f/min" % float(rates[i]["rate"])
+		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 25.0
+		if cx + cw > box.end.x - 12.0:
+			break
+		_round_rect(Rect2(cx, box.position.y + 50.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
+		Visuals.draw_item(self, Vector2(cx + 11.0, box.position.y + 60.0), 13.0, item)
+		draw_string(_font, Vector2(cx + 19.0, box.position.y + 64.0), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.85, 0.72, 0.42))
+		cx += cw + 6.0
+
+
+## One have/need chip. Green when the pack covers it, red when it does not — the affordability answer given
+## per ingredient rather than as one verdict, so a short shopping list says WHICH thing is short.
+func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
+	var label: String = "%d/%d" % [need, have]
+	var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 26.0
+	_round_rect(Rect2(at, Vector2(w, 19.0)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
+	Visuals.draw_item(self, at + Vector2(11.0, 9.5), 13.0, item)
+	var ok: bool = have >= need
+	draw_string(_font, at + Vector2(19.0, 13.5), str(need), HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+		Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
+	var nw: float = _font.get_string_size(str(need), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(_font, at + Vector2(19.0 + nw, 13.5), "/%d" % have, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+		Color(0.36, 0.39, 0.45))
+	return at.x + w
+
+
+# --- the bench ------------------------------------------------------------------------------------------
+
 ## BENCH — the research ladder as a graph, AND the verb that acts on it, on one screen.
 ##
 ## This is the fix for the worst of the six: the tree used to be a separate full-screen overlay on `T` that
 ## showed you the ladder you could not act on, because the research verb lived back inside the pack screen.
 ## You read here and acted there. Now the ladder is a tab of the same counter, a cursor walks it, and the
-## selected node is the one the verb takes — so what you are looking at and what you would get are the same
-## thing by construction rather than by remembering.
+## SELECTED rung is the one the detail plate prices and the one Enter takes.
 ##
 ## Tiers derive from each tech's `requires` chain, so a branching tree simply stacks its chips in a column
 ## and no layout changes. The chips are SCALED to the panel rather than the panel to the chips: the ladder
 ## grows, the counter does not.
-func _tab_bench(content: Rect2) -> void:
+func _tab_bench(g: Dictionary) -> void:
+	var content: Rect2 = g["content"]
 	var tiers: Array = []
 	for tid: StringName in ResearchRules.ORDER:
 		var d: int = 0
@@ -1227,13 +1635,13 @@ func _tab_bench(content: Rect2) -> void:
 	for tier: Array in tiers:
 		tallest = maxi(tallest, tier.size())
 	var gap := Vector2(10.0, 6.0)
-	var body_h: float = content.size.y - 14.0                  # a line of footer under the graph
 	var chip := Vector2(
-		minf(102.0, (content.size.x - float(tiers.size() - 1) * gap.x) / float(tiers.size())),
-		minf(74.0, (body_h - float(tallest - 1) * gap.y) / float(tallest)))
+		minf(108.0, (content.size.x - float(tiers.size() - 1) * gap.x) / float(tiers.size())),
+		minf(64.0, (content.size.y - float(tallest - 1) * gap.y) / float(tallest)))
 	var span := Vector2(float(tiers.size()) * chip.x + float(tiers.size() - 1) * gap.x,
 		float(tallest) * chip.y + float(tallest - 1) * gap.y)
-	var at := Vector2(content.position.x + (content.size.x - span.x) * 0.5, content.position.y)
+	var at := Vector2(content.position.x + (content.size.x - span.x) * 0.5,
+		content.position.y + (content.size.y - span.y) * 0.5)
 	var rects: Dictionary = {}
 	for ti: int in tiers.size():
 		var tier: Array = tiers[ti]
@@ -1251,8 +1659,8 @@ func _tab_bench(content: Rect2) -> void:
 		var b: Rect2 = rects[tid]
 		var p0 := Vector2(a.end.x, a.position.y + a.size.y * 0.5)
 		var p1 := Vector2(b.position.x, b.position.y + b.size.y * 0.5)
-		var lc: Color = Color(0.55, 0.75, 0.55, 0.8) if sim.is_researched(req) \
-			else Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, 0.8)
+		var lc: Color = Color(0.48, 0.72, 0.52, 0.85) if sim.is_researched(req) \
+			else Color(0.26, 0.29, 0.36, 0.85)
 		draw_line(p0, p1, lc, 1.5)
 		draw_colored_polygon(PackedVector2Array([p1, p1 + Vector2(-5.0, -3.5), p1 + Vector2(-5.0, 3.5)]), lc)
 	var next: StringName = ResearchRules.next_tech(sim.research)
@@ -1262,87 +1670,121 @@ func _tab_bench(content: Rect2) -> void:
 		picked = act["id"]
 	for tid: StringName in ResearchRules.ORDER:
 		_draw_tech_chip(tid, rects[tid], tid == next, tid == picked)
-	_draw_bench_foot(content, picked, next)
 
 
-## One line under the ladder saying what Enter would do to the SELECTED node — not to "the next one". A tree
-## that highlights one node and acts on another is the same look-here-act-there bug in miniature.
-func _draw_bench_foot(content: Rect2, picked: StringName, next: StringName) -> void:
-	var y: float = content.end.y - 3.0
-	var foot: String
-	var col: Color = UI_TEXT_DIM
-	if picked == &"":
-		foot = "every tech researched — the tree is yours" if next == &"" else "pick a rung"
-	elif sim.is_researched(picked):
-		foot = "%s — already yours" % str(ResearchRules.tech(picked)["name"])
-		col = Color(0.45, 0.62, 0.48)
-	elif picked != next:
-		var req: StringName = ResearchRules.tech(picked).get("requires", &"")
-		foot = "%s — locked behind %s" % [str(ResearchRules.tech(picked)["name"]),
-			str(ResearchRules.tech(req)["name"]) if req != &"" else "an earlier rung"]
-	elif not can_craft:
-		foot = "Enter researches %s — at a claimed Bazaar" % str(ResearchRules.tech(picked)["name"])
-		col = Color(0.58, 0.48, 0.32)
-	else:
-		foot = "Enter  research %s" % str(ResearchRules.tech(picked)["name"])
-		col = UI_ACCENT
-	draw_string(_font, Vector2(content.position.x + 2.0, y), foot, HORIZONTAL_ALIGNMENT_LEFT,
-		content.size.x - 4.0, 10, col)
-
-
-## One tech chip: lamp + name / analyze-sample / price / the unlocked machines as mini-glyphs.
+## One tech chip: a lamp, a name, and the machines it unlocks. Its PRICE moved to the detail plate — a chip
+## that carried the price had to shrink the name to fit it, and a truncated name ("Prospecti") costs the
+## player more than a second glance downward does.
 func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool = false) -> void:
 	var t: Dictionary = ResearchRules.tech(tid)
 	var done: bool = sim.is_researched(tid)
-	draw_rect(rr, UI_SLOT)
-	if is_next:
-		draw_rect(rr.grow(1.0), UI_ACCENT, false, 1.5)     # the lit rung — the one the ladder is offering
-	else:
-		draw_rect(rr, UI_EDGE, false, 1.0)
 	if picked:
-		draw_rect(rr.grow(2.5), UI_EDGE_HI, false, 1.5)    # …and the one the CURSOR is on, which Enter takes
-	var name_col: Color = Color(0.45, 0.62, 0.48) if done else (UI_TEXT if is_next else Color(0.40, 0.42, 0.48))
-	# The chip is SCALED to the panel (the ladder grows, the counter does not), so its type has to scale with
-	# it or a seven-tier tree prints "Prospecti". The lamp keeps its size and gives up its indent first,
-	# because a truncated NAME costs the player more than a tight margin does.
+		_round_rect(rr, 5.0, Color(0.176, 0.153, 0.098))
+		draw_rect(Rect2(rr.position + Vector2(0.0, 3.0), Vector2(2.0, rr.size.y - 6.0)), UI_ACCENT)
+	elif done:
+		_round_rect(rr, 5.0, Color(0.078, 0.113, 0.086))
+	else:
+		_round_rect(rr, 5.0, Color(1.0, 1.0, 1.0, 0.040 if is_next else 0.022))
+	var name_col: Color = Color(0.48, 0.70, 0.52) if done \
+		else ((Color(0.949, 0.831, 0.549) if picked else UI_TEXT) if is_next else Color(0.40, 0.42, 0.48))
 	var narrow: bool = rr.size.x < 96.0
+	var indent: float = 15.0 if narrow else 19.0
+	# The largest size the NAME actually fits at, rather than a size picked from the chip's width. A chip
+	# guessed from its own geometry printed "Prospectin" and "Enrichmen" — a truncated name costs the player
+	# more than a point of type does, and only the string knows how wide it is.
+	var room: float = rr.size.x - indent - 5.0
 	var fs: int = 9 if narrow else 11
-	var indent: float = 14.0 if narrow else 18.0
-	draw_circle(rr.position + Vector2(7.0 if narrow else 10.0, 11.0), 3.2,
+	while fs > 7 and _font.get_string_size(str(t["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+		fs -= 1
+	draw_circle(rr.position + Vector2(8.0 if narrow else 11.0, 13.0), 3.2,
 		Color(0.38, 0.78, 0.44) if done else (UI_ACCENT if is_next else Color(0.22, 0.24, 0.30)))
-	draw_string(_font, rr.position + Vector2(indent, 14.0), str(t["name"]),
-		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - indent - 4.0, fs, name_col)
-	# The price: what you analyze + what you pour in. Dim on done (paid), gold-if-affordable on next.
-	var sample: StringName = t.get("sample", &"")
-	var afford: bool = _can_afford(t["cost"]) and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
-	var line_col: Color = Color(0.42, 0.52, 0.45) if done \
-		else ((UI_ACCENT if afford else Color(0.62, 0.52, 0.34)) if is_next else Color(0.40, 0.42, 0.48))
-	if sample != &"":
-		draw_string(_font, rr.position + Vector2(6.0, 28.0), "analyze %s" % _item_label(sample),
-			HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 10.0, 8, line_col)
-	draw_string(_font, rr.position + Vector2(6.0, 40.0), "+ " + _cost_text(t["cost"]),
-		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 10.0, 8, line_col)
+	draw_string(_font, rr.position + Vector2(indent, 16.0), str(t["name"]),
+		HORIZONTAL_ALIGNMENT_LEFT, room, fs, name_col)
 	# What it buys: the unlocked machines' faces, dimmed until the tech is live.
-	var ux: float = rr.position.x + 6.0
+	var ux: float = rr.position.x + 7.0
 	for uid: StringName in (t.get("unlocks", []) as Array):
-		var box := Rect2(ux, rr.position.y + 48.0, 16.0, 16.0)
-		if box.end.x > rr.end.x - 2.0 or box.end.y > rr.end.y - 2.0:
+		var box := Rect2(ux, rr.position.y + 26.0, 17.0, 17.0)
+		if box.end.x > rr.end.x - 3.0 or box.end.y > rr.end.y - 3.0:
 			break                                          # a narrow chip shows what it can, never overflows
-		if machine_icons.has(uid):
-			var spr: Texture2D = Art.tex("machine_" + String(uid))
-			if spr != null:
-				draw_texture_rect(spr, box, false)
-			else:
-				draw_rect(box, machine_icons[uid]["color"])
-				Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
-					str(machine_icons[uid]["kind"]), box.size.y / 20.0, false, 0.0)
-		else:
-			Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, uid)
+		_draw_thing_icon(uid, box)
 		if not done:
-			draw_rect(box, Color(0.0, 0.0, 0.0, 0.25 if is_next else 0.45))
-		ux += 19.0
-	if not done and not is_next:
-		draw_rect(rr, Color(0.0, 0.0, 0.0, 0.30))          # locked: the whole chip recedes
+			draw_rect(box, Color(0.0, 0.0, 0.0, 0.22 if is_next else 0.45))
+		ux += 20.0
+
+
+# --- the counter's surface primitives --------------------------------------------------------------------
+
+## A REAL rounded rect. Composing one from a rect plus four circles double-blends every corner the moment
+## the fill is translucent, which is exactly what a modern surface tint is.
+func _round_rect(rect: Rect2, r: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(int(r))
+	sb.corner_detail = 8
+	sb.draw(get_canvas_item(), rect)
+
+
+## Rounded on the left two corners only — for the rail, flush against the panel's edge.
+func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(0)
+	sb.corner_radius_top_left = int(r)
+	sb.corner_radius_bottom_left = int(r)
+	sb.corner_detail = 8
+	sb.draw(get_canvas_item(), rect)
+
+
+## Elevation instead of a border. A modern panel does not outline itself; it casts. Concentric translucent
+## rings are the cheap honest version of that, and they are what stop the counter reading as printed on the
+## world behind it.
+func _soft_shadow(rect: Rect2, spread: int, peak: float) -> void:
+	for i: int in range(spread, 0, -1):
+		var t: float = float(i) / float(spread)
+		draw_rect(rect.grow(float(i)), Color(0.0, 0.0, 0.0, peak * (1.0 - t) * 0.32))
+
+
+## One hairline of light along the top edge and a slow warm gradient down the plate — the two marks that say
+## which way the lamp is, which is the difference between a surface and a fill.
+func _panel_sheen(rect: Rect2) -> void:
+	for i: int in 10:
+		var t: float = float(i) / 9.0
+		draw_rect(Rect2(rect.position.x + 2.0, rect.position.y + 2.0 + t * 46.0, rect.size.x - 4.0, 5.0),
+			Color(1.0, 0.94, 0.82, 0.020 * (1.0 - t)))
+	draw_rect(Rect2(rect.position.x + 8.0, rect.position.y, rect.size.x - 16.0, 1.0),
+		Color(1.0, 1.0, 1.0, 0.075))
+
+
+## Letter-spaced type. Small caps with air between them is most of what separates a title from a label.
+func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
+	var x: float = at.x
+	for i: int in text.length():
+		var ch: String = text[i]
+		draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+
+
+## What `_tracked` actually occupies — the plain width plus one gap per letter. Measuring tracked type with
+## `get_string_size` is how a caption ends up printed through its own title.
+func _tracked_w(text: String, size: int, track: float) -> float:
+	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
+		+ track * float(maxi(text.length() - 1, 0))
+
+
+## Darkens the frame's edges so the eye is pushed to the counter. Every modern pause screen does it; this
+## one did not, which was part of why the panel read as pasted onto a screenshot.
+func _bazaar_vignette(peak: float) -> void:
+	if peak <= 0.001:
+		return
+	for i: int in 18:
+		var t: float = float(i) / 18.0
+		var inset: float = t * 130.0
+		draw_rect(Rect2(0.0, 0.0, CANVAS.x, 1.0 + inset * 0.5), Color(0.0, 0.0, 0.0, peak * 0.030))
+		draw_rect(Rect2(0.0, CANVAS.y - 1.0 - inset * 0.5, CANVAS.x, 1.0 + inset * 0.5),
+			Color(0.0, 0.0, 0.0, peak * 0.030))
+		draw_rect(Rect2(0.0, 0.0, 1.0 + inset, CANVAS.y), Color(0.0, 0.0, 0.0, peak * 0.024))
+		draw_rect(Rect2(CANVAS.x - 1.0 - inset, 0.0, 1.0 + inset, CANVAS.y),
+			Color(0.0, 0.0, 0.0, peak * 0.024))
 
 
 ## THE PRODUCTION DASHBOARD ([G]): the flywheel made legible — the factory's whole

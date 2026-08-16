@@ -179,6 +179,9 @@ var _particles := Particles.new()
 ## The "+N" gain ticks that rise off a broken block — the payoff shown where you're looking, instead of
 ## only as a number in the corner of the HUD. Pure representation.
 var _payouts := Payouts.new()
+## The screen-space lens pass. Held so the counter can rack the WORLD out of focus behind it (#S34) —
+## the panel draws on a layer above this one, so only what is behind it defocuses.
+var _lens: ColorRect
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
 var _line_pivots: int = 0          ## pivots on the rope last frame — the rising edge is a CATCH
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
@@ -457,6 +460,7 @@ func _setup_post_fx() -> void:
 	lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fx_layer.add_child(lens)
 	add_child(fx_layer)
+	_lens = lens
 
 
 ## A continuous GPUParticles2D haze of dust motes drifting in the air — the modern particle lever
@@ -600,6 +604,17 @@ func _seed_world() -> void:
 	WorldSeeder.seed_tutorial(sim, dev_start)
 
 
+## Rack the world out of focus behind the counter, tracking the HUD's own open ease so the blur arrives
+## with the panel rather than snapping on. Nothing else in the frame is touched: the lens layer sits BELOW
+## the HUD, so the counter, the hotbar and every readable glyph stay crisp.
+func _update_defocus() -> void:
+	if _lens == null or _hud == null:
+		return
+	var mat: ShaderMaterial = _lens.material as ShaderMaterial
+	if mat != null:
+		mat.set_shader_parameter("defocus", _hud._bazaar_ease() * 3.4)
+
+
 func _process(delta: float) -> void:
 	if not _paused:
 		sim.advance(delta)
@@ -610,6 +625,7 @@ func _process(delta: float) -> void:
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_bazaars(delta)
 	_update_juice(delta)
+	_update_defocus()
 	if _camera != null:
 		# Soft follow toward the body, then PIXEL-SNAP the render so the terrain doesn't shimmer in motion.
 		# A big jump (spawn / F9 load / a teleport) SNAPS instead of panning across the whole world — which
@@ -1455,6 +1471,11 @@ func _bazaar_enter() -> void:
 			try_craft_tool(id)
 		"tech":
 			try_research(id)
+		"hold":
+			# PACK's verb. Equipping is stateless (`BitRules`), so "hold this" is literally "select this
+			# slot" — the same act as pressing its hotbar digit, reachable from the screen you are already
+			# looking at rather than only from a row of numbers hidden behind the panel.
+			_inv_selected = int(act["row"])
 
 
 ## Mine the aimed cell if it's solid and within reach. (Cooldown is input pacing, not part of the verb.)

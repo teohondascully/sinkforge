@@ -69,15 +69,31 @@ func _initialize() -> void:
 	_assert_fits(hud, canvas, "real")
 	var g: Dictionary = hud._bazaar_geometry()
 	var per_column: int = int(g["rows"])
-	print("  the counter holds %d rows per column (%d across the two)" % [per_column, per_column * 2])
-	# Twenty across the two columns is the number `docs/BAZAAR.md` promises, and the number that makes the
-	# scrollbar unnecessary. If the machine list ever outgrows it the answer is a third column — this layer
-	# failing is how you find out, rather than a scrollbar appearing and nobody noticing.
-	_check(per_column * 2 >= 20, "the counter holds twenty rows without scrolling")
-	_check(hud.craft_options.size() <= per_column,
-		"every machine fits its column without scrolling (%d of %d)" % [hud.craft_options.size(), per_column])
-	_check(hud.rack_options.size() <= per_column,
-		"every Rack row fits its column without scrolling (%d of %d)" % [hud.rack_options.size(), per_column])
+	var cols: int = int(g["cols"])
+	print("  the counter holds %d rows per column, %d columns (%d in all)"
+		% [per_column, cols, per_column * cols])
+	# Twenty is the number `docs/BAZAAR.md` promises, and the number that makes the scrollbar unnecessary.
+	# #S34 moved it from two columns of ten to three of seven when the detail plate took the bottom of the
+	# panel — the promise is the ROW COUNT, not the column count, and this is the assertion that says so.
+	_check(per_column * cols >= 20, "the counter holds twenty rows without scrolling")
+	# ...and each GROUP gets whole columns of its own, because the left list is what you build and the right
+	# is what you buy. A group that spilled into its neighbour's column would make a row's meaning depend on
+	# its position, which is the one thing a two-list screen must never do.
+	var lay: Dictionary = hud.works_columns(per_column)
+	print("  MACHINES takes %d column(s), THE RACK %d — of %d" % [int(lay["machines"]), int(lay["rack"]), cols])
+	_check(int(lay["total"]) <= cols,
+		"both lists fit the counter in whole columns (%d of %d)" % [int(lay["total"]), cols])
+	_check(hud.craft_options.size() <= per_column * int(lay["machines"]),
+		"every machine is reachable without a window (%d of %d)"
+		% [hud.craft_options.size(), per_column * int(lay["machines"])])
+	_check(hud.rack_options.size() <= per_column * int(lay["rack"]),
+		"every Rack row is reachable without a window (%d of %d)"
+		% [hud.rack_options.size(), per_column * int(lay["rack"])])
+	# THE DETAIL PLATE is part of the shape, so it is part of the test: it has to be inside the panel and it
+	# has to be big enough to hold the thing it exists to show (a 44px glyph plus two lines and a button).
+	var detail: Rect2 = g["detail"]
+	_check(detail.end.y <= float(g["origin"].y) + float(g["h"]) + 0.5 and detail.size.y >= 70.0,
+		"the detail plate is inside the panel and tall enough to matter (%.0fpx)" % detail.size.y)
 
 	# --- SAME SHAPE EVERYWHERE (fix #4). Away from a Bazaar only the VERBS are gated. ---
 	var at_stall: Dictionary = hud._bazaar_geometry()
@@ -101,15 +117,52 @@ func _initialize() -> void:
 		hud.bazaar_move(0, -1)
 	_check(hud.bazaar_row == 0, "the cursor clamps at the top")
 	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "…which is a machine row")
+	# LEFT/RIGHT jumps a whole COLUMN — the motion your eye makes. Two of them clears the machine list's two
+	# columns and lands in the Rack, which is the counter-to-Rack hop stated in the honest units.
 	hud.bazaar_move(1, 0)
-	_check(str(hud.bazaar_action().get("kind", "")) == "rack", "left/right hops the counter-to-Rack gap")
+	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "right jumps a column, still in MACHINES")
+	hud.bazaar_move(1, 0)
+	_check(str(hud.bazaar_action().get("kind", "")) == "rack", "…and the next one lands in the Rack")
+	hud.bazaar_move(-1, 0)
 	hud.bazaar_move(-1, 0)
 	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "…and back")
 	hud.set_bazaar_tab(Hud.TAB_BENCH)
 	_check(hud.bazaar_row_count() == ResearchRules.ORDER.size(), "BENCH offers every rung to the cursor")
 	_check(str(hud.bazaar_action().get("kind", "")) == "tech", "…and Enter acts on a tech")
 	hud.set_bazaar_tab(Hud.TAB_PACK)
-	_check(hud.bazaar_action().is_empty(), "PACK has nothing to buy, so Enter does nothing")
+	# PACK's verb is HOLD (#S34): the one tab that had a cursor and nothing to do with it. Equipping is
+	# stateless, so "hold this" is the same act as pressing the slot's hotbar digit — reachable from the
+	# screen you are looking at rather than only from a row of numbers hidden behind the panel.
+	_check(hud.bazaar_row_count() == sim.inventory_slots().size(), "PACK offers every carried slot to the cursor")
+	_check(str(hud.bazaar_action().get("kind", "")) == "hold", "…and Enter holds the one under the cursor")
+	hud.bazaar_move(0, 1)
+	_check(int(hud.bazaar_action().get("row", -1)) == 1, "…and the row it reports is the slot it drew")
+
+	# --- WORKS LISTS WHAT YOU CAN BUILD, NOT THE CATALOGUE (#S34). Thirteen greyed rows in the place you go
+	# to get things is decision paralysis dressed as content; the locked half lives on the BENCH, under the
+	# rung that unlocks it, which is the one screen whose job is "what comes next". ---
+	var locked_tech: StringName = ResearchRules.ORDER[ResearchRules.ORDER.size() - 1]
+	var gated: Array = (ResearchRules.tech(locked_tech).get("unlocks", []) as Array)
+	if gated.is_empty():
+		_check(false, "fixture: the last rung unlocks something to gate on")
+	else:
+		var gated_id: StringName = gated[0]
+		hud.craft_options = [{"name": "Free", "cost": {}}, {"name": "Gated", "cost": {}}]
+		hud.craft_ids = [&"", gated_id] as Array[StringName]
+		hud.rack_options = []
+		hud.rack_ids = [] as Array[StringName]
+		hud.set_bazaar_tab(Hud.TAB_WORKS)
+		_check(hud.open_machines().size() == 1,
+			"a machine behind unresearched tech is NOT on the counter (%d of 2 listed)" % hud.open_machines().size())
+		_check(hud.bazaar_row_count() == 1, "…so the cursor cannot even land on it")
+		sim.research[locked_tech] = true
+		_check(hud.open_machines().size() == 2, "…and researching its tech puts it on the counter")
+		# The row index the panel reports is the index into the FULL catalogue, because that is what the
+		# verbs are keyed on: filtering the view must never renumber the world.
+		hud.bazaar_move(0, 1)
+		_check(int(hud.bazaar_action().get("row", -1)) == 1,
+			"the reported row indexes the catalogue, not the filtered view")
+		sim.research.erase(locked_tech)
 
 	# --- THE MINIMAP FRAME: both forms fit their box, whatever shape the world is. A corner map sized by
 	# width alone was fine at 96x80 and became a 150x150 slab down half the screen the moment the world

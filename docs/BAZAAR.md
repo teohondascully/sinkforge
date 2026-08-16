@@ -8,8 +8,17 @@
 > The Rack is no longer the stub §6 describes: #S32 landed the tool-shapes design first, so it opened
 > stocked with the four bits.
 >
-> **Its LOOK is a separate question and is being reworked** — this document specs the counter's *shape*
-> (one panel, three tabs, no scrolling, same everywhere), and that shape is what shipped and what stays.
+> **Its LOOK was reworked as #S34** — this document specs the counter's *shape* (one panel, three tabs, no
+> scrolling, same everywhere), and that shape is what shipped and what stays. The surface on top of it is in
+> `docs/FEEL_GAP.md` STRIKE 34, along with two changes that revise §3 and §7 below:
+>
+> * **WORKS lists only what you can BUILD.** §3 said the Rack shows locked rows naming the tech that
+>   unlocks them. In play that was thirteen greyed rows out of sixteen — decision paralysis in the place you
+>   go to get things. The locked half moved to BENCH, greyed, under the rung that unlocks it, and WORKS
+>   carries one line saying how many wait there. §7's "every row that is locked names the tech that unlocks
+>   it" is therefore satisfied on the BENCH rather than on the counter.
+> * **PACK gained a verb** (ENTER holds the thing under the cursor), and the panel gained a DETAIL PLATE
+>   along the bottom, which is where a row's description, price and verb now live.
 
 ## 1. What is actually wrong today
 

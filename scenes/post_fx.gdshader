@@ -9,6 +9,7 @@ shader_type canvas_item;
 // HUD, so the world gets the lens treatment and the UI stays crisp.
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform float defocus : hint_range(0.0, 6.0) = 0.0;             // mip level the world is sampled at
 uniform float vignette_strength : hint_range(0.0, 1.0) = 0.32;  // darker corners focus the light-pools-in-black
 uniform float vignette_inner : hint_range(0.0, 1.0) = 0.48;     // radius where darkening starts
 uniform float vignette_outer : hint_range(0.0, 1.5) = 0.98;     // radius of full darkening
@@ -39,9 +40,18 @@ void fragment() {
 	// Chromatic aberration: split the channels outward, growing with distance from centre.
 	vec2 shift = c * aberration;
 	vec3 col;
-	col.r = texture(screen_tex, uv + shift).r;
-	col.g = texture(screen_tex, uv).g;
-	col.b = texture(screen_tex, uv - shift).b;
+	col.r = textureLod(screen_tex, uv + shift, defocus).r;
+	col.g = textureLod(screen_tex, uv, defocus).g;
+	col.b = textureLod(screen_tex, uv - shift, defocus).b;
+	// DEFOCUS (#S34): while the Bazaar counter is open the WORLD goes out of focus behind it and loses a
+	// little of its colour, the way a camera racks focus onto the thing you are looking at. This is what
+	// stops a panel reading as pasted onto a screenshot — the old counter dimmed the world 38% and left it
+	// perfectly sharp, so nothing said the panel was in FRONT of anything. The HUD draws on a layer above
+	// this pass, so the counter itself stays crisp. Free: it is a mip level, not a kernel.
+	if (defocus > 0.001) {
+		float g = dot(col, vec3(0.299, 0.587, 0.114));
+		col = mix(col, vec3(g), clamp(defocus * 0.13, 0.0, 0.34)) * (1.0 - clamp(defocus * 0.05, 0.0, 0.18));
+	}
 
 	// --- the palette grade: filmic S-curve + cool-shadow / warm-highlight split-tone ---
 	vec3 curved = mix(col, col * col * (3.0 - 2.0 * col), grade_curve);

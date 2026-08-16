@@ -200,18 +200,18 @@ func _variant_a(c: Control, blur: ImageTexture) -> void:
 		c.draw_circle(det.position + Vector2(det.size.x * 0.5, 40.0), 34.0 - float(k) * 8.0,
 			Color(0.85, 0.70, 0.35, 0.05 + float(k) * 0.02))
 	Visuals.draw_item(c, det.position + Vector2(det.size.x * 0.5, 40.0), 42.0, &"broad_bit")
-	_tracked(c, "BROAD BIT", det.position + Vector2(12.0, 100.0), 13, 1.8, BRASS_HI)
-	c.draw_string(_font, det.position + Vector2(12.0, 118.0),
+	_tracked(c, "BROAD BIT", det.position + Vector2(12.0, 98.0), 13, 1.8, BRASS_HI)
+	c.draw_string(_font, det.position + Vector2(12.0, 114.0),
 		"Takes a 2×2 the way you face. Everything", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
-	c.draw_string(_font, det.position + Vector2(12.0, 129.0),
+	c.draw_string(_font, det.position + Vector2(12.0, 125.0),
 		"it breaks is dust — hollow rooms with it,", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
-	c.draw_string(_font, det.position + Vector2(12.0, 140.0),
+	c.draw_string(_font, det.position + Vector2(12.0, 136.0),
 		"never veins.", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
-	_tracked(c, "PRICE", det.position + Vector2(12.0, 160.0), 8, 1.6, FAINT)
-	_cost_chip(c, det.position + Vector2(12.0, 166.0), &"ingot", "3", "8", true)
-	_cost_chip(c, det.position + Vector2(78.0, 166.0), &"stone", "12", "24", true)
+	_tracked(c, "PRICE", det.position + Vector2(12.0, 154.0), 8, 1.6, FAINT)
+	_cost_chip(c, det.position + Vector2(12.0, 160.0), &"ingot", "3", "8", true)
+	_cost_chip(c, det.position + Vector2(78.0, 160.0), &"stone", "12", "24", true)
 	# The verb as a real KEYCAP, lit, sitting where your eye already is.
-	var buy := Rect2(det.position.x + 12.0, det.position.y + 178.0, det.size.x - 24.0, 20.0)
+	var buy := Rect2(det.position.x + 12.0, det.position.y + 184.0, det.size.x - 24.0, 20.0)
 	_vgrad(c, buy, Color(0.612, 0.478, 0.196), Color(0.400, 0.310, 0.125), 6)
 	c.draw_rect(buy, BRASS_HI, false, 1.0)
 	_tracked(c, "ENTER   ·   BUY", buy.position + Vector2(buy.size.x * 0.5 - 42.0, 14.0), 10, 2.0,
@@ -271,7 +271,7 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 	# never had. It sits ABOVE the content, on its own line, so no list has to carry it. ---
 	var head: Vector2 = panel.position + Vector2(76.0, 0.0)
 	_tracked(c, "BAZAAR", head + Vector2(0.0, 32.0), 19, 3.0, TEXT)
-	_tracked(c, "WORKS", head + Vector2(_w("BAZAAR", 19) + 21.0, 32.0), 19, 3.0, Color(0.25, 0.27, 0.33))
+	_tracked(c, "WORKS", head + Vector2(_w("BAZAAR", 19) + 40.0, 32.0), 19, 3.0, Color(0.25, 0.27, 0.33))
 	var rx: float = panel.end.x - 20.0
 	for pair: Array in [[&"stone", "24"], [&"coal", "12"], [&"ore", "24"], [&"iron_ingot", "3"], [&"ingot", "8"]]:
 		var t: String = String(pair[1])
@@ -284,10 +284,10 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 	# --- cards ---
 	_tracked(c, "MACHINES", head + Vector2(1.0, 58.0), 8, 2.2, FAINT)
 	var cards: Array[Dictionary] = [
-		{"id": &"forge", "name": "Forge", "cost": "2 ingot", "ok": true},
-		{"id": &"drill", "name": "Drill", "cost": "4 ingot", "ok": true},
-		{"id": &"hopper", "name": "Hopper", "cost": "3 ingot", "ok": true},
-		{"id": &"generator", "name": "Generator", "cost": "POWER", "ok": false},
+		{"def": "processor", "name": "Forge", "note": "smelts ore into ingots", "cost": "2 ingot", "ok": true},
+		{"def": "drill", "name": "Drill", "note": "eats the rock it faces", "cost": "4 ingot", "ok": true},
+		{"def": "hopper", "name": "Hopper", "note": "buffers a line", "cost": "3 ingot", "ok": true},
+		{"def": "generator", "name": "Generator", "note": "locked behind POWER", "cost": "POWER", "ok": false},
 	]
 	var cy: float = panel.position.y + 68.0
 	for i: int in cards.size():
@@ -296,11 +296,11 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 		_rrect(c, card, 5.0, Color(1.0, 1.0, 1.0, 0.032))
 		var icon := Rect2(card.position + Vector2(8.0, 8.0), Vector2(28.0, 28.0))
 		_rrect(c, icon, 4.0, Color(0.0, 0.0, 0.0, 0.28))
-		Visuals.draw_item(c, icon.get_center(), 20.0, d["id"])
+		_machine(c, icon.get_center(), String(d["def"]), 0.62)
 		c.draw_string(_font, card.position + Vector2(44.0, 20.0), String(d["name"]),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT if bool(d["ok"]) else DIM)
-		c.draw_string(_font, card.position + Vector2(44.0, 33.0),
-			"builds ore into ingots" if i == 0 else "part of the line", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, FAINT)
+		c.draw_string(_font, card.position + Vector2(44.0, 33.0), String(d["note"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, FAINT)
 		var cost: String = String(d["cost"])
 		c.draw_string(_font, Vector2(card.end.x - 10.0 - _w(cost, 10), card.position.y + 27.0), cost,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, GOOD if bool(d["ok"]) else FAINT)
@@ -312,7 +312,7 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 	for k: int in 4:
 		c.draw_circle(det.position + Vector2(det.size.x * 0.5, 54.0), 46.0 - float(k) * 10.0,
 			Color(0.85, 0.70, 0.35, 0.032))
-	Visuals.draw_item(c, det.position + Vector2(det.size.x * 0.5, 54.0), 52.0, &"forge")
+	_machine(c, det.position + Vector2(det.size.x * 0.5, 54.0), "processor", 1.5)
 	_tracked(c, "FORGE", det.position + Vector2(16.0, 118.0), 15, 2.0, TEXT)
 	c.draw_string(_font, det.position + Vector2(16.0, 136.0), "Smelts ore into ingots, one at a time,",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
@@ -329,6 +329,16 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 
 	c.draw_string(_font, Vector2(panel.position.x + 76.0, panel.end.y - 14.0),
 		"↑↓ pick    1/2/3 tab    E close", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, FAINT)
+
+
+## A machine drawn with its OWN glyph — `Visuals.draw_item` only knows carried goods, and a machine drawn as
+## a carried good is the white square this mock caught on its first pass.
+func _machine(c: Control, at: Vector2, def_name: String, s: float) -> void:
+	var def: MachineDef = load("res://src/data/machines/%s.tres" % def_name) as MachineDef
+	if def == null:
+		return
+	c.draw_rect(Rect2(at - Vector2(11.0, 11.0) * s, Vector2(22.0, 22.0) * s), Visuals.machine_color(def))
+	Visuals.draw_machine_glyph(c, at, Visuals.machine_kind(def), s, false, 0.0)
 
 
 func _rail_glyph(c: Control, at: Vector2, kind: int, on: bool) -> void:
@@ -414,7 +424,7 @@ func _variant_c(c: Control, sharp: ImageTexture) -> void:
 
 	# The one line of prose, on the slab's front edge where a price card would be.
 	_tracked(c, "BROAD BIT", Vector2(78.0, 348.0), 11, 2.0, BRASS_HI)
-	c.draw_string(_font, Vector2(78.0 + _w("BROAD BIT", 11) + 22.0, 348.0),
+	c.draw_string(_font, Vector2(78.0 + _tracked_w("BROAD BIT", 11, 2.0) + 20.0, 348.0),
 		"takes a 2×2 — and grinds every scrap of it to dust", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
 	var buy: String = "ENTER  buy"
 	c.draw_string(_font, Vector2(CANVAS.x - 22.0 - _w(buy, 10), 348.0), buy, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, BRASS_HI)
@@ -431,6 +441,12 @@ func _variant_c(c: Control, sharp: ImageTexture) -> void:
 
 func _w(s: String, size: int) -> float:
 	return _font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+
+
+## What `_tracked` actually occupies — the plain width plus one gap per letter. Measuring tracked type with
+## `_w` is how the mock's first pass printed a caption straight through its own title.
+func _tracked_w(s: String, size: int, track: float) -> float:
+	return _w(s, size) + track * float(maxi(s.length() - 1, 0))
 
 
 ## Letter-spaced type. Small caps with air between them is most of what separates a title from a label, and
@@ -474,21 +490,25 @@ func _well(c: Control, rect: Rect2) -> void:
 	c.draw_rect(Rect2(rect.position.x, rect.end.y - 1.0, rect.size.x, 1.0), Color(1.0, 1.0, 1.0, 0.05))
 
 
+## A REAL rounded rect, via StyleBoxFlat, because composing one from a rect plus four circles double-blends
+## every corner when the fill is translucent — which is exactly the case a modern surface tint is.
 func _rrect(c: Control, rect: Rect2, r: float, col: Color) -> void:
-	c.draw_rect(Rect2(rect.position + Vector2(r, 0.0), Vector2(rect.size.x - r * 2.0, rect.size.y)), col)
-	c.draw_rect(Rect2(rect.position + Vector2(0.0, r), Vector2(r, rect.size.y - r * 2.0)), col)
-	c.draw_rect(Rect2(rect.end.x - r, rect.position.y + r, r, rect.size.y - r * 2.0), col)
-	for p: Vector2 in [rect.position + Vector2(r, r), Vector2(rect.end.x - r, rect.position.y + r),
-			Vector2(rect.position.x + r, rect.end.y - r), rect.end - Vector2(r, r)]:
-		c.draw_circle(p, r, col)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(int(r))
+	sb.corner_detail = 8
+	sb.draw(c.get_canvas_item(), rect)
 
 
 ## Rounded on the left two corners only — for a rail flush against a panel's edge.
 func _rrect_left(c: Control, rect: Rect2, r: float, col: Color) -> void:
-	c.draw_rect(Rect2(rect.position + Vector2(r, 0.0), Vector2(rect.size.x - r, rect.size.y)), col)
-	c.draw_rect(Rect2(rect.position + Vector2(0.0, r), Vector2(r, rect.size.y - r * 2.0)), col)
-	c.draw_circle(rect.position + Vector2(r, r), r, col)
-	c.draw_circle(Vector2(rect.position.x + r, rect.end.y - r), r, col)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(0)
+	sb.corner_radius_top_left = int(r)
+	sb.corner_radius_bottom_left = int(r)
+	sb.corner_detail = 8
+	sb.draw(c.get_canvas_item(), rect)
 
 
 ## have/need as one chip: the icon, what it costs, and what you are carrying, so "can I afford this" is
