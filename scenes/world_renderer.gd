@@ -1045,10 +1045,27 @@ func _zone_tinted(col: Color, row: int) -> Color:
 func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 	var col: Color = _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
-	var j: float = _cell_jitter(c)
+	# CONTRAST TO SPEND (#S2). Underground, everything a cell is painted with gets compressed twice —
+	# once by depth_darken, then again by the shadow veil sinking it toward a fraction of itself. A
+	# tonal range that reads fine in daylight survives that as mush, which is the mechanical reason deep
+	# rock looked like fog: the detail was there, scaled down until it stopped being detail. Both the
+	# jitter and the bedding therefore get progressively LOUDER with depth, so what reaches the eye
+	# after the veil takes its cut is roughly as legible at the bottom of the world as at the top.
+	# Measured against a real delve capture, not guessed: at the veil's opacity roughly half a cell's own
+	# tonal range survives to the eye, so the compensation has to be well over 2x by the deep band before
+	# bedding reads down there at all.
+	var boost: float = 1.0 + depth * 2.2
+	var j: float = _cell_jitter(c) * boost
 	col = col.lightened(j) if j > 0.0 else col.darkened(-j)
-	var s: float = _strata(c)
-	return col.lerp(STRATA_WARM, s) if s > 0.0 else col.lerp(STRATA_COOL, -s)
+	# Bedding is applied RELATIVE to the cell's own colour, then tinted. Absolute band targets looked
+	# right against brown topsoil and silently died below it: a dark clay target sits almost exactly on
+	# deep stone's own colour, so half the bedding became a no-op in precisely the place that needed it
+	# most. Lightening and darkening the cell always swings, whatever the cell happens to be; the tint
+	# then rides on top for the hue that makes a band read as a different DEPOSIT and not just shading.
+	var s: float = _strata(c) * boost
+	if s > 0.0:
+		return col.lightened(s * 0.85).lerp(STRATA_WARM, s * 0.30)
+	return col.darkened(-s * 1.05).lerp(STRATA_COOL, -s * 0.20)
 
 
 ## SEDIMENTARY BANDING — the ground's own structure. The cell jitter above breaks a field of earth out
@@ -2181,7 +2198,14 @@ func _paint_lights(layer: LightLayer) -> void:
 		# A faint flicker so the lamp reads as a live flame, not a static disc. Bright enough to blaze
 		# against the near-black base but held at 0.66 so the WARM amber core reads (not blown to white) —
 		# the pool is the light in the deep, and it stays gold (diff 11).
-		var flick: float = 0.60 + 0.04 * sin(_anim_time * 11.0) + 0.03 * sin(_anim_time * 27.0)
+		# LIGHT REVEALS, IT DOESN'T PAINT (#S2). The lamp does two jobs: it CUTS a wide hole in the
+		# darkness veil (see _update_veil — 5.4 cells at near-full strength, which is what actually makes
+		# rock visible) and it ADDS an amber pool on top. The additive term was strong enough to swamp the
+		# reveal: three overlapping pools summed past 1.0, tripped the glow threshold, and blew the centre
+		# of the frame to a white smear. Rock the veil had just uncovered was repainted flat — which is
+		# most of why the underground read as fog rather than as stone. The pool is now a fraction of what
+		# it was: enough that you plainly see a warm lamp, not so much that it erases what the lamp is for.
+		var flick: float = 0.32 + 0.035 * sin(_anim_time * 11.0) + 0.025 * sin(_anim_time * 27.0)
 		# Scale the lamp by how DARK the miner's spot actually is (blind-playtest fix): a full blaze in the
 		# deep where it IS the light, but a dim glow in daylight — at spawn the full-strength lamp was
 		# washing out the avatar AND the starter ore it sits on, so every warm thing read as "a lamp".
@@ -2195,7 +2219,7 @@ func _paint_lights(layer: LightLayer) -> void:
 		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
 		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
 		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.38)
-		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.14 * lamp_scale)  # close body glow
+		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.09 * lamp_scale)  # close body glow
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
 		# Saturated cores (diffs 2, 9): each machine's pool blazes in its OWN colour out of the black — a

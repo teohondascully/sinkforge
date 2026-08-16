@@ -375,8 +375,20 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.66, 0.71, 0.80)        # rolled sheet — the press's product
 	if item == &"gear":
 		return Color(0.82, 0.68, 0.34)        # bronze-toothed cog — the mill's product
+	# THE CARRIED GROUND. Terraria-style dig-and-carry means the pack routinely fills with the plain
+	# terrain you cut — and those had no entry here, so every one of them fell through to WHITE and
+	# drew as a blank square. Three identical white blanks in the hotbar is the single most illegible
+	# thing on the screen; it looks like missing art, which is exactly what it was.
+	if item == &"earth":
+		return Color(0.46, 0.33, 0.21)
+	if item == &"stone":
+		return Color(0.48, 0.49, 0.53)
+	if item == &"shale":
+		return Color(0.34, 0.36, 0.42)
 	if item == &"deepslate":
 		return Color(0.28, 0.31, 0.40)
+	if item == &"sealrock":
+		return Color(0.30, 0.26, 0.34)
 	return Color.WHITE
 
 
@@ -420,8 +432,23 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_pickaxe(canvas, center, size, Color(0.42, 0.32, 0.22), Color(0.80, 0.84, 0.94))
 		&"wood_axe":
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
+		&"earth", &"stone", &"shale", &"deepslate", &"sealrock":
+			_item_block(canvas, center, size, item_color(item))
 		_:
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
+
+
+## A CARRIED BLOCK of plain terrain (earth / stone / shale / deepslate / sealrock) — the dig-and-carry
+## stock you backfill, bridge and pillar with. Drawn as a chunk with a lit top face and a shadowed base
+## so it reads as a solid piece of ground you could set down, rather than the flat colour swatch these
+## used to get. The top-lit reading matches the world's own key light, which comes from above.
+static func _item_block(canvas: CanvasItem, c: Vector2, size: float, col: Color) -> void:
+	var h: float = size * 0.40
+	canvas.draw_rect(Rect2(c - Vector2(h, h), Vector2(h, h) * 2.0), col)
+	canvas.draw_rect(Rect2(c - Vector2(h, h), Vector2(h * 2.0, h * 0.34)), col.lightened(0.24))
+	canvas.draw_rect(Rect2(c + Vector2(-h, h * 0.62), Vector2(h * 2.0, h * 0.38)), col.darkened(0.34))
+	for g: Vector2 in [Vector2(-0.42, 0.10), Vector2(0.22, -0.14), Vector2(0.06, 0.34)]:
+		canvas.draw_rect(Rect2(c + g * size, Vector2(size * 0.10, size * 0.10)), col.darkened(0.22))
 
 
 ## RICH ORE (#48) — the same rough nugget, crowded with brighter white-gold flecks: quality READS.

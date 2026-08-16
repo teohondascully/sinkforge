@@ -86,6 +86,7 @@ static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) ->
 			ci.draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
 			ci.draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
 			ci.draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
+			_draw_fissure(ci, c, pos, col)
 		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
 			# Speck DENSITY tracks the remaining deposit: a rich body sparkles thickly, a
 			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
@@ -293,6 +294,30 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		# The cap edge (grass/lip) rides the diagonal, with a soft dark liner just under it for a carved rim.
 		ci.draw_line(foot, peak, edge.darkened(0.35), 4.0)
 		ci.draw_line(foot, peak, edge, 3.0)
+
+
+## FISSURES — a sparse fracture running through the rock, so a MASS of solid cells has structure of its
+## own. Speckles alone give a cell surface texture, but they are point noise: a wall of them is a field
+## of static, which is a large part of why a solid body of rock underground read as fog rather than as
+## stone. A fracture is a LINE, and a line is the one thing an eye reads as structure at a glance.
+##
+## Roughly one cell in five gets one, and it runs shallowly across the cell — along the bedding, since
+## rock splits along its layers — with a lighter highlight under it so the crack has an edge that
+## catches the same overhead key light as everything else. Deterministic per cell like the speckles, so
+## the same rock always carries the same crack and a rebaked chunk is identical.
+static func _draw_fissure(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
+	var h: int = _fringe_hash(c.x * 31 + c.y, c.y)
+	if h % 5 != 0:
+		return
+	var cs: float = float(WorldRenderer.CELL)
+	var y0: float = 6.0 + float((h >> 4) % int(cs - 12.0))
+	var slope: float = float((h >> 11) % 7) - 3.0                   # -3..+3 px of dip across the cell
+	var x0: float = 2.0 + float((h >> 17) % 6)
+	var x1: float = cs - 2.0 - float((h >> 21) % 6)
+	var a := pos + Vector2(x0, y0)
+	var b := pos + Vector2(x1, y0 + slope)
+	ci.draw_line(a + Vector2(0.0, 1.0), b + Vector2(0.0, 1.0), col.lightened(0.16), 1.0)
+	ci.draw_line(a, b, col.darkened(0.42), 1.0)
 
 
 ## THE FLAT CAP, RAGGED (#A5). A flat surface cell used to take one uniform 4px bar of cap colour, and a
