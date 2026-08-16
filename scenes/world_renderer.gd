@@ -1081,29 +1081,41 @@ func _zone_tinted(col: Color, row: int) -> Color:
 ## isn't ONE flat colour — the biggest flat-fill tell). Extracted so the surface RAMP wedge fills with the
 ## exact same colour as the cell body below it — the slope is the same earth mass, not a sticker on top.
 func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
+	return FineTerrain.apply_tone(_cell_base_color(c, def), _cell_tone(c))
+
+
+## The cell's colour BEFORE any tone: the material's base darkened with depth and zone-tinted. Split out
+## for the fine bake (#S12), which needs the base and the tone separately so it can reconstruct the tone
+## field between coarse samples instead of inheriting one flat value per 32px cell. The coarse pass gets
+## the two put straight back together above, so its output is unchanged.
+func _cell_base_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-	var col: Color = _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
-	# CONTRAST TO SPEND (#S2). Underground, everything a cell is painted with gets compressed twice —
-	# once by depth_darken, then again by the shadow veil sinking it toward a fraction of itself. A
-	# tonal range that reads fine in daylight survives that as mush, which is the mechanical reason deep
-	# rock looked like fog: the detail was there, scaled down until it stopped being detail. Both the
-	# jitter and the bedding therefore get progressively LOUDER with depth, so what reaches the eye
-	# after the veil takes its cut is roughly as legible at the bottom of the world as at the top.
-	# Measured against a real delve capture, not guessed: at the veil's opacity roughly half a cell's own
-	# tonal range survives to the eye, so the compensation has to be well over 2x by the deep band before
-	# bedding reads down there at all.
+	return _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
+
+
+## The cell's (jitter, strata) tone, both already scaled by the depth boost.
+##
+## CONTRAST TO SPEND (#S2). Underground, everything a cell is painted with gets compressed twice — once
+## by depth_darken, then again by the shadow veil sinking it toward a fraction of itself. A tonal range
+## that reads fine in daylight survives that as mush, which is the mechanical reason deep rock looked
+## like fog: the detail was there, scaled down until it stopped being detail. Both the jitter and the
+## bedding therefore get progressively LOUDER with depth, so what reaches the eye after the veil takes
+## its cut is roughly as legible at the bottom of the world as at the top. Measured against a real delve
+## capture, not guessed: at the veil's opacity roughly half a cell's own tonal range survives to the eye,
+## so the compensation has to be well over 2x by the deep band before bedding reads down there at all.
+##
+## That boost is also why quantising these two to the coarse grid was so costly, and why the fine bake
+## reconstructs them: the term the game amplifies most was the term drawing the grid.
+##
+## Both are applied RELATIVE to the cell's own colour (see FineTerrain.apply_tone), then tinted. Absolute
+## band targets looked right against brown topsoil and silently died below it: a dark clay target sits
+## almost exactly on deep stone's own colour, so half the bedding became a no-op in precisely the place
+## that needed it most. Lightening and darkening the cell always swings, whatever the cell happens to be;
+## the tint then rides on top for the hue that makes a band read as a different DEPOSIT, not just shading.
+func _cell_tone(c: Vector2i) -> Vector2:
+	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 	var boost: float = 1.0 + depth * 2.2
-	var j: float = _cell_jitter(c) * boost
-	col = col.lightened(j) if j > 0.0 else col.darkened(-j)
-	# Bedding is applied RELATIVE to the cell's own colour, then tinted. Absolute band targets looked
-	# right against brown topsoil and silently died below it: a dark clay target sits almost exactly on
-	# deep stone's own colour, so half the bedding became a no-op in precisely the place that needed it
-	# most. Lightening and darkening the cell always swings, whatever the cell happens to be; the tint
-	# then rides on top for the hue that makes a band read as a different DEPOSIT and not just shading.
-	var s: float = _strata(c) * boost
-	if s > 0.0:
-		return col.lightened(s * 0.85).lerp(STRATA_WARM, s * 0.30)
-	return col.darkened(-s * 1.05).lerp(STRATA_COOL, -s * 0.20)
+	return Vector2(_cell_jitter(c) * boost, _strata(c) * boost)
 
 
 ## SEDIMENTARY BANDING — the ground's own structure. The cell jitter above breaks a field of earth out
@@ -1120,8 +1132,8 @@ func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 ##
 ## Deterministic and RNG-free, and it feeds the fine-terrain bake through the same callable, so a dug
 ## face exposes the same layer the coarse cell was showing.
-const STRATA_WARM := Color(0.86, 0.74, 0.52)   ## the sandy band
-const STRATA_COOL := Color(0.15, 0.16, 0.21)   ## the cool clay/silt band
+## The two band COLOURS live on FineTerrain with `apply_tone`, which is now the single authority for what
+## a tone means to a pixel — the coarse pass and the fine pass have to agree, so only one of them may own it.
 const STRATA_AMOUNT: float = 0.17              ## how far a band pulls toward its colour
 
 func _strata(c: Vector2i) -> float:
@@ -2070,9 +2082,10 @@ func _bake_fine_terrain() -> void:
 	_fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),   # P2: the sim's real fine grid
-		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
+		func(c: Vector2i) -> Color: return _cell_base_color(c, _material(sim.material_at(c))),
 		_wall_fill_color,
-		func(col: int) -> int: return sim.surface_row(col))
+		func(col: int) -> int: return sim.surface_row(col),
+		_cell_tone)
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 
@@ -2086,9 +2099,10 @@ func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 	_fine.rebake_region(cmin, cmax,
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),
-		func(c: Vector2i) -> Color: return _cell_fill_color(c, _material(sim.material_at(c))),
+		func(c: Vector2i) -> Color: return _cell_base_color(c, _material(sim.material_at(c))),
 		_wall_fill_color,
-		func(col: int) -> int: return sim.surface_row(col))
+		func(col: int) -> int: return sim.surface_row(col),
+		_cell_tone)
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 

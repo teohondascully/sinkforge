@@ -823,26 +823,28 @@ func _draw() -> void:
 		if f > 0.0:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
 			dst.position.x = -w * 0.5
-		# STICKER OUTLINE — readable on ANY background (blind testers kept finding the body only via the
-		# guide arrow, not the sprite itself: tiny + low-contrast over the gear/hills/trees, and a single
-		# DARK outline vanished against the dark terrain/machines/underground he actually stands in). TWO
-		# rings: a warm LIGHT halo on the outside separates him from the dark/mid world; a near-black inner
-		# edge separates him from the bright sky. Light drawn first (wider), dark over it (tighter), so the
-		# light survives only as a thin outer fringe — a crisp rim, not a heavy glow.
-		# The rim is COOL + bright on purpose: the miner's own art is warm (leather/amber) — the SAME warm
-		# family as the dirt, the FORGE boxes and the amber UI, so a warm outline just deepened the collision
-		# (blind testers read the body as "one of three machine-ish objects"). A cool bright edge is the one
-		# thing in the warm-brown world nothing else wears, so the body reads instantly as THE player.
+		# THE RIM — readable on ANY background (blind testers kept finding the body only via the guide arrow,
+		# not the sprite itself: tiny + low-contrast over the gear/hills/trees, and a single DARK outline
+		# vanished against the dark terrain/machines/underground he actually stands in).
+		#
+		# It is COOL + bright on purpose. The miner's own art is warm (leather/amber) — the SAME warm family
+		# as the dirt, the FORGE boxes and the amber UI, so a warm outline just deepened the collision (blind
+		# testers read the body as "one of three machine-ish objects"). A cool bright edge is the one thing in
+		# the warm-brown world nothing else wears, so the body reads instantly as THE player.
+		#
+		# It used to be TWO rings — this halo at 2.6px plus a near-black inner edge at 1.4px — because the
+		# sprite it was built for had no silhouette of its own to lean on. The authored pixel art does: it
+		# carries its own one-pixel near-black outline, so the second ring was drawing a black edge on top of
+		# a black edge. At 1.4px offset in eight directions on art whose pixels are ONE world px, that is up
+		# to two solid pixels of black wrapped round every limb, and it printed exactly as it sounds — the
+		# legs turned into black boxes with boots inside them and the shoulders into lumps. Deleting it costs
+		# nothing on the bright sky, where the art's own outline does the same job, and returns the shape the
+		# art was drawn to have. What is left is one thin cool rim: separation, not a sticker.
 		var rim := Color(0.80, 0.93, 1.0, 0.85)                 # cool bright halo — the reserved "that's me" edge
-		var ol := Color(0.03, 0.03, 0.05, 0.72)                 # near-black inner edge — pops on the bright sky
-		const RW: float = 2.6
-		const OW: float = 1.4
+		const RW: float = 1.5                                   # ~1.5 art pixels: a rim you read, not one you see
 		for d: Vector2 in [Vector2(-RW, 0.0), Vector2(RW, 0.0), Vector2(0.0, -RW), Vector2(0.0, RW),
 				Vector2(-RW, -RW), Vector2(RW, -RW), Vector2(-RW, RW), Vector2(RW, RW)]:
 			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, rim)
-		for d: Vector2 in [Vector2(-OW, 0.0), Vector2(OW, 0.0), Vector2(0.0, -OW), Vector2(0.0, OW),
-				Vector2(-OW, -OW), Vector2(OW, -OW), Vector2(-OW, OW), Vector2(OW, OW)]:
-			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, ol)
 		draw_texture_rect(tex, dst, false)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return

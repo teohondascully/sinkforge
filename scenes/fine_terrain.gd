@@ -174,6 +174,37 @@ const BACKROCK_COOL := Color(0.10, 0.15, 0.20)
 ## COOL SHADOW tint (fix-2 diff 3): carved/AO-shadowed foreground rock is lerped toward this cold
 ## teal-blue so shadows read blue-grey (the reference's cold rock), not the warm brown murk of pass-1.
 const SHADOW_TEAL := Color(0.13, 0.20, 0.27)
+## THE COARSE TONE, RECONSTRUCTED (#S12) — the last thing in the rock that still knew where the grid was.
+##
+## Everything above this line is sampled per FINE cell and measured by check_texture. All of it is painted
+## on top of a BASE colour the renderer computes per COARSE cell, and that base carries two deliberately
+## smooth low-frequency fields: a cloudy value jitter and the sedimentary banding. Their own source calls
+## for "cloudy patches ... NOT a per-cell random that seams at every tile edge (which just rebuilds the
+## grid)" — and then evaluates them once per 32px cell, which is precisely how you rebuild the grid. A
+## smooth field held constant across a 4x4 block is a mosaic, every one of its steps lands on a coarse
+## boundary, and both terms are multiplied by up to 3.2x with depth, so the mosaic shouts loudest exactly
+## where the game is played. Measured before the fix (tools/check_grid): crossing a coarse ROW stepped
+## 2.38x harder than the rock's own grain, which is a hard horizontal rule drawn across the whole world
+## every 32 pixels — read as "flat", "blocky", "tiled", and impossible to unsee once you have seen it.
+##
+## The fix is not new art, it is not resampling the fields, and it changes no cell's centre: the renderer
+## still hands over ONE tone per coarse cell, and the paint BILINEARLY reconstructs the field between
+## those samples. Mapping fine cell centres to continuous coarse coordinates puts the samples on an even
+## 1/SUBDIV lattice, so the reconstruction steps by exactly the same amount everywhere and the boundary
+## stops being special. Cost is four array reads and three lerps per fine cell — no extra Callable, no
+## extra noise, and the per-dig fast lane is untouched because a tone never changes when you mine.
+const STRATA_WARM := Color(0.86, 0.74, 0.52)   ## the sandy band
+const STRATA_COOL := Color(0.15, 0.16, 0.21)   ## the cool clay/silt band
+
+## Apply a (jitter, strata) tone to a base body colour. THE single authority for what a tone means — the
+## coarse pass calls it per cell and the fine pass calls it per fine cell with a reconstructed tone, so
+## the two passes cannot drift apart. Both terms arrive already scaled by the renderer's depth boost.
+static func apply_tone(base: Color, tone: Vector2) -> Color:
+	var col: Color = base.lightened(tone.x) if tone.x > 0.0 else base.darkened(-tone.x)
+	if tone.y > 0.0:
+		return col.lightened(tone.y * 0.85).lerp(STRATA_WARM, tone.y * 0.30)
+	return col.darkened(-tone.y * 1.05).lerp(STRATA_COOL, -tone.y * 0.20)
+
 
 var _cols: int
 var _rows: int
@@ -196,7 +227,8 @@ var _tex: ImageTexture
 var _data: PackedByteArray = PackedByteArray()          ## the baked pixel bytes (region rebakes overwrite a sub-rect)
 var _fine_solid: PackedByteArray = PackedByteArray()    ## the real fine solid/air grid (neighbours for region AO/moss)
 var _solid_mask: PackedFloat32Array = PackedFloat32Array()  ## coarse solidity 0/1
-var _mat_col: PackedColorArray = PackedColorArray()     ## coarse body colour (solid cells)
+var _mat_col: PackedColorArray = PackedColorArray()     ## coarse body BASE colour, tone NOT yet applied
+var _tone: PackedVector2Array = PackedVector2Array()    ## coarse (jitter, strata) samples, reconstructed per fine cell
 var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall colour
 var _surf_row: PackedInt32Array = PackedInt32Array()    ## walkable surface row per column (cap band)
 var last_baked_cells: int = 0                           ## fine cells the LAST bake touched — the dig-hitch friction gauge (#103)
@@ -277,7 +309,8 @@ const SURFACE_KEEP: int = 2
 ## surface authority the coarse pass uses:
 ##   solid_at(Vector2i) -> bool              (the COARSE cell — parent solidity, for colour + accretion source)
 ##   fine_solid_at(int fx, int fy) -> bool   (P2: the REAL fine terrain grid from the sim — the molded shape)
-##   material_color_at(Vector2i) -> Color    (the coarse cell's body colour; only called on solid cells)
+##   material_color_at(Vector2i) -> Color    (the coarse cell's body BASE colour, tone NOT applied)
+##   tone_at(Vector2i) -> Vector2            (#S12: that cell's (jitter, strata) sample, reconstructed here)
 ##   wall_color_at(Vector2i) -> Color        (the back-wall colour to show where solid rock is ERODED to air)
 ##   surface_at(int col) -> int              (the walkable surface row of a column; its cap is left uncovered)
 ## P2: the fine SHAPE now comes from the sim's real fine grid (fine_solid_at) instead
@@ -287,7 +320,7 @@ const SURFACE_KEEP: int = 2
 ## per-dig fast lane is rebake_region (dirty-chunks, #102). Fills the persisted caches, then paints every
 ## fine cell via _paint_fine (shared with the region path).
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
-		surface_at: Callable) -> void:
+		surface_at: Callable, tone_at: Callable) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)
@@ -301,12 +334,16 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 	# Cache coarse colours once per cell (reused by all SUBDIV² children).
 	_mat_col.resize(_cols * _rows)
 	_wall_col.resize(_cols * _rows)
+	# The tone is sampled on EVERY cell, solid or not: the reconstruction below reads a fine cell's four
+	# surrounding coarse samples, and an air cell beside a rock face is one of them.
+	_tone.resize(_cols * _rows)
 	for cy: int in _rows:
 		for cx: int in _cols:
 			var idx: int = cy * _cols + cx
 			if _solid_mask[idx] > 0.5:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
+			_tone[idx] = tone_at.call(Vector2i(cx, cy)) as Vector2
 	_data.resize(_fcols * _frows * 4)
 	# Read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding lives in the sim's fine
 	# DATA), stashed so the paint can read neighbours for fine AO.
@@ -328,9 +365,9 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 ## rebake() but touches ~256 cells for a single dig, not the whole ~120k grid. Falls back to a full rebake
 ## if the grid was never fully baked (nothing cached to patch). Callables match rebake()'s.
 func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_solid_at: Callable,
-		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable) -> void:
+		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable, tone_at: Callable) -> void:
 	if _data.size() != _fcols * _frows * 4:
-		rebake(solid_at, fine_solid_at, material_color_at, wall_color_at, surface_at)
+		rebake(solid_at, fine_solid_at, material_color_at, wall_color_at, surface_at, tone_at)
 		return
 	cmin.x = maxi(cmin.x, 0)
 	cmin.y = maxi(cmin.y, 0)
@@ -350,6 +387,8 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			if s:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
+	# _tone is deliberately NOT refreshed: a tone is a pure function of (x, y), so mining cannot change
+	# one. Leaving the cache alone is what keeps a region bake byte-identical to a full bake here.
 	# 2) Refresh the real fine solid/air shape for the changed cells' fine footprint.
 	var fx0c: int = cmin.x * SUBDIV
 	var fy0c: int = cmin.y * SUBDIV
@@ -399,7 +438,10 @@ func _paint_fine(fx: int, fy: int) -> void:
 	var here_solid: bool = _fine_solid[fy * _fcols + fx] == 1
 	var parent_solid: bool = _solid_mask[cidx] > 0.5
 	if here_solid:
-		var col: Color = _mat_col[cidx] if parent_solid else _accreted_color(_mat_col, _wall_col, _solid_mask, fx, fy, cidx)
+		var base: Color = _mat_col[cidx] if parent_solid else _accreted_color(_mat_col, _wall_col, _solid_mask, fx, fy, cidx)
+		# #S12: put the tone back on at FINE resolution. The base arrives untoned, so this is the only
+		# place the jitter and the bedding reach the rock — as a reconstructed field, not as a mosaic.
+		var col: Color = apply_tone(base, _tone_at_fine(fx, fy))
 		# ROCK HUE VARIATION (diff-04 #3): pull the body colour a hair toward a region-picked hue pole
 		# (teal / faint brown / faint violet) so a broad rock face carries its own subtle tint and the frame
 		# stops reading as one monochrome blue-grey. Very-low-freq → whole faces share a tone; a two-noise
@@ -488,6 +530,30 @@ func _paint_fine(fx: int, fy: int) -> void:
 		_data[i4 + 3] = 255
 	else:
 		_clear_fine(i4)   # genuine open air — transparent, the world below shows unchanged
+
+
+## THE TONE FIELD, REBUILT BETWEEN SAMPLES (#S12). Bilinearly interpolate the coarse (jitter, strata)
+## samples at this fine cell's position.
+##
+## The mapping is the part that matters. A fine cell's CENTRE sits at world coordinate
+## (fx + 0.5) * FINE, which in coarse units is (fx + 0.5) / SUBDIV - 0.5 relative to coarse cell centres.
+## On that lattice consecutive fine cells are an even 1/SUBDIV apart both inside a coarse cell and across
+## a boundary — which is the whole reason the seam stops being special. Sampling at fx / SUBDIV instead
+## would put four samples inside each cell and none on the boundary, and the grid would survive.
+##
+## Clamped at the world edges so the border reconstructs against itself rather than against nothing.
+func _tone_at_fine(fx: int, fy: int) -> Vector2:
+	var u: float = (float(fx) + 0.5) / float(SUBDIV) - 0.5
+	var v: float = (float(fy) + 0.5) / float(SUBDIV) - 0.5
+	var x0: int = clampi(int(floor(u)), 0, _cols - 1)
+	var y0: int = clampi(int(floor(v)), 0, _rows - 1)
+	var x1: int = mini(x0 + 1, _cols - 1)
+	var y1: int = mini(y0 + 1, _rows - 1)
+	var tx: float = clampf(u - float(x0), 0.0, 1.0)
+	var ty: float = clampf(v - float(y0), 0.0, 1.0)
+	var top: Vector2 = _tone[y0 * _cols + x0].lerp(_tone[y0 * _cols + x1], tx)
+	var bot: Vector2 = _tone[y1 * _cols + x0].lerp(_tone[y1 * _cols + x1], tx)
+	return top.lerp(bot, ty)
 
 
 ## Weighted OPEN-air neighbour count around a solid fine cell — the fine AO term. Orthogonal neighbours

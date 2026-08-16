@@ -137,7 +137,10 @@ func _check_paint() -> int:
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),
 		func(_c: Vector2i) -> Color: return grey,
 		func(_c: Vector2i) -> Color: return grey,
-		func(col: int) -> int: return sim.surface_row(col))
+		func(col: int) -> int: return sim.surface_row(col),
+		# A ZERO tone, for the same reason the palette is flat grey: this layer measures the texture passes
+		# alone, and the coarse tone field is measured by tools/check_grid against the real palette.
+		func(_c: Vector2i) -> Vector2: return Vector2.ZERO)
 
 	var sub: int = FineTerrain.SUBDIV
 	var fcols: int = cols * sub
