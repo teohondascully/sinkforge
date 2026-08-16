@@ -1049,12 +1049,83 @@ func _update_mining(delta: float) -> void:
 			_shake = maxf(_shake, 0.7)
 			# Harder rock strikes a deeper note (hardness 1..4 → pitch ~1.15..0.85).
 			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1 + _rhythm * 0.12, 0.8, 1.4))
+			# ...and if there is a void behind the face, it RINGS over the top of that thud (#S11). Layered
+			# rather than swapped, so the tell is the rock ANSWERING the same blow — the pick sounds the
+			# same, the wall does not. Volume rides the reading, so closing on a cavity is a crescendo you
+			# can act on rather than a flag that flips.
+			var dir: Vector2i = _swing_dir(work)
+			var hollow: float = _hollow_at(work, dir)
+			if hollow > 0.12:
+				_sfx.play(&"hollow", center, clampf(1.05 - hollow * 0.25, 0.7, 1.15),
+					lerpf(-26.0, -9.0, hollow))
+				# ...and the same tell for a player with the sound off: air drawn through the face toward
+				# the cavity, hanging in the lamp pool. A cave breathes, and this one does it at the wall
+				# you are hitting.
+				_particles.draught(center - Vector2(dir) * (float(CELL) * 0.4),
+					Visuals.terrain_dust(mat).lightened(0.25), Vector2(dir), 1 + int(2.0 * hollow))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
 		_cracks.erase(work)                                  # broken: nothing left to remember
+		var was_hollow: float = _hollow_at(work, _swing_dir(work))
 		if try_mine(work):                                   # charge full → land the breaking blow
 			_rhythm = minf(1.0, _rhythm + RHYTHM_GAIN)       # ...and the rhythm carries into the next one
 			_rhythm_idle = 0.0
+			_note_breach(work, was_hollow)
+
+
+## HOW HOLLOW IS THE ROCK BEHIND THIS FACE (#S11) — 0 solid to the horizon, 1 a void right behind it.
+##
+## The generator fills this world with caverns, rifts, halls, veins and aquifers, and until now none of it
+## existed until you physically walked into it: you broke every block blind, so digging was a chore rather
+## than a search. Real rock does not work that way and no miner treats it that way — a face with a cavity
+## behind it RINGS, and listening for that is the oldest skill in the trade.
+##
+## The reading is a weighted count of open cells in a small box AHEAD of the face, biased along the
+## direction the pick is swinging: what is behind the block you are hitting matters, what is beside your
+## own shoulder does not. Nearer counts for more, so the tell rises as you close on a void instead of
+## switching on. It reads sim.solid directly and writes nothing — pure representation, and it cannot
+## desync because there is nothing to desync.
+const TELL_REACH: int = 4              ## cells ahead the reading looks
+const TELL_SPREAD: int = 2             ## ...and how far to either side of the swing line
+func _hollow_at(cell: Vector2i, dir: Vector2i) -> float:
+	var side: Vector2i = Vector2i(dir.y, dir.x)          # perpendicular to the swing
+	var acc: float = 0.0
+	var total: float = 0.0
+	for d: int in range(1, TELL_REACH + 1):
+		var near: float = 1.0 - float(d - 1) / float(TELL_REACH)   # a void one cell in is worth four far out
+		for o: int in range(-TELL_SPREAD, TELL_SPREAD + 1):
+			var w: float = near * (1.0 - absf(float(o)) / float(TELL_SPREAD + 1))
+			var probe: Vector2i = cell + dir * d + side * o
+			total += w
+			if not sim.in_bounds(probe) or not sim.is_solid(probe):
+				acc += w
+	return 0.0 if total <= 0.0 else clampf(acc / total * 1.6, 0.0, 1.0)
+
+
+## Which way the pick is swinging, as a unit cell step: from the body toward the worked block. Falls back
+## to straight down, which is where a miner who is not obviously beside something is usually digging.
+func _swing_dir(cell: Vector2i) -> Vector2i:
+	var d: Vector2 = _cell_center(cell) - _player.position
+	if absf(d.x) > absf(d.y):
+		return Vector2i(signi(int(d.x)), 0)
+	return Vector2i(0, signi(int(d.y))) if absi(int(d.y)) > 0 else Vector2i(0, 1)
+
+
+## THE BREACH (#S11) — the face gives way and the space behind it opens.
+##
+## The ring is the anticipation; this is the payoff, and a payoff that arrives silently teaches the player
+## the anticipation meant nothing. Air moving, a puff of the wall's own dust blown INTO the room rather
+## than chipped off it, and a settle of the camera. Gated on the reading having actually been high, so
+## breaking ordinary rock is exactly as unceremonious as it has always been — the beat is only worth
+## anything while it stays rare.
+const BREACH_TELL: float = 0.45        ## reading above which a break counts as opening a space
+func _note_breach(cell: Vector2i, hollow: float) -> void:
+	if hollow < BREACH_TELL:
+		return
+	var center: Vector2 = _cell_center(cell)
+	_sfx.play(&"breach", center, clampf(1.12 - hollow * 0.22, 0.85, 1.15), lerpf(-14.0, -5.0, hollow))
+	_particles.dust(center, Color(0.62, 0.60, 0.56), 6 + int(6.0 * hollow))
+	_shake = maxf(_shake, 1.4 * hollow)
 
 
 ## The charge this cell already owes us (0.0 for untouched rock). Half-dug blocks resume where they

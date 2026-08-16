@@ -35,6 +35,21 @@ func dust(pos: Vector2, color: Color, amount: int = 8) -> void:
 	burst(pos, amount, color, 90.0, PI * 0.55, 3.0, 0.42, 260.0)
 
 
+## THE DRAUGHT (#S11) — a thin, slow drift of dust pulled ALONG a direction, for a face with a void behind
+## it. Nearly weightless and long-lived, so it hangs in the lamp pool and reads as moving air rather than
+## as debris; the tell has to be visible to a player with the sound off, and a cave breathes.
+func draught(pos: Vector2, color: Color, dir: Vector2, amount: int = 2) -> void:
+	for _i: int in amount:
+		if _p.size() >= MAX:
+			return
+		var v: Vector2 = dir.normalized().rotated(randf_range(-0.4, 0.4)) * randf_range(14.0, 34.0)
+		_p.append({
+			"pos": pos + Vector2(randf_range(-9.0, 9.0), randf_range(-9.0, 9.0)),
+			"vel": v, "life": 1.5, "max_life": 1.5, "color": color.lightened(randf_range(-0.1, 0.2)),
+			"size": randf_range(1.2, 2.2), "grav": 6.0,
+		})
+
+
 ## A bright outward spark spray (placing a machine) — fast, short, little gravity.
 func spark(pos: Vector2, color: Color) -> void:
 	burst(pos, 12, color, 150.0, PI, 2.4, 0.30, 60.0, PI * 0.5)

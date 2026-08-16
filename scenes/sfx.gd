@@ -44,6 +44,8 @@ func _ready() -> void:
 	_streams[&"drip"] = _wav(_gen_drip())
 	_streams[&"boom"] = _wav(_gen_boom(rng))
 	_streams[&"step"] = _wav(_gen_step(rng))
+	_streams[&"hollow"] = _wav(_gen_hollow(rng))
+	_streams[&"breach"] = _wav(_gen_breach(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -218,6 +220,55 @@ func _gen_crunch(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		lp += 0.30 * (rng.randf_range(-1.0, 1.0) - lp)
 		out[i] = lp * env * 1.6
 	return out
+
+## THE HOLLOW RING (#S11) — the pick striking rock with a VOID behind it.
+##
+## Real rock does this and every miner and caver on earth listens for it: struck over solid ground the
+## blow is a dead thud, struck over a cavity it RINGS, because the void behind the face is a resonator and
+## the face is a drum skin. It is the single best piece of information a game like this can give a player
+## for free, and this game was giving none of it — you broke every block blind, so digging was a chore
+## rather than a search, and the whole generated world of caverns, rifts, veins and aquifers might as well
+## not have been there until you walked into it.
+##
+## Synthesised as the crunch's noise burst gated into a short decaying tone: a low fundamental with two
+## partials, long enough to read as a RING against the 0.09s dead thud, and quiet enough that hearing it
+## is a thing you do on purpose.
+func _gen_hollow(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.26)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		var strike: float = pow(maxf(0.0, 1.0 - t * 7.0), 2.0)     # the impact itself, over in a moment
+		lp += 0.30 * (rng.randf_range(-1.0, 1.0) - lp)
+		# ...and the cavity answering it. Three partials on a slightly stretched series, which is what
+		# stops it reading as a musical note and keeps it reading as an empty space.
+		var s: float = float(i) / float(RATE)
+		var ring: float = sin(TAU * 96.0 * s) * 0.6 \
+			+ sin(TAU * 154.0 * s) * 0.28 \
+			+ sin(TAU * 233.0 * s) * 0.12
+		out[i] = lp * strike * 1.5 + ring * pow(1.0 - t, 2.6) * 0.42
+	return out
+
+
+## THE BREACH — the moment the face gives way and the void behind it opens. Air moving, not rock: a burst
+## of noise swept from bright to dark by a closing filter, under a low swell. The reward beat for the ring
+## above; hear one, then the other, and the whole dig has a shape.
+func _gen_breach(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.55)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	var phase: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		var k: float = lerpf(0.42, 0.03, pow(t, 0.55))            # the filter closing = the air settling
+		lp += k * (rng.randf_range(-1.0, 1.0) - lp)
+		phase += TAU * lerpf(74.0, 38.0, t) / float(RATE)
+		out[i] = lp * pow(1.0 - t, 1.5) * 1.5 + sin(phase) * pow(1.0 - t, 2.4) * 0.30
+	return out
+
 
 ## Break thump: a sine gliding 120→55 Hz with a click of noise on the front — the block giving way.
 func _gen_thump(rng: RandomNumberGenerator) -> PackedFloat32Array:
