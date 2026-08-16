@@ -157,6 +157,9 @@ var _falling := FallingItems.new()
 var _bazaars := Bazaars.new()
 ## Cosmetic particle + screenshake juice (dig/land/place/collect). Pure representation.
 var _particles := Particles.new()
+## The "+N" gain ticks that rise off a broken block — the payoff shown where you're looking, instead of
+## only as a number in the corner of the HUD. Pure representation.
+var _payouts := Payouts.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
 const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
@@ -283,6 +286,7 @@ func _ready() -> void:
 	_renderer = WorldRenderer.new()
 	_renderer.setup(sim, _falling, _player)
 	_renderer.particles = _particles
+	_renderer.payouts = _payouts
 	_renderer.bazaars = _bazaars
 	_renderer.set_dig_marks(_dig_marks)   # a LIVE reference — the overlay tracks the plan as it's painted
 	add_child(_renderer)
@@ -587,6 +591,7 @@ func _update_bazaars(delta: float) -> void:
 ## decay the screenshake into the camera offset. None of this touches the sim.
 func _update_juice(delta: float) -> void:
 	_particles.advance(delta)
+	_payouts.advance(delta)
 	# Sonar pacing + the staggered returns: each scheduled ding fires when the wavefront (whose speed
 	# the renderer owns) actually reaches its vein — you HEAR the distance.
 	_scan_cooldown = maxf(0.0, _scan_cooldown - delta)
@@ -1017,10 +1022,12 @@ func try_mine(cell: Vector2i) -> bool:
 	if not MiningRules.can_mine(mat, sim.inventory):
 		return false                                           # no tool for this rock — the gate the test drives
 	var rich: bool = sim.ore_deposit_at(cell) > 0              # captured BEFORE the mine clears the cell
+	var before: Dictionary = sim.inventory.duplicate()         # …so the payout tick can name the real yield
 	var mined: StringName = sim.mine(cell)
 	if mined != &"":
 		_dig_marks.erase(cell)                                 # a dug cell's mark is spent
 		var center: Vector2 = _cell_center(cell)
+		_show_gains(before, center + Vector2(0.0, -float(CELL) * 0.35))
 		_renderer.note_mined(cell, mat)                        # the block shatters away, not pops (#18)
 		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
 		if _player != null:
@@ -1035,6 +1042,17 @@ func try_mine(cell: Vector2i) -> bool:
 		_shake = maxf(_shake, 2.2 if rich else 1.7)
 		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
 	return mined != &""
+
+
+## Float a "+N" tick at `at` for every pack entry that GREW since `before` — the payoff shown at the
+## point of impact instead of only as a number in the HUD corner (#B2). Diffing the pack rather than
+## reading the verb's return value means the tick always names what you actually got: an ore burst is
+## the 3-6 it really paid, a leaf that hid a sapling says sapling, and new yields need no wiring.
+func _show_gains(before: Dictionary, at: Vector2) -> void:
+	for item: StringName in sim.inventory:
+		var delta: int = int(sim.inventory[item]) - int(before.get(item, 0))
+		if delta > 0:
+			_payouts.gain(at, item, delta)
 
 
 ## Hand the SELECTED carried item into the nearest machine within reach (the manual half of the arc).
@@ -1176,8 +1194,10 @@ func _collect_ground_under_player() -> void:
 		if _player.position.distance_squared_to(_cell_center(c)) > reach_sq:
 			continue
 		var item: StringName = pile.keys()[0]
+		var before: Dictionary = sim.inventory.duplicate()
 		if sim.collect_ground(c):
 			_particles.pop(_cell_center(c), Visuals.item_color(item))  # pickup pop
+			_show_gains(before, _cell_center(c) + Vector2(0.0, -float(CELL) * 0.35))
 			_sfx.play(&"pop", _cell_center(c), 1.0, -4.0)
 
 
@@ -1348,6 +1368,19 @@ func try_drop() -> bool:
 	var item: StringName = slots[sel]["item"]
 	var carried: int = int(slots[sel]["count"])
 	var here: Vector2i = _cell_at(_player.position)
+	# THE TOSS FINDS THE MOUTH (#B2). Gravity is still the conveyor, but the first ore→ingot handoff was
+	# fiddly out of all proportion to its importance: stand a cell off, or face the wrong way, and the
+	# stack lands at your feet, gets auto-scooped a moment later, and you try the whole dance again. So
+	# when a machine in reach genuinely EATS what you're holding, the toss goes in — you aimed at the
+	# forge, you meant the forge. Everything else keeps the old arc: over a ledge, down a shaft, onto the
+	# floor. This only ever redirects a throw that a machine wanted anyway.
+	var mouth: MachineState = _reachable_eater(item)
+	if mouth != null:
+		var fed: int = sim.deposit(mouth.cell, item, carried)
+		if fed > 0:
+			_particles.pop(_cell_center(mouth.cell), Visuals.item_color(item))
+			_sfx.play(&"pop", _cell_center(mouth.cell), 1.2)
+			return true
 	var face: Vector2i = here + Vector2i(_player.facing, 0)
 	# Toss forward into the facing column when it's clear (open air or a machine to feed); a solid wall
 	# blocks the toss, so drop straight down instead. Landing is sim-truth; `here` is the launch origin.
@@ -1357,6 +1390,21 @@ func try_drop() -> bool:
 		_no_pickup[sim.last_drop_landing] = DROP_GRACE_S   # don't instantly suck it back up (playtest fix)
 		_particles.pop(_cell_center(target), Visuals.item_color(item))
 	return dropped > 0
+
+
+## The nearest machine in reach that would actually consume `item`, or null. Ties break by distance so
+## a wall of machines feeds the one you're standing at, not the one that happens to be first in the list.
+func _reachable_eater(item: StringName) -> MachineState:
+	var best: MachineState = null
+	var best_d: float = INF
+	for machine: MachineState in sim.machines:
+		if not _can_reach(machine.cell) or not sim.machine_eats(machine, item):
+			continue
+		var d: float = _player.position.distance_squared_to(_cell_center(machine.cell))
+		if d < best_d:
+			best_d = d
+			best = machine
+	return best
 
 
 ## RMB build verb: standing in reach of `cell`, place the selected machine on an open cell, or pick one

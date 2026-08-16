@@ -114,6 +114,7 @@ var sim: FactorySim
 var player: Player
 var falling: FallingItems
 var particles: Particles                              ## cosmetic juice layer (set by MainView), drawn on top
+var payouts: Payouts                                  ## the "+N" gain ticks off a broken block (set by MainView)
 
 var _font: Font = ThemeDB.fallback_font
 var _anim_time: float = 0.0                          ## free-running cosmetic clock (never feeds the sim)
@@ -511,6 +512,8 @@ func _draw() -> void:
 	_draw_ping()           # the map-click beacon — the spot you marked, findable on foot
 	_draw_scan()           # the sonar pulse + vein echoes (the scanner's whole voice)
 	_draw_aim()
+	if payouts != null:
+		payouts.draw(self)  # "+N" gain ticks LAST: the reward should never be buried by the world
 
 
 ## THE SONAR: an expanding wavefront ring from the body, and — as it passes each vein's

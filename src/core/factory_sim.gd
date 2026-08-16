@@ -260,6 +260,27 @@ func machine_at(cell: Vector2i) -> MachineState:
 	return grid.get(cell, null)
 
 
+## Coal-burners: the behaviors whose runner spends `fuel` and refills it from buffered coal. Kept beside
+## machine_status so the "what does this box eat?" answer can't drift from the runners that eat it.
+const _COAL_BURNERS: Array[StringName] = [&"drill", &"h_drill", &"generator"]
+
+
+## Would this machine actually CONSUME `item` if you fed it? True for a recipe machine's ingredients, a
+## coal-burner's coal, and the descent engine's ingots — false for everything else, so a mis-aimed
+## handful never disappears into a box that will sit on it forever. Read-only derivation; `deposit`
+## itself stays unfiltered (a test rig may prime any buffer), this is the PLAYER-facing question.
+func machine_eats(machine: MachineState, item: StringName) -> bool:
+	if machine == null:
+		return false
+	var behavior: StringName = machine.def.behavior
+	if behavior == &"descent":
+		return item == DESCENT_EATS
+	if item == &"coal" and _COAL_BURNERS.has(behavior):
+		return true
+	var recipe: RecipeDef = machine.def.recipe
+	return recipe != null and recipe.inputs.has(item)
+
+
 ## Read-only status of a machine THIS tick, mirroring the run-gates in _run_machine (so legibility can't
 ## drift from reality). Pure derivation — no mutation, determinism untouched — the representation reads it to
 ## draw a Factorio-style status dot + a "needs-X" glyph. One of:
