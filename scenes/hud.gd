@@ -110,6 +110,7 @@ var _flash_life: float = 0.0
 ## one-shot banner MainView fires when the body first crosses into a band it has not been in.
 var depth_row: int = Strata.SURFACE_ROW
 var _arrival_text: String = ""
+var _arrival_kicker: String = ""
 var _arrival_color: Color = Color.WHITE
 var _arrival_life: float = 0.0
 const ARRIVAL_HOLD: float = 3.4          ## total life of the banner, fade included
@@ -171,8 +172,9 @@ func flash(text: String) -> void:
 
 
 ## Announce arrival in a new stratum — the one moment the descent gets to be an EVENT.
-func announce(text: String, color: Color) -> void:
+func announce(text: String, kicker: String, color: Color) -> void:
 	_arrival_text = text
+	_arrival_kicker = kicker
 	_arrival_color = color
 	_arrival_life = ARRIVAL_HOLD
 
@@ -405,21 +407,48 @@ func _draw_depth() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, tint)
 
 
-## THE ARRIVAL BANNER. Large, centred, brief, and only ever the FIRST time you enter a band: the whole
-## value is that it is rare. It sits above the body rather than over it, rises a few pixels as it fades,
-## and is backed by a soft bar rather than a panel — this is a moment, not a piece of furniture.
+## THE ARRIVAL PLATE. Only ever the FIRST time you enter a band — the whole value is that it is rare.
+##
+## It used to be set at three times this size across a full-width bar, which made the one moment the
+## descent gets to be an event read instead as a modal dialog: it covered the play space, it competed
+## with the objective banner directly above it, and a player's first instinct was to dismiss it. Weight
+## in a title card comes from SPACING, not from point size. So: half the type, letters tracked apart, a
+## kicker line above it, rules only as wide as the text, and no panel at all.
+const ARRIVAL_SIZE: int = 15             ## canvas px; the objective banner above runs at 13
+const ARRIVAL_TRACK: float = 3.4         ## extra px between letters — what makes small type read as engraved
 func _draw_arrival() -> void:
 	if _arrival_life <= 0.0:
 		return
 	var t: float = _arrival_life / ARRIVAL_HOLD
 	var a: float = clampf(minf((1.0 - t) * 6.0, t * 2.4), 0.0, 1.0)     # fast in, slow out
-	var y: float = CANVAS.y * 0.30 - (1.0 - t) * 6.0
-	var w: float = _font.get_string_size(_arrival_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-	draw_rect(Rect2(0.0, y - 26.0, CANVAS.x, 40.0), Color(0.03, 0.035, 0.06, 0.42 * a))
-	draw_line(Vector2(CANVAS.x * 0.5 - w * 0.5 - 26.0, y + 8.0),
-		Vector2(CANVAS.x * 0.5 + w * 0.5 + 26.0, y + 8.0), Color(_arrival_color, 0.55 * a), 1.0)
-	draw_string(_font, Vector2(CANVAS.x * 0.5 - w * 0.5, y), _arrival_text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(_arrival_color, a))
+	var y: float = CANVAS.y * 0.26 - (1.0 - t) * 5.0
+	var w: float = _tracked_width(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
+	var half: float = w * 0.5 + 12.0
+	if _arrival_kicker != "":
+		var kw: float = _tracked_width(_arrival_kicker, 9, 2.6)
+		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
+			Color(_arrival_color, 0.62 * a))
+	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y), ARRIVAL_SIZE, ARRIVAL_TRACK,
+		Color(_arrival_color, a))
+	# Two hairlines the width of the words: a frame that says "plate" without drawing a panel.
+	for ry: float in [y - 25.0, y + 7.0]:
+		draw_line(Vector2(CANVAS.x * 0.5 - half, ry), Vector2(CANVAS.x * 0.5 + half, ry),
+			Color(_arrival_color, 0.40 * a), 1.0)
+
+
+## Letter-tracked text. Godot's draw_string has no tracking, and tracking is the entire difference
+## between small type that reads as a label and small type that reads as a caption.
+func _draw_tracked(text: String, at: Vector2, size: int, track: float, color: Color) -> void:
+	var x: float = at.x
+	for i: int in text.length():
+		var ch: String = text[i]
+		draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+
+
+func _tracked_width(text: String, size: int, track: float) -> float:
+	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
+		+ track * float(maxi(0, text.length() - 1))
 
 
 func _draw_fastforward() -> void:

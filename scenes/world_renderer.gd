@@ -2129,6 +2129,8 @@ func _draw_grapple() -> void:
 ## check_dig_hitch holds.
 const MASS_SHADE: float = 0.46       ## light a fully-buried cell loses vs. one at an opening
 const MASS_REACH: int = 2            ## cells light bleeds into the mass (the blur radius)
+const KEY_STRENGTH: float = 0.30     ## brightening of a fully up-facing mass (and dimming of an overhang)
+const KEY_GAIN: float = 3.0          ## how fast the vertical openness gradient saturates the key
 var _open_field: PackedFloat32Array = PackedFloat32Array()
 var _open_blur: PackedFloat32Array = PackedFloat32Array()
 
@@ -2172,10 +2174,12 @@ func _bake_veil_base() -> void:
 				r = int(lerpf(float(sky_rgb[row * 3]), float(amb_r), t))
 				g = int(lerpf(float(sky_rgb[row * 3 + 1]), float(amb_g), t))
 				b = int(lerpf(float(sky_rgb[row * 3 + 2]), float(amb_b), t))
+			# Clamped, because the key term can push a strongly up-facing cell ABOVE its row's own light
+			# level and a byte does not say so — it wraps, and a lit ledge prints as a dark one.
 			var lit: float = _open_blur[row * cols + col]
-			_veil_base[i] = int(float(r) * lit)
-			_veil_base[i + 1] = int(float(g) * lit)
-			_veil_base[i + 2] = int(float(b) * lit)
+			_veil_base[i] = mini(255, int(float(r) * lit))
+			_veil_base[i + 1] = mini(255, int(float(g) * lit))
+			_veil_base[i + 2] = mini(255, int(float(b) * lit))
 			_veil_base[i + 3] = 255
 
 
@@ -2211,11 +2215,25 @@ func _bake_openness(cols: int, rows: int) -> void:
 	# Open cells keep their full row-based light; solid ones are dimmed by how buried they are. The
 	# blurred openness is already 0..1, and a cell touching air lands high enough in it that a rock FACE
 	# — the thing you actually look at when you look at a wall — barely dims at all.
+	#
+	# ...and then the KEY (#S8). How buried a cell is says how much light reaches it; it says nothing about
+	# which way its mass faces, so a floor and a ceiling at the same burial depth came out at the same
+	# brightness, and a cavern read as a dark patch rather than as a space with a lit floor and a shadowed
+	# roof. The VERTICAL GRADIENT of the openness field is exactly that missing information: it is positive
+	# where the air is above (an up-facing surface) and negative where the air is below (an overhang), and
+	# it is already smooth because the field was blurred, so it shades as a gradient rather than banding.
+	# Light in a mine comes down, so up-facing mass gains and down-facing mass loses.
 	for row: int in range(rows):
 		for col: int in range(cols):
 			var i: int = row * cols + col
-			_open_blur[i] = 1.0 if not solid.has(Vector2i(col, row)) \
-				else lerpf(1.0 - MASS_SHADE, 1.0, clampf(_open_field[i] * 2.2, 0.0, 1.0))
+			if not solid.has(Vector2i(col, row)):
+				_open_blur[i] = 1.0
+				continue
+			var above: float = _open_field[maxi(row - 1, 0) * cols + col]
+			var below: float = _open_field[mini(row + 1, rows - 1) * cols + col]
+			var key: float = clampf((above - below) * KEY_GAIN, -1.0, 1.0)
+			_open_blur[i] = lerpf(1.0 - MASS_SHADE, 1.0, clampf(_open_field[i] * 2.2, 0.0, 1.0)) \
+				* (1.0 + KEY_STRENGTH * key)
 
 
 ## Darkness (0 = full light, AMBIENT_DARK = the deep's gloom) → the multiplier the veil applies there.

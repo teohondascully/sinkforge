@@ -939,7 +939,11 @@ func _note_stratum(row: int) -> void:
 		return
 	_band_seen[band] = true
 	if _hud != null:
-		_hud.announce(str(Strata.BANDS[band]["name"]), Strata.color_at(row))
+		# The kicker carries the depth, which is what makes the plate an ARRIVAL rather than a label: you
+		# are told where you got to as well as what it is called.
+		_hud.announce(str(Strata.BANDS[band]["name"]),
+			"%d METRES DOWN" % Strata.depth_m(row) if Strata.depth_m(row) > 0 else "THE SURFACE",
+			Strata.color_at(row))
 	# Pitched DOWN as you go deeper, so the arrivals themselves form a descending line across a run —
 	# the same idea the Score runs continuously, said once and out loud.
 	_sfx.ui(&"chime", clampf(1.18 - float(band) * 0.11, 0.55, 1.2))

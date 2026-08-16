@@ -22,12 +22,12 @@ extends SceneTree
 const SCENE: String = "res://scenes/main.tscn"
 const ROOM_W: int = 13
 const ROOM_H: int = 7
-## How much brighter open space must be than deep mass IN THE VEIL. The veil term alone can never
-## exceed 1/(1 - MASS_SHADE) = 1.85x by construction, so this floor sits just under it — what the eye
-## finally receives is larger again (3.5x, measured off a torch-lit capture) because the back-wall
-## plane has its own paint on top of this. The guard is against the term being weakened, not a claim
-## about the finished picture.
-const CONTRAST_FLOOR: float = 1.7
+## How much brighter open space must be than deep mass IN THE VEIL. The mass term alone caps out at
+## 1/(1 - MASS_SHADE) = 1.85x by construction; the KEY (#S8) raises the ceiling by brightening up-facing
+## mass on top of that, and the pair measure 2.21x here. What the eye finally receives is larger again
+## (3.5x, measured off a torch-lit capture) because the back-wall plane has its own paint over this. The
+## guard is against the terms being weakened, not a claim about the finished picture.
+const CONTRAST_FLOOR: float = 2.0
 const MASS_STEPS: int = 4            ## how far into the rock the gradient is walked
 
 var _main: MainView
