@@ -1408,11 +1408,19 @@ func try_mine(cell: Vector2i) -> bool:
 	var before: Dictionary = sim.inventory.duplicate()         # …so the payout tick can name the real yield
 	var mined: StringName = sim.mine(cell)
 	if mined != &"":
+		# THE GRAIN CALVES (#S31). Resolved BEFORE the payout tick, because the run's yield is part of what
+		# this one blow paid and a "+3 stone" over a swing that handed you nine would be a lie.
+		var calved: int = _calve(cell)
 		_dig_marks.erase(cell)                                 # a dug cell's mark is spent
 		var center: Vector2 = _cell_center(cell)
 		_show_gains(before, center + Vector2(0.0, -float(CELL) * 0.35))
 		_renderer.note_mined(cell, mat)                        # the block shatters away, not pops (#18)
 		_particles.dust(center, Visuals.terrain_dust(mat), 10)  # settling break-dust puff
+		if calved > 0:
+			# One blow, one report: the run gets a heavier shake and a lower, longer note than a single
+			# break, so calving a ledge sounds like a different event rather than three fast ones.
+			_shake = maxf(_shake, 3.4)
+			_sfx.play(&"thump", center, 0.78, 3.0)
 		if _player != null:
 			# The breaking blow's payoff: chunky debris kicked out of the shattered face
 			# toward the digger, a heavier kick than a mid-charge chip — and a vein pays out a bright
@@ -1429,6 +1437,56 @@ func try_mine(cell: Vector2i) -> bool:
 		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
 		_note_strike(cell, mat)
 	return mined != &""
+
+
+## THE ROCK HAS A GRAIN, AND THE BLOW FOLLOWS IT (#S31, `docs/BITS.md` §4).
+##
+## Every rock cell carries a seam (see `Seams` — bedding planes, joints, diagonals, all free functions of
+## the seed). Strike ALONG one and the contiguous run of same-seam rock calves off with the struck cell, up
+## to `Seams.RUN_CAP`. Strike across it and this returns nothing at all, which is the point: cutting against
+## the grain is exactly the mining we already shipped, at exactly the speed we already shipped it. The whole
+## mechanic is upside for reading the rock, and never a penalty for not.
+##
+## Three gates the run must respect, each for its own reason:
+##   * CONTIGUOUS — it stops at the first cell that is not solid, not the same seam, or not bitable. A run
+##     that hopped over gaps would let one blow reach through a chamber and take rock on the far side.
+##   * THE DRIVE — every calved cell is re-checked against `can_mine`. A seam must never smuggle you past a
+##     depth gate; the wall stays where the tool ladder put it.
+##   * REACH IS NOT RE-CHECKED, deliberately. Reach gates the BLOW, and the calve is a consequence of the
+##     blow, not a second one. Requiring it would make the run vanish at exactly the arm's-length distance
+##     where you can actually see the seam you are cutting.
+##
+## It walks one way and then the other rather than alternating, so a capped run reads as a ledge shearing
+## off in a direction rather than crumbling evenly around the pick.
+func _calve(from: Vector2i) -> int:
+	var seam: int = Seams.at(from, sim.world_seed)
+	if seam == Seams.NONE or _player == null:
+		return 0
+	var swing := Vector2i(roundi(_cell_center(from).x - _player.position.x),
+		roundi(_cell_center(from).y - _player.position.y))
+	if not Seams.aligned(seam, swing):
+		return 0
+	var axis: Vector2i = Seams.axis(seam)
+	var taken: int = 0
+	for side: int in [1, -1]:
+		for step: int in range(1, Seams.RUN_CAP):
+			if taken >= Seams.RUN_CAP - 1:
+				break
+			var c: Vector2i = from + axis * (step * side)
+			if not sim.solid.has(c) or Seams.at(c, sim.world_seed) != seam:
+				break
+			var m: StringName = sim.material_at(c)
+			if not MiningRules.can_mine(m, sim.inventory):
+				break
+			if sim.mine(c) == &"":
+				break
+			taken += 1
+			_dig_marks.erase(c)
+			var at: Vector2 = _cell_center(c)
+			_renderer.note_mined(c, m)
+			_particles.dust(at, Visuals.terrain_dust(m), 6)
+			_particles.spark(at, Visuals.item_color(m).lightened(0.15))
+	return taken
 
 
 ## THE STRIKE THAT FINDS THE VEIN.

@@ -1,6 +1,19 @@
 # THE BIT SET — picks that differ in SHAPE, and rock that has a grain
 
-> **Status: SPEC, not built** (2026-08-16). Opened at the user's request, merging two ideas that turned out
+> **Status: §4 SEAMS SHIPPED (#S31, 2026-08-16); the rest is still spec.** The grain is in the world, drawn,
+> and calving works — `src/data/seams.gd`, `MainView._calve`, `WorldRenderer._draw_seams`, held by
+> `tools/check_seam.gd`. Bits, drives and the speed-flattening below are NOT built yet, and the order matters:
+> flattening `TOOLS[...].speed` before a relief bit exists would make the game strictly slower, which §6 names
+> as the failure mode. Seams shipped first precisely because they are pure upside and cannot unbalance
+> anything.
+>
+> One deviation from §4 worth recording: seams are **planes, not per-cell rolls**. A 35%-dense per-cell
+> sprinkle gives a contiguous run of three about once in six hundred cells, so the mechanic would have fired
+> essentially never. A horizontal seam is now a ROW of the world, a vertical seam a COLUMN, a diagonal one
+> anti-diagonal — which is also how real bedding and jointing work, gives runs for free, and costs the same
+> nothing to store.
+>
+> **Original spec follows.** (2026-08-16). Opened at the user's request, merging two ideas that turned out
 > to be one design seen from either end: picks-as-shapes, and rock you can read. Provisional and reversible;
 > the numbers are placeholders that want play, not a spec. **This deliberately overturns a documented
 > decision** — see §6.

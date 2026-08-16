@@ -384,6 +384,12 @@ func _is_foliage(material: StringName) -> bool:
 	return material == &"wood" or material == &"leaves"
 
 
+## The same test, public: passes that describe ROCK have to exclude the trees standing in it. The renderer's
+## seam grain (#S31) is the first — a tree does not have bedding planes — and it will not be the last.
+func is_foliage_material(material: StringName) -> bool:
+	return _is_foliage(material)
+
+
 ## After a cell clears, FELL any foliage that just lost its ROOT. A tree stands because its base rests
 ## on solid ground; cut the base trunk (or dig the earth under it) and everything above no longer touches
 ## the ground — so in a gravity game it FALLS (Terraria; the user's "nothing floats" — FOLIAGE only, NOT

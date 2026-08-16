@@ -573,6 +573,7 @@ func _draw() -> void:
 	# sparse content (machines, items, conduits, cursor) — no full-world cell loop.
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE).grow(1.0), Color(0.22, 0.23, 0.27), false, 2.0)  # world border
 	_draw_crumble()   # a just-mined block shattering away at the terrain layer (#18)
+	_draw_seams()     # the rock's grain — the planes a blow can follow (#S31)
 	_draw_drop_paths()
 	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
@@ -1546,6 +1547,59 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 			var col: Color = _wall_fill_color(c)
 			ci.draw_rect(Rect2(wpos, Vector2(CELL, CELL)), col)
 			TerrainPainter.paint_wall_face(self, ci, c, wpos, col)
+
+
+## THE GRAIN, DRAWN (#S31). `Seams` gives every rock cell a bedding plane, a joint, a diagonal or nothing,
+## and a blow that follows one calves the whole run — so the grain has to be READABLE BEFORE YOU SWING or
+## the mechanic is a slot machine. It is drawn per cell rather than per plane, which sounds wasteful and is
+## not: a per-cell segment is clipped to solid rock for free, so a bedding plane crossing a chamber stops at
+## the chamber and resumes on the far side, which is exactly what a real one does.
+##
+## A parting is a SHADOW WITH A LIT LIP, never a drawn line — rock does not have ink in it. The dark stroke
+## sits on the plane itself and the pale one just past it, so the pair reads as one surface stepping over
+## another. Both are quiet on purpose: this is texture the eye finds when it looks, not an overlay it has to
+## look past, and the darkness veil multiplies over it so the grain fades into unlit rock like everything
+## else. Foliage is excluded — a tree does not have bedding.
+const SEAM_DARK := Color(0.03, 0.04, 0.06, 0.58)
+const SEAM_LIP := Color(0.95, 0.91, 0.82, 0.24)
+func _draw_seams() -> void:
+	var view: Rect2 = _view_world_rect(1.0)
+	var s: float = float(CELL)
+	var x0: int = maxi(int(view.position.x / s), 0)
+	var x1: int = mini(int(view.end.x / s) + 1, FactorySim.GRID_COLS)
+	var y0: int = maxi(int(view.position.y / s), 0)
+	var y1: int = mini(int(view.end.y / s) + 1, FactorySim.GRID_ROWS)
+	for cy: int in range(y0, y1):
+		for cx: int in range(x0, x1):
+			var c := Vector2i(cx, cy)
+			if not sim.solid.has(c):
+				continue
+			var seam: int = Seams.at(c, sim.world_seed)
+			if seam == Seams.NONE or sim.is_foliage_material(sim.solid[c]):
+				continue
+			# A plane that ran cell to cell at a constant strength drew as INK — a perfectly straight
+			# ruled stroke lying on top of the rock rather than inside it. A real parting is welded shut in
+			# places and open in others, and it wanders by a hair. So each cell's stretch gets its own span
+			# and its own one-pixel wobble off the plane, and one stretch in five is closed entirely.
+			var h: int = Seams.grain(c)
+			if h % 5 == 4:
+				continue
+			var a: float = float(h % 3) * 0.15
+			var b: float = 1.0 - float((h >> 5) % 3) * 0.15
+			var wob: float = float((h >> 11) % 3) - 1.0
+			var o := Vector2(c) * s + Vector2(wob, wob)
+			match seam:
+				Seams.HORIZONTAL:
+					draw_line(o + Vector2(a * s, 0.0), o + Vector2(b * s, 0.0), SEAM_DARK, 2.0)
+					draw_line(o + Vector2(a * s, 2.5), o + Vector2(b * s, 2.5), SEAM_LIP, 1.0)
+				Seams.VERTICAL:
+					draw_line(o + Vector2(0.0, a * s), o + Vector2(0.0, b * s), SEAM_DARK, 2.0)
+					draw_line(o + Vector2(2.5, a * s), o + Vector2(2.5, b * s), SEAM_LIP, 1.0)
+				_:
+					draw_line(o + Vector2(a * s, (1.0 - a) * s), o + Vector2(b * s, (1.0 - b) * s),
+						SEAM_DARK, 2.0)
+					draw_line(o + Vector2(a * s + 2.0, (1.0 - a) * s), o + Vector2(b * s, (1.0 - b) * s + 2.0),
+						SEAM_LIP, 1.0)
 
 
 func _draw_drop_paths() -> void:
