@@ -232,7 +232,12 @@ const SUBDIV: int = 4                              ## fine cells per coarse cell
 ## PROTRUSIONS near surfaces add the Noita crunch. See _sync_fine_block / rebuild_fine_terrain.
 const FINE_EDGE_FREQ: float = 0.34                 ## boundary erosion/accretion — clumps ~3 fine cells wide
 const FINE_EDGE_AMP: float = 0.62                  ## how hard the edge noise bends the boundary band
-const FINE_GRIT_FREQ: float = 1.10                 ## dense per-fine-cell grit that pits/protrudes near faces
+## Sampled on the integer fine grid, so a frequency at or above 1.0 has a period under two samples and
+## every fine cell gets an uncorrelated value — white noise, not grit. At 1.10 the boundary therefore
+## alternated in/out on EVERY cell, and a rock lip that should read as a rough edge printed as a
+## one-pixel dither along the whole floor. Real grit bites in clumps: 0.52 clusters it across a
+## couple of cells, which is what a chipped edge actually looks like.
+const FINE_GRIT_FREQ: float = 0.52                 ## grit that pits/protrudes near faces, in clumps
 const FINE_GRIT_BITE: float = 0.42                 ## grit strength at an exposed face (fades inward)
 const FINE_EROSION_BIAS: float = 0.04              ## tiny net-erode so cave mouths open rather than seal
 var world_seed: int = 0                            ## the seed the terrain was generated from (drives fine detail)

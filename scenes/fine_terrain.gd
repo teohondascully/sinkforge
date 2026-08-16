@@ -31,10 +31,23 @@ const TONAL_FREQ: float = 0.085                        ## low-freq drift so a br
 ## GRAIN + SPECKLE (Noita diff 4): a dense high-frequency per-fine-cell noise field that pits and clods
 ## the rock so it reads granular/textured, not smooth flat-shaded. Two octaves — a fine speckle and a
 ## crisper grit — modulate each solid fine cell's value.
-const GRAIN_FREQ: float = 0.55                         ## dense speckle — clumps ~2 fine cells (16px)
-const GRAIN_FREQ2: float = 1.30                        ## crisp per-fine-cell grit
-const GRAIN_AMP: float = 0.17                          ## value swing of the grain (fix-2 diff 4: 0.14 -> 0.17 so
-                                                      ## the granular pits/clods still read in the raised gloom)
+## ...and the two things that decide whether that reads as ROCK or as STATIC.
+##
+## FREQUENCY. Sampled on an integer grid, a noise field at frequency 1.3 has a period well under two
+## samples: neighbouring fine cells get uncorrelated values, and the "crisp grit" octave was therefore
+## not grit at all — it was white noise, one value per 8px cell. Printed at 3x magnification the rock
+## floor came out as a high-contrast CHECKERBOARD, which is the loudest programmer-art tell there is, and
+## no amount of hue, patch or crack work above it survives being averaged with static. Both octaves now
+## resolve: features clump across several cells the way granular rock does.
+##
+## ANISOTROPY. Even resolved, isotropic noise reads as fog or sand — never as stone. Rock has GRAIN, and
+## sedimentary rock's grain is horizontal. Sampling with the X axis compressed makes every feature wider
+## than it is tall, so the grain lies down into bedding and the eye reads a face of layered rock instead
+## of a field of dots. Same trick CAVE_XSTRETCH plays on the cave noise, one scale down.
+const GRAIN_FREQ: float = 0.34                         ## dense speckle — clumps ~3 fine cells (24px)
+const GRAIN_FREQ2: float = 0.85                        ## crisper grit, still above the sample rate
+const GRAIN_XSTRETCH: float = 0.38                     ## <1 = features stretch HORIZONTALLY (bedding)
+const GRAIN_AMP: float = 0.15                          ## value swing of the grain
 ## ROCK INTERNAL TONAL VARIATION (diff-04 #1): the interiors of the reference rock are far from flat —
 ## broad PATCHES of lighter/darker rock, darker EMBEDDED-STONE blobs, and faint hairline cracks. Three
 ## noise scales layer on top of the fine grain so the rock reads busy/detailed EVERYWHERE, not just at
@@ -59,10 +72,18 @@ const HUE_VIOLET := Color(0.24, 0.18, 0.30)            ## faint violet pole
 ## tint toward an olive/moss green — the mossy ledges of the reference. Confined to the top MOSS_DEPTH
 ## fine rows below the exposed surface, and only where enough open air sits above (a real ledge, not a
 ## crevice ceiling). Deterministic per fine cell — no RNG, determinism-safe.
-const MOSS_COLOR := Color(0.30, 0.50, 0.16)            ## olive-moss green (diff-04 #2: pushed greener/more olive +
-                                                      ## a touch darker-saturated so the carpet reads as growth)
-const MOSS_DEPTH: int = 5                              ## fine rows of moss below an exposed top edge (diff-04 #2:
-                                                      ## 3 -> 5 so the band CARPETS the ledge, not a thin line)
+const MOSS_COLOR := Color(0.25, 0.36, 0.15)            ## olive-moss green, darkened off the LAWN a saturated green
+                                                      ## printed at 3x: growth ON rock, not green tiles
+const MOSS_DEPTH: int = 3                              ## fine rows of moss below an exposed top edge (5 read as a
+                                                      ## LAWN at 3x magnification; 3 is a damp rim on a ledge)
+## MOSS IS ALIVE, and living things want light and water. Ungated, the band carpeted every exposed ledge
+## at EVERY depth in saturated olive — a green lawn a hundred metres inside the earth, which is the
+## loudest wrong note in the underground and reads instantly as a texture RULE rather than as a world.
+## It now thins with depth and is gone below MOSS_DEAD_ROW, so the shallow ledges keep the damp growing
+## look the reference has and the deep is bare rock, the way the deep should be.
+const RIM_DEPTH: int = 2                               ## fine rows the lit lip fades over (1 = a dotted line)
+const MOSS_LUSH_ROW: int = 22                          ## full moss down to here — the damp shallow ledges
+const MOSS_DEAD_ROW: int = 34                          ## ...and none below here (14 m: roots and daylight end)
 const MOSS_FREQ: float = 0.9                           ## breaks the moss into organic patches, not a solid band
 ## HANGING MOSS TUFTS (diff-04 #2): a few moss pixels drip BELOW down-facing overhangs (open air directly
 ## below a solid fine cell). Confined to the top HANG_DEPTH fine rows below such a lip, noise-masked so
@@ -102,7 +123,8 @@ var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall colo
 var _surf_row: PackedInt32Array = PackedInt32Array()    ## walkable surface row per column (cap band)
 var last_baked_cells: int = 0                           ## fine cells the LAST bake touched — the dig-hitch friction gauge (#103)
 ## Fine-cell dilation for a region rebake: must cover the widest neighbour reach any paint term reads so a
-## patched region is byte-identical to a full bake — MOSS_DEPTH(5 up) / HANG_DEPTH(3 down) / SUBDIV(4, accretion).
+## patched region is byte-identical to a full bake — MOSS_DEPTH(3 up) / HANG_DEPTH(3 down) / SUBDIV(4,
+## accretion). RIM_DEPTH(2) and _moss_life (a pure function of the row) are both inside that reach.
 const REGION_MARGIN: int = 6
 
 
@@ -320,8 +342,9 @@ func _paint_fine(fx: int, fy: int) -> void:
 		drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP
 		# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it reads
 		# granular. Multiplicative on value so it rides the material's own colour.
-		var grain: float = _grain.get_noise_2d(float(fx), float(fy)) * GRAIN_AMP \
-			+ _grain2.get_noise_2d(float(fx), float(fy)) * (GRAIN_AMP * 0.55)
+		var gx: float = float(fx) * GRAIN_XSTRETCH
+		var grain: float = _grain.get_noise_2d(gx, float(fy)) * GRAIN_AMP \
+			+ _grain2.get_noise_2d(gx, float(fy)) * (GRAIN_AMP * 0.45)
 		# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole cluster
 		# into an embedded darker stone; a ridged near-zero band of a second field cuts a thin dark crack.
 		var stone: float = _stone.get_noise_2d(float(fx), float(fy))
@@ -332,33 +355,39 @@ func _paint_fine(fx: int, fy: int) -> void:
 			grain -= CRACK_DARKEN * (1.0 - crackv / 0.05)
 		# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches a
 		# bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
+		# ...and it fades over RIM_DEPTH rows rather than lighting exactly one. A binary rim lights the
+		# single topmost fine cell of each column, and the mold deliberately makes that boundary ragged —
+		# so along a flat floor the lit cells and their unlit neighbours alternate, and a lip that should
+		# read as a lit EDGE printed as a dotted line. Falling off over two rows makes it a band.
+		var top_dist: int = _top_air_distance(_fine_solid, fx, fy)
 		var rim: float = 0.0
 		var rim_warm: float = 0.0
-		if _fine_air(_fine_solid, fx, fy - 1) and not _fine_air(_fine_solid, fx, fy + 1):
-			rim = 0.17
-			rim_warm = 0.04
+		if top_dist >= 0 and top_dist < RIM_DEPTH and not _fine_air(_fine_solid, fx, fy + 1):
+			var lip: float = 1.0 - float(top_dist) / float(RIM_DEPTH)
+			rim = 0.17 * lip
+			rim_warm = 0.04 * lip
 		var vmul: float = shade + grain
 		var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
 			col.b * vmul + drift + rim, 1.0)
 		# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open air
 		# above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked), fading down.
-		var top_dist: int = _top_air_distance(_fine_solid, fx, fy)
+		var alive: float = _moss_life(fy)
 		if top_dist >= 0 and top_dist < MOSS_DEPTH:
 			var patch: float = _moss.get_noise_2d(float(fx), float(fy) * 0.6)
-			if patch > -0.28:                       # diff-04 #2: wider accept → more coverage
+			if alive > 0.0 and patch > -0.28:       # diff-04 #2: wider accept → more coverage
 				var band: float = (1.0 - float(top_dist) / float(MOSS_DEPTH)) \
 					* clampf((patch + 0.28) * 1.5, 0.0, 1.0)
-				out = out.lerp(MOSS_COLOR, 0.88 * band)   # diff-04 #2: stronger tint = a real carpet
+				out = out.lerp(MOSS_COLOR, 0.66 * band * alive)
 		else:
 			# HANGING MOSS TUFTS (diff-04 #2): the top rows just BELOW a down-facing overhang lip grow a few
 			# moss pixels dripping into the air — the reference's hanging tufts under ledges.
 			var hang: int = _bottom_air_distance(_fine_solid, fx, fy)
 			if hang >= 0 and hang < HANG_DEPTH:
 				var hp: float = _moss.get_noise_2d(float(fx) * 1.3, float(fy) * 1.3 + 90.0)
-				if hp > HANG_GATE:
+				if alive > 0.0 and hp > HANG_GATE:
 					var hband: float = (1.0 - float(hang) / float(HANG_DEPTH)) \
 						* clampf((hp - HANG_GATE) * 3.0, 0.0, 1.0)
-					out = out.lerp(MOSS_COLOR.darkened(0.12), 0.85 * hband)
+					out = out.lerp(MOSS_COLOR.darkened(0.12), 0.66 * hband * alive)
 		_data[i4] = int(clampf(out.r, 0.0, 1.0) * 255.0)
 		_data[i4 + 1] = int(clampf(out.g, 0.0, 1.0) * 255.0)
 		_data[i4 + 2] = int(clampf(out.b, 0.0, 1.0) * 255.0)
@@ -399,6 +428,13 @@ func _fine_air(fine_solid: PackedByteArray, fx: int, fy: int) -> bool:
 
 ## Rows below the nearest EXPOSED top surface directly above this solid fine cell (0 = this cell has
 ## open air right above it — a ledge top; N = N solid rows below such a top; -1 = no open top within
+## How alive moss is at a fine row: full in the damp shallows, gone in the deep. A pure function of the
+## row, so a region re-bake after a dig stays byte-identical to a full bake.
+func _moss_life(fy: int) -> float:
+	var row: float = float(fy) / float(SUBDIV)
+	return clampf((float(MOSS_DEAD_ROW) - row) / float(MOSS_DEAD_ROW - MOSS_LUSH_ROW), 0.0, 1.0)
+
+
 ## MOSS_DEPTH — an interior or overhung cell). Walks straight up: the first open-air cell within
 ## MOSS_DEPTH gives the distance; all-solid = interior. Drives the moss band on Noita ledge tops (diff 5).
 func _top_air_distance(fine_solid: PackedByteArray, fx: int, fy: int) -> int:
