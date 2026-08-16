@@ -100,7 +100,13 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 			x += 24.0
 		pts.append(Vector2(view.end.x + 24.0, floor_y))
 		pts.append(Vector2(view.position.x, floor_y))
-		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * (0.42 - f * 0.5)))
+		# AERIAL PERSPECTIVE (#A2). The old falloff topped out near a third of the way to the sky, which
+		# is far too little air for a range on the horizon — every ridge stayed a hard dark cut-out and
+		# the backdrop had no depth to read. The curve is now both stronger and much steeper in the
+		# parallax factor, so the farthest range nearly dissolves into the sky while the nearest stays a
+		# silhouette. Steepness is the point: an even haze across all three would only make one flat
+		# plane paler, where a gradient across them is the depth itself.
+		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * maxf(0.88 - f * 1.5, 0.0)))
 
 
 ## A soft filled ellipse (flat alpha — no scalloped edge, no overlap hotspot) — one lobe of a cloud lozenge.
@@ -125,8 +131,12 @@ static func _sinkforge(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vecto
 	var base_y: float = horizon + 30.0 + cam.y * (1.0 - f) * 0.30  # base seam just under the horizon
 	if cx < view.position.x - 360.0 * s or cx > view.end.x + 360.0 * s:
 		return
-	# Silhouette: darker + more present than the ridges (a solid mass), lightly hazed by daylight.
-	var sil: Color = Color(0.050, 0.058, 0.098).lerp(hor_c, dl * 0.28)
+	# Silhouette: darker + more present than the ridges (a solid mass), hazed by daylight. It sits at a
+	# parallax factor between the far and mid ranges, so once those gained real aerial perspective (#A2)
+	# its old near-unhazed black stopped reading as distance and started reading as a sticker pasted on
+	# the sky. It takes less haze than an equidistant hill would — it is the landmark, and it should stay
+	# the most present thing on the horizon — but it now stands in the same air as everything around it.
+	var sil: Color = Color(0.050, 0.058, 0.098).lerp(hor_c, dl * 0.44)
 	var pyl_top: float = base_y - 250.0 * s
 	# CHAINS: titanic catenaries hanging from the pylon shoulders (upper spans read above the hills).
 	for k: int in 2:

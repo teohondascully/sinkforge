@@ -24,9 +24,18 @@ const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air ABOVE the surface
 ## PARALLAX ridgeline layers: factor = how world-locked (1 = terrain speed, 0 = pinned
 ## to the camera — smaller reads further away), drop = px below the horizon band the ridge crests sit,
 ## amp = crest height. Far hills are lighter (atmospheric haze), near hills darker.
+##
+## THREE PLANES, NOT TWO (#A2). With two ranges the backdrop still collapsed into "cardboard on sky":
+## the far range was much darker than the sky behind it, which is the opposite of what distance does,
+## so high contrast read it as NEAR and the scene had no middle. A third, farthest range now sits
+## almost in the sky's own value, and SkyPainter's aerial-perspective lerp falls off far more steeply
+## across the set (see its ridge loop), so the three ranges land at clearly different distances instead
+## of three shades of the same one. The nearest range keeps its near-black silhouette — with real haze
+## in front of it, it finally reads as the thing closest to you rather than as more of the same.
 const RIDGES: Array[Dictionary] = [
-	{"factor": 0.22, "drop": 150.0, "amp": 150.0, "freq": 0.006, "color": Color(0.145, 0.165, 0.225)},
-	{"factor": 0.42, "drop": 55.0, "amp": 110.0, "freq": 0.010, "color": Color(0.062, 0.072, 0.112)},
+	{"factor": 0.12, "drop": 205.0, "amp": 185.0, "freq": 0.004, "color": Color(0.235, 0.290, 0.400)},
+	{"factor": 0.24, "drop": 150.0, "amp": 150.0, "freq": 0.006, "color": Color(0.145, 0.165, 0.225)},
+	{"factor": 0.44, "drop": 55.0, "amp": 110.0, "freq": 0.010, "color": Color(0.062, 0.072, 0.112)},
 ]
 ## THE SINKFORGE — the endgame LANDMARK (greenlit 2026-08-07). A colossal DORMANT ancient machine whose
 ## CROWN breaches the surface: a broken cog-ring on a dead industrial pylon, buttressed by leaning
