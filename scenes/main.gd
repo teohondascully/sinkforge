@@ -85,6 +85,7 @@ var _camera: Camera2D
 var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_lead: Vector2 = Vector2.ZERO   ## the eased velocity look-ahead the camera adds to the body (#S4)
 const CAMERA_LEAD_TIME: float = 0.34    ## seconds of travel the camera leads by — how far "ahead" is
+const STRIDE_LEAD: float = 0.55         ## extra lead time at full stride (#S9) — speed you can SEE
 const CAMERA_LEAD_MAX: float = 170.0    ## px cap, so a terminal-velocity fall can't shove the body off-frame
 const CAMERA_LEAD_VERTICAL: float = 0.55
 const CAMERA_LEAD_EASE: float = 5.0     ## per-second easing on the lead itself (a lurch reads as a bug)
@@ -569,7 +570,11 @@ func _process(delta: float) -> void:
 		# spends its most interesting half off-screen, and the player brakes to see. The lead is capped in
 		# world px and eased so it doesn't lurch on a direction change, and it goes to zero at a standstill
 		# so the resting frame is still centred on the miner.
-		var lead: Vector2 = _player.velocity * CAMERA_LEAD_TIME
+		# ...and it leads FURTHER once the miner is running (#S9). The stride's whole promise is that a long
+		# traverse feels like travel rather than a commute, and a camera that keeps the body dead centre at
+		# 232 px/s quietly cancels that: the ground scrolls faster but the frame looks identical. Extra lead
+		# is what turns extra speed into extra READ.
+		var lead: Vector2 = _player.velocity * (CAMERA_LEAD_TIME * (1.0 + STRIDE_LEAD * _player.stride))
 		lead.y *= CAMERA_LEAD_VERTICAL      # vertical space is scarcer on a 16:9 frame; lead into it gently
 		_cam_lead = _cam_lead.lerp(lead.limit_length(CAMERA_LEAD_MAX),
 			1.0 - exp(-CAMERA_LEAD_EASE * delta))
@@ -751,7 +756,9 @@ func _update_juice(delta: float) -> void:
 				var ground: StringName = sim.material_at(_cell_at(feet + Vector2(0.0, 2.0)))
 				var puff: Color = _renderer.material_color(ground) if ground != &"" \
 					else Color(0.40, 0.30, 0.20)
-				_particles.dust(feet, puff.lightened(0.10), 3)
+				# A running miner kicks more of the floor up than a walking one, and the puff is the only
+				# thing on screen that says the ground is being pushed against rather than slid over.
+				_particles.dust(feet, puff.lightened(0.10), 3 + int(round(4.0 * _player.stride)))
 				# Quiet on purpose — this fires several times a second, so it has to sit under everything.
 				var scuff: float = clampf(1.35 - MiningRules.hardness(ground) * 0.09, 0.85, 1.35)
 				_sfx.play(&"step", feet, scuff, -19.0)

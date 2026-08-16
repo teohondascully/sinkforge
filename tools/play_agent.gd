@@ -207,9 +207,22 @@ func walk_to_column(col: int, budget: int = 600) -> bool:
 	while t < budget:
 		var here_cell: Vector2i = main._cell_at(player.position)
 		if here_cell.x == col and player.on_floor:
-			player.input_dir = 0.0
-			return true
+			if await _settle(col):
+				return true
+			# Coasted a cell too far. That is a miss, not an arrival — fall back into the loop and walk
+			# it off, exactly as a player who overshot a doorway would.
+			last_x = player.position.x
+			continue
 		var dir: int = signi(int(col_x - player.position.x))
+		# ARRIVE STOPPED (#S9). The body now builds a RUN over a long hold, and a long hold is exactly what
+		# walking across the map is — so the agent used to reach its column at 222 px/s and be carried off
+		# the spot by its own momentum before it could act on it. (It cost RUNG 4 the borer socket: the
+		# floor came out from under a sliding body and the step-up put it two rows higher and a column
+		# over, out of reach of the hole it had just started.) A player brakes on approach without being
+		# told to; the agent has to be. Release inside the last cell and coast in — friction alone kills a
+		# full stride in about that distance, so it lands on the mark instead of skidding past it.
+		if absf(col_x - player.position.x) < BRAKE_DIST and absf(player.velocity.x) > Player.RUN_SPEED:
+			dir = 0
 		player.input_dir = float(dir)
 		_jump_cool = maxi(0, _jump_cool - 1)
 		if player.on_floor and dir != 0:
@@ -232,6 +245,24 @@ func walk_to_column(col: int, budget: int = 600) -> bool:
 		if still > 150:
 			break
 	player.input_dir = 0.0
+	return main._cell_at(player.position).x == col
+
+
+## How close to the target column the agent stops pushing, and how settled "arrived" means. A stride is
+## worth 232 px/s and friction rubs that off in about 24 px, so one cell of coast is the honest number.
+const BRAKE_DIST: float = 28.0
+const SETTLE_SPEED: float = 8.0        ## px/s under which the body counts as standing still
+const SETTLE_FRAMES: int = 40          ## ...and how long it is given to get there
+
+
+## Come to rest on the arrival column before reporting arrival. Returns whether the body is actually
+## still there once it has stopped — coasting a cell too far is a miss, and must read as one.
+func _settle(col: int) -> bool:
+	player.input_dir = 0.0
+	for _i: int in SETTLE_FRAMES:
+		if absf(player.velocity.x) <= SETTLE_SPEED and player.on_floor:
+			break
+		await tree.physics_frame
 	return main._cell_at(player.position).x == col
 
 

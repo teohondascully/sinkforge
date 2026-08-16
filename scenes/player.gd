@@ -45,6 +45,32 @@ const JUMP_CUT_GRAVITY: float = 2.1
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
 const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
+## THE STRIDE (#S9) — the body builds momentum, the same idea the dig rhythm already runs on.
+##
+## RUN_SPEED is tuned for MINING: close quarters, one cell at a time, stop exactly where you meant to.
+## It is the wrong speed for crossing a hundred and twenty-eight columns of world, and the world grew
+## sixty percent taller without the legs getting any longer, so every traverse became a commute. Raising
+## the constant would fix the commute and ruin the mining, which is why it stayed wrong.
+##
+## So it stops being a constant and becomes a state. Hold one direction on the ground and, after
+## STRIDE_DELAY of unbroken travel, the miner settles into a run that tops out STRIDE_GAIN faster. Turn,
+## stop, hit a wall, wade into water or land hard and it is gone. Everything SHORT — a step to line up a
+## dig, a hop onto a ledge, the whole first second of any movement — happens at exactly the speed it
+## always did, so the mining feel is untouched and the measured top speed still reads 150.
+##
+## Deliberately not free, and deliberately not a toggle: the delay is long enough that you cannot flick
+## into it, a hard landing costs half of it, and it SURVIVES leaving the ground — so running a line of
+## broken terrain without breaking the run is a thing a player gets better at. The grapple stays king by
+## a wide margin (a pumped arc measures 2.8x RUN_SPEED against a full stride's 1.55x); this is the floor
+## of traversal rising, not the ceiling.
+const STRIDE_DELAY: float = 0.9      ## s of unbroken same-way ground travel before the run starts building
+const STRIDE_RAMP: float = 1.2       ## ...and s from there to full
+const STRIDE_GAIN: float = 0.55      ## extra top speed at full stride (150 -> 232 px/s)
+const STRIDE_DECAY: float = 3.0      ## per-second bleed once the run breaks (a third of a second to nothing)
+const STRIDE_LAND_COST: float = 0.5  ## fraction of the stride a hard landing takes
+const STRIDE_LEAN: float = 0.07      ## radians the body tilts forward at full stride (~4 degrees)
+var stride: float = 0.0              ## 0..1 into the run — read by the lean, the camera and the dust
+var _stride_hold: float = 0.0        ## s of unbroken qualifying travel so far (counts toward STRIDE_DELAY)
 const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (the paid inverse of gravity)
 const CLIMB_SPEED: float = 110.0     ## px/s the body travels a gripped rope (hold W/S; release = hang)
 ## Slope follow: a single-tile rise is walked as a 45° ramp (glide, not teleport); a taller rise is a
@@ -164,7 +190,9 @@ func _physics_process(delta: float) -> void:
 	# travels sideways at 400px/s reads as a sticker being dragged, and the same sprite tilted 20 degrees
 	# reads as a person on a rope. Node rotation only touches _draw — the AABB the collider uses is built
 	# from position and the size constants, so leaning can never change where the body actually is.
-	var want_lean: float = (velocity.x / SWING_MAX_SPEED) * SWING_LEAN if grapple.taut else 0.0
+	# ...and on the ground the same two lines sell the RUN: a body at full stride leans into it.
+	var want_lean: float = (velocity.x / SWING_MAX_SPEED) * SWING_LEAN if grapple.taut \
+		else stride * STRIDE_LEAN * float(facing)
 	rotation = lerpf(rotation, clampf(want_lean, -SWING_LEAN, SWING_LEAN),
 		1.0 - exp(-SWING_LEAN_EASE * delta))
 	queue_redraw()
@@ -213,7 +241,8 @@ func _step(delta: float) -> void:
 	# below; on dry land every mult is 1.0 so the resolve, step-up, snap, and agility are byte-for-byte
 	# unchanged. The gate is the ONLY thing gating impedance — it can't leak onto dry ground.
 	var wet: bool = _in_water()
-	var speed_top: float = RUN_SPEED * (WATER_SPEED_MULT if wet else 1.0)
+	_update_stride(delta, wet)
+	var speed_top: float = RUN_SPEED * (1.0 + STRIDE_GAIN * stride) * (WATER_SPEED_MULT if wet else 1.0)
 	var accel: float = ACCEL * (WATER_ACCEL_MULT if wet else 1.0)
 	var friction: float = FRICTION * (WATER_ACCEL_MULT if wet else 1.0)
 	var gravity: float = GRAVITY * (WATER_GRAVITY_MULT if wet else 1.0)
@@ -377,6 +406,7 @@ func _step(delta: float) -> void:
 		landed_hard = true
 		last_impact = impact_v           # the consumer scales dust/shake/thump by how hard (#43)
 		_land_hold = 0.14                # hold the landing-impact frame a beat (#42)
+		stride *= 1.0 - STRIDE_LAND_COST # a heavy landing costs the run — weight has to be felt somewhere
 	_land_hold = maxf(0.0, _land_hold - delta)
 	if climbing:
 		_climb_phase += absf(velocity.y) * delta * 0.055   # hand-over-hand cadence tracks climb speed
@@ -556,6 +586,31 @@ func _aabb() -> Rect2:
 
 func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
+
+
+## Advance the stride (#S9). Three states and nothing else:
+##
+##   BUILDING  — grounded, dry, off the line, pushing one way and actually travelling that way at close
+##               to top speed. Time banks toward STRIDE_DELAY first, then the stride itself ramps.
+##   HOLDING   — airborne with a run already going. A ledge in the middle of a sprint must not cost the
+##               sprint, or the player learns to avoid terrain, which is the opposite of the point.
+##   BREAKING  — everything else. Bleeds fast enough that a mistake reads as a mistake.
+##
+## Note what needs no special case: a wall zeroes velocity.x, which fails the "actually travelling" test,
+## so running into rock breaks the run without the controller ever being told what a wall is.
+func _update_stride(delta: float, wet: bool) -> void:
+	var building: bool = on_floor and not wet and not climbing and not grapple.taut \
+		and input_dir != 0.0 and input_dir * velocity.x > 0.0 \
+		and absf(velocity.x) > RUN_SPEED * 0.8
+	if building:
+		_stride_hold += delta
+		if _stride_hold > STRIDE_DELAY:
+			stride = minf(1.0, stride + delta / STRIDE_RAMP)
+		return
+	if not on_floor and stride > 0.0 and input_dir * velocity.x >= 0.0:
+		return                                  # airborne mid-run: the run keeps, it just stops growing
+	_stride_hold = 0.0
+	stride = maxf(0.0, stride - STRIDE_DECAY * delta)
 
 
 ## Is the body wading — does any cell its AABB overlaps hold water (≥ WATER_MIN_LEVEL)? Reads the sim's
