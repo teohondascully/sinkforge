@@ -9,6 +9,16 @@ extends RefCounted
 ## fine-terrain and the minimap share them). Bake-time code (drawn once per dirty chunk into the terrain
 ## SubViewport, not per frame), so the r.x reach-backs are amortized. Deterministic; purely cosmetic.
 
+## THE KEY LIGHT (#A1) — the carved-edge pass's four face weights, in one place because they only mean
+## anything relative to each other. Light comes from straight ABOVE (the same direction the veil's
+## skylight floods), so a sky-facing top catches a warm lit lip while an underside falls into the
+## deepest shadow in the frame and walls sit between. The SPREAD between these numbers is what gives a
+## block a top and a bottom; flattening them back toward each other returns the sticker look.
+const LIT_LIP: float = 0.22      ## warm highlight alpha on the very edge of a sky-facing face
+const AO_TOP: float = 0.07       ## whisper of dark under that lip, just enough to give it thickness
+const AO_SIDE: float = 0.26      ## walls — the mid tone
+const AO_UNDER: float = 0.46     ## overhangs/ceilings — nothing in the world is darker
+
 ## Draw the solid cells in `rect`, then the concave fillets + the surface cap/ramp pass for its columns.
 static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
@@ -154,27 +164,40 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
 	var keep_top: bool = r.sim.surface_row(c.x) == c.y   # top corners uncut there — the cap pass owns them
 	var cs: float = float(WorldRenderer.CELL)
+	# THE KEY LIGHT (#A1). This pass used to darken all four faces by the same amount, which is
+	# ambient occlusion without a light — and occlusion alone can't make a form. Every block got an
+	# even dark border and read as a sticker with a drawn outline, which is most of what "flat" and
+	# "two-dimensional" meant. Light now comes from ABOVE, matching the skylight model the veil already
+	# bakes (daylight floods DOWN each column), so the three exposed faces do three different jobs:
+	# a sky-facing top catches a warm LIT lip, an underside falls into deep shadow, and the walls sit
+	# between. Same cheap strips, same bake, but the rock finally has a top and a bottom.
+	var top_lip := Color(1.0, 0.95, 0.84, LIT_LIP)
 	for i: int in STEPS:
-		var a: float = 0.20 * (1.0 - float(i) / float(STEPS))
-		var sh := Color(0.0, 0.0, 0.0, a)
+		var fade: float = 1.0 - float(i) / float(STEPS)
 		var o: float = float(i) * 2.0
 		var s := 2.0
 		if open_u:
 			var x0: float = CH if (open_l and not keep_top) else 0.0
 			var x1: float = cs - (CH if (open_r and not keep_top) else 0.0)
-			ci.draw_rect(Rect2(pos.x + x0, pos.y + o, x1 - x0, s), sh)
+			# The very edge catches the sun; below it only a whisper of dark, enough to give the lip
+			# thickness without re-flattening the face we just lit.
+			var col: Color = top_lip if i == 0 else Color(0.0, 0.0, 0.0, AO_TOP * fade)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + o, x1 - x0, s), col)
 		if open_d:
 			var x0: float = CH if open_l else 0.0
 			var x1: float = cs - (CH if open_r else 0.0)
-			ci.draw_rect(Rect2(pos.x + x0, pos.y + cs - o - s, x1 - x0, s), sh)
+			ci.draw_rect(Rect2(pos.x + x0, pos.y + cs - o - s, x1 - x0, s),
+				Color(0.0, 0.0, 0.0, AO_UNDER * fade))
 		if open_l:
 			var y0: float = CH if (open_u and not keep_top) else 0.0
 			var y1: float = cs - (CH if open_d else 0.0)
-			ci.draw_rect(Rect2(pos.x + o, pos.y + y0, s, y1 - y0), sh)
+			ci.draw_rect(Rect2(pos.x + o, pos.y + y0, s, y1 - y0),
+				Color(0.0, 0.0, 0.0, AO_SIDE * fade))
 		if open_r:
 			var y0: float = CH if (open_u and not keep_top) else 0.0
 			var y1: float = cs - (CH if open_d else 0.0)
-			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0), sh)
+			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0),
+				Color(0.0, 0.0, 0.0, AO_SIDE * fade))
 	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops)
 	# AND the diagonal past it is solid too (an overhang roofs the junction). Each scoop: two nested
 	# rects hugging that end of the face, stacking extra dark onto the strips already there.
@@ -215,7 +238,7 @@ static func _ao_scoop(ci: CanvasItem, corner: Vector2, along: Vector2, near_edge
 		if not near_edge:
 			thick = -thick
 		var rc := Rect2(corner, run + thick).abs()
-		ci.draw_rect(rc, Color(0.0, 0.0, 0.0, 0.11))
+		ci.draw_rect(rc, Color(0.0, 0.0, 0.0, 0.14))
 
 
 ## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
