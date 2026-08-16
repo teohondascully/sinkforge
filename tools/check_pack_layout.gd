@@ -1,17 +1,22 @@
 extends SceneTree
 
-## Harness layer — the PACK / CRAFT panel always FITS the screen and the RESEARCH bench stays reachable
-## (playtest #75: "the craft list outgrew the panel, so by the time you could research automation it was
-## off the bottom, unreachable"). The class of bug is a growing list overflowing a screen-sized panel;
-## the guard is the panel's own layout authority, Hud._pack_geometry(), which the draw code reads too —
-## so seen == tested. We stress it with a craft list far longer than any real tier count and assert:
-##   - the panel stays on-screen (top >= 0, bottom <= canvas)
-##   - the research bench (pinned under the scroll viewport) sits inside the panel
-##   - a long list actually scrolls (content > viewport), snapped to whole rows, clamped
-##   - a short list does NOT scroll (viewport == content, scroll_max == 0)
-## Also guards the MINIMAP frame, which is the same class of bug one element over: a HUD rect that
-## derives one of its dimensions from a WORLD constant is a rect that resizes itself when the world
-## does. Both map forms must fit their box, keep the world aspect, and stay off the live play area.
+## Harness layer — THE BAZAAR panel is ONE SHAPE, always on-screen, and never needs to scroll.
+##
+## The property changed with #S33 and it changed to a stronger one. It used to be "the growing craft list
+## scrolls correctly inside its viewport, and the research bench stays reachable below it" — a guard on a
+## workaround. `docs/BAZAAR.md` deletes the workaround: two columns of 24px rows hold twenty rows in the
+## space eight stacked ones used to need, and if a list ever outgrows that the answer is a third column,
+## not a scrollbar. So what is asserted now is that the overflow never happens, which is what the scrollbar
+## was there to survive.
+##
+## The other half is fix #4, and it is worth stating as an assertion because it was the most annoying of the
+## six: the panel is the SAME SIZE AND POSITION whether or not you are standing at a claimed Bazaar. It used
+## to change shape — away from the stall the recipe rows and the whole research section vanished and you got
+## a hint line — so you could not plan a build from the bottom of a shaft, which is the one place you want
+## to. Now only the VERBS are gated; the layout is a constant.
+##
+## Also guards the MINIMAP frame, which is the same class of bug one element over: a HUD rect that derives
+## one of its dimensions from a WORLD constant is a rect that resizes itself when the world does.
 ## Run: godot --headless --path . --script res://tools/check_pack_layout.gd
 
 var _failures: int = 0
@@ -33,18 +38,15 @@ func _craft_options(n: int) -> Array[Dictionary]:
 
 
 func _assert_fits(hud: Hud, canvas: Vector2, tag: String) -> void:
-	var g: Dictionary = hud._pack_geometry()
+	var g: Dictionary = hud._bazaar_geometry()
 	var origin: Vector2 = g["origin"]
-	var h: float = g["h"]
-	_check(origin.y >= -0.5, "%s: panel top on-screen (y=%.1f)" % [tag, origin.y])
-	_check(origin.y + h <= canvas.y + 0.5, "%s: panel bottom on-screen (bot=%.1f <= %.0f)"
-		% [tag, origin.y + h, canvas.y])
-	# The research bench is pinned at the bottom of the scroll viewport and needs research_h beneath it.
-	var bench_bottom: float = origin.y + g["head"] + g["grid_h"] + 4.0 + g["craft_head"] \
-		+ g["viewport_h"] + g["research_h"]
-	_check(bench_bottom <= origin.y + h + 0.5,
-		"%s: research bench inside the panel (bench_bot=%.1f <= panel_bot=%.1f)"
-		% [tag, bench_bottom, origin.y + h])
+	var content: Rect2 = g["content"]
+	_check(origin.x >= -0.5 and origin.x + float(g["w"]) <= canvas.x + 0.5,
+		"%s: panel on-screen horizontally (%.0f..%.0f)" % [tag, origin.x, origin.x + float(g["w"])])
+	_check(origin.y >= -0.5 and origin.y + float(g["h"]) <= canvas.y + 0.5,
+		"%s: panel on-screen vertically (%.0f..%.0f)" % [tag, origin.y, origin.y + float(g["h"])])
+	_check(content.position.y >= origin.y and content.end.y <= origin.y + float(g["h"]) + 0.5,
+		"%s: the content area is inside the panel" % tag)
 
 
 func _initialize() -> void:
@@ -60,36 +62,54 @@ func _initialize() -> void:
 	hud.sim = sim
 	hud.can_craft = true
 
-	# --- a craft list far longer than any real tier count: it MUST fit + scroll ---
-	hud.craft_options = _craft_options(30)
-	_assert_fits(hud, canvas, "long")
-	var gl: Dictionary = hud._pack_geometry()
-	_check(gl["content_h"] > gl["viewport_h"] + 0.5, "long: list overflows the viewport (scrolls)")
-	_check(gl["viewport_h"] >= gl["row_h"] - 0.5, "long: at least one craft row is visible")
-	_check(hud._craft_scroll_max > 0.5, "long: scroll_max > 0")
-	_check(fmod(hud._craft_scroll_max, gl["row_h"]) < 0.01, "long: scroll_max is a whole number of rows")
+	# --- THE REAL LISTS FIT WITHOUT SCROLLING. This is the assertion that replaced the scrollbar: the whole
+	# counter, at the largest it can currently be, has to be readable in one look. ---
+	hud.craft_options = _craft_options(10)
+	hud.rack_options = _craft_options(7)
+	_assert_fits(hud, canvas, "real")
+	var g: Dictionary = hud._bazaar_geometry()
+	var per_column: int = int(g["rows"])
+	print("  the counter holds %d rows per column (%d across the two)" % [per_column, per_column * 2])
+	# Twenty across the two columns is the number `docs/BAZAAR.md` promises, and the number that makes the
+	# scrollbar unnecessary. If the machine list ever outgrows it the answer is a third column — this layer
+	# failing is how you find out, rather than a scrollbar appearing and nobody noticing.
+	_check(per_column * 2 >= 20, "the counter holds twenty rows without scrolling")
+	_check(hud.craft_options.size() <= per_column,
+		"every machine fits its column without scrolling (%d of %d)" % [hud.craft_options.size(), per_column])
+	_check(hud.rack_options.size() <= per_column,
+		"every Rack row fits its column without scrolling (%d of %d)" % [hud.rack_options.size(), per_column])
 
-	# scroll to the end: clamps, lands exactly on the max, snapped to rows
-	for _i: int in 200:
-		hud.scroll_craft(1)
-	_check(is_equal_approx(hud._craft_scroll, hud._craft_scroll_max), "long: over-scroll clamps to max")
-	_check(fmod(hud._craft_scroll, gl["row_h"]) < 0.01, "long: scroll offset stays row-aligned")
-	# and back up
-	for _i: int in 200:
-		hud.scroll_craft(-1)
-	_check(hud._craft_scroll <= 0.01, "long: scroll back clamps to 0")
-
-	# --- a short list: no scroll, whole thing shown ---
-	hud.craft_options = _craft_options(3)
-	_assert_fits(hud, canvas, "short")
-	var gs: Dictionary = hud._pack_geometry()
-	_check(is_equal_approx(gs["viewport_h"], gs["content_h"]), "short: viewport == content (no scroll)")
-	_check(hud._craft_scroll_max <= 0.01, "short: scroll_max == 0")
-
-	# --- away from the Bazaar (can_craft = false): still fits, no research section ---
+	# --- SAME SHAPE EVERYWHERE (fix #4). Away from a Bazaar only the VERBS are gated. ---
+	var at_stall: Dictionary = hud._bazaar_geometry()
 	hud.can_craft = false
+	var in_a_shaft: Dictionary = hud._bazaar_geometry()
 	_assert_fits(hud, canvas, "no-bazaar")
-	_check(hud._pack_geometry()["research_h"] <= 0.01, "no-bazaar: no research section")
+	_check(at_stall["origin"] == in_a_shaft["origin"] and is_equal_approx(at_stall["h"], in_a_shaft["h"]),
+		"the panel is the same size and place away from a Bazaar as at one")
+	_check(hud.bazaar_row_count() >= 0, "…and the counter still lists its rows down a shaft")
+	hud.can_craft = true
+
+	# --- THE CURSOR walks both columns and never leaves the list. ---
+	hud.set_bazaar_tab(Hud.TAB_WORKS)
+	_check(hud.bazaar_row_count() == hud.craft_options.size() + hud.rack_options.size(),
+		"WORKS offers every machine and every Rack row to the cursor")
+	for _i: int in 200:
+		hud.bazaar_move(0, 1)
+	_check(hud.bazaar_row == hud.bazaar_row_count() - 1, "the cursor clamps at the bottom")
+	_check(str(hud.bazaar_action().get("kind", "")) == "rack", "…which is a Rack row")
+	for _i: int in 200:
+		hud.bazaar_move(0, -1)
+	_check(hud.bazaar_row == 0, "the cursor clamps at the top")
+	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "…which is a machine row")
+	hud.bazaar_move(1, 0)
+	_check(str(hud.bazaar_action().get("kind", "")) == "rack", "left/right hops the counter-to-Rack gap")
+	hud.bazaar_move(-1, 0)
+	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "…and back")
+	hud.set_bazaar_tab(Hud.TAB_BENCH)
+	_check(hud.bazaar_row_count() == ResearchRules.ORDER.size(), "BENCH offers every rung to the cursor")
+	_check(str(hud.bazaar_action().get("kind", "")) == "tech", "…and Enter acts on a tech")
+	hud.set_bazaar_tab(Hud.TAB_PACK)
+	_check(hud.bazaar_action().is_empty(), "PACK has nothing to buy, so Enter does nothing")
 
 	# --- THE MINIMAP FRAME: both forms fit their box, whatever shape the world is. A corner map sized by
 	# width alone was fine at 96x80 and became a 150x150 slab down half the screen the moment the world

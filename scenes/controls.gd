@@ -51,7 +51,7 @@ static func defaults() -> Dictionary:
 		BUILD: [{"button": MOUSE_BUTTON_RIGHT}],
 		DROP: [{"key": KEY_Q}],
 		CRAFT: [{"key": KEY_E}],
-		RESEARCH: [{"key": KEY_R}],   # in the pack screen at the Bazaar: research the next tech
+		RESEARCH: [{"key": KEY_R}],   # #S33: CONFIGURE the machine you are aiming at. Research moved to ENTER.
 
 		MAP: [{"key": KEY_M}],
 		HELP: [{"key": KEY_H}, {"key": KEY_SLASH}],

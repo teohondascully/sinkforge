@@ -39,14 +39,14 @@ var steps: Array[Dictionary] = [
 	{"id": &"smelt",  "label": "Toss ore down the mineshaft into the forge (face it, press Q), then drop in to grab the ingots", "goal": "Forge 2 ingots"},
 	{"id": &"wood",   "label": "Chop a tree — hold LMB on a trunk to fell it for wood", "goal": "Get wood"},
 	{"id": &"bazaar", "label": "Claim the Bazaar — place wood (RMB) in the gap of the ruined frame near spawn", "goal": "Claim the Bazaar"},
-	{"id": &"research", "label": "Research AUTOMATION at the Bazaar — press E by the stall, then R (needs an ore sample + 2 ingots)", "goal": "Research Automation"},
+	{"id": &"research", "label": "Research AUTOMATION at the Bazaar — press T by the stall, then ENTER on the lit rung (needs an ore sample + 2 ingots)", "goal": "Research Automation"},
 	{"id": &"craft",  "label": "Stand by the Bazaar, press E, then the Drill key to craft a Drill", "goal": "Craft a Drill"},
 	{"id": &"build",  "label": "Drop the Drill into the shaft just ABOVE the ore vein (RMB) — it bores down into it", "goal": "Build the line"},
 	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
 	{"id": &"auto",   "label": "Stand back — the fueled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
 	# --- the gentle L1→L2 handoff: research power → burn coal → research descent → breach the seal. After
 	# this the chain ENDS; the player self-directs (tech tree [T], go deeper). Deliberately NOT into L3.
-	{"id": &"power",     "label": "Research POWER at the Bazaar (press R) — the deep needs energy", "goal": "Research Power"},
+	{"id": &"power",     "label": "Research POWER at the Bazaar (T, then ENTER) — the deep needs energy", "goal": "Research Power"},
 	{"id": &"generator", "label": "Craft a GENERATOR, place it, and toss coal in (Q) to burn it for power", "goal": "Burn coal for power"},
 	{"id": &"descent",   "label": "Research the DESCENT ENGINE at the Bazaar — the way down is sealed", "goal": "Research Descent"},
 	{"id": &"breach",    "label": "Feed a Descent Engine on the seal to breach into Stonereach — then explore on your own", "goal": "Breach the seal"},

@@ -15,6 +15,10 @@ extends SceneTree
 ##   teach — a line caught on a corner WITH the bubble the game raises for it, so the one thing a still
 ##           frame can say about onboarding — does the lesson arrive on the moment it explains? — is
 ##           answerable from the picture
+##   counter / works / bench — THE BAZAAR panel on each of its three tabs, over a real world with a real
+##           pack, so the one question a still frame can answer about a menu — can you read it, and can you
+##           tell what it wants you to press? — is answerable. Three moments rather than one because the
+##           tabs are three different layout problems (a grid, two priced columns, a graph).
 ##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
 ##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
 ##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
@@ -82,6 +86,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_scarp(main)
 		"teach":
 			await _teaching(main)
+		"counter", "works", "bench":
+			await _at_the_counter(main, moment)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -163,6 +169,23 @@ func _bending_geometry(main: MainView) -> void:
 ## The hint is real: it is fired by the swing itself (asserted below), not painted on for the photograph.
 ## What is arranged is only WHICH of the fired hints is on screen, since a body this deep has also earned
 ## the depth hint and the queue would otherwise show that one first.
+## THE BAZAAR, open. Stocks the pack first so the counter has something to price against — an empty pack
+## makes every row unaffordable and the whole panel greys out, which judges the wrong thing.
+func _at_the_counter(main: MainView, which: String) -> void:
+	for item: StringName in [&"ingot", &"ore", &"coal", &"stone", &"wood", &"iron_ingot"]:
+		main.sim.inventory[item] = 24
+		main.sim.total_produced[item] = 24
+	main._inventory_open = true
+	main._hud.can_craft = true
+	main._hud.set_bazaar_tab(1 if which == "works" else (2 if which == "bench" else 0))
+	if which == "works":
+		main._hud.bazaar_move(0, 2)
+	elif which == "bench":
+		main._hud.bazaar_move(0, 1)
+	for _i in 6:
+		await physics_frame
+
+
 func _teaching(main: MainView) -> void:
 	await _bending_geometry(main)
 	if main._hints == null:

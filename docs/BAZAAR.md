@@ -1,8 +1,15 @@
 # THE BAZAAR — one counter, three tabs
 
-> **Status: SPEC, not built** (2026-08-16). Chosen with the user over two alternatives (walk-between-
-> physical-stations; a hybrid of both). Provisional and reversible per the working model: the SHAPE is what
-> is agreed, the contents of the Rack wait on the tool-shapes design and are deliberately left as a stub.
+> **Status: SHIPPED** as #S33 (2026-08-16), with one deviation from the text below. Chosen with the user
+> over two alternatives (walk-between-physical-stations; a hybrid of both).
+>
+> **Deviation:** rows are **22px, not 24** — 24 gave nine rows per column, and the twenty rows §2 promises
+> are the reason the scrolling viewport could be deleted, so the row height moved rather than the promise.
+> The Rack is no longer the stub §6 describes: #S32 landed the tool-shapes design first, so it opened
+> stocked with the four bits.
+>
+> **Its LOOK is a separate question and is being reworked** — this document specs the counter's *shape*
+> (one panel, three tabs, no scrolling, same everywhere), and that shape is what shipped and what stays.
 
 ## 1. What is actually wrong today
 

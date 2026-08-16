@@ -29,6 +29,8 @@ _zoom_*.png
 # "Sees" tier canonical-moment captures (tools/sees.sh) + boot diagnostics — regenerable, never commit
 /_moment_*.png
 /_moment_*.png.import
+/_mock_*.png
+/_mock_*.png.import
 /_boot*.png
 
 # Tool-script UIDs — tools/ scripts run by path (never referenced via uid://), so

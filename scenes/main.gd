@@ -111,8 +111,6 @@ var _settings_open: bool = false
 var _capture_action: StringName = &""
 var _settings_drag: String = ""
 var _show_help: bool = false
-var _show_tech: bool = false        ## T — the TECH TREE overlay; viewable anywhere,
-                                    ## the research VERB (R) stays Bazaar-gated like the bench
 var _show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD; non-modal read
 ## Fast-forward game clock: "." cycles Engine.time_scale through this exponential ladder so the whole
 ## game (sim ticks AND the body) runs faster — watch a factory fill, or (headless) speed up play-tests.
@@ -316,14 +314,20 @@ func _ready() -> void:
 		craft_opts.append({"name": def.display_name, "cost": def.craft_cost})
 		craft_ids.append(def.id)
 		machine_icons[def.id] = {"color": Visuals.machine_color(def), "kind": Visuals.machine_kind(def), "name": def.display_name}
-	# Craftable TOOLS listed AFTER machines (the Bazaar crafts both). Not placeable, so
-	# they're not in machine_icons (the craft panel renders them via their item glyph instead).
+	# THE RACK (#S33) is its own column, not the tail of the machine list. The two mean different things —
+	# the counter builds from your own materials, the Rack sells gear for refined goods — and a player should
+	# never have to work out which half of one list they are looking at. Tools are not placeable, so they are
+	# absent from machine_icons and the panel draws them by their item glyph.
+	var rack_opts: Array[Dictionary] = []
+	var rack_ids: Array[StringName] = []
 	for t: Dictionary in CRAFT_TOOLS:
 		var tid: StringName = t["id"]
-		craft_opts.append({"name": t["name"], "cost": _tool_recipe(tid)})
-		craft_ids.append(tid)
+		rack_opts.append({"name": t["name"], "cost": _tool_recipe(tid)})
+		rack_ids.append(tid)
 	hud.craft_options = craft_opts
 	hud.craft_ids = craft_ids
+	hud.rack_options = rack_opts
+	hud.rack_ids = rack_ids
 	hud.machine_icons = machine_icons
 	hud.inv_selected_getter = func() -> int: return _inv_selected
 	# Tutorial chain — built AFTER the world is seeded (so its baseline includes any dev-start kit) and
@@ -668,7 +672,6 @@ func _process(delta: float) -> void:
 		_hud.minimap_large = _minimap_mode == 2
 		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
-		_hud.show_tech = _show_tech
 		_hud.show_dashboard = _show_dashboard
 		_hud.alerts = sim.machine_problems()    # stalled machines → the left-edge alert stack (#29)
 		_hud.settings_open = _settings_open
@@ -876,8 +879,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(Controls.PAUSE):
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):
-		_inventory_open = not _inventory_open
-		if _inventory_open: _hud.scroll_craft(-9999)   # open at the top of the craft list (#75)
+		# E always lands on PACK — the tab you want when you pressed the pack key.
+		if _inventory_open and _hud.bazaar_tab == Hud.TAB_PACK:
+			_inventory_open = false
+		else:
+			_inventory_open = true
+			_hud.set_bazaar_tab(Hud.TAB_PACK)
 	elif event.is_action_pressed(Controls.DROP):
 		try_drop()
 	elif event.is_action_pressed(Controls.MAP):
@@ -885,23 +892,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.TECH):
-		_show_tech = not _show_tech
+		# T is now a TAB of the counter rather than a second screen: the ladder and the verb that acts on it
+		# are the same panel, which is the whole of `docs/BAZAAR.md` fix #2.
+		if _inventory_open and _hud.bazaar_tab == Hud.TAB_BENCH:
+			_inventory_open = false
+		else:
+			_inventory_open = true
+			_hud.set_bazaar_tab(Hud.TAB_BENCH)
 	elif event.is_action_pressed(Controls.DASHBOARD):
 		_show_dashboard = not _show_dashboard
 	elif event.is_action_pressed(Controls.CLOSE):
 		# ESC closes whatever's open; with a CALM screen it opens SETTINGS (the pause-menu convention).
-		if _inventory_open or _show_help or _show_tech or _show_dashboard or _minimap_mode != 0:
+		if _inventory_open or _show_help or _show_dashboard or _minimap_mode != 0:
 			_inventory_open = false
 			_show_help = false
-			_show_tech = false
 			_show_dashboard = false
 			_minimap_mode = 0
 		else:
 			_settings_open = true
-	elif event.is_action_pressed(Controls.RESEARCH) and (_inventory_open or _show_tech):
-		try_research(ResearchRules.next_tech(sim.research))   # R at the bench/tree: research the next tech
 	elif event.is_action_pressed(Controls.RESEARCH) and not _inventory_open:
-		try_configure(_aim)                                   # R in the world: configure the aimed machine
+		# R IS ONE VERB AGAIN (#S33). It used to be two — research, and configure-the-thing-you-are-aiming-at
+		# — disambiguated by context, which is a thing you have to be taught. Research moved onto ENTER at the
+		# BENCH tab, where a cursor is sitting on the rung you would buy, so R is left with the only meaning
+		# it can have while you are standing in the world.
+		try_configure(_aim)
+	elif _inventory_open and event is InputEventKey and event.pressed and not event.echo \
+			and (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_SPACE):
+		_bazaar_enter()
+	elif _inventory_open and event is InputEventKey and event.pressed \
+			and event.keycode in [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_W, KEY_S, KEY_A, KEY_D]:
+		var dy: int = (1 if event.keycode in [KEY_DOWN, KEY_S] else 0) \
+			- (1 if event.keycode in [KEY_UP, KEY_W] else 0)
+		var dx: int = (1 if event.keycode in [KEY_RIGHT, KEY_D] else 0) \
+			- (1 if event.keycode in [KEY_LEFT, KEY_A] else 0)
+		_hud.bazaar_move(dx, dy)
 	elif event.is_action_pressed(Controls.BUILD):
 		if not _cursor_on_minimap() and not _cursor_on_hover_panel():   # UI panels eat the click
 			if _selected_item() == &"scanner":
@@ -932,22 +956,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dig_marks.clear()
 			_hud.flash("dig plan cleared")
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		if _inventory_open: _hud.scroll_craft(1)   # in the PACK: the wheel scrolls the craft list (#75)
+		# Nothing scrolls any more — two columns of ten rows hold everything the game can list — so the wheel
+		# is free to do the thing you actually want at a counter: change counter.
+		if _inventory_open: _hud.set_bazaar_tab((_hud.bazaar_tab + 1) % 3)
 		else: _cycle_inventory(1)                  # otherwise: the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		if _inventory_open: _hud.scroll_craft(-1)
+		if _inventory_open: _hud.set_bazaar_tab((_hud.bazaar_tab + 2) % 3)
 		else: _cycle_inventory(-1)
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and ((event.keycode >= KEY_1 and event.keycode <= KEY_9) or event.keycode == KEY_0):
 		# The fixed hotbar number row; 0 is the TENTH slot (the craft list outgrew 1-9).
 		var idx: int = (event.keycode - KEY_1) if event.keycode != KEY_0 else 9
 		if _inventory_open:
-			if event.shift_pressed:
-				idx += 10                               # SHIFT+digit = craft rows 11-20 (until the real tech panel)
-			if idx < _craftable.size():
-				try_craft(_craftable[idx])              # in the PACK screen, numbers CRAFT a machine (Bazaar-gated)
-			elif idx < _craftable.size() + CRAFT_TOOLS.size():
-				try_craft_tool(CRAFT_TOOLS[idx - _craftable.size()]["id"])   # …or a tool (same gate)
+			# While the counter is open the number row picks a TAB, not a recipe. Buying moved to a cursor
+			# and Enter, which is what let the shift-digit rows (11 through 20, on a list that had outgrown
+			# its panel) go away entirely.
+			if idx < 3:
+				_hud.set_bazaar_tab(idx)
 		else:
 			_select_slot(idx)                           # otherwise they SELECT the hotbar slot
 
@@ -1408,6 +1433,30 @@ func _nearest_reachable_solid(point: Vector2, fallback: Vector2i) -> Vector2i:
 ## drives them from mouse/keys; the scripted play-harness (tools/play_agent.gd) drives the SAME methods
 ## to literally play the game. One verb surface → what a human can do, the test can do, by construction.
 
+## ENTER, AT THE COUNTER (#S33) — do whatever the cursor is sitting on. The panel owns the cursor because
+## the panel draws it; this owns the verbs. That split is the point: the highlighted row and the thing that
+## happens cannot drift apart, which is exactly how `R` ended up meaning two different things depending on
+## where you were standing.
+##
+## All three verbs stay Bazaar-gated exactly as they were — you can READ the whole counter from the bottom of
+## a shaft and plan the trip back, and the footer says so, but you buy at the counter.
+func _bazaar_enter() -> void:
+	var act: Dictionary = _hud.bazaar_action()
+	var kind: String = str(act.get("kind", ""))
+	if kind == "":
+		return
+	var id: StringName = act["id"]
+	match kind:
+		"machine":
+			var row: int = int(act["row"])
+			if row < _craftable.size():
+				try_craft(_craftable[row])
+		"rack":
+			try_craft_tool(id)
+		"tech":
+			try_research(id)
+
+
 ## Mine the aimed cell if it's solid and within reach. (Cooldown is input pacing, not part of the verb.)
 func try_mine(cell: Vector2i) -> bool:
 	if _paused or not _mineable(cell):     # reach + LINE OF SIGHT: can't dig through solid rock to a hidden block
@@ -1681,7 +1730,7 @@ func try_craft_tool(tool_id: StringName) -> bool:
 	return made
 
 
-## RESEARCH a tech at the Bazaar bench (R in the pack screen) — the demand-side PULL: analyze a sample
+## RESEARCH a tech at the Bazaar bench (ENTER on the BENCH tab) — the demand-side PULL: analyze a sample
 ## of the tech's signature material + spend refined ingots to UNLOCK crafting its machines
 ## (docs/PROGRESSION.md §5). Bazaar proximity is the bench (same gate as crafting); the spend itself is
 ## the sim's discrete research_tech. Verb-surfaced so the play-harness researches like a player.

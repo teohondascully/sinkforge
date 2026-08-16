@@ -432,10 +432,49 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_pickaxe(canvas, center, size, Color(0.42, 0.32, 0.22), Color(0.80, 0.84, 0.94))
 		&"wood_axe":
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
+		&"broad_bit", &"sinker_bit", &"lance_bit", &"wedge_bit":
+			_item_bit(canvas, center, size, item)
 		&"earth", &"stone", &"shale", &"deepslate", &"sealrock":
 			_item_block(canvas, center, size, item_color(item))
 		_:
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
+
+
+## A CUTTING BIT — and its SILHOUETTE IS ITS CUT, which is the entire design of `BitRules` made visible.
+## The bits differ in shape rather than in speed, so four identical steel lumps with four different names
+## would throw away the one thing the icons could have said. A Broad is a wide blunt head, a Sinker is a
+## downward spike, a Lance is a long horizontal point, a Wedge is a splitting triangle: you can tell what a
+## bit does to rock by looking at what it is, before you have read a single price.
+##
+## All four share the same brass socket so they read as a SET of interchangeable heads for one drive, rather
+## than as four unrelated tools — which is also the progression thesis (chassis plus modules) drawn.
+static func _item_bit(canvas: CanvasItem, c: Vector2, size: float, kind: StringName) -> void:
+	var u: float = size * 0.5
+	var steel := Color(0.72, 0.76, 0.84)
+	var edge := Color(0.90, 0.94, 1.0)
+	var brass := Color(0.72, 0.56, 0.28)
+	# the socket every bit fits: a short collar at the bottom, the drive's end of the joint
+	canvas.draw_rect(Rect2(c + Vector2(-u * 0.34, u * 0.42), Vector2(u * 0.68, u * 0.52)), brass)
+	match kind:
+		&"broad_bit":
+			canvas.draw_rect(Rect2(c + Vector2(-u * 0.92, -u * 0.70), Vector2(u * 1.84, u * 1.04)), steel)
+			canvas.draw_rect(Rect2(c + Vector2(-u * 0.92, -u * 0.70), Vector2(u * 1.84, u * 0.22)), edge)
+		&"sinker_bit":
+			canvas.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-u * 0.40, -u * 0.86), c + Vector2(u * 0.40, -u * 0.86),
+				c + Vector2(u * 0.14, u * 0.42), c + Vector2(-u * 0.14, u * 0.42)]), steel)
+			canvas.draw_rect(Rect2(c + Vector2(-u * 0.40, -u * 0.86), Vector2(u * 0.80, u * 0.20)), edge)
+		&"lance_bit":
+			canvas.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-u * 0.86, -u * 0.30), c + Vector2(u * 0.50, -u * 0.30),
+				c + Vector2(u * 0.94, 0.0), c + Vector2(u * 0.50, u * 0.30),
+				c + Vector2(-u * 0.86, u * 0.30)]), steel)
+			canvas.draw_line(c + Vector2(-u * 0.86, -u * 0.18), c + Vector2(u * 0.62, -u * 0.18), edge, 1.5)
+		_:
+			canvas.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(0.0, -u * 0.88), c + Vector2(u * 0.86, u * 0.44),
+				c + Vector2(-u * 0.86, u * 0.44)]), steel)
+			canvas.draw_line(c + Vector2(0.0, -u * 0.88), c + Vector2(-u * 0.50, u * 0.10), edge, 1.5)
 
 
 ## A CARRIED BLOCK of plain terrain (earth / stone / shale / deepslate / sealrock) — the dig-and-carry
