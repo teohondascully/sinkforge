@@ -758,6 +758,16 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 		sim.set_solid(Vector2i(ds, y), &"deepslate")
 	sim.set_solid(Vector2i(ds, settle_row), &"")      # foothold at the top
 	sim.set_solid(Vector2i(ds, settle_row - 1), &"")
+	# A LANDING at the shaft mouth. Climbing back up only counts as "out" if there is somewhere to STAND
+	# there, and once the shaft below has been dug the top cell has no floor left — so the body rides the
+	# rope to the lip, finds no footed exit either side, and hangs there until the budget runs out. A
+	# player descending from a chamber cuts this ledge before dropping in; the fixture cuts it too.
+	for dx: int in [-1, 1]:
+		if not sim.in_bounds(Vector2i(ds + dx, settle_row + 1)):
+			continue
+		sim.set_solid(Vector2i(ds + dx, settle_row), &"")
+		sim.set_solid(Vector2i(ds + dx, settle_row - 1), &"")
+		sim.set_solid(Vector2i(ds + dx, settle_row + 1), &"deepslate")
 
 	# Loadout: a pump, a generator (its aura powers the adjacent pump — no wiring; conduit delivery is RUNG 5's
 	# proof), the tier-2 pick (deepslate + rich_ore), rope for the climb out.

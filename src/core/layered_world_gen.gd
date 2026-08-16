@@ -13,6 +13,18 @@ extends HeightmapWorldGen
 ## change; this is the seam working. Deterministic in (cols, rows, seed): one seeded RNG for veins, a
 ## seeded FastNoiseLite for caves. Improve generation here without sim or viz knowing.
 
+## HOW MANY OF A THING A WORLD GETS. Every "N per column" density below was tuned against the 80-row
+## world it was written in, and a count derived from WIDTH alone silently HALVES in density the moment
+## the world gets deeper — which is exactly how a bigger world becomes an emptier one. The features that
+## are per-CELL rolls (the cave noise, spires, rubble) scale with area for free; these counted ones did
+## not, so they are scaled against the reference the numbers actually mean.
+const DENSITY_ROWS: int = 80         ## the world height every *_PER_COL figure below was tuned against
+
+
+func _density_count(world: WorldData, per_col: float) -> int:
+	return int(round(float(world.cols) * per_col * float(world.rows) / float(DENSITY_ROWS)))
+
+
 # --- caves ---
 ## Caves never breach this many tiles below a column's surface (keeps the spawn base safe/solid).
 const CAVE_MIN_DEPTH: int = 6
@@ -83,9 +95,12 @@ const TUNNEL_RADIUS: int = 1
 ## are punctuation rather than the medium you travel through. The first cut of these numbers pushed it to
 ## 26.5% and tripped it, correctly. Narrow and long is the better shape anyway — a chasm that pinches to
 ## two cells and opens to five is far more dramatic than a uniform six-wide slot, and costs less.
-const RIFT_PER_COL: float = 0.026        ## ~2 rifts on a 96-wide world — landmarks, not a feature grid
-const RIFT_MIN_LEN: int = 26             ## rows; short of this it reads as a hole rather than a chasm
-const RIFT_MAX_LEN: int = 54
+## Re-cut for the 128-row world: RARER and LONGER for the same open-space budget. A rift's whole job is
+## to fall THROUGH the layer stack, and 26 rows stopped being that when the stack got sixty rows taller —
+## it became a pothole. Four long chasms beat six medium ones at the same cost in carved air.
+const RIFT_PER_COL: float = 0.018        ## ~4 rifts on this world — landmarks, not a feature grid
+const RIFT_MIN_LEN: int = 34             ## rows; short of this it reads as a hole rather than a chasm
+const RIFT_MAX_LEN: int = 80
 const RIFT_HALF_W_MIN: float = 0.8       ## half-width in cells at the narrowest — a squeeze
 const RIFT_HALF_W_MAX: float = 2.1       ## ...and at the widest — a rift PINCHES and OPENS as it falls
 const RIFT_WANDER: float = 0.34          ## cells of horizontal drift per row (kept low: a rift is a fall line)
@@ -387,7 +402,7 @@ func _carve_caves(world: WorldData, seed: int) -> void:
 ## gives the world real ROOMS to explore, not just noise pockets. Each keeps its wall (carved room), never
 ## breaches the base-safe band, and only opens solid rock. Deterministic via the shared rng.
 func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
-	var count: int = maxi(2, int(round(float(world.cols) * CAVERN_PER_COL)))
+	var count: int = maxi(2, _density_count(world, CAVERN_PER_COL))
 	# Chambers live in the deep-but-above-seal band so they read as big open halls in Stonereach's approach.
 	var lo_row: int = DEEPSLATE_ROW - 18
 	var hi_row: int = SEAL_TOP - 3
@@ -422,7 +437,7 @@ func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
 ## gives blobs; these give you somewhere to GO). Each worm keeps its wall (carved room) and never rises
 ## into the base-safe band. Deterministic via the shared rng.
 func _carve_tunnels(world: WorldData, rng: RandomNumberGenerator) -> void:
-	var worms: int = maxi(3, int(round(float(world.cols) * TUNNEL_PER_COL)))
+	var worms: int = maxi(3, _density_count(world, TUNNEL_PER_COL))
 	for _w: int in worms:
 		var x: float = float(rng.randi_range(2, world.cols - 3))
 		var min_row: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + 2
@@ -463,7 +478,7 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 ## straight into the tutorial.
 func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2i]:
 	var carved: Array[Vector2i] = []
-	var count: int = maxi(2, int(round(float(world.cols) * RIFT_PER_COL)))
+	var count: int = maxi(2, _density_count(world, RIFT_PER_COL))
 	for _r: int in count:
 		var x: float = float(rng.randi_range(5, world.cols - 6))
 		# Push a rift that rolled too near spawn out to whichever side it was already leaning toward.
@@ -531,7 +546,7 @@ func _mineralize(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vec
 ## Sampled from a snapshot of the open set so a ledge placed this pass can't seed another one next to it.
 func _stud_ledges(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var sites: Array[Vector2i] = _open_cells(world)
-	var wanted: int = int(round(float(world.cols) * LEDGE_PER_COL))
+	var wanted: int = _density_count(world, LEDGE_PER_COL)
 	for _i: int in wanted:
 		if sites.is_empty():
 			return
@@ -624,7 +639,7 @@ func _open_cells(world: WorldData) -> Array[Vector2i]:
 ## shallow ones rarely do), then grown into a blob whose size also scales with depth. Ore only replaces
 ## SOLID rock (earth/stone) — never fills a carved cave, though a vein can sit exposed in a cave wall.
 func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
-	var attempts: int = int(round(float(world.cols) * ORE_ATTEMPTS_PER_COL))
+	var attempts: int = _density_count(world, ORE_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
 		var top: int = _surface_row(cx)
@@ -652,7 +667,7 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 ## A depth-banded COAL pass — the drill's fuel. Same machinery as ore veins (cavity model), its own
 ## depth-weighted commonness/size/richness, stamping &"coal" blocks the player mines for coal.
 func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
-	var attempts: int = int(round(float(world.cols) * COAL_ATTEMPTS_PER_COL))
+	var attempts: int = _density_count(world, COAL_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
 		var top: int = _surface_row(cx)
@@ -701,7 +716,7 @@ func _scatter_iron(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var l2_top: int = SEAL_TOP + SEAL_ROWS
 	if l2_top >= world.rows - 1:
 		return
-	var attempts: int = int(round(float(world.cols) * IRON_ATTEMPTS_PER_COL))
+	var attempts: int = _density_count(world, IRON_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
 		var cy: int = rng.randi_range(l2_top, world.rows - 1)
@@ -736,7 +751,7 @@ func _stamp_seal(world: WorldData) -> void:
 ## rock lining it (see _seed_aquifer_treasure) — the flood guards the reward.
 ## Deterministic via the shared rng.
 func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
-	var count: int = maxi(2, int(round(float(world.cols) * AQUIFER_PER_COL)))
+	var count: int = maxi(2, _density_count(world, AQUIFER_PER_COL))
 	var seal_lo: int = SEAL_TOP
 	var seal_hi: int = SEAL_TOP + SEAL_ROWS - 1
 	# Centres span the deep band: from AQUIFER_MIN_ROW down to near the world bottom (leave room for the blob).
