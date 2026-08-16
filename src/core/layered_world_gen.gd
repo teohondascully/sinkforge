@@ -149,6 +149,16 @@ const RUBBLE_CHANCE: float = 0.060
 const ORE_ATTEMPTS_PER_COL: float = 1.0
 ## A vein seed at the very bottom is accepted this often; at the surface, ~0. Linear in depth.
 const ORE_CHANCE_DEEP: float = 0.85
+
+## ...except that a ramp starting at ZERO does not mean "the shallow rock is poorer", it means "the shallow
+## rock is EMPTY", and the shallow rock is the entire first session. Measured by tools/check_richness before
+## this floor existed: TOPSOIL ran 1.2 encounters per hundred rows — a new player's whole world, and
+## essentially nothing in it. So the ramp now runs from a FLOOR to full instead of from nothing to full.
+## Deep acceptance is untouched (at depth_frac 1 the floor drops out of the expression entirely), so the
+## core pull — deeper is richer — survives exactly as designed; what changes is that "poorer" stops meaning
+## "barren". Coal floors higher than ore: it is the drill's fuel and the tutorial asks for it early.
+const ORE_SHALLOW_FLOOR: float = 0.34
+const COAL_SHALLOW_FLOOR: float = 0.42
 ## Vein BODY size (cells in the accretion blob) grows from this (shallow) toward +BONUS (deep) — deeper =
 ## fatter bodies you can array more drills across. Big enough to be a real patch, not a fleck.
 const ORE_SIZE_MIN: int = 8
@@ -287,6 +297,9 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_stud_ledges(world, rng)     # then put rock BACK: shelves, spires and rubble, so open space has form
 	_stud_spires(world, rng)
 	_scatter_rubble(world, rng)
+	# LAST pass over the rock, so it judges the world every earlier pass actually left behind: no column
+	# may run dry, however the veins, caves, rifts and rubble happened to fall.
+	_seed_droughts(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
 	_stamp_seal(world)          # LAST solid pass: the gate band overwrites everything, so nothing can hole it
@@ -635,6 +648,68 @@ func _open_cells(world: WorldData) -> Array[Vector2i]:
 	return out
 
 
+## The depth band, floored: `floor` at the surface rising to 1.0 at the bottom of the world. Ore and coal
+## both weight their acceptance rolls through this, which is what keeps "deeper is richer" a GRADIENT
+## rather than a cliff with nothing on the near side of it.
+static func _banded(depth_frac: float, floor_frac: float) -> float:
+	return floor_frac + (1.0 - floor_frac) * clampf(depth_frac, 0.0, 1.0)
+
+
+## THE DROUGHT PASS — the guarantee that random placement cannot give you.
+##
+## Flooring the depth ramp raised the AVERAGE, and an average is not what tedium is made of: a world can
+## measure a fine 7.5 encounters per hundred rows and still contain the one shaft that ran thirty-five
+## rows of identical rock, and that shaft is the one the player was in. Randomness produces such runs
+## constantly — that is what randomness IS — so no amount of density buys the property. It has to be
+## enforced, so this walks every column and, wherever the rock has gone quiet for too long, plants
+## something back in the middle of the silence.
+##
+## What it plants is varied on purpose, because a rule that always yields the same thing reads as a rule.
+## Mostly a small vein — deliberately small, these are make-up pockets and not bonanzas — and sometimes a
+## VUG, a little cavity in solid rock. The vug is the better half of the deal: strike 11 gave the pick a
+## hollow ring that rises as you approach a void, so a vug is a thing you HEAR before you reach it, and a
+## drought broken by one is a drought that ended with a question rather than with a lump of ore.
+##
+## Blobs span several columns, so a column fixed here fixes its neighbours too — the pass reads the world
+## it is writing, and quietly does less work the richer the surrounding rock already is.
+const DROUGHT_LIMIT: int = 18            ## rows of unbroken plain rock before the generator owes you something
+const DROUGHT_VUG_CHANCE: float = 0.34   ## ...and how often what it owes you is a cavity rather than a vein
+const DROUGHT_VEIN_SIZE: int = 5
+const DROUGHT_COAL_BIAS: float = 0.38    ## share of planted veins that are coal rather than ore
+const PLAIN_ROCK: Array[StringName] = [&"earth", &"stone", &"shale", &"deepslate"]
+
+func _seed_droughts(world: WorldData, rng: RandomNumberGenerator) -> void:
+	for col: int in world.cols:
+		var top: int = _surface_row(col) + CAVE_MIN_DEPTH
+		var run: int = 0
+		for row: int in range(top, world.rows):
+			if not _is_plain(world, Vector2i(col, row)):
+				run = 0
+				continue
+			run += 1
+			if run < DROUGHT_LIMIT:
+				continue
+			# Plant back INTO the run we just walked, not at its far end, so the break lands in the middle
+			# of the quiet rather than at the moment it was noticed.
+			var at := Vector2i(col, row - rng.randi_range(3, DROUGHT_LIMIT - 4))
+			if rng.randf() < DROUGHT_VUG_CHANCE:
+				_carve_disc(world, at, 1)
+			else:
+				var span: int = maxi(1, world.rows - _surface_row(col))
+				var depth_frac: float = float(at.y - _surface_row(col)) / float(span)
+				var coal: bool = rng.randf() < DROUGHT_COAL_BIAS
+				var base: int = COAL_AMOUNT_BASE if coal else ORE_AMOUNT_BASE
+				var bonus: int = COAL_AMOUNT_DEPTH_BONUS if coal else ORE_AMOUNT_DEPTH_BONUS
+				_grow_vein(world, rng, at, DROUGHT_VEIN_SIZE,
+					base + int(round(depth_frac * float(bonus))), &"coal" if coal else &"ore")
+			run = row - at.y
+
+
+## Whether this cell is just "the rock here" — solid, and made of nothing worth stopping for.
+func _is_plain(world: WorldData, cell: Vector2i) -> bool:
+	return world.blocks.has(cell) and world.blocks[cell] in PLAIN_ROCK
+
+
 ## Depth-banded ore: many vein-seed attempts, each kept by a depth-weighted roll (deep seeds survive,
 ## shallow ones rarely do), then grown into a blob whose size also scales with depth. Ore only replaces
 ## SOLID rock (earth/stone) — never fills a carved cave, though a vein can sit exposed in a cave wall.
@@ -650,8 +725,8 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 		# HORIZONTAL richness (the frontier pull): a rich x-band lifts acceptance/size/deposit above the
 		# depth baseline, a lean band drops them below — so at a fixed depth the fat fresh veins fan OUT.
 		var hmul: float = hfield[cx]
-		if rng.randf() > depth_frac * ORE_CHANCE_DEEP * hmul:
-			continue                            # rejected — most shallow seeds die here (the band)
+		if rng.randf() > _banded(depth_frac, ORE_SHALLOW_FLOOR) * ORE_CHANCE_DEEP * hmul:
+			continue                            # rejected — shallow seeds still mostly die here (the band)
 		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS) * hmul))
 		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS) * hmul))
 		# ORE QUALITY: a vein seeded in/below the deepslate band may come up RICH — a
@@ -676,7 +751,7 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedF
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
 		var depth_frac: float = float(cy - top) / float(maxi(1, world.rows - top))
 		var hmul: float = hfield[cx]            # same frontier pull as ore (coal fans out too)
-		if rng.randf() > depth_frac * COAL_CHANCE_DEEP * hmul:
+		if rng.randf() > _banded(depth_frac, COAL_SHALLOW_FLOOR) * COAL_CHANCE_DEEP * hmul:
 			continue
 		var size: int = COAL_SIZE_MIN + int(round(depth_frac * float(COAL_SIZE_DEPTH_BONUS) * hmul))
 		var richness: int = COAL_AMOUNT_BASE + int(round(depth_frac * float(COAL_AMOUNT_DEPTH_BONUS) * hmul))

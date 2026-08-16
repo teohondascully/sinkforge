@@ -1303,7 +1303,53 @@ func try_mine(cell: Vector2i) -> bool:
 		_particles.spark(center, Visuals.item_color(mat).lightened(0.35 if rich else 0.15))
 		_shake = maxf(_shake, 2.6 if rich else 2.0)
 		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
+		_note_strike(cell, mat)
 	return mined != &""
+
+
+## THE STRIKE THAT FINDS THE VEIN.
+##
+## Strike 11 gave the pick a hollow ring, so the rock tells you when there is SPACE behind it. This is the
+## other half of the same sentence: it must also tell you when there is METAL behind it. Breaking the first
+## block of a vein and breaking its sixth were the same event — same dust, same spark, same tick — so the
+## single best thing that happens while digging, the moment a seam of ore opens out of plain rock in front
+## of you, had no moment. The pacing timeline said so plainly: enriching the whole world moved the density
+## of what a shaft MEETS by half again and did not add one single beat to a session, because meeting more
+## of a thing you already carry registered as nothing at all.
+##
+## It fires on EXPOSURE, not on proximity, which is what keeps it from becoming wallpaper: a neighbour only
+## counts if this blow is what uncovered it — every other side of it still buried. Tunnel along a seam you
+## have already opened and it stays quiet; break through into one and it rings.
+const TREASURE: Array[StringName] = [&"ore", &"rich_ore", &"coal", &"iron"]
+const STRIKE_SHAKE: float = 3.2
+var veins_struck: int = 0                 ## read by tools/check_pacing — a session's real discoveries
+
+func _note_strike(cell: Vector2i, was: StringName) -> void:
+	if was in TREASURE:
+		return                             # already inside the body; the arrival was the blow before this
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var n: Vector2i = cell + d
+		if not sim.in_bounds(n) or not sim.is_solid(n):
+			continue
+		var found: StringName = sim.material_at(n)
+		if not found in TREASURE or not _was_buried(n, cell):
+			continue
+		veins_struck += 1
+		var at: Vector2 = _cell_center(n)
+		var tint: Color = Visuals.item_color(found)
+		_sfx.play(&"vein", at, 1.16 if found == &"rich_ore" else 1.0, 1.0)
+		_particles.burst(at, 9, tint.lightened(0.30), 62.0, TAU, 1.7, 0.75, 60.0)
+		_shake = maxf(_shake, STRIKE_SHAKE)
+		return                             # one arrival per blow, however much the blow uncovered
+
+
+## Whether `cell` had no open side at all until `opened` was broken — i.e. this blow is what found it.
+func _was_buried(cell: Vector2i, opened: Vector2i) -> bool:
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var n: Vector2i = cell + d
+		if n != opened and sim.in_bounds(n) and not sim.is_solid(n):
+			return false
+	return true
 
 
 ## Float a "+N" tick at `at` for every pack entry that GREW since `before` — the payoff shown at the

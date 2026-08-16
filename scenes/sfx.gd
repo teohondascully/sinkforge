@@ -47,6 +47,7 @@ func _ready() -> void:
 	_streams[&"hollow"] = _wav(_gen_hollow(rng))
 	_streams[&"breach"] = _wav(_gen_breach(rng))
 	_streams[&"ignite"] = _wav(_gen_ignite(rng))
+	_streams[&"vein"] = _wav(_gen_vein(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -306,6 +307,23 @@ func _gen_ignite(rng: RandomNumberGenerator) -> PackedFloat32Array:
 				var v: float = (u - onset) / maxf(1.0 - onset, 0.001)
 				out[i] += sin(TAU * float(notes[j]) * float(i - int(float(n) * LOCK)) / float(RATE)) \
 					* smoothstep(0.0, 0.10, v) * pow(1.0 - v, 1.6) * (0.24 - float(j) * 0.028)
+	return out
+
+
+## THE VEIN — the pick finding metal in the dark. Struck bronze rather than a chime: two partials a shade
+## out of tune with each other so they beat against one another the way real struck metal does, over a hard
+## transient and under a long thin shimmer. Short, because it fires often; bright, because it is good news.
+func _gen_vein(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.38)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var u: float = float(i) / float(n)
+		var strike: float = rng.randf_range(-1.0, 1.0) * pow(maxf(0.0, 1.0 - u * 22.0), 2.0) * 0.30
+		var body: float = (sin(TAU * 587.0 * t) + sin(TAU * 593.0 * t) * 0.85) * exp(-t * 9.0) * 0.26
+		var shimmer: float = sin(TAU * 1760.0 * t) * exp(-t * 15.0) * 0.10
+		out[i] = strike + body + shimmer
 	return out
 
 

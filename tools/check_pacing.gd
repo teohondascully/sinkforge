@@ -45,9 +45,10 @@ const DEPTH_STEP: int = 6
 ## THE CAPS, ratcheted to what this build actually measures. The play is deterministic — three consecutive
 ## runs landed on the same frame counts to the frame — so these can sit close without flaking, and they
 ## should be RATCHETED whenever the shape genuinely improves, the way the friction ceilings are.
-## Measured 2026-08-16: longest silence 15%, density 26.6.
+## Measured 2026-08-16: longest silence 15%, density 30.6 (26.6 before the earth was made worth digging
+## through and the pick was given a beat for finding a seam — see tools/check_richness).
 const QUIET_SHARE_CAP: float = 0.20   ## no single silence may be this much of the whole session
-const DENSITY_FLOOR: float = 18.0     ## events per 1000 frames, across the session
+const DENSITY_FLOOR: float = 24.0     ## events per 1000 frames, across the session
 
 const BAR: int = 76                   ## characters of printed session shape
 
@@ -64,6 +65,7 @@ var _seen_depth: int = -9999
 var _seen_research: bool = false
 var _seen_current: StringName = &""
 var _seen_hail: bool = false
+var _seen_veins: int = 0
 
 
 ## Ticks inside the live tree so the session is sampled every physics frame, not only at the points the
@@ -164,6 +166,7 @@ func _seed(agent: PlayAgent) -> void:
 	_seen_research = sim.is_researched(&"automation")
 	_seen_current = agent.main._objectives.current_id() if agent.main._objectives != null else &""
 	_seen_hail = agent.main._line_hailed
+	_seen_veins = agent.main.veins_struck
 	var row: int = agent.main._cell_at(agent.player.position).y
 	_seen_band = Strata.band_at(row)
 	_seen_depth = row
@@ -191,6 +194,12 @@ func _sample(agent: PlayAgent) -> void:
 	if not _seen_hail and main._line_hailed:
 		_seen_hail = true
 		_note("★ THE LINE RUNS")
+	# Striking a seam is the best thing that happens while digging, and until the game marked it this
+	# instrument could not see it: meeting more of a material already in the pack produced no event at
+	# all, so enriching the entire world moved the session timeline by exactly nothing.
+	if main.veins_struck > _seen_veins:
+		_seen_veins = main.veins_struck
+		_note("struck a vein (%d this session)" % _seen_veins)
 
 	for item: Variant in sim.inventory:
 		var key: StringName = item
