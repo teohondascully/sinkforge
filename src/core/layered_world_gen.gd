@@ -89,6 +89,14 @@ const RIFT_MAX_LEN: int = 54
 const RIFT_HALF_W_MIN: float = 0.8       ## half-width in cells at the narrowest — a squeeze
 const RIFT_HALF_W_MAX: float = 2.1       ## ...and at the widest — a rift PINCHES and OPENS as it falls
 const RIFT_WANDER: float = 0.34          ## cells of horizontal drift per row (kept low: a rift is a fall line)
+## A rift has to be worth WALKING TO, or it is scenery. Real fissures are where hydrothermal veins form —
+## mineral-rich fluid rises through the fracture and deposits in its walls — so the geology and the game
+## design want the same thing: the chasm pays. Ore already in a rift wall upgrades to RICH ore; plain rock
+## in a rift wall sometimes becomes ore outright. Rifts are also kept clear of the spawn window, which is
+## the same rule the frontier pull follows: the good stuff is somewhere you travel to.
+const RIFT_SPAWN_KEEPOUT: int = 10       ## columns either side of spawn no rift may start in
+const RIFT_WALL_ORE_CHANCE: float = 0.11 ## plain rock in a rift wall that becomes ore
+const RIFT_WALL_RICH_CHANCE: float = 0.55## ore already in a rift wall that upgrades to rich ore
 
 ## A cavern with smooth walls is a bubble, and a bubble is not a place. LEDGES jut back into open space
 ## from its sides so there is somewhere to land, somewhere to stand a machine, and something for the eye
@@ -260,7 +268,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# is also a reward, which is the whole reason to walk to one. And the ore field's horizontal balance
 	# (the frontier pull) is computed on unperturbed rock, so a rift that happens to land on a frontier
 	# band can't quietly eat that band's richness — which it did, and the harness said so.
-	_carve_rifts(world, rng)     # RIFTS: tall vertical chasms — the vertical space the grapple exists for
+	_mineralize(world, rng, _carve_rifts(world, rng))   # RIFTS: vertical space — and the reason to go to one
 	_stud_ledges(world, rng)     # then put rock BACK: shelves, spires and rubble, so open space has form
 	_stud_spires(world, rng)
 	_scatter_rubble(world, rng)
@@ -453,10 +461,15 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 ## a uniform slot). Like every other carve it keeps the wall behind it — a rift is a room, not a hole in
 ## the world — and it refuses the base-safe band under the spawn surface, so one can never open a chimney
 ## straight into the tutorial.
-func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> void:
+func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2i]:
+	var carved: Array[Vector2i] = []
 	var count: int = maxi(2, int(round(float(world.cols) * RIFT_PER_COL)))
 	for _r: int in count:
 		var x: float = float(rng.randi_range(5, world.cols - 6))
+		# Push a rift that rolled too near spawn out to whichever side it was already leaning toward.
+		if absf(x - float(SPAWN_COL)) < float(RIFT_SPAWN_KEEPOUT):
+			var away: float = 1.0 if x >= float(SPAWN_COL) else -1.0
+			x = clampf(float(SPAWN_COL) + away * float(RIFT_SPAWN_KEEPOUT), 5.0, float(world.cols - 6))
 		var top: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + rng.randi_range(2, 10)
 		var length: int = rng.randi_range(RIFT_MIN_LEN, RIFT_MAX_LEN)
 		var drift: float = rng.randf_range(-RIFT_WANDER, RIFT_WANDER)
@@ -478,10 +491,39 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> void:
 				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
 				world.blocks.erase(cell)
+				carved.append(cell)
 			x += drift
 			drift = clampf(drift + rng.randf_range(-0.10, 0.10), -RIFT_WANDER, RIFT_WANDER)
 			if x < 3.0 or x > float(world.cols - 4):
 				break
+	return carved
+
+
+## THE CHASM PAYS. Walk the rift's own carved cells, look at the solid rock touching each one, and enrich
+## it: ore already there upgrades to RICH ore, plain rock sometimes becomes ore. Runs on the carve's own
+## cell list rather than rescanning the grid, so it can only ever touch rift walls — a cave that happens
+## to sit next to one is untouched, and the enrichment stays a property of rifts specifically.
+func _mineralize(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vector2i]) -> void:
+	var rich: int = int(round(float(ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS) * RICH_AMOUNT_MULT))
+	var touched: Dictionary = {}
+	for c: Vector2i in carved:
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var cell: Vector2i = c + d
+			if touched.has(cell) or not world.in_bounds(cell):
+				continue
+			touched[cell] = true
+			var here: StringName = world.blocks.get(cell, &"")
+			if here == &"ore":
+				# RICH ore stays a DEEP find, rift or no rift. The chasm makes the deep band richer; it
+				# does not move the band up. A fissure that handed out rich ore at twenty rows would let
+				# a player skip the whole tier gate by walking sideways.
+				if cell.y >= DEEPSLATE_ROW and rng.randf() < RIFT_WALL_RICH_CHANCE:
+					world.blocks[cell] = &"rich_ore"
+					world.amounts[cell] = rich
+			elif here == &"stone" or here == &"shale" or here == &"deepslate":
+				if rng.randf() < RIFT_WALL_ORE_CHANCE:
+					world.blocks[cell] = &"ore"
+					world.amounts[cell] = ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS
 
 
 ## LEDGES. Walk the open cells; where an open cell sits against a solid side wall and has open air above
