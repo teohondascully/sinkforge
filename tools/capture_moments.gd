@@ -9,6 +9,7 @@ extends SceneTree
 ## Moments:
 ##   boot  — the clean new-player opening (the surface, first frame a player ever sees)
 ##   delve — standing at the bottom of a dug shaft, lamp-lit, rock on every side
+##   swing — mid-arc on a live grapple line, so the rope, the hook and the pose can be judged together
 ##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
 ##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
 ##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
@@ -54,6 +55,10 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 		"room":
 			await _dig_in(main)
 			await _hollow_room(main)
+		"swing":
+			await _dig_in(main)
+			await _hollow_room(main)
+			await _swing(main)
 		_:
 			push_warning("unknown moment '%s' — capturing boot" % moment)
 
@@ -114,4 +119,23 @@ func _hollow_room(main: MainView) -> void:
 	main.sim.torch[Vector2i(left + ROOM_W - 3, c.y - 2)] = true
 	main._renderer.repaint_world()
 	for _i in 30:
+		await physics_frame
+
+
+## Hang the body off a live line in the middle of a swing. The grapple is the one thing in the game that
+## cannot be judged from a still of it at rest — a rope reads as a rope only when it is under load — so
+## the shot is taken mid-arc, with the body already moving.
+func _swing(main: MainView) -> void:
+	var p: Player = main._player
+	var c: Vector2i = main._cell_at(p.position)
+	p.auto_input = false
+	p.grapple.fire(p.hand(), main._cell_center(Vector2i(c.x + 4, c.y - 6)))
+	for _i in 90:
+		await physics_frame
+		if p.grapple.state == Grapple.State.ANCHORED:
+			break
+	p.position += Vector2(-40.0, -70.0)
+	p.velocity = Vector2(240.0, 40.0)
+	p.input_dir = 1.0
+	for _i in 26:
 		await physics_frame

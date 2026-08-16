@@ -1171,6 +1171,8 @@ func _draw_help_overlay() -> void:
 		"move        A / D  (or ← →)",
 		"jump        W  or  SPACE",
 		"climb       W / S  on a rope (W climbs, not jumps)",
+		"grapple     F  — fire at the rock you're aiming at, F again to let go",
+		"swing       W / S reel the line in / out · SPACE leaps off it",
 		"mine        LMB (hold)",
 		"dig plan    LMB drag paints it · X clears",
 		"select      1–9  ·  mouse wheel",
@@ -1205,6 +1207,7 @@ const REMAP_ROWS: Array[Array] = [
 	[Controls.LEFT, "move left"], [Controls.RIGHT, "move right"],
 	[Controls.UP, "climb up"], [Controls.DOWN, "climb down"],
 	[Controls.JUMP, "jump"], [Controls.MINE, "mine (hold)"],
+	[Controls.GRAPPLE, "grapple"],
 	[Controls.BUILD, "build / place"], [Controls.DROP, "drop / feed"],
 	[Controls.CRAFT, "pack"], [Controls.RESEARCH, "research / config"],
 	[Controls.MAP, "map"], [Controls.TECH, "tech tree"],
@@ -1318,7 +1321,7 @@ func settings_slider_frac(id: String, canvas_x: float) -> float:
 ## A tiny dim hint, bottom-left — the toggle keys, so the player knows the menus exist without the old
 ## always-on keyboard-reference footer hogging the whole bottom edge.
 func _draw_hint() -> void:
-	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "Q drop   ·   E pack   ·   M map   ·   H keys",
+	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "F hook   ·   Q drop   ·   E pack   ·   M map   ·   H keys",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 
 

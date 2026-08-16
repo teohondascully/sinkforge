@@ -112,6 +112,29 @@ var _climb_phase: float = 0.0        ## climb-cycle clock, advanced by rope trav
 var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / walk anim-frame pick
 var _anim_time: float = 0.0          ## free-running clock for non-walk frame cycling (the dig loop)
 var _dig_hold: float = 0.0           ## seconds the dig pose stays latched after the last mined cell
+## THE GRAPPLE (see scenes/grapple.gd). The body owns one because the line is a constraint on the body,
+## not a thing in the world: it changes how gravity resolves, so it has to live inside the same substep.
+var grapple: Grapple = Grapple.new()
+## Air control is normally the same as ground control, which is generous and correct for a mining game.
+## On the rope it is deliberately WEAKER: a swing you can steer freely is not a swing, it is flying, and
+## the whole pleasure of a pendulum is that you commit to an arc and time your exit rather than driving
+## the arc directly. Enough authority to pump and to aim the release; not enough to cancel the physics.
+const SWING_ACCEL_MULT: float = 0.42
+const SWING_DRAG: float = 0.22       ## per-second velocity bleed while taut — a rope has losses, and
+                                     ## without one a pumped swing never settles and never feels heavy
+## A terminal speed for the arc. Measured: with almost no drag, a driver pumping perfectly every frame
+## reached 6.6x RUN_SPEED — about 31 cells a second — which is not a swing, it is a slingshot the player
+## has no chance of reading. Capping the arc keeps the reward real (comfortably faster than running, and
+## faster than you can fall) while leaving the body somewhere the camera and the collider can follow.
+const SWING_MAX_SPEED: float = RUN_SPEED * 2.8
+const SWING_LEAN: float = 0.40       ## radians (~23 deg) the body tilts into a full-speed arc
+const SWING_LEAN_EASE: float = 7.0   ## per-second easing so the tilt settles rather than snapping
+## How fast speed ABOVE the run cap bleeds off. Ground is a skid (you can feel the boots); air is nearly
+## free, because nothing is touching you. At these values a full-speed release (420px/s) coasts about
+## three seconds through open air and skids to a walk in a third of a second on landing — long enough
+## that a good swing visibly buys you distance, short enough that it never feels like ice.
+const GROUND_COAST_DRAG: float = 900.0
+const AIR_COAST_DRAG: float = 95.0
 var _step_grounded: bool = false     ## set per-step: may the horizontal resolve auto-step UP this frame?
 var _stepped: bool = false           ## set BY the resolve when it auto-stepped up onto a ledge this frame
 
@@ -131,10 +154,19 @@ func _physics_process(delta: float) -> void:
 	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
 	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
 	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
+	grapple.begin_frame()                     # same contract for the line's plant/release one-shots
 	var remaining: float = delta
 	while remaining > 0.0:
 		_step(minf(remaining, MAX_SUBSTEP))
 		remaining -= MAX_SUBSTEP
+	# THE LEAN (#S4). On a taut line the body tilts into its own arc. It is two lines of code and it does
+	# more for how a swing reads than the whole constraint does: a sprite that stays bolt upright while it
+	# travels sideways at 400px/s reads as a sticker being dragged, and the same sprite tilted 20 degrees
+	# reads as a person on a rope. Node rotation only touches _draw — the AABB the collider uses is built
+	# from position and the size constants, so leaning can never change where the body actually is.
+	var want_lean: float = (velocity.x / SWING_MAX_SPEED) * SWING_LEAN if grapple.taut else 0.0
+	rotation = lerpf(rotation, clampf(want_lean, -SWING_LEAN, SWING_LEAN),
+		1.0 - exp(-SWING_LEAN_EASE * delta))
 	queue_redraw()
 
 
@@ -151,6 +183,13 @@ func _unhandled_input(event: InputEvent) -> void:
 ## "climb up" (on a rope), so the same key does the Terraria-natural thing in both contexts.
 func _on_rope() -> bool:
 	return sim != null and sim.is_climbable(_cell_of(position))
+
+
+## Where the line leaves the body — the winch on the miner's belt, a little above centre so the rope
+## doesn't appear to grow out of their boots. Also the point the constraint measures from, so the swing
+## pivots around the torso rather than the feet.
+func hand() -> Vector2:
+	return position + Vector2(0.0, -HEIGHT * 0.18)
 
 
 func request_jump() -> void:
@@ -181,7 +220,33 @@ func _step(delta: float) -> void:
 	var max_fall: float = WATER_MAX_SINK if wet else MAX_FALL
 
 	# Accelerate toward the input target / rub off speed with friction — not instant (which reads stiff).
-	if input_dir != 0.0:
+	# On a taut line the body is on a pendulum: input still bites (that is how you pump an arc and how you
+	# aim a release) but at reduced authority, and the top-speed clamp is lifted — a swing is allowed to
+	# carry you faster than your legs ever could, which is the entire reward for using it.
+	if grapple.taut:
+		if input_dir != 0.0:
+			velocity.x += input_dir * accel * SWING_ACCEL_MULT * delta
+			facing = int(signf(input_dir))
+	elif absf(velocity.x) > speed_top + 1.0:
+		# MOMENTUM SURVIVES (#S4). Above your own top speed you are COASTING, not running, and the normal
+		# controller would throw that away: move_toward(velocity, input * top) DECELERATES a body already
+		# travelling faster than top speed, and friction does the same when you let go — so every swing,
+		# every long drop, every hard release bled back to a walk inside a sixth of a second. Building
+		# speed you cannot keep is worse than not building it at all; it teaches the player that the fast
+		# tool does nothing. So: while over the cap, the only things that slow you down are a deliberate
+		# input AGAINST your travel (full braking authority — you must always be able to stop) and a slow
+		# coast drag, which is much weaker in the air than on the ground because ground is where friction
+		# lives. Steering WITH your travel does nothing, which is correct: you cannot run faster than you
+		# can run. Below the cap the controller is byte-for-byte what it was.
+		var travel: float = signf(velocity.x)
+		if input_dir != 0.0:
+			facing = int(signf(input_dir))
+		if input_dir * travel < 0.0:
+			velocity.x = move_toward(velocity.x, 0.0, friction * delta)   # braking always wins
+		else:
+			var coast: float = GROUND_COAST_DRAG if on_floor else AIR_COAST_DRAG
+			velocity.x = move_toward(velocity.x, travel * speed_top, coast * delta)
+	elif input_dir != 0.0:
 		velocity.x = move_toward(velocity.x, input_dir * speed_top, accel * delta)
 		facing = int(signf(input_dir))
 	else:
@@ -204,7 +269,16 @@ func _step(delta: float) -> void:
 	if _jump_request:
 		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant we land (forgiving)
 	_jump_request = false
-	if _jump_buffer > 0.0 and grounded:
+	# LEAP OFF THE SWING: jumping while the line is TAUT cuts it and adds the jump on top of whatever the
+	# arc had built up. This is the payoff move — time the release at the bottom of a swing and the leap
+	# stacks onto the swing's speed — and it needs no extra key, because "let go and jump" is one motion.
+	# A slack line is left alone, so hooking a ceiling and then hopping around under it keeps you hooked.
+	if _jump_buffer > 0.0 and grapple.taut:
+		grapple.cut()
+		velocity.y = minf(velocity.y, 0.0) + JUMP_VELOCITY * (WATER_JUMP_MULT if wet else 1.0)
+		velocity *= Grapple.RELEASE_KICK
+		_jump_buffer = 0.0
+	elif _jump_buffer > 0.0 and grounded:
 		velocity.y = JUMP_VELOCITY * (WATER_JUMP_MULT if wet else 1.0)   # weaker leap out of a pool
 		on_floor = false
 		climbing = false                    # a jump lets GO of the rope (Space = off, W = up: distinct verbs)
@@ -232,6 +306,14 @@ func _step(delta: float) -> void:
 		if input_climb > 0.0 and not sim.is_climbable(_cell_of(position) + Vector2i(0, -1)):
 			var top_hold: float = float(_cell_of(position).y * CELL) + 6.0
 			velocity.y = clampf((top_hold - position.y) / delta, velocity.y, 0.0)
+
+	# THE LINE. Flown, reeled and constrained inside the substep so a fast swing collides every tile the
+	# same way a fast fall does. UP/DOWN reel while anchored — the same axis that rides a rope, because it
+	# is the same gesture — and reeling is gated to being off the floor so standing on the ground under
+	# your own anchor and holding W still just jumps.
+	grapple.advance(sim, hand(), delta)
+	if grapple.state == Grapple.State.ANCHORED and not on_floor:
+		grapple.reel(input_climb, delta)
 
 	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
 	# that trapped you in a dug 1-pit): on a GENUINE rendered ramp (ramp_dir≠0) the heightmap glides the
@@ -266,6 +348,21 @@ func _step(delta: float) -> void:
 		if grounded and not on_floor and velocity.y >= 0.0:
 			var allow_step: bool = absf(velocity.x) > SNAP_WALK_MIN or velocity.y > SNAP_FALL_MIN
 			_snap_to_floor(allow_step)
+
+	# THE CONSTRAINT, applied after the body has integrated and collided on both axes: pull the position
+	# back onto the circle, then cancel the OUTWARD half of the velocity and nothing else. Because it runs
+	# last it can never fight the collider — a swing into a wall stops at the wall, and the line simply
+	# goes slack until the body swings back inside its radius. The re-resolve catches the rare case where
+	# the pull-back lands the box a pixel inside geometry.
+	if grapple.state == Grapple.State.ANCHORED:
+		var swung: Vector2 = grapple.constrain_position(position)
+		if grapple.taut:
+			position = swung
+			velocity = grapple.resolve_velocity(position, velocity)
+			velocity -= velocity * SWING_DRAG * delta      # a rope has losses; a frictionless one feels fake
+			velocity = velocity.limit_length(SWING_MAX_SPEED)
+			_resolve_axis(true)
+			_resolve_axis(false)
 
 	# FALL KICK: the frame a resting body loses its floor (mined out from under it, or ran off a ledge) it
 	# would otherwise creep down from zero velocity — the reported "laggy" drop. Seed a brisk minimum fall so

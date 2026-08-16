@@ -46,6 +46,7 @@ add "check_controls"                  "res://tools/check_controls.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
+add "check_grapple (swing score)"     "res://tools/check_grapple.gd"
 add "check_loop_health (loop score)"  "res://tools/check_loop_health.gd"
 add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 

@@ -83,6 +83,11 @@ var _camera: Camera2D
 ## The camera's un-snapped follow position (smoothed toward the body each frame); the value ACTUALLY
 ## assigned to the camera is snap_to_pixel'd off this, so motion stays soft but the render is crisp.
 var _cam_pos: Vector2 = Vector2.ZERO
+var _cam_lead: Vector2 = Vector2.ZERO   ## the eased velocity look-ahead the camera adds to the body (#S4)
+const CAMERA_LEAD_TIME: float = 0.34    ## seconds of travel the camera leads by — how far "ahead" is
+const CAMERA_LEAD_MAX: float = 170.0    ## px cap, so a terminal-velocity fall can't shove the body off-frame
+const CAMERA_LEAD_VERTICAL: float = 0.55
+const CAMERA_LEAD_EASE: float = 5.0     ## per-second easing on the lead itself (a lurch reads as a bug)
 const CAMERA_FOLLOW_SPEED: float = 8.0   ## matches the old position_smoothing_speed (soft follow)
 var _renderer: WorldRenderer       ## the VIEW: all world-space drawing + lighting (we push it aim state)
 var _hud: Hud                      ## screen-space HUD (we push it objectives + the machine inspector)
@@ -534,7 +539,16 @@ func _process(delta: float) -> void:
 		# Soft follow toward the body, then PIXEL-SNAP the render so the terrain doesn't shimmer in motion.
 		# A big jump (spawn / F9 load / a teleport) SNAPS instead of panning across the whole world — which
 		# also keeps capture fixtures centred the instant they reposition the body.
-		var target: Vector2 = _player.global_position
+		# LOOK-AHEAD (#S4). The camera leads the body along its own velocity, so at speed you see where you
+		# are GOING rather than where you have been. Without it, every fast move — a swing, a long fall —
+		# spends its most interesting half off-screen, and the player brakes to see. The lead is capped in
+		# world px and eased so it doesn't lurch on a direction change, and it goes to zero at a standstill
+		# so the resting frame is still centred on the miner.
+		var lead: Vector2 = _player.velocity * CAMERA_LEAD_TIME
+		lead.y *= CAMERA_LEAD_VERTICAL      # vertical space is scarcer on a 16:9 frame; lead into it gently
+		_cam_lead = _cam_lead.lerp(lead.limit_length(CAMERA_LEAD_MAX),
+			1.0 - exp(-CAMERA_LEAD_EASE * delta))
+		var target: Vector2 = _player.global_position + _cam_lead
 		if _cam_pos.distance_to(target) > VIEWPORT.x / _current_zoom() * 0.5:
 			_cam_pos = target
 		else:
@@ -610,6 +624,18 @@ func _update_bazaars(delta: float) -> void:
 func _update_juice(delta: float) -> void:
 	_particles.advance(delta)
 	_payouts.advance(delta)
+	# THE LINE'S VOICE (#S4). A piton biting rock is a hard, close, percussive event and it wants to be
+	# felt: chips off the anchor, a crack, and a small kick of shake so the plant lands in the hands. The
+	# release is the opposite — a soft whip of nothing. Both are one-shot flags the body raises inside its
+	# substep, so they fire exactly once per event no matter how the frame was subdivided.
+	if _player != null:
+		var g: Grapple = _player.grapple
+		if g.just_planted:
+			_particles.spark(g.anchor, Color(0.90, 0.84, 0.66))
+			_sfx.play(&"crunch", g.anchor, 1.6, -4.0)
+			_shake = maxf(_shake, 1.6)
+		elif g.just_cut:
+			_sfx.play(&"pop", _player.position, 1.7, -12.0)
 	# Sonar pacing + the staggered returns: each scheduled ding fires when the wavefront (whose speed
 	# the renderer owns) actually reaches its vein — you HEAR the distance.
 	_scan_cooldown = maxf(0.0, _scan_cooldown - delta)
@@ -761,6 +787,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_hover_panel():
 		_apply_knob(_hud.hover_click(get_viewport().get_mouse_position()))   # config-panel chips (#32)
+	elif event.is_action_pressed(Controls.GRAPPLE):
+		_toggle_grapple()
 	elif event.is_action_pressed(Controls.ZOOM):
 		_cycle_zoom()
 	elif event.is_action_pressed(Controls.SPEED):
@@ -851,6 +879,22 @@ func _set_volume(id: String, frac: float) -> void:
 		"ambience": Settings.ambience = clampf(frac, 0.0, 1.0)
 	Settings.apply_audio()
 	Settings.save_settings()
+
+
+## THE GRAPPLE (F / middle-mouse). One key, two verbs: a live line is cut, a stowed one is fired at
+## wherever the cursor is. It shoots at the raw mouse point rather than at `_aim` on purpose — `_aim`
+## snaps to mineable faces within the pick's 3.2-cell reach, which is exactly the wrong behaviour for a
+## tool whose whole job is to reach the far wall you CAN'T touch.
+func _toggle_grapple() -> void:
+	if _paused or _settings_open or _inventory_open:
+		return
+	var g: Grapple = _player.grapple
+	if g.live():
+		g.cut()
+		_sfx.play(&"pop", _player.position, 1.5, -8.0)
+		return
+	g.fire(_player.hand(), get_global_mouse_position())
+	_sfx.play(&"clunk", _player.position, 1.9, -10.0)
 
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---

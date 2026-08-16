@@ -35,6 +35,7 @@ const LOAD := &"sf_load"
 const CLEAR_MARKS := &"sf_clear_marks"
 const TECH := &"sf_tech"
 const DASHBOARD := &"sf_dashboard"
+const GRAPPLE := &"sf_grapple"
 
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
@@ -65,6 +66,10 @@ static func defaults() -> Dictionary:
 		CLEAR_MARKS: [{"key": KEY_X}],  # wipe the painted dig plan
 		TECH: [{"key": KEY_T}],         # the tech-tree overlay
 		DASHBOARD: [{"key": KEY_G}],    # the production dashboard (throughput + factory census)
+		# The grapple sits on F and on the middle mouse button: one key that fires AND releases, so the
+		# line is something you flick rather than something you manage. Both hands can reach it while the
+		# left is on WASD and the right is aiming — the two things you are already doing when you want it.
+		GRAPPLE: [{"key": KEY_F}, {"button": MOUSE_BUTTON_MIDDLE}],
 	}
 
 

@@ -518,6 +518,8 @@ func _draw() -> void:
 	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
 	_draw_ping()           # the map-click beacon — the spot you marked, findable on foot
 	_draw_scan()           # the sonar pulse + vein echoes (the scanner's whole voice)
+	_draw_speed_streaks()  # motion lines behind a body moving faster than it can run
+	_draw_grapple()        # the live line + its hook, over the world and under the HUD
 	_draw_aim()
 	if payouts != null:
 		payouts.draw(self)  # "+N" gain ticks LAST: the reward should never be buried by the world
@@ -1976,6 +1978,86 @@ func _wall_fill_color(c: Vector2i) -> Color:
 func _paint_darkness(layer: LightLayer) -> void:
 	layer.draw_texture_rect(_veil_tex,
 		Rect2(0.0, 0.0, float(FactorySim.GRID_COLS * CELL), float(FactorySim.GRID_ROWS * CELL)), false)
+
+
+## SPEED READS (#S4). Above running pace the body gets motion lines trailing along its own velocity.
+## This is the cheapest possible trick and it is worth more than it costs: at 400px/s the sprite crosses
+## a cell in five frames, and without streaks the eye reads that as a teleport rather than as speed —
+## which is why fast movement in a tile game so often feels twitchy instead of exhilarating. The lines
+## start where the body was and fade out behind it, so they show you the path you just took.
+##
+## Deliberately gated to speed you had to EARN. A body at walking pace draws nothing, so the streaks are
+## themselves a readout: seeing them means the swing worked.
+const STREAK_MIN: float = 1.15          ## × RUN_SPEED before any line is drawn
+const STREAK_COUNT: int = 5
+const STREAK_SPREAD: float = 9.0        ## px the fan of lines spans across the direction of travel
+const STREAK_COLOR := Color(0.86, 0.92, 1.0)
+
+
+func _draw_speed_streaks() -> void:
+	if player == null:
+		return
+	var v: Vector2 = player.velocity
+	var speed: float = v.length()
+	var floor_speed: float = Player.RUN_SPEED * STREAK_MIN
+	if speed < floor_speed:
+		return
+	# 0 at the threshold, 1 at the swing's terminal — so the lines grow in with the speed rather than
+	# popping on at full strength the instant you cross the line.
+	var t: float = clampf((speed - floor_speed) / (Player.SWING_MAX_SPEED - floor_speed), 0.0, 1.0)
+	var dir: Vector2 = v / speed
+	var side := Vector2(-dir.y, dir.x)
+	var origin: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.15)
+	for i: int in STREAK_COUNT:
+		var f: float = (float(i) / float(STREAK_COUNT - 1)) * 2.0 - 1.0   # -1..1 across the fan
+		var a: Vector2 = origin + side * f * STREAK_SPREAD
+		var run: float = (16.0 + 30.0 * t) * (1.0 - absf(f) * 0.45)       # longest through the middle
+		draw_line(a - dir * 6.0, a - dir * (6.0 + run),
+			Color(STREAK_COLOR, (0.10 + 0.26 * t) * (1.0 - absf(f) * 0.5)), 1.0)
+
+
+## THE LINE. Drawn as a chain of short segments along a quadratic bow rather than as one straight line,
+## so slack reads as ROPE: a line the body has swung inside of sags, a line the body is hanging on snaps
+## bar-straight, and you can see which you are on without looking at your speed. The hook itself is a
+## small dark wedge at the anchor with a bright chip on its lit side, because a hook that reads as a dot
+## makes the whole tool read as a laser pointer.
+const ROPE_SEGMENTS: int = 14
+const ROPE_SAG: float = 26.0            ## px the fully-slack line bows below the chord
+const ROPE_CORE := Color(0.78, 0.70, 0.52)
+const ROPE_SHADE := Color(0.20, 0.16, 0.12)
+
+
+func _draw_grapple() -> void:
+	if player == null or not player.grapple.live():
+		return
+	var g: Grapple = player.grapple
+	var from: Vector2 = player.hand()
+	var to: Vector2 = g.tip if g.state == Grapple.State.FLYING else g.anchor
+	var sag: float = g.slack(from) * ROPE_SAG
+	var pts := PackedVector2Array()
+	for i: int in ROPE_SEGMENTS + 1:
+		var t: float = float(i) / float(ROPE_SEGMENTS)
+		var p: Vector2 = from.lerp(to, t)
+		p.y += sin(t * PI) * sag                     # a parabola is close enough to a catenary at this size
+		pts.append(p)
+	# Two passes: a dark under-stroke that gives the rope an edge against light rock, then the fibre.
+	for i: int in ROPE_SEGMENTS:
+		draw_line(pts[i], pts[i + 1], ROPE_SHADE, 4.5)
+	for i: int in ROPE_SEGMENTS:
+		draw_line(pts[i], pts[i + 1], ROPE_CORE, 2.0)
+	# A twist highlight every other segment: the difference between "a rope" and "a laser" at this scale
+	# is entirely whether the line has any internal structure at all.
+	for i: int in ROPE_SEGMENTS:
+		if i % 2 == 0:
+			draw_line(pts[i], pts[i].lerp(pts[i + 1], 0.55), ROPE_CORE.lightened(0.35), 1.0)
+	# The hook: a wedge biting INTO the rock, oriented along the last segment so it always looks planted.
+	var dir: Vector2 = (pts[ROPE_SEGMENTS] - pts[ROPE_SEGMENTS - 1]).normalized()
+	var side: Vector2 = Vector2(-dir.y, dir.x)
+	var head: Vector2 = to + dir * 3.0
+	draw_colored_polygon(PackedVector2Array([
+		head, head - dir * 9.0 + side * 5.0, head - dir * 6.0, head - dir * 9.0 - side * 5.0]),
+		ROPE_SHADE.lightened(0.22))
+	draw_line(head - dir * 8.0 + side * 3.0, head - dir * 2.0, Color(0.92, 0.86, 0.70), 1.0)
 
 
 ## Bake the veil's BASE — the skylight/ambient model: daylight floods DOWN each column's open air
