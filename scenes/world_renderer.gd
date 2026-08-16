@@ -307,6 +307,12 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_fine_layer = LightLayer.new()
 	_fine_layer.setup(-9, _paint_fine_terrain)
 	_fine_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# ...and the tooth INSIDE those 8px pixels, which the baked texture cannot hold and the screen post-pass
+	# cannot supply (its grain is camera-locked, so it reads as dirt on the lens rather than as rough rock).
+	# See scenes/rock_grit.gdshader; measured by tools/check_underground.
+	var grit := ShaderMaterial.new()
+	grit.shader = load("res://scenes/rock_grit.gdshader")
+	_fine_layer.material = grit
 	add_child(_fine_layer)
 	_bake_fine_terrain()
 	# Two world-space canvases ABOVE this renderer's draw — the skylight/darkness veil, then light pools.
