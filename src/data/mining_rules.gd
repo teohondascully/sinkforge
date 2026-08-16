@@ -46,15 +46,22 @@ const REQUIRED_TIER: Dictionary = {
 
 ## Material id -> base SECONDS to break with a tier-1 tool (or by hand). Eye-tuned so shallow dirt is
 ## quick, stone/ore is a real grind, deepslate is brutal — the deeper you go the more you want a drill.
+##
+## THE ACHE LIVES DEEP (#B1). The SHALLOW band was retuned down hard: the grind that sells automation
+## was landing in the first sixty seconds, BEFORE any of its payoff, so a first-timer met only tedium
+## (4 ore = six seconds of holding, to open step one). The surface is now loose, weathered ground you
+## chew through — and because the DEEP numbers didn't move, the same change SHARPENS the gradient that
+## actually teaches: deepslate went from ~2x surface rock to ~3x. You feel the world get harder as you
+## sink, instead of feeling it be hard from the first swing.
 const HARDNESS: Dictionary = {
-	&"earth": 0.40,
-	&"stone": 1.30,
-	&"ore": 1.50,
-	&"coal": 1.50,
-	&"deepslate": 2.80,
+	&"earth": 0.28,
+	&"stone": 0.85,
+	&"ore": 0.90,
+	&"coal": 0.90,
+	&"deepslate": 2.80,      # the deep band is UNTOUCHED — this is where the drill-hunger belongs
 	&"iron": 3.0,
 	&"rich_ore": 2.4,
-	&"wood": 0.70,
+	&"wood": 0.50,
 	&"leaves": 0.10,
 }
 const DEFAULT_HARDNESS: float = 0.50

@@ -106,10 +106,19 @@ var _show_dashboard: bool = false   ## G — the PRODUCTION DASHBOARD; non-modal
 const TIME_SCALES: Array[float] = [1.0, 2.0, 4.0, 8.0]
 var _time_scale_idx: int = 0
 ## Timed-mining (the friction): holding LMB CHARGES the aimed cell; it breaks when the charge reaches the
-## material's hardness (scaled by your best tool's speed). _mine_target tracks which cell is charging so
-## moving the cursor to a new block resets it. The charge fraction is pushed to the renderer (crack viz).
+## material's hardness (scaled by your best tool's speed). _mine_target tracks which cell is charging.
+## The charge fraction is pushed to the renderer (crack viz).
 var _mine_target: Vector2i = Vector2i(-999, -999)
 var _mine_charge: float = 0.0
+## THE ROCK REMEMBERS (#B1). Charge is banked PER CELL, not per aim: a cursor slip onto a neighbour used
+## to zero the whole dig, which is the single most-punishing feel bug in the early game — the pain of
+## mis-aiming dwarfed the pain of the rock. Now the cracks you chipped stay chipped, and returning to a
+## block RESUMES it. Left alone the rock heals: CRACK_HOLD seconds of grace (so a slip costs literally
+## nothing), then the banked charge bleeds off at CRACK_HEAL/s and the entry evicts itself at zero — the
+## table stays small without a cap, and abandoned half-digs don't linger as free progress forever.
+const CRACK_HOLD: float = 2.5    ## seconds a cell keeps its full banked charge after you look away
+const CRACK_HEAL: float = 0.5    ## charge-seconds bled per second once the grace expires
+var _cracks: Dictionary = {}     ## Vector2i -> Vector2(banked charge seconds, seconds since last worked)
 var _aim: Vector2i = Vector2i(-99, -99)
 ## The DIG PLAN (smart mining): dragging LMB across rock PAINTS marks (cell -> true),
 ## a plan that persists after release; while LMB is held and the cursor isn't on a workable block, the
@@ -848,6 +857,7 @@ func _update_mining(delta: float) -> void:
 	if pressed and not _workable(work):
 		work = _nearest_marked_workable()
 	var holding: bool = pressed and _workable(work)
+	_heal_cracks(delta, work if holding else Vector2i(-999, -999))
 	if not holding:
 		_mine_target = Vector2i(-999, -999)
 		_mine_charge = 0.0
@@ -860,13 +870,14 @@ func _update_mining(delta: float) -> void:
 			_renderer.set_mine_progress(_aim, 0.0)
 		return
 	var mat: StringName = sim.material_at(work)
-	if work != _mine_target:                                  # moved to a fresh block → restart the charge
+	if work != _mine_target:                 # moved to a fresh block → RESUME whatever it already owes us
 		_mine_target = work
-		_mine_charge = 0.0
+		_mine_charge = _banked_charge(work)
 	var cls: StringName = MiningRules.required_tool(mat)
 	var speed: float = MiningRules.best_speed(cls, sim.inventory) if cls != &"" else 1.0
 	_mine_charge += delta * speed
 	var hard: float = MiningRules.hardness(mat)
+	_cracks[work] = Vector2(_mine_charge, 0.0)                # bank it: this cell stays cracked if we look away
 	_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
 	# Swing FEEL: while charging, the body holds the dig pose facing the block, and on a
 	# steady cadence a BLOW lands — a chip of the rock's dust off the struck face + a micro-shake — so
@@ -885,7 +896,29 @@ func _update_mining(delta: float) -> void:
 			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1, 0.8, 1.2))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
+		_cracks.erase(work)                                  # broken: nothing left to remember
 		try_mine(work)                                       # charge full → land the breaking blow
+
+
+## The charge this cell already owes us (0.0 for untouched rock). Half-dug blocks resume where they
+## stopped, so a mis-aim costs travel time, never progress.
+func _banked_charge(cell: Vector2i) -> float:
+	return (_cracks[cell] as Vector2).x if _cracks.has(cell) else 0.0
+
+
+## Age every banked crack except the one being worked; past the grace window they bleed off and evict.
+func _heal_cracks(delta: float, working: Vector2i) -> void:
+	for cell: Vector2i in _cracks.keys():
+		if cell == working:
+			continue
+		var c: Vector2 = _cracks[cell]
+		c.y += delta
+		if c.y > CRACK_HOLD:
+			c.x -= delta * CRACK_HEAL
+		if c.x <= 0.0 or not sim.is_solid(cell):   # healed, or the cell stopped being rock (dug/built over)
+			_cracks.erase(cell)
+		else:
+			_cracks[cell] = c
 
 
 ## A cell the miner can WORK right now: breakable (solid + reach + LOS, the try_mine gate) AND the
