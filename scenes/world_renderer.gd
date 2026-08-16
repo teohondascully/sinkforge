@@ -198,6 +198,13 @@ var _chunk_rows: int = 0
 ## UPDATE_ONCE; between changes the GPU replays the single quad for free.
 var _terrain_viewport: SubViewport                    ## world-in-pixels canvas the chunk painters render into
 var _terrain_layer: LightLayer                        ## the ONE quad in the main tree that draws the bake (z -10)
+## THE INCREMENTAL BAKE (#S14). The viewport is the WHOLE WORLD — 4096x4096 — and every chunk painter lives
+## inside it, so nothing is ever culled: re-rendering it replayed every chunk over sixteen megapixels and
+## cost ~100ms, once per dig. Measured, that was two thirds of a 114ms mining hitch (tools/check_frametime).
+## Now the target is RETAINED and a dig re-renders only the chunks that changed: the rest keep the pixels
+## they already had. `_eraser` blanks those chunks' rects first, because blending cannot remove coverage.
+var _eraser: LightLayer                               ## z -11 inside the viewport: clears a dirty chunk's rect
+var _erase_rects: Array[Rect2] = []                   ## world rects to blank on the next viewport render
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 ## FINE TERRAIN MOLDING (Noita-look slice 1): the coarse 32px terrain fill re-rendered as an organic,
 ## molded 8px-grain field baked to one texture (scenes/fine_terrain.gd), drawn OVER the chunk terrain
@@ -223,7 +230,12 @@ var _veil_img: Image
 var _veil_tex: ImageTexture
 var _veil_base: PackedByteArray
 var _veil_scratch: PackedByteArray   ## persistent per-frame veil buffer — base memcpy'd in, holes cut (#3, no per-frame .duplicate)
-var _veil_dirty: bool = true
+var _veil_dirty: bool = true                     ## a FULL veil rebake (daylight moved / world loaded)
+## #S14: a dig dirties only the columns it touched. Tracked separately from _veil_dirty so the cheap case
+## stays cheap and the global case (the daylight clock) still gets the whole world.
+var _veil_cols_dirty: bool = false
+var _veil_col_min: int = 0
+var _veil_col_max: int = 0
 ## Crystal seams (#4): the O(exposed-ore^2) flood is cached across frames and shared by _update_veil +
 ## _paint_lights (which both need the identical seam list). It only changes when ore EXPOSURE changes
 ## (terrain dug/placed near ore) or when the culling view-rect moves (a seam pans on/off screen), so it
@@ -286,6 +298,14 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 			chunk.setup(-10, _paint_terrain_chunk.bind(rect))  # painter(ci, rect) draws only this block
 			_terrain_viewport.add_child(chunk)                        # renders into the bake viewport, not the main tree
 			_chunks.append(chunk)
+	# The eraser sits BELOW the chunk painters inside the same viewport, so on a partial re-render each
+	# dirty chunk's rect is blanked before that chunk repaints into it.
+	_eraser = LightLayer.new()
+	_eraser.setup(-11, _paint_erase)
+	var erase_mat := ShaderMaterial.new()
+	erase_mat.shader = load("res://scenes/erase.gdshader")
+	_eraser.material = erase_mat
+	_terrain_viewport.add_child(_eraser)
 	# The ONE quad in the main tree that draws the baked coarse terrain (where the ~7700 chunk draws were,
 	# z -10). Drawn at the world rect 1:1 with NEAREST filter so it lines up crisply with the pixel-snap
 	# camera (#77) — unlike the veil which is intentionally low-res + linear. Content updates via the viewport.
@@ -340,8 +360,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	add_child(_haze)
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()  # initial full paint (once); thereafter only dirtied chunks repaint
-	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE  # bake the initial coarse terrain once
-	_terrain_layer.queue_redraw()
+	_bake_terrain_full()   # the initial coarse terrain: every chunk, and the target cleared under it
 	sim.terrain_dirty.clear()  # drop any dirt from world-seeding — the initial paint above already covers it
 	_dark.queue_redraw()  # the veil's ONE draw command (the stretched lightmap); content updates via the texture
 
@@ -353,8 +372,7 @@ func repaint_world() -> void:
 	for chunk: LightLayer in _chunks:
 		chunk.queue_redraw()
 	if _terrain_viewport != null:
-		_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE  # re-bake the whole coarse terrain
-		_terrain_layer.queue_redraw()
+		_bake_terrain_full()
 	_veil_dirty = true
 	_fine_dirty = true
 	sim.terrain_dirty.clear()
@@ -469,14 +487,7 @@ func _process(delta: float) -> void:
 					var idx: int = _chunk_index(cell + Vector2i(dx, dy))
 					if idx >= 0:
 						dirty[idx] = true
-		for idx: int in dirty:
-			_chunks[idx].queue_redraw()
-		# Re-bake the coarse-terrain viewport ONCE this frame (only the dirtied chunks actually repaint their
-		# retained buffers inside it) and re-draw the single quad that shows it. The per-dig fast lane holds:
-		# ~64 cells re-issue their draw commands into the viewport, not the whole world, and the bake is a
-		# no-op on frames with no terrain change.
-		_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-		_terrain_layer.queue_redraw()
+		_bake_terrain_chunks(dirty)
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
 		_crystal_seams_valid = false   # a dig/place near ore changes which cells are EXPOSED — reflood the seams (#4)
@@ -486,13 +497,65 @@ func _process(delta: float) -> void:
 		_fine_dirty_min = rmin
 		_fine_dirty_max = rmax
 		# The veil is a pure LIGHT LEVEL now (#S3) — it carries no material colour at all, so a dig never
-		# patches its hue. Only the skylight base cares, because a dig can move the surface line.
-		_veil_dirty = true
+		# patches its hue. Only the skylight base cares, because a dig can move the surface line — and it
+		# can only have moved it in the columns that changed (#S14).
+		if _veil_cols_dirty:
+			_veil_col_min = mini(_veil_col_min, rmin.x)
+			_veil_col_max = maxi(_veil_col_max, rmax.x)
+		else:
+			_veil_col_min = rmin.x
+			_veil_col_max = rmax.x
+		_veil_cols_dirty = true
 	if _fine_dirty:
 		_bake_fine_terrain()          # FULL rebake (initial / load) — the slow lane
 	elif _fine_region_pending:
 		_bake_fine_region(_fine_dirty_min, _fine_dirty_max)   # the per-dig fast lane
 		_fine_region_pending = false
+
+
+## FULL BAKE — every chunk, onto a freshly cleared target. Used for the initial paint and for a wholesale
+## change (loading a save), where nothing on the target can be trusted. CLEAR_MODE_ONCE rather than ALWAYS:
+## the target is retained from here on, and clearing it again would undo every partial bake below.
+func _bake_terrain_full() -> void:
+	for chunk: LightLayer in _chunks:
+		chunk.visible = true
+		chunk.queue_redraw()
+	_erase_rects.clear()
+	_terrain_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
+	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_terrain_layer.queue_redraw()
+
+
+## PARTIAL BAKE (#S14) — the per-dig fast lane, and the fix for the mining hitch.
+##
+## Only the dirty chunks are made visible, so only their retained draw buffers are replayed; every other
+## chunk keeps the pixels already in the target. The eraser blanks the dirty rects first, because a chunk
+## repaint can only ADD coverage — a cell dug open to the sky would otherwise keep its rock.
+##
+## Chunks stay hidden after this returns, which is safe: the viewport re-renders only when a bake asks it
+## to, and every bake sets visibility for itself before asking.
+func _bake_terrain_chunks(dirty: Dictionary) -> void:
+	_erase_rects.clear()
+	for i: int in _chunks.size():
+		var on: bool = dirty.has(i)
+		_chunks[i].visible = on
+		if on:
+			_chunks[i].queue_redraw()
+			var cx: int = i % _chunk_cols
+			var cy: int = i / _chunk_cols
+			_erase_rects.append(Rect2(float(cx * CHUNK * CELL), float(cy * CHUNK * CELL),
+				float(CHUNK * CELL), float(CHUNK * CELL)))
+	_eraser.queue_redraw()
+	_terrain_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
+	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_terrain_layer.queue_redraw()
+
+
+## Blank the rects a partial bake is about to repaint. The material's `blend_disabled` is what makes this a
+## clear rather than a no-op — see scenes/erase.gdshader.
+func _paint_erase(layer: LightLayer) -> void:
+	for r: Rect2 in _erase_rects:
+		layer.draw_rect(r, Color(0.0, 0.0, 0.0, 0.0))
 
 
 ## The row-major index of the chunk owning `cell`, or -1 if the cell is out of the world.
@@ -2353,14 +2416,29 @@ const KEY_STRENGTH: float = 0.30     ## brightening of a fully up-facing mass (a
 const KEY_GAIN: float = 3.0          ## how fast the vertical openness gradient saturates the key
 var _open_field: PackedFloat32Array = PackedFloat32Array()
 var _open_blur: PackedFloat32Array = PackedFloat32Array()
+## #S14: raw solidity, kept SEPARATE and persistent. The vertical blur below writes its result back into
+## `_open_field`, destroying the raw values it was built from — harmless when every column is rebuilt every
+## time, fatal once a bake covers only a band, because the horizontal blur of a band column reads raw
+## solidity from columns OUTSIDE it. Those columns are unchanged and cached; they just have to still hold
+## what they are supposed to hold.
+var _open_raw: PackedFloat32Array = PackedFloat32Array()
 
 
-func _bake_veil_base() -> void:
+## #S14: `dug_from`..`dug_to` are the columns whose terrain changed. A dig changes light only near itself
+## and only down its own columns — the surface line it may have moved, and the openness of its neighbours —
+## so the whole 16,384-cell field never needed rebuilding for it. Measured at 13ms per dig before this,
+## which was the second-largest piece of a mining hitch after the terrain bake itself.
+##
+## The daylight clock is the case that genuinely IS global: every row's sky level moves at once. That path
+## passes the whole world and pays the full cost, a few times a day rather than a few times a second.
+func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) -> void:
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
 	if _veil_base.size() != cols * rows * 4:
 		_veil_base.resize(cols * rows * 4)
-	_bake_openness(cols, rows)
+		dug_from = 0
+		dug_to = cols - 1
+	var band: Vector2i = _bake_openness(cols, rows, dug_from, dug_to)
 	# Above its column's surface the light level depends on the ROW alone — table it once per bake
 	# instead of a function call per cell (the bake's dominant cost at 7.7k cells).
 	var sky_rgb: PackedInt32Array = PackedInt32Array()
@@ -2377,7 +2455,7 @@ func _bake_veil_base() -> void:
 	var amb_r: int = int(amb.r * 255.0)
 	var amb_g: int = int(amb.g * 255.0)
 	var amb_b: int = int(amb.b * 255.0)
-	for col: int in range(cols):
+	for col: int in range(band.x, band.y + 1):
 		var surf: int = sim.surface_row(col)
 		var scatter_end: int = mini(surf + SKY_FADE, rows - 1)
 		for row: int in range(rows):
@@ -2408,25 +2486,31 @@ func _bake_veil_base() -> void:
 ## opening bleed light into the rock around it rather than ending at a hard black line — without it the
 ## row under a flat surface would drop straight to buried-dark and the ground would read as a painted
 ## band rather than as earth you are looking into the top of.
-func _bake_openness(cols: int, rows: int) -> void:
+## `dug_from`..`dug_to` are the columns whose SOLIDITY changed. Everything downstream of them changes over
+## a wider band — the horizontal blur reaches MASS_REACH either side — so the function widens the range
+## itself and returns the band it actually refreshed, which is what the caller must then re-compose.
+func _bake_openness(cols: int, rows: int, dug_from: int, dug_to: int) -> Vector2i:
 	var n: int = cols * rows
 	if _open_field.size() != n:
 		_open_field.resize(n)
 		_open_blur.resize(n)
+		_open_raw.resize(n)
 	var solid: Dictionary = sim.solid
 	for row: int in range(rows):
 		var base: int = row * cols
-		for col: int in range(cols):
-			_open_field[base + col] = 0.0 if solid.has(Vector2i(col, row)) else 1.0
+		for col: int in range(dug_from, dug_to + 1):
+			_open_raw[base + col] = 0.0 if solid.has(Vector2i(col, row)) else 1.0
+	var col_from: int = maxi(dug_from - MASS_REACH, 0)
+	var col_to: int = mini(dug_to + MASS_REACH, cols - 1)
 	var span: float = float(MASS_REACH * 2 + 1)
 	for row: int in range(rows):                    # horizontal box blur, clamped at the world edges
 		var base: int = row * cols
-		for col: int in range(cols):
+		for col: int in range(col_from, col_to + 1):
 			var acc: float = 0.0
 			for d: int in range(-MASS_REACH, MASS_REACH + 1):
-				acc += _open_field[base + clampi(col + d, 0, cols - 1)]
+				acc += _open_raw[base + clampi(col + d, 0, cols - 1)]
 			_open_blur[base + col] = acc / span
-	for col: int in range(cols):                    # ...then vertical, back into the source buffer
+	for col: int in range(col_from, col_to + 1):    # ...then vertical, into the working buffer
 		for row: int in range(rows):
 			var acc: float = 0.0
 			for d: int in range(-MASS_REACH, MASS_REACH + 1):
@@ -2444,7 +2528,7 @@ func _bake_openness(cols: int, rows: int) -> void:
 	# it is already smooth because the field was blurred, so it shades as a gradient rather than banding.
 	# Light in a mine comes down, so up-facing mass gains and down-facing mass loses.
 	for row: int in range(rows):
-		for col: int in range(cols):
+		for col: int in range(col_from, col_to + 1):
 			var i: int = row * cols + col
 			if not solid.has(Vector2i(col, row)):
 				_open_blur[i] = 1.0
@@ -2454,6 +2538,7 @@ func _bake_openness(cols: int, rows: int) -> void:
 			var key: float = clampf((above - below) * KEY_GAIN, -1.0, 1.0)
 			_open_blur[i] = lerpf(1.0 - MASS_SHADE, 1.0, clampf(_open_field[i] * 2.2, 0.0, 1.0)) \
 				* (1.0 + KEY_STRENGTH * key)
+	return Vector2i(col_from, col_to)
 
 
 ## Darkness (0 = full light, AMBIENT_DARK = the deep's gloom) → the multiplier the veil applies there.
@@ -2486,7 +2571,11 @@ func _light_tint(source: Color) -> Color:
 func _update_veil() -> void:
 	if _veil_dirty:
 		_veil_dirty = false
+		_veil_cols_dirty = false
 		_bake_veil_base()
+	elif _veil_cols_dirty:
+		_veil_cols_dirty = false
+		_bake_veil_base(maxi(_veil_col_min, 0), mini(_veil_col_max, FactorySim.GRID_COLS - 1))
 	# PERSISTENT scratch (#3): the working buffer is a MEMBER, refilled from the freshly-baked base each
 	# frame (.duplicate() is a native memcpy — ~0.4us at this size — not the veil's cost; the real cost is
 	# the per-source cutting below + the texture upload). Cut into the member directly so nothing leaks a
