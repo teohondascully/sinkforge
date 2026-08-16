@@ -26,14 +26,22 @@ const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * 
 ## World-area-shown math (motes/camera/minimap) reads VIEWPORT, not CANVAS, since they diverged here.
 const VIEWPORT := Vector2(1280.0, 720.0)
 const HUD_SCALE: float = VIEWPORT.x / 640.0        ## = 2.0; scales the 640×360 HUD onto the 1280×720 render
-## Zoom levels cycled by Z (Terraria-style). _current_zoom() reads the active level everywhere. Index 0 is
-## the default 0.70× (RE-PICKED 2026-08-09 from the blind "Sees" legibility A/B — at 0.50× a 16px cell can't
-## show rock texture (warm rock blooms into "a glow") and machine labels fall below the declutter threshold,
-## so a first-time player couldn't read the miner, the ore, or the machines; 0.70× makes the avatar a real
-## character and surfaces the FORGE labels while keeping a good chunk of the vertical shaft in frame. See
-## "Sees" + DECISIONS). Z cycles out (0.50×, the old big-world feel) then widest
-## (0.33×, survey the whole base). Smaller = further out.
-const ZOOM_LEVELS: Array[float] = [0.70, 0.50, 0.33]
+## Zoom levels cycled by Z (Terraria-style). _current_zoom() reads the active level everywhere. Smaller =
+## further out; Z cycles outward and wraps.
+##
+## Index 0 is 1.00× (#A4, 2026-08-16). The previous default of 0.70× showed a 57×32-cell field, which put
+## the miner at well under one percent of the frame's width — the measured floor under "it's hard to see
+## the character at base zoom". Every code lever for his presence (cool two-tone rim, head-lamp, guide
+## ring) was already pulled, and the blind judges still found him via the marker rather than the sprite,
+## because at that size there is no sprite left to find. 1.00× shows 40×22 cells — still a wide side-view
+## field, comfortably wider than Terraria's in tile terms — and buys back 43% of linear size on
+## everything: the avatar becomes a character, a 32px cell shows its rock texture instead of blooming
+## into a smear, and machine labels clear the declutter threshold with room to spare.
+##
+## The old default survives one step out (0.70×, the 2026-08-09 "Sees" A/B pick), then 0.50× (the
+## big-world feel) and 0.33× (survey the whole base). Nothing was taken away — the frame just starts
+## where the character is legible, and widens on demand.
+const ZOOM_LEVELS: Array[float] = [1.00, 0.70, 0.50, 0.33]
 var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
 
@@ -369,10 +377,16 @@ func _setup_post_fx() -> void:
 	env.set_glow_level(1, 1.0)
 	env.set_glow_level(2, 0.7)
 	env.set_glow_level(3, 0.3)
-	env.adjustment_enabled = true          # gentle grade — keep the readability floor (Terraria never
-	env.adjustment_contrast = 1.03         # sacrifices legibility), just a touch more pop + warmth
-	env.adjustment_saturation = 1.07
-	env.adjustment_brightness = 1.02
+	# THE GRADE (#A3). Kept gentle — Terraria never sacrifices legibility — but the old numbers were so
+	# close to identity that the world stayed a same-value brown/grey jumble the eye couldn't get purchase
+	# on. SATURATION is the lever that does the most here and costs the least: it separates dirt from rock
+	# from ore from machine by HUE, where a contrast push would just crush an underground that is already
+	# near-black. Contrast rises a little for form, and brightness a little more to hold the darks up
+	# under it, so the deep stays readable.
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.07
+	env.adjustment_saturation = 1.18
+	env.adjustment_brightness = 1.03
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -410,15 +424,19 @@ func _setup_ambient_motes() -> void:
 	mat.damping_min = 1.0
 	mat.damping_max = 4.0
 	mat.scale_min = 0.5
-	mat.scale_max = 1.7
-	mat.color = Color(1.0, 0.94, 0.82, 0.20)                 # warm dust, faint (was 0.40 — fogged the screen)
+	mat.scale_max = 2.1
+	# A LIVING FRAME (#A6). The field was tuned down to 0.20/55 to stop it fogging the screen, and
+	# overshot into invisibility — atmosphere you cannot see is atmosphere you did not build. Denser and
+	# a touch brighter, with a wider size range so near motes read as near: enough that the air is
+	# visibly moving in a still frame, still well under the fog line that motivated the original cut.
+	mat.color = Color(1.0, 0.94, 0.82, 0.26)                 # warm dust
 	mat.turbulence_enabled = true                            # organic, swirling drift
-	mat.turbulence_noise_strength = 4.0
+	mat.turbulence_noise_strength = 5.0
 	mat.turbulence_noise_scale = 1.4
 	_motes = GPUParticles2D.new()
 	_motes.process_material = mat
 	_motes.texture = _make_mote_texture()
-	_motes.amount = 55                                       # halved+ : atmosphere, not a snowstorm
+	_motes.amount = 95                                       # atmosphere, not a snowstorm
 	_motes.lifetime = 7.0
 	_motes.preprocess = 5.0                                  # start with a full field, not an empty screen
 	_motes.z_index = 45
@@ -1037,9 +1055,12 @@ func try_mine(cell: Vector2i) -> bool:
 			_particles.debris(center, Visuals.terrain_dust(mat).lightened(0.12),
 				(_player.position - center).angle())
 			_player.note_dig(int(signf(center.x - _player.position.x)))
-		if rich:
-			_particles.spark(center, Visuals.item_color(mat).lightened(0.35))
-		_shake = maxf(_shake, 2.2 if rich else 1.7)
+		# THE BREAK POPS (#A6). Every break throws a spray in the material's OWN item colour, not just a
+		# rich one — the block visibly becomes the thing you now carry, which is the moment the payout
+		# tick then names. A rich vein still out-sparkles a plain one; it just isn't the only break that
+		# reads as an event.
+		_particles.spark(center, Visuals.item_color(mat).lightened(0.35 if rich else 0.15))
+		_shake = maxf(_shake, 2.6 if rich else 2.0)
 		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
 	return mined != &""
 

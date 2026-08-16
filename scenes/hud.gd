@@ -11,12 +11,20 @@ const MINI_W: float = 150.0     ## minimap width (top-right); height derives fro
 const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 
 ## --- UI skin palette (one cohesive theme so the HUD reads as designed, not flat code-drawn) -------
+##
+## THE FOCAL HIERARCHY (#A3). The HUD used to hold the two brightest values in the frame — a near-white
+## text and a near-fluorescent gold — which inverted the whole image: the eye was pulled to the chrome
+## and away from the play space, and the world it left behind was a same-value jumble by comparison.
+## That is a large part of what "it hurts my eyes to play" was pointing at. Both are stepped down here.
+## The HUD is still perfectly readable against its own near-black panels (it always had the contrast to
+## spare); it simply stops competing with the world for first look. Nothing in the UI should ever be
+## brighter than lit rock.
 const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill
 const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
 const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → panels read as raised
-const UI_ACCENT := Color(0.96, 0.82, 0.36)           ## gold accent (FORGED, selected slot, current step)
-const UI_TEXT := Color(0.88, 0.90, 0.95)
-const UI_TEXT_DIM := Color(0.58, 0.62, 0.70)
+const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent (FORGED, selected slot, current step)
+const UI_TEXT := Color(0.80, 0.83, 0.89)
+const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
 const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
 
 var sim: FactorySim
