@@ -1450,8 +1450,8 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 ## measures 0.182 against 0.052 — a 3.5x separation instead of 1.2x — which buys the wall its value
 ## back. It is a lit rock surface again, and the recess is carried by the cast shadows above, by hue,
 ## and by the lighting model finally agreeing with all of it.
-const WALL_RECESS: float = 0.32      ## how far the back plane sits behind the front one, in value
-const WALL_COOL := Color(0.16, 0.19, 0.30)   ## the cool it drifts toward (distance desaturates)
+## WALL_RECESS and WALL_COOL live on FineTerrain with `apply_wall_tone`, which is now the single authority
+## for what a wall colour is — the coarse pass and the fine pass have to agree, so only one may own it.
 const WALL_AO_UNDER: float = 0.62    ## cast shadow on the wall under a solid ceiling — the deepest
 const WALL_AO_SIDE: float = 0.34     ## …beside a solid wall
 const WALL_AO_ABOVE: float = 0.16    ## …over a solid floor: light reaches a floor, so it stays open
@@ -2083,9 +2083,10 @@ func _bake_fine_terrain() -> void:
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),   # P2: the sim's real fine grid
 		func(c: Vector2i) -> Color: return _cell_base_color(c, _material(sim.material_at(c))),
-		_wall_fill_color,
+		_wall_base_color,
 		func(col: int) -> int: return sim.surface_row(col),
-		_cell_tone)
+		_cell_tone,
+		_has_wall)
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 
@@ -2100,9 +2101,10 @@ func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),
 		func(c: Vector2i) -> Color: return _cell_base_color(c, _material(sim.material_at(c))),
-		_wall_fill_color,
+		_wall_base_color,
 		func(col: int) -> int: return sim.surface_row(col),
-		_cell_tone)
+		_cell_tone,
+		_has_wall)
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 
@@ -2116,15 +2118,31 @@ func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 ## value and drifted toward cool, the two moves distance actually makes. What it no longer does is
 ## darken itself for being underground; that is the veil's job, and doing it here as well was
 ## double-counting the same shadow twice (#S3).
+const WALL_NONE := Color(0.06, 0.055, 0.05)   ## a cell with no wall entry (unlikely on solid terrain)
+
 func _wall_fill_color(c: Vector2i) -> Color:
 	if not sim.wall.has(c):
-		return Color(0.06, 0.055, 0.05)
-	var def: MaterialDef = _material(sim.wall[c])
-	var col: Color = _zone_tinted(def.base_color, c.y)
-	var boost: float = 1.0 + clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0) * 2.2
-	var s: float = _strata(c) * boost * 0.7                # the same beds, a little quieter back there
-	col = col.lightened(s * 0.85) if s > 0.0 else col.darkened(-s * 1.05)
-	return col.darkened(WALL_RECESS).lerp(WALL_COOL, 0.30)
+		return WALL_NONE
+	return FineTerrain.apply_wall_tone(_wall_base_color(c), _wall_strata(c))
+
+
+## The wall's colour BEFORE any bedding or recess — split out for the fine bake (#S13), which reconstructs
+## the bedding between coarse samples rather than inheriting one flat value per 32px cell. The coarse pass
+## puts the two straight back together above, so its output is unchanged.
+func _wall_base_color(c: Vector2i) -> Color:
+	if not sim.wall.has(c):
+		return WALL_NONE
+	return _zone_tinted(_material(sim.wall[c]).base_color, c.y)
+
+
+## The wall's bedding: the SAME beds as the foreground rock, because it IS the same ground seen a plane
+## back — a tunnel cut through a sandy layer should show that layer behind it — only quieter.
+func _wall_strata(c: Vector2i) -> float:
+	return _cell_tone(c).y * FineTerrain.WALL_STRATA_QUIET
+
+
+func _has_wall(c: Vector2i) -> bool:
+	return sim.wall.has(c)
 
 
 func _paint_darkness(layer: LightLayer) -> void:

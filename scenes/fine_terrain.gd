@@ -171,6 +171,46 @@ const FORM_SINK: float = 0.13          ## darkening at a cell hanging directly u
 ## rock BEHIND the carved foreground reads as a distinct, cooler, set-back layer (Noita's fore/background
 ## rock depth) instead of a flat near-black void.
 const BACKROCK_COOL := Color(0.10, 0.15, 0.20)
+## THE BACK WALL IS A SURFACE (#S13) — and until now it was the one large thing on screen that was not.
+##
+## Everything above this line paints the rock you have NOT dug. The moment you dig, what fills the frame is
+## the BACK WALL, and it was drawn by the coarse pass as `draw_rect(cell, one_colour)` plus two speckles and
+## an occasional fissure: one flat fill per 32px cell, carrying the same `_strata` quantised to the coarse
+## row that #S12 just took out of the foreground. So the better the front rock got, the more the wall behind
+## it read as cardboard — and a player spends the entire game looking at it, because it is the inside of
+## every shaft, room and gallery they have ever cut.
+##
+## It moves here, to fine resolution, for the same reason the foreground did: this is where the grain, the
+## reconstructed tone and the per-8px shape already live. The coarse pass keeps drawing walls underneath at
+## z -10 (harmless, and it is the fallback if this layer is ever off); the fine layer covers it at z -9, and
+## nothing else in the game draws in between.
+##
+## The cast shadow has to come with it. The coarse pass carried the wall's whole sense of depth in AO strips
+## along the cell edges — "the recess is carried by the cast shadows above" — and covering that up without
+## replacing it would flatten the wall even as the tone improved. `_wall_shade` re-casts it from the fine
+## grid, directionally: rock overhead is the deepest shadow, rock to the side less, a floor below least,
+## because light reaches a floor.
+const WALL_RECESS: float = 0.32                        ## how far the back plane sits behind the front one, in value
+const WALL_COOL := Color(0.16, 0.19, 0.30)             ## the cool it drifts toward (distance desaturates)
+const WALL_STRATA_QUIET: float = 0.7                   ## the same beds, a little quieter back there
+const WALL_AO_UNDER: float = 0.62                      ## cast shadow under a solid ceiling — the deepest
+const WALL_AO_SIDE: float = 0.34                       ## …beside a solid wall
+const WALL_AO_ABOVE: float = 0.16                      ## …over a solid floor: light reaches a floor
+const WALL_AO_REACH: int = 5                           ## fine cells the cast fades over (~1.2 coarse cells)
+const WALL_AO_MAX: float = 0.74                        ## a corner stacks three casts; it may not reach black
+## The wall is a DISTANT plane, so its texture is deliberately quieter than the foreground's. Matching the
+## front rock's grain amplitude here would collapse the depth cue the recess exists to create: two surfaces
+## at the same visual roughness read as one surface.
+const WALL_GRAIN: float = 0.055
+const WALL_PATCH: float = 0.11
+
+## Apply a wall's strata to its base body colour, then set it back. THE single authority for what a wall
+## colour is — the coarse pass calls it per cell, the fine pass per fine cell with a reconstructed strata,
+## so the two cannot drift apart. Order matters and matches the original: bedding rides on the material's
+## own colour, and the recess + cool are applied last, to the result.
+static func apply_wall_tone(base: Color, strata: float) -> Color:
+	var col: Color = base.lightened(strata * 0.85) if strata > 0.0 else base.darkened(-strata * 1.05)
+	return col.darkened(WALL_RECESS).lerp(WALL_COOL, 0.30)
 ## COOL SHADOW tint (fix-2 diff 3): carved/AO-shadowed foreground rock is lerped toward this cold
 ## teal-blue so shadows read blue-grey (the reference's cold rock), not the warm brown murk of pass-1.
 const SHADOW_TEAL := Color(0.13, 0.20, 0.27)
@@ -229,12 +269,13 @@ var _fine_solid: PackedByteArray = PackedByteArray()    ## the real fine solid/a
 var _solid_mask: PackedFloat32Array = PackedFloat32Array()  ## coarse solidity 0/1
 var _mat_col: PackedColorArray = PackedColorArray()     ## coarse body BASE colour, tone NOT yet applied
 var _tone: PackedVector2Array = PackedVector2Array()    ## coarse (jitter, strata) samples, reconstructed per fine cell
-var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall colour
+var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall BASE colour, tone NOT applied
+var _wall_has: PackedByteArray = PackedByteArray()      ## #S13: 1 where the coarse cell actually HAS a wall
 var _surf_row: PackedInt32Array = PackedInt32Array()    ## walkable surface row per column (cap band)
 var last_baked_cells: int = 0                           ## fine cells the LAST bake touched — the dig-hitch friction gauge (#103)
 ## Fine-cell dilation for a region rebake: must cover the widest neighbour reach any paint term reads so a
 ## patched region is byte-identical to a full bake — MOSS_DEPTH(3 up) / HANG_DEPTH(3 down) / SUBDIV(4,
-## accretion). RIM_DEPTH(2) and _moss_life (a pure function of the row) are both inside that reach.
+## accretion). RIM_DEPTH(2), WALL_AO_REACH(5) and _moss_life (a pure function of the row) are all inside it.
 const REGION_MARGIN: int = 6
 
 
@@ -320,7 +361,7 @@ const SURFACE_KEEP: int = 2
 ## per-dig fast lane is rebake_region (dirty-chunks, #102). Fills the persisted caches, then paints every
 ## fine cell via _paint_fine (shared with the region path).
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
-		surface_at: Callable, tone_at: Callable) -> void:
+		surface_at: Callable, tone_at: Callable, has_wall_at: Callable) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)
@@ -337,6 +378,7 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 	# The tone is sampled on EVERY cell, solid or not: the reconstruction below reads a fine cell's four
 	# surrounding coarse samples, and an air cell beside a rock face is one of them.
 	_tone.resize(_cols * _rows)
+	_wall_has.resize(_cols * _rows)
 	for cy: int in _rows:
 		for cx: int in _cols:
 			var idx: int = cy * _cols + cx
@@ -344,6 +386,7 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
 			_tone[idx] = tone_at.call(Vector2i(cx, cy)) as Vector2
+			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	_data.resize(_fcols * _frows * 4)
 	# Read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding lives in the sim's fine
 	# DATA), stashed so the paint can read neighbours for fine AO.
@@ -365,9 +408,10 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 ## rebake() but touches ~256 cells for a single dig, not the whole ~120k grid. Falls back to a full rebake
 ## if the grid was never fully baked (nothing cached to patch). Callables match rebake()'s.
 func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_solid_at: Callable,
-		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable, tone_at: Callable) -> void:
+		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable, tone_at: Callable,
+		has_wall_at: Callable) -> void:
 	if _data.size() != _fcols * _frows * 4:
-		rebake(solid_at, fine_solid_at, material_color_at, wall_color_at, surface_at, tone_at)
+		rebake(solid_at, fine_solid_at, material_color_at, wall_color_at, surface_at, tone_at, has_wall_at)
 		return
 	cmin.x = maxi(cmin.x, 0)
 	cmin.y = maxi(cmin.y, 0)
@@ -387,6 +431,7 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			if s:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
+			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	# _tone is deliberately NOT refreshed: a tone is a pure function of (x, y), so mining cannot change
 	# one. Leaving the cache alone is what keeps a region bake byte-identical to a full bake here.
 	# 2) Refresh the real fine solid/air shape for the changed cells' fine footprint.
@@ -522,14 +567,29 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# Eroded: this fine cell WAS rock, molding opened it → paint the RECESSED BACK-ROCK behind so the
 		# blocky coarse fill can't show through the organic curve (fix-2 diff 6): a darker, COOLER wall that
 		# reads as rock set BEHIND the foreground shelf, + a touch of fine AO so the pocket reads scooped.
-		var wc: Color = _wall_col[cidx].darkened(0.42).lerp(BACKROCK_COOL, 0.18)
+		var wc: Color = _wall_body(fx, fy, cidx).darkened(0.42).lerp(BACKROCK_COOL, 0.18)
 		var back_ao: float = 1.0 - 0.10 * _air_weight(_fine_solid, fx, fy)
 		_data[i4] = int(clampf(wc.r * back_ao, 0.0, 1.0) * 255.0)
 		_data[i4 + 1] = int(clampf(wc.g * back_ao, 0.0, 1.0) * 255.0)
 		_data[i4 + 2] = int(clampf(wc.b * back_ao, 0.0, 1.0) * 255.0)
 		_data[i4 + 3] = 255
+	elif _wall_has[cidx] == 1:
+		# #S13 THE BACK WALL. Genuine open air, but the coarse cell carries a wall — so this is the inside
+		# of something you have dug, and it is most of what is on screen once you have. Painted here rather
+		# than left to the coarse pass's flat per-cell rect, with the reconstructed tone, its own quieter
+		# grain, and the cast shadow re-thrown from the fine grid so the recess still reads.
+		var wall: Color = _wall_body(fx, fy, cidx)
+		var wgrain: float = _grain.get_noise_2d(float(fx) * GRAIN_XSTRETCH, float(fy)) * WALL_GRAIN \
+			+ _patch.get_noise_2d(float(fx), float(fy)) * WALL_PATCH
+		var wshade: float = 1.0 - _wall_shade(fx, fy)
+		var wout := Color(maxf(wall.r * wshade + wgrain, 0.0), maxf(wall.g * wshade + wgrain, 0.0),
+			maxf(wall.b * wshade + wgrain, 0.0), 1.0)
+		_data[i4] = int(clampf(wout.r, 0.0, 1.0) * 255.0)
+		_data[i4 + 1] = int(clampf(wout.g, 0.0, 1.0) * 255.0)
+		_data[i4 + 2] = int(clampf(wout.b, 0.0, 1.0) * 255.0)
+		_data[i4 + 3] = 255
 	else:
-		_clear_fine(i4)   # genuine open air — transparent, the world below shows unchanged
+		_clear_fine(i4)   # genuine open air with nothing behind it (the sky) — transparent
 
 
 ## THE TONE FIELD, REBUILT BETWEEN SAMPLES (#S12). Bilinearly interpolate the coarse (jitter, strata)
@@ -554,6 +614,37 @@ func _tone_at_fine(fx: int, fy: int) -> Vector2:
 	var top: Vector2 = _tone[y0 * _cols + x0].lerp(_tone[y0 * _cols + x1], tx)
 	var bot: Vector2 = _tone[y1 * _cols + x0].lerp(_tone[y1 * _cols + x1], tx)
 	return top.lerp(bot, ty)
+
+
+## A back-wall cell's body colour: the cached BASE with its strata put back on at fine resolution, quieted
+## the way the coarse pass quieted it, then set back behind the front plane.
+func _wall_body(fx: int, fy: int, cidx: int) -> Color:
+	return apply_wall_tone(_wall_col[cidx], _tone_at_fine(fx, fy).y * WALL_STRATA_QUIET)
+
+
+## THE CAST SHADOW ON THE BACK WALL (#S13), re-thrown from the fine grid.
+##
+## The coarse pass carried the wall's entire sense of depth in AO strips ruled along the cell edges, and the
+## fine layer now covers those — so it has to cast the shadow itself or the wall goes flat exactly as its
+## tone gets better. Directional, with the coarse pass's own weights: rock overhead is the deepest shadow,
+## rock to either side less, and a floor below least, because light reaches a floor.
+##
+## Each direction walks out until it finds solid rock or runs out of reach, and fades with distance, so an
+## opening's shadow is a gradient rather than the ruled border a per-cell strip drew. Capped below black: a
+## corner throws three casts at once and unclamped they would punch a hole in the wall.
+func _wall_shade(fx: int, fy: int) -> float:
+	var d: float = WALL_AO_UNDER * _cast(fx, fy, 0, -1) + WALL_AO_ABOVE * _cast(fx, fy, 0, 1) \
+		+ WALL_AO_SIDE * _cast(fx, fy, -1, 0) + WALL_AO_SIDE * _cast(fx, fy, 1, 0)
+	return clampf(d, 0.0, WALL_AO_MAX)
+
+
+## 1.0 when solid rock sits immediately that way, fading to 0.0 at WALL_AO_REACH fine cells. Early-exits on
+## the first solid cell, and every probe is inside REGION_MARGIN so a patched region matches a full bake.
+func _cast(fx: int, fy: int, dx: int, dy: int) -> float:
+	for i: int in range(WALL_AO_REACH):
+		if not _fine_air(_fine_solid, fx + dx * (i + 1), fy + dy * (i + 1)):
+			return 1.0 - float(i) / float(WALL_AO_REACH)
+	return 0.0
 
 
 ## Weighted OPEN-air neighbour count around a solid fine cell — the fine AO term. Orthogonal neighbours

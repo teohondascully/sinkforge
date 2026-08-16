@@ -77,9 +77,10 @@ func _on_frame() -> void:
 			func(c: Vector2i) -> bool: return r.sim.is_solid(c),
 			func(fx: int, fy: int) -> bool: return r.sim.fine_is_solid(fx, fy),
 			func(c: Vector2i) -> Color: return r._cell_base_color(c, r._material(r.sim.material_at(c))),
-			r._wall_fill_color,
+			r._wall_base_color,
 			func(col: int) -> int: return r.sim.surface_row(col),
-			r._cell_tone)
+			r._cell_tone,
+			r._has_wall)
 		var got: PackedByteArray = r._fine.texture().get_image().get_data()
 		var want: PackedByteArray = ref.texture().get_image().get_data()
 		_check(got == want, "region bake is byte-identical to a full bake of the same world (margin is safe)")
