@@ -7,7 +7,8 @@ extends Node2D
 const CANVAS := Vector2(640, 360)
 const SLOT: float = 30.0        ## inventory hotbar slot size
 const SLOT_GAP: float = 4.0
-const MINI_W: float = 150.0     ## minimap width (top-right); height derives from the world aspect
+const MINI_W: float = 150.0     ## minimap BOX in the top-right corner; the world fits inside it,
+const MINI_H: float = 116.0     ## ...whatever shape the world happens to be
 const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 
 ## --- UI skin palette (one cohesive theme so the HUD reads as designed, not flat code-drawn) -------
@@ -553,8 +554,7 @@ func _draw_hover() -> void:
 	var line_h: float = 18.0
 	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
 	# is centred, off this column), else just the FORGED chip — so the inspector never collides.
-	var mini_bottom: float = (MINI_TOP + MINI_W * float(FactorySim.GRID_ROWS) / float(FactorySim.GRID_COLS)) \
-		if (show_minimap and not minimap_large) else 34.0
+	var mini_bottom: float = minimap_frame().end.y if (show_minimap and not minimap_large) else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_hover_rect = Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0))
 	_panel(_hover_rect)
@@ -666,14 +666,23 @@ func draw_string_pos(x: float, y: float, text: String) -> float:
 
 ## Where the minimap sits RIGHT NOW (canvas space) — corner (top-right, small) or LARGE (centred).
 ## Public: MainView uses it to route map-clicks to the PING and to keep world verbs off the map.
+##
+## Both forms FIT the world's aspect inside a box rather than deriving one side from the other. A corner
+## map sized by width alone was fine while the world was 96x80 and became a 150x150 slab down half the
+## screen the moment it went square — a corner element has a height budget as much as a width one, and
+## the world's shape is not the HUD's to assume.
 func minimap_frame() -> Rect2:
-	var cols: float = float(FactorySim.GRID_COLS)
-	var rows: float = float(FactorySim.GRID_ROWS)
+	var world := Vector2(float(FactorySim.GRID_COLS), float(FactorySim.GRID_ROWS))
 	if minimap_large:
-		var mh: float = 272.0
-		var mw: float = mh * cols / rows
-		return Rect2(Vector2((CANVAS.x - mw) * 0.5, (CANVAS.y - mh) * 0.5), Vector2(mw, mh))
-	return Rect2(Vector2(CANVAS.x - MINI_W - 12.0, MINI_TOP), Vector2(MINI_W, MINI_W * rows / cols))
+		var big: Vector2 = _fit(world, Vector2(360.0, 272.0))
+		return Rect2((CANVAS - big) * 0.5, big)
+	var small: Vector2 = _fit(world, Vector2(MINI_W, MINI_H))
+	return Rect2(Vector2(CANVAS.x - small.x - 12.0, MINI_TOP), small)
+
+
+## The largest rect with `aspect`'s proportions that fits inside `box`.
+func _fit(aspect: Vector2, box: Vector2) -> Vector2:
+	return aspect * minf(box.x / aspect.x, box.y / aspect.y)
 
 
 ## The MINIMAP (M — corner; M again — LARGE): a cached image of the whole world — solid cells in their
@@ -702,11 +711,32 @@ func _draw_minimap() -> void:
 	draw_rect(Rect2(origin.x, seal_y + seal_h, frame.size.x, frame.end.y - (seal_y + seal_h)),
 		Color(0.35, 0.50, 0.95, 0.10))                                  # Stonereach: a cold wash
 	draw_rect(Rect2(origin.x, seal_y, frame.size.x, seal_h), Color(0.62, 0.42, 0.85, 0.55))  # THE SEAL
+	# THE DESCENT CHART. The large map used to name exactly two bands, TOPSOIL and STONEREACH, and it
+	# put the first of them immediately above the seal — which is the deepslate, sixty rows from any
+	# topsoil. Every band Strata knows about now gets a hairline at its ceiling and its own name in its
+	# own colour, so the map answers "how far down does this go, and what is between here and there"
+	# at a glance. That is the whole reason to open a map in a game about descending.
 	if minimap_large:
-		draw_string(_font, Vector2(origin.x + 5.0, seal_y - 4.0), "TOPSOIL",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.72, 0.60, 0.75))
-		draw_string(_font, Vector2(origin.x + 5.0, seal_y + seal_h + 10.0), "STONEREACH",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.55, 0.65, 0.90, 0.75))
+		for i: int in range(1, Strata.BANDS.size()):     # skip OPEN SKY: it has no ceiling to draw
+			var band: Dictionary = Strata.BANDS[i]
+			var by: float = origin.y + float(int(band["from"])) * scale.y
+			if by < origin.y or by > frame.end.y - 6.0:
+				continue
+			var tint: Color = band["color"]
+			draw_line(Vector2(origin.x, by), Vector2(frame.end.x, by), Color(tint, 0.30), 1.0)
+			# A thin band (THE SEAL is two rows) would stack its name on top of the one below it. Every
+			# band keeps its LINE; the one that loses its text is the shallower of a colliding pair,
+			# because the deeper name is the one telling you what you are about to be in.
+			if i + 1 < Strata.BANDS.size():
+				var next_y: float = origin.y + float(int(Strata.BANDS[i + 1]["from"])) * scale.y
+				if next_y - by < 9.0:
+					continue
+			draw_string(_font, Vector2(origin.x + 5.0, by + 8.0), str(band["name"]),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(tint, 0.80))
+			var depth: String = "%d m" % Strata.depth_m(int(band["from"]))
+			var dw: float = _font.get_string_size(depth, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+			draw_string(_font, Vector2(frame.end.x - dw - 5.0, by + 8.0), depth,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(tint, 0.55))
 	# --- AQUIFERS: the flooded pockets that guard rich ore. A distinct cool cyan-blue (clear of the
 	# amber power wash, the gold bazaars, and the violet seal/breach), alpha scaling with fill so deep
 	# water reads solid, a puddle reads faint. Live overlay: water FLOWS each tick, not in the cached bake.

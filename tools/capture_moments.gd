@@ -10,6 +10,8 @@ extends SceneTree
 ##   boot  — the clean new-player opening (the surface, first frame a player ever sees)
 ##   delve — standing at the bottom of a dug shaft, lamp-lit, rock on every side
 ##   swing — mid-arc on a live grapple line, so the rope, the hook and the pose can be judged together
+##   map   — the LARGE minimap over a dug world: the one view that shows the world's whole shape, and
+##           so the only way to judge whether the descent reads as a journey rather than as a grid
 ##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
 ##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
 ##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
@@ -59,6 +61,11 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _dig_in(main)
 			await _hollow_room(main)
 			await _swing(main)
+		"map":
+			await _dig_in(main)
+			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
+			for _i in 8:
+				await physics_frame
 		_:
 			push_warning("unknown moment '%s' — capturing boot" % moment)
 

@@ -9,6 +9,9 @@ extends SceneTree
 ##   - the research bench (pinned under the scroll viewport) sits inside the panel
 ##   - a long list actually scrolls (content > viewport), snapped to whole rows, clamped
 ##   - a short list does NOT scroll (viewport == content, scroll_max == 0)
+## Also guards the MINIMAP frame, which is the same class of bug one element over: a HUD rect that
+## derives one of its dimensions from a WORLD constant is a rect that resizes itself when the world
+## does. Both map forms must fit their box, keep the world aspect, and stay off the live play area.
 ## Run: godot --headless --path . --script res://tools/check_pack_layout.gd
 
 var _failures: int = 0
@@ -87,6 +90,30 @@ func _initialize() -> void:
 	hud.can_craft = false
 	_assert_fits(hud, canvas, "no-bazaar")
 	_check(hud._pack_geometry()["research_h"] <= 0.01, "no-bazaar: no research section")
+
+	# --- THE MINIMAP FRAME: both forms fit their box, whatever shape the world is. A corner map sized by
+	# width alone was fine at 96x80 and became a 150x150 slab down half the screen the moment the world
+	# went square; the class of bug is a HUD element deriving one dimension from a world constant. ---
+	for large: bool in [false, true]:
+		hud.minimap_large = large
+		var f: Rect2 = hud.minimap_frame()
+		var tag: String = "map-large" if large else "map-corner"
+		_check(f.position.x >= -0.5 and f.end.x <= canvas.x + 0.5,
+			"%s: on-screen horizontally (%.0f..%.0f)" % [tag, f.position.x, f.end.x])
+		_check(f.position.y >= -0.5 and f.end.y <= canvas.y + 0.5,
+			"%s: on-screen vertically (%.0f..%.0f of %.0f)" % [tag, f.position.y, f.end.y, canvas.y])
+		var world_aspect: float = float(FactorySim.GRID_COLS) / float(FactorySim.GRID_ROWS)
+		_check(absf(f.size.x / f.size.y - world_aspect) < 0.01,
+			"%s: keeps the world's aspect (%.2f vs %.2f)" % [tag, f.size.x / f.size.y, world_aspect])
+	hud.minimap_large = false
+	var corner: Rect2 = hud.minimap_frame()
+	_check(corner.size.x <= Hud.MINI_W + 0.5 and corner.size.y <= Hud.MINI_H + 0.5,
+		"map-corner: inside its %.0fx%.0f box (%.0fx%.0f)"
+		% [Hud.MINI_W, Hud.MINI_H, corner.size.x, corner.size.y])
+	# ...and it must not reach the hotbar. The corner map is an ALWAYS-AVAILABLE overlay over live play,
+	# so anything it covers is something the player cannot see while it is up.
+	_check(corner.end.y <= canvas.y * 0.5,
+		"map-corner: stays in the top half (bot=%.0f)" % corner.end.y)
 
 	hud.free()
 	if _failures == 0:
