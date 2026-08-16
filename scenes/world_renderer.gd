@@ -1037,7 +1037,36 @@ func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 	var col: Color = _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
 	var j: float = _cell_jitter(c)
-	return col.lightened(j) if j > 0.0 else col.darkened(-j)
+	col = col.lightened(j) if j > 0.0 else col.darkened(-j)
+	var s: float = _strata(c)
+	return col.lerp(STRATA_WARM, s) if s > 0.0 else col.lerp(STRATA_COOL, -s)
+
+
+## SEDIMENTARY BANDING — the ground's own structure. The cell jitter above breaks a field of earth out
+## of ONE flat colour, but it drifts in cloudy isotropic patches, which reads as noise on a slab rather
+## than as a slab made of something. From the surface, forty cells of untouched dirt were a single brown
+## expanse: the largest remaining piece of "flat and two-dimensional", and the reason a shaft felt like
+## a hole punched in cardboard instead of a cut through ground.
+##
+## Bands run HORIZONTALLY (the direction you cut across as you sink) at three incommensurable
+## frequencies, so fine laminations and thick beds overlap and the pattern never visibly repeats down a
+## shaft. They are warped slowly along x so a layer dips and rises like real bedding instead of ruling a
+## straight line across the world. Light bands go sandy and dark bands go to cool clay — a HUE move, not
+## just a value one, because value alone would just re-shade the same brown.
+##
+## Deterministic and RNG-free, and it feeds the fine-terrain bake through the same callable, so a dug
+## face exposes the same layer the coarse cell was showing.
+const STRATA_WARM := Color(0.86, 0.74, 0.52)   ## the sandy band
+const STRATA_COOL := Color(0.15, 0.16, 0.21)   ## the cool clay/silt band
+const STRATA_AMOUNT: float = 0.17              ## how far a band pulls toward its colour
+
+func _strata(c: Vector2i) -> float:
+	var y: float = float(c.y) + sin(float(c.x) * 0.055) * 2.4 + sin(float(c.x) * 0.021) * 3.6
+	# Periods of roughly 18, 7 and 4 cells: a screen holds about twenty rows, so you always see a thick
+	# bed, the two or three layers inside it, and the fine laminations between — the whole scale ladder
+	# at once, which is what makes ground read as ground.
+	var n: float = sin(y * 0.34) * 0.46 + sin(y * 0.88) * 0.36 + sin(y * 1.62) * 0.18
+	return n * STRATA_AMOUNT
 
 
 ## A SMOOTH, spatially-coherent value nudge (~[-0.06, +0.06]) — low-frequency sines so neighbouring
