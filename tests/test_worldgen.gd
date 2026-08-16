@@ -10,6 +10,7 @@ func _initialize() -> void:
 	print("== worldgen tests ==")
 	_test_terrain()
 	_test_surface_silhouette()
+	_test_surface_walkable()
 	_test_worldgen()
 	_test_layered_worldgen()
 	_test_worldgen_fuzz()
@@ -68,6 +69,46 @@ func _test_surface_silhouette() -> void:
 	sim.place_machine(proc_def, Vector2i(10, 9))           # a machine standing on the flat row-10 ground
 	_check(sim.surface_row(10) == 10, "a placed machine does NOT raise the surface silhouette")
 	_check(sim.ramp_dir(10) == 0, "a placed machine casts NO phantom ramp (it's a box you bump, not a hill)")
+
+
+## EVERY SURFACE IS WALKABLE. The body auto-steps up to 1.3 cells, so a 2-row rise between adjacent
+## columns is a wall it has to jump — and a skyline built out of those is the "walking feels clunky"
+## complaint in its purest form: you press right and the world says no, repeatedly, on ground that looks
+## like a gentle hill. HeightmapWorldGen guarantees this arithmetically (its slope budget is documented at
+## the constants), and this is the assertion that keeps the budget honest: a future amplitude bump that
+## breaks it trips here rather than shipping a hillside nobody can climb.
+##
+## Checked across several seeds and both generators, because the surface function is shared and a
+## subclass could reasonably decide to override it.
+func _test_surface_walkable() -> void:
+	print("- surface walkability (no un-steppable rises)")
+	for gen: WorldGen in [HeightmapWorldGen.new(), LayeredWorldGen.new()] as Array[WorldGen]:
+		for seed_v: int in [1337, 4242, 20260807]:
+			var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, seed_v)
+			var worst: int = 0
+			var worst_col: int = -1
+			for col: int in range(world.cols - 1):
+				var step: int = absi(_surface_of(world, col + 1) - _surface_of(world, col))
+				if step > worst:
+					worst = step
+					worst_col = col
+			_check(worst <= 1, "%s seed %d: every column step is <= 1 row (worst %d at col %d)"
+				% [gen.get_script().resource_path.get_file(), seed_v, worst, worst_col])
+
+
+## Topmost GROUND row of a generated column, read from the produced WorldData (so it measures what the
+## world actually is after every pass, not what the height function intended before them). Flora and the
+## bazaar ruin's timber are skipped: a tree trunk is a thing you chop, not a hill you climb, and counting
+## a canopy as terrain reports a four-row "step" at the base of every tree.
+const _NOT_GROUND: Array[StringName] = [&"wood", &"leaves"]
+
+
+func _surface_of(world: WorldData, col: int) -> int:
+	for row: int in world.rows:
+		var m: StringName = world.blocks.get(Vector2i(col, row), &"")
+		if m != &"" and not _NOT_GROUND.has(m):
+			return row
+	return world.rows
 
 
 ## The world-engine handshake: a generator produces a WorldData deterministically; the sim ingests

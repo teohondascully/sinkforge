@@ -301,10 +301,16 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 			if anchor.y >= 0:
 				do_build(anchor)                          # hang it — it unrolls down to us
 		if sim.is_climbable(bc):
-			if bc.y <= target_row:
-				player.input_climb = 0.0                  # at the lip — LEAP off toward the exit side (the
-				player.input_dir = _exit_dir(bc)          # human move; walking can ping-pong between two
-				if player.climbing:                        # adjacent roped shaft mouths)
+			# AT THE LIP — but only if there IS a lip. Reaching the target ROW is not the same as being
+			# level with somewhere to stand: when a shaft's mouth sits flush with the ground beside it (a
+			# rolling surface makes that common, and a 2-wide shaft makes it worse) the body would stop
+			# climbing exactly one row short and leap sideways into the shaft's OWN second column, fall
+			# back down, and do it again until the budget ran out. Keep riding until a floored side
+			# actually exists; the rope-stall escape below still covers a top that can't be exited at all.
+			if bc.y <= target_row and _floored_exit(bc) != 0.0:
+				player.input_climb = 0.0                  # LEAP off toward the exit side (the human move;
+				player.input_dir = _floored_exit(bc)      # walking can ping-pong between two adjacent
+				if player.climbing:                        # roped shaft mouths)
 					_do_jump()
 			else:
 				player.input_dir = 0.0
@@ -386,6 +392,18 @@ func _rope_anchor_above(bc: Vector2i) -> Vector2i:
 ## Which way to step OFF a rope at the lip: prefer an open side cell WITH A FLOOR under it (stepping
 ## into the open mouth of a neighbouring shaft would just drop you back down); fall back to any open
 ## side. Used once the body has climbed to the target row and needs to stand on ground.
+## The side of `bc` you could actually LAND on: open to move into, with solid ground directly under it.
+## 0.0 when neither side offers one — which is the whole point, because "no exit here" has to be
+## distinguishable from "exit right", and _exit_dir's any-open-side fallback cannot express it.
+func _floored_exit(bc: Vector2i) -> float:
+	for d: int in [1, -1]:
+		var side := Vector2i(bc.x + d, bc.y)
+		if sim.in_bounds(side) and not sim.is_solid(side) and sim.machine_at(side) == null \
+				and sim.is_solid(side + Vector2i(0, 1)):
+			return float(d)
+	return 0.0
+
+
 func _exit_dir(bc: Vector2i) -> float:
 	for d: int in [1, -1]:
 		var side := Vector2i(bc.x + d, bc.y)
