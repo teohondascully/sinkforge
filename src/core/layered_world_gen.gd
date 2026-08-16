@@ -65,6 +65,59 @@ const TUNNEL_MAX_LEN: int = 46
 ## Carve radius around the worm path (1 → ~3-wide walkable caverns).
 const TUNNEL_RADIUS: int = 1
 
+## --- VERTICAL STRUCTURE (#S5) -------------------------------------------------------------------------
+## Everything above this line carves HORIZONTALLY. Noise pockets are round, big caverns are wide ellipses
+## with flat floors, and tunnel worms are explicitly biased flat. That is a coherent set of choices for a
+## game you walk through, and it produced an underground with no vertical dimension at all: at full
+## zoom-out the whole world reads as one grey mass with a few dark lens shapes floating in it, and every
+## screen looks like every other screen. It is also, bluntly, why the game reads as flat — the terrain
+## genuinely is.
+##
+## A RIFT is the opposite carve: a narrow chasm that falls THROUGH the layer stack, wandering a little as
+## it goes, slicing whatever it meets. It does three jobs at once. It is a landmark (you recognise a rift
+## and you remember where it was). It is a shortcut down and a problem coming up, which is exactly the
+## tension the grapple was built to resolve. And it puts a hard vertical edge into a world made entirely
+## of soft horizontal ones, so the eye finally has something to hang scale on.
+## Budgeted against the DIG-YOUR-FACTORY guard in tests/test_worldgen.gd, which holds open space under a
+## quarter of everything below the surface: this world is solid ore-rich rock you carve INTO, and caves
+## are punctuation rather than the medium you travel through. The first cut of these numbers pushed it to
+## 26.5% and tripped it, correctly. Narrow and long is the better shape anyway — a chasm that pinches to
+## two cells and opens to five is far more dramatic than a uniform six-wide slot, and costs less.
+const RIFT_PER_COL: float = 0.026        ## ~2 rifts on a 96-wide world — landmarks, not a feature grid
+const RIFT_MIN_LEN: int = 26             ## rows; short of this it reads as a hole rather than a chasm
+const RIFT_MAX_LEN: int = 54
+const RIFT_HALF_W_MIN: float = 0.8       ## half-width in cells at the narrowest — a squeeze
+const RIFT_HALF_W_MAX: float = 2.1       ## ...and at the widest — a rift PINCHES and OPENS as it falls
+const RIFT_WANDER: float = 0.34          ## cells of horizontal drift per row (kept low: a rift is a fall line)
+
+## A cavern with smooth walls is a bubble, and a bubble is not a place. LEDGES jut back into open space
+## from its sides so there is somewhere to land, somewhere to stand a machine, and something for the eye
+## to measure the room against. They are placed on the OPEN side of a solid wall, so they read as rock
+## that resisted rather than as debris that floats.
+const LEDGE_PER_COL: float = 0.22
+const LEDGE_LEN_MIN: int = 2
+const LEDGE_LEN_MAX: int = 4
+const LEDGE_HEADROOM: int = 2            ## cells of clear air a shelf needs above it, or it is just fill
+
+## SPIRES: stalactites down from ceilings, stalagmites up from floors. One cell wide, tapering to nothing.
+## Cheaper than any other cue on this list and worth more than most — nothing else says "you are inside
+## rock" so immediately, and a 4-cell spire gives a 40-cell view a sense of scale it cannot get from flat
+## surfaces. Kept sparse; a forest of them reads as decoration rather than as geology.
+## Ceilings and floors get different teeth, for the same reason real caves do and for one better one:
+## a five-cell stalagmite in a tunnel is not decoration, it is a wall, and the play-tests caught exactly
+## that — two scripted rungs started failing because the route down had grown floor spikes taller than the
+## body could step over. Stalactites hang long from ceilings where nothing walks; stalagmites stay stubby.
+const SPIRE_CHANCE: float = 0.075        ## per eligible ceiling cell
+const SPIRE_FLOOR_BIAS: float = 0.34     ## × that chance for a floor cell — teeth belong on the roof
+const SPIRE_HANG_MIN: int = 2            ## stalactite, growing DOWN from a ceiling
+const SPIRE_HANG_MAX: int = 5
+const SPIRE_RISE_MIN: int = 1            ## stalagmite, growing UP from a floor — steppable by construction
+const SPIRE_RISE_MAX: int = 2
+
+## RUBBLE: single loose blocks resting on cave floors. The detail that makes a floor read as a floor that
+## things have fallen onto, rather than as the bottom edge of a shape.
+const RUBBLE_CHANCE: float = 0.060
+
 # --- ore ---
 ## Vein-seed attempts ≈ this × columns. Each is accepted by a depth-weighted roll, so most surviving
 ## veins land deep — the band. Nudged up (#107): with the rock now solid-dominant (fewer caves), more
@@ -202,6 +255,15 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_scatter_veins(world, rng, hfield)
 	_scatter_coal(world, rng, hfield)
 	_scatter_iron(world, rng)
+	# THE VERTICAL PASSES (#S5) run AFTER the ore, and the order is load-bearing in two directions. A rift
+	# cut through finished rock SLICES VEINS, so its walls show exposed ore — the chasm is a landmark that
+	# is also a reward, which is the whole reason to walk to one. And the ore field's horizontal balance
+	# (the frontier pull) is computed on unperturbed rock, so a rift that happens to land on a frontier
+	# band can't quietly eat that band's richness — which it did, and the harness said so.
+	_carve_rifts(world, rng)     # RIFTS: tall vertical chasms — the vertical space the grapple exists for
+	_stud_ledges(world, rng)     # then put rock BACK: shelves, spires and rubble, so open space has form
+	_stud_spires(world, rng)
+	_scatter_rubble(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
 	_stamp_seal(world)          # LAST solid pass: the gate band overwrites everything, so nothing can hole it
@@ -384,6 +446,136 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 				continue                                 # protect the near-surface base
 			if world.blocks.has(cell):
 				world.blocks.erase(cell)
+
+
+## RIFTS. A chasm walks DOWN from a start row, wandering slightly, carving a column of open air whose
+## half-width breathes along the way (so it pinches to a squeeze and opens into a shaft rather than being
+## a uniform slot). Like every other carve it keeps the wall behind it — a rift is a room, not a hole in
+## the world — and it refuses the base-safe band under the spawn surface, so one can never open a chimney
+## straight into the tutorial.
+func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var count: int = maxi(2, int(round(float(world.cols) * RIFT_PER_COL)))
+	for _r: int in count:
+		var x: float = float(rng.randi_range(5, world.cols - 6))
+		var top: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + rng.randi_range(2, 10)
+		var length: int = rng.randi_range(RIFT_MIN_LEN, RIFT_MAX_LEN)
+		var drift: float = rng.randf_range(-RIFT_WANDER, RIFT_WANDER)
+		var phase: float = rng.randf_range(0.0, TAU)
+		var pinch: float = rng.randf_range(0.16, 0.30)      # how fast the width breathes down the fall
+		for i: int in length:
+			var row: int = top + i
+			if row >= world.rows - 2:
+				break
+			# Width breathes on a sine so the chasm reads as carved by something that varied, not extruded.
+			var t: float = 0.5 + 0.5 * sin(phase + float(i) * pinch)
+			var half: float = lerpf(RIFT_HALF_W_MIN, RIFT_HALF_W_MAX, t)
+			var lo: int = int(floor(x - half))
+			var hi: int = int(ceil(x + half))
+			for col: int in range(lo, hi + 1):
+				var cell := Vector2i(col, row)
+				if not world.in_bounds(cell):
+					continue
+				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+					continue
+				world.blocks.erase(cell)
+			x += drift
+			drift = clampf(drift + rng.randf_range(-0.10, 0.10), -RIFT_WANDER, RIFT_WANDER)
+			if x < 3.0 or x > float(world.cols - 4):
+				break
+
+
+## LEDGES. Walk the open cells; where an open cell sits against a solid side wall and has open air above
+## it (so the shelf is something you could stand ON), grow a short tongue of rock out into the space.
+## Sampled from a snapshot of the open set so a ledge placed this pass can't seed another one next to it.
+func _stud_ledges(world: WorldData, rng: RandomNumberGenerator) -> void:
+	var sites: Array[Vector2i] = _open_cells(world)
+	var wanted: int = int(round(float(world.cols) * LEDGE_PER_COL))
+	for _i: int in wanted:
+		if sites.is_empty():
+			return
+		var c: Vector2i = sites[rng.randi_range(0, sites.size() - 1)]
+		var dir: int = 0
+		if world.blocks.has(c + Vector2i(-1, 0)):
+			dir = 1                                   # wall on the left → the shelf grows right
+		elif world.blocks.has(c + Vector2i(1, 0)):
+			dir = -1
+		if dir == 0:
+			continue                                  # needs a wall to spring from
+		var clear: bool = true
+		for h: int in range(1, LEDGE_HEADROOM + 1):
+			if world.blocks.has(c + Vector2i(0, -h)):
+				clear = false
+				break
+		if not clear:
+			continue                                  # a shelf you cannot stand on is just fill
+		var mat: StringName = _structural_rock(world.blocks.get(c + Vector2i(-dir, 0), &"stone"))
+		var run: int = rng.randi_range(LEDGE_LEN_MIN, LEDGE_LEN_MAX)
+		for k: int in run:
+			var cell: Vector2i = c + Vector2i(dir * k, 0)
+			if not world.in_bounds(cell) or world.blocks.has(cell):
+				break
+			world.blocks[cell] = mat
+
+
+## SPIRES. Hang teeth from ceilings and raise them from floors, tapering to a point so the silhouette is
+## a spike rather than a post. A ceiling cell is open with solid directly above; a floor cell is open with
+## solid directly below. Both take the material of the rock they grow out of, so a spire in the deepslate
+## band is deepslate and reads as part of the same stone.
+func _stud_spires(world: WorldData, rng: RandomNumberGenerator) -> void:
+	for c: Vector2i in _open_cells(world):
+		var down: bool = world.blocks.has(c + Vector2i(0, -1))
+		var up: bool = world.blocks.has(c + Vector2i(0, 1))
+		if down == up:
+			continue                                  # a 1-cell gap between two solids grows nothing
+		var hang: bool = down                         # solid above → this tooth hangs from a ceiling
+		if rng.randf() > SPIRE_CHANCE * (1.0 if hang else SPIRE_FLOOR_BIAS):
+			continue
+		var step: int = 1 if hang else -1
+		var mat: StringName = _structural_rock(world.blocks.get(c + Vector2i(0, -step), &"stone"))
+		var run: int = rng.randi_range(SPIRE_HANG_MIN, SPIRE_HANG_MAX) if hang \
+			else rng.randi_range(SPIRE_RISE_MIN, SPIRE_RISE_MAX)
+		for k: int in run:
+			var cell: Vector2i = c + Vector2i(0, step * k)
+			if not world.in_bounds(cell) or world.blocks.has(cell):
+				break
+			world.blocks[cell] = mat
+
+
+## RUBBLE: a single loose block resting on a cave floor. One cell, no cleverness — but a floor with a few
+## stones on it reads as a place where things have come to rest, and a bare one reads as an edge.
+func _scatter_rubble(world: WorldData, rng: RandomNumberGenerator) -> void:
+	for c: Vector2i in _open_cells(world):
+		if not world.blocks.has(c + Vector2i(0, 1)):
+			continue                                  # must be resting on something
+		if world.blocks.has(c + Vector2i(0, -1)):
+			continue                                  # ...with air above it, or it is just fill
+		if rng.randf() > RUBBLE_CHANCE:
+			continue
+		world.blocks[c] = _structural_rock(world.blocks.get(c + Vector2i(0, 1), &"stone"))
+
+
+## The material a structural block should be built from, given the rock it grows out of. Ore, coal and
+## iron are REWARDS — a stalagmite or a loose stone made of them would be free ore lying on a cave floor,
+## which is not what a cave floor is for. Structure is always plain rock.
+const _REWARD_ROCK: Array[StringName] = [&"ore", &"rich_ore", &"coal", &"iron"]
+
+
+func _structural_rock(source: StringName) -> StringName:
+	return &"stone" if source == &"" or _REWARD_ROCK.has(source) else source
+
+
+## Every underground cell that is currently OPEN, in a deterministic order. Built by scanning the grid
+## rather than by tracking carves, so it sees the union of every carve pass that ran before it — and the
+## fixed scan order is what keeps the studding passes byte-identical across runs at a given seed.
+func _open_cells(world: WorldData) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for col: int in world.cols:
+		var top: int = _surface_row(col) + CAVE_MIN_DEPTH
+		for row: int in range(top, world.rows - 1):
+			var cell := Vector2i(col, row)
+			if not world.blocks.has(cell):
+				out.append(cell)
+	return out
 
 
 ## Depth-banded ore: many vein-seed attempts, each kept by a depth-weighted roll (deep seeds survive,
