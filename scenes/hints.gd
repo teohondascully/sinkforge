@@ -60,6 +60,16 @@ const WATER_HINT_ID: StringName = &"in_water"
 const WATER_HINT_TEXT: String = \
 	"AQUIFER — water floods your dig and slows you. A POWERED PUMP drains it; then mine the rich walls."
 
+## The GRAPPLE edge. The tool is in the miner's kit from the first frame, which means nothing at all if
+## nobody ever presses F — and the moment it becomes obviously worth pressing is the first time the way
+## back up is a real trip. Ten rows down is where a player stops thinking about the hole and starts
+## thinking about the climb, so that is where the game mentions the winch. Latched like every other hint.
+const DEPTH_HINT_ID: StringName = &"deep_enough"
+const DEPTH_HINT_ROWS: int = 10
+const DEPTH_HINT_TEXT: String = \
+	"GRAPPLE — F fires the winch at whatever you're aiming at. W reels you UP it, SPACE leaps off. " \
+	+ "The climb back is the swing."
+
 var sim: FactorySim
 var _had: Dictionary = {}           ## item -> true if the pack held it last frame (edge detection)
 var _done: Dictionary = {}          ## hint id -> true once shown (latched for the session)
@@ -68,6 +78,7 @@ var _active: StringName = &""
 var _life: float = 0.0
 var _in_water: bool = false         ## body wet this frame (poked by note_in_water; drives the water edge)
 var _was_in_water: bool = false     ## body wet last frame — the rising-edge detector for the water hint
+var _depth_rows: int = 0            ## rows below the local surface this frame (poked; drives the grapple hint)
 
 
 func _init(factory: FactorySim) -> void:
@@ -81,6 +92,12 @@ func _init(factory: FactorySim) -> void:
 ## playing, so a dry spawn never fires the hint retroactively.
 func note_in_water(wet: bool) -> void:
 	_in_water = wet
+
+
+## Poked with how far below its own column's surface the body currently is. Like note_in_water this is a
+## Player/world predicate rather than a pack item, so it rides a poked value instead of an inventory scan.
+func note_depth(rows_below_surface: int) -> void:
+	_depth_rows = rows_below_surface
 
 
 ## Call every frame. Detects acquisition edges, advances the active bubble's life, promotes the queue.
@@ -98,6 +115,10 @@ func refresh(delta: float) -> void:
 		_done[WATER_HINT_ID] = true
 		_queue.append(WATER_HINT_ID)
 	_was_in_water = _in_water
+	# The DEPTH edge: the first time the shaft is deep enough that the climb is a chore, name the tool.
+	if _depth_rows >= DEPTH_HINT_ROWS and not _done.has(DEPTH_HINT_ID):
+		_done[DEPTH_HINT_ID] = true
+		_queue.append(DEPTH_HINT_ID)
 	if _active != &"":
 		_life -= delta
 		if _life <= 0.0:
@@ -113,6 +134,8 @@ func active_text() -> String:
 		return ""
 	if _active == WATER_HINT_ID:
 		return WATER_HINT_TEXT
+	if _active == DEPTH_HINT_ID:
+		return DEPTH_HINT_TEXT
 	for def: Dictionary in _defs:
 		if def["id"] == _active:
 			return str(def["text"])
