@@ -17,6 +17,10 @@ var _pool_idx: int = 0
 var _ui_player: AudioStreamPlayer
 var _hum_player: AudioStreamPlayer
 var _hum_level: float = 0.0                   # smoothed 0..1
+var _winch_player: AudioStreamPlayer          # rope bed: the drum ratcheting line in
+var _creak_player: AudioStreamPlayer          # rope bed: the line singing under load
+var _winch_level: float = 0.0                 # smoothed 0..1
+var _creak_level: float = 0.0
 var _rush_player: AudioStreamPlayer           # speed bed: the air going past you
 var _rush_level: float = 0.0                  # smoothed 0..1
 var _wind_player: AudioStreamPlayer           # ambience bed: surface wind
@@ -50,6 +54,7 @@ func _ready() -> void:
 	_streams[&"breach"] = _wav(_gen_breach(rng))
 	_streams[&"ignite"] = _wav(_gen_ignite(rng))
 	_streams[&"vein"] = _wav(_gen_vein(rng))
+	_streams[&"catch"] = _wav(_gen_catch(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -78,12 +83,20 @@ func _ready() -> void:
 	# you near falling water (a small waterfall in the dark), and a working PUMP's wet mechanical drain.
 	# Both level-driven from the controller (set_water) exactly like the factory hum, so they swell with
 	# nearby activity and fade to silence when nothing's pouring/pumping — they blend under wind/cave/drips.
+	# THE ROPE'S OWN VOICE. The line became the movement system across strikes 20-22 and it was very nearly
+	# silent: a borrowed clunk on the throw, a borrowed crunch on the bite, a borrowed pop on the release,
+	# and NOTHING for the winch — the one rope action you hold down for seconds at a time, hauling thirteen
+	# cells a second. A continuous verb with no continuous sound reads as a thing that is not happening.
+	_winch_player = _make_loop_player(_gen_winch(rng))
+	_creak_player = _make_loop_player(_gen_creak(rng))
 	_rush_player = _make_loop_player(_gen_rush(rng))
 	_pour_player = _make_loop_player(_gen_pour(rng))
 	_pump_player = _make_loop_player(_gen_pump(rng))
 	if not _muted:
 		_hum_player.play()
 		_wind_player.play()
+		_winch_player.play()
+		_creak_player.play()
 		_rush_player.play()
 		_cave_player.play()
 		_pour_player.play()
@@ -96,7 +109,7 @@ func _ready() -> void:
 ## so never reaps a stopped voice on its own.
 func _exit_tree() -> void:
 	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _rush_player,
-			_pour_player, _pump_player, _ui_player]:
+			_pour_player, _pump_player, _winch_player, _creak_player, _ui_player]:
 		bed.stop()
 		bed.stream = null
 	for p: AudioStreamPlayer2D in _pool:
@@ -180,6 +193,80 @@ func set_water(pour: float, pump: float, delta: float) -> void:
 	_pour_player.volume_db = lerpf(-60.0, -24.0, _pour_level) + Settings.ambience_db()
 	_pour_player.pitch_scale = lerpf(0.92, 1.06, _pour_level)
 	_pump_player.volume_db = lerpf(-60.0, -23.0, _pump_level) + Settings.ambience_db()
+
+
+## THE WINCH and THE LINE, driven together because they are two halves of one instrument.
+##
+## `haul` is how hard the drum is pulling (0 at rest, 1 at full REEL_SPEED) and `load` is how hard the rope
+## itself is working — speed on a taut line. They rise and fall on different clocks on purpose: a winch
+## starts and stops with the key, so it snaps; a rope under load sings up and dies away, so it drags.
+func set_line(haul: float, load: float, delta: float) -> void:
+	_winch_level = move_toward(_winch_level, clampf(haul, 0.0, 1.0), delta * 7.0)
+	_creak_level = move_toward(_creak_level, clampf(load, 0.0, 1.0), delta * 2.4)
+	_winch_player.volume_db = lerpf(-60.0, -17.0, _winch_level) + Settings.ambience_db()
+	_winch_player.pitch_scale = lerpf(0.82, 1.22, _winch_level)
+	_creak_player.volume_db = lerpf(-60.0, -22.0, _creak_level) + Settings.ambience_db()
+	_creak_player.pitch_scale = lerpf(0.88, 1.30, _creak_level)
+
+
+## THE WINCH DRUM: a geared motor under a pawl clicking over the ratchet teeth. The clicks are what make it
+## read as a WINCH rather than as a machine — a smooth motor tone alone sounds like the factory hum, and the
+## rope already has a factory to not be confused with.
+func _gen_winch(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 2
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var motor: float = sin(TAU * 88.0 * t) * 0.30 + sin(TAU * 132.0 * t) * 0.14
+		var tooth: float = fmod(t * 19.0, 1.0)                # nineteen pawl clicks a second
+		lp += 0.55 * (rng.randf_range(-1.0, 1.0) - lp)        # bright metallic edge on each click
+		var click: float = lp * pow(maxf(0.0, 1.0 - tooth * 9.0), 2.2) * 0.85
+		out[i] = (motor + click) * 1.15
+	return _loopify(out)
+
+
+## THE LINE UNDER LOAD: a low fibre creak with a slow wow, and a thin harmonic that only shows up when the
+## rope is really working. This is the sound that tells you the swing is carrying weight.
+func _gen_creak(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 3
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var wow: float = 1.0 + 0.06 * sin(TAU * 0.37 * t) + 0.03 * sin(TAU * 1.13 * t)
+		var fibre: float = sin(TAU * 143.0 * wow * t) * 0.26 + sin(TAU * 219.0 * wow * t) * 0.11
+		lp += 0.06 * (rng.randf_range(-1.0, 1.0) - lp)        # heavily filtered rustle: hemp, not metal
+		out[i] = (fibre + lp * 2.4) * 1.1
+	return _loopify(out)
+
+
+## THE CATCH: rope coming down onto a rock edge and biting there.
+##
+## Deliberately the OPPOSITE of the hook's own bite, which is a bright short burst of stone breaking. This
+## is soft against hard: a dull woody knock with a fibre rasp over it, low-passed far harder and running
+## longer. The first version was a noise slap with a little body under it and tools/check_voice put it
+## 0.125 from `crunch` in feature space — near enough that a player would learn one sound for two events,
+## which for the game's newest mechanic is the same as having no sound at all.
+##
+## The rasp also SWELLS before it decays, because that is what a line does: it slides onto the corner and
+## then loads. That gives the two sounds different attack shapes as well as different colours, so they stay
+## apart on more than one axis.
+func _gen_catch(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.20)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var u: float = float(i) / float(n)
+		lp += 0.055 * (rng.randf_range(-1.0, 1.0) - lp)      # heavy roll-off: hemp on stone, not stone on stone
+		var swell: float = pow(sin(PI * clampf(u * 1.35, 0.0, 1.0)), 1.4)
+		var knock: float = (sin(TAU * 165.0 * t) + sin(TAU * 244.0 * t) * 0.45) * exp(-t * 21.0) * 0.42
+		out[i] = (lp * 5.5 * swell + knock) * 1.1
+	return out
 
 
 ## A silent looping non-positional bed from a sample buffer (the ambience beds + the hum share this shape).

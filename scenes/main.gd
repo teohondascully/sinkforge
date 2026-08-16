@@ -175,6 +175,7 @@ var _particles := Particles.new()
 ## only as a number in the corner of the HUD. Pure representation.
 var _payouts := Payouts.new()
 var _shake: float = 0.0            ## current screenshake magnitude (px), decays each frame
+var _line_pivots: int = 0          ## pivots on the rope last frame — the rising edge is a CATCH
 var _step_dist: float = 0.0       ## accumulated walk distance, for periodic footstep dust
 ## THE DESCENT: which stratum the body was in last frame, so crossing into a NEW one can be an event.
 ## Session-scoped by design — a returning player gets the arrival again, which is the right trade: the
