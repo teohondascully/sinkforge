@@ -80,6 +80,12 @@ var anchor: Vector2 = Vector2.ZERO   ## where it bit (world px) — valid while 
 var anchor_cell: Vector2i = Vector2i.ZERO
 var length: float = 0.0              ## live line length (world px)
 var taut: bool = false               ## was the constraint actually doing work last step? (drives the render)
+## Px of line taken IN by the last reel() — zero when paying out or idle. The body converts this into
+## approach speed, which is the difference between a winch and a lift: the constraint on its own only clamps
+## a position, so before this existed the reel dragged you along the line and left you with no momentum at
+## all. You arrived somewhere at a standstill, every time, and let go with nothing. A winch does work on the
+## thing it hauls, and the work has to land in the velocity or the tool cannot build speed.
+var hauled: float = 0.0
 var just_planted: bool = false       ## one-shot for the impact puff / sound
 var just_cut: bool = false           ## one-shot for the release whoosh
 
@@ -206,12 +212,15 @@ func trace(sim: FactorySim, from: Vector2, toward: Vector2) -> Dictionary:
 ## Shorten / pay out the line. `axis` is +1 for UP (reel in), -1 for DOWN (pay out) — the same axis that
 ## climbs a rope, because it is the same gesture.
 func reel(axis: float, delta: float) -> void:
+	hauled = 0.0
 	if state != State.ANCHORED or axis == 0.0:
 		return
+	var before: float = length
 	if axis > 0.0:
 		length = maxf(MIN_LENGTH, length - REEL_SPEED * delta * axis)
 	else:
 		length = minf(MAX_RANGE, length - PAY_SPEED * delta * axis)
+	hauled = before - length
 
 
 ## The constraint. Returns the corrected position; mutates `vel` in place through the returned value's

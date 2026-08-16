@@ -451,6 +451,34 @@ func _setup_post_fx() -> void:
 ##. It fills the camera view (repositioned to the camera each frame) and sits at
 ## z 45, BELOW the lighting veil (z 50) + light pools (z 51), so a mote is dark in the gloom and lit
 ## warm where the lamp/glow reaches — "dust catching the light." Pure atmosphere; never touches the sim.
+## THE AIR NOTICES YOU. The speed streaks behind the body say the MINER is moving fast; nothing said the
+## WORLD was. A frame where the avatar wears motion lines and the dust around it hangs perfectly still reads
+## as an animation played over a photograph, which is most of what "flat" means when you look at a game and
+## cannot say why.
+##
+## So the dust field gets a wind, and the wind is your own travel turned around. Below a walk there is none
+## — the resting frame is exactly the one that was tuned — and past that it builds with the speed over the
+## cap, so it is the SWING and the long fall that stir the air rather than a stroll. Applied as the field's
+## gravity, which means the existing damping gives it inertia for free: the air takes a moment to get moving
+## and a moment to settle, instead of snapping between two states with the velocity.
+const MOTE_SETTLE: float = 5.0        ## the ambient downward drift the field was tuned with
+const MOTE_WIND_FROM: float = Player.RUN_SPEED   ## px/s of travel below which the air is simply still
+const MOTE_WIND: float = 1.2          ## px/s^2 of wind per px/s of travel over that
+const MOTE_WIND_EASE: float = 3.5     ## how quickly the air catches up with you
+var _mote_wind: Vector2 = Vector2.ZERO
+
+
+func _drive_mote_wind(delta: float) -> void:
+	var mat: ParticleProcessMaterial = _motes.process_material as ParticleProcessMaterial
+	if mat == null or _player == null:
+		return
+	var v: Vector2 = _player.velocity
+	var over: float = maxf(0.0, v.length() - MOTE_WIND_FROM)
+	var want: Vector2 = Vector2.ZERO if over <= 0.0 else -v.normalized() * over * MOTE_WIND
+	_mote_wind = _mote_wind.lerp(want, 1.0 - exp(-MOTE_WIND_EASE * delta))
+	mat.gravity = Vector3(_mote_wind.x, MOTE_SETTLE + _mote_wind.y, 0.0)
+
+
 func _setup_ambient_motes() -> void:
 	var view: Vector2 = VIEWPORT / _current_zoom()    # world area the camera shows (render viewport / zoom)
 	var mat := ParticleProcessMaterial.new()
@@ -458,7 +486,7 @@ func _setup_ambient_motes() -> void:
 	mat.emission_box_extents = Vector3(view.x * 0.6, view.y * 0.6, 1.0)  # a touch wider than the view
 	mat.direction = Vector3(0.2, 1.0, 0.0)
 	mat.spread = 180.0
-	mat.gravity = Vector3(0.0, 5.0, 0.0)                     # a barely-there settle
+	mat.gravity = Vector3(0.0, MOTE_SETTLE, 0.0)             # a barely-there settle
 	mat.initial_velocity_min = 2.0
 	mat.initial_velocity_max = 11.0
 	mat.damping_min = 1.0
@@ -595,6 +623,7 @@ func _process(delta: float) -> void:
 		_camera.global_position = snap_to_pixel(_cam_pos, _current_zoom())
 	if _motes != null and _camera != null:
 		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
+		_drive_mote_wind(delta)
 	if _objectives != null:
 		_objectives.refresh(delta)
 		if not _line_hailed and _objectives.is_done(&"auto"):

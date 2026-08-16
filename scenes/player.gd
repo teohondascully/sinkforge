@@ -198,6 +198,31 @@ func _ready() -> void:
 	Controls.register()    # so the body works standalone in motion harnesses, not only under MainView
 
 
+## THE WINCH DOES WORK. The distance constraint only ever CLAMPS a position to a circle and cancels the
+## outward radial velocity; shortening the line moved the body by correcting its position and left the
+## velocity untouched. So the reel was a lift, not a winch: it carried you along the rope and set you down
+## at a standstill, and letting go gave you nothing to let go WITH. Everything the swing physics conserves
+## so carefully was being handed a body with no momentum to conserve.
+##
+## Stated physically, the fix is one line of intent: a winch taking line in at REEL_SPEED means the body
+## APPROACHES THE ANCHOR at REEL_SPEED. So set the inward radial component to the haul rate — never add to
+## it, which would compound every frame into nonsense, and never touch the tangential component, which is
+## the swing and belongs to the pendulum. It only ever speeds the body up along the line, so a body already
+## flying inward faster than the winch can pull keeps its own speed.
+func _winch_drive(delta: float) -> Vector2:
+	if grapple.hauled <= 0.0 or delta <= 0.0:
+		return velocity
+	var d: Vector2 = position - grapple.anchor
+	if d.length() < 0.001:
+		return velocity
+	var out_dir: Vector2 = d.normalized()
+	var radial: float = velocity.dot(out_dir)          # negative = already closing on the anchor
+	var want: float = -grapple.hauled / delta          # ...and this is how fast the line says we close
+	if want >= radial:
+		return velocity
+	return velocity + out_dir * (want - radial)
+
+
 ## Put the body somewhere without it counting as having FALLEN there.
 ##
 ## The landing cost is priced on distance dropped, which means anything that moves the body by assignment —
@@ -391,9 +416,18 @@ func _step(delta: float) -> void:
 	# expensive way, watching a body stand on a shelf holding UP into a planted line for a hundred and fifty
 	# frames, three separate times, going nowhere. So it hauls from standing; the only thing still refused
 	# is winching toward an anchor at or below your own feet, which would wind you into the floor.
+	# ...and the refusal is about the DIRECTION of the pull, not about height alone. The first version of
+	# this refused any anchor that was not above you, which quietly killed the one thing the surface has to
+	# offer: a hook planted in ground AHEAD of you, at about your own height, several cells out. Winching
+	# that does not wind you into the floor, it hauls you ALONG it — a zip, and the only rope verb available
+	# under an open sky, where there is nothing overhead to swing from. tools/check_traverse caught it as a
+	# body that crossed seven columns in nine hundred frames while attached to a hook it could not use.
+	# What is still refused is a line that points mostly DOWNWARD while the boots are planted, which is the
+	# case that would genuinely wind you into the floor.
 	grapple.advance(sim, hand(), delta)
-	if grapple.state == Grapple.State.ANCHORED \
-			and (not on_floor or grapple.anchor.y < position.y - CELL * 0.5):
+	var reach: Vector2 = grapple.anchor - position
+	var into_floor: bool = on_floor and reach.y > absf(reach.x)
+	if grapple.state == Grapple.State.ANCHORED and not into_floor:
 		grapple.reel(input_climb, delta)
 
 	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
@@ -440,6 +474,7 @@ func _step(delta: float) -> void:
 		if grapple.taut:
 			position = swung
 			velocity = grapple.resolve_velocity(position, velocity)
+			velocity = _winch_drive(delta)
 			velocity -= velocity * SWING_DRAG * delta      # a rope has losses; a frictionless one feels fake
 			velocity = velocity.limit_length(SWING_MAX_SPEED)
 			_resolve_axis(true)

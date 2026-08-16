@@ -71,6 +71,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _aiming(main)
 		"land":
 			await _landing(main)
+		"haul":
+			await _hauling(main)
 		"scarp":
 			await _at_the_scarp(main)
 		"map":
@@ -107,6 +109,50 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 const ARC := preload("res://tools/arc_driver.gd")
 const HAIL_WAIT := 2400              ## frames the fueled line is given to pour its first ingot
 const HAIL_PEAK := 60                ## frames after the hail — inside the plate's full-opacity dwell
+
+## THE HAUL. A body mid-arc in a gallery, moving faster than it can run — the thing check_traverse measures
+## and the one state no still frame in history/ has ever shown. Everything this strike added lands in the
+## same picture: the taut line, the winch pulling along it, the streaks off the body, and the dust field
+## blown backwards by the travel.
+func _hauling(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var p: Player = main._player
+	var floor_row: int = 46
+	for x: int in range(20, 80):
+		for y: int in range(floor_row - 7, floor_row):
+			sim.mine(Vector2i(x, y))
+		for y: int in range(floor_row - 10, floor_row - 7):
+			if not sim.is_solid(Vector2i(x, y)):
+				sim.set_solid(Vector2i(x, y), &"stone")
+		if not sim.is_solid(Vector2i(x, floor_row)):
+			sim.set_solid(Vector2i(x, floor_row), &"stone")
+	p.auto_input = false
+	p.place(Vector2(30.0 * 32.0, float(floor_row) * 32.0 - Player.HEIGHT))
+	for _i: int in 8:
+		await physics_frame
+	# Swing until the body is genuinely quick and genuinely airborne, then stop the clock there.
+	for _i: int in 420:
+		p.input_dir = 1.0
+		if not p.grapple.live():
+			p.grapple.fire(p.hand(), p.hand() + Vector2(7.0 * 32.0, -6.0 * 32.0))
+		elif p.grapple.state == Grapple.State.ANCHORED:
+			p.input_climb = 1.0
+			if p.position.x > p.grapple.anchor.x and p.velocity.x > 0.0:
+				p.grapple.cut()
+				p.input_climb = 0.0
+		await physics_frame
+		if p.grapple.taut and p.velocity.length() > Player.RUN_SPEED * 2.0:
+			break
+	p.input_climb = 0.0
+	# The grapple HINT bubble is drawn across the middle of the frame, and this moment exists to photograph
+	# the arc rather than the onboarding — the same reason check_water_reads hides the HUD before judging
+	# pixels. Cleared HERE and not before the swing: the hint re-fires on depth every frame the body is
+	# under the surface, so clearing it first just gives it four hundred frames to come back.
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+
 
 ## THE SCARP. Walk the body west out of the base until it is standing under the headland face — the one
 ## place on the surface where the ground stops being something you walk over. The terraces are the answer to
