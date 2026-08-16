@@ -230,9 +230,15 @@ func _rope_hop(main: MainView, p: Player, sim: FactorySim, dir: float) -> int:
 		# Let go once level with the anchor: the body is over the lip it was stuck behind, and everything the
 		# winch and the lean built up carries it across. Waiting to pass the anchor in X sounds tidier and
 		# never fires — a winch pulls you ALONG the line, so the body arrives under the hook, not beyond it.
-		# Let go when the winch is DONE — either the body has come up level with the hook, or the line is
-		# wound in as far as it goes and hanging on it any longer buys nothing.
-		if p.position.y <= p.grapple.anchor.y + CELL * 0.5 \
+		# Let go the moment the way is OPEN — the hop exists to clear one lip, and riding the winch past
+		# that point is pure cost. Falling back on "wound all the way in" only when the terrain read never
+		# comes good, so a hop can still end.
+		var cell: Vector2i = main._cell_at(p.position)
+		var ahead := Vector2i(cell.x + int(dir), cell.y)
+		var clear: bool = sim.in_bounds(ahead) and not sim.is_solid(ahead) \
+				and not sim.is_solid(ahead + Vector2i(0, -1))
+		if clear and not p.on_floor \
+				or p.position.y <= p.grapple.anchor.y + CELL * 0.5 \
 				or p.grapple.length <= Grapple.MIN_LENGTH + 1.0:
 			over = true
 			break

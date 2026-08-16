@@ -67,6 +67,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_mouth(main)
 		"plunge":
 			await _plunging(main)
+		"aim":
+			await _aiming(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -187,6 +189,28 @@ func _plunging(main: MainView) -> void:
 	for _i: int in PLUNGE_HANG:
 		await physics_frame
 	p.auto_input = true
+
+
+## THE AIMING GHOST — the marker that says where the hook would bite, shot underground where it matters:
+## a hollow with rock on several sides, the cursor parked on a far wall, the ring drawn on the cell the
+## hook would actually take. Warps the mouse rather than the world, because the ghost reads the CURSOR and
+## the whole question is whether what it draws matches where you are pointing.
+const AIM_ROOM_W: int = 13
+const AIM_ROOM_H: int = 7
+const AIM_SETTLE: int = 12
+
+func _aiming(main: MainView) -> void:
+	await _dig_in(main)
+	await _hollow_room(main)
+	var p: Player = main._player
+	var here: Vector2i = main._cell_at(p.position)
+	# Point at the far wall of the chamber, high and to the side — the shot you would actually take to
+	# leave a hole you have just finished digging.
+	var target: Vector2 = main._cell_center(here + Vector2i(AIM_ROOM_W / 2, -AIM_ROOM_H))
+	var vp: Viewport = main.get_viewport()
+	vp.warp_mouse(vp.get_canvas_transform() * target)
+	for _i: int in AIM_SETTLE:
+		await physics_frame
 
 
 ## Sink a shaft under the spawn column and leave the body standing at the bottom of it. Driven through

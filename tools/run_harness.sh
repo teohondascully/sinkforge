@@ -64,6 +64,7 @@ add "check_pacing (session shape)"    "res://tools/check_pacing.gd"
 add "check_richness (a rich earth)"   "res://tools/check_richness.gd"
 add "check_descent (a way down)"      "res://tools/check_descent.gd"
 add "check_plunge (ride it down)"     "res://tools/check_plunge.gd"
+add "check_aim (honest marker)"       "res://tools/check_aim.gd"
 add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
 
 total="${#NAMES[@]}"

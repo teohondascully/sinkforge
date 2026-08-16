@@ -1002,18 +1002,20 @@ func _set_volume(id: String, frac: float) -> void:
 	Settings.save_settings()
 
 
-## THE GRAPPLE (F / middle-mouse). One key, two verbs: a live line is cut, a stowed one is fired at
-## wherever the cursor is. It shoots at the raw mouse point rather than at `_aim` on purpose — `_aim`
-## snaps to mineable faces within the pick's 3.2-cell reach, which is exactly the wrong behaviour for a
-## tool whose whole job is to reach the far wall you CAN'T touch.
+## THE GRAPPLE (F / middle-mouse). One key, ONE verb: throw. It shoots at the raw mouse point rather than
+## at `_aim` on purpose — `_aim` snaps to mineable faces within the pick's 3.2-cell reach, which is exactly
+## the wrong behaviour for a tool whose whole job is to reach the far wall you CAN'T touch.
+##
+## The key used to toggle, cutting a live line. That made every chained arc cost a wasted press that also
+## dropped you mid-swing, so the rope could never become a rhythm. Now it always throws, and Grapple.fire
+## keeps the old line holding until the new hook bites; letting go is Space, which cuts the line and stacks
+## a leap on the arc in one motion.
 func _toggle_grapple() -> void:
 	if _paused or _settings_open or _inventory_open:
 		return
 	var g: Grapple = _player.grapple
-	if g.live():
-		g.cut()
-		_sfx.play(&"pop", _player.position, 1.5, -8.0)
-		return
+	if g.throwing():
+		return                                    # a hook is already out — let it land
 	g.fire(_player.hand(), get_global_mouse_position())
 	_sfx.play(&"clunk", _player.position, 1.9, -10.0)
 

@@ -2072,13 +2072,63 @@ const ROPE_CORE := Color(0.78, 0.70, 0.52)
 const ROPE_SHADE := Color(0.20, 0.16, 0.12)
 
 
+## THE AIMING GHOST. Where the hook would bite if you threw it now — the marker, and the faint line it
+## sits on the end of.
+##
+## The rope is the traversal verb and it was fired BLIND: you pointed at a wall fifteen cells off and found
+## out whether you had the range, and whether anything was in the way, only after the throw. Every other
+## reaching tool in the game shows you its target (the pick has its aim box, the builder its ghost); the
+## one tool whose whole job is distance had nothing, so using it well meant memorising a radius.
+##
+## Drawn quietly on purpose: a thin dotted lead and a small ring, nothing that competes with the ore glint
+## or the crack overlay. And drawn ONLY when the line is stowed — once you are on the rope your attention
+## belongs on the arc, and a second line racing your cursor across the rock is noise at exactly the moment
+## you can least afford it.
+const AIM_DOTS: int = 11
+const AIM_RING: float = 6.0
+const AIM_LEAD := Color(0.86, 0.80, 0.62, 0.34)
+const AIM_MARK := Color(0.99, 0.88, 0.56, 0.88)
+const AIM_MISS := Color(0.62, 0.64, 0.70, 0.16)   ## nothing in range: the lead fades out and there is no ring
+const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)  ## a dark backing ring, so the mark survives pale rock too
+
+
+func _draw_aim_ghost() -> void:
+	if player == null or player.grapple.live() or sim == null:
+		return
+	var from: Vector2 = player.hand()
+	var shot: Dictionary = player.grapple.trace(sim, from, get_global_mouse_position())
+	var to: Vector2 = shot["at"]
+	var hit: bool = shot["hit"]
+	# A dotted lead rather than a solid one: a solid line reads as a rope that is already there.
+	for i: int in AIM_DOTS:
+		var t0: float = float(i) / float(AIM_DOTS)
+		var t1: float = t0 + 0.5 / float(AIM_DOTS)
+		var fade: float = 1.0 if hit else 1.0 - t0            # out of range, the throw trails off into nothing
+		draw_line(from.lerp(to, t0), from.lerp(to, t1),
+			(AIM_LEAD if hit else AIM_MISS) * Color(1, 1, 1, fade), 1.0)
+	if hit:
+		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_SHADE, 3.0)
+		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_MARK, 1.5)
+		draw_arc(to, AIM_RING * 0.30, 0.0, TAU, 8, AIM_MARK, 1.5)
+
+
 func _draw_grapple() -> void:
+	_draw_aim_ghost()
 	if player == null or not player.grapple.live():
 		return
 	var g: Grapple = player.grapple
 	var from: Vector2 = player.hand()
-	var to: Vector2 = g.tip if g.state == Grapple.State.FLYING else g.anchor
-	var sag: float = g.slack(from) * ROPE_SAG
+	# A CHAINED throw draws both: the line still carrying you, and the hook already on its way to the next
+	# one. Seeing them overlap for those few frames is the clearest possible statement of what chaining
+	# does — you never let go of anything.
+	if g.state == Grapple.State.ANCHORED:
+		_draw_rope(from, g.anchor, g.slack(from) * ROPE_SAG)
+	if g.throwing():
+		_draw_rope(from, g.tip, 0.0)
+
+
+## One line, bowed by `sag`, with its hook on the end.
+func _draw_rope(from: Vector2, to: Vector2, sag: float) -> void:
 	var pts := PackedVector2Array()
 	for i: int in ROPE_SEGMENTS + 1:
 		var t: float = float(i) / float(ROPE_SEGMENTS)

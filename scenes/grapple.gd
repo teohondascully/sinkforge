@@ -35,6 +35,14 @@ extends RefCounted
 
 const CELL: int = 32
 
+## THE PROBE STEP. Both the flying hook and the aiming ghost walk a shot in fixed steps of this size FROM
+## THE ORIGIN, which is what lets them agree cell-for-cell. Flying by `FLY_SPEED * delta` and clipping each
+## frame's leftover meant the sample points depended on the frame rate and on when in the flight you looked
+## — so a shot grazing the corner of a block resolved one way in the ghost and another in the hook, three
+## times in forty-eight, and three lies in forty-eight is all it takes to stop trusting a marker.
+## Quarter-cell: fine enough that a hook cannot slip past a block corner, coarse enough to stay free.
+const PROBE: float = float(CELL) * 0.25
+
 enum State {
 	IDLE,       ## stowed
 	FLYING,     ## the hook is in the air, no constraint yet
@@ -75,8 +83,12 @@ var taut: bool = false               ## was the constraint actually doing work l
 var just_planted: bool = false       ## one-shot for the impact puff / sound
 var just_cut: bool = false           ## one-shot for the release whoosh
 
-var _flown: float = 0.0              ## px the hook has travelled this shot
+var _flown: float = 0.0              ## px the hook has travelled this shot (always a multiple of PROBE)
+var _carry: float = 0.0              ## sub-PROBE remainder of this frame's flight, kept for the next one
 var _dir: Vector2 = Vector2.RIGHT
+## A new hook is in the air while the OLD line is still holding — see fire(). The constraint stays live
+## the whole time, so a chained shot never costs you the arc you are already riding.
+var _chain: bool = false
 
 
 ## Clear the one-shot event flags. Called ONCE PER FRAME by the body, not per substep — a plant that
@@ -88,24 +100,40 @@ func begin_frame() -> void:
 	just_cut = false
 
 
-## Launch toward a world point. A second fire while live is a RELEASE — one key, two verbs, which is
-## what makes the rope feel like something you flick rather than something you manage.
+## Launch toward a world point — and launch again, and again, without ever letting go.
+##
+## A second fire used to CUT the line: one key, two verbs. That is the right binding for a tool you reach
+## for occasionally and the wrong one for a movement system. Crossing a chasm in three arcs meant six
+## presses, and every second press dropped you out of the swing you had just built — so the tool could
+## never become a RHYTHM, which is the only thing that makes rope movement feel like anything.
+##
+## So firing while anchored CHAINS: the new hook flies while the old line keeps holding, and the anchor is
+## swapped only at the instant the new one bites. Nothing is ever released into empty air, a shot that
+## finds no rock costs you nothing but the throw, and everything the old arc built up carries straight
+## into the new one — which is the whole physics of this style of movement in one sentence.
+##
+## The deliberate release did not need a key of its own. Jumping off a taut line already cuts it AND
+## stacks a leap on top of the arc, which is the better verb and the one a player reaches for anyway.
 func fire(from: Vector2, toward: Vector2) -> void:
-	if state != State.IDLE:
-		cut()
-		return
+	if state == State.FLYING:
+		return                       # a hook is already out; let it land or fall short before throwing again
 	var d: Vector2 = toward - from
 	_dir = d.normalized() if d.length() > 1.0 else Vector2.RIGHT
 	tip = from
 	_flown = 0.0
-	state = State.FLYING
-	taut = false
+	_carry = 0.0
+	if state == State.ANCHORED:
+		_chain = true                # the line you are on holds until the new one bites
+	else:
+		state = State.FLYING
+		taut = false
 
 
 func cut() -> void:
 	just_cut = state == State.ANCHORED
 	state = State.IDLE
 	taut = false
+	_chain = false
 
 
 func live() -> bool:
@@ -113,31 +141,66 @@ func live() -> bool:
 
 
 ## Fly the hook / retire a shot that found nothing. `from` is the body's hand this step, so a shot fired
-## while running still trails from the runner.
+## while running still trails from the runner. A CHAINED shot flies under exactly the same rules; the only
+## difference is what happens when it fails, because failing back onto a live line is not a failure.
 func advance(sim: FactorySim, from: Vector2, delta: float) -> void:
-	if state != State.FLYING:
+	if state != State.FLYING and not _chain:
 		return
-	var step: float = FLY_SPEED * delta
-	# Walk the flight in CELL-sized bites so a fast hook can't tunnel through a one-cell ledge.
-	var travelled: float = 0.0
-	while travelled < step:
-		var bite: float = minf(float(CELL) * 0.5, step - travelled)
-		tip += _dir * bite
-		travelled += bite
-		_flown += bite
+	# Walk the flight in fixed PROBE bites, carrying the remainder, so the sample points are exactly the
+	# ones trace() tests and a fast hook still cannot tunnel through a one-cell ledge.
+	_carry += FLY_SPEED * delta
+	while _carry >= PROBE:
+		_carry -= PROBE
+		tip += _dir * PROBE
+		_flown += PROBE
 		var cell := Vector2i(int(floor(tip.x / float(CELL))), int(floor(tip.y / float(CELL))))
 		if sim.is_solid(cell):
 			anchor_cell = cell
 			# Bite at the hook's actual contact point rather than the cell centre — a hook planted in the
 			# middle of a block would visibly float inside the rock.
 			anchor = tip
-			length = maxf(MIN_LENGTH, from.distance_to(anchor) * SLACK_TAKEUP)
+			# A FRESH plant takes up a little slack so the hook bites instead of hanging loose. A CHAINED
+			# one must not: yanking ten percent of the radius out at the swap cancels a chunk of the arc's
+			# velocity as "outward" motion, and an arc that loses speed every time you reach for the next
+			# hold is a chain nobody chains. Take the distance as it is and let the swing tighten it.
+			var takeup: float = 1.0 if _chain else SLACK_TAKEUP
+			length = maxf(MIN_LENGTH, from.distance_to(anchor) * takeup)
 			state = State.ANCHORED
 			just_planted = true
+			_chain = false
 			return
 		if _flown >= MAX_RANGE:
-			state = State.IDLE       # out of line — the shot falls short and stows
+			# Out of line. A fresh shot falls short and stows; a chained one just stops flying and leaves
+			# you on the rope you were already on, which is why chaining is always worth trying.
+			if not _chain:
+				state = State.IDLE
+			_chain = false
 			return
+
+
+## Is a hook in the air right now — on its own, or thrown from a line you are still riding?
+func throwing() -> bool:
+	return state == State.FLYING or _chain
+
+
+## WHERE A SHOT WOULD LAND, right now, without firing one. The aiming ghost's single source of truth.
+##
+## It walks the same cell-sized bites `advance` flies in, tests the same predicate, and stops at the same
+## range — because an aim indicator that disagrees with the hook is worse than no indicator at all. You
+## learn within a minute that it lies, and from then on you are aiming blind AND reading noise. The two
+## staying in step is the property tools/check_aim exists to hold.
+func trace(sim: FactorySim, from: Vector2, toward: Vector2) -> Dictionary:
+	var d: Vector2 = toward - from
+	var dir: Vector2 = d.normalized() if d.length() > 1.0 else Vector2.RIGHT
+	var at: Vector2 = from
+	var flown: float = 0.0
+	while flown < MAX_RANGE:
+		at += dir * PROBE
+		flown += PROBE
+		var cell := Vector2i(int(floor(at.x / float(CELL))), int(floor(at.y / float(CELL))))
+		if sim.is_solid(cell):
+			return {"hit": true, "at": at, "cell": cell}
+	return {"hit": false, "at": at, "cell": Vector2i.ZERO}
 
 
 ## Shorten / pay out the line. `axis` is +1 for UP (reel in), -1 for DOWN (pay out) — the same axis that

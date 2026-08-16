@@ -1351,7 +1351,7 @@ func _draw_help_overlay() -> void:
 		"move        A / D  (or ← →)",
 		"jump        W  or  SPACE",
 		"climb       W / S  on a rope (W climbs, not jumps)",
-		"grapple     F  — fire at the rock you're aiming at, F again to let go",
+		"grapple     F  — throw at the ringed rock; throw again to swing on, Space to let go",
 		"swing       W / S reel the line in / out · SPACE leaps off it",
 		"mine        LMB (hold)",
 		"dig plan    LMB drag paints it · X clears",
