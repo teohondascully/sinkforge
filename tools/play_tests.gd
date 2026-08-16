@@ -54,6 +54,7 @@ func _run() -> void:
 		["RUNG 3 — the L2 iron chain", _goal_l2_chain],
 		["RUNG 4 — the Borer ferret loop", _goal_borer],
 		["RUNG 5 — drain the aquifer (L3 flood loop)", _goal_drain_the_aquifer],
+		["RUNG 6 — breach a worldgen aquifer (real descent)", _goal_breach_worldgen_aquifer],
 		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
@@ -528,6 +529,150 @@ func _goal_drain_the_aquifer() -> bool:
 	return await _finish(agent, got >= 1,
 		"waded the flood, built a powered pump, drained the pocket (%d->%d), and mined the exposed rich_ore (%d)"
 			% [water_before, water_after, got])
+
+
+## RUNG 6 — BREACH A REAL WORLDGEN AQUIFER (the L3 loop on the SHIPPING WORLD): RUNG 5 proved the flood
+## loop on a hand-staged surface puddle; this proves the world worldgen actually SHIPS is playable — a body
+## DESCENDS into the deep, digs into a genuine sealed worldgen aquifer, and breaching it RELEASES the flood
+## AND yields the rich_ore treasure lining it (the risk/reward, #126). The aquifer is DISCOVERED dynamically
+## (scan sim.water for a deep, substantial, treasure-lined pocket), so the rung guards WORLDGEN too: a gen
+## retune that stops shipping breachable, treasure-lined aquifers at depth fails here. The breach is ONE
+## honest cut — a rim rich_ore cell at the waterline — that CLAIMS the treasure and OPENS the seal in a single
+## move, after which the released flood pours laterally into the dig (the body wades). Setup hatch (RUNG-3's
+## "guarantee the site"): the descent column is made solid + a foothold set at the breach level, so a worldgen
+## cave in the shaft can't drop the body out of reach mid-dig — the DESCENT dig, the BREACH cut, and the flood
+## are all real. The pump-drain claim is RUNG 5's business; this rung's novelty is descent + breach + release.
+func _goal_breach_worldgen_aquifer() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	# The deep band AND its rich_ore both need a tier-2 pick (MiningRules) — hand it (the craft is proven in
+	# RUNG 1); the descent dig, the breach cut, and the claim are what's under test.
+	agent.give(&"stone_pickaxe", 1)
+
+	# --- FIND a real worldgen aquifer to breach: the shallowest pocket that is DEEP (in the aquifer band),
+	# SUBSTANTIAL, and TREASURE-LINED, with a rim rich_ore cell sitting horizontally between pocket water and
+	# OUTSIDE solid rock — so one sideways cut claims the ore AND opens the seal. Dynamic = a worldgen guard. ---
+	var pockets: Array = _water_pockets(sim)
+	pockets.sort_custom(func(a: Array, b: Array) -> bool: return _pocket_top(a) < _pocket_top(b))
+	var target: Array = []
+	var breach: Vector2i = Vector2i(-1, -1)     # the rim rich_ore cell to cut (claims treasure + opens the seal)
+	var breach_col: int = -1                    # the OUTSIDE column the body descends + stands in to reach it
+	for p: Array in pockets:
+		if _pocket_top(p) < LayeredWorldGen.AQUIFER_MIN_ROW or p.size() < 12:
+			continue
+		var wset: Dictionary = {}
+		for w: Vector2i in p:
+			wset[w] = true
+		# Scan for the SHALLOWEST rim rich_ore cell with the clean [water | rich_ore | outside] geometry.
+		var best: Vector2i = Vector2i(-1, -1)
+		var best_col: int = -1
+		for w: Vector2i in p:
+			for dir: int in [-1, 1]:
+				var r: Vector2i = Vector2i(w.x + dir, w.y)      # the cell just outside this water cell, horizontally
+				var out_cell: Vector2i = Vector2i(w.x + dir * 2, w.y)  # one more step out = the descent/stand column
+				if wset.has(r) or wset.has(out_cell) or not sim.in_bounds(out_cell):
+					continue
+				if sim.solid.get(r, &"") != &"rich_ore":
+					continue
+				if best.x < 0 or r.y < best.y:
+					best = r
+					best_col = out_cell.x
+		if best.x >= 0:
+			target = p
+			breach = best
+			breach_col = best_col
+			break
+	if breach.x < 0:
+		return await _finish(agent, false,
+			"worldgen produced no deep, treasure-lined aquifer with a breachable rim rich_ore vein (checked %d pockets)" % pockets.size())
+	agent._note("  target aquifer: %d cells, breach rim rich_ore %s, descend column %d" % [target.size(), str(breach), breach_col])
+
+	# --- SETUP HATCH: guarantee the DESCENT (RUNG-3's guarantee-the-site). Make the descent column solid
+	# deepslate from the settle row down through the breach level + a floor one below (the body ends standing
+	# LEVEL with the rim vein), then open a foothold at the top. A worldgen cave in this shaft would drop the
+	# body out of reach mid-dig; the DIG itself stays the tested verb. Pocket, water, and vein are untouched. ---
+	const DESCENT_ROWS: int = 10
+	var settle_row: int = breach.y - DESCENT_ROWS
+	for y: int in range(settle_row, breach.y + 2):
+		sim.set_solid(Vector2i(breach_col, y), &"deepslate")
+	sim.set_solid(Vector2i(breach_col, settle_row), &"")         # the body's foothold (stand on settle_row+1)
+	sim.set_solid(Vector2i(breach_col, settle_row - 1), &"")
+	agent.player.position = agent.main._cell_center(Vector2i(breach_col, settle_row))
+	for _i: int in 20:
+		await physics_frame                                      # settle onto the foothold
+	if not await agent.select_item(&"stone_pickaxe"):
+		return await _finish(agent, false, "no pick to dig the deep")
+
+	# --- STEP 1: the DESCENT — dig straight down the deep column to the breach level (a genuine reach-gated
+	# deep dig; deepslate needs the tier-2 pick we selected). ---
+	if not await agent.dig_down_to(Vector2i(breach_col, breach.y)):
+		return await _finish(agent, false,
+			"could not descend the deep shaft to the aquifer (stuck at %s)" % str(agent.main._cell_at(agent.player.position)))
+
+	# --- STEP 2: the BREACH + the CLAIM — one honest cut. Mine the rim rich_ore at the waterline: it CLAIMS
+	# the flood-guarded treasure AND opens the sealed pocket wall. Reach in horizontally from the dry shaft
+	# (re-select the pick — picking up deepslate on the way down can swap the active slot). ---
+	if not agent.main._can_reach(breach):
+		return await _finish(agent, false, "descended, but the rim vein at %s is out of reach from the shaft" % str(breach))
+	if not await agent.select_item(&"stone_pickaxe"):
+		return await _finish(agent, false, "lost the pick before the breach cut")
+	var rich_before: int = int(sim.inventory.get(&"rich_ore", 0))
+	var g: int = 0
+	while sim.is_solid(breach) and g < 90:
+		agent.do_mine(breach)
+		await agent.wait(4); g += 1
+	if sim.is_solid(breach):
+		return await _finish(agent, false, "could not cut the rim rich_ore breach at %s" % str(breach))
+	var got: int = int(sim.inventory.get(&"rich_ore", 0)) - rich_before
+	if got < 1:
+		return await _finish(agent, false, "cut into the aquifer wall but the rich_ore treasure didn't drop (got %d)" % got)
+
+	# --- STEP 3: the FLOOD RELEASES — the sealed pocket, breached, pours into the dig. Let the game tick and
+	# confirm water floods the shaft the body stands in (it wades) — the sealed-pocket-releases fantasy, on
+	# real worldgen water at real depth. ---
+	var flooded: bool = false
+	for _i: int in 60:
+		await agent.step()
+		if sim.water_at(Vector2i(breach_col, breach.y)) > 0 or agent.player._in_water():
+			flooded = true
+			break
+	print("  breach: %s  (descended %d rows to %d, rich_ore=%d, flood released=%s)" % [
+		agent.friction(), DESCENT_ROWS, breach.y, got, flooded])
+	if not flooded:
+		return await _finish(agent, false, "breached the aquifer + took the ore, but the sealed flood never released into the dig")
+	return await _finish(agent, true,
+		"descended into the deep, breached a real worldgen aquifer to claim its guarded rich_ore (%d), and released the flood" % got)
+
+
+## Flood-fill sim.water into connected 4-neighbour pockets — RUNG 6 uses this to DISCOVER a real worldgen
+## aquifer to breach rather than hand-staging one, so the rung guards worldgen (it must keep shipping deep,
+## treasure-lined, breachable water pockets) as well as the embodied breach loop.
+func _water_pockets(sim: FactorySim) -> Array:
+	var seen: Dictionary = {}
+	var pockets: Array = []
+	for c: Vector2i in sim.water.keys():
+		if seen.has(c):
+			continue
+		var cells: Array[Vector2i] = []
+		var stack: Array[Vector2i] = [c]
+		seen[c] = true
+		while not stack.is_empty():
+			var w: Vector2i = stack.pop_back()
+			cells.append(w)
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var n: Vector2i = w + d
+				if sim.water.has(n) and not seen.has(n):
+					seen[n] = true
+					stack.append(n)
+		pockets.append(cells)
+	return pockets
+
+
+func _pocket_top(cells: Array) -> int:
+	var t: int = 1 << 30
+	for c: Vector2i in cells:
+		t = mini(t, (c as Vector2i).y)
+	return t
 
 
 ## RUNG 3 — the L2 IRON CHAIN is playable embodied: with the iron
