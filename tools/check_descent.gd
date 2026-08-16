@@ -77,16 +77,19 @@ func _run() -> void:
 		seen[cell] = true
 		frontier.append(cell)
 
-	# --- THE REACH: flood the standable open space and see how deep it gets. Four-connected, because a
-	#     body walks and falls; it does not squeeze through diagonals.
+	# --- THE REACH: flood the standable open space and see how deep it gets — but flood it the way a BODY
+	#     travels, not the way water does. A four-connected flood answers "is this air connected", and the
+	#     first version of this layer asked exactly that, got sixty-three rows, and was wrong: it walked the
+	#     body up a nine-cell wall one cell at a time. Air can do that. A miner with a 1.3-cell step and a
+	#     2.3-cell jump cannot, and the played descent parked in a pocket the flood had called a corridor.
+	#     So the moves here are the moves the controller actually has, and nothing else.
 	var deepest: int = -1
 	var surface_datum: int = sim.surface_row(FactorySim.GRID_COLS / 2)
 	while not frontier.is_empty():
 		var at: Vector2i = frontier.pop_back()
 		deepest = maxi(deepest, at.y)
-		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var n: Vector2i = at + d
-			if seen.has(n) or not sim.in_bounds(n) or not _standable(sim, n):
+		for n: Vector2i in _moves(sim, at):
+			if seen.has(n) or not sim.in_bounds(n):
 				continue
 			seen[n] = true
 			frontier.append(n)
@@ -120,6 +123,38 @@ func _run() -> void:
 
 	main.queue_free()
 	await physics_frame
+
+
+## THE BODY'S MOVES from a cell it is standing in: step aside, step or hop UP a wall it can clear, and
+## fall off anything. Every edge here corresponds to something the player controller can do; going up is
+## the only expensive direction, which is exactly why a descent can be a one-way trip.
+const STEP_UP: int = 1               ## cells the slope-follow glides up without a jump (MAX_STEP 1.3)
+const JUMP_UP: int = 2               ## ...and cells a full jump clears (apex 74px over a 32px cell)
+
+func _moves(sim: FactorySim, at: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for dx: int in [1, -1]:
+		# Sideways and upward, nearest first: a step, then a jump.
+		for up: int in range(0, JUMP_UP + 1):
+			var side := Vector2i(at.x + dx, at.y - up)
+			if not sim.in_bounds(side) or not _standable(sim, side):
+				continue
+			out.append(side)
+			break                                    # the lowest opening on that side is the one you take
+		# ...and off the edge: fall to the first floor under the neighbouring column.
+		var over := Vector2i(at.x + dx, at.y)
+		if sim.in_bounds(over) and _standable(sim, over):
+			out.append(_ground_under(sim, over))
+	out.append(_ground_under(sim, at))               # the floor may have been mined out from under you
+	return out
+
+
+## The cell a body dropped at `from` comes to rest in — straight down until something holds it.
+func _ground_under(sim: FactorySim, from: Vector2i) -> Vector2i:
+	var at: Vector2i = from
+	while at.y + 1 < FactorySim.GRID_ROWS and not sim.is_solid(Vector2i(at.x, at.y + 1)):
+		at.y += 1
+	return at
 
 
 ## Whether a body could occupy this cell: it and the cells above it, to head height, are all open.

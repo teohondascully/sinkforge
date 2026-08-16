@@ -65,6 +65,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _the_line(main)
 		"mouth":
 			await _at_the_mouth(main)
+		"plunge":
+			await _plunging(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -125,14 +127,7 @@ func _at_the_mouth(main: MainView) -> void:
 	var agent: PlayAgent = AGENT.new(self, main)
 	var sim: FactorySim = main.sim
 	var here: int = main._cell_at(agent.player.position).x
-	var lip: int = -1
-	for c: int in range(2, FactorySim.GRID_COLS - 2):
-		var step: int = sim.surface_row(c) - sim.surface_row(c - 1)
-		if absi(step) < MOUTH_PLUNGE:
-			continue
-		var edge: int = (c - 1) if step > 0 else c
-		if lip < 0 or absi(edge - here) < absi(lip - here):
-			lip = edge
+	var lip: int = _mouth_lip(sim, here)
 	if lip < 0:
 		push_warning("no sinkhole mouth in this world — capturing the plain surface")
 		return
@@ -140,6 +135,58 @@ func _at_the_mouth(main: MainView) -> void:
 	await agent.walk_to_column(clampi(stand, 2, FactorySim.GRID_COLS - 3), 1600)
 	for _i: int in MOUTH_SETTLE:
 		await physics_frame
+
+
+## The standable side of the biggest break in the ground nearest `from` — the lip of a sinkhole.
+func _mouth_lip(sim: FactorySim, from: int) -> int:
+	var lip: int = -1
+	for c: int in range(2, FactorySim.GRID_COLS - 2):
+		var step: int = sim.surface_row(c) - sim.surface_row(c - 1)
+		if absi(step) < MOUTH_PLUNGE:
+			continue
+		var edge: int = (c - 1) if step > 0 else c
+		if lip < 0 or absi(edge - from) < absi(lip - from):
+			lip = edge
+	return lip
+
+
+## THE PLUNGE — the body inside a sinkhole, hanging on the line, daylight overhead. Played, not posed:
+## the same walk to the same found mouth, then off the lip, then a real fall arrested by a real hook bitten
+## into the real shaft wall. If the rock ever stops offering purchase this capture comes back as a body
+## lying at the bottom of a hole, which is the correct picture of that regression.
+const PLUNGE_FALL: int = 15          ## rows down the shaft before reaching for the wall
+const PLUNGE_HANG: int = 26          ## frames left hanging, so the line is taut and the dust has caught up
+
+func _plunging(main: MainView) -> void:
+	var agent: PlayAgent = AGENT.new(self, main)
+	var sim: FactorySim = main.sim
+	var p: Player = agent.player
+	var here: int = main._cell_at(p.position).x
+	var lip: int = _mouth_lip(sim, here)
+	if lip < 0:
+		push_warning("no sinkhole mouth in this world — capturing the plain surface")
+		return
+	var inward: float = 1.0 if lip > here else -1.0
+	await agent.walk_to_column(clampi(lip - int(inward) * 2, 2, FactorySim.GRID_COLS - 3), 1600)
+
+	var start: int = main._cell_at(p.position).y
+	p.auto_input = false
+	var guard: int = 0
+	while guard < 600 and main._cell_at(p.position).y - start < PLUNGE_FALL:
+		# Walk until the ground stops being there, then stop steering — a counted number of frames of input
+		# is a guess about how far the lip is, and it guessed wrong: the body stood on the edge admiring it.
+		p.input_dir = inward if p.on_floor else 0.0
+		await physics_frame
+		guard += 1
+	p.input_dir = 0.0
+	p.grapple.fire(p.hand(), p.hand() + Vector2(inward * MOUTH_STANDOFF * 32.0, -64.0))
+	guard = 0
+	while p.grapple.state == Grapple.State.FLYING and guard < 40:
+		await physics_frame
+		guard += 1
+	for _i: int in PLUNGE_HANG:
+		await physics_frame
+	p.auto_input = true
 
 
 ## Sink a shaft under the spawn column and leave the body standing at the bottom of it. Driven through

@@ -338,10 +338,19 @@ func _step(delta: float) -> void:
 
 	# THE LINE. Flown, reeled and constrained inside the substep so a fast swing collides every tile the
 	# same way a fast fall does. UP/DOWN reel while anchored — the same axis that rides a rope, because it
-	# is the same gesture — and reeling is gated to being off the floor so standing on the ground under
-	# your own anchor and holding W still just jumps.
+	# is the same gesture.
+	#
+	# THE WINCH HAULS FROM STANDING. This was gated to being off the floor, and the gate was defending
+	# against a conflict that does not exist: jump is Space, the reel is W/S, and on the ground with a hook
+	# planted overhead W did nothing at all. What it actually cost was the tool's headline claim. The whole
+	# reason the grapple exists is the trip back up, and a winch that only engages once you are ALREADY
+	# airborne is not a way up, it is a thing you use after a jump — tools/check_plunge caught it the
+	# expensive way, watching a body stand on a shelf holding UP into a planted line for a hundred and fifty
+	# frames, three separate times, going nowhere. So it hauls from standing; the only thing still refused
+	# is winching toward an anchor at or below your own feet, which would wind you into the floor.
 	grapple.advance(sim, hand(), delta)
-	if grapple.state == Grapple.State.ANCHORED and not on_floor:
+	if grapple.state == Grapple.State.ANCHORED \
+			and (not on_floor or grapple.anchor.y < position.y - CELL * 0.5):
 		grapple.reel(input_climb, delta)
 
 	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict

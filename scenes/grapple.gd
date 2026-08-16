@@ -46,8 +46,20 @@ const FLY_SPEED: float = 1800.0      ## px/s the hook travels. Measured against 
                                      ## dead air between pressing and swinging is enough to make the tool feel
                                      ## like a request rather than an action. 1800 lands the same shot in 15.
 const MAX_RANGE: float = CELL * 15.0 ## px of line on the winch; beyond this the hook falls short
-const REEL_SPEED: float = 165.0      ## px/s the line shortens while you hold UP — the ascent verb
-const PAY_SPEED: float = 210.0       ## px/s it pays out under DOWN (faster than reeling: rope falls easily)
+## THE WINCH SPEED, and it is the number that decides whether this is a traversal tool or a novelty.
+##
+## It was 165 px/s. The body RUNS at 150 and strides at 232, so hauling yourself up a line was slower than
+## walking — a hand-over-hand crawl wearing a winch's name. Every game where the hook IS the movement pulls
+## hard (Terraria's is about fifteen cells a second); ours pulled five, and tools/check_plunge priced the
+## consequence: riding a real sinkhole down cost THREE winch hauls and forty-eight percent of the descent,
+## which made the free route slower than swinging a pickaxe. A tool nobody takes is a tool that isn't there.
+##
+## 420 is thirteen cells a second — decisively faster than the legs, so reaching for the rope is always the
+## quick answer, and still slow enough that a long haul is a commitment you feel rather than a teleport.
+## The swing is untouched: reeling changes the RADIUS, and the arc's speed comes from conserved tangential
+## momentum, so a faster winch spins an arc up harder without altering how the pendulum itself behaves.
+const REEL_SPEED: float = 420.0      ## px/s the line shortens while you hold UP — the ascent verb
+const PAY_SPEED: float = 520.0       ## px/s it pays out under DOWN (faster than reeling: rope falls easily)
 const MIN_LENGTH: float = CELL * 0.8 ## you cannot winch yourself into the anchor itself
 const SLACK_TAKEUP: float = 0.90     ## on plant, the line is set to this × the current distance, so the
                                      ## hook bites and takes up a little slack instead of hanging loose

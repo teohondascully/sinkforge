@@ -548,6 +548,14 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 ##
 ## Cut UP from the top of a rift rather than down from the sky, so a mouth always opens onto somewhere
 ## worth arriving at, and flared toward the surface so it reads as a collapse rather than as a drilled pipe.
+##
+## WHERE they open matters as much as that they do. The first version took the leftmost rift column that
+## cleared the keepout, which meant a mouth could open over the thin tapering END of a chasm: tools/
+## check_plunge played that descent and the body dropped twelve rows onto a shelf and stood there for the
+## rest of the budget. A hole that lands you on a floor is a pit. So the columns are ranked by the FALL
+## underneath them — the tallest unbroken open run below the rift ceiling — and the mouths go over the
+## deepest ones. Stepping in is then a commitment to a real drop, which is the only version of this that
+## is worth walking across a world to find.
 const SINKHOLE_COUNT: int = 3            ## mouths in a world — landmarks, and rare enough to stay landmarks
 const SINKHOLE_MOUTH_HALF: float = 3.0   ## half-width where it meets the sky: wide enough to see from away
 const SINKHOLE_THROAT_HALF: float = 1.1  ## ...and where it joins the rift below
@@ -555,6 +563,7 @@ const SINKHOLE_FLARE: float = 2.2        ## >1 keeps the throat narrow and opens
 const SINKHOLE_KEEPOUT: int = 20         ## columns either side of spawn that stay sealed (the tutorial's ground)
 const SINKHOLE_SPACING: int = 15         ## columns between mouths, so no two read as one broken region
 const SINKHOLE_WANDER: float = 0.22      ## cells of drift per row — a throat, not a drainpipe
+const SINKHOLE_MIN_DROP: int = 14        ## rows of fall under a mouth, below which it is a pit not a route
 
 func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: Array[Vector2i]) -> void:
 	# The highest open cell in each column the rifts carved — the ceiling that has to be broken through.
@@ -565,21 +574,39 @@ func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: A
 	var cols: Array = tops.keys()
 	cols.sort()
 
-	var opened: Array[int] = []
+	# Rank by the fall underneath, deepest first, ties to the leftmost column so the pick stays deterministic.
+	var ranked: Array[Vector2i] = []
 	for col: Variant in cols:
-		if opened.size() >= SINKHOLE_COUNT:
-			break
 		var cx: int = col
 		if absi(cx - SPAWN_COL) < SINKHOLE_KEEPOUT:
-			continue
+			continue                                        # the tutorial's ground stays solid
+		ranked.append(Vector2i(cx, _drop_below(world, cx, int(tops[cx]))))
+	ranked.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y > b.y if a.y != b.y else a.x < b.x)
+
+	var opened: Array[int] = []
+	for cand: Vector2i in ranked:
+		if opened.size() >= SINKHOLE_COUNT or cand.y < SINKHOLE_MIN_DROP:
+			break                                           # nothing left worth opening onto
 		var clear: bool = true
 		for prev: int in opened:
-			if absi(cx - prev) < SINKHOLE_SPACING:
+			if absi(cand.x - prev) < SINKHOLE_SPACING:
 				clear = false
 		if not clear:
 			continue
-		opened.append(cx)
-		_cut_throat(world, rng, cx, int(tops[cx]))
+		opened.append(cand.x)
+		_cut_throat(world, rng, cand.x, int(tops[cand.x]))
+
+
+## How far a body that stepped into a mouth at this column would actually FALL: the unbroken open run
+## below the rift's ceiling. This is the number that separates a route from a pit.
+func _drop_below(world: WorldData, col: int, ceiling: int) -> int:
+	var run: int = 0
+	for row: int in range(ceiling, world.rows):
+		if world.blocks.has(Vector2i(col, row)):
+			break
+		run += 1
+	return run
 
 
 ## Carve one flaring shaft from a rift's ceiling up through the lid to daylight.
@@ -597,6 +624,15 @@ func _cut_throat(world: WorldData, rng: RandomNumberGenerator, col: int, rift_to
 			if world.in_bounds(cell):
 				world.blocks.erase(cell)                # deliberately past CAVE_MIN_DEPTH: this IS the mouth
 				world.routes[cell] = true
+		# THE FALL LINE stays plumb. The wander is decoration — it stops the shaft reading as a drilled pipe —
+		# but a cone that drifts away from the column the drop is under puts the mouth in one place and the
+		# fall in another, and a body that steps in slides down the SIDE of its own sinkhole, catching every
+		# shelf on the way. So the source column is opened at every row regardless: one clean line from the
+		# sky to the chasm, with a collapse shaped around it.
+		var plumb := Vector2i(col, row)
+		if world.in_bounds(plumb):
+			world.blocks.erase(plumb)
+			world.routes[plumb] = true
 		x += drift
 		drift = clampf(drift + rng.randf_range(-0.08, 0.08), -SINKHOLE_WANDER, SINKHOLE_WANDER)
 
