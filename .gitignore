@@ -37,3 +37,8 @@ tools/*.uid
 
 # Local visual progress archive — keep on disk, NEVER publish or delete
 history/
+
+# Godot's per-machine ProjectSettings override + any local cert bundle it points at. Machine
+# state, never project state: nothing here may change how the game builds for anyone else.
+override.cfg
+.local_ca_stub.pem

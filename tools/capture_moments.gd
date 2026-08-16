@@ -12,6 +12,9 @@ extends SceneTree
 ##   swing — mid-arc on a live grapple line, so the rope, the hook and the pose can be judged together
 ##   map   — the LARGE minimap over a dug world: the one view that shows the world's whole shape, and
 ##           so the only way to judge whether the descent reads as a journey rather than as a grid
+##   teach — a line caught on a corner WITH the bubble the game raises for it, so the one thing a still
+##           frame can say about onboarding — does the lesson arrive on the moment it explains? — is
+##           answerable from the picture
 ##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
 ##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
 ##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
@@ -77,6 +80,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _hauling(main)
 		"scarp":
 			await _at_the_scarp(main)
+		"teach":
+			await _teaching(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -116,6 +121,15 @@ const HAIL_PEAK := 60                ## frames after the hail — inside the pla
 ## through solid rock. Built on the same geometry check_wrap measures: a hook in a high roof, a shelf
 ## jutting out below it, and a body swung under the shelf so the line has no choice but to catch.
 func _bending(main: MainView) -> void:
+	await _bending_geometry(main)
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+
+
+## The rig both bend moments share: hook, shelf, and a body swung under it until the line catches.
+func _bending_geometry(main: MainView) -> void:
 	var sim: FactorySim = main.sim
 	var p: Player = main._player
 	for x: int in range(30, 59):
@@ -142,10 +156,26 @@ func _bending(main: MainView) -> void:
 		if not p.grapple.pivots.is_empty():
 			break
 	p.input_dir = 0.0
-	if main._hints != null:
-		main._hints._active = &""
-		main._hints._queue.clear()
-		main._hints._life = 0.0
+
+
+## THE LESSON, in place. The bend from _bending, but with the bubble the game now raises the first time a
+## line catches — the picture of a technique being taught at the moment it happens rather than in a manual.
+## The hint is real: it is fired by the swing itself (asserted below), not painted on for the photograph.
+## What is arranged is only WHICH of the fired hints is on screen, since a body this deep has also earned
+## the depth hint and the queue would otherwise show that one first.
+func _teaching(main: MainView) -> void:
+	await _bending_geometry(main)
+	if main._hints == null:
+		return
+	if not main._hints._done.has(&"wrapped"):
+		push_warning("the swing never caught the corner — no lesson to photograph")
+		return
+	main._hints._queue.clear()
+	main._hints._active = &"wrapped"
+	main._hints._life = Hints.SHOW_SECONDS - 1.0    # past the fade-in, nowhere near the fade-out
+	main._hints._lingered = 0.0
+	for _i: int in 20:
+		await physics_frame
 
 
 ## THE HAUL. A body mid-arc in a gallery, moving faster than it can run — the thing check_traverse measures

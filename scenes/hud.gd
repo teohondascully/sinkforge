@@ -1353,6 +1353,12 @@ func _draw_help_overlay() -> void:
 		"climb       W / S  on a rope (W climbs, not jumps)",
 		"grapple     F  — throw at the ringed rock; throw again to swing on, Space to let go",
 		"swing       W / S reel the line in / out · SPACE leaps off it",
+		# The three techniques the winch grew. Each is taught in place by a hint the first time you are in
+		# the situation (scenes/hints.gd), but a lesson you can only be told once is a lesson you can miss,
+		# so the card carries them too — same key-first voice as every line above it.
+		"chain       F again in mid-air — the next line keeps the speed you left with",
+		"wrap        the line bends round corners; the shorter it gets, the harder it whips",
+		"catch       F on the way down — the line ends the fall, and the cost of landing it",
 		"mine        LMB (hold)",
 		"dig plan    LMB drag paints it · X clears",
 		"select      1–9  ·  mouse wheel",

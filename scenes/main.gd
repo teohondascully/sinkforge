@@ -635,6 +635,10 @@ func _process(delta: float) -> void:
 			_hints.note_in_water(_player._in_water())   # feed the body's wet state for the AQUIFER edge
 			var pc: Vector2i = _cell_at(_player.position)
 			_hints.note_depth(pc.y - sim.surface_row(pc.x))   # ...and its depth, for the GRAPPLE edge
+			_note_rope_moments()                              # ...and the three the ROPE teaches by itself
+			# A bubble's clock only runs while you could plausibly have read it. Full stride is 232 px/s,
+			# so this sits just above a cruise: walking and reading is fine, flying and reading is not.
+			_hints.note_busy(_player.velocity.length() > Player.RUN_SPEED * 1.25)
 			# The FEET, not the body centre: standing on the grass the centre cell is the air above it,
 			# which read as "+1 m, OPEN SKY" while the miner was plainly stood on the ground.
 			_note_stratum(_cell_at(_player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0)).y)
@@ -973,6 +977,38 @@ func _apply_setting(payload: Dictionary) -> void:
 	elif payload.has("reset"):
 		Settings.reset_bindings()
 		_hud.flash("bindings reset to defaults")
+
+
+## THE THREE THINGS THE ROPE CAN TEACH ITSELF.
+##
+## The winch has grown three techniques the game never mentioned: you can chain throws instead of
+## landing, the line bends around corners and whips you round them, and it will catch a fall you are
+## already committed to. A player who never finds those is playing a strictly worse game with the same
+## build — and none of the three can be taught by a bubble at the start, because none of them means
+## anything until you are in the situation. So each is poked as a condition and fires the frame the
+## situation arrives: the release at speed, the first bend, the first landing that costs your footing.
+##
+## Predicates live HERE rather than in Hints because this is where the body and the rope are; Hints
+## stays a latch and a queue that knows nothing about physics. Same reason note_in_water lives here.
+const CHAIN_HINT_SPEED: float = Player.RUN_SPEED * 1.4    ## a release below this was not going anywhere
+
+
+var _was_anchored: bool = false      ## line held last frame — the falling edge is a RELEASE
+
+
+func _note_rope_moments() -> void:
+	var g: Grapple = _player.grapple
+	var anchored: bool = g.state == Grapple.State.ANCHORED
+	# A release, airborne and moving: the exact frame a second throw would have paid off. Read as a
+	# TRANSITION the controller tracks itself rather than off Grapple.just_cut, because that flag is
+	# cleared by the player's own step and the player is a child node — by the time the controller looks,
+	# the frame it was set in is already over. Tracking the edge here cannot lose that race either way up.
+	_hints.note(&"chain",
+		_was_anchored and not anchored and not _player.on_floor
+			and _player.velocity.length() > CHAIN_HINT_SPEED)
+	_was_anchored = anchored
+	_hints.note(&"wrapped", not g.pivots.is_empty())
+	_hints.note(&"hard_landing", _player.stagger > 0.0)
 
 
 ## THE DESCENT, marked. Crossing into a band for the first time this session raises a banner and a
