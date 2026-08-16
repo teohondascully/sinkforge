@@ -1404,11 +1404,18 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 ## where this wall meets solid takes a soft inward shadow, deepest under a ceiling because the world's
 ## key light comes from above (#A1). That cast is what turns "a hole" into "a room" — it is the same
 ## cue Terraria leans on, and it costs four neighbour lookups in a pass that only runs on a dig.
-## Measured, not guessed: with a 13x7 chamber dug and two torches hung in it, the room's back wall and
-## the solid rock around it printed close enough in value that THE ROOM WAS INVISIBLE — you could not
-## tell carved space from mass. A back plane has to lose a decisive amount of light, because it is
-## further from every source and shadowed by the rock in front of it; half is not too much.
-const WALL_RECESS: float = 0.52      ## how far the back plane sits behind the front one, in value
+## Measured, not guessed, twice. The first measurement — a 13x7 chamber with two torches in it — found
+## the back wall and the surrounding rock printing at luma 0.142 vs 0.117, so THE ROOM WAS INVISIBLE:
+## you could not tell carved space from mass. The response was to spend half the wall's value proving it
+## was not the rock in front of it, which separated the planes and cost the room its back wall — a lit
+## chamber whose middle was a black rectangle.
+##
+## The real culprit was upstream (see MASS_SHADE): the veil gave buried rock and open space identical
+## light, so no amount of grading here could win. Now the mass darkens itself and the same chamber
+## measures 0.182 against 0.052 — a 3.5x separation instead of 1.2x — which buys the wall its value
+## back. It is a lit rock surface again, and the recess is carried by the cast shadows above, by hue,
+## and by the lighting model finally agreeing with all of it.
+const WALL_RECESS: float = 0.32      ## how far the back plane sits behind the front one, in value
 const WALL_COOL := Color(0.16, 0.19, 0.30)   ## the cool it drifts toward (distance desaturates)
 const WALL_AO_UNDER: float = 0.62    ## cast shadow on the wall under a solid ceiling — the deepest
 const WALL_AO_SIDE: float = 0.34     ## …beside a solid wall
@@ -2098,11 +2105,38 @@ func _draw_grapple() -> void:
 ## OWN colour darkened, purely so the hue survived the blend; a multiply preserves hue for free. The
 ## whole per-cell shadow-colour bake, its dirty flag, and its per-dig patch pass are gone with it, and
 ## a dig no longer touches this texture's colours at all.
+## MASS OCCLUDES (#S6) — the last reason a dug room did not read as a room.
+##
+## The veil's light level was a pure function of ROW: every cell at a given depth got the same light,
+## whether it was open air or the middle of a hundred tonnes of rock. So a 13x7 chamber cut into the
+## deep printed at the same value as the mass around it — measured, the room's back wall came out at
+## luma 0.148 against 0.127 for the surrounding stone, a sixteen-percent difference no eye reads as
+## SPACE. Every other depth cue in the renderer (the recessed wall plane, its cast shadows, the carved
+## edges, the second-plane hue shift) was fighting a lighting model that flatly contradicted it.
+##
+## Light does not travel through stone. Openness is measured as a field — 1 in air, 0 in rock — and
+## smoothed with a separable box blur, so light bleeds a couple of cells INTO the mass from any opening
+## instead of stopping at a hard line. Solid cells are then dimmed by how buried they are: a rock face
+## on the edge of a chamber keeps nearly all its light, and rock with nothing but rock around it loses
+## MASS_SHADE of it. Open cells are never touched — the veil's own row-based level already describes
+## them, and the lamp still cuts straight through all of it, so shining a light on buried rock reveals
+## it exactly as before.
+##
+## Cost: the field is floats in flat arrays, not Dictionary probes, and the blur is separable, so the
+## whole term is four linear passes over 7.7k cells inside a bake that already ran on terrain change.
+## check_dig_hitch holds.
+const MASS_SHADE: float = 0.46       ## light a fully-buried cell loses vs. one at an opening
+const MASS_REACH: int = 2            ## cells light bleeds into the mass (the blur radius)
+var _open_field: PackedFloat32Array = PackedFloat32Array()
+var _open_blur: PackedFloat32Array = PackedFloat32Array()
+
+
 func _bake_veil_base() -> void:
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
 	if _veil_base.size() != cols * rows * 4:
 		_veil_base.resize(cols * rows * 4)
+	_bake_openness(cols, rows)
 	# Above its column's surface the light level depends on the ROW alone — table it once per bake
 	# instead of a function call per cell (the bake's dominant cost at 7.7k cells).
 	var sky_rgb: PackedInt32Array = PackedInt32Array()
@@ -2136,10 +2170,50 @@ func _bake_veil_base() -> void:
 				r = int(lerpf(float(sky_rgb[row * 3]), float(amb_r), t))
 				g = int(lerpf(float(sky_rgb[row * 3 + 1]), float(amb_g), t))
 				b = int(lerpf(float(sky_rgb[row * 3 + 2]), float(amb_b), t))
-			_veil_base[i] = r
-			_veil_base[i + 1] = g
-			_veil_base[i + 2] = b
+			var lit: float = _open_blur[row * cols + col]
+			_veil_base[i] = int(float(r) * lit)
+			_veil_base[i + 1] = int(float(g) * lit)
+			_veil_base[i + 2] = int(float(b) * lit)
 			_veil_base[i + 3] = 255
+
+
+## Build the per-cell "how much light can reach in here" multiplier used by _bake_veil_base. Four linear
+## passes: solidity, a horizontal blur, a vertical blur, then the multiplier. The blur is what makes an
+## opening bleed light into the rock around it rather than ending at a hard black line — without it the
+## row under a flat surface would drop straight to buried-dark and the ground would read as a painted
+## band rather than as earth you are looking into the top of.
+func _bake_openness(cols: int, rows: int) -> void:
+	var n: int = cols * rows
+	if _open_field.size() != n:
+		_open_field.resize(n)
+		_open_blur.resize(n)
+	var solid: Dictionary = sim.solid
+	for row: int in range(rows):
+		var base: int = row * cols
+		for col: int in range(cols):
+			_open_field[base + col] = 0.0 if solid.has(Vector2i(col, row)) else 1.0
+	var span: float = float(MASS_REACH * 2 + 1)
+	for row: int in range(rows):                    # horizontal box blur, clamped at the world edges
+		var base: int = row * cols
+		for col: int in range(cols):
+			var acc: float = 0.0
+			for d: int in range(-MASS_REACH, MASS_REACH + 1):
+				acc += _open_field[base + clampi(col + d, 0, cols - 1)]
+			_open_blur[base + col] = acc / span
+	for col: int in range(cols):                    # ...then vertical, back into the source buffer
+		for row: int in range(rows):
+			var acc: float = 0.0
+			for d: int in range(-MASS_REACH, MASS_REACH + 1):
+				acc += _open_blur[clampi(row + d, 0, rows - 1) * cols + col]
+			_open_field[row * cols + col] = acc / span
+	# Open cells keep their full row-based light; solid ones are dimmed by how buried they are. The
+	# blurred openness is already 0..1, and a cell touching air lands high enough in it that a rock FACE
+	# — the thing you actually look at when you look at a wall — barely dims at all.
+	for row: int in range(rows):
+		for col: int in range(cols):
+			var i: int = row * cols + col
+			_open_blur[i] = 1.0 if not solid.has(Vector2i(col, row)) \
+				else lerpf(1.0 - MASS_SHADE, 1.0, clampf(_open_field[i] * 2.2, 0.0, 1.0))
 
 
 ## Darkness (0 = full light, AMBIENT_DARK = the deep's gloom) → the multiplier the veil applies there.
@@ -2223,6 +2297,11 @@ func _update_veil() -> void:
 	for cell: Variant in sim.torch:
 		var tpos: Vector2 = _cell_center(cell as Vector2i)
 		if cull.has_point(tpos):
+			# Two cuts, same shape as the head-lamp: a wide soft glow that makes the ROOM habitable and
+			# a hot core at the flame. One quadratic pool alone put a 2-cell bright disc on the wall and
+			# left the rest of a hung chamber black — which is not what a torch in a room looks like, and
+			# it is the reason lighting a space felt like decorating it rather than claiming it.
+			_veil_cut(bytes, tpos, 7.6, 0.52, _light_tint(TORCH_LIGHT))
 			_veil_cut(bytes, tpos, 4.4, 0.94, _light_tint(TORCH_LIGHT))
 	for cell: Variant in sim.conduit:
 		var cpos: Vector2 = _cell_center(cell as Vector2i)
