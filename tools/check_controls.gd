@@ -30,25 +30,25 @@ func _initialize() -> void:
 	player.auto_input = true
 
 	# W off a rope → jump.
-	player.position = _center(Vector2i(7, 9))
+	player.place(_center(Vector2i(7, 9)))
 	player._jump_request = false
 	player._unhandled_input(_press(Controls.UP))
 	_check(player._jump_request, "W off a rope requests a JUMP (Terraria)")
 
 	# W on a rope → NO jump (climbs instead).
-	player.position = _center(Vector2i(3, 6))
+	player.place(_center(Vector2i(3, 6)))
 	player._jump_request = false
 	player._unhandled_input(_press(Controls.UP))
 	_check(not player._jump_request, "W on a rope does NOT jump (it climbs)")
 
 	# Space always jumps.
-	player.position = _center(Vector2i(7, 9))
+	player.place(_center(Vector2i(7, 9)))
 	player._jump_request = false
 	player._unhandled_input(_press(Controls.JUMP))
 	_check(player._jump_request, "Space jumps")
 
 	# Space jumps OFF a rope too.
-	player.position = _center(Vector2i(3, 6))
+	player.place(_center(Vector2i(3, 6)))
 	player._jump_request = false
 	player._unhandled_input(_press(Controls.JUMP))
 	_check(player._jump_request, "Space jumps off a rope")

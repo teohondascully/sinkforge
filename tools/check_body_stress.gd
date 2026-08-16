@@ -131,7 +131,7 @@ func _park_on_run(search_from: int, cell_span: int = 6) -> bool:
 	_run_col = f
 	_foot_col = f + cell_span / 2
 	_foot_row = _sim.surface_row(_foot_col)
-	_player.position = _main._cell_center(Vector2i(_foot_col, _foot_row - 1))
+	_player.place(_main._cell_center(Vector2i(_foot_col, _foot_row - 1)))
 	_player.velocity = Vector2.ZERO
 	_player.input_dir = 0.0
 	return true
@@ -409,7 +409,7 @@ func _start_escape_check() -> void:
 		_sim.set_solid(Vector2i(x, row), &"stone")            # floor plate
 		for y: int in range(row - 4, row):
 			_sim.set_solid(Vector2i(x, y), &"")               # clear air above it
-	_player.position = _main._cell_center(Vector2i(col + 1, row - 1))
+	_player.place(_main._cell_center(Vector2i(col + 1, row - 1)))
 	_player.velocity = Vector2.ZERO
 	_phase = 4
 	_budget = ESCAPE_FRAMES + 60

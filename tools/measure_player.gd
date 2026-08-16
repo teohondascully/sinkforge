@@ -43,7 +43,7 @@ func _phys() -> void:
 		_player.auto_input = false
 		# Start in the plateau's clear LEFT flat lane (left of the bazaar at col 40): genuine flat ground with
 		# clear sky above and room to run left, so run-speed/jump-apex aren't contaminated by hill slopes.
-		_player.position = _main._cell_center(Vector2i(HeightmapWorldGen.FLAT_START + 6, 3))
+		_player.place(_main._cell_center(Vector2i(HeightmapWorldGen.FLAT_START + 6, 3)))
 		_player.velocity = Vector2.ZERO
 		return
 

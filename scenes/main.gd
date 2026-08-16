@@ -264,7 +264,7 @@ func _ready() -> void:
 
 	_player = Player.new()
 	_player.sim = sim
-	_player.position = _cell_center(Vector2i(SPAWN_COL, SURFACE - 2))  # just above the centred plateau (falls onto it)
+	_player.place(_cell_center(Vector2i(SPAWN_COL, SURFACE - 2)))  # just above the centred plateau (falls onto it)
 	_player.z_index = 60  # above the light layers (50/51) so the miner stays crisp inside his lamp pool
 	add_child(_player)
 
@@ -708,6 +708,13 @@ func _update_juice(delta: float) -> void:
 		var below: float = float(_body_cell().y - sim.surface_row(_body_cell().x))
 		_sfx.set_ambience(clampf(1.0 - below / 4.0, 0.0, 1.0), clampf(below / 10.0, 0.0, 1.0),
 			_player.position, delta)
+		# THE RUSH: how fast you are going, heard. Measured from RUN_SPEED up — a walk is the zero
+		# point, because the sound has to mean "faster than you can run", which is the only speed the
+		# rope and a sinkhole ever give you. So ordinary mining never whistles, and a forty-row drop
+		# stops sounding exactly like standing still.
+		var fast: float = _player.velocity.length()
+		_sfx.set_rush(clampf((fast - Player.RUN_SPEED) / (Player.MAX_FALL - Player.RUN_SPEED),
+			0.0, 1.0), delta)
 		# THE SCORE (audio slice 3): where ambience says WHERE you are, the score says what it MEANS —
 		# and the only thing that reliably means something in a game about descending is DEPTH. So the
 		# music is a pure function of it: absolute row, not depth-below-your-column, because a shaft you
@@ -1562,7 +1569,7 @@ func _load_game() -> void:
 		return
 	var pp: Variant = data.get("player_pos")
 	if pp is Vector2:
-		_player.position = pp
+		_player.place(pp)
 		_player.velocity = Vector2.ZERO
 	MainView.boot_tint = clampi(int(data.get("lamp_tint", MainView.boot_tint)), 0, LAMP_TINTS.size() - 1)
 	_renderer.lamp_color = LAMP_TINTS[MainView.boot_tint]["color"]

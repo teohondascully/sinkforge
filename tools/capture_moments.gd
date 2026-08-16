@@ -69,6 +69,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _plunging(main)
 		"aim":
 			await _aiming(main)
+		"land":
+			await _landing(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -211,6 +213,40 @@ func _aiming(main: MainView) -> void:
 	vp.warp_mouse(vp.get_canvas_transform() * target)
 	for _i: int in AIM_SETTLE:
 		await physics_frame
+
+
+## THE LANDING — the frame a real plunge arrives. Ride a found sinkhole all the way to whatever floor it
+## has, and shoot a beat after touchdown, while the impact dust is still up and the body is still folded.
+## The whole point of Strike 18 is that this moment now COSTS something, and a cost the player cannot see
+## reads as the controller going vague, so this capture is the check on whether it reads.
+const LAND_FALL: int = 900
+const LAND_BEAT: int = 5              ## frames after touchdown — inside the held impact pose
+
+func _landing(main: MainView) -> void:
+	var agent: PlayAgent = AGENT.new(self, main)
+	var sim: FactorySim = main.sim
+	var p: Player = agent.player
+	var here: int = main._cell_at(p.position).x
+	var lip: int = _mouth_lip(sim, here)
+	if lip < 0:
+		push_warning("no sinkhole mouth in this world — capturing the plain surface")
+		return
+	var inward: float = 1.0 if lip > here else -1.0
+	await agent.walk_to_column(clampi(lip - int(inward) * 2, 2, FactorySim.GRID_COLS - 3), 1600)
+	p.auto_input = false
+	var guard: int = 0
+	var airborne: bool = false
+	while guard < LAND_FALL:
+		p.input_dir = inward if p.on_floor and not airborne else 0.0
+		await physics_frame
+		guard += 1
+		if not p.on_floor:
+			airborne = true
+		elif airborne:
+			break                      # it has arrived
+	for _i: int in LAND_BEAT:
+		await physics_frame
+	p.auto_input = true
 
 
 ## Sink a shaft under the spawn column and leave the body standing at the bottom of it. Driven through

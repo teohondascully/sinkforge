@@ -17,6 +17,8 @@ var _pool_idx: int = 0
 var _ui_player: AudioStreamPlayer
 var _hum_player: AudioStreamPlayer
 var _hum_level: float = 0.0                   # smoothed 0..1
+var _rush_player: AudioStreamPlayer           # speed bed: the air going past you
+var _rush_level: float = 0.0                  # smoothed 0..1
 var _wind_player: AudioStreamPlayer           # ambience bed: surface wind
 var _cave_player: AudioStreamPlayer           # ambience bed: deep cave-air
 var _wind_level: float = 0.0                  # smoothed 0..1
@@ -76,11 +78,13 @@ func _ready() -> void:
 	# you near falling water (a small waterfall in the dark), and a working PUMP's wet mechanical drain.
 	# Both level-driven from the controller (set_water) exactly like the factory hum, so they swell with
 	# nearby activity and fade to silence when nothing's pouring/pumping — they blend under wind/cave/drips.
+	_rush_player = _make_loop_player(_gen_rush(rng))
 	_pour_player = _make_loop_player(_gen_pour(rng))
 	_pump_player = _make_loop_player(_gen_pump(rng))
 	if not _muted:
 		_hum_player.play()
 		_wind_player.play()
+		_rush_player.play()
 		_cave_player.play()
 		_pour_player.play()
 		_pump_player.play()
@@ -91,7 +95,8 @@ func _ready() -> void:
 ## Dropping the stream refs too matters under the headless Dummy driver, whose mixer never steps and
 ## so never reaps a stopped voice on its own.
 func _exit_tree() -> void:
-	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _pour_player, _pump_player, _ui_player]:
+	for bed: AudioStreamPlayer in [_hum_player, _wind_player, _cave_player, _rush_player,
+			_pour_player, _pump_player, _ui_player]:
 		bed.stop()
 		bed.stream = null
 	for p: AudioStreamPlayer2D in _pool:
@@ -129,6 +134,22 @@ func ui(name: StringName, pitch: float = 1.0) -> void:
 func set_hum(level: float, delta: float) -> void:
 	_hum_level = move_toward(_hum_level, clampf(level, 0.0, 1.0), delta * 0.8)
 	_hum_player.volume_db = lerpf(-60.0, -22.0, _hum_level) + Settings.ambience_db()
+
+
+## THE RUSH — the air going past you, 0..1 by how fast you are actually moving.
+##
+## Everything else in this mixer is a bed you stand IN: the factory hum, the surface wind, the cave air.
+## They tell you where you are. None of them tell you how fast you are, and after the winch got geared up
+## and the sinkholes opened, going fast became the point — a forty-row drop and a standing start sounded
+## exactly alike, which is the surest way to make speed feel like nothing.
+##
+## Rides pitch as well as level, because that is what actually sells velocity: a bed that only gets LOUDER
+## reads as "more wind", while one that also climbs reads as "you, going faster". Ceiling deliberately sits
+## under the ambience beds — it should be the thing you notice stop when you land, not a howl.
+func set_rush(level: float, delta: float) -> void:
+	_rush_level = move_toward(_rush_level, clampf(level, 0.0, 1.0), delta * 3.2)
+	_rush_player.volume_db = lerpf(-60.0, -19.0, _rush_level) + Settings.ambience_db()
+	_rush_player.pitch_scale = lerpf(0.78, 1.34, _rush_level)
 
 
 ## The AMBIENCE crossfade (audio slice 2): `surface` 0..1 drives the wind bed, `cave` 0..1 the
@@ -404,6 +425,26 @@ func _gen_wind(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		lp2 += 0.20 * (lp1 - lp2)
 		var gust: float = 0.6 + 0.25 * sin(TAU * 0.13 * t) + 0.15 * sin(TAU * 0.071 * t + 1.7)
 		out[i] = lp2 * gust * 2.6
+	return _loopify(out)
+
+
+## THE RUSH bed: brighter and thinner than the surface wind — less low-frequency body, a touch of whistle
+## on top — so the two never read as the same sound when you are outdoors and moving. Loopified.
+func _gen_rush(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = RATE * 2
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	var hp: float = 0.0
+	var prev: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(RATE)
+		var white: float = rng.randf_range(-1.0, 1.0)
+		lp += 0.42 * (white - lp)                      # gentler low-pass than the wind: keeps the hiss
+		hp = 0.86 * (hp + lp - prev)                   # ...and a high-pass to cut the rumble entirely
+		prev = lp
+		var whistle: float = 0.14 * sin(TAU * 1180.0 * t) * (0.5 + 0.5 * sin(TAU * 0.9 * t))
+		out[i] = (hp * 1.9 + whistle) * (0.85 + 0.15 * sin(TAU * 0.31 * t))
 	return _loopify(out)
 
 

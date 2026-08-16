@@ -68,6 +68,35 @@ const STRIDE_RAMP: float = 1.2       ## ...and s from there to full
 const STRIDE_GAIN: float = 0.55      ## extra top speed at full stride (150 -> 232 px/s)
 const STRIDE_DECAY: float = 3.0      ## per-second bleed once the run breaks (a third of a second to nothing)
 const STRIDE_LAND_COST: float = 0.5  ## fraction of the stride a hard landing takes
+## THE COST OF A LANDING. A fall was free. You could ride terminal velocity into rock and sprint off the
+## impact frame at full speed, which made every drop in the game weightless — and once the sinkholes
+## landed, it made a forty-row hole a strictly better staircase. Weight has to be felt somewhere.
+##
+## Deliberately NOT damage. There is no health system, and inventing one to price a fall is a far larger
+## decision than this needs; more importantly, a platformer that takes control AWAY feels broken however
+## justified the moment. So a hard landing costs GRIP: for a fraction of a second scaled by how hard you
+## hit, the legs have reduced authority and the stride is gone. You can still steer, still jump, still
+## mine — you just do not accelerate out of a forty-metre drop like you stepped off a kerb.
+##
+## And the rope is the answer, for free and without a special case: arresting on the line bleeds the fall
+## before it lands, so a descent you actually FLEW costs nothing, and one you merely survived costs a beat.
+## That is the whole risk side of "dig, or find the open way and ride it" — priced in the only currency
+## this game has, which is time.
+## Priced on the DISTANCE fallen, not the speed of the impact, and that distinction is the whole design.
+## Impact speed saturates: terminal velocity arrives after 5.4 cells, so by that measure a six-cell hop and
+## a forty-row plunge land identically, and any threshold you pick either fires on both or on neither.
+## Distance keeps counting. It is also what the player is actually tracking — nobody feels px/s, everybody
+## feels "that was a long way down".
+##
+## And it makes the rope the answer without a special case: a taut line RESETS the fall, because a fall the
+## rope caught is over. Let go again and a new one starts from there. So a descent you flew properly costs
+## nothing, one you flew badly costs a beat, and neither needed a rule of its own.
+const STAGGER_FALL: float = CELL * 9.0   ## px of fall that lands clean — past any ordinary platforming drop
+const STAGGER_FULL: float = CELL * 30.0  ## ...and the fall that costs the full beat
+const STAGGER_MAX: float = 0.26      ## s of reduced grip at the worst of it — a beat, never a lockout
+const STAGGER_GRIP: float = 0.34     ## × ACCEL while staggered: steering, but not steering WELL
+var stagger: float = 0.0             ## s of stagger left — also read by the view for the recovery pose
+var _fall_from: float = 0.0          ## world y the current fall began at (ground, rope or taut line)
 const STRIDE_LEAN: float = 0.07      ## radians the body tilts forward at full stride (~4 degrees)
 var stride: float = 0.0              ## 0..1 into the run — read by the lean, the camera and the dust
 var _stride_hold: float = 0.0        ## s of unbroken qualifying travel so far (counts toward STRIDE_DELAY)
@@ -169,6 +198,19 @@ func _ready() -> void:
 	Controls.register()    # so the body works standalone in motion harnesses, not only under MainView
 
 
+## Put the body somewhere without it counting as having FALLEN there.
+##
+## The landing cost is priced on distance dropped, which means anything that moves the body by assignment —
+## a savegame restoring your position, a harness rig setting up a shot — banks the whole teleport as a fall
+## and charges for it the next time you touch ground. Nothing in the game teleports during play, so this is
+## not a gameplay concern; it is the seam every non-gameplay mover has to go through, and it is one line.
+func place(at: Vector2) -> void:
+	position = at
+	velocity = Vector2.ZERO
+	_fall_from = at.y
+	stagger = 0.0
+
+
 func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Input.get_axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
@@ -243,7 +285,8 @@ func _step(delta: float) -> void:
 	var wet: bool = _in_water()
 	_update_stride(delta, wet)
 	var speed_top: float = RUN_SPEED * (1.0 + STRIDE_GAIN * stride) * (WATER_SPEED_MULT if wet else 1.0)
-	var accel: float = ACCEL * (WATER_ACCEL_MULT if wet else 1.0)
+	var accel: float = ACCEL * (WATER_ACCEL_MULT if wet else 1.0) \
+			* (STAGGER_GRIP if stagger > 0.0 else 1.0)
 	var friction: float = FRICTION * (WATER_ACCEL_MULT if wet else 1.0)
 	var gravity: float = GRAVITY * (WATER_GRAVITY_MULT if wet else 1.0)
 	var max_fall: float = WATER_MAX_SINK if wet else MAX_FALL
@@ -416,7 +459,21 @@ func _step(delta: float) -> void:
 		last_impact = impact_v           # the consumer scales dust/shake/thump by how hard (#43)
 		_land_hold = 0.14                # hold the landing-impact frame a beat (#42)
 		stride *= 1.0 - STRIDE_LAND_COST # a heavy landing costs the run — weight has to be felt somewhere
+		var fell: float = position.y - _fall_from
+		if fell > STAGGER_FALL:
+			stagger = maxf(stagger, STAGGER_MAX * clampf(
+				(fell - STAGGER_FALL) / (STAGGER_FULL - STAGGER_FALL), 0.0, 1.0))
+			# Hold the impact pose for exactly as long as the grip is missing. A cost the player cannot SEE
+			# reads as the controller having gone vague — they feel the sluggishness and blame the game, not
+			# the forty metres they just fell. Tying the two together makes it one legible event: you land
+			# hard, you are folded up for a beat, you push off slowly, and all three are the same fact.
+			_land_hold = maxf(_land_hold, stagger)
 	_land_hold = maxf(0.0, _land_hold - delta)
+	stagger = maxf(0.0, stagger - delta)
+	# Anything holding you is where the next fall starts from: the ground, a gripped rope, or a line under
+	# tension. Everything else lets the drop keep accumulating.
+	if on_floor or climbing or grapple.taut:
+		_fall_from = position.y
 	if climbing:
 		_climb_phase += absf(velocity.y) * delta * 0.055   # hand-over-hand cadence tracks climb speed
 	_was_on_floor = on_floor

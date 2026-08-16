@@ -60,7 +60,7 @@ func _phys() -> void:
 			_sim.set_solid(Vector2i(col, r), &"stone")         # the block the body stands ON
 			_sim.set_solid(Vector2i(col, r + 4), &"stone")     # catch floor, 3 open tiles below the stand block
 			_stand = Vector2i(col, r)
-			_player.position = _main._cell_center(Vector2i(col, r - 1))
+			_player.place(_main._cell_center(Vector2i(col, r - 1)))
 			_player.velocity = Vector2.ZERO
 			_phase = 1
 			_budget = 0
