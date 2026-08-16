@@ -1021,8 +1021,23 @@ func _draw_saplings() -> void:
 ## across a transition band so strata read as different PLACES, not stripes. Topsoil keeps its warm
 ## material colours (no entry = no tint); Stonereach below THE SEAL chills toward cold slate-blue.
 ## A new depth layer = one new row here (rows straddle the transition; strength is the held tint).
+## THE DESCENT'S COLOUR ARC (#S5). One tint was doing all of this work, and the twenty-odd rows between
+## the topsoil and it were a single undifferentiated grey — the heart of the game, and the place a player
+## spends the most time, painted in exactly one colour. Depth was being sold by DARKNESS alone, which is
+## the weakest of the three signals available and the one the shadow veil is already spending.
+##
+## Now the descent runs an arc a player can feel without reading a depth gauge: warm ochre clay carries
+## the topsoil's warmth a little way down and then loses it, the middle stone sits honestly neutral (the
+## rest is measured against it), Stonereach chills hard into slate-blue below the seal, and the last band
+## before the bottom of the world goes cold violet toward the sealrock it is approaching. Warm to neutral
+## to cold to alien: that is what going deeper looks like when you cannot see a number.
+##
+## A new depth layer = one new row here. Bands straddle their transition; strength is the held tint.
 const ZONE_TINTS: Array[Dictionary] = [
-	{"from": 50, "to": 66, "color": Color(0.42, 0.55, 0.90), "strength": 0.30},   # Stonereach (L2)
+	{"from": 26, "to": 36, "color": Color(0.86, 0.58, 0.30), "strength": 0.22},   # Clayband — warmth to lose
+	{"from": 40, "to": 50, "color": Color(0.55, 0.58, 0.66), "strength": 0.16},   # the honest neutral middle
+	{"from": 50, "to": 66, "color": Color(0.42, 0.55, 0.90), "strength": 0.34},   # Stonereach (L2)
+	{"from": 68, "to": 79, "color": Color(0.40, 0.30, 0.62), "strength": 0.26},   # the approach to the seal
 ]
 
 
