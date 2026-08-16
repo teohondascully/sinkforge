@@ -34,3 +34,6 @@ _zoom_*.png
 # Tool-script UIDs — tools/ scripts run by path (never referenced via uid://), so
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
+
+# Local visual progress archive — keep on disk, NEVER publish or delete
+history/
