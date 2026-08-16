@@ -398,10 +398,26 @@ func _draw_forged() -> void:
 	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
 
 
-## The OBJECTIVE line (top-centre) — ONE line: the current step only, as a gentle nudge, not a wall of
-## text. A small gold dot + the step's how-to label. When the whole chain is done it shows a brief
-## "all set" then auto-hides (the Guide stops nagging). Pure read of the Objectives tracker. Top-centre
-## sits over open sky, so it never buries the avatar (who spawns top-left) the way the old panel did.
+## How long a fresh step shows its full how-to line, how long that takes to fade, and how long you have
+## to sit on one step before it comes back (#B4).
+const HINT_HOLD: float = 9.0
+const HINT_FADE: float = 1.5
+const HINT_STUCK: float = 40.0
+
+
+## The OBJECTIVE line (top-centre) — the current step only, as a gentle nudge. Pure read of the
+## Objectives tracker. Top-centre sits over open sky, so it never buries the avatar the way the old
+## panel did. When the whole chain is done it shows a brief "all set" then auto-hides (the Guide stops
+## nagging).
+##
+## LESS TEXT, MORE SHOW (#B4). This used to be one long imperative sentence, permanently — thirteen of
+## them in a row, each a banner of prose across the top of the screen. It reads as homework: the game
+## telling you what to do rather than a world inviting you to try things, and it was a real part of
+## "the early game is annoying instead of seamless". The banner now leads with the SHORT goal ("Mine 4
+## ore"), which is all a player needs once they know the verb, and carries the full how-to underneath
+## only while it's actually wanted: for the first few seconds after a step opens, and again once you
+## have been stuck on one long enough to want it back. In between, the world does the talking — the
+## pulsing target ring already points at where the step happens.
 func _draw_objective_line() -> void:
 	if objectives == null:
 		return
@@ -409,24 +425,39 @@ func _draw_objective_line() -> void:
 		return  # finished + lingered → clear the screen for veterans
 	var text: String
 	var col: Color
+	var hint: String = ""
+	var hint_a: float = 0.0
 	if objectives.all_done():
 		text = "✓  All set — keep digging deeper."
 		col = Color(0.62, 0.86, 0.58)
 	else:
 		var step: Dictionary = objectives.steps[objectives.current_index()]
-		text = str(step["label"])
+		text = str(step["goal"])
 		col = Color(0.97, 0.93, 0.78)
+		var age: float = objectives.step_age
+		if age < HINT_HOLD + HINT_FADE:
+			hint_a = clampf((HINT_HOLD + HINT_FADE - age) / HINT_FADE, 0.0, 1.0)
+		elif age > HINT_STUCK:
+			hint_a = clampf((age - HINT_STUCK) / HINT_FADE, 0.0, 1.0)   # you've stalled — hand it back
+		if hint_a > 0.0:
+			hint = str(step["label"])
 	var fs: int = 13
-	var tw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var hfs: int = 10
 	var pad: float = 12.0
-	var w: float = tw + pad * 2.0 + 14.0
-	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, 24.0)
+	var tw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 14.0
+	var hw: float = _font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hfs).x if hint != "" else 0.0
+	var w: float = maxf(tw, hw) + pad * 2.0
+	var h: float = 24.0 + (13.0 if hint != "" else 0.0)
+	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, h)
 	_panel(rect, true)
-	var cy: float = rect.position.y + rect.size.y * 0.5
+	var cy: float = rect.position.y + 12.0
 	if not objectives.all_done():
 		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, UI_ACCENT)
 	draw_string(_font, Vector2(rect.position.x + pad + 14.0, cy + 5.0), text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+	if hint != "":
+		draw_string(_font, Vector2(rect.position.x + pad, cy + 18.0), hint,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, hfs, Color(UI_TEXT_DIM, hint_a))
 
 
 ## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,

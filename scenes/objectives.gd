@@ -23,6 +23,11 @@ var _base_consumed: Dictionary = {}
 var _base_machines: int = 0
 var _done: Dictionary = {}              ## step id -> true once achieved (latched)
 var _all_done_time: float = -1.0        ## seconds the chain has been fully complete (for HUD auto-hide)
+## Seconds the CURRENT step has been the current one, reset the moment the chain advances. The HUD reads
+## it to show the long how-to only while it's wanted: right after a step opens, and again once you've
+## been on one long enough to be stuck (#B4).
+var step_age: float = 0.0
+var _shown_index: int = -1
 var _ingots_at_line: int = -1           ## ingots produced the moment the drill→forge line was assembled
 var _seal_cells: Array[Vector2i] = []   ## the sealrock cells at construction — a breach opens one (below)
 
@@ -67,6 +72,12 @@ func refresh(delta: float) -> void:
 		var id: StringName = step["id"]
 		if not _done.has(id) and _achieved(id):
 			_done[id] = true
+	var i: int = current_index()
+	if i != _shown_index:
+		_shown_index = i
+		step_age = 0.0
+	else:
+		step_age += delta
 	if all_done():
 		_all_done_time = (_all_done_time if _all_done_time >= 0.0 else 0.0) + delta
 
