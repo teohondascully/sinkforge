@@ -1551,6 +1551,8 @@ const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so
 const WATER_SHEEN := Color(0.32, 0.66, 0.98)          ## cool blue tint for the wet-sheen pool
 const WATER_SHEEN_BASE: float = 0.07                  ## floor intensity for a barely-wet cell
 const WATER_SHEEN_LEVEL: float = 0.11                 ## added intensity at a brim-full cell (scales by level)
+const WATER_SHEEN_RADIUS: float = 2.4                 ## cells — wide enough that neighbouring pools MERGE
+const WATER_SHEEN_SPREAD: float = 0.42                ## ...and dimmer each, so the total stays a whisper
 ## The surface y (top of the water) a cell would draw for a given integer level, anchored at the cell
 ## BOTTOM. Higher level => higher surface => SMALLER y. Level 0 => the cell floor (an empty edge).
 func _water_surface_y(cell: Vector2i, level: int) -> float:
@@ -1615,13 +1617,67 @@ func _spawn_water_drips(delta: float) -> void:
 				particles.water_splash(lpos)
 
 
+## WATER, and the difference between a body of it and a blue rectangle.
+##
+## What was here drew every water cell as one flat translucent quad with a bright 2px line along its top,
+## and that line was drawn for EVERY cell — including the ones with more water above them. So a pool three
+## deep came out as three glowing horizontal stripes stacked inside a uniform slab, which is why the
+## aquifers read as UI panels rather than as water. Three things fix it, and none of them are expensive:
+##
+##   THE SURFACE IS THE SURFACE.  The waterline is drawn only where there is sky (or rock, or air) directly
+##                                above. Everything below is interior and gets no edge at all.
+##   DEPTH DARKENS.               Water is not one colour. The further down inside the body a cell sits, the
+##                                deeper and denser it draws — a gradient is the single cheapest cue that a
+##                                volume has volume, and a flat fill is the single loudest cue that it does
+##                                not.
+##   IT MOVES.                    A still surface reads as a solid. The waterline rides a small travelling
+##                                sine and carries a soft meniscus under it, and slow caustic bands drift
+##                                through the body. All cosmetic, all off the free-running clock, none of it
+##                                anywhere near the sim.
+## Deep water is deeply BLUE, not dark. The first value here (0.05, 0.16, 0.34) took the body toward black
+## as it deepened, which loses the one cue that says "this is water and not a hole": measured against the
+## rock it sits in, the colour separation fell to 10 levels and most of that was the top few cells. Dropping
+## red and green further while HOLDING blue up deepens it and reads more like water, not less.
+const WATER_DEEP := Color(0.03, 0.13, 0.46)           ## the colour the body tends toward with depth
+const WATER_DEPTH_CELLS: float = 7.0                  ## cells down over which the gradient runs out
+## Deliberately short of opaque. Depth is carried by COLOUR — toward WATER_DEEP — rather than by density,
+## because the rock behind a pool is where a body of water gets most of its visible structure: shut it out
+## and the interior goes back to being a flat field, just a darker one. Judged, not guessed: at 0.80 the
+## body measured 60% featureless by the shared dead-space standard; the rock showing through is what fixes
+## that, not more caustics.
+const WATER_ALPHA_DEEP: float = 0.66                  ## ...and the density it reaches there
+const WATER_RIPPLE_AMP: float = 1.5                   ## px the waterline travels
+const WATER_RIPPLE_LEN: float = 46.0                  ## px between ripple crests
+const WATER_RIPPLE_SPEED: float = 1.7                 ## crests per second
+const WATER_MENISCUS: float = 3.0                     ## px of soft edge hung under the bright line
+const WATER_CAUSTIC_LEN: float = 78.0                 ## px between caustic bands
+const WATER_CAUSTIC_SPEED: float = 0.55
+const WATER_CAUSTIC: float = 0.15                     ## how much a band lifts the fill
+## A second, finer set crossing the first the other way. One band pattern is a stripe; two at different
+## scales and drifting in opposite directions interfere, and interference is what light on moving water
+## actually looks like.
+const WATER_CAUSTIC_LEN2: float = 29.0
+const WATER_CAUSTIC_SPEED2: float = -0.9
+const WATER_CAUSTIC2: float = 0.09
+
+
+## How far INSIDE the body this cell sits: 0 at the surface, growing downward, capped where the gradient
+## has run out anyway so a deep aquifer costs no more to draw than a puddle.
+func _water_depth(c: Vector2i) -> float:
+	var d: int = 0
+	while d < int(WATER_DEPTH_CELLS):
+		if sim.water_at(c - Vector2i(0, d + 1)) <= 0:
+			break
+		d += 1
+	return float(d) / WATER_DEPTH_CELLS
+
+
 func _draw_water() -> void:
 	if sim.water.is_empty():
 		return
 	var view: Rect2 = _view_world_rect()
-	var fill := Color(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, WATER_ALPHA)
-	var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, minf(1.0, WATER_ALPHA + 0.22))
 	var cell_f: float = float(CELL)
+	var t: float = _anim_time
 	for key: Variant in sim.water:
 		var c: Vector2i = key
 		var level: int = int(sim.water[c])
@@ -1646,15 +1702,52 @@ func _draw_water() -> void:
 		var right_y: float = mid_y
 		if right_lvl > 0:
 			right_y = 0.5 * (mid_y + _water_surface_y(c + Vector2i(1, 0), right_lvl))
-		# The fill as a quad: sloped top (left_y..right_y) down to the flat cell floor. Same colour+alpha.
+
+		var open_above: bool = sim.water_at(c - Vector2i(0, 1)) <= 0
+		if not open_above:
+			# AN INTERIOR CELL IS FULL. Its own level is a bookkeeping number about how much water lives
+			# here, not a height — the water above it is resting ON it, so there is no air in this cell to
+			# draw. Honouring the level everywhere made a settling body terrace into horizontal slabs with
+			# gaps of rock showing between them, which is what a large pool looks like for the several
+			# seconds it takes the sim to even out, and what an unevenly-fed aquifer looks like forever.
+			left_y = base.y
+			right_y = base.y
+		if open_above:
+			# Only a cell with nothing above it owns a waterline, and only that line ripples.
+			left_y += sin((base.x) / WATER_RIPPLE_LEN * TAU + t * WATER_RIPPLE_SPEED * TAU) * WATER_RIPPLE_AMP
+			right_y += sin((base.x + cell_f) / WATER_RIPPLE_LEN * TAU
+				+ t * WATER_RIPPLE_SPEED * TAU) * WATER_RIPPLE_AMP
+
+		# Depth tint: toward WATER_DEEP and denser as the body closes over you.
+		var depth: float = _water_depth(c)
+		var body: Color = WATER_COLOR.lerp(WATER_DEEP, depth)
+		var alpha: float = lerpf(WATER_ALPHA, WATER_ALPHA_DEEP, depth)
+		# ...and slow caustic bands, so the interior is never one dead value.
+		var caustic: float = 0.5 + 0.5 * sin((base.x + base.y * 0.6) / WATER_CAUSTIC_LEN * TAU
+			- t * WATER_CAUSTIC_SPEED * TAU)
+		var caustic2: float = 0.5 + 0.5 * sin((base.x * 0.7 - base.y) / WATER_CAUSTIC_LEN2 * TAU
+			- t * WATER_CAUSTIC_SPEED2 * TAU)
+		body = body.lightened((caustic * WATER_CAUSTIC + caustic2 * WATER_CAUSTIC2)
+			* (1.0 - depth * 0.4))
+		var fill := Color(body.r, body.g, body.b, alpha)
+
 		var tl := Vector2(base.x, left_y)
 		var tr := Vector2(base.x + cell_f, right_y)
 		var br := Vector2(base.x + cell_f, floor_y)
 		var bl := Vector2(base.x, floor_y)
 		draw_colored_polygon(PackedVector2Array([tl, tr, br, bl]), fill)
-		# The brighter waterline rides the smoothed top edge (a thin quad, 2px thick, following the slope).
+
+		if not open_above:
+			continue
+		# The MENISCUS: a soft band hung under the bright line so the surface has thickness. Without it the
+		# waterline is a drawn stroke sitting on a fill; with it, the fill appears to end in a surface.
+		var men := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, 0.22)
 		draw_colored_polygon(PackedVector2Array([
-			tl, tr, Vector2(tr.x, right_y + 2.0), Vector2(tl.x, left_y + 2.0)]), line)
+			tl, tr, Vector2(tr.x, right_y + WATER_MENISCUS), Vector2(tl.x, left_y + WATER_MENISCUS)]), men)
+		var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b,
+			minf(1.0, WATER_ALPHA + 0.22))
+		draw_colored_polygon(PackedVector2Array([
+			tl, tr, Vector2(tr.x, right_y + 1.5), Vector2(tl.x, left_y + 1.5)]), line)
 
 
 ## A machine: a riveted CASING + its animated type glyph (shared Visuals) + a held-count badge + the
@@ -2631,6 +2724,12 @@ func _paint_lights(layer: LightLayer) -> void:
 	# a lamp reaches it. Deliberately weak (WATER_SHEEN_BASE + level-scaled), well under a torch/crystal/
 	# lamp, so lit + shallow water looks essentially unchanged and it never reads as a light source or lava.
 	# View-culled like the passes above; scaled modestly by water level (a full cell glows a touch more).
+	# Drawn on the body's SKIN, not cell by cell. A glow of radius 1.15 cells at every cell centre puts one
+	# disc per cell in a square grid: adjacent discs touch without merging, so a wide aquifer came out as
+	# visible polka dots — the loudest thing in frame once the fill itself stopped being a flat slab. Only
+	# the cells at the top or the sides of the body glow now, over a radius wide enough that neighbours
+	# actually blend, which is both cheaper on a deep pool and closer to what dim water does: the light
+	# leaves at the surface, not out of the middle.
 	if not sim.water.is_empty():
 		var wview: Rect2 = _view_world_rect()
 		for wkey: Variant in sim.water:
@@ -2641,11 +2740,17 @@ func _paint_lights(layer: LightLayer) -> void:
 			var wpos := Vector2(wc) * float(CELL)
 			if not wview.has_point(wpos):
 				continue
+			var skin: bool = sim.water_at(wc - Vector2i(0, 1)) <= 0 \
+					or sim.water_at(wc + Vector2i(-1, 0)) <= 0 \
+					or sim.water_at(wc + Vector2i(1, 0)) <= 0
+			if not skin:
+				continue
 			var wfrac: float = clampf(float(wlevel) / float(FactorySim.WATER_MAX), 0.0, 1.0)
-			var wintensity: float = WATER_SHEEN_BASE + WATER_SHEEN_LEVEL * wfrac
+			var wintensity: float = (WATER_SHEEN_BASE + WATER_SHEEN_LEVEL * wfrac) * WATER_SHEEN_SPREAD
 			# A faint slow shimmer so the pool reads as live water, not a painted disc — tiny amplitude.
 			var wshim: float = 0.9 + 0.1 * sin(_anim_time * 1.8 + float(wc.x) * 0.6 + float(wc.y) * 0.4)
-			_draw_glow(layer, _cell_center(wc), float(CELL) * 1.15, WATER_SHEEN, wintensity * wshim)
+			_draw_glow(layer, _cell_center(wc), float(CELL) * WATER_SHEEN_RADIUS, WATER_SHEEN,
+				wintensity * wshim)
 
 
 ## GODRAYS — the signature shot: where a dug shaft admits the sky below the enclosing
