@@ -546,11 +546,23 @@ func _draw() -> void:
 		if f > 0.0:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
 			dst.position.x = -w * 0.5
-		# STICKER OUTLINE: the sprite silhouette in near-black at 1.5px offsets (8-way), drawn BEHIND the
-		# real sprite so the miner reads against any busy background. Blind testers kept finding the body
-		# only via the guide arrow, not the sprite itself (tiny + low-contrast over the gear/hills/trees).
-		var ol := Color(0.04, 0.04, 0.06, 0.6)
-		const OW: float = 1.5
+		# STICKER OUTLINE — readable on ANY background (blind testers kept finding the body only via the
+		# guide arrow, not the sprite itself: tiny + low-contrast over the gear/hills/trees, and a single
+		# DARK outline vanished against the dark terrain/machines/underground he actually stands in). TWO
+		# rings: a warm LIGHT halo on the outside separates him from the dark/mid world; a near-black inner
+		# edge separates him from the bright sky. Light drawn first (wider), dark over it (tighter), so the
+		# light survives only as a thin outer fringe — a crisp rim, not a heavy glow.
+		# The rim is COOL + bright on purpose: the miner's own art is warm (leather/amber) — the SAME warm
+		# family as the dirt, the FORGE boxes and the amber UI, so a warm outline just deepened the collision
+		# (blind testers read the body as "one of three machine-ish objects"). A cool bright edge is the one
+		# thing in the warm-brown world nothing else wears, so the body reads instantly as THE player.
+		var rim := Color(0.80, 0.93, 1.0, 0.85)                 # cool bright halo — the reserved "that's me" edge
+		var ol := Color(0.03, 0.03, 0.05, 0.72)                 # near-black inner edge — pops on the bright sky
+		const RW: float = 2.6
+		const OW: float = 1.4
+		for d: Vector2 in [Vector2(-RW, 0.0), Vector2(RW, 0.0), Vector2(0.0, -RW), Vector2(0.0, RW),
+				Vector2(-RW, -RW), Vector2(RW, -RW), Vector2(-RW, RW), Vector2(RW, RW)]:
+			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, rim)
 		for d: Vector2 in [Vector2(-OW, 0.0), Vector2(OW, 0.0), Vector2(0.0, -OW), Vector2(0.0, OW),
 				Vector2(-OW, -OW), Vector2(OW, -OW), Vector2(-OW, OW), Vector2(OW, OW)]:
 			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, ol)
