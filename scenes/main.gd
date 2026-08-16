@@ -182,6 +182,23 @@ var _band_seen: Dictionary = {}   ## band index -> true, the bands announced thi
 var _band_now: int = -1
 const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
+
+## THE DIG RHYTHM. The single biggest source of tedium was that mining had no MOMENTUM: every block
+## started from a dead stop, so a twenty-block shaft was twenty identical unrelated chores. Breaking
+## blocks back to back now builds a rhythm that speeds the pick up and shortens the swing cadence, and
+## it bleeds away if you stop. Nothing is displayed for it — the body swings visibly faster and the
+## strikes come audibly quicker, which is where the player is already looking.
+##
+## It is deliberately a MULTIPLIER on a grind that stays a grind. The first block of a session is
+## exactly as slow as it was, so hand-mining still argues for automation; what changed is that staying
+## in the work now pays you back, which is what "grind" versus "groove" actually means.
+const RHYTHM_GAIN: float = 0.34    ## rhythm added per block broken (≈3 blocks to full)
+const RHYTHM_GRACE: float = 1.1    ## seconds of not-digging before it starts to bleed
+const RHYTHM_DECAY: float = 0.55   ## per-second bleed after the grace window
+const RHYTHM_SPEED: float = 0.60   ## +60% charge rate at full rhythm
+const RHYTHM_SWING: float = 0.55   ## ...and a 1/1.55 shorter cadence, so you SEE and HEAR the speed
+var _rhythm: float = 0.0           ## 0..1
+var _rhythm_idle: float = 0.0      ## seconds since the last block broke
 ## The tutorial chain (representation-layer legibility — the "how do I play?" signpost). Reads the sim.
 var _objectives: Objectives
 ## Just-in-time hint bubbles: first rope in the pack → "RMB above a drop", etc. Reads the sim.
@@ -959,6 +976,9 @@ func _toggle_grapple() -> void:
 ## deliberate grind (the friction that sells automation). The charge fraction drives the crack overlay.
 ## (The wall-clock timing lives HERE; the tool-GATE lives in try_mine, the verb the play-harness drives.)
 func _update_mining(delta: float) -> void:
+	_rhythm_idle += delta
+	if _rhythm_idle > RHYTHM_GRACE:
+		_rhythm = maxf(0.0, _rhythm - delta * RHYTHM_DECAY)
 	var mouse_world: Vector2 = get_global_mouse_position()
 	_aim = _effective_aim(mouse_world)
 	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
@@ -997,7 +1017,7 @@ func _update_mining(delta: float) -> void:
 		_mine_charge = _banked_charge(work)
 	var cls: StringName = MiningRules.required_tool(mat)
 	var speed: float = MiningRules.best_speed(cls, sim.inventory) if cls != &"" else 1.0
-	_mine_charge += delta * speed
+	_mine_charge += delta * speed * (1.0 + _rhythm * RHYTHM_SPEED)
 	var hard: float = MiningRules.hardness(mat)
 	_cracks[work] = Vector2(_mine_charge, 0.0)                # bank it: this cell stays cracked if we look away
 	_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
@@ -1007,7 +1027,7 @@ func _update_mining(delta: float) -> void:
 	if _player != null:
 		_player.note_dig(int(signf(_cell_center(work).x - _player.position.x)))
 		_swing_clock += delta
-		if _swing_clock >= SWING_PERIOD:
+		if _swing_clock >= SWING_PERIOD / (1.0 + _rhythm * RHYTHM_SWING):
 			_swing_clock = 0.0
 			var center: Vector2 = _cell_center(work)
 			var to_body: Vector2 = _player.position - center
@@ -1015,11 +1035,13 @@ func _update_mining(delta: float) -> void:
 				Visuals.terrain_dust(mat), to_body.angle())
 			_shake = maxf(_shake, 0.7)
 			# Harder rock strikes a deeper note (hardness 1..4 → pitch ~1.15..0.85).
-			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1, 0.8, 1.2))
+			_sfx.play(&"crunch", center, clampf(1.25 - hard * 0.1 + _rhythm * 0.12, 0.8, 1.4))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
 		_cracks.erase(work)                                  # broken: nothing left to remember
-		try_mine(work)                                       # charge full → land the breaking blow
+		if try_mine(work):                                   # charge full → land the breaking blow
+			_rhythm = minf(1.0, _rhythm + RHYTHM_GAIN)       # ...and the rhythm carries into the next one
+			_rhythm_idle = 0.0
 
 
 ## The charge this cell already owes us (0.0 for untouched rock). Half-dug blocks resume where they
