@@ -181,6 +181,15 @@ var _step_dist: float = 0.0       ## accumulated walk distance, for periodic foo
 ## banner is orientation as much as ceremony, and re-reading "STONEREACH" after a week away is welcome.
 var _band_seen: Dictionary = {}   ## band index -> true, the bands announced this session
 var _band_now: int = -1
+
+## THE THESIS MOMENT. The first time a line the player built pours an ingot with the player's hands nowhere
+## near it, this game has said the only thing it is really about. It used to tick a checkbox on the
+## objective ladder and then say nothing at all — measured by tools/check_pacing, the stretch right after
+## first automation was the LONGEST SILENCE in the whole session, which is an extraordinary place to put
+## one. It gets the arrival plate now, the same ceremony a new stratum gets, because it is the same kind
+## of event: you arrived somewhere you had not been.
+var _line_hailed: bool = false
+const LINE_HAIL_SHAKE: float = 2.6
 const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 
@@ -588,6 +597,9 @@ func _process(delta: float) -> void:
 		_motes.position = _camera.get_screen_center_position()  # keep the haze over the view
 	if _objectives != null:
 		_objectives.refresh(delta)
+		if not _line_hailed and _objectives.is_done(&"auto"):
+			_line_hailed = true
+			_hail_the_line()
 	if _hints != null and not _paused:
 		if _player != null:
 			_hints.note_in_water(_player._in_water())   # feed the body's wet state for the AQUIFER edge
@@ -954,6 +966,30 @@ func _note_stratum(row: int) -> void:
 	# Pitched DOWN as you go deeper, so the arrivals themselves form a descending line across a run —
 	# the same idea the Score runs continuously, said once and out loud.
 	_sfx.ui(&"chime", clampf(1.18 - float(band) * 0.11, 0.55, 1.2))
+
+
+## THE LINE RUNS — the first ingot this world produced without a hand on it.
+##
+## Announced with the same plate the strata get, deliberately: this game has exactly one channel that
+## means "stop, look, something changed", and spending it on the moment the player's machine outgrows the
+## player is what that channel is FOR. The beat is aimed at the MACHINE rather than at the screen — the
+## sound comes from the drill, the sparks come off it, the shake radiates from it — so the eye is thrown
+## at the thing that did the work instead of at a banner about it.
+func _hail_the_line() -> void:
+	var where: Vector2 = _player.position if _player != null else Vector2.ZERO
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"drill":
+			where = _cell_center(m.cell)
+			break
+	if _hud != null:
+		_hud.announce("THE LINE RUNS", "IT WORKS WITHOUT YOU", Color(0.98, 0.72, 0.34))
+	if _sfx != null:
+		_sfx.ui(&"ignite")
+		_sfx.play(&"ignite", where, 1.0, -4.0)
+	if _particles != null:
+		_particles.burst(where, 16, Color(1.0, 0.80, 0.42), 90.0, TAU, 2.4, 1.1, 40.0)
+		_particles.dust(where, Color(0.70, 0.62, 0.52), 10)
+	_shake = maxf(_shake, LINE_HAIL_SHAKE)
 
 
 func _set_volume(id: String, frac: float) -> void:

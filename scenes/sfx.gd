@@ -46,6 +46,7 @@ func _ready() -> void:
 	_streams[&"step"] = _wav(_gen_step(rng))
 	_streams[&"hollow"] = _wav(_gen_hollow(rng))
 	_streams[&"breach"] = _wav(_gen_breach(rng))
+	_streams[&"ignite"] = _wav(_gen_ignite(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -267,6 +268,44 @@ func _gen_breach(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		lp += k * (rng.randf_range(-1.0, 1.0) - lp)
 		phase += TAU * lerpf(74.0, 38.0, t) / float(RATE)
 		out[i] = lp * pow(1.0 - t, 1.5) * 1.5 + sin(phase) * pow(1.0 - t, 2.4) * 0.30
+	return out
+
+
+## THE LINE RUNS — the one sound in the game that means "your machine outgrew you", so it must not be
+## mistakable for anything else. Three motions in one: a low SPIN-UP sweeping 52→124 Hz that fades in
+## rather than starting (something getting up to speed, caught mid-way), a metallic KNOCK of engagement,
+## and then a major triad that does not stab but LOCKS IN — each note fading up on its own soft attack
+## and holding under a long tail. Deliberately not the research chime: research is a small bright idea,
+## and this is a large warm one.
+func _gen_ignite(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	const LOCK: float = 0.34                                       # when the triad takes over
+	var n: int = int(RATE * 0.95)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase: float = 0.0
+	var lp: float = 0.0
+	var notes: Array = [131.0, 262.0, 330.0, 392.0, 523.0]         # C3 + a C-major triad + its octave
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		# 1. the spin-up: rising, fading in over its first third, gone by the time the chord is full
+		phase += TAU * lerpf(52.0, 124.0, minf(t / 0.55, 1.0)) / float(RATE)
+		var spin: float = smoothstep(0.0, 0.22, t) * (1.0 - smoothstep(0.30, 0.75, t))
+		out[i] = (sin(phase) + sin(phase * 2.0) * 0.28) * spin * 0.34
+		# 2. the knock of engagement — one short filtered noise hit right at the lock
+		var k: float = (t - LOCK) * 26.0
+		if k >= 0.0 and k < 1.0:
+			lp += 0.30 * (rng.randf_range(-1.0, 1.0) - lp)
+			out[i] += lp * pow(1.0 - k, 2.0) * 0.55
+		# 3. the chord, arriving note by note and holding
+		if t > LOCK:
+			var u: float = (t - LOCK) / (1.0 - LOCK)
+			for j: int in notes.size():
+				var onset: float = float(j) * 0.055
+				if u <= onset:
+					continue
+				var v: float = (u - onset) / maxf(1.0 - onset, 0.001)
+				out[i] += sin(TAU * float(notes[j]) * float(i - int(float(n) * LOCK)) / float(RATE)) \
+					* smoothstep(0.0, 0.10, v) * pow(1.0 - v, 1.6) * (0.24 - float(j) * 0.028)
 	return out
 
 

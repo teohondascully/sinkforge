@@ -416,6 +416,22 @@ func _draw_depth() -> void:
 ## kicker line above it, rules only as wide as the text, and no panel at all.
 const ARRIVAL_SIZE: int = 15             ## canvas px; the objective banner above runs at 13
 const ARRIVAL_TRACK: float = 3.4         ## extra px between letters — what makes small type read as engraved
+
+## THE SCRIM. Panel-less type only reads while the thing behind it is dark, and every stratum plate fires
+## underground, so the plate was legible for as long as it was the only thing that used this channel. The
+## first-automation hail fires on the surface at midday, against a bright sky and a mountain range and a
+## rotating gearwheel — and the words simply disappeared. The fix is not a panel (a panel is the modal
+## dialog this design was built to escape) but a soft darkening under the words that has no edge to read
+## as a shape: a soft field of dusk under the words that fades to nothing in every direction, so the text
+## sits in its own patch of evening wherever it lands.
+const SCRIM_COLS: int = 12               ## quads across the field...
+const SCRIM_ROWS: int = 8                ## ...and down it
+const SCRIM_ALPHA: float = 0.80          ## peak darkening, dead centre
+const SCRIM_PAD: float = 34.0            ## px of solid core beyond the widest line
+const SCRIM_FEATHER: float = 96.0        ## px the core fades out over, left and right
+const SCRIM_ABOVE: float = 32.0
+const SCRIM_BELOW: float = 18.0
+
 func _draw_arrival() -> void:
 	if _arrival_life <= 0.0:
 		return
@@ -424,16 +440,67 @@ func _draw_arrival() -> void:
 	var y: float = CANVAS.y * 0.26 - (1.0 - t) * 5.0
 	var w: float = _tracked_width(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
 	var half: float = w * 0.5 + 12.0
+	var kw: float = _tracked_width(_arrival_kicker, 9, 2.6) if _arrival_kicker != "" else 0.0
+	_draw_scrim(maxf(w, kw) * 0.5 + SCRIM_PAD, y, a)
 	if _arrival_kicker != "":
-		var kw: float = _tracked_width(_arrival_kicker, 9, 2.6)
 		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
-			Color(_arrival_color, 0.62 * a))
+			Color(_arrival_color, 0.80 * a))
 	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y), ARRIVAL_SIZE, ARRIVAL_TRACK,
 		Color(_arrival_color, a))
 	# Two hairlines the width of the words: a frame that says "plate" without drawing a panel.
 	for ry: float in [y - 25.0, y + 7.0]:
 		draw_line(Vector2(CANVAS.x * 0.5 - half, ry), Vector2(CANVAS.x * 0.5 + half, ry),
 			Color(_arrival_color, 0.40 * a), 1.0)
+
+
+## The arrival plate's soft ground, drawn as an interpolated GRID rather than as a stack of bands.
+##
+## The first version stacked constant-alpha strips with a half-pixel overlap to hide the seams, which is
+## precisely backwards: where two translucent strips overlap their alpha COMPOSITES, so every seam came
+## out darker than either neighbour and the scrim rasterized as venetian blinds straight across the sky.
+## A grid has no seams to hide. Adjacent quads share their edge vertices AND those vertices' colours, so
+## the hardware interpolates one continuous field across the whole plate — and the falloff can then be
+## smoothstepped on both axes, which puts a zero derivative at every outer edge and leaves nothing for
+## the eye to catch.
+func _draw_scrim(core_half: float, y: float, a: float) -> void:
+	var cx: float = CANVAS.x * 0.5
+	var top: float = y - SCRIM_ABOVE
+	var bot: float = y + SCRIM_BELOW
+	var half_w: float = core_half + SCRIM_FEATHER
+	var xstep: float = half_w * 2.0 / float(SCRIM_COLS)
+	var ystep: float = (bot - top) / float(SCRIM_ROWS)
+	for r: int in SCRIM_ROWS:
+		var y0: float = top + ystep * float(r)
+		var y1: float = y0 + ystep
+		var v0: float = _scrim_v(y0, top, bot)
+		var v1: float = _scrim_v(y1, top, bot)
+		if maxf(v0, v1) <= 0.004:
+			continue
+		for c: int in SCRIM_COLS:
+			var x0: float = cx - half_w + xstep * float(c)
+			var x1: float = x0 + xstep
+			var h0: float = _scrim_h(x0 - cx, core_half)
+			var h1: float = _scrim_h(x1 - cx, core_half)
+			if maxf(h0, h1) <= 0.004:
+				continue
+			draw_polygon(
+				PackedVector2Array([Vector2(x0, y0), Vector2(x1, y0), Vector2(x1, y1), Vector2(x0, y1)]),
+				PackedColorArray([_scrim_c(h0 * v0, a), _scrim_c(h1 * v0, a),
+					_scrim_c(h1 * v1, a), _scrim_c(h0 * v1, a)]))
+
+
+## Full weight across the core, smoothly out to nothing across the feather.
+func _scrim_h(dx: float, core_half: float) -> float:
+	return 1.0 - smoothstep(core_half, core_half + SCRIM_FEATHER, absf(dx))
+
+
+## ...and a bell down the plate, so it has no top or bottom edge either.
+func _scrim_v(yy: float, top: float, bot: float) -> float:
+	return 1.0 - smoothstep(0.0, 1.0, absf(yy - (top + bot) * 0.5) / maxf((bot - top) * 0.5, 0.001))
+
+
+func _scrim_c(weight: float, a: float) -> Color:
+	return Color(0.02, 0.025, 0.04, SCRIM_ALPHA * a * weight)
 
 
 ## Letter-tracked text. Godot's draw_string has no tracking, and tracking is the entire difference

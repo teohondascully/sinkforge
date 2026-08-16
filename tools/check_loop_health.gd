@@ -5,7 +5,8 @@ extends SceneTree
 ## to play?" into a number. A PlayAgent boots a FRESH game and plays the real RUNG-1 arc — dig ore → smelt →
 ## chop wood → claim the Bazaar → research → craft → build → fuel → automate — through the same public,
 ## reach-gated verbs a human drives (try_mine/try_build/try_drop/try_research/…), following the on-screen
-## objective ladder (scenes/objectives.gd) exactly like RUNG 1 in play_tests.gd.
+## objective ladder (scenes/objectives.gd) exactly like RUNG 1 in play_tests.gd. The arc itself lives in
+## tools/arc_driver.gd so this layer and check_pacing are provably scoring the SAME opening.
 ##
 ## While it plays it SAMPLES per physics frame and scores three feel-penalties (mirrors check_agility's
 ## style — a printed breakdown, a ratcheting floor, component caps that a real regression trips):
@@ -26,7 +27,7 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const AGENT := preload("res://tools/play_agent.gd")
-const DRILL: String = "res://src/data/machines/drill.tres"
+const ARC := preload("res://tools/arc_driver.gd")     ## the opening, shared with check_pacing
 
 
 ## A tiny sampler Node parented into the live tree so it ticks EVERY physics frame (SceneTree isn't a Node,
@@ -99,12 +100,8 @@ func _run() -> void:
 	var agent: PlayAgent = await _boot()
 	var obj: Objectives = agent.main._objectives
 	# The scored arc runs THROUGH "auto" (first automation); the gentle handoff steps after it are RUNG 2's.
-	# Par must reflect the steps actually played, so measure the ladder up to and including "auto".
-	var step_count: int = obj.steps.size()
-	for i: int in obj.steps.size():
-		if obj.steps[i]["id"] == &"auto":
-			step_count = i + 1
-			break
+	# Par must reflect the steps actually played, so ask the driver how many of them it will run.
+	var step_count: int = ARC.step_count(obj)
 	var par: int = step_count * FRAMES_PER_STEP_PAR
 
 	# Install the per-physics-frame sampler INTO the live tree (ticks after MainView pushes its guide
@@ -118,7 +115,7 @@ func _run() -> void:
 
 	# --- play the RUNG-1 arc; the sampler runs every frame throughout --------------------------------
 	var frames0: int = Engine.get_physics_frames()
-	var completed: bool = await _play_arc(agent, obj)
+	var completed: bool = await ARC.new().play(agent, obj)
 	var frames: int = maxi(1, int(Engine.get_physics_frames() - frames0))
 	var stalls: int = agent.stuck_frames
 	sampler.queue_free()
@@ -146,34 +143,6 @@ func _run() -> void:
 	await physics_frame
 
 
-## Play the FIRST-AUTOMATION arc, doing ONLY what each signpost says (like RUNG 1), and SAMPLING per frame
-## throughout: guidance-gap frames (a spatial step with no offered target) and the agent's own stall count.
-## Stops at the "auto" step — the gentle L1→L2 handoff steps after it (power/generator/descent/breach) are
-## RUNG 2's journey; this metric scores the loop's playability to its FIRST goal. Returns whether it reached
-## first automation.
-func _play_arc(agent: PlayAgent, obj: Objectives) -> bool:
-	for step: Dictionary in obj.steps:
-		var id: StringName = step["id"]
-		if obj.is_done(id):
-			if id == &"auto":
-				break                                             # first automation already reached
-			continue
-		var acted: bool = await _do_step(agent, id)
-		if not acted:
-			agent._note("could not perform signposted step '%s'" % id)
-			return false
-		var t: int = 0
-		while not obj.is_done(id) and t < 240:                    # give the chain a beat to latch
-			await agent.step()
-			t += 1
-		if not obj.is_done(id):
-			agent._note("did '%s' but the objective never ticked" % id)
-			return false
-		if id == &"auto":
-			break                                                 # first automation reached — the arc's goal
-	return obj.is_done(&"auto")
-
-
 ## Sample the CURRENT-frame feel signal: if the active objective is a spatial step (one MainView is designed
 ## to point at) but offers no reachable guide cell, that's a "what do I do now?" frame. Read through the same
 ## public surface the renderer does (_guide_targets), so this measures exactly what the player would see.
@@ -185,270 +154,6 @@ func _sample(agent: PlayAgent) -> void:
 	var id: StringName = obj.current_id()
 	if id in SPATIAL_STEPS and agent.main._guide_targets().is_empty():
 		_guidance_gap_frames += 1
-
-
-# --- the RUNG-1 step driver (faithful to play_tests.gd; PlayAgent does all the real navigation) --------
-
-## Perform the real-verb action a single objective step asks for — one branch per signpost, using only the
-## body, reach, and the hotbar. Returns whether the action could be carried out at all.
-func _do_step(agent: PlayAgent, id: StringName) -> bool:
-	match id:
-		&"mine":     return await _step_mine(agent)
-		&"smelt":    return await _step_smelt(agent)
-		&"wood":     return await _step_wood(agent)
-		&"bazaar":   return await _step_bazaar(agent)
-		&"research": return await _step_research(agent)
-		&"craft":    return await _step_craft(agent)
-		&"build":    return await _step_build(agent)
-		&"fuel":     return await _step_fuel(agent)
-		&"auto":     return await _step_auto(agent)
-	return false
-
-
-## Step 1 — hand-dig the bootstrap ore (4) from the starter vein near spawn (never the mineshaft's vein, so
-## the automated line's vein stays intact).
-func _step_mine(agent: PlayAgent) -> bool:
-	var guard: int = 0
-	while int(agent.sim.inventory.get(&"ore", 0)) < 4 and guard < 8:
-		guard += 1
-		var ore: Vector2i = _nearest_ore_not_shaft(agent)
-		if ore.x < 0:
-			return false
-		await agent.dig_down_to(ore)
-	return int(agent.sim.inventory.get(&"ore", 0)) >= 4
-
-
-## Step 2 — toss surface ore into the bootstrap forge, let it smelt, stand by the pocket to reach-collect 2
-## ingots.
-func _step_smelt(agent: PlayAgent) -> bool:
-	if not await agent.select_item(&"ore"):
-		return false
-	var bf: Vector2i = MainView.MINESHAFT_FORGE_CELL
-	if not await agent.walk_to_column(bf.x - 1):
-		return false
-	agent.player.facing = 1
-	agent.main.try_drop()
-	var collect: Vector2i = bf + Vector2i(0, 1)
-	var guard: int = 0
-	while int(agent.sim.inventory.get(&"ingot", 0)) < 2 and guard < 30:
-		guard += 1
-		await agent.approach(collect)
-		for _i: int in 20:
-			await physics_frame
-	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
-
-
-## Step 3 — chop one trunk block of the nearest tree for wood (enough to claim the bazaar).
-func _step_wood(agent: PlayAgent) -> bool:
-	var base: Vector2i = _nearest_tree_base(agent)
-	if base.x < 0:
-		return false
-	await agent.mine_cell(base, 1400)
-	return int(agent.sim.inventory.get(&"wood", 0)) >= 1
-
-
-## Step 4 — claim the Bazaar: place one wood block in the gap of the ruined frame near spawn.
-func _step_bazaar(agent: PlayAgent) -> bool:
-	var gap: Vector2i = agent.sim.bazaar_completion_cell()
-	if gap.x < 0:
-		return false
-	if not await agent.select_item(&"wood"):
-		return false
-	if not await agent.build_at(gap):
-		return false
-	return not agent.sim.find_bazaars().is_empty()
-
-
-## Step 5 — research Automation at the bench: earn the ingot price, keep an ore SAMPLE, then research at the
-## Bazaar (the drill stays locked until this opens it).
-func _step_research(agent: PlayAgent) -> bool:
-	if agent.sim.is_researched(&"automation"):
-		return true
-	var price: int = int(ResearchRules.tech(&"automation")["cost"].get(&"ingot", 0))
-	if not await _ensure_ingots(agent, price):
-		return false
-	var guard: int = 0
-	while int(agent.sim.inventory.get(&"ore", 0)) < 1 and guard < 4:
-		guard += 1
-		var ore: Vector2i = _nearest_ore_not_shaft(agent)
-		if ore.x < 0:
-			return false
-		await agent.dig_down_to(ore)
-		await agent.climb_to_surface(MainView.SURFACE - 1)
-	if not await _walk_to_bazaar(agent):
-		return false
-	return agent.main.try_research(&"automation")
-
-
-## Step 6 — craft a Drill AT the Bazaar: earn its price, then walk to the stall and craft (gated on proximity).
-func _step_craft(agent: PlayAgent) -> bool:
-	var price: int = int((load(DRILL) as MachineDef).craft_cost.get(&"ingot", 0))
-	if not await _ensure_ingots(agent, price):
-		return false
-	if not await _walk_to_bazaar(agent):
-		return false
-	if not agent.craft(load(DRILL)):
-		return false
-	return int(agent.sim.inventory.get(&"drill", 0)) >= 1 or _has_drill(agent)
-
-
-## Step 7 — drop the Drill above the mineshaft vein (boring model): reach in from the shaft edge.
-func _step_build(agent: PlayAgent) -> bool:
-	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):
-		return false
-	var d: Vector2i = MainView.MINESHAFT_DRILL_CELL
-	if agent.sim.drill_column_remaining(d) <= 0:
-		return false
-	if not await agent.select_item(&"drill"):
-		return false
-	if not await agent.build_at(d):
-		return false
-	return agent.sim.machine_at(d) != null
-
-
-## Step 8 — fuel the Drill: mine the coal vein, then toss coal down the open shaft onto the drill.
-func _step_fuel(agent: PlayAgent) -> bool:
-	var guard: int = 0
-	while int(agent.sim.inventory.get(&"coal", 0)) < 3 and guard < 6:
-		guard += 1
-		var coal: Vector2i = _nearest_coal(agent)
-		if coal.x < 0:
-			break
-		await agent.dig_down_to(coal)
-	if int(agent.sim.inventory.get(&"coal", 0)) < 1:
-		return false
-	if not await agent.select_item(&"coal"):
-		return false
-	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):
-		return false
-	agent.player.facing = 1
-	var guard2: int = 0
-	while not _drill_has_fuel(agent) and guard2 < 14:
-		guard2 += 1
-		agent.main.try_drop()
-		for _i: int in 6:
-			await physics_frame
-	return _drill_has_fuel(agent)
-
-
-## Step 9 — stand back and let the fueled line run until it pours ingots on its own.
-func _step_auto(agent: PlayAgent) -> bool:
-	for _i: int in 200:
-		await physics_frame
-	return true
-
-
-# --- step helpers (faithful to play_tests.gd) -----------------------------------------------------
-
-## Earn `want` ingots the tutorial way: mine starter veins, toss ore into the bootstrap forge, reach-collect.
-func _ensure_ingots(agent: PlayAgent, want: int) -> bool:
-	var guard: int = 0
-	while int(agent.sim.inventory.get(&"ingot", 0)) < want and guard < 12:
-		guard += 1
-		if int(agent.sim.inventory.get(&"ore", 0)) < 2:
-			var ore: Vector2i = _nearest_ore_not_shaft(agent)
-			if ore.x < 0:
-				return false
-			await agent.dig_down_to(ore)
-			await agent.climb_to_surface(MainView.SURFACE - 1)
-			continue
-		if not await agent.select_item(&"ore"):
-			return false
-		if not await agent.walk_to_column(MainView.MINESHAFT_FORGE_CELL.x - 1):
-			return false
-		agent.player.facing = 1
-		agent.main.try_drop()
-		var collect: Vector2i = MainView.MINESHAFT_FORGE_CELL + Vector2i(0, 1)
-		var last: int = -1
-		var settled: int = 0
-		while settled < 3 and int(agent.sim.inventory.get(&"ingot", 0)) < want:
-			await agent.approach(collect)
-			for _i: int in 30:
-				await physics_frame
-			var now: int = int(agent.sim.inventory.get(&"ingot", 0))
-			settled = settled + 1 if now == last else 0
-			last = now
-	return int(agent.sim.inventory.get(&"ingot", 0)) >= want
-
-
-## Walk to within crafting range of a claimed Bazaar (stand just outside the frame on the work side).
-func _walk_to_bazaar(agent: PlayAgent) -> bool:
-	var bzs: Array[Vector2i] = agent.sim.find_bazaars()
-	if bzs.is_empty():
-		return false
-	await agent.walk_to_column(bzs[0].x + FactorySim.BAZAAR_W)
-	return agent.main._near_bazaar()
-
-
-## The nearest solid ORE cell that is NOT the mineshaft column (so hand-mining never eats the drill's vein).
-func _nearest_ore_not_shaft(agent: PlayAgent) -> Vector2i:
-	var best := Vector2i(-1, -1)
-	var best_d: float = INF
-	for cell: Variant in agent.sim.solid:
-		var c: Vector2i = cell
-		if agent.sim.solid[c] != &"ore" or c.x == MainView.MINESHAFT_COL:
-			continue
-		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
-		if d < best_d:
-			best_d = d
-			best = c
-	return best
-
-
-## The base (lowest) trunk cell of the nearest TREE — a wood cell crowned by leaves (a real trunk top, not a
-## bazaar-frame post), then descend that column to its base.
-func _nearest_tree_base(agent: PlayAgent) -> Vector2i:
-	var top := Vector2i(-1, -1)
-	var best_d: float = INF
-	for cell: Variant in agent.sim.solid:
-		var c: Vector2i = cell
-		if agent.sim.solid[c] != &"wood":
-			continue
-		if agent.sim.solid.get(c + Vector2i(0, -1), &"") != &"leaves":
-			continue
-		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
-		if d < best_d:
-			best_d = d
-			top = c
-	if top.x < 0:
-		return Vector2i(-1, -1)
-	var base := top
-	for cell2: Variant in agent.sim.solid:
-		var c2: Vector2i = cell2
-		if c2.x == top.x and agent.sim.solid[c2] == &"wood" and c2.y > base.y:
-			base = c2
-	return base
-
-
-## The nearest COAL vein cell to the body (the drill's fuel source).
-func _nearest_coal(agent: PlayAgent) -> Vector2i:
-	var best := Vector2i(-1, -1)
-	var bd: float = INF
-	for cell: Variant in agent.sim.solid:
-		var c: Vector2i = cell
-		if agent.sim.solid[c] != &"coal":
-			continue
-		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
-		if d < bd:
-			bd = d
-			best = c
-	return best
-
-
-## Whether a placed Drill has coal to burn (fuel mid-burn, or coal waiting in its buffer).
-func _drill_has_fuel(agent: PlayAgent) -> bool:
-	for m: MachineState in agent.sim.machines:
-		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
-			return true
-	return false
-
-
-## Whether a Drill machine is placed anywhere.
-func _has_drill(agent: PlayAgent) -> bool:
-	for m: MachineState in agent.sim.machines:
-		if m.def.behavior == &"drill":
-			return true
-	return false
 
 
 # --- scaffolding ----------------------------------------------------------------------------------

@@ -61,6 +61,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _dig_in(main)
 			await _hollow_room(main)
 			await _swing(main)
+		"line":
+			await _the_line(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -83,6 +85,30 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 	var path := "res://_moment_%s%s%s.png" % [moment, suffix, name_suffix]
 	img.save_png(path)
 	print("CAPTURED %s -> %s (%dx%d)" % [moment, ProjectSettings.globalize_path(path), img.get_width(), img.get_height()])
+
+
+## THE LINE RUNS — the frame the first-automation plate is on screen. Reached by PLAYING there: the same
+## opening arc check_loop_health scores and check_pacing times, run to first automation, then paused a beat
+## into the announcement so the plate, the sparks and the machine that earned them are all in the shot.
+## Nothing is staged; if the ceremony ever stops firing, this capture goes blank and says so.
+## The shutter has to be timed off the CEREMONY, not off the driver: the arc's last step stands back and
+## waits out a fixed count while the line spins up, so by the time play() returns the plate has already
+## come and gone. So the arc is run only as far as a fueled drill, and then we watch for the hail itself.
+const ARC := preload("res://tools/arc_driver.gd")
+const HAIL_WAIT := 2400              ## frames the fueled line is given to pour its first ingot
+const HAIL_PEAK := 60                ## frames after the hail — inside the plate's full-opacity dwell
+
+func _the_line(main: MainView) -> void:
+	var agent: PlayAgent = AGENT.new(self, main)
+	await ARC.new().play(agent, main._objectives, &"fuel")
+	var guard := 0
+	while not main._line_hailed and guard < HAIL_WAIT:
+		await physics_frame
+		guard += 1
+	if not main._line_hailed:
+		push_warning("the line never ran — capturing without the plate")
+	for _i in HAIL_PEAK:
+		await physics_frame
 
 
 ## Sink a shaft under the spawn column and leave the body standing at the bottom of it. Driven through
