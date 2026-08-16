@@ -736,38 +736,56 @@ func _in_water() -> bool:
 	return false
 
 
-## The logical sprite-frame key for the body's current motion state (Phase C). Priority: digging > airborne
-## > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2 off the free clock. The
-## caller falls back to the idle "miner" frame for any state whose art hasn't been drawn yet, so dropping
-## in only a subset of frames still works (and with NO frames present, every key misses → primitive path).
-## Frame fallback chains: a state whose art hasn't landed borrows the nearest drawn
-## pose, ending at the idle frame — so the artist can land climb_0 alone, or nothing, and every state
-## still shows SOMETHING sensible.
+## Frame fallback chains: a state whose art hasn't landed borrows the NEAREST drawn pose rather than
+## snapping to a neutral stand, and every chain drains toward the idle frame — so the artist can land
+## climb_0 alone, or nothing at all, and every state still shows something that belongs to the motion.
+## The chains are deliberately acyclic; _resolve_tex walks them until a key hits.
 const SPRITE_FALLBACKS: Dictionary = {
+	"miner_swing": "miner_fall", "miner_fall": "miner_jump", "miner_jump": "miner_idle",
+	"miner_haul": "miner_climb_0",
 	"miner_climb_0": "miner_climb", "miner_climb_1": "miner_climb",
-	"miner_hang": "miner_climb", "miner_climb": "miner", "miner_land": "miner",
+	"miner_hang": "miner_climb", "miner_climb": "miner_idle",
+	"miner_land": "miner_idle",
+	"miner_walk_0": "miner_idle", "miner_walk_1": "miner_idle",
+	"miner_walk_2": "miner_idle", "miner_walk_3": "miner_idle",
+	"miner_dig_0": "miner_idle", "miner_dig_1": "miner_idle",
+	"miner_idle": "miner",
 }
 
 
+## The logical sprite-frame key for the body's current motion state (Phase C). Priority: digging > the
+## LINE > the rope > airborne > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2
+## off the free clock.
 func _sprite_key() -> String:
 	if digging:
 		return "miner_dig_0" if int(_anim_time * 8.0) % 2 == 0 else "miner_dig_1"
+	# A live line outranks the floor AND the rope. Once the constraint is doing work he is not standing,
+	# jumping or climbing — he is hanging off it, and that is the only pose that explains what the body
+	# is about to do. Reeling on a planted line is the other half of the same story, so it gets its own
+	# frame instead of borrowing the climb: winching up and hand-over-hand are different verbs.
+	if grapple.taut:
+		return "miner_swing"
+	if grapple.state == Grapple.State.ANCHORED and input_climb > 0.0:
+		return "miner_haul"
 	if climbing:
 		# Moving on the rope cycles the climb; a still grip HANGS (a distinct held pose).
 		if absf(velocity.y) > 6.0:
 			return "miner_climb_%d" % (int(_climb_phase) % 2)
 		return "miner_hang"
 	if not on_floor:
-		return "miner_jump"
+		# Up and down are different beats, and conflating them is why every fall used to read as a jump:
+		# the rise is a tuck, the drop streams the legs out behind him.
+		return "miner_fall" if velocity.y > 0.0 else "miner_jump"
 	if _land_hold > 0.0:
 		return "miner_land"        # the landing-impact beat, right after touchdown
 	if absf(velocity.x) > 10.0:
 		return "miner_walk_%d" % (int(_walk_phase) % 4)
-	return "miner"
+	return "miner_idle"
 
 
-## The best drawn texture for a state key: walk its fallback chain, ending at the idle frame (null
-## only when NO miner art exists at all — then the code-drawn figure takes over).
+## The best drawn texture for a state key: walk its fallback chain, then try the baked idle and finally
+## the hand-made original. Returns null only when NO miner art exists at all — that null is load-bearing,
+## it is what hands the body back to the code-drawn figure.
 func _resolve_tex(key: String) -> Texture2D:
 	var k: String = key
 	while true:
@@ -777,7 +795,8 @@ func _resolve_tex(key: String) -> Texture2D:
 		if not SPRITE_FALLBACKS.has(k):
 			break
 		k = SPRITE_FALLBACKS[k]
-	return Art.tex("miner")
+	var idle: Texture2D = Art.tex("miner_idle")
+	return idle if idle != null else Art.tex("miner")
 
 
 ## The MINER. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present (feet-anchored,
