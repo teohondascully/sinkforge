@@ -69,7 +69,22 @@ const SKY_REACH: int = 12                           ## tiles of open air sunligh
 ## the bottom third of the opening frame into a void the player reads as "the world ends here" (#S3).
 ## Seven tiles is roughly the topsoil band, so the dirt layer reads AS DIRT from the surface and the dark
 ## begins where the player has actually descended into it.
-const SKY_FADE: int = 7
+##
+## ...except seven was not the topsoil band, it was a seventh of the frame, and the opening shot proved it:
+## the bottom FORTY-FIVE PERCENT of the first screen a player ever sees printed as one smooth brown
+## gradient with four or five levels in it and no visible rock at all. That is not "mysterious", it is
+## dead space, and it is the single largest region of the composition.
+##
+## The cause is 8-bit, not artistic. The veil MULTIPLIES, which preserves relative contrast perfectly —
+## but at a multiplier of 0.18 the whole rock has thirty-five levels to live in and its own texture spans
+## about two of them, so a paint that measurably reads as rock at full light quantizes into a stain. There
+## is no amount of terrain work that survives being multiplied into two levels.
+##
+## Sixteen tiles is the honest depth: daylight soaks into SOIL, not into rock. The band under the grass is
+## meant to be the INVITATION to dig — you can see the dirt, you can see stones in it, you can see where it
+## stops — and the dark begins at rock depth, where the player has genuinely descended. The deep is not
+## touched by this at all; it is exactly as black as it was.
+const SKY_FADE: int = 16
 ## How dark the deep gets, on a 0 (full light) .. 1 (pitch) scale. Read by _light_level, which turns it
 ## into the multiplier the veil actually applies. The lamp/machine/crystal pools still cut this back to
 ## ~0, so the "bring your own light" pillar holds and lit rock pops hard out of the gloom.

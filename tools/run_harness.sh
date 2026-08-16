@@ -20,8 +20,12 @@ NCPU="$( (sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 8) )"
 JOBS="${JOBS:-$NCPU}"
 
 # --- the layers, in declaration order (order is cosmetic; results stream as they finish) ---
-NAMES=(); SCRIPTS=()
-add() { NAMES+=("$1"); SCRIPTS+=("$2"); }
+# A layer is normally headless. `add_gl` marks one that must render for real — the dummy renderer paints
+# blank frames, so any layer that judges PIXELS has to own a window. Those layers self-skip (green) when
+# no display exists, which is how CI stays honest without pretending to have tested a picture.
+NAMES=(); SCRIPTS=(); GLFLAG=()
+add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); }
+add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); }
 add "sim (core/determinism)"          "res://tests/test_sim.gd"
 add "stress (invariants/flow/power)"  "res://tests/test_stress.gd"
 add "worldgen (gen/ore/fine)"         "res://tests/test_worldgen.gd"
@@ -46,6 +50,7 @@ add "check_score (the descent)"       "res://tools/check_score.gd"
 add "check_rhythm (dig groove)"       "res://tools/check_rhythm.gd"
 add "check_room_reads (2nd plane)"    "res://tools/check_room_reads.gd"
 add "check_texture (no static)"       "res://tools/check_texture.gd"
+add_gl "check_opening (no dead space)" "res://tools/check_opening.gd"
 add "check_stride (the run)"          "res://tools/check_stride.gd"
 add "check_controls"                  "res://tools/check_controls.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
@@ -78,7 +83,9 @@ while [ "$done_count" -lt "$total" ]; do
 		i="$launched"
 		(
 			s=$SECONDS
-			if "$GODOT" --headless --path . --script "${SCRIPTS[$i]}" >"$DIR/$i.log" 2>&1; then r=0; else r=1; fi
+			if [ "${GLFLAG[$i]}" = "1" ]; then
+				if "$GODOT" --path . --script "${SCRIPTS[$i]}" >"$DIR/$i.log" 2>&1; then r=0; else r=1; fi
+			elif "$GODOT" --headless --path . --script "${SCRIPTS[$i]}" >"$DIR/$i.log" 2>&1; then r=0; else r=1; fi
 			printf '%d %d' "$r" "$((SECONDS - s))" >"$DIR/$i.done"
 		) &
 		launched=$((launched + 1))

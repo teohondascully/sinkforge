@@ -108,6 +108,46 @@ const MOSS_FREQ: float = 0.15                          ## breaks the moss into o
 ## only the odd lip grows a tuft — the reference's hanging tufts under ledges.
 const HANG_DEPTH: int = 3                              ## fine rows a tuft hangs below an overhang lip
 const HANG_GATE: float = 0.30                          ## only lips whose moss-noise clears this hang a tuft (sparse)
+## THE SOIL PROFILE (#S10) — the top of the underground is GROUND, not a fill colour.
+##
+## The opening frame's bottom half is the band directly under the grass, and it was painted with exactly
+## the same rules as rock ninety metres down: one material colour, the same grain, the same everything. So
+## the most-looked-at region in the game was also its least specific one, and a player looking down from
+## spawn saw a brown rectangle rather than somewhere to dig.
+##
+## Real soil is strongly BANDED and every band is a different colour — dark organic humus right under the
+## turf, a warmer mineral subsoil below it, then weathered rock. It also has things IN it, which rock does
+## not: roots reaching down from whatever is growing above, and loose stones that are LIGHTER than the
+## earth around them rather than darker (a cobble in dirt catches light; a stone inclusion in rock does
+## not). All three are functions of depth-below-this-column's-own-surface, so a hillside's profile follows
+## the hill instead of lying in flat world rows.
+const SOIL_ROWS: int = 40                 ## fine rows below a column's surface the profile spans (10 cells)
+const HUMUS_ROWS: int = 5                 ## the dark organic band right under the turf
+const HUMUS_DARKEN: float = 0.26          ## how much darker humus is than the earth below it
+const SUBSOIL_ROWS: int = 20              ## the warm mineral band under the humus
+const SUBSOIL_WARM: float = 0.13          ## how far the subsoil lifts toward its own warm pole
+const SUBSOIL_POLE := Color(0.52, 0.35, 0.18)   ## iron-stained ochre — what makes a subsoil read as subsoil
+## ROOTS. Thin, near-vertical, dark, and reaching DOWN from the turf line — the one feature that says the
+## surface above is alive and the ground below it is connected to it. Noise picks which columns grow one
+## and how far it reaches, so they are sparse and uneven rather than a fringe.
+const ROOT_FREQ: float = 0.14             ## along-X: roots cluster where growth clusters
+const ROOT_GATE: float = 0.34             ## noise above this grows a root (sparse — most columns have none)
+const ROOT_MAX: int = 26                  ## deepest a root reaches, in fine rows
+const ROOT_DARKEN: float = 0.30
+## COBBLES AND CLASTS. Soil is a MIXTURE, not a solid, and that is the difference the eye actually reads
+## between dirt and rock: rock is one substance with texture on it, soil is full of things that are not
+## soil. So the same inclusion field the rock reads as a dark embedded stone is read here at a far lower
+## threshold and in BOTH directions — pale cobbles where it runs high (a stone in dirt catches light) and
+## dark clasts where it runs low. Same geometry, seen from two sides, at three times the density.
+## Read at COBBLE_SCALE the inclusion field gives PEBBLES rather than boulders, which is the difference
+## between soil and rubble — and it is a difference the eye is very sure about. Read at the rock's own
+## scale and threshold the first attempt turned the whole opening frame into a gravel pit that scored
+## beautifully on every content metric and looked worse than the dead gradient it replaced.
+const COBBLE_SCALE: float = 1.9           ## finer than the rock's inclusions — stones, not outcrops
+const COBBLE_THRESH: float = 0.26
+const COBBLE_LIGHTEN: float = 0.26
+const CLAST_THRESH: float = -0.30         ## ...and below this the inclusion is a dark lump instead
+const CLAST_DARKEN: float = 0.20
 ## THE ROCK GETS A TOP AND A BOTTOM (#S8).
 ##
 ## Everything above this line is TEXTURE: noise that says what the rock is MADE of. None of it says which
@@ -143,6 +183,7 @@ var _noise: FastNoiseLite                              ## low-freq tonal drift o
 var _grain: FastNoiseLite                              ## dense speckle field (diff 4)
 var _grain2: FastNoiseLite                             ## crisp grit octave
 var _moss: FastNoiseLite                               ## moss patch mask (diff 5)
+var _root: FastNoiseLite                               ## which columns grow a root, and how deep (#S10)
 var _patch: FastNoiseLite                              ## broad tonal patches (diff-04 #1)
 var _stone: FastNoiseLite                              ## embedded darker-stone blobs (diff-04 #1)
 var _crack: FastNoiseLite                              ## hairline crack seams (diff-04 #1)
@@ -192,6 +233,7 @@ func _init(cols: int, rows: int, seed: int) -> void:
 	_grain = _field(seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX, GRAIN_FREQ)
 	_grain2 = _field(seed, 0x165667b1, FastNoiseLite.TYPE_VALUE, GRAIN_FREQ2)   ## crisper grit
 	_moss = _field(seed, 0x9e3779b1, FastNoiseLite.TYPE_SIMPLEX, MOSS_FREQ)
+	_root = _field(seed, 0x7feb352d, FastNoiseLite.TYPE_SIMPLEX, ROOT_FREQ)
 	# diff-04 #1 — broad tonal patches + embedded stones + cracks (each its own seed so they don't correlate).
 	_patch = _field(seed, 0x2545f491, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, PATCH_FREQ, 3)
 	# Both are THRESHOLDED downstream, so neither may carry an octave tail: doubling the frequency once
@@ -410,6 +452,7 @@ func _paint_fine(fx: int, fy: int) -> void:
 		var vmul: float = maxf(0.22, shade + grain + _sky_form(fx, fy))
 		var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
 			col.b * vmul + drift + rim, 1.0)
+		out = _soil(out, fx, fy, pcol)
 		# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open air
 		# above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked), fading down.
 		var alive: float = _moss_life(fy)
@@ -495,6 +538,46 @@ func _sky_form(fx: int, fy: int) -> float:
 			f -= FORM_SINK * (1.0 - float(d) / float(FORM_REACH))
 			break
 	return f
+
+
+## THE SOIL PROFILE (#S10). Everything here is keyed to depth below THIS COLUMN's own surface, so the
+## bands follow a hillside instead of lying in flat world rows, and a column that is rock all the way up
+## (a cliff face, anything underground) is left alone entirely — `depth` only lands inside SOIL_ROWS for
+## cells that are genuinely near a walkable top.
+func _soil(c: Color, fx: int, fy: int, pcol: int) -> Color:
+	var depth: int = fy - (_surf_row[pcol] * SUBDIV + SURFACE_KEEP)
+	if depth < 0 or depth >= SOIL_ROWS:
+		return c
+	# Fade the whole profile out over its last third, or the bottom of the soil would be a ruled line
+	# across the world — which is the exact failure the bands exist to fix, moved down ten cells.
+	var strength: float = clampf(float(SOIL_ROWS - depth) / (float(SOIL_ROWS) * 0.34), 0.0, 1.0)
+	var out: Color = c
+	if depth < HUMUS_ROWS:
+		# Ramped in as well as out. Darkest AT the turf line puts the band's maximum contrast directly
+		# against the coarse grass cap, which prints as a hard seam ruled across the whole world — the
+		# humus has to meet the cap, not fight it.
+		var d: float = float(depth) / float(HUMUS_ROWS)
+		out = out.darkened(HUMUS_DARKEN * smoothstep(0.0, 0.4, d) * (1.0 - d))
+	elif depth < HUMUS_ROWS + SUBSOIL_ROWS:
+		var t: float = float(depth - HUMUS_ROWS) / float(SUBSOIL_ROWS)
+		out = out.lerp(SUBSOIL_POLE, SUBSOIL_WARM * (1.0 - t) * strength)
+	# INCLUSIONS, both signs. `strength` fades them with the profile so the soil dissolves into plain rock
+	# rather than ending at a ruled line.
+	var peb: float = _stone.get_noise_2d(float(fx) * COBBLE_SCALE, float(fy) * COBBLE_SCALE)
+	if peb > COBBLE_THRESH:
+		out = out.lightened(COBBLE_LIGHTEN * smoothstep(0.0, 1.0, (peb - COBBLE_THRESH) * STONE_RAMP)
+			* strength)
+	elif peb < CLAST_THRESH:
+		out = out.darkened(CLAST_DARKEN * smoothstep(0.0, 1.0, (CLAST_THRESH - peb) * STONE_RAMP)
+			* strength)
+	# ROOTS: sparse, near-vertical, reaching down from the turf. The X sample is compressed so a root is
+	# THIN across and long down — the same anisotropy trick the bedding grain uses, turned ninety degrees.
+	var rn: float = _root.get_noise_2d(float(fx) * 1.9, float(fy) * 0.18)
+	if rn > ROOT_GATE:
+		var reach: float = float(ROOT_MAX) * clampf((rn - ROOT_GATE) * 3.0, 0.0, 1.0)
+		if float(depth) < reach:
+			out = out.darkened(ROOT_DARKEN * (1.0 - float(depth) / reach))
+	return out
 
 
 ## Rows below the nearest EXPOSED top surface directly above this solid fine cell (0 = this cell has open
