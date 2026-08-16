@@ -154,6 +154,13 @@ const CRAFT_TOOLS: Array[Dictionary] = [
 	{"id": &"stone_pickaxe", "name": "Stone Pickaxe"},
 	{"id": &"iron_pickaxe", "name": "Iron Pickaxe"},
 	{"id": &"scanner", "name": "Scanner"},
+	# THE BITS (#S32). Cutting heads, not upgrades: each is a different job rather than the same job faster,
+	# and you keep every one you buy. Priced in REFINED goods so wanting one is a reason to run the factory
+	# rather than a reason to hand-mine more (`docs/BITS.md` §7).
+	{"id": BitRules.BROAD, "name": "Broad Bit"},
+	{"id": BitRules.SINKER, "name": "Sinker Bit"},
+	{"id": BitRules.LANCE, "name": "Lance Bit"},
+	{"id": BitRules.WEDGE, "name": "Wedge Bit"},
 ]
 ## THE SCANNER: with it selected, RMB fires a sonar pulse from the body — ore bodies in
 ## range answer with echo rings THROUGH the rock (transient, localized: prospecting, not a map reveal).
@@ -313,7 +320,7 @@ func _ready() -> void:
 	# they're not in machine_icons (the craft panel renders them via their item glyph instead).
 	for t: Dictionary in CRAFT_TOOLS:
 		var tid: StringName = t["id"]
-		craft_opts.append({"name": t["name"], "cost": MiningRules.TOOL_RECIPES.get(tid, {})})
+		craft_opts.append({"name": t["name"], "cost": _tool_recipe(tid)})
 		craft_ids.append(tid)
 	hud.craft_options = craft_opts
 	hud.craft_ids = craft_ids
@@ -1231,6 +1238,10 @@ func _update_mining(delta: float) -> void:
 			_rhythm = minf(1.0, _rhythm + RHYTHM_GAIN)       # ...and the rhythm carries into the next one
 			_rhythm_idle = 0.0
 			_note_breach(work, was_hollow)
+			# RECOVERY (#S32) as a NEGATIVE charge rather than a separate timer: the next blow simply starts
+			# from further back, so it reads as a heavy tool being hauled up again and needs no new state,
+			# no new gauge and no new rule. Only the Lance has any.
+			_mine_charge = -BitRules.recovery(BitRules.equipped(_selected_item()))
 
 
 ## HOW HOLLOW IS THE ROCK BEHIND THIS FACE (#S11) — 0 solid to the horizon, 1 a void right behind it.
@@ -1406,11 +1417,15 @@ func try_mine(cell: Vector2i) -> bool:
 		return false                                           # no tool for this rock — the gate the test drives
 	var rich: bool = sim.ore_deposit_at(cell) > 0              # captured BEFORE the mine clears the cell
 	var before: Dictionary = sim.inventory.duplicate()         # …so the payout tick can name the real yield
-	var mined: StringName = sim.mine(cell)
+	# THE BIT DECIDES WHAT THE BLOW TAKES (#S32). The drive decided whether you may bite this rock at all,
+	# above; from here on the shape of the hole is the bit's business and nothing else's.
+	var bit: StringName = BitRules.equipped(_selected_item())
+	var keeps: bool = BitRules.keeps(bit)
+	var mined: StringName = sim.mine(cell, keeps)
 	if mined != &"":
-		# THE GRAIN CALVES (#S31). Resolved BEFORE the payout tick, because the run's yield is part of what
-		# this one blow paid and a "+3 stone" over a swing that handed you nine would be a lie.
-		var calved: int = _calve(cell)
+		# Both resolved BEFORE the payout tick, because everything this one blow took is part of what it
+		# paid — a "+3 stone" over a swing that handed you nine would be a lie.
+		var calved: int = _shape(bit, cell, keeps) + _calve(cell, BitRules.cap(bit), keeps)
 		_dig_marks.erase(cell)                                 # a dug cell's mark is spent
 		var center: Vector2 = _cell_center(cell)
 		_show_gains(before, center + Vector2(0.0, -float(CELL) * 0.35))
@@ -1458,19 +1473,17 @@ func try_mine(cell: Vector2i) -> bool:
 ##
 ## It walks one way and then the other rather than alternating, so a capped run reads as a ledge shearing
 ## off in a direction rather than crumbling evenly around the pick.
-func _calve(from: Vector2i) -> int:
+func _calve(from: Vector2i, cap: int, keeps: bool) -> int:
+	if cap <= 1:
+		return 0                          # this bit does not follow the grain (`BitRules`)
 	var seam: int = Seams.at(from, sim.world_seed)
-	if seam == Seams.NONE or _player == null:
-		return 0
-	var swing := Vector2i(roundi(_cell_center(from).x - _player.position.x),
-		roundi(_cell_center(from).y - _player.position.y))
-	if not Seams.aligned(seam, swing):
+	if seam == Seams.NONE or not Seams.aligned(seam, _swing_heading(from)):
 		return 0
 	var axis: Vector2i = Seams.axis(seam)
 	var taken: int = 0
 	for side: int in [1, -1]:
-		for step: int in range(1, Seams.RUN_CAP):
-			if taken >= Seams.RUN_CAP - 1:
+		for step: int in range(1, cap):
+			if taken >= cap - 1:
 				break
 			var c: Vector2i = from + axis * (step * side)
 			if not sim.solid.has(c) or Seams.at(c, sim.world_seed) != seam:
@@ -1478,15 +1491,53 @@ func _calve(from: Vector2i) -> int:
 			var m: StringName = sim.material_at(c)
 			if not MiningRules.can_mine(m, sim.inventory):
 				break
-			if sim.mine(c) == &"":
+			if sim.mine(c, keeps) == &"":
 				break
 			taken += 1
-			_dig_marks.erase(c)
-			var at: Vector2 = _cell_center(c)
-			_renderer.note_mined(c, m)
-			_particles.dust(at, Visuals.terrain_dust(m), 6)
-			_particles.spark(at, Visuals.item_color(m).lightened(0.15))
+			_break_spall(c, m)
 	return taken
+
+
+## THE BIT'S OWN SHAPE (#S32) — the cells a blow takes because of what is fitted to the drive, as opposed to
+## because of the way the rock lies. Returns how many it took beyond the aimed cell, which `try_mine` has
+## already broken.
+##
+## A RAY bit stops at the first cell that is not solid; a block bit skips it and carries on. That difference
+## is the whole reason the flag exists: a Lance is five cells DRIVEN through rock, so a chamber in the way
+## ends the drive, and without that rule one blow could reach across a hall and take rock on the far side.
+## A Broad's 2x2 has no travel direction to interrupt, so a gap in one corner is simply a corner already open.
+func _shape(bit: StringName, cell: Vector2i, keeps: bool) -> int:
+	var face: int = 1
+	if _player != null and _cell_center(cell).x < _player.position.x:
+		face = -1
+	var ray: bool = BitRules.ray(bit)
+	var took: int = 0
+	for c: Vector2i in BitRules.cut(bit, cell, face):
+		if c == cell:
+			continue                      # the aimed cell is `try_mine`'s, already broken
+		if not sim.solid.has(c):
+			if ray:
+				break
+			continue
+		var m: StringName = sim.material_at(c)
+		if not MiningRules.can_mine(m, sim.inventory):
+			break                         # the drive gates every cell, not just the one you pointed at
+		if sim.mine(c, keeps) == &"":
+			break
+		took += 1
+		_break_spall(c, m)
+	return took
+
+
+## The lighter break feedback for a cell a blow took in passing, as opposed to the one it was aimed at. Same
+## dust and the same fleck in the material's own colour, at a fraction of the count — one blow should read as
+## one event with a wide mouth, never as three or five separate breaks going off at once.
+func _break_spall(c: Vector2i, m: StringName) -> void:
+	_dig_marks.erase(c)
+	var at: Vector2 = _cell_center(c)
+	_renderer.note_mined(c, m)
+	_particles.dust(at, Visuals.terrain_dust(m), 6)
+	_particles.spark(at, Visuals.item_color(m).lightened(0.15))
 
 
 ## THE STRIKE THAT FINDS THE VEIN.
@@ -1624,7 +1675,7 @@ func try_scan() -> bool:
 func try_craft_tool(tool_id: StringName) -> bool:
 	if not _near_bazaar():
 		return false
-	var made: bool = sim.craft_item(tool_id, MiningRules.TOOL_RECIPES.get(tool_id, {}))
+	var made: bool = sim.craft_item(tool_id, _tool_recipe(tool_id))
 	if made:
 		_sfx.ui(&"ding", 1.1)
 	return made
@@ -2067,7 +2118,41 @@ func _body_cell() -> Vector2i:
 ## one layer at a time (mine the face → the pocket grows → the next layer is exposed). The dig becomes
 ## carving, not poking a radius blob. Building/hover keep the plain reach test; this gates mining only.
 func _mineable(cell: Vector2i) -> bool:
-	return sim.is_solid(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)
+	if not (sim.is_solid(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)):
+		return false
+	# THE WEDGE SPLITS OR IT DOES NOTHING (#S32). It is the one bit that can refuse a cell, and the refusal
+	# has to live HERE rather than in try_mine: the hold-loop charges on this same predicate, so a cell that
+	# looked mineable and then would not break would spider a full charge and start over forever — the exact
+	# bug `check_mining`'s last case exists to make impossible. Gating the predicate instead means the aim
+	# cursor greys out on rock the Wedge cannot split, before you press anything, which is also the honest
+	# way to sell a specialist tool.
+	return _bit_bites(BitRules.equipped(_selected_item()), cell)
+
+
+## Can this bit break this cell at all? Only the Wedge ever says no, and only across the grain.
+func _bit_bites(bit: StringName, cell: Vector2i) -> bool:
+	if not BitRules.grain_only(bit):
+		return true
+	return Seams.aligned(Seams.at(cell, sim.world_seed), _swing_heading(cell))
+
+
+## The blow's heading, in world pixels from the body to the struck cell. Deliberately NOT `_swing_dir`,
+## which quantises to four compass directions: after that quantisation a diagonal plane is indistinguishable
+## from an axis-aligned one, so every diagonal seam would read as "along the grain" from any angle and the
+## rarest, most satisfying plane in the world would become the most forgiving one.
+func _swing_heading(cell: Vector2i) -> Vector2i:
+	if _player == null:
+		return Vector2i.ZERO
+	var d: Vector2 = _cell_center(cell) - _player.position
+	return Vector2i(roundi(d.x), roundi(d.y))
+
+
+## A tool or bit's ingredient cost. One lookup so the craft SCREEN and the craft VERB can never disagree
+## about what something costs.
+func _tool_recipe(id: StringName) -> Dictionary:
+	if BitRules.BIT_RECIPES.has(id):
+		return BitRules.BIT_RECIPES[id]
+	return MiningRules.TOOL_RECIPES.get(id, {})
 
 
 ## Is the straight segment from cell `a` to cell `b` clear of SOLID cells strictly between them? A grid

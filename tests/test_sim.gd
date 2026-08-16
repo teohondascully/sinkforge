@@ -853,15 +853,21 @@ func _test_mining_rules() -> void:
 	poor.inventory[&"stone"] = 2
 	_check(not poor.craft_item(&"stone_pickaxe", MiningRules.TOOL_RECIPES[&"stone_pickaxe"]), "can't craft the pick without enough materials")
 	# THE IRON PICKAXE (tier 3): priced in the L2 chain's own product — the MATERIALS
-	# gate it (iron ingots want the Iron Forge, which wants the breach). Its value today is SPEED;
-	# tier 3 is the rung L3's rock band will gate on.
+	# gate it (iron ingots want the Iron Forge, which wants the breach). Since #S32 its value is purely the
+	# RUNG — tier 3 is what L3's rock band will gate on — because the speed axis is gone.
 	var smith: FactorySim = FactorySim.new()
 	smith.inventory[&"iron_ingot"] = 6
 	smith.inventory[&"wood"] = 3
 	_check(smith.craft_item(&"iron_pickaxe", MiningRules.TOOL_RECIPES[&"iron_pickaxe"]), "craft an Iron Pickaxe from 6 iron ingots + 3 wood")
 	_check(MiningRules.best_tier(&"pick", smith.inventory) == 3, "the iron pick is tier 3")
-	_check(MiningRules.mine_seconds(&"deepslate", smith.inventory)
-		< MiningRules.mine_seconds(&"deepslate", stone_pick), "…and chews deepslate faster than the stone pick")
+	# A DRIVE IS A KEY, NOT A STAT (#S32). This assertion used to demand the opposite — that a better pick
+	# chews the same rock FASTER — and that was the treadmill written down as a requirement: every upgrade
+	# was mostly the old pick with a bigger number. `docs/BITS.md` §2 deletes the speed axis, so what is
+	# asserted here is now its inverse, and deliberately so. The relief a speed bump used to give moved to
+	# the BITS, where it is a choice you made rather than a number that went up; `check_bits` holds that end.
+	_check(is_equal_approx(MiningRules.mine_seconds(&"deepslate", smith.inventory),
+		MiningRules.mine_seconds(&"deepslate", stone_pick)),
+		"…and cuts deepslate at exactly the same speed as the stone pick — the ladder is a key, not a stat")
 	_check(not MiningRules.can_mine(&"sealrock", smith.inventory), "even tier 3 cannot hand-mine THE SEAL")
 
 

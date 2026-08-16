@@ -70,10 +70,19 @@ const DEFAULT_HARDNESS: float = 0.50
 ## seconds); TIER gates which materials the tool may break at all (see REQUIRED_TIER). The starter kit is
 ## the two wood tools (tier 1); the Stone Pickaxe (tier 2) is the first depth-unlocking upgrade, crafted at
 ## the Bazaar (TOOL_RECIPES) — it's both faster AND the key to the deepslate band. Ladder grows demand-pull.
+## THE SPEED AXIS IS DELETED (#S32, `docs/BITS.md` §2). Every pick now cuts at 1.0 and the ladder means one
+## thing only: WHAT YOU MAY BITE. A drive is a key, not a stat. It was 1.0 / 1.7 / 2.6, and the source was
+## honest about what that bought — "its value today is SPEED (deepslate 1.65s -> 1.08s)" — which is to say
+## every upgrade was mostly the old pick, faster. That is the treadmill.
+##
+## What replaces the retroactive relief a speed bump used to give is the BITS (`BitRules`): a Broad or a
+## Lance trivialises old rock four and five cells at a time, and it is a choice you made rather than a
+## number that went up. That replacement is load-bearing, and it is why this line could not be flattened
+## until the bits existed — without them this change is nothing but "the game is now slower".
 const TOOLS: Dictionary = {
 	&"wood_pickaxe": {&"class": &"pick", &"tier": 1, &"speed": 1.0},
-	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.7},
-	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 2.6},
+	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.0},
+	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 1.0},
 	# The wood_axe entry stays ONLY so a pre-#38 save carrying one still renders (glyph/tooltip);
 	# it is no longer seeded, required by any material, or craftable.
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
@@ -91,9 +100,9 @@ const TOOL_RECIPES: Dictionary = {
 	&"stone_pickaxe": {&"stone": 8, &"wood": 3},
 	# The tier-3 pick is priced in the L2 chain's own product (iron ingots want the Iron Forge, which
 	# wants Ironworks research, which wants the breach) — the MATERIALS gate it, research doesn't need
-	# to. Its value today is SPEED (deepslate 1.65s -> 1.08s); tier 3 is the ladder rung L3's rock
-	# band will gate on (— no sub-L2 band exists yet, so nothing bounces a stone pick
-	# that this one opens; that arrives with L3 worldgen, demand-pull).
+	# to. Since #S32 its value is purely the rung: tier 3 is what L3's rock band will gate on (no sub-L2
+	# band exists yet, so nothing bounces a stone pick that this one opens; that arrives with L3
+	# worldgen, demand-pull).
 	&"iron_pickaxe": {&"iron_ingot": 6, &"wood": 3},
 	# The sonar: cheap in materials, gated by PROSPECTING research instead (the sim's
 	# craft_item refuses it until the tech is in — ResearchRules.locking_tech drives the gate).
@@ -135,7 +144,7 @@ static func hardness(material: StringName) -> float:
 ## Is this item one of the equipment TOOLS (a pick/axe), versus a resource? (Named is_tool_ITEM to avoid
 ## colliding with the built-in Script.is_tool() on the class object.)
 static func is_tool_item(item: StringName) -> bool:
-	return TOOLS.has(item)
+	return TOOLS.has(item) or BitRules.is_bit(item)
 
 
 ## The best (fastest) speed among the tools of `tool_class` the pack currently holds, or 0.0 if it holds

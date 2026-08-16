@@ -1,6 +1,25 @@
 # THE BIT SET — picks that differ in SHAPE, and rock that has a grain
 
-> **Status: §4 SEAMS SHIPPED (#S31, 2026-08-16); the rest is still spec.** The grain is in the world, drawn,
+> **Status: SHIPPED (#S31 + #S32, 2026-08-16).** Seams, the five bits, the drive/bit split and the deletion
+> of the speed axis are all in — `src/data/seams.gd`, `src/data/bit_rules.gd`, `MainView._shape` / `_calve` /
+> `_mineable`, `WorldRenderer._draw_seams` — held by `tools/check_seam.gd` and `tools/check_bits.gd`.
+> Still spec: the Rack (bits are crafted at the Bazaar's existing counter for now, `docs/BAZAAR.md` §6),
+> drives as research rather than as craftable picks, and the §5 skid/refusal tells for over-tier rock.
+>
+> The **order** was load-bearing and is worth recording: seams shipped first because they are pure upside and
+> cannot unbalance anything; the speed axis could only be flattened AFTER the bits existed, because without a
+> relief bit that change is nothing but "the game is now slower", which §6 names as the failure mode.
+>
+> Two deviations from the spec below. **Seams are planes, not per-cell rolls** — a 35%-dense per-cell
+> sprinkle gives a contiguous run of three about once in six hundred cells, so the mechanic would have fired
+> essentially never; a horizontal seam is now a ROW, a vertical a COLUMN, a diagonal one anti-diagonal, which
+> is also how real bedding and jointing work and costs the same nothing to store. **The Wedge's refusal lives
+> in `_mineable`, not in the verb** — the hold-loop charges on that predicate, so a cell that reads as
+> mineable and then will not break spiders a full charge forever (the exact bug `check_mining`'s last case
+> exists to prevent). Gating the predicate instead greys the cursor out before you press anything, which is
+> also the better tell.
+>
+> **Original spec follows.** The grain is in the world, drawn,
 > and calving works — `src/data/seams.gd`, `MainView._calve`, `WorldRenderer._draw_seams`, held by
 > `tools/check_seam.gd`. Bits, drives and the speed-flattening below are NOT built yet, and the order matters:
 > flattening `TOOLS[...].speed` before a relief bit exists would make the game strictly slower, which §6 names

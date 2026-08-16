@@ -559,7 +559,11 @@ func _dirty_terrain(cell: Vector2i) -> void:
 ## cell was already open. Mining an ORE vein yields one ore into the player's pack — and that ore is
 ## genuinely produced from the world, so it counts toward total_produced (conservation stays true).
 ## The cell's background WALL is left intact (you carve the block, the wall stays behind).
-func mine(cell: Vector2i) -> StringName:
+## `keep` false PULVERISES: the block still breaks and the world still opens, but nothing enters the pack
+## and nothing is counted as produced — which is exactly what conservation wants, since a pulverised block
+## was never produced at all. It is the Broad bit's price (`BitRules`), and it is the same accounting the
+## ore vein's discarded latent yield has always used.
+func mine(cell: Vector2i, keep: bool = true) -> StringName:
 	if not solid.has(cell):
 		return &""
 	_bazaars_dirty = true               # a mined block can break a bazaar frame → rescan lazily
@@ -571,9 +575,10 @@ func mine(cell: Vector2i) -> StringName:
 		# DOWN through the solid ore, draining each cell dry. So hand-mining is how you grab your
 		# FIRST few ore (to craft the drill); the drill is how you mine the vein. The burst counts as produced
 		# when it enters the pack; the discarded latent yield was never produced, so conservation holds.
-		var burst: int = _ore_burst(cell)
-		inventory[material] = int(inventory.get(material, 0)) + burst
-		total_produced[material] = int(total_produced.get(material, 0)) + burst
+		var burst: int = _ore_burst(cell) if keep else 0
+		if burst > 0:
+			inventory[material] = int(inventory.get(material, 0)) + burst
+			total_produced[material] = int(total_produced.get(material, 0)) + burst
 		deposits.erase(cell)
 		solid.erase(cell)
 		_dirty_terrain(cell)                # repaint the chunk + re-mold the fine block now the cell is air
@@ -587,7 +592,9 @@ func mine(cell: Vector2i) -> StringName:
 		# (#38): plant it on soil and a new tree grows. The whole-tree fell stays removed.
 		solid.erase(cell)
 		_dirty_terrain(cell)
-		if material == &"wood":
+		if not keep:
+			pass                                       # pulverised: the tree still falls, the wood is dust
+		elif material == &"wood":
 			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
 		elif material == &"leaves" and leaf_drops_sapling(cell):
@@ -601,8 +608,9 @@ func mine(cell: Vector2i) -> StringName:
 	# consumed on placement (place_block) → conservation holds, symmetric with mining a placed block back.
 	solid.erase(cell)
 	_dirty_terrain(cell)
-	inventory[material] = int(inventory.get(material, 0)) + 1
-	total_produced[material] = int(total_produced.get(material, 0)) + 1
+	if keep:
+		inventory[material] = int(inventory.get(material, 0)) + 1
+		total_produced[material] = int(total_produced.get(material, 0)) + 1
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
 	_settle_foliage(cell)                    # dug the earth under a tree → the whole tree loses its root
 	return material
