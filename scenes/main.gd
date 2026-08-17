@@ -273,6 +273,13 @@ func _ready() -> void:
 		Settings.persist = true
 		Settings.load_settings()
 		_zoom_idx = clampi(Settings.zoom_idx, 0, ZOOM_LEVELS.size() - 1)
+	else:
+		# ...and the same gate silences the run. The shipped default is SOUND ON (settings.gd), which is
+		# a statement about what a player hears, not about what a windowed harness layer should do to
+		# whoever is sitting in front of it. Muting HERE keeps that default honest: the fixture opts out
+		# of the audio the way it opts out of persistence, instead of the default lying to stay quiet.
+		Settings.muted = true
+		Settings.apply_audio()
 	sim = FactorySim.new()
 	_craftable = [
 		load("res://src/data/machines/processor.tres"),

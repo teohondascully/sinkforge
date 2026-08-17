@@ -30,6 +30,17 @@ func _key_event(code: int) -> InputEventKey:
 func _initialize() -> void:
 	DirAccess.remove_absolute(TEST_PATH)
 	Controls.register()
+
+	# --- THE SHIPPED DEFAULT ---
+	# The only assertion in this file about what a PLAYER gets rather than how the mechanism works, and it
+	# has to come first, before any line below sets a level for its own purposes. A clean profile — no
+	# settings.cfg, nothing chosen — must boot AUDIBLE.
+	#
+	# It is pinned because the opposite shipped and 61 harness layers never saw it: every other audio check
+	# here assigns `muted` before observing it, so the default was the one audio fact nothing in the project
+	# actually read. A test that sets the value it is about cannot report on the value that ships.
+	_check(not Settings.muted, "a first boot, with no settings file, starts with SOUND ON")
+
 	Settings.path = TEST_PATH
 
 	# --- the harness-isolation gate: persist OFF (the default) never writes a file ---
@@ -71,7 +82,7 @@ func _initialize() -> void:
 	_check(InputMap.event_is_action(_key_event(KEY_J), Controls.DROP),
 		"binding override survives a reload (J -> drop after load)")
 
-	# --- SOUND STARTS OFF, and the mute is a switch over the mix rather than a level pinned to zero ---
+	# --- the mute is a switch over the mix rather than a level pinned to zero ---
 	_check(bool(Controls.defaults()[Controls.MUTE].size()) and not Settings.bindings.has(Controls.MUTE),
 		"mute has a default key, so it is reachable before anyone opens the settings page")
 	Settings.muted = true

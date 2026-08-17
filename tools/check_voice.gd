@@ -56,6 +56,17 @@ func _run() -> void:
 		await physics_frame
 	var sfx: Node = main._sfx
 
+	# --- ...AND THE MIX CAN ACTUALLY REACH A PERSON ---
+	# Everything below reads sample BUFFERS, and a buffer has signal in it whether or not the Master bus is
+	# ever unmuted. That is precisely why this layer went on answering its own title with a confident yes
+	# while the shipped game booted SILENT: every sound was present, distinct and click-free, and none of
+	# them were audible to anybody. The last link in the chain is the only one a player stands at.
+	#
+	# A scripted boot mutes ITSELF (main.gd::_ready) so a windowed layer does not shout at whoever is
+	# running the harness; the default a player gets is the opposite, and check_settings pins that half in
+	# a process where main.tscn never boots and the class default therefore survives to be read.
+	_check(Settings.muted, "a scripted boot silences itself rather than relying on a silent default")
+
 	# --- every one-shot makes a sound ---
 	var names: Array = sfx._streams.keys()
 	names.sort()

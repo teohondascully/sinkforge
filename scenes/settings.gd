@@ -13,10 +13,16 @@ extends RefCounted
 ## the file — so every fixture/test runs on pure defaults and can never read or clobber the dev's real
 ## settings. check_settings opts in explicitly on its own temp path.
 
-## SOUND STARTS OFF. Not a slider pinned to zero — a MUTE, with every level left where it belongs, so the
-## first thing an unmute does is give you the mix as it was designed rather than a silent game and four
-## sliders to go and find. It persists like everything else here, so turning it on is a one-time act.
-static var muted: bool = true
+## SOUND IS ON. A first boot has to be able to hear the machine it is standing in — the drill biting, the
+## water finding a way down, the winch loading up — because roughly half of what this game tells you it
+## tells you by ear, and a player who never opens the settings page never learns the audio is there at all.
+## The mute itself is unchanged: still one switch over the whole mix rather than levels pinned to zero (see
+## apply_audio), still persisted, so turning it OFF is equally a one-time act.
+##
+## This is the PLAYER's default, and fixtures do not inherit it: a scripted boot silences itself in
+## main.gd::_ready(), the same way and in the same place it declines to persist. The harness stays quiet
+## without the shipped default having to lie about what a new player hears.
+static var muted: bool = false
 static var master: float = 1.0          ## 0..1 — the Master bus (everything)
 static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
 static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
