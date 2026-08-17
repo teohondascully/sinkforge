@@ -31,7 +31,7 @@ static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 	var band: PackedInt32Array = PackedInt32Array()
 	band.resize(rect.size.x)
 	for i: int in rect.size.x:
-		band[i] = r.sim.surface_row(rect.position.x + i)
+		band[i] = FineTerrain.walked_surface(r.sim.surface_row(rect.position.x + i))
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
 			# One row either side of the walked line, so the cap's chamfers still have a neighbour to sit on.
@@ -145,7 +145,7 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
 	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
-	var keep_top: bool = r.sim.surface_row(c.x) == c.y     # the walk line — the cap/ramp pass owns it
+	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y     # the walk line — the cap/ramp pass owns it
 	var s: float = float(WorldRenderer.CELL)
 	var pts := PackedVector2Array()
 	if open_u and open_l and not keep_top:               # top-left
@@ -181,7 +181,7 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
 	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
-	var keep_top: bool = r.sim.surface_row(c.x) == c.y   # top corners uncut there — the cap pass owns them
+	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y   # top corners uncut there — the cap pass owns them
 	var cs: float = float(WorldRenderer.CELL)
 	# THE KEY LIGHT (#A1). This pass used to darken all four faces by the same amount, which is
 	# ambient occlusion without a light — and occlusion alone can't make a form. Every block got an
@@ -272,9 +272,15 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 	for col: int in range(rect.position.x, rect.position.x + rect.size.x):
 		if col >= FactorySim.GRID_COLS:
 			break
-		var row: int = r.sim.surface_row(col)
-		if row >= FactorySim.GRID_ROWS:
-			continue  # empty column, no surface
+		# THE PASS THAT DRAWS THE GRASS, and the one that put a turf cap eight hundred pixels underground.
+		# `surface_row` returns the first solid cell scanning down, so on a dug column it names the rock at
+		# the bottom of the player's own shaft — and this pass then caps it, chamfers it and ramps it as if
+		# it were the hillside. `walked_surface` rejects any row below the band the generator can produce.
+		# The existing GRID_ROWS test already meant "this column has no surface"; NO_SURFACE is the same
+		# statement about a column that has ground, but not up here.
+		var row: int = FineTerrain.walked_surface(r.sim.surface_row(col))
+		if row == FineTerrain.NO_SURFACE or row >= FactorySim.GRID_ROWS:
+			continue  # empty column, or a hole floor that is not the walked line
 		# Only THIS chunk's rows own the cap. (The wedge reaches one cell up into the chunk above, which is
 		# harmless — chunks aren't clipped — and that neighbour is dirtied on a dig so stale caps clear.)
 		if row < rect.position.y or row >= rect.position.y + rect.size.y:

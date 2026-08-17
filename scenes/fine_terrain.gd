@@ -378,6 +378,31 @@ static func CELL_PX() -> int:
 ## the grass is still fully molded.
 const SURFACE_KEEP: int = 2
 
+## "THIS COLUMN HAS NO WALKED SURFACE" — the value `_surf_row` holds for a column that is a hole.
+##
+## The authority it caches, `FactorySim.surface_row`, returns the first solid cell scanning from row 0 and
+## has no memory of the original ground. That is correct at generation time and wrong the moment anybody
+## digs: sink a shaft and the function answers with the rock at the BOTTOM of it, so every consumer that
+## means *the walked ground* is handed a row forty tiles down and dresses it as ground. Both of this file's
+## consumers did. The cap band left the top of that cell transparent so the coarse grass could show
+## through, which is why `_moment_boot.png` has a GRASS-CAPPED LEDGE eight hundred pixels underground; and
+## `_soil` keyed its humus/subsoil profile to depth below it, which painted TOPSOIL COLOUR at the foot of
+## any shaft — the exact case its own docstring promises is "left alone entirely".
+##
+## The bound is derived, not guessed: `HeightmapWorldGen._surface_row` clamps every column into
+## [SURFACE_ROW_MIN, SURFACE_ROW_MAX], so a first-solid below that band is provably not ground.
+const NO_SURFACE: int = -1
+
+
+## `FactorySim.surface_row`'s answer, or NO_SURFACE when that answer is a hole floor rather than ground.
+##
+## Static and public because FOUR passes across three files ask this question and every one of them was
+## getting it wrong the same way — `TerrainPainter` (the cap/ramp pass that draws the grass, plus both
+## chamfer `keep_top` tests), `WorldRenderer._draw_background`, and this file's mold. Six copies of one
+## bound is how the next consumer gets written without it, so there is one.
+static func walked_surface(row: int) -> int:
+	return row if row <= HeightmapWorldGen.SURFACE_ROW_MAX else NO_SURFACE
+
 ## Rebake the fine terrain into the Image + upload. The Callables let the paint reuse the exact palette /
 ## surface authority the coarse pass uses:
 ##   solid_at(Vector2i) -> bool              (the COARSE cell — parent solidity, for colour + accretion source)
@@ -406,7 +431,7 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)
 	for cx: int in _cols:
-		_surf_row[cx] = int(surface_at.call(cx))
+		_surf_row[cx] = walked_surface(int(surface_at.call(cx)))
 	# Coarse solid mask (0.0/1.0): a single lookup per coarse cell instead of SUBDIV² per fine.
 	_solid_mask.resize(_cols * _rows)
 	for cy: int in _rows:
@@ -626,7 +651,7 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 	# 1) Refresh the coarse caches for the changed cells only (a handful — cheap). Neighbour coarse cells the
 	#    dilated paint reads keep their persisted values (they didn't change).
 	for cx: int in range(cmin.x, cmax.x + 1):
-		_surf_row[cx] = int(surface_at.call(cx))
+		_surf_row[cx] = walked_surface(int(surface_at.call(cx)))
 	for cy: int in range(cmin.y, cmax.y + 1):
 		for cx: int in range(cmin.x, cmax.x + 1):
 			var idx: int = cy * _cols + cx
@@ -969,6 +994,13 @@ func _sky_form(fx: int, fy: int) -> float:
 ## (a cliff face, anything underground) is left alone entirely — `depth` only lands inside SOIL_ROWS for
 ## cells that are genuinely near a walkable top.
 func _soil(c: Color, fx: int, fy: int, pcol: int) -> Color:
+	# Checked, not left to the arithmetic. NO_SURFACE is negative, so the subtraction below would make
+	# `depth` *larger* and the range test would reject it for most of the grid — but only for most of it:
+	# near the top of the world a hole column would land back inside SOIL_ROWS and get the topsoil profile
+	# it must never have. A sentinel that works by accident for 90% of its inputs is the shape this whole
+	# fix is about.
+	if _surf_row[pcol] == NO_SURFACE:
+		return c
 	var depth: int = fy - (_surf_row[pcol] * SUBDIV + SURFACE_KEEP)
 	if depth < 0 or depth >= SOIL_ROWS:
 		return c

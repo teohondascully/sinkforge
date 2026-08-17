@@ -81,6 +81,18 @@ const SCARP_SPAN: int = 2            ## columns the face takes to fall — 2 kee
 ## on the body, then frames the player in the middle of the screen (Terraria) instead of jamming them at
 ## the top against the limit. Everything below is underground; the rows above (0..FLAT_SURFACE_ROW-1) are sky.
 const FLAT_SURFACE_ROW: int = 20
+
+## THE BAND THE GENERATED GROUND CAN OCCUPY, and it is a promise other code needs to be able to rely on.
+## `_surface_row` clamps into these, so no column's ground is ever outside them, on either generator —
+## `LayeredWorldGen extends HeightmapWorldGen`, so this bound governs both.
+##
+## They are public because the RENDERER has to be able to ask "is that a surface, or the floor of a hole?"
+## `FactorySim.surface_row` cannot answer it: that function scans from row 0 and returns the first solid
+## cell, which is the right question at generation time and the wrong one afterwards, because a dug column
+## answers with the rock under the player's own shaft. Consumers that mean *the walked ground* must reject
+## anything below `SURFACE_ROW_MAX`; see `FineTerrain.NO_SURFACE`.
+const SURFACE_ROW_MIN: int = FLAT_SURFACE_ROW - 9   ## the highest hilltop (row 11)
+const SURFACE_ROW_MAX: int = FLAT_SURFACE_ROW + 11  ## the lowest valley floor (row 31)
 ## Earth turns to STONE this many tiles below the surface — sells depth, and demonstrates a new
 ## material dropped into generation without touching sim or renderer.
 const STONE_DEPTH: int = 8
@@ -142,7 +154,7 @@ func _surface_row(col: int) -> int:
 		- NEAR_AMP * sin(float(col) * NEAR_FREQ + 0.5) * near \
 		- (FAR_AMP_A * sin(float(col) * FAR_FREQ_A)
 			+ FAR_AMP_B * sin(float(col) * FAR_FREQ_B + 1.7)) * far
-	return clampi(int(round(h)) + terrace(col), FLAT_SURFACE_ROW - 9, FLAT_SURFACE_ROW + 11)
+	return clampi(int(round(h)) + terrace(col), SURFACE_ROW_MIN, SURFACE_ROW_MAX)
 
 
 ## The accumulated scarp offset at a column: which terrace this ground belongs to. Public because the

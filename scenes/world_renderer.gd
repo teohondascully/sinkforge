@@ -1791,10 +1791,21 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 	var band: PackedInt32Array = PackedInt32Array()
 	band.resize(rect.size.x)
 	for i: int in rect.size.x:
-		band[i] = sim.surface_row(rect.position.x + i)
+		# Same bound as the mold's, and for the same reason: `surface_row` answers with the floor of a
+		# shaft on a dug column, and this pass would then show the WALL through the cap band at whatever
+		# depth the player happened to stop digging.
+		var top: int = sim.surface_row(rect.position.x + i)
+		band[i] = FineTerrain.walked_surface(top)
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
-			if absi(cy - band[cx - rect.position.x]) > 1:
+			var top_here: int = band[cx - rect.position.x]
+			# Tested for by NAME, not left to the distance check. NO_SURFACE is -1, and `absi(0 - -1)` is
+			# 1, which is NOT greater than 1 — so row zero of a hole column would have fallen through and
+			# drawn. It is sky up there and `sim.wall` would have rejected it a line later, so the bug was
+			# invisible; a sentinel that survives on a downstream accident is the thing being fixed here.
+			if top_here == FineTerrain.NO_SURFACE:
+				continue
+			if absi(cy - top_here) > 1:
 				continue
 			var c := Vector2i(cx, cy)
 			if not sim.wall.has(c):
