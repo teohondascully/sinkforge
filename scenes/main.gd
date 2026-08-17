@@ -675,7 +675,8 @@ func _process(delta: float) -> void:
 			_note_stratum(_cell_at(_player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0)).y)
 		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
-	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(), _selected_build_material())
+	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(),
+		_selected_build_material(), _drive_bites(_aim))
 	_renderer.set_guide_targets(_guide_targets())   # pulse WHERE the current objective happens
 	if _hud != null:
 		# The config-panel PIN (#32): while the cursor sits on the inspector itself, keep showing the
@@ -1231,10 +1232,14 @@ func _update_mining(delta: float) -> void:
 		_swing_clock = SWING_PERIOD          # primed: the FIRST blow of the next charge lands instantly
 		if _renderer != null:
 			_renderer.set_mine_progress(Vector2i(-999, -999), 0.0)
-		# Tool-locked hover keeps its "no progress" read (the hint says why).
-		if pressed and _mineable(_aim) and not MiningRules.can_mine(sim.material_at(_aim), sim.inventory):
+		# Tool-locked hover keeps its "no progress" read (the hint says why) — and now SKIDS, because a
+		# gate you cannot feel is indistinguishable from a game that ignored your click (docs/BITS.md §5).
+		if pressed and _refuses(_aim):
 			_mine_target = _aim
 			_renderer.set_mine_progress(_aim, 0.0)
+			_skid(_aim, delta)
+		else:
+			_skid_clock = SKID_PERIOD        # primed: the first skid of the next attempt lands instantly
 		return
 	var mat: StringName = sim.material_at(work)
 	if work != _mine_target:                 # moved to a fresh block → RESUME whatever it already owes us
@@ -1363,6 +1368,81 @@ func _heal_cracks(delta: float, working: Vector2i) -> void:
 			_cracks.erase(cell)
 		else:
 			_cracks[cell] = c
+
+
+## Will the carried drive bite this rock? True for anything that isn't solid rock (the question doesn't
+## apply) and for rock within your tier; false only where the wall is genuinely over your drive — which is
+## the one case the cursor has to draw differently.
+func _drive_bites(cell: Vector2i) -> bool:
+	if not sim.is_solid(cell):
+		return true
+	return MiningRules.can_mine(sim.material_at(cell), sim.inventory) \
+		and _bit_bites(BitRules.equipped(_selected_item()), cell)
+
+
+## Is this cell rock you can SWING AT but not break — the one state a skid answers? Solid, in reach, in
+## line of sight (so the swing would really land there), and then refused by one of the two things that can
+## refuse: your DRIVE is under the rock's tier, or the WEDGE is across the grain. Named rather than inlined
+## so the mining loop and `check_refusal` assert the same sentence, and kept separate from `_mineable` —
+## which must stay false here, or the charge would spider forever on a cell that never breaks (#S32).
+func _refuses(cell: Vector2i) -> bool:
+	if not (sim.is_solid(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)):
+		return false
+	if not MiningRules.can_mine(sim.material_at(cell), sim.inventory):
+		return true
+	return not _bit_bites(BitRules.equipped(_selected_item()), cell)
+
+
+## THE SKID (`docs/BITS.md` §5). Steel glancing off rock your drive cannot bite: a spark off the struck
+## face, a short scrape, a flick of shake — on the same cadence a real blow lands on, so what you feel is
+## SWINGING AND NOT BITING rather than nothing at all. Never a partial break bar: you must never be able
+## to mistake "cannot" for "slow", which is the whole reason the speed axis was deleted (#S32).
+##
+## And the refusal NAMES THE RUNG, once, on a long cooldown — the tier of drive this rock wants and the
+## tool that carries it, the way a locked craft row names its tech. Saying it on every skid would be
+## nagging; saying it never is the state this game was in, where over-tier rock read as a broken click.
+const SKID_PERIOD: float = 0.30       ## seconds between skids while you hold on rock that won't take it
+const SKID_TELL_COOLDOWN: float = 6.0 ## ...and how long before it will spell out the reason again
+var _skid_clock: float = SKID_PERIOD
+var _skid_tell: float = 0.0
+var _skids: int = 0                   ## skids this session — the harness reads it; nothing else does
+
+
+func _skid(cell: Vector2i, delta: float) -> void:
+	_skid_tell = maxf(0.0, _skid_tell - delta)
+	_skid_clock += delta
+	if _skid_clock < SKID_PERIOD:
+		return
+	_skid_clock = 0.0
+	_skids += 1
+	var center: Vector2 = _cell_center(cell)
+	if _player != null:
+		_player.note_dig(int(signf(center.x - _player.position.x)))
+		var to_body: Vector2 = _player.position - center
+		var face: Vector2 = center + to_body.normalized() * (float(CELL) * 0.45)
+		# Sparks, not dust: nothing came off the rock. The colour is the TOOL's, not the wall's.
+		_particles.spark(face, Color(1.0, 0.86, 0.52))
+		_shake = maxf(_shake, 0.45)
+	_sfx.play(&"skid", center, randf_range(0.94, 1.08))
+	# THE WORDS, and only where nothing else has them. A TIER refusal is already written down: the hover
+	# inspector names the drive, in the same sentence, for as long as you hold the cursor on the rock. The
+	# refusal nothing else explains is the WEDGE across the grain — the pick is fine, the ANGLE is wrong —
+	# so that is the one the skid says out loud, once, on a cooldown.
+	if _hud == null or _skid_tell > 0.0:
+		return
+	if not MiningRules.can_mine(sim.material_at(cell), sim.inventory):
+		return
+	_skid_tell = SKID_TELL_COOLDOWN
+	_hud.flash("the %s splits ALONG the grain — line the swing up with the seam"
+		% _thing_name(BitRules.equipped(_selected_item())))
+
+
+## A carried thing's display name, for the one place that has to say a tool's name out loud.
+func _thing_name(id: StringName) -> String:
+	for t: Dictionary in CRAFT_TOOLS:
+		if t["id"] == id:
+			return str(t["name"])
+	return MiningRules.tool_name(id)
 
 
 ## A cell the miner can WORK right now: breakable (solid + reach + LOS, the try_mine gate) AND the

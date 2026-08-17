@@ -36,8 +36,13 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 		if sim.is_solid(aim):
 			var rock: StringName = sim.material_at(aim)
 			if not MiningRules.can_mine(rock, sim.inventory):
+				# NAME THE DRIVE THIS ROCK ACTUALLY WANTS. This line used to say "craft a Stone Pickaxe"
+				# for every over-tier rock in the game, which is true today only because deepslate is the
+				# deepest band that exists; the moment L3's rock lands it would be telling you to craft a
+				# pick you already own. `drive_for` derives it from the same table the gate reads.
 				return {"name": String(rock).capitalize(), "in": [], "out": [], "holding": [],
-					"mode": "too hard for your pick — craft a Stone Pickaxe (tier %d)" % MiningRules.required_tier(rock)}
+					"mode": "too hard — the %s (tier %d) bites it" % [
+						MiningRules.tool_name(MiningRules.drive_for(rock)), MiningRules.required_tier(rock)]}
 		return {}
 	var info: Dictionary = {"name": m.def.display_name}
 	var recipe: RecipeDef = m.def.recipe

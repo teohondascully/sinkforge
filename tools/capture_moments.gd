@@ -94,6 +94,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_drift(main)
 		"pack":
 			await _at_the_packing(main)
+		"refuse":
+			await _at_the_refusal(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -532,6 +534,58 @@ func _at_the_drift(main: MainView) -> void:
 		main._hints._active = &""
 		main._hints._queue.clear()
 		main._hints._life = 0.0
+
+
+## THE ROCK THAT SAYS NO (`docs/BITS.md` §5). A wall over your drive, with the cursor on it: cold, crossed,
+## refusing BEFORE the press — and the line that names the rung. The one shot that can answer whether a hard
+## gate reads as a locked door rather than as a broken click.
+##
+## The cursor has to be really ON the wall for this, and the mining loop derives the aim from the real mouse,
+## so the shot WARPS the pointer (a real window exists — this capture never runs headless) to the screen
+## position of the cell two to the body's right, and then actually holds the button down.
+func _at_the_refusal(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 40
+	for x: int in range(x0 - 12, x0 + 13):
+		for y: int in range(row - 6, row + 6):
+			sim.set_solid(Vector2i(x, y), &"deepslate")
+	for x2: int in range(x0 - 6, x0):                          # the drift you cut to get here; the FACE is x0
+		for y2: int in [row, row - 1]:
+			sim.set_solid(Vector2i(x2, y2), &"")
+	for x3: int in range(x0 - 6, x0):
+		sim.set_solid(Vector2i(x3, row - 2), &"stone")
+		sim.set_solid(Vector2i(x3, row + 1), &"stone")
+	sim.inventory.erase(&"stone_pickaxe")                      # the starter drive only — that is the point
+	sim.inventory.erase(&"iron_pickaxe")
+	sim.inventory[&"wood_pickaxe"] = 1
+	main._inv_selected = 0
+	for x4: int in [x0 - 5, x0 - 1]:
+		sim.torch[Vector2i(x4, row - 1)] = true
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 2) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 30:
+		await physics_frame
+	# The pointer, onto the face. HUD_SCALE-independent: the window is 1.5x the render viewport, one cell is
+	# 32 world px, and the camera holds the body at the centre of the frame.
+	Input.warp_mouse(Vector2(960.0 + 2.0 * 32.0 * 1.5, 540.0 - 8.0))
+	for _i2: int in 6:
+		await physics_frame
+	Input.action_press(Controls.MINE)
+	for _i3: int in 40:                                        # long enough to skid twice and say why
+		await physics_frame
+	Input.action_release(Controls.MINE)
+	for _i4: int in 6:
+		await physics_frame
+	print("REFUSE  aim=%s  material=%s  refuses=%s  said: %s" % [main._aim,
+		str(sim.material_at(main._aim)), str(main._refuses(main._aim)), main._hud._flash_text])
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+	main._hud._arrival_life = 0.0      # the stratum plate fired on the way in; it isn't this shot's subject
+	main._hud.objectives = null        # …and neither is the opening ladder. Staging, not a game change.
 
 
 ## THE WALL THAT WEEPS, and the wall that doesn't. One reservoir with a gallery running out of either side

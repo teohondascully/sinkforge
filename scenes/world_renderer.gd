@@ -160,6 +160,9 @@ const CRUMBLE_MAX: int = 48
 # Pushed by MainView each frame (the bits the renderer can't derive from the sim alone).
 var _aim: Vector2i = Vector2i(-99, -99)
 var _aim_in_reach: bool = false
+## Will the carried DRIVE bite the aimed rock at all? False = the wall is over your tier, and the
+## cursor has to say so BEFORE the swing (docs/BITS.md §5) rather than after a click that did nothing.
+var _aim_bites: bool = true
 var _aim_placeable: bool = false
 var _lamp_offset: Vector2 = Vector2.ZERO   ## eased head→beam-pool offset (the aim-following lamp, #44)
 var lamp_color: Color = LAMP_COLOR         ## the picked lamp TINT (#45 — set from the title screen)
@@ -383,12 +386,14 @@ func repaint_world() -> void:
 
 
 ## The controller hands over the cursor + its computed affordances (reach / placeable / the ghost def).
-func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: MachineDef, ghost_material: StringName = &"") -> void:
+func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: MachineDef,
+		ghost_material: StringName = &"", bites: bool = true) -> void:
 	_ghost_material = ghost_material
 	_aim = cell
 	_aim_in_reach = in_reach
 	_aim_placeable = placeable
 	_ghost_def = ghost_def
+	_aim_bites = bites
 
 
 ## The controller hands over the cells the CURRENT objective points at (each {cell, mode}) — drawn as a
@@ -1315,6 +1320,15 @@ func _draw_aim() -> void:
 		return
 	var pos := Vector2(_aim) * float(CELL)
 	if sim.is_solid(_aim):
+		# OVER YOUR DRIVE: the cursor goes cold and crossed BEFORE you press (docs/BITS.md §5). A binary
+		# gate is only honest if you can see it coming, and the alternative — finding out by clicking and
+		# watching nothing happen — reads as a broken game rather than as a locked door.
+		if _aim_in_reach and not _aim_bites:
+			var no := Color(0.86, 0.42, 0.34, 0.60 + 0.16 * sin(_anim_time * 3.0))
+			draw_rect(Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2)), no, false, 2.0)
+			draw_line(pos + Vector2(5, 5), pos + Vector2(CELL - 5, CELL - 5), no, 2.0)
+			draw_line(pos + Vector2(CELL - 5, 5), pos + Vector2(5, CELL - 5), no, 2.0)
+			return
 		var col := Color(1, 1, 1, 0.85) if _aim_in_reach else Color(1, 1, 1, 0.18)
 		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
 		if _aim_in_reach and sim.ore_deposit_at(_aim) > 0:   # a rich vein reads as a THING, not just rock

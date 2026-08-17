@@ -137,6 +137,42 @@ static func best_tier(tool_class: StringName, inventory: Dictionary) -> int:
 	return best
 
 
+## Display names for the drives, so every place that has to SAY one — the hover inspector's refusal line,
+## the skid's tell, the craft screen — says the same words. One table, or they drift.
+const TOOL_NAMES: Dictionary = {
+	&"wood_pickaxe": "Wood Pickaxe",
+	&"stone_pickaxe": "Stone Pickaxe",
+	&"iron_pickaxe": "Iron Pickaxe",
+	&"wood_axe": "Wood Axe",
+	&"scanner": "Scanner",
+}
+
+
+static func tool_name(id: StringName) -> String:
+	return str(TOOL_NAMES.get(id, str(id).capitalize()))
+
+
+## THE DRIVE THIS ROCK WANTS — the lowest-tier tool of the required class that can actually bite it, or
+## &"" when the rock is hand-mineable. `docs/BITS.md` §5: a refusal has to NAME the rung, not mutter "you
+## need a better pick", and naming it needs one place that derives the answer from the same table the gate
+## reads. Deterministic: TOOLS is iterated in declaration order and the lowest sufficient tier wins.
+static func drive_for(material: StringName) -> StringName:
+	var cls: StringName = required_tool(material)
+	if cls == &"":
+		return &""
+	var need: int = required_tier(material)
+	var best: StringName = &""
+	var best_tier_seen: int = 9999
+	for tid: StringName in TOOLS:
+		if TOOLS[tid][&"class"] != cls:
+			continue
+		var tier: int = int(TOOLS[tid][&"tier"])
+		if tier >= need and tier < best_tier_seen:
+			best = tid
+			best_tier_seen = tier
+	return best
+
+
 static func hardness(material: StringName) -> float:
 	return float(HARDNESS.get(material, DEFAULT_HARDNESS))
 

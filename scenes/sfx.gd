@@ -55,6 +55,7 @@ func _ready() -> void:
 	_streams[&"ignite"] = _wav(_gen_ignite(rng))
 	_streams[&"vein"] = _wav(_gen_vein(rng))
 	_streams[&"catch"] = _wav(_gen_catch(rng))
+	_streams[&"skid"] = _wav(_gen_skid(rng))
 	for _i: int in POOL:
 		var p := AudioStreamPlayer2D.new()
 		p.max_distance = 1500.0
@@ -330,6 +331,35 @@ func _gen_crunch(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		lp += 0.30 * (rng.randf_range(-1.0, 1.0) - lp)
 		out[i] = lp * env * 1.6
 	return out
+
+## THE SKID (`docs/BITS.md` §5) — steel glancing off rock it cannot bite.
+##
+## The one thing this sound must never do is resemble the crunch. A crunch is a dead 90ms thud that says
+## "you took a bite"; a skid says "nothing happened, and it is never going to". So it is the opposite
+## shape: no impact transient to speak of, a bright band-passed scrape that SLIDES down in pitch as the
+## edge runs off the face, and a thin metallic ring left hanging after it — the tool complaining, not the
+## rock yielding. Long enough (0.3s) that you cannot mistake it for a slow first blow.
+func _gen_skid(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n: int = int(RATE * 0.30)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var hp: float = 0.0
+	var lp: float = 0.0
+	var phase: float = 0.0
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		# A band that starts bright and slides down — the edge running along the face and losing it.
+		var k: float = lerpf(0.72, 0.20, pow(t, 0.7))
+		var noise: float = rng.randf_range(-1.0, 1.0)
+		lp += k * (noise - lp)
+		hp = lp - (lp * 0.42)
+		# The scrape swells rather than striking: a slow attack is what stops it reading as a hit.
+		var env: float = minf(1.0, t * 6.0) * pow(1.0 - t, 1.4)
+		# ...and the tool rings thinly on top, high and quiet, well clear of the hollow ring's 96 Hz.
+		phase += TAU * lerpf(1240.0, 880.0, t) / float(RATE)
+		out[i] = hp * env * 1.5 + sin(phase) * pow(1.0 - t, 3.0) * 0.20
+	return out
+
 
 ## THE HOLLOW RING (#S11) — the pick striking rock with a VOID behind it.
 ##

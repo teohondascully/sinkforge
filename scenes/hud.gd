@@ -628,6 +628,7 @@ func _draw_forged() -> void:
 ## How long a fresh step shows its full how-to line, how long that takes to fade, and how long you have
 ## to sit on one step before it comes back (#B4).
 const HINT_HOLD: float = 9.0
+const HOVER_MAX_W: float = 300.0   ## the inspector may grow to fit its widest line, but no further
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 
@@ -742,11 +743,25 @@ func _draw_hover() -> void:
 	var has_recipe: bool = not ins.is_empty() or not outs.is_empty()
 	var has_mode: bool = hover_info.has("mode") and str(hover_info["mode"]) != ""
 	var has_rate: bool = hover_info.has("rate")
-	var width: float = 218.0
-	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate) \
-		+ knobs.size() + int(not bar.is_empty())
 	var pad: float = 9.0
 	var line_h: float = 18.0
+	# THE PANEL TAKES THE WIDTH OF ITS WIDEST LINE. It is anchored to the right edge of the canvas, so a
+	# line that overflowed a fixed 218px ran off the SCREEN — which is how "too hard for your pick — craft
+	# a Stone Pickaxe", the single most important sentence the inspector says, came out as "craft a Stone
+	# Pick". Capped, and anything past the cap is ellipsized rather than lost off the edge.
+	var name_text: String = str(hover_info.get("name", ""))
+	var mode_text: String = str(hover_info.get("mode", "")) if has_mode else ""
+	var rate_text: String = str(hover_info.get("rate", "")) if has_rate else ""
+	var widest: float = _font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	for line: String in [mode_text, rate_text]:
+		if line != "":
+			widest = maxf(widest, _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x)
+	var width: float = clampf(widest + pad * 2.0, 218.0, HOVER_MAX_W)
+	name_text = _fit_text(name_text, 13, width - pad * 2.0)
+	mode_text = _fit_text(mode_text, 11, width - pad * 2.0)
+	rate_text = _fit_text(rate_text, 11, width - pad * 2.0)
+	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate) \
+		+ knobs.size() + int(not bar.is_empty())
 	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
 	# is centred, off this column), else just the FORGED chip — so the inspector never collides.
 	var mini_bottom: float = minimap_frame().end.y if (show_minimap and not minimap_large) else 34.0
@@ -755,7 +770,7 @@ func _draw_hover() -> void:
 	_panel(_hover_rect)
 	var x0: float = origin.x + pad
 	var y: float = origin.y + 8.0 + 12.0
-	draw_string(_font, Vector2(x0, y), str(hover_info.get("name", "")),
+	draw_string(_font, Vector2(x0, y), name_text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.92, 0.80))
 	y += line_h
 	if has_recipe:
@@ -764,7 +779,7 @@ func _draw_hover() -> void:
 		_chips(x, y, outs)
 		y += line_h
 	if has_mode:
-		draw_string(_font, Vector2(x0, y), str(hover_info["mode"]),
+		draw_string(_font, Vector2(x0, y), mode_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.66, 0.80, 0.90))
 		y += line_h
 	if not holding.is_empty():
@@ -772,7 +787,7 @@ func _draw_hover() -> void:
 		_chips(hx, y, holding)
 		y += line_h
 	if has_rate:
-		draw_string(_font, Vector2(x0, y), str(hover_info["rate"]),
+		draw_string(_font, Vector2(x0, y), rate_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.85, 0.72, 0.42))
 		y += line_h
 	if not bar.is_empty():
