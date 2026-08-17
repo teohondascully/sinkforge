@@ -33,6 +33,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
 	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue — the powered flood-drain (L3)
 	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal — powered, heavy
+	&"crush": {"kind": "crush", "color": Color(0.38, 0.33, 0.30)},        # crusher iron — spoil in, gravel out
 }
 
 
@@ -92,6 +93,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_h_drill(canvas, center, s, active, t, flip)
 		"drift":
 			_drift(canvas, center, s, active, t, flip)
+		"crush":
+			_crusher(canvas, center, s, active, t)
 		"descent":
 			_descent(canvas, center, s, active, t)
 		"pump":
@@ -225,6 +228,37 @@ static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 	var arc: float = (0.6 + 0.4 * sin(t * 19.0)) if active else 0.20
 	var spark := Color(0.62, 0.88, 1.0, 0.30 + 0.65 * arc)
 	canvas.draw_line(c + Vector2(-8.0 * s * f, -9.5 * s), c + Vector2(-2.0 * s * f, -9.5 * s), spark, 1.6)
+
+
+## THE CRUSHER (docs/DRIFT.md §4): two counter-rotating toothed ROLLERS with rock going in the top and
+## gravel coming out the bottom. The read has to be "this eats what falls into it and something smaller
+## comes out", so the rollers turn OPPOSITE ways while it works and the spill below is drawn in gravel's
+## own colour — the same trick the Drift Rig's chutes use, and for the same reason.
+static func _crusher(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var steel := Color(0.11, 0.12, 0.13)
+	var edge := Color(0.74, 0.76, 0.78)
+	var grit := Color(0.46, 0.48, 0.51)
+	# The hopper mouth: a funnel at the top, wide open, so it reads as a thing you POUR into.
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-10.0 * s, -11.0 * s), c + Vector2(10.0 * s, -11.0 * s),
+		c + Vector2(4.5 * s, -4.0 * s), c + Vector2(-4.5 * s, -4.0 * s)]), steel)
+	# The two rollers, turning against each other while it runs.
+	var spin: float = (t * 4.5) if active else 0.0
+	for k: int in 2:
+		var dir: float = 1.0 if k == 0 else -1.0
+		var r := Vector2(c.x + dir * 4.6 * s, c.y + 0.5 * s)
+		canvas.draw_circle(r, 4.2 * s, steel)
+		for i: int in 5:
+			var a: float = spin * dir + float(i) * TAU / 5.0
+			canvas.draw_line(r + Vector2(cos(a), sin(a)) * 2.0 * s,
+				r + Vector2(cos(a), sin(a)) * 5.2 * s, edge, 1.3)
+	# The spill: crushed grit falling out of the nip, in gravel's colour.
+	var fall: float = (fmod(t * 14.0, 6.0) if active else 2.0) * s
+	for k2: int in 3:
+		var gy: float = c.y + 6.0 * s + fall + float(k2) * 2.6 * s
+		if gy > c.y + 12.0 * s:
+			gy -= 7.8 * s
+		canvas.draw_circle(Vector2(c.x + (-1.6 + 1.6 * float(k2)) * s, gy), 1.3 * s, grit)
 
 
 ## Generator (coal burner → power): a steel housing with a coal-fire at its base that BREATHES while
@@ -436,6 +470,8 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.28, 0.31, 0.40)
 	if item == &"sealrock":
 		return Color(0.30, 0.26, 0.34)
+	if item == &"gravel":
+		return Color(0.40, 0.42, 0.45)       # crushed rock — cooler and flatter than the stone it came from
 	return Color.WHITE
 
 

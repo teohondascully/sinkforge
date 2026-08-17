@@ -265,6 +265,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 		"res://src/data/materials/wood.tres",
 		"res://src/data/materials/leaves.tres",
 		"res://src/data/materials/sealrock.tres",
+		"res://src/data/materials/gravel.tres",
 		"res://src/data/materials/iron.tres",
 		"res://src/data/materials/dirt_wall.tres",
 		"res://src/data/materials/stone_wall.tres",
@@ -584,6 +585,7 @@ func _draw() -> void:
 	_draw_saplings()  # planted sprouts growing on the sim's tick (#38 — renewable wood)
 	_draw_ground()
 	_draw_water()      # the L3 fluid layer — translucent blue pools filling each cell to its water line
+	_draw_fill_tells() # YOUR OWN construction: packed fill reads as aggregate, loose fill weeps
 	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
 	falling.draw(self)
 	# Cull machines whose cell is off-screen. Margin 3 cells so a partially-on-screen machine's glow,
@@ -1872,6 +1874,71 @@ func _water_depth(c: Vector2i) -> float:
 			break
 		d += 1
 	return float(d) / WATER_DEPTH_CELLS
+
+
+## WHAT YOU BUILT, AND WHETHER IT HOLDS. Two tells over the same one pass, because they are two halves of
+## one fact (docs/DRIFT.md §4):
+##
+##   PACKED fill draws as AGGREGATE — a compacted stipple with a hairline seam around the cell. The molded
+##     terrain layer blends a one-cell material into its neighbours (that is what makes rock read as rock
+##     rather than as tiles), which is exactly wrong for a wall whose whole value is being a different
+##     material from the rock beside it. So packing is drawn ON TOP, as construction rather than as strata.
+##   LOOSE fill WEEPS when water leans on it: a bead runs down the dry face and fades, phased per cell so a
+##     wall reads as a weeping SURFACE rather than one blinking light. Without it, water simply appears on
+##     the dry side out of nowhere, and the player never learns which of their walls is the leak.
+##
+## Iterates `fill` — the cells YOU built — so the cost is the size of your own construction, culled to the
+## view. Pure representation: reads the sim, never writes it.
+func _draw_fill_tells() -> void:
+	if sim.fill.is_empty():
+		return
+	var view: Rect2 = _view_world_rect()
+	var cell_f: float = float(CELL)
+	for key: Variant in sim.fill:
+		var c: Vector2i = key
+		var base := Vector2(c) * cell_f
+		if not view.has_point(base):
+			continue
+		if sim.fill[c] == FactorySim.FILL_PACKED:
+			_draw_packed_cell(base, c, cell_f)
+			continue
+		if sim.water.is_empty():
+			continue
+		for pair: Array in [[Vector2i(0, -1), Vector2i(0, 1)], [Vector2i(-1, 0), Vector2i(1, 0)],
+				[Vector2i(1, 0), Vector2i(-1, 0)]]:
+			var wet: Vector2i = c + (pair[0] as Vector2i)
+			var dry: Vector2i = c + (pair[1] as Vector2i)
+			if sim.water_at(wet) < FactorySim.SEEP_PRESSURE or sim.is_solid(dry):
+				continue
+			var face := base + Vector2(cell_f, cell_f) * 0.5 + Vector2(pair[1] as Vector2i) * cell_f * 0.44
+			# The face goes WET first — a cool sheen down the dry side, which is what you actually notice
+			# from across a gallery — and the beads run down it.
+			draw_line(face + Vector2(0.0, -cell_f * 0.46), face + Vector2(0.0, cell_f * 0.46),
+				Color(0.55, 0.78, 0.94, 0.26), 3.0)
+			for b: int in 2:
+				var phase: float = fmod(_anim_time * 0.5 + float(c.x * 7 + c.y * 13) * 0.11
+					+ 0.5 * float(b), 1.0)
+				var at: Vector2 = face + Vector2(0.0, -cell_f * 0.42) + Vector2(0.0, cell_f * 0.9) * phase
+				var fade: float = (1.0 - phase * 0.7)
+				draw_circle(at, 2.3, Color(0.52, 0.76, 0.94, 0.85 * fade))
+				draw_circle(at + Vector2(-0.6, -1.0), 1.1, Color(0.86, 0.95, 1.0, 0.85 * fade))
+			break
+
+
+## One packed cell: a hairline seam that says "this is a placed block, not the rock" and a deterministic
+## scatter of crushed aggregate inside it. Deterministic (hashed off the cell) so it never crawls, and
+## drawn at low alpha so a packed bulkhead reads as a surface rather than as a decal.
+func _draw_packed_cell(base: Vector2, c: Vector2i, cell_f: float) -> void:
+	draw_rect(Rect2(base + Vector2(1.0, 1.0), Vector2(cell_f - 2.0, cell_f - 2.0)),
+		Color(0.70, 0.76, 0.84, 0.16), false, 1.0)
+	var seed: int = c.x * 73856093 ^ c.y * 19349663
+	for i: int in 6:
+		seed = (seed * 1103515245 + 12345) & 0x7fffffff
+		var px: float = float(seed % 1000) / 1000.0
+		seed = (seed * 1103515245 + 12345) & 0x7fffffff
+		var py: float = float(seed % 1000) / 1000.0
+		draw_circle(base + Vector2(3.0 + px * (cell_f - 6.0), 3.0 + py * (cell_f - 6.0)), 1.5,
+			Color(0.62, 0.66, 0.72, 0.30))
 
 
 func _draw_water() -> void:

@@ -68,7 +68,7 @@ const LAMP_TINTS: Array[Dictionary] = [
 ]
 ## Materials the player can PLACE as blocks from the pack (the Terraria build primitive). Wood = the
 ## bazaar build material; the list grows as more buildables land (log/stone/etc).
-const BUILD_MATERIALS: Array[StringName] = [&"wood", &"earth", &"stone", &"deepslate"]
+const BUILD_MATERIALS: Array[StringName] = [&"wood", &"earth", &"stone", &"deepslate", &"gravel"]
 ## How close (chebyshev cells, around a bazaar's centre) you must stand to craft machines — the Bazaar is
 ## the crafting hub (Minecraft crafting-table proximity). Away from it, the E screen shows the pack only.
 const BAZAAR_RADIUS: int = 3
@@ -262,6 +262,8 @@ func _ready() -> void:
 		load("res://src/data/machines/drift_rig.tres"),   # the Drift Rig — a POWERED gallery that sorts
 		                                                  # pay from spoil at the face (docs/DRIFT.md)
 		load("res://src/data/machines/blast_furnace.tres"),   # 1 rich ore → 2 ingots (#48, Enrichment)
+		load("res://src/data/machines/crusher.tres"),     # spoil → GRAVEL, the one material that packs
+		                                                  # (docs/DRIFT.md §4, Packing)
 		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (Drainage)
 	]
 	for def: MachineDef in _craftable:

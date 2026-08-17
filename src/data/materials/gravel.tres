@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MaterialDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/material_def.gd" id="1_mat"]
+
+[resource]
+script = ExtResource("1_mat")
+id = &"gravel"
+display_name = "Packed Gravel"
+layer = &"block"
+base_color = Color(0.225, 0.238, 0.262, 1)
+grain = true
+cap_color = Color(0, 0, 0, 0)
+nugget_color = Color(0.60, 0.62, 0.66, 1)
+nugget_count = 9
+depth_darken = 0.12
+glitters = false

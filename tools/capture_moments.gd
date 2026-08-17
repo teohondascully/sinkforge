@@ -19,6 +19,8 @@ extends SceneTree
 ##           pack, so the one question a still frame can answer about a menu — can you read it, and can you
 ##           tell what it wants you to press? — is answerable. Three moments rather than one because the
 ##           tabs are three different layout problems (a grid, two priced columns, a graph).
+##   pack  — THE WALL THAT WEEPS: one reservoir, two galleries, one plugged with loose stone and one with
+##           packed gravel — the only shot whose subject is a difference rather than a thing
 ##   room  — a torch-lit WORK CHAMBER: the only view that shows the back wall as a plane rather than as a
 ##           sliver, so it is the instrument for judging whether a carved-out space reads as a ROOM (a
 ##           recessed second plane with rock in front of it) or as a hole punched in a flat sheet. A
@@ -90,6 +92,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_counter(main, moment)
 		"drift":
 			await _at_the_drift(main)
+		"pack":
+			await _at_the_packing(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -525,6 +529,68 @@ func _at_the_drift(main: MainView) -> void:
 	for _i: int in 40:                                         # let the veil re-cut around the new lamp
 		await physics_frame
 	if main._hints != null:                                    # the tutorial bubble is not part of the shot
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+
+
+## THE WALL THAT WEEPS, and the wall that doesn't. One reservoir with a gallery running out of either side
+## of it: the left one plugged with the LOOSE stone you dug out of it, the right one plugged with PACKED
+## GRAVEL. Run it, and the left gallery has a pool in its sump while the right one is bone dry. This is the
+## only shot in the set whose subject is a DIFFERENCE, so it is built symmetrically on purpose — same rock,
+## same gallery, same water, one variable.
+func _at_the_packing(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 40
+	for x: int in range(x0 - 24, x0 + 25):
+		for y: int in range(row - 8, row + 10):
+			sim.set_solid(Vector2i(x, y), &"stone")
+	for x: int in range(x0 - 18, x0 + 19):                     # the two galleries + the reservoir between them
+		for y: int in [row, row - 1]:
+			sim.set_solid(Vector2i(x, y), &"")
+	for y: int in range(row - 4, row + 1):                     # the reservoir: a tall pocket in the middle
+		for x: int in range(x0 - 2, x0 + 3):
+			sim.set_solid(Vector2i(x, y), &"")
+	for y: int in range(row + 1, row + 4):                     # a sump on the left, so a weep reads as a POOL
+		for x: int in range(x0 - 11, x0 - 6):
+			sim.set_solid(Vector2i(x, y), &"")
+	for y: int in range(row + 1, row + 4):                     # ...and its mirror on the right, still dry
+		for x: int in range(x0 + 7, x0 + 12):
+			sim.set_solid(Vector2i(x, y), &"")
+	# The two plugs, PLACED BY HAND (place_block, not set_solid) — the whole difference lives in the fill
+	# layer, and only construction writes it.
+	sim.inventory[&"stone"] = 8
+	sim.inventory[&"gravel"] = 8
+	for y2: int in [row, row - 1]:
+		sim.place_block(Vector2i(x0 - 3, y2), &"stone")
+		sim.place_block(Vector2i(x0 + 3, y2), &"gravel")
+	for y3: int in range(row - 4, row + 1):                    # fill the reservoir to the brim
+		for x2: int in range(x0 - 2, x0 + 3):
+			sim.add_water(Vector2i(x2, y3), FactorySim.WATER_MAX)
+	# Torches either side of BOTH plugs: the whole shot is a comparison of two blocks, so both blocks
+	# have to be lit well enough to tell apart.
+	for x3: int in [x0 - 14, x0 - 8, x0 - 4, x0 + 4, x0 + 8, x0 + 14]:
+		sim.torch[Vector2i(x3, row - 1)] = true
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 + 6) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 1500:                                       # ~25s: long enough for the left sump to fill
+		await physics_frame
+	var wet: int = 0
+	var dry: int = 0
+	for cell: Vector2i in sim.water:                           # count ONLY the two galleries: the world has
+		if cell.y < row - 4 or cell.y > row + 4:               # aquifers of its own, and they are not the
+			continue                                           # subject of this photograph
+		if cell.x < x0 - 3 and cell.x > x0 - 19:
+			wet += int(sim.water[cell])
+		elif cell.x > x0 + 3 and cell.x < x0 + 19:
+			dry += int(sim.water[cell])
+	print("PACK  through the LOOSE plug: %d   ·   through the PACKED plug: %d" % [wet, dry])
+	print("PACK  plugs: loose=%s/%s  packed=%s/%s" % [
+		str(sim.material_at(Vector2i(x0 - 3, row))), str(sim.is_loose_fill(Vector2i(x0 - 3, row))),
+		str(sim.material_at(Vector2i(x0 + 3, row))), str(sim.is_packed(Vector2i(x0 + 3, row)))])
+	if main._hints != null:
 		main._hints._active = &""
 		main._hints._queue.clear()
 		main._hints._life = 0.0

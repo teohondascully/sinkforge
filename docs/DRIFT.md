@@ -1,10 +1,12 @@
 # THE DRIFT RIG & SPOIL — horizontal extraction, vertical logistics
 
-> **Status: §3 SHIPPED as STRIKE 35** (2026-08-16) — the Drift Rig is in the game, researched under
+> **Status: §3 SHIPPED as STRIKE 35, §4 SHIPPED as STRIKE 36** (2026-08-16) — the Drift Rig is in the game, researched under
 > **Galleries**, asserted by `check_drift` (harness layer 53) and photographed at
-> `history/115-a-gallery-that-sorts-itself.png`. §4's Crusher, gravel-as-packing and the per-layer packing
-> payoffs are still SPEC, and so is the §7 play-test rung that ends in L3 water. Pairs with `docs/BITS.md`
-> (the Lance is this machine's hand-held half) and `docs/BAZAAR.md`.
+> `history/115-a-gallery-that-sorts-itself.png`. §4's **Crusher** and **packing** followed as Strike 36 —
+> researched under **Packing**, asserted by `check_spoil` (harness layer 54), photographed at
+> `history/116-the-wall-that-weeps.png`. What is still SPEC: the per-layer packing payoffs BELOW L3 (magma
+> insulation, Hollow ballast) and the §7 play-test rung that runs a whole gallery end to end. Pairs with
+> `docs/BITS.md` (the Lance is this machine's hand-held half) and `docs/BAZAAR.md`.
 >
 > **Recorded deviations from the spec as written.**
 > * **The FACE advances; the MACHINE stays put.** §3 says the rig "advances". It does not move: it reaches
@@ -19,6 +21,16 @@
 >   two-generator trunk 5.61, three 6.09. 6.0 puts a lone generator at a 0.67 throttle — it LABOURS rather
 >   than refuses — and makes a real conduit trunk the thing that buys full speed. A higher number would have
 >   been a demand no achievable network could meet.
+> * **§4's payoff is a PROPERTY OF YOUR OWN CONSTRUCTION, not of the material.** The table says packed
+>   spoil "holds water back", but any solid cell already does — water never enters rock. So the shipped
+>   rule is the other half of that sentence: **everything you stack back is LOOSE FILL and WEEPS**, and
+>   packed gravel is the one thing that doesn't. A gallery backfilled with the stone you dug out of it is a
+>   sieve; crush that stone and pack it and the same gallery is a bulkhead. Undisturbed strata never seeps
+>   — the leak is a property of construction, which is why the sim tracks a `fill` layer and not a material.
+> * **8:1 was not implemented as a ratio.** It did not need to be: a gallery's face is mostly rock and the
+>   rig already produces whatever the geology gives it. The Crusher halves the stream at 2 spoil → 1 gravel,
+>   which is the volume answer the ratio was reaching for, and pay is never crushed — ore-like items fall
+>   straight through the machine, so a crusher under a mixed stream costs you nothing.
 > * **Two new status words, not one.** "output blocked" is not an answer on a machine with two outputs, so
 >   the rig says `blocked_pay` ("dig a drain UNDER it") or `blocked_spoil` ("dig a drain BEHIND it"), plus
 >   `no_power` for the dark case.

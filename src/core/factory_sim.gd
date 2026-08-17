@@ -84,6 +84,24 @@ const DRIFT_CYCLE: float = 0.9          ## seconds per bite AT FULL POWER (brown
 const DRIFT_POWER_DEMAND: float = 6.0
 const DRIFT_BELLY: int = 48             ## PER STREAM. Each jams on its own, and the status says which.
 const DRIFT_TIER: int = 2               ## same bit as the Borer: this is a logistics upgrade, not a drive one
+## --- THE CRUSHER (docs/DRIFT.md §4): spoil in, GRAVEL out. The sink that makes a gallery's ~8:1 spoil
+## stream survivable, and the only source of the one material that PACKS (see the fill layer below).
+## Two units of spoil — any mix of them — become one of gravel, so the stream halves as it passes through.
+## Pay is never crushed: ore-like items fall STRAIGHT THROUGH to the output, because a crusher that ate the
+## thing you were mining for would be a trap wearing a machine's face.
+const CRUSH_CYCLE: float = 1.1          ## seconds per crush AT FULL POWER
+const CRUSH_POWER_DEMAND: float = 3.0   ## a lone generator's aura (4.0) runs ONE crusher flat out
+const CRUSH_RATIO: int = 2              ## units of spoil consumed per gravel produced
+const CRUSH_BELLY: int = 60             ## gravel held before it jams on a sealed column
+## --- PACKING (docs/DRIFT.md §4): the difference between rock you STACKED BACK and rock that was always
+## there. Every hand-placed block is LOOSE fill and WEEPS — a wet cell pressing on one side pushes a unit
+## through to the open side every SEEP_INTERVAL ticks. Packed gravel does not. So a gallery backfilled with
+## the stone you dug out of it is a sieve, and the same gallery packed with crushed gravel is a BULKHEAD.
+## Undisturbed strata never seeps: this is a property of your own construction, not a leak in the world.
+const SEEP_INTERVAL: int = 12           ## ticks between weeps — a seep, not a flow
+const SEEP_PRESSURE: int = 4            ## water level on the wet side before it finds a way through
+const FILL_LOOSE: StringName = &"loose"
+const FILL_PACKED: StringName = &"packed"
 ## HOPPER (storage): it STOCKPILES what falls into it (input_buffer = the store, unbounded) and meters it
 ## back DOWN to a machine below with BACK-PRESSURE — only feeding while the consumer's buffer is under
 ## FEED_CAP, so the stockpile stays in the hopper (a visible bank) instead of overflowing the forge. No
@@ -127,6 +145,7 @@ const _BEHAVIORS: Dictionary = {
 	&"drift": {"run": &"_run_drift", "status": &"_status_drift", "dests": &"_destinations_drift",
 		"flow": &"_flow_drift"},
 	&"pump": {"run": &"_run_pump", "status": &"_status_pump"},
+	&"crush": {"run": &"_run_crush", "status": &"_status_crush"},
 }
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
@@ -227,6 +246,12 @@ var torch: Dictionary = {}
 ## per-tick _flow_water sweep. No system reads it yet (sim-only, reversible); the render is a later slice.
 var water: Dictionary = {}
 const WATER_MAX: int = 8                       ## units of water a full cell holds (integer levels only)
+## FILL: cell -> FILL_LOOSE | FILL_PACKED, for the solid cells YOU built rather than the ones the world
+## laid down. It is a property of construction, not of material: the same stone reads as strata where the
+## generator put it and as loose fill where you stacked it back. Only two things write it — place_block
+## (loose, or packed for gravel) and the erasures that take a cell away — and only the seep step and the
+## renderer read it, so a mis-tracked cell can never do anything worse than weep or not weep.
+var fill: Dictionary = {}
 ## RESEARCHED techs (tech id -> true) — the demand-side PULL (docs/PROGRESSION.md §5). The tree lives in
 ## ResearchRules (static data); this is the per-session unlock state. Mutated ONLY by research_tech (a
 ## discrete player call at the Bazaar bench), read by the craft gate — deterministic + serializable.
@@ -280,6 +305,7 @@ const RATE_SAMPLE_TICKS: int = 20        # one snapshot per simulated second
 const RATE_WINDOW_SAMPLES: int = 61      # ~60s of history
 var _rate_tick: int = 0
 var _rate_samples: Array[Dictionary] = []   # each: {"tick": int, "totals": Dictionary}
+var _seep_tick: int = 0                     # counts ticks between seep passes (see _seep_step)
 
 
 func in_bounds(cell: Vector2i) -> bool:
@@ -492,6 +518,7 @@ func set_solid(cell: Vector2i, material: StringName = &"earth") -> void:
 	else:
 		solid[cell] = material
 		water.erase(cell)          # rock displaces water — the two layers never coexist in a cell
+	fill.erase(cell)               # strata, not construction: what set_solid writes is the world's own rock
 	_dirty_terrain(cell)
 	_bazaars_dirty = true
 
@@ -521,6 +548,7 @@ func load_world(world: WorldData) -> void:
 	wall.clear()
 	deposits.clear()
 	water.clear()
+	fill.clear()                       # a fresh world has no construction in it
 	world_seed = world.seed
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
@@ -592,6 +620,7 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 	if not solid.has(cell):
 		return &""
 	_bazaars_dirty = true               # a mined block can break a bazaar frame → rescan lazily
+	fill.erase(cell)                    # dug back out — it is no longer anybody's fill
 	var material: StringName = solid[cell]
 	if _is_ore_like(material):
 		# HAND-mining an ore-like block (ore or coal) is a quick, inefficient grab: one strike clears the whole
@@ -678,6 +707,9 @@ func place_block(cell: Vector2i, material: StringName) -> bool:
 	_take_from_pack(material, 1)
 	total_consumed[material] = int(total_consumed.get(material, 0)) + 1
 	solid[cell] = material
+	# What you stacked back is FILL, and fill is either packed or it weeps (docs/DRIFT.md §4). Gravel is
+	# the one material that packs; everything else — the stone out of this very gallery included — is loose.
+	fill[cell] = FILL_PACKED if material == &"gravel" else FILL_LOOSE
 	water.erase(cell)                   # placing rock into a watered cell displaces that cell's water
 	_dirty_terrain(cell)
 	_bazaars_dirty = true               # a placed block can COMPLETE a bazaar frame → rescan lazily
@@ -874,6 +906,52 @@ func total_water() -> int:
 	for v: Variant in water.values():
 		sum += int(v)
 	return sum
+
+
+## --- PACKING & SEEPAGE (docs/DRIFT.md §4). What you STACKED BACK is not what was always there. ---
+
+## Is this cell packed fill — the watertight kind? Pure read; the renderer and the harness both use it.
+func is_packed(cell: Vector2i) -> bool:
+	return fill.get(cell, &"") == FILL_PACKED
+
+
+## Is this cell loose fill — rock you stacked back, which weeps under pressure?
+func is_loose_fill(cell: Vector2i) -> bool:
+	return fill.get(cell, &"") == FILL_LOOSE
+
+
+## THE SEEP STEP — run every SEEP_INTERVAL ticks. For each cell of LOOSE fill, a wet neighbour at or above
+## SEEP_PRESSURE pushes ONE unit through to the open cell on the far side. Down first (a flooded gallery
+## over your backfilled floor is the case that matters), then the two lateral pairs.
+##
+## Water is MOVED, never made: the sum is invariant across this step exactly as it is across WaterFlow. The
+## pass is deterministic (cells sorted, one unit per cell per pass) and it iterates `fill` — the cells YOU
+## built — not the world, so its cost is the size of your own construction and nothing else.
+func _seep_step() -> void:
+	if fill.is_empty() or water.is_empty():
+		return
+	var cells: Array[Vector2i] = []
+	for cv: Variant in fill:
+		if fill[cv] == FILL_LOOSE:
+			cells.append(cv)
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y if a.y != b.y else a.x < b.x)
+	for c: Vector2i in cells:
+		for pair: Array in [[Vector2i(0, -1), Vector2i(0, 1)], [Vector2i(-1, 0), Vector2i(1, 0)],
+				[Vector2i(1, 0), Vector2i(-1, 0)]]:
+			var wet: Vector2i = c + (pair[0] as Vector2i)
+			var dry: Vector2i = c + (pair[1] as Vector2i)
+			if int(water.get(wet, 0)) < SEEP_PRESSURE:
+				continue
+			if not in_bounds(dry) or solid.has(dry):
+				continue
+			if int(water.get(dry, 0)) >= WATER_MAX:
+				continue
+			water[wet] = int(water[wet]) - 1
+			if int(water[wet]) <= 0:
+				water.erase(wet)
+			water[dry] = int(water.get(dry, 0)) + 1
+			break                                  # one unit per loose cell per pass — a weep, not a breach
 
 
 ## --- SAPLINGS — the renewable-wood loop. Chopped canopies hide seeds; plant one on
@@ -1291,6 +1369,9 @@ func tick() -> void:
 		_run_machine(machine)
 	_flow()
 	WaterFlow.step(self)
+	_seep_tick += 1
+	if _seep_tick % SEEP_INTERVAL == 0:
+		_seep_step()                      # loose backfill weeps; packed gravel holds (docs/DRIFT.md §4)
 	Flora.grow(self)
 	_prune_empty_ground()
 	_sample_production()
@@ -1768,6 +1849,7 @@ func _run_drill(machine: MachineState) -> void:
 	else:
 		deposits.erase(target)
 		solid.erase(target)                                   # cell bored out → the shaft deepens
+		fill.erase(target)
 		_dirty_terrain(target)                                # repaint the chunk + re-mold the fine block
 		_bazaars_dirty = true                                 # solid changed → invalidate the bazaar cache
 		_resettle_pile_above(target)                          # gravity: anything resting above now falls
@@ -1847,11 +1929,13 @@ func _run_h_drill(machine: MachineState) -> void:
 		else:
 			deposits.erase(target)
 			solid.erase(target)
+			fill.erase(target)
 			_dirty_terrain(target)
 			_bazaars_dirty = true
 			_resettle_pile_above(target)
 	else:
 		solid.erase(target)
+		fill.erase(target)
 		_dirty_terrain(target)
 		_bazaars_dirty = true
 		_resettle_pile_above(target)
@@ -1958,11 +2042,13 @@ func _run_drift(machine: MachineState) -> void:
 		else:
 			deposits.erase(bite)
 			solid.erase(bite)
+			fill.erase(bite)
 			_dirty_terrain(bite)
 			_bazaars_dirty = true
 			_resettle_pile_above(bite)
 	else:
 		solid.erase(bite)
+		fill.erase(bite)
 		_dirty_terrain(bite)
 		_bazaars_dirty = true
 		_resettle_pile_above(bite)
@@ -2025,6 +2111,77 @@ func _flow_drift(machine: MachineState) -> void:
 	if not machine.spoil_buffer.is_empty() and not dests[1].is_empty():
 		_deliver(machine, dests[1], machine.spoil_buffer)
 		machine.spoil_buffer.clear()
+
+
+## Is this item SPOIL — the class the Crusher eats? Everything `_is_ore_like` says no to and that isn't a
+## manufactured good: earth, stone, deepslate, gravel's own feedstock. Named as its own question because
+## docs/DRIFT.md §4 is explicit that spoil is a CLASS, not a new item, and one predicate is how that stays
+## true. Gravel itself is excluded — crushing gravel into gravel is a loop with a machine in it.
+func is_spoil(item: StringName) -> bool:
+	return item in [&"earth", &"stone", &"deepslate", &"clay", &"shale"]
+
+
+## THE CRUSHER (docs/DRIFT.md §4). Two units of spoil — any mix — become one of GRAVEL, the only material
+## that packs. Powered, like everything on this rung: unpowered it does nothing and says so.
+##
+## PAY IS NEVER CRUSHED. Ore-like items in the input fall straight through to the output and carry on down
+## the column, so a crusher parked under a mixed stream is a filter that costs you nothing — put one under
+## the Drift Rig's SPOIL column and it is pure gain, put one under a mixed Borer stream and your ore still
+## reaches the forge. A machine that ate the thing you were mining for would be a trap wearing a machine's
+## face, and the one rule this whole rung is built on is that spoil never becomes housekeeping.
+func _run_crush(machine: MachineState) -> void:
+	# Pass-through first, so pay never waits behind rock: anything that isn't spoil leaves immediately.
+	for item: StringName in machine.input_buffer.keys():
+		if not is_spoil(item):
+			machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) \
+				+ int(machine.input_buffer[item])
+			machine.input_buffer.erase(item)
+	machine.power_factor = power_throttle(machine.cell, CRUSH_POWER_DEMAND)
+	if machine.power_factor <= 0.0:
+		return
+	if _spoil_held(machine) < CRUSH_RATIO:
+		return
+	if int(machine.output_buffer.get(&"gravel", 0)) >= CRUSH_BELLY:
+		return
+	machine.progress += SECONDS_PER_TICK * machine.power_factor
+	if machine.progress < CRUSH_CYCLE:
+		return
+	machine.progress -= CRUSH_CYCLE
+	var taken: int = 0
+	for item: StringName in machine.input_buffer.keys():
+		if not is_spoil(item):
+			continue
+		while taken < CRUSH_RATIO and int(machine.input_buffer[item]) > 0:
+			machine.input_buffer[item] = int(machine.input_buffer[item]) - 1
+			total_consumed[item] = int(total_consumed.get(item, 0)) + 1
+			taken += 1
+		if int(machine.input_buffer[item]) <= 0:
+			machine.input_buffer.erase(item)
+		if taken >= CRUSH_RATIO:
+			break
+	machine.output_buffer[&"gravel"] = int(machine.output_buffer.get(&"gravel", 0)) + 1
+	total_produced[&"gravel"] = int(total_produced.get(&"gravel", 0)) + 1
+
+
+## How much SPOIL (only) a crusher is holding — the number its cycle and its status both gate on.
+func _spoil_held(machine: MachineState) -> int:
+	var total: int = 0
+	for item: StringName in machine.input_buffer:
+		if is_spoil(item):
+			total += int(machine.input_buffer[item])
+	return total
+
+
+## Crusher status, mirroring _run_crush's gates in the same order. A crusher holding nothing but ore says
+## `no_input` — correctly: it has no spoil, and the ore it is holding is already on its way out.
+func _status_crush(machine: MachineState) -> StringName:
+	if power_throttle(machine.cell, CRUSH_POWER_DEMAND) <= 0.0:
+		return &"no_power"
+	if _spoil_held(machine) < CRUSH_RATIO:
+		return &"no_input"
+	if int(machine.output_buffer.get(&"gravel", 0)) >= CRUSH_BELLY:
+		return &"blocked"
+	return &"working"
 
 
 ## A GENERATOR burns coal to pour power. Each tick it spends one tick of its current fuel;

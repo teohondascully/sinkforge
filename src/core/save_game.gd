@@ -24,6 +24,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		machines.append({
 			"def": String(m.def.id), "cell": m.cell,
 			"in": m.input_buffer.duplicate(), "out": m.output_buffer.duplicate(),
+			"spoil": m.spoil_buffer.duplicate(),
 			"progress": m.progress, "route_toggle": m.route_toggle,
 			"fuel": m.fuel, "power_factor": m.power_factor, "fed": m.fed,
 			"facing": m.facing, "mode": m.mode, "filter": String(m.filter),
@@ -43,6 +44,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"rope": sim.rope.duplicate(),
 		"torch": sim.torch.duplicate(),
 		"water": sim.water.duplicate(),
+		"fill": sim.fill.duplicate(),
 		"research": sim.research.duplicate(),
 		"sapling": sim.sapling.duplicate(),
 		"machines": machines,
@@ -65,6 +67,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 		var m := MachineState.new(load(path) as MachineDef, entry["cell"])
 		m.input_buffer = (entry["in"] as Dictionary).duplicate()
 		m.output_buffer = (entry["out"] as Dictionary).duplicate()
+		m.spoil_buffer = (entry.get("spoil", {}) as Dictionary).duplicate()   # additive: the rig's 2nd belly
 		m.progress = float(entry["progress"])
 		m.route_toggle = int(entry["route_toggle"])
 		m.fuel = int(entry["fuel"])
@@ -87,6 +90,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	sim.rope = (data["rope"] as Dictionary).duplicate()
 	sim.torch = (data["torch"] as Dictionary).duplicate()
 	sim.water = (data.get("water", {}) as Dictionary).duplicate()   # additive: absent in older saves → empty
+	sim.fill = (data.get("fill", {}) as Dictionary).duplicate()     # additive: an older save has no packing
 	sim.research = (data["research"] as Dictionary).duplicate()
 	sim.sapling = (data.get("sapling", {}) as Dictionary).duplicate()   # additive: absent in older saves
 	sim.machines = rebuilt

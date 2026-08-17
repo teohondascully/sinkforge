@@ -72,6 +72,15 @@ const TECHS: Dictionary = {
 		                                       # after the Borer: it is the answer to a problem you have
 		                                       # personally hauled, not the tutorial for power.
 	},
+	&"packing": {
+		"name": "Packing",
+		"requires": &"galleries",
+		"sample": &"stone",                   # analyze the spoil AGAIN, this time asking what it is FOR —
+		                                       # the answer is the Crusher, and gravel, and a gallery that
+		                                       # holds water instead of weeping it (docs/DRIFT.md §4)
+		"cost": {&"plate": 2, &"gear": 2},
+		"unlocks": [&"crusher"],
+	},
 	&"enrichment": {
 		"name": "Enrichment",
 		"requires": &"machining",
@@ -92,7 +101,7 @@ const TECHS: Dictionary = {
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
 ## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
 ## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
-const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"galleries", &"enrichment", &"drainage"]
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"galleries", &"packing", &"enrichment", &"drainage"]
 
 
 static func tech(id: StringName) -> Dictionary:

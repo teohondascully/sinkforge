@@ -177,6 +177,7 @@ const ITEM_PURPOSE: Dictionary = {
 	&"stone": "placeable block — and the Stone Pickaxe's making",
 	&"earth": "placeable block — plug a pit, bridge a gap",
 	&"deepslate": "the deep rock — the sample that unlocks DESCENT research",
+	&"gravel": "PACKED fill — the one block that doesn't weep when water leans on it",
 	&"iron": "L2 ore — the Iron Forge smelts it into iron ingots",
 	&"iron_ingot": "the L2 metal — plates, gears and the Iron Pickaxe",
 	&"plate": "pressed iron sheet — the Borer's frame wants them",
@@ -204,6 +205,7 @@ const ITEM_PURPOSE: Dictionary = {
 	&"gear_mill": "mills iron ingots + ingots into gears (two inputs, one column)",
 	&"h_drill": "the Borer — chews sideways the way you faced; its haul drops below it",
 	&"drift_rig": "cuts a 2-high gallery on POWER, and sorts it: ore drops below, spoil drops behind",
+	&"crusher": "eats SPOIL, pours GRAVEL — pay falls straight through it, untouched",
 }
 ## The hovered slot this frame (captured while drawing the hotbar/pack grid, drawn last, on top).
 var _tooltip_item: StringName = &""
