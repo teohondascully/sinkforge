@@ -1168,17 +1168,76 @@ func is_bazaar_at(o: Vector2i) -> bool:
 ## real steady-state stutter. Bazaars are made of blocks, so the result only changes on a terrain edit; the
 ## mutators flip `_bazaars_dirty` and we rescan lazily. O(1) amortized between digs.
 var _bazaars_cache: Array[Vector2i] = []
+var _ruins_cache: Array[Dictionary] = []       ## {origin, gap} — frames ONE block short (see find_bazaar_ruins)
 var _bazaars_dirty: bool = true
 func find_bazaars() -> Array[Vector2i]:
-	if not _bazaars_dirty:
-		return _bazaars_cache
+	if _bazaars_dirty:
+		_rescan_bazaars()
+	return _bazaars_cache
+
+
+## Frames that are exactly ONE wood block short of being a bazaar, each with the cell that is missing.
+##
+## The world stamps one of these near spawn as the first thing a player is asked to build
+## (layered_world_gen._stamp_bazaar_ruin lays the frame minus its bottom-right post). Until it is
+## finished it is not a bazaar, so nothing downstream knew it existed, and the view drew nothing over it
+## — the game's first landmark and its first build lesson looked like four loose wood blocks. This is
+## what lets the representation draw it as a derelict stall with a marked gap.
+##
+## Same scan and same dirty flag as find_bazaars: one pass fills both caches.
+func find_bazaar_ruins() -> Array[Dictionary]:
+	if _bazaars_dirty:
+		_rescan_bazaars()
+	return _ruins_cache
+
+
+func _rescan_bazaars() -> void:
 	_bazaars_cache = []
+	_ruins_cache = []
 	for y: int in range(0, GRID_ROWS - BAZAAR_H):
 		for x: int in range(0, GRID_COLS - BAZAAR_W + 1):
-			if is_bazaar_at(Vector2i(x, y)):
-				_bazaars_cache.append(Vector2i(x, y))
+			var o := Vector2i(x, y)
+			if is_bazaar_at(o):
+				_bazaars_cache.append(o)
+				continue
+			var gap: Vector2i = bazaar_gap_at(o)
+			if gap.x >= 0:
+				_ruins_cache.append({"origin": o, "gap": gap})
 	_bazaars_dirty = false
-	return _bazaars_cache
+
+
+## The single missing FRAME cell at `o`, or (-1,-1) if `o` is not a one-block-short frame.
+##
+## Deliberately strict: EVERYTHING a finished bazaar needs must already hold — interior open, interior
+## floor real ground, every other frame cell wood — and the one hole must be genuinely EMPTY rather than
+## occupied by stone you would have to dig first. So a positive answer means "place one wood block here
+## and it activates", which is the only claim the view is allowed to make to the player. A complete
+## bazaar answers (-1,-1) too: complete is not one-short.
+func bazaar_gap_at(o: Vector2i) -> Vector2i:
+	if not in_bounds(o) or not in_bounds(o + Vector2i(BAZAAR_W - 1, BAZAAR_H)):
+		return Vector2i(-1, -1)
+	var gap := Vector2i(-1, -1)
+	for dx: int in BAZAAR_W:                                   # top beam: all wood but at most one hole
+		var c: Vector2i = o + Vector2i(dx, 0)
+		if solid.get(c, &"") != &"wood":
+			if gap.x >= 0 or solid.has(c):                     # a second hole, or something else in the way
+				return Vector2i(-1, -1)
+			gap = c
+	for dy: int in range(1, BAZAAR_H):
+		for px: int in [0, BAZAAR_W - 1]:                      # posts: same rule
+			var pc: Vector2i = o + Vector2i(px, dy)
+			if solid.get(pc, &"") != &"wood":
+				if gap.x >= 0 or solid.has(pc):
+					return Vector2i(-1, -1)
+				gap = pc
+		for ix: int in range(1, BAZAAR_W - 1):                 # interior must already be open
+			if solid.has(o + Vector2i(ix, dy)):
+				return Vector2i(-1, -1)
+	for ix: int in range(1, BAZAAR_W - 1):                     # interior floor: real solid ground
+		var floor_cell: Vector2i = o + Vector2i(ix, BAZAAR_H)
+		if not solid.has(floor_cell) or _is_foliage(solid[floor_cell]):
+			return Vector2i(-1, -1)
+	return gap
 
 
 ## True if `cell` is a WOOD FRAME cell (post or top beam) of a COMPLETED bazaar — the walls of the stall you
