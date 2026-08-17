@@ -501,7 +501,14 @@ while [ "$done_count" -lt "$total" ]; do
 			else
 				"$GODOT" --headless --path . --script "${SCRIPTS[$i]}" >"$DIR/${LOGS[$i]}" 2>&1
 			fi
-			printf '%d %d' "$?" "$((SECONDS - s))" >"$MARKS/$i.done"
+			# WRITTEN ASIDE AND RENAMED, because `>` CREATES THE FILE BEFORE ANYTHING IS IN IT and the
+			# poller below accepts a mark on `-f` alone. That window is small and it is real: a passing layer
+			# read in it yields an EMPTY `r`, which is not "0", so it takes the FAIL branch — and `%d` renders
+			# the empty string as 0, so the run reports `FAIL 0s (exit 0)` for a layer whose own log says it
+			# passed every assertion. Observed on `check_pack_layout` and reproduced exactly from an empty
+			# mark. `mv` within one directory is atomic, so the reader now sees the mark absent or complete,
+			# never half-born.
+			printf '%d %d' "$?" "$((SECONDS - s))" >"$MARKS/$i.part" && mv "$MARKS/$i.part" "$MARKS/$i.done"
 		) &
 		launched=$((launched + 1))
 		if [ "${EXCL[$i]}" = "1" ]; then
@@ -514,8 +521,25 @@ while [ "$done_count" -lt "$total" ]; do
 	i=0
 	while [ "$i" -lt "$launched" ]; do
 		if [ -f "$MARKS/$i.done" ] && [ "${REPORTED[$i]:-0}" != "1" ]; then
-			REPORTED[$i]=1
 			read -r r el <"$MARKS/$i.done"
+			# A MARK THAT DOES NOT PARSE IS THE HARNESS'S FAULT, AND IT MUST SAY SO IN ITS OWN NAME.
+			# The atomic rename above removes the only known way to get here, so this should be unreachable —
+			# which is exactly why it is worth keeping. The failure it replaces was silent: an empty `r` fell
+			# through to the generic FAIL branch and `%d` printed it as 0, so a layer that passed everything was
+			# reported `FAIL 0s (exit 0)` and anyone reading that would go and debug the layer. Fail closed, but
+			# name the right defendant.
+			if [ -z "$r" ]; then
+				REPORTED[$i]=1
+				done_count=$((done_count + 1))
+				progressed=1
+				say "$(printf '  [%2d/%2d] %-36s HARNESS FAULT — unreadable mark file, layer verdict UNKNOWN' \
+					"$done_count" "$total" "${NAMES[$i]}")"
+				fail=$((fail + 1))
+				failed_names+=("${NAMES[$i]} (harness fault, not the layer)")
+				i=$((i + 1))
+				continue
+			fi
+			REPORTED[$i]=1
 			done_count=$((done_count + 1))
 			progressed=1
 			log="$DIR/${LOGS[$i]}"
