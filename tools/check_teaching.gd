@@ -85,6 +85,37 @@ func _run() -> void:
 	await physics_frame
 
 
+## HAS THIS HINT LATCHED YET? Waits a bounded number of frames for it, and says how long it took.
+##
+## THIS IS A FIX FOR A CI-ONLY RED, AND THE RACE IS STRUCTURAL RATHER THAN UNLUCKY. The hints are noted in
+## MainView._process (main.gd:1205, via :749). This layer drives the body with `await physics_frame`, and
+## the drop loop below breaks on the very frame `on_floor and worst > 0.0` first holds — then asserted the
+## hint on the next line. A GDScript coroutine resumes synchronously when the signal fires, so at that
+## point ZERO process frames have necessarily run since the landing, and whether the hint has been noted
+## depends entirely on whether `on_floor` happened to lag `stagger` by a frame. It did on both our boxes.
+## It did not on CI, and the layer failed there while passing everywhere we looked.
+##
+## Waiting is safe rather than lenient because the window is real: stagger is set to STAGGER_MAX = 0.26s and
+## decays by delta per physics frame, so there are ~15 frames in which _process can legitimately observe it.
+## Twelve is inside that and nowhere near it — a hint that has not latched in twelve process frames has not
+## latched, and still fails.
+##
+## All three hint assertions go through here, not just the one that turned red. `chain` breaks out of its
+## loop after two physics frames and `wrapped` after a full one, which are the same bug with more slack —
+## the kind that waits for a slower machine. Fixing the instance and leaving the class is how this comes
+## back next month as somebody else's afternoon.
+const HINT_SETTLE: int = 12
+
+func _latched(hints: Hints, id: StringName) -> bool:
+	for i: int in HINT_SETTLE:
+		if hints._done.has(id):
+			if i > 0:
+				print("    (%s latched %d process frame(s) after the situation)" % [id, i])
+			return true
+		await process_frame
+	return hints._done.has(id)
+
+
 ## --- what the hints SAY -------------------------------------------------------------------------
 
 ## Every bubble in the game, pack-acquisition and state-edge alike, on one list.
@@ -218,7 +249,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 		pivots = maxi(pivots, p.grapple.pivots.size())
 	print("  swung under the spur at up to %.0f px/s; the line took %d pivot(s) at its most bent"
 		% [fastest, pivots])
-	_check(hints._done.has(&"wrapped"),
+	_check(await _latched(hints, &"wrapped"),
 		"the first time the line BENDS, the game says what just happened")
 
 	# THE CHAIN. Let go while airborne and moving — the frame a second throw would have paid off.
@@ -237,7 +268,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 	print("  released the line airborne at %.0f px/s (the hint wants over %.0f)"
 		% [released, MainView.CHAIN_HINT_SPEED])
 	_check(released > 0.0, "the swing got fast enough in the air to be worth chaining (%.0f px/s)" % released)
-	_check(hints._done.has(&"chain"),
+	_check(await _latched(hints, &"chain"),
 		"...and letting go at speed is where the game mentions throwing again")
 
 	# THE CATCH. Drop the body far enough that the landing costs its footing.
@@ -254,7 +285,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 			break
 	print("  dropped %d rows and landed with %.2fs of stagger" % [DROP_ROWS, worst])
 	_check(worst > 0.0, "the drop actually cost the landing (%.2fs stagger)" % worst)
-	_check(hints._done.has(&"hard_landing"),
+	_check(await _latched(hints, &"hard_landing"),
 		"...and a landing that costs your footing is where the game offers the rope")
 
 	# ONCE. Everything above is now latched; doing it all again must produce nothing new.
