@@ -2912,7 +2912,24 @@ func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
 ## Cost: the field is floats in flat arrays, not Dictionary probes, and the blur is separable, so the
 ## whole term is four linear passes over 7.7k cells inside a bake that already ran on terrain change.
 ## check_dig_hitch holds.
-const MASS_SHADE: float = 0.46       ## light a fully-buried cell loses vs. one at an opening
+## WHY 0.55 AND NOT 0.46. Deep buried mass sits at openness≈0 with `key`≈0 (rock above it and rock below
+## it, so the vertical gradient is flat), which puts it at exactly `1 - MASS_SHADE` while an open cell sits
+## at 1.0. The open-vs-buried contrast is therefore capped at `1/(1 - MASS_SHADE)` BY CONSTRUCTION, and the
+## KEY cannot raise it — the KEY brightens up-facing FACES, which is a different cell than the one this
+## ratio is about. At 0.46 that cap is 1.85x, and `check_room_reads` has demanded 2.0x since the day it was
+## written: a floor above the model's structural maximum, unreachable by construction.
+##
+## It passed anyway, for three years of commits, because it sampled ONE cell and that cell's material tone
+## rode along with the lighting — a dark-toned stone read 39 where the lighting alone predicts 46, and
+## 86/39 = 2.21x looked like headroom. Taking the median over the buried block (which is what the light
+## actually does to the mass, with the per-material tone lottery averaged out) reports 1.87x, and 86 x 0.54
+## = 46.4 confirms it is the model and not the measurement.
+##
+## So the floor was right about what the game needs and the renderer was not delivering it. 0.55 makes the
+## cap 2.22x, which clears 2.0 with room for material spread instead of depending on it. This is the
+## legibility complaint a blind first-time player filed as "I cannot reliably tell solid rock from empty
+## air", with a number attached to it at last.
+const MASS_SHADE: float = 0.55       ## light a fully-buried cell loses vs. one at an opening
 const MASS_REACH: int = 2            ## cells light bleeds into the mass (the blur radius)
 const KEY_STRENGTH: float = 0.30     ## brightening of a fully up-facing mass (and dimming of an overhang)
 const KEY_GAIN: float = 3.0          ## how fast the vertical openness gradient saturates the key
