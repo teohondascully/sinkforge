@@ -31,8 +31,16 @@ extends SceneTree
 const SLOT: String = "user://sinkforge.save"
 const SELF: String = "res://tools/check_save_isolation.gd"
 
+## The ONE file under tools/ that is allowed to name the slot, and it earns it: `save_sentinel.gd` is not
+## a harness layer at all — it is the runner's own instrument, whose entire job is to hash that exact path
+## before and after a sweep and shout if it moved. Exempting it would be a hole, so the exemption is paid
+## for below: this layer asserts the runner actually invokes it in BOTH modes, and that it is never
+## registered as a layer. An exemption that has to prove it is being used is not much of an exemption.
+const SENTINEL: String = "res://tools/save_sentinel.gd"
+
 const SCAN_DIRS: Array[String] = ["res://tools", "res://tests"]
 const MAIN_SRC: String = "res://scenes/main.gd"
+const RUNNER: String = "res://tools/run_harness.sh"
 
 var _failures: int = 0
 
@@ -79,7 +87,7 @@ func _initialize() -> void:
 		var srcs: Dictionary = _sources(dir)
 		for path_v: Variant in srcs.keys():
 			var path: String = String(path_v)
-			if path == SELF:
+			if path == SELF or path == SENTINEL:
 				continue
 			var src: String = srcs[path_v]
 			scanned += 1
@@ -104,6 +112,22 @@ func _initialize() -> void:
 			% ", ".join(touchers))
 	_check(unguarded.is_empty(), "every save-reaching layer overrides MainView.save_path%s"
 		% ("" if unguarded.is_empty() else " — " + ", ".join(unguarded)))
+
+	# --- 4. the sentinel's exemption is paid for ------------------------------------------------
+	# save_sentinel.gd is skipped above. That is only defensible while it is doing the job it was
+	# skipped for, so the runner is read here and held to actually calling it — both halves, since an
+	# `arm` with no `verify` protects nothing — and to never registering it as a layer (a layer runs
+	# under the parallel sweep, where planting a file at the production slot would race everything).
+	var runner: String = FileAccess.get_file_as_string(RUNNER)
+	_check(runner.length() > 1000, "tools/run_harness.sh read (%d chars)" % runner.length())
+	_check(runner.contains("save_sentinel.gd -- arm"), "the runner ARMS the save sentinel before the sweep")
+	_check(runner.contains("save_sentinel.gd -- verify"), "the runner VERIFIES the save sentinel after the sweep")
+	var as_layer: bool = false
+	for line: String in runner.split("\n"):
+		var t: String = line.strip_edges()
+		if (t.begins_with("add ") or t.begins_with("add_gl ")) and t.contains("save_sentinel"):
+			as_layer = true
+	_check(not as_layer, "the sentinel is a runner instrument, not a harness layer")
 
 	if _failures == 0:
 		print("check_save_isolation: PASS")
