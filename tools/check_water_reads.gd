@@ -103,7 +103,7 @@ func _run() -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var img: Image = get_root().get_texture().get_image()
-	img.save_png("res://_moment_water.png")
+	img.save_png("res://_diag_water.png")
 
 	# Where the pool landed on screen, so every measurement below reads the water and not the HUD.
 	var band: Rect2i = _on_screen(main, img)
@@ -119,7 +119,7 @@ func _run() -> void:
 	# grades is the dark rock either side and whatever HUD is floating over it — the first run of this
 	# reported the deadest tile at an x the cistern does not even reach.
 	var sub: Image = img.get_region(band)
-	sub.save_png("res://_moment_water_body.png")
+	sub.save_png("res://_diag_water_body.png")
 	# The dead-space fraction is REPORTED, not gated, and that is a deliberate reversal. Running the shared
 	# judge here was the obvious move and it was the wrong standard: "dead" was defined for ROCK, which is
 	# supposed to have tooth, and it grades this body 60% featureless. But water is the one thing in the
@@ -138,7 +138,7 @@ func _run() -> void:
 	var rock_rect: Rect2i = _rock_below(main, img)
 	print("  the reference wall is %s" % rock_rect)
 	var rock: Image = img.get_region(rock_rect)
-	rock.save_png("res://_moment_water_rock.png")
+	rock.save_png("res://_diag_water_rock.png")
 	var wet: Vector3 = _cool(sub)
 	var dry: Vector3 = _cool(rock)
 	var sep: float = (wet.z - wet.x) - (dry.z - dry.x)

@@ -92,3 +92,8 @@ tools/_scratch_*.gd
 # that was ever committed and this holds the one that was not — capture, look, recapture, all before any
 # commit exists to fall back to. Still worth having, for a narrower reason than the one it was built for.
 _moment_prev/
+
+# Harness diagnostic frames. Distinct from the tracked _moment_*.png captures ON PURPOSE: a layer that
+# writes into the canonical namespace dirties the tree on every run, and the ~38% run-to-run difference
+# from animation phase alone means that churn is almost entirely noise being offered for commit.
+_diag_*.png
