@@ -37,7 +37,17 @@ func _initialize() -> void:
 	var cut: Image = img.get_region(box)
 	cut.resize(cut.get_width() * scale, cut.get_height() * scale, Image.INTERPOLATE_NEAREST)
 
-	var out: String = path.get_basename() + OUT_SUFFIX + ".png"
+	# A TOOL THAT INSPECTS CAPTURES MUST NOT BE ABLE TO OVERWRITE THEM.
+	#
+	# This wrote `<input>_zoom.png` beside its input, which for `_moment_boot.png` is `_moment_boot_zoom.png`
+	# — one of the 44 tracked canonical frames, with its own deliberate framing. The peer ran this to look at
+	# something and silently replaced two of them with their crops. They were recoverable only because the
+	# captures had been committed hours earlier; a day before, that inspection would have destroyed the
+	# evidence it was performed on.
+	#
+	# Crops go to the gitignored `_diag_` namespace, same rule as the harness diagnostics: reading a capture
+	# cannot dirty the tree, and no tool that is not `capture_moments.gd` writes a `_moment_` file.
+	var out: String = "res://_diag_" + path.get_file().get_basename() + OUT_SUFFIX + ".png"
 	cut.save_png(out)
 	print("%s -> %s  (%dx%d at %s, x%d)" % [path, out, box.size.x, box.size.y, box.position, scale])
 	quit(0)

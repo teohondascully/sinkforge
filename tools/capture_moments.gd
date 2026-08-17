@@ -1,7 +1,8 @@
 extends SceneTree
 
-## LOCAL DEV TOOL — the "Sees" blind-vision instrument's renderer (NOT committed; _moment_*.png is
-## gitignored). Renders canonical game MOMENTS to _moment_<name>.png so a zero-context vision agent can
+## The "Sees" blind-vision instrument's renderer. The 44 `_moment_*.png` are COMMITTED (3c46c8c) — this
+## header said "not committed; gitignored" until the afternoon they were tracked, and then told readers the
+## opposite of what .gitignore says. Renders canonical game MOMENTS to _moment_<name>.png so a zero-context vision agent can
 ## judge legibility from pixels the way a first-time player would. Run WITHOUT --headless (needs a real
 ## GL context — headless is the dummy renderer and saves blank frames):
 ##   godot --path . --script res://tools/capture_moments.gd -- boot

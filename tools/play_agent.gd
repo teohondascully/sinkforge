@@ -55,13 +55,44 @@ func stats() -> String:
 
 ## Friction summary — the byproduct effort spent this journey (the play-FEEL numbers, not pass/fail).
 func friction() -> String:
-	return "mines=%d places=%d jumps=%d frames=%d stuck=%d" % [mines, places, jumps, frames, stuck_frames]
+	return "mines=%d places=%d jumps=%d frames=%d stuck=%d | peak carried: %s" % [mines, places, jumps, frames, stuck_frames, peaks()]
+
+
+## PEAK CARRIED QUANTITY PER ITEM, across this agent's whole journey.
+##
+## Measured because a bulk carry cap is being designed (T1.0) and nobody knows what the fixtures actually
+## hold. `factory_sim.gd:207` records that no capacity is enforced "yet — a knob to turn when trip-friction
+## is the thing being tuned", which is exactly now; the risk of turning it blind is that a fixture which has
+## always relied on infinite pockets goes red and is indistinguishable from a real regression. That
+## attribution problem is what made check_frametime expensive, so the number comes first this time.
+##
+## Sampled rather than hooked into the sim: the sim is not mine to instrument, and every accumulation this
+## project cares about passes through a frame boundary or a mine, both of which are here.
+var peak: Dictionary = {}
+
+
+func _sample_peak() -> void:
+	for item: StringName in main.sim.inventory:
+		var n: int = int(main.sim.inventory[item])
+		if n > int(peak.get(item, 0)):
+			peak[item] = n
+
+
+## The peaks as a printable line, biggest first. Empty if the journey never carried anything.
+func peaks() -> String:
+	var items: Array = peak.keys()
+	items.sort_custom(func(a: StringName, b: StringName) -> bool: return int(peak[a]) > int(peak[b]))
+	var parts: PackedStringArray = PackedStringArray()
+	for i: StringName in items:
+		parts.append("%s=%d" % [String(i), int(peak[i])])
+	return " ".join(parts) if parts.size() > 0 else "(carried nothing)"
 
 
 ## A COUNTED frame-wait (used by journey code so `frames` measures how long a byproduct step really took).
 func step() -> void:
 	await tree.physics_frame
 	frames += 1
+	_sample_peak()
 
 
 ## Mine a cell through the real verb, counting it as friction. Returns whether the strike landed.
@@ -69,6 +100,7 @@ func do_mine(cell: Vector2i) -> bool:
 	var ok: bool = main.try_mine(cell)
 	if ok:
 		mines += 1
+		_sample_peak()
 	return ok
 
 
