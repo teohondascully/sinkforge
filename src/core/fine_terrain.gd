@@ -23,9 +23,20 @@ static func rebuild(sim: FactorySim) -> void:
 			sim._fine_solid[fy * fw + fx] = 1 if _cell_solid(sim, fx, fy) else 0
 
 
-## Re-mold ONE coarse cell's SUBDIV×SUBDIV fine block PLUS the one-cell boundary band around it (its
+## How many coarse cells of margin an edit re-molds AROUND the edited cell. _cell_solid reads a cell's
+## eight coarse neighbours to decide whether it is on a boundary, so changing one coarse cell can change
+## the molded fine shape of the ring of cells touching it — not just its own SUBDIV² block.
+##
+## THIS NUMBER IS A CONTRACT, not a local detail. Anything caching the fine grid must refresh at least
+## this wide after an edit or it keeps stale solidity. The renderer's per-dig fast lane
+## (scenes/fine_terrain.gd rebake_region) reads it for exactly that reason; it used to hardcode a narrower
+## window and silently diverged from a full bake by a 16-texel smear. Widen this and that path follows.
+const SYNC_BAND: int = 1
+
+## Re-mold ONE coarse cell's SUBDIV×SUBDIV fine block PLUS the SYNC_BAND boundary band around it (its
 ## edge molding reads the coarse neighbours, so a dig must re-mold the neighbours' rims to stay organic).
-## O(local): (SUBDIV+2)² fine cells per edit — the cheap incremental path used on mine/place/bore/fell.
+## O(local): the window is (1 + 2·SYNC_BAND) coarse cells on a side, so (SUBDIV·(1 + 2·SYNC_BAND))² fine
+## cells per edit — 144 at today's constants. The cheap incremental path used on mine/place/bore/fell.
 static func sync_block(sim: FactorySim, coarse: Vector2i) -> void:
 	_ensure_noise(sim)
 	var fw: int = sim.fine_w()
@@ -33,11 +44,11 @@ static func sync_block(sim: FactorySim, coarse: Vector2i) -> void:
 	if sim._fine_solid.size() != fw * fh:
 		rebuild(sim)
 		return
-	# Cover this cell's SUBDIV block and one coarse cell of margin on every side (the boundary band).
-	var fx0: int = maxi(0, (coarse.x - 1) * FactorySim.SUBDIV)
-	var fy0: int = maxi(0, (coarse.y - 1) * FactorySim.SUBDIV)
-	var fx1: int = mini(fw, (coarse.x + 2) * FactorySim.SUBDIV)
-	var fy1: int = mini(fh, (coarse.y + 2) * FactorySim.SUBDIV)
+	# Cover this cell's SUBDIV block and SYNC_BAND coarse cells of margin on every side.
+	var fx0: int = maxi(0, (coarse.x - SYNC_BAND) * FactorySim.SUBDIV)
+	var fy0: int = maxi(0, (coarse.y - SYNC_BAND) * FactorySim.SUBDIV)
+	var fx1: int = mini(fw, (coarse.x + 1 + SYNC_BAND) * FactorySim.SUBDIV)
+	var fy1: int = mini(fh, (coarse.y + 1 + SYNC_BAND) * FactorySim.SUBDIV)
 	for fy: int in range(fy0, fy1):
 		for fx: int in range(fx0, fx1):
 			sim._fine_solid[fy * fw + fx] = 1 if _cell_solid(sim, fx, fy) else 0

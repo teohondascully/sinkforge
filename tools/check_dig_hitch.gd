@@ -11,6 +11,22 @@ extends SceneTree
 ##               dirty-chunk fast lane), not the whole grid. Before #102 this reads the full grid → FAIL.
 ##   CORRECT   — the dirty-chunk region bake must be BYTE-IDENTICAL to a full rebake of the same post-dig
 ##               world (guards the dilation margin: too small a margin would leave stale AO/moss seams).
+##   COST      — the region bake must actually be CHEAP IN TIME, not merely small in extent.
+##
+## That last one was missing for a long time and its absence is worth writing down. This layer is
+## registered as "check_dig_hitch (friction)" and every assertion in it counted CELLS. Extent is a proxy
+## for cost, and it is a proxy that breaks exactly where it matters: the tile-texture work adds ~2 extra
+## noise samples per solid fine cell, which makes every bake more expensive while touching precisely the
+## same number of cells. The measured original defect — DIG p95 33.8ms → 19.8ms — could have walked back
+## in and this gauge would have printed PASS the whole way.
+##
+## An ABSOLUTE millisecond budget is not the answer on arbitrary hardware; it flakes, and someone deletes
+## it. So the always-on assertion is a RATIO measured twice on the same machine in the same process: bake
+## the full grid, bake one region, and compare their per-cell costs. A region bake is allowed to be dearer
+## per cell (fixed setup amortised over few cells, worse cache locality) but not wildly so — that is what
+## "the fast lane is genuinely a fast lane" means in time rather than in cell count. The per-cell µs of
+## both is always PRINTED, so drift is visible to a human even when the ratio holds, and an absolute
+## budget can be switched on for one named machine via SF_PERF_HOST.
 ##
 ## It boots the REAL scene and digs through the real sim, so it measures the path the game actually runs.
 ## HEADED:  /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_dig_hitch.gd
@@ -20,11 +36,66 @@ const FINE_SEED: int = 1337                 ## must match WorldRenderer's FineTe
 ## A single 32px dig dilated by REGION_MARGIN(6) is a ~16×16 fine patch (256 cells). Allow generous slack
 ## for a dig that dirties a small cluster, but far below the ~120k full grid — the freeze is unmistakable.
 const MAX_DIG_CELLS: int = 4096
+## Each bake is timed BEST-OF-N. The minimum is the right statistic here: we are asking "what does this work
+## cost", and every sample is that cost plus some amount of scheduler noise ≥ 0. Taking the min subtracts as
+## much of the noise as the samples let us, which is what keeps a ratio gate usable on a loaded CI box.
+const TIME_SAMPLES: int = 3
+## THE PORTABLE COST GATE — per-cell, not total. A region bake's cost PER FINE CELL may exceed a full
+## bake's per-cell cost, but only by this factor. Per-cell is the right normalisation: it does not care how
+## many cells the dig happened to dirty, so changing REGION_MARGIN or SYNC_BAND does not silently re-tune
+## the gate the way a raw total-time ratio would.
+##
+## Derivation, measured on an M4 Pro over four runs (every run PRINTS these numbers, so anyone can redo it):
+##   full bake    6.47 / 6.54 / 6.75 / 7.01 us per cell   (262144 cells, ~1.7 s)
+##   dig region   7.68 / 7.93 / 8.31 / 9.00 us per cell   (576 cells, ~4.6 ms)
+##   ratio        1.19 / 1.21 / 1.23 / 1.28
+## The absolutes drift together as the machine warms; the RATIO barely moves. That is exactly the property
+## that makes it portable, and the reason the gate is a ratio rather than a millisecond count.
+##
+## Why the ratio exceeds 1.0 at all, and why the gate is not tighter: both paths end with the SAME fixed
+## full-image set_data + texture upload of the whole 512x512 image. Call it U. Then
+##   region per-cell = U/576 + p        full per-cell = U/262144 + p ~= p
+## and from the measured pair, U/576 ~= 1.4 us so U ~= 0.8 ms — about a fifth of the region bake. The
+## consequence worth knowing: the ratio RISES as the dirty region SHRINKS, because U is spread over fewer
+## cells. If a future change halved the region to ~288 cells the ratio would climb to ~1.5 with no
+## regression at all. The gate is set at 3.0 to survive that, which still catches a doubling of the region
+## path's real per-cell work.
+##
+## PROVED NON-VACUOUS, not assumed to be. Injecting the exact bug class this gate exists for — a full-grid
+## _tone refresh inside rebake_region, which does hidden 262144-cell work while last_baked_cells stays 576 —
+## moved the region bake 4.73 -> 13.19 ms and the ratio 1.19 -> 3.385, and the layer went RED. Every OTHER
+## assertion here stayed green through that injection: the cell-count gate still saw 576 cells and the
+## byte-identity check still matched, because the output was correct, only ruinously expensive. That is the
+## whole point of the gate. It fires at roughly a 2.5x per-cell regression; a 1.5x one would slip through,
+## and that is the honest limit of a ratio with this much headroom.
+##
+## WHAT THIS GATE CANNOT SEE, stated plainly so nobody trusts it further than it goes: a change that makes
+## EVERY bake more expensive — more noise samples per solid cell, say — moves both numbers together and the
+## ratio does not budge. That is why the absolute us/cell is printed on every run, and why SF_DIG_BUDGET_MS
+## exists below for anyone who has characterised a specific machine.
+const MAX_PERCELL_RATIO: float = 3.0
+## Optional ABSOLUTE gate: set SF_DIG_BUDGET_MS to a millisecond ceiling for the region bake on a machine
+## you have characterised (CI runner, your desktop) and it is asserted too. Unset, the cost is only printed.
+## The budget lives in the environment rather than in a constant here because "how many ms is acceptable"
+## is a property of the machine, and this file is read on machines nobody controls.
+const BUDGET_ENV: String = "SF_DIG_BUDGET_MS"
+
+## Frame of the first dig, and how many frames apart the digs are spaced (the renderer consumes
+## terrain_dirty and takes the fast lane on a later frame, so each dig needs room to land).
+const MINE_FRAME: int = 13
+const MINE_STEP: int = 6
 
 var _main: MainView
 var _frames: int = 0
 var _failures: int = 0
 var _dig_cell: Vector2i
+## THE DIG SITES. Each entry is the set of coarse cells mined in ONE frame, so the last entry exercises a
+## MULTI-CELL dirty range (cmin != cmax) — the generalisation where the stale-ring bug actually lived and
+## which a single-cell test cannot reach. Sites are spread far apart in x on purpose: each dig's rebake
+## window is only ~5 coarse cells wide, so no dig can accidentally repaint (and thus repair) another's
+## staleness before the comparison at the end.
+var _sites: Array = []
+var _max_dig_cells_seen: int = 0
 
 
 func _initialize() -> void:
@@ -32,6 +103,28 @@ func _initialize() -> void:
 	_main = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(_main)
 	process_frame.connect(_on_frame)
+
+
+## The first SOLID cell in `col` at or below `surface_row(col) + drop`, searching down. Returns the
+## starting cell unchanged if the column is hollow all the way — the caller asserts solidity, so a hollow
+## column fails loudly rather than silently digging air.
+func _rock(sim: FactorySim, col: int, drop: int) -> Vector2i:
+	var start: int = sim.surface_row(col) + drop
+	for y: int in range(start, FactorySim.GRID_ROWS):
+		if sim.is_solid(Vector2i(col, y)):
+			return Vector2i(col, y)
+	return Vector2i(col, start)
+
+
+## Two horizontally ADJACENT solid cells near `col`, for the multi-cell dirty range. Searches down for a
+## row where both columns are rock; a single-cell dig cannot exercise cmin != cmax and that is exactly the
+## generalisation the stale-ring bug lived in.
+func _rock_pair(sim: FactorySim, col: int, drop: int) -> Array:
+	var start: int = sim.surface_row(col) + drop
+	for y: int in range(start, FactorySim.GRID_ROWS):
+		if sim.is_solid(Vector2i(col, y)) and sim.is_solid(Vector2i(col + 1, y)):
+			return [Vector2i(col, y), Vector2i(col + 1, y)]
+	return [Vector2i(col, start), Vector2i(col + 1, start)]
 
 
 func _check(cond: bool, label: String) -> void:
@@ -51,26 +144,51 @@ func _on_frame() -> void:
 		var full: int = _main._renderer._fine.last_baked_cells
 		_check(full == FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV
 			or full > MAX_DIG_CELLS, "initial full bake touched the whole grid (%d cells)" % full)
-		# Pick a deep interior solid cell so mining it dirties exactly one cell (no tree-fell / ore-collapse
-		# / surface shift) — the cleanest single-dig friction measurement.
+		# Pick dig sites at several depths and columns. The first is a deep interior solid cell, so mining it
+		# dirties exactly one cell (no tree-fell / ore-collapse / surface shift) — the cleanest single-dig
+		# friction measurement, and the one the cost gate is timed against.
 		var mid: int = FactorySim.GRID_COLS / 2
 		_dig_cell = Vector2i(mid, sim.surface_row(mid) + 10)
-		_check(sim.is_solid(_dig_cell), "chosen dig cell is solid interior rock %s" % _dig_cell)
+		var far: int = maxi(FactorySim.GRID_COLS / 5, 4)
+		var near: int = mini(FactorySim.GRID_COLS - 5, mid + far)
+		# Depth offsets are a STARTING point, not an answer: a fixed offset lands in a cave often enough to
+		# make the layer seed-fragile, so each site searches downward for real rock from there.
+		_sites = [
+			[_dig_cell],                                     # deep interior, single cell — the timed one
+			[_rock(sim, far, 18)],                           # deeper, a different column
+			[_rock(sim, mid - far, 3)],                      # shallow — inside the surface molding band
+			_rock_pair(sim, near, 12),                       # MULTI-CELL: cmin != cmax
+		]
+		for site: Array in _sites:
+			for c: Vector2i in site:
+				_check(sim.is_solid(c), "dig site %s is solid rock" % c)
 		return
-	if _frames == 13:
-		sim.mine(_dig_cell)   # the real dig verb — appends the cell to sim.terrain_dirty
-		return
-	if _frames == 18:
-		# The renderer has consumed terrain_dirty and taken the fine fast lane by now.
+	# Mine each site on its own frame, spaced so the renderer takes the fast lane between them.
+	for i: int in _sites.size():
+		if _frames == MINE_FRAME + i * MINE_STEP:
+			for c: Vector2i in _sites[i]:
+				sim.mine(c)   # the real dig verb — appends the cell to sim.terrain_dirty
+			return
+	if _frames == MINE_FRAME + 3:
+		# The renderer has consumed terrain_dirty and taken the fine fast lane for the FIRST dig by now.
 		var cells: int = _main._renderer._fine.last_baked_cells
 		print("  dig rebaked %d fine cells (limit %d, full grid ~%d)" % [cells, MAX_DIG_CELLS,
 			FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV])
 		_check(cells > 0, "a dig triggered a fine rebake")
 		_check(cells <= MAX_DIG_CELLS, "a single dig rebakes a SMALL region, not the whole grid (no freeze)")
+		return
+	if _frames > MINE_FRAME and _frames < MINE_FRAME + _sites.size() * MINE_STEP:
+		_max_dig_cells_seen = maxi(_max_dig_cells_seen, _main._renderer._fine.last_baked_cells)
+		return
+	if _frames == MINE_FRAME + _sites.size() * MINE_STEP + 3:
+		_check(_max_dig_cells_seen <= MAX_DIG_CELLS,
+			"the DEAREST dig of the set, including the multi-cell one, still rebakes a small region (%d <= %d)"
+				% [_max_dig_cells_seen, MAX_DIG_CELLS])
 
-		# CORRECTNESS: a full rebake of the SAME post-dig world must be byte-identical to the region bake the
-		# renderer just did — reuse the renderer's exact palette/wall/surface authorities so only the bake
-		# PATH differs, not the inputs.
+		# CORRECTNESS: a full rebake of the SAME post-dig world must be byte-identical to the region bakes the
+		# renderer has accumulated — reuse the renderer's exact palette/wall/surface authorities so only the
+		# bake PATH differs, not the inputs. One reference bake covers every site: a region bake that left
+		# stale solidity behind has no later chance to repair it, because the sites do not overlap.
 		var r: WorldRenderer = _main._renderer
 		var ref := FineTerrain.new(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, FINE_SEED)
 		ref.rebake(
@@ -85,9 +203,64 @@ func _on_frame() -> void:
 		var want: PackedByteArray = ref.texture().get_image().get_data()
 		_check(got == want, "region bake is byte-identical to a full bake of the same world (margin is safe)")
 
+		_cost(r, ref)
+
 		if _failures == 0:
 			print("check_dig_hitch: PASS")
 			quit(0)
 		else:
 			printerr("check_dig_hitch: %d FAILURE(S)" % _failures)
 			quit(1)
+
+
+## THE COST GATE. `ref` has already been fully baked once by the caller, so its caches are sized and warm —
+## which is the state the game is actually in when it bakes. Time a full bake and a region bake back to back
+## on that same warm object: same machine, same process, same data, same moment. Only the PATH differs, so
+## the ratio between them is a property of the code and not of the hardware it ran on.
+func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
+	var solid_at := func(c: Vector2i) -> bool: return r.sim.is_solid(c)
+	var fine_at := func(fx: int, fy: int) -> bool: return r.sim.fine_is_solid(fx, fy)
+	var mat_at := func(c: Vector2i) -> Color: return r._cell_base_color(c, r._material(r.sim.material_at(c)))
+	var surf_at := func(col: int) -> int: return r.sim.surface_row(col)
+
+	var full_us: int = 1 << 62
+	var full_cells: int = 0
+	for i: int in TIME_SAMPLES:
+		var t0: int = Time.get_ticks_usec()
+		ref.rebake(solid_at, fine_at, mat_at, r._wall_base_color, surf_at, r._cell_tone, r._has_wall)
+		full_us = mini(full_us, Time.get_ticks_usec() - t0)
+		full_cells = ref.last_baked_cells
+
+	var region_us: int = 1 << 62
+	var region_cells: int = 0
+	for i: int in TIME_SAMPLES:
+		var t0: int = Time.get_ticks_usec()
+		ref.rebake_region(_dig_cell, _dig_cell, solid_at, fine_at, mat_at, r._wall_base_color, surf_at,
+			r._cell_tone, r._has_wall)
+		region_us = mini(region_us, Time.get_ticks_usec() - t0)
+		region_cells = ref.last_baked_cells
+
+	# Always PRINT the cost, whether or not it is asserted, so drift is visible to a human reading a green
+	# run and so the derivation above can be re-checked on any machine without editing anything.
+	var full_pc: float = float(full_us) / float(maxi(full_cells, 1))
+	var region_pc: float = float(region_us) / float(maxi(region_cells, 1))
+	var ratio: float = region_pc / maxf(full_pc, 0.001)
+	print("  COST full bake %.2f ms / %d cells (%.3f us/cell)" % [full_us / 1000.0, full_cells, full_pc])
+	print("  COST dig region %.2f ms / %d cells (%.3f us/cell)" % [region_us / 1000.0, region_cells, region_pc])
+	print("  COST per-cell region/full = %.3f (gate %.2f), best of %d each; total ratio %.4f"
+		% [ratio, MAX_PERCELL_RATIO, TIME_SAMPLES, float(region_us) / float(maxi(full_us, 1))])
+
+	_check(full_cells > region_cells, "the timed pair really is full-grid vs region (%d vs %d cells)"
+		% [full_cells, region_cells])
+	_check(ratio <= MAX_PERCELL_RATIO,
+		"a dig's bake costs no more PER CELL than a full bake — the fast lane is fast in TIME, not just "
+			+ "small in extent (%.3f <= %.2f)" % [ratio, MAX_PERCELL_RATIO])
+
+	var budget: String = OS.get_environment(BUDGET_ENV)
+	if budget.is_empty():
+		print("  (absolute ms budget not asserted: %s unset — the per-cell ratio is what CI enforces)"
+			% BUDGET_ENV)
+	else:
+		var ms: float = float(budget)
+		_check(region_us / 1000.0 <= ms, "dig region within the %s=%s budget (%.2f <= %.2f ms)"
+			% [BUDGET_ENV, budget, region_us / 1000.0, ms])

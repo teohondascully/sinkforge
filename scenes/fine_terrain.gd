@@ -424,10 +424,11 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 
 
 ## THE PER-DIG FAST LANE (#102 dirty-chunks — the mining micro-freeze fix). Rebake ONLY the fine cells under
-## the changed coarse cells [cmin..cmax], DILATED by REGION_MARGIN so every neighbour-reading paint term
-## (AO / moss / accretion / rim) recomputes exactly as a full bake would → the output is byte-identical to
-## rebake() but touches ~256 cells for a single dig, not the whole ~120k grid. Falls back to a full rebake
-## if the grid was never fully baked (nothing cached to patch). Callables match rebake()'s.
+## the changed coarse cells [cmin..cmax] WIDENED by the sim's SYNC_BAND re-mold ring, then DILATED by
+## REGION_MARGIN so every neighbour-reading paint term (AO / moss / accretion / rim) recomputes exactly as
+## a full bake would → the output is byte-identical to rebake() but touches ~576 cells for a single dig,
+## not the whole 262k grid. Falls back to a full rebake if the grid was never fully baked (nothing cached
+## to patch). Callables match rebake()'s.
 func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_solid_at: Callable,
 		material_color_at: Callable, wall_color_at: Callable, surface_at: Callable, tone_at: Callable,
 		has_wall_at: Callable) -> void:
@@ -455,11 +456,18 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	# _tone is deliberately NOT refreshed: a tone is a pure function of (x, y), so mining cannot change
 	# one. Leaving the cache alone is what keeps a region bake byte-identical to a full bake here.
-	# 2) Refresh the real fine solid/air shape for the changed cells' fine footprint.
-	var fx0c: int = cmin.x * SUBDIV
-	var fy0c: int = cmin.y * SUBDIV
-	var fx1c: int = (cmax.x + 1) * SUBDIV - 1
-	var fy1c: int = (cmax.y + 1) * SUBDIV - 1
+	# 2) Refresh the real fine solid/air shape over every fine cell the EDIT COULD HAVE CHANGED.
+	#    That window is NOT the changed coarse cells' own footprint: the sim re-molds a SYNC_BAND ring of
+	#    coarse cells around each edit (src/core/fine_terrain.gd sync_block), because a fine cell's molded
+	#    shape reads its parent's eight coarse neighbours. Refreshing only the footprint left the ring
+	#    holding pre-dig solidity, and a single stale bit there smeared ~16 texels of wrong AO/moss — a
+	#    region bake that was no longer byte-identical to a full one. Read the band width from the sim so
+	#    the two cannot drift apart again.
+	var band: int = FactorySim.FineTerrain.SYNC_BAND
+	var fx0c: int = maxi((cmin.x - band) * SUBDIV, 0)
+	var fy0c: int = maxi((cmin.y - band) * SUBDIV, 0)
+	var fx1c: int = mini((cmax.x + 1 + band) * SUBDIV - 1, _fcols - 1)
+	var fy1c: int = mini((cmax.y + 1 + band) * SUBDIV - 1, _frows - 1)
 	for fy: int in range(fy0c, fy1c + 1):
 		for fx: int in range(fx0c, fx1c + 1):
 			_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
