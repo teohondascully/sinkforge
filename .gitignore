@@ -87,5 +87,8 @@ _miner_sheet.png.import
 /_crop_*.png.import
 tools/_scratch_*.gd
 
-# One-generation undo for the gitignored canonical captures (tools/capture_moments.gd).
+# One-generation undo for the canonical captures (tools/capture_moments.gd). It was written when they were
+# gitignored and it was the ONLY undo they had; now that they are committed, git holds every generation
+# that was ever committed and this holds the one that was not — capture, look, recapture, all before any
+# commit exists to fall back to. Still worth having, for a narrower reason than the one it was built for.
 _moment_prev/
