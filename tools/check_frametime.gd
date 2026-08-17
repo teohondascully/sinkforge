@@ -10,9 +10,11 @@ extends SceneTree
 ## can be true: an absolute 8.33ms budget that runs ONLY when SF_PERF_HOST names the machine (see
 ## FRAME_BUDGET_MS). Everywhere else this layer says what it measured and asserts only the ratio.
 ##
-## Forty-nine harness layers judged what the game DOES and not one of them judged how fast it does it, which
-## is a strange gap for a 2D game whose whole pitch is movement. A swing that measures beautifully and hitches
-## twice on the way down is not a good swing, and no layer here could tell the difference.
+## Every other layer in this suite judged what the game DOES and not one judged how fast it does it, which is
+## a strange gap for a 2D game whose whole pitch is movement. A swing that measures beautifully and hitches
+## twice on the way down is not a good swing, and no layer here could tell the difference. (This sentence
+## used to open with a COUNT of those layers. It was written at 49 and read 49 at 66 — a number in prose is
+## a claim with no runner, and the suite grows faster than anybody re-reads a docstring.)
 ##
 ## WALL-CLOCK, not `Performance.TIME_PROCESS`. The engine's process timer counts script time and misses the
 ## command buffer, the submit and everything the driver does — and on this renderer that is most of a frame.

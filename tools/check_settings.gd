@@ -36,7 +36,7 @@ func _initialize() -> void:
 	# has to come first, before any line below sets a level for its own purposes. A clean profile — no
 	# settings.cfg, nothing chosen — must boot AUDIBLE.
 	#
-	# It is pinned because the opposite shipped and 61 harness layers never saw it: every other audio check
+	# It is pinned because the opposite shipped and the entire suite never saw it: every other audio check
 	# here assigns `muted` before observing it, so the default was the one audio fact nothing in the project
 	# actually read. A test that sets the value it is about cannot report on the value that ships.
 	_check(not Settings.muted, "a first boot, with no settings file, starts with SOUND ON")

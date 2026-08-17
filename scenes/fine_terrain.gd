@@ -418,14 +418,29 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 	_data.resize(_fcols * _frows * 4)
 	# Read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding lives in the sim's fine
 	# DATA), stashed so the paint can read neighbours for fine AO.
-	# ONE COPY INSTEAD OF 262144 DYNAMIC DISPATCHES. This loop called a Callable once per fine cell, and
-	# the boot/load bake it belongs to measured 1671.79ms — 6.377us per cell, on a body of work that is
-	# an array read. `Callable.call()` is dynamic dispatch with argument boxing; at a quarter of a million
-	# invocations it dominates everything the bake actually computes.
+	# ONE COPY INSTEAD OF 262144 DYNAMIC DISPATCHES. This loop called a Callable once per fine cell to read
+	# an array the sim already holds — `FactorySim._fine_solid`, a PackedByteArray of 0/1 with the same
+	# `fy * width + fx` layout and the same dimensions — so the whole loop is a memcpy. Duplicated rather
+	# than aliased: the baker's copy is a SNAPSHOT, and rebake_region writes into it later.
 	#
-	# The sim already holds exactly this array — `FactorySim._fine_solid`, a PackedByteArray of 0/1 with
-	# the same `fy * width + fx` layout and the same dimensions — so the whole loop is a memcpy. Duplicated
-	# rather than aliased: the baker's copy is a SNAPSHOT, and rebake_region writes into it later.
+	# WHAT IT ACTUALLY BOUGHT, because this comment used to claim otherwise and the claim was wrong. It
+	# read "the bake measured 1671.79ms — 6.377us per cell … at a quarter of a million invocations it
+	# dominates everything the bake actually computes." Neither half survived being measured (`25494c4`):
+	#
+	#   full bake, per-cell Callable   1695.31 ms   6.467 us/cell
+	#   full bake, bulk fine grid      1520.65 ms   5.801 us/cell   1.11x
+	#
+	# 175ms — about 10%, not the 10x the dispatch count suggested, and nothing near "dominates". The
+	# hypothesis was reasonable and the arithmetic was seductive; it was still a guess, and the number in
+	# the comment was neither of the two the benchmark later produced.
+	#
+	# DO NOT RE-DERIVE THIS THE HARD WAY. The other obvious candidate is also dead: the eight
+	# get_noise_2d() calls per fine cell measure 16% (246.84ms, `9bac504`, instrument at
+	# tools/measure_bake_noise.gd). The remaining ~74% is the REST of `_paint_fine` — Color allocation and
+	# lerps, apply_tone, _contact_index, _accreted_color, the neighbour scans — with no hotspot at all,
+	# just a hundred interpreted operations across 262144 iterations. Micro-optimisation cannot reach a
+	# diffuse 74%. The two options that preserve the output byte-identically are baking the visible region
+	# first and filling outward on later frames, or getting the bake off the main thread.
 	#
 	# The Callable path is kept, and is not dead code: check_texture bakes a synthetic world that has no
 	# sim behind it. A size mismatch also falls back here rather than baking a wrong-shaped grid.
