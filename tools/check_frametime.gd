@@ -551,7 +551,17 @@ func _report_refusal(player: Player, target: Vector2i) -> void:
 		% [_main._paused, _main.sim.is_solid(target), String(mat) if mat != &"" else "(none)"])
 	printerr("       can_mine=%s  pack=%s"
 		% [MiningRules.can_mine(mat, _main.sim.inventory), _main.sim.inventory])
-	printerr("       if solid=true and can_mine=true, the refusal was REACH or LINE OF SIGHT")
+	# EVERY GATE, NAMED SEPARATELY. The previous line said "if solid and can_mine, it was REACH or LINE OF
+	# SIGHT" — a two-way guess that was also incomplete, because `_mineable` has a fourth clause. Each gate
+	# is now reported as itself, so the next occurrence arrives with the answer rather than a shortlist.
+	var bit: StringName = BitRules.equipped(_main._selected_item())
+	printerr("       reach=%s  line_of_sight=%s  bit=%s grain_only=%s bites=%s"
+		% [_main._can_reach(target), _main._line_of_sight_clear(_main._body_cell(), target),
+			String(bit), BitRules.grain_only(bit), _main._bit_bites(bit, target)])
+	printerr("       body px=%s  target centre px=%s  distance=%.1f cells (reach is %.1f)"
+		% [player.position, _main._cell_center(target),
+			player.position.distance_to(_main._cell_center(target)) / float(WorldRenderer.CELL),
+			MainView.REACH_CELLS])
 
 
 ## DERIVED FROM THE GAME'S OWN REACH, not typed. It was 4 and the body can mine 3.2 cells, so
@@ -570,11 +580,39 @@ func _report_refusal(player: Player, target: Vector2i) -> void:
 ## `floori`, not `roundi`: 3.2 cells of reach means three whole cells, and rounding up would restore the
 ## bug with a derivation in front of it.
 const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
+
+## ASK THE VERB, DO NOT MODEL IT. The scan now tests `_main._mineable(c)` — the exact predicate
+## `try_mine` gates on — instead of `is_solid`, which was only ever one of its four clauses.
+##
+## Deriving `DIG_REACH` from `REACH_CELLS` fixed the gross case (it was a typed 4 against a 3.2 reach) and
+## I wrote a docstring claiming the fixture could no longer select a cell the verb was forbidden to service.
+## That claim was too strong and this is the retraction. `_can_reach` is a EUCLIDEAN PIXEL distance from
+## the body's centre to the cell's centre (main.gd:2439); `dy <= DIG_REACH` is a ROW COUNT. They disagree
+## by up to a cell depending on where in its own cell the body is standing: sitting high in row 19, the
+## centre of row 22 is ~3.5 cells away and REFUSED, while `dy == 3` waves it through. A row count is not a
+## radius, and rounding the radius down does not turn it into one — it only shrinks how often they differ.
+##
+## And `_mineable` has a fourth clause the proxy never modelled at all: `_bit_bites`, the Wedge grain rule.
+## A grain-only bit facing a misaligned seam refuses that cell PERMANENTLY — the body is not falling, so
+## nothing self-corrects, and the refusal repeats every frame for as long as the phase runs. That is the
+## only mechanism I have found whose signature actually matches the one unreproduced failure (400
+## consecutive refusals, body over 44 rows of solid rock). I am NOT claiming it is that failure's cause:
+## the failing run's bit is not in the record and this fixture has never been seen to equip a grain-only
+## one. It is a candidate that the old proxy was structurally incapable of surfacing, which is reason
+## enough to stop using the proxy.
+##
+## `DIG_REACH` survives as the SEARCH BOUND — how far down to look — which is the one job a row count is
+## right for. The reach decision itself now belongs to the code that owns it.
+##
+## The fallback is deliberately still an unmineable cell rather than the best near-miss. If nothing within
+## reach is mineable, the honest outcome is `try_mine` refusing, the refusal reporter naming which gate
+## said no, and the workload floor failing the layer. Substituting a cell the verb would accept would
+## convert "this fixture had nothing to dig" into a passing measurement of somewhere else.
 func _dig_target(player: Player) -> Vector2i:
 	var here: Vector2i = _main._cell_at(player.position)
 	for dy: int in range(1, DIG_REACH + 1):
 		var c: Vector2i = here + Vector2i(0, dy)
-		if _main.sim.is_solid(c):
+		if _main._mineable(c):
 			return c
 	return here + Vector2i(0, 1)
 
