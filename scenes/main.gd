@@ -979,6 +979,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _settings_open:
 		_settings_input(event)
 		return
+	# Retire the bottom-left key hint one entry at a time, as each key is actually used. Done HERE, above
+	# the whole if/elif chain, rather than inside each branch — a hint that retires on some of its keys and
+	# not others is worse than one that never retires, and five scattered call sites is how that happens.
+	# Every hinted action, GRAPPLE included, is dispatched by this one chain, so one loop sees all of them.
+	for row: Array in Hud.HINT_KEYS:
+		if event.is_action_pressed(row[0]):
+			_hud.note_hint_used(row[0])
+			break
 	if event.is_action_pressed(Controls.PAUSE):
 		_paused = not _paused
 	elif event.is_action_pressed(Controls.CRAFT):

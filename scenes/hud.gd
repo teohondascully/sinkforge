@@ -2168,8 +2168,44 @@ func settings_slider_frac(id: String, canvas_x: float) -> float:
 
 ## A tiny dim hint, bottom-left — the toggle keys, so the player knows the menus exist without the old
 ## always-on keyboard-reference footer hogging the whole bottom edge.
+##
+## IT RETIRES ITSELF, ONE KEY AT A TIME, AND THAT IS THE POINT. The subjective audit's charge against this
+## line was not that it is ugly — it is 10px and dim — but that it is PERMANENT: "the persistent bottom-left
+## key legend reads like test-build chrome", listed on the kill list under "teach contextually, then remove
+## it". A reference card that never leaves is a statement that the game expects you never to learn it, and
+## it sits in the corner of every screenshot the game will ever take.
+##
+## So each entry disappears the first time you press that key, and when the last one goes the line goes with
+## it. A player who already knows the controls clears it in about four seconds and never sees it again; a
+## player who does not gets exactly the entries they have not yet used, which is a smaller and more pointed
+## hint every time they look. Nothing is hidden that has not been demonstrably learned.
+##
+## SESSION-SCOPED ON PURPOSE. This is not written to the save. `check_save_frontier` guards every field in
+## the envelope and would rightly demand this one declare its disposition, and "which keys has this player
+## pressed" is not world state — it is a teaching aid whose cost of being wrong is one dim line for four
+## seconds. A returning player re-clears it. That is cheaper than owning a migration for it.
+const HINT_KEYS: Array = [
+	[Controls.GRAPPLE, "F hook"], [Controls.DROP, "Q drop"], [Controls.CRAFT, "E pack"],
+	[Controls.MAP, "M map"], [Controls.HELP, "H keys"],
+]
+
+var _hint_used: Dictionary = {}          ## action -> true, once the player has pressed it this session
+
+
+## Called from the input handler when one of the hinted actions fires. Unknown actions are ignored, so a
+## caller may pass anything without checking.
+func note_hint_used(action: StringName) -> void:
+	_hint_used[action] = true
+
+
 func _draw_hint() -> void:
-	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "F hook   ·   Q drop   ·   E pack   ·   M map   ·   H keys",
+	var parts: PackedStringArray = PackedStringArray()
+	for row: Array in HINT_KEYS:
+		if not _hint_used.has(row[0]):
+			parts.append(String(row[1]))
+	if parts.is_empty():
+		return                            # everything here has been used — the line has finished its job
+	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "   ·   ".join(parts),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 
 
