@@ -254,6 +254,13 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # the build, which is a different question from how good the picture has to be. Run it by hand:
 #   bash tools/with_machine.sh --script res://tools/check_rock_reads.gd
 # and register it the day it passes. Current reading and the open item live in docs/PRIORITY.md.
+#
+# check_contact_edge (6b) is unregistered for the SAME reason and on the same terms:
+#   bash tools/with_machine.sh --script res://tools/check_contact_edge.gd
+# First reading on a generated world: detectability 52%, polarity 51%, floor 75% for both. A rock/air face
+# steps 1.6/255 and rock's own interior texture steps 1.5/255, so the contact between wall and hole carries
+# very nearly no information at all. Same rule as above — the floor does not move, and the layer joins the
+# suite the day the picture clears it rather than the day the bar is lowered to meet the picture.
 # add_gl and NOT add_excl: it renders every item icon and compares silhouettes and CIELab means. Contention
 # changes how LONG that takes and not one pixel of what comes back, and exclusivity is the scheduler's most
 # expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
