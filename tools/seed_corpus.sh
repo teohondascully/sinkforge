@@ -85,13 +85,18 @@ for layer in "${LAYERS[@]}"; do
 	for s in "${CORPUS[@]}"; do
 		log="$DIR/$layer.$s.log"
 		[ -f "$log" ] || continue
-		nums=$(grep -hoE '\(([a-z ]+ )?[-0-9]+\.[0-9]+ [^)]*\)|[0-9]+\.[0-9]+ (per|encounters|rows)[^,)]*' "$log" 2>/dev/null | head -3 | tr '\n' ' ')
-		[ -z "$nums" ] && nums=$(grep -hE "PASS|FAIL" "$log" | grep -oE '\([^)]*[0-9][^)]*\)' | head -3 | tr '\n' ' ')
+		# Layers report their measurements parenthesised inside the assertion text -- "(density 7.4 per 100
+		# rows)", "(drought 19)". Pull the parenthesised groups that contain a digit off the PASS/FAIL lines
+		# and put one seed per line. Deliberately dumb: any layer that prints its numbers the normal way
+		# shows up here without the corpus knowing anything about that layer.
+		nums=$(grep -hE "^[[:space:]]*(PASS|FAIL)" "$log" 2>/dev/null \
+			| grep -oE '\([^)]*[0-9][^)]*\)' | head -4 | tr '\n' ' ')
 		if [ -n "$nums" ]; then
 			[ "$shown" = 0 ] && { echo; echo "--- $layer"; shown=1; }
 			printf '  seed %-10s %s\n' "$s" "$nums"
 		fi
 	done
+	[ "$shown" = 0 ] && { echo; echo "--- $layer  (prints no parenthesised numbers — read its log directly)"; }
 done
 
 echo
