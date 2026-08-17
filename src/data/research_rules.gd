@@ -61,6 +61,17 @@ const TECHS: Dictionary = {
 		"unlocks": [&"plate_press", &"gear_mill", &"h_drill"],   # the crafter modules + the Borer
 		                                       # (the Borer is machining's PAYOFF: priced in plates+gears)
 	},
+	&"galleries": {
+		"name": "Galleries",
+		"requires": &"machining",
+		"sample": &"stone",                    # analyze the SPOIL — the thing the Borer has been drowning
+		                                       # you in is the thing that teaches you to sort it
+		"cost": {&"plate": 3, &"gear": 3},
+		"unlocks": [&"drift_rig"],             # the powered gallery machine that sorts pay from spoil at
+		                                       # the face (docs/DRIFT.md). Deliberately AFTER Power and
+		                                       # after the Borer: it is the answer to a problem you have
+		                                       # personally hauled, not the tutorial for power.
+	},
 	&"enrichment": {
 		"name": "Enrichment",
 		"requires": &"machining",
@@ -81,7 +92,7 @@ const TECHS: Dictionary = {
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
 ## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
 ## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
-const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"enrichment", &"drainage"]
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"galleries", &"enrichment", &"drainage"]
 
 
 static func tech(id: StringName) -> Dictionary:

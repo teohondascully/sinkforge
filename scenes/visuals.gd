@@ -32,6 +32,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
 	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
 	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue — the powered flood-drain (L3)
+	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal — powered, heavy
 }
 
 
@@ -89,6 +90,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_press(canvas, center, s, active, t)
 		"h_drill":
 			_h_drill(canvas, center, s, active, t, flip)
+		"drift":
+			_drift(canvas, center, s, active, t, flip)
 		"descent":
 			_descent(canvas, center, s, active, t)
 		"pump":
@@ -178,6 +181,50 @@ static func _h_drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 			canvas.draw_line(Vector2(fx, c.y - 3.0 * s), Vector2(fx - 1.4 * s * f, c.y + 3.0 * s), edge, 1.0)
 	var fire: float = (0.7 + 0.3 * sin(t * 7.0)) if active else 0.3     # the coal bunker's fire dot
 	canvas.draw_circle(c + Vector2(-4.5 * s * f, 4.0 * s), 1.6 * s, Color(1.0, 0.55, 0.18, 0.4 + 0.5 * fire))
+
+
+## THE DRIFT RIG: a squat powered gallery machine. It reads as the Borer's bigger sibling on purpose — same
+## facing, same forward judder — but with the two things that make it a different machine drawn where you can
+## see them: a TWO-HIGH cutting head (the walkable gallery it leaves) and a SORTER — two chutes under the
+## body, one pointing down for pay and one pointing back for spoil, with a divider between them. Its power is
+## an arc across the head rather than a fire, because it eats a network and not a coal box.
+static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, flip: bool) -> void:
+	var f: float = -1.0 if flip else 1.0
+	var steel := Color(0.10, 0.12, 0.14)
+	var edge := Color(0.78, 0.84, 0.82)
+	var pay := Color(0.92, 0.74, 0.30)      # the ore chute wears ORE's colour...
+	var spoil := Color(0.60, 0.60, 0.62)    # ...and the rock chute wears ROCK's. That IS the machine.
+	var bob: float = (sin(t * 11.0) * 1.2 if active else 0.0) * s
+	# The body: one dark block with its mass to the rear, so the bright bar at the face has something to
+	# read against. At 32 world pixels a machine gets two shapes and a colour — no more.
+	var bx: float = (c.x - 10.0 * s) if f > 0.0 else (c.x - 2.0 * s)
+	canvas.draw_rect(Rect2(bx, c.y - 8.0 * s, 12.0 * s, 17.0 * s), steel)
+	# THE CUTTER BAR: ONE bright bar spanning the full height of the face, with four teeth biting forward
+	# off it. Two small drums read as a single arrow at world scale — the full-height bar is the only way
+	# "it cuts two cells high" survives to 32 pixels, and the teeth are what make it a cutter not a mast.
+	var bar: float = c.x + (5.0 * s + bob) * f
+	canvas.draw_line(Vector2(bar, c.y - 11.0 * s), Vector2(bar, c.y + 10.0 * s), edge, 3.2 * s)
+	var march: float = (fmod(t * 9.0, 6.0) if active else 0.0) * s
+	for k: int in 4:
+		var ty: float = c.y + (-9.5 + 6.0 * float(k)) * s + march
+		if ty > c.y + 10.0 * s:
+			ty -= 21.0 * s
+		canvas.draw_colored_polygon(PackedVector2Array([
+			Vector2(bar, ty - 1.8 * s), Vector2(bar, ty + 1.8 * s),
+			Vector2(bar + 4.2 * s * f, ty)]), edge)
+	# THE SORTER: two chutes under the belly, each in the colour of what falls out of it — pay straight
+	# down its own column, spoil back down the one behind. They are the machine's whole reason to exist,
+	# so they are drawn as material, not as plumbing.
+	var pay_x: float = c.x - 2.0 * s * f
+	var spoil_x: float = c.x - 7.5 * s * f
+	canvas.draw_line(Vector2(pay_x, c.y + 6.0 * s), Vector2(pay_x, c.y + 12.0 * s), pay, 3.0 * s)
+	canvas.draw_line(Vector2(spoil_x, c.y + 6.0 * s), Vector2(spoil_x - 3.5 * s * f, c.y + 12.0 * s),
+		spoil, 3.0 * s)
+	# The power tell: an arc across the roof of the body — bright while it cuts, a dim filament while it
+	# waits on the network. It eats a network, not a coal box, so it never shows fire.
+	var arc: float = (0.6 + 0.4 * sin(t * 19.0)) if active else 0.20
+	var spark := Color(0.62, 0.88, 1.0, 0.30 + 0.65 * arc)
+	canvas.draw_line(c + Vector2(-8.0 * s * f, -9.5 * s), c + Vector2(-2.0 * s * f, -9.5 * s), spark, 1.6)
 
 
 ## Generator (coal burner → power): a steel housing with a coal-fire at its base that BREATHES while

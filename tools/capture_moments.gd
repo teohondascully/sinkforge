@@ -88,6 +88,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _teaching(main)
 		"counter", "works", "bench":
 			await _at_the_counter(main, moment)
+		"drift":
+			await _at_the_drift(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -425,6 +427,107 @@ func _dig_in(main: MainView) -> void:
 			await physics_frame
 	for _i in 20:                             # let the body settle and the veil re-cut around the lamp
 		await physics_frame
+
+
+## How far past the rig the gallery has actually been opened, both cells high — the number the shot's
+## whole left-hand claim rests on.
+func _drift_reach(sim: FactorySim, x0: int, row: int) -> int:
+	var k: int = 0
+	while k < 24 and not sim.solid.has(Vector2i(x0 + k + 1, row)) \
+			and not sim.solid.has(Vector2i(x0 + k + 1, row - 1)):
+		k += 1
+	return k
+
+
+## A DRIFT RIG mid-gallery: the one shot that can answer whether the machine's two claims read from pixels.
+## The gallery behind it should look WALKABLE (two cells high, with the miner standing in it for scale), and
+## the two streams should be visibly separate — ore falling down one shaft, spoil down the other — which is
+## the whole thing you paid for and the whole thing a still frame can check.
+func _at_the_drift(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 34
+	# A level bench of rock for the gallery to run through, with a mixed face ahead of the rig.
+	for x: int in range(x0 - 8, x0 + 40):
+		for y: int in range(row - 8, row + 12):
+			sim.set_solid(Vector2i(x, y), &"stone")
+	for x: int in range(x0 - 8, x0 + 4):                       # the gallery already driven, two high
+		for y: int in [row, row - 1]:
+			sim.set_solid(Vector2i(x, y), &"")
+	# The face, four cells ahead: rock banded with ore. The seams are THIN on purpose (a handful of units
+	# where worldgen writes 30–200) so that seven seconds of real cutting puts both classes of material in
+	# the shot — ore, then rock, then ore. A real vein would hold the rig on one cell for minutes, which is
+	# the correct game and a useless photograph.
+	for k: int in range(4, 26):
+		for dy: int in [0, -1]:
+			if (k + dy) % 3 == 0:
+				var seam := Vector2i(x0 + k, row + dy)
+				sim.set_solid(seam, &"ore")
+				sim.deposits[seam] = 4
+	# The two drop shafts, dug where the rig's two columns are — the player's half of the bargain — falling
+	# into a lit SUMP. Both halves are for the photograph and both are what a player would build: short
+	# shafts so the landed piles are in the same frame as the machine that sorted them, and a chamber at
+	# the bottom because two piles at the foot of two unlit one-cell holes are two dark smudges.
+	for y: int in range(row + 1, row + 6):
+		sim.set_solid(Vector2i(x0, y), &"")
+		sim.set_solid(Vector2i(x0 - 1, y), &"")
+	for x: int in range(x0 - 4, x0 + 3):
+		for y: int in [row + 5, row + 6]:
+			sim.set_solid(Vector2i(x, y), &"")
+	for x: int in [x0 - 3, x0 + 1]:
+		sim.torch[Vector2i(x, row + 5)] = true
+	var rig: MachineState = sim.place_machine(load("res://src/data/machines/drift_rig.tres") as MachineDef,
+		Vector2i(x0, row))
+	rig.facing = 1
+	# Its network: three generators on a conduit trunk, which is what full speed actually costs. The pocket
+	# they sit in has to be CUT first — place_machine refuses a cell that is still rock, which is how the
+	# first pass at this shot ended up with three nulls and no power.
+	for x: int in range(x0 - 2, x0 + 3):
+		for y: int in range(row - 6, row - 1):
+			sim.set_solid(Vector2i(x, y), &"")
+	# The trunk has to come all the way DOWN to the ceiling cell over the rig: a conduit bleeds to ADJACENT
+	# cells only, and a generator's aura is two, so a trunk that stops two cells short powers nothing at all
+	# (the first build of this shot read `no_power` for exactly that reason). Same geometry check_drift
+	# measures at a full 1.00 throttle.
+	var gen: MachineDef = load("res://src/data/machines/generator.tres") as MachineDef
+	for dx: int in [-1, 0, 1]:
+		var g: MachineState = sim.place_machine(gen, Vector2i(x0 + dx, row - 4))
+		g.input_buffer[&"coal"] = 200
+		g.fuel = FactorySim.GENERATOR_FUEL_TICKS
+	sim.inventory[&"conduit"] = 40
+	for k: int in range(3, 0, -1):
+		sim.place_conduit(Vector2i(x0, row - k))
+	# Light the gallery. Underground, an unlit two-high tunnel reads as "dark" and nothing else — the first
+	# pass at this shot was a black frame with a machine in the corner of it. A torch's strong pool is 4.4
+	# cells, so they hang every three along the ceiling, with one down the shafts to light where the two
+	# streams LAND. That is exactly the spacing a player who walked this drift would have left behind.
+	for x: int in [x0 - 7, x0 - 4, x0 - 1]:
+		sim.torch[Vector2i(x, row - 1)] = true
+	sim.torch[Vector2i(x0 - 1, row + 3)] = true
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 4) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 900:                                        # let it cut, and let both streams fall
+		await physics_frame
+	# What the shot is claiming, printed. A still frame of a machine that did nothing looks a lot like a
+	# still frame of a machine that worked, so the capture says out loud what the pixels should be showing.
+	print("DRIFT  status=%s  pay=%s  spoil=%s  cut_to=+%d" % [
+		sim.machine_status(rig), sim.ground.get(Vector2i(x0, row + 6), {}),
+		sim.ground.get(Vector2i(x0 - 1, row + 6), {}), _drift_reach(sim, x0, row)])
+	# One more torch on the FRESH face, hung in the deepest column the rig has actually opened. Placed after
+	# the run, not before: the whole point of this lamp is to prove the gallery on the far side of the
+	# machine was cut by the machine, and before the run there is nothing there to light.
+	for k: int in range(8, 0, -1):
+		if not sim.solid.has(Vector2i(x0 + k, row)) and not sim.solid.has(Vector2i(x0 + k, row - 1)):
+			sim.torch[Vector2i(x0 + k, row - 1)] = true
+			break
+	main._renderer.repaint_world()
+	for _i: int in 40:                                         # let the veil re-cut around the new lamp
+		await physics_frame
+	if main._hints != null:                                    # the tutorial bubble is not part of the shot
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
 
 
 ## Widen the delve pocket into a proper CHAMBER and hang two torches in it. Cut through sim.mine rather

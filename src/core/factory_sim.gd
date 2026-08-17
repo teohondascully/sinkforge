@@ -61,6 +61,29 @@ const H_DRILL_COAL_STOCK: int = 8       ## its self-feeding fuel bunker's cap (b
 const H_DRILL_BELLY_STACKS: int = 5     ## distinct item stacks the belly holds (the "5 slots")
 const H_DRILL_BELLY_TOTAL: int = 40     ## total items across those stacks
 const H_DRILL_TIER: int = 2             ## chews what a stone pick could; harder rock ends the gallery
+
+## --- THE DRIFT RIG (docs/DRIFT.md §3) — the Borer's successor, and a change of KIND rather than a bigger
+## number. Three things separate it: it cuts a 2-HIGH gallery you can walk, it SORTS pay from spoil at the
+## face into two drop columns, and it eats POWER rather than coal — which is what makes it the machine that
+## forces a power NETWORK instead of a fed box.
+##
+## DEVIATION FROM THE SPEC, recorded because it is a design finding rather than a shortcut: the spec says the
+## rig "advances" instead of sitting at a fixed range. Its FACE advances — 24 cells from one placement, three
+## times the Borer's reach — but the MACHINE stays put, because a machine that walks takes its two drop
+## columns with it, and then every drain you dug is behind you within one cycle. Extraction may be lateral;
+## logistics stays gravity-vertical, and gravity-vertical only works if the drains hold still.
+const DRIFT_RANGE: int = 24             ## a gallery, not a stub
+const DRIFT_CYCLE: float = 0.9          ## seconds per bite AT FULL POWER (browned out, proportionally slower)
+## More than a lone generator can DELIVER anywhere. A generator pours GENERATOR_POWER at its own cell and
+## its aura attenuates with distance, so the most any machine standing beside one ever reads is 4.0 — auras
+## take the max, they never sum. Only a CONDUIT TRUNK sums (two feeders merging into one tube), and a tube
+## bleeds 0.6 of what it carries to the machine beside it. Measured, not guessed: a lone adjacent generator
+## gives this rig 0.67 speed, a two-generator trunk 0.93, a three-generator trunk full. So the rig is the
+## first appetite in the game a single fed box cannot satisfy — you build a network or you run it slow, and
+## it still runs, because a machine that refuses is a wall and a machine that labours is a decision.
+const DRIFT_POWER_DEMAND: float = 6.0
+const DRIFT_BELLY: int = 48             ## PER STREAM. Each jams on its own, and the status says which.
+const DRIFT_TIER: int = 2               ## same bit as the Borer: this is a logistics upgrade, not a drive one
 ## HOPPER (storage): it STOCKPILES what falls into it (input_buffer = the store, unbounded) and meters it
 ## back DOWN to a machine below with BACK-PRESSURE — only feeding while the consumer's buffer is under
 ## FEED_CAP, so the stockpile stays in the hopper (a visible bank) instead of overflowing the forge. No
@@ -101,6 +124,8 @@ const _BEHAVIORS: Dictionary = {
 	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
 	&"descent": {"run": &"_run_descent", "status": &"_status_descent"},
 	&"h_drill": {"run": &"_run_h_drill", "status": &"_status_h_drill", "dests": &"_destinations_h_drill"},
+	&"drift": {"run": &"_run_drift", "status": &"_status_drift", "dests": &"_destinations_drift",
+		"flow": &"_flow_drift"},
 	&"pump": {"run": &"_run_pump", "status": &"_status_pump"},
 }
 
@@ -1863,6 +1888,145 @@ func _destinations_h_drill(machine: MachineState) -> Array[Dictionary]:
 	return [_column_landing(machine.cell.x, machine.cell.y + 1)]
 
 
+## THE DRIFT RIG'S FACE: the next COLUMN with something to cut, as the rig's own row. It cuts two cells at
+## once — its row and the row above — so the gallery it leaves is walkable, which is the difference between
+## a bore-hole and a drift. Scans outward along the facing, skipping columns it has already cleared.
+## (-1,-1) = nothing left in range: the gallery is spent, a machine walls it, the rock is over its tier, or
+## the world ends. Pure read — the hover, the placement preview and the runner all share it.
+func drift_target(cell: Vector2i, facing: int) -> Vector2i:
+	for k: int in range(1, DRIFT_RANGE + 1):
+		var lo := Vector2i(cell.x + facing * k, cell.y)
+		var hi := lo + Vector2i(0, -1)
+		if not in_bounds(lo) or not in_bounds(hi) or grid.has(lo) or grid.has(hi):
+			return Vector2i(-1, -1)
+		var has_lo: bool = solid.has(lo)
+		var has_hi: bool = solid.has(hi)
+		if not has_lo and not has_hi:
+			continue                                     # already cut — reach deeper into its own gallery
+		if has_lo and MiningRules.required_tier(solid[lo]) > DRIFT_TIER:
+			return Vector2i(-1, -1)                      # over-tier rock ends the drift, same as the Borer
+		if has_hi and MiningRules.required_tier(solid[hi]) > DRIFT_TIER:
+			return Vector2i(-1, -1)
+		return lo
+	return Vector2i(-1, -1)
+
+
+## Which belly a material goes to. `_is_ore_like` already draws the line the whole game uses — ore, coal,
+## iron, rich ore are PAY; earth, stone, clay and the rest are SPOIL. The rig does not invent a new class,
+## it acts on the one that was already there (docs/DRIFT.md §4).
+func drift_is_pay(material: StringName) -> bool:
+	return _is_ore_like(material)
+
+
+func _drift_belly_full(buffer: Dictionary) -> bool:
+	var total: int = 0
+	for it: StringName in buffer:
+		total += int(buffer[it])
+	return total >= DRIFT_BELLY
+
+
+## THE DRIFT RIG. Each cycle it takes ONE cell of the two-cell face — the lower first, then the upper — and
+## files it by class: pay into `output_buffer`, spoil into `spoil_buffer`. Its speed is POWER-GOVERNED
+## through the one cost rule (`power_throttle`): fully supplied it bites every DRIFT_CYCLE seconds, half
+## supplied it takes twice as long, unpowered it does nothing at all. It burns no coal, which is the point —
+## the Borer's constraint was fuel you could carry, and this one's is a network you have to build.
+##
+## A stream whose belly is full stalls THAT STREAM ONLY. The rig keeps cutting as long as the cell it is
+## about to take has somewhere to go, so a jammed spoil column does not stop you pulling ore out of a vein —
+## it just means the gallery stops advancing once the rock in front of it is rock.
+func _run_drift(machine: MachineState) -> void:
+	machine.power_factor = power_throttle(machine.cell, DRIFT_POWER_DEMAND)
+	if machine.power_factor <= 0.0:
+		return                                           # dark — idle, and the status says "no power"
+	var target: Vector2i = drift_target(machine.cell, machine.facing)
+	if target.x < 0:
+		return                                           # gallery spent — carry it to a new face
+	var bite: Vector2i = target if solid.has(target) else target + Vector2i(0, -1)
+	var item: StringName = solid[bite]
+	if _drift_belly_full(machine.spoil_buffer if not drift_is_pay(item) else machine.output_buffer):
+		return                                           # that stream is jammed — the status names which
+	machine.progress += SECONDS_PER_TICK * machine.power_factor
+	if machine.progress < DRIFT_CYCLE:
+		return
+	machine.progress -= DRIFT_CYCLE
+	# THE BITE — the Borer's rule exactly: ore-like cells drain unit by unit (a rich vein takes many bites),
+	# plain rock clears in one and yields its block-item. Nothing is deleted; everything is matter.
+	if _is_ore_like(item):
+		var amt: int = int(deposits.get(bite, DEFAULT_ORE_DEPOSIT)) - 1
+		if amt > 0:
+			deposits[bite] = amt
+		else:
+			deposits.erase(bite)
+			solid.erase(bite)
+			_dirty_terrain(bite)
+			_bazaars_dirty = true
+			_resettle_pile_above(bite)
+	else:
+		solid.erase(bite)
+		_dirty_terrain(bite)
+		_bazaars_dirty = true
+		_resettle_pile_above(bite)
+	total_produced[item] = int(total_produced.get(item, 0)) + 1
+	if drift_is_pay(item):
+		machine.output_buffer[item] = int(machine.output_buffer.get(item, 0)) + 1
+	else:
+		machine.spoil_buffer[item] = int(machine.spoil_buffer.get(item, 0)) + 1
+	flow_events.append({"item": item, "from": bite, "to": machine.cell, "count": 1})
+
+
+## Drift Rig status, mirroring _run_drift's gates in the same order — legibility cannot be allowed to drift
+## from reality. Two of these are new words: `no_power` (the machine is dark) and the two BLOCKED variants,
+## because "output blocked" on a machine with two outputs is not an answer to anything.
+func _status_drift(machine: MachineState) -> StringName:
+	if power_throttle(machine.cell, DRIFT_POWER_DEMAND) <= 0.0:
+		return &"no_power"
+	var target: Vector2i = drift_target(machine.cell, machine.facing)
+	if target.x < 0:
+		return &"no_input"                               # gallery spent — move it
+	# A FULL BELLY IS REPORTED THE MOMENT IT IS FULL, not only when the next bite would go into it. This is
+	# the one place the status deliberately says MORE than the stall gate does: the rig can be mid-vein,
+	# cutting ore perfectly happily, with its spoil column dead behind it — and "working" would be true and
+	# useless. A jam needs a drain dug; the sooner it is named, the sooner it is dug.
+	if _drift_belly_full(machine.output_buffer):
+		return &"blocked_pay"
+	if _drift_belly_full(machine.spoil_buffer):
+		return &"blocked_spoil"
+	return &"working"
+
+
+## THE TWO COLUMNS, and the ON-HOOK RULE used twice rather than bent once. Destination 0 is PAY — straight
+## down the rig's own column. Destination 1 is SPOIL — straight down the column immediately BEHIND it, the
+## mouth of the gallery you came in through, which is where you already had to dig to get here.
+##
+## Each is gated separately on having a drain: a column whose next cell down is solid rock and not a machine
+## takes nothing, and that stream pools in its belly instead. Neither stream ever moves sideways. That is
+## the one property in this whole machine that must never regress.
+func _destinations_drift(machine: MachineState) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for col: int in [machine.cell.x, machine.cell.x - machine.facing]:
+		var below := Vector2i(col, machine.cell.y + 1)
+		if not in_bounds(below) or (solid.has(below) and not grid.has(below)):
+			out.append({})                               # no drain under this column — that stream pools
+		else:
+			out.append(_column_landing(col, machine.cell.y + 1))
+	return out
+
+
+## The rig's own delivery, because the default multi-destination path DEALS items round-robin (that is the
+## splitter's job) and the rig's two columns mean two different THINGS. Pay goes down one, spoil down the
+## other, by class, with zero cross-contamination — which is the machine's entire reason to exist.
+func _flow_drift(machine: MachineState) -> void:
+	var dests: Array[Dictionary] = _destinations_drift(machine)
+	if dests.size() < 2:
+		return
+	if not machine.output_buffer.is_empty() and not dests[0].is_empty():
+		_deliver(machine, dests[0], machine.output_buffer)
+		machine.output_buffer.clear()
+	if not machine.spoil_buffer.is_empty() and not dests[1].is_empty():
+		_deliver(machine, dests[1], machine.spoil_buffer)
+		machine.spoil_buffer.clear()
+
+
 ## A GENERATOR burns coal to pour power. Each tick it spends one tick of its current fuel;
 ## when that runs out it consumes one coal from its input buffer to reburn for GENERATOR_FUEL_TICKS. No
 ## fuel left and no coal → it goes dark (fuel stays 0, so _compute_power emits nothing for it). Coal is
@@ -1887,6 +2051,13 @@ func _run_generator(machine: MachineState) -> void:
 ## so odd counts split fairly over time). Items are only moved here, never created or destroyed.
 func _flow() -> void:
 	for machine: MachineState in machines:
+		# A machine whose outputs mean DIFFERENT THINGS routes them itself (the Drift Rig's pay/spoil
+		# columns). The default path below deals items round-robin, which is the splitter's job and exactly
+		# wrong for a machine that sorted at the face.
+		var entry: Dictionary = _BEHAVIORS.get(machine.def.behavior, {})
+		if entry.has("flow"):
+			call(entry["flow"], machine)
+			continue
 		if machine.output_buffer.is_empty():
 			continue
 		var dests: Array[Dictionary] = _destinations(machine)

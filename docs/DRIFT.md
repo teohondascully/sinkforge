@@ -1,8 +1,27 @@
 # THE DRIFT RIG & SPOIL — horizontal extraction, vertical logistics
 
-> **Status: SPEC, not built** (2026-08-16). The third of the five ideas, written as one design because the
-> machine and the material are the same problem. Provisional and reversible; numbers are placeholders.
-> Pairs with `docs/BITS.md` (the Lance is this machine's hand-held half) and `docs/BAZAAR.md`.
+> **Status: §3 SHIPPED as STRIKE 35** (2026-08-16) — the Drift Rig is in the game, researched under
+> **Galleries**, asserted by `check_drift` (harness layer 53) and photographed at
+> `history/115-a-gallery-that-sorts-itself.png`. §4's Crusher, gravel-as-packing and the per-layer packing
+> payoffs are still SPEC, and so is the §7 play-test rung that ends in L3 water. Pairs with `docs/BITS.md`
+> (the Lance is this machine's hand-held half) and `docs/BAZAAR.md`.
+>
+> **Recorded deviations from the spec as written.**
+> * **The FACE advances; the MACHINE stays put.** §3 says the rig "advances". It does not move: it reaches
+>   up to `DRIFT_RANGE` 24 cells along its facing and cuts the two-cell face at the end of its own gallery.
+>   A walking machine would take its two drop columns with it, and the drop columns are the player's half of
+>   the bargain — they are dug by hand, in advance, where the player chose. A rig that walked would either
+>   drag its shafts along behind it (impossible) or start pooling the moment it left them (a machine that
+>   breaks itself by working). So the gallery grows and the rig sits at its mouth, which is also what a real
+>   drift head does.
+> * **Power demand is 6.0, not "more than a lone generator can give".** Auras take the MAX and never sum, so
+>   the most a machine standing beside one generator ever reads is 4.0. Measured: lone generator 4.00, a
+>   two-generator trunk 5.61, three 6.09. 6.0 puts a lone generator at a 0.67 throttle — it LABOURS rather
+>   than refuses — and makes a real conduit trunk the thing that buys full speed. A higher number would have
+>   been a demand no achievable network could meet.
+> * **Two new status words, not one.** "output blocked" is not an answer on a machine with two outputs, so
+>   the rig says `blocked_pay` ("dig a drain UNDER it") or `blocked_spoil` ("dig a drain BEHIND it"), plus
+>   `no_power` for the dark case.
 
 ## 1. What is already there
 

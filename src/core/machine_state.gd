@@ -36,6 +36,12 @@ var facing: int = 1
 ## Configurable machines only (the splitter's ratio, for now): a small mode index cycled by the
 ## player's R-configure verb (a discrete call). 0 = the machine's default behaviour.
 var mode: int = 0
+## Drift-Rig-only: the SPOIL half of its haul, waiting to fall down the column BEHIND the rig while
+## `output_buffer` holds the pay half for the column under it. Two bellies rather than one because the rig's
+## whole point is that it sorts at the face — one buffer would mean sorting downstream, which is the problem
+## it exists to solve. Each jams on its own (docs/DRIFT.md §3). Same composition-over-inheritance stance as
+## route_toggle/fuel/fed: a plain field, unused by every other machine.
+var spoil_buffer: Dictionary = {}
 ## Hopper-only: the ONE item id this hopper banks. Auto-latches on the first item it
 ## banks ("keeps the first thing it tastes"); everything else passes through. &"" = not yet latched.
 var filter: StringName = &""

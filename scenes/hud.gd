@@ -60,6 +60,11 @@ const ALERT_REASON: Dictionary = {
 	&"blocked": "output blocked — dig a drain",
 	&"no_fuel": "out of coal — feed it",
 	&"no_input": "starved — nothing feeding it",
+	# The Drift Rig has TWO outputs, so "output blocked" is not an answer to anything — it has to say which
+	# column jammed, because the two are dug in different places (docs/DRIFT.md §7).
+	&"blocked_pay": "ore column jammed — dig a drain UNDER it",
+	&"blocked_spoil": "spoil column jammed — dig a drain BEHIND it",
+	&"no_power": "no power — it eats a network, not a coal box",
 }
 ## THE TITLE / NEW-GAME card (#6 + #45): {} = closed; else {seed, tint, tint_name, tints, has_save}.
 var title_info: Dictionary = {}
@@ -198,6 +203,7 @@ const ITEM_PURPOSE: Dictionary = {
 	&"plate_press": "presses iron ingots into plates",
 	&"gear_mill": "mills iron ingots + ingots into gears (two inputs, one column)",
 	&"h_drill": "the Borer — chews sideways the way you faced; its haul drops below it",
+	&"drift_rig": "cuts a 2-high gallery on POWER, and sorts it: ore drops below, spoil drops behind",
 }
 ## The hovered slot this frame (captured while drawing the hotbar/pack grid, drawn last, on top).
 var _tooltip_item: StringName = &""
@@ -444,14 +450,22 @@ func cursor_on_alerts(mouse: Vector2) -> bool:
 ## THE DEPTH READOUT (top-left). Metres below the surface datum, and the name of the band you are in,
 ## in that band's own colour — so the number and the world's palette agree. Permanent, because in a game
 ## whose entire subject is descending, "how far down am I" is not an optional overlay.
+## The depth chip's width, on its own so the objective banner can measure what it must not grow under.
+func _depth_chip_w() -> float:
+	var m: int = Strata.depth_m(depth_row)
+	var label: String = ("%d m" % m) if m >= 0 else ("+%d m" % -m)
+	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	var bw: float = _font.get_string_size(Strata.name_at(depth_row), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+	return maxf(lw + 10.0 + bw, 96.0) + 24.0
+
+
 func _draw_depth() -> void:
 	var m: int = Strata.depth_m(depth_row)
 	var label: String = ("%d m" % m) if m >= 0 else ("+%d m" % -m)
 	var band: String = Strata.name_at(depth_row)
 	var tint: Color = Strata.color_at(depth_row)
 	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	var bw: float = _font.get_string_size(band, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
-	var chip := Rect2(10.0, 8.0, maxf(lw + 10.0 + bw, 96.0) + 24.0, 22.0)
+	var chip := Rect2(10.0, 8.0, _depth_chip_w(), 22.0)
 	_panel(chip)
 	var cy: float = chip.position.y + chip.size.y * 0.5
 	draw_string(_font, Vector2(chip.position.x + 12.0, cy + 6.0), label,
@@ -584,12 +598,19 @@ func _draw_fastforward() -> void:
 
 ## FORGED production chip (top-right): an ingot swatch + the lifetime ingot count, in a small panel —
 ## consistent with the inspector/minimap skin instead of bare floating text.
+## The FORGED chip's width — the other wall the objective banner has to stay inside of.
+func _forged_chip_w() -> float:
+	var label_w: float = _font.get_string_size("FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var count_w: float = _font.get_string_size(str(int(sim.total_produced.get(&"ingot", 0))),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	return 12.0 + 14.0 + 8.0 + label_w + 8.0 + count_w + 12.0
+
+
 func _draw_forged() -> void:
 	var n: int = int(sim.total_produced.get(&"ingot", 0))
 	var count: String = str(n)
 	var label_w: float = _font.get_string_size("FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	var count_w: float = _font.get_string_size(count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	var w: float = 12.0 + 14.0 + 8.0 + label_w + 8.0 + count_w + 12.0
+	var w: float = _forged_chip_w()
 	var chip := Rect2(CANVAS.x - w - 10.0, 8.0, w, 22.0)
 	_panel(chip)
 	var x: float = chip.position.x + 12.0
@@ -648,9 +669,16 @@ func _draw_objective_line() -> void:
 	var fs: int = 13
 	var hfs: int = 10
 	var pad: float = 12.0
+	# THE FREE SPAN. The banner is centred between two fixed chips — depth on the left, FORGED on the
+	# right — so a long how-to line grows symmetrically until the plate's own frame runs under one and
+	# through the other. ("Toss ore down the mineshaft into the forge…" did exactly that.) Clamp to what
+	# is actually free and let the HOW-TO be the part that gives: the goal is the half you need.
+	var free_w: float = CANVAS.x - (maxf(_depth_chip_w(), _forged_chip_w()) + 18.0) * 2.0
+	text = _fit_text(text, fs, free_w - pad * 2.0 - 14.0)
+	hint = _fit_text(hint, hfs, free_w - pad * 2.0)
 	var tw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 14.0
 	var hw: float = _font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hfs).x if hint != "" else 0.0
-	var w: float = maxf(tw, hw) + pad * 2.0
+	var w: float = minf(maxf(tw, hw) + pad * 2.0, free_w)
 	var h: float = 24.0 + (13.0 if hint != "" else 0.0)
 	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, h)
 	_panel(rect, true)
@@ -662,6 +690,22 @@ func _draw_objective_line() -> void:
 	if hint != "":
 		draw_string(_font, Vector2(rect.position.x + pad, cy + 18.0), hint,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, hfs, Color(UI_TEXT_DIM, hint_a))
+
+
+## Trim a string until it fits `max_w`, with an ellipsis standing in for what was cut. Binary-search-free
+## on purpose: these are one-line labels, the loop runs a handful of times, and a wrong answer here is a
+## sentence running off a panel rather than a frame-rate problem.
+func _fit_text(text: String, size: int, max_w: float) -> String:
+	if text == "" or max_w <= 0.0:
+		return text
+	if _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= max_w:
+		return text
+	var cut: String = text
+	while cut.length() > 1:
+		cut = cut.substr(0, cut.length() - 1)
+		if _font.get_string_size(cut + "…", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= max_w:
+			return cut.strip_edges(false, true) + "…"
+	return "…"
 
 
 ## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,

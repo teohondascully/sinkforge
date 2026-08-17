@@ -259,6 +259,8 @@ func _ready() -> void:
 		load("res://src/data/machines/plate_press.tres"),
 		load("res://src/data/machines/gear_mill.tres"),
 		load("res://src/data/machines/h_drill.tres"),     # the Borer — sideways extraction
+		load("res://src/data/machines/drift_rig.tres"),   # the Drift Rig — a POWERED gallery that sorts
+		                                                  # pay from spoil at the face (docs/DRIFT.md)
 		load("res://src/data/machines/blast_furnace.tres"),   # 1 rich ore → 2 ingots (#48, Enrichment)
 		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (Drainage)
 	]

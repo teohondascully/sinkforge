@@ -1338,6 +1338,8 @@ func _draw_aim() -> void:
 			_draw_rope_preview()   # ghost line down the shaft: how far the rope will unroll from here
 		if _ghost_def.behavior == &"h_drill" and _aim_placeable:
 			_draw_h_drill_preview()  # the gallery it will chew + where the haul drains (or won't)
+		if _ghost_def.behavior == &"drift" and _aim_placeable:
+			_draw_drift_preview()    # the 2-high gallery + BOTH drop columns, each lit for its own drain
 	elif _ghost_material != &"":
 		# Block-placement preview: a translucent material-tinted fill (the Terraria build cursor).
 		var bg: Color = _material(_ghost_material).base_color
@@ -1423,6 +1425,65 @@ func _draw_h_drill_preview() -> void:
 	draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
 	draw_line(Vector2(cx, bot_y), Vector2(cx - 6.0, bot_y - 6.0), tint, 2.5)
 	draw_line(Vector2(cx, bot_y), Vector2(cx + 6.0, bot_y - 6.0), tint, 2.5)
+
+
+## When holding the Drift Rig, preview the TWO things that make it a different machine from the Borer:
+## the gallery is TWO CELLS HIGH, and the haul leaves by TWO COLUMNS — pay straight down, spoil down the
+## column behind. `docs/DRIFT.md` §6 names this as the thing most likely to go wrong ("two drop columns is
+## twice the geometry to get wrong"), so both arrows are drawn and each is lit for its OWN drain: gold where
+## a column has somewhere to fall, red-amber where that stream would pool the moment it started.
+func _draw_drift_preview() -> void:
+	var facing: int = player.facing if player != null else 1
+	var cells: Array[Vector2i] = []
+	for k: int in range(1, FactorySim.DRIFT_RANGE + 1):
+		var lo := Vector2i(_aim.x + facing * k, _aim.y)
+		var hi := lo + Vector2i(0, -1)
+		if not sim.in_bounds(lo) or not sim.in_bounds(hi) \
+				or sim.machine_at(lo) != null or sim.machine_at(hi) != null:
+			break
+		var hard: bool = false
+		for c: Vector2i in [lo, hi]:
+			if sim.is_solid(c) and MiningRules.required_tier(sim.material_at(c)) > FactorySim.DRIFT_TIER:
+				hard = true
+		if hard:
+			break
+		if sim.is_solid(lo):
+			cells.append(lo)
+		if sim.is_solid(hi):
+			cells.append(hi)
+	for c: Vector2i in cells:
+		# Tinted by CLASS, not by material: this machine's whole promise is that it separates the two, so
+		# the preview should already show you which half of that wall is ore and which half is rock.
+		var pay: bool = sim.drift_is_pay(sim.material_at(c))
+		var col: Color = Color(1.0, 0.82, 0.34, 0.26) if pay else Color(0.62, 0.66, 0.70, 0.18)
+		draw_rect(Rect2(Vector2(c) * float(CELL), Vector2(CELL, CELL)), col)
+	if not cells.is_empty():
+		var xs: Array[int] = []
+		for c: Vector2i in cells:
+			xs.append(c.x)
+		xs.sort()
+		var box := Rect2(Vector2(float(xs[0] * CELL) + 1.0, float((_aim.y - 1) * CELL) + 1.0),
+			Vector2(float((xs[-1] - xs[0] + 1) * CELL) - 2.0, float(CELL * 2) - 2.0))
+		_draw_dashed_rect(box, Color(1.0, 0.80, 0.30, 0.85), 6.0, 2.5)
+	_drift_chute(_aim.x, "ORE")
+	_drift_chute(_aim.x - facing, "SPOIL")
+
+
+## One of the rig's two drop columns, drawn as an arrow under it and labelled, lit for its own drain.
+func _drift_chute(col: int, label: String) -> void:
+	var below := Vector2i(col, _aim.y + 1)
+	if not sim.in_bounds(below):
+		return
+	var drained: bool = not sim.is_solid(below) or sim.machine_at(below) != null
+	var tint := Color(1.0, 0.80, 0.30, 0.95) if drained else Color(0.98, 0.45, 0.38, 0.95)
+	var cx: float = float(col * CELL) + float(CELL) * 0.5
+	var top_y: float = float(below.y * CELL) + 3.0
+	var bot_y: float = top_y + float(CELL) * 0.55
+	draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
+	draw_line(Vector2(cx, bot_y), Vector2(cx - 6.0, bot_y - 6.0), tint, 2.5)
+	draw_line(Vector2(cx, bot_y), Vector2(cx + 6.0, bot_y - 6.0), tint, 2.5)
+	var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(_font, Vector2(cx - w * 0.5, bot_y + 12.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, tint)
 
 
 ## When holding Rope over a valid anchor, preview the UNROLL: a translucent hemp line from the anchor
