@@ -815,9 +815,42 @@ func _exposed_ore_cells() -> Array[Vector2i]:
 ## one glow {pos = centroid, radius = base + extent}. Deterministic (iterates a sorted cell list); a few
 ## big glows instead of many dots. Lone/tiny clusters (< CRYSTAL_MIN_CELLS) are dropped as noise.
 const CLUSTER_LINK: int = 3                             ## cells within this chebyshev distance join one seam
+
+## Side length of a spatial-hash bucket, in cells. Any value >= CLUSTER_LINK works; at 4 the seven-cell
+## neighbourhood a frontier pop has to search spans at most three buckets per axis.
+const CLUSTER_BUCKET: int = 4
+
 func _crystal_seams() -> Array[Dictionary]:
-	var cells: Array[Vector2i] = _exposed_ore_cells()
+	return _cluster_seams(_exposed_ore_cells())
+
+
+## The flood itself, split out from the world query above so it can be tested as what it is: a pure
+## function from a cell list to a seam list. check_seam_flood drives it with synthetic scatters and clumps
+## and compares it against the obvious quadratic implementation, which is a far harder test than one world.
+##
+## THE SEARCH IS SPATIAL, NOT LINEAR. This used to rescan the ENTIRE cell list for every frontier pop —
+## O(n^2) in exposed ore — and it ran on a frame where n is at its largest, because digging is the thing
+## that exposes ore. Now each pop looks only in the buckets its own neighbourhood can reach.
+##
+## THE ORDER IS PRESERVED, and that is not incidental: this is a GREEDY flood, so the order cells are
+## absorbed in decides which seam a cell between two seams lands in, and therefore the centroids and radii
+## that get drawn. The old scan walked a globally sorted list, so for a given frontier cell it absorbed
+## matching cells in sorted order; the gathered candidates are re-sorted here to reproduce exactly that.
+## Without the sort this is still a correct clustering and a different picture.
+func _cluster_seams(from_cells: Array[Vector2i]) -> Array[Dictionary]:
+	var cells: Array[Vector2i] = from_cells.duplicate()
 	cells.sort()                                        # deterministic flood order
+	# cell -> bucket, and bucket -> the cells in it. floori and not `>> 2`, but NOT for the reason this
+	# comment first claimed: GDScript's right shift on ints floors toward negative infinity, so the two
+	# agree on every coordinate including negative ones (checked, after a mutation that swapped them stayed
+	# green and exposed the claim as decoration). The real reason is narrower — `>>` silently requires
+	# CLUSTER_BUCKET to be a power of two, and nothing else here does. floori keeps the constant free.
+	var buckets: Dictionary = {}
+	for c: Vector2i in cells:
+		var key := Vector2i(floori(float(c.x) / float(CLUSTER_BUCKET)), floori(float(c.y) / float(CLUSTER_BUCKET)))
+		if not buckets.has(key):
+			buckets[key] = ([] as Array[Vector2i])
+		(buckets[key] as Array[Vector2i]).append(c)
 	var seams: Array[Dictionary] = []
 	var claimed: Dictionary = {}
 	for start: Vector2i in cells:
@@ -829,12 +862,27 @@ func _crystal_seams() -> Array[Dictionary]:
 		while i < group.size():                         # grow the frontier by chained proximity
 			var g: Vector2i = group[i]
 			i += 1
-			for other: Vector2i in cells:
-				if claimed.has(other):
+			var near: Array[Vector2i] = []
+			var bx0: int = floori(float(g.x - CLUSTER_LINK) / float(CLUSTER_BUCKET))
+			var bx1: int = floori(float(g.x + CLUSTER_LINK) / float(CLUSTER_BUCKET))
+			var by0: int = floori(float(g.y - CLUSTER_LINK) / float(CLUSTER_BUCKET))
+			var by1: int = floori(float(g.y + CLUSTER_LINK) / float(CLUSTER_BUCKET))
+			for by: int in range(by0, by1 + 1):
+				for bx: int in range(bx0, bx1 + 1):
+					var key := Vector2i(bx, by)
+					if not buckets.has(key):
+						continue
+					for other: Vector2i in (buckets[key] as Array[Vector2i]):
+						if claimed.has(other):
+							continue
+						if absi(other.x - g.x) <= CLUSTER_LINK and absi(other.y - g.y) <= CLUSTER_LINK:
+							near.append(other)
+			near.sort()                                 # …the globally-sorted order the old linear scan had
+			for other: Vector2i in near:
+				if claimed.has(other):                  # a bucket overlap can offer the same cell twice
 					continue
-				if absi(other.x - g.x) <= CLUSTER_LINK and absi(other.y - g.y) <= CLUSTER_LINK:
-					claimed[other] = true
-					group.append(other)
+				claimed[other] = true
+				group.append(other)
 		if group.size() < CRYSTAL_MIN_CELLS:
 			continue
 		var sum := Vector2.ZERO
