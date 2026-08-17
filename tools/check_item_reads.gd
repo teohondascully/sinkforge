@@ -47,6 +47,7 @@ const SAME_TINT: float = 10.0   ## CIELab dE below which two icons share a colou
 const SKIP: int = 42            ## the runner's "I did not run" code
 
 var _fails: int = 0
+var _skipped: bool = false
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the geometry is handed to it
@@ -71,6 +72,12 @@ func _check(ok: bool, label: String) -> void:
 func _initialize() -> void:
 	print("== can you tell what you are holding ==")
 	await _run()
+	# quit() sets the exit code and leaves at the end of the frame, so a SECOND quit overwrites the first.
+	# Without this guard the skip below returned 0, and the runner reads the exact code — so a layer that
+	# announced "I did not run" in its own output was counted as a PASS, which is the precise defect the
+	# three-state runner exists to prevent. Caught by expecting 42 and getting 0.
+	if _skipped:
+		return
 	if _fails == 0:
 		print("check_item_reads: PASS — no two items wear the same icon")
 		quit(0)
@@ -82,6 +89,7 @@ func _initialize() -> void:
 func _run() -> void:
 	if DisplayServer.get_name() == "headless":
 		print("check_item_reads: SKIP — no rendering device, and comparing blank images would pass.")
+		_skipped = true
 		quit(SKIP)
 		return
 

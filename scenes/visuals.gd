@@ -617,11 +617,11 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 		&"sapling":
 			_item_sapling(canvas, center, size)
 		&"wood_pickaxe":
-			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47))
+			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47), 0)
 		&"stone_pickaxe":
-			_item_pickaxe(canvas, center, size, Color(0.50, 0.37, 0.23), Color(0.60, 0.64, 0.71))
+			_item_pickaxe(canvas, center, size, Color(0.50, 0.37, 0.23), Color(0.60, 0.64, 0.71), 1)
 		&"iron_pickaxe":
-			_item_pickaxe(canvas, center, size, Color(0.42, 0.32, 0.22), Color(0.80, 0.84, 0.94))
+			_item_pickaxe(canvas, center, size, Color(0.42, 0.32, 0.22), Color(0.80, 0.84, 0.94), 2)
 		&"wood_axe":
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
 		&"broad_bit", &"sinker_bit", &"lance_bit", &"wedge_bit":
@@ -765,10 +765,20 @@ static func _item_clod(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_circle(c + crumb * size, size * 0.045, col.darkened(0.18))
 
 
-## RICH ORE (#48) — the same rough nugget, crowded with brighter white-gold flecks: quality READS.
+## RICH ORE (#48) — a nugget the ore has CRYSTALLISED out of, spurs breaking the outline.
+##
+## This used to be "the same rough nugget, crowded with brighter flecks: quality READS." It did not read.
+## check_item_reads measured ore against rich_ore at IoU 1.00 and dE 4.4 — the identical silhouette in an
+## indistinguishable colour, because both used this exact polygon and the flecks are interior detail that
+## a hotbar cell throws away. Rich ore is the only quality axis in the game (1 rich → 2 ingots against
+## ore's 2 → 1, a fourfold difference), so it is worth a shape of its own: the same body, with crystal
+## spurs growing off it, which breaks the outline where more flecks could not.
 static func _item_rich_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
-	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
-		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.40, 0.40, 0.46))
+	_poly(canvas, c, size, [
+		Vector2(-0.34, 0.02), Vector2(-0.22, -0.16), Vector2(-0.30, -0.46),   # spur, up and left
+		Vector2(-0.06, -0.22), Vector2(0.10, -0.48),                          # the tall one
+		Vector2(0.22, -0.18), Vector2(0.42, -0.04), Vector2(0.30, 0.16),
+		Vector2(0.34, 0.36), Vector2(0.08, 0.26), Vector2(-0.18, 0.32)], Color(0.40, 0.40, 0.46))
 	for f: Vector2 in [Vector2(-0.14, 0.00), Vector2(0.10, -0.14), Vector2(0.20, 0.10),
 			Vector2(-0.02, 0.20), Vector2(-0.04, -0.20)]:
 		canvas.draw_circle(c + f * size, size * 0.06, Color(1.0, 0.86, 0.46))
@@ -892,11 +902,29 @@ static func _item_wood(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 ## PICKAXE — a wood handle with a curved double-pointed head at the top (points sweeping down-and-out).
 ## `handle`/`head` colours let one drawer serve the wood pick and the grey stone pick.
-static func _item_pickaxe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, head: Color) -> void:
+## `tier` shapes the HEAD, and it has to, because the three pickaxes were one silhouette in three tints and
+## two of those tints are dE 8.6 apart — check_item_reads found stone/iron at IoU 1.00. A tool tier is not
+## decoration: the iron head is what lets you into deepslate, and "which pick am I holding" was being
+## answered by a grey that is a coin-flip at hotbar size. So the head grows with the tier — a wooden pick is
+## barely more than a wedge lashed on, stone is broad and blunt, iron is long and swept and comes to points
+## that rise above the shoulder.
+static func _item_pickaxe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, head: Color,
+		tier: int = 1) -> void:
 	canvas.draw_line(c + Vector2(size * 0.10, size * 0.42), c + Vector2(-0.02 * size, -0.16 * size),
 		handle, maxf(1.5, size * 0.12))                              # the shaft
-	_poly(canvas, c, size, [Vector2(-0.44, -0.04), Vector2(-0.16, -0.30), Vector2(0.16, -0.30),
-		Vector2(0.44, -0.04), Vector2(0.12, -0.16), Vector2(-0.12, -0.16)], head)   # the curved head
+	var pts: Array
+	match tier:
+		0:                                                           # WOOD — a short blunt head
+			pts = [Vector2(-0.30, -0.02), Vector2(-0.12, -0.26), Vector2(0.12, -0.26),
+				Vector2(0.30, -0.02), Vector2(0.10, -0.14), Vector2(-0.10, -0.14)]
+		2:                                                           # IRON — long, swept, pointed
+			pts = [Vector2(-0.52, -0.20), Vector2(-0.22, -0.36), Vector2(0.22, -0.36),
+				Vector2(0.52, -0.20), Vector2(0.38, -0.04), Vector2(0.12, -0.20),
+				Vector2(-0.12, -0.20), Vector2(-0.38, -0.04)]
+		_:                                                           # STONE — broad and chunky
+			pts = [Vector2(-0.44, -0.04), Vector2(-0.16, -0.30), Vector2(0.16, -0.30),
+				Vector2(0.44, -0.04), Vector2(0.12, -0.16), Vector2(-0.12, -0.16)]
+	_poly(canvas, c, size, pts, head)
 
 
 ## AXE — a wood handle with a fanned blade on the upper right + a bright cutting edge.
