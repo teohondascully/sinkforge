@@ -19,9 +19,17 @@ extends SceneTree
 ##      first. This is the one that catches the next check_saveload — a new layer that calls `_save_game()`
 ##      inherits the production default unless it says otherwise, and here is where it gets told.
 ##
+## WHAT THE SCAN CAN AND CANNOT SEE, because a gate that oversells its reach is how the last one came to
+## be trusted. It reads every .gd under those trees INCLUDING SUBDIRECTORIES (it did not, once, which
+## meant the first `tools/perf/` layer would have been invisible while the gate kept passing), and it
+## reads them with adjacent string splicing collapsed, so `"user://" + "sinkforge.save"` is caught. It
+## still cannot see a path built from a variable or a format string at runtime. Nothing that reads source
+## ever will; `save_sentinel.gd` is the half that hashes the real file and does not care how it was named.
+##
 ## Non-vacuity (see the architecture handover §5): a source scan that matches nothing passes trivially, so
-## this asserts the scan found files, found the slot literal where it MUST appear (scenes/main.gd), and
-## found at least one real save-driving layer to hold to property 3.
+## this asserts the scan found files, found the slot literal where it MUST appear (scenes/main.gd), proved
+## the splice-flattener actually fires on a sample built for it, and found at least one real save-driving
+## layer to hold to property 3.
 ##   godot --headless --path . --script res://tools/check_save_isolation.gd
 
 ## The player's slot. Matched WHOLE: `user://test_sinkforge.save` (test_sim's own isolated round-trip
@@ -53,7 +61,25 @@ func _check(cond: bool, label: String) -> void:
 		printerr("  FAIL: %s" % label)
 
 
-## Every .gd under `dir`, as path → source text.
+## Source with adjacent string-literal splicing collapsed, so the scan reads what a program will actually
+## SPELL rather than how the file happens to be laid out. `"user://" + "sinkforge.save"` is a path to the
+## player's game, and a plain `contains()` looks straight through it.
+##
+## HONEST LIMIT, stated here because a gate that oversells itself is exactly how the last one came to be
+## trusted: this closes literal splicing, not computation. A path assembled from a variable, a format
+## string, or a name resolved at runtime still walks past, and no source scan will ever catch that one.
+## What stands behind this is the sentinel, which hashes the real slot before and after and does not care
+## how anybody spelled anything.
+static func _flatten(src: String) -> String:
+	var re: RegEx = RegEx.create_from_string("\"\\s*\\+\\s*\"")
+	return re.sub(src, "", true)
+
+
+## Every .gd under `dir` AND its subdirectories, as path → flattened source text.
+##
+## RECURSIVE on purpose. This read `get_files()` alone, so the day anybody filed layers under `tools/perf/`
+## the gate would have gone on passing while seeing none of them. A safety gate that quietly stops covering
+## new code is worse than no gate at all, because the runner's header keeps promising it.
 func _sources(dir: String) -> Dictionary:
 	var out: Dictionary = {}
 	var d: DirAccess = DirAccess.open(dir)
@@ -63,7 +89,9 @@ func _sources(dir: String) -> Dictionary:
 		if not name.ends_with(".gd"):
 			continue
 		var path: String = dir + "/" + name
-		out[path] = FileAccess.get_file_as_string(path)
+		out[path] = _flatten(FileAccess.get_file_as_string(path))
+	for sub: String in d.get_directories():
+		out.merge(_sources(dir + "/" + sub))
 	return out
 
 
@@ -77,6 +105,13 @@ func _initialize() -> void:
 	_check(main_src.contains(SLOT), "MainView still names the production slot (players keep their saves)")
 	_check(main_src.contains("static var save_path"),
 		"MainView.save_path is an overridable static, not a const (the harness can point elsewhere)")
+
+	# NON-VACUITY FOR THE FLATTENER. Prove on a synthetic sample that splicing is invisible to the naive
+	# match and visible after normalising. Without this the regex could quietly become a no-op — matching
+	# nothing, rewriting nothing — and every scan below would keep passing with the hole reopened.
+	var spliced: String = "var p: String = \"user://\" + \"sinkforge.save\""
+	_check(not spliced.contains(SLOT), "a spliced slot literal is invisible to a plain contains()")
+	_check(_flatten(spliced).contains(SLOT), "…and visible once flattened — the normaliser really fires")
 
 	# --- 2/3. no fixture reaches the production slot --------------------------------------------
 	var scanned: int = 0
@@ -122,12 +157,47 @@ func _initialize() -> void:
 	_check(runner.length() > 1000, "tools/run_harness.sh read (%d chars)" % runner.length())
 	_check(runner.contains("save_sentinel.gd -- arm"), "the runner ARMS the save sentinel before the sweep")
 	_check(runner.contains("save_sentinel.gd -- verify"), "the runner VERIFIES the save sentinel after the sweep")
-	var as_layer: bool = false
+	# …and takes the plant back on the ABORT path too. `verify` only runs when the sweep reaches the end;
+	# a run killed at any point before that leaves a marker sitting at the player's real save path, which
+	# is the exact species of litter this whole instrument exists to argue nobody drops. An arm with no
+	# verify protects nothing; an arm with no disarm is a promise kept only when nothing goes wrong.
+	_check(runner.contains("save_sentinel.gd -- disarm"),
+		"…and DISARMS it from the cleanup trap, so an aborted run does not leave a marker behind")
+	_check(runner.contains("trap harness_cleanup EXIT"),
+		"…with that cleanup actually installed as an EXIT trap, not merely defined")
+	# WHICH VERBS REGISTER A LAYER IS DERIVED FROM THE RUNNER, not spelled here. This used to hunt for
+	# `add ` and `add_gl ` by hand. `add_excl` was added to the runner afterwards — so on the day this was
+	# read, the sentinel could have been registered through the third verb and walked straight past a gate
+	# still looking for the other two. A list of names inside a test is a snapshot of the code on the day
+	# it was written, and this particular snapshot had already gone stale without anything turning red.
+	# Anything that appends to NAMES is a registration verb, by definition, so ask the runner.
+	var verbs: Array[String] = []
+	var appenders: int = 0
 	for line: String in runner.split("\n"):
 		var t: String = line.strip_edges()
-		if (t.begins_with("add ") or t.begins_with("add_gl ")) and t.contains("save_sentinel"):
-			as_layer = true
-	_check(not as_layer, "the sentinel is a runner instrument, not a harness layer")
+		if not t.contains("NAMES+=("):
+			continue
+		appenders += 1
+		var paren: int = t.find("() {")
+		if paren > 0:
+			verbs.append(t.substr(0, paren))
+	# No floor of "3" here — that would be the same snapshot mistake one level up. The property is that
+	# every line which can append a layer was attributed to a verb we then check. Refactor the runner into
+	# a multi-line function and this goes RED asking to be taught, rather than silently covering less.
+	_check(appenders > 0 and verbs.size() == appenders,
+		"every layer-registering line in the runner resolved to a verb (%d/%d: %s)"
+			% [verbs.size(), appenders, ", ".join(verbs)])
+
+	var as_layer: Array[String] = []
+	for line: String in runner.split("\n"):
+		var t: String = line.strip_edges()
+		if not t.contains("save_sentinel") or t.begins_with("#"):
+			continue
+		for verb: String in verbs:
+			if t.begins_with(verb + " "):
+				as_layer.append(t)
+	_check(as_layer.is_empty(), "the sentinel is a runner instrument, not a harness layer%s"
+		% ("" if as_layer.is_empty() else " — registered by: " + "; ".join(as_layer)))
 
 	if _failures == 0:
 		print("check_save_isolation: PASS")
