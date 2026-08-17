@@ -102,6 +102,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_adit(main)
 		"head":
 			await _at_the_head(main)
+		"chain":
+			await _at_the_chain(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -680,6 +682,60 @@ func _at_the_adit(main: MainView) -> void:
 ## the sump it was placed over — beside the same vein still being worked by hand. The subject is the
 ## PLACEMENT: one machine, one cell, on the ore. The old model needed three facts right (somewhere above it,
 ## same column, drain under the bottom) before anything happened at all.
+## THE CHAIN. One Head, four Spurs, one seam, one drain — the picture `docs/LODE.md` §5 is describing when
+## it says a vein stops being a number and becomes a layout. The seam is CONTIGUOUS on purpose (the `head`
+## moment's is every other cell, which is the shape a chain cannot cross) and it thins left to right, so the
+## bores widen along the line and the machine reads as a gauge of the thing it is standing on.
+func _at_the_chain(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 40
+	for x: int in range(x0 - 16, x0 + 17):
+		for y: int in range(row - 9, row + 11):
+			sim.set_solid(Vector2i(x, y), &"stone")
+			sim.lode.erase(Vector2i(x, y))
+			sim.deposits.erase(Vector2i(x, y))
+	for x2: int in range(x0 - 9, x0 + 8):                      # the gallery you cut to reach across it
+		for y2: int in range(row - 3, row + 1):
+			sim.set_solid(Vector2i(x2, y2), &"")
+	var seam_row: int = row - 1
+	for i: int in 9:                                           # the seam, contiguous, thinning as it goes
+		var c := Vector2i(x0 - 6 + i, seam_row)
+		sim.lode[c] = &"ore"
+		sim.deposits[c] = 220 - i * 24
+		sim.lode_max[c] = 220
+	var head_cell := Vector2i(x0 - 4, seam_row)
+	for y3: int in range(row, row + 7):                        # the ONE sump the whole chain pours into
+		sim.set_solid(Vector2i(head_cell.x, y3), &"")
+	for t: int in [x0 - 9, x0 - 1, x0 + 6]:
+		sim.torch[Vector2i(t, row - 3)] = true   # on the gallery's ROOF row: the seam row belongs to the chain
+	var drill: MachineState = sim.place_machine(load("res://src/data/machines/drill.tres") as MachineDef,
+		head_cell)
+	if drill != null:
+		drill.input_buffer[&"coal"] = 900
+	var spurs: int = 0
+	for dx: int in [-2, -1, 1, 2, 3]:
+		if sim.place_machine(load("res://src/data/machines/spur.tres") as MachineDef,
+				head_cell + Vector2i(dx, 0)) != null:
+			spurs += 1
+	sim.inventory[&"wood_pickaxe"] = 1
+	main._inv_selected = 0
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 8) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 300:                                        # let it run, so the bores have widened unevenly
+		await physics_frame
+	Input.warp_mouse(Vector2(340.0, 250.0))     # OFF the chain: a name plate would cover the subject
+	for _i2: int in 8:
+		await physics_frame
+	print("CHAIN  spurs=%d  reach=%d  produced=%d  status=%s" % [
+		spurs, sim.head_coverage(head_cell).size(), int(sim.total_produced.get(&"ore", 0)),
+		str(sim.machine_status(drill)) if drill != null else "none"])
+	if main._hints != null:
+		main._hints._active = &""
+	main._hud.objectives = null
+
+
 func _at_the_head(main: MainView) -> void:
 	var sim: FactorySim = main.sim
 	var row: int = 46
