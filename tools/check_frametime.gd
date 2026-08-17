@@ -38,10 +38,19 @@ extends "res://tools/check_base.gd"
 ##     _fastest. Treat the claim as machine-specific and re-derive it from the samples, not from prose.
 ##   * THE MACHINE. A background reindex can put whole SECONDS into a frame that the game had no part in.
 ##     A layer that fails when Spotlight is busy is a layer people learn to ignore.
-## Both move the quiet frames and the busy frames together, so the RATIO between them survives what the
-## absolute numbers do not: a dig may cost a few times a quiet frame, never twenty times one. That is also
-## the honest statement of the property — "mining must not hitch" — rather than a number copied off a spec
-## sheet. The absolutes are still printed, because when the machine IS quiet they are what you want to read.
+## Both move the quiet frames and the busy frames together, so the RATIO between them survives MUCH of what
+## the absolute numbers do not: a dig may cost a few times a quiet frame, never twenty times one. That is
+## also the honest statement of the property — "mining must not hitch" — rather than a number copied off a
+## spec sheet. The absolutes are still printed, because when the machine IS quiet they are what you want.
+##
+## THAT PARAGRAPH USED TO SAY THE RATIO "SURVIVES" LOAD, FULL STOP, AND IT IS NOT TRUE. Measured: with five
+## unlocked Godot processes beside it the quiet frame rose 2.4x and the DIG ratio rose from 3.9-4.4x to
+## 4.7-6.7x — through a 6.0x cap — because a longer frame has more wall-clock in which to be descheduled,
+## so the numerator pays more for contention than the denominator. The ratio is a PARTIAL correction: it
+## absorbs load for cheap phases and stops absorbing it as a phase gets expensive. A later pass found
+## this from the opposite end, a sweep failing RUN at 2.1x that passed three times standalone. There is no
+## fix inside the layer — see `_load_caveat`, which records the detector that failed and why its whole
+## family must — so the defence is `tools/with_machine.sh`: anything that boots Godot takes the lock.
 ##
 ## PERCENTILES, not the mean. A hitch is one frame in a hundred and a mean of two hundred cannot see it.
 ## p95 carries the gate rather than p99 or max, because under background load the top one percent belongs
@@ -101,6 +110,10 @@ var _perf_host: String = OS.get_environment("SF_PERF_HOST")
 ## Per-phase proof that the phase did the work its name claims — filled by _phase, judged by _workload.
 var _work: Dictionary = {}
 
+## The display's refresh interval in ms, 0 if unreported. A machine constant that contention cannot move,
+## which is what makes it the yardstick `_load_caveat` holds the quiet frame against.
+var _interval: float = 0.0
+
 
 func _initialize() -> void:
 	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
@@ -127,6 +140,8 @@ func _run() -> void:
 
 	var player: Player = _main._player
 	player.auto_input = false
+	var refresh: float = DisplayServer.screen_get_refresh_rate()
+	_interval = (1000.0 / refresh) if refresh > 0.0 else 0.0
 
 	var claim: String = "the hitch ratio only — no absolute budget on unnamed hardware"
 	if _perf_host != "":
@@ -139,7 +154,13 @@ func _run() -> void:
 	var idle: PackedFloat32Array = await _phase(&"idle")
 	var quiet: float = _pct(idle, 0.50)
 	_report("IDLE  standing on the surface", idle)
-	print("      -> a quiet frame is %.2fms; everything below is judged against it" % quiet)
+	# The quiet frame in refresh intervals, printed on EVERY run and not only on a failure. It is the one
+	# number that says whether this box was busy, and a reader who only ever sees it beside a red gate has
+	# no idea what it reads when things are fine. See _load_caveat.
+	print("      -> a quiet frame is %.2fms" % quiet
+		+ (" (%.2fx the display's %.2fms refresh interval)" % [quiet / _interval, _interval]
+			if _interval > 0.0 else "")
+		+ "; everything below is judged against it")
 
 	var ok: bool = true
 	var run_ms: PackedFloat32Array = await _phase(&"run")
@@ -273,8 +294,7 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			+ " SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn the budget on.")
 		return true
 
-	var refresh: float = DisplayServer.screen_get_refresh_rate()
-	var interval: float = (1000.0 / refresh) if refresh > 0.0 else 0.0
+	var interval: float = _interval
 	var paced: bool = false
 	if interval > 0.0:
 		var fastest: float = _fastest(phases)
@@ -599,6 +619,54 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 			_pct(ms, 0.99), ms[ms.size() - 1]])
 
 
+## WHAT A READER HAS TO CHECK BEFORE BELIEVING A RED RATIO — and the negative result behind it, which is
+## the more useful half and is written here because deleted code leaves no trace of what it cost to learn.
+##
+## THE HEADER'S CENTRAL CLAIM IS WRONG AND HAS BEEN CORRECTED ABOVE. It said "both move the quiet frames
+## and the busy frames together, so the RATIO between them survives what the absolute numbers do not". The
+## a later pass hit the counterexample: this layer passed standalone three times (quiet 8.57/8.06/8.01ms,
+## RUN 1.2-1.8x) and FAILED inside a sweep at RUN 2.1x against a 2.0x cap, on a quiet frame of 10.51ms.
+##
+## I TRIED TO BUILD A DETECTOR FOR IT AND IT DOES NOT WORK. The idea was sound on its face: measure the
+## quiet frame TWICE, at the start and again at the end from the same fixture, and refuse to render a ratio
+## verdict if the unit moved between them. Eight runs on an idle box, then three beside five deliberately
+## unlocked Godot processes at load 7.89:
+##
+##                     idle box (8 runs)    5 unlocked neighbours (3 runs)
+##   quiet frame       8.01 - 8.37 ms       18.31 - 21.10 ms
+##   start-to-end drift  1.00 - 1.13x        1.03 - 1.17x     <- OVERLAPS. Not a discriminator.
+##   IDLE p95/p50      1.05 - 1.68x          1.33 - 1.37x     <- also overlaps
+##   DIG ratio         3.9 - 4.4x            4.7 - 6.7x       <- the failure, cap 6.0x
+##
+## SUSTAINED LOAD SCALES THE WHOLE DISTRIBUTION UNIFORMLY. The contended runs are not noisier in shape —
+## their p95/p50 is indistinguishable from an idle box's — they are the same distribution multiplied by
+## 2.4. So nothing INTERNAL to a run separates "this box is loaded" from "this box is slow", and every
+## detector of that family is dead on arrival, not just the one I wrote. A drift threshold would have had
+## to sit between 1.13 and 1.17 — inside the run-to-run noise of the idle box — which is vacuity shape 3,
+## a floor no configuration reliably reaches, and I would have shipped it in the one file that warns about
+## shape 3 twice, one commit after writing a strike about not doing that. It is deleted rather than tuned.
+##
+## WHAT THE RATIO ACTUALLY IS, then, stated correctly: a PARTIAL correction for machine load, not an
+## invariant. It absorbs load for cheap phases (RUN read 1.4x contended, inside its idle-box 1.1-1.6x
+## range) and fails to absorb it for expensive ones (DIG 3.9-4.4x idle, 4.7-6.7x contended, on one commit).
+## A longer frame has more wall-clock in which to be descheduled, so the numerator pays more for contention
+## than the denominator does, and the more expensive the phase the worse the correction holds.
+##
+## THE ONLY DEFENCE IS THE PROTOCOL, which is why `tools/with_machine.sh` exists (peer, `0cdb36a`):
+## anything that boots Godot takes the machine lock. This function is what is left over — it cannot stop a
+## contended run, so it tells whoever reads the failure how to recognise one.
+func _load_caveat(quiet: float) -> String:
+	if _interval <= 0.0:
+		return ""
+	return (". Before believing this: the quiet frame it divides by is %.2fx the display's %.2fms refresh"
+		% [quiet / _interval, _interval]
+		+ " interval. On THIS project's hardware a still frame costs almost exactly one interval on an idle"
+		+ " box and 2.4x that with five unlocked Godot processes beside it, and the same commit's DIG ratio"
+		+ " rose from 3.9-4.4x to 4.7-6.7x purely from the load. A quiet frame well above one interval means"
+		+ " you are reading the machine and not the game — re-run it through tools/with_machine.sh, which"
+		+ " takes the lock, before treating this as a regression")
+
+
 ## Report a phase and gate its p95 against the quiet frame. p95, not p99 — see the header: the top one
 ## percent belongs to whatever else the machine is doing.
 func _gate(label: String, ms: PackedFloat32Array, quiet: float, ratio: float) -> bool:
@@ -609,7 +677,7 @@ func _gate(label: String, ms: PackedFloat32Array, quiet: float, ratio: float) ->
 	var got: float = p95 / maxf(quiet, 0.001)
 	if got > ratio:
 		printerr("      FAIL: p95 is %.1fx a quiet frame (%.2fms vs %.2fms), cap %.1fx — this phase hitches"
-			% [got, p95, quiet, ratio])
+			% [got, p95, quiet, ratio] + _load_caveat(quiet))
 		return false
 	print("      PASS: p95 is %.1fx a quiet frame (cap %.1fx)" % [got, ratio])
 	return true
