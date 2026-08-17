@@ -187,6 +187,79 @@ func _run() -> void:
 ## because a vsync-pinned run reports the refresh interval whether the game has four milliseconds of
 ## headroom or none — passing on that measurement would be the same species of lie as counting a skip as a
 ## pass.
+## A MISSED DEADLINE, which is what "120fps" actually MEANS on a vsync-paced display, and the number this
+## layer should have been reporting all along.
+##
+## Under pacing the frame delta is QUANTISED. A frame that fits presents at the refresh interval; a frame
+## that misses waits for the next one and presents at twice it. There is nothing in between. So "is p95
+## under 8.33ms" is very nearly unanswerable here: on a paced run p95 IS the interval by construction, and
+## a p95 a hair above it does not mean the game is slow — it means roughly one frame in twenty presented
+## late. Those are extremely different claims and the old output could not tell them apart.
+##
+## HOW OFTEN a deadline is missed is answerable, is what a player actually feels, and cannot be faked by
+## pacing in either direction. 1.5x the interval is the threshold because there is no legitimate value
+## there: a paced frame lands on 1.0x or on 2.0x, so anything past the midpoint waited for another refresh.
+##
+## This also exists because the alternative on the table was to assert the budget against
+## `viewport_get_measured_render_time_cpu`, which reads 0.12-0.16ms on this machine. A gate comparing
+## 0.16ms to 8.33ms cannot fail, and would have been vacuity shape 3 — an unreachable floor passing on
+## noise — installed in the one place this project has been fighting exactly that. The render-CPU number is
+## real and worth PRINTING; it is not a gate.
+##
+## THE CAP IS MEASURED, over EIGHT runs, and the number moved once while measuring it. Written first as 5%
+## off two runs; a third read RUN at 6.0% and tripped it. That is the exact moment a threshold gets quietly
+## nudged to fit, so instead of nudging, five more runs. The full distribution:
+##
+##   IDLE   0.0 - 6.0%
+##   RUN    0.0 - 13.0%
+##   SWING  1.5 - 4.0%
+##   DIG    62.9 - 68.1%      <- eight runs, spread of five points
+##
+## The movement phases are dominated by MACHINE NOISE on this box, exactly as the VSYNC/THE MACHINE
+## paragraphs at the top of this file predict, and nothing near 5% is assertable about them. DIG is not
+## noise: it is five times the worst noise reading and its own spread is five points wide across eight runs.
+##
+## So 25%: about twice the worst healthy observation, and about two and a half times below the unhealthy
+## one. It gates the one phase where the signal is real and stays silent where the number belongs to the
+## operating system. A layer that fails when Spotlight is busy is a layer people learn to ignore.
+##
+## AND THEN THE MACHINE MOVED UNDER THE MEASUREMENT, WHICH IS WHY THERE IS NO GATE HERE YET.
+##
+## Immediately after the eight runs above, three more read IDLE 41%, RUN 37.5%, SWING 50%, DIG 89.7% —
+## every phase five to ten times worse. That was not the game. `pgrep` found EIGHT Godot processes and a
+## load average of 7.64: a neighbouring session was running captures without taking the harness lock, so
+## the eight-run distribution and the three that contradict it were taken on two different computers that
+## happen to share a case.
+##
+## The threshold is therefore NOT SET. A cap derived from data whose provenance collapsed mid-derivation
+## is a number with a story, not a measurement, and the honest state of this is "measured twice, disagreed,
+## needs a verified-quiet box". Setting one anyway — at 25%, which is where the arithmetic was heading —
+## would have shipped exactly the thing this file's own header warns about: a threshold that fails for
+## reasons the game did not cause is a threshold someone deletes within a month.
+##
+## So `_drop_rate` REPORTS and does not assert. Reporting is immune to the contention that ruined the
+## derivation: a printed number carries its own conditions, and the reader can see IDLE at 41% and know to
+## look at the load average. An assertion cannot do that.
+##
+## What survives the contamination anyway, because it is a RATIO between phases measured in the same run
+## rather than an absolute: DIG misses roughly ten to a hundred times as many deadlines as the phases that
+## do no terrain work, on every run, contended or not. That comparison is the finding — the game holds its
+## frame rate except when it edits terrain — and it is the shape this layer's ratio gates were built around
+## in the first place. See the audit notes, Strike 12.
+##
+## WHOEVER SETS THIS: take it on a quiet box with the harness lock held and `pgrep Godot` returning one
+## process, over at least eight runs, and write the distribution here. Do not derive it from a suite run.
+const DROP_AT: float = 1.5
+func _drop_rate(ms: PackedFloat32Array, interval: float) -> float:
+	if ms.is_empty() or interval <= 0.0:
+		return 0.0
+	var late: int = 0
+	for v: float in ms:
+		if v > interval * DROP_AT:
+			late += 1
+	return float(late) / float(ms.size())
+
+
 func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], quiet: float) -> bool:
 	if _perf_host == "":
 		# `SKIP:` at the start of the line is the harness contract for "this layer passed but stood part of
@@ -231,9 +304,20 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			ok = false
 			continue
 		var p95: float = _pct(ms, 0.95)
+		# The missed-deadline rate alongside the p95, always, whichever way the budget goes. On a paced run
+		# it is the only one of the two that distinguishes "slow" from "occasionally late", and a reader
+		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing — as happened here twice.
+		var drops: float = _drop_rate(ms, interval)
+		print("      %s: p95 %.2fms · %.1f%% of frames missed their %.2fms slot (>%.2fms)"
+			% [labels[i], p95, drops * 100.0, interval, interval * DROP_AT])
 		if p95 > FRAME_BUDGET_MS:
 			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget — that phase is under 120fps on %s"
-				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host])
+				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host]
+				+ (". NOTE: it missed only %.1f%% of its slots, so on a paced display this p95 is consistent"
+					% (drops * 100.0)
+					+ " with a phase that is comfortably fast and occasionally late rather than a slow one —"
+					+ " read the drop rate before acting on this number."
+					if drops <= 0.10 else ""))
 			ok = false
 		elif paced:
 			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
