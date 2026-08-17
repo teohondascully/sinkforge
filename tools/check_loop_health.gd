@@ -132,6 +132,24 @@ func _run() -> void:
 	# GATE first: an incomplete arc is a hard fail regardless of the number (the loop dead-ended).
 	_check(completed, "the first-automation arc COMPLETES (the loop is playable to its first goal)")
 
+	# AND THE SAMPLER HAS TO HAVE WATCHED IT. Two of the three penalties are per-frame tallies that start at
+	# zero and only ever go up, so a sampler that never ticked — freed early, never added, its Node dropped
+	# by a refactor — hands back stalls=0 and guidance_gap=0, which is a PERFECT 100 for a play nobody
+	# observed. The failure is silent and it moves the score the wrong way, which is the worst combination
+	# available: the layer reports its best number ever at the moment it stops measuring, and a ratcheting
+	# floor cannot catch a value that went UP. `_sampled_frames` was already printed on the line above and
+	# was the only figure here nothing asserted. Measured 2026-08-17: 1099 sampled against 1099 played —
+	# exact — so the floor is the played count less the single frame the sampler Node is added on.
+	#
+	# `> 0` as well as the ratio, and this is the guard applied to itself. `frames` is `maxi(1, …)`, so a
+	# play that did nothing reports one frame and `_sampled_frames >= frames - 1` becomes `0 >= 0` — the
+	# non-run passing its own attendance check, which is the exact shape this assertion was added to close.
+	# It cannot co-occur with `completed` today, and it costs one clause to stop depending on that.
+	# NON-VACUITY — an unwatched play scores a perfect 100.
+	_check(_sampled_frames > 0 and _sampled_frames >= frames - 1,
+		"the per-frame sampler watched the whole play (%d frames sampled of %d played)"
+			% [_sampled_frames, frames])
+
 	# THESE THREE USED TO READ `clampf(x, 0.0, CAP) <= CAP`. That is not a test, it is the definition of
 	# clampf — three assertions that could not fail, inflating the pass count and making the layer look
 	# like it watched three things it never watched. What a cap actually hides is SATURATION: a component

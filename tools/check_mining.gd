@@ -104,6 +104,16 @@ func _run() -> void:
 	_check(not _sim.is_solid(eff) or _main._mineable(eff),
 		"the effective aim is never a solid that would crack forever (eff=%s, %s)"
 			% [eff, "open" if not _sim.is_solid(eff) else "mineable"])
+	# 3. AND IT HAS TO HAVE SNAPPED TO SOMETHING. The invariant above is satisfied outright by an aim that
+	# lands on OPEN SKY — `not is_solid(eff)` short-circuits it — so a `_effective_aim` that gave up and
+	# returned empty air whenever the cursor sat behind a wall would pass every assertion in this block. That
+	# is the same bug wearing the other face: instead of charging forever on rock it will not break, the pick
+	# charges forever on nothing, and the player holding the button behind a wall sees the identical dead
+	# animation. So name where it went, and then follow it through with the real verb: the gate saying yes
+	# and the rock actually breaking have to be one answer, which is the whole reason the two share a
+	# predicate. `_workable` is what `_update_mining`'s hold-gate reads; `try_mine` is what spends the charge.
+	_check(_main._workable(eff), "…it snapped to a face the hold-gate will really charge (%s)" % eff)
+	_check(_main.try_mine(eff), "…and the charge breaks it — no phantom crack loop on either face")
 
 	_run_dig_queue(row)
 

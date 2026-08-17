@@ -184,6 +184,15 @@ func _run() -> void:
 	_check(cleared, "...and it COMES OFF again (peak %d pivots, stack emptied)" % wrapped)
 
 	print("  the arc turned at up to %.1f rad/s while free and %.1f rad/s while wrapped" % [free_spin, spin])
+	# THE BASELINE HAS TO EXIST. `free_spin` starts at 0.0 and is only ever raised by a maxf, so a run in
+	# which the line never went taut without a pivot leaves it at zero and the whip assertion below decays
+	# into `spin > 0.0` — "the arc turned at all", which is not the claim and is nearly impossible to fail.
+	# It is the same trap the `events > 0` guard further down was written for, sitting one assertion above it
+	# unguarded. Measured on this rig: 1.2 rad/s free against 4.8 wrapped, so there is plenty to compare
+	# with; this is here for the day the fixture stops producing a free arc and the whip check silently
+	# weakens instead of going red.
+	# NON-VACUITY — without a free arc the whip test decays to `spin > 0.0`.
+	_check(free_spin > 0.0, "there was a FREE arc to measure the whip against (%.1f rad/s)" % free_spin)
 	_check(spin > free_spin * WHIP_EDGE,
 		"...and catching a corner WHIPS you round it (%.1f rad/s vs %.1f, needs %.1fx)"
 			% [spin, free_spin, WHIP_EDGE])

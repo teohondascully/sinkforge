@@ -126,11 +126,29 @@ func _run() -> void:
 	_check(bool(roped["untouched"]) and int(roped["rock"]) > 1000,
 		"...and the %d cells of rock around it are untouched by the trip — the hole was already there"
 			% int(roped["rock"]))
+	# BOTH JOURNEYS HAVE TO HAVE HAPPENED before their frame counts may be divided by one another. A shaft
+	# that stalls does not stop early — it spends its whole 6000-frame budget going nowhere and then returns
+	# those frames as its cost, so the ratio reads as a spectacular ~21x win for the hole. The worse mining
+	# gets, the better this layer says the plunge is, and it reports the number in the tone of a pass. The
+	# stall does print, but to stderr, out of the assertion record and into a place a green run never shows.
+	# So the SLOWER route must arrive before its frame count is allowed to flatter the faster one.
+	# NON-VACUITY — the shaft must ARRIVE before its frame count may divide anything.
+	_check(bool(shaft["ok"]),
+		"the shaft got all the way down too, so the two frame counts are of the same journey (%d rows)"
+			% shaft["rows"])
 	_check(speedup >= SPEEDUP_FLOOR,
 		"...and it is worth walking to (%.1fx the shaft, floor %.1fx)" % [speedup, SPEEDUP_FLOOR])
 	_check(purchase >= PURCHASE_FLOOR,
 		"...and there is rock to hold the whole way (rope bit %.0f%%, floor %.0f%%)"
 			% [purchase * 100.0, PURCHASE_FLOOR * 100.0])
+	# ...and the same trap on the other route. "On legs alone it is a ONE-WAY door" is measured as rows
+	# REGAINED against a cap, and a body that never went down the hole regains nothing and passes it with
+	# room to spare. A run that stalled six rows in would report the trap working perfectly when what it
+	# actually measured is a body that was never in the trap. The cap only means something below the lip.
+	# NON-VACUITY — the body must have gone DOWN before 'it cannot climb out' says anything.
+	_check(int(legs["rows"]) >= TARGET_ROWS,
+		"the legs-only ride went down that same hole first (%d rows, asked for %d)"
+			% [legs["rows"], TARGET_ROWS])
 	_check(int(legs["back"]) <= LEGS_BACK_CAP,
 		"...and on legs alone it is a ONE-WAY door (%d rows regained, cap %d)"
 			% [legs["back"], LEGS_BACK_CAP])
@@ -362,7 +380,7 @@ func _dig() -> Dictionary:
 	if not ok:
 		printerr("  the shaft stalled %d rows down" % reached)
 	var out := {"rows": reached, "frames": int(Engine.get_physics_frames()) - before,
-		"mines": agent.mines}
+		"mines": agent.mines, "ok": ok}
 	main.queue_free()
 	await physics_frame
 	return out

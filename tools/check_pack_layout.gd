@@ -26,6 +26,30 @@ func _craft_options(n: int) -> Array[Dictionary]:
 	return out
 
 
+## The first field of the panel's shape that moved, named — "" if nothing did, and NOTHING_MEASURED if there
+## was nothing to compare. Every entry `_bazaar_geometry` returns is compared, so a field ADDED to that
+## dictionary later is covered the day it lands rather than the day somebody remembers to come back here.
+##
+## THE TWO EMPTY ANSWERS ARE DIFFERENT STRINGS, and that is the whole design of this function. A version
+## that returned "" for both would say "nothing moved" about a shape it never looked at — the un-measurable
+## case handed back as the passing verdict, which is the `dead_space.gd` defect exactly. That one was
+## survivable only because callers guarded it, and it went wrong the moment a second caller appeared and
+## did not: three callers, two remembered, one did not, and nobody ever decided that. A caller-side guard
+## has a per-call-site failure rate. So the ambiguity is sealed off here where it cannot be forgotten, and
+## the fixture assertion beside the call site is free to be about the fixture instead of propping this up.
+const NOTHING_MEASURED: String = "NOTHING TO COMPARE — the shape dictionary was empty"
+func _shape_diff(a: Dictionary, b: Dictionary) -> String:
+	if a.is_empty() or b.is_empty():
+		return NOTHING_MEASURED
+	for k: Variant in a.keys():
+		if typeof(a[k]) == TYPE_FLOAT and typeof(b.get(k)) == TYPE_FLOAT:
+			if not is_equal_approx(a[k], b[k]):
+				return "%s: %s -> %s" % [k, a[k], b[k]]
+		elif a[k] != b.get(k):
+			return "%s: %s -> %s" % [k, a[k], b.get(k)]
+	return ""
+
+
 func _assert_fits(hud: Hud, canvas: Vector2, tag: String) -> void:
 	var g: Dictionary = hud._bazaar_geometry()
 	var origin: Vector2 = g["origin"]
@@ -70,8 +94,26 @@ func _initialize() -> void:
 	# its position, which is the one thing a two-list screen must never do.
 	var lay: Dictionary = hud.works_columns(per_column)
 	print("  MACHINES takes %d column(s), THE RACK %d — of %d" % [int(lay["machines"]), int(lay["rack"]), cols])
-	_check(int(lay["total"]) <= cols,
-		"both lists fit the counter in whole columns (%d of %d)" % [int(lay["total"]), cols])
+	# ASKED OF THE DEMAND, NOT OF THE ANSWER. This read `lay["total"] <= cols`, and `works_columns` ends with
+	# `if m + r > BAZAAR_COLS: … m = BAZAAR_COLS - r` — it CLAMPS its own total on purpose, so the number
+	# being tested had just been forced into range by the function under test. It could not fail however far
+	# the two lists overflowed. `hud.gd`'s comment beside that clamp says "check_pack_layout asserts the
+	# squeeze is not happening today", and that was exactly the sentence this file was not saying: the clamp
+	# is the FAILURE MODE, made legible rather than invisible, and reading it back as if it were the result
+	# is how a fallback becomes the silent normal. So compute what the lists ASK for, before the clamp sees
+	# it, and require that the squeeze never fires.
+	# The `maxi(1, …)` floors mean two EMPTY lists still ask for 1+1, so this alone would pass on a counter
+	# with nothing on it. It is not left resting on that: the per-tab census below asserts TAB_WORKS has rows
+	# at the stall, and TAB_WORKS is these two lists end to end — so emptiness fails there, loudly, and this
+	# assertion is free to be about the squeeze. Stated because the coupling is real but not local.
+	var want_machines: int = maxi(1, ceili(float(hud.open_machines().size()) / float(per_column)))
+	var want_rack: int = maxi(1, ceili(float(hud.open_rack().size()) / float(per_column)))
+	_check(want_machines + want_rack <= cols,
+		"both lists fit the counter in whole columns UNSQUEEZED (%d asked of %d)"
+		% [want_machines + want_rack, cols])
+	_check(int(lay["machines"]) == want_machines and int(lay["rack"]) == want_rack,
+		"…and the counter gave each list the columns it asked for (%d+%d, wanted %d+%d)"
+		% [int(lay["machines"]), int(lay["rack"]), want_machines, want_rack])
 	_check(hud.craft_options.size() <= per_column * int(lay["machines"]),
 		"every machine is reachable without a window (%d of %d)"
 		% [hud.craft_options.size(), per_column * int(lay["machines"])])
@@ -85,20 +127,52 @@ func _initialize() -> void:
 		"the detail plate is inside the panel and tall enough to matter (%.0fpx)" % detail.size.y)
 
 	# --- SAME SHAPE EVERYWHERE (fix #4). Away from a Bazaar only the VERBS are gated. ---
+	# Two fields of the shape were compared — `origin` and `h` — which is the panel's OUTLINE. The content
+	# rect, the detail plate and the row geometry could all move underneath an outline that stayed put, and
+	# the content rect is exactly where the vanishing recipe rows lived. And the row count was asked on the
+	# ONE tab that happened to be selected, while the old panel lost a different part of itself on each. So:
+	# every field compared, and every tab counted.
+	var tabs: Array[int] = [Hud.TAB_PACK, Hud.TAB_WORKS, Hud.TAB_BENCH]
+	var stall_rows: Dictionary = {}
+	for tab: int in tabs:
+		hud.set_bazaar_tab(tab)
+		stall_rows[tab] = hud.bazaar_row_count()
+		# The guard that makes the comparison below mean anything: a tab that is EMPTY at the stall would
+		# keep its nothing down a shaft and report a pass for having lost none of it.
+		# NON-VACUITY — a tab with no rows at the stall would lose none down a shaft.
+		_check(int(stall_rows[tab]) > 0,
+			"at the stall, tab %d has rows it could lose (%d)" % [tab, int(stall_rows[tab])])
+	# BOTH GEOMETRIES ARE READ ON THE SAME TAB, pinned here rather than inherited. `_bazaar_geometry` does
+	# not consult `bazaar_tab` today, so the census loop above cannot disturb it — but the whole point of
+	# `_shape_diff` is that it covers fields nobody has added yet, and the day one of them varies by tab this
+	# comparison would read two different tabs and report the difference as `can_craft`'s doing. One line to
+	# make the only variable between the two readings the one under test.
+	hud.set_bazaar_tab(Hud.TAB_WORKS)
 	var at_stall: Dictionary = hud._bazaar_geometry()
-	var rows_at_stall: int = hud.bazaar_row_count()
+	var stall_cols: Dictionary = hud.works_columns(per_column)
 	hud.can_craft = false
+	hud.set_bazaar_tab(Hud.TAB_WORKS)
 	var in_a_shaft: Dictionary = hud._bazaar_geometry()
 	_assert_fits(hud, canvas, "no-bazaar")
-	_check(at_stall["origin"] == in_a_shaft["origin"] and is_equal_approx(at_stall["h"], in_a_shaft["h"]),
-		"the panel is the same size and place away from a Bazaar as at one")
+	# NON-VACUITY — a statement about the FIXTURE, not the feature. It no longer props up `_shape_diff`
+	# (that ambiguity is sealed inside the helper now); it asserts the panel reports a shape worth comparing.
+	_check(at_stall.size() >= 6, "the geometry has fields to compare at all (%d)" % at_stall.size())
+	var moved: String = _shape_diff(at_stall, in_a_shaft)
+	_check(moved == "", "the panel is the same shape FIELD FOR FIELD away from a Bazaar as at one (%s)"
+		% ("nothing moved" if moved == "" else moved))
 	# THIS ASSERTION USED TO READ `bazaar_row_count() >= 0`. A row count is an integer count; it is never
 	# negative; the check could not fail, and it was the only thing standing behind the claim its own
 	# label made. The property that sentence is actually about is that the list does not SHRINK when the
 	# verbs gate — away from a Bazaar you still READ everything it would sell you, you just cannot buy it
 	# here, which is what makes the screen the same screen in both places.
-	_check(rows_at_stall > 0 and hud.bazaar_row_count() == rows_at_stall,
-		"…and the counter lists the SAME %d rows down a shaft — only the verbs gate" % rows_at_stall)
+	for tab: int in tabs:
+		hud.set_bazaar_tab(tab)
+		_check(hud.bazaar_row_count() == int(stall_rows[tab]),
+			"…and tab %d still lists all %d of its rows down a shaft (%d) — only the verbs gate"
+			% [tab, int(stall_rows[tab]), hud.bazaar_row_count()])
+	var split_moved: String = _shape_diff(stall_cols, hud.works_columns(per_column))
+	_check(split_moved == "", "…and WORKS still splits its columns the same way (%s)"
+		% ("unchanged %s" % stall_cols if split_moved == "" else split_moved))
 	hud.can_craft = true
 
 	# --- THE CURSOR walks both columns and never leaves the list. ---

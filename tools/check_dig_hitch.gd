@@ -337,8 +337,16 @@ func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
 	print("  COST per-cell region/full = %.3f (gate %.2f), best of %d each; total ratio %.4f"
 		% [ratio, MAX_PERCELL_RATIO, TIME_SAMPLES, float(region_us) / float(maxi(full_us, 1))])
 
-	_check(full_cells > region_cells, "the timed pair really is full-grid vs region (%d vs %d cells)"
-		% [full_cells, region_cells])
+	# BOTH SIDES OF THE RATIO HAVE TO HAVE HAPPENED. `full_cells > region_cells` is satisfied by
+	# `region_cells == 0`, and a region bake that painted nothing also costs almost no time — so `region_pc`
+	# (which divides by `maxi(region_cells, 1)`) comes out near zero, `ratio` comes out near zero, and the
+	# claim "the fast lane is fast in TIME" passes on a lane that did no work at all. That is the strongest
+	# possible pass for the emptiest possible measurement, and the `maxi(…, 1)` divide-guard is what converts
+	# the impossible case into a flattering one instead of a loud one.
+	# NON-VACUITY — an empty region bake costs no time, so the ratio flatters it.
+	_check(region_cells > 0 and full_cells > region_cells,
+		"the timed pair really is full-grid vs region, and the region baked something (%d vs %d cells)"
+			% [full_cells, region_cells])
 	_check(ratio <= MAX_PERCELL_RATIO,
 		"a dig's bake costs no more PER CELL than a full bake — the fast lane is fast in TIME, not just "
 			+ "small in extent (%.3f <= %.2f)" % [ratio, MAX_PERCELL_RATIO])

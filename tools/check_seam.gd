@@ -106,6 +106,33 @@ func _field() -> void:
 			differs += 1
 	_check(differs > 0, "a different seed grains the world differently (it is seeded, not hard-coded)")
 
+	# PRECEDENCE, WHERE THE TWO PLANES CROSS. Bedding beats joint. That order is arbitrary but it must be
+	# FIXED, because the renderer draws the grain and the swing calves along it and the two have to be
+	# reading the same answer — and this file already DEPENDS on it in two places (`_plain_row` exists only
+	# because a joint on a bedding row would report as bedding and be struck along the grain instead of
+	# across it). It was stated in a comment and relied on by the fixtures, and asserted nowhere, which is
+	# the shape of a rule that gets quietly inverted by a refactor while every test stays green.
+	#
+	# The FIXTURE guard carries the "this is really a joint" half: `_joint_column` returns a column only if
+	# it answered VERTICAL on that row, so the `>= 0` below already says so and re-asserting it here would
+	# be a check that cannot fail — the exact thing this commit is repairing elsewhere. One assertion, then,
+	# and it is the load-bearing one. What it does NOT prove is that the joint SPANS as far as the bedding
+	# row: a joint that simply stops short reads identically from outside. So this is precedence as far as
+	# the field exposes it, which is further than nothing and is all that can be claimed honestly.
+	var cross_row: int = _bedding_row()
+	var cross_plain: int = _plain_row()
+	var cross_col: int = _joint_column(cross_plain) if cross_plain >= 0 else -1
+	# NON-VACUITY — the CROSSING has to exist before anything can be claimed about precedence at it.
+	_check(cross_row >= 0 and cross_col >= 0,
+		"there is a bedding row and a joint column to cross (row %d, joint at col %d on plain row %d)"
+			% [cross_row, cross_col, cross_plain])
+	if cross_row >= 0 and cross_col >= 0:
+		_check(Seams.at(Vector2i(cross_col, cross_row), seed) == Seams.HORIZONTAL,
+			"a column that answers VERTICAL on row %d answers BEDDING where the plane crosses it (row %d"
+				% [cross_plain, cross_row]
+				+ " gave %d) — bedding beats joint, the order this file's fixtures already assume"
+				% Seams.at(Vector2i(cross_col, cross_row), seed))
+
 	# PLANES, not a sprinkle. A bedding row must be bedding for its WHOLE length, because that is what makes
 	# runs exist at all — a per-cell roll would give a run of three about once in six hundred cells.
 	var row: int = _bedding_row()
