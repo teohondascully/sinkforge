@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE INLINED PER-TEXEL TERMS STILL SAY WHAT THE OBVIOUS ONES SAID.
 ##
@@ -31,25 +31,14 @@ extends SceneTree
 const W: int = 61                 ## deliberately not a multiple of anything — no lucky alignment
 const H: int = 47
 
-var _fails: int = 0
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _initialize() -> void:
 	print("== the inlined per-texel terms still say what the obvious ones said ==")
 	_run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_paint_terms: PASS — the flat rewrites agree with the loops they replaced, everywhere")
 		quit(0)
 	else:
-		printerr("check_paint_terms: FAIL (%d)" % _fails)
+		printerr("check_paint_terms: FAIL (%d)" % _failures)
 		quit(1)
 
 

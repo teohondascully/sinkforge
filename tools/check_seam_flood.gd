@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE FAST FLOOD DRAWS THE SAME PICTURE AS THE OBVIOUS ONE.
 ##
@@ -54,26 +54,16 @@ const SCALE_N: int = 1200
 ## argued to the peer that exclusivity is for layers whose ANSWER is a duration, and this layer's answer is
 ## a shape. Draining the whole scheduler to protect one informational print would contradict that.)
 
-var _fails: int = 0
 var _rng := RandomNumberGenerator.new()
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== the fast flood draws the same picture as the obvious one ==")
 	_run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_seam_flood: PASS — spatial hash and quadratic scan agree, and the hash is faster")
 		quit(0)
 	else:
-		printerr("check_seam_flood: FAIL (%d)" % _fails)
+		printerr("check_seam_flood: FAIL (%d)" % _failures)
 		quit(1)
 
 
