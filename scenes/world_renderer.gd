@@ -101,6 +101,31 @@ const AMBIENT_DARK: float = 0.66
 ## different rocks separated by four units of luminance. Barely cool and appreciably brighter keeps the
 ## material read (brown earth stays brown, grey stone stays grey) while the deep still plainly needs a lamp.
 const AMBIENT_LIGHT := Color(0.34, 0.35, 0.42)
+## HOW MUCH OF THE DEEP AMBIENT AN UNLIT *EMPTY* CELL KEEPS. Applies below the scatter band only, so the
+## surface and the daylight soak are untouched.
+##
+## THE FINDING THIS FIXES, and it is not the one the audit predicted. `check_rock_reads` sampled 140 solid
+## cells against 55 air cells outside every light source and asked how often you would be right telling them
+## apart from pixels: 56%, against a coin flip of 50%. That is the blind tester's *"I cannot reliably tell
+## solid rock from empty air"* stated as a number. But the medians say something sharper than "no contrast":
+## unlit air read 12.0 and unlit rock read 9.4, so THE VOID WAS BRIGHTER THAN THE ROCK. Not a missing cue —
+## an INVERTED one. A first-timer who learned to read that frame would have learned that brighter means
+## emptier, which is backwards in every other game they have ever played and backwards against the lamp,
+## where bright plainly means solid-and-lit.
+##
+## The mechanism was `_open_blur`, and it was not a bug. That term means "how much light can reach in here",
+## which is exactly right near the surface, where openness IS how skylight arrives. Carried into the deep it
+## keeps paying out light that has no source: an air pocket forty rows down is maximally open, so it took
+## the full ambient, while the rock beside it took the openness of rock. Correct arithmetic, wrong premise —
+## down here there is nothing overhead to be open TO.
+##
+## Why a floor on the VOID rather than a lift on the rock: the audit is explicit that raising global
+## brightness is how this was got wrong before (an earlier blue fog did exactly that and had to be pulled),
+## and the prescription is to SHAPE the darkness — keep unlit rock grainy while unlit air goes black. Rock's
+## ambient is therefore untouched at AMBIENT_LIGHT, every value and every grain it had it still has, and the
+## whole change is subtractive on cells that hold nothing. "Bring your own light" gets stronger, not weaker:
+## the space you have carved is now the darkest thing in frame until you light it.
+const VOID_FLOOR: float = 0.35
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
                                                    ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
                                                    ## a white wash (diff 11)
@@ -3100,6 +3125,9 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 	var amb_r: int = int(amb.r * 255.0)
 	var amb_g: int = int(amb.g * 255.0)
 	var amb_b: int = int(amb.b * 255.0)
+	var void_r: int = int(float(amb_r) * VOID_FLOOR)
+	var void_g: int = int(float(amb_g) * VOID_FLOOR)
+	var void_b: int = int(float(amb_b) * VOID_FLOOR)
 	for col: int in range(band.x, band.y + 1):
 		var surf: int = sim.surface_row(col)
 		var scatter_end: int = mini(surf + SKY_FADE, rows - 1)
@@ -3117,6 +3145,11 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 				r = int(lerpf(float(sky_rgb[row * 3]), float(amb_r), t))
 				g = int(lerpf(float(sky_rgb[row * 3 + 1]), float(amb_g), t))
 				b = int(lerpf(float(sky_rgb[row * 3 + 2]), float(amb_b), t))
+			elif not sim.is_solid(Vector2i(col, row)):
+				# UNLIT AIR IS ABSENCE, AND ABSENCE IS THE DARKEST THING DOWN HERE. See VOID_FLOOR.
+				r = void_r
+				g = void_g
+				b = void_b
 			# Clamped, because the key term can push a strongly up-facing cell ABOVE its row's own light
 			# level and a byte does not say so — it wraps, and a lit ledge prints as a dark one.
 			var lit: float = _open_blur[row * cols + col]
