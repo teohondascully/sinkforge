@@ -59,7 +59,13 @@ const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can
 var _title_open: bool = false
 var _title_seed: int = WORLD_SEED
 var _title_tint: int = 0
-var _world_seed: int = WORLD_SEED           ## the seed THIS world was actually built with
+## THE SEED THIS WORLD WAS BUILT WITH lives in ONE place: `sim.world_seed`, set by `load_world` at
+## generation and by `SaveGame.restore` at load. The controller used to keep its own `_world_seed`
+## alongside it and that second copy was a live bug, not a convenience: a restore updated the sim's
+## seed and the fine terrain derived from it, but nothing updated the controller's, so the very next
+## F5 stamped the STALE seed over the correct captured one. Load a world, press Continue, save, and
+## the file now claimed a seed its own terrain had never been molded with — and the load after that
+## rebuilt the fine grid wrong. Two authorities for one fact is the whole defect; there is now one.
 static var boot_seed: int = -1              ## >=0: the next boot generates with this seed
 static var boot_tint: int = 0               ## the picked lamp tint index (persists across reloads)
 static var boot_skip_title: bool = false    ## set before a new-world reload: land straight in the game
@@ -396,7 +402,7 @@ static func _is_scripted_boot() -> bool:
 func _open_title() -> void:
 	_title_open = true
 	_paused = true
-	_title_seed = _world_seed
+	_title_seed = sim.world_seed
 	_title_tint = clampi(MainView.boot_tint, 0, LAMP_TINTS.size() - 1)
 	if _player != null:
 		_player.auto_input = false        # the miner stands still behind the veil
@@ -406,7 +412,7 @@ func _open_title() -> void:
 ## through the boot statics (they survive reload_current_scene).
 func _confirm_title() -> void:
 	MainView.boot_tint = _title_tint
-	if _title_seed != _world_seed:
+	if _title_seed != sim.world_seed:
 		MainView.boot_seed = _title_seed
 		MainView.boot_skip_title = true
 		get_tree().reload_current_scene()
@@ -654,9 +660,9 @@ const WorldSeeder := preload("res://scenes/world_seeder.gd")
 
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
-	_world_seed = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
-	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, _world_seed)
-	sim.load_world(world)
+	var seed: int = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
+	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, seed)
+	sim.load_world(world)   # …which stamps `sim.world_seed`, the single authority from here on
 	WorldSeeder.seed_tutorial(sim, dev_start)
 
 
@@ -753,7 +759,9 @@ func _process(delta: float) -> void:
 			"seed": _title_seed, "tint": _title_tint,
 			"tint_name": str(LAMP_TINTS[_title_tint]["name"]),
 			"tints": LAMP_TINTS,
-			"has_save": FileAccess.file_exists(save_path),
+			# The BACKUP counts. If the slot was damaged, the one thing the title must not do is hide the
+			# Continue prompt — that is the moment a recoverable save becomes an unrecovered one.
+			"has_save": FileAccess.file_exists(save_path) or FileAccess.file_exists(save_path + SaveGame.BAK_SUFFIX),
 		}
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
@@ -2045,12 +2053,15 @@ func _cycle_speed() -> void:
 	Engine.time_scale = TIME_SCALES[_time_scale_idx]
 
 
-## F5 quicksave: the sim capture + the body's position, one versioned file.
+## F5 quicksave: the sim capture + the body's position, one versioned file. The write is atomic and
+## keeps the previous save as a backup (see SaveGame.write) — a failed save leaves the old one intact,
+## which is why "save FAILED" is now a survivable sentence rather than an epitaph.
 func _save_game() -> void:
 	var data: Dictionary = SaveGame.capture(sim)
 	data["player_pos"] = _player.position
 	data["lamp_tint"] = MainView.boot_tint          # representation keys ride beside the sim envelope
-	data["world_seed"] = _world_seed
+	# NB: no `world_seed` line here. `capture` already wrote `sim.world_seed`, and the controller
+	# overwriting it with a second copy of the same fact is precisely the bug documented at `_title_seed`.
 	_hud.flash("SAVED" if SaveGame.write(save_path, data) else "save FAILED")
 
 
@@ -2059,7 +2070,15 @@ func _save_game() -> void:
 func _load_game() -> void:
 	var data: Dictionary = SaveGame.read(save_path)
 	if data.is_empty() or not SaveGame.restore(sim, data):
-		_hud.flash("no save to load")
+		# THREE DIFFERENT SENTENCES, because they are three different situations and only one of them is
+		# ordinary. Telling somebody who definitely saved an hour ago that they have "no save" is a lie
+		# that also destroys the evidence — they start a new game and overwrite what was left.
+		if SaveGame.last_read == SaveGame.Read.CORRUPT:
+			_hud.flash("save DAMAGED — not loaded")
+		elif not data.is_empty():
+			_hud.flash("save UNREADABLE — not loaded")
+		else:
+			_hud.flash("no save to load")
 		return
 	var pp: Variant = data.get("player_pos")
 	if pp is Vector2:
@@ -2071,7 +2090,7 @@ func _load_game() -> void:
 	_prime_breach_watch()   # a breach that happened before this save doesn't boom retroactively
 	if _hints != null:
 		_hints.resync()     # whatever the save already carries is old news, not a fresh acquisition
-	_hud.flash("LOADED")
+	_hud.flash("RECOVERED (backup)" if SaveGame.last_read == SaveGame.Read.RECOVERED else "LOADED")
 
 
 ## Mark every ALREADY-breached descent engine as heard, so the breach stinger fires only for a breach

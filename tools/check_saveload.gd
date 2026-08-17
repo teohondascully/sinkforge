@@ -25,10 +25,18 @@ var _pos_before: Vector2
 func _initialize() -> void:
 	Engine.max_fps = 120
 	MainView.save_path = TEST_SLOT          # BEFORE the scene exists: nothing may read the real slot
-	DirAccess.remove_absolute(TEST_SLOT)    # a stale file from a previous run must not be mistaken for this one's
+	_sweep()                                # a stale file from a previous run must not be mistaken for this one's
 	_main = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(_main)
 	process_frame.connect(_on_frame)
+
+
+## The isolated slot AND its two companions. An atomic write leaves a `.bak` beside the save and can
+## leave a `.tmp` if it failed, so "delete the save file" is no longer one path — and a fixture that
+## tidies only the file it first thought of leaves litter in `user://` for the next run to trip over.
+func _sweep() -> void:
+	for suffix: String in ["", SaveGame.TMP_SUFFIX, SaveGame.BAK_SUFFIX]:
+		DirAccess.remove_absolute(TEST_SLOT + suffix)
 
 
 func _check(cond: bool, label: String) -> void:
@@ -83,7 +91,20 @@ func _on_frame() -> void:
 		# nothing about the on-disk format, and it would still pass if the path override had quietly
 		# sent the save somewhere that never got written.
 		_check(FileAccess.file_exists(TEST_SLOT), "the round-trip went through the isolated slot on disk")
-		DirAccess.remove_absolute(TEST_SLOT)
+		_check(not FileAccess.file_exists(TEST_SLOT + SaveGame.TMP_SUFFIX),
+			"the atomic write left no .tmp behind — the temp file was promoted, not abandoned")
+
+		# THE CONTROLLER DOES NOT OWN THE SEED. `check_save_durability` proves SaveGame carries a loaded
+		# world's seed through a re-save; it cannot prove that the SCENE doesn't stamp its own copy over
+		# it afterwards, which is exactly where the bug lived — `_save_game()` wrote `data["world_seed"]
+		# = _world_seed` from a controller field that a load never updated. So: move the sim's seed out
+		# from under the controller, press the real save verb, and read the file back.
+		var moved: int = sim.world_seed + 4242
+		sim.world_seed = moved
+		_main._save_game()
+		_check(int(SaveGame.read(TEST_SLOT).get("world_seed", -1)) == moved,
+			"F5 saves the seed the SIM was built with, not a second copy the controller kept")
+		_sweep()
 		if _failures == 0:
 			print("check_saveload: PASS")
 			quit(0)

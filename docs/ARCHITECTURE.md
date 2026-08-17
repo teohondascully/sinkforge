@@ -92,14 +92,26 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
   ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),
   in one VERSIONED envelope written with the binary Variant serializer (Vector2i keys round-trip; no
-  JSON mangling). DERIVED state (grid, power, flow_events, terrain_dirty, the rate buffer) is not saved
-  — it rebuilds next tick. `restore(sim, data)` mutates IN PLACE (live references survive) and is
-  all-or-nothing: an unknown version or missing def refuses without touching the sim. The controller
-  owns the file (F5/F9 → `_save_game`/`_load_game`, `user://sinkforge.save`, + `player_pos` in the
-  envelope) and calls `WorldRenderer.repaint_world()` (requeue all retained chunks + veil, drop lazy
-  caches) after a load. **Determinism is the verifier:** capture → restore → tick both 120× →
-  identical signatures (`_test_save_load`), plus the live-scene layer `tools/check_saveload.gd`
-  (harness layer 12: save, scar the world, load, exact heal + conservation).
+  JSON mangling, envelope **v2**). DERIVED state (grid, power, flow_events, terrain_dirty, the rate
+  buffer, the tick accumulator) is not saved — it rebuilds next tick, and restore RESETS it explicitly so
+  an in-process F9 and a fresh-process load resume identically. AUTHORITATIVE PHASE (`seep_tick`) *is*
+  saved, because when the next weep lands is part of the world's future. `restore(sim, data)` mutates IN
+  PLACE (live references survive) and is genuinely all-or-nothing: the whole envelope is validated and
+  staged into a scratch dictionary first, so an unknown version, a malformed field, or a missing def
+  refuses without having written a single byte into the sim.
+  **The write is atomic and keeps a backup:** encode to `<path>.tmp` → close → read it back and prove it
+  decodes → copy the current save aside to `<path>.bak` → rename the temp over the slot. A failure at any
+  step leaves the previous save intact, and `read()` falls back to `.bak` when the slot is damaged,
+  reporting which happened through `SaveGame.last_read` (NONE / OK / RECOVERED / CORRUPT) so the UI can
+  tell "you have no save" apart from "your save was damaged". The controller owns the file (F5/F9 →
+  `_save_game`/`_load_game`, `user://sinkforge.save` via the overridable `MainView.save_path`, +
+  `player_pos` in the envelope) but NOT the seed — `sim.world_seed` is the single authority, and the
+  controller keeping a second copy was a live bug that re-stamped loaded worlds with the wrong seed.
+  It calls `WorldRenderer.repaint_world()` (requeue all retained chunks + veil, drop lazy caches) after a
+  load. **Determinism is the verifier:** capture → restore → tick both 120× → identical signatures
+  (`_test_save_load`), plus two live layers — `tools/check_saveload.gd` (boot the real scene: save, scar
+  the world, load, exact heal + conservation) and `tools/check_save_durability.gd` (the unhappy paths:
+  truncation, unopenable path, missing keys, v1 migration, phase equivalence, seed ownership).
 - **Research — the PULL (docs/PROGRESSION.md §5):** `research` (tech id → true) is sim state mutated only
   by `research_tech(id)` — a discrete call that consumes an analyze-SAMPLE of the tech's signature
   material + its refined-goods cost (both ledgered). The tree is static data in **`ResearchRules`**

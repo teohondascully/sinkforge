@@ -53,6 +53,7 @@ NAMES=(); SCRIPTS=(); GLFLAG=()
 add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); }
 add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); }
 add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
+add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "sim (core/determinism)"          "res://tests/test_sim.gd"
 add "stress (invariants/flow/power)"  "res://tests/test_stress.gd"
 add "worldgen (gen/ore/fine)"         "res://tests/test_worldgen.gd"

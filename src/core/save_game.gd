@@ -11,9 +11,58 @@ extends RefCounted
 ## Determinism is the verifier: capture → restore → tick both N times → identical signatures
 ## (tests/_test_save_load). Restore mutates a sim IN PLACE so live references (Player, renderer,
 ## HUD) stay valid; the caller repaints the view (WorldRenderer.repaint_world).
+##
+## ---------------------------------------------------------------------------------------------------
+## DURABILITY, and why v2 exists. The original writer opened the player's one and only save file in
+## WRITE mode and streamed into it. That is the single most destructive shape a save can have: the
+## instant `FileAccess.open(path, WRITE)` returns, the previous save is GONE — truncated to zero — and
+## everything after that point (a full disk, a crash, a kill, a Variant that fails to encode) leaves the
+## player with a file that is empty or half a game. There was no temporary file, no verification that
+## what landed on disk could be read back, no backup, and no recovery path. One bad moment ate the
+## save, silently, and the next boot said "no save to load".
+##
+## So a write now goes: encode to `.tmp` → close it → READ IT BACK and prove it decodes to a real
+## envelope → copy the current good save aside to `.bak` → atomically rename `.tmp` over the slot. The
+## ordering is chosen so that at NO point does the slot fail to hold a complete, readable game:
+##
+##   crash during the tmp write   → slot untouched, still the old good save
+##   crash during the readback    → slot untouched (the tmp is discarded)
+##   crash during the backup copy → slot untouched
+##   crash during the rename      → POSIX rename is atomic; the slot is old-or-new, never in between
+##
+## Reading is the mirror: a slot that is missing, truncated, or not a well-formed envelope falls back to
+## `.bak`, and `last_read` tells the caller which of those happened so the UI can distinguish "you have
+## no save" from "your save was damaged and this is the previous one" — two very different sentences to
+## read after losing an hour of work.
+##
+## RESTORE IS TRANSACTIONAL. It used to resolve machine defs up front (all-or-nothing, correctly) and
+## then assign the twenty terrain/economy fields straight into the live sim with unguarded `data["x"]`
+## indexing. A save missing any one of those keys therefore errored PART WAY THROUGH, leaving the running
+## game with new terrain and old inventory — the "bad file can never eat a running game" promise in the
+## comment above was true only for the two failures it checked and false for every other one. Now every
+## field is validated and duplicated into a staging dictionary FIRST, and the live sim is not touched
+## until the whole envelope is known good.
 
-const VERSION: int = 1
+const VERSION: int = 2
+## The oldest envelope `_migrate` can carry forward. v1 saves (no `seep_tick`) still load.
+const OLDEST_READABLE: int = 1
 const DEF_DIR: String = "res://src/data/machines/"
+
+const TMP_SUFFIX: String = ".tmp"
+const BAK_SUFFIX: String = ".bak"
+
+## The keys the restore path REQUIRES — the ones it used to index unguarded, so a save without them was
+## a crash mid-mutation rather than a clean refusal. Everything not listed here is additive: absent in an
+## older save, defaulted on the way in, and that is the whole reason it is not listed.
+const REQUIRED_KEYS: Array[String] = [
+	"version", "solid", "wall", "deposits", "inventory", "ground", "sink",
+	"produced", "consumed", "conduit", "rope", "torch", "research", "machines",
+]
+
+## What the last `read()` actually found. The caller needs this to say the right thing out loud: NONE is
+## a new player, CORRUPT is an hour of work that is gone, and RECOVERED is an hour of work that is not.
+enum Read { NONE, OK, RECOVERED, CORRUPT }
+static var last_read: Read = Read.NONE
 
 
 ## The sim's authoritative state as one plain Dictionary (the envelope). Callers may add their own
@@ -49,81 +98,206 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"fill": sim.fill.duplicate(),
 		"research": sim.research.duplicate(),
 		"sapling": sim.sapling.duplicate(),
+		# THE SEEP PHASE (v2). Loose backfill weeps every SEEP_INTERVAL ticks, so WHERE IN THAT CYCLE the
+		# world is decides which tick the next weep lands on. Leaving it out meant an F9 in the same
+		# process resumed mid-cycle while the same file loaded in a fresh process resumed at phase zero —
+		# one file, two different futures, from a system that stakes its correctness on determinism.
+		"seep_tick": sim._seep_tick,
 		"machines": machines,
 	}
 
 
-## Load a capture back into `sim` (in place). Refuses an unknown version or a machine whose def no
-## longer exists (a save from a different data set) — on refusal the sim is left UNTOUCHED, so a bad
-## file can never eat a running game. Returns whether the restore happened.
-static func restore(sim: FactorySim, data: Dictionary) -> bool:
-	if int(data.get("version", -1)) != VERSION:
+## Does this dictionary look like a save at all? Cheap structural gate, run on anything coming off disk
+## BEFORE it is allowed near the sim — a truncated file decodes to null, a foreign file decodes to
+## something without these keys, and both must be told apart from a good save without a crash.
+static func _valid_envelope(data: Dictionary) -> bool:
+	if data.is_empty():
 		return false
-	# Resolve every machine def BEFORE touching the sim (all-or-nothing).
-	var rebuilt: Array[MachineState] = []
-	for md: Variant in (data.get("machines", []) as Array):
-		var entry: Dictionary = md
-		var path: String = DEF_DIR + String(entry["def"]) + ".tres"
-		if not ResourceLoader.exists(path):
+	var v: int = int(data.get("version", -1))
+	if v < OLDEST_READABLE or v > VERSION:
+		return false
+	for key: String in REQUIRED_KEYS:
+		if not data.has(key):
 			return false
-		var m := MachineState.new(load(path) as MachineDef, entry["cell"])
-		m.input_buffer = (entry["in"] as Dictionary).duplicate()
-		m.output_buffer = (entry["out"] as Dictionary).duplicate()
+	if not (data["machines"] is Array):
+		return false
+	for key2: String in REQUIRED_KEYS:
+		if key2 == "version" or key2 == "machines":
+			continue
+		if not (data[key2] is Dictionary):
+			return false
+	return true
+
+
+## Carry an older envelope forward to VERSION. Written as a chain of single-step migrations so the next
+## one appends a branch rather than editing this one — and so a v1 save from before any of this existed
+## still opens, which is the only reason a version number is worth having.
+static func _migrate(data: Dictionary) -> Dictionary:
+	var out: Dictionary = data.duplicate(true)
+	var v: int = int(out.get("version", -1))
+	if v == 1:
+		# v1 → v2: the seep phase became authoritative and saved. An old save has no record of where in
+		# the cycle it was, and phase zero is the honest answer — not a guess dressed as continuity.
+		out["seep_tick"] = 0
+		v = 2
+	out["version"] = v
+	return out
+
+
+## Validate and DUPLICATE the whole envelope into a ready-to-assign staging dictionary. Returns {} if
+## anything is wrong, having touched nothing. This is the half of `restore` that is allowed to fail.
+static func _stage(data: Dictionary) -> Dictionary:
+	if not _valid_envelope(data):
+		return {}
+	var env: Dictionary = _migrate(data)
+
+	# Resolve every machine def BEFORE anything else (a save from a different data set is refused whole).
+	var rebuilt: Array[MachineState] = []
+	for md: Variant in (env.get("machines", []) as Array):
+		if not (md is Dictionary):
+			return {}
+		var entry: Dictionary = md
+		if not (entry.get("cell") is Vector2i):
+			return {}
+		var path: String = DEF_DIR + String(entry.get("def", "")) + ".tres"
+		if not ResourceLoader.exists(path):
+			return {}
+		var def: MachineDef = load(path) as MachineDef
+		if def == null:
+			return {}
+		var m := MachineState.new(def, entry["cell"])
+		m.input_buffer = (entry.get("in", {}) as Dictionary).duplicate()
+		m.output_buffer = (entry.get("out", {}) as Dictionary).duplicate()
 		m.spoil_buffer = (entry.get("spoil", {}) as Dictionary).duplicate()   # additive: the rig's 2nd belly
-		m.progress = float(entry["progress"])
-		m.route_toggle = int(entry["route_toggle"])
-		m.fuel = int(entry["fuel"])
-		m.power_factor = float(entry["power_factor"])
-		m.fed = int(entry["fed"])
+		m.progress = float(entry.get("progress", 0.0))
+		m.route_toggle = int(entry.get("route_toggle", 0))
+		m.fuel = int(entry.get("fuel", 0))
+		m.power_factor = float(entry.get("power_factor", 0.0))
+		m.fed = int(entry.get("fed", 0))
 		m.facing = int(entry.get("facing", 1))   # additive fields: absent in older v1 saves → defaults
 		m.mode = int(entry.get("mode", 0))
 		m.filter = StringName(str(entry.get("filter", "")))
 		rebuilt.append(m)
-	sim.world_seed = int(data.get("world_seed", 0))   # additive: absent in older v1 saves → 0 (default)
-	sim.solid = (data["solid"] as Dictionary).duplicate()
-	sim.wall = (data["wall"] as Dictionary).duplicate()
-	sim.deposits = (data["deposits"] as Dictionary).duplicate()
-	sim.lode = (data.get("lode", {}) as Dictionary).duplicate()     # additive: absent in older saves → empty
-	sim.lode_max = (data.get("lode_max", {}) as Dictionary).duplicate()
-	sim.inventory = (data["inventory"] as Dictionary).duplicate()
-	sim.ground = (data["ground"] as Dictionary).duplicate(true)
-	sim.sink = (data["sink"] as Dictionary).duplicate()
-	sim.total_produced = (data["produced"] as Dictionary).duplicate()
-	sim.total_consumed = (data["consumed"] as Dictionary).duplicate()
-	sim.conduit = (data["conduit"] as Dictionary).duplicate()
-	sim.rope = (data["rope"] as Dictionary).duplicate()
-	sim.torch = (data["torch"] as Dictionary).duplicate()
-	sim.water = (data.get("water", {}) as Dictionary).duplicate()   # additive: absent in older saves → empty
-	sim.fill = (data.get("fill", {}) as Dictionary).duplicate()     # additive: an older save has no packing
-	sim.research = (data["research"] as Dictionary).duplicate()
-	sim.sapling = (data.get("sapling", {}) as Dictionary).duplicate()   # additive: absent in older saves
+
+	return {
+		"world_seed": int(env.get("world_seed", 0)),   # additive: absent in the oldest saves → 0 (default)
+		"solid": (env["solid"] as Dictionary).duplicate(),
+		"wall": (env["wall"] as Dictionary).duplicate(),
+		"deposits": (env["deposits"] as Dictionary).duplicate(),
+		"lode": (env.get("lode", {}) as Dictionary).duplicate(),     # additive: absent in older saves → empty
+		"lode_max": (env.get("lode_max", {}) as Dictionary).duplicate(),
+		"inventory": (env["inventory"] as Dictionary).duplicate(),
+		"ground": (env["ground"] as Dictionary).duplicate(true),
+		"sink": (env["sink"] as Dictionary).duplicate(),
+		"produced": (env["produced"] as Dictionary).duplicate(),
+		"consumed": (env["consumed"] as Dictionary).duplicate(),
+		"conduit": (env["conduit"] as Dictionary).duplicate(),
+		"rope": (env["rope"] as Dictionary).duplicate(),
+		"torch": (env["torch"] as Dictionary).duplicate(),
+		"water": (env.get("water", {}) as Dictionary).duplicate(),   # additive: absent in older saves → empty
+		"fill": (env.get("fill", {}) as Dictionary).duplicate(),     # additive: an older save has no packing
+		"research": (env["research"] as Dictionary).duplicate(),
+		"sapling": (env.get("sapling", {}) as Dictionary).duplicate(),   # additive: absent in older saves
+		"seep_tick": int(env.get("seep_tick", 0)),
+		"machines": rebuilt,
+	}
+
+
+## Assign a staged envelope into the live sim. Cannot fail — every value here has already been validated
+## and duplicated, which is exactly what makes the restore all-or-nothing.
+static func _commit(sim: FactorySim, s: Dictionary) -> void:
+	sim.world_seed = s["world_seed"]
+	sim.solid = s["solid"]
+	sim.wall = s["wall"]
+	sim.deposits = s["deposits"]
+	sim.lode = s["lode"]
+	sim.lode_max = s["lode_max"]
+	sim.inventory = s["inventory"]
+	sim.ground = s["ground"]
+	sim.sink = s["sink"]
+	sim.total_produced = s["produced"]
+	sim.total_consumed = s["consumed"]
+	sim.conduit = s["conduit"]
+	sim.rope = s["rope"]
+	sim.torch = s["torch"]
+	sim.water = s["water"]
+	sim.fill = s["fill"]
+	sim.research = s["research"]
+	sim.sapling = s["sapling"]
+	var rebuilt: Array[MachineState] = s["machines"]
 	sim.machines = rebuilt
 	sim.grid.clear()
 	for m: MachineState in rebuilt:
 		sim.grid[m.cell] = m
+	# AUTHORITATIVE PHASE (v2) — restored, because the next weep's timing is part of the world's future.
+	sim._seep_tick = s["seep_tick"]
 	# Transient/derived state resets — the next tick rebuilds power; the view drains fresh channels;
 	# the bazaar cache rescans the restored terrain.
 	sim.power.clear()
 	sim.flow_events.clear()
 	sim.terrain_dirty.clear()
 	sim._bazaars_dirty = true
+	# DERIVED PHASE, reset EXPLICITLY rather than left wherever the previous game happened to leave it.
+	# These three used to survive an in-process F9 untouched while a fresh process started them at zero,
+	# so the same file produced a different sub-tick offset and a different rate readout depending on how
+	# you got there. They are pure readouts and accumulators, so zero is the correct value for both paths
+	# — the point is that both paths now agree.
+	sim._tick_accumulator = 0.0
+	sim._rate_tick = 0
+	sim._rate_samples.clear()
 	# The FINE TERRAIN grid is DERIVED (not saved) — rebuild it deterministically from the restored
 	# coarse terrain + seed, so a loaded game molds identically to when it was saved.
 	sim.rebuild_fine_terrain()
+
+
+## Load a capture back into `sim` (in place). Refuses an unknown version, a malformed envelope, or a
+## machine whose def no longer exists (a save from a different data set) — on refusal the sim is left
+## UNTOUCHED, because nothing is written until the entire envelope has been validated and staged.
+## Returns whether the restore happened.
+static func restore(sim: FactorySim, data: Dictionary) -> bool:
+	var staged: Dictionary = _stage(data)
+	if staged.is_empty():
+		return false
+	_commit(sim, staged)
 	return true
 
 
-## Write an envelope to disk (binary Variant format). Returns success.
+## Write an envelope to disk ATOMICALLY, keeping the previous good save as `<path>.bak`. Returns success.
+## On ANY failure the existing save is left exactly as it was — that is the entire point of the dance.
 static func write(path: String, data: Dictionary) -> bool:
-	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	var tmp: String = path + TMP_SUFFIX
+	var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
+		push_warning("save: cannot open %s (err %d) — the existing save is untouched"
+			% [tmp, FileAccess.get_open_error()])
 		return false
 	f.store_var(data)
+	# CLOSE BEFORE READING BACK. Godot flushes on free, but "the object goes out of scope eventually" is
+	# not a durability guarantee, and the readback below would otherwise be racing the writer.
+	f.close()
+
+	# PROVE IT LANDED. A disk that filled up mid-write leaves a truncated file that `get_var` returns
+	# null for; a Variant that failed to encode leaves something that is not an envelope. Either way the
+	# temp file is discarded and the player keeps the save they already had.
+	if not _valid_envelope(_read_file(tmp)):
+		push_warning("save: %s did not read back as a valid envelope — the existing save is untouched" % tmp)
+		DirAccess.remove_absolute(tmp)
+		return false
+
+	# LAST KNOWN GOOD. Copied, not renamed: a copy leaves the slot occupied the whole time, so a crash
+	# between these two lines still finds a complete game at the real path.
+	if FileAccess.file_exists(path):
+		DirAccess.copy_absolute(path, path + BAK_SUFFIX)
+	if DirAccess.rename_absolute(tmp, path) != OK:
+		push_warning("save: could not promote %s over %s — the existing save is untouched" % [tmp, path])
+		DirAccess.remove_absolute(tmp)
+		return false
 	return true
 
 
-## Read an envelope from disk; {} when missing/unreadable (callers treat {} as "no save").
-static func read(path: String) -> Dictionary:
+## Decode one file, or {} if it is missing/unreadable/truncated. No validation, no fallback — the
+## recovery policy lives in `read()`, this is just the bytes.
+static func _read_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -131,3 +305,27 @@ static func read(path: String) -> Dictionary:
 		return {}
 	var v: Variant = f.get_var()
 	return v if v is Dictionary else {}
+
+
+## Read an envelope from disk, falling back to the backup if the slot is missing or damaged. `{}` still
+## means "no game to load", but `last_read` now says WHY, so the caller can tell a new player apart from
+## one whose save just failed to open.
+static func read(path: String) -> Dictionary:
+	var primary: Dictionary = _read_file(path)
+	if _valid_envelope(primary):
+		last_read = Read.OK
+		return primary
+	var backup: Dictionary = _read_file(path + BAK_SUFFIX)
+	if _valid_envelope(backup):
+		# The slot is damaged and the backup is not. Say so loudly: the player is about to be handed a
+		# slightly older game than the one they saved, and silently rolling them back is how trust dies.
+		push_warning("save: %s is missing or damaged — recovered the previous save from %s"
+			% [path, path + BAK_SUFFIX])
+		last_read = Read.RECOVERED
+		return backup
+	# A file that exists but will not decode is a CORRUPT save, not an absent one. The distinction is the
+	# difference between "start a new game" and "something ate your hour", and only one of those should
+	# ever be shown to somebody who definitely had a save yesterday.
+	last_read = Read.CORRUPT if (FileAccess.file_exists(path) or FileAccess.file_exists(path + BAK_SUFFIX)) \
+		else Read.NONE
+	return {}
