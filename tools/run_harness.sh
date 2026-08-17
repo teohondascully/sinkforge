@@ -296,8 +296,25 @@ LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 LOCK_WAIT="${SF_LOCK_WAIT:-900}"
 LOCK_HELD=0
 
+# Declared HERE, above the trap, not where they are first used. `set -u` is on, so an exit taken between
+# installing the trap and arming the sentinel would run a cleanup handler that dies on an unset variable —
+# and a cleanup that aborts halfway is worse than one that does nothing, because it stops before releasing
+# the lock. Both start in the state "there is nothing to take back", which is true at this point.
+SENTINEL=""
+SENTINEL_ARMED=0
+
 harness_cleanup() {
 	local rc=$?
+	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed
+	# further down. A run that never reached `verify` (Ctrl-C, a crash, an early exit on any of the codes
+	# above) has still left a marker at the player's REAL save path, and leaving it there is the one piece
+	# of litter this whole instrument exists to argue nobody drops. Best-effort by construction: disarm
+	# exits 0 on every path and removes only bytes still identical to what it planted, so a slot something
+	# else wrote during the run survives as evidence instead of being tidied away.
+	if [ "$SENTINEL_ARMED" = "1" ]; then
+		"$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- disarm "$SENTINEL" 2>&1 \
+			| grep -E '^save_sentinel:' || true
+	fi
 	[ "$LOCK_HELD" = "1" ] && rm -rf "$LOCK"
 	rm -rf "$MARKS"
 	if [ "$KEEP_LOGS" = "1" ] || [ "$rc" != "0" ] || [ "$((fail + skip + partial))" -gt 0 ]; then
@@ -364,6 +381,9 @@ if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- arm "
 	echo "  !! could not arm the save sentinel — refusing to run the harness unguarded"
 	exit 2
 fi
+# From here on an abort owes the player a disarm (see harness_cleanup). Set AFTER the arm succeeded: a
+# failed arm planted nothing, and disarming on that path would be looking for litter nobody dropped.
+SENTINEL_ARMED=1
 
 while [ "$done_count" -lt "$total" ]; do
 	# Fill free slots.
@@ -457,18 +477,23 @@ echo
 # Verify the sentinel AFTER the sweep. This can turn an all-green run red, and it should: a suite that
 # passes every assertion while eating the player's save has not passed.
 #
-# ONE KNOWN FALSE ALARM, and it cost time here, so: two harness runs on one machine share one production
-# slot. If another run is in flight, its `verify` removes the sentinel THIS run is holding, and this run
-# reports "THE SAVE SLOT WAS DELETED BY THE HARNESS" with nothing actually lost. The tell is the arm line
-# above — if it said "REAL SAVE PRESENT" with the same digest a planted run prints, what it found was the
-# other run's plant, not a save. Check for a second `run_harness.sh` before believing this one. (The same
-# neighbour will also make check_frametime hitch, since it measures milliseconds while a dozen other Godot
-# processes fight it for the GPU.)
+# CONCURRENT RUNS, which cost time here once and no longer produce the same lie: two harness runs on one
+# machine share one production slot, because user:// is keyed on the project NAME and worktrees do not
+# separate it. Markers now carry the arming process's pid, so a neighbour's `verify` no longer matches its
+# digest against OUR plant and no longer deletes it — what it reports instead is REWRITTEN, which is true.
+# A run next to another run therefore gets an accurate accusation rather than a phantom deletion, but it
+# is still an accusation about a neighbour and not about a layer. Check for a second `run_harness.sh`
+# before believing this one. (The same neighbour also makes check_frametime hitch, since it measures
+# milliseconds while a dozen other Godot processes fight it for the GPU.)
 if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- verify "$SENTINEL" 2>&1 | grep -E '^save_sentinel:'; then
 	echo
 	echo "!! THE HARNESS TOUCHED THE PRODUCTION SAVE SLOT. Layer results ($pass pass / $fail fail) are moot."
 	exit 3
 fi
+# `verify` has already taken back anything it planted, so the abort-path disarm has nothing left to do.
+# Clearing this is not cosmetic: disarm would otherwise run on a slot verify just removed, and the next
+# thing it would find at that path is whatever a CONCURRENT run planted there a moment later.
+SENTINEL_ARMED=0
 
 # THE SUMMARY. Its only job is to be true. It printed "ALL 61 HARNESS LAYERS PASS" on runs where 57 layers
 # ran and 4 returned in one second having drawn nothing, and every branch below exists to make that
