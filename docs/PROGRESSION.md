@@ -2,10 +2,16 @@
 
 > **Update 2026-07-11:** §5's research engine is BUILT (first slice) — the Bazaar bench + the L1 tech
 > ladder (`automation` → `power` → `descent`), analyze-the-new + ingot price, sim-gated crafting, in the
-> tutorial chain. **§2/§9's first GATE is BUILT too:** THE SEAL (unbreakable worldgen band at rows 56-57)
-> + the DESCENT ENGINE (feed it 40 gravity-dropped ingots on the seal → it breaches into Stonereach,
-> where IRON waits) — the throughput wall is live and RUNG-2 play-tested. See `ResearchRules`,
-> `_run_descent`, DECISIONS 2026-07-11. The rest below remains design.
+> tutorial chain. **§2/§9's first GATE is BUILT too:** THE SEAL (an unbreakable full-width worldgen band
+> `SEAL_ROWS` deep starting at `LayeredWorldGen.SEAL_TOP`) + the DESCENT ENGINE (feed it
+> `FactorySim.DESCENT_QUOTA` gravity-dropped ingots on the seal → it breaches into Stonereach, where IRON
+> waits) — the throughput wall is live and RUNG-2 play-tested. See `ResearchRules`, `_run_descent`,
+> DECISIONS 2026-07-11. The rest below remains design.
+>
+> *Both numbers were written out longhand here as "rows 56-57" and "40 ingots", and both had drifted — the
+> band starts at row 84 and the quota is 64. The code never lied: `hover_info.gd` prints the quota with
+> `% FactorySim.DESCENT_QUOTA`, which is exactly the discipline DECISIONS calls "a comment that states a
+> number is a test with no runner". The doc had no such excuse, so it now names the constants instead.*
 
 > **Status: DESIGNED (2026-06-28), via a guided brainstorm with the user. Not yet built.** This is the
 > progression backbone the whole game hangs on — the resolution of the long-open "what is the Sinkforge /
