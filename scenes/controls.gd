@@ -36,6 +36,7 @@ const CLEAR_MARKS := &"sf_clear_marks"
 const TECH := &"sf_tech"
 const DASHBOARD := &"sf_dashboard"
 const GRAPPLE := &"sf_grapple"
+const MUTE := &"sf_mute"
 
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
@@ -70,6 +71,7 @@ static func defaults() -> Dictionary:
 		# line is something you flick rather than something you manage. Both hands can reach it while the
 		# left is on WASD and the right is aiming — the two things you are already doing when you want it.
 		GRAPPLE: [{"key": KEY_F}, {"button": MOUSE_BUTTON_MIDDLE}],
+		MUTE: [{"key": KEY_N}],       # sound on/off in one key. M is the map; N is its neighbour and free.
 	}
 
 

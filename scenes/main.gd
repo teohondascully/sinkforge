@@ -597,6 +597,47 @@ const TUTORIAL_COAL_CELLS: Array[Vector2i] = [Vector2i(54, SURFACE)]
 ## path is fine — the body strolls through it and chops it in passing, no walling even for the taller body.
 ## Crowned with leaves so it reads + fells as a real tree. Realized by WorldSeeder.
 const TUTORIAL_TREE_COL := 51
+## THE STARTER ADIT (`docs/LODE.md`) — a small stepped cut into the ground beside spawn whose back wall shows
+## an ORE LODE, open to the sky and needing no digging to find.
+##
+## Once ore lives in the background plane, a first-time player has nothing to aim at: every vein in the world
+## is behind rock, and the stain that will eventually telegraph them through stone is phase 4. The old
+## opening only worked because there was a literal ore BLOCK sitting on the surface at cols 47-48 — the
+## "metal-flecked rock" the first objective points at — and that block cannot exist after the cutover.
+##
+## An adit answers it by handing you a FACE: the rock is already gone, the vein is already showing, and your
+## first swing teaches the real loop (clear rock, work what is behind it) instead of a special case that is
+## about to stop being true. It descends one cell per step, because step-up climbs exactly one tile and a
+## two-tile drop is the trap this plateau's whole layout is arranged to avoid.
+##
+## And the vein CONTINUES down behind solid rock past the face, which is the second half of the lesson: what
+## you can see is the end of something, and the way to get more of it is to dig along it.
+## The cut, cell by cell, relative to SURFACE. Three things shape it, and the first two are the BODY's:
+##
+## IT IS TWO ROWS TALL EVERYWHERE, because the body is 34px against a 32px cell and does not fit in one; a
+## one-row cut is a trench you look into, not a place you go. And it DESCENDS ONE ROW PER COLUMN, opening the
+## new row without closing the old one, so every column overlaps its neighbour by a row and the corridor is
+## walkable at the transit height. The first cut of this stepped down without the overlap and was, strictly,
+## impassable: the body's head met solid rock at every step, in a passage the harness was happily calling a
+## corridor because the sim only ever asked whether the FLOOR cells were clear.
+##
+## THE THIRD IS THAT IT IS SEALED, and that is the part two rewrites were needed to arrive at. The cave began
+## as a notch open to the sky, which is what "entrance" suggests — and a hole in the walking surface beside
+## spawn broke four playthrough layers at once, because the plateau's surface is not spare ground: it is the
+## corridor the opening walks (spawn 49 → tree 51 → coal 54 → shaft 56) AND the runway every motion fixture
+## measures on (`measure_player` places at FLAT_START + 6 and runs west). Moving it merely moved which fixture
+## fell in. There is no unclaimed stretch of that surface, and there should not be.
+##
+## So the roof is unbroken and the cave is a POCKET: sealed, and plainly visible from the surface anyway,
+## because this game draws the ground it has not dug. You see the vein before you can reach it, and one swing
+## at the roof drops you in. That is strictly better teaching than a ramp would have been — the first thing
+## you ever do is clear rock to get at what is behind it, which is the whole of `docs/LODE.md` in one blow —
+## and it costs the surface nothing.
+const ADIT_COLS: Array[int] = [52, 53]                ## the roof you break, and the room it opens into
+const ADIT_CHAMBER_COL: int = 54                      ## the deepest end, under the tutorial coal
+const ADIT_ROOF: int = 1                              ## rows of intact ground over the pocket — the surface stays whole
+const ADIT_FACE_AMOUNT: int = 45                      ## per exposed cell — the first ingots, and not much more
+const ADIT_DEEP_AMOUNT: int = 120                     ## per buried cell — the reason to follow it down
 
 ## The world builder. MainView owns the layout constants above (the canonical contract the play-tests assert
 ## against); scenes/world_seeder.gd is the procedure that realizes them — the tutorial fixtures, the starter
@@ -915,6 +956,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		try_drop()
 	elif event.is_action_pressed(Controls.MAP):
 		_minimap_mode = (_minimap_mode + 1) % 3          # hidden → corner → LARGE → hidden
+	elif event.is_action_pressed(Controls.MUTE):
+		_toggle_mute()
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.TECH):
@@ -1034,6 +1077,12 @@ func _settings_input(event: InputEvent) -> void:
 			_hud.settings_slider_frac(_settings_drag, get_viewport().get_mouse_position().x))
 
 
+## Sound on or off, from the key or from the settings chip, saying so on screen either way — a mute you
+## cannot see the result of is indistinguishable from a game whose audio has broken.
+func _toggle_mute() -> void:
+	_hud.flash("sound OFF" if Settings.toggle_mute() else "sound ON")
+
+
 func _apply_setting(payload: Dictionary) -> void:
 	if payload.has("slider"):
 		_settings_drag = str(payload["slider"])          # press starts a drag; motion keeps updating it
@@ -1041,6 +1090,8 @@ func _apply_setting(payload: Dictionary) -> void:
 	elif payload.get("toggle", "") == "shake":
 		Settings.screen_shake = not Settings.screen_shake
 		Settings.save_settings()
+	elif payload.get("toggle", "") == "mute":
+		_toggle_mute()
 	elif payload.get("toggle", "") == "auto_pickup":
 		Settings.auto_pickup = not Settings.auto_pickup
 		Settings.save_settings()

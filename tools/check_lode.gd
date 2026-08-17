@@ -31,6 +31,10 @@ extends SceneTree
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 30
 
+## The body is 34px tall against a 32px cell, so it always occupies two rows and any passage it uses must
+## be at least that tall. Named here because the adit's whole geometry is a consequence of it.
+const BODY_ROWS: int = 2
+
 var _fails: int = 0
 var _main: MainView
 var _sim: FactorySim
@@ -62,6 +66,7 @@ func _run() -> void:
 	for _i: int in SETTLE:
 		await physics_frame
 	_sim = _main.sim
+	_the_adit_is_there()      # FIRST: every case below carves the spawn plateau up as its own fixture
 	_the_trap_is_gone()
 	_the_blow_opens_it()
 	_one_pool_two_hands()
@@ -259,6 +264,100 @@ func _opened_a_lode(face: Vector2i) -> bool:
 			if _sim.lode_at(face + Vector2i(k, dy)) == &"ore":
 				return true
 	return false
+
+
+## THE STARTER ADIT. Once ore lives behind rock, the opening has a hole in it: a first-time player has
+## nothing to aim at, because every vein in the world is buried and the stain that will telegraph them is
+## phase 4. The adit is the answer — a face you can see from the surface, with the rock already off it.
+##
+## Three things have to be true, and the third is the one that bites: the vein has to be VISIBLE without
+## digging, it has to CONTINUE past what you were given, and the cut has to be a place you can walk out of.
+## This plateau's entire layout is arranged around the last one ("a 2-deep pit would trap the body — step-up
+## climbs one tile"), and a fixture that ignored it would strand the player in the tutorial's own hole.
+func _the_adit_is_there() -> void:
+	var sim: FactorySim = _sim
+	var top: int = MainView.SURFACE + MainView.ADIT_ROOF
+	var mouth: int = MainView.ADIT_COLS[0]
+	var face: int = MainView.ADIT_COLS[1]
+	var room: int = MainView.ADIT_CHAMBER_COL
+	var open_face: Array[Vector2i] = [Vector2i(face, top + 2), Vector2i(room, top + 1),
+		Vector2i(room, top + 2), Vector2i(room, top + 3)]
+	var seen: int = 0
+	for c: Vector2i in open_face:
+		if sim.lode_workable(c):
+			seen += 1
+	_check(seen == open_face.size(),
+		"every spawn opens with a vein you can SEE and work without a swing (%d cells)" % seen)
+	_check(not sim.is_solid(Vector2i(mouth, top)) and not sim.is_solid(Vector2i(face, top + 1)),
+		"…because the rock is already off it — that is what makes it a face and not a guess")
+	_check(not sim.lode.has(Vector2i(mouth, top)) and not sim.lode.has(Vector2i(mouth, top + 1)),
+		"…and the break-in end is bare, so the vein is a reason to go deeper rather than a thing you land on")
+	# THE SURFACE IS WHOLE. The pocket is sealed, and this is the assertion that earns its keep: the first two
+	# versions of this cut opened onto the sky, and the plateau's surface is not spare ground — it is the
+	# corridor the opening walks AND the runway `measure_player` and `check_fastforward` measure motion on.
+	# A hole in it took four playthrough layers down at once, twice, in two different columns.
+	var roof_whole: bool = true
+	for col: int in [mouth, face, room]:
+		for r: int in range(MainView.SURFACE, MainView.SURFACE + MainView.ADIT_ROOF):
+			roof_whole = roof_whole and sim.is_solid(Vector2i(col, r))
+	_check(roof_whole,
+		"the ground OVER the pocket is unbroken — you can walk across it without knowing it is there")
+	# YOU CAN WALK IT. The property the first cut broke and nothing caught: it stepped down one row per column
+	# without keeping the row above open, so the body — 34px against a 32px cell, always two rows — met solid
+	# rock with its HEAD at every step. The sim was content because the floor cells were clear. So this asserts
+	# the corridor the way the body meets it: contiguous, two rows minimum, and OVERLAPPING by the body's own
+	# height where one column hands over to the next.
+	var cols: Array[int] = [mouth, face, room]
+	var rows: Array = []
+	for col: int in cols:
+		var open_rows: Array[int] = []
+		for r: int in range(top, top + 8):
+			if not sim.is_solid(Vector2i(col, r)):
+				open_rows.append(r)
+		rows.append(open_rows)
+	var tall: bool = true
+	var contiguous: bool = true
+	for open_rows: Variant in rows:
+		var rr: Array[int] = open_rows
+		tall = tall and rr.size() >= BODY_ROWS
+		contiguous = contiguous and rr.size() == (rr[rr.size() - 1] - rr[0] + 1)
+	_check(tall and contiguous,
+		"every column of the cut is a clear run at least %d rows tall — the body's own height" % BODY_ROWS)
+	var passable: bool = true
+	var descends: bool = true
+	for i: int in cols.size() - 1:
+		var a: Array[int] = rows[i]
+		var b: Array[int] = rows[i + 1]
+		var shared: int = 0
+		for r2: int in a:
+			if b.has(r2):
+				shared += 1
+		passable = passable and shared >= BODY_ROWS
+		var drop: int = b[b.size() - 1] - a[a.size() - 1]
+		descends = descends and drop == 1
+	_check(passable,
+		"…and each column overlaps the next by %d, so you can walk through at the height you arrive at"
+			% BODY_ROWS)
+	_check(descends,
+		"…dropping exactly one row per column, which is the reach of a step-up — two would be a trap")
+	_check(sim.is_solid(Vector2i(mouth, MainView.SURFACE)),
+		"…so getting in costs exactly ONE swing at the roof, which is the lesson the whole migration is about")
+	# IT CONTINUES. What you were handed is the end of something, not the whole of it.
+	var buried: int = 0
+	for dy: int in range(4, 7):
+		var c2 := Vector2i(room, top + dy)
+		if sim.lode_at(c2) == &"ore" and sim.is_solid(c2):
+			buried += 1
+	_check(buried >= 3, "the vein CONTINUES behind the rock below the face (%d cells)" % buried)
+	_check(int(sim.deposits.get(Vector2i(room, top + 4), 0))
+			> int(sim.deposits.get(Vector2i(room, top + 3), 0)),
+		"…and it gets richer as it goes, so following it is worth the digging")
+	# And the free part is a taste, not a supply — the pressure to dig has to survive the gift.
+	var given: int = 0
+	for c3: Vector2i in open_face:
+		given += int(sim.deposits.get(c3, 0))
+	_check(given < FactorySim.DEFAULT_ORE_DEPOSIT,
+		"…while the exposed part is a taste (%d), not a factory's worth" % given)
 
 
 ## Every unit still in the ground across the working.

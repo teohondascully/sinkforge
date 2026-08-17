@@ -18,6 +18,7 @@ static func seed_tutorial(sim: FactorySim, dev_start: bool) -> void:
 	_seed_starter_vein(sim)
 	_seed_tutorial_coal(sim)
 	_seed_tutorial_tree(sim)
+	_seed_starter_adit(sim)
 	_seed_tutorial_mineshaft(sim)
 	_seed_starter_kit(sim)
 	if dev_start:
@@ -39,6 +40,58 @@ static func _seed_tutorial_coal(sim: FactorySim) -> void:
 	for cell: Vector2i in MainView.TUTORIAL_COAL_CELLS:
 		sim.set_solid(cell, &"coal")
 		sim.deposits[cell] = 200                                       # a hundreds-scale coal patch — fuels the drill for a long time
+
+
+## THE STARTER ADIT (MainView.ADIT_COLS) — the guaranteed first FACE. A stepped cut beside spawn, one cell
+## per step so the body walks in and out of it, with an ore lode exposed in its back wall and more of the
+## same vein continuing down behind the rock below. See MainView.ADIT_COLS for why this exists at all.
+##
+## The lodes are written straight into `sim.lode` rather than being made by mining an ore block, because
+## that is what the world will do for itself after the cutover (`docs/LODE_PLAN.md` phase 3) — this fixture
+## is the shape of the new opening, standing up before the generator learns to build it.
+static func _seed_starter_adit(sim: FactorySim) -> void:
+	var mouth: int = MainView.ADIT_COLS[0]
+	var face: int = MainView.ADIT_COLS[1]
+	var room: int = MainView.ADIT_CHAMBER_COL
+	# The cut. Each column is two rows tall (the body's height) and each one opens a row deeper than the last
+	# WITHOUT closing the row above, so neighbours overlap and the body can actually walk through at the height
+	# it arrives at. It starts ADIT_ROOF rows down, leaving the walking surface whole — see MainView.ADIT_COLS
+	# for the four harness layers that cost.
+	var top: int = MainView.SURFACE + MainView.ADIT_ROOF
+	var opened: Array[Vector2i] = [
+		Vector2i(mouth, top), Vector2i(mouth, top + 1),                            # break in here
+		Vector2i(face, top), Vector2i(face, top + 1), Vector2i(face, top + 2),      # it opens up, and drops
+		Vector2i(room, top + 1), Vector2i(room, top + 2), Vector2i(room, top + 3),  # the deepest end
+	]
+	for c: Vector2i in opened:
+		sim.set_solid(c, &"")
+	# NO backing is written behind the bare cells, and that is the whole reason the cut reads as a cut. The
+	# first version gave every opened cell a `dirt_wall`, reasoning that a carved room needs something behind
+	# it — and the pocket vanished: a walled cell draws as rock, so a hole in the ground looked like ground.
+	# This game already has one word for "you can walk here" and it is DARKNESS. Mining never writes a wall
+	# (`FactorySim.mine` only erases the solid), so every tunnel a player digs is void and reads black; a
+	# hand-authored opening that backs itself is speaking a dialect the world does not.
+	#
+	# THE FACE — ore in the wall of the cells you can stand in, at the BACK and the BOTTOM of the pocket. The
+	# cells under the break-in point are left bare on purpose: the vein starts a step in and a step down, so
+	# going deeper is rewarded rather than skippable, and what you see from up top is a dark room with
+	# something catching the light at the far end of it.
+	for c2: Vector2i in [
+		Vector2i(face, top + 2), Vector2i(room, top + 1),
+		Vector2i(room, top + 2), Vector2i(room, top + 3),
+	]:
+		sim.lode[c2] = &"ore"
+		sim.deposits[c2] = MainView.ADIT_FACE_AMOUNT
+		sim.lode_max[c2] = MainView.ADIT_FACE_AMOUNT      # untouched, so it draws FULL however small it is
+	# …and the same vein CONTINUING, behind solid rock, straight down off the bottom of the face. Nothing
+	# reveals it yet (the stain is phase 4) — it is there so that the first player who thinks "the vein must
+	# go somewhere" and digs one block down is immediately right. Being rewarded for reading the world is the
+	# lesson; a vein that simply stopped at the exact edge of the free part would teach the opposite.
+	for dy: int in range(4, 7):                # from the first row BELOW the chamber floor, which is exposed
+		var deep := Vector2i(room, top + dy)
+		sim.lode[deep] = &"ore"
+		sim.deposits[deep] = MainView.ADIT_DEEP_AMOUNT
+		sim.lode_max[deep] = MainView.ADIT_DEEP_AMOUNT
 
 
 ## The guaranteed TUTORIAL TREE (MainView.TUTORIAL_TREE_COL) — the wood source the bazaar step needs.

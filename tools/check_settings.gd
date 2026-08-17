@@ -71,6 +71,23 @@ func _initialize() -> void:
 	_check(InputMap.event_is_action(_key_event(KEY_J), Controls.DROP),
 		"binding override survives a reload (J -> drop after load)")
 
+	# --- SOUND STARTS OFF, and the mute is a switch over the mix rather than a level pinned to zero ---
+	_check(bool(Controls.defaults()[Controls.MUTE].size()) and not Settings.bindings.has(Controls.MUTE),
+		"mute has a default key, so it is reachable before anyone opens the settings page")
+	Settings.muted = true
+	Settings.apply_audio()
+	_check(AudioServer.is_bus_mute(0), "muted: the Master bus is silenced")
+	var kept: float = Settings.master
+	_check(Settings.toggle_mute() == false and not AudioServer.is_bus_mute(0),
+		"…one toggle turns it back on")
+	_check(is_equal_approx(Settings.master, kept),
+		"…and the levels are exactly where they were — unmuting gives back the mix, not a zeroed one")
+	Settings.toggle_mute()
+	Settings.muted = false
+	Settings.load_settings()
+	_check(Settings.muted, "mute round-trips through the config file like every other preference")
+	Settings.muted = false
+
 	# --- the master slider drives the Master bus ---
 	Settings.apply_audio()
 	_check(absf(AudioServer.get_bus_volume_db(0) - linear_to_db(0.5)) < 0.01,
@@ -90,6 +107,7 @@ func _initialize() -> void:
 	DirAccess.remove_absolute(TEST_PATH)
 	Settings.persist = false
 	Settings.path = "user://settings.cfg"
+	Settings.muted = true
 	Settings.master = 1.0
 	Settings.sound = 1.0
 	Settings.ambience = 1.0

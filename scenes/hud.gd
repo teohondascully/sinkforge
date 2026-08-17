@@ -2003,6 +2003,7 @@ const REMAP_ROWS: Array[Array] = [
 	[Controls.BUILD, "build / place"], [Controls.DROP, "drop / feed"],
 	[Controls.CRAFT, "pack"], [Controls.RESEARCH, "research / config"],
 	[Controls.MAP, "map"], [Controls.TECH, "tech tree"],
+	[Controls.MUTE, "mute sound"],
 	[Controls.DASHBOARD, "dashboard"], [Controls.HELP, "help"],
 	[Controls.PAUSE, "pause"],
 	[Controls.SPEED, "game speed"], [Controls.ZOOM, "zoom"],
@@ -2025,6 +2026,11 @@ func _draw_settings_overlay() -> void:
 	# --- left column: AUDIO + FEEL ---
 	var x0: float = panel.position.x + 16.0
 	draw_string(_font, Vector2(x0, 58.0), "AUDIO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	# The mute sits ON the AUDIO header, above the levels it overrides, because that is what it does: one
+	# switch over the whole block. It reads as its STATE ("MUTED" / "SOUND ON"), never as an instruction —
+	# a chip that says the opposite of what is happening is the oldest bug in settings UI.
+	_settings_chip(x0 + 92.0, 58.0, "MUTED" if Settings.muted else "SOUND ON",
+		{"toggle": "mute"}, not Settings.muted, mouse)
 	_settings_slider(x0, 78.0, "master", "master", Settings.master)
 	_settings_slider(x0, 98.0, "sound", "sound", Settings.sound)
 	_settings_slider(x0, 118.0, "ambience", "ambience", Settings.ambience)
@@ -2067,7 +2073,10 @@ func _draw_settings_overlay() -> void:
 
 ## One slider row: label + a clickable/drag-able bar + the live percentage.
 func _settings_slider(x0: float, y: float, id: String, label: String, value: float) -> void:
-	draw_string(_font, Vector2(x0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	# Dimmed while muted: the levels are still yours and still remembered, but nothing they say is audible,
+	# and a bright slider over a silent game is the page lying about which control is in charge.
+	draw_string(_font, Vector2(x0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		UI_TEXT_DIM if Settings.muted else UI_TEXT)
 	var bar := Rect2(x0 + 62.0, y - 9.0, 100.0, 10.0)
 	_slider_rects[id] = bar
 	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.5))

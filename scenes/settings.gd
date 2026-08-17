@@ -13,6 +13,10 @@ extends RefCounted
 ## the file — so every fixture/test runs on pure defaults and can never read or clobber the dev's real
 ## settings. check_settings opts in explicitly on its own temp path.
 
+## SOUND STARTS OFF. Not a slider pinned to zero — a MUTE, with every level left where it belongs, so the
+## first thing an unmute does is give you the mix as it was designed rather than a silent game and four
+## sliders to go and find. It persists like everything else here, so turning it on is a one-time act.
+static var muted: bool = true
 static var master: float = 1.0          ## 0..1 — the Master bus (everything)
 static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
 static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
@@ -32,6 +36,7 @@ static var path: String = "user://settings.cfg"      ## overridable so the harne
 static func load_settings() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(path) == OK:
+		muted = bool(cfg.get_value("audio", "muted", muted))
 		master = clampf(float(cfg.get_value("audio", "master", master)), 0.0, 1.0)
 		sound = clampf(float(cfg.get_value("audio", "sound", sound)), 0.0, 1.0)
 		ambience = clampf(float(cfg.get_value("audio", "ambience", ambience)), 0.0, 1.0)
@@ -50,6 +55,7 @@ static func save_settings() -> void:
 	if not persist:
 		return
 	var cfg := ConfigFile.new()
+	cfg.set_value("audio", "muted", muted)
 	cfg.set_value("audio", "master", master)
 	cfg.set_value("audio", "sound", sound)
 	cfg.set_value("audio", "ambience", ambience)
@@ -63,8 +69,20 @@ static func save_settings() -> void:
 
 
 ## The Master bus follows the master slider; sound/ambience apply lazily as offsets (below).
+##
+## Mute is applied at the BUS, not by zeroing the levels: it is one switch over the whole mix, it cannot be
+## half-on, and it leaves the sliders holding the values you chose so unmuting restores them exactly.
 static func apply_audio() -> void:
+	AudioServer.set_bus_mute(0, muted)
 	AudioServer.set_bus_volume_db(0, linear_to_db(clampf(master, 0.0001, 1.0)))
+
+
+## Flip the sound on or off and remember it. Returns the new state so a caller can say so on screen.
+static func toggle_mute() -> bool:
+	muted = not muted
+	apply_audio()
+	save_settings()
+	return muted
 
 
 ## dB offsets the Sfx layer ADDS to its own baselines at play/frame time — 0 dB at full, ~-60 (gone)

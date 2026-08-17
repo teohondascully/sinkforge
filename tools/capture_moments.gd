@@ -98,6 +98,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_refusal(main)
 		"lode":
 			await _at_the_lode(main)
+		"adit":
+			await _at_the_adit(main)
 		"head":
 			await _at_the_head(main)
 		"map":
@@ -649,6 +651,29 @@ func _at_the_lode(main: MainView) -> void:
 		main._hints._life = 0.0
 	main._hud._arrival_life = 0.0
 	main._hud.objectives = null
+
+
+## THE FIRST FACE. Nothing is staged: this is the real spawn, seeded by WorldSeeder exactly as a new player
+## gets it, with the body walked over to the adit and the cursor on the vein. If the fixture ever stops being
+## visible from the surface, this shot says so.
+func _at_the_adit(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var probe := Vector2i(MainView.ADIT_CHAMBER_COL, MainView.SURFACE + MainView.ADIT_ROOF + 1)
+	main._player.auto_input = false
+	main._player.place(Vector2(float(MainView.ADIT_COLS[0] - 1) * 32.0,
+		float(MainView.SURFACE) * 32.0 - Player.HEIGHT))
+	for _i: int in 40:
+		await physics_frame
+	Input.warp_mouse(Vector2(960.0 + 3.0 * 32.0 * 1.5, 540.0 + 2.5 * 32.0 * 1.5))
+	for _i2: int in 8:
+		await physics_frame
+	print("ADIT  lode=%s  left=%d  workable=%s" % [str(sim.lode_at(probe)),
+		sim.ore_deposit_at(probe), str(sim.lode_workable(probe))])
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+	main._hud._arrival_life = 0.0
 
 
 ## STAND IT ON THE THING IT EATS. A Head working a face it is standing on, pouring down its own column into
