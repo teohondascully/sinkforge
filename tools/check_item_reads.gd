@@ -32,10 +32,15 @@ extends "res://tools/check_base.gd"
 ## Every item draw_item is expected to have a real glyph for. The carried ground is the reason this layer
 ## exists; the metal chain is here because ingot/rich_ore and iron/iron_ingot/plate/iron_pickaxe are the
 ## other colour-close families and they should be held to the same rule.
+##
+## THIS LIST IS HAND-MAINTAINED, WHICH IS A LIABILITY, and `_check_vocabulary` below is what keeps it from
+## becoming one. An item added to the game and not added here is never rendered by this layer and never
+## compared against anything — so it can wear another item's exact icon and the suite stays green, which is
+## the failure mode this layer was written to end. A list that has to be remembered protects nothing.
 const ITEMS: Array[StringName] = [
 	&"earth", &"stone", &"gravel", &"shale", &"deepslate", &"sealrock",
 	&"ore", &"rich_ore", &"iron", &"ingot", &"iron_ingot", &"plate", &"gear",
-	&"coal", &"wood", &"scanner", &"sapling",
+	&"coal", &"wood", &"scanner", &"sapling", &"rope", &"torch",
 	&"wood_pickaxe", &"stone_pickaxe", &"iron_pickaxe", &"wood_axe",
 	&"broad_bit", &"sinker_bit", &"lance_bit", &"wedge_bit",
 ]
@@ -76,7 +81,20 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# THE VOCABULARY CHECK RUNS FIRST AND WITHOUT A DISPLAY, because it is the one assertion here a headless
+	# CI can still make. Everything below it needs pixels; this needs a source file.
+	_check_vocabulary()
 	if DisplayServer.get_name() == "headless":
+		# AND IF IT FAILED, THIS IS A FAILURE AND NOT A SKIP. Reporting 42 here would hand the runner "I did
+		# not run" while holding a real failure in _failures — a broken build filed under "not attempted",
+		# which is the precise defect the three-state protocol exists to prevent. The honest report is: the
+		# pixel half could not run, and the half that could run failed.
+		if _failures > 0:
+			printerr("check_item_reads: FAIL (%d) — no display, but the vocabulary check does not need one"
+				% _failures)
+			_skipped = true
+			quit(1)
+			return
 		print("check_item_reads: SKIP — no rendering device, and comparing blank images would pass.")
 		_skipped = true
 		quit(SKIP)
@@ -215,6 +233,92 @@ func _mean_lab(img: Image) -> Vector3:
 	if n == 0:
 		return Vector3.ZERO
 	return _lab(Color(r / float(n), g / float(n), b / float(n)))
+
+
+## EVERY ITEM THE VIEW CLAIMS TO KNOW MUST BE PROVEN LEGIBLE.
+##
+## `Visuals.item_color` is an if-ladder ending in `return Color.WHITE`, and its own comment records the day
+## that fallback shipped: the carried ground had no entries, so earth, stone and shale all drew as blank
+## white squares in the hotbar and it looked like missing art, because it was. The ladder was fixed. The
+## thing that let it happen — a vocabulary defined by whoever last edited a function, checked against a list
+## somebody has to remember to update — was not.
+##
+## So the list above is held to `visuals.gd` by reading it. Give an item a look and this goes red until the
+## item is also being compared against every other icon, which is the right dependency: drawing something
+## specifically is a promise that it is identifiable, and this layer is where that promise is tested.
+##
+## WHAT COUNTS AS "KNOWN" TOOK A CORRECTION, and it is worth leaving written down. The first version scanned
+## `item_color` alone and reported the four bits as stale, on the reasoning that an item compared here ought
+## to have a colour. It does not: `_item_bit` hardcodes its own steel, edge and brass and never calls
+## `item_color`, so the bits are drawn deliberately and specifically while having no entry in the ladder at
+## all. The premise was mine and it was wrong — an item_color entry is one way the view knows an item, not
+## the only way. The vocabulary is the UNION of the two places a look can be declared.
+##
+## THE CHECK IS SET EQUALITY, NOT CONTAINMENT, and that is deliberate. Containment in either direction alone
+## can be satisfied by a scanner that silently matches nothing — the cleanest vacuous pass there is, and one
+## this project has already been bitten by. Requiring both directions means a broken regex produces
+## twenty-five items "the view does not know" and fails instantly rather than passing on an empty set.
+func _check_vocabulary() -> void:
+	var known: Array[StringName] = _items_the_view_knows()
+	var missing: Array[String] = []       # drawn deliberately, but nobody checks it reads
+	for item: StringName in known:
+		if not ITEMS.has(item):
+			missing.append(String(item))
+	var stale: Array[String] = []         # compared here, but the view no longer draws it specifically
+	for item: StringName in ITEMS:
+		if not known.has(item):
+			stale.append(String(item))
+
+	_check(missing.is_empty(),
+		"every item the view draws specifically is compared against the others%s"
+			% ["" if missing.is_empty() else " — UNCHECKED: " + ", ".join(missing)])
+	_check(stale.is_empty(),
+		"every item compared here is still one the view knows%s"
+			% ["" if stale.is_empty() else " — STALE: " + ", ".join(stale)])
+	# NON-VACUITY: both assertions above are perfectly satisfied by an empty scan and an empty list.
+	_check(known.size() >= 20, "the scan read %d items out of visuals.gd" % known.size())
+
+
+## Every item `visuals.gd` declares a look for: a branch in the `item_color` ladder, or a `match` arm in
+## `draw_item`'s glyph dispatch. There is no runtime way to ask a function which values it treats specially,
+## and a hand-kept mirror of either would be one more list to drift — the exact problem this is here to
+## solve.
+func _items_the_view_knows() -> Array[StringName]:
+	var f: FileAccess = FileAccess.open("res://scenes/visuals.gd", FileAccess.READ)
+	if f == null:
+		_check(false, "visuals.gd is readable")
+		return ([] as Array[StringName])
+	var out: Array[StringName] = []
+	var in_color: bool = false
+	var in_draw: bool = false
+	var ladder := RegEx.new()
+	ladder.compile("item == &\"([a-z_]+)\"")
+	# A match arm is one or more quoted names and then a colon: `&"ore":` or `&"broad_bit", &"sinker_bit":`
+	var arm := RegEx.new()
+	arm.compile("^\\s+(&\"[a-z_]+\"(,\\s*&\"[a-z_]+\")*)\\s*:\\s*$")
+	var name := RegEx.new()
+	name.compile("&\"([a-z_]+)\"")
+	while not f.eof_reached():
+		var line: String = f.get_line()
+		if line.begins_with("static func "):
+			in_color = line.begins_with("static func item_color")
+			in_draw = line.begins_with("static func draw_item")
+			continue
+		if in_color:
+			for m: RegExMatch in ladder.search_all(line):
+				_add(out, StringName(m.get_string(1)))
+		elif in_draw:
+			var hit: RegExMatch = arm.search(line)
+			if hit != null:
+				for m: RegExMatch in name.search_all(hit.get_string(1)):
+					_add(out, StringName(m.get_string(1)))
+	f.close()
+	return out
+
+
+func _add(into: Array[StringName], s: StringName) -> void:
+	if not into.has(s):
+		into.append(s)
 
 
 func _lab(c: Color) -> Vector3:
