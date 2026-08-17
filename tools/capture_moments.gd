@@ -248,16 +248,22 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 
 	# NOTHING OVERWRITES A CAPTURE THAT HAS NO COPY.
 	#
-	# The 44 `_moment_*.png` are gitignored, so git holds no version of any of them, and `save_png` writes
-	# in place. That combination means a capture run is an IRREVERSIBLE edit to the project's only copy of
-	# its own evidence — and these are the frames the audits are argued from. The gate above stops a
-	# CONTAMINATED capture replacing a good one; it does nothing about a perfectly valid capture of a
-	# moment you did not mean to retake, which loses the old frame just as completely and says nothing.
+	# WRITTEN ON A PREMISE THAT WAS TRUE FOR THREE HOURS. The original text here said the 44 `_moment_*.png`
+	# are gitignored, so git holds no version of any of them — correct when this landed, and false by the
+	# same afternoon: the captures and `history/` were committed (3c46c8c, 4047b4a), so git now holds every
+	# one. The rationale is corrected rather than deleted, because the guard still earns its place and the
+	# reason it does has changed.
 	#
-	# `history/` (242 curated screenshots) sits in the same position, and docs/DECISIONS.md makes losing
-	# the user's artifacts a HARD RULE precisely because 84 of them were once deleted in a refactor. The
-	# rule was written and the tool that overwrites them was not changed, which is the same gap as a locked
-	# commit trailer that 23 commits carried anyway.
+	# WHAT IT PROTECTS NOW is the UNCOMMITTED generation, which is the one the work actually happens in:
+	# capture, look, disagree, recapture — all before any commit exists to fall back to. `git checkout` can
+	# return you to the last committed frame; it cannot return you to the one you took twenty minutes ago
+	# and have not yet decided about. The gate above stops a CONTAMINATED capture replacing a good one, and
+	# does nothing about a perfectly valid capture of a moment you did not mean to retake.
+	#
+	# The `docs/DECISIONS.md` rule about never destroying the user's artifacts is why this exists at all,
+	# and it was written while the tool that overwrites them was left unchanged — the same gap as a locked
+	# commit trailer that 23 commits carried anyway. A rule in a document is enforced by whoever last read
+	# the document.
 	#
 	# One generation is enough to be an undo. If the copy cannot be made, REFUSE — a capture is worth less
 	# than the capture it would destroy, so the failing side is the side that keeps what already exists.
@@ -270,8 +276,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 		if err != OK:
 			printerr("capture_moments: REFUSED '%s' — could not back up the existing %s (error %d)."
 				% [moment, path, err])
-			printerr("capture_moments: it is gitignored, so this file is the only copy and there is no undo."
-				+ " Nothing was written.")
+			printerr("capture_moments: nothing was written. The committed frame is recoverable with"
+				+ " `git checkout -- %s`, but any UNCOMMITTED capture at that path is not." % path)
 			return 1
 		print("  kept the previous %s at %s" % [path.get_file(), prev])
 
