@@ -45,7 +45,9 @@ const NOT_SAVED: Dictionary = {
 	"terrain_dirty": "TRANSIENT — the renderer's rebake queue; a load repaints everything wholesale anyway.",
 	"last_drop_landing": "TRANSIENT — one-shot view channel (the controller's pickup grace). RESET on load.",
 	"_bazaars_cache": "DERIVED — lazily rescanned from the restored terrain; `_bazaars_dirty` forces it.",
-	"_bazaars_dirty": "DERIVED — set true on load precisely so the cache above rebuilds.",
+	"_ruins_cache": "DERIVED — the one-block-short frames, filled by the SAME _rescan_bazaars() pass as"
+		+ " `_bazaars_cache` and behind the same `_bazaars_dirty` gate, so it rebuilds from restored terrain.",
+	"_bazaars_dirty": "DERIVED — set true on load precisely so the caches above rebuild.",
 	"_fine_solid": "DERIVED — the fine grid is a pure function of (solid, world_seed); rebuild_fine_terrain().",
 	"_fine_edge": "DERIVED — molding noise, built from world_seed on the first rebuild.",
 	"_fine_grit": "DERIVED — grit noise, likewise.",
