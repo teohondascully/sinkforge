@@ -131,18 +131,12 @@ static func _apply_action(action: StringName, specs: Array) -> void:
 	if not InputMap.has_action(action):
 		return
 	InputMap.action_erase_events(action)
+	# Built by Controls, not here. This function used to carry its own copy of the if/else, which was fine
+	# while a spec could only be a key or a mouse button and stopped being fine the moment gamepad specs
+	# existed: an unrecognised spec fell out of the `else` and came back as a mouse button, so a player's
+	# saved pad binding would silently reload as a click.
 	for spec_v: Variant in specs:
-		var spec: Dictionary = spec_v
-		var ev: InputEvent
-		if spec.has("key"):
-			var k := InputEventKey.new()
-			k.physical_keycode = int(spec["key"])
-			ev = k
-		else:
-			var m := InputEventMouseButton.new()
-			m.button_index = int(spec["button"])
-			ev = m
-		InputMap.action_add_event(action, ev)
+		InputMap.action_add_event(action, Controls.event_from_spec(spec_v as Dictionary))
 
 
 ## Human-readable label for an action's CURRENT binding (first event), for the remap page.
@@ -170,4 +164,32 @@ static func event_label(ev: InputEvent) -> String:
 			MOUSE_BUTTON_WHEEL_UP: return "WHEEL UP"
 			MOUSE_BUTTON_WHEEL_DOWN: return "WHEEL DN"
 			_: return "MB%d" % (ev as InputEventMouseButton).button_index
+	# GAMEPAD LABELS ARE PREFIXED, every one of them, and that is not decoration. A bare "A" would collide
+	# with the keyboard's A on any screen that lists bindings, and worse, `check_binding_text` reads these
+	# labels to decide whether a key named in a tooltip is bound — an unprefixed pad face button would make
+	# the prose "press A" look satisfied by a gamepad the player does not own.
+	if ev is InputEventJoypadButton:
+		match (ev as InputEventJoypadButton).button_index:
+			JOY_BUTTON_A: return "PAD A"
+			JOY_BUTTON_B: return "PAD B"
+			JOY_BUTTON_X: return "PAD X"
+			JOY_BUTTON_Y: return "PAD Y"
+			JOY_BUTTON_LEFT_SHOULDER: return "PAD LB"
+			JOY_BUTTON_RIGHT_SHOULDER: return "PAD RB"
+			JOY_BUTTON_START: return "PAD START"
+			JOY_BUTTON_BACK: return "PAD BACK"
+			JOY_BUTTON_DPAD_UP: return "PAD UP"
+			JOY_BUTTON_DPAD_DOWN: return "PAD DOWN"
+			JOY_BUTTON_DPAD_LEFT: return "PAD LEFT"
+			JOY_BUTTON_DPAD_RIGHT: return "PAD RIGHT"
+			_: return "PAD %d" % (ev as InputEventJoypadButton).button_index
+	if ev is InputEventJoypadMotion:
+		var m := ev as InputEventJoypadMotion
+		var back: bool = m.axis_value < 0.0
+		match m.axis:
+			JOY_AXIS_LEFT_X: return "STICK LEFT" if back else "STICK RIGHT"
+			JOY_AXIS_LEFT_Y: return "STICK UP" if back else "STICK DOWN"
+			JOY_AXIS_TRIGGER_LEFT: return "PAD LT"
+			JOY_AXIS_TRIGGER_RIGHT: return "PAD RT"
+			_: return "AXIS %d%s" % [m.axis, "-" if back else "+"]
 	return "?"

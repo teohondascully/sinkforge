@@ -219,6 +219,7 @@ add "check_casing_light (machines lit)" "res://tools/check_casing_light.gd"
 add "check_status_reads (every state)" "res://tools/check_status_reads.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
+add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
 # add_gl: it measures the boxes the HUD actually DREW, and the dummy renderer draws none of them — so
 # headless every state reports zero panels and every overlap assertion passes on an empty screen.
 add_gl "check_hud_layout (no collisions)" "res://tools/check_hud_layout.gd"

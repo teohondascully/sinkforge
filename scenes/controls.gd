@@ -68,41 +68,123 @@ static func pressed(action: StringName) -> bool:
 	return false if deaf else Input.is_action_pressed(action)
 
 
-## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
+## action -> list of default event specs. See `event_from_spec` for the four spec kinds.
+##
+## THE PAD LAYOUT, and why each verb sits where it does. COMPREHENSIVE_AUDIT §198: the game had no gamepad
+## bindings at all, which is not a missing convenience — it is a player who plugs in a controller, gets
+## nothing, and has no way to discover the game is not broken. Every binding below is ADDITIONAL: the
+## keyboard and mouse defaults are untouched, and both sets are live at once, so a player can steer with a
+## stick and still hit F5.
+##
+## The scheme assumes an Xbox-shaped pad, which is what Godot's JOY_BUTTON_* names describe, and it is built
+## around what the hands are doing in the moment rather than around alphabetical tidiness:
+##
+##   LEFT STICK    move and climb. Both axes, because UP/DOWN is the climb verb — a rope is ridden with the
+##                 same thumb that walks, which is the whole reason they are separate from JUMP.
+##   TRIGGERS      MINE and BUILD, because both are HELD. A trigger is the only analogue control on the pad
+##                 that a finger can rest on for whole seconds without fatigue, and mining is measured in
+##                 seconds. Right is mine, matching the right mouse hand's LMB.
+##   RIGHT BUMPER  the grapple, for the same reason F is: it wants to be FLICKED, and a bumper is the
+##                 fastest thing on the pad to hit without moving a thumb off a stick.
+##   D-PAD         left/right cycle the hotbar; up cycles zoom. The D-pad is free for this precisely
+##                 because movement lives on the stick, and it must NOT also mirror the stick — an input
+##                 that both walks you and changes tool is worse than one that does neither.
+##   FACE BUTTONS  A jumps. X crafts, Y drops, B closes — B is the universal back button and CLOSE is what
+##                 back means here.
+##   START/BACK    pause and map, which is where a decade of controllers has put them.
+##
+## What is deliberately NOT bound: SAVE, LOAD, TECH, DASHBOARD, SPEED, MUTE, RESEARCH, CLEAR_MARKS and HELP.
+## A pad has about fourteen inputs and this game has twenty-four actions, so a scheme that binds everything
+## binds them badly — chords, long-presses, and a layer nobody can remember. Those nine are all reachable
+## from menus or are conveniences, and `check_gamepad` asserts the ESSENTIAL set is complete while printing
+## the remainder, so the line between "chose not to" and "forgot" stays visible instead of being a guess.
 static func defaults() -> Dictionary:
 	return {
-		LEFT: [{"key": KEY_A}, {"key": KEY_LEFT}],
-		RIGHT: [{"key": KEY_D}, {"key": KEY_RIGHT}],
+		# Movement is the STICK only, and the D-pad is deliberately not a second copy of it: the D-pad is
+		# carrying the hotbar below, and an input cannot be both without walking the body every time you
+		# change tool. The first draft of this bound both and check_gamepad caught it.
+		LEFT: [{"key": KEY_A}, {"key": KEY_LEFT}, {"axis": JOY_AXIS_LEFT_X, "dir": -1}],
+		RIGHT: [{"key": KEY_D}, {"key": KEY_RIGHT}, {"axis": JOY_AXIS_LEFT_X, "dir": 1}],
 		# W/↑ and S/↓ are the CLIMB axis (grab + ride a rope); JUMP is Space alone now, so climbing
-		# up a rope (W) and jumping off it (Space) stay distinct verbs.
-		UP: [{"key": KEY_W}, {"key": KEY_UP}],
-		DOWN: [{"key": KEY_S}, {"key": KEY_DOWN}],
-		JUMP: [{"key": KEY_SPACE}],
-		MINE: [{"button": MOUSE_BUTTON_LEFT}],
-		BUILD: [{"button": MOUSE_BUTTON_RIGHT}],
-		DROP: [{"key": KEY_Q}],
-		CRAFT: [{"key": KEY_E}],
+		# up a rope (W) and jumping off it (Space) stay distinct verbs. On the pad that separation is what
+		# puts climb on the stick's Y and jump on A: one thumb rides, the other leaps.
+		UP: [{"key": KEY_W}, {"key": KEY_UP}, {"axis": JOY_AXIS_LEFT_Y, "dir": -1}],
+		DOWN: [{"key": KEY_S}, {"key": KEY_DOWN}, {"axis": JOY_AXIS_LEFT_Y, "dir": 1}],
+		JUMP: [{"key": KEY_SPACE}, {"pad": JOY_BUTTON_A}],
+		MINE: [{"button": MOUSE_BUTTON_LEFT}, {"axis": JOY_AXIS_TRIGGER_RIGHT, "dir": 1}],
+		BUILD: [{"button": MOUSE_BUTTON_RIGHT}, {"axis": JOY_AXIS_TRIGGER_LEFT, "dir": 1}],
+		DROP: [{"key": KEY_Q}, {"pad": JOY_BUTTON_Y}],
+		CRAFT: [{"key": KEY_E}, {"pad": JOY_BUTTON_X}],
 		RESEARCH: [{"key": KEY_R}],   # #S33: CONFIGURE the machine you are aiming at. Research moved to ENTER.
 
-		MAP: [{"key": KEY_M}],
+		MAP: [{"key": KEY_M}, {"pad": JOY_BUTTON_BACK}],
 		HELP: [{"key": KEY_H}, {"key": KEY_SLASH}],
-		PAUSE: [{"key": KEY_P}],
-		CLOSE: [{"key": KEY_ESCAPE}],
+		PAUSE: [{"key": KEY_P}, {"pad": JOY_BUTTON_START}],
+		CLOSE: [{"key": KEY_ESCAPE}, {"pad": JOY_BUTTON_B}],
 		SPEED: [{"key": KEY_PERIOD}],   # "." — cycle the fast-forward game clock (1x -> 2x -> 4x -> 8x)
-		CYCLE_NEXT: [{"button": MOUSE_BUTTON_WHEEL_DOWN}],
-		CYCLE_PREV: [{"button": MOUSE_BUTTON_WHEEL_UP}],
-		ZOOM: [{"key": KEY_Z}],
+		CYCLE_NEXT: [{"button": MOUSE_BUTTON_WHEEL_DOWN}, {"pad": JOY_BUTTON_DPAD_RIGHT}],
+		CYCLE_PREV: [{"button": MOUSE_BUTTON_WHEEL_UP}, {"pad": JOY_BUTTON_DPAD_LEFT}],
+		ZOOM: [{"key": KEY_Z}, {"pad": JOY_BUTTON_DPAD_UP}],
 		SAVE: [{"key": KEY_F5}],        # classic quicksave/quickload
 		LOAD: [{"key": KEY_F9}],
 		CLEAR_MARKS: [{"key": KEY_X}],  # wipe the painted dig plan
 		TECH: [{"key": KEY_T}],         # the tech-tree overlay
 		DASHBOARD: [{"key": KEY_G}],    # the production dashboard (throughput + factory census)
-		# The grapple sits on F and on the middle mouse button: one key that fires AND releases, so the
-		# line is something you flick rather than something you manage. Both hands can reach it while the
-		# left is on WASD and the right is aiming — the two things you are already doing when you want it.
-		GRAPPLE: [{"key": KEY_F}, {"button": MOUSE_BUTTON_MIDDLE}],
+		# The grapple sits on F, the middle mouse button and the right bumper: one input that fires AND
+		# releases, so the line is something you flick rather than something you manage. All three are
+		# reachable without moving the hand off the thing it is already doing — WASD and aim, or a stick.
+		GRAPPLE: [{"key": KEY_F}, {"button": MOUSE_BUTTON_MIDDLE}, {"pad": JOY_BUTTON_RIGHT_SHOULDER}],
 		MUTE: [{"key": KEY_N}],       # sound on/off in one key. M is the map; N is its neighbour and free.
 	}
+
+
+## THE ONE PLACE A BINDING SPEC BECOMES AN EVENT.
+##
+## There used to be two, byte-identical: this one, and `Settings._apply_action` doing the same if/else for
+## the remap page. That was survivable while a spec could only be a key or a mouse button, because the else
+## branch was always right. It stops being survivable the moment a THIRD kind exists — a spec the remap
+## page did not understand would fall out of its `else` and become a mouse button, silently, and a player's
+## saved gamepad binding would come back as a click.
+##
+## Four kinds now:
+##
+##   {"key": KEY_*}          a physical keycode, so the binding follows the key's POSITION and a player on
+##                           AZERTY gets the same shape of hand rather than the same letters.
+##   {"button": MOUSE_*}     a mouse button.
+##   {"pad": JOY_BUTTON_*}   a gamepad button.
+##   {"axis": JOY_AXIS_*, "dir": -1|1}   half of a stick or a trigger. `dir` picks WHICH half, because a
+##                           stick axis is two bindings wearing one number: left and right are the same
+##                           axis with opposite signs, and an action bound to "the axis" would fire on both.
+static func event_from_spec(spec: Dictionary) -> InputEvent:
+	if spec.has("key"):
+		var k := InputEventKey.new()
+		k.physical_keycode = int(spec["key"])
+		return k
+	if spec.has("pad"):
+		var j := InputEventJoypadButton.new()
+		j.button_index = int(spec["pad"]) as JoyButton
+		return j
+	if spec.has("axis"):
+		var a := InputEventJoypadMotion.new()
+		a.axis = int(spec["axis"]) as JoyAxis
+		# The magnitude is the DEADZONE the action trips at, and its sign is the half of the axis that
+		# counts. Sticks rest near zero and drift; triggers rest at zero and travel one way only.
+		a.axis_value = float(spec["dir"]) * (TRIGGER_POINT if _is_trigger(int(spec["axis"])) else STICK_POINT)
+		return a
+	var m := InputEventMouseButton.new()
+	m.button_index = int(spec["button"])
+	return m
+
+
+## How far a stick must lean, and a trigger must be pulled, before the action counts as pressed. The stick
+## number is a deadzone: a worn thumbstick that rests at 0.15 must not walk the body across the room. The
+## trigger number is higher because a trigger is being used as a BUTTON here — MINE is held down for whole
+## seconds — and a light rest of the finger should not start mining.
+const STICK_POINT: float = 0.5
+const TRIGGER_POINT: float = 0.5
+
+static func _is_trigger(axis: int) -> bool:
+	return axis == JOY_AXIS_TRIGGER_LEFT or axis == JOY_AXIS_TRIGGER_RIGHT
 
 
 ## Register the defaults into InputMap. IDEMPOTENT and non-destructive: an action that already exists is
@@ -115,13 +197,4 @@ static func register() -> void:
 			continue
 		InputMap.add_action(action)
 		for spec: Dictionary in specs[action]:
-			var ev: InputEvent
-			if spec.has("key"):
-				var k := InputEventKey.new()
-				k.physical_keycode = int(spec["key"])
-				ev = k
-			else:
-				var m := InputEventMouseButton.new()
-				m.button_index = int(spec["button"])
-				ev = m
-			InputMap.action_add_event(action, ev)
+			InputMap.action_add_event(action, event_from_spec(spec))
