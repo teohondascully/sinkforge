@@ -201,7 +201,34 @@ func _on_frame() -> void:
 			r._has_wall)
 		var got: PackedByteArray = r._fine.texture().get_image().get_data()
 		var want: PackedByteArray = ref.texture().get_image().get_data()
-		_check(got == want, "region bake is byte-identical to a full bake of the same world (margin is safe)")
+
+		# BEFORE trusting `got == want`, establish that the comparison COULD have failed.
+		#
+		# This assertion spent its whole life vacuous and nobody could tell. Under --headless the dummy
+		# rendering driver never uploads texture data, so get_image() hands back a BLANK surface — full
+		# size, one repeated value. Two blank surfaces are byte-identical, so the check passed. And
+		# --headless was the only way the harness ever ran this layer, because it was registered with `add`
+		# rather than `add_gl`. The result: the guard reported PASS while the very bug it exists to catch
+		# was live on main. Measured, not inferred — same commit, same layer: 115 distinct sampled values
+		# and a real FAIL with a window, 1 distinct value and a PASS headless.
+		if DisplayServer.get_name() == "headless":
+			print("  SKIP: byte-identity NOT verified — no rendering surface. The headless driver returns a")
+			print("        blank image, so this comparison cannot fail and asserting it would be a lie.")
+			print("        Extent and cost below still assert for real. Run with a window to verify it.")
+		else:
+			var want_bytes: int = FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS \
+				* FactorySim.SUBDIV * 4
+			_check(got.size() == want_bytes and want.size() == want_bytes,
+				"both textures read back at full size (got %d, ref %d, expected %d)"
+					% [got.size(), want.size(), want_bytes])
+			# Uniformity is how this goes vacuous even at full size. Real molded terrain is never one value.
+			var distinct: Dictionary = {}
+			for i: int in range(0, got.size(), 997 * 4):   # coprime stride — samples the whole image cheaply
+				distinct[got[i]] = true
+			_check(distinct.size() > 4, "the baked texture carries real variation, so the comparison below "
+				+ "could actually fail (%d distinct sampled values)" % distinct.size())
+			_check(got == want,
+				"region bake is byte-identical to a full bake of the same world (margin is safe)")
 
 		_cost(r, ref)
 
