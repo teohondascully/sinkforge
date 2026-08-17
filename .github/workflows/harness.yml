@@ -144,11 +144,18 @@ jobs:
       # did not come up and the layer quietly opted out, which must be red rather than a
       # green run that judged nothing. That is the exact failure this whole change exists
       # to make impossible, so the job that runs the pixel layers refuses to tolerate it.
+      #
+      # JOBS=1 is not caution, it is a measurement. Run four-up in the container, one layer
+      # came back `Killed` with exit 137 — four Godot processes each holding a 1920x1080
+      # software-rendered swapchain and a full world bake do not fit in a runner's memory.
+      # Serially the same four passed. A pixel layer OOM-killed at random is worse than a
+      # slow job, and there are only four of them.
       - name: Run the pixel layers on a real display
         env:
           SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
           SF_STRICT: "1"
           SF_LOG_DIR: ${{ runner.temp }}/harness-logs
+          JOBS: "1"
         run: xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
 
       - name: Publish the result table
