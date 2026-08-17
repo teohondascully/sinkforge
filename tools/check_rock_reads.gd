@@ -260,11 +260,19 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	c0 = Vector2i(maxi(c0.x, 0), maxi(c0.y, 0))
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
+	# ABSOLUTE, NOT PER-COLUMN, and the difference is a sim bug rather than a preference.
+	# `surface_row(col)` returns the first solid cell scanning from row 0 — it has no memory of the
+	# original terrain, so a column the player has dug reports the row BELOW the shaft as its surface.
+	# The old filter was `cy <= surface_row(col) + SURFACE_CLEAR`, which on every dug column excluded a
+	# twenty-row band starting at the bottom of the shaft: exactly the carved space this layer is supposed
+	# to be judging, thrown out for being near a surface that is not there. 1696 cells were going out that
+	# door and which ones depended on where the delve happened to land, which is the run-to-run variance.
+	# SURFACE_LINE is the nominal terrain row, a constant, and no amount of digging moves it.
+	var floor_row: int = WorldRenderer.SURFACE_LINE + SURFACE_CLEAR
 	for cx: int in range(c0.x, c1.x + 1):
-		var surf: int = main.sim.surface_row(cx)
 		for cy: int in range(c0.y, c1.y + 1):
 			var c := Vector2i(cx, cy)
-			if cy <= surf + SURFACE_CLEAR:
+			if cy <= floor_row:
 				near_surface += 1
 				continue
 			var vi: int = (cy * FactorySim.GRID_COLS + cx) * 4
