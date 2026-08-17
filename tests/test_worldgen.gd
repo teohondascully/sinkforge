@@ -532,6 +532,17 @@ func _test_layered_worldgen() -> void:
 ##   6. Determinism   — same (seed,size) twice → identical blocks/walls/amounts/water.
 ##   7. Load-clean    — load_world ingests without crash; sim.total_water() matches the generated grid
 ##                      (sizes are kept ≤ the sim's fixed GRID so nothing is clamped away).
+##   8. Lode legal    — every generated vein is behind host rock, dry, outside the seal, walled, and rich;
+##                      and the plane ingests whole (count, material, positive lode_max).
+##   9. Lode usable   — on every PRODUCTION-size world: a buried vein in each tier, and the chain through
+##                      the real contract — buried → not workable; clear the rock → workable; work it →
+##                      yields its own ore. The arm's own coverage is asserted, not assumed.
+##
+## 8 and 9 exist because the lode plane's first evidence was a single seed. `_test_generated_lodes` runs
+## seed 1337 at one size and proves the design; it cannot speak for the generator across seeds, and the
+## sweep that was built for exactly that did not know the plane existed. Citing the one-seed guard as
+## cross-seed evidence would have been the same error the plane itself was introduced to fix — a sound
+## instrument reporting on a population it was never pointed at.
 func _test_worldgen_fuzz() -> void:
 	print("- worldgen fuzz (seeds × sizes)")
 	var gen := LayeredWorldGen.new()
@@ -564,6 +575,11 @@ func _test_worldgen_fuzz() -> void:
 	var water_deep_fail: String = ""
 	var determinism_fail: String = ""
 	var load_fail: String = ""
+	var lode_legal_fail: String = ""
+	var lode_amount_fail: String = ""
+	var lode_tier_fail: String = ""
+	var lode_load_fail: String = ""
+	var tier_worlds: int = 0
 
 	for seed: int in seeds:
 		for dim: Vector2i in sizes:
@@ -575,7 +591,7 @@ func _test_worldgen_fuzz() -> void:
 
 			# --- 1. IN-BOUNDS: every key of every grid sits inside (cols,rows). ---
 			if oob_fail == "":
-				for grid: Dictionary in [world.blocks, world.walls, world.amounts, world.water]:
+				for grid: Dictionary in [world.blocks, world.walls, world.amounts, world.water, world.lodes]:
 					for cell: Vector2i in grid:
 						if not world.in_bounds(cell):
 							oob_fail = "%s cell %s out of bounds" % [tag, str(cell)]
@@ -635,6 +651,69 @@ func _test_worldgen_fuzz() -> void:
 					water_deep_fail = "%s water at %s above AQUIFER_MIN_ROW=%d" \
 						% [tag, str(wc), LayeredWorldGen.AQUIFER_MIN_ROW]
 
+			# --- 8. LODE LEGALITY: every generated vein is behind host rock, dry, out of the seal, and rich. ---
+			# The single-seed guard (_test_generated_lodes) proves this for seed 1337 at one size. That is one
+			# world, and the lode plane is generated per-seed like everything else here — so the cross-seed
+			# claim belongs in the population that already sweeps seeds, not beside it.
+			for lc: Vector2i in world.lodes:
+				var host: StringName = world.blocks.get(lc, &"")
+				if lode_legal_fail == "":
+					if host != &"earth" and host != &"stone" and host != &"deepslate" and host != &"shale":
+						lode_legal_fail = "%s lode %s host is %s, not host rock" \
+							% [tag, str(lc), str(host) if host != &"" else "<air>"]
+					elif world.water.has(lc):
+						lode_legal_fail = "%s lode %s is inside an aquifer" % [tag, str(lc)]
+					elif lc.y >= seal_lo and lc.y <= seal_hi:
+						lode_legal_fail = "%s lode %s is inside the seal band" % [tag, str(lc)]
+					elif not world.walls.has(lc):
+						lode_legal_fail = "%s lode %s has no wall behind it" % [tag, str(lc)]
+				# Richness is the deposit — a lode with none is a vein that pays nothing, which is the
+				# generated-world version of the defect this whole plane exists to fix.
+				if int(world.amounts.get(lc, 0)) <= 0 and lode_amount_fail == "":
+					lode_amount_fail = "%s lode %s carries deposit %d" \
+						% [tag, str(lc), int(world.amounts.get(lc, 0))]
+
+			# --- 9. USABLE BURIED LODE IN BOTH TIERS, production-size worlds only. ---
+			# Guarded on `rows > seal_hi` because a 20- or 40-row world has no below-seal band at all, and an
+			# arm that silently skips every world it cannot satisfy is the vacuity this suite keeps finding in
+			# other people's fixtures. `tier_worlds` is asserted against the seed count below, so if the guard
+			# ever stops admitting anything the sweep FAILS instead of quietly proving nothing.
+			if rows > seal_hi:
+				tier_worlds += 1
+				var l2_top: int = LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS
+				var probe_above: Vector2i = Vector2i(-1, -1)
+				var probe_below: Vector2i = Vector2i(-1, -1)
+				for lc2: Vector2i in world.lodes:
+					if not world.blocks.has(lc2):
+						continue                                  # only a BURIED vein is the case in question
+					if lc2.y >= l2_top:
+						if probe_below.x < 0:
+							probe_below = lc2
+					elif probe_above.x < 0:
+						probe_above = lc2
+				if probe_above.x < 0 and lode_tier_fail == "":
+					lode_tier_fail = "%s no buried lode above the seal" % tag
+				elif probe_below.x < 0 and lode_tier_fail == "":
+					lode_tier_fail = "%s no buried lode below the seal" % tag
+				elif lode_tier_fail == "":
+					# The chain, through the real contract: buried → not workable; clear the host rock →
+					# workable; work it → yields its own ore. Both tiers, every seed.
+					var tsim: FactorySim = FactorySim.new()
+					tsim.load_world(world)
+					for probe: Vector2i in [probe_above, probe_below]:
+						if tsim.lode_workable(probe):
+							lode_tier_fail = "%s buried lode %s was workable before the rock was cleared" \
+								% [tag, str(probe)]
+							break
+						tsim.mine(probe)
+						if not tsim.lode_workable(probe):
+							lode_tier_fail = "%s clearing rock at %s exposed no workable lode" % [tag, str(probe)]
+							break
+						if tsim.take_lode(probe) != world.lodes[probe]:
+							lode_tier_fail = "%s working the exposed lode at %s yielded the wrong ore" \
+								% [tag, str(probe)]
+							break
+
 			# --- 6. DETERMINISM: regenerating the same (seed,size) yields identical grids. ---
 			if determinism_fail == "":
 				var again: WorldData = gen.generate(cols, rows, seed)
@@ -646,16 +725,20 @@ func _test_worldgen_fuzz() -> void:
 					determinism_fail = "%s amounts differ on regen" % tag
 				elif world.water != again.water:
 					determinism_fail = "%s water differs on regen" % tag
+				elif world.lodes != again.lodes:
+					determinism_fail = "%s lodes differ on regen" % tag
 
 			# --- 7. LOAD-CLEAN: ingest through the real contract; total_water matches the grid. ---
-			if load_fail == "":
+			if load_fail == "" or lode_load_fail == "":
 				var sim: FactorySim = FactorySim.new()
 				sim.load_world(world)
 				# Sizes are ≤ the fixed sim grid, so no cell is clamped away → the water totals must match.
 				var grid_total: int = 0
 				for v: Variant in world.water.values():
 					grid_total += int(v)
-				if sim.total_water() != grid_total:
+				if load_fail != "":
+					pass                                          # already reported; keep checking the lode plane
+				elif sim.total_water() != grid_total:
 					load_fail = "%s total_water mismatch: sim=%d grid=%d" \
 						% [tag, sim.total_water(), grid_total]
 				else:
@@ -665,6 +748,25 @@ func _test_worldgen_fuzz() -> void:
 							load_fail = "%s load invented %s (present=%d produced=%d)" \
 								% [tag, it, _items_present(sim, it), int(sim.total_produced.get(it, 0))]
 							break
+				# LODE INGESTION, through the same contract and NOT gated on the water arm — the two failures
+				# are independent and coupling them would let one mask the other. The plane must arrive whole:
+				# same count, same material per cell, and a positive `lode_max`, which is the denominator the
+				# fleck field thins against. A lode that loads with a zero denominator draws as a stripped vein
+				# on an untouched one — the exact bug `lode_max` was introduced to fix.
+				if lode_load_fail == "":
+					if sim.lode.size() != world.lodes.size():
+						lode_load_fail = "%s lode count mismatch: sim=%d grid=%d" \
+							% [tag, sim.lode.size(), world.lodes.size()]
+					else:
+						for lc3: Vector2i in world.lodes:
+							if sim.lode_at(lc3) != world.lodes[lc3]:
+								lode_load_fail = "%s lode %s ingested as %s, generated as %s" \
+									% [tag, str(lc3), str(sim.lode_at(lc3)), str(world.lodes[lc3])]
+								break
+							if int(sim.lode_max.get(lc3, 0)) <= 0:
+								lode_load_fail = "%s lode %s ingested with lode_max=%d" \
+									% [tag, str(lc3), int(sim.lode_max.get(lc3, 0))]
+								break
 
 	_check(worlds == seeds.size() * sizes.size(),
 		"fuzzed the whole matrix (%d worlds = %d seeds × %d sizes)" % [worlds, seeds.size(), sizes.size()])
@@ -684,6 +786,24 @@ func _test_worldgen_fuzz() -> void:
 		% ("OK" if determinism_fail == "" else determinism_fail))
 	_check(load_fail == "", "load-clean: ingests without error, water/items conserved — %s"
 		% ("OK" if load_fail == "" else load_fail))
+	_check(lode_legal_fail == "",
+		"lode legal: every generated vein is behind host rock, dry, out of the seal, walled — %s"
+		% ("OK" if lode_legal_fail == "" else lode_legal_fail))
+	_check(lode_amount_fail == "", "lode richness: every generated vein carries a positive deposit — %s"
+		% ("OK" if lode_amount_fail == "" else lode_amount_fail))
+	_check(lode_load_fail == "",
+		"lode load-clean: the plane ingests whole — count, material and a positive lode_max — %s"
+		% ("OK" if lode_load_fail == "" else lode_load_fail))
+	# NON-VACUITY GUARD ON THE TIER ARM. It is skipped for any world too short to contain the seal band,
+	# which is every size in this matrix except the production one. If that guard ever stops admitting
+	# worlds — a shrunk production size, a moved seal — the arm would pass by testing nothing, so the count
+	# is asserted rather than trusted. This is the assertion I would have omitted a week ago.
+	_check(tier_worlds == seeds.size(),
+		"the both-tier arm actually ran on every production-size world (%d of %d seeds)"
+		% [tier_worlds, seeds.size()])
+	_check(lode_tier_fail == "",
+		"usable buried lode in BOTH tiers, every seed: buried → clear the rock → workable → yields ore — %s"
+		% ("OK" if lode_tier_fail == "" else lode_tier_fail))
 
 
 ## HORIZONTAL ore pull (the frontier fix): ore richness varies across X at a fixed depth, with the richest
