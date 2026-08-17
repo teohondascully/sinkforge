@@ -97,3 +97,9 @@ _moment_prev/
 # writes into the canonical namespace dirties the tree on every run, and the ~38% run-to-run difference
 # from animation phase alone means that churn is almost entirely noise being offered for commit.
 _diag_*.png
+# ...and the three that were committed under the canonical name before that split existed. Nothing writes
+# them now, so they are frozen the moment the split landed — a tracked file that looks current and is not
+# is worse than an absent one. Untracked with `git rm --cached`, never `rm`; the copies stay on disk.
+/_moment_water.png
+/_moment_water_body.png
+/_moment_water_rock.png
