@@ -335,18 +335,23 @@ func _run() -> void:
 		print("        -> %d helpers total %6.3f ms of the %6.3f ms paint"
 			% [helpers.size(), helper_total, paint_ms])
 
-	# --- THE STILL FRAME, which is the actual problem ---
+	# --- THE STILL FRAME ---
 	#
-	# The table above was written to convict the seam flood and instead acquitted it. What it turned up is
-	# larger: a frame that mines NOTHING still costs ~8.4ms, and the budget is 8.33. Standing perfectly
-	# still, doing nothing, this game is at 120fps and no better — so no amount of making digging cheaper
-	# reaches the target, and any optimisation aimed at the dig path is aimed at the smaller half.
+	# WHAT THIS SECTION USED TO CLAIM, AND WHY IT WAS WRONG. It said: a frame that mines NOTHING still costs
+	# ~8.4ms against a budget of 8.33, so the game is at 120fps and no better even standing still, so the dig
+	# path is the smaller half of the problem. That reading was refuted by the drop-rate instrument built
+	# session built afterwards — an idle frame misses its deadline 0-6% of the time, and a digging frame
+	# misses 63-68%. The 8.4ms was the PANEL handing us frames at 120Hz, not the game filling them. See the
+	# pacing detection immediately below, which is the part of this file that was right.
 	#
-	# Before anyone optimises anything, the first question is WHICH MACHINE is busy. Godot can answer it
-	# directly: the viewport reports its own render cost split into the CPU that builds the command stream
-	# and the GPU that executes it, and Performance reports the script time on top. Script, draw-call
-	# submission and the GPU are three different problems with three different fixes, and guessing which
-	# one you have is how a week gets spent making the wrong one faster.
+	# The lesson is kept here rather than deleted, because the trap is still live: on this display "makes
+	# budget" and "is paced" produce the same p50, so a wall-clock number can NEVER distinguish a fast frame
+	# from a throttled one. Only missed deadlines can.
+	#
+	# What survives is the split: when a frame IS slow, the first question is WHICH MACHINE is busy. The
+	# viewport reports its render cost split into the CPU that builds the command stream and the GPU that
+	# executes it. Those are two different problems with two different fixes, and guessing which one you
+	# have is how a week gets spent making the wrong one faster.
 	print("")
 	print("  --- the still frame: which machine is actually busy ---")
 	var vp_rid: RID = get_root().get_viewport_rid()
@@ -357,7 +362,6 @@ func _run() -> void:
 
 	var cpu := PackedFloat32Array()
 	var gpu := PackedFloat32Array()
-	var proc := PackedFloat32Array()
 	var whole := PackedFloat32Array()
 	var t_last: int = Time.get_ticks_usec()
 	for _i: int in 120:
@@ -367,15 +371,23 @@ func _run() -> void:
 		t_last = t_now
 		cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp_rid))
 		gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp_rid))
-		proc.append(float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0)
-	cpu.sort(); gpu.sort(); proc.sort(); whole.sort()
+	cpu.sort(); gpu.sort(); whole.sort()
 	print("    whole frame        p50 %5.2fms   p95 %5.2fms" % [_pct(whole, 0.50), _pct(whole, 0.95)])
 	print("    render CPU         p50 %5.2fms   p95 %5.2fms   (building the command stream)"
 		% [_pct(cpu, 0.50), _pct(cpu, 0.95)])
-	print("    render GPU         p50 %5.2fms   p95 %5.2fms   (executing it)"
-		% [_pct(gpu, 0.50), _pct(gpu, 0.95)])
-	print("    script _process    p50 %5.2fms   p95 %5.2fms   (our own per-frame code)"
-		% [_pct(proc, 0.50), _pct(proc, 0.95)])
+	# A GPU timer that reads exactly zero is an unimplemented timer, not an idle GPU. Metal does not fill
+	# these timestamp queries in this build, and printing "0.00ms (executing it)" invites the reader to
+	# conclude the GPU is free — which is a claim nobody measured. Say which it is.
+	if _pct(gpu, 0.50) <= 0.0 and _pct(gpu, 0.95) <= 0.0:
+		print("    render GPU         NOT MEASURED — this backend does not fill the timestamp query")
+	else:
+		print("    render GPU         p50 %5.2fms   p95 %5.2fms   (executing it)"
+			% [_pct(gpu, 0.50), _pct(gpu, 0.95)])
+	# THE SCRIPT ROW IS GONE ON PURPOSE. It read `Performance.TIME_PROCESS` and reported p50 21.89ms inside
+	# frames whose whole duration was 8.4ms — our own per-frame code taking two and a half times the frame
+	# it runs in. That is not a slow number, it is an impossible one, and I quoted it in a conclusion before
+	# noticing. I do not know what that monitor is counting here; until I do, it does not belong in a table
+	# people make decisions from. An unexplained number is worse than a missing one, because it gets used.
 	print("    draw calls %d · objects %d · vertices %d"
 		% [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
