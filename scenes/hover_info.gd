@@ -31,7 +31,8 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 					"mode": "too hard — the %s (tier %d) bites it" % [
 						MiningRules.tool_name(MiningRules.drive_for(vein)), MiningRules.required_tier(vein)]}
 			return {"name": "%s Lode" % String(vein).capitalize(), "in": [], "out": [], "holding": [],
-				"mode": "%d left — hold LMB on the face to work it" % sim.ore_deposit_at(aim)}
+				"mode": "%d left — work it by hand, or stand a Drill ON it (%s)" % [
+					sim.ore_deposit_at(aim), _rate_eta(drill_rate, sim.ore_deposit_at(aim))]}
 		var dep: int = sim.ore_deposit_at(aim)
 		if dep > 0:
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],

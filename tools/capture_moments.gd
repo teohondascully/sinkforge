@@ -98,6 +98,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_refusal(main)
 		"lode":
 			await _at_the_lode(main)
+		"head":
+			await _at_the_head(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -641,6 +643,57 @@ func _at_the_lode(main: MainView) -> void:
 		await physics_frame
 	print("LODE  aim=%s  lode=%s  left=%d  frac=%.2f" % [main._aim, str(sim.lode_at(main._aim)),
 		sim.ore_deposit_at(main._aim), sim.lode_fraction(main._aim)])
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+	main._hud._arrival_life = 0.0
+	main._hud.objectives = null
+
+
+## STAND IT ON THE THING IT EATS. A Head working a face it is standing on, pouring down its own column into
+## the sump it was placed over — beside the same vein still being worked by hand. The subject is the
+## PLACEMENT: one machine, one cell, on the ore. The old model needed three facts right (somewhere above it,
+## same column, drain under the bottom) before anything happened at all.
+func _at_the_head(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 40
+	for x: int in range(x0 - 14, x0 + 15):
+		for y: int in range(row - 8, row + 10):
+			sim.set_solid(Vector2i(x, y), &"stone")
+			sim.lode.erase(Vector2i(x, y))
+			sim.deposits.erase(Vector2i(x, y))
+	for x2: int in range(x0 - 8, x0 + 5):                      # the chamber you cleared to find the vein
+		for y2: int in range(row - 3, row + 1):
+			sim.set_solid(Vector2i(x2, y2), &"")
+	for i: int in 5:                                           # the vein, exposed across the back of it
+		for dy: int in [-1, -2]:
+			var c := Vector2i(x0 - 6 + i * 2, row + dy)
+			sim.lode[c] = &"ore"
+			sim.deposits[c] = 190 - i * 34
+	var head_cell := Vector2i(x0 - 2, row - 1)
+	for y3: int in range(row, row + 6):                        # the sump the Head pours into
+		sim.set_solid(Vector2i(head_cell.x, y3), &"")
+	for t: int in [x0 - 8, x0 - 4, x0 + 2]:
+		sim.torch[Vector2i(t, row - 1)] = true
+	var drill: MachineState = sim.place_machine(load("res://src/data/machines/drill.tres") as MachineDef,
+		head_cell)
+	if drill != null:
+		drill.input_buffer[&"coal"] = 500
+	sim.inventory[&"wood_pickaxe"] = 1
+	main._inv_selected = 0
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 6) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 240:                                        # let it run, so there is a haul in the shaft
+		await physics_frame
+	Input.warp_mouse(Vector2(960.0 + 4.0 * 32.0 * 1.5, 540.0 - 40.0))
+	for _i2: int in 8:
+		await physics_frame
+	print("HEAD  status=%s  left=%d  produced=%d" % [
+		str(sim.machine_status(drill)) if drill != null else "none",
+		sim.ore_deposit_at(head_cell), int(sim.total_produced.get(&"ore", 0))])
 	if main._hints != null:
 		main._hints._active = &""
 		main._hints._queue.clear()

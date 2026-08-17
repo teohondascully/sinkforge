@@ -2270,6 +2270,7 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 		&"working": lamp = Color(0.35, 0.92, 0.42)
 		&"no_fuel": lamp = Color(0.96, 0.26, 0.20)
 		&"no_input": lamp = Color(0.97, 0.72, 0.22)
+		&"spent": lamp = Color(0.46, 0.58, 0.78)   # cool, not alarmed: a finished job is not a fault
 		_: lamp = Color(0.52, 0.55, 0.62)          # idle
 	# Status lamp: a rimmed dot in the machine's top-left corner (mirrors Factorio's entity status light).
 	# The lamp is a glanceable COLOUR (like the glyph), not text — it stays ALWAYS on so a red/amber
@@ -2281,6 +2282,8 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 		return                                       # green = fine; no floating alarm
 	if status == &"idle":
 		return                                       # benign (empty mover); lamp is enough
+	if status == &"spent":
+		return                                       # the vein is finished, not the machine — no alarm bubble
 	if not show_bubble:
 		return                                       # zoomed out + not hovered: lamp is enough, drop the bubble
 	# Stalled (no_fuel / no_input) → a blinking bubble floats above the machine carrying WHAT it needs.

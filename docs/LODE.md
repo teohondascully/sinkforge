@@ -1,11 +1,14 @@
 # THE LODE — ore lives in the wall, and mining stops being a trap
 
-> **Status: PHASE 1 SHIPPED as STRIKE 38 (2026-08-16); phases 2-4 SPEC.** The lode layer, the hand-work
+> **Status: PHASE 1 SHIPPED as STRIKE 38, PHASE 2a as STRIKE 39 (2026-08-16); 2b-4 SPEC.** The lode layer, the hand-work
 > verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
 > `take_lode` / `lode_fraction`, `MainView.try_work_lode`, `WorldRenderer._draw_lode` and the lode's entry
 > into `_wall_base_color` — held by `tools/check_lode.gd` (harness layer 56, 39 assertions) and photographed
 > at `history/118-the-vein-outlives-the-blow.png`. Ore is still authored SOLID by the generator; the cutover
-> is phase 3. Migration plan, blast radius and eval gate: `docs/LODE_PLAN.md`.
+> is phase 3. **§5's Drill Head shipped as #S39** — a drill placed ON a lode drains it in place and pours
+> down its own column, held by `tools/check_head.gd` (harness layer 57) and photographed at
+> `history/119-stand-it-on-the-thing-it-eats.png`. The Spur is 2b.
+> Migration plan, blast radius and eval gate: `docs/LODE_PLAN.md`.
 >
 > **Recorded deviations so far.** **A lode is painted by the WALL BAKE, not by an overlay.** Three cuts were
 > needed to learn why: a filled rect with a rim read as a poster stuck on the rock, soft blobs read as smoke,

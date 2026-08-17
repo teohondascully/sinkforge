@@ -90,14 +90,31 @@ Each phase is one commit (or a tight run), lands green, and is independently rev
 - `hover_info.gd`: an exposed lode reads as a vein with what is left in it.
 - **New layer `check_lode`.** **Changed:** `test_sim` finite-deposit section (§5).
 
-### Phase 2 — the Drill Head and the Spur
-*Player-visible change: drills can be placed on an exposed lode. The old placement still works.*
+### Phase 2a — the Drill Head ✅ SHIPPED as STRIKE 39
+*Player-visible change: drills can be placed ON an exposed lode. The old placement still works.*
 
-- Drill accepts an open cell over a lode; drains it; still pours down its own column (**on-hook rule
-  untouched**). Old bore-down-through-solid path retained until phase 3.
-- `drill_column_remaining` → a coverage read that answers both models during the bridge.
-- **The Spur**: `spur.tres`, a coverage set, a research rung, cost. Placement preview draws coverage.
-- `spent` status with words, distinct from `blocked`.
+> Split out from phase 2 deliberately: the Head is a complete, playable, assertable unit, and the Spur is a
+> separate design commitment (a new machine, a research rung, a coverage model). Bisectable beats bundled on
+> the one migration where a bad commit is expensive. Landed green at **57/57** with `check_head` (23
+> assertions) passing on its first run and — the real result — **not one existing drill assertion needed to
+> change**, which is the phase-1/2 additive claim in §3 actually holding rather than being asserted.
+
+- Drill accepts a cell whose backing is a lode; drains it in place; still pours down its own column
+  (**on-hook rule asserted, not assumed**). Old bore-down-through-solid path untouched.
+- `drill_preview` over a lode shows ONE cell, not a column — the placement legibility win, taken by deleting
+  geometry rather than drawing more of it. `drill_column_remaining` reports the face it stands on.
+- `spent` status with its own words and a cool (not alarmed) lamp, distinct from `no_input`. Deciding between
+  them needs the Head to remember it has pulled something, so a *misplaced* drill still reads as starved.
+- **A Head is never `blocked`.** With no shaft under it the ore piles at its feet, like every other item in
+  this game when it lands; refusing to run to prevent a pile would invent a chore (`docs/DRIFT.md` §5).
+
+### Phase 2b — the Spur
+*Player-visible change: one Head can work a whole vein.*
+
+- `spur.tres`: a passive coverage extender placed adjacent to a Head or another Spur, adding its own cell's
+  lode to that Head's draw. Passive on purpose — no power question, and the Head keeps owning the fuel.
+- A new research rung: the Spur must NOT unlock with the drill, or you never feel that a Head covers one cell
+  (demand-pull). Coverage set, drain order, placement preview, `check_head` extensions.
 - **Changed:** `test_sim` drill cases, `test_stress` finite-deposit/drill cases, `check_drift`, `check_spoil`.
 
 ### Phase 3 — THE CUTOVER (the dangerous one)

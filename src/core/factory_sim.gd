@@ -369,10 +369,18 @@ func machine_status(machine: MachineState) -> StringName:
 
 ## DRILL status — mirrors _run_drill's exact gates, in order: something to bore → a drain → fuel.
 func _status_drill(machine: MachineState) -> StringName:
-	var t: Vector2i = drill_target(machine.cell)
+	var on_lode: Vector2i = drill_lode_target(machine.cell)
+	if on_lode.x < 0:
+		# SPENT IS NOT STARVED, and a machine that says the wrong one sends you looking for a fix that does
+		# not exist. A Head standing on a vein it has finished has nothing wrong with it — pick it up, move
+		# it. It is known by the Head having pulled something and there being no lode left under it, so a
+		# drill that was simply misplaced still reads as starved.
+		if machine.fed > 0 and not lode.has(machine.cell):
+			return &"spent"
+	var t: Vector2i = on_lode if on_lode.x >= 0 else drill_target(machine.cell)
 	if t.x < 0:
 		return &"no_input"                                    # no solid ore below to bore (spent/relocate)
-	if _drill_blocked(t):
+	if on_lode.x < 0 and _drill_blocked(t):
 		return &"blocked"                                     # ore has no drain below — "dig a drain below"
 	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
 		return &"no_fuel"
@@ -1823,11 +1831,34 @@ func _drill_blocked(target: Vector2i) -> bool:
 	return solid.has(below)            # solid rock caps it → blocked; open air → drains free
 
 
+## THE DRILL HEAD (`docs/LODE.md` §5, `docs/LODE_PLAN.md` phase 2a). A drill standing IN a cell whose
+## backing is a lode draws from that lode, in place — you put the machine ON the thing it eats, which is the
+## one placement rule nobody has to be taught. Returns the drill's own cell when there is a lode under it
+## with something left, else (-1,-1) and the old bore-down-the-column model answers instead (the bridge
+## `docs/LODE_PLAN.md` §3 keeps green until the phase-3 cutover).
+##
+## Note what is deliberately NOT checked: whether the cell is solid. It cannot be — a machine only stands in
+## an open cell — and the lode is background, so "the machine is here" and "the vein is here" are compatible
+## facts rather than competing ones. That is the whole point of moving ore off the terrain plane.
+func drill_lode_target(cell: Vector2i) -> Vector2i:
+	return cell if lode.has(cell) and int(deposits.get(cell, 0)) > 0 else Vector2i(-1, -1)
+
+
 ## Read-only PLACEMENT PREVIEW for a drill hovered at `cell` — what the representation draws so a player
 ## sees, before committing, exactly which ore the drill will bore and where it will pour. Returns the ore
 ## cells it would extract (its whole column, top to bottom), the DROP cell just below the deepest ore (the
 ## out-point), and whether that drop is blocked. Empty ore_cells = not over any ore. Pure derivation.
 func drill_preview(cell: Vector2i) -> Dictionary:
+	# ON A LODE the preview is a different sentence: not "it will bore this column and pour there", but
+	# "it will work THIS face, and the ore goes down from here". One cell, its own column — which is the
+	# placement legibility win `docs/DRIFT.md` §6 asks for, arrived at by deleting geometry rather than
+	# drawing more of it.
+	if lode.has(cell) and int(deposits.get(cell, 0)) > 0:
+		return {
+			"ore_cells": [cell] as Array[Vector2i],
+			"drop_cell": cell + Vector2i(0, 1),
+			"blocked": false,
+		}
 	var ore_cells: Array[Vector2i] = []
 	for dy: int in range(0, GRID_ROWS):
 		var c := Vector2i(cell.x, cell.y + dy)
@@ -1852,6 +1883,8 @@ func drill_preview(cell: Vector2i) -> Dictionary:
 ## remaining deposit straight down until rock or a machine stops it. The "how much is left for this drill"
 ## the hover surfaces, so a drill on a fat body reads its real remaining supply.
 func drill_column_remaining(cell: Vector2i) -> int:
+	if lode.has(cell):
+		return int(deposits.get(cell, 0))     # a Head's supply is the face it stands on, not a column
 	var total: int = 0
 	for dy: int in range(0, GRID_ROWS):
 		var c := Vector2i(cell.x, cell.y + dy)
@@ -1878,10 +1911,16 @@ func _run_drill(machine: MachineState) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	if recipe == null:
 		return
-	var target: Vector2i = drill_target(machine.cell)
+	var lode_cell: Vector2i = drill_lode_target(machine.cell)
+	var target: Vector2i = lode_cell if lode_cell.x >= 0 else drill_target(machine.cell)
 	if target.x < 0:
 		return                          # nothing borable below — idle, hold progress
-	if _drill_blocked(target):
+	# A HEAD IS NEVER "BLOCKED". The old drill stalls when the ore it bored has rock right under it, because
+	# a freed unit would have nowhere to fall and would pile against the body it just came out of. A Head
+	# pours down its own column like anything else and, if there is no shaft, the ore piles at its feet —
+	# which is what every other item in this game does when it lands, and is a state you can read and fix by
+	# digging. Refusing to run would be inventing a chore (`docs/DRIFT.md` §5) to prevent a pile.
+	if lode_cell.x < 0 and _drill_blocked(target):
 		return                          # ore has no drain below — stall (status shows "blocked: dig a drain")
 	# FUEL: the drill burns COAL to run (the demand-web — automating ore creates demand for coal). Burn one
 	# tick of the current coal; when it's spent, refuel from the coal in its input buffer. No fuel + no coal
@@ -1902,6 +1941,24 @@ func _run_drill(machine: MachineState) -> void:
 	if machine.progress < recipe.time:
 		return
 	machine.progress -= recipe.time
+	# A HEAD ON A LODE drains the vein in place and clears nothing — the same one-unit-per-cycle rate, off the
+	# same pool the hand pulls from, poured down the same column. When it runs dry the vein is gone and the
+	# machine says so (&"spent"); the machine itself is untouched and can be picked up and moved.
+	if lode_cell.x >= 0:
+		var vein: StringName = lode[lode_cell]
+		var rest: int = int(deposits.get(lode_cell, 0)) - 1
+		if rest > 0:
+			deposits[lode_cell] = rest
+		else:
+			deposits.erase(lode_cell)
+			lode.erase(lode_cell)
+		terrain_dirty.append(lode_cell)                       # the fleck field thins on this
+		machine.fed += 1                                      # what this Head has pulled — and how `spent` is known
+		total_produced[vein] = int(total_produced.get(vein, 0)) + 1
+		var vdest: Dictionary = _column_landing(lode_cell.x, lode_cell.y + 1)
+		vdest["target"][vein] = int(vdest["target"].get(vein, 0)) + 1
+		flow_events.append({"item": vein, "from": lode_cell, "to": vdest["to_cell"], "count": 1})
+		return
 	# Drain one unit from the target solid ore cell (CLEARED when its deposit empties, carving the shaft). The
 	# freed material is produced + ejected DOWN.
 	var item: StringName = solid[target]                      # the solid ore block the drill bores into
