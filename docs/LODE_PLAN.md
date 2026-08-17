@@ -118,7 +118,38 @@ Each phase is one commit (or a tight run), lands green, and is independently rev
 - **Changed:** `test_sim` drill cases, `test_stress` finite-deposit/drill cases, `check_drift`, `check_spoil`.
 
 ### Phase 3 — THE CUTOVER (the dangerous one)
-*One commit. Ore is born in the wall; the solid-ore path is deleted in the same breath.*
+*Was: one commit. Ore is born in the wall; the solid-ore path is deleted in the same breath.*
+
+> **SPLIT 3a / 3b ON 2026-08-17, AND 3a HAS LANDED (`303d1f5`).** T0.2 was scoped to the gen→sim
+> channel alone, so the plan's "one commit" is no longer what happened and a reader who trusts this section
+> would look for work that is already done and assume work that is not.
+>
+> **3a — SHIPPED, and deliberately ADDITIVE.** `WorldData.lodes` exists; `LayeredWorldGen._seed_lodes` /
+> `_grow_lode` write lode bodies into the background plane behind rock that stays solid;
+> `FactorySim.load_world` ingests them (after `amounts`, because a lode's richness IS its deposit and
+> `lode_max` must read what was loaded). Determinism holds. Six overlap guards are asserted at zero, and
+> the chain is proven end to end on a GENERATED world — buried → not workable; clear the rock → workable;
+> work it → yields its ore.
+>
+> **WHAT 3a IS NOT, stated plainly because the bullet below overstates it.** It does **not** make "every
+> vein/patch/body/reward emit a lode + host rock *instead of* an ore block". Nothing above it in `generate`
+> was touched: the existing ore blocks, the whole current economy, every richness assertion and every ore
+> fixture keep their exact previous meaning. 3a **adds** a new class of deposit; it **converts** nothing.
+> That is why it could land without the tutorial rewrite and without touching a single fixture.
+>
+> What it bought: "a generated world contains usable extraction sites" stopped being false **by
+> construction**. That was the blocking half, and it blocked because `sim.lode`'s only writer outside
+> save/load was the blow that opens a vein — lode was derived from destroying an ore block and never
+> generated, so the Borer and Drift Rig cut rock with nothing behind it while every lode fixture in the
+> suite injected its own and stayed green.
+>
+> **3b — STILL OPEN, and it is the dangerous half.** Everything below this box: converting the ore blocks
+> themselves, `world_seeder`, the tutorial ladder, sonar, the Borer/Drift re-source, and the deletions.
+> **The deletions are what make it dangerous, and none of them have happened.**
+>
+> **Not claimed by 3a:** that the pay chute works. An empty world means everything downstream of it was
+> never exercised, so it is **untested, not exonerated** — it may hold independent defects that only become
+> visible now there is lode to draw. The first rig pointed at a generated lode is a real experiment.
 
 - `world_data.gd`: `lodes` grid. `layered_world_gen.gd`: every vein/patch/body/reward emits a **lode + host
   rock** instead of an ore block. Determinism preserved (same seed → same lodes).
@@ -209,16 +240,43 @@ These are the reason to be careful, and none of them is allowed to be "updated t
 Green harness (all 55 + new layers) · the changed assertions argued in the commit body · a capture proving the
 player-visible change · `history/` archived · docs updated in the same commit.
 
+> **3a MET FOUR OF THESE FIVE AND I AM NAMING THE ONE IT DID NOT.** Harness: 77 PASS / 0 FAIL / 0 SKIP,
+> exit 4 — `check_frametime`'s 120fps budget stood down under `SF_PERF_HOST`, so **green on every layer and
+> not a full sweep by the harness's own verdict**. Assertions argued in the commit body: yes. Docs in the
+> same commit: yes, plus this section. **No capture, and `history/` not archived.**
+>
+> That gap is not cosmetic here, because 3a HAS a player-visible change and it is a large one: the renderer
+> already stains buried lode off `sim.lode` without asking whether the cell is solid, so **378 cells of
+> through-rock tell appeared in every generated world** the moment the generator moved. Nobody has looked
+> at it. It is asserted structurally and unverified visually — the same split I have now made three times
+> (code-verified, not pixel-verified), and the one my own tracelog flags as a habit rather than a standard.
+>
+> It also means every luma measurement in this project now has a **pre-lode / post-lode** side, and the
+> boundary is `303d1f5`. That is a project-wide line, not a property of any one number.
+
 ## 6. Risk register
 
 | Risk | Mitigation |
 |---|---|
-| **Half-migrated world** (§1) | phases 1–2 additive with both models valid by construction; the cutover is one commit that flips the generator and deletes the old path together |
+| **Half-migrated world** (§1) | ~~the cutover is one commit that flips the generator and deletes the old path together~~ — **VOID since the 3a/3b split; see below** |
 | Conservation quietly breaks | conservation asserted **unchanged**, not rewritten; `take_lode` mirrors the drill's ledger exactly |
 | The opening arc stalls (agent can't get 4 ore) | `arc_driver` + a `work_lode` agent verb land **with** the cutover, in the same commit |
 | Tutorial describes the old game | tutorial rewrite is in the cutover commit, listed as non-negotiable |
 | Frametime regression from the fleck field | view-culled like `_draw_water`/`_draw_ore_glints`; `check_frametime` is a gate |
 | Discovery gets flatter (§7 of LODE) | the stain says *something is here*, never *400 iron is here*; judged by the blind-vision pass |
+
+> **THE TOP RISK'S MITIGATION WAS "THE CUTOVER IS ONE COMMIT", AND THE CUTOVER IS NO LONGER ONE COMMIT.**
+> 3a shipped and 3b is open, so that sentence is void and must not be leaned on. Whether the risk is still
+> mitigated is a separate question from whether the written mitigation survived, and the answer is yes —
+> **by the same property phases 1–2 relied on, not by the one that was retired.** 3a is purely additive:
+> ore blocks and lodes are both valid simultaneously, no conversion happened, and nothing was deleted. A
+> world is therefore never half-migrated; it carries both models, exactly as it did after phase 1.
+>
+> What that costs is precision about WHEN the risk returns. It returns the instant 3b starts deleting,
+> because the deletions are what make a world unable to hold both models — and 3b no longer has "it all
+> lands together" protecting it. **Whoever picks up 3b inherits a real half-migration risk that this table
+> previously claimed was structurally impossible.** The mitigation it needs is its own, and it does not
+> exist yet.
 | Old saves | additive read; absent → empty lode layer; asserted in `check_saveload` |
 | Scope creep into the Spur | the Spur is phase 2 and may be deferred without blocking the cutover |
 
