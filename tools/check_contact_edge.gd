@@ -86,6 +86,17 @@ const FACE_OFFSET: float = 0.28
 const PATCH_FRAC: float = 0.18
 const MIN_PATCH: int = 1
 
+## Distances from the face, in world px, at which the luminance profile is taken. Negative is INTO THE AIR,
+## positive is INTO THE ROCK. Dense in the first six pixels because that is the entire span
+## `_draw_edge_ao` paints into — 3 steps x 2px of strip, plus the lit lip in step 0.
+const PROFILE_PX: Array[float] = [-9.0, -5.0, -2.0, 1.0, 3.0, 5.0, 7.0, 9.0, 13.0, 17.0]
+
+## Face orientations, because the treatment under test is directional by design.
+const ORIENT_TOP: int = 0      ## the rock's sky-facing face — `_draw_edge_ao` paints a warm LIT lip here
+const ORIENT_UNDER: int = 1    ## the rock's underside/ceiling — the darkest thing in the world (AO 0.46)
+const ORIENT_SIDE: int = 2     ## a vertical wall — dim rim, then the mid AO
+const ORIENT_NAME: Array[String] = ["rock TOP (lit lip)", "rock UNDER (ceiling)", "rock SIDE (wall)"]
+
 ## PRE-REGISTERED, BEFORE ANY NUMBER EXISTS. All four of these were written down before the layer was first
 ## run, because every one of them is a place where a later choice could be made to flatter a result.
 ##
@@ -187,6 +198,37 @@ func _run() -> void:
 	print("  edge step spread: %s" % _shape(edge_step))
 	print("  flat step spread: %s" % _shape(flat_step))
 
+	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. `_draw_edge_ao` paints
+	# only the first 6px of a 32px cell, so if a contact treatment is reaching the screen at all it shows up
+	# here as a bump at +1..+5 that has decayed by +9 — and the two-patch measure above, centred at 9px,
+	# would be looking straight past it. If the profile is flat, the treatment is not reaching the eye and
+	# the verdict above is about the world rather than about where this layer looked.
+	var prof: Array = s["profile"]
+	var line: String = ""
+	for k: int in PROFILE_PX.size():
+		var arr: Array[float] = prof[k]
+		line += "%+d:%s  " % [int(PROFILE_PX[k]), ("%.1f" % _median(arr)) if not arr.is_empty() else "--"]
+	print("  luminance profile from the face (- air, + rock), median over %d faces:" % edge_step.size())
+	print("    pooled:  %s" % line)
+	# BY ORIENTATION, because pooled cancels a key light against itself. If the lip and the ceiling AO are
+	# reaching the eye, TOP and UNDER must diverge here in opposite directions inside the first 6px.
+	var por: Array = s["prof_or"]
+	var sor: Array = s["signed_or"]
+	var tor: Array = s["step_or"]
+	for o: int in 3:
+		var ln: String = ""
+		for k: int in PROFILE_PX.size():
+			var arr: Array[float] = por[o][k]
+			ln += "%+d:%s  " % [int(PROFILE_PX[k]), ("%.1f" % _median(arr)) if not arr.is_empty() else "--"]
+		print("    %-22s %s" % [ORIENT_NAME[o], ln])
+	print("  by orientation — n, step median, polarity WITHIN that orientation:")
+	for o: int in 3:
+		var sg: Array[float] = sor[o]
+		var st: Array[float] = tor[o]
+		print("    %-22s n=%3d  step %5.2f  polarity %3.0f%%%s"
+			% [ORIENT_NAME[o], sg.size(), _median(st), _consistency(sg) * 100.0,
+				"" if sg.size() >= MIN_SAMPLES else "   [below the %d floor — no conclusion]" % MIN_SAMPLES])
+
 	# THE STAINED ARM, REPORTED SEPARATELY AND NEVER FOLDED IN. Pre-registered above. If these two disagree
 	# it means ore tell is carrying legibility that plain rock does not have, which is a finding about what
 	# is doing the work — and a fix aimed at the pooled number would be aimed at the wrong half.
@@ -222,7 +264,12 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var half := Vector2(float(w), float(h)) * 0.5
 	var cell_px: float = float(WorldRenderer.CELL) * zoom
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
-	var off: float = cell_px * FACE_OFFSET
+	# WORLD UNITS, because it is subtracted in world space and transformed afterwards. It was
+	# `cell_px * FACE_OFFSET`, which is CELL * zoom * FACE_OFFSET — a SCREEN-space length applied before the
+	# `* zoom`, so the real offset was CELL * FACE_OFFSET * zoom². Harmless at the zoom 1.0 every reading so
+	# far was taken at, and silently wrong at any other, which is the kind of latent defect that surfaces as
+	# an unexplained drift the day someone changes a camera default.
+	var off: float = float(WorldRenderer.CELL) * FACE_OFFSET
 
 	var scratch: PackedByteArray = main._renderer._veil_scratch
 	var base: PackedByteArray = main._renderer._veil_base
@@ -237,6 +284,19 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 		quit(1)
 		return {}
 
+	var profile: Array[Array] = []
+	for _k: int in PROFILE_PX.size():
+		profile.append([] as Array[float])
+	var prof_or: Array[Array] = []
+	var signed_or: Array[Array] = []
+	var step_or: Array[Array] = []
+	for _o: int in 3:
+		var per: Array[Array] = []
+		for _k: int in PROFILE_PX.size():
+			per.append([] as Array[float])
+		prof_or.append(per)
+		signed_or.append([] as Array[float])
+		step_or.append([] as Array[float])
 	var edge_step: Array[float] = []
 	var flat_step: Array[float] = []
 	var edge_signed: Array[float] = []
@@ -300,6 +360,41 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 				if not _on_slab(pa, patch, w, top, bottom) or not _on_slab(pb, patch, w, top, bottom):
 					offslab += 1
 					continue
+				# THE PROFILE ACROSS THE FACE, sampled at single pixels rather than in a patch, because the
+				# thing it is looking for is only a few pixels wide and a patch would average it away.
+				#
+				# This exists because `TerrainPainter._draw_edge_ao` ALREADY draws a contact treatment — a
+				# lit lip on sky-facing tops, a rim on side walls, three 2px AO steps and concave scoops —
+				# and all of it lives in the first 6px of a 32px cell. The two-patch measure above centres
+				# 9px from the face with a 5px radius, so it samples 4..14px and can capture at most the
+				# outer sliver of a 6px treatment. Before "the contact carries no information" can be a
+				# claim about the WORLD, it has to survive the possibility that it is a claim about where
+				# this instrument happened to look.
+				# ORIENTATION IS NOT A NUISANCE HERE, IT IS THE SUBJECT. `_draw_edge_ao` is a KEY LIGHT from
+				# above, not uniform occlusion — its own comment says so: "occlusion alone can't make a
+				# form". A sky-facing face gets a warm LIT lip (alpha 0.30), an underside falls into the
+				# darkest thing in the world (0.46), and side walls take a dim rim then a mid AO (0.14 /
+				# 0.26). So the rock side is deliberately BRIGHTER at a top face and DARKER at a ceiling.
+				#
+				# Pooling those into one median cancels them against each other, and pooling them into one
+				# polarity statistic is worse than that: it tests "is the rock side always the same side",
+				# a rule this renderer never claimed and deliberately breaks. **A perfectly executed key
+				# light scores ~50% on a pooled polarity measure by construction.** That is my statistic
+				# encoding an assumption its subject does not share — the same error as every population
+				# mistake in this project, one level up, in the verdict rather than the sample.
+				var orient: int = ORIENT_SIDE
+				if d.y == 1:
+					orient = ORIENT_UNDER if sa else ORIENT_TOP
+				if sa != sb:
+					var rock_dir: Vector2 = -n if sa else n
+					for k: int in PROFILE_PX.size():
+						var wp: Vector2 = face + rock_dir * PROFILE_PX[k]
+						var sp: Vector2 = (wp - cam) * zoom + half
+						if sp.x < 1.0 or sp.y < float(top) or sp.x >= float(w - 1) or sp.y >= float(bottom):
+							continue
+						var v: float = _patch_luma(img, int(sp.x), int(sp.y), 0)
+						profile[k].append(v)
+						prof_or[orient][k].append(v)
 				var la: float = _patch_luma(img, int(pa.x), int(pa.y), patch)
 				var lb: float = _patch_luma(img, int(pb.x), int(pb.y), patch)
 				luma.append(la)
@@ -318,11 +413,15 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 						edge_signed_stained.append(sgn)
 					else:
 						edge_signed_plain.append(sgn)
+					signed_or[orient].append(sgn)
+					step_or[orient].append(absf(la - lb))
 
 	return {"edge_step": edge_step, "flat_step": flat_step, "edge_signed": edge_signed,
 		"edge_signed_stained": edge_signed_stained, "edge_signed_plain": edge_signed_plain,
 		"luma": luma, "near_surface": near_surface, "lit": lit, "offslab": offslab, "wet": wet,
-		"airair": airair, "skipped": near_surface + lit + offslab + wet + airair}
+		"airair": airair, "profile": profile, "prof_or": prof_or, "signed_or": signed_or,
+		"step_or": step_or,
+		"skipped": near_surface + lit + offslab + wet + airair}
 
 
 ## A cell the veil never brightened — scratch bytes still equal base bytes, so no source reached it. Any
