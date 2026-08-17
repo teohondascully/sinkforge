@@ -59,3 +59,6 @@ _miner_sheet.png.import
 /_crop_*.png
 /_crop_*.png.import
 tools/_scratch_*.gd
+
+# One-generation undo for the gitignored canonical captures (tools/capture_moments.gd).
+_moment_prev/

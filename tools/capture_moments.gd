@@ -246,6 +246,35 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			% [path, "no previous capture" if not FileAccess.file_exists(path) else "previous capture kept"])
 		return 1
 
+	# NOTHING OVERWRITES A CAPTURE THAT HAS NO COPY.
+	#
+	# The 44 `_moment_*.png` are gitignored, so git holds no version of any of them, and `save_png` writes
+	# in place. That combination means a capture run is an IRREVERSIBLE edit to the project's only copy of
+	# its own evidence — and these are the frames the audits are argued from. The gate above stops a
+	# CONTAMINATED capture replacing a good one; it does nothing about a perfectly valid capture of a
+	# moment you did not mean to retake, which loses the old frame just as completely and says nothing.
+	#
+	# `history/` (242 curated screenshots) sits in the same position, and docs/DECISIONS.md makes losing
+	# the user's artifacts a HARD RULE precisely because 84 of them were once deleted in a refactor. The
+	# rule was written and the tool that overwrites them was not changed, which is the same gap as a locked
+	# commit trailer that 23 commits carried anyway.
+	#
+	# One generation is enough to be an undo. If the copy cannot be made, REFUSE — a capture is worth less
+	# than the capture it would destroy, so the failing side is the side that keeps what already exists.
+	if FileAccess.file_exists(path):
+		var keep: String = "res://_moment_prev/"
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(keep))
+		var prev: String = keep + path.get_file()
+		var err: int = DirAccess.copy_absolute(ProjectSettings.globalize_path(path),
+			ProjectSettings.globalize_path(prev))
+		if err != OK:
+			printerr("capture_moments: REFUSED '%s' — could not back up the existing %s (error %d)."
+				% [moment, path, err])
+			printerr("capture_moments: it is gitignored, so this file is the only copy and there is no undo."
+				+ " Nothing was written.")
+			return 1
+		print("  kept the previous %s at %s" % [path.get_file(), prev])
+
 	var img := get_root().get_texture().get_image()
 	img.save_png(path)
 	# THE MANIFEST. A reviewer looking at a folder of PNGs cannot tell a delve from a Bazaar screenshot,
