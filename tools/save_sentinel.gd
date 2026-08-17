@@ -57,6 +57,25 @@ static func _plant() -> String:
 	return "%s // not a save; delete me freely (pid %d)" % [MARKER_HEAD, OS.get_process_id()]
 
 
+# THE PRODUCTION WITNESS, and why it is a different instrument from everything above.
+# Once `run_harness.sh` moved HOME, `user://` stopped being the player's directory — so the marker this
+# file plants is planted in scratch, and the old claim "the harness never touches your save" became true
+# by construction. True by construction is not proved: the isolation is three lines of shell that a future
+# edit can drop without any test noticing. So the runner hands us the REAL path it just stopped using and
+# we hash it, before and after, WITHOUT EVER OPENING IT FOR WRITE. Absent is a legitimate reading and is
+# recorded as such — the player having no save is not a failure, but "absent then present" is.
+const NO_WITNESS: String = "-"
+
+
+func _production_digest() -> String:
+	var path: String = OS.get_environment("SF_PRODUCTION_SLOT")
+	if path.is_empty():
+		return NO_WITNESS          # not under the runner (a bare `--script` call); nothing claimed
+	if not FileAccess.file_exists(path):
+		return "absent"
+	return FileAccess.get_sha256(path)
+
+
 func _initialize() -> void:
 	var argv: PackedStringArray = OS.get_cmdline_user_args()
 	if argv.size() < 2:
@@ -88,9 +107,11 @@ func _initialize() -> void:
 			f.store_string(_plant())
 			f.close()
 		var digest: String = FileAccess.get_sha256(SLOT)
+		var witness: String = _production_digest()
 		var out: FileAccess = FileAccess.open(statefile, FileAccess.WRITE)
 		out.store_line("planted" if planted else "real")
 		out.store_line(digest)
+		out.store_line(witness)
 		out.close()
 		var what: String = "planted"
 		if stale:
@@ -124,7 +145,23 @@ func _initialize() -> void:
 			return
 		if kind == "planted":
 			DirAccess.remove_absolute(SLOT)   # ours to remove: this run created it
-		print("save_sentinel: verified — the production slot is untouched")
+
+		# The witness is checked AFTER the slot verdict and reported separately, because the two answer
+		# different questions and a run can fail one while passing the other. `-` means the runner never
+		# named a production slot, so this run claims nothing about one — printed, not silently skipped.
+		var was: String = st[2].strip_edges() if st.size() >= 3 else NO_WITNESS
+		var now: String = _production_digest()
+		if was != NO_WITNESS and now != was:
+			printerr("save_sentinel: THE PLAYER'S REAL SAVE CHANGED DURING THIS RUN — %s"
+					% OS.get_environment("SF_PRODUCTION_SLOT"))
+			printerr("save_sentinel: armed=%s, now=%s. Isolation did not hold." % [was, now])
+			quit(1)
+			return
+		if was == NO_WITNESS:
+			print("save_sentinel: verified — the run's own slot is untouched (no production slot named)")
+		else:
+			print("save_sentinel: verified — the run's own slot is untouched, and the player's real save is "
+					+ "byte-identical (%s)" % ("absent throughout" if was == "absent" else was.substr(0, 12)))
 		quit(0)
 		return
 

@@ -96,6 +96,43 @@ GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# ISOLATE `user://`, WHICH IS THE ONLY REAL FIX FOR THE HAZARD DESCRIBED AT THE LOCK BELOW.
+# Godot keys `user://` on the project NAME, so every checkout of Sinkforge on this machine — worktrees
+# included — reads and writes one ~/Library/Application Support/Godot/app_userdata/Sinkforge/. The lock
+# makes runs take turns in it; it does not stop the harness from being IN the player's save directory at
+# all, which is why the sentinel has to plant a marker at the player's real slot to prove it left again.
+#
+# Measured on this box before choosing, because all three candidates are plausible and two do not work:
+# Godot READS XDG_DATA_HOME and XDG_CONFIG_HOME on macOS and IGNORES them (user:// stayed at Library/
+# Application Support with both set); there is no command-line flag for the user directory; and the
+# project-settings route (`use_custom_user_dir`) would move the SHIPPED GAME's save too, which is the one
+# thing that must not change. HOME works: user:// follows it, per process, with no file on disk for two
+# runs to fight over — which `override.cfg` would have been, and that file is spoken for anyway.
+#
+# Keyed on the ROOT PATH, not on a run id: the same checkout wants the same fixtures and a warm shader
+# cache across runs, while a second worktree gets its own namespace and stops colliding with this one.
+# Deliberately NOT under $DIR — surviving the run is the point, and a cold first boot is a one-time cost.
+#
+# BOTH knobs are set, and that is not belt-and-braces, it is the platform difference. macOS ignores XDG and
+# derives the path from HOME; Linux — which is what CI runs — honours XDG_DATA_HOME and would otherwise
+# keep using a container-provided one, leaking the isolation on the only machine nobody watches.
+sf_hash() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
+if [ "${SF_REAL_HOME:-0}" != "1" ]; then
+	SF_HOME="${SF_HOME:-${TMPDIR:-/tmp}/sinkforge-home-$(printf '%s' "$ROOT" | sf_hash | cut -c1-12)}"
+	mkdir -p "$SF_HOME/.local/share" "$SF_HOME/.config" \
+		|| { echo "!! could not create the isolated home at $SF_HOME"; exit 2; }
+	# Hand the sentinel the REAL slot before we lose the path, so it can witness production read-only.
+	# Isolation makes "the harness never touched your save" true; this is what makes it PROVED.
+	if [ "$(uname -s)" = "Darwin" ]; then
+		export SF_PRODUCTION_SLOT="$HOME/Library/Application Support/Godot/app_userdata/Sinkforge/sinkforge.save"
+	else
+		export SF_PRODUCTION_SLOT="${XDG_DATA_HOME:-$HOME/.local/share}/godot/app_userdata/Sinkforge/sinkforge.save"
+	fi
+	export HOME="$SF_HOME"
+	export XDG_DATA_HOME="$SF_HOME/.local/share"
+	export XDG_CONFIG_HOME="$SF_HOME/.config"
+fi
+
 # Default concurrency = CPU count (bounds memory too); overridable via JOBS.
 NCPU="$( (sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 8) )"
 JOBS="${JOBS:-$NCPU}"
@@ -330,16 +367,21 @@ fi
 MARKS="$(mktemp -d)"
 
 # ONE HARNESS AT A TIME ON A MACHINE, and this is not tidiness — it is correctness.
-# Godot keys `user://` on the project NAME, not the project directory, so a git worktree does NOT isolate
-# it: every checkout of Sinkforge on this machine reads and writes one
-# ~/Library/Application Support/Godot/app_userdata/Sinkforge/. Two runs therefore share one production
-# save slot AND one set of test fixtures. That cost an afternoon on 2026-08-17, twice and in opposite
-# directions: two concurrent sweeps each reported "THE SAVE SLOT WAS DELETED BY THE HARNESS", because the
-# other one's `verify` had removed the planted marker mid-sweep. Both were false alarms — but the same
-# collision has a quieter form, where a neighbour clobbers a fixture and a layer passes for a reason that
-# has nothing to do with the code, and that one nobody would ever notice. A result is only meaningful if
-# the run was exclusive, so make it exclusive. `mkdir` is the atomic primitive: it succeeds for exactly
-# one caller.
+# The ORIGINAL reason is now handled upstream and the history is worth keeping, because it explains why
+# this lock is drawn tighter than the remaining hazard needs. Godot keys `user://` on the project NAME, so
+# a git worktree did NOT isolate it: every checkout of Sinkforge on this machine read and wrote one
+# ~/Library/Application Support/Godot/app_userdata/Sinkforge/, sharing one save slot and one set of test
+# fixtures. That cost an afternoon on 2026-08-17, twice and in opposite directions: two concurrent sweeps
+# each reported "THE SAVE SLOT WAS DELETED BY THE HARNESS", because the other one's `verify` had removed
+# the planted marker mid-sweep. Both were false alarms — but the same collision had a quieter form, where a
+# neighbour clobbers a fixture and a layer passes for a reason that has nothing to do with the code, and
+# that one nobody would ever notice.
+#
+# The per-root HOME above ends that class: two worktrees now hold two namespaces and cannot see each
+# other's fixtures at all. What the lock still buys is the thing isolation CANNOT give, and it is the
+# reason not to relax it — a timing layer measures the box, not the directory, so `add_excl` is meaningless
+# if another Godot process is running at the same time. Contention was worth 12% on `check_dig_hitch` and
+# inverted its verdict. `mkdir` is the atomic primitive: it succeeds for exactly one caller.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 LOCK_WAIT="${SF_LOCK_WAIT:-900}"
 LOCK_HELD=0

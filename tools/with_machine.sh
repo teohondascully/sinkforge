@@ -28,6 +28,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # the one path in this script that must never be mistaken for success was the one path never exercised.
 WAIT="${SF_LOCK_WAIT:-900}"
 
+# Same isolated `user://` the harness uses, by the same key, so a one-off probe and a full sweep land in
+# one namespace and neither lands in the player's. Reasoning and the two mechanisms that DON'T work are
+# written out once, at the top of run_harness.sh; this must stay in step with it. `SF_REAL_HOME=1` opts
+# back into the real home for the rare tool that genuinely wants the player's slot.
+sf_hash() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
+if [ "${SF_REAL_HOME:-0}" != "1" ]; then
+	SF_HOME="${SF_HOME:-${TMPDIR:-/tmp}/sinkforge-home-$(printf '%s' "$ROOT" | sf_hash | cut -c1-12)}"
+	if mkdir -p "$SF_HOME/.local/share" "$SF_HOME/.config"; then
+		export HOME="$SF_HOME"
+		export XDG_DATA_HOME="$SF_HOME/.local/share"
+		export XDG_CONFIG_HOME="$SF_HOME/.config"
+	fi
+fi
+
 # THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine
 # time. `bash tools/with_machine.sh bash tools/run_harness.sh` reads like a runner taking a command; it
 # actually becomes `godot --path <repo> bash tools/run_harness.sh`, which Godot accepts — it ignores the two
