@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer 14 — CONTROL-SCHEME context rules (playtest: "W should be jump like Terraria", but W
 ## must still CLIMB on a rope). Feeds synthetic action events to Player._unhandled_input and checks the
@@ -19,7 +19,6 @@ extends SceneTree
 const CELL: int = 32
 const SCENE: String = "res://scenes/main.tscn"
 
-var _failures: int = 0
 var _main: MainView
 var _frames: int = 0
 
@@ -134,11 +133,3 @@ func _press(action: StringName) -> InputEventAction:
 
 func _center(c: Vector2i) -> Vector2:
 	return Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)

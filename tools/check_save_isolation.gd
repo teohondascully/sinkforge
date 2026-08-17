@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: NO TEST MAY WRITE THE PLAYER'S SAVE. This is a data-safety gate, not a
 ## behaviour check, and it is deliberately the cheapest layer in the suite (a source scan, no scene, no
@@ -49,17 +49,6 @@ const SENTINEL: String = "res://tools/save_sentinel.gd"
 const SCAN_DIRS: Array[String] = ["res://tools", "res://tests"]
 const MAIN_SRC: String = "res://scenes/main.gd"
 const RUNNER: String = "res://tools/run_harness.sh"
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 ## Source with adjacent string-literal splicing collapsed, so the scan reads what a program will actually
 ## SPELL rather than how the file happens to be laid out. `"user://" + "sinkforge.save"` is a path to the

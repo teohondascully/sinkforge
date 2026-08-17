@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: A SAVE YOU CANNOT LOSE. `check_saveload` proves the happy path — save, damage, load,
 ## everything came back. This layer proves the UNHAPPY ones, which is where saves actually die: the disk
@@ -21,17 +21,6 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/check_save_durability.gd
 
 const SLOT: String = "user://check_save_durability.save"
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _sweep() -> void:
 	for suffix: String in ["", SaveGame.TMP_SUFFIX, SaveGame.BAK_SUFFIX]:

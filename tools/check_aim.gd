@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## CAN YOU AIM IT, AND CAN YOU KEEP GOING?
 ##
@@ -44,18 +44,15 @@ const HORIZON: int = 40              ## frames after the throw at which both rea
 const CHAIN_ANCHOR := Vector2i(26, 14)
 const CHAIN_NEXT := Vector2i(34, 14)
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== the hook you can aim ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_aim: PASS — the marker is honest and the chain holds the arc")
 		quit(0)
 	else:
-		print("check_aim: FAIL (%d)" % _fails)
+		print("check_aim: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -126,7 +123,7 @@ func _chain_keeps_the_arc(main: MainView, p: Player) -> void:
 	var chained: Dictionary = await _reach(main, p, true)
 	var toggled: Dictionary = await _reach(main, p, false)
 	if chained.is_empty() or toggled.is_empty():
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: could not fly the arc to compare the two reaches")
 		return
 	print("  the same arc (%.0f px/s at the throw), %d frames on from reaching for the same hold:"
@@ -227,11 +224,3 @@ func _carve(sim: FactorySim) -> void:
 				sim.mine(cell)
 			elif not sim.is_solid(cell):
 				sim.set_solid(cell, &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

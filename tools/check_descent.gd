@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## IS THERE A WAY DOWN, OR IS THERE ONLY DIGGING?
 ##
@@ -42,18 +42,15 @@ const REACH_ROWS: int = 30           ## rows below the surface the open space mu
 const MOUTHS_FLOOR: int = 3          ## ...from at least this many separate places on the surface
 const DROP_ROWS: int = 12            ## ...and somewhere there must be a fall this tall to commit to
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== is there a way down ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_descent: PASS — the world offers a way down that is not a pickaxe")
 		quit(0)
 	else:
-		print("check_descent: FAIL (%d)" % _fails)
+		print("check_descent: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -164,11 +161,3 @@ func _standable(sim: FactorySim, cell: Vector2i) -> bool:
 		if not sim.in_bounds(c) or sim.is_solid(c):
 			return false
 	return true
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

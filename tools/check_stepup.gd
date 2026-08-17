@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer 5 — motion check for AUTO-STEP (pulled by the sloped-terrain presentation slice).
 ## Drives the real Player walking into a single-tile step and asserts the body CLIMBS it and keeps
@@ -17,7 +17,6 @@ var _x0: float = 0.0
 var _y0: float = 0.0
 var _prev_y: float = 0.0
 var _max_rise: float = 0.0  ## largest single-frame UPWARD jump during the climb (teleport detector)
-var _failures: int = 0
 
 
 func _initialize() -> void:
@@ -102,11 +101,3 @@ func _phys() -> void:
 				print("STEP-UP OK"); quit(0)
 			else:
 				printerr("%d STEP-UP CHECK(S) FAILED" % _failures); quit(1)
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)

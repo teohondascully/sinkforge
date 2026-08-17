@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## CAN YOU TELL WHAT HAPPENED WITH YOUR EYES SHUT?
 ##
@@ -34,17 +34,14 @@ const SEAM_MAX: float = 6.0          ## multiples of a bed's own typical sample 
 const QUIET_DB: float = -55.0        ## a bed at zero level must be at least this far down
 const LOUD_DB: float = -40.0         ## ...and at full level must be at least this far up
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== can you tell what happened with your eyes shut ==")
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_voice: PASS — every event has a voice, and no two share one")
 		quit(0)
 	else:
-		print("check_voice: FAIL (%d)" % _fails)
+		print("check_voice: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -239,11 +236,3 @@ func _longest(sfx: Node) -> int:
 	for n: StringName in sfx._streams:
 		most = maxi(most, (sfx._streams[n] as AudioStreamWAV).data.size() / 2)
 	return most
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

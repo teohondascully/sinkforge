@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## WHAT YOU CANNOT SEE MUST NOT COST ANYTHING — AND WHAT YOU CAN SEE MUST NOT VANISH.
 ##
@@ -30,23 +30,11 @@ extends SceneTree
 ## A 1000x1000 view at the origin. Every coordinate below is chosen against these bounds.
 const VIEW: Rect2 = Rect2(0.0, 0.0, 1000.0, 1000.0)
 
-var _fails: int = 0
-
-
 class Spy extends FallingItems:
 	var drawn: int = 0
 
 	func _draw_item(_canvas: CanvasItem, _f: Dictionary) -> void:
 		drawn += 1
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 ## How many of the given drops draw against VIEW. Each call gets a fresh layer so counts never carry.
 func _drawn(drops: Array) -> int:
@@ -107,9 +95,9 @@ func _initialize() -> void:
 		flood.append([Vector2(9000, 9000), Vector2(9000, 9200), 0.5])
 	_check(_drawn(flood) == 0, "400 off-screen drops cost nothing (and MAX_ITEMS caps the list at 240)")
 
-	if _fails == 0:
+	if _failures == 0:
 		print("check_draw_cull: PASS — off-screen drops are free, and on-screen ones still arrive")
 		quit(0)
 	else:
-		printerr("check_draw_cull: FAIL (%d)" % _fails)
+		printerr("check_draw_cull: FAIL (%d)" % _failures)
 		quit(1)

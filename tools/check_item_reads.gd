@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## CAN YOU TELL WHAT YOU ARE HOLDING?
 ##
@@ -44,9 +44,7 @@ const CANVAS: int = 64          ## px per icon render
 const ICON: float = 48.0        ## the size draw_item is asked for, roughly a hotbar cell
 const SAME_SHAPE: float = 0.90  ## silhouette IoU at or above which two icons share an outline
 const SAME_TINT: float = 10.0   ## CIELab dE below which two icons share a colour
-const SKIP: int = 42            ## the runner's "I did not run" code
 
-var _fails: int = 0
 var _skipped: bool = false
 
 
@@ -60,15 +58,6 @@ class Glyph extends Node2D:
 	func _draw() -> void:
 		Visuals.draw_item(self, at, icon, item)
 
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _initialize() -> void:
 	print("== can you tell what you are holding ==")
 	await _run()
@@ -78,11 +67,11 @@ func _initialize() -> void:
 	# three-state runner exists to prevent. Caught by expecting 42 and getting 0.
 	if _skipped:
 		return
-	if _fails == 0:
+	if _failures == 0:
 		print("check_item_reads: PASS — no two items wear the same icon")
 		quit(0)
 	else:
-		printerr("check_item_reads: FAIL (%d)" % _fails)
+		printerr("check_item_reads: FAIL (%d)" % _failures)
 		quit(1)
 
 

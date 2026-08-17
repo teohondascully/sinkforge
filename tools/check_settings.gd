@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: SETTINGS persistence + remap. Headless, no scene — the Settings
 ## class is pure statics over ConfigFile/InputMap/AudioServer, so the whole contract checks in
@@ -9,17 +9,6 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/check_settings.gd
 
 const TEST_PATH: String = "user://settings_check.cfg"
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _key_event(code: int) -> InputEventKey:
 	var ev := InputEventKey.new()

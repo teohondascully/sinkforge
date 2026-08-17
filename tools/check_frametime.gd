@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## NOTHING MAY HITCH — and on named hardware, it has to run at 120.
 ##
@@ -94,10 +94,6 @@ const VSYNC_PINNED_MS: float = 0.2
 ## panel" looked decisive and is not.
 const PACED_FRACTION: float = 0.6
 
-## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
-## which is how a layer that measured nothing got counted in "ALL 61 HARNESS LAYERS PASS".
-const SKIP: int = 42
-
 var _main: MainView = null
 ## Non-empty = controlled hardware, named by whoever set it, and the absolute budget applies.
 var _perf_host: String = OS.get_environment("SF_PERF_HOST")
@@ -148,6 +144,13 @@ func _run() -> void:
 	var ok: bool = true
 	var run_ms: PackedFloat32Array = await _phase(&"run")
 	ok = _gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO) and ok
+	# Stand the body over rock before the clock starts — see _stand_over_rock. Without this the DIG phase
+	# inherits wherever RUN happened to stop, which varies by several columns run to run, and lands over a
+	# void about half the time.
+	var seam: int = _stand_over_rock(_main._player)
+	for _s: int in 12:
+		await physics_frame                          # let the body settle onto the ground it was placed on
+	print("      (dig site: %d rows of solid rock under the body, needs %d)" % [seam, DIG_MINES])
 	var dig_ms: PackedFloat32Array = await _phase(&"dig", DIG_MINES, SAMPLE * 2)
 	ok = _gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO) and ok
 	var swing_ms: PackedFloat32Array = await _phase(&"swing")
@@ -379,6 +382,49 @@ func _dig_target(player: Player) -> Vector2i:
 		if _main.sim.is_solid(c):
 			return c
 	return here + Vector2i(0, 1)
+
+
+## How far either side of the body to look for a column worth digging.
+const COLUMN_SEARCH: int = 12
+
+
+## PUT THE BODY OVER ROCK BEFORE TIMING A DIG.
+##
+## `_dig_target` widened the search downward and that was only the DETECTION half. The cause is stated in
+## its own docstring and was never addressed: the DIG phase measured whatever happened to be under the feet
+## when the previous phase handed over, and RUN's stopping point is not stable — measured across runs on
+## one machine it varies from 210px to 323px, which is several columns. On roughly half of all runs the
+## body finished over a void, nothing was within DIG_REACH, and the phase timed a body standing still.
+##
+## The workload guard added last session catches that and fails the layer, which is correct — and which
+## also meant the whole suite went red on a coin flip. A layer that fails half the time is a layer people
+## learn to ignore, which this file's own header warns about in the paragraph about background load.
+##
+## THIS IS SETUP, NOT A MEASURED FRAME, and that is the whole reconciliation with `_drive`'s "no
+## teleporting, no synthetic load". That rule governs the frames being TIMED: every input inside the loop
+## goes through the fields a keyboard drives, and that is untouched. Where the body stands when the clock
+## starts is a nuisance variable, and controlling a nuisance variable is what a fixture is for. Leaving it
+## to chance is not neutrality, it is just a noisier experiment.
+##
+## Picks the DEEPEST solid column within reach so all DIG_MINES cuts land in real rock rather than breaking
+## through into a cave halfway and timing air. Returns the depth found, so a world with nowhere to dig
+## still fails the workload floor loudly instead of being quietly relocated somewhere useless.
+func _stand_over_rock(player: Player) -> int:
+	var here: Vector2i = _main._cell_at(player.position)
+	var best_col: int = here.x
+	var best_depth: int = -1
+	for dx: int in range(-COLUMN_SEARCH, COLUMN_SEARCH + 1):
+		var col: int = here.x + dx
+		var top: int = _main.sim.surface_row(col)
+		var depth: int = 0
+		while depth < DIG_MINES + DIG_REACH and _main.sim.is_solid(Vector2i(col, top + depth)):
+			depth += 1
+		if depth > best_depth:
+			best_depth = depth
+			best_col = col
+	player.position = _main._cell_center(Vector2i(best_col, _main.sim.surface_row(best_col) - 1))
+	player.velocity = Vector2.ZERO
+	return best_depth
 
 
 ## Put the body on a rope so the SWING phase measures a real swing rather than a fall.

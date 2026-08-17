@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## DOES THE ROPE CATCH ON THINGS?
 ##
@@ -59,18 +59,15 @@ const SWING_FRAMES: int = 150        ## frames driven into the swing, each direc
 const WHIP_EDGE: float = 2.0         ## how much faster a wrapped arc must turn than a free one
 const KEEP_MIN: float = 0.80         ## share of speed that must survive the frame a pivot appears
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== does the rope catch on things ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_wrap: PASS — the line goes around the rock, and comes back off it")
 		quit(0)
 	else:
-		print("check_wrap: FAIL (%d)" % _fails)
+		print("check_wrap: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -95,7 +92,7 @@ func _run() -> void:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: the hook never planted — nothing to test")
 		main.queue_free()
 		return
@@ -215,11 +212,3 @@ func _carve(sim: FactorySim) -> void:
 			sim.set_solid(Vector2i(x, y), &"stone")
 	for x: int in range(SPUR_FROM, SPUR_TO + 1):
 		sim.set_solid(Vector2i(x, SPUR_ROW), &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

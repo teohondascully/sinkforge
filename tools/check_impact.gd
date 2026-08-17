@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## WHAT DOES A FALL COST?
 ##
@@ -49,18 +49,15 @@ const RECOVER_CAP: float = 0.35      ## s the body may be short of grip — a be
 const CATCH_ROWS: int = 7            ## cells above the floor the line is thrown — late and low
 const CATCH_HOLD: int = 26           ## frames on the winch before letting go to land it on foot
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== what a fall costs ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_impact: PASS — a drop has weight, and the rope is the way out of it")
 		quit(0)
 	else:
-		print("check_impact: FAIL (%d)" % _fails)
+		print("check_impact: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -164,11 +161,3 @@ func _carve(sim: FactorySim) -> void:
 	for x: int in range(COL - BORE - 1, COL + BORE + 2):
 		if not sim.is_solid(Vector2i(x, FLOOR_ROW)):
 			sim.set_solid(Vector2i(x, FLOOR_ROW), &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

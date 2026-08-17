@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Mining LINE-OF-SIGHT (the "carve the exposed face" rule): you can't dig THROUGH solid rock to a block
 ## behind it — a block is mineable only if a clear line reaches it from the body. Asserts the exact bug the
@@ -11,7 +11,6 @@ const SCENE: String = "res://scenes/main.tscn"
 var _main: MainView
 var _sim: FactorySim
 var _frames: int = 0
-var _fails: int = 0
 
 
 func _initialize() -> void:
@@ -21,15 +20,6 @@ func _initialize() -> void:
 	print("== mining line-of-sight ==")
 	process_frame.connect(_on_frame)
 
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _on_frame() -> void:
 	_frames += 1
 	if _frames < 3:
@@ -37,11 +27,11 @@ func _on_frame() -> void:
 	process_frame.disconnect(_on_frame)
 	_sim = _main.sim
 	_run()
-	if _fails == 0:
+	if _failures == 0:
 		print("ALL MINING-LOS CHECKS PASS")
 		quit(0)
 	else:
-		printerr("%d MINING-LOS FAILURE(S)" % _fails)
+		printerr("%d MINING-LOS FAILURE(S)" % _failures)
 		quit(1)
 
 

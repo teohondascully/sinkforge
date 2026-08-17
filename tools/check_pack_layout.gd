@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — THE BAZAAR panel is ONE SHAPE, always on-screen, and never needs to scroll.
 ##
@@ -18,17 +18,6 @@ extends SceneTree
 ## Also guards the MINIMAP frame, which is the same class of bug one element over: a HUD rect that derives
 ## one of its dimensions from a WORLD constant is a rect that resizes itself when the world does.
 ## Run: godot --headless --path . --script res://tools/check_pack_layout.gd
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _craft_options(n: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

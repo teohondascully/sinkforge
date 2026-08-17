@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — THE GRAPPLE, scored. The grapple exists to make vertical space fun instead of tedious,
 ## and "fun" is not a thing a harness can read. What a harness CAN read is the four properties the fun is
@@ -45,17 +45,6 @@ const REEL_LIFT_FLOOR: float = 3.0     ## cells the body must gain in 90 frames 
 ## it did exactly that to a released swing — 420px/s bled back to a walk inside a sixth of a second, which
 ## makes every swing a very pretty way of arriving at walking pace. Speed you cannot keep is not a reward.
 const MOMENTUM_KEEP_FLOOR: float = 0.72
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== grapple check ==")

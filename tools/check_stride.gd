@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE RUN HAS TO BE WORTH BUILDING, AND MINING HAS TO BE UNTOUCHED BY IT.
 ##
@@ -34,18 +34,15 @@ const RAMP_MIN_SECONDS: float = 1.1
 ## How long a broken run may take to die. Much longer and stopping costs nothing.
 const DECAY_MAX_SECONDS: float = 0.6
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== the run ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_stride: PASS — the run is worth building, costs something, and leaves mining alone")
 		quit(0)
 	else:
-		print("check_stride: FAIL (%d)" % _fails)
+		print("check_stride: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -199,11 +196,3 @@ func _run_up(p: Player) -> void:
 		p.input_dir = 1.0
 		await physics_frame
 		t += 1.0 / FPS
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## SPOIL IS NOT WASTE — IT IS WHAT THE FRONTIER IS MADE OF.
 ##
@@ -17,7 +17,6 @@ extends SceneTree
 ##   AND IT NEVER BECOMES HOUSEKEEPING (§5). No spoil meter, no refusal to run: a full crusher jams its own
 ##     output like every other machine and the rig upstream keeps cutting into its own belly.
 
-var _failures: int = 0
 var _sim: FactorySim
 var _def: MachineDef
 
@@ -41,15 +40,6 @@ func _initialize() -> void:
 	else:
 		printerr("check_spoil: FAIL — %d failure(s)" % _failures)
 		quit(1)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 ## Ticks driven ONE AT A TIME: advance() caps the backlog it will chew in a single call, so handing it
 ## twenty seconds at once runs a fraction of them and reads as "the machine does nothing".

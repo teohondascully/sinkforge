@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — LOOP HEALTH, scored (an AUTOMATED proxy for a human early-game playtest). check_agility
 ## turned "does MOVEMENT feel awkward?" into a number; this turns "does the FIRST-AUTOMATION LOOP feel good
@@ -68,21 +68,11 @@ const PACE_PEN_PER_OVER: float = 25.0        ## penalty for each 1.0× the frame
 const FRICTION_PEN_PER_STALL: float = 0.10   ## per stall-frame (mirrors check_agility's stall weighting, capped)
 const GUIDANCE_PEN_PER_GAP: float = 0.20     ## per lost-frame — the heaviest per-frame weight (the lost feeling)
 
-var _failures: int = 0
 var _agent: PlayAgent = null
 
 ## Per-play sampled tallies (reset each play).
 var _guidance_gap_frames: int = 0
 var _sampled_frames: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== loop-health check ==")

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Guards the "mine the floor from under yourself" bug (user report): standing on a block and breaking the
 ## block beneath your feet must make you FALL under gravity — NOT teleport instantly onto the next surface,
@@ -13,7 +13,6 @@ var _main: MainView
 var _sim: FactorySim
 var _player: Player
 var _frames: int = 0
-var _fails: int = 0
 var _phase: int = 0
 var _stand := Vector2i(-1, -1)
 var _y_at_mine: float = 0.0
@@ -33,15 +32,6 @@ func _initialize() -> void:
 	get_root().add_child(_main)
 	print("== fall when the floor is mined (no teleport) ==")
 	physics_frame.connect(_phys)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _phys() -> void:
 	_frames += 1
@@ -118,9 +108,9 @@ func _phys() -> void:
 
 
 func _finish() -> void:
-	if _fails == 0:
+	if _failures == 0:
 		print("ALL FALL CHECKS PASS")
 		quit(0)
 	else:
-		printerr("%d FALL FAILURE(S)" % _fails)
+		printerr("%d FALL FAILURE(S)" % _failures)
 		quit(1)

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: THE TREE IS PAYABLE IN THE ORDER YOU CLIMB IT.
 ##
@@ -34,17 +34,6 @@ const SEEDER := preload("res://scenes/world_seeder.gd")
 
 ## Items produced by a recipe and consumed by no recipe. See the header: subset, not equality.
 const KNOWN_TERMINAL: Array[StringName] = [&"gear", &"plate"]
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== the tree is payable in order ==")

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE ROCK THAT SAYS NO.
 ##
@@ -23,7 +23,6 @@ extends SceneTree
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 30
 
-var _fails: int = 0
 var _main: MainView
 var _sim: FactorySim
 
@@ -31,21 +30,12 @@ var _sim: FactorySim
 func _initialize() -> void:
 	print("== the rock that says no ==")
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_refusal: PASS — over-tier rock refuses, and you can see, hear and read why")
 		quit(0)
 	else:
-		printerr("check_refusal: FAIL (%d)" % _fails)
+		printerr("check_refusal: FAIL (%d)" % _failures)
 		quit(1)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _run() -> void:
 	MainView.dev_start = false

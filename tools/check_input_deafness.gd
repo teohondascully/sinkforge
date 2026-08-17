@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## A CAPTURE MUST PHOTOGRAPH THE FIXTURE, NOT THE KEYBOARD.
 ##
@@ -26,25 +26,14 @@ extends SceneTree
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 8
 
-var _fails: int = 0
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _initialize() -> void:
 	print("== a capture photographs the fixture, not the keyboard ==")
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_input_deafness: PASS — held keys reach a live game and cannot reach a deafened one")
 		quit(0)
 	else:
-		printerr("check_input_deafness: FAIL (%d)" % _fails)
+		printerr("check_input_deafness: FAIL (%d)" % _failures)
 		quit(1)
 
 

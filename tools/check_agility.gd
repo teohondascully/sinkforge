@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — MOVEMENT AGILITY, scored (playtest: "movement/build/drop agility is awkward — I need a
 ## scoring FUNCTION to optimize against"). This turns "does it feel awkward?" into a repeatable NUMBER.
@@ -38,17 +38,6 @@ const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne
 ## headroom over today's measured baseline; ratchet them as movement improves.
 const TURN_LATENCY_CAP: int = 9        ## frames from a full-speed input FLIP to velocity crossing zero (baseline 6; ratcheted 12→9)
 const AIR_CONTROL_FLOOR: float = 0.80  ## fraction of ground top-speed steer-able MID-AIR in a 12f window (baseline 1.00; ratcheted 0.5→0.80)
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== agility check ==")

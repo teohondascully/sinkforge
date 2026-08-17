@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## IS THE DESCENT A CHOICE, OR IS ONE ROUTE STRICTLY BETTER?
 ##
@@ -80,18 +80,15 @@ const HOP_UP: int = 5              ## ...and up
 const HOP_BITE: int = 24           ## frames the hook is given to plant
 const HOP_RIDE: int = 150          ## frames spent reeling before letting go regardless
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== the descent, both ways ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_plunge: PASS — the hole is a route, and it is one you can steer")
 		quit(0)
 	else:
-		print("check_plunge: FAIL (%d)" % _fails)
+		print("check_plunge: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -101,7 +98,7 @@ func _run() -> void:
 	var shaft: Dictionary = await _dig()
 
 	if legs.is_empty() or roped.is_empty() or shaft.is_empty():
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: one of the routes could not be played at all")
 		return
 
@@ -433,11 +430,3 @@ func _nearest_mouth(sim: FactorySim, from: int) -> int:
 		if lip < 0 or absi(edge - from) < absi(lip - from):
 			lip = edge
 	return lip
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

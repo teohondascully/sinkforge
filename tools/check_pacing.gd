@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE SESSION HAS TO HAVE A SHAPE. THE GAME IS NOT ALLOWED TO GO QUIET.
 ##
@@ -52,8 +52,6 @@ const DENSITY_FLOOR: float = 24.0     ## events per 1000 frames, across the sess
 
 const BAR: int = 76                   ## characters of printed session shape
 
-var _fails: int = 0
-
 ## The timeline, and the last-seen state each event is derived from.
 var _events: Array[Dictionary] = []
 var _f0: int = 0
@@ -83,11 +81,11 @@ func _initialize() -> void:
 	print("== the shape of a session ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_pacing: PASS — the session keeps talking")
 		quit(0)
 	else:
-		print("check_pacing: FAIL (%d)" % _fails)
+		print("check_pacing: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -244,11 +242,3 @@ func _shape(total: int) -> String:
 	for e: Dictionary in _events:
 		cols[clampi(int(float(e["at"]) / float(total) * float(BAR)), 0, BAR - 1)] = "|"
 	return "".join(cols)
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

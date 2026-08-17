@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE FIRST THING THE WORLD ASKS YOU TO BUILD HAS TO LOOK LIKE A THING.
 ##
@@ -44,27 +44,16 @@ class Spy extends Bazaars:
 	func _draw_bazaar(_canvas: CanvasItem, _origin: Vector2i, _age: float) -> void:
 		stalls += 1
 
-var _fails: int = 0
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _initialize() -> void:
 	print("== the bazaar you have not finished yet ==")
 	_shipping_world()
 	_strictness()
 	_view_wiring()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_bazaar_ruin: PASS — the unfinished stall is a thing the game can see and point at")
 		quit(0)
 	else:
-		printerr("check_bazaar_ruin: FAIL (%d)" % _fails)
+		printerr("check_bazaar_ruin: FAIL (%d)" % _failures)
 		quit(1)
 
 

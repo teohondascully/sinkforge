@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — the CAMERA PIXEL-SNAP contract (playtest: "the texture blurs while running, and the
 ## tests didn't catch it"). The blur is sub-pixel camera jitter: a fractional camera offset makes every
@@ -11,17 +11,6 @@ extends SceneTree
 ## (The end-to-end frame-diff — render twice, assert identical terrain — lives in the headed fixture
 ## tools/capture_pixel_snap.gd, which also saves the screenshot; rendering needs a real GPU context.)
 ##   godot --headless --path . --script res://tools/check_pixel_snap.gd
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== pixel-snap check ==")

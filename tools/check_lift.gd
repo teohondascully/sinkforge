@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer 5 — motion check for the LIFT RIDE (the rideable half of the updraft shaft). Builds a
 ## walled shaft with a lift at the bottom, drops the body into it, and asserts the updraft carries it
@@ -14,7 +14,6 @@ var _phase: int = 0
 var _t: float = 0.0
 var _y_start: float = 0.0
 var _checked_mid: bool = false
-var _failures: int = 0
 
 
 func _initialize() -> void:
@@ -76,11 +75,3 @@ func _phys() -> void:
 				print("LIFT OK"); quit(0)
 			else:
 				printerr("%d LIFT CHECK(S) FAILED" % _failures); quit(1)
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)

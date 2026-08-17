@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE DIG RHYTHM — the anti-tedium rule, pinned. Mining used to have no momentum: every block started
 ## from a dead stop, so a twenty-block shaft was twenty unrelated chores. The rhythm makes staying in the
@@ -20,7 +20,6 @@ const SCENE: String = "res://scenes/main.tscn"
 
 var _main: MainView
 var _frames: int = 0
-var _fails: int = 0
 
 
 func _initialize() -> void:
@@ -31,26 +30,17 @@ func _initialize() -> void:
 	print("== dig rhythm ==")
 	process_frame.connect(_on_frame)
 
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _on_frame() -> void:
 	_frames += 1
 	if _frames < 4:
 		return
 	process_frame.disconnect(_on_frame)
 	_run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_rhythm: PASS")
 		quit(0)
 	else:
-		print("check_rhythm: FAIL (%d)" % _fails)
+		print("check_rhythm: FAIL (%d)" % _failures)
 		quit(1)
 
 

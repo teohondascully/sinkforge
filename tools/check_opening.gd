@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## NO LARGE REGION OF THE OPENING FRAME MAY BE DEAD SPACE.
 ##
@@ -18,9 +18,6 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 60
-## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
-## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
-const SKIP: int = 42
 const DEAD := preload("res://tools/dead_space.gd")
 
 ## WHAT IS JUDGED: the GROUND, from the horizon down to where the hotbar starts.

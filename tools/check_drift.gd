@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## EXTRACTION MAY BE LATERAL. LOGISTICS STAYS VERTICAL.
 ##
@@ -25,7 +25,6 @@ extends SceneTree
 
 const CELL: int = 32
 
-var _failures: int = 0
 var _sim: FactorySim
 var _def: MachineDef
 
@@ -48,15 +47,6 @@ func _initialize() -> void:
 	else:
 		printerr("check_drift: FAIL — %d failure(s)" % _failures)
 		quit(1)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 ## A world with a rig at `at` facing +1, a mixed wall in front of it, and — unless `drains` says otherwise —
 ## an open shaft under both of its columns so the haul has somewhere to go.

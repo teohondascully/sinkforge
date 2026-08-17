@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE VEIN OUTLIVES THE BLOW.
 ##
@@ -35,7 +35,6 @@ const SETTLE: int = 30
 ## be at least that tall. Named here because the adit's whole geometry is a consequence of it.
 const BODY_ROWS: int = 2
 
-var _fails: int = 0
 var _main: MainView
 var _sim: FactorySim
 
@@ -43,21 +42,12 @@ var _sim: FactorySim
 func _initialize() -> void:
 	print("== the vein outlives the blow ==")
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_lode: PASS — the blow opens the vein instead of ending it")
 		quit(0)
 	else:
-		printerr("check_lode: FAIL (%d)" % _fails)
+		printerr("check_lode: FAIL (%d)" % _failures)
 		quit(1)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _run() -> void:
 	MainView.dev_start = false

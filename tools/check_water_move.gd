@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer — WATER IMPEDANCE (L3 slice 3b). The body should WADE, not glide, through water: reduced
 ## horizontal speed, buoyant slow-fall, a weaker jump — the felt located-hazard the Pump later relieves.
@@ -29,16 +29,6 @@ const MOVE_EPS: float = 8.0          ## px that proves the body is NOT frozen (s
 var _main: MainView
 var _player: Player
 var _sim: FactorySim
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	print("== water-move check (L3 impedance) ==")

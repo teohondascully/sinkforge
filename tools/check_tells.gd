@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE ROCK HAS TO TELL YOU, AND IT HAS TO BE TELLING THE TRUTH.
 ##
@@ -40,18 +40,15 @@ const QUIET_CEIL: float = 0.02
 ## digging at a real cave is a payoff that does not exist.
 const BREACH_REACHABLE: float = 0.45
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== the rock tells you what is behind it ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_tells: PASS — the tell rises on approach and stays silent in solid rock")
 		quit(0)
 	else:
-		print("check_tells: FAIL (%d)" % _fails)
+		print("check_tells: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -118,11 +115,3 @@ func _run() -> void:
 	var away: float = main._hollow_at(Vector2i(COL - 2, mid), Vector2i(-1, 0))
 	_check(away < into * 0.5,
 		"it answers the swing, not the standing spot (into %.2f vs away %.2f)" % [into, away])
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

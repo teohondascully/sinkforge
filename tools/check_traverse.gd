@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## IS THE ROPE A WAY TO TRAVEL, OR ONLY A WAY TO DESCEND?
 ##
@@ -64,18 +64,15 @@ const SKY_SPAN: int = 40
 const ROPE_EDGE: float = 1.15        ## frames-to-cross the legs take per frame the rope takes, to BE travel
 const SPEED_EDGE: float = 1.10       ## ...and beat their top speed by this, or the lifted clamp is a fiction
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== is the rope a way to travel ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_traverse: PASS — under a roof, the line is the fast way across")
 		quit(0)
 	else:
-		print("check_traverse: FAIL (%d)" % _fails)
+		print("check_traverse: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -336,11 +333,3 @@ func _carve(sim: FactorySim) -> void:
 				sim.set_solid(Vector2i(x, y), &"stone")
 		if not sim.is_solid(Vector2i(x, HALL_FLOOR)):
 			sim.set_solid(Vector2i(x, HALL_FLOOR), &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

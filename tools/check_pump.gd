@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## CAN YOU WIND A SWING UP?
 ##
@@ -58,18 +58,15 @@ const DIE_EDGE: float = 0.92        ## ...and the most of that an out-of-phase a
 const HAUL_MIN: float = 0.25        ## winch bed level the game must reach on its own while reeling
 const SING_MIN: float = 0.25        ## ...and the fibre, under load
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== can you wind a swing up ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_pump: PASS — the arc answers the rhythm, and you can hear it")
 		quit(0)
 	else:
-		print("check_pump: FAIL (%d)" % _fails)
+		print("check_pump: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -118,7 +115,7 @@ func _arm(main: MainView, phase: int) -> Dictionary:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: the hook never planted — no arc to judge")
 		return {"widest": 0.0, "rate": 0.0}
 	var start_len: float = p.grapple.length
@@ -219,11 +216,3 @@ func _carve(sim: FactorySim) -> void:
 	for y: int in range(HOOK_ROW - 2, HOOK_ROW + 1):
 		for x: int in range(HOOK_COL - 1, HOOK_COL + 2):
 			sim.set_solid(Vector2i(x, y), &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

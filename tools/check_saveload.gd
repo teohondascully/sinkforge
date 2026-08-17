@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: LIVE save/load. Boots the REAL scene, saves via the same method F5
 ## drives, damages the world (digs cells, moves the body, spends items), loads via F9's method, and
@@ -16,7 +16,6 @@ const TEST_SLOT: String = "user://check_saveload.save"
 
 var _main: MainView
 var _frames: int = 0
-var _failures: int = 0
 var _solid_before: int = 0
 var _inv_before: int = 0
 var _pos_before: Vector2
@@ -37,15 +36,6 @@ func _initialize() -> void:
 func _sweep() -> void:
 	for suffix: String in ["", SaveGame.TMP_SUFFIX, SaveGame.BAK_SUFFIX]:
 		DirAccess.remove_absolute(TEST_SLOT + suffix)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _on_frame() -> void:
 	_frames += 1

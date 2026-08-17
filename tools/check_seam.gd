@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE GRAIN PAYS, AND IT NEVER CHARGES.
 ##
@@ -33,7 +33,6 @@ const MAX_DENSITY: float = 0.45
 var _main: MainView
 var _sim: FactorySim
 var _frames: int = 0
-var _fails: int = 0
 
 
 func _initialize() -> void:
@@ -43,15 +42,6 @@ func _initialize() -> void:
 	print("== the rock has a grain ==")
 	process_frame.connect(_on_frame)
 
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _on_frame() -> void:
 	_frames += 1
 	if _frames < 3:
@@ -60,11 +50,11 @@ func _on_frame() -> void:
 	_sim = _main.sim
 	_field()
 	_swings()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_seam: PASS — reading the grain pays, and ignoring it costs nothing")
 		quit(0)
 	else:
-		printerr("check_seam: FAIL — %d failure(s)" % _fails)
+		printerr("check_seam: FAIL — %d failure(s)" % _failures)
 		quit(1)
 
 

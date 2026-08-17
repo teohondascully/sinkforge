@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: THE SAVE FRONTIER — no authoritative field may quietly fall outside the envelope.
 ##
@@ -63,17 +63,6 @@ const ALIASES: Dictionary = {
 	"produced": "total_produced", "consumed": "total_consumed", "seep_tick": "_seep_tick",
 }
 const META_KEYS: Array[String] = ["version"]
-
-var _failures: int = 0
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _initialize() -> void:
 	var fields: Array[String] = _script_fields()

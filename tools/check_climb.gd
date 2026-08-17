@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer 5 — motion check for the ROPE CLIMB (the placeable climb, Sprint B). Builds a deep
 ## 1-wide pit with a rope hung down it, drops the body to the bottom, and asserts the three feel
@@ -24,7 +24,6 @@ var _max_jump: float = 0.0      ## biggest single-frame rise while climbing (tel
 var _hold_y: float = 0.0        ## position when the top-of-rope hold watch began
 var _hold_frames: int = 0
 var _hold_drift: float = 0.0    ## how far the body wandered while holding UP at the rope top
-var _failures: int = 0
 
 
 func _initialize() -> void:
@@ -129,11 +128,3 @@ func _phys() -> void:
 				print("CLIMB OK"); quit(0)
 			else:
 				printerr("%d CLIMB CHECK(S) FAILED" % _failures); quit(1)
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)

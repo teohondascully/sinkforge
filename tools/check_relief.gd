@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## IS THE SURFACE A PLACE, OR A LINE?
 ##
@@ -45,18 +45,15 @@ const WALKABLE_MIN: float = 0.90     ## share of steps the body's auto-step-up g
 const BLUFF_MIN: int = 2             ## faces too tall to walk up — the reason to own a rope
 const BLUFF_ROWS: int = 3            ## ...and how tall that is (MAX_STEP is 1.3 cells)
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== is the surface a place ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_relief: PASS — a landscape, and one you can still walk across")
 		quit(0)
 	else:
-		print("check_relief: FAIL (%d)" % _fails)
+		print("check_relief: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -162,11 +159,3 @@ func _profile(ground: Array[int], lo: int, hi: int) -> String:
 	for i: int in range(0, ground.size(), 2):
 		out += String.chr(0x30 + clampi((ground[i] - lo) * 9 / maxi(hi - lo, 1), 0, 9))
 	return out
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

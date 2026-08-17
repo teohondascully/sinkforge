@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## CONTRACT GUARD — every material the world can contain has a MaterialDef the renderer will actually use.
 ##
@@ -36,7 +36,6 @@ const MATERIAL_DIR: String = "res://src/data/materials/"
 
 var _main: MainView
 var _frames: int = 0
-var _fails: int = 0
 
 
 func _initialize() -> void:
@@ -46,26 +45,17 @@ func _initialize() -> void:
 	print("== material registry contract ==")
 	process_frame.connect(_on_frame)
 
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
-
 func _on_frame() -> void:
 	_frames += 1
 	if _frames < 3:
 		return
 	process_frame.disconnect(_on_frame)
 	_run()
-	if _fails == 0:
+	if _failures == 0:
 		print("ALL MATERIAL-REGISTRY CHECKS PASS")
 		quit(0)
 	else:
-		printerr("%d MATERIAL-REGISTRY FAILURE(S)" % _fails)
+		printerr("%d MATERIAL-REGISTRY FAILURE(S)" % _failures)
 		quit(1)
 
 

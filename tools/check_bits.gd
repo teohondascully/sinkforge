@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## A BIT IS A VERB, NOT A NUMBER.
 ##
@@ -27,7 +27,6 @@ const SCENE: String = "res://scenes/main.tscn"
 var _main: MainView
 var _sim: FactorySim
 var _frames: int = 0
-var _fails: int = 0
 
 
 func _initialize() -> void:
@@ -36,15 +35,6 @@ func _initialize() -> void:
 	get_root().add_child(_main)
 	print("== a bit is a verb ==")
 	process_frame.connect(_on_frame)
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _on_frame() -> void:
 	_frames += 1
@@ -57,11 +47,11 @@ func _on_frame() -> void:
 	_pulverise()
 	_gates()
 	_wedge()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_bits: PASS — every bit is worse than the Point somewhere")
 		quit(0)
 	else:
-		printerr("check_bits: FAIL — %d failure(s)" % _fails)
+		printerr("check_bits: FAIL — %d failure(s)" % _failures)
 		quit(1)
 
 

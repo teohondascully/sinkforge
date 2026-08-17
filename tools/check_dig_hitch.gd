@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## Harness layer: THE DIG-HITCH FRICTION GAUGE (#103, the mining micro-freeze guard).
 ##
@@ -92,7 +92,6 @@ const MINE_STEP: int = 6
 
 var _main: MainView
 var _frames: int = 0
-var _failures: int = 0
 var _dig_cell: Vector2i
 ## THE DIG SITES. Each entry is the set of coarse cells mined in ONE frame, so the last entry exercises a
 ## MULTI-CELL dirty range (cmin != cmax) — the generalisation where the stale-ring bug actually lived and
@@ -130,15 +129,6 @@ func _rock_pair(sim: FactorySim, col: int, drop: int) -> Array:
 		if sim.is_solid(Vector2i(col, y)) and sim.is_solid(Vector2i(col + 1, y)):
 			return [Vector2i(col, y), Vector2i(col + 1, y)]
 	return [Vector2i(col, start), Vector2i(col + 1, start)]
-
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("  PASS: %s" % label)
-	else:
-		_failures += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _on_frame() -> void:
 	_frames += 1

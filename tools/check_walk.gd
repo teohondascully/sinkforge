@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE WALK — the body moves the way you asked it to, everywhere on the real generated surface.
 ##
@@ -40,7 +40,6 @@ var _main: MainView
 var _player: Player
 var _sim: FactorySim
 var _frames: int = 0
-var _fails: int = 0
 
 var _cols: Array[int] = []
 var _at: int = -1                      ## index into _cols; -1 until the world is up
@@ -62,15 +61,6 @@ func _initialize() -> void:
 	get_root().add_child(_main)
 	print("== the walk ==")
 	physics_frame.connect(_phys)
-
-
-func _check(ok: bool, label: String) -> void:
-	if ok:
-		print("  PASS: %s" % label)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % label)
-
 
 func _phys() -> void:
 	_frames += 1
@@ -190,9 +180,9 @@ func _report() -> void:
 		_check(false, "REPRODUCED: %d backward-snap frames, worst %.1fpx" % [_snaps, _worst])
 		printerr("  context: %s" % _worst_ctx)
 
-	if _fails == 0:
+	if _failures == 0:
 		print("WALK OK")
 		quit(0)
 	else:
-		printerr("%d WALK FAILURE(S)" % _fails)
+		printerr("%d WALK FAILURE(S)" % _failures)
 		quit(1)

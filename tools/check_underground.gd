@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## THE PLACE THE PLAYER SPENDS THE GAME HAS TO HAVE SOMETHING IN IT TOO.
 ##
@@ -56,11 +56,6 @@ const LIT_FLOOR: float = 26.0
 ## already been filtered down to the part of the frame the lamp is pointing at, so there is no cave mouth
 ## or unlit overhang left in the sample to excuse.
 const DEAD_CAP: float = 0.10
-
-## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
-## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
-const SKIP: int = 42
-
 
 func _initialize() -> void:
 	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a

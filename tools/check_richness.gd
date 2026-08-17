@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## A SHAFT MUST NOT GO FORTY METRES WITHOUT MEETING ANYTHING.
 ##
@@ -55,18 +55,17 @@ const PLAIN: Array[StringName] = [&"earth", &"stone", &"shale", &"deepslate",
 const DENSITY_FLOOR: float = 6.0     ## encounters per 100 rows descended, averaged over the shafts
 const DROUGHT_CAP: int = 25          ## rows of unbroken plain rock, anywhere, in any shaft
 
-var _fails: int = 0
 
 
 func _initialize() -> void:
 	print("== is there anything down there ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_richness: PASS — the earth has things in it")
 		quit(0)
 	else:
-		print("check_richness: FAIL (%d)" % _fails)
+		print("check_richness: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -152,10 +151,3 @@ func _what(sim: FactorySim, cell: Vector2i) -> StringName:
 	var mat: StringName = sim.solid.get(cell, &"")
 	return &"" if mat in PLAIN else mat
 
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## DOES WATER READ AS WATER, OR AS A BLUE RECTANGLE?
 ##
@@ -53,13 +53,6 @@ const GRADIENT_MIN: float = 2.5
 const SURFACES_MAX: int = 2          ## bright horizontal edges down one column (one surface, plus slack)
 const EDGE_JUMP: float = 9.0         ## sRGB rise between neighbouring rows that counts as an EDGE
 
-## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
-## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
-const SKIP: int = 42
-
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== does water read as water ==")
 	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
@@ -70,11 +63,11 @@ func _initialize() -> void:
 		return
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_water_reads: PASS — a body of water, not a blue rectangle")
 		quit(0)
 	else:
-		print("check_water_reads: FAIL (%d)" % _fails)
+		print("check_water_reads: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -116,7 +109,7 @@ func _run() -> void:
 	var band: Rect2i = _on_screen(main, img)
 	print("  the cistern occupies %s of a %dx%d frame" % [band, img.get_width(), img.get_height()])
 	if band.size.x < 40 or band.size.y < 40:
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: the cistern did not land on screen — nothing to judge")
 		main.queue_free()
 		return
@@ -272,11 +265,3 @@ func _bright_edges(img: Image) -> int:
 		else:
 			y += 1
 	return edges
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)

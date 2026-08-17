@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tools/check_base.gd"
 
 ## DOES THE GAME TEACH WHAT IT ACTUALLY DOES?
 ##
@@ -59,18 +59,15 @@ const SWING_FRAMES: int = 150
 const DROP_ROWS: int = 22            ## a fall tall enough to cost the landing (see Player.STAGGER_MAX)
 const DROP_FRAMES: int = 180
 
-var _fails: int = 0
-
-
 func _initialize() -> void:
 	print("== does the game teach what it actually does ==")
 	MainView.dev_start = false
 	await _run()
-	if _fails == 0:
+	if _failures == 0:
 		print("check_teaching: PASS — every technique is taught, once, in real keys, in time to read")
 		quit(0)
 	else:
-		print("check_teaching: FAIL (%d)" % _fails)
+		print("check_teaching: FAIL (%d)" % _failures)
 		quit(1)
 
 
@@ -207,7 +204,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_fails += 1
+		_failures += 1
 		printerr("  FAIL: the hook never planted — nothing to teach")
 		return
 
@@ -293,11 +290,3 @@ func _carve(sim: FactorySim) -> void:
 			sim.set_solid(Vector2i(x, y), &"stone")
 	for x: int in range(SPUR_FROM, SPUR_TO + 1):
 		sim.set_solid(Vector2i(x, SPUR_ROW), &"stone")
-
-
-func _check(ok: bool, msg: String) -> void:
-	if ok:
-		print("  PASS: %s" % msg)
-	else:
-		_fails += 1
-		printerr("  FAIL: %s" % msg)
