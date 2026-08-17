@@ -237,6 +237,9 @@ static func _commit(sim: FactorySim, s: Dictionary) -> void:
 	sim.flow_events.clear()
 	sim.terrain_dirty.clear()
 	sim._bazaars_dirty = true
+	# …and the one-shot view channels. `last_drop_landing` used to survive a load, so the controller
+	# granted its pickup grace at a cell from the session BEFORE the one you just loaded into.
+	sim.last_drop_landing = Vector2i(-1, -1)
 	# DERIVED PHASE, reset EXPLICITLY rather than left wherever the previous game happened to leave it.
 	# These three used to survive an in-process F9 untouched while a fresh process started them at zero,
 	# so the same file produced a different sub-tick offset and a different rate readout depending on how
