@@ -277,7 +277,10 @@ func _draw() -> void:
 	if settings_open:
 		_draw_settings_overlay()  # ESC — audio / feel / the remap page
 	if paused_getter.is_valid() and bool(paused_getter.call()):
-		var p := Rect2(CANVAS.x * 0.5 - 52.0, 8.0, 104.0, 26.0)
+		# UNDER the objective line, not on top of it. Both were aimed at top-centre at y=8 and the
+		# objective panel is 37 tall, so PAUSED printed straight across the one line telling you what to
+		# do next — and pausing is exactly when a player stops to read it.
+		var p := Rect2(CANVAS.x * 0.5 - 52.0, 50.0, 104.0, 26.0)
 		_panel(p, true)
 		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
@@ -718,7 +721,19 @@ func _fit_text(text: String, size: int, max_w: float) -> String:
 ## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,
 ## inspector, minimap, the bottom pack). A faint lit top edge makes it read as raised rather than a
 ## flat sticker; `accent` paints a gold cap bar for headlined panels.
+## TEST HOOK — when non-null, every panel this frame appends its rect here and nothing else changes.
+##
+## The HUD is immediate-mode: there are no Control nodes, so nothing about the layout can be read off the
+## scene tree, and a layout test would otherwise have to RE-DERIVE where each chip goes. A test that
+## recomputes the layout it is checking agrees with itself by construction and catches nothing. This is
+## two lines that let `check_hud_layout` observe the boxes the HUD ACTUALLY DREW, at real screen size, in
+## the real scene. Left null in play, so it costs one null check per panel.
+static var panel_probe: Array[Rect2]
+
+
 func _panel(rect: Rect2, accent: bool = false) -> void:
+	if panel_probe != null:
+		panel_probe.append(rect)
 	draw_rect(rect, UI_BG)
 	draw_line(rect.position + Vector2(1.0, 1.0), rect.position + Vector2(rect.size.x - 1.0, 1.0),
 		UI_EDGE_HI, 1.0)
@@ -1950,47 +1965,69 @@ func _craft_id(i: int) -> StringName:
 
 
 ## The HELP overlay (H / ?) — the full control list, summoned not stuck on screen. Centred card.
+## The CONTROLS card, hoisted out of _draw_help_overlay so check_hud_layout can MEASURE it. Text is the
+## half a panel-rect test cannot see: every one of these is drawn inside a fixed-width column, and a line
+## wider than its column spills across the card or off it entirely while the panel it overflows still
+## reports a perfectly legal rectangle.
+## Column width for the CONTROLS card, and the number check_hud_layout holds every line to.
+const HELP_COL_W: float = 236.0
+## Text size the card is drawn at — named so the measuring layer cannot drift from the drawing code.
+const HELP_TEXT_SIZE: int = 11
+
+const HELP_LINES: Array[String] = [
+	"move        A / D  (or ← →)",
+	"jump        W  or  SPACE",
+	"climb       W / S  on a rope (not a jump)",
+	"grapple     F  at ringed rock · again to ride",
+	"swing       W / S reel in / out · SPACE off",
+	# The three techniques the winch grew. Each is taught in place by a hint the first time you are in
+	# the situation (scenes/hints.gd), but a lesson you can only be told once is a lesson you can miss,
+	# so the card carries them too — same key-first voice as every line above it.
+	"chain       F in mid-air — keeps your speed",
+	"wrap        the line bends round corners",
+	"catch       F while falling — ends the fall",
+	"mine        LMB (hold)",
+	"dig plan    LMB drag paints it · X clears",
+	"select      1–9  ·  mouse wheel",
+	"place/pick  RMB  (machine, rope, block)",
+	"scan        RMB  (Scanner — veins echo)",
+	"drop / feed  Q  (gravity feeds it in)",
+	"counter     E  (pack · works · bench)",
+	"  tabs      1 / 2 / 3   ·   mouse wheel",
+	"  pick      arrows / WASD   ·   buy  ENTER",
+	"bench       T  (straight to the tech ladder)",
+	"configure   R  (aimed at a splitter / hopper)",
+	"dashboard   G",
+	"map         M  (again: LARGE · click it = ping)",
+	"fast-fwd    .     (1x → 2x → 4x → 8x)",
+	"save / load  F5 / F9",
+	"pause       P     ·   help   H",
+	"settings    ESC  (audio · shake · remap keys)",
+	]
+
+
 func _draw_help_overlay() -> void:
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.45))
-	var lines: Array[String] = [
-		"move        A / D  (or ← →)",
-		"jump        W  or  SPACE",
-		"climb       W / S  on a rope (W climbs, not jumps)",
-		"grapple     F  — throw at the ringed rock; throw again to swing on, Space to let go",
-		"swing       W / S reel the line in / out · SPACE leaps off it",
-		# The three techniques the winch grew. Each is taught in place by a hint the first time you are in
-		# the situation (scenes/hints.gd), but a lesson you can only be told once is a lesson you can miss,
-		# so the card carries them too — same key-first voice as every line above it.
-		"chain       F again in mid-air — the next line keeps the speed you left with",
-		"wrap        the line bends round corners; the shorter it gets, the harder it whips",
-		"catch       F on the way down — the line ends the fall, and the cost of landing it",
-		"mine        LMB (hold)",
-		"dig plan    LMB drag paints it · X clears",
-		"select      1–9  ·  mouse wheel",
-		"place / pick  RMB  (machine, rope, or block)",
-		"scan        RMB  (Scanner selected — veins echo)",
-		"drop / feed  Q  (gravity feeds it in)",
-		"counter     E  (pack · works · bench)",
-		"  tabs      1 / 2 / 3   ·   mouse wheel",
-		"  pick      arrows / WASD   ·   buy  ENTER",
-		"bench       T  (straight to the tech ladder)",
-		"configure   R  (aimed at a splitter / hopper)",
-		"dashboard   G",
-		"map         M  (again: LARGE · click it = ping)",
-		"fast-fwd    .     (1x → 2x → 4x → 8x)",
-		"save / load  F5 / F9",
-		"pause       P     ·   help   H",
-		"settings    ESC  (audio · shake · remap keys)",
-	]
-	var w: float = 244.0
-	var h: float = 30.0 + float(lines.size()) * 16.0 + 10.0
+	# TWO COLUMNS, BECAUSE ONE DID NOT FIT ON THE SCREEN. At 16px a row this list is 25 rows and 440px
+	# tall on a 360px canvas, centred — so it hung 40px off the top AND 40px off the bottom, and the first
+	# and last controls were simply not on screen. It rendered cleanly and looked deliberate, which is why
+	# nothing caught it until check_hud_layout measured the box instead of looking at it.
+	#
+	# Splitting rather than shrinking is the right repair twice over: a smaller font would have fitted the
+	# same wall of 25 rows into the same screen, and a wall of rows is the thing this card should least be.
+	var lines: Array[String] = HELP_LINES
+	var half: int = int(ceil(float(lines.size()) * 0.5))
+	var col_w: float = HELP_COL_W
+	var w: float = col_w * 2.0 + 16.0
+	var h: float = 30.0 + float(half) * 16.0 + 10.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
 	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
-	var y: float = origin.y + 38.0
-	for ln: String in lines:
-		draw_string(_font, Vector2(origin.x + 16.0, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
-		y += 16.0
+	for i: int in lines.size():
+		var col: int = i / half
+		var row: int = i % half
+		draw_string(_font, Vector2(origin.x + 16.0 + float(col) * col_w, origin.y + 38.0 + float(row) * 16.0),
+			lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, HELP_TEXT_SIZE, UI_TEXT)
 
 
 ## THE SETTINGS page: audio sliders + feel chips on the left, the full REMAP list on

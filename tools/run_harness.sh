@@ -199,6 +199,9 @@ add "check_controls"                  "res://tools/check_controls.gd"
 add "check_input_deafness (shutter)"  "res://tools/check_input_deafness.gd"
 add "check_seam_flood (same picture)" "res://tools/check_seam_flood.gd"
 add "check_paint_terms (per-texel)" "res://tools/check_paint_terms.gd"
+# add_gl: it measures the boxes the HUD actually DREW, and the dummy renderer draws none of them — so
+# headless every state reports zero panels and every overlap assertion passes on an empty screen.
+add_gl "check_hud_layout (no collisions)" "res://tools/check_hud_layout.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
