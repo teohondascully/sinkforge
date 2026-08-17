@@ -122,20 +122,32 @@ func _run() -> void:
 		"no pair shares BOTH an outline and a colour (%d pair(s) do)" % clashes.size())
 
 	# --- the carried ground specifically: it is what this layer was written for ---
+	# NOT "these six no longer share a silhouette" — that would be the wrong claim and it would fail on a
+	# pair that is working as designed. sealrock KEEPS the cube, deliberately: it is a block, and its colour
+	# already separates it from stone by dE 24. What must hold is the narrower, true thing — where COLOUR
+	# cannot tell two carried materials apart, SHAPE has to, because tint is the half that dies first at
+	# hotbar size against a dark moving background.
 	var ground: Array[StringName] = [&"earth", &"stone", &"gravel", &"shale", &"deepslate", &"sealrock"]
-	var cube: float = 0.0
-	var cube_pair: String = ""
+	var unseparated: Array[String] = []
+	var close_pairs: int = 0
 	for i: int in ground.size():
 		for j: int in range(i + 1, ground.size()):
-			var iou: float = _iou(shots[ground[i]], shots[ground[j]])
-			if iou > cube:
-				cube = iou
-				cube_pair = "%s/%s" % [ground[i], ground[j]]
-	# Not a colour claim: these six are the ones that USED to share one cube, so the thing worth asserting
-	# is that they no longer share an OUTLINE — the property that survives a small icon and a dark screen.
-	_check(cube < SAME_SHAPE,
-		"the six carried materials no longer share one silhouette (worst %s at IoU %.2f, cap %.2f)"
-			% [cube_pair, cube, SAME_SHAPE])
+			var a: StringName = ground[i]
+			var b: StringName = ground[j]
+			if _de(_mean_lab(shots[a]), _mean_lab(shots[b])) >= SAME_TINT:
+				continue                                    # colour already separates these two
+			close_pairs += 1
+			var iou: float = _iou(shots[a], shots[b])
+			if iou >= SAME_SHAPE:
+				unseparated.append("%s/%s (IoU %.2f)" % [a, b, iou])
+	# Non-vacuity: if no carried pair is colour-close, the loop above asserts nothing at all. The palette
+	# genuinely has several such pairs, so zero here means the measurement broke, not that the art is good.
+	_check(close_pairs > 0,
+		"the carried ground still contains colour-close pairs to judge (%d) — else this asserts nothing"
+			% close_pairs)
+	_check(unseparated.is_empty(),
+		"...and every one of them is separated by SHAPE instead (%d not: %s)"
+			% [unseparated.size(), ", ".join(unseparated)])
 
 	# --- and gravel in particular, against the block it decides a flood against ---
 	var gs: float = _iou(shots[&"gravel"], shots[&"stone"])
