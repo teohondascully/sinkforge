@@ -100,35 +100,27 @@ fi
 # the history clean while the reinfection sat one merge away, which is the shape of half the defects in
 # the audit notes: a gauge whose population is smaller than the claim it is used to make.
 
-# THE ONE EXEMPTION, named rather than pattern-matched. `pre-trailer-strip` is the pre-rewrite history,
-# kept deliberately so the strip is reversible; it carries all 23 original messages BY DESIGN and always
-# will. the trailer-strip map is the old-sha -> new-sha mapping that makes it usable.
+# NO EXEMPTIONS. There was one for a while — the `pre-trailer-strip` backup held the 23 original messages
+# by design — and the user's instruction closed it: zero commits anywhere, which made the safety net the
+# last thing carrying the thing it was protecting. The absence of an allowlist here is the point. An
+# allowlist that can grow quietly is how a guard becomes a formality, and the cheapest way to keep one from
+# growing is not to have one.
 #
-# Written as an exact ref name and asserted to be the ONLY exemption, because an allowlist that can grow
-# quietly is how a guard becomes a formality. If a second ref ever needs exempting, that is a decision
-# somebody makes on purpose, in this file, in a diff.
-EXEMPT='refs/tags/pre-trailer-strip'
+# COUNTS COMMITS, NOT MATCHING LINES, and lets git do it. `git log --format=%B | grep -c` counts lines, so
+# a message carrying two trailers reported 2 where the sentence around the number says refs. `--grep`
+# matches per COMMIT in C — right unit, and fast enough to sweep every ref, where a shell loop over 528
+# shas per ref took long enough to time out.
 dirty=""
-n_exempt=0
 for ref in $(git for-each-ref --format='%(refname)' refs/heads refs/remotes refs/tags); do
-	# COUNT COMMITS, NOT MATCHING LINES. `git log --format=%B | grep -c` counts lines, so a message with
-	# two trailers reports 2 and the number printed at a reader is not the unit the sentence around it
-	# claims. It cannot produce a false clean, which is why it survived review; it is still the wrong unit,
-	# and printing the wrong unit confidently is most of what the audit notes is about.
-	n=0
-	for sha in $(git rev-list "$ref" 2>/dev/null); do
-		git log -1 --format='%B' "$sha" | grep -qiE "$PATTERN" && n=$((n + 1))
-	done
+	n="$(git log -E -i --format='%H' \
+		--grep='^[[:space:]]*co-authored-by:.*(assistant|vendor)' \
+		--grep='^[[:space:]]*assistant-session:' \
+		--grep='generated with \[assistant' "$ref" 2>/dev/null | wc -l | tr -d ' ')"
 	[ "$n" -eq 0 ] && continue
-	if [ "$ref" = "$EXEMPT" ]; then
-		n_exempt=$((n_exempt + 1))
-		continue
-	fi
-	dirty="$dirty  $ref ($n)"$'\n'
+	dirty="$dirty  $ref ($n commit(s))"$'\n'
 done
-[ "$n_exempt" -le 1 ]; check $? "at most one ref is exempt from the scan (found $n_exempt)"
 hits="$(printf '%s' "$dirty" | grep -c . || true)"
-[ "$hits" -eq 0 ]; check $? "no ref outside the named backup carries an assistant trailer ($hits ref(s) do)"
+[ "$hits" -eq 0 ]; check $? "no ref anywhere carries an assistant trailer ($hits ref(s) do)"
 if [ "$hits" -ne 0 ]; then
 	echo "  REINFECTION RISK — these refs still carry it, and a merge brings it straight back:" >&2
 	printf '%s' "$dirty" >&2
