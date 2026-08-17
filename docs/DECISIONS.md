@@ -389,6 +389,39 @@ sacred.
 
 *Attested: the architecture handover §8.*
 
+### The visual record is committed, not merely kept
+
+`history/` and the 44 canonical `_moment_*.png` captures are tracked in git, at the user's instruction on
+2026-08-17. Until then both were ignored, `history/` under a `.gitignore` note reading *"keep on disk,
+NEVER publish or delete"* — one line asserting two rules that have nothing to do with each other. Only the
+**delete** half was ever a decision (the LOCKED rule directly above); the **publish** half was never
+recorded or argued anywhere, and it was the half doing the damage, because an ignored file has no undo. A
+capture overwritten in place was simply gone.
+
+Committing serves the locked rule instead of straining against it: it is the strongest available form of
+not destroying these files. And the disclosure worry the word "publish" implies does not survive being
+stated — the repo is the user's own MIT-licensed game, and these are pictures of it.
+
+The premise under the old note was wrong too. These captures are not regenerable. Re-running `tools/sees.sh`
+does not reproduce them, because the game it photographs has changed; each one is a record of a world that
+no longer exists. That is the argument for versioning them rather than against it.
+
+**Cost, recorded because git history is permanent:** ~237MB (`history/` 171MB, moments 66MB) onto a 53MB
+`.git`. There is no lossless win to take first — they are 8-bit RGB PNGs at 1920x1080, already near 3:1 —
+and lossy compression is barred outright, because the harness *samples these pixels* (`check_rock_reads`
+and its neighbours read values off them). Quantizing would corrupt the evidence rather than merely soften
+the picture. A full recapture adds ~66MB; git stores per file, so a partial one costs only what moved.
+
+**`history/.gdignore` keeps the archive out of Godot's resource scanner**, and it is not an optimization —
+CI runs `godot --headless --import` from a clean clone in *both* jobs with no cache, so every tracked image
+gets imported twice per push. Nothing anywhere references the archive, so that would have been 171MB of
+pure CI time bought for nothing. Its `.png.import` sidecars are untracked for the same reason (left on
+disk, per the rule above — untracking and deleting are different operations). The 44 moments stay visible
+to the scanner, because `tools/` addresses them by `res://` path; `save_png` and `Image.load` read the file
+rather than the imported resource, but the path still has to resolve.
+
+*Attested: `.gitignore`, "THE VISUAL RECORD".*
+
 ### Isolate parallel work in its own worktree; one integrator commits — LOCKED
 
 Parallel agents on a shared tree contaminate each other's harness runs — same `_moment_*.png` at repo root,

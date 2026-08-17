@@ -26,9 +26,8 @@ build/
 /_capture*.png
 /_capture*.png.import
 _zoom_*.png
-# "Sees" tier canonical-moment captures (tools/sees.sh) + boot diagnostics — regenerable, never commit
-/_moment_*.png
-/_moment_*.png.import
+# The "Sees" tier canonical-moment captures (tools/sees.sh) are TRACKED — see THE VISUAL RECORD below.
+# Boot diagnostics and mock renders are not: they answer one question and stop mattering.
 /_mock_*.png
 /_mock_*.png.import
 /_boot*.png
@@ -37,8 +36,36 @@ _zoom_*.png
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
 
-# Local visual progress archive — keep on disk, NEVER publish or delete
-history/
+# THE VISUAL RECORD — history/ (the curated archive) and the 44 canonical _moment_*.png captures — is
+# COMMITTED, at the user's instruction on 2026-08-17. Both sat here ignored before, history/ under a note
+# reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
+# (docs/DECISIONS.md, "Never destroy anything the user made") forbids DESTROYING them, and it exists
+# because 84 of these screenshots were once purged during a refactor. Committing is the strongest
+# available form of not destroying, so it serves that rule rather than breaking it; only the unbacked
+# "publish" half is reversed, and a public MIT repo of the user's own game discloses nothing by carrying
+# pictures of it.
+#
+# Neither set is regenerable, whatever the old comment claimed. The game changes underneath them, so a
+# capture is a record of a world that no longer exists — not an output you can rebuild by re-running
+# anything. That is precisely why they needed an undo.
+#
+# The cost is written down because it is permanent: ~237MB (history/ 171MB, moments 66MB) against a .git
+# that was 53MB. They are 8-bit RGB PNGs at 1920x1080, already ~3:1 zlib — there is no meaningful lossless
+# win available, and lossy is barred outright because the harness SAMPLES these pixels (check_rock_reads
+# and friends read values off them), so quantization would corrupt the evidence, not just soften it.
+# A full recapture writes all 44 moments and adds ~66MB more; git stores per file, so a partial recapture
+# costs only what actually changed.
+#
+# `history/.gdignore` keeps the archive out of Godot's resource scanner. CI runs `godot --headless --import`
+# from a clean clone in BOTH jobs with no cache, so every tracked image is imported twice per push — and
+# nothing references the archive, so importing 171MB of it is pure CI time. The moments stay visible to the
+# scanner because tools/ addresses them by `res://` path (`save_png`, `Image.load`); that reads the file
+# rather than the imported resource, but the path has to resolve.
+#
+# The archive's sidecars are stale the moment `.gdignore` lands — Godot will not refresh or recreate them,
+# and they describe imports that no longer happen. Ignored rather than removed from disk, on the same
+# principle as everything else in this file.
+history/*.png.import
 
 # Godot's per-machine ProjectSettings override + any local cert bundle it points at. Machine
 # state, never project state: nothing here may change how the game builds for anyone else.
