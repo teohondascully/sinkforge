@@ -37,6 +37,16 @@ const AGENT := preload("res://tools/play_agent.gd")
 const SETTLE := 60
 const DELVE_ROWS := 14            ## how far below the surface the delve shot digs
 
+## The moments whose whole claim is "this is underground" — every one of them is built on `_dig_in`, and
+## every one of them is a lie if the shaft was never sunk. Named here rather than inferred so that adding a
+## moment which delves and forgetting to list it is the only way to escape the guard.
+const DELVED: Array[String] = ["delve", "room", "swing"]
+
+## Rows the body actually descended during `_dig_in`, measured against the surface as it stood BEFORE the
+## shaft was cut. -1 = no delve was attempted, which is correct for the moments that do not need one and is
+## why the guard below only consults it for DELVED.
+var _delve_rows: int = -1
+
 ## WHAT EACH MOMENT IS ALLOWED TO LOOK LIKE. This fixture boots the real, input-responsive scene and
 ## then takes minutes to reach its subject, so anything the window receives in that time lands in the
 ## photograph. It did: `_moment_delve.png` — one of the three canonical frames the 2026-08-17 audit
@@ -115,6 +125,15 @@ func _contamination(main: MainView, moment: String) -> String:
 	for k: Variant in (EXPECT.get(moment, {}) as Dictionary):
 		want[k] = (EXPECT[moment] as Dictionary)[k]
 	var wrong: Array[String] = []
+	# A DELVE SHOT MUST BE UNDERGROUND. Every moment built on `_dig_in` claims, by its name, to be a frame
+	# from inside a shaft — and the shaft is cut by an agent that can silently decline to dig (see _dig_in).
+	# Measured against the surface row recorded BEFORE the dig, never after: sinking a shaft down a column
+	# moves that column's own `surface_row` to the bottom of the hole, so a body compared against the live
+	# value reads as standing on the surface no matter how deep it went, and the guard would pass on the
+	# one frame it exists to catch.
+	if moment in DELVED and _delve_rows < DELVE_ROWS / 2:
+		wrong.append(("this moment is cut from a shaft and the body is only %d rows below where the "
+			+ "surface was — the delve did not happen, so the frame is of daylight") % _delve_rows)
 	if main.is_processing_unhandled_input():
 		wrong.append("the scene is still LISTENING to input — _deafen did not take, so this frame is not "
 			+ "a pure function of the fixture")
@@ -543,7 +562,24 @@ func _dig_in(main: MainView) -> void:
 	var agent: PlayAgent = AGENT.new(self, main)
 	agent.give(&"stone_pickaxe", 1)
 	var here: Vector2i = main._cell_at(agent.player.position)
-	await agent.dig_down_to(Vector2i(here.x, main.sim.surface_row(here.x) + DELVE_ROWS))
+	# THE SHAFT HAS TO ACTUALLY BE SUNK, and until now nothing here checked that it was.
+	#
+	# `dig_down_to` exits on `not sim.is_solid(cell)`, which means BOTH "I finished digging" and, on the
+	# first iteration, "the target was already open" — the two-contracts bug found on a later pass in
+	# `PlayAgent` (it is why `check_underground` graded a sunlit surface on seed 99 for its whole life).
+	# A world with a void under the spawn column would return true immediately, and every frame below
+	# would be a photograph of DAYLIGHT filed under `delve`, `room` and `swing`.
+	#
+	# So: `require_arrival` on, and the return value read rather than discarded. The depth is also recorded
+	# for the shutter guard in `_contamination`, because a return value proves the agent believed it
+	# arrived and the row it ends on proves it did.
+	var target := Vector2i(here.x, main.sim.surface_row(here.x) + DELVE_ROWS)
+	var surface_before: int = main.sim.surface_row(here.x)
+	var sank: bool = await agent.dig_down_to(target, 2400, true)
+	_delve_rows = main._cell_at(agent.player.position).y - surface_before
+	if not sank:
+		printerr("capture_moments: the delve shaft did not reach row %d (body %d rows down)"
+			% [target.y, _delve_rows])
 	# Then hollow out a small CHAMBER at the bottom — the work pocket a player cuts when they stop to
 	# set up a drill site. A one-cell shaft shows almost no back-wall, so a shaft-only shot is a bad
 	# instrument for judging the second plane: this is the view the underground is actually played in.
