@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# REFUSE A COMMIT THAT NAMES AN assistant AS A CO-AUTHOR.
+#
+# TRACKED ON PURPOSE, in .githooks/ rather than .git/hooks/. A hook in .git/hooks is not version-controlled,
+# does not reach a fresh clone, does not reach a worktree, and does not reach another checkout working in
+# this repository — so installing one there produces a guard that works on exactly one machine and is absent
+# everywhere the rule is actually broken. That is the same defect as a CI job list kept by hand: one place
+# enumerating a rule, and nothing checking the enumeration is present.
+#
+# Activated by `git config core.hooksPath .githooks`, which every clone must run once. Because that is a
+# step a person can forget, tools/check_trailers.sh asserts the setting IS configured — the guard's job
+# includes checking that the guard is installed, which is the only version of this that survives a clone.
+#
+# This hook is the ordinary path and it is not the enforcement. `--no-verify` skips it, and two separate runs
+# here commit with `--no-verify` by habit. The layer in the suite is what actually holds the line.
+
+msg_file="$1"
+if grep -qiE '^[[:space:]]*(co-authored-by:.*(assistant|vendor)|assistant-session:|generated with \[assistant)' \
+		"$msg_file"; then
+	echo "commit-msg: REFUSED — this message carries an assistant co-author or session trailer." >&2
+	echo "  docs/DECISIONS.md locks the sole author of every commit as the developer." >&2
+	echo "  Offending line(s):" >&2
+	grep -inE '^[[:space:]]*(co-authored-by:.*(assistant|vendor)|assistant-session:|generated with \[assistant)' \
+		"$msg_file" >&2
+	echo "  Remove them and commit again. Do NOT reach for --no-verify: tools/check_trailers.sh" >&2
+	echo "  scans every ref in the suite, so the only thing that buys you is a red harness later." >&2
+	exit 1
+fi
+exit 0

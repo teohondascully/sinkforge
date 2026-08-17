@@ -47,6 +47,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # THE ONE GUARD NEITHER SESSION CAN WALK PAST. `docs/DECISIONS.md` locks the sole author of every commit
+  # as the developer; the rule was LOCKED for months and 23 pushed commits carried an assistant co-author trailer
+  # anyway. The tracked commit-msg hook catches the ordinary path, but all work in this repo
+  # commit with `--no-verify` as a matter of habit, so the hook is the guard they are most likely to skip.
+  # This job is not skippable, and it is thirty seconds.
+  authorship:
+    name: sole author, no assistant trailers on any ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # fetch-depth: 0 IS THE JOB. The default is a depth-1 checkout, and a trailer scan over one commit
+      # finds nothing and prints the identical green line it prints over a clean 500-commit history — the
+      # exact vacuity this repo has spent two days finding elsewhere. `check_trailers.sh` refuses to report
+      # a verdict on a shallow clone rather than pass on one, so removing this line turns the job red
+      # instead of turning it into a formality.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: No assistant co-author trailer on any ref
+        run: bash tools/check_trailers.sh
+
   headless:
     name: every layer, headless (the pixel layers skip here)
     runs-on: ubuntu-latest

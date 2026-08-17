@@ -351,6 +351,31 @@ found signage per band in the hint table's voice, drawn under the band name on t
 Author is `teohondascully` only. Messages are prose, in the house voice: what changed and **why**,
 including the failure that motivated it.
 
+**Enforced, as of 2026-08-17, because for months it was not.** The rule was LOCKED here and 23 pushed
+commits carried the trailer anyway — written by tooling that adds one by default, neither of
+which noticed. A rule that lives only in a document is enforced by whoever last read the document.
+
+Three layers, because the first two are each individually escapable:
+
+- `.githooks/commit-msg` refuses the ordinary path. **Tracked**, not in `.git/hooks/` — an untracked hook
+  reaches no clone, no worktree and no other session, so it guards the one machine where it was installed
+  and is absent everywhere the rule actually gets broken. Activate with `git config core.hooksPath .githooks`.
+- `tools/check_trailers.sh` in the harness. This is the real enforcement: all commits land with
+  `--no-verify` by habit, which is exactly the flag that skips the hook, and no flag skips the suite. It
+  scans **every ref**, not just the current branch, because thirteen worktrees exist and a stale branch
+  brings the trailer straight back on merge. It asserts `core.hooksPath` is wired, so the guard's job
+  includes checking the guard is installed. It carries a positive control that runs every time, because
+  every other assertion in it is a search that found nothing, and a detector that quietly stopped matching
+  reports a clean history in precisely the words a clean history produces.
+- Neither session uses `--no-verify` any more.
+
+**The 23 historical commits were rewritten**, at the user's explicit instruction on 2026-08-17, superseding
+the earlier written recommendation to grandfather them. Trees are byte-identical; only messages changed.
+The pre-rewrite history is kept whole at `pre-trailer-strip` — locally as a tag, on origin as
+`refs/backup/pre-trailer-strip` — and `the trailer-strip map` records every old SHA against its
+new one. Nothing was deleted and the strip is reversible. That backup ref is the single named exemption in
+the scanner, and the scanner asserts it is the only one.
+
 *Attested: the architecture handover §8.*
 
 ### Never destroy anything the user made — LOCKED
