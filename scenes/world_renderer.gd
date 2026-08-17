@@ -3163,7 +3163,7 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 				r = int(lerpf(float(sky_rgb[row * 3]), float(amb_r), t))
 				g = int(lerpf(float(sky_rgb[row * 3 + 1]), float(amb_g), t))
 				b = int(lerpf(float(sky_rgb[row * 3 + 2]), float(amb_b), t))
-			elif not sim.is_solid(Vector2i(col, row)) and not sim.wall.has(Vector2i(col, row)):
+			elif _is_true_void(Vector2i(col, row)):
 				# UNLIT NOTHING IS ABSENCE, AND ABSENCE IS THE DARKEST THING DOWN HERE. See VOID_FLOOR.
 				#
 				# `and not wall`, because a cell with nothing in it is TWO different objects and the first
@@ -3252,6 +3252,26 @@ func _bake_openness(cols: int, rows: int, dug_from: int, dug_to: int) -> Vector2
 ## Darkness (0 = full light, AMBIENT_DARK = the deep's gloom) → the multiplier the veil applies there.
 ## Full light is white, i.e. the world untouched; full gloom is AMBIENT_LIGHT, a cool near-dark, so
 ## shadow both dims and cools in one operation the way real skylight-only ambient does.
+## IS THERE GENUINELY NOTHING HERE — the predicate VOID_FLOOR needs, written once because I got it wrong
+## twice by reaching for one that already existed.
+##
+## `not is_solid` looked like "this cell is empty" and is not. It is COLLISION's question, and it has been
+## answering that question correctly for years: it means "a body may pass through here". Three different
+## things pass that test and only one of them is nothing.
+##
+##   a CARVED ROOM has a wall behind it — space someone opened, and the backing survived the digging.
+##     Flooring it made a chamber read 0.79x darker than the mass it was cut from (check_room_reads).
+##   a FLOODED CELL has water in it — a surface with a colour and a depth ramp of its own. Flooring it put
+##     the floor of a pool 23.4 levels LIGHTER than its surface, inverting the depth cue (check_water_reads).
+##   a TRUE VOID is the only one that is absence, and the only one that should go black.
+##
+## Both breaks were the same mistake and I shipped the second one in the fix for the first. The lesson is
+## not "check more conditions": it is that a predicate borrowed from another subsystem carries THAT
+## subsystem's question. This one is written here, in the renderer, in terms of what the renderer means.
+func _is_true_void(c: Vector2i) -> bool:
+	return not sim.is_solid(c) and not sim.wall.has(c) and not sim.water.has(c)
+
+
 func _light_level(darkness: float) -> Color:
 	return Color.WHITE.lerp(AMBIENT_LIGHT, clampf(darkness / AMBIENT_DARK, 0.0, 1.0))
 
