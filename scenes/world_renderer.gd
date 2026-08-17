@@ -3125,9 +3125,16 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 	var amb_r: int = int(amb.r * 255.0)
 	var amb_g: int = int(amb.g * 255.0)
 	var amb_b: int = int(amb.b * 255.0)
-	var void_r: int = int(float(amb_r) * VOID_FLOOR)
-	var void_g: int = int(float(amb_g) * VOID_FLOOR)
-	var void_b: int = int(float(amb_b) * VOID_FLOOR)
+	# A/B SWITCH, and it stays. check_rock_reads varies 53-63% run to run on identical code -- the delve
+	# lands in a slightly different place each time -- so a single before-number and a single after-number
+	# cannot tell a real change from the spread, and that is exactly the mistake this switch exists to stop
+	# anyone repeating. With it, the same build measures both arms, three runs each, and the comparison is
+	# between two distributions instead of two anecdotes. It also keeps the fix FALSIFIABLE: a constant you
+	# can turn off is a claim you can test.
+	var vf: float = 1.0 if OS.get_environment("SF_NO_VOID_FLOOR") == "1" else VOID_FLOOR
+	var void_r: int = int(float(amb_r) * vf)
+	var void_g: int = int(float(amb_g) * vf)
+	var void_b: int = int(float(amb_b) * vf)
 	for col: int in range(band.x, band.y + 1):
 		var surf: int = sim.surface_row(col)
 		var scatter_end: int = mini(surf + SKY_FADE, rows - 1)

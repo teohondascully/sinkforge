@@ -103,6 +103,21 @@ const DARK_CEILING: float = 34.0
 ## sentence stated as a number.
 const READ_FLOOR: float = 0.75
 
+## PRE-REGISTERED, BEFORE THE NUMBER EXISTS, because the moment to decide which measure closes an item is
+## the moment before you can see which one flatters you.
+##
+## A local adjacent-pair measure is coming: for every rock cell that TOUCHES an air cell, is the rock the
+## brighter of the two? That is a better model of the tester's actual task — at the lamp's edge, is that
+## wall or hole — than the global statistic below, which pools every rock cell in frame against every air
+## cell and so answers "could you identify an isolated patch".
+##
+## **6a CLOSES ON THE GLOBAL MEASURE.** If the local one comes up green while the global stays red, that is
+## NOT a close; it is a finding that boundaries read while fields do not, and the item stays open. The
+## global measure is the one that was red when the blind tester wrote the sentence this layer exists to
+## restate, and swapping to a second measure after seeing a result I did not like would be threshold
+## shopping with a methodology alibi. Written down here so that later-me has to delete a paragraph to
+## cheat, rather than merely change his mind.
+
 
 func _initialize() -> void:
 	if DisplayServer.get_name() == "headless":
@@ -142,7 +157,8 @@ func _run() -> void:
 
 	print("  sampled %d solid cells and %d air cells outside the lamp (%d skipped: %d near the surface,"
 		% [rock_v.size(), air_v.size(), int(s["skipped"]), int(s["near_surface"])]
-		+ " %d inside the lamp, %d off the judged slab)" % [int(s["lit"]), int(s["offslab"])])
+		+ " %d inside the lamp, %d off the judged slab, %d flooded)"
+		% [int(s["lit"]), int(s["offslab"]), int(s["wet"])])
 
 	# NON-VACUITY FIRST, because everything below is a ratio and a ratio over nothing is not a small
 	# result, it is no result. These run before the verdict so that a frame with nothing in it fails as a
@@ -173,6 +189,20 @@ func _run() -> void:
 		% [_median(rock_g), _median(air_g), absf(_median(rock_g) - _median(air_g)), g_auc * 100.0])
 	print("  the better cue is %s at %.0f%% (a coin flip is 50%%, the floor is %.0f%%)"
 		% ["VALUE" if v_auc >= g_auc else "GRAIN", best * 100.0, READ_FLOOR * 100.0])
+
+	# THE SHAPE OF EACH POPULATION, NOT JUST ITS CENTRE. A median gap and a separability can move in
+	# opposite directions — this fixture did exactly that, gap 2.6 -> 4.2 while discriminability went
+	# 56% -> 53% — and a median cannot show why. Two candidate mechanisms both predict it and they want
+	# different fixes, so print the spread and let the distribution choose between them:
+	#   heterogeneous rock  -> wide rock spread, narrow air spread, heavy overlap at the shoulders
+	#   bimodal air         -> air's own quartiles far apart, a population with two homes
+	# Printed rather than asserted. This is diagnosis, and an assertion on a shape nobody has looked at
+	# yet would be a floor invented before the measurement, which is the error this file already made once.
+	print("  rock spread: %s" % _shape(rock_v))
+	print("  air  spread: %s" % _shape(air_v))
+	print("  sampled rows: rock median %d, air median %d (the two populations should be looking at the"
+		% [int(_median(s["rock_row"])), int(_median(s["air_row"]))]
+		+ " same depths; far apart means they are not the same picture)")
 
 	_check(best >= READ_FLOOR,
 		"a player can tell rock from air out in the dark — %.0f%% on the better of the two cues (floor %.0f%%)"
@@ -215,7 +245,10 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var air_value: Array[float] = []
 	var rock_grain: Array[float] = []
 	var air_grain: Array[float] = []
+	var rock_row: Array[float] = []
+	var air_row: Array[float] = []
 	var near_surface: int = 0
+	var wet: int = 0
 	var lit: int = 0
 	var offslab: int = 0
 
@@ -250,12 +283,25 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 			if main.sim.is_solid(c):
 				rock_value.append(stat.x)
 				rock_grain.append(stat.y)
+				rock_row.append(float(cy))
+			elif main.sim.water_at(c) > 0:
+				# THE THIRD THING, and finding it is why the air population was bimodal. `is_solid` is
+				# `solid.has(cell)` and water lives in a SEPARATE dictionary, so a flooded cell is
+				# not-solid and was being counted as air — while drawing as water, which is bright on
+				# purpose. Air's quartiles sat at 0.7 and 11.2 around a median of 3.7: two homes, one of
+				# them the void and the other a fluid the layer had never heard of.
+				#
+				# The question this layer asks is wall-or-hole. Water is neither, a player is never
+				# confused about which one it is, and check_water_reads already owns whether it reads.
+				# Counting it here does not make the measurement harder, it makes it about something else.
+				wet += 1
 			else:
 				air_value.append(stat.x)
 				air_grain.append(stat.y)
+				air_row.append(float(cy))
 
 	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain,
-		"air_grain": air_grain, "near_surface": near_surface, "lit": lit, "offslab": offslab,
+		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
 		"skipped": near_surface + lit + offslab}
 
 
@@ -301,6 +347,19 @@ func _readability(a: Array[float], b: Array[float]) -> float:
 				wins += 0.5
 	var auc: float = wins / float(a.size() * b.size())
 	return maxf(auc, 1.0 - auc)
+
+
+## Quartiles and the extremes, so a population that has gone bimodal is visible as one. A distribution
+## with two homes shows a p25 and a p75 sitting far from the median in both directions at once, where a
+## merely-wide one spreads evenly.
+func _shape(a: Array[float]) -> String:
+	if a.is_empty():
+		return "none"
+	var s: Array[float] = a.duplicate()
+	s.sort()
+	var q := func(f: float) -> float: return s[clampi(int(float(s.size()) * f), 0, s.size() - 1)]
+	return "min %.1f  p25 %.1f  med %.1f  p75 %.1f  max %.1f  (IQR %.1f)" % [s[0], q.call(0.25),
+		q.call(0.50), q.call(0.75), s[s.size() - 1], q.call(0.75) - q.call(0.25)]
 
 
 func _median(a: Array[float]) -> float:
