@@ -136,6 +136,27 @@ func _run() -> void:
 	get_root().add_child(_main)
 	for _i: int in SETTLE:
 		await physics_frame
+	# TAKE THE SCENE'S EARS OFF, AFTER A FRAME HAS PASSED.
+	#
+	# This layer opens a REAL WINDOW with live input callbacks, and `main.gd:991` toggles `_paused` from
+	# `_unhandled_input` on Controls.PAUSE — KEY_P or JOY_BUTTON_START. `_paused` is the FIRST gate
+	# `try_mine` tests, so one stray keystroke, or a joypad that enumerates START, silently pauses the run
+	# and every mine for the rest of it returns false with the world in perfect condition.
+	#
+	# That fits a failure I could not otherwise explain: DIG landed 0 of 40 in a sweep, the body correctly
+	# placed over 44 rows of solid rock, all six cells beneath it solid, and fifteen isolated runs plus a
+	# second full sweep could not reproduce it. It is the only candidate whose intermittency does not depend
+	# on the world — which is exactly what ten byte-identical placements demand.
+	#
+	# `capture_moments.gd` learned this the hard way when an E and a P arrived mid-capture and it
+	# photographed the Bazaar modal. It deafens; NO check_* layer did, including this one, and
+	# `check_input_deafness` exists to prove the mechanism works while nothing was using it.
+	#
+	# AFTER a frame, not before: a SceneTree script's `_initialize` runs before the tree is up, so `_ready`
+	# is deferred — and Godot re-arms unhandled-input delivery as part of it. Deafen first and `_ready`
+	# turns the ears back on behind you.
+	Controls.deaf = true
+	_deafen(_main)
 	await RenderingServer.frame_post_draw
 
 	var player: Player = _main._player
@@ -465,7 +486,15 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 			# Reverse periodically so the run stays inside the generated world instead of hitting its edge.
 			player.input_dir = 1.0 if (i / 60) % 2 == 0 else -1.0
 		&"dig":
-			var hit: bool = _main.try_mine(_dig_target(player))
+			var target: Vector2i = _dig_target(player)
+			var hit: bool = _main.try_mine(target)
+			if hit:
+				_dig_refusals_running = 0
+			else:
+				_dig_refusals_running += 1
+				if _dig_refusals_running >= STUCK_REFUSALS and not _dig_refusal_reported:
+					_dig_refusal_reported = true
+					_report_refusal(player, target)
 			player.input_dir = 0.0
 			return hit
 		&"swing":
@@ -487,7 +516,60 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 ## Searching downward for real rock is what check_dig_hitch already does, for exactly this reason. Bounded
 ## by DIG_REACH so that a body genuinely standing over a void still fails the workload floor rather than
 ## silently teleporting its dig to the bottom of the world — the failure must stay visible.
-const DIG_REACH: int = 4
+## PERSISTENT refusals, not the first one — and the difference is the whole value of the instrument.
+##
+## The first version reported the FIRST refusal and was immediately useless: every healthy run refuses once,
+## on the frame after a successful mine, when the cell below is the hole you just made and the next solid
+## rock is further than the reach. Benign, self-correcting, and it would have consumed the one-shot before
+## anything interesting could happen — a diagnostic spent on the normal case is a diagnostic that is not
+## there for the abnormal one.
+##
+## The failure this is for is 400 consecutive refusals. So the trigger is a RUN of them: long enough that a
+## body falling between strikes cannot produce it, short enough to fire well before the phase gives up.
+const STUCK_REFUSALS: int = 30
+var _dig_refusals_running: int = 0
+var _dig_refusal_reported: bool = false
+
+
+## WHY DID `try_mine` SAY NO — asked at the first refusal, answered from the three gates it actually has.
+##
+## This exists because the failure it is for happened ONCE, in a sweep, and could not be reproduced in
+## fifteen isolated runs, a loaded-box arm, or a second full sweep. A defect at that rate cannot be chased
+## by re-running; the only affordable move is to make sure the NEXT occurrence arrives with its own answer
+## attached. "DIG landed 0 of 40" plus a dig-site print already eliminated placement — the body stood over
+## 44 rows of solid rock — so what remains is `try_mine` refusing a target it should have taken, and the
+## three reasons it can are paused, reach/line-of-sight, and no tool for this material.
+##
+## Printed rather than asserted. Adding a gate here would guess at the mechanism, and the whole reason this
+## function exists is that nobody knows it yet.
+func _report_refusal(player: Player, target: Vector2i) -> void:
+	var here: Vector2i = _main._cell_at(player.position)
+	var mat: StringName = _main.sim.material_at(target)
+	printerr("    !! try_mine REFUSED %d TIMES IN A ROW at %s (body at %s, %d cells away)"
+		% [_dig_refusals_running, target, here, target.y - here.y])
+	printerr("       paused=%s  solid=%s  material=%s"
+		% [_main._paused, _main.sim.is_solid(target), String(mat) if mat != &"" else "(none)"])
+	printerr("       can_mine=%s  pack=%s"
+		% [MiningRules.can_mine(mat, _main.sim.inventory), _main.sim.inventory])
+	printerr("       if solid=true and can_mine=true, the refusal was REACH or LINE OF SIGHT")
+
+
+## DERIVED FROM THE GAME'S OWN REACH, not typed. It was 4 and the body can mine 3.2 cells, so
+## `_dig_target` could return a cell the verb is FORBIDDEN to service and `try_mine` refused it every
+## frame for as long as the body stayed there.
+##
+## Caught by the refusal reporter on a PASSING run — one refusal at (42, 23) with the body at (42, 19),
+## four cells away — which is the argument for printing a diagnostic on the first failure rather than only
+## when the layer goes red. The run was green; the defect was live; nothing would ever have said so.
+##
+## Whether this is THE mechanism behind the one 0-mines sweep is not established and I am not claiming it:
+## a transient four-cell gap self-corrects as the body falls, and the failing run would have needed the
+## body held there for 400 frames. What is established is that the fixture could select an unreachable
+## target at all, which is a fixture that can fail for a reason having nothing to do with what it measures.
+##
+## `floori`, not `roundi`: 3.2 cells of reach means three whole cells, and rounding up would restore the
+## bug with a derivation in front of it.
+const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
 func _dig_target(player: Player) -> Vector2i:
 	var here: Vector2i = _main._cell_at(player.position)
 	for dy: int in range(1, DIG_REACH + 1):
@@ -551,10 +633,13 @@ func _stand_over_rock(player: Player) -> int:
 	# decides it. A fixture that cannot explain its own failure makes every run after it a re-run rather
 	# than an investigation, and this one has already cost a full sweep.
 	var under: String = ""
+	# `_paused` printed every run, because it is the one gate that does not depend on world state and the
+	# falsifier for the input hypothesis above: a recurrence with paused=true confirms it, a recurrence with
+	# paused=false eliminates the last non-world gate. One field, in a line already being printed.
 	for d: int in range(0, DIG_REACH + 2):
 		under += "#" if _main.sim.is_solid(Vector2i(best_col, surf + d)) else "."
-	print("    dig site: col %d, surface_row %d, body at row %d, %d solid rows found, under the feet [%s]"
-		% [best_col, surf, surf - 1, best_depth, under])
+	print("    dig site: col %d, surface_row %d, body at row %d, %d solid rows found, under the feet [%s], paused=%s, deaf=%s"
+		% [best_col, surf, surf - 1, best_depth, under, _main._paused, Controls.deaf])
 	return best_depth
 
 
@@ -708,3 +793,15 @@ func _gate(label: String, ms: PackedFloat32Array, quiet: float, ratio: float) ->
 		return false
 	print("      PASS: p95 is %.1fx a quiet frame (cap %.1fx)" % [got, ratio])
 	return true
+
+
+## Clear every input door on every node — `_input`, `_unhandled_input`, `_unhandled_key_input` — plus the
+## POLLING path via `Controls.deaf`, which the callback flags do not touch. Recursive rather than naming
+## MainView, because the HUD and anything added later have doors too and a list of them would rot. Lifted
+## from `capture_moments.gd`, which is the only tool in the repo that had this right.
+func _deafen(n: Node) -> void:
+	n.set_process_input(false)
+	n.set_process_unhandled_input(false)
+	n.set_process_unhandled_key_input(false)
+	for c: Node in n.get_children():
+		_deafen(c)
