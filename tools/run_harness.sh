@@ -122,9 +122,25 @@ SKIP_CODE=42
 # the alternative is the 33-red-push era (see the DisplayServer comment above).
 STRICT="${SF_STRICT:-$HAVE_DISPLAY}"
 
-NAMES=(); SCRIPTS=(); GLFLAG=()
-add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); }
-add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); }
+NAMES=(); SCRIPTS=(); GLFLAG=(); EXCL=()
+add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); EXCL+=(0); }
+add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(0); }
+
+# EXCLUSIVE — the scheduler drains every other layer before this one starts and launches nothing beside it.
+#
+# For a layer that measures MILLISECONDS this is not a nicety, it is the difference between a number and a
+# rumour. The parallel sweep runs JOBS=NCPU Godot processes at once, so a frame-time layer sharing the box
+# with a dozen neighbours is timing the contention, not the game. Measured, on this machine, same commit:
+#
+#            alone (SF_ONLY)      inside the parallel sweep
+#   IDLE p95    15.59ms                 20.70ms
+#   DIG  p95    32.58ms                 40.40ms
+#
+# A 33% inflation on IDLE and 24% on DIG, entirely manufactured by the harness. The file already warned
+# about this for a SECOND concurrent run ("a dozen other Godot processes fight it for the GPU") without
+# noticing the same sentence describes one run of itself. A 120fps gate read off the inflated column would
+# fail a game that met it — and, worse, could not be trusted when it eventually passed.
+add_excl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(1); }
 add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
 add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "check_save_frontier (envelope)"  "res://tools/check_save_frontier.gd"
@@ -165,13 +181,14 @@ add "check_refusal (rock says no)"    "res://tools/check_refusal.gd"
 add "check_lode (vein outlives blow)" "res://tools/check_lode.gd"
 add "check_head (stand it on it)"     "res://tools/check_head.gd"
 add "check_bazaar_ruin (it has art)"  "res://tools/check_bazaar_ruin.gd"
+add "check_draw_cull (offscreen)"     "res://tools/check_draw_cull.gd"
 add_gl "check_opening (no dead space)" "res://tools/check_opening.gd"
 add_gl "check_underground (lit rock)"  "res://tools/check_underground.gd"
 add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # Named for what it asserts everywhere, which is a RATIO — a dig may cost a few quiet frames, never twenty.
 # It read "120fps" for its whole life and never once asserted 8.33ms; that absolute now exists, but only on
 # hardware someone has named with SF_PERF_HOST, and a layer name cannot say "sometimes".
-add_gl "check_frametime (hitch ratio)" "res://tools/check_frametime.gd"
+add_excl "check_frametime (hitch+budget)" "res://tools/check_frametime.gd"
 add "check_stride (the run)"          "res://tools/check_stride.gd"
 add "check_tells (hollow rock)"       "res://tools/check_tells.gd"
 add "check_controls"                  "res://tools/check_controls.gd"
@@ -200,15 +217,16 @@ DECLARED="${#NAMES[@]}"
 # "all", because a filtered sweep that printed the all-pass line would be a new way to claim coverage
 # nobody ran — the exact bug this file was opened to fix.
 if [ -n "${SF_ONLY:-}" ]; then
-	fn=(); fs=(); fg=()
+	fn=(); fs=(); fg=(); fe=()
 	i=0
 	while [ "$i" -lt "$DECLARED" ]; do
 		if printf '%s' "${NAMES[$i]}" | grep -Eq -- "$SF_ONLY"; then
-			fn+=("${NAMES[$i]}"); fs+=("${SCRIPTS[$i]}"); fg+=("${GLFLAG[$i]}")
+			fn+=("${NAMES[$i]}"); fs+=("${SCRIPTS[$i]}"); fg+=("${GLFLAG[$i]}"); fe+=("${EXCL[$i]}")
 		fi
 		i=$((i + 1))
 	done
 	NAMES=(${fn[@]+"${fn[@]}"}); SCRIPTS=(${fs[@]+"${fs[@]}"}); GLFLAG=(${fg[@]+"${fg[@]}"})
+	EXCL=(${fe[@]+"${fe[@]}"})
 	if [ "${#NAMES[@]}" -eq 0 ]; then
 		echo "!! SF_ONLY='$SF_ONLY' matched none of the $DECLARED layers — refusing to report a run of nothing"
 		exit 2
@@ -346,6 +364,12 @@ while [ "$done_count" -lt "$total" ]; do
 	# Fill free slots.
 	while [ "$launched" -lt "$total" ] && [ "$((launched - done_count))" -lt "$JOBS" ]; do
 		i="$launched"
+		# An EXCLUSIVE layer gets the machine to itself: wait here until everything in flight has finished,
+		# and once it launches, stop filling slots until it is done. See add_excl for why a timing layer
+		# measured beside its neighbours reports the contention rather than the game.
+		if [ "${EXCL[$i]}" = "1" ] && [ "$((launched - done_count))" -gt 0 ]; then
+			break
+		fi
 		(
 			s=$SECONDS
 			# The EXACT exit code, not a boolean. Collapsing it to 0/1 is what made a skip indistinguishable
@@ -358,6 +382,9 @@ while [ "$done_count" -lt "$total" ]; do
 			printf '%d %d' "$?" "$((SECONDS - s))" >"$MARKS/$i.done"
 		) &
 		launched=$((launched + 1))
+		if [ "${EXCL[$i]}" = "1" ]; then
+			break
+		fi
 	done
 
 	# Report any newly-finished layers (index order within a poll; the [k/total] counter is truth).

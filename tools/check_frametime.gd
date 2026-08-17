@@ -26,9 +26,14 @@ extends SceneTree
 ##
 ## THE BAR IS RELATIVE, and that took a round to get right. Two things make an absolute millisecond budget
 ## unmeasurable here:
-##   * VSYNC. Asking for it off does not reliably get it off on macOS, and when it is on every frame that
-##     fits inside the refresh interval measures as exactly the refresh interval. A game with 4ms of
-##     headroom and one with 0.1ms both report a perfect 8.33, and the number says nothing.
+##   * VSYNC. When it is on, every frame that fits inside the refresh interval measures as exactly the
+##     refresh interval. A game with 4ms of headroom and one with 0.1ms both report a perfect 8.33, and
+##     the number says nothing. This is why the absolute budget refuses to assert on a paced run.
+##     MEASURED, and the older claim here was wrong: this file used to say "asking for it off does not
+##     reliably get it off on macOS", and a boot-time override.cfg fight was planned around that
+##     sentence. On macOS arm64 (M4 Pro, Godot 4.6.2) the VSYNC_DISABLED call in _run() DOES take effect —
+##     proven by samples arriving FASTER than the panel can present, which vsync makes impossible. See
+##     _fastest. Treat the claim as machine-specific and re-derive it from the samples, not from prose.
 ##   * THE MACHINE. A background reindex can put whole SECONDS into a frame that the game had no part in.
 ##     A layer that fails when Spotlight is busy is a layer people learn to ignore.
 ## Both move the quiet frames and the busy frames together, so the RATIO between them survives what the
@@ -73,6 +78,14 @@ const FRAME_BUDGET_MS: float = 1000.0 / 120.0
 ## vsync-pinned and refuse to assert an absolute. Frames landing on the refresh within a fifth of a
 ## millisecond are being paced by the display, not by the game.
 const VSYNC_PINNED_MS: float = 0.2
+
+## Fraction of samples sitting on a refresh multiple above which the run LOOKS vsync-paced. Measured, not
+## guessed: forcing VSYNC_ENABLED on this machine drives every phase p95 to ~16.5ms — two refresh intervals,
+## uniform across four phases that otherwise differ by 2x — while a genuine VSYNC_DISABLED run spreads them
+## 13.6 / 15.6 / 16.4 / 32.6. Clustering is the signal; individual frames are not. A handful of samples DO
+## come in under the interval even with vsync requested on, which is why "was any frame faster than the
+## panel" looked decisive and is not.
+const PACED_FRACTION: float = 0.6
 
 ## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
 ## which is how a layer that measured nothing got counted in "ALL 61 HARNESS LAYERS PASS".
@@ -159,18 +172,35 @@ func _run() -> void:
 ## pass.
 func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], quiet: float) -> bool:
 	if _perf_host == "":
-		print("  absolute: NOT ASSERTED — SF_PERF_HOST is unset, so this is arbitrary hardware. The budget"
-			+ " would be %.2fms/frame (120fps); the p95s above are a measurement, not a claim." % FRAME_BUDGET_MS)
+		# `SKIP:` at the start of the line is the harness contract for "this layer passed but stood part of
+		# itself down" — see run_harness.sh:43. It matters here more than anywhere: this is the project's
+		# ONLY 120fps assertion, SF_PERF_HOST was unset everywhere for the whole life of the code, and so
+		# the budget had never once run while the summary said ALL PASS. An opt-in assertion is fine; a
+		# SILENT opt-in assertion is decoration. It can no longer pass without saying it did not assert.
+		print("  SKIP: the %.2fms/frame (120fps) budget was NOT asserted — SF_PERF_HOST is unset, so this"
+			% FRAME_BUDGET_MS
+			+ " is arbitrary hardware and the p95s above are a measurement, not a claim. Set"
+			+ " SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn the budget on.")
 		return true
 
 	var refresh: float = DisplayServer.screen_get_refresh_rate()
 	var interval: float = (1000.0 / refresh) if refresh > 0.0 else 0.0
-	if interval > 0.0 and absf(quiet - interval) < VSYNC_PINNED_MS:
-		printerr("  absolute: FAIL on SF_PERF_HOST=%s — the quiet frame is %.2fms and the display refreshes"
-			% [_perf_host, quiet]
-			+ " every %.2fms, so vsync is pacing these frames and the millisecond numbers describe the" % interval
-			+ " monitor, not the game. Turn vsync off on this machine or stop naming it as a perf host.")
-		return false
+	if interval > 0.0:
+		var fastest: float = _fastest(phases)
+		var paced: float = _paced_fraction(phases, interval)
+		print("  absolute: vsync evidence — fastest frame %.2fms against a %.2fms refresh; %.0f%% of all"
+			% [fastest, interval, paced * 100.0]
+			+ " samples land on a refresh multiple."
+			+ (" The quiet frame is %.2fms, ON the interval: the game renders AT the panel's rate, so" % quiet
+				+ " there is no headroom before it drops under it."
+				if absf(quiet - interval) < VSYNC_PINNED_MS else ""))
+		if paced > PACED_FRACTION:
+			print("  absolute: CAUTION — that clustering is what vsync pacing looks like, so a FAIL below"
+				+ " may be inflated. The budget is asserted anyway, and that is deliberate: vsync makes a"
+				+ " frame WAIT for the next refresh, so it can only report times that are the same or"
+				+ " SLOWER, never faster. A paced run can therefore produce a false FAIL but never a false"
+				+ " PASS — and refusing to measure is exactly how this budget went unrun for its whole"
+				+ " life. An honest red beats a silent nothing.")
 
 	print("  absolute: SF_PERF_HOST=%s — every phase p95 must fit in %.2fms (120fps); the display refreshes"
 		% [_perf_host, FRAME_BUDGET_MS]
@@ -190,6 +220,56 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		else:
 			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
 	return ok
+
+
+## THE FASTEST FRAME IN THE RUN, and the reason this function exists is worth more than the function.
+##
+## The pin test used to be `quiet median ~= refresh interval`, and that is a guard that fires exactly when
+## its target is MET. It cannot separate "vsync is holding us at 120fps" from "we are genuinely rendering
+## at 120fps" — on a 120Hz panel both produce a quiet frame of 8.33ms. The first time anyone set
+## SF_PERF_HOST, it refused to assert on a run that was not vsync-paced at all, and this cost an
+## evening planning an OS-level fight that was never needed.
+##
+## What actually separates the two: under vsync the loop blocks on present, so NO frame can come in faster
+## than the refresh interval. A single sample below it is proof the pacing is ours. The evidence that
+## settled it was already sitting in the output nobody had read this way — an IDLE median of 8.27ms and a
+## worst frame of 12.95ms, one below the 8.33ms interval and the other stranded between 8.33 and 16.67
+## where a vsync-paced frame cannot land.
+##
+## `_phase` returns its samples sorted, so the fastest frame is ms[0] and costs nothing to read.
+func _fastest(phases: Array[PackedFloat32Array]) -> float:
+	var best: float = INF
+	for ms: PackedFloat32Array in phases:
+		if not ms.is_empty():
+			best = minf(best, ms[0])
+	return best
+
+
+## What share of samples land on a multiple of the refresh interval — the actual vsync signature, and the
+## reason the two simpler tests before it both failed.
+##
+## Test one was `quiet median ~= interval`. It fires exactly when the target is MET, and worse, it cannot
+## fire at all once the game is slower than one refresh: forcing vsync on drove the quiet frame to 8.96ms,
+## not 8.33, because pacing rounds a too-slow frame UP to the next interval rather than holding it at one.
+##
+## Test two was `did any frame beat the panel`. That looked decisive — under pacing nothing should present
+## faster than the refresh — and it is not: a VSYNC_ENABLED run still produced a 5.65ms sample. A single
+## outlier disables the whole detection, which is the worst property a guard can have.
+##
+## What survives both is CLUSTERING. Paced frames pile up on multiples of the interval; unpaced ones spread.
+## Forced on: four phase p95s at 16.56 / 16.51 / 16.61 / 16.59. Forced off: 15.59 / 13.60 / 32.58 / 16.42.
+func _paced_fraction(phases: Array[PackedFloat32Array], interval: float) -> float:
+	if interval <= 0.0:
+		return 0.0
+	var on: int = 0
+	var total: int = 0
+	for ms: PackedFloat32Array in phases:
+		for s: float in ms:
+			total += 1
+			var off: float = fmod(s, interval)
+			if minf(off, interval - off) < VSYNC_PINNED_MS:
+				on += 1
+	return (float(on) / float(total)) if total > 0 else 0.0
 
 
 ## Run one phase for SAMPLE drawn frames, driving the body as that phase requires and timing each frame
