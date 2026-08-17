@@ -95,6 +95,13 @@ func _initialize() -> void:
 ## re-checks the flag at the shutter, so a future re-arm fails the capture instead of quietly photographing
 ## whatever the keyboard did.
 func _deafen(n: Node) -> void:
+	# THE CALLBACK PATH — and it is only half the hardware. Turning these off stops _input/_unhandled_input
+	# being delivered; it does nothing whatsoever to POLLING, which reads the driver's live state every
+	# physics frame regardless. player.gd asks for the move axis, the climb axis and the jump button that
+	# way, and main.gd asks for MINE, so before this a hand resting on W or a held mouse button would walk
+	# or MINE the miner through a capture that takes seconds — and the check below could not see it,
+	# because it inspected modal state and a callback flag, and polling is neither.
+	Controls.deaf = true
 	n.set_process_input(false)
 	n.set_process_unhandled_input(false)
 	n.set_process_unhandled_key_input(false)
@@ -111,6 +118,10 @@ func _contamination(main: MainView, moment: String) -> String:
 	if main.is_processing_unhandled_input():
 		wrong.append("the scene is still LISTENING to input — _deafen did not take, so this frame is not "
 			+ "a pure function of the fixture")
+	if not Controls.deaf:
+		wrong.append("live input POLLING is still connected — player.gd reads the move/climb/jump state "
+			+ "and main.gd reads MINE every physics frame, so a key held down during this capture walked "
+			+ "or mined the miner and the shot is of the keyboard, not the fixture")
 	for field: Variant in want.keys():
 		var got: Variant = main.get(String(field))
 		if got == null:

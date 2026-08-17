@@ -1300,7 +1300,7 @@ func _update_mining(delta: float) -> void:
 	var mouse_world: Vector2 = get_global_mouse_position()
 	_aim = _effective_aim(mouse_world)
 	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
-	var pressed: bool = not _paused and not _settings_open and Input.is_action_pressed(Controls.MINE) \
+	var pressed: bool = not _paused and not _settings_open and Controls.pressed(Controls.MINE) \
 		and not _cursor_on_minimap() and not _cursor_on_hover_panel() and not _cursor_on_alerts()
 	if pressed:
 		_paint_dig_marks(mouse_world)        # dragging LMB sketches the plan (even beyond reach)

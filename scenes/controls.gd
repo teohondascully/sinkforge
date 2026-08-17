@@ -38,6 +38,36 @@ const DASHBOARD := &"sf_dashboard"
 const GRAPPLE := &"sf_grapple"
 const MUTE := &"sf_mute"
 
+
+## DEAFNESS — the one switch that takes live hardware away from the running game.
+##
+## capture_moments' `_deafen()` clears `_input` / `_unhandled_input` / `_unhandled_key_input`, and that is
+## the CALLBACK path only. POLLING is a different mechanism: `Input.get_axis()` and
+## `Input.is_action_pressed()` read the driver's current state and do not care in the slightest whether a
+## node is set to process input. So a capture — which takes seconds — could be walked, jumped, climbed or
+## MINED through by a hand resting on W or a mouse button held down, and `_contamination()` could not
+## notice, because it inspects modal state and a callback flag and polling touches neither of those.
+##
+## Every gameplay poll goes through `axis()` / `pressed()` below, so ONE place decides whether the hardware
+## is connected to the game and a fixture can assert that it still holds at the shutter. The alternative —
+## another list of things to disable — requires the next polling site anyone adds to know that it was
+## supposed to add itself to a list, which is exactly the kind of guarantee that quietly decays.
+##
+## This is representation-side only: it silences live hardware. Scripted drivers set `Player.input_dir` and
+## friends directly, so play-tests and fixtures are unaffected by it.
+static var deaf: bool = false
+
+
+## The remappable axis, or dead centre while the game is deafened.
+static func axis(negative: StringName, positive: StringName) -> float:
+	return 0.0 if deaf else Input.get_axis(negative, positive)
+
+
+## Is this action being held? Never, while the game is deafened.
+static func pressed(action: StringName) -> bool:
+	return false if deaf else Input.is_action_pressed(action)
+
+
 ## action -> list of default event specs. {"key": KEY_*} (physical) or {"button": MOUSE_BUTTON_*}.
 static func defaults() -> Dictionary:
 	return {

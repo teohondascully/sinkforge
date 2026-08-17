@@ -185,6 +185,10 @@ add "check_draw_cull (offscreen)"     "res://tools/check_draw_cull.gd"
 add_gl "check_opening (no dead space)" "res://tools/check_opening.gd"
 add_gl "check_underground (lit rock)"  "res://tools/check_underground.gd"
 add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
+# add_gl and NOT add_excl: it renders every item icon and compares silhouettes and CIELab means. Contention
+# changes how LONG that takes and not one pixel of what comes back, and exclusivity is the scheduler's most
+# expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
+add_gl "check_item_reads (icons)"      "res://tools/check_item_reads.gd"
 # Named for what it asserts everywhere, which is a RATIO — a dig may cost a few quiet frames, never twenty.
 # It read "120fps" for its whole life and never once asserted 8.33ms; that absolute now exists, but only on
 # hardware someone has named with SF_PERF_HOST, and a layer name cannot say "sometimes".
@@ -192,6 +196,7 @@ add_excl "check_frametime (hitch+budget)" "res://tools/check_frametime.gd"
 add "check_stride (the run)"          "res://tools/check_stride.gd"
 add "check_tells (hollow rock)"       "res://tools/check_tells.gd"
 add "check_controls"                  "res://tools/check_controls.gd"
+add "check_input_deafness (shutter)"  "res://tools/check_input_deafness.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
