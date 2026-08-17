@@ -175,7 +175,14 @@ add "check_fastforward"               "res://tools/check_fastforward.gd"
 add "check_mining"                    "res://tools/check_mining.gd"
 # add_gl, not add: it reads a rendered texture back and compares it, and the dummy renderer hands it two
 # blank surfaces that match. Registered headless it passed on the identity of nothing.
-add_gl "check_dig_hitch (friction)"   "res://tools/check_dig_hitch.gd"
+# add_excl, not add_gl: this layer MEASURES TIME, and a timing layer cannot share the box. It compares a
+# bulk fine-grid bake against the per-cell Callable path, and CI proved the comparison inverts under load —
+# green on the display job (JOBS=1, runs alone) and red on the headless job (JOBS=4) on the SAME commit,
+# twice, with bulk 2.2% then 8.2% slower where it is 12% FASTER on an idle box under both renderers. The
+# advantage is memory bandwidth the contending processes were eating; nothing about the code changed.
+# `check_frametime` already carries this verb for the same reason, and its own docstring records the effect:
+# a still frame costs one refresh interval idle and 2.4x that with five Godot processes beside it.
+add_excl "check_dig_hitch (friction)"   "res://tools/check_dig_hitch.gd"
 # Headless on purpose, unlike its neighbour: this one compares the baker's CPU-side bytes rather than a
 # texture read back from the driver, so it is the same test in both and belongs in CI.
 add "check_progressive_bake (#17)"    "res://tools/check_progressive_bake.gd"
