@@ -47,7 +47,12 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 90                 ## frames to let worldgen, the first full bake and the caches land
-const SAMPLE: int = 200                ## frames measured per phase
+const SAMPLE: int = 200                ## frames measured per phase (IDLE/RUN/SWING: work is continuous)
+## DIG measures a fixed amount of WORK instead, and stops when it has done it. 40 is under the 42-47 that
+## four observed runs fitted into SAMPLE frames, so it is reachable on a slower machine without hitting the
+## cap; the cap is 2x SAMPLE, and failing to reach 40 within it is a workload FAIL rather than a quiet
+## short measurement.
+const DIG_MINES: int = 40
 
 ## A quiet frame — the median of the IDLE phase — is the unit everything else is measured in. With vsync on
 ## it is the refresh interval; with vsync off it is the game's real floor cost. Either way it is what the
@@ -141,7 +146,7 @@ func _run() -> void:
 	var ok: bool = true
 	var run_ms: PackedFloat32Array = await _phase(&"run")
 	ok = _gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO) and ok
-	var dig_ms: PackedFloat32Array = await _phase(&"dig")
+	var dig_ms: PackedFloat32Array = await _phase(&"dig", DIG_MINES, SAMPLE * 2)
 	ok = _gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO) and ok
 	var swing_ms: PackedFloat32Array = await _phase(&"swing")
 	ok = _gate("SWING on the rope at speed", swing_ms, quiet, MOVE_HITCH_RATIO) and ok
@@ -292,7 +297,12 @@ func _paced_fraction(ms: PackedFloat32Array, interval: float) -> float:
 
 ## Run one phase for SAMPLE drawn frames, driving the body as that phase requires and timing each frame
 ## from the end of one draw to the end of the next. Returns the sorted millisecond samples.
-func _phase(kind: StringName) -> PackedFloat32Array:
+## `until_mines` makes the WORK the constant and the frame count the variable, which is the only way a
+## before/after on the dig path means anything. Left at 0 the phase runs a fixed SAMPLE frames, which is
+## right for IDLE/RUN/SWING because their work is continuous. DIG's is not: it lands a mine, falls, lands
+## another, and how many it fits into 200 frames depends on how fast it fell. That put 42-47 mines and a
+## 33-40ms p95 spread on honest runs — wide enough to swallow a real 15% win whole.
+func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> PackedFloat32Array:
 	var player: Player = _main._player
 	var ms := PackedFloat32Array()
 	if kind == &"swing":
@@ -302,7 +312,9 @@ func _phase(kind: StringName) -> PackedFloat32Array:
 	var anchored: int = 0
 	var prev: Vector2 = player.position
 	var last: int = Time.get_ticks_usec()
-	for i: int in SAMPLE:
+	for i: int in cap:
+		if until_mines > 0 and mined >= until_mines:
+			break
 		if _drive(kind, player, i):
 			mined += 1
 		await RenderingServer.frame_post_draw
@@ -317,7 +329,8 @@ func _phase(kind: StringName) -> PackedFloat32Array:
 			anchored += 1
 	player.input_dir = 0.0
 	player.input_climb = 0.0
-	_work[kind] = {"moved": moved, "mined": mined, "anchored": anchored, "at": _main._cell_at(player.position)}
+	_work[kind] = {"moved": moved, "mined": mined, "anchored": anchored, "frames": ms.size(),
+		"at": _main._cell_at(player.position)}
 	ms.sort()
 	return ms
 
@@ -398,15 +411,18 @@ func _fire_rope() -> void:
 ## its work — a body that cannot move, mines that all fail, a rope that never takes — and NOT to police
 ## small changes in how far the fixture happens to travel. A tight floor here would fail on honest fixture
 ## edits and teach everyone to raise it, which is how a guard becomes a formality.
+## DIG's floor is not half-the-observed like the other two: the phase now stops AT DIG_MINES, so anything
+## short of it means the cap was hit and the fixed work did not complete. Exact, and it cannot pass vacuously.
 const RUN_MIN_PX: float = 100.0
-const DIG_MIN_MINES: int = 20
+const DIG_MIN_MINES: int = DIG_MINES
 const SWING_MIN_ANCHORED: int = 100
 func _workload() -> bool:
 	var run_moved: float = float(_work.get(&"run", {}).get("moved", 0.0))
 	var dig_mined: int = int(_work.get(&"dig", {}).get("mined", 0))
 	var swing_anchored: int = int(_work.get(&"swing", {}).get("anchored", 0))
-	print("  workload: RUN moved %.0fpx · DIG landed %d mines of %d frames · SWING anchored %d frames of %d"
-		% [run_moved, dig_mined, SAMPLE, swing_anchored, SAMPLE]
+	print("  workload: RUN moved %.0fpx · DIG landed %d mines in %d frames (fixed work) · SWING anchored"
+		% [run_moved, dig_mined, int(_work.get(&"dig", {}).get("frames", 0))]
+		+ " %d frames of %d" % [swing_anchored, SAMPLE]
 		+ "   (body ended RUN at %s, DIG at %s, SWING at %s)"
 			% [_work.get(&"run", {}).get("at", Vector2i.ZERO),
 				_work.get(&"dig", {}).get("at", Vector2i.ZERO),
@@ -418,10 +434,10 @@ func _workload() -> bool:
 			+ " body that is stuck or standing still, under the name RUN")
 		ok = false
 	if dig_mined < DIG_MIN_MINES:
-		printerr("      FAIL: DIG landed %d successful mines across %d frames, under the %d floor — little"
-			% [dig_mined, SAMPLE, DIG_MIN_MINES]
-			+ " or nothing was excavated, so this distribution is not the cost of mining and the ratio"
-			+ " gate above is measuring something else entirely")
+		printerr("      FAIL: DIG landed only %d of its %d fixed mines before the %d-frame cap — the phase"
+			% [dig_mined, DIG_MIN_MINES, SAMPLE * 2]
+			+ " did not complete its work, so this distribution is not comparable to any other run's and"
+			+ " is not the cost of mining")
 		ok = false
 	if swing_anchored < SWING_MIN_ANCHORED:
 		printerr("      FAIL: SWING was anchored for %d of %d frames, under the %d floor — the rope did not"
