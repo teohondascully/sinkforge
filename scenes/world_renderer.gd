@@ -922,9 +922,44 @@ func _draw_lode() -> void:
 		var n: int = maxi(1, int(round(frac * float(all.size()))))
 		for i: int in n:
 			var p: Vector2 = base + all[i]
-			draw_circle(p + Vector2(0.6, 1.0), 3.0, Color(0.0, 0.0, 0.0, 0.34))   # seated in the wall
-			draw_circle(p, 2.5, Color(nug, 0.94))
-			draw_circle(p + Vector2(-0.6, -0.7), 1.1, Color(nug.lightened(0.55), 0.95))  # the catch of light
+			# Size and facing are read back out of the position, so the grain field stays deterministic per
+			# cell — a half-worked vein is the SAME vein, half worked — without a second hash to keep in step
+			# with the first as the prefix shortens.
+			var j: float = fposmod(all[i].x * 0.37 + all[i].y * 0.19, 1.0)
+			var spin: float = fposmod(all[i].x * 0.11 + all[i].y * 0.53, 1.0) * TAU
+			_draw_grain(p, GRAIN_MIN + GRAIN_VARY * j, spin, nug)
+
+
+## HOW BIG A GRAIN OF METAL IS, and how much the size varies across a face. Small: the fleck field has to
+## survive being stared at for as long as it takes to build on it, and a big fleck is a sticker.
+const GRAIN_MIN: float = 1.45
+const GRAIN_VARY: float = 1.15
+const GRAIN_SEAT := Vector2(0.6, 0.9)                ## how far the grain's own shadow falls behind it
+const GRAIN_SEAT_COLOR := Color(0.0, 0.0, 0.0, 0.38)
+const GRAIN_BODY_DARK: float = 0.34                  ## the grain's midtone, under its nugget colour
+const GRAIN_LIT: float = 0.42                        ## the facet the light is on
+const GRAIN_SHADE: float = 0.36                      ## …and the one it is not
+
+
+## ONE GRAIN OF METAL IN THE FACE — angular, and lit from one side.
+##
+## The lode's look died three times on the same read before this: a circle with a bright core is a BUBBLE, and
+## six of them per cell is foam. Rock does not hold round metal. A grain is a facet — a small quad seated in
+## its own shadow, split into a lit half and a shaded half — and the two-tone split is what does the work,
+## because it means the grain is a SHAPE catching light from somewhere rather than a dot emitting it. That is
+## `docs/LODE.md` §11's first line ("ore does not glow, it answers your lamp") spent at the level of one fleck;
+## the veil overhead still does the rest, dimming the whole field where no lamp reaches it.
+func _draw_grain(p: Vector2, r: float, spin: float, nug: Color) -> void:
+	var ax := Vector2(cos(spin), sin(spin)) * r
+	var ay := Vector2(-ax.y, ax.x) * 0.74
+	var q := PackedVector2Array([p + ax, p + ay, p - ax, p - ay])
+	var seated := PackedVector2Array([
+		q[0] + GRAIN_SEAT, q[1] + GRAIN_SEAT, q[2] + GRAIN_SEAT, q[3] + GRAIN_SEAT])
+	draw_colored_polygon(seated, GRAIN_SEAT_COLOR)
+	var body: Color = nug.darkened(GRAIN_BODY_DARK)
+	draw_colored_polygon(q, body)
+	draw_colored_polygon(PackedVector2Array([q[3], q[0], p]), body.lightened(GRAIN_LIT))
+	draw_colored_polygon(PackedVector2Array([q[1], q[2], p]), body.darkened(GRAIN_SHADE))
 
 
 func _draw_ore_glints() -> void:
@@ -1670,57 +1705,92 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 			TerrainPainter.paint_wall_face(self, ci, c, wpos, col)
 
 
-## THE GRAIN, DRAWN (#S31). `Seams` gives every rock cell a bedding plane, a joint, a diagonal or nothing,
-## and a blow that follows one calves the whole run — so the grain has to be READABLE BEFORE YOU SWING or
-## the mechanic is a slot machine. It is drawn per cell rather than per plane, which sounds wasteful and is
-## not: a per-cell segment is clipped to solid rock for free, so a bedding plane crossing a chamber stops at
-## the chamber and resumes on the far side, which is exactly what a real one does.
+## THE GRAIN, DRAWN (#S31) — only where it is being used.
 ##
-## A parting is a SHADOW WITH A LIT LIP, never a drawn line — rock does not have ink in it. The dark stroke
-## sits on the plane itself and the pale one just past it, so the pair reads as one surface stepping over
-## another. Both are quiet on purpose: this is texture the eye finds when it looks, not an overlay it has to
-## look past, and the darkness veil multiplies over it so the grain fades into unlit rock like everything
-## else. Foliage is excluded — a tree does not have bedding.
-const SEAM_DARK := Color(0.03, 0.04, 0.06, 0.58)
-const SEAM_LIP := Color(0.95, 0.91, 0.82, 0.24)
+## `Seams` gives every rock cell a bedding plane, a joint, a diagonal or nothing, and a blow that follows one
+## calves the whole run, so the grain has to be READABLE BEFORE YOU SWING or the mechanic is a slot machine.
+## The first version answered that by drawing every plane in the world, all the time, and it was wrong on
+## screen in three compounding ways. `Seams.at` keys bedding to the ROW and joints to the COLUMN, so one
+## plane spans the entire world. Each cell laid its stroke on its own EDGE, so a run of them is a ruled line
+## lying exactly on a cell boundary. And it was inked at 0.58 alpha. Eighteen percent of rows and twelve
+## percent of columns, ruled, on the grid, in ink: the ground read as graph paper — dashed lines running up,
+## sideways and diagonally across untouched rock, which is a renderer drawing its own storage layout.
+##
+## The fix is not a quieter version of that. "Readable before you swing" is answered better by the CURSOR
+## than by the world: hovering a cell lights the plane through it and the run it would shear, which is more
+## information than an ambient hairline ever carried, at the exact moment it is worth having, and it costs
+## the other nine-tenths of the screen nothing. So the ambient pass is gone and rock reads as rock. The
+## stroke itself is a SHADOW WITH A LIT LIP, never a drawn line — rock does not have ink in it — and it
+## still wanders off the cell line, because a parting that ran straight down a boundary would put the grid
+## back on screen for as long as the cursor sat there.
+const SEAM_AIM_DARK := Color(0.02, 0.03, 0.05, 0.60)
+const SEAM_AIM_LIP := Color(1.0, 0.96, 0.86, 0.32)
+const SEAM_WANDER: float = 0.30                        ## how far off its nominal line a parting strays, in cells
+
 func _draw_seams() -> void:
-	var view: Rect2 = _view_world_rect(1.0)
 	var s: float = float(CELL)
-	var x0: int = maxi(int(view.position.x / s), 0)
-	var x1: int = mini(int(view.end.x / s) + 1, FactorySim.GRID_COLS)
-	var y0: int = maxi(int(view.position.y / s), 0)
-	var y1: int = mini(int(view.end.y / s) + 1, FactorySim.GRID_ROWS)
-	for cy: int in range(y0, y1):
-		for cx: int in range(x0, x1):
-			var c := Vector2i(cx, cy)
-			if not sim.solid.has(c):
-				continue
-			var seam: int = Seams.at(c, sim.world_seed)
-			if seam == Seams.NONE or sim.is_foliage_material(sim.solid[c]):
-				continue
-			# A plane that ran cell to cell at a constant strength drew as INK — a perfectly straight
-			# ruled stroke lying on top of the rock rather than inside it. A real parting is welded shut in
-			# places and open in others, and it wanders by a hair. So each cell's stretch gets its own span
-			# and its own one-pixel wobble off the plane, and one stretch in five is closed entirely.
-			var h: int = Seams.grain(c)
-			if h % 5 == 4:
-				continue
-			var a: float = float(h % 3) * 0.15
-			var b: float = 1.0 - float((h >> 5) % 3) * 0.15
-			var wob: float = float((h >> 11) % 3) - 1.0
-			var o := Vector2(c) * s + Vector2(wob, wob)
-			match seam:
-				Seams.HORIZONTAL:
-					draw_line(o + Vector2(a * s, 0.0), o + Vector2(b * s, 0.0), SEAM_DARK, 2.0)
-					draw_line(o + Vector2(a * s, 2.5), o + Vector2(b * s, 2.5), SEAM_LIP, 1.0)
-				Seams.VERTICAL:
-					draw_line(o + Vector2(0.0, a * s), o + Vector2(0.0, b * s), SEAM_DARK, 2.0)
-					draw_line(o + Vector2(2.5, a * s), o + Vector2(2.5, b * s), SEAM_LIP, 1.0)
-				_:
-					draw_line(o + Vector2(a * s, (1.0 - a) * s), o + Vector2(b * s, (1.0 - b) * s),
-						SEAM_DARK, 2.0)
-					draw_line(o + Vector2(a * s + 2.0, (1.0 - a) * s), o + Vector2(b * s, (1.0 - b) * s + 2.0),
-						SEAM_LIP, 1.0)
+	for key: Variant in _aim_run():
+		var c: Vector2i = key
+		_stroke_seam(c, Seams.at(c, sim.world_seed), s, SEAM_AIM_DARK, SEAM_AIM_LIP, 2.2)
+
+
+## A smooth ±1 wander along a plane, sampled per cell INDEX so neighbouring cells share an endpoint exactly
+## and the polyline is continuous. Two sines rather than a hash on purpose: a hash steps at every cell, which
+## is the defect this replaces — a plane has to bend, not jump.
+func _seam_wander(i: int, salt: float) -> float:
+	return 0.62 * sin(float(i) * 0.73 + salt) + 0.38 * sin(float(i) * 0.31 + salt * 2.1)
+
+
+## One cell's stretch of parting: the shadow on the plane, the lit lip just past it.
+func _stroke_seam(c: Vector2i, seam: int, s: float, dark: Color, lip: Color, w: float) -> void:
+	var a: Vector2
+	var b: Vector2
+	var perp: Vector2
+	match seam:
+		Seams.HORIZONTAL:
+			var salt: float = float(c.y) * 1.37
+			a = Vector2(float(c.x) * s, (float(c.y) + _seam_wander(c.x, salt) * SEAM_WANDER) * s)
+			b = Vector2(float(c.x + 1) * s, (float(c.y) + _seam_wander(c.x + 1, salt) * SEAM_WANDER) * s)
+			perp = Vector2(0.0, 2.4)
+		Seams.VERTICAL:
+			var salt_v: float = float(c.x) * 1.37
+			a = Vector2((float(c.x) + _seam_wander(c.y, salt_v) * SEAM_WANDER) * s, float(c.y) * s)
+			b = Vector2((float(c.x) + _seam_wander(c.y + 1, salt_v) * SEAM_WANDER) * s, float(c.y + 1) * s)
+			perp = Vector2(2.4, 0.0)
+		_:
+			# The diagonal runs (1,-1), so it is parameterised by x alone: the cell up-right of this one
+			# recomputes this cell's far endpoint as its own near one, and the line joins exactly.
+			var salt_d: float = float(c.x + c.y) * 1.37
+			var d0: float = _seam_wander(c.x, salt_d) * SEAM_WANDER * s
+			var d1: float = _seam_wander(c.x + 1, salt_d) * SEAM_WANDER * s
+			a = Vector2(float(c.x) * s + d0, float(c.y + 1) * s + d0)
+			b = Vector2(float(c.x + 1) * s + d1, float(c.y) * s + d1)
+			perp = Vector2(1.7, 1.7)
+	draw_line(a, b, dark, w)
+	draw_line(a + perp, b + perp, lip, maxf(w * 0.62, 1.0))
+
+
+## The cells the AIMED cell's plane runs through, within one blow's reach along it — the mechanic made
+## visible at the moment it is about to be used. Walked with `MainView._calve`'s own gates (contiguous, same
+## seam, still solid) so what lights up is what would actually shear, not a decoration that resembles it.
+## The heading gate is deliberately NOT applied: this says which way the rock parts, which is the thing you
+## need in order to choose a heading at all.
+func _aim_run() -> Dictionary:
+	var out: Dictionary = {}
+	if not _aim_in_reach or not _aim_bites or not sim.solid.has(_aim):
+		return out
+	var seam: int = Seams.at(_aim, sim.world_seed)
+	if seam == Seams.NONE or sim.is_foliage_material(sim.solid[_aim]):
+		return out
+	out[_aim] = true
+	var axis: Vector2i = Seams.axis(seam)
+	for side: int in [1, -1]:
+		for step: int in range(1, Seams.RUN_CAP):
+			var c: Vector2i = _aim + axis * (step * side)
+			if not sim.solid.has(c) or Seams.at(c, sim.world_seed) != seam:
+				break
+			out[c] = true
+	return out
 
 
 func _draw_drop_paths() -> void:
@@ -2460,6 +2530,12 @@ func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 ## double-counting the same shadow twice (#S3).
 const WALL_NONE := Color(0.06, 0.055, 0.05)   ## a cell with no wall entry (unlikely on solid terrain)
 
+## How far a vein carries its host rock toward the metal in it, and how much brighter a mineralised face is
+## allowed to be than the plain rock beside it. The lift is deliberately almost nothing: a face reads as a
+## face because of its colour and its grain, never because it is lit differently from the wall it is cut into.
+const LODE_STAIN: float = 0.42
+const LODE_STAIN_LIFT: float = 1.05
+
 func _wall_fill_color(c: Vector2i) -> Color:
 	if not sim.wall.has(c):
 		return WALL_NONE
@@ -2482,8 +2558,18 @@ func _wall_base_color(c: Vector2i) -> Color:
 		# literally correct and completely invisible. A real vein face is STAINED by what is in it, so the
 		# wall here is the rock carried a quarter of the way toward the metal. That derives per material
 		# rather than being picked: coal stains the wall dark, iron rusty, ore pale. One rule, four answers.
+		#
+		# …but it stains in HUE, not in VALUE. The first cut lerped the raw colour, and ore's nugget is pale
+		# (v 0.85) against its matrix (v 0.34), so a 42% stain brightened the wall by 62% — a carved adit came
+		# out LIGHTER than the solid rock around it and read as more rock rather than as a hole with a face at
+		# the back of it. `docs/LODE.md` §11 already names the rule this breaks: brightness carries ATTENTION,
+		# density carries richness. So the mix sets what the wall is made of and the host rock keeps the say
+		# over how lit it is; the metal earns its brightness one grain at a time, in `_draw_lode`.
 		var vein: MaterialDef = _material(sim.lode[c])
-		return _zone_tinted(vein.base_color.lerp(vein.nugget_color, 0.42), c.y)
+		var host: Color = _material(sim.wall[c]).base_color if sim.wall.has(c) else vein.base_color
+		var stained: Color = host.lerp(vein.nugget_color, LODE_STAIN)
+		stained.v = host.v * LODE_STAIN_LIFT
+		return _zone_tinted(stained, c.y)
 	if not sim.wall.has(c):
 		return WALL_NONE
 	return _zone_tinted(_material(sim.wall[c]).base_color, c.y)

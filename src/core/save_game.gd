@@ -36,6 +36,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"wall": sim.wall.duplicate(),
 		"deposits": sim.deposits.duplicate(),
 		"lode": sim.lode.duplicate(),
+		"lode_max": sim.lode_max.duplicate(),
 		"inventory": sim.inventory.duplicate(),
 		"ground": sim.ground.duplicate(true),
 		"sink": sim.sink.duplicate(),
@@ -83,6 +84,7 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	sim.wall = (data["wall"] as Dictionary).duplicate()
 	sim.deposits = (data["deposits"] as Dictionary).duplicate()
 	sim.lode = (data.get("lode", {}) as Dictionary).duplicate()     # additive: absent in older saves → empty
+	sim.lode_max = (data.get("lode_max", {}) as Dictionary).duplicate()
 	sim.inventory = (data["inventory"] as Dictionary).duplicate()
 	sim.ground = (data["ground"] as Dictionary).duplicate(true)
 	sim.sink = (data["sink"] as Dictionary).duplicate()

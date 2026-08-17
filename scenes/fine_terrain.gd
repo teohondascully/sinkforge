@@ -67,6 +67,25 @@ const GRAIN_AMP: float = 0.10                          ## value swing of the gra
 ## can cut into scattered single cells, so an "embedded stone" prints as one dark square and a "hairline
 ## crack" as a line of dots. Both now ramp in over several cells instead of switching, which is also what
 ## makes them read as a blob and a seam rather than as damage.
+## THE CONTACT MUST NOT BE THE CELL.
+##
+## Materials are stored one per 32px coarse cell, so every place two of them meet is an axis-aligned
+## rectangle edge — and the ground is not one material: earth, shale, stone, ore and coal interleave cell by
+## cell, each with its own base colour, and `_paint_fine` reads that colour FLAT for all SUBDIV² children.
+## Stored that way it paints a QUILT: flat-shaded blocks in a grid. That is the "weird contrast between the
+## lighting of the blocks" read, and it survives the veil being switched off entirely, which is how it was
+## finally pinned on the palette rather than on the light. `check_grid` never saw it because it excludes
+## pairs whose coarse parents hold different materials — reasonably, since dirt meeting stone SHOULD step.
+## The defect is not that the contact is sharp. It is that the contact is a RECTANGLE.
+##
+## So the material LOOKUP is displaced: each fine cell asks which coarse cell it belongs to after a small
+## noise offset, up to CONTACT_WARP fine cells. A cell's interior is unaffected — a displaced sample lands
+## back in the same cell — and only the boundary moves, so every contact becomes a wandering line at 8px
+## granularity instead of a 32px step. Nothing else changes: not the palette, not the tone, and not the
+## SHAPE, which keeps reading `_solid_mask` at the true index so molding and AO are untouched.
+const CONTACT_WARP: float = 3.2
+const CONTACT_FREQ: float = 0.14                       ## ~7 fine cells per wiggle — a contact, not a fringe
+
 const PATCH_FREQ: float = 0.045                        ## big low-freq tonal patches (~22 fine cells / ~2.7 cells)
 const PATCH_AMP: float = 0.22                          ## value swing of the broad patches (lighter/darker rock)
 const STONE_FREQ: float = 0.10                         ## embedded darker-stone blobs (~10 fine cells across)
@@ -256,6 +275,7 @@ var _grain2: FastNoiseLite                             ## crisp grit octave
 var _moss: FastNoiseLite                               ## moss patch mask (diff 5)
 var _root: FastNoiseLite                               ## which columns grow a root, and how deep (#S10)
 var _patch: FastNoiseLite                              ## broad tonal patches (diff-04 #1)
+var _warp: FastNoiseLite                               ## displaces the MATERIAL lookup so contacts wander
 var _stone: FastNoiseLite                              ## embedded darker-stone blobs (diff-04 #1)
 var _crack: FastNoiseLite                              ## hairline crack seams (diff-04 #1)
 var _huex: FastNoiseLite                               ## region hue field, x axis (diff-04 #3)
@@ -309,6 +329,7 @@ func _init(cols: int, rows: int, seed: int) -> void:
 	_root = _field(seed, 0x7feb352d, FastNoiseLite.TYPE_SIMPLEX, ROOT_FREQ)
 	# diff-04 #1 — broad tonal patches + embedded stones + cracks (each its own seed so they don't correlate).
 	_patch = _field(seed, 0x2545f491, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, PATCH_FREQ, 3)
+	_warp = _field(seed, 0x6f4f2b91, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, CONTACT_FREQ, 2)
 	# Both are THRESHOLDED downstream, so neither may carry an octave tail: doubling the frequency once
 	# puts detail at the grid's own scale, and a threshold on that prints the blob as scattered squares
 	# and the crack as dots. One octave each — the shape is the point, not the roughness of its edge.
@@ -483,7 +504,8 @@ func _paint_fine(fx: int, fy: int) -> void:
 	var here_solid: bool = _fine_solid[fy * _fcols + fx] == 1
 	var parent_solid: bool = _solid_mask[cidx] > 0.5
 	if here_solid:
-		var base: Color = _mat_col[cidx] if parent_solid else _accreted_color(_mat_col, _wall_col, _solid_mask, fx, fy, cidx)
+		var midx: int = _contact_index(fx, fy, cidx)
+		var base: Color = _mat_col[midx] if parent_solid else _accreted_color(_mat_col, _wall_col, _solid_mask, fx, fy, cidx)
 		# #S12: put the tone back on at FINE resolution. The base arrives untoned, so this is the only
 		# place the jitter and the bedding reach the rock — as a reconstructed field, not as a mosaic.
 		var col: Color = apply_tone(base, _tone_at_fine(fx, fy))
@@ -602,6 +624,19 @@ func _paint_fine(fx: int, fy: int) -> void:
 ## would put four samples inside each cell and none on the boundary, and the grid would survive.
 ##
 ## Clamped at the world edges so the border reconstructs against itself rather than against nothing.
+## Which coarse cell this fine cell takes its MATERIAL COLOUR from, after the contact warp (see
+## CONTACT_WARP). Falls back to the true parent whenever the displaced sample lands somewhere that is not
+## solid rock: a warp that reached into air would paint rock the colour of nothing, and what happens at a
+## face is the molding's job, not this one's.
+func _contact_index(fx: int, fy: int, cidx: int) -> int:
+	var dx: float = _warp.get_noise_2d(float(fx), float(fy)) * CONTACT_WARP
+	var dy: float = _warp.get_noise_2d(float(fx) + 311.0, float(fy) - 197.0) * CONTACT_WARP
+	var wc: int = clampi(int(floor((float(fx) + dx) / float(SUBDIV))), 0, _cols - 1)
+	var wr: int = clampi(int(floor((float(fy) + dy) / float(SUBDIV))), 0, _rows - 1)
+	var widx: int = wr * _cols + wc
+	return widx if _solid_mask[widx] > 0.5 else cidx
+
+
 func _tone_at_fine(fx: int, fy: int) -> Vector2:
 	var u: float = (float(fx) + 0.5) / float(SUBDIV) - 0.5
 	var v: float = (float(fy) + 0.5) / float(SUBDIV) - 0.5
@@ -609,8 +644,17 @@ func _tone_at_fine(fx: int, fy: int) -> Vector2:
 	var y0: int = clampi(int(floor(v)), 0, _rows - 1)
 	var x1: int = mini(x0 + 1, _cols - 1)
 	var y1: int = mini(y0 + 1, _rows - 1)
+	# SMOOTHSTEPPED, not linear. `_tone` is one sample per COARSE cell and the beds it carries swing far
+	# enough to be seen, so how it is interpolated is not a detail. Straight bilinear is continuous in VALUE
+	# but not in SLOPE: the gradient turns a corner at every sample point, and the eye reads a slope
+	# discontinuity as an edge. The result is a faint facet running through every cell CENTRE — a grid, drawn
+	# by the smoothing meant to hide one. A screenshot measured luma steps 2.5x harder on that phase than
+	# between it. Smoothstep zeroes the derivative at each sample, so the field arrives and leaves flat and
+	# the facets have nothing to draw.
 	var tx: float = clampf(u - float(x0), 0.0, 1.0)
 	var ty: float = clampf(v - float(y0), 0.0, 1.0)
+	tx = tx * tx * (3.0 - 2.0 * tx)
+	ty = ty * ty * (3.0 - 2.0 * ty)
 	var top: Vector2 = _tone[y0 * _cols + x0].lerp(_tone[y0 * _cols + x1], tx)
 	var bot: Vector2 = _tone[y1 * _cols + x0].lerp(_tone[y1 * _cols + x1], tx)
 	return top.lerp(bot, ty)

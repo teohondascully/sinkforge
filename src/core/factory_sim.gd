@@ -192,6 +192,13 @@ const DEFAULT_ORE_DEPOSIT: int = 250
 ## the remaining amount for solid ore blocks and lodes alike). Cleared only by load_world and by being
 ## worked dry; placing a block back over a lode covers it, it does not destroy it.
 var lode: Dictionary = {}
+## What each lode held when it was OPENED (cell -> units) — the denominator the fleck field thins against.
+## `lode_fraction` first measured remaining units against DEFAULT_ORE_DEPOSIT, which quietly says "how rich
+## is this vein compared to a standard one" when the question the picture has to answer is "how much of THIS
+## vein is left". The two come apart badly at the small end: the starter adit holds 45 units, untouched, and
+## drew with one fleck in six — a fresh vein that looked stripped, on the first face a new player ever sees.
+## Extent already carries richness (a big body covers more wall); density carries depletion.
+var lode_max: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -566,6 +573,7 @@ func load_world(world: WorldData) -> void:
 	wall.clear()
 	deposits.clear()
 	lode.clear()
+	lode_max.clear()
 	water.clear()
 	fill.clear()                       # a fresh world has no construction in it
 	world_seed = world.seed
@@ -657,9 +665,11 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 		if left > 0:
 			lode[cell] = material          # the blow OPENED the vein; the rest of it is still there to work
 			deposits[cell] = left
+			lode_max[cell] = left          # …and this is full, for this vein: the blow is what opened it
 		else:
 			deposits.erase(cell)           # a thin seam the burst took whole — nothing left to open
 			lode.erase(cell)
+			lode_max.erase(cell)
 		solid.erase(cell)
 		_dirty_terrain(cell)                # repaint the chunk + re-mold the fine block now the cell is air
 		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
@@ -1208,6 +1218,7 @@ func take_lode(cell: Vector2i) -> StringName:
 	else:
 		deposits.erase(cell)               # worked dry — the vein is spent, and it stops drawing as one
 		lode.erase(cell)
+		lode_max.erase(cell)
 	terrain_dirty.append(cell)
 	return item
 
@@ -1218,7 +1229,8 @@ func take_lode(cell: Vector2i) -> StringName:
 func lode_fraction(cell: Vector2i) -> float:
 	if not lode.has(cell):
 		return 0.0
-	return clampf(float(deposits.get(cell, 0)) / float(DEFAULT_ORE_DEPOSIT), 0.0, 1.0)
+	var full: float = float(lode_max.get(cell, deposits.get(cell, 1)))
+	return clampf(float(deposits.get(cell, 0)) / maxf(full, 1.0), 0.0, 1.0)
 
 
 ## The carried pack as an ordered list of {item, count} for the inventory hotbar UI. Dictionaries
@@ -1952,6 +1964,7 @@ func _run_drill(machine: MachineState) -> void:
 		else:
 			deposits.erase(lode_cell)
 			lode.erase(lode_cell)
+			lode_max.erase(lode_cell)
 		terrain_dirty.append(lode_cell)                       # the fleck field thins on this
 		machine.fed += 1                                      # what this Head has pulled — and how `spent` is known
 		total_produced[vein] = int(total_produced.get(vein, 0)) + 1
