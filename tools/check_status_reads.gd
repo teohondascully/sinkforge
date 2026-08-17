@@ -103,6 +103,40 @@ func _run() -> void:
 		"the need bubble only appears where an item is the answer%s"
 			% ["" if liars.is_empty() else " — " + "; ".join(liars)])
 
+	# --- and the bubble has something to say for every job that reaches it ---
+	#
+	# The need bubble is drawn for every status whose fix is not `none` and which is not `spent`. Two of
+	# those jobs are answered with an item glyph (`feeds`); the rest need a glyph of their own in
+	# `Visuals.draw_fix_glyph`. A job that reaches the bubble with neither draws an EMPTY bubble — a
+	# pulsing ring with nothing inside it, which is a worse answer than the silence it replaced, and the
+	# kind of thing only a rendering test would otherwise catch and only if someone thought to add the case.
+	#
+	# Set equality again, for the same reason as above: containment one way is satisfied by a scanner that
+	# matched nothing, and containment the other way would let a glyph exist for a job nothing can produce.
+	var needs_glyph: Array[String] = []
+	for s: Variant in table:
+		var look: Dictionary = Visuals.STATUS_LOOK[s]
+		var fix := StringName(look["fix"])
+		if fix == &"none" or fix == &"relocate" or bool(look["feeds"]):
+			continue
+		if not needs_glyph.has(String(fix)):
+			needs_glyph.append(String(fix))
+	var drawn: Array[String] = _scan_fix_glyphs()
+	var mute: Array[String] = []
+	for fix: String in needs_glyph:
+		if not drawn.has(fix):
+			mute.append(fix)
+	var orphan: Array[String] = []
+	for fix: String in drawn:
+		if not needs_glyph.has(fix):
+			orphan.append(fix)
+	_check(mute.is_empty(),
+		"every job that reaches the bubble has a glyph to put in it%s"
+			% ["" if mute.is_empty() else " — EMPTY BUBBLE: " + ", ".join(mute)])
+	_check(orphan.is_empty(),
+		"no glyph is drawn for a job nothing can report%s"
+			% ["" if orphan.is_empty() else " — ORPHAN: " + ", ".join(orphan)])
+
 	# --- every entry is complete, since a half-filled row would crash the renderer mid-draw ---
 	var ragged: Array[String] = []
 	for s: Variant in table:
@@ -127,6 +161,32 @@ func _run() -> void:
 		"the statuses wear %d different marks, so the geometry channel carries real information"
 			% marks.size())
 	print("  %d statuses, %d marks, %d distinct jobs" % [reported.size(), marks.size(), fixes.size()])
+
+
+## The jobs `Visuals.draw_fix_glyph` actually has a match arm for, by reading its source. Same method and
+## same reason as the sim scan: there is no runtime way to ask a function which values it handles, and a
+## hand-kept mirror would be one more thing to drift.
+func _scan_fix_glyphs() -> Array[String]:
+	var f: FileAccess = FileAccess.open("res://scenes/visuals.gd", FileAccess.READ)
+	if f == null:
+		_check(false, "visuals.gd is readable")
+		return ([] as Array[String])
+	var out: Array[String] = []
+	var inside: bool = false
+	var arm := RegEx.new()
+	arm.compile("^\\s+&\"([a-z_]+)\"\\s*:\\s*$")
+	while not f.eof_reached():
+		var line: String = f.get_line()
+		if line.begins_with("static func "):
+			inside = line.begins_with("static func draw_fix_glyph")
+			continue
+		if not inside:
+			continue
+		var hit: RegExMatch = arm.search(line)
+		if hit != null and not out.has(hit.get_string(1)):
+			out.append(hit.get_string(1))
+	f.close()
+	return out
 
 
 ## Every status literal returned from `machine_status` or a `_status_*` helper, by reading the sim's source.

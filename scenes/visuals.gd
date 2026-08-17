@@ -116,6 +116,45 @@ static func draw_status_mark(canvas: CanvasItem, c: Vector2, r: float, mark: Str
 			canvas.draw_circle(c, r, col)
 
 
+## THE NEED BUBBLE'S OTHER VOCABULARY — what to draw when the answer is not an item.
+##
+## The bubble floats above a stalled machine holding up WHAT IT NEEDS, and it could only ever draw an item
+## glyph. That is fine for the two statuses whose answer is a thing you carry, and useless for the three
+## whose answer is a job: no power, a jammed column, a Spur wired to nothing. Those used to reach the bubble
+## anyway and float an ORE icon over all of them, which is why they now stop at the lamp — correct, and
+## quieter than they should be, because the lamp names the KIND of problem and the bubble is where the
+## specific one belongs.
+##
+## So the three jobs get glyphs. They are deliberately not items: an item glyph says "fetch me this" and
+## these say "go do this", and the difference has to survive being 11px across.
+##
+##   power   a bolt — the same motif as the lamp's diamond and the conduit's channel
+##   clear   a chevron driving DOWN into a bar: the drain is dug below the machine, which is where a jam is
+##           always cleared from. It points at the answer's location, not just at its existence.
+##   link    two links with a gap between them — the one shape that means "connected" when it is closed
+static func draw_fix_glyph(canvas: CanvasItem, c: Vector2, size: float, fix: StringName,
+		col: Color) -> void:
+	var u: float = size * 0.5
+	match fix:
+		&"power":
+			canvas.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(u * 0.22, -u * 0.95), c + Vector2(-u * 0.62, u * 0.12),
+				c + Vector2(-u * 0.06, u * 0.12), c + Vector2(-u * 0.22, u * 0.95),
+				c + Vector2(u * 0.62, -u * 0.12), c + Vector2(u * 0.06, -u * 0.12)]), col)
+		&"clear":
+			canvas.draw_rect(Rect2(c + Vector2(-u * 0.78, u * 0.52), Vector2(u * 1.56, u * 0.30)), col)
+			canvas.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(0.0, u * 0.30), c + Vector2(-u * 0.66, -u * 0.42),
+				c + Vector2(-u * 0.30, -u * 0.42), c + Vector2(0.0, -u * 0.10),
+				c + Vector2(u * 0.30, -u * 0.42), c + Vector2(u * 0.66, -u * 0.42)]), col)
+		&"link":
+			var w: float = maxf(1.4, u * 0.26)
+			canvas.draw_arc(c + Vector2(-u * 0.46, 0.0), u * 0.44, -PI * 0.45, PI * 0.45, 10, col, w)
+			canvas.draw_arc(c + Vector2(-u * 0.46, 0.0), u * 0.44, PI * 0.55, PI * 1.45, 10, col, w)
+			canvas.draw_arc(c + Vector2(u * 0.46, 0.0), u * 0.44, PI * 0.55, PI * 1.45, 10, col, w)
+			canvas.draw_arc(c + Vector2(u * 0.46, 0.0), u * 0.44, -PI * 0.45, PI * 0.45, 10, col, w)
+
+
 ## The icon "kind" of a machine: its style entry, else furnace (no-input source) / gear (runner).
 static func machine_kind(def: MachineDef) -> String:
 	if MACHINE_STYLE.has(def.behavior):

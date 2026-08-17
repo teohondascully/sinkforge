@@ -2483,13 +2483,20 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 		draw_rect(Rect2(pos - Vector2(1.5, 1.5), Vector2(float(CELL) + 3.0, float(CELL) + 3.0)),
 			Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 2.0)
 		return
-	# THE BUBBLE CAN ONLY DRAW AN ITEM, SO IT ONLY SPEAKS WHEN THE ANSWER IS ONE. A jam, a dead power net
-	# and an unwired Spur have no item to hold up, and the code that used to reach here defaulted to `ore`
-	# and floated it over all three — telling you to feed a machine that was not hungry. Those states now
-	# stop at the lamp, whose mark and colour do name the problem, and the hover inspector carries the
-	# sentence. Saying less is not the ideal fix; the ideal fix is a bolt glyph, a chevron and a broken
-	# link, and that is the next slice. Saying nothing beats saying something false in the meantime.
+	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
+	var bob: float = sin(_anim_time * 3.0) * 1.5
+	var bc: Vector2 = pos + Vector2(float(CELL) * 0.5, -24.0 + bob)
+	draw_circle(bc, 9.0, Color(0.05, 0.04, 0.06, 0.82 * pulse))
+	draw_arc(bc, 9.0, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
+
+	# THE BUBBLE HOLDS UP WHAT YOU WOULD GO AND DO ABOUT IT, which for two statuses is an item you fetch and
+	# for three is a job you perform. It could originally only draw items, so the jam / dead-power / unwired
+	# states reached it and floated an ORE icon over all three — telling you to feed a machine that was not
+	# hungry. They were then silenced, which was true but quiet: the lamp names the KIND of problem and the
+	# bubble is where the specific one belongs. Now each job has its own glyph and the bubble speaks for all
+	# five, without any of them borrowing another's answer.
 	if not bool(look["feeds"]):
+		Visuals.draw_fix_glyph(self, bc, 11.0, look["fix"], Color(lamp.r, lamp.g, lamp.b, 0.55 + 0.45 * pulse))
 		return
 	var need: StringName = &"ore"
 	if status == &"no_fuel":
@@ -2498,11 +2505,6 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 		need = FactorySim.DESCENT_EATS              # the gate eats ingots, not ore
 	elif machine.def.recipe != null and not machine.def.recipe.inputs.is_empty():
 		need = machine.def.recipe.inputs.keys()[0]
-	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
-	var bob: float = sin(_anim_time * 3.0) * 1.5
-	var bc: Vector2 = pos + Vector2(float(CELL) * 0.5, -24.0 + bob)
-	draw_circle(bc, 9.0, Color(0.05, 0.04, 0.06, 0.82 * pulse))
-	draw_arc(bc, 9.0, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
 	Visuals.draw_item(self, bc, 11.0, need)
 
 
