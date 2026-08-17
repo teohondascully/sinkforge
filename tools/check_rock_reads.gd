@@ -46,14 +46,31 @@ const MIN_DELVE: int = 12
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
 
-## HOW FAR OUT "OUTSIDE THE LAMP" STARTS, in multiples of the lamp's own halo radius. The complaint is
-## specifically about the rock the lamp does NOT reach — inside the pool everyone agrees it reads fine, and
-## including lit cells would drown the failure in the region that already works.
+## WHAT "OUTSIDE THE LAMP" MEANS HERE — and it is not a distance.
 ##
-## Geometric, never photometric. Excluding cells for being bright would define the dark region in terms of
-## the very quantity under test: every sample that made rock legible would be thrown out for making rock
-## legible, and the layer would report a coin flip on a perfect frame and on a black one alike.
-const DARK_START: float = 1.6
+## The complaint is specifically about the rock the lamp does NOT reach. Inside the pool everyone agrees it
+## reads fine, and including lit cells would drown the failure in the region that already works.
+##
+## The first version of this cut samples further than 1.6 lamp-halo radii from the body, which was a guess
+## dressed as a constant, and reading the renderer showed it wrong twice over. `LAMP_RADIUS` is the additive
+## bloom SPRITE, not the veil cut; the veil's widest cut is 9.0 cells and it is centred on the aimed beam at
+## `head + _lamp_offset`, not on the body. A cell can sit 9 cells from the body and 7 from the beam.
+##
+## So ask the veil instead of guessing at it. `_veil_scratch` is the per-frame lighting buffer with every
+## source's hole already cut into it, and `_veil_base` is that same buffer before any source touched it. A
+## cut only ever RAISES a channel. So a cell whose scratch bytes still equal its base bytes was reached by
+## no light at all — not the lamp, not a torch, not a machine, not a crystal, not a seam. That is
+## provable-zero rather than far-enough, and it cannot drift: a light source added tomorrow appears in the
+## buffer and is excluded automatically, where a hand-kept radius list would have to be remembered.
+##
+## It also covers the bloom sprite the veil knows nothing about, by arithmetic: the halo reaches 5.6 cells
+## from the head, the beam centre sits 1.9 cells from the head, so the furthest a bloom-touched cell can be
+## from the beam centre is 7.5 — inside the 9.0 cut. Every cell the bloom brightens is already veil-lit.
+##
+## Still geometric in spirit, never photometric: nothing here excludes a cell for being BRIGHT. Doing that
+## would define the dark region in terms of the quantity under test, throw out every sample that made rock
+## legible for the crime of making rock legible, and report a coin flip on a perfect frame and a black one
+## alike.
 
 ## Cells this close to their column's surface are thrown out. Above the surface is sky, and sky against rock
 ## separates trivially and for a reason that has nothing to do with the complaint — a layer that sampled it
@@ -180,8 +197,19 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var half := Vector2(float(w), float(h)) * 0.5
 	var cell_px: float = float(WorldRenderer.CELL) * zoom
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
-	var dark_r: float = WorldRenderer.LAMP_RADIUS * DARK_START
-	var body: Vector2 = main._player.position
+	# The two lighting buffers, read straight off the renderer. Their difference IS the set of lit cells.
+	var scratch: PackedByteArray = main._renderer._veil_scratch
+	var base: PackedByteArray = main._renderer._veil_base
+	var want_bytes: int = FactorySim.GRID_COLS * FactorySim.GRID_ROWS * 4
+	if scratch.size() != want_bytes or base.size() != want_bytes:
+		# FALL TO THE FAILING SIDE. Without these buffers every cell would test as unlit, the sample would
+		# silently become "the whole frame including the lamp pool", and the layer would report on a
+		# different question than the one it is named for — while looking greener, because lit rock reads.
+		printerr("check_rock_reads: FAIL — the veil buffers are %d/%d bytes, expected %d; the lit/unlit"
+			% [scratch.size(), base.size(), want_bytes]
+			+ " split cannot be computed and every cell would count as dark")
+		quit(1)
+		return {}
 
 	var rock_value: Array[float] = []
 	var air_value: Array[float] = []
@@ -206,10 +234,12 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 			if cy <= surf + SURFACE_CLEAR:
 				near_surface += 1
 				continue
-			var centre: Vector2 = main._cell_center(c)
-			if centre.distance_to(body) < dark_r:
+			var vi: int = (cy * FactorySim.GRID_COLS + cx) * 4
+			if scratch[vi] != base[vi] or scratch[vi + 1] != base[vi + 1] \
+					or scratch[vi + 2] != base[vi + 2]:
 				lit += 1
 				continue
+			var centre: Vector2 = main._cell_center(c)
 			var p: Vector2 = (centre - cam) * zoom + half
 			var px: int = int(p.x)
 			var py: int = int(p.y)
