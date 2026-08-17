@@ -65,6 +65,16 @@
 # A filtered run prints what it selected out of how many and refuses to print the all-pass line, because
 # the sentence "ALL LAYERS PASS" is only true of the whole list.
 #
+# Two more filters, and they exist because CI got this wrong in a way nobody could see:
+#   SF_GL_ONLY=1   select exactly the layers registered `add_gl`/`add_excl` — the ones that need a surface
+#   SF_NOT='regex' drop layers whose name matches, ON TOP of whatever else selected them
+# The display job used to name its four pixel layers by hand. `add_gl` grew to six, and the two that
+# arrived after that list was written ran in NO CI JOB AT ALL: they skip in the headless job because they
+# need a window, and the display job never selected them. Deriving the selection from the REGISTRATION
+# closes that permanently, and `SF_NOT` makes the one deliberate exclusion a statement rather than an
+# omission — because in a hand-kept list "left out on purpose" and "forgotten" look identical.
+# `tools/check_ci_coverage.gd` holds the workflow to this, both directions.
+#
 # EXCLUSIVE BY DEFAULT, because a worktree does not isolate `user://` — Godot keys it on the project NAME,
 # so every checkout on this machine shares one save slot and one set of fixtures, and two runs at once
 # produce two results neither of which means anything. The runner now takes a machine-wide lock before it
@@ -142,6 +152,9 @@ add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(0); }
 # fail a game that met it — and, worse, could not be trusted when it eventually passed.
 add_excl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(1); }
 add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
+# Holds the CI workflow against THIS list. It reads both files, which is the only way to see a layer that
+# needs a surface and is selected by no job — two were, and both jobs reported green over them.
+add "check_ci_coverage (every layer runs)" "res://tools/check_ci_coverage.gd"
 add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "check_save_frontier (envelope)"  "res://tools/check_save_frontier.gd"
 add "sim (core/determinism)"          "res://tests/test_sim.gd"
@@ -232,11 +245,22 @@ DECLARED="${#NAMES[@]}"
 # SF_ONLY narrows the list. Everything downstream then talks about "selected of declared", never about
 # "all", because a filtered sweep that printed the all-pass line would be a new way to claim coverage
 # nobody ran — the exact bug this file was opened to fix.
-if [ -n "${SF_ONLY:-}" ]; then
+if [ -n "${SF_ONLY:-}" ] || [ "${SF_GL_ONLY:-0}" = "1" ] || [ -n "${SF_NOT:-}" ]; then
 	fn=(); fs=(); fg=(); fe=()
 	i=0
 	while [ "$i" -lt "$DECLARED" ]; do
-		if printf '%s' "${NAMES[$i]}" | grep -Eq -- "$SF_ONLY"; then
+		keep=1
+		[ -n "${SF_ONLY:-}" ] && ! printf '%s' "${NAMES[$i]}" | grep -Eq -- "$SF_ONLY" && keep=0
+		# SF_GL_ONLY reads the REGISTRATION, not a list of names. That is the whole point of it: the display
+		# job used to name its four layers by hand, `add_gl` grew to six, and the two that arrived after the
+		# list was written ran in NO ci job at all — they skip headless because they need a surface, and the
+		# display job never selected them. A hand-kept list of the things that need special treatment is a
+		# snapshot with an expiry date and nothing prints the date. Ask the runner instead.
+		[ "${SF_GL_ONLY:-0}" = "1" ] && [ "${GLFLAG[$i]}" != "1" ] && keep=0
+		# ...and SF_NOT is how a job states an exclusion OUT LOUD rather than by omitting a name from a list,
+		# where the difference between "deliberately left out" and "forgotten" is invisible.
+		[ -n "${SF_NOT:-}" ] && printf '%s' "${NAMES[$i]}" | grep -Eq -- "$SF_NOT" && keep=0
+		if [ "$keep" = "1" ]; then
 			fn+=("${NAMES[$i]}"); fs+=("${SCRIPTS[$i]}"); fg+=("${GLFLAG[$i]}"); fe+=("${EXCL[$i]}")
 		fi
 		i=$((i + 1))
@@ -244,7 +268,8 @@ if [ -n "${SF_ONLY:-}" ]; then
 	NAMES=(${fn[@]+"${fn[@]}"}); SCRIPTS=(${fs[@]+"${fs[@]}"}); GLFLAG=(${fg[@]+"${fg[@]}"})
 	EXCL=(${fe[@]+"${fe[@]}"})
 	if [ "${#NAMES[@]}" -eq 0 ]; then
-		echo "!! SF_ONLY='$SF_ONLY' matched none of the $DECLARED layers — refusing to report a run of nothing"
+		echo "!! the filter (SF_ONLY='${SF_ONLY:-}' SF_GL_ONLY='${SF_GL_ONLY:-0}' SF_NOT='${SF_NOT:-}')" \
+			"matched none of the $DECLARED layers — refusing to report a run of nothing"
 		exit 2
 	fi
 fi

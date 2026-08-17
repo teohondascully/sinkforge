@@ -149,10 +149,29 @@ jobs:
       # came back `Killed` with exit 137 — four Godot processes each holding a 1920x1080
       # software-rendered swapchain and a full world bake do not fit in a runner's memory.
       # Serially the same four passed. A pixel layer OOM-killed at random is worse than a
-      # slow job, and there are only four of them.
+      # slow job, and the runner tells us how many there are rather than this comment doing it.
+      # SELECTED BY REGISTRATION, NOT BY NAME. This read
+      #   SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
+      # and that list was accurate on the day it was typed. `add_gl` then grew to six, and
+      # `check_item_reads` and `check_hud_layout` ran in NEITHER job — they skip in the
+      # headless one because they need a surface, and this one never selected them. Nothing
+      # anywhere printed that; both jobs were green over two layers that never executed,
+      # which is the exact failure this workflow's whole header is about, returned in a new
+      # place. SF_GL_ONLY asks the runner which layers need a window; SF_NOT states the one
+      # exclusion out loud, because in a hand-kept list "left out on purpose" and "forgotten"
+      # look the same. `check_ci_coverage` asserts the two files agree, both directions.
+      #
+      # Every name in SF_NOT needs one of these, and `check_ci_coverage` asserts it. The marker is
+      # structured rather than prose because prose is what fooled the first two versions of that layer:
+      # a keyword search for the name matched the paragraph explaining the defect.
+      # CI-EXCLUDED check_frametime: a software rasterizer draws at 6-9 fps, and its hitch RATIOS stop
+      #   describing the game — the same commit passed in an x86_64 container (RUN p95 0.7x quiet) and
+      #   failed in an arm64 one (2.3x against a 2.0x cap). Opposite verdicts, same code, two software
+      #   renderers. It runs on developer machines with a real GPU, under SF_STRICT.
       - name: Run the pixel layers on a real display
         env:
-          SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
+          SF_GL_ONLY: "1"
+          SF_NOT: check_frametime
           SF_STRICT: "1"
           SF_LOG_DIR: ${{ runner.temp }}/harness-logs
           JOBS: "1"
