@@ -3163,8 +3163,20 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 				r = int(lerpf(float(sky_rgb[row * 3]), float(amb_r), t))
 				g = int(lerpf(float(sky_rgb[row * 3 + 1]), float(amb_g), t))
 				b = int(lerpf(float(sky_rgb[row * 3 + 2]), float(amb_b), t))
-			elif not sim.is_solid(Vector2i(col, row)):
-				# UNLIT AIR IS ABSENCE, AND ABSENCE IS THE DARKEST THING DOWN HERE. See VOID_FLOOR.
+			elif not sim.is_solid(Vector2i(col, row)) and not sim.wall.has(Vector2i(col, row)):
+				# UNLIT NOTHING IS ABSENCE, AND ABSENCE IS THE DARKEST THING DOWN HERE. See VOID_FLOOR.
+				#
+				# `and not wall`, because a cell with nothing in it is TWO different objects and the first
+				# version of this treated them as one. A natural void was never filled and has no backing;
+				# a CARVED ROOM is space someone opened, and the wall behind it is a surface that survived
+				# the digging. Flooring both to near-black made a chamber read 0.79x DARKER than the buried
+				# mass around it and turned check_room_reads red — correctly, because the whole claim of
+				# that layer is that carved space announces itself as carved. A room you dug going darker
+				# than the rock you dug it out of is the inversion I just fixed, pointed the other way.
+				#
+				# This is the distinction the renderer already draws everywhere else — `_draw_background`
+				# paints walled cells and only walled cells — so the term was in the vocabulary and this
+				# code was the one place not using it.
 				r = void_r
 				g = void_g
 				b = void_b
