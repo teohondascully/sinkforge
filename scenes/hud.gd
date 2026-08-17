@@ -647,21 +647,27 @@ const HINT_STUCK: float = 40.0
 ## art director. The complaint is PERMANENCE, not existence: a game may tell you what just became possible,
 ## it may not stand over you while you do it.
 ##
-## So the goal announces itself, holds, fades, and returns on the same stall the how-to uses. The world
-## keeps talking after it goes — `world_renderer._draw_guide_targets()` already pulses a ring on the cells
-## the current step points at, which is the "attach subsequent guidance to the relevant world object" half
-## of the same recommendation, and it was already built.
+## So AFTER THE OPENING LESSON, NOTHING IS OFFERED. Later steps do not announce, do not hold, and do not
+## fade — the top of the screen is simply empty, and guidance is REACTIVE ONLY: it returns when you have
+## genuinely stalled, and not before. The world does the talking meanwhile —
+## `world_renderer._draw_guide_targets()` already pulses a ring on the cells the current step points at,
+## which is the "attach subsequent guidance to the relevant world object" half of the same recommendation,
+## and it was already built and previously drowned out.
+##
+## This is the LITERAL reading, and it is a design call rather than a measurement one (2026-08-17). I built the
+## softer version first — announce, hold six seconds, fade — and logged it in `the working notes` as a
+## fork with the argument against my own choice: that reading an unambiguous kill-list item as ambiguous is
+## less work and less risk for me, and that is how a kill list gets negotiated down one entry at a time.
+## The directive chose literal. The soft version is one `else` branch away if it is ever wanted back.
 ##
 ## THIS IS ALSO THE PRECONDITION FOR MEASURING ANY OF IT. `docs/DIRECTOR_BRIEF.md` §4.4 scores whether a
 ## player forms a desire when NO objective is supplied; while a permanent slab supplies one, that
 ## evaluation reads the supervisor instead of the player and cannot return a valid result on this build.
 ##
-## `GOAL_PERSISTS_THROUGH` is the dial between two readings of the same instruction — the kill list says
-## "keep for first exposure, then kill it", dimension #10 says "remove after its first lesson". At 1 the
-## opening step keeps its permanent plate (nobody is stranded on the first thing they ever see) and every
-## step after it announces and withdraws. Raise it to soften, set it to 0 to kill the plate outright.
-const GOAL_HOLD: float = 6.0
-const GOAL_FADE: float = 1.2
+## `GOAL_PERSISTS_THROUGH` is how many steps count as "the opening lesson" — the ones that keep the old
+## permanent plate, so nobody is stranded on the first thing they ever see. At 1 that is the first step
+## only. Raise it to teach longer; set it to 0 to remove the plate outright, including from the opening.
+const GOAL_FADE: float = 1.2       ## how long reactive guidance takes to arrive once you have stalled
 const GOAL_PERSISTS_THROUGH: int = 1
 
 
@@ -683,6 +689,15 @@ func _draw_objective_line() -> void:
 		return
 	if objectives.all_done() and objectives.done_for() > 5.0:
 		return  # finished + lingered → clear the screen for veterans
+	# THE BIG MAP IS THE SCREEN. It is centred and 272 tall in a 360 canvas, so its panel top sits at y=41
+	# while this banner reaches y=45 whenever its how-to line is up — a four-pixel overlap that
+	# `check_hud_layout` caught only INTERMITTENTLY, because whether the how-to is on screen depends on
+	# `step_age`, which depends on how much sim time the layer happened to burn. A latent collision behind
+	# a flaky assertion. Standing down here fixes it for every timing rather than nudging the map: someone
+	# who opened the whole-world view is looking at the world, and a goal plate over it is the supervisor
+	# talking across the one screen that is purely for reading the game.
+	if minimap_large:
+		return
 	var text: String
 	var col: Color
 	var hint: String = ""
@@ -696,20 +711,20 @@ func _draw_objective_line() -> void:
 		text = str(step["goal"])
 		col = Color(0.97, 0.93, 0.78)
 		var age: float = objectives.step_age
-		if age < HINT_HOLD + HINT_FADE:
-			hint_a = clampf((HINT_HOLD + HINT_FADE - age) / HINT_FADE, 0.0, 1.0)
-		elif age > HINT_STUCK:
-			hint_a = clampf((age - HINT_STUCK) / HINT_FADE, 0.0, 1.0)   # you've stalled — hand it back
+		# Reactive guidance, the ONLY thing a later step may put on screen: it arrives once you have sat on
+		# a step long enough to want it, and it is zero until then.
+		var stalled: float = clampf((age - HINT_STUCK) / GOAL_FADE, 0.0, 1.0)
+		if objectives.current_index() < GOAL_PERSISTS_THROUGH:
+			# The opening lesson keeps the plate, and the how-to that arrives with it and fades.
+			if age < HINT_HOLD + HINT_FADE:
+				hint_a = clampf((HINT_HOLD + HINT_FADE - age) / HINT_FADE, 0.0, 1.0)
+			elif age > HINT_STUCK:
+				hint_a = stalled
+		else:
+			goal_a = stalled                     # nothing is OFFERED after the first lesson
+			hint_a = stalled
 		if hint_a > 0.0:
 			hint = str(step["label"])
-		# The goal withdraws on the same terms, once the opening step has had its permanent exposure.
-		if objectives.current_index() >= GOAL_PERSISTS_THROUGH:
-			if age < GOAL_HOLD + GOAL_FADE:
-				goal_a = clampf((GOAL_HOLD + GOAL_FADE - age) / GOAL_FADE, 0.0, 1.0)
-			elif age > HINT_STUCK:
-				goal_a = clampf((age - HINT_STUCK) / GOAL_FADE, 0.0, 1.0)
-			else:
-				goal_a = 0.0                     # said once — the guide ring has it from here
 	if goal_a <= 0.0 and hint_a <= 0.0:
 		return                                    # nothing to say: leave the sky alone
 	var fs: int = 13
