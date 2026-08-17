@@ -535,8 +535,26 @@ func _stand_over_rock(player: Player) -> int:
 		if depth > best_depth:
 			best_depth = depth
 			best_col = col
-	player.position = _main._cell_center(Vector2i(best_col, _main.sim.surface_row(best_col) - 1))
+	var surf: int = _main.sim.surface_row(best_col)
+	player.position = _main._cell_center(Vector2i(best_col, surf - 1))
 	player.velocity = Vector2.ZERO
+	# SAY WHERE IT STOOD AND WHAT WAS UNDER IT, every run, not only on failure.
+	#
+	# This fixture fails intermittently — 40 mines and 37 rows deeper on one run, 0 mines and the body
+	# unmoved on the next, same tree — and when it failed there was nothing in the output to tell WHICH
+	# assumption broke. "DIG landed 0 of 40" says the phase did no work; it does not say whether the body
+	# was placed somewhere wrong, placed right and then moved, or placed right over rock that was not
+	# there. Three different bugs, one message.
+	#
+	# The column under the feet is the whole premise: `_dig_target` searches DIG_REACH rows down and returns
+	# an AIR cell if it finds nothing, which `try_mine` then refuses forever. So print the thing that
+	# decides it. A fixture that cannot explain its own failure makes every run after it a re-run rather
+	# than an investigation, and this one has already cost a full sweep.
+	var under: String = ""
+	for d: int in range(0, DIG_REACH + 2):
+		under += "#" if _main.sim.is_solid(Vector2i(best_col, surf + d)) else "."
+	print("    dig site: col %d, surface_row %d, body at row %d, %d solid rows found, under the feet [%s]"
+		% [best_col, surf, surf - 1, best_depth, under])
 	return best_depth
 
 
