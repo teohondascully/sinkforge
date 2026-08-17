@@ -188,3 +188,60 @@ Three strikes, each provable on its own and each leaving the game playable:
    drill keep working against a compatibility path.
 2. **The Head and the Spur.** Drills re-based onto the lode, coverage, spent status, placement preview.
 3. **The stain.** The through-rock tell, measured against the `check_tells` contract, plus draining density.
+
+## 11. How ore should read under light
+
+> Raised by the user while phase 1 was landing: *"I want the lighting to make ores feel special but not so
+> much so that it's hard to play the game from distractions and overstimulation."* This is phase 4 material
+> — it belongs with the stain — but the principle is written down here because it decides how the stain is
+> built, not the other way round.
+
+**The rule: ore does not glow. It answers your lamp.**
+
+One sentence solves both halves of the request, because distraction and specialness come from the same
+property and it is the wrong one. Anything **self-luminous** competes with the light you placed, animates
+regardless of whether you care, and pulls the eye by emission alone — and it does this everywhere at once,
+which is overstimulation by construction. Anything **highly reflective but dark on its own** does the
+opposite: it is quiet until you do something, and then it is dazzling.
+
+That is also just true of metal in rock. It has no light in it. It catches yours.
+
+### What this fixes that is already broken
+
+`_draw_ore_glints` runs on a free-running **per-cell** timer (`PERIOD` 3.4s, each cell independently phased)
+and gates on `_skylight_alpha` — *daylight*, so that a surface vein does not sparkle at noon. It therefore has
+no idea where your lamp is or where your torches are. Every exposed ore cell on screen twinkles on its own
+schedule, forever, which is exactly the **"ore reads as a floating starfield"** finding already recorded
+against the game. The user's worry is not hypothetical; it is the current behaviour.
+
+### The five parts
+
+1. **Specular, not emissive.** Fleck brightness becomes a steep function of the *artificial* light at the
+   cell — lamp pool, torches, machine glow — not a timer. Steep on purpose (square it): unlit ore is a dull
+   matte patch, lit ore is near-white pinpoints, and the gap between them is the whole effect. Cheap to
+   compute without a light buffer: distance to the body's lamp pool and to the nearest `sim.torch`.
+2. **A motion BUDGET, globally, not per cell.** At most one or two glints alive on screen at any instant —
+   the sparkle is a token passed around the visible veins, not an independent clock in every cell. A wall of
+   ore then reads as *something occasionally catching the light*, which is what a real vein does, instead of
+   a Christmas tree. This single change is most of the anti-overstimulation ask.
+3. **Richness reads as DENSITY, brightness reads as ATTENTION.** Already true as of #S38: how much is left is
+   carried by how many flecks there are. Keep those two channels separate — density can be studied at
+   leisure, brightness says *look here now*, and a vein should never shout its size at you.
+4. **Emission is reserved for `rich_ore`, and nothing else.** One faintly self-lit material in the whole game
+   means a glow across a dark cavern is genuine information and a genuine thrill. If everything glows, glow
+   is noise — the same logic that keeps the cannon a lighthouse rather than a progress bar.
+5. **Coal absorbs.** It should read as a matte, light-swallowing cluster, which anchors the low end of the
+   palette and proves the system is "ore answers light", not "ore is bright".
+
+### The payoff this buys for free
+
+Placing a torch on a face becomes a small **reveal**: you light the wall and the wall answers. Torches are
+already how you claim territory; this makes them also how you *appraise* a vein — and it means the moment
+worth photographing is an action the player took, not an animation that was going to happen anyway.
+
+### What the harness must say
+
+- Fleck brightness is a function of local artificial light, and is near-floor with no light on it.
+- The number of glints alive at once is capped, independent of how much ore is on screen — the assertion
+  that keeps this from ever drifting back into a starfield.
+- `rich_ore` is the only material with any emission at all.
