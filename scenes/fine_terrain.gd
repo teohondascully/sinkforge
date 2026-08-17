@@ -738,14 +738,40 @@ func _cast(fx: int, fy: int, dx: int, dy: int) -> float:
 ## Weighted OPEN-air neighbour count around a solid fine cell — the fine AO term. Orthogonal neighbours
 ## weigh 1, diagonals 0.5, so an exposed face darkens strongly and a corner rounds off smoothly (0..6).
 ## Off-grid counts as air (the world edge reads carved, not walled).
+## Orthogonal neighbours count 1.0, diagonals 0.5, and anything off the grid counts as air — exactly as the
+## two array-literal loops this replaces did, and `check_dig_hitch` holds the result byte-identical.
+##
+## WHY IT IS WRITTEN OUT LONGHAND. This is the single most expensive helper in the per-texel paint (~1.3ms
+## of a 4.5ms dig region, measured by tools/profile_frame.gd), and almost none of that was the eight array
+## reads. Each call ALLOCATED TWO `Array[Vector2i]` LITERALS — eight Vector2i objects built and thrown away
+## per texel, 576 times a dig and 262144 times a load — and then made eight function calls to do work that
+## is one index and one comparison. The loop read beautifully and cost more than everything it was
+## measuring. Written flat it allocates nothing and calls nothing.
 func _air_weight(fine_solid: PackedByteArray, fx: int, fy: int) -> float:
 	var w: float = 0.0
-	for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
-		if _fine_air(fine_solid, fx + d.x, fy + d.y):
-			w += 1.0
-	for d: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
-		if _fine_air(fine_solid, fx + d.x, fy + d.y):
-			w += 0.5
+	var lo_x: bool = fx - 1 < 0
+	var hi_x: bool = fx + 1 >= _fcols
+	var lo_y: bool = fy - 1 < 0
+	var hi_y: bool = fy + 1 >= _frows
+	var row: int = fy * _fcols
+	var up: int = row - _fcols
+	var dn: int = row + _fcols
+	if lo_x or fine_solid[row + fx - 1] == 0:
+		w += 1.0
+	if hi_x or fine_solid[row + fx + 1] == 0:
+		w += 1.0
+	if lo_y or fine_solid[up + fx] == 0:
+		w += 1.0
+	if hi_y or fine_solid[dn + fx] == 0:
+		w += 1.0
+	if lo_x or lo_y or fine_solid[up + fx - 1] == 0:
+		w += 0.5
+	if hi_x or lo_y or fine_solid[up + fx + 1] == 0:
+		w += 0.5
+	if lo_x or hi_y or fine_solid[dn + fx - 1] == 0:
+		w += 0.5
+	if hi_x or hi_y or fine_solid[dn + fx + 1] == 0:
+		w += 0.5
 	return w
 
 
@@ -772,14 +798,21 @@ func _moss_life(fy: int) -> float:
 ##
 ## Cheap on purpose: at most 2*FORM_REACH probes, early-exiting on the first air, and every probe is
 ## inside the region-rebake margin so a patched region stays byte-identical to a full bake.
+## Same reach, same falloff, same break — the `_fine_air` call per step is inlined for the reason spelled
+## out on _air_weight: this runs up to 2*FORM_REACH times per texel and was the second-largest helper in
+## the paint (~0.96ms of a 4.5ms dig region). The column bound is hoisted because it cannot change inside
+## either loop.
 func _sky_form(fx: int, fy: int) -> float:
 	var f: float = 0.0
+	var oob_x: bool = fx < 0 or fx >= _fcols
 	for d: int in range(FORM_REACH):
-		if _fine_air(_fine_solid, fx, fy - d - 1):
+		var yy: int = fy - d - 1
+		if oob_x or yy < 0 or yy >= _frows or _fine_solid[yy * _fcols + fx] == 0:
 			f += FORM_LIFT * (1.0 - float(d) / float(FORM_REACH))
 			break
 	for d: int in range(FORM_REACH):
-		if _fine_air(_fine_solid, fx, fy + d + 1):
+		var yy: int = fy + d + 1
+		if oob_x or yy < 0 or yy >= _frows or _fine_solid[yy * _fcols + fx] == 0:
 			f -= FORM_SINK * (1.0 - float(d) / float(FORM_REACH))
 			break
 	return f
