@@ -111,7 +111,14 @@ EXEMPT='refs/tags/pre-trailer-strip'
 dirty=""
 n_exempt=0
 for ref in $(git for-each-ref --format='%(refname)' refs/heads refs/remotes refs/tags); do
-	n="$(git log --format='%B' "$ref" 2>/dev/null | grep -icE "$PATTERN")"
+	# COUNT COMMITS, NOT MATCHING LINES. `git log --format=%B | grep -c` counts lines, so a message with
+	# two trailers reports 2 and the number printed at a reader is not the unit the sentence around it
+	# claims. It cannot produce a false clean, which is why it survived review; it is still the wrong unit,
+	# and printing the wrong unit confidently is most of what the audit notes is about.
+	n=0
+	for sha in $(git rev-list "$ref" 2>/dev/null); do
+		git log -1 --format='%B' "$sha" | grep -qiE "$PATTERN" && n=$((n + 1))
+	done
 	[ "$n" -eq 0 ] && continue
 	if [ "$ref" = "$EXEMPT" ]; then
 		n_exempt=$((n_exempt + 1))
