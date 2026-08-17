@@ -2246,8 +2246,12 @@ func _text_visible(cell: Vector2i) -> bool:
 ## Is this drill standing ON a lode — i.e. a Head boring into the back wall rather than down through rock?
 ## Two mounts for one machine while the bridge lasts (`docs/LODE_PLAN.md` §3), and the sprite says WHICH,
 ## so it is never describing the wrong action. After the phase-3 cutover there is only ever the Head.
+## Is this machine BOLTED TO THE WALL rather than standing in the cell? A Head on a lode, and every Spur —
+## both are frames hung on a face, both must not hide the vein they are eating, and both therefore skip the
+## opaque casing and the contact shadow that every other machine gets.
 func _is_head(machine: MachineState) -> bool:
-	return machine.def.behavior == &"drill" and sim.lode.has(machine.cell)
+	return machine.def.behavior == &"spur" \
+		or (machine.def.behavior == &"drill" and sim.lode.has(machine.cell))
 
 
 func _draw_machine(machine: MachineState) -> void:
@@ -2287,7 +2291,8 @@ func _draw_machine(machine: MachineState) -> void:
 		# is eating: it would hide the vein completely, and the vein is the only reason the machine is there.
 		# So the casing is dropped and the glyph's own rails carry the body — you watch the flecks thin THROUGH
 		# the machine, which makes the Head a gauge without adding a gauge.
-		Visuals.draw_machine_glyph(self, center, "collar", 1.0, active, clock, false,
+		Visuals.draw_machine_glyph(self, center,
+			"spur" if machine.def.behavior == &"spur" else "collar", 1.0, active, clock, false,
 			sim.lode_fraction(machine.cell))
 	else:
 		var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))

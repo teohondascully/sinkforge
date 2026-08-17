@@ -253,6 +253,7 @@ func _ready() -> void:
 		load("res://src/data/machines/splitter.tres"),
 		load("res://src/data/machines/lift.tres"),
 		load("res://src/data/machines/drill.tres"),  # automates ore extraction
+		load("res://src/data/machines/spur.tres"),   # one more mouth on a Head — reach across a vein
 		load("res://src/data/machines/hopper.tres"),  # stockpiles + meters gravity-fed output (the 'chest')
 		load("res://src/data/machines/generator.tres"),  # burns coal → power
 		load("res://src/data/machines/conduit.tres"),     # carries power down+lateral
@@ -2351,9 +2352,22 @@ func _placeable(cell: Vector2i) -> bool:
 func _placeable_here(cell: Vector2i) -> bool:
 	if not _placeable(cell):
 		return false
-	if _selected_machine_def() == null and _selected_build_material() != &"":
+	var def: MachineDef = _selected_machine_def()
+	if def != null and def.behavior == &"spur":
+		return spur_fits(cell)
+	if def == null and _selected_build_material() != &"":
 		return sim.block_supported(cell)
 	return true
+
+
+## A SPUR HAS TWO CONDITIONS AND THEY ARE BOTH VISIBLE IN THE WORLD. It eats what it stands on — same rule
+## as the Head, learned once — so it needs a lode behind it; and it is one more mouth on an existing drill,
+## so it has to touch a Head or a Spur that chains back to one. Gated at placement rather than allowed and
+## then reported broken: an unlinked Spur is a machine doing nothing, and `docs/DRIFT.md` §6 is explicit that
+## placement is the thing that will be got wrong every time if it is not refused clearly at the moment of
+## the attempt. The ghost turns red before the click, and the hover says which half is missing.
+func spur_fits(cell: Vector2i) -> bool:
+	return sim.lode_at(cell) != &"" and sim.spur_head(cell).x >= 0
 
 
 func _player_occupies(cell: Vector2i) -> bool:

@@ -31,6 +31,13 @@ const TECHS: Dictionary = {
 		"unlocks": [&"scanner"],               # the handheld sonar — finds the veins that
 		                                       # pay the 12-ingot Power wall right after
 	},
+	&"crosscutting": {
+		"name": "Crosscutting",
+		"requires": &"automation",             # you must have felt a Head finish one cell and stop
+		"sample": &"ore",                      # analyze the vein you have been draining a cell at a time
+		"cost": {&"ingot": 5},
+		"unlocks": [&"spur"],                  # reach across the vein instead of moving the machine
+	},
 	&"power": {
 		"name": "Power",
 		"requires": &"automation",
@@ -101,7 +108,7 @@ const TECHS: Dictionary = {
 ## Display/keybinding order for the bench rows (explicit, not dict-order-implicit). Prospecting sits
 ## BEFORE Power: the single-R bench walks you through the cheap sonar detour whose whole point is
 ## finding the veins that pay Power's 12-ingot wall. (The graph still shows them as a branch.)
-const ORDER: Array[StringName] = [&"automation", &"prospecting", &"power", &"descent", &"ironworks", &"machining", &"galleries", &"packing", &"enrichment", &"drainage"]
+const ORDER: Array[StringName] = [&"automation", &"prospecting", &"crosscutting", &"power", &"descent", &"ironworks", &"machining", &"galleries", &"packing", &"enrichment", &"drainage"]
 
 
 static func tech(id: StringName) -> Dictionary:

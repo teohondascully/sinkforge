@@ -23,9 +23,19 @@ extends SceneTree
 ##   THE OLD MODEL STILL RUNS.  The bridge (`docs/LODE_PLAN.md` §3): solid ore still bores exactly as it
 ##                              did, so nothing in the game breaks before the phase-3 cutover.
 ##
+##   ONE MORE MOUTH.           A Spur chained to a Head makes the Head take a unit out of the Spur's cell
+##                              too, on the same cycle, down the HEAD's column. One Head, many Spurs, one
+##                              column, one drain — and the fuel bill scales with the reach, so coverage
+##                              buys throughput without buying another machine to manage.
+##   IT MUST REACH SOMETHING.   A Spur is refused unless it stands on a lode AND touches a Head or a Spur
+##                              that chains back to one. Placement is the thing that gets got wrong.
+##   THE CHAIN OUTLIVES ITS LINKS.  A Head whose own cell is finished keeps working its Spurs, and does not
+##                              say `spent` until nothing anywhere in its reach has ore left.
+##
 ##   godot --headless --path . --script res://tools/check_head.gd
 
 const DRILL: String = "res://src/data/machines/drill.tres"
+const SPUR: String = "res://src/data/machines/spur.tres"
 
 var _fails: int = 0
 
@@ -38,6 +48,9 @@ func _initialize() -> void:
 	_spent_is_not_starved()
 	_the_old_model_still_runs()
 	_the_preview_says_one_thing()
+	_a_spur_is_one_more_mouth()
+	_a_spur_must_reach_something()
+	_the_chain_outlives_its_links()
 	if _fails == 0:
 		print("check_head: PASS — a Head works the face it stands on")
 		quit(0)
@@ -179,3 +192,112 @@ func _the_preview_says_one_thing() -> void:
 	_check(not bool(pv["blocked"]), "…and never previews as blocked")
 	_check(sim.drill_column_remaining(at) == 40,
 		"…and the supply it reports is the face it stands on (40), not a column sum")
+
+
+## A sim with a horizontal run of `n` lode cells starting at `at`, each holding `each`, floor well below.
+func _seam(at: Vector2i, n: int, each: int) -> FactorySim:
+	var sim := FactorySim.new()
+	for i: int in n:
+		var c: Vector2i = at + Vector2i(i, 0)
+		sim.lode[c] = &"ore"
+		sim.deposits[c] = each
+		sim.lode_max[c] = each
+	sim.set_solid(at + Vector2i(0, 4), &"stone")
+	return sim
+
+
+func _spur(sim: FactorySim, at: Vector2i) -> MachineState:
+	return sim.place_machine(load(SPUR) as MachineDef, at)
+
+
+## ONE MORE MOUTH — and the drain stays in one place, which is the property that makes reach worth building.
+func _a_spur_is_one_more_mouth() -> void:
+	var at := Vector2i(8, 6)
+	var sim: FactorySim = _seam(at, 3, 30)
+	var head: MachineState = _head(sim, at, 4000)
+	_check(_spur(sim, at + Vector2i(1, 0)) != null and _spur(sim, at + Vector2i(2, 0)) != null,
+		"two Spurs chain off a Head along the seam")
+	var cover: Array[Vector2i] = sim.head_coverage(at)
+	_check(cover.size() == 3 and cover[0] == at,
+		"…and the Head's reach is all three cells, its own first (%d)" % cover.size())
+	_check(sim.spur_head(at + Vector2i(2, 0)) == at,
+		"…the far Spur knows which Head it answers to, through the near one")
+	_run(sim, 400)
+	var took: int = 0
+	for i: int in 3:
+		took += 30 - sim.ore_deposit_at(at + Vector2i(i, 0))
+	_check(sim.ore_deposit_at(at + Vector2i(2, 0)) < 30,
+		"the Head draws the FAR cell too — reach is real, not a label (%d left)"
+			% sim.ore_deposit_at(at + Vector2i(2, 0)))
+	_check(int(sim.total_produced.get(&"ore", 0)) == took,
+		"…and every unit off the whole chain is realised exactly once (%d)" % took)
+	# ONE COLUMN, ONE DRAIN.
+	var strays: int = 0
+	for key: Variant in sim.ground:
+		var c: Vector2i = key
+		if c.x == at.x:
+			continue
+		for item: Variant in (sim.ground[c] as Dictionary):
+			strays += int((sim.ground[c] as Dictionary)[item])
+	_check(strays == 0, "…and the whole haul comes out of the HEAD's column, not each Spur's")
+	# REACH IS A TRADE. Three mouths pull three times as much per cycle and burn three times the coal doing
+	# it, so a Spur buys THROUGHPUT and never efficiency — the ore-per-coal is untouched, and what you have
+	# actually bought is the same vein emptied sooner with no second machine to feed, watch or drain.
+	var lone := _seam(Vector2i(40, 6), 1, 3000)
+	var solo: MachineState = _head(lone, Vector2i(40, 6), 4000)
+	_run(lone, 400)
+	var wide := _seam(Vector2i(40, 6), 3, 3000)
+	var many: MachineState = _head(wide, Vector2i(40, 6), 4000)
+	_spur(wide, Vector2i(41, 6))
+	_spur(wide, Vector2i(42, 6))
+	_run(wide, 400)
+	_check(many.fed > solo.fed,
+		"in the same time a wide Head out-produces a lone one (%d vs %d)" % [many.fed, solo.fed])
+	_check(int(wide.total_consumed.get(&"coal", 0)) > int(lone.total_consumed.get(&"coal", 0)),
+		"…and burns more coal doing it (%d vs %d) — reach is a trade, not a free upgrade"
+			% [int(wide.total_consumed.get(&"coal", 0)), int(lone.total_consumed.get(&"coal", 0))])
+
+
+## IT MUST REACH SOMETHING. Both halves of the rule, refused at the moment of the attempt.
+func _a_spur_must_reach_something() -> void:
+	var at := Vector2i(8, 6)
+	var sim: FactorySim = _seam(at, 4, 30)
+	var main := MainView.new()
+	main.sim = sim
+	_head(sim, at)
+	_check(main.spur_fits(at + Vector2i(1, 0)),
+		"a Spur fits on a lode cell touching the Head")
+	_check(not main.spur_fits(at + Vector2i(3, 0)),
+		"…and is refused two cells out, where it would touch nothing — an orphan is not a build")
+	_spur(sim, at + Vector2i(1, 0))
+	_check(main.spur_fits(at + Vector2i(2, 0)),
+		"…but fits once the gap is bridged: a chain reaches as far as you build it")
+	sim.lode.erase(at + Vector2i(2, 0))
+	_check(not main.spur_fits(at + Vector2i(2, 0)),
+		"…and is refused where there is no vein, because a Spur eats what it stands on, same as a Head")
+	main.free()
+
+
+## THE CHAIN OUTLIVES ITS LINKS.
+func _the_chain_outlives_its_links() -> void:
+	var at := Vector2i(8, 6)
+	var sim: FactorySim = _seam(at, 2, 30)
+	sim.deposits[at] = 1                       # the Head's own cell is nearly done; the Spur's is not
+	sim.lode_max[at] = 1
+	var head: MachineState = _head(sim, at)
+	_spur(sim, at + Vector2i(1, 0))
+	_run(sim, 100)
+	_check(sim.ore_deposit_at(at) == 0, "the Head's own cell is worked out")
+	_check(sim.machine_status(head) != &"spent",
+		"…and it does NOT say spent, because moving it would throw away a chain that is still paying")
+	_check(sim.drill_lode_target(at) == at + Vector2i(1, 0),
+		"…it draws from the nearest link that still has something in it")
+	_run(sim, 900)
+	_check(sim.ore_deposit_at(at + Vector2i(1, 0)) == 0 and sim.machine_status(head) == &"spent",
+		"…and only when the WHOLE reach is dry does it ask to be moved")
+	var orphan := FactorySim.new()
+	orphan.lode[Vector2i(4, 4)] = &"ore"
+	orphan.deposits[Vector2i(4, 4)] = 10
+	var lone: MachineState = orphan.place_machine(load(SPUR) as MachineDef, Vector2i(4, 4))
+	_check(orphan.machine_status(lone) == &"unlinked",
+		"a Spur reaching no Head says UNLINKED — its own word, because nothing else is wrong with it")

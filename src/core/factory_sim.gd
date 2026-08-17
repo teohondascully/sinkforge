@@ -146,6 +146,7 @@ const _BEHAVIORS: Dictionary = {
 		"flow": &"_flow_drift"},
 	&"pump": {"run": &"_run_pump", "status": &"_status_pump"},
 	&"crush": {"run": &"_run_crush", "status": &"_status_crush"},
+	&"spur": {"run": &"_run_spur", "status": &"_status_spur"},
 }
 
 ## THE DESCENT ENGINE (the L1→L2 gate — docs/PROGRESSION.md §2): placed over THE SEAL, it EATS
@@ -382,7 +383,7 @@ func _status_drill(machine: MachineState) -> StringName:
 		# not exist. A Head standing on a vein it has finished has nothing wrong with it — pick it up, move
 		# it. It is known by the Head having pulled something and there being no lode left under it, so a
 		# drill that was simply misplaced still reads as starved.
-		if machine.fed > 0 and not lode.has(machine.cell):
+		if machine.fed > 0 and not _coverage_has_ore(machine.cell):
 			return &"spent"
 	var t: Vector2i = on_lode if on_lode.x >= 0 else drill_target(machine.cell)
 	if t.x < 0:
@@ -392,6 +393,100 @@ func _status_drill(machine: MachineState) -> StringName:
 	if machine.fuel <= 0 and int(machine.input_buffer.get(&"coal", 0)) <= 0:
 		return &"no_fuel"
 	return &"working"
+
+
+## THE SPUR — a cheap module that extends a Head's reach across the vein it is standing on.
+##
+## It has no cycle of its own: it is not a small drill, it is one more mouth on the SAME drill. That is the
+## whole reason it exists (`docs/LODE.md` §5). A vein is a shape now, not a number, and the shape is only
+## worth reading if covering more of it is a BUILD rather than another machine to feed, another column to
+## drain and another status bubble to watch. One Head, many Spurs, one column, one drain.
+##
+## A Spur eats what it STANDS ON, exactly like the Head — same rule, learned once — so it must be in an open
+## cell whose backing is a lode, orthogonally touching a Head or another Spur that chains back to one.
+## Everything about which cells a chain covers is therefore visible in the world without a readout.
+## Is there anything left anywhere in this Head's reach? A Head whose own cell is finished but whose Spurs
+## are not is still working, and must not say `spent` — the word means "pick me up and move me", and moving
+## it would throw away a chain that is still paying.
+## How many cells in this Head's reach still hold ore. The fuel bill is the LIVE reach, not the built one:
+## a chain half of which is worked out costs half as much to run, because the alternative is charging a
+## player for links that are producing nothing and calling it a trade.
+func _live_mouths(head_cell: Vector2i) -> int:
+	var n: int = 0
+	for c: Vector2i in head_coverage(head_cell):
+		if lode.has(c) and int(deposits.get(c, 0)) > 0:
+			n += 1
+	return maxi(n, 1)
+
+
+func _coverage_has_ore(head_cell: Vector2i) -> bool:
+	for c: Vector2i in head_coverage(head_cell):
+		if lode.has(c) and int(deposits.get(c, 0)) > 0:
+			return true
+	return false
+
+
+func _run_spur(_machine: MachineState) -> void:
+	pass                                   # driven by its Head; see `_run_drill`
+
+
+func _status_spur(machine: MachineState) -> StringName:
+	if spur_head(machine.cell).x < 0:
+		return &"unlinked"                 # placed on a vein but reaching nothing — the one way to get it wrong
+	if not lode.has(machine.cell):
+		return &"spent"                    # its own cell is worked out; the chain past it still runs
+	return &"working"
+
+
+## Orthogonal neighbours, in a FIXED order. Coverage order decides which cell of a chain is drained first
+## when a Head cannot afford all of them, so it has to be a property of the layout and never of iteration.
+const _ORTHO: Array[Vector2i] = [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1)]
+
+
+## Every lode cell one Head works: its own, plus every Spur chained to it. Breadth-first from the Head, so
+## the order is by chain DISTANCE — the near end of a spur line drains before the far end, which is the order
+## a player would guess from looking at it.
+func head_coverage(head_cell: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = [head_cell]
+	var seen: Dictionary = {head_cell: true}
+	var queue: Array[Vector2i] = [head_cell]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_front()
+		for step: Vector2i in _ORTHO:
+			var n: Vector2i = c + step
+			if seen.has(n):
+				continue
+			var m: MachineState = machine_at(n)
+			if m == null or m.def.behavior != &"spur":
+				continue
+			seen[n] = true
+			out.append(n)
+			queue.append(n)
+	return out
+
+
+## The Head a Spur reports to, or (-1, -1) if its chain reaches none. Walked from the Spur rather than read
+## off a stored link: a chain that is broken by picking a middle Spur up has to go dead the same frame,
+## without anyone remembering to tell it.
+func spur_head(from: Vector2i) -> Vector2i:
+	var seen: Dictionary = {from: true}
+	var queue: Array[Vector2i] = [from]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_front()
+		for step: Vector2i in _ORTHO:
+			var n: Vector2i = c + step
+			if seen.has(n):
+				continue
+			var m: MachineState = machine_at(n)
+			if m == null:
+				continue
+			if m.def.behavior == &"drill" and lode.has(n):
+				return n
+			if m.def.behavior != &"spur":
+				continue
+			seen[n] = true
+			queue.append(n)
+	return Vector2i(-1, -1)
 
 
 ## GENERATOR status — burning (or holding coal to burn) = working, else the load-bearing "feed me coal".
@@ -1852,8 +1947,18 @@ func _drill_blocked(target: Vector2i) -> bool:
 ## Note what is deliberately NOT checked: whether the cell is solid. It cannot be — a machine only stands in
 ## an open cell — and the lode is background, so "the machine is here" and "the vein is here" are compatible
 ## facts rather than competing ones. That is the whole point of moving ore off the terrain plane.
+##
+## A Head is NOT un-made by finishing the cell under it. Once Spurs exist its reach is the chain, not the one
+## cell, so this answers with the nearest link that still holds ore — own cell first, then outward by chain
+## distance. Without a Spur on it that is exactly the old behaviour, one cell, and the preview and every
+## existing assertion see no difference.
 func drill_lode_target(cell: Vector2i) -> Vector2i:
-	return cell if lode.has(cell) and int(deposits.get(cell, 0)) > 0 else Vector2i(-1, -1)
+	if lode.has(cell) and int(deposits.get(cell, 0)) > 0:
+		return cell
+	for c: Vector2i in head_coverage(cell):
+		if lode.has(c) and int(deposits.get(c, 0)) > 0:
+			return c
+	return Vector2i(-1, -1)
 
 
 ## Read-only PLACEMENT PREVIEW for a drill hovered at `cell` — what the representation draws so a player
@@ -1948,7 +2053,13 @@ func _run_drill(machine: MachineState) -> void:
 			machine.fuel = DRILL_FUEL_TICKS
 		else:
 			return                      # out of fuel, no coal → idle ("feed me coal")
-	machine.fuel -= 1
+	# FUEL SCALES WITH REACH. A Head with Spurs on it takes a unit out of every covered cell per cycle, so it
+	# burns coal per cell too. That is the trade the module is worth having for: coverage scales output and
+	# cost together and leaves the MACHINE COUNT flat, which is the only one of the three that costs the
+	# player attention. Free reach would make a Spur strictly better than not placing one, and a module you
+	# always place is a tax with extra steps.
+	var mouths: int = _live_mouths(machine.cell) if lode_cell.x >= 0 else 1
+	machine.fuel -= mouths
 	machine.progress += SECONDS_PER_TICK
 	if machine.progress < recipe.time:
 		return
@@ -1957,20 +2068,30 @@ func _run_drill(machine: MachineState) -> void:
 	# same pool the hand pulls from, poured down the same column. When it runs dry the vein is gone and the
 	# machine says so (&"spent"); the machine itself is untouched and can be picked up and moved.
 	if lode_cell.x >= 0:
-		var vein: StringName = lode[lode_cell]
-		var rest: int = int(deposits.get(lode_cell, 0)) - 1
-		if rest > 0:
-			deposits[lode_cell] = rest
-		else:
-			deposits.erase(lode_cell)
-			lode.erase(lode_cell)
-			lode_max.erase(lode_cell)
-		terrain_dirty.append(lode_cell)                       # the fleck field thins on this
-		machine.fed += 1                                      # what this Head has pulled — and how `spent` is known
-		total_produced[vein] = int(total_produced.get(vein, 0)) + 1
-		var vdest: Dictionary = _column_landing(lode_cell.x, lode_cell.y + 1)
-		vdest["target"][vein] = int(vdest["target"].get(vein, 0)) + 1
-		flow_events.append({"item": vein, "from": lode_cell, "to": vdest["to_cell"], "count": 1})
+		# ONE COLUMN, ONE DRAIN. Every covered cell gives up a unit and ALL of it pours out of the Head's own
+		# column, not each Spur's. The on-hook rule is intact and this is what it says: extraction may be
+		# lateral, logistics stays gravity-vertical — a Spur is part of the Head reaching sideways, never a
+		# conveyor. It is also the property that makes reach worth building: you cut wide across the vein and
+		# still only manage one drop.
+		var pulled: int = 0
+		for c: Vector2i in head_coverage(machine.cell):
+			if not lode.has(c) or int(deposits.get(c, 0)) <= 0:
+				continue                                      # a worked-out link; the chain past it still runs
+			var vein: StringName = lode[c]
+			var rest: int = int(deposits.get(c, 0)) - 1
+			if rest > 0:
+				deposits[c] = rest
+			else:
+				deposits.erase(c)
+				lode.erase(c)
+				lode_max.erase(c)
+			terrain_dirty.append(c)                           # the fleck field thins on this
+			pulled += 1
+			total_produced[vein] = int(total_produced.get(vein, 0)) + 1
+			var vdest: Dictionary = _column_landing(machine.cell.x, machine.cell.y + 1)
+			vdest["target"][vein] = int(vdest["target"].get(vein, 0)) + 1
+			flow_events.append({"item": vein, "from": c, "to": vdest["to_cell"], "count": 1})
+		machine.fed += pulled                                 # what this Head has pulled — and how `spent` is known
 		return
 	# Drain one unit from the target solid ore cell (CLEARED when its deposit empties, carving the shaft). The
 	# freed material is produced + ejected DOWN.

@@ -34,6 +34,7 @@ const MACHINE_STYLE: Dictionary = {
 	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue — the powered flood-drain (L3)
 	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal — powered, heavy
 	&"crush": {"kind": "crush", "color": Color(0.38, 0.33, 0.30)},        # crusher iron — spoil in, gravel out
+	&"spur": {"kind": "spur", "color": Color(0.66, 0.53, 0.32)},          # the Head's own amber — it IS the Head
 }
 
 
@@ -69,6 +70,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 	match kind:
 		"collar":
 			_collar(canvas, center, s, active, t, fill)
+		"spur":
+			_spur(canvas, center, s, active, t, fill)
 		"furnace":
 			_furnace(canvas, center, s, active, t)
 		"gear":
@@ -183,6 +186,44 @@ static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 ##
 ## And the socket WIDENS as the vein goes (`fill` 1 → 0), so the machine and the flecks tell the same story
 ## from opposite ends: the metal thins out while the hole eats outward.
+## THE SPUR — the Collar's smaller sibling, and drawn to say so.
+##
+## It reads as the same machine wearing less of it: the same amber frame, the same dark bore, the same
+## inverted value relationship that lets a frame survive being seen against dark rock. What it does NOT have
+## is a chute, and that absence is the whole sentence — a Spur's haul does not leave here, it leaves at the
+## Head. What it has instead is a LINK ARM reaching out of one side toward whatever it is chained to, so a
+## line of them reads as one machine with several mouths rather than as several machines that happen to be
+## adjacent. Unlinked, the arm reaches into nothing and the bore goes cold, which is what being unlinked is.
+static func _spur(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, fill: float) -> void:
+	var steel := Color(0.66, 0.53, 0.32)
+	var edge := Color(0.90, 0.80, 0.56)
+	var shade := Color(0.10, 0.09, 0.12)
+	var left: float = c.x - 5.4 * s
+	canvas.draw_rect(Rect2(left, c.y - 7.2 * s, 10.8 * s, 3.6 * s), steel)       # the mount, shorter
+	canvas.draw_rect(Rect2(left, c.y - 7.2 * s, 10.8 * s, 1.1 * s), edge)
+	canvas.draw_rect(Rect2(left, c.y - 3.9 * s, 10.8 * s, 0.8 * s), shade)
+	for rx: float in [left, c.x + 3.6 * s]:                                       # two short rails
+		canvas.draw_rect(Rect2(rx, c.y - 3.6 * s, 1.8 * s, 7.4 * s), steel)
+		canvas.draw_rect(Rect2(rx, c.y - 3.6 * s, 0.7 * s, 7.4 * s), edge)
+	# THE LINK ARM: it belongs to something. Drawn low and wide so it reads as reaching sideways, not down.
+	var arm: Color = edge if active else Color(steel, 0.55)
+	canvas.draw_rect(Rect2(c.x - 9.5 * s, c.y + 3.4 * s, 19.0 * s, 1.5 * s), arm)
+	var bore := Vector2(c.x, c.y + 0.2 * s)
+	var pulse: float = (1.0 + 0.08 * sin(t * 18.0)) if active else 1.0
+	var r: float = (2.4 + 2.0 * (1.0 - clampf(fill, 0.0, 1.0))) * s * pulse
+	canvas.draw_circle(bore, r + 1.0 * s, Color(0.0, 0.0, 0.0, 0.42))
+	canvas.draw_circle(bore, r, Color(0.03, 0.03, 0.05, 0.94))
+	canvas.draw_arc(bore, r, 0.0, TAU, 16, edge, 1.2 * s)
+	if not active:
+		return
+	canvas.draw_arc(bore, r, PI * 0.85, PI * 1.55, 8, Color(1.0, 0.93, 0.74, 0.9), 1.4 * s)
+	for k: int in 3:
+		var ang: float = float(k) * TAU / 3.0 + t * 0.7
+		var phase: float = fmod(t * 1.9 + float(k) * 0.3, 1.0)
+		canvas.draw_circle(bore + Vector2(cos(ang), sin(ang)) * (r + phase * 4.0 * s),
+			(1.2 - phase) * s, Color(0.72, 0.66, 0.56, 0.5 * (1.0 - phase)))
+
+
 static func _collar(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, fill: float) -> void:
 	# THE FRAME CARRIES ITS OWN CONTRAST. Every other machine draws near-black steel on top of an opaque
 	# machine-coloured casing, and the casing is what makes the dark glyph read. Dropping the casing to show

@@ -68,6 +68,7 @@ const ALERT_REASON: Dictionary = {
 	# SPENT is not STARVED. A Head that has finished its vein has nothing wrong with it, and telling the
 	# player it is "starved" sends them hunting for a feed problem that does not exist (`docs/LODE.md` §5).
 	&"spent": "the vein is worked out — pick it up and move it",
+	&"unlinked": "nothing to feed — a Spur must touch a Drill, or a Spur that reaches one",
 }
 ## THE TITLE / NEW-GAME card (#6 + #45): {} = closed; else {seed, tint, tint_name, tints, has_save}.
 var title_info: Dictionary = {}
