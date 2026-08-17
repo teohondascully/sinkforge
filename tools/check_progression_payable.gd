@@ -27,8 +27,10 @@ extends SceneTree
 
 const MACHINE_DIR: String = "res://src/data/machines/"
 const MATERIAL_DIR: String = "res://src/data/materials/"
-## Read rather than listed, so it cannot drift from what the world actually builds for you.
+## RUN rather than listed, so it cannot drift from what the world actually builds for you. Preloaded
+## because WorldSeeder declares no class_name — MainView reaches it exactly this way (main.gd:680).
 const SEEDER_SRC: String = "res://scenes/world_seeder.gd"
+const SEEDER := preload("res://scenes/world_seeder.gd")
 
 ## Items produced by a recipe and consumed by no recipe. See the header: subset, not equality.
 const KNOWN_TERMINAL: Array[StringName] = [&"gear", &"plate"]
@@ -129,14 +131,29 @@ func _producible(machines: Array[MachineDef], raw: Dictionary, researched: Dicti
 	return have
 
 
-## The machines the WORLD stands up for you, read out of the seeder's source so this can never drift from
-## what actually gets placed. `place_machine(load("res://src/data/machines/X.tres"), …)`.
+## The machines the WORLD stands up for you — obtained by RUNNING the seeder against a real sim and
+## reading back what it placed.
+##
+## This used to scan `world_seeder.gd` for `place_machine(load("res://src/data/machines/X.tres"), …)` with
+## a RegEx, and that could not fail in the way that matters. A regex over source text cannot tell live code
+## from dead code: comment the two placements out — which is how a person actually disables something while
+## debugging — and the pattern still matches, the layer still finds two Processors, and the whole bootstrap
+## assertion goes green over a game that is now unwinnable from a fresh save. Measured: DELETING the lines
+## goes red with the right blast radius (11 rungs collapse), COMMENTING them out stays green.
+##
+## That is the same defect this layer exists to catch, one level up — a guard reporting on a description of
+## the code rather than on the code. WorldSeeder is `RefCounted` and explicitly node-free ("pure sim
+## seeding: no scene nodes"), so there is no reason to settle for the description: generate the world the
+## real boot generates, seed it the way the real boot seeds it, and observe. Costs one worldgen.
 func _seeded() -> Dictionary:
 	var out: Dictionary = {}
-	var src: String = FileAccess.get_file_as_string(SEEDER_SRC)
-	var re := RegEx.create_from_string("place_machine\\(load\\(\"res://src/data/machines/([a-z_]+)\\.tres\"")
-	for m: RegExMatch in re.search_all(src):
-		out[StringName(m.get_string(1))] = true
+	var gen: WorldGen = LayeredWorldGen.new()
+	var sim := FactorySim.new()
+	sim.load_world(gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, MainView.WORLD_SEED))
+	# WorldSeeder has no class_name; MainView reaches it by preload and so must we.
+	SEEDER.seed_tutorial(sim, false)   # dev_start=false: what a REAL new game gets, not the dev pack
+	for m: MachineState in sim.machines:
+		out[m.def.id] = true
 	return out
 
 
