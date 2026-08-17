@@ -1240,7 +1240,30 @@ func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 ## the two put straight back together above, so its output is unchanged.
 func _cell_base_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-	return _zone_tinted(def.base_color.darkened(depth * def.depth_darken), c.y)
+	var base: Color = def.base_color.darkened(depth * def.depth_darken)
+	# THE STAIN (`docs/LODE.md` §10 phase 4). Rock with a vein behind it is MINERALISED rock, and it should
+	# look it — otherwise, once ore stops being a block, the world is uniform stone and the only way to find
+	# anything is to dig at random. This is the answer to the question that opened the whole migration:
+	# "maybe the rock has some signal so you know there's a specific ore behind it".
+	#
+	# It is a DISCOLOURATION and nothing else. Not a glint: `_draw_ore_glints` already learned, at some cost,
+	# that sparkling cells sealed inside stone read as a floating starfield rather than as a vein, so buried
+	# ore gets no motion at all — §11's motion budget is spent entirely on the faces you have opened. And it
+	# is far weaker than an exposed face, because it has to be findable without being a map marker: what you
+	# notice is that a patch of rock is not quite the colour of the rock beside it.
+	if sim.lode.has(c):
+		base = _stain(base, _material(sim.lode[c]), LODE_STAIN_BURIED)
+		base.v *= LODE_STAIN_BURIED_DARK
+	return _zone_tinted(base, c.y)
+
+
+## Carry rock `amount` of the way toward the metal in it, in HUE only — the host keeps the say over how lit
+## it is. Shared by the buried stain and the exposed face so the two can never drift apart: an opened vein
+## has to be the same vein, more so.
+func _stain(host: Color, vein: MaterialDef, amount: float) -> Color:
+	var out: Color = host.lerp(vein.nugget_color, amount)
+	out.v = host.v * lerpf(1.0, LODE_STAIN_LIFT, amount / LODE_STAIN)
+	return out
 
 
 ## The cell's (jitter, strata) tone, both already scaled by the depth boost.
@@ -2540,6 +2563,27 @@ const WALL_NONE := Color(0.06, 0.055, 0.05)   ## a cell with no wall entry (unli
 ## face because of its colour and its grain, never because it is lit differently from the wall it is cut into.
 const LODE_STAIN: float = 0.42
 const LODE_STAIN_LIFT: float = 1.05
+## …and how far rock STILL COVERING a vein carries, plus how much it DARKENS.
+##
+## The buried tell gets a value channel and the open face does not, and the asymmetry is the point. Holding
+## value is right at an open face: both a face and the rock beside it are things you look at, and a carved
+## pocket that came out brighter than its host read as more rock rather than as a hole. Buried, there is no
+## such confusion — every cell in question is solid — and value is the only channel with any reach left,
+## because the darkness veil crushes saturation long before it crushes brightness. A hue-only stain at 0.14
+## was measurably applied and completely invisible on screen, in lamplight, on a forty-cell body.
+##
+## Mineralised rock reading DARKER is also the right direction: metal in stone is denser and duller than the
+## stone, and a bruise in a lit wall is a thing the eye finds without being told to look.
+##
+## Both numbers are MEASURED, not picked. `capture_moments -- stain` stages two ore bodies in a lit gallery
+## and prints the stained-vs-plain luma; capturing it again under SF_NO_LODE=1 gives the same frame without
+## them, and the pair is diffed in matched boxes. That loop is the only way to set this honestly, because
+## run-to-run noise from animation phase alone reaches ±8% and the first two attempts at this constant were
+## read as "invisible" when they were merely below that floor. At 0.78 a buried body measures ~13% darker
+## on screen against a ~2% noise floor: a patch of wrong-coloured rock you find when you look, and not a map
+## marker. An earlier hue-only version at 0.14 measured -8% in the base colour and was genuinely invisible.
+const LODE_STAIN_BURIED: float = 0.26
+const LODE_STAIN_BURIED_DARK: float = 0.78
 
 func _wall_fill_color(c: Vector2i) -> Color:
 	if not sim.wall.has(c):
@@ -2572,9 +2616,7 @@ func _wall_base_color(c: Vector2i) -> Color:
 		# over how lit it is; the metal earns its brightness one grain at a time, in `_draw_lode`.
 		var vein: MaterialDef = _material(sim.lode[c])
 		var host: Color = _material(sim.wall[c]).base_color if sim.wall.has(c) else vein.base_color
-		var stained: Color = host.lerp(vein.nugget_color, LODE_STAIN)
-		stained.v = host.v * LODE_STAIN_LIFT
-		return _zone_tinted(stained, c.y)
+		return _zone_tinted(_stain(host, vein, LODE_STAIN), c.y)
 	if not sim.wall.has(c):
 		return WALL_NONE
 	return _zone_tinted(_material(sim.wall[c]).base_color, c.y)

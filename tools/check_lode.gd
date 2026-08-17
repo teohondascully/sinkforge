@@ -74,6 +74,7 @@ func _run() -> void:
 	_covering_is_not_killing()
 	_the_ladder_still_holds()
 	_it_round_trips()
+	_the_rock_tells_on_itself()
 
 
 ## A sealed working with the body standing in it and a wall of `mat` in reach, each cell seeded to `each`.
@@ -375,3 +376,62 @@ func _pocketed() -> int:
 
 func _reset_pack() -> void:
 	_sim.inventory.erase(&"ore")
+
+
+## THE ROCK TELLS ON ITSELF (`docs/LODE.md` §10 phase 4).
+##
+## Once ore stops being a block, a world with no stain is uniform stone and the only way to find anything is
+## to dig at random — so this is not a cosmetic pass, it is the prerequisite that keeps the cutover from
+## being a legibility regression. Asserted on the RULE rather than on pixels: the tell is a HUE move that
+## holds the host's value, it is real enough to see, and it is markedly quieter than an open face, because
+## a buried vein you can read as clearly as an exposed one makes clearing the rock pointless.
+func _the_rock_tells_on_itself() -> void:
+	var r: WorldRenderer = _main._renderer
+	var host := Color(0.29, 0.30, 0.34)                     # plain stone, untouched
+	var vein: MaterialDef = r._material(&"ore")
+	var buried: Color = r._stain(host, vein, WorldRenderer.LODE_STAIN_BURIED)
+	buried.v *= WorldRenderer.LODE_STAIN_BURIED_DARK
+	var face: Color = r._stain(host, vein, WorldRenderer.LODE_STAIN)
+	var shift_buried: float = absf(buried.h - host.h) + absf(buried.s - host.s)
+	var shift_face: float = absf(face.h - host.h) + absf(face.s - host.s)
+	_check(shift_buried > 0.01, "rock with a vein behind it is NOT the colour of the rock beside it (%.3f)"
+		% shift_buried)
+	_check(buried.v < host.v and buried.v > host.v * 0.7,
+		"…and it reads DARKER, like metal in stone, without becoming a hole (%.2f vs %.2f)"
+			% [buried.v, host.v])
+	_check(face.v >= host.v,
+		"…while an OPEN face never darkens, because a hole that reads dark is just more rock")
+	_check(shift_face > shift_buried,
+		"…and an OPEN face stains further still (%.3f vs %.3f)" % [shift_face, shift_buried])
+	# …and it actually reaches the terrain bake, not just the helper.
+	var plain := Vector2i(6, 60)
+	var veined := Vector2i(7, 60)                           # reused as `buried_cell` below
+	for d: Vector2i in [Vector2i(0, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		_sim.set_solid(plain + d, &"stone")
+		_sim.set_solid(veined + d, &"stone")
+	_sim.lode.erase(plain)
+	_sim.lode[veined] = &"ore"
+	_sim.deposits[veined] = 120
+	var stone: MaterialDef = r._material(&"stone")
+	var a: Color = r._cell_base_color(plain, stone)
+	var b: Color = r._cell_base_color(veined, stone)
+	_check(not a.is_equal_approx(b),
+		"…and the SOLID terrain pass picks it up, so the tell survives into the rock you have not dug")
+	# WHAT CLEARING THE ROCK ACTUALLY BUYS YOU. This started as a comparison of the two stains and the
+	# comparison was the wrong test: covered rock now DARKENS and an open face does not, so they are not two
+	# volumes of one signal, they are two different signals. The real answer is that only an exposed face
+	# carries metal — the grain field of `_draw_lode`, which is also exactly the state the hand and the Head
+	# can work. Buried, you get a discolouration and a decision; exposed, you get the vein.
+	var open_cell := Vector2i(7, 58)
+	_sim.set_solid(open_cell, &"")
+	_sim.lode[open_cell] = &"ore"
+	_sim.deposits[open_cell] = 120
+	_sim.lode_max[open_cell] = 120
+	_check(not _sim.lode_workable(veined) and _sim.lode_workable(open_cell),
+		"…and only the OPEN one carries metal you can see and work — that is what the swing buys")
+
+	# NO MOTION. `_draw_ore_glints` learned at some cost that sparkling sealed cells read as a starfield;
+	# the buried tell must stay still, so a sealed cell is not allowed to be a glint candidate.
+	var sealed: bool = _sim.is_solid(veined + Vector2i(0, -1)) and _sim.is_solid(veined + Vector2i(0, 1)) \
+		and _sim.is_solid(veined + Vector2i(-1, 0)) and _sim.is_solid(veined + Vector2i(1, 0))
+	_check(sealed, "…on a cell sealed in rock, which is exactly where a GLINT would read as a floating star")

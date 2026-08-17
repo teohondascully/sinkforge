@@ -216,6 +216,30 @@ Three strikes, each provable on its own and each leaving the game playable:
 2. **The Head and the Spur.** Drills re-based onto the lode, coverage, spent status, placement preview.
 3. **The stain.** The through-rock tell, measured against the `check_tells` contract, plus draining density.
 
+> **The stain landed early — before the cutover, not after it.** Written as strike 3 because it reads as
+> polish, it is actually a precondition: after the cutover the world is stone with the ore *inside* it, and a
+> player who cannot see where to dig is looking at featureless rock. So it shipped first, at 57/57.
+>
+> It is built as one function, `WorldRenderer._stain(host, vein, amount)`, used by both tell states with a
+> deliberate asymmetry between them:
+>
+> | | amount | value | what it says |
+> |---|---|---|---|
+> | exposed face | `LODE_STAIN` 0.42 | held at the host's (never darkens) | *here it is* |
+> | buried rock | `LODE_STAIN_BURIED` 0.26 | ×0.78 | *something is under this* |
+>
+> The value split is the whole trick, and it is forced by §11's rule rather than chosen. **An open face may
+> not darken** — a hole that reads dark is indistinguishable from more rock, which is exactly the bug that
+> made the starter adit look like a scuff. **Buried rock may not brighten** — a lit patch on a wall reads as
+> a light source, and worse, underground the veil crushes saturation long before it touches brightness, so
+> value is the only channel with any reach down there. Measured on-screen: **−13.2% luma** against a ~2%
+> capture noise floor. Loud enough to steer a dig, quiet enough that §7's reveal is still a reveal.
+>
+> `check_lode:_the_rock_tells_on_itself` holds all of it, including the one that is easy to lose: the buried
+> tell must be **still**. `_draw_ore_glints` learned at cost that sparkling sealed cells read as a starfield,
+> so a sealed cell is asserted not to be a glint candidate. And what an open face buys you is not a louder
+> stain — it is the metal itself: only an exposed lode draws grain, and only an exposed lode is workable.
+
 ## 11. How ore should read under light
 
 > Raised by the user while phase 1 was landing: *"I want the lighting to make ores feel special but not so

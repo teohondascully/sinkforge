@@ -104,6 +104,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_head(main)
 		"chain":
 			await _at_the_chain(main)
+		"stain":
+			await _at_the_stain(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -682,6 +684,83 @@ func _at_the_adit(main: MainView) -> void:
 ## the sump it was placed over — beside the same vein still being worked by hand. The subject is the
 ## PLACEMENT: one machine, one cell, on the ore. The old model needed three facts right (somewhere above it,
 ## same column, drain under the bottom) before anything happened at all.
+## THE STAIN. A lit gallery with a fat ore BODY still buried in the rock past its far wall, and a second,
+## poorer one below the floor. Nothing is exposed: the whole question this shot answers is whether a player
+## standing in a room they have cleared can tell where to dig NEXT without a readout, a sonar or a swing.
+## If the bodies cannot be picked out of the rock here, the stain is too quiet and the cutover would leave
+## the world unreadable; if they read like map markers it is too loud and clearing rock stops meaning
+## anything. Both failures are visible in this one frame.
+func _at_the_stain(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 44
+	var x0: int = 40
+	for x: int in range(x0 - 18, x0 + 19):
+		for y: int in range(row - 10, row + 14):
+			sim.set_solid(Vector2i(x, y), &"stone")
+			sim.lode.erase(Vector2i(x, y))
+			sim.lode_max.erase(Vector2i(x, y))
+			sim.deposits.erase(Vector2i(x, y))
+	for x2: int in range(x0 - 8, x0 + 5):                      # the room you are standing in
+		for y2: int in range(row - 3, row + 1):
+			sim.set_solid(Vector2i(x2, y2), &"")
+	# A FAT BODY, buried, just past the room's right-hand wall — the thing you are meant to notice.
+	# It starts AT the room's wall, because that is where the question is actually asked: you are standing in
+	# lamplight looking at the face in front of you, deciding which way to cut. Two cells further out it is in
+	# the dark, and a tell that only answers your lamp cannot be seen where no lamp reaches — which is correct
+	# behaviour and a useless photograph.
+	for dx: int in range(0, 5):
+		for dy: int in range(-4, 2):
+			if absi(dx - 1) + absi(dy + 1) > 4:
+				continue                                       # a blob, not a rectangle
+			var c := Vector2i(x0 + 5 + dx, row + dy)
+			if OS.has_environment("SF_NO_LODE"):
+				continue            # the A/B half of the calibration rig — see the print at the end
+			sim.lode[c] = &"ore"
+			sim.deposits[c] = 200
+			sim.lode_max[c] = 200
+	# …and a poorer one in the FLOOR you are standing on, where the light is strongest of all.
+	for dx2: int in range(0, 6):
+		for dy2: int in range(1, 3):
+			var c2 := Vector2i(x0 - 7 + dx2, row + dy2)
+			if OS.has_environment("SF_NO_LODE"):
+				continue
+			sim.lode[c2] = &"coal"
+			sim.deposits[c2] = 140
+			sim.lode_max[c2] = 140
+	for t: int in [x0 - 7, x0 - 2, x0 + 3]:
+		sim.torch[Vector2i(t, row - 3)] = true
+	sim.inventory[&"wood_pickaxe"] = 1
+	main._inv_selected = 0
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 3) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
+	for _i: int in 60:
+		await physics_frame
+	Input.warp_mouse(Vector2(300.0, 240.0))
+	for _i2: int in 8:
+		await physics_frame
+	var buried: int = 0
+	for key: Variant in sim.lode:
+		if sim.is_solid(key):
+			buried += 1
+	# The calibration number, printed rather than eyeballed. WorldRenderer.LODE_STAIN_BURIED* were tuned by
+	# capturing this moment twice — once with SF_NO_LODE=1 to suppress the bodies — and measuring the luma of
+	# matched boxes in the two frames. Run-to-run noise from animation phase alone reaches ±8% in a bad run,
+	# so the delta below is the honest read and anything under about 5% is not a signal.
+	var r: WorldRenderer = main._renderer
+	var probe := Vector2i(x0 - 5, row + 1)
+	var near := Vector2i(x0 + 1, row + 1)
+	var a: Color = r._cell_base_color(probe, r._material(sim.material_at(probe)))
+	var b: Color = r._cell_base_color(near, r._material(sim.material_at(near)))
+	var la: float = 0.2126 * a.r + 0.7152 * a.g + 0.0722 * a.b
+	var lb: float = 0.2126 * b.r + 0.7152 * b.g + 0.0722 * b.b
+	print("STAIN  buried=%d  probe=%s  stained luma %.3f vs plain %.3f (%+.1f%%)"
+		% [buried, str(sim.lode.get(probe, &"-")), la, lb, 100.0 * (la - lb) / maxf(lb, 0.001)])
+	if main._hints != null:
+		main._hints._active = &""
+	main._hud.objectives = null
+
+
 ## THE CHAIN. One Head, four Spurs, one seam, one drain — the picture `docs/LODE.md` §5 is describing when
 ## it says a vein stops being a number and becomes a layout. The seam is CONTIGUOUS on purpose (the `head`
 ## moment's is every other cell, which is the shape a chain cannot cross) and it thins left to right, so the

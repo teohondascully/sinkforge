@@ -135,8 +135,17 @@ Each phase is one commit (or a tight run), lands green, and is independently rev
   `capture_moments`, and every remaining ore fixture.
 
 ### Phase 4 — the stain, and the shot
-- The through-rock tell, measured against the `check_tells` honesty contract (climbs near a lode, ~0 in dead
-  rock). Spent-vein look. Capture moments + `history/` archive. Doc status updates across LODE/DRIFT/BITS.
+*The stain half is **LANDED**, out of order, ahead of phase 3 — see below for why.*
+
+- **DONE — the through-rock tell.** `WorldRenderer._stain()`, shared by the exposed face and the buried tell
+  with an asymmetry in the value channel (face holds value, buried darkens ×0.78). −13.2% on-screen luma
+  against a ~2% noise floor. Held by `check_lode:_the_rock_tells_on_itself`, `history/124-*`, `docs/LODE.md`
+  §10. Spec detail in LODE §10; the reason it moved is one line: *after the cutover, a world without the
+  stain is featureless stone and nobody can tell where to dig.* Phase 3 needs it, so it went first.
+- **DONE — draining density.** `lode_max` (the per-vein denominator) plus the angular grain field, so a
+  worked-out vein looks worked out and a fat one looks fat.
+- **TODO** — spent-vein look at the *host rock* level (a cleared-out wall that still stains reads as a lie),
+  the shot itself, and doc status updates across DRIFT/BITS.
 
 ## 5. The eval gate
 
@@ -168,6 +177,9 @@ deliberate design decision that must be re-argued in the commit, never silently 
 - **`check_head`** (phase 2) — coverage never crosses to a cell with no lode; a spent Head says so; a Spur
   extends exactly what it claims; neither hand yield nor Head output ever moves sideways.
 - **`check_stain`** (phase 4) — the `check_tells` honesty contract, applied to the through-rock tell.
+  **Resolved as a case inside `check_lode` instead of a layer of its own** (`_the_rock_tells_on_itself`): the
+  contract is about one function's output, and a 57th process launch to assert four colours is a worse trade
+  than a case in the layer that already owns the lode's spec.
 
 ### 5c. Invariants that must NOT move (the regression guard)
 
