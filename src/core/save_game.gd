@@ -280,8 +280,21 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	return true
 
 
-## Write an envelope to disk ATOMICALLY, keeping the previous good save as `<path>.bak`. Returns success.
-## On ANY failure the existing save is left exactly as it was — that is the entire point of the dance.
+## Write an envelope to disk, keeping the previous GOOD save as `<path>.bak`. Returns success.
+##
+## On ANY failure the existing save is left exactly as it was — that is the entire point of the dance,
+## and every early return below removes the temp file rather than the player's game.
+##
+## "Atomic" here means REPLACEMENT VISIBILITY, and only that: a reader either sees the whole old save or
+## the whole new one, never a half-written mixture, because the bytes are staged in a temp file and the
+## slot is swapped with a single rename. It is NOT a power-loss durability claim — nothing here fsyncs,
+## so a kernel that has acknowledged the write but not flushed it can still lose the tail on a hard cut.
+## The backup generation, not the rename, is what covers that case.
+##
+## COST: this decodes the existing save once per write to decide whether it may become the backup. That
+## is a second full decode on top of the readback below. Saves are user/interval-triggered and the
+## envelope is small, so the price is paid deliberately — the alternative is trusting a file we have not
+## looked at, which is exactly the bug this replaced.
 static func write(path: String, data: Dictionary) -> bool:
 	var tmp: String = path + TMP_SUFFIX
 	var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
@@ -304,8 +317,33 @@ static func write(path: String, data: Dictionary) -> bool:
 
 	# LAST KNOWN GOOD. Copied, not renamed: a copy leaves the slot occupied the whole time, so a crash
 	# between these two lines still finds a complete game at the real path.
+	#
+	# TWO CONDITIONS, both of which this code got wrong, and both found by an external audit as
+	# release-blocking. They are opposite failure directions of the same three lines.
+	#
+	# 1. ONLY A VALID PRIMARY MAY BECOME THE BACKUP. The copy used to require merely that the file
+	#    EXISTED. But `read()` recovers FROM the backup when the primary is damaged — so the very next
+	#    save copied that damaged primary over the good backup which had just rescued the player, and
+	#    the recovery generation was gone. The new save might be fine; the safety net behind it was not.
+	#    One more corruption after that and there is nothing left to fall back to.
+	# 2. A FAILED COPY MUST ABORT THE WRITE. `copy_absolute()` returns an Error and it was discarded.
+	#    A copy that failed — permissions, a full disk — followed by a rename that succeeded replaced
+	#    the player's save with NO valid backup behind it, while this function's own docstring promised
+	#    that on ANY failure the existing save is left exactly as it was. The promise was the defect.
 	if FileAccess.file_exists(path):
-		DirAccess.copy_absolute(path, path + BAK_SUFFIX)
+		if _valid_envelope(_read_file(path)):
+			var backed: int = DirAccess.copy_absolute(path, path + BAK_SUFFIX)
+			if backed != OK:
+				push_warning("save: could not preserve %s as %s (err %d) — refusing to promote a new save "
+					% [path, path + BAK_SUFFIX, backed]
+					+ "over a generation we cannot back up; the existing save is untouched")
+				DirAccess.remove_absolute(tmp)
+				return false
+		else:
+			# The slot on disk is damaged. Whatever sits in .bak is older but INTACT, and it is the only
+			# good generation left — overwriting it with this wreckage is the one thing we must not do.
+			push_warning("save: %s is damaged — keeping the existing backup rather than overwriting it "
+				% path + "with a corrupt primary")
 	if DirAccess.rename_absolute(tmp, path) != OK:
 		push_warning("save: could not promote %s over %s — the existing save is untouched" % [tmp, path])
 		DirAccess.remove_absolute(tmp)

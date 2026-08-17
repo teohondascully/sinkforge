@@ -78,6 +78,7 @@ func _initialize() -> void:
 	_version_migration()
 	_phase_equivalence()
 	_seed_ownership()
+	_backup_generation()
 	_sweep()
 	if _failures == 0:
 		print("check_save_durability: PASS")
@@ -321,4 +322,80 @@ func _seed_ownership() -> void:
 	_check(SaveGame.restore(reloaded, SaveGame.read(SLOT)), "…reloaded once more")
 	_check(reloaded._fine_solid == session._fine_solid and not reloaded._fine_solid.is_empty(),
 		"…and the fine terrain rebuilds identically (%d cells), because the seed came through" % reloaded._fine_solid.size())
+	_sweep()
+
+
+## 7. THE BACKUP GENERATION IS NOT SPENT TWICE.
+## Section 2 proves a damaged slot recovers from the backup. This proves the recovery SURVIVES THE NEXT
+## SAVE — which is where it used to die, one save later and out of sight of every test.
+##
+## `write` copied the primary to `.bak` on the sole condition that the primary EXISTED. So the first save
+## after a recovery copied the wreckage that had just been recovered *from* over the only intact
+## generation left. The player was warned "recovered", played on, saved once — and was then a single
+## corruption away from nothing at all, with no sign that the net under them had been cut. Nothing here
+## fails loudly; the damage is entirely in what is no longer there.
+##
+## The second half is the opposite direction of the same three lines: `copy_absolute` returns an Error and
+## it was discarded, so a backup that could NOT be written was followed by a rename that could, replacing
+## the save with nothing behind it — while `write`'s own docstring promised any failure leaves the
+## existing save exactly as it was. Both were found by an external audit and both were release-blocking.
+func _backup_generation() -> void:
+	print("== the backup generation ==")
+	_sweep()
+	_check(SaveGame.write(SLOT, SaveGame.capture(_world(11))), "an older save is written")
+	_check(SaveGame.write(SLOT, SaveGame.capture(_world(22))), "…then a newer one, demoting it to backup")
+
+	# Damage the slot exactly as section 2 does. This whole section is about the state AFTER a recovery, so
+	# a recovery that did not actually happen would make everything below true for the wrong reason.
+	var whole: PackedByteArray = FileAccess.get_file_as_bytes(SLOT)
+	var f: FileAccess = FileAccess.open(SLOT, FileAccess.WRITE)
+	f.store_buffer(whole.slice(0, whole.size() / 3))
+	f.close()
+	var wreck: PackedByteArray = FileAccess.get_file_as_bytes(SLOT)
+	_check(wreck.size() > 0 and wreck.size() < whole.size(),
+		"the slot is genuinely damaged, not empty (%d bytes of %d)" % [wreck.size(), whole.size()])
+	_check(int(SaveGame.read(SLOT).get("world_seed", -1)) == 11
+		and SaveGame.last_read == SaveGame.Read.RECOVERED,
+		"…and the player is now running on a RECOVERED save, with that damage still on disk")
+
+	# THE SAVE THAT USED TO EAT THE NET. Everything about it succeeds — the new game lands in the slot —
+	# and the only question is what it did to the generation standing behind it.
+	_check(SaveGame.write(SLOT, SaveGame.capture(_world(33))), "they save again, and the new save writes")
+	_check(int(SaveGame.read(SLOT).get("world_seed", -1)) == 33, "…and the slot holds it")
+	var bak: PackedByteArray = FileAccess.get_file_as_bytes(SLOT + SaveGame.BAK_SUFFIX)
+	_check(bak != wreck,
+		"…and the backup is NOT the corrupt primary it just recovered from (%d bytes vs the wreck's %d)"
+			% [bak.size(), wreck.size()])
+	_check(int(SaveGame._read_file(SLOT + SaveGame.BAK_SUFFIX).get("world_seed", -1)) == 11,
+		"…it is still the intact seed-11 generation — the net that caught them is still under them")
+
+	# THE CONTROL, without which the assertion above is equally satisfied by a `write` that simply stopped
+	# backing anything up. An UNDAMAGED primary must still rotate into the backup on the very next save.
+	_check(SaveGame.write(SLOT, SaveGame.capture(_world(44))), "a save over an INTACT slot")
+	_check(int(SaveGame._read_file(SLOT + SaveGame.BAK_SUFFIX).get("world_seed", -1)) == 33,
+		"…DOES rotate the backup forward — the new guard is a validity check, not a disabled feature")
+
+	# A BACKUP THAT CANNOT BE WRITTEN ABORTS THE PROMOTION. Occupying the backup path with a DIRECTORY is
+	# the cleanest honest forcing function: the copy cannot open its destination, while the rename of the
+	# temp file over the primary is entirely unaffected — which is precisely the shape that used to leave
+	# a fresh save sitting on top of no backup at all.
+	_sweep()
+	_check(SaveGame.write(SLOT, SaveGame.capture(_world(55))), "a save exists to be protected")
+	var guarded: PackedByteArray = FileAccess.get_file_as_bytes(SLOT)
+	_check(guarded.size() > 0, "…and it is real bytes (%d), so 'untouched' below compares something" % guarded.size())
+	DirAccess.make_dir_absolute(SLOT + SaveGame.BAK_SUFFIX)
+	if DirAccess.copy_absolute(SLOT, SLOT + SaveGame.BAK_SUFFIX) == OK:
+		# The forcing function did not fire here, so the assertions it guards would pass without ever
+		# exercising a failed copy. Stand them down out loud rather than bank them.
+		print("  SKIP: the failed-backup path was NOT exercised — a directory at %s did not stop"
+			% (SLOT + SaveGame.BAK_SUFFIX))
+		print("        copy_absolute on this platform, so there is no way here to make the copy fail.")
+	else:
+		_check(not SaveGame.write(SLOT, SaveGame.capture(_world(66))),
+			"a save whose backup copy FAILS is refused, not promoted over an unbacked slot")
+		_check(FileAccess.get_file_as_bytes(SLOT) == guarded,
+			"…and the existing save is byte-for-byte untouched, exactly as the docstring promises")
+		_check(not FileAccess.file_exists(SLOT + SaveGame.TMP_SUFFIX),
+			"…with the rejected temp file cleaned up rather than left to rot in user://")
+	DirAccess.remove_absolute(SLOT + SaveGame.BAK_SUFFIX)
 	_sweep()
