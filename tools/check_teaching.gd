@@ -190,6 +190,28 @@ func _judge_texts(hints: Hints) -> void:
 	hints._active = &""
 	_check(blank == 0, "...and every id resolves to real text (%d blank)" % blank)
 
+	# NON-VACUITY. Every one of the four assertions above counts a fault among the hints that EXIST, and all
+	# four are satisfied perfectly by a game that teaches nothing at all: no duplicate ids, no dead keys, no
+	# overlong bubbles and no blank text, over an empty table. The population is `hints._defs` +
+	# `hints._moments`, which is to say it is defined by the thing under test — so every hint that goes
+	# missing removes a chance to fail, and the layer gets quieter as the teaching gets worse.
+	#
+	# Both tables are floored SEPARATELY. A single combined floor is satisfied by the larger one surviving
+	# alone, and they teach different things: `_defs` fires when you pick something up, `_moments` when the
+	# world does something to you. Losing either is losing half the teaching.
+	#
+	# The numbers are deliberately under today's counts (12 and 6). Their job is to catch a table that
+	# vanished or halved, not to police the count — pruning a hint is a design decision and should not have
+	# to argue with a test.
+	_check(hints._defs.size() >= 8,
+		"%d pickup hints exist to be judged" % hints._defs.size())
+	_check(hints._moments.size() >= 4,
+		"%d situation hints exist to be judged" % hints._moments.size())
+	# ...and the key sweep found keys. A regex that stopped matching empties `named`, and the "every key a
+	# hint names is really bound" assertion above would then pass over nothing and report perfect health.
+	_check(named.size() >= 4,
+		"the hints were found to name %d distinct keys" % named.size())
+
 
 ## Every key label the live InputMap will actually respond to.
 func _bound_labels() -> Dictionary:

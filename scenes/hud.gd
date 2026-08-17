@@ -1108,8 +1108,16 @@ func works_columns(rows: int) -> Dictionary:
 	var r: int = maxi(1, ceili(float(open_rack().size()) / float(maxi(rows, 1))))
 	# The counter has a fixed number of columns, so if the two lists ever ask for more than it has, they get
 	# SQUEEZED rather than allowed to run off the panel's edge — the group that overflows falls back to a
-	# window around the cursor, which is ugly but reachable. `check_pack_layout` asserts the squeeze is not
-	# happening today; this clamp is what makes the failure mode legible instead of invisible.
+	# window around the cursor, which is ugly but reachable. This clamp is the FAILURE MODE made legible
+	# instead of invisible, not the intended layout.
+	#
+	# THE PROPERTY: today the two lists together ask for no more columns than the counter has, so this
+	# branch never fires. `check_pack_layout` holds that — and holds it correctly, which this comment used
+	# to claim without it being true. It read `lay["total"] <= cols`, a number this function had *just*
+	# clamped into range, so the assertion could not fail however far the lists overflowed and the citation
+	# was vouching for a guarantee nobody was making. It now computes what the lists ask for BEFORE the
+	# clamp sees it. Naming the property rather than only the test is the point: a citation is an assertion
+	# made somewhere it cannot run, and this one was wrong for as long as it took someone to read both files.
 	if m + r > BAZAAR_COLS:
 		r = clampi(r, 1, BAZAAR_COLS - 1)
 		m = BAZAAR_COLS - r

@@ -62,6 +62,37 @@ func _initialize() -> void:
 	print("== the ground in the opening frame has to have something in it ==  (%dx%d, horizon at y=%d, %d tiles)"
 		% [w, h, y0, int(j["total"])])
 	DEAD.report(j)
+
+	# NON-VACUITY — THERE HAS TO HAVE BEEN A BAND TO JUDGE. `frac` is a fraction of the tiles that were
+	# judged, so the gate below says nothing at all about a band that held none. And the band is not fixed:
+	# it runs from the live horizon to the HUD, so any change to the opening camera framing moves it, while
+	# a tile is a flat 120px. A framing tweak leaving under 120px between the horizon and the HUD reduces
+	# this layer to a permanent pass, and the only trace is the "0 tiles" already printed one line above.
+	#
+	# `judge()` now returns frac 1.0 for a band it could not judge, so the run already fails without these —
+	# a sentinel on the failing side beats a guard every caller has to remember, which is exactly how
+	# check_underground came to have one and this file did not. What these add is a LEGIBLE failure: "the
+	# band is 90px tall, under one 120px tile" is a five-second fix and "100% of the ground is dead" is an
+	# afternoon of looking at the wrong thing.
+	#
+	# Two claims, because the second catches something the sentinel cannot: the band must be big enough to
+	# tile at all, AND every tile in it must have been judged. Equality alone is satisfied by 0 == 0.
+	var tile: int = int(DEAD.TILE)
+	var rows_j: int = maxi(0, (y1 - y0) / tile)
+	var cols_j: int = w / tile
+	var want: int = rows_j * cols_j
+	print("  the band from the horizon to the HUD is %d x %d tiles" % [cols_j, rows_j])
+	if want <= 0:
+		printerr("check_opening: FAIL — the judged band is %dpx tall, under one %dpx tile: there was nothing"
+			% [y1 - y0, tile] + " to judge, and a dead fraction of a judged nothing is not a pass")
+		quit(1)
+		return
+	if int(j["total"]) != want:
+		printerr("check_opening: FAIL — %d tiles judged where the band holds %d; tiles were skipped"
+			% [int(j["total"]), want])
+		quit(1)
+		return
+
 	var frac: float = float(j["frac"])
 	if frac <= DEAD_CAP:
 		print("check_opening: PASS — %d/%d tiles dead (%.0f%%, cap %.0f%%)"

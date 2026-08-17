@@ -69,7 +69,16 @@ static func judge(img: Image, y0: int, y1: int, lit_floor: float = 0.0) -> Dicti
 			tx += TILE
 		rows.append(line)
 		ty += TILE
-	return {"total": total, "dead": dead, "frac": float(dead) / float(maxi(total, 1)),
+	# NOTHING JUDGED FALLS TO THE FAILING SIDE, and the `maxi(total, 1)` this replaces is why it has to be
+	# said out loud. That was a divide-by-zero guard, which is a reasonable thing to reach for — and it made
+	# the empty case return 0.0, the BEST possible score. A judged band that collapsed to nothing therefore
+	# reported a flawless frame, and every caller gating on `frac <= cap` passed unconditionally.
+	#
+	# That is the whole family in one line: the failure moved the number the passing way, so tightening the
+	# cap would have made a broken capture pass more comfortably. A guard against an impossible arithmetic
+	# case must fall to the side that stops the build, because "I could not measure this" and "this is
+	# perfect" are the two readings, and only one of them is safe to be wrong about.
+	return {"total": total, "dead": dead, "frac": 1.0 if total == 0 else float(dead) / float(total),
 		"rows": rows, "worst": worst, "details": details}
 
 

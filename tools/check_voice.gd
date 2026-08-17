@@ -67,6 +67,35 @@ func _run() -> void:
 	# --- every one-shot makes a sound ---
 	var names: Array = sfx._streams.keys()
 	names.sort()
+
+	# NON-VACUITY — THE PREMISE OF EVERY SOUND ASSERTION BELOW, stated out loud because all of them are
+	# satisfied by a library that mostly failed to load. `mute == 0` counts the silent sounds among those
+	# that EXIST, so a `_streams` holding three entries reports perfect health over three. The pair sweep is
+	# worse than that, and worse in an instructive direction: `worst` starts at INF and can only be pulled
+	# DOWN by finding a close pair, so every voice that failed to register removes a chance to fail. The
+	# defect moves the number the passing way, and tightening NEAR would make a broken library pass more
+	# comfortably rather than less.
+	#
+	# So the set being judged is pinned to the source, in both directions: the names sfx.gd registers and the
+	# names the running mixer holds must be the SAME SET, not one contained in the other. Every assertion
+	# below inherits its non-vacuity from this one, which is why none of them carries a size floor of its own.
+	var registered: Dictionary = _streams_the_source_registers()
+	var drift: Array[String] = []
+	for n: Variant in registered:
+		if not sfx._streams.has(StringName(n)):
+			drift.append("%s is registered but the mixer does not hold it" % String(n))
+	for n: Variant in names:
+		if not registered.has(String(n)):
+			drift.append("the mixer holds %s, which sfx.gd never registers" % String(n))
+	_check(drift.is_empty(),
+		"the mixer holds every voice sfx.gd registers, and no others (%d)%s"
+			% [registered.size(), "" if drift.is_empty() else " — " + "; ".join(drift)])
+	# ...and the scan itself found the source. A regex that stopped matching would report an empty expected
+	# set, which the comparison above would then satisfy against an empty mixer. This floor guards the
+	# INSTRUMENT, not the library: it says the file was read and parsed, nothing about how many sounds is enough.
+	_check(registered.size() >= 15,
+		"the source scan found %d registrations to compare against" % registered.size())
+
 	var feats: Dictionary = {}
 	var mute: int = 0
 	for n: StringName in names:
@@ -104,10 +133,16 @@ func _run() -> void:
 		&"winch": sfx._winch_player, &"creak": sfx._creak_player,
 	}
 	var clicky: int = 0
+	var unsampled: Array[String] = []
 	var loudest_seam: float = 0.0
 	for n: StringName in beds:
 		var buf: PackedFloat32Array = _samples((beds[n] as AudioStreamPlayer).stream)
 		if buf.size() < 2:
+			# COUNTED, not skipped. `_samples` returns an empty array for anything that is not an
+			# AudioStreamWAV, so a bed whose player lost its stream used to leave this loop without being
+			# counted either way — `clicky` stayed 0 and the assertion below reported that every bed loops
+			# cleanly, over a set that did not include it. A bed nobody could sample is not a bed that passed.
+			unsampled.append(String(n))
 			continue
 		# Measured against the buffer's OWN typical step, not in absolute amplitude. The first version of
 		# this compared |last - first| to a fixed threshold and reported the water bed as ticking: the pour
@@ -123,6 +158,9 @@ func _run() -> void:
 				% [n, seam])
 	print("  %d looping beds; the worst seam steps %.1fx its own signal" % [beds.size(), loudest_seam])
 	_check(clicky == 0, "...and every bed loops without a click (%d ticking)" % clicky)
+	_check(unsampled.is_empty(),
+		"...and every bed had samples to judge in the first place%s"
+			% ["" if unsampled.is_empty() else " — UNSAMPLED: " + ", ".join(unsampled)])
 
 	# --- the level-driven beds actually respond ---
 	for _i: int in 40:
@@ -146,6 +184,21 @@ func _run() -> void:
 
 	main.queue_free()
 	await physics_frame
+
+
+## The one-shot names sfx.gd REGISTERS, read out of the source. The runtime dictionary is what this layer
+## judges; this is what it is supposed to contain. Comparing the two is what makes the judgement a statement
+## about the whole sound library rather than about whichever part of it happened to load.
+func _streams_the_source_registers() -> Dictionary:
+	var out: Dictionary = {}
+	var f := FileAccess.open("res://scenes/sfx.gd", FileAccess.READ)
+	if f == null:
+		return out
+	var re := RegEx.new()
+	re.compile("_streams\\[&\"([a-z_]+)\"\\]")
+	for m: RegExMatch in re.search_all(f.get_as_text()):
+		out[m.get_string(1)] = true
+	return out
 
 
 ## 16-bit PCM back to floats. The generators work in floats and the streams store PCM, so everything this

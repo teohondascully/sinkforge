@@ -60,8 +60,15 @@ func _run() -> void:
 		p.input_dir = 1.0
 		await physics_frame
 		quiet = maxf(quiet, absf(p.velocity.x))
-	_check(quiet <= Player.RUN_SPEED * (1.0 + QUIET_TOL),
-		"the first %.2fs is untouched (%.1f px/s vs RUN_SPEED %.1f)"
+	# TWO-SIDED, because the claim in the comment above is two-sided and the assertion was not. "The top
+	# speed reached must still be RUN_SPEED, full stop" says the body runs at full base speed straight away
+	# AND that the stride adds nothing yet — and a cap alone only says the second half. A body that never
+	# moved satisfies `quiet <= RUN_SPEED * 1.05` perfectly, which makes the most important property this
+	# layer tests (base speed is INSTANT, so mining feel survives the stride) the one it could not see.
+	#
+	# `quiet` is a max over the window, so the floor only asks that full speed was touched once inside it.
+	_check(quiet <= Player.RUN_SPEED * (1.0 + QUIET_TOL) and quiet >= Player.RUN_SPEED * (1.0 - QUIET_TOL),
+		"the first %.2fs runs at RUN_SPEED and no faster (%.1f px/s vs RUN_SPEED %.1f)"
 		% [QUIET_WINDOW, quiet, Player.RUN_SPEED])
 
 	# 2. IT ARRIVES, AND IT ARRIVES SMOOTHLY. Keep holding: the stride must reach full, and the span from
