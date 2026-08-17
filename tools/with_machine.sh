@@ -23,6 +23,10 @@ set -uo pipefail
 GODOT="${GODOT:-godot}"
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# How long to wait before giving up, overridable so the GIVE-UP PATH IS TESTABLE. It was not: proving that
+# a timeout exits 5 rather than 0 meant holding the lock for fifteen minutes, so nobody ever proved it, and
+# the one path in this script that must never be mistaken for success was the one path never exercised.
+WAIT="${SF_LOCK_WAIT:-900}"
 
 waited=0
 until mkdir "$LOCK" 2>/dev/null; do
@@ -34,8 +38,14 @@ until mkdir "$LOCK" 2>/dev/null; do
 		rm -rf "$LOCK"
 		continue
 	fi
-	if [ "$waited" -ge 900 ]; then
-		echo "with_machine: gave up after 900s waiting for the lock (held by pid ${holder:-?})" >&2
+	if [ "$waited" -ge "$WAIT" ]; then
+		# LOUD, and on stdout as well as stderr. A give-up is a run that NEVER HAPPENED, and the failure
+		# mode is not that somebody misreads the exit code — it is that nothing downstream ever looks at
+		# it. A backgrounded call reports "completed"; a shell that appends `; echo done` reports 0. So
+		# say in words, in the output a human actually skims, that no test ran.
+		echo "with_machine: GAVE UP after ${waited}s waiting for the lock (held by pid ${holder:-?})" >&2
+		echo "with_machine: NOTHING RAN — this is not a pass (exit 5)" >&2
+		echo "with_machine: GAVE UP — NOTHING RAN. Not a pass."
 		exit 5
 	fi
 	[ $((waited % 30)) -eq 0 ] && echo "  waiting for the machine lock (held by pid ${holder:-?}) ..." >&2
