@@ -28,6 +28,27 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # the one path in this script that must never be mistaken for success was the one path never exercised.
 WAIT="${SF_LOCK_WAIT:-900}"
 
+# THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine
+# time. `bash tools/with_machine.sh bash tools/run_harness.sh` reads like a runner taking a command; it
+# actually becomes `godot --path <repo> bash tools/run_harness.sh`, which Godot accepts — it ignores the two
+# junk positionals, boots the project, and PLAYS THE GAME until something kills it. No layer runs. Elapsed
+# time and CPU both look perfect, because a game is genuinely running; only the argv shows it.
+#
+# So the malformed call is refused here rather than left to be spotted. Every real invocation starts with a
+# Godot flag (`--headless`, `--script`, `--path`), so a first argument that is not a flag is this mistake
+# every time. Refused BEFORE the lock is taken: a bad call must not queue behind anyone, and must not make
+# anyone queue behind it.
+if [ "$#" -eq 0 ] || { [ "${SF_ALLOW_POSITIONAL:-0}" != "1" ] && case "$1" in -*) false ;; *) true ;; esac; }; then
+	echo "with_machine: REFUSED — these are GODOT arguments, not a shell command." >&2
+	echo "with_machine:   you wrote:  with_machine.sh $*" >&2
+	echo "with_machine:   which runs: $GODOT --path <repo> $*" >&2
+	echo "with_machine:   ...and Godot would ignore those and just play the game." >&2
+	echo "with_machine: try:  with_machine.sh --headless --script res://tools/check_thing.gd" >&2
+	echo "with_machine: (run_harness.sh takes the lock itself — do not wrap it.)" >&2
+	echo "with_machine: REFUSED — NOTHING RAN. Not a pass."
+	exit 2
+fi
+
 waited=0
 until mkdir "$LOCK" 2>/dev/null; do
 	holder="$(head -1 "$LOCK/owner" 2>/dev/null)"

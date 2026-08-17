@@ -40,7 +40,10 @@ shift 2
 exec "$@"
 EOF
 chmod +x "$TMP/fake_godot"
-run() { SF_LOCK="$LOCK" GODOT="$TMP/fake_godot" bash "$WITH" "$@"; }
+# SF_ALLOW_POSITIONAL, because the cases below drive a STUB and not Godot, so their first argument is a
+# path (`/bin/sh`) rather than a Godot flag. The refusal that flag disables gets its own case at the end,
+# tested WITHOUT the escape hatch — otherwise this file would be the one place the guard never fires.
+run() { SF_LOCK="$LOCK" SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" bash "$WITH" "$@"; }
 
 check() {  # check <ok:0|1> <label>
 	if [ "$1" -eq 0 ]; then
@@ -58,7 +61,7 @@ rm -rf "$LOCK"; mkdir -p "$LOCK"
 sleep 30 & holder=$!
 disown "$holder" 2>/dev/null
 printf '%s\n/elsewhere\n' "$holder" > "$LOCK/owner"
-out="$(SF_LOCK="$LOCK" SF_LOCK_WAIT=2 GODOT="$TMP/fake_godot" bash "$WITH" /bin/sh -c 'exit 0' 2>/dev/null)"
+out="$(SF_LOCK="$LOCK" SF_LOCK_WAIT=2 SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" bash "$WITH" /bin/sh -c 'exit 0' 2>/dev/null)"
 code=$?
 kill "$holder" 2>/dev/null
 [ "$code" -eq 5 ]; check $? "a lock that never frees ends the run with 5, not 0 (got $code)"
@@ -74,7 +77,7 @@ rm -rf "$LOCK"; mkdir -p "$LOCK"
 sleep 0 & dead=$!
 wait "$dead" 2>/dev/null
 printf '%s\n/elsewhere\n' "$dead" > "$LOCK/owner"
-SF_LOCK="$LOCK" SF_LOCK_WAIT=3 GODOT="$TMP/fake_godot" bash "$WITH" /bin/sh -c 'exit 0' >/dev/null 2>&1
+SF_LOCK="$LOCK" SF_LOCK_WAIT=3 SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" bash "$WITH" /bin/sh -c 'exit 0' >/dev/null 2>&1
 [ $? -eq 0 ]; check $? "a lock left behind by a killed run is cleared, not waited on"
 
 # --- THE INNER CODE SURVIVES ---
@@ -106,6 +109,20 @@ got="$(tr '\n' ' ' < "$log")"
 # NON-VACUITY: the assertion above is satisfied by a log that was never written to, and by one run that
 # died on startup — both of which would leave the pairing trivially intact.
 [ "$(grep -c . "$log")" -eq 4 ]; check $? "...and both runs actually ran (4 stamps)"
+
+# --- A COMMAND IS NOT AN ARGUMENT LIST ---
+# The real incident, kept as a case. `with_machine.sh bash tools/run_harness.sh` reads like a runner taking
+# a command and becomes `godot --path <repo> bash tools/run_harness.sh` — Godot ignores the positionals,
+# boots the project and plays the game. It ran for 39 minutes, no layer executed, and the task notification
+# said "completed (exit code 0)". Elapsed time and CPU looked healthy throughout, because a game genuinely
+# was running. Only the argv would have shown it.
+rm -rf "$LOCK"
+out="$(SF_LOCK="$LOCK" GODOT="$TMP/fake_godot" bash "$WITH" bash tools/run_harness.sh 2>/dev/null)"
+code=$?
+[ "$code" -eq 2 ]; check $? "a shell command where Godot flags belong is REFUSED (exit 2, got $code)"
+case "$out" in *"NOTHING RAN"*) r=0 ;; *) r=1 ;; esac
+check $r "...and says NOTHING RAN, on stdout, before taking the lock"
+[ ! -d "$LOCK" ]; check $? "...and a refused call never took the lock at all"
 
 echo
 if [ "$fails" -eq 0 ]; then
