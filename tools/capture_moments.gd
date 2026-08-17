@@ -37,6 +37,34 @@ const AGENT := preload("res://tools/play_agent.gd")
 const SETTLE := 60
 const DELVE_ROWS := 14            ## how far below the surface the delve shot digs
 
+## WHAT EACH MOMENT IS ALLOWED TO LOOK LIKE. This fixture boots the real, input-responsive scene and
+## then takes minutes to reach its subject, so anything the window receives in that time lands in the
+## photograph. It did: `_moment_delve.png` — one of the three canonical frames the 2026-08-17 audit
+## reviewed — came back showing the full Bazaar/Pack modal and `PAUSED (P)` instead of a lamp-lit shaft.
+## An `E` and a `P` arrived mid-run. The audit threw the image out, but nothing else did: the contaminated
+## PNG had already overwritten the good one and the process exited 0, so the capture FAILED OPEN and the
+## bad frame became the evidence.
+##
+## Two fixes, because either alone is insufficient. `_deafen` stops device input reaching any node, so the
+## picture is a pure function of this script. This table is the belt to that brace: before a single byte is
+## written the scene is checked against what the moment CLAIMS to be showing, and a mismatch refuses the
+## write and exits non-zero. A stale good capture beats a fresh bad one, because only the fresh one gets
+## believed.
+##
+## Empty override = the default contract: no modal, not paused, no title veil. The Bazaar moments are the
+## interesting case — they open the pack deliberately, so for them an OPEN modal is the pass condition and
+## a closed one is the failure.
+const CALM: Dictionary = {
+	"_inventory_open": false, "_paused": false, "_settings_open": false,
+	"_show_help": false, "_title_open": false,
+}
+const EXPECT: Dictionary = {
+	"counter": {"_inventory_open": true},
+	"works": {"_inventory_open": true},
+	"bench": {"_inventory_open": true},
+	"map": {"_minimap_mode": 2},
+}
+
 
 func _initialize() -> void:
 	var uargs := OS.get_cmdline_user_args()
@@ -47,14 +75,57 @@ func _initialize() -> void:
 	if ore_nug != "":
 		var ore := load("res://src/data/materials/ore.tres") as MaterialDef
 		ore.nugget_color = Color(ore_nug)                     # in-memory only (resource cache); never saved
-	await _capture(moment, zoom_idx, suffix2)
-	quit(0)
+	var code: int = await _capture(moment, zoom_idx, suffix2)
+	quit(code)
 
 
-func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
+## Take every node's ears off. `_unhandled_input`, `_input` and `_unhandled_key_input` are the three doors
+## a keystroke can walk through to reach MainView's verb router, and this shuts all of them on every node
+## in the tree — the scripted fixture below is then the ONLY thing that can change the scene. Done by
+## recursion rather than by naming MainView, because the HUD, the settings page and anything added later
+## have doors too, and a list of them would rot.
+##
+## MUST BE CALLED AFTER A FRAME HAS PASSED, and it is worth knowing why, because calling it in the obvious
+## place does nothing at all. A SceneTree script's `_initialize()` runs before the tree is up, so the
+## `_ready()` triggered by `add_child` is deferred — and Godot re-arms unhandled-input delivery for a node
+## whose script defines `_unhandled_input` as part of that. Deafen first and `_ready` quietly turns the ears
+## back on behind you. Measured 2026-08-17 with an E/P injection: deafened-before-ready left
+## `is_processing_unhandled_input() == true` and the modal opened and the game paused exactly as if nothing
+## had been done. Deafened after one frame: flag false, injection lands on the floor. `_contamination`
+## re-checks the flag at the shutter, so a future re-arm fails the capture instead of quietly photographing
+## whatever the keyboard did.
+func _deafen(n: Node) -> void:
+	n.set_process_input(false)
+	n.set_process_unhandled_input(false)
+	n.set_process_unhandled_key_input(false)
+	for c: Node in n.get_children():
+		_deafen(c)
+
+
+## "" when the scene really is showing what `moment` claims, otherwise what is wrong with it.
+func _contamination(main: MainView, moment: String) -> String:
+	var want: Dictionary = CALM.duplicate()
+	for k: Variant in (EXPECT.get(moment, {}) as Dictionary):
+		want[k] = (EXPECT[moment] as Dictionary)[k]
+	var wrong: Array[String] = []
+	if main.is_processing_unhandled_input():
+		wrong.append("the scene is still LISTENING to input — _deafen did not take, so this frame is not "
+			+ "a pure function of the fixture")
+	for field: Variant in want.keys():
+		var got: Variant = main.get(String(field))
+		if got == null:
+			wrong.append("%s: no such field (this guard has rotted)" % field)
+		elif got != want[field]:
+			wrong.append("%s is %s, expected %s" % [field, got, want[field]])
+	return ", ".join(wrong)
+
+
+func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 	MainView.dev_start = false
 	var main: MainView = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(main)
+	await physics_frame               # let the deferred _ready() land before taking its ears off
+	_deafen(main)
 	for _i in SETTLE:
 		await physics_frame
 
@@ -112,7 +183,12 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			for _i in 8:
 				await physics_frame
 		_:
-			push_warning("unknown moment '%s' — capturing boot" % moment)
+			# FAIL CLOSED. This used to `push_warning` and fall through, so a typo'd moment name captured
+			# the boot screen and saved it as `_moment_<typo>.png` — a picture of the wrong thing, under
+			# the right name, exit 0. The match arms above ARE the list of moments; keeping a second copy
+			# in a constant to validate against would be one more hand-maintained registry to rot.
+			printerr("capture_moments: unknown moment '%s' — refusing to save a boot frame under its name" % moment)
+			return 2
 
 	var suffix := ""
 	if zoom_idx > 0:
@@ -124,10 +200,34 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw    # the veil/light layers repaint a frame behind a camera move
-	var img := get_root().get_texture().get_image()
 	var path := "res://_moment_%s%s%s.png" % [moment, suffix, name_suffix]
+
+	# A moment's helper may have added nodes of its own since the first pass, and a new node arrives with
+	# its ears on. Re-deafen, then let the gate below confirm it took.
+	_deafen(main)
+
+	# THE GATE. Checked BEFORE the image is taken, let alone written: a contaminated run must leave
+	# whatever is already on disk exactly where it is. The audit's delve shot was believed precisely
+	# because the bad frame replaced the good one and said nothing.
+	var wrong: String = _contamination(main, moment)
+	if wrong != "":
+		printerr("capture_moments: REFUSED '%s' — the scene is not what this moment claims: %s" % [moment, wrong])
+		printerr("capture_moments: %s left untouched (%s)"
+			% [path, "no previous capture" if not FileAccess.file_exists(path) else "previous capture kept"])
+		return 1
+
+	var img := get_root().get_texture().get_image()
 	img.save_png(path)
-	print("CAPTURED %s -> %s (%dx%d)" % [moment, ProjectSettings.globalize_path(path), img.get_width(), img.get_height()])
+	# THE MANIFEST. A reviewer looking at a folder of PNGs cannot tell a delve from a Bazaar screenshot,
+	# which is how a Bazaar screenshot got reviewed as a delve. One line per capture, saying what was
+	# actually in front of the camera.
+	var cell: Vector2i = main._body_cell() if main.has_method("_body_cell") else Vector2i(-1, -1)
+	print("CAPTURED %s -> %s (%dx%d) | settled=%d body=%s zoom=%.2f modal=%s paused=%s"
+		% [moment, ProjectSettings.globalize_path(path), img.get_width(), img.get_height(),
+			SETTLE, cell, main._current_zoom(),
+			"pack" if main._inventory_open else ("settings" if main._settings_open else "none"),
+			main._paused])
+	return 0
 
 
 ## THE LINE RUNS — the frame the first-automation plate is on screen. Reached by PLAYING there: the same
