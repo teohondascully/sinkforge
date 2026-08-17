@@ -65,8 +65,10 @@ static func machine_color(def: MachineDef) -> Color:
 ## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.
 ## `flip` mirrors DIRECTIONAL glyphs (the Borer bores left when its machine faces -1); others ignore it.
 static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String, s: float,
-		active: bool, t: float, flip: bool = false) -> void:
+		active: bool, t: float, flip: bool = false, fill: float = 1.0) -> void:
 	match kind:
+		"collar":
+			_collar(canvas, center, s, active, t, fill)
 		"furnace":
 			_furnace(canvas, center, s, active, t)
 		"gear":
@@ -159,6 +161,72 @@ static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 		var fy: float = c.y - 1.0 * s + float(k) * 3.2 * s + march + bob
 		if fy < c.y + 7.5 * s:
 			canvas.draw_line(Vector2(c.x - 3.0 * s, fy), Vector2(c.x + 3.0 * s, fy - 1.4 * s), edge, 1.0)
+
+
+## THE COLLAR — a Drill Head bolted to the rock, boring INTO THE BACKGROUND (`docs/LODE.md` §5).
+##
+## This machine works along an axis the game does not have. Sinkforge is a side view: X and Y are the whole
+## world, and a Head bores along Z, into the screen. The old drill glyph — a motor block with a tapering bit
+## pointing DOWN and flutes marching downward — said "I bore downward through solid rock" as clearly as a
+## glyph can, and once ore moved to the background plane that became a lie the player would believe.
+##
+## Four cues, all flat, none of them a perspective axis borrowed from a different game:
+##   FORESHORTENING.  A bit pointing at you is a CIRCLE, not a shaft. The bore reads as a dark socket with a
+##                    lit rim — the universal "hole going away from you".
+##   SCALE, NOT BOB.  The judder pulses the socket's SIZE. Things moving toward the viewer grow; things
+##                    moving along the plane slide. Swapping translation for scale is the whole axis flip.
+##   RADIAL SPOIL.    Dust leaves the hole in every direction rather than falling one way — it is coming OUT
+##                    at you, which only makes sense if the hole faces you.
+##   A FRAME, NOT A FILL. Rails and a bracket, open in the middle, so the vein it is eating shows straight
+##                    through the machine. A machine that sits on a resource must never hide it — and since
+##                    the fleck field thins as the deposit drains, the Head becomes a gauge for free.
+##
+## And the socket WIDENS as the vein goes (`fill` 1 → 0), so the machine and the flecks tell the same story
+## from opposite ends: the metal thins out while the hole eats outward.
+static func _collar(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, fill: float) -> void:
+	# THE FRAME CARRIES ITS OWN CONTRAST. Every other machine draws near-black steel on top of an opaque
+	# machine-coloured casing, and the casing is what makes the dark glyph read. Dropping the casing to show
+	# the vein through it (which is the whole point) also dropped that contrast, and the first cut of this
+	# vanished into dark rock entirely — only the bore ring survived. So the value relationship inverts: the
+	# frame is the LIGHT part now, and the bore is the dark one.
+	var steel := Color(0.66, 0.53, 0.32)
+	var edge := Color(0.90, 0.80, 0.56)
+	var shade := Color(0.10, 0.09, 0.12)
+	var left: float = c.x - 7.0 * s
+	# The mount: a bracket and motor housing across the TOP, so it reads as hung off the face rather than
+	# standing on the floor. Everything else in this game sits on something; this one is bolted to a wall.
+	canvas.draw_rect(Rect2(left, c.y - 9.0 * s, 14.0 * s, 5.0 * s), steel)
+	canvas.draw_rect(Rect2(left, c.y - 9.0 * s, 14.0 * s, 1.3 * s), edge)
+	canvas.draw_rect(Rect2(left, c.y - 4.4 * s, 14.0 * s, 0.9 * s), shade)      # the housing's under-lip
+	for bx: float in [left + 2.0 * s, c.x + 5.0 * s]:
+		canvas.draw_circle(Vector2(bx, c.y - 6.5 * s), 0.9 * s, Color(shade, 0.75))   # bolts
+	# The rails: the frame's two legs. The middle is deliberately EMPTY.
+	for rx: float in [left, c.x + 4.8 * s]:
+		canvas.draw_rect(Rect2(rx, c.y - 4.0 * s, 2.2 * s, 10.0 * s), steel)
+		canvas.draw_rect(Rect2(rx, c.y - 4.0 * s, 0.8 * s, 10.0 * s), edge)
+	# The BORE, head-on. Scale-pulsed while cutting; wider the more of the vein it has taken.
+	var bore := Vector2(c.x, c.y + 0.5 * s)
+	var pulse: float = (1.0 + 0.08 * sin(t * 18.0)) if active else 1.0
+	var r: float = (3.2 + 2.8 * (1.0 - clampf(fill, 0.0, 1.0))) * s * pulse
+	canvas.draw_circle(bore, r + 1.2 * s, Color(0.0, 0.0, 0.0, 0.45))       # the shadow it casts inward
+	canvas.draw_circle(bore, r, Color(0.03, 0.03, 0.05, 0.94))
+	canvas.draw_arc(bore, r, 0.0, TAU, 20, edge, 1.4 * s)
+	canvas.draw_arc(bore, r, PI * 0.85, PI * 1.55, 8, Color(1.0, 0.93, 0.74, 0.9), 1.6 * s)  # the lit lip
+	# The chute: where the haul leaves, downward, on the hook.
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - 3.6 * s, c.y + 5.8 * s), Vector2(c.x + 3.6 * s, c.y + 5.8 * s),
+		Vector2(c.x + 2.1 * s, c.y + 8.8 * s), Vector2(c.x - 2.1 * s, c.y + 8.8 * s)]), steel)
+	canvas.draw_line(Vector2(c.x - 2.1 * s, c.y + 8.8 * s), Vector2(c.x + 2.1 * s, c.y + 8.8 * s),
+		shade, 1.4 * s)                                        # the open mouth of the chute, in shadow
+	if not active:
+		return
+	# Spoil, thrown OUT of the hole in every direction — the cue that the hole faces the viewer.
+	for k: int in 5:
+		var ang: float = float(k) * TAU / 5.0 + t * 0.7
+		var phase: float = fmod(t * 1.9 + float(k) * 0.2, 1.0)
+		var d: float = r + phase * 5.0 * s
+		canvas.draw_circle(bore + Vector2(cos(ang), sin(ang)) * d, (1.5 - phase) * s,
+			Color(0.72, 0.66, 0.56, 0.55 * (1.0 - phase)))
 
 
 ## The Borer (horizontal drill): the vertical drill's cousin turned on its side — a motor block with a

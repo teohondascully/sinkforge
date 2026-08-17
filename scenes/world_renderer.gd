@@ -2173,14 +2173,28 @@ func _text_visible(cell: Vector2i) -> bool:
 	return get_canvas_transform().get_scale().x >= TEXT_ZOOM
 
 
+## Is this drill standing ON a lode — i.e. a Head boring into the back wall rather than down through rock?
+## Two mounts for one machine while the bridge lasts (`docs/LODE_PLAN.md` §3), and the sprite says WHICH,
+## so it is never describing the wrong action. After the phase-3 cutover there is only ever the Head.
+func _is_head(machine: MachineState) -> bool:
+	return machine.def.behavior == &"drill" and sim.lode.has(machine.cell)
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
 	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
-	# Contact shadow — grounds the machine on the floor it sits on.
-	draw_set_transform(pos + Vector2(float(CELL) * 0.5, float(CELL) - 1.0), 0.0, Vector2(1.0, 0.26))
-	draw_circle(Vector2.ZERO, float(CELL) * 0.46, Color(0.0, 0.0, 0.0, 0.30))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if _is_head(machine):
+		# A Head is BOLTED TO THE WALL, so it gets no contact shadow at its feet — it is not standing on
+		# anything. What it gets instead is a shadow cast onto the plane BEHIND it, offset down-right, which
+		# is the cheapest and strongest way to say "this object is in front of that surface".
+		draw_rect(Rect2(pos + Vector2(3.0, 3.0), Vector2(CELL - 4.0, CELL - 4.0)),
+			Color(0.0, 0.0, 0.0, 0.34))
+	else:
+		# Contact shadow — grounds the machine on the floor it sits on.
+		draw_set_transform(pos + Vector2(float(CELL) * 0.5, float(CELL) - 1.0), 0.0, Vector2(1.0, 0.26))
+		draw_circle(Vector2.ZERO, float(CELL) * 0.46, Color(0.0, 0.0, 0.0, 0.30))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# A machine reads as ALIVE while it's working (behavior-aware), and a powered LIFT marches faster.
 	var active: bool = _machine_active(machine)
 	var clock: float = _anim_time
@@ -2197,6 +2211,14 @@ func _draw_machine(machine: MachineState) -> void:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		else:
 			draw_texture_rect(spr, Rect2(pos, Vector2(CELL, CELL)), false)
+	elif _is_head(machine):
+		# A HEAD IS A FRAME, NOT A FILL (`docs/LODE.md` §5). Every other machine gets an opaque casing filling
+		# its cell, which is right for a box that processes things and wrong for one bolted onto the thing it
+		# is eating: it would hide the vein completely, and the vein is the only reason the machine is there.
+		# So the casing is dropped and the glyph's own rails carry the body — you watch the flecks thin THROUGH
+		# the machine, which makes the Head a gauge without adding a gauge.
+		Visuals.draw_machine_glyph(self, center, "collar", 1.0, active, clock, false,
+			sim.lode_fraction(machine.cell))
 	else:
 		var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
 		draw_rect(body, Visuals.machine_color(machine.def))

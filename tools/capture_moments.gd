@@ -688,7 +688,7 @@ func _at_the_head(main: MainView) -> void:
 	main._player.place(Vector2(float(x0 - 6) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
 	for _i: int in 240:                                        # let it run, so there is a haul in the shaft
 		await physics_frame
-	Input.warp_mouse(Vector2(960.0 + 4.0 * 32.0 * 1.5, 540.0 - 40.0))
+	Input.warp_mouse(Vector2(360.0, 260.0))     # OFF the machine: its name plate would cover the subject
 	for _i2: int in 8:
 		await physics_frame
 	print("HEAD  status=%s  left=%d  produced=%d" % [

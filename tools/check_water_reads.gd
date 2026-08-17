@@ -29,7 +29,8 @@ const SCENE: String = "res://scenes/main.tscn"
 const DEAD := preload("res://tools/dead_space.gd")
 const CELL: int = 32
 const SETTLE: int = 30
-const SHOT_SETTLE: int = 90   ## frames for the sim to even the body out before it is photographed
+const SHOT_SETTLE: int = 90   ## frames for the light/veil layers to repaint after the body is placed
+const POOL_TICKS: int = 600   ## SIM ticks driven directly, so the body is evenly settled on any machine
 
 ## The cistern: a chamber cut into real rock well below the surface, flooded to the brim.
 const POOL_LEFT: int = 24
@@ -45,7 +46,10 @@ const HEAD: int = 6                  ## rows of air left above the water, so the
 const WALL: int = 3
 
 const COOL_MIN: float = 12.0         ## sRGB levels of blue-over-red the water must beat the rock by
-const GRADIENT_MIN: float = 2.5      ## sRGB levels the top must beat the bottom by
+## sRGB levels of blue-over-red the SURFACE must beat the FLOOR by — the body tends toward WATER_DEEP with
+## depth, which is denser and darker, so its blue-over-red separation shrinks. Measured 4.3-5.2 over three
+## runs on the fixture cistern; the floor keeps roughly 1.7x headroom under the worst of those.
+const GRADIENT_MIN: float = 2.5
 const SURFACES_MAX: int = 2          ## bright horizontal edges down one column (one surface, plus slack)
 const EDGE_JUMP: float = 9.0         ## sRGB rise between neighbouring rows that counts as an EDGE
 
@@ -80,6 +84,15 @@ func _run() -> void:
 	# judged a hillside forty rows from the cistern it was supposed to be looking at.
 	main._player.place(Vector2(float((POOL_LEFT + POOL_RIGHT) / 2) * CELL,
 		float(POOL_TOP - 3) * CELL))
+	# SETTLE THE SIM, NOT THE CLOCK. This waited SHOT_SETTLE rendered frames and assumed the pool would be
+	# even by then — but the scene advances the sim by real delta with a CAPPED backlog, so how far a body
+	# settles in ninety frames depends on how busy the machine is. Under parallel harness load each frame
+	# carries more sim time and the pool levelled; run alone on an idle machine it was still terracing, the
+	# depth tint had nothing to read, and the gradient assertion failed at 0.1 of a floor of 2.5 — a layer
+	# that passed or failed on CPU contention rather than on anything about the game. Ticking the sim
+	# directly makes the fixture deterministic, which is the only way this measurement means anything.
+	for _t: int in POOL_TICKS:
+		main.sim.tick()
 	for _i: int in SHOT_SETTLE:
 		await physics_frame
 	# The HUD off, because it is not what is under test and it is drawn right across the middle of the
@@ -136,9 +149,25 @@ func _run() -> void:
 
 	var top: float = _mean(sub, 0.10, 0.35)
 	var bottom: float = _mean(sub, 0.65, 0.92)
-	print("  the body reads %.1f at the top and %.1f near its floor" % [top, bottom])
-	_check(top - bottom >= GRADIENT_MIN,
-		"depth darkens (%.1f levels, floor %.1f)" % [top - bottom, GRADIENT_MIN])
+	var ctop: Vector3 = _cool(sub.get_region(Rect2i(0, int(float(sub.get_height()) * 0.10),
+		sub.get_width(), int(float(sub.get_height()) * 0.25))))
+	var cbot: Vector3 = _cool(sub.get_region(Rect2i(0, int(float(sub.get_height()) * 0.65),
+		sub.get_width(), int(float(sub.get_height()) * 0.27))))
+	# DEPTH IS GRADED ON THE AXIS THE DESIGN PUTS IT ON. This assertion used to measure LUMINANCE and demand
+	# the floor of the body be 2.5 sRGB levels darker than its top. The renderer says in as many words that
+	# it does not work that way — "Depth is carried by COLOUR — toward WATER_DEEP — rather than by density" —
+	# and underground the shadow veil multiplies the whole body down until a luminance difference of tens of
+	# levels in the source palette survives as 0.6 on screen. So the check demanded a real property through a
+	# channel that could not carry it, and had failed every time it genuinely ran since it was written; it
+	# only ever reported green in the harness on runs where this GL layer self-skipped for want of a window.
+	# Measured on the COOL axis this same body separates by 4.3-5.2 levels across three runs, so the property
+	# is plainly there. The floor is set from those measurements, not guessed ahead of them.
+	var fall: float = (ctop.z - ctop.x) - (cbot.z - cbot.x)
+	print("  the body reads %.1f blue-over-red at the top and %.1f near its floor (luma %.1f / %.1f)"
+		% [ctop.z - ctop.x, cbot.z - cbot.x, top, bottom])
+	_check(fall >= GRADIENT_MIN,
+		"depth deepens the colour — the floor is denser than the surface (%.1f levels, floor %.1f)"
+			% [fall, GRADIENT_MIN])
 
 	var edges: int = _bright_edges(sub)
 	print("  %d bright horizontal edges down the middle of it" % edges)
