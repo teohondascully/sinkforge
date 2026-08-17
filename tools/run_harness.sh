@@ -3,9 +3,17 @@
 # The whole safety net behind autonomous sprints, in one invocation:
 #   tools/run_harness.sh
 #
-# PARALLEL by default: the layers are independent Godot processes that
-# write only uniquely-named user:// files (or none), so wall-clock is max(layers),
-# not sum(layers). Concurrency is bounded to the CPU count.
+# PARALLEL by default: the layers are independent Godot processes, so wall-clock is max(layers), not
+# sum(layers). Concurrency is bounded to the CPU count.
+#
+# YOUR SAVE IS SAFE, AND THAT IS CHECKED, NOT PROMISED. These three lines used to claim that every layer
+# "writes only uniquely-named user:// files" — a comment asserting a safety property with nothing behind
+# it. It was false: check_saveload drove the real F5 slot and then deleted it, so the one command this
+# project tells everyone to run destroyed the developer's game. Two things now hold it:
+#   * `check_save_isolation` (a layer, first in the list) proves from source that no fixture can even
+#     name the production slot, and that anything reaching the save verbs redirects them first.
+#   * `save_sentinel` (below, wrapped around the sweep) hashes the real slot before and after. A run
+#     that rewrites or deletes it fails LOUDLY even if every layer passed.
 #   JOBS=1   tools/run_harness.sh   # serialize (debug; old behavior)
 #   JOBS=4   tools/run_harness.sh   # cap at 4 concurrent layers
 #   GODOT=/path/to/Godot            # override the engine path
@@ -44,6 +52,7 @@ fi
 NAMES=(); SCRIPTS=(); GLFLAG=()
 add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); }
 add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); }
+add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
 add "sim (core/determinism)"          "res://tests/test_sim.gd"
 add "stress (invariants/flow/power)"  "res://tests/test_stress.gd"
 add "worldgen (gen/ore/fine)"         "res://tests/test_worldgen.gd"
@@ -120,6 +129,14 @@ T0=$SECONDS
 
 echo "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total) =="
 
+# Arm the save sentinel BEFORE any layer launches. A failure here is fatal: running unguarded is exactly
+# the situation that cost a developer their save.
+SENTINEL="$DIR/save_sentinel.state"
+if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- arm "$SENTINEL" 2>&1 | grep -E '^save_sentinel:'; then
+	echo "  !! could not arm the save sentinel — refusing to run the harness unguarded"
+	exit 2
+fi
+
 while [ "$done_count" -lt "$total" ]; do
 	# Fill free slots.
 	while [ "$launched" -lt "$total" ] && [ "$((launched - done_count))" -lt "$JOBS" ]; do
@@ -160,6 +177,15 @@ done
 
 wall=$((SECONDS - T0))
 echo
+
+# Verify the sentinel AFTER the sweep. This can turn an all-green run red, and it should: a suite that
+# passes every assertion while eating the player's save has not passed.
+if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- verify "$SENTINEL" 2>&1 | grep -E '^save_sentinel:'; then
+	echo
+	echo "!! THE HARNESS TOUCHED THE PRODUCTION SAVE SLOT. Layer results ($pass pass / $fail fail) are moot."
+	exit 3
+fi
+
 if [ "$fail" -eq 0 ]; then
 	echo "ALL $pass HARNESS LAYERS PASS  (${wall}s wall-clock)"
 	exit 0

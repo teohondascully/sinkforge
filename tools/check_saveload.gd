@@ -5,8 +5,14 @@ extends SceneTree
 ## asserts the world + body came back EXACTLY — the in-scene proof the sim tests can't give (renderer
 ## repaint, player restore, the user:// file round-trip inside a running game). HEADED:
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_saveload.gd
+##
+## RUNS ON ITS OWN FILE. It used to drive the real slot and then delete it, so the one command the
+## project told everyone to run destroyed the developer's game. The isolation is one assignment, made
+## before the scene is instantiated so no boot-time read can see the production default; the layer that
+## keeps it that way is `tools/check_save_isolation.gd`.
 
 const SCENE: String = "res://scenes/main.tscn"
+const TEST_SLOT: String = "user://check_saveload.save"
 
 var _main: MainView
 var _frames: int = 0
@@ -18,6 +24,8 @@ var _pos_before: Vector2
 
 func _initialize() -> void:
 	Engine.max_fps = 120
+	MainView.save_path = TEST_SLOT          # BEFORE the scene exists: nothing may read the real slot
+	DirAccess.remove_absolute(TEST_SLOT)    # a stale file from a previous run must not be mistaken for this one's
 	_main = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(_main)
 	process_frame.connect(_on_frame)
@@ -71,7 +79,11 @@ func _on_frame() -> void:
 		for m: MachineState in sim.machines:
 			present += int(m.input_buffer.get(&"ore", 0)) + int(m.output_buffer.get(&"ore", 0))
 		_check(present == made, "conservation holds across the live round-trip (present=%d net=%d)" % [present, made])
-		DirAccess.remove_absolute(MainView.SAVE_PATH)
+		# The round-trip must have gone through a FILE, not just memory — otherwise this layer proves
+		# nothing about the on-disk format, and it would still pass if the path override had quietly
+		# sent the save somewhere that never got written.
+		_check(FileAccess.file_exists(TEST_SLOT), "the round-trip went through the isolated slot on disk")
+		DirAccess.remove_absolute(TEST_SLOT)
 		if _failures == 0:
 			print("check_saveload: PASS")
 			quit(0)

@@ -18,7 +18,12 @@ extends Node2D
 
 const CELL: int = 32
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
-const SAVE_PATH: String = "user://sinkforge.save"   ## the F5/F9 quicksave slot (SaveGame envelope)
+## The F5/F9 quicksave slot (SaveGame envelope). A `static var`, not a const, for the same reason
+## `Settings.path` is one: a harness layer that drives the real save verbs must be able to point them at
+## its own file first. It was a const, and `check_saveload` consequently saved over — and then DELETED —
+## the developer's actual game every time the advertised harness ran. `tools/check_save_isolation.gd`
+## now holds every fixture to overriding this before it touches a save.
+static var save_path: String = "user://sinkforge.save"
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 ## The internal render viewport (project.godot). Bumped 640×360 → 1280×720 for the SCALE spike: 2× the
 ## pixel density keeps the world crisp when the camera is zoomed WAY out (Noita: small avatar, big world).
@@ -748,7 +753,7 @@ func _process(delta: float) -> void:
 			"seed": _title_seed, "tint": _title_tint,
 			"tint_name": str(LAMP_TINTS[_title_tint]["name"]),
 			"tints": LAMP_TINTS,
-			"has_save": FileAccess.file_exists(SAVE_PATH),
+			"has_save": FileAccess.file_exists(save_path),
 		}
 		_hud.time_scale = TIME_SCALES[_time_scale_idx]
 		if _player != null:
@@ -2046,13 +2051,13 @@ func _save_game() -> void:
 	data["player_pos"] = _player.position
 	data["lamp_tint"] = MainView.boot_tint          # representation keys ride beside the sim envelope
 	data["world_seed"] = _world_seed
-	_hud.flash("SAVED" if SaveGame.write(SAVE_PATH, data) else "save FAILED")
+	_hud.flash("SAVED" if SaveGame.write(save_path, data) else "save FAILED")
 
 
 ## F9 quickload: restore in place (sim object survives, so every live reference stays valid), put the
 ## body back, and repaint the retained view caches wholesale. A missing/bad file never touches the game.
 func _load_game() -> void:
-	var data: Dictionary = SaveGame.read(SAVE_PATH)
+	var data: Dictionary = SaveGame.read(save_path)
 	if data.is_empty() or not SaveGame.restore(sim, data):
 		_hud.flash("no save to load")
 		return
