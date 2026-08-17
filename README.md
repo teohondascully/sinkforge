@@ -1,5 +1,9 @@
 # sinkforge
 
+[![harness](https://github.com/teohondascully/sinkforge/actions/workflows/harness.yml/badge.svg)](https://github.com/teohondascully/sinkforge/actions/workflows/harness.yml)
+[![godot 4.6.2](https://img.shields.io/badge/godot-4.6.2-478cbf)](https://godotengine.org)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
 a 2d side-view game about digging an industrial empire into a destructible
 underworld. you play a person, not a cursor: you mine by hand, carry ore in
 your pack, and feed it into machines. you can dig freely in every direction
@@ -49,7 +53,9 @@ godot editor and press play, or run it from the command line:
 godot --path .
 ```
 
-it targets desktop (macos, windows, linux). the art is 32px pixel-art tiles.
+it runs on desktop (macos, windows, linux) — but note that `export_presets.cfg` is gitignored and not
+committed, so a fresh clone can run the game from source and cannot yet reproduce a packaged build. the art
+is 32px pixel-art tiles, drawn almost entirely in immediate-mode canvas calls rather than sprites.
 
 ## controls
 
@@ -117,5 +123,9 @@ src/data/   machine, recipe, and material definitions (godot resources)
 tools/      the test + measurement harness
 tests/      the determinism / conservation test suite
 assets/     sprites
-docs/       design notes — GDD.md, ARCHITECTURE.md, PROGRESSION.md
+docs/       design notes — DECISIONS.md (the log), GDD.md, ARCHITECTURE.md, PROGRESSION.md
 ```
+
+## license
+
+MIT — see [LICENSE](LICENSE).

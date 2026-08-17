@@ -6,9 +6,21 @@
 
 Machines, materials, recipes, and depth layers are **Godot custom Resources (data files)**, consumed by a generic engine. Adding new content = creating/editing a data file, NOT writing new classes. This is the load-bearing architectural decision.
 
-## Core Principle: Abstract Flow Is Source of Truth
+## Core Principle: Discrete Items Are Source of Truth
 
-Production math runs entirely through the abstract rate-based flow layer. Discrete falling-item sprites are a COSMETIC layer driven by the same numbers. They never feed back into production calculations. If all item sprites were removed, production counts would be identical.
+Production is **discrete and integer**. A machine fills `output_buffer`; `_flow` hands those items to the
+machine's destination list; nothing anywhere is a rate. `production_rate()` is **derived bookkeeping** — a
+ring buffer of `total_produced` snapshots, read only by the HUD for legibility, never read back by
+production logic.
+
+The falling-item sprites (`FallingItems`) are a cosmetic layer spawned from `flow_events`. **Delete them
+and every production count is identical.**
+
+> *This principle used to be written the other way round — "production math runs entirely through the
+> abstract rate-based flow layer, discrete falling items are cosmetic". That inverted the actual
+> dependency: items are authoritative and the rate layer is the cosmetic one. It described an earlier
+> architecture and would have led a new contributor to build against a layer that does not exist.
+> Corrected 2026-08-17.*
 
 ---
 
@@ -51,10 +63,13 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   Behavior-SPECIFIC view reads (renderer `_machine_active`/`_draw_machine_io`, the hover `mode`
   text in `MainView`) keep sane defaults, so most new machines never touch them.
 - **The DESCENT ENGINE (`behavior == &"descent"`, docs/PROGRESSION.md §2):** the L1→L2 gate-breacher.
-  Standing over THE SEAL (an unbroken worldgen band of unmineable `sealrock`, `LayeredWorldGen.SEAL_TOP`
-  rows 56-57, with a mineable deepslate SHELF above and IRON only below), `_run_descent` EATS gravity-fed
-  `DESCENT_EATS` (ingots) toward `DESCENT_QUOTA` (40, `MachineState.fed`) — the throughput WALL — passing
-  every other item through; at quota it BREACHES the contiguous seal below (`set_solid` + pile resettle).
+  Standing over THE SEAL (an unbroken worldgen band of unmineable `sealrock`, `SEAL_ROWS` deep from
+  `LayeredWorldGen.SEAL_TOP`, with a mineable deepslate SHELF above and IRON only below), `_run_descent`
+  EATS gravity-fed `DESCENT_EATS` (ingots) toward `DESCENT_QUOTA` (`MachineState.fed`) — the throughput
+  WALL — passing every other item through; at quota it BREACHES the contiguous seal below (`set_solid` +
+  pile resettle). *Both numbers were spelled out here as "rows 56-57" and "40" and both had drifted from
+  the real 84 and 64. They now name the constants, per DECISIONS: a comment that states a number is a test
+  with no runner.*
   Misplaced = `blocked` and everything passes. Research-locked behind the `descent` tech.
 - **Placed layers (conduit / rope / torch):** sparse world layers beside `solid`/`wall`, NOT machines —
   item-flow, collision, and the tick never see them. `conduit` carries power. `rope`
@@ -124,6 +139,23 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
   is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
   a distinctive 4×3 wood frame with an open interior — "active" is derived from the world, no state. The
   decorated look + the block-by-block transform on completion live in the `Bazaars` view.
+- **The LODE plane — what you EXTRACT, beside what you CARVE (docs/LODE.md):** `lode` (cell → material id)
+  and `lode_max` (cell → units the vein held when opened) are sparse layers beside `solid`/`wall`/`water`.
+  The old model made a vein *be* the rock, so a tunnel driven through an ore body destroyed everything it
+  did not pocket. Now **terrain is what you carve and the lode is what you extract**: a blow OPENS a vein
+  rather than ending it, and what the burst did not take stays in the cell to keep working. A lode is not
+  collision (you walk through it) and not "items present" (latent, like `deposits`); it is cleared only by
+  `load_world` and by being worked dry, and placing a block back over one **covers** it rather than
+  destroying it. API: `lode_at` · `lode_workable` · `take_lode` (hand extraction) · `lode_fraction` (the
+  denominator the renderer's fleck density thins against — measured against `lode_max`, not against a
+  standard vein, or a full 45-unit starter adit draws as one fleck in six and reads as stripped on the
+  first face a new player ever sees).
+  Three machines work it: the **Head** (`behavior == &"h_drill"`) stands ON a lode and drains it in place;
+  the **Spur** (`&"spur"`) is a passive coverage extender chained off a Head; the **Drift Rig** (`&"drift"`)
+  cuts rock and sorts pay from spoil into two columns (which is why it owns a `flow` hook — the default
+  round-robin deal is exactly wrong for a machine that already sorted at the face).
+  **Status: the cutover (phase 3) is NOT done** — see `docs/LODE_PLAN.md`. The Borer and Drift Rig expose
+  lode but their pay chute draws nothing on a generated world.
 - **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
   ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
   by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT
@@ -141,13 +173,17 @@ Production math runs entirely through the abstract rate-based flow layer. Discre
 - **Location:** `src/data/` (`MachineDef`, `RecipeDef`; `.tres` instances in `machines/`, `recipes/`)
 - **Responsibility:** Shared definitions consumed by the generic sim. A machine = a named
   recipe-runner; a source = a recipe with no inputs; a thin `behavior: StringName` tag
-  (default empty) lets the few non-recipe machines (currently the splitter) branch in the sim
-  without a type-enum. PROVISIONAL machine model (see DECISIONS 2026-06-27 splitter entry).
-  Every def carries a stable `id: StringName` (save/reference safety).
+  (default empty) lets non-recipe machines branch in the sim without a type-enum. PROVISIONAL machine
+  model (see `docs/DECISIONS.md`, 2026-06-27). Every def carries a stable `id: StringName` (save/reference
+  safety). **The authoritative list of behaviour tags is `FactorySim._BEHAVIORS`** — this doc used to say
+  "the few non-recipe machines (currently the splitter)", which was true when the splitter was the only
+  one and had been wrong for a long time by 2026-08-17, when there were eleven. Read the table; don't
+  restate it here.
 
 ### World engine — the gen↔viz handshake
-- **Location:** `src/core/world_data.gd`, `src/core/world_gen.gd`,
-  `src/core/heightmap_world_gen.gd`; `src/data/material_def.gd` + `src/data/materials/*.tres`.
+- **Location:** `src/core/world_data.gd`, `src/core/world_gen.gd`, `src/core/heightmap_world_gen.gd`,
+  `src/core/layered_world_gen.gd` (the generator the live world actually uses);
+  `src/data/material_def.gd` + `src/data/materials/*.tres`.
 - **Responsibility:** Decouple HOW the world is generated from HOW it is visualised, so either
   improves without the other. Three contract pieces:
   - **`MaterialDef`** (Resource, flyweight) — the shared vocabulary. A cell holds a material
@@ -222,7 +258,8 @@ production state — delete them and the numbers are unchanged):
   `Controls` defaults. Persists to `user://settings.cfg` (ConfigFile) — deliberately SEPARATE from
   `SaveGame`: a save is a world, settings are this machine. HARNESS RULE: `persist` is false by
   default and only a real (unscripted) boot loads/saves the file, so every fixture runs on pure
-  defaults (`tools/check_settings.gd` = harness layer 13, on its own temp path). The UI is a drawn
+  defaults (`tools/check_settings.gd`, on its own temp path — this used to name its position in the runner,
+  "harness layer 13", which drifted the moment anyone added a layer above it). The UI is a drawn
   HUD page (ESC on a calm screen): sliders/chips/remap rows return payloads through
   `Hud.settings_click()`; `MainView` turns them into `Settings` calls — the knob pattern.
 - **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: the
@@ -258,5 +295,13 @@ production state — delete them and the numbers are unchanged):
 - Items are referenced by `StringName` id (e.g. `&"ore"`, `&"ingot"`); no `ItemDef` yet (added when needed).
 
 ## Scene Tree Overview
-- `Main` (`MainView`, Node2D) — the entire Prototype-1 scene. Owns the sim in script; no child
-  nodes yet (everything is `_draw`n). Set as `run/main_scene`.
+- `Main` (`MainView`, Node2D) — the session root, set as `run/main_scene`. Owns the `FactorySim` in
+  script and **hosts real children**: the embodied `Player`, a follow `Camera2D`, the `WorldRenderer`,
+  a screen-fixed `Hud` on its own `CanvasLayer` (layer 10), the post-FX `ColorRect` on a `CanvasLayer`
+  at layer 5, and a `GPUParticles2D` mote haze. Drawing is still immediate-mode `_draw` inside those
+  nodes rather than sprites — that part was never the same claim.
+
+  > *This section read "the entire Prototype-1 scene. Owns the sim in script; no child nodes yet
+  > (everything is `_draw`n)" while the Representation section of this same file described MainView
+  > hosting a Player, a Camera2D, a Hud and the WorldRenderer. One file, two answers. Corrected
+  > 2026-08-17; "no child nodes yet" had been false since the body was embodied.*
