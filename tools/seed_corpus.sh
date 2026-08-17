@@ -30,20 +30,65 @@ GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 CORPUS=(1337 4242 7 99 20260817 31337 512 8675309)
 [ "$#" -gt 0 ] && CORPUS=("$@")
 
-# The seed-sensitive layers: each boots a generated world and measures a property of it. Layers that
-# assert something seed-independent (save durability, controls, registries) are deliberately absent --
-# running them per seed would burn minutes to re-prove the same thing.
+# The seed-sensitive layers: each boots a GENERATED world and measures a property of it. Layers asserting
+# something seed-independent (save durability, controls, registries) are deliberately absent — running them
+# per seed would burn minutes to re-prove the same thing. A layer that builds its own FIXTURE does not
+# belong here either, however seed-shaped its subject sounds.
+#
+# `check_tells` was in this list and has been removed. Its first sweep printed BYTE-IDENTICAL numbers in all
+# eight columns — 0.48 / 1.00 / 0.00 / 0.96-vs-0.00, every seed — because its own docstring says it measures
+# a hand-built fixture "rather than on generated terrain", deliberately and for good reasons. Eight ok cells
+# that are one result printed eight times. Nothing was broken; the corpus was simply claiming 48 cells of
+# coverage when 40 of them were the evidence. The invariance check below now catches this class rather than
+# trusting this list to stay honest.
 LAYERS=(
 	check_richness
 	check_descent
 	check_relief
 	check_room_reads
-	check_tells
 	check_underground
 )
 
+# WHICH LAYERS NEED A REAL WINDOW. `check_underground` judges PIXELS, and the headless driver paints blank
+# frames — run it under --headless and it stands itself down with exit 42. This list used to not exist, so
+# every one of its cells came back non-zero and the corpus would have printed EIGHT RED CELLS for a layer
+# that never ran, which reads exactly like the seed-fragility finding this tool was built to look for.
+# Fabricating the finding you went looking for is the worst failure available to an instrument.
+GL_LAYERS=" check_underground "
+
+# The runner's whole-layer skip code. A layer that stood down did NOT fail, and a corpus that cannot tell
+# those apart is the "skip counts as PASS" bug from queue item 1 wearing its sign backwards.
+SKIP_CODE=42
+
 DIR="$(mktemp -d)"
 trap 'rm -rf "$DIR"' EXIT
+
+# RULE 15 (the working notes): anything that boots Godot takes the harness lock. `user://` is keyed on
+# the project NAME, so this sweep shares one save slot and one set of fixtures with any harness run, in any
+# worktree, on this machine. Sixteen minutes of Godot next to somebody's sweep corrupts both, and the
+# corpus is precisely the tool whose output somebody will read as a property of the WORLD.
+LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
+LOCK_HELD=0
+if [ "${SF_NO_LOCK:-0}" != "1" ]; then
+	waited=0
+	while :; do
+		if mkdir "$LOCK" 2>/dev/null; then
+			printf '%s\n%s\n' "$$" "$PWD" >"$LOCK/owner"; LOCK_HELD=1; break
+		fi
+		holder="$(head -1 "$LOCK/owner" 2>/dev/null || true)"
+		if [ -n "${holder:-}" ] && ! kill -0 "$holder" 2>/dev/null; then
+			echo "  (clearing a stale harness lock: pid $holder is gone)"; rm -rf "$LOCK"; continue
+		fi
+		if [ "$waited" -ge "${SF_LOCK_WAIT:-900}" ]; then
+			echo "!! another run has held $LOCK for ${waited}s (pid ${holder:-unknown}) — refusing to sweep"
+			echo "   concurrently, because the distribution would then describe two runs. SF_NO_LOCK=1 overrides."
+			exit 5
+		fi
+		[ $((waited % 30)) -eq 0 ] && echo "  waiting for the harness lock (held by pid ${holder:-?}) ..."
+		sleep 2; waited=$((waited + 2))
+	done
+	trap 'rm -rf "$DIR"; [ "$LOCK_HELD" = "1" ] && rm -rf "$LOCK"' EXIT
+fi
 
 echo "SEED CORPUS — ${#LAYERS[@]} layers x ${#CORPUS[@]} seeds"
 echo "godot: $GODOT"
@@ -56,24 +101,38 @@ printf '%8s\n' "pass"
 printf -- '-%.0s' $(seq 1 $((24 + 9 * ${#CORPUS[@]} + 8))); echo
 
 total_fail=0
+total_skip=0
+seed_blind=0
 declare -a FAILED_CELLS=()
+declare -a SKIPPED_CELLS=()
 
 for layer in "${LAYERS[@]}"; do
 	printf '%-24s' "$layer"
 	npass=0
+	nran=0
+	# A pixel layer gets a real window; everything else stays headless, which is faster and is what CI does.
+	headless=(--headless)
+	case "$GL_LAYERS" in *" $layer "*) headless=() ;; esac
 	for s in "${CORPUS[@]}"; do
 		log="$DIR/$layer.$s.log"
-		if SF_SEED="$s" "$GODOT" --headless --path . --script "res://tools/$layer.gd" >"$log" 2>&1; then
-			printf '%9s' "ok"
-			npass=$((npass + 1))
+		# `${a[@]+"${a[@]}"}` rather than `"${a[@]}"`: macOS ships bash 3.2, where expanding an EMPTY array
+		# under `set -u` is an unbound-variable error. The pixel layer is exactly the case with an empty one.
+		SF_SEED="$s" "$GODOT" ${headless[@]+"${headless[@]}"} --path . --script "res://tools/$layer.gd" >"$log" 2>&1
+		rc=$?
+		if [ "$rc" -eq 0 ]; then
+			printf '%9s' "ok"; npass=$((npass + 1)); nran=$((nran + 1))
+		elif [ "$rc" -eq "$SKIP_CODE" ]; then
+			# NOT a failure and NOT a pass. Counted in neither, named at the bottom, and excluded from the
+			# per-layer denominator so "6/6" never quietly means "6 of the 2 that ran".
+			printf '%9s' "skip"; total_skip=$((total_skip + 1)); SKIPPED_CELLS+=("$layer @ seed $s")
 		else
-			printf '%9s' "FAIL"
+			printf '%9s' "FAIL"; nran=$((nran + 1))
 			total_fail=$((total_fail + 1))
 			FAILED_CELLS+=("$layer @ seed $s")
 			cp "$log" "${TMPDIR:-/tmp}/seed_corpus.$layer.$s.log" 2>/dev/null
 		fi
 	done
-	printf '%7s/%d\n' "$npass" "${#CORPUS[@]}"
+	printf '%7s/%d\n' "$npass" "$nran"
 done
 
 echo
@@ -94,15 +153,53 @@ for layer in "${LAYERS[@]}"; do
 		if [ -n "$nums" ]; then
 			[ "$shown" = 0 ] && { echo; echo "--- $layer"; shown=1; }
 			printf '  seed %-10s %s\n' "$s" "$nums"
+			printf '%s\n' "$nums" >>"$DIR/$layer.nums"
 		fi
 	done
 	[ "$shown" = 0 ] && { echo; echo "--- $layer  (prints no parenthesised numbers — read its log directly)"; }
+
+	# THE INVARIANCE CHECK. A row whose numbers never move across eight different worlds is not evidence
+	# that the generator is robust — it is evidence the LAYER never looked at the world. Those cells are a
+	# constant repeated, and counting them as coverage is how a corpus overstates itself.
+	#
+	# This is here because it already happened: `check_tells` sat in the layer list printing one identical
+	# result eight times, and the sweep read as 6x8 green. The list is now one line shorter, but a list is a
+	# snapshot and this is the runner for it — the next layer added by somebody who has not read this far
+	# announces itself instead of quietly padding the total.
+	if [ -f "$DIR/$layer.nums" ]; then
+		distinct=$(sort -u "$DIR/$layer.nums" | wc -l | tr -d ' ')
+		if [ "$distinct" -eq 1 ] && [ "${#CORPUS[@]}" -gt 1 ]; then
+			echo "  !! SEED-BLIND: identical on all ${#CORPUS[@]} seeds. This layer is not reading the world;"
+			echo "     its cells are one result repeated and prove nothing about seed robustness."
+			seed_blind=$((seed_blind + 1))
+		fi
+	fi
 done
 
 echo
+if [ "$total_skip" -gt 0 ]; then
+	echo "$total_skip CELL(S) DID NOT RUN — not passes, not failures:"
+	for c in "${SKIPPED_CELLS[@]}"; do echo "  $c"; done
+	echo
+fi
 if [ "$total_fail" -eq 0 ]; then
+	if [ "$total_skip" -gt 0 ]; then
+		# The word "GREEN" is reserved for a sweep that actually measured every cell. This is the same rule
+		# the runner learned the hard way when it printed "ALL 61 HARNESS LAYERS PASS" over four layers that
+		# had drawn nothing.
+		echo "NO RED CELLS, but $total_skip did not run — this is NOT a clean corpus sweep."
+		exit 4
+	fi
+	if [ "$seed_blind" -gt 0 ]; then
+		echo "NO RED CELLS, but $seed_blind layer(s) are SEED-BLIND — that is not a clean sweep either."
+		exit 4
+	fi
 	echo "CORPUS GREEN — every floor holds on all ${#CORPUS[@]} seeds."
 	exit 0
+fi
+if [ "$seed_blind" -gt 0 ]; then
+	echo "$seed_blind LAYER(S) ARE SEED-BLIND — see the flags above. Their columns are not coverage."
+	echo
 fi
 echo "$total_fail RED CELL(S) — the generator is seed-fragile at these points:"
 for c in "${FAILED_CELLS[@]}"; do echo "  $c"; done
