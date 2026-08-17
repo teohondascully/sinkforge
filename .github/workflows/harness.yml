@@ -1,7 +1,39 @@
-# CI: run the full verification harness (determinism, conservation, movement
-# gauges, and agent play-tests) on every push to main and every PR. The harness
-# is meant to always be green; this enforces it. All layers run headless — no
-# display/GPU needed (Godot --headless uses the dummy renderer).
+# CI: run the verification harness (determinism, conservation, movement gauges,
+# agent play-tests, and the pixel layers) on every push to main and every PR.
+#
+# WHY THERE ARE TWO JOBS, AND WHY THAT IS THE WHOLE POINT OF THIS FILE.
+# This used to be one headless job whose name promised the lot. It could not deliver
+# the lot: four layers judge PIXELS, a headless Godot paints blank frames with the
+# dummy renderer, and those four detected that and stopped. They stopped by exiting 0,
+# so the run reported every layer green with four of them unexecuted — for as long as
+# this workflow has existed. The tell was the clock: `check_opening` takes 12s on a
+# machine with a display and 1s without, and one second is not a test run.
+#
+# Two things fixed it. The runner now reports PASS / FAIL / SKIP separately and never
+# says "ALL" over a list with a skip in it (tools/run_harness.sh). And the layers that
+# need a surface now actually get one here: `xvfb-run` supplies the display and Mesa's
+# software Vulkan (lavapipe, from mesa-vulkan-drivers) supplies the device, so no GPU is
+# needed. That was measured before it was written, in an ubuntu:24.04 x86_64 container
+# standing in for this runner: opening 18s, underground 34s, water_reads 16s, all PASS,
+# under the DEFAULT Vulkan driver — no `--rendering-driver` override needed.
+#
+# AND IT IS NOT COSMETIC COVERAGE. `check_dig_hitch` compares a texture read back after a
+# dig against a full rebake. Headless, the dummy renderer uploads nothing, so it compared
+# two blank surfaces and passed — while the stale-cache bug it guards was live on main.
+# Run in that same container against the pre-fix tree: headless PASS (exit 0), and under
+# xvfb `FAIL: region bake is byte-identical to a full bake` (exit 1). This job would have
+# caught it. Against fixed main it passes both ways, and its per-cell timing ratio is
+# 1.175 under xvfb versus 1.180 headless against a gate of 3.00 — the software renderer
+# does not move it, so there is nothing flaky about running it here.
+#
+# ONE LAYER IS DELIBERATELY LEFT OUT — `check_frametime` — and that is measured too
+# rather than assumed. Under a software rasterizer the game draws at 6-9 fps, and its
+# hitch ratios stop describing the game: the same commit PASSED in the x86_64 container
+# (133s, RUN p95 0.7x quiet) and FAILED in an arm64 one (99s, RUN p95 2.3x quiet against
+# a 2.0x cap). Same code, two software-rendered Linux boxes, opposite verdicts — that is
+# a flaky gate, and a flaky gate is one somebody deletes within a month. It runs on
+# developer machines with a real GPU, where the runner now defaults to SF_STRICT=1 and
+# goes red if it ever quietly skips there.
 name: harness
 
 on:
@@ -15,8 +47,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  harness:
-    name: run harness (Godot 4.6.2 headless)
+  headless:
+    name: every layer, headless (the pixel layers skip here)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -38,5 +70,102 @@ jobs:
       - name: Import project
         run: "$GODOT --headless --import"
 
+      # No display here by design, so the layers that need one report SKIP — or PASS* if
+      # they ran and stood a single assertion down — and the summary says so out loud
+      # instead of folding either into the pass count. SF_STRICT is left at its default
+      # (off without a display): the last time an `add_gl` layer was forced to run on a
+      # machine with no window, Godot died in main.cpp before any GDScript ran and CI was
+      # red for 33 straight pushes. The display job below is what covers those layers;
+      # this job's job is to be honest about not covering them.
       - name: Run the harness
+        env:
+          SF_LOG_DIR: ${{ runner.temp }}/harness-logs
         run: bash tools/run_harness.sh
+
+      # The result table on the run page, so "what actually ran" is readable without
+      # opening an artifact or scrolling the log.
+      - name: Publish the result table
+        if: always()
+        run: |
+          {
+            echo '### harness — headless'
+            echo '```'
+            cat "${{ runner.temp }}/harness-logs/summary.txt" 2>/dev/null || echo 'no summary written'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Every layer's stdout/stderr, kept. Before this, the runner mktemp'd its log dir
+      # and rm -rf'd it on EXIT, so the evidence for a red CI run died with the job and
+      # left 14 tail lines behind.
+      - name: Keep the layer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-logs-headless
+          path: ${{ runner.temp }}/harness-logs
+          if-no-files-found: warn
+          retention-days: 14
+
+  pixels:
+    name: the layers that need a surface, on a real display (xvfb + software Vulkan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # xvfb is the display; mesa-vulkan-drivers is lavapipe, the software Vulkan device
+      # Godot's Forward+ renderer binds to when there is no GPU. The X client libs are
+      # what Godot's display driver dlopens. Audio needs nothing: with no sound device it
+      # falls back to the dummy driver on its own, which these layers do not care about.
+      - name: Install a display and a software renderer
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            xvfb mesa-vulkan-drivers libgl1-mesa-dri \
+            libxcursor1 libxinerama1 libxrandr2 libxi6
+
+      - name: Install Godot 4.6.2 (linux)
+        run: |
+          set -euo pipefail
+          V=4.6.2-stable
+          wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          BIN="$PWD/Godot_v${V}_linux.x86_64"
+          chmod +x "$BIN"
+          echo "GODOT=$BIN" >> "$GITHUB_ENV"
+          "$BIN" --version
+
+      - name: Import project
+        run: "$GODOT --headless --import"
+
+      # SF_STRICT=1 is the fail-closed half. A display was provided, so a layer that
+      # reports SKIP here has not been excused by circumstance — it means xvfb or lavapipe
+      # did not come up and the layer quietly opted out, which must be red rather than a
+      # green run that judged nothing. That is the exact failure this whole change exists
+      # to make impossible, so the job that runs the pixel layers refuses to tolerate it.
+      - name: Run the pixel layers on a real display
+        env:
+          SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
+          SF_STRICT: "1"
+          SF_LOG_DIR: ${{ runner.temp }}/harness-logs
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
+
+      - name: Publish the result table
+        if: always()
+        run: |
+          {
+            echo '### harness — pixel layers (xvfb)'
+            echo '```'
+            cat "${{ runner.temp }}/harness-logs/summary.txt" 2>/dev/null || echo 'no summary written'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the layer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-logs-pixels
+          path: ${{ runner.temp }}/harness-logs
+          if-no-files-found: warn
+          retention-days: 14

@@ -18,6 +18,9 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 60
+## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
+## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
+const SKIP: int = 42
 const DEAD := preload("res://tools/dead_space.gd")
 
 ## WHAT IS JUDGED: the GROUND, from the horizon down to where the hotbar starts.
@@ -39,10 +42,11 @@ const DEAD_CAP: float = 0.12
 func _initialize() -> void:
 	# The dummy renderer paints blank frames, so there is nothing here to judge and pretending otherwise
 	# would be worse than not running: a green "no dead space" on an all-black image is a lie. Skip, say
-	# so, and let the machines that can actually draw be the ones that answer.
+	# so, and let the machines that can actually draw be the ones that answer. The runner is told with
+	# exit 42 and the reason line below — both halves, or it counts this as a failure.
 	if DisplayServer.get_name() == "headless":
 		print("check_opening: SKIP — no display; a picture cannot be judged by the dummy renderer")
-		quit(0)
+		quit(SKIP)
 		return
 	MainView.dev_start = false
 	var main: MainView = (load(SCENE) as PackedScene).instantiate()

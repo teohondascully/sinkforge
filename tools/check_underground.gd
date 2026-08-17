@@ -50,11 +50,17 @@ const LIT_FLOOR: float = 26.0
 ## or unlit overhang left in the sample to excuse.
 const DEAD_CAP: float = 0.10
 
+## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
+## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
+const SKIP: int = 42
+
 
 func _initialize() -> void:
+	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
+	# failure, because a silent opt-out is what it is now guarding against.
 	if DisplayServer.get_name() == "headless":
 		print("check_underground: SKIP — no display; a picture cannot be judged by the dummy renderer")
-		quit(0)
+		quit(SKIP)
 		return
 	MainView.dev_start = false
 	await _run()

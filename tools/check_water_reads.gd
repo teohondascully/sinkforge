@@ -53,14 +53,20 @@ const GRADIENT_MIN: float = 2.5
 const SURFACES_MAX: int = 2          ## bright horizontal edges down one column (one surface, plus slack)
 const EDGE_JUMP: float = 9.0         ## sRGB rise between neighbouring rows that counts as an EDGE
 
+## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
+## which is how a layer that drew nothing got counted in "ALL 61 HARNESS LAYERS PASS".
+const SKIP: int = 42
+
 var _fails: int = 0
 
 
 func _initialize() -> void:
 	print("== does water read as water ==")
+	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
+	# failure, because a silent opt-out is what it is now guarding against.
 	if DisplayServer.get_name() == "headless":
 		print("check_water_reads: SKIP (headless — this layer judges pixels)")
-		quit(0)
+		quit(SKIP)
 		return
 	MainView.dev_start = false
 	await _run()

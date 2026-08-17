@@ -1,6 +1,14 @@
 extends SceneTree
 
-## IT HAS TO RUN AT 120.
+## NOTHING MAY HITCH — and on named hardware, it has to run at 120.
+##
+## THE NAME WAS A LIE FOR THIS LAYER'S WHOLE LIFE. It was registered in the runner as `check_frametime
+## (120fps)`, it printed "the game does not hold 120fps" when it failed, and it never once compared
+## anything to 8.33ms. What it asserts — and the reasons are below, and they are good ones — is a RATIO:
+## a busy frame's p95 against a quiet frame's median. That ratio is the portable, honest property, and it
+## is kept exactly as it was. But a ratio cannot tell you the frame rate, so the claim moved to where it
+## can be true: an absolute 8.33ms budget that runs ONLY when SF_PERF_HOST names the machine (see
+## FRAME_BUDGET_MS). Everywhere else this layer says what it measured and asserts only the ratio.
 ##
 ## Forty-nine harness layers judged what the game DOES and not one of them judged how fast it does it, which
 ## is a strange gap for a 2D game whose whole pitch is movement. A swing that measures beautifully and hitches
@@ -49,13 +57,39 @@ const DIG_HITCH_RATIO: float = 6.0
 ## to pay for and no excuse for a slow frame.
 const MOVE_HITCH_RATIO: float = 2.0
 
+## THE ABSOLUTE BUDGET, and the one place in this project where 120fps is an assertion rather than an
+## ambition. 120 frames per second is 8.33ms per frame, so every measured phase's p95 must fit inside it.
+##
+## IT RUNS ONLY WHERE THE NUMBER MEANS SOMETHING. `SF_PERF_HOST` names the machine — set it to whatever
+## identifies the box you are calibrating on, e.g. `SF_PERF_HOST=m4max-16in`. Naming it is an assertion by
+## whoever set it that this is controlled hardware and vsync is genuinely off. On anything else the budget
+## is not merely noisy, it is meaningless (see VSYNC above: a vsync-pinned run reports the refresh interval
+## no matter how fast the game is), and a threshold that fails for reasons the game did not cause is a
+## threshold someone deletes within a month. So: unset means the absolute is measured, printed, and NOT
+## asserted, which is stated in the output so no one reads the pass as a frame-rate claim.
+const FRAME_BUDGET_MS: float = 1000.0 / 120.0
+
+## How close the quiet frame has to sit to the display's refresh interval before we call the run
+## vsync-pinned and refuse to assert an absolute. Frames landing on the refresh within a fifth of a
+## millisecond are being paced by the display, not by the game.
+const VSYNC_PINNED_MS: float = 0.2
+
+## The runner's reserved "I did not run" exit code (tools/run_harness.sh, SKIP_CODE). This used to be 0,
+## which is how a layer that measured nothing got counted in "ALL 61 HARNESS LAYERS PASS".
+const SKIP: int = 42
+
 var _main: MainView = null
+## Non-empty = controlled hardware, named by whoever set it, and the absolute budget applies.
+var _perf_host: String = OS.get_environment("SF_PERF_HOST")
 
 
 func _initialize() -> void:
+	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
+	# failure. Twelve seconds with a display, one second without — that gap is what made the old quit(0)
+	# a lie every time CI ran.
 	if DisplayServer.get_name() == "headless":
 		print("check_frametime: SKIP — no display; the dummy renderer draws nothing, so its frames are free")
-		quit(0)
+		quit(SKIP)
 		return
 	_run()
 
@@ -75,30 +109,87 @@ func _run() -> void:
 	var player: Player = _main._player
 	player.auto_input = false
 
-	print("== it has to run at 120 ==  (%d frames per phase, %s)"
-		% [SAMPLE, DisplayServer.get_name()])
+	var claim: String = "the hitch ratio only — no absolute budget on unnamed hardware"
+	if _perf_host != "":
+		claim = "hitch ratio AND the %.2fms budget, on SF_PERF_HOST=%s" % [FRAME_BUDGET_MS, _perf_host]
+	print("== nothing may hitch ==  (%d frames per phase, %s, asserting %s)"
+		% [SAMPLE, DisplayServer.get_name(), claim])
 
-	# IDLE first and ungated: it defines the quiet frame the others are judged against.
+	# IDLE first and ungated by the ratio: it defines the quiet frame the others are judged against. It is
+	# NOT exempt from the absolute — a game that cannot draw a still frame in 8.33ms does not run at 120.
 	var idle: PackedFloat32Array = await _phase(&"idle")
 	var quiet: float = _pct(idle, 0.50)
 	_report("IDLE  standing on the surface", idle)
 	print("      -> a quiet frame is %.2fms; everything below is judged against it" % quiet)
 
 	var ok: bool = true
-	ok = _gate("RUN   moving, chunks streaming", await _phase(&"run"), quiet, MOVE_HITCH_RATIO) and ok
-	ok = _gate("DIG   mining, region rebakes", await _phase(&"dig"), quiet, DIG_HITCH_RATIO) and ok
-	ok = _gate("SWING on the rope at speed", await _phase(&"swing"), quiet, MOVE_HITCH_RATIO) and ok
+	var run_ms: PackedFloat32Array = await _phase(&"run")
+	ok = _gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO) and ok
+	var dig_ms: PackedFloat32Array = await _phase(&"dig")
+	ok = _gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO) and ok
+	var swing_ms: PackedFloat32Array = await _phase(&"swing")
+	ok = _gate("SWING on the rope at speed", swing_ms, quiet, MOVE_HITCH_RATIO) and ok
 
 	print("  draw calls in the last frame: %d   objects: %d"
 		% [int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))])
 
+	var phases: Array[PackedFloat32Array] = [idle, run_ms, dig_ms, swing_ms]
+	ok = _absolute(PackedStringArray(["IDLE", "RUN", "DIG", "SWING"]), phases, quiet) and ok
+
 	if not ok:
-		printerr("check_frametime: FAIL — the game does not hold 120fps")
+		printerr("check_frametime: FAIL — see the phase(s) marked FAIL above")
 		quit(1)
 		return
-	print("check_frametime: PASS — nothing hitches; a dig costs a few quiet frames, not twenty")
+	if _perf_host == "":
+		print("check_frametime: PASS — nothing hitches; a dig costs a few quiet frames, not twenty."
+			+ " Frame RATE is unasserted here (set SF_PERF_HOST on controlled hardware for that)")
+	else:
+		print("check_frametime: PASS — nothing hitches, and every phase fits in %.2fms on %s"
+			% [FRAME_BUDGET_MS, _perf_host])
 	quit(0)
+
+
+## The absolute 120fps budget, and the whole of its refusal to run anywhere it would not mean anything.
+##
+## Three outcomes, and the middle one is the point: assert it on named hardware; state plainly that it is
+## unasserted on everything else; and FAIL on named hardware whose frames are being paced by the display,
+## because a vsync-pinned run reports the refresh interval whether the game has four milliseconds of
+## headroom or none — passing on that measurement would be the same species of lie as counting a skip as a
+## pass.
+func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], quiet: float) -> bool:
+	if _perf_host == "":
+		print("  absolute: NOT ASSERTED — SF_PERF_HOST is unset, so this is arbitrary hardware. The budget"
+			+ " would be %.2fms/frame (120fps); the p95s above are a measurement, not a claim." % FRAME_BUDGET_MS)
+		return true
+
+	var refresh: float = DisplayServer.screen_get_refresh_rate()
+	var interval: float = (1000.0 / refresh) if refresh > 0.0 else 0.0
+	if interval > 0.0 and absf(quiet - interval) < VSYNC_PINNED_MS:
+		printerr("  absolute: FAIL on SF_PERF_HOST=%s — the quiet frame is %.2fms and the display refreshes"
+			% [_perf_host, quiet]
+			+ " every %.2fms, so vsync is pacing these frames and the millisecond numbers describe the" % interval
+			+ " monitor, not the game. Turn vsync off on this machine or stop naming it as a perf host.")
+		return false
+
+	print("  absolute: SF_PERF_HOST=%s — every phase p95 must fit in %.2fms (120fps); the display refreshes"
+		% [_perf_host, FRAME_BUDGET_MS]
+		+ (" every %.2fms" % interval if interval > 0.0 else " at an unreported rate"))
+	var ok: bool = true
+	for i: int in labels.size():
+		var ms: PackedFloat32Array = phases[i]
+		if ms.is_empty():
+			printerr("      FAIL: %s produced no samples — the budget was not measured" % labels[i])
+			ok = false
+			continue
+		var p95: float = _pct(ms, 0.95)
+		if p95 > FRAME_BUDGET_MS:
+			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget — that phase is under 120fps on %s"
+				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host])
+			ok = false
+		else:
+			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
+	return ok
 
 
 ## Run one phase for SAMPLE drawn frames, driving the body as that phase requires and timing each frame
