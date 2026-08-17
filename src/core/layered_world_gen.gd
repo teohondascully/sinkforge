@@ -242,9 +242,24 @@ const IRON_AMOUNT: int = 220
 ## richness assertion and every fixture keep their current meaning — and "a generated world contains
 ## usable extraction sites" stops being false by construction, which was the blocking half.
 ##
-## No new render work: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
-## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid. So
-## these are visible as a tell the moment they exist, and prospecting starts meaning something.
+## No new render CODE: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
+## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid.
+##
+## WHETHER A PLAYER CAN SEE ANY OF THIS IS UNVERIFIED, and this comment has now been wrong in BOTH
+## directions in one afternoon, which is the only reason it is worth the space.
+##
+## It first read "so these are visible as a tell the moment they exist, and prospecting starts meaning
+## something" — reasoning from the existence of `_stain()` to a claim about what a player SEES, without
+## looking at anything. I then took one capture, saw dark rock, and rewrote it to say the tell is not
+## discernible by eye. That was worse: the centre of the subject in that frame is covered by the GRAPPLE
+## tutorial bubble, so it is evidence about HUD occlusion and not about rock. **I read an occluded frame
+## as evidence about what it occludes.**
+##
+## So: unverified. Not "visible", not "invisible". A capture that could settle it has to set and record
+## the tutorial/objective state first so the vein is unoccluded, and is a diagnostic frame rather than a
+## first-impression one. Until then the honest statement is that the lode plane is correct, generated,
+## deterministic, ingested and workable — none of which depends on the tell — and that nobody has yet
+## established what it looks like to a person.
 const LODE_ATTEMPTS_PER_COL: float = 0.35
 const LODE_SIZE_MIN: int = 6
 const LODE_SIZE_DEPTH_BONUS: int = 12

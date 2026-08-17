@@ -251,6 +251,30 @@ player-visible change · `history/` archived · docs updated in the same commit.
 > at it. It is asserted structurally and unverified visually — the same split I have now made three times
 > (code-verified, not pixel-verified), and the one my own tracelog flags as a habit rather than a standard.
 >
+> **A CAPTURE WAS TAKEN AND IT CANNOT SETTLE THE GATE. THE GATE REMAINS UNMET AND THE QUESTION REMAINS
+> OPEN.** `_diag_lode_face.png` shows a worked lateral face at depth 44 with buried cells inside the lamp's
+> brightest pool — and **the centre of that subject is covered by the GRAPPLE tutorial bubble**, with the
+> objective rail across the top.
+>
+> I wrote here, briefly, that the capture proved the tell invisible. It proves nothing of the sort: I read
+> an occluded frame as evidence about what it occludes. That correction stands (0017), and is not
+> mine, and it arrived because someone reviewed the pixels I had already drawn a conclusion from.
+>
+> **So the claim has now been wrong in both directions in one afternoon** — first "visible", asserted from
+> the existence of `_stain()` without looking; then "invisible", asserted from a frame whose subject was
+> hidden. The honest state is UNVERIFIED. A capture that could settle it must set and RECORD the
+> tutorial/objective state so the vein is unoccluded, and is a diagnostic post-tutorial frame rather than a
+> first-impression one.
+>
+> The frame is preserved and re-filed as what it actually documents: **a first-time HUD-interference
+> artifact.** On that it is good evidence — a first-time player standing at a lateral face has the subject
+> of the moment hidden behind a tutorial bubble, which is T2.1's argument made in pixels instead of prose.
+>
+> **What is unaffected either way:** the lode plane is correct, generated, deterministic, ingested and
+> workable. None of that rests on the tell. What nobody has established is what it looks like to a person,
+> and phase 3b's "sonar re-pointed at lodes through rock" should not assume the stain covers it in the
+> meantime.
+>
 > It also means every luma measurement in this project now has a **pre-lode / post-lode** side, and the
 > boundary is `303d1f5`. That is a project-wide line, not a property of any one number.
 
