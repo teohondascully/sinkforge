@@ -639,6 +639,31 @@ const HOVER_MAX_W: float = 300.0   ## the inspector may grow to fit its widest l
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 
+## THE PERMANENT PLATE IS THE PART THAT DIES (kill list #1; Diegetic 3.7).
+##
+## The how-to line already knew how to leave: it holds, fades, and comes back when you stall. The GOAL line
+## did not — it sat at top-centre for every step, all thirteen of them, which is the "~85-90% of the
+## interface floats above the world" finding and the reason the audit called the presentation system the
+## art director. The complaint is PERMANENCE, not existence: a game may tell you what just became possible,
+## it may not stand over you while you do it.
+##
+## So the goal announces itself, holds, fades, and returns on the same stall the how-to uses. The world
+## keeps talking after it goes — `world_renderer._draw_guide_targets()` already pulses a ring on the cells
+## the current step points at, which is the "attach subsequent guidance to the relevant world object" half
+## of the same recommendation, and it was already built.
+##
+## THIS IS ALSO THE PRECONDITION FOR MEASURING ANY OF IT. `docs/DIRECTOR_BRIEF.md` §4.4 scores whether a
+## player forms a desire when NO objective is supplied; while a permanent slab supplies one, that
+## evaluation reads the supervisor instead of the player and cannot return a valid result on this build.
+##
+## `GOAL_PERSISTS_THROUGH` is the dial between two readings of the same instruction — the kill list says
+## "keep for first exposure, then kill it", dimension #10 says "remove after its first lesson". At 1 the
+## opening step keeps its permanent plate (nobody is stranded on the first thing they ever see) and every
+## step after it announces and withdraws. Raise it to soften, set it to 0 to kill the plate outright.
+const GOAL_HOLD: float = 6.0
+const GOAL_FADE: float = 1.2
+const GOAL_PERSISTS_THROUGH: int = 1
+
 
 ## The OBJECTIVE line (top-centre) — the current step only, as a gentle nudge. Pure read of the
 ## Objectives tracker. Top-centre sits over open sky, so it never buries the avatar the way the old
@@ -662,6 +687,7 @@ func _draw_objective_line() -> void:
 	var col: Color
 	var hint: String = ""
 	var hint_a: float = 0.0
+	var goal_a: float = 1.0
 	if objectives.all_done():
 		text = "✓  All set — keep digging deeper."
 		col = Color(0.62, 0.86, 0.58)
@@ -676,6 +702,16 @@ func _draw_objective_line() -> void:
 			hint_a = clampf((age - HINT_STUCK) / HINT_FADE, 0.0, 1.0)   # you've stalled — hand it back
 		if hint_a > 0.0:
 			hint = str(step["label"])
+		# The goal withdraws on the same terms, once the opening step has had its permanent exposure.
+		if objectives.current_index() >= GOAL_PERSISTS_THROUGH:
+			if age < GOAL_HOLD + GOAL_FADE:
+				goal_a = clampf((GOAL_HOLD + GOAL_FADE - age) / GOAL_FADE, 0.0, 1.0)
+			elif age > HINT_STUCK:
+				goal_a = clampf((age - HINT_STUCK) / GOAL_FADE, 0.0, 1.0)
+			else:
+				goal_a = 0.0                     # said once — the guide ring has it from here
+	if goal_a <= 0.0 and hint_a <= 0.0:
+		return                                    # nothing to say: leave the sky alone
 	var fs: int = 13
 	var hfs: int = 10
 	var pad: float = 12.0
@@ -691,12 +727,12 @@ func _draw_objective_line() -> void:
 	var w: float = minf(maxf(tw, hw) + pad * 2.0, free_w)
 	var h: float = 24.0 + (13.0 if hint != "" else 0.0)
 	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, h)
-	_panel(rect, true)
+	_panel(rect, true, maxf(goal_a, hint_a))   # the skin is as present as its most visible line
 	var cy: float = rect.position.y + 12.0
 	if not objectives.all_done():
-		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, UI_ACCENT)
+		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, Color(UI_ACCENT, UI_ACCENT.a * goal_a))
 	draw_string(_font, Vector2(rect.position.x + pad + 14.0, cy + 5.0), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col, col.a * goal_a))
 	if hint != "":
 		draw_string(_font, Vector2(rect.position.x + pad, cy + 18.0), hint,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, hfs, Color(UI_TEXT_DIM, hint_a))
@@ -731,15 +767,17 @@ func _fit_text(text: String, size: int, max_w: float) -> String:
 static var panel_probe: Array[Rect2]
 
 
-func _panel(rect: Rect2, accent: bool = false) -> void:
+## `alpha` modulates the whole skin so a panel can FADE rather than blink out. Panels that fade fully are
+## expected to return before calling this at all, so the probe keeps recording only what was really drawn.
+func _panel(rect: Rect2, accent: bool = false, alpha: float = 1.0) -> void:
 	if panel_probe != null:
 		panel_probe.append(rect)
-	draw_rect(rect, UI_BG)
+	draw_rect(rect, Color(UI_BG, UI_BG.a * alpha))
 	draw_line(rect.position + Vector2(1.0, 1.0), rect.position + Vector2(rect.size.x - 1.0, 1.0),
-		UI_EDGE_HI, 1.0)
-	draw_rect(rect, UI_EDGE, false, 1.0)
+		Color(UI_EDGE_HI, UI_EDGE_HI.a * alpha), 1.0)
+	draw_rect(rect, Color(UI_EDGE, UI_EDGE.a * alpha), false, 1.0)
 	if accent:
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), UI_ACCENT)
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(UI_ACCENT, UI_ACCENT.a * alpha))
 
 
 ## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
