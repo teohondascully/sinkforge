@@ -293,6 +293,17 @@ var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall BASE
 var _wall_has: PackedByteArray = PackedByteArray()      ## #S13: 1 where the coarse cell actually HAS a wall
 var _surf_row: PackedInt32Array = PackedInt32Array()    ## walkable surface row per column (cap band)
 var last_baked_cells: int = 0                           ## fine cells the LAST bake touched — the dig-hitch friction gauge (#103)
+## FINE CELLS THE LAST `rebake` PAINTED BEFORE RETURNING — the cost that is actually in front of the first
+## frame, which `last_baked_cells` stopped being able to answer the moment bakes became progressive. Every
+## `bake_pending` slice and every per-dig region bake overwrites `last_baked_cells`, so a reader who asks it
+## "how big was the boot bake?" ten frames later gets the size of the most recent 4ms fill slice instead.
+## That is not a hypothetical: it is what `check_dig_hitch` measured, and it reported 1024 for a bake of
+## tens of thousands of cells. Written by `rebake` and by nothing else.
+var opening_baked_cells: int = 0
+## PROGRESSIVE BAKE STATE (#17). -1 = nothing outstanding; otherwise the next fine ROW `bake_pending` owes.
+var _pending_fy: int = -1
+## The fine-cell rect the opening bake already painted, skipped while filling the rest.
+var _painted_view: Rect2i = Rect2i()
 ## Fine-cell dilation for a region rebake: must cover the widest neighbour reach any paint term reads so a
 ## patched region is byte-identical to a full bake — MOSS_DEPTH(3 up) / HANG_DEPTH(3 down) / SUBDIV(4,
 ## accretion). RIM_DEPTH(2), WALL_AO_REACH(5) and _moss_life (a pure function of the row) are all inside it.
@@ -384,9 +395,13 @@ const SURFACE_KEEP: int = 2
 ## `fine_solid_bulk` is the sim's fine grid handed over WHOLE instead of read a cell at a time. It is
 ## optional and the per-cell Callable remains the fallback, so callers that have no array (check_texture
 ## builds a synthetic world) are unaffected. See the loop below for why it exists.
+## `view` is the world-space rectangle the player can actually SEE, and passing one turns the bake
+## PROGRESSIVE: the visible fine cells are painted now and the rest are owed to `bake_pending`. Left empty
+## (every existing caller, and both harness layers) the whole grid is painted in one go, exactly as before.
+## See `bake_pending` for why this is safe and what the world looks like in between.
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
 		surface_at: Callable, tone_at: Callable, has_wall_at: Callable,
-		fine_solid_bulk: PackedByteArray = PackedByteArray()) -> void:
+		fine_solid_bulk: PackedByteArray = PackedByteArray(), view: Rect2 = Rect2()) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)
@@ -451,12 +466,143 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 		for fy: int in _frows:
 			for fx: int in _fcols:
 				_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
-	for fy: int in _frows:
-		for fx: int in _fcols:
-			_paint_fine(fx, fy)
-	last_baked_cells = _fcols * _frows
+	_pending_fy = -1
+	_painted_view = _fine_rect(view)
+	if _painted_view.size == Vector2i.ZERO:
+		for fy: int in _frows:
+			for fx: int in _fcols:
+				_paint_fine(fx, fy)
+		last_baked_cells = _fcols * _frows
+		opening_baked_cells = last_baked_cells
+	else:
+		# A partial bake leaves cells UNWRITTEN, and on a re-bake (a save load) those cells still hold the
+		# previous world's pixels. Clearing to transparent is what makes the unpainted region fall through
+		# to the coarse pass instead of showing somewhere else's rock. One memset of ~1MB.
+		_data.fill(0)
+		for fy: int in range(_painted_view.position.y, _painted_view.end.y):
+			for fx: int in range(_painted_view.position.x, _painted_view.end.x):
+				_paint_fine(fx, fy)
+		last_baked_cells = _painted_view.size.x * _painted_view.size.y
+		opening_baked_cells = last_baked_cells
+		_pending_fy = 0
 	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, _data)
 	_tex.update(_img)
+
+
+## The fine-cell rect a world-space rectangle covers, clamped to the grid. An empty or off-world rect
+## returns a zero-size rect, which is the "bake everything at once" signal.
+func _fine_rect(view: Rect2) -> Rect2i:
+	if view.size.x <= 0.0 or view.size.y <= 0.0:
+		return Rect2i()
+	var x0: int = clampi(int(floor(view.position.x / float(FINE))), 0, _fcols)
+	var y0: int = clampi(int(floor(view.position.y / float(FINE))), 0, _frows)
+	var x1: int = clampi(int(ceil(view.end.x / float(FINE))), 0, _fcols)
+	var y1: int = clampi(int(ceil(view.end.y / float(FINE))), 0, _frows)
+	if x1 <= x0 or y1 <= y0:
+		return Rect2i()
+	return Rect2i(x0, y0, x1 - x0, y1 - y0)
+
+
+## PAINT WHAT THE PLAYER CANNOT SEE YET, A SLICE PER FRAME (#17). Returns true while work remains.
+##
+## The full bake is 262144 fine cells and it is not fast: 1199ms on this machine after the peer's loop
+## work, ~4.6us a cell. Every millisecond of it is spent before the first frame, and the profiling that
+## went looking for the hotspot found there isn't one — the bulk fine-grid handover bought 11%, the eight
+## noise calls per cell are 16%, and the remaining ~74% is `_paint_fine` itself, a hundred interpreted
+## operations with no peak anywhere in it. `rebake`'s own comment states the conclusion: micro-optimisation
+## cannot reach a diffuse 74%, and the two options that preserve the output EXACTLY are baking the visible
+## region first or getting the bake off the main thread. This is the first one.
+##
+## WHY IT IS SAFE, and the reason is a property of `_paint_fine` rather than a promise about this function:
+## it reads only the coarse caches, `_fine_solid`, `_surf_row` and the noise fields — every one of which is
+## fully populated by `rebake` BEFORE any painting starts — and writes only its own four bytes. So the
+## painting order over the grid cannot affect the result, ANY partition of the cells yields the same image,
+## and a progressive bake is byte-identical to a single-shot one by construction rather than by testing.
+## `tools/check_progressive_bake.gd` asserts it anyway, because "by construction" is what every one of this
+## project's vacuous guards also said.
+##
+## WHAT THE WORLD LOOKS LIKE IN BETWEEN: unpainted fine cells are transparent, and the coarse terrain pass
+## still draws underneath at z -10 — the same fallback that covers this layer being switched off entirely.
+## So the not-yet-filled region reads as the old blocky 32px terrain, not as a hole, and it is off-screen
+## anyway unless the camera outruns the fill.
+##
+## THE BUDGET IS TIME, NOT CELLS, because the point is to fit inside a frame and a cell count that fits on
+## this machine does not fit on a slower one. Granularity is one fine ROW — 384 cells, ~1.8ms — so a budget
+## can overshoot by that much and one row is always painted however small the budget is. Progress is
+## guaranteed: a budget of zero still advances a row per call rather than stalling forever.
+##
+## Deliberately NOT self-driving off a timer inside this class. The caller owns the frame, knows whether it
+## is mid-dig, and is the only one that can decide this frame has 4ms to spare.
+func bake_pending(budget_usec: int = 4000) -> bool:
+	if _pending_fy < 0:
+		return false
+	var t0: int = Time.get_ticks_usec()
+	var painted: int = 0
+	while _pending_fy < _frows:
+		var fy: int = _pending_fy
+		var skip: bool = fy >= _painted_view.position.y and fy < _painted_view.end.y
+		for fx: int in _fcols:
+			if skip and fx >= _painted_view.position.x and fx < _painted_view.end.x:
+				continue
+			_paint_fine(fx, fy)
+			painted += 1
+		_pending_fy += 1
+		if Time.get_ticks_usec() - t0 >= budget_usec:
+			break
+	last_baked_cells = painted
+	_img.set_data(_fcols, _frows, false, Image.FORMAT_RGBA8, _data)
+	_tex.update(_img)
+	if _pending_fy >= _frows:
+		_pending_fy = -1
+		return false
+	return true
+
+
+## Fine rows still owed by a progressive bake — 0 when the grid is whole. The harness reads it; so does any
+## caller that wants to know whether the world it is looking at is finished.
+func pending_rows() -> int:
+	return 0 if _pending_fy < 0 else _frows - _pending_fy
+
+
+## FINISH THE OUTSTANDING FILL NOW, in one call. Returns the rows it had to paint.
+##
+## This exists because THREE harness layers needed it within an hour of #17 landing, each with its own
+## paragraph explaining the same thing, and a rule retyped three times is a rule about to be typed wrong a
+## fourth. They need it for two different reasons and both are legitimate:
+##
+##   * a layer that JUDGES the baked image (`check_grid` reads `_data` directly) must judge a WHOLE one.
+##     Unpainted cells are transparent, its sweeps skip transparent cells, and it failed on a sample too
+##     thin to mean anything rather than on anything about the rock.
+##   * a layer that TIMES frames (`check_frametime`) must not catch the tail of the boot fill inside a
+##     phase named IDLE, because every ratio it reports divides by IDLE.
+##
+## Neither is hiding a cost. The fill is a boot transient that happens once and never again, and a layer
+## that measured it would be reporting it under the wrong name. What SHOULD measure it is a layer named for
+## it — `check_progressive_bake` — and what should measure a dig landing during it is `check_dig_hitch`,
+## which now does, before it calls this.
+func finish_pending() -> int:
+	var owed: int = pending_rows()
+	while bake_pending(1 << 30):
+		pass
+	return owed
+
+
+## The fine-cell rect the last `rebake` painted before returning; zero-size after a whole-grid bake.
+##
+## Exposed so the CONTRACT can be asserted rather than the cell count. "The opening bake is bigger than a
+## dig" is a number that happened to be in scope; "the opening bake contains the body" is the property, and
+## it is the one that fails when a caller hands over a rect built from a camera that has not moved onto the
+## player yet — which is a real thing that happened, and which a cell-count floor near 4096 waved through.
+func opening_rect() -> Rect2i:
+	return _painted_view
+
+
+## The baked pixel bytes, for a test that wants to compare two bakes WITHOUT going through the texture.
+## `texture().get_image()` returns a blank surface under the headless driver, which is how one byte-identity
+## assertion in this project passed for its whole life while comparing two blank images. These bytes are
+## CPU-side and are the same in both drivers.
+func baked_bytes() -> PackedByteArray:
+	return _data
 
 
 ## THE PER-DIG FAST LANE (#102 dirty-chunks — the mining micro-freeze fix). Rebake ONLY the fine cells under

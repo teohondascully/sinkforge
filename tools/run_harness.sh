@@ -163,6 +163,9 @@ add "check_mining"                    "res://tools/check_mining.gd"
 # add_gl, not add: it reads a rendered texture back and compares it, and the dummy renderer hands it two
 # blank surfaces that match. Registered headless it passed on the identity of nothing.
 add_gl "check_dig_hitch (friction)"   "res://tools/check_dig_hitch.gd"
+# Headless on purpose, unlike its neighbour: this one compares the baker's CPU-side bytes rather than a
+# texture read back from the driver, so it is the same test in both and belongs in CI.
+add "check_progressive_bake (#17)"    "res://tools/check_progressive_bake.gd"
 add "check_fall"                      "res://tools/check_fall.gd"
 add "check_climb"                     "res://tools/check_climb.gd"
 add "check_saveload"                  "res://tools/check_saveload.gd"

@@ -140,6 +140,15 @@ func _run() -> void:
 
 	var player: Player = _main._player
 	player.auto_input = false
+	# FINISH THE BOOT BAKE BEFORE THE CLOCK STARTS. #17 made the fine bake progressive: a fresh scene paints
+	# the visible rect and then fills the rest off-camera at 4ms a frame for about a second. That is real
+	# work the game really does — and it happens once, at boot, and never again. A phase that caught the tail
+	# of it would be reporting the BOOT cost under the name IDLE, and every ratio below divides by IDLE. This
+	# is fixture setup for the same reason _stand_over_rock is: controlling a nuisance variable, not hiding a
+	# cost. Whatever the fill costs belongs in a layer named for it, not in this one's denominator.
+	var fine: FineTerrain = _main._renderer._fine
+	if fine != null:
+		fine.finish_pending()
 	var refresh: float = DisplayServer.screen_get_refresh_rate()
 	_interval = (1000.0 / refresh) if refresh > 0.0 else 0.0
 

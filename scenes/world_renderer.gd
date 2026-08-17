@@ -518,6 +518,13 @@ func _process(delta: float) -> void:
 	elif _fine_region_pending:
 		_bake_fine_region(_fine_dirty_min, _fine_dirty_max)   # the per-dig fast lane
 		_fine_region_pending = false
+	elif _fine != null and _fine.pending_rows() > 0:
+		# #17: the boot bake painted only what was on screen. Fill the rest a slice per frame — behind the
+		# player, off-camera, and after a dig has had its turn, because a dig is the one edit that is
+		# visible immediately. See FineTerrain.bake_pending.
+		_fine.bake_pending(FINE_FILL_BUDGET_US)
+		if _fine_layer != null:
+			_fine_layer.queue_redraw()
 
 
 ## FULL BAKE — every chunk, onto a freshly cleared target. Used for the initial paint and for a wholesale
@@ -2669,6 +2676,45 @@ func _paint_fine_terrain(layer: LightLayer) -> void:
 ## Rebuild the molded fine-terrain texture from the current sim.solid (via scenes/fine_terrain.gd),
 ## reusing this renderer's exact material + wall palette so the mold matches the coarse pass's colours.
 ## Called on terrain change only (never per frame). Cleared _fine_dirty + a redraw of the ONE quad.
+## HOW MUCH OF A FRAME THE OFF-SCREEN FILL MAY TAKE (#17). 4ms of an 8.33ms frame, which is generous
+## because the alternative it replaces is 1199ms of not drawing anything at all. It is a target and not a
+## cap: `bake_pending` works in whole fine rows (~1.8ms each), so a call can overshoot by one row.
+##
+## Measured consequence at this budget: ~2 rows a frame, 320 rows, so the world finishes molding a little
+## over a second after boot — off-camera, while the player is still reading the opening frame. The visible
+## rect is already correct in the first bake; nothing the player is looking at waits for this.
+const FINE_FILL_BUDGET_US: int = 4000
+
+## THE OPENING VIEW IS THE GROUND AROUND THE BODY, and it is deliberately NOT the camera rect. Two attempts
+## at asking the camera both failed, in ways worth keeping written down because the second one passed a test.
+##
+## `setup()` runs from main's `_ready` BEFORE the renderer is added to the tree, so `get_canvas_transform`
+## and `get_viewport_rect` fail there — first loudly, with two engine errors, then QUIETLY, by returning an
+## empty rect that `rebake` reads as "bake everything". The boot bake is the one bake #17 exists to split,
+## so the change would have shipped defeating itself with a green sweep behind it.
+##
+## Guarding that with `is_inside_tree()` — camera rect inside, body rect outside — compiled, passed, and
+## was still the wrong shape. It makes the opening view depend on WHICH call site ran first, and the two
+## sites disagree: `setup()` is outside the tree and `_process` is inside it, so the same boot could bake
+## around the body or around wherever the canvas transform happened to point on frame one, which is not
+## necessarily the body. A view that is correct only when the frame ordering cooperates is a view that will
+## be wrong on someone's machine and right on the one it was written on.
+##
+## The body's position needs no tree, no camera and no frame ordering, and the camera in this game is on
+## the body by construction. The span is about 1.6 screens wide by 2.2 tall at the default zoom — 49152
+## fine cells, 19% of the grid, so the opening bake costs roughly 226ms of the measured 1199ms. Generous on
+## purpose, in both axes: overshooting wastes a few milliseconds once, and undershooting shows coarse
+## terrain where the player is looking. Undershooting is also self-healing within about a second, which is
+## why this errs toward the cheap failure rather than toward covering the survey zoom.
+const FINE_OPENING_SPAN := Vector2(2048.0, 1536.0)
+
+
+## The world rect the opening bake must finish before the first frame.
+func _fine_view() -> Rect2:
+	var at: Vector2 = player.position if player != null else Vector2.ZERO
+	return Rect2(at - FINE_OPENING_SPAN * 0.5, FINE_OPENING_SPAN)
+
+
 func _bake_fine_terrain() -> void:
 	_fine_dirty = false
 	if _fine == null:
@@ -2681,7 +2727,8 @@ func _bake_fine_terrain() -> void:
 		func(col: int) -> int: return sim.surface_row(col),
 		_cell_tone,
 		_has_wall,
-		sim.fine_solid_bytes())   # the same fine grid handed over WHOLE — see rebake()'s bulk path
+		sim.fine_solid_bytes(),   # the same fine grid handed over WHOLE — see rebake()'s bulk path
+		_fine_view())   # #17: paint what is on screen NOW, owe the rest
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 

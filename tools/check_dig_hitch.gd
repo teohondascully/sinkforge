@@ -134,11 +134,57 @@ func _on_frame() -> void:
 	_frames += 1
 	var sim: FactorySim = _main.sim
 	if _frames == 10:
-		# The initial full bake has run (renderer inits _fine_dirty=true). Confirm the baseline reads the
-		# WHOLE grid — this is the cost a per-dig rebake must NOT pay.
-		var full: int = _main._renderer._fine.last_baked_cells
-		_check(full == FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV
-			or full > MAX_DIG_CELLS, "initial full bake touched the whole grid (%d cells)" % full)
+		# The boot bake has run. It used to paint the WHOLE grid in one call and this assertion said so;
+		# since #17 it paints the visible rect and owes the rest to `bake_pending`, so the baseline is now
+		# "much more than a dig, and still nowhere near the whole grid in one go".
+		var rend: WorldRenderer = _main._renderer
+		var fine: FineTerrain = rend._fine
+		var whole: int = FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV
+		# `opening_baked_cells`, NOT `last_baked_cells`. The first version of this assertion read the latter
+		# and reported 1024 cells: by frame 10 the off-screen fill had already overwritten it with the size
+		# of its most recent 4ms slice. It failed, which is the only reason the wrong number was ever seen —
+		# had the range happened to fit, this layer would have been asserting on a fill slice under the name
+		# "the boot bake" for as long as anyone cared to read it.
+		var boot: int = fine.opening_baked_cells
+		var rect: Rect2i = fine.opening_rect()
+		print("  boot bake: %d of %d fine cells (%.0f%%), rect %s" % [boot, whole,
+			100.0 * float(boot) / float(whole), rect])
+		# THE CONTRACT, NOT A NUMBER NEAR IT. The challenge raised later, and it is right: the previous
+		# floor here was `boot > MAX_DIG_CELLS`, picked because 4096 was already in scope, and a regression
+		# that painted one row and stalled would sit above it and pass. What item 17 actually promises is
+		# that THE GROUND AROUND THE BODY is finished before the first frame — so assert exactly that. It is
+		# also the assertion that fails on the defect this change really had: an opening rect built from a
+		# camera that had not yet moved onto the player, clipped to the world corner, containing nothing
+		# anyone was looking at.
+		var body: Vector2i = _main._cell_at(_main._player.position) * FactorySim.SUBDIV
+		_check(rect.has_point(body), "the boot bake's rect %s contains the body's fine cell %s" % [rect, body])
+		_check(boot < whole, "...and it is still a SPLIT, not the whole grid (%d of %d)" % [boot, whole])
+		_check(fine.pending_rows() > 0, "the boot bake left rows outstanding (%d)" % fine.pending_rows())
+
+		# ITEM 17'S OWN WORST CASE, BEFORE IT IS DRAINED AWAY. The change trades a boot freeze for a
+		# possible mid-play stutter: a dig landing while off-screen fill is still outstanding. Everything
+		# below this block drains the fill first — necessarily, because a not-yet-filled cell is transparent
+		# in the region-baked image and painted in the reference, which this layer would report as a stale
+		# ring — and that drain arranges for the one new risk never to be measured. So measure it here.
+		var owed: int = fine.pending_rows()
+		var probe: Vector2i = _rock(sim, maxi(FactorySim.GRID_COLS / 3, 4), 6)
+		_check(sim.is_solid(probe), "the pending-fill probe site %s is solid rock" % probe)
+		_main.try_mine(probe)
+		rend._bake_fine_region(probe, probe)       # the exact call _process makes for a dig
+		_check(fine.last_baked_cells <= MAX_DIG_CELLS,
+			"a dig stays a SMALL region even with %d rows of fill outstanding (%d cells)"
+			% [owed, fine.last_baked_cells])
+		_check(fine.pending_rows() == owed,
+			"...and the dig did not drag the outstanding fill along with it (%d rows before, %d after)"
+			% [owed, fine.pending_rows()])
+		# NOT ASSERTED HERE, and written down so green is not misread as coverage: that the renderer never
+		# runs a dig bake and a fill slice in the SAME frame. It cannot — `_process` reaches the fill through
+		# an `elif` after the dig branch — but that is a structural argument about a file this layer does not
+		# read, not a measurement. The bounded thing above is the region bake's own extent.
+
+		# EVERY ASSERTION BELOW NEEDS A WHOLE GRID, for the transparent-vs-painted reason given above.
+		_check(fine.finish_pending() > 0 and fine.pending_rows() == 0,
+			"finish_pending drained the outstanding fill and left the grid whole")
 		# Pick dig sites at several depths and columns. The first is a deep interior solid cell, so mining it
 		# dirties exactly one cell (no tree-fell / ore-collapse / surface shift) — the cleanest single-dig
 		# friction measurement, and the one the cost gate is timed against.

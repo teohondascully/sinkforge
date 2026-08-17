@@ -77,6 +77,13 @@ func _process(_delta: float) -> bool:
 func _judge() -> void:
 	var r: WorldRenderer = _main._renderer
 	var fine: FineTerrain = r._fine
+	# #17 made the boot bake progressive, so at SETTLE_FRAMES part of the grid is still transparent — and
+	# every sweep below SKIPS transparent cells, so an unfinished grid does not read as a grid problem, it
+	# reads as too few pairs to say anything. It failed exactly that way. This layer judges the molded rock,
+	# not boot pacing; give it a whole one. See FineTerrain.finish_pending.
+	var filled: int = fine.finish_pending()
+	if filled > 0:
+		print("  (finished %d rows of outstanding boot fill before judging)" % filled)
 	var sub: int = FineTerrain.SUBDIV
 	var fcols: int = fine._fcols
 	var frows: int = fine._frows
