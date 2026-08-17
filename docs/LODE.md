@@ -1,6 +1,7 @@
 # THE LODE — ore lives in the wall, and mining stops being a trap
 
-> **Status: PHASE 1 SHIPPED as STRIKE 38, PHASE 2a as STRIKE 39 (2026-08-16); 2b-4 SPEC.** The lode layer, the hand-work
+> **Status: PHASE 1 SHIPPED as STRIKE 38, PHASE 2a as STRIKE 39, the STARTER POCKET as STRIKE 40
+> (2026-08-16); 2b-4 SPEC.** The lode layer, the hand-work
 > verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
 > `take_lode` / `lode_fraction`, `MainView.try_work_lode`, `WorldRenderer._draw_lode` and the lode's entry
 > into `_wall_base_color` — held by `tools/check_lode.gd` (harness layer 56, 39 assertions) and photographed
@@ -18,6 +19,29 @@
 > block's matrix is within a hair of stone's (ore reads as ore because of its pale flecks), so painting the
 > wall the ore's own base colour is exactly correct and completely invisible; the wall is now the rock
 > carried 42% of the way toward the metal, which derives per material — coal stains dark, iron rusty.
+> **…but it stains in HUE, not in VALUE.** Ore's nugget is pale (v 0.85) against its matrix (v 0.34), so a
+> 42% stain of the raw colour brightened the wall by 62% and a carved pocket came out LIGHTER than the rock
+> around it — reading as more rock rather than as a hole with a face at the back of it. §11 already names the
+> rule that breaks: brightness carries ATTENTION. The mix now sets what the wall is made of and the host rock
+> keeps the say over how lit it is.
+>
+> **A vein's fullness is measured against ITSELF.** `lode_fraction` first read remaining units against
+> `DEFAULT_ORE_DEPOSIT`, which answers *how rich is this vein compared to a standard one* when the picture has
+> to answer *how much of THIS vein is left*. They come apart badly at the small end: the starter pocket holds
+> 45 units, untouched, and drew one fleck in six — a fresh vein that looked stripped, on the first face a new
+> player ever sees. `lode_max` records what each lode held when it was opened. **Extent carries richness (a
+> big body covers more wall); density carries depletion.**
+>
+> **THE STARTER POCKET (#S40).** Every spawn opens with a small sealed cave a step under the surface, an ore
+> lode showing in its back wall, and the same vein continuing richer behind the rock below it — the guaranteed
+> first FACE, standing up before the generator learns to build one. The shape took three tries and both
+> failures are load-bearing. It was **impassable**: it stepped down one row per column without keeping the row
+> above open, so the body (34px against a 32px cell, always two rows) met rock with its head at every step,
+> and the harness called it a corridor because the sim only asks whether the FLOOR is clear. And it was
+> **open to the sky**, which took four playthrough layers down at once — twice, in two different columns. The
+> plateau's surface is not spare ground: it is the corridor the opening walks AND the runway every motion
+> fixture measures on. So the cave is SEALED and visible anyway, because this game draws the ground it has not
+> dug. Getting in costs one swing at the roof, which is the whole of this document in one blow.
 >
 > **Original spec (2026-08-16).** Opened by the user's question — *"is having ores that you put drills under
 > still valuable? it's odd that you can mine an ore and it disappears, but you can drill an ore and it might
