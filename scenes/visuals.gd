@@ -61,6 +61,101 @@ static func machine_color(def: MachineDef) -> Color:
 	return Color(0.30, 0.55, 0.75)       # steel-blue — the generic processor
 
 
+## THE CASING — the body a machine is built out of, as opposed to the glyph painted on its front.
+##
+## COMPREHENSIVE_AUDIT §194 says the machines read as UI rather than hardware, and the casing is the whole
+## reason. It was a flat `draw_rect` of one colour, a dark 1.5px border, and four black dots for bolts —
+## which is, exactly and not approximately, how you draw a BUTTON. Every machine in the game was the same
+## 30x30 flat square in a different hue with an icon on it. Hue and icon are how a toolbar distinguishes its
+## entries; they are not how a world distinguishes its objects.
+##
+## What separates a drawn object from a drawn control is LIGHT. The world has a sun somewhere above it, and
+## every rock in it is shaded accordingly; the machines were lit from nowhere, so they sat on top of the
+## scene instead of in it. So this is a lighting model and almost nothing else:
+##
+##   TOP-LIT BODY.   A pale wash across the top third, a heavier shadow across the bottom quarter. Painted
+##                   as white/black at low alpha rather than by computing new colours, so every machine in
+##                   the registry keeps its own hue exactly and gets the same light for free.
+##   BEVEL.          One pixel of near-white on the top edge, one pixel of near-black on the bottom and
+##                   right. This is the entire trick behind why a lit cube reads as a cube: two edges catch
+##                   the light, two edges do not. It costs four rects.
+##   PLINTH.         A darker band across the foot, so the machine is BOLTED DOWN to the floor rather than
+##                   pasted onto it. Paired with the contact shadow the renderer already drew.
+##
+## WHY THE DETAIL TIER EXISTS. Rivets, vents and a recessed faceplate are what actually sell sheet metal —
+## and at the locked 0.50x play zoom a 32px cell is 16 screen pixels, where a 1px rivet is half a pixel of
+## grey mush and a vent slot is nothing at all. Detail below the pixel grid is not subtle, it is a cost with
+## no image attached. So the fine work draws only when it is resolvable, and the cheap tier carries the
+## whole load at play zoom, which is right on both counts: shading and silhouette are what read when small,
+## and they are also the part that fits in the frame budget on a mature base.
+static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float, col: Color,
+		active: bool, detail: bool) -> void:
+	var c: float = cell_px
+	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(c - 2.0, c - 2.0))
+	canvas.draw_rect(body, col)
+
+	# --- the light: A THIN CATCH AND A DEEP SHADOW, not a wash --------------------
+	# The first version of this lit the top THIRD with a broad pale wash, and the A/B was decisive against
+	# it: the body's mid-value climbed until it met the glyph painted on top of it, and the Drift Rig's white
+	# rails stopped separating from their own casing. Under a torch — where the world light is already
+	# multiplying everything — it read as a blown-out cream tile, which is a worse UI tile than the flat one
+	# it replaced. LEGIBILITY OUTRANKS THE LOOK, and the glyph is the part that has to be read.
+	#
+	# So the light is where light actually is on a 32px object: a couple of pixels catching it along the top,
+	# and a real shadow across the foot. The body keeps its registry colour in the middle, which is the value
+	# every glyph in the vocabulary was drawn against.
+	canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, 3.0)), Color(1.0, 0.98, 0.92, 0.07))
+	canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - c * 0.30),
+		Vector2(body.size.x, c * 0.30)), Color(0.0, 0.0, 0.02, 0.30))
+
+	# --- the bevel: two edges catch it, two do not --------------------------------
+	# A WORKING machine takes its top light warm. This is the only emissive the casing has, and it is
+	# deliberately one pixel: the glyphs already animate, and a body that pulses too would give every
+	# powered machine on screen its own heartbeat competing with the avatar.
+	var top: Color = col.lightened(0.34) if not active else col.lightened(0.34).lerp(Color(1.0, 0.86, 0.58), 0.30)
+	canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, 1.0)), top)
+	canvas.draw_rect(Rect2(body.position, Vector2(1.0, body.size.y)), col.lightened(0.16))
+	canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - 1.0), Vector2(body.size.x, 1.0)),
+		col.darkened(0.50))
+	canvas.draw_rect(Rect2(body.position + Vector2(body.size.x - 1.0, 0.0), Vector2(1.0, body.size.y)),
+		col.darkened(0.42))
+
+	# --- the plinth: this thing is bolted to the floor ----------------------------
+	canvas.draw_rect(Rect2(pos.x + 2.0, pos.y + c - 4.0, c - 4.0, 3.0), Color(0.05, 0.05, 0.07, 0.55))
+	# and the hard outline that keeps it off the rock behind it
+	canvas.draw_rect(Rect2(pos, Vector2(c, c)), Color(0.03, 0.03, 0.05, 0.85), false, 1.0)
+
+	if not detail:
+		return
+
+	# --- the tier that only exists when you can see it ----------------------------
+	# A RECESSED FACEPLATE: the glyph sits in a panel sunk into the body, which is why it reads as stamped
+	# into the machine instead of stickered onto it. The bevel runs the OTHER WAY here — dark on top, light
+	# on the bottom — because that inversion is the only thing that distinguishes a hole from a bump.
+	#
+	# The plate also does legibility work, and it is the reason the number here is 0.26 and not the 0.20 it
+	# started at: sinking the panel DARKENS the ground the glyph is drawn on, so every glyph in the
+	# vocabulary gains contrast against its own machine. The recess and the readability want the same thing.
+	var face := Rect2(pos + Vector2(5.0, 5.0), Vector2(c - 10.0, c - 10.0))
+	canvas.draw_rect(face, Color(0.0, 0.0, 0.02, 0.26))
+	canvas.draw_rect(Rect2(face.position, Vector2(face.size.x, 1.0)), Color(0.0, 0.0, 0.02, 0.38))
+	canvas.draw_rect(Rect2(face.position + Vector2(0.0, face.size.y - 1.0), Vector2(face.size.x, 1.0)),
+		col.lightened(0.22))
+
+	# VENTS: three slots cut in the lower body. Sheet metal with a hole in it is unmistakably manufactured,
+	# and this is the cheapest manufactured thing to draw.
+	for i: int in 3:
+		canvas.draw_rect(Rect2(pos.x + 6.0 + float(i) * 4.0, pos.y + c - 8.0, 2.0, 3.0),
+			Color(0.0, 0.0, 0.02, 0.42))
+
+	# RIVETS: a dark seat with a lit crown offset up-left, toward the same sun the bevel assumes. A rivet
+	# drawn as a single black dot — which is what shipped — is a hole, not a fastener.
+	for corner: Vector2 in [Vector2(4.0, 4.0), Vector2(c - 4.0, 4.0), Vector2(4.0, c - 4.0),
+			Vector2(c - 4.0, c - 4.0)]:
+		canvas.draw_circle(pos + corner, 1.4, Color(0.0, 0.0, 0.02, 0.55))
+		canvas.draw_circle(pos + corner - Vector2(0.4, 0.4), 0.7, col.lightened(0.40))
+
+
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,
 ## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation — a gear
 ## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.

@@ -575,6 +575,7 @@ func _chunk_index(cell: Vector2i) -> int:
 # --- draw sequence (WORLD space; the Camera2D provides the view transform) ----
 
 func _draw() -> void:
+	_zoom = get_canvas_transform().get_scale().x   # once per frame; every zoom gate below reads this
 	# Terrain + background walls + the smoothed surface are STATIC: drawn by the chunked terrain canvases
 	# (below this, z -10) and repainted only on the DIG'd chunk. This per-frame pass draws ONLY the live/
 	# sparse content (machines, items, conduits, cursor) — no full-world cell loop.
@@ -2307,13 +2308,25 @@ func _draw_crumble() -> void:
 ## zoom of 0.70 (the inspect level) gives a canvas scale of 0.70. Threshold below 0.70, above 0.50.
 const TEXT_ZOOM: float = 0.65
 
+## The zoom at/above which a machine's FINE casing detail — rivets, vent slots, the recessed faceplate —
+## is resolvable enough to be worth drawing. Same reasoning as TEXT_ZOOM and a different threshold, because
+## a rivet stops being a rivet before a label stops being a label: at the locked 0.50x default a 32px cell
+## covers 16 screen pixels, and a 1.4px rivet in it is under a pixel of grey. What carries the machines at
+## play zoom is the shading and the silhouette, which the cheap tier draws unconditionally.
+const DETAIL_ZOOM: float = 0.62
+
+## The canvas scale for THIS frame, read once in `_draw` instead of once per machine. `get_canvas_transform`
+## is a server round-trip and the machine loop called it twice per machine — once for the label gate and
+## again for the detail gate would have made it three times, on the pass that already owns the frame budget.
+var _zoom: float = 1.0
+
 
 ## Should this machine's TEXT decorations draw? Yes when zoomed in enough to read them, OR when it's the
 ## machine the player is aiming at (so pointing at any box always reads its label/status, even zoomed out).
 func _text_visible(cell: Vector2i) -> bool:
 	if cell == _aim:
 		return true
-	return get_canvas_transform().get_scale().x >= TEXT_ZOOM
+	return _zoom >= TEXT_ZOOM
 
 
 ## Is this drill standing ON a lode — i.e. a Head boring into the back wall rather than down through rock?
@@ -2368,12 +2381,8 @@ func _draw_machine(machine: MachineState) -> void:
 			"spur" if machine.def.behavior == &"spur" else "collar", 1.0, active, clock, false,
 			sim.lode_fraction(machine.cell))
 	else:
-		var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(CELL - 2.0, CELL - 2.0))
-		draw_rect(body, Visuals.machine_color(machine.def))
-		draw_rect(body, Color(0.04, 0.04, 0.06, 0.8), false, 1.5)  # darker inset casing
-		for corner: Vector2 in [Vector2(4, 4), Vector2(CELL - 4, 4), Vector2(4, CELL - 4),
-				Vector2(CELL - 4, CELL - 4)]:
-			draw_circle(pos + corner, 1.0, Color(0.0, 0.0, 0.0, 0.5))  # bolts
+		Visuals.draw_machine_casing(self, pos, float(CELL), Visuals.machine_color(machine.def),
+			active, _zoom >= DETAIL_ZOOM)
 		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock,
 			machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
