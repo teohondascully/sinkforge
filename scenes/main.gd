@@ -50,6 +50,21 @@ const ZOOM_LEVELS: Array[float] = [1.00, 0.70, 0.50, 0.33]
 var _zoom_idx: int = 0
 const WORLD_SEED: int = 1337       ## the default gen seed (the title screen can reroll it — #6)
 
+
+## The seed a boot uses when nothing has picked one — WORLD_SEED, unless SF_SEED names another.
+##
+## The env override exists because every feel floor in this project measures seed 1337 and nothing else.
+## Every screenshot, play-test, capture and richness reading in the repo's history is ONE world, so a
+## change that leaves 1337 pleasant and 4242 barren passes the entire harness. Routing the default through
+## here means a seed corpus re-runs the REAL layers with their REAL floors on other worlds, instead of
+## re-implementing the measurements somewhere they could drift.
+##
+## Deliberately consulted only when no explicit seed was chosen: `boot_seed` (the title screen, a save
+## being restored) always wins, so this can never overwrite a seed the player or a save actually picked.
+static func default_seed() -> int:
+	var env: String = OS.get_environment("SF_SEED")
+	return int(env) if env.is_valid_int() else WORLD_SEED
+
 ## --- THE TITLE / NEW-GAME screen -------------------------------------------
 ## Opens on a REAL boot only: every harness fixture and play-test launches with `--script`, which
 ## suppresses it — so scripted drivers land in the live world instantly and ZERO fixtures change.
@@ -660,7 +675,7 @@ const WorldSeeder := preload("res://scenes/world_seeder.gd")
 
 func _seed_world() -> void:
 	var gen: WorldGen = LayeredWorldGen.new()
-	var seed: int = MainView.boot_seed if MainView.boot_seed >= 0 else WORLD_SEED   # the title's pick (#6)
+	var seed: int = MainView.boot_seed if MainView.boot_seed >= 0 else default_seed()   # title's pick (#6)
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, seed)
 	sim.load_world(world)   # …which stamps `sim.world_seed`, the single authority from here on
 	WorldSeeder.seed_tutorial(sim, dev_start)

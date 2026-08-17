@@ -181,9 +181,11 @@ func _transactional_restore() -> void:
 	# and thirteen others with no guard, AFTER it had already assigned `sim.world_seed`. An envelope
 	# missing any one of them therefore errored PART WAY IN, leaving the live game with a new seed and
 	# old terrain. Each required key is removed in turn and the sim is fingerprinted after every attempt.
+	var ablated: int = 0
 	for key: String in SaveGame.REQUIRED_KEYS:
 		if key == "version":
 			continue
+		ablated += 1
 		var holed: Dictionary = SaveGame.capture(_world(66))
 		holed.erase(key)
 		var refused: bool = not SaveGame.restore(live, holed)
@@ -198,6 +200,14 @@ func _transactional_restore() -> void:
 		# test tell the two guards apart.
 		_check(SaveGame.last_invalid == "missing key: %s" % key,
 			"…caught by the presence gate, not by an index into a hole (reason: %s)" % SaveGame.last_invalid)
+
+	# The ablation above is driven BY SaveGame.REQUIRED_KEYS, which is also the thing it is testing. Empty
+	# that constant and the production presence-gate and this entire loop vanish together, silently, green.
+	# A floor is the difference between "every required key is gated" and "there are no required keys".
+	# 13 today (REQUIRED_KEYS is 14, less "version" which is skipped). The floor is 10, not 13: dropping a
+	# key or two from the envelope is a legitimate schema change and should not turn this red, while gutting
+	# the list -- the case that makes both guards evaporate -- cannot get past it.
+	_check(ablated >= 10, "the ablation really ran, over the whole required-key set (%d of 13)" % ablated)
 
 	# …and a well-formed one still goes in, so the refusals above are not just "restore never works".
 	_check(SaveGame.restore(live, SaveGame.capture(_world(77))), "a complete envelope restores")

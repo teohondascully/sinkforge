@@ -113,6 +113,11 @@ func _working(mat: StringName, each: int, span: int = 3) -> Vector2i:
 func _the_trap_is_gone() -> void:
 	var total_before: int = 0
 	var total_after: int = 0
+	# The per-bit assertions below already refuse a vacuous pass (no blow landed => red). The LOOP itself
+	# needs the same treatment: drive it from BIT_RECIPES and an empty BIT_RECIPES skips every one of them,
+	# leaving the summary assertion comparing 0 to 0 and printing green. 4 bits today.
+	_check(BitRules.BIT_RECIPES.size() >= 3,
+		"there is a bit set to swing at all (%d bits)" % BitRules.BIT_RECIPES.size())
 	for bit: StringName in BitRules.BIT_RECIPES.keys():
 		var face: Vector2i = _working(&"ore", 60, 3)
 		_sim.inventory[bit] = 1
