@@ -200,6 +200,20 @@ func _run() -> void:
 	# yet would be a floor invented before the measurement, which is the error this file already made once.
 	print("  rock spread: %s" % _shape(rock_v))
 	print("  air  spread: %s" % _shape(air_v))
+
+	# THE PARTITION, PRINTED EVERY RUN AND ASSERTED ON NEVER. Declared before rock stops being one thing,
+	# so that when a contact treatment lands the global number cannot move for two reasons at once. Read it
+	# as a baseline: today all four arms should sit close together, because nothing in the renderer yet
+	# distinguishes a boundary rock cell from an interior one. The day they separate is the day the
+	# treatment is doing something, and this line is what will say so.
+	var arms: Array = [["plain interior", s["rock_pi"]], ["plain BOUNDARY", s["rock_pe"]],
+		["stained interior", s["rock_si"]], ["stained BOUNDARY", s["rock_se"]]]
+	print("  rock partition (diagnostic only — the verdict above is the pooled global measure):")
+	for a: Array in arms:
+		var arr: Array[float] = a[1]
+		print("    %-18s n=%4d  median %6.2f  vs air %.0f%%%s"
+			% [a[0], arr.size(), _median(arr), _readability(arr, air_v) * 100.0,
+				"" if arr.size() >= MIN_SAMPLES else "   [below the %d floor — no conclusion]" % MIN_SAMPLES])
 	print("  sampled rows: rock median %d, air median %d (the two populations should be looking at the"
 		% [int(_median(s["rock_row"])), int(_median(s["air_row"]))]
 		+ " same depths; far apart means they are not the same picture)")
@@ -243,6 +257,11 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 
 	var rock_value: Array[float] = []
 	var air_value: Array[float] = []
+	# The 2x2 declared above: {plain, stained} x {interior, edge}. Diagnostic arms, never the verdict.
+	var rock_pi: Array[float] = []      # plain interior
+	var rock_pe: Array[float] = []      # plain, touching air
+	var rock_si: Array[float] = []      # lode-stained interior
+	var rock_se: Array[float] = []      # lode-stained, touching air
 	var rock_grain: Array[float] = []
 	var air_grain: Array[float] = []
 	var rock_row: Array[float] = []
@@ -292,6 +311,33 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 				rock_value.append(stat.x)
 				rock_grain.append(stat.y)
 				rock_row.append(float(cy))
+				# THE PARTITION IS DECLARED BEFORE ROCK STOPS BEING ONE THING, which is the whole point of
+				# it existing today rather than the day it matters. This layer draws its solid population at
+				# random from rock and treats it as homogeneous. It already is not: c2's lode pass stains
+				# 378 buried cells through their host rock. And the 6b fix under consideration — a contact
+				# rim or shadow in the rock's LAST ROW — would deliberately make boundary rock look unlike
+				# interior rock, across EVERY rock/air face in the world rather than 378 cells.
+				#
+				# If that treatment landed while this layer still sampled "rock" as one population, the next
+				# reading would move for two reasons at once and nothing could separate them — and the
+				# failure would be SILENT, because the number would move in the direction we hoped for.
+				# c2 raised this pointed at my own fix; it is the same catch I made on their lode change,
+				# handed back.
+				#
+				# A 2x2 rather than a precedence order, because a stained boundary cell is genuinely both
+				# and any ranking of the two would be invented. Diagnostic only: the VERDICT stays on the
+				# pooled measure, because 6a's pre-registration says 6a closes on the global number and
+				# reporting arms must not become a way to find a greener one.
+				var stained: bool = main.sim.lode.has(c)
+				var edge: bool = _touches_air(main.sim, c)
+				if stained and edge:
+					rock_se.append(stat.x)
+				elif stained:
+					rock_si.append(stat.x)
+				elif edge:
+					rock_pe.append(stat.x)
+				else:
+					rock_pi.append(stat.x)
 			elif main.sim.water_at(c) > 0:
 				# THE THIRD THING, and finding it is why the air population was bimodal. `is_solid` is
 				# `solid.has(cell)` and water lives in a SEPARATE dictionary, so a flooded cell is
@@ -310,7 +356,26 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 
 	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain,
 		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
+		"rock_pi": rock_pi, "rock_pe": rock_pe, "rock_si": rock_si, "rock_se": rock_se,
 		"skipped": near_surface + lit + offslab}
+
+
+## Does this solid cell have a face onto open air? The property a contact rim would change, and therefore
+## the axis this layer's rock population is about to split along.
+##
+## Water is not air for this purpose. A rock face onto a flooded cell is a rock/water contact, which is
+## check_water_reads' subject and looks nothing like a rock/void one — counting it here would put a third
+## kind of cell into the "boundary" arm and reintroduce, inside the fix, exactly the heterogeneity the fix
+## exists to expose. (6a already learned this once: flooded cells counted as air gave the air population
+## two homes.)
+func _touches_air(sim: FactorySim, c: Vector2i) -> bool:
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var n: Vector2i = c + d
+		if n.x < 0 or n.y < 0 or n.x >= FactorySim.GRID_COLS or n.y >= FactorySim.GRID_ROWS:
+			continue
+		if not sim.is_solid(n) and sim.water_at(n) <= 0:
+			return true
+	return false
 
 
 ## Mean luminance and standard deviation over a square patch — x is VALUE, y is GRAIN.
