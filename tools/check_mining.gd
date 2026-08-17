@@ -95,13 +95,25 @@ func _run() -> void:
 		_sim.set_solid(Vector2i(x, row), &"stone")            # a fresh solid wall
 	_main._player.position = _main._cell_center(Vector2i(wcol - 1, row))
 	var buried := Vector2i(wcol + 2, row)                     # two behind the wall face
+	# THE BRANCH THAT NEVER RAN. This was an `if LOS-blocked … else …`, and `_effective_aim` snaps the aim
+	# to an exposed face, so the condition was false on every run: the LOS arm — the actual regression
+	# guard, the one whose label names the phantom-crack loop — was dead code, and the layer quietly
+	# asserted the other property instead. A check whose subject depends on a runtime branch reports on
+	# whichever half happened to hold, which is not a check.
+	#
+	# Both halves are true and neither needs the other's permission, so both are stated outright.
+	_check(_sim.is_solid(buried) and not _main._line_of_sight_clear(_main._body_cell(), buried),
+		"the staged block really is solid AND line-of-sight blocked (the setup is what it claims)")
+	# 1. THE PREDICATE the hold-gate reads, asked directly about a buried cell.
+	_check(not _main._mineable(buried),
+		"a LOS-blocked block is never 'mineable' → the hold-gate won't charge it (no phantom crack loop)")
+	# 2. THE AIM PATH, as an invariant rather than a case analysis: whatever `_effective_aim` hands back,
+	# it may never be a SOLID the gate would charge and then refuse to break. That IS the phantom-crack
+	# state, and saying it once covers both of the arms this used to choose between.
 	var eff: Vector2i = _main._effective_aim(_main._cell_center(buried))
-	if _sim.is_solid(eff) and not _main._line_of_sight_clear(_main._body_cell(), eff):
-		_check(not _main._mineable(eff),
-			"a LOS-blocked block is never 'mineable' → the hold-gate won't charge it (no phantom crack loop)")
-	else:
-		_check(_main._mineable(eff),
-			"the aim snapped to an exposed face → you dig the PATH toward the buried block (no phantom)")
+	_check(not _sim.is_solid(eff) or _main._mineable(eff),
+		"the effective aim is never a solid that would crack forever (eff=%s, %s)"
+			% [eff, "open" if not _sim.is_solid(eff) else "mineable"])
 
 	_run_dig_queue(row)
 

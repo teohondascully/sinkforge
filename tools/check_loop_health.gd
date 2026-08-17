@@ -129,15 +129,39 @@ func _run() -> void:
 
 	print("  arc: completed=%s steps=%d  |  frames=%d par=%d pace=%.2fx stalls=%d guidance_gap=%d/%d frames"
 		% [completed, step_count, frames, par, pace, stalls, _guidance_gap_frames, _sampled_frames])
-	print("  penalties: pace=-%.1f (cap %.0f) friction=-%.1f (cap %.0f) guidance=-%.1f (cap %.0f)  =>  LOOP-HEALTH SCORE = %.1f / 100"
-		% [pace_pen, PACE_PEN_CAP, friction_pen, FRICTION_PEN_CAP, guidance_pen, GUIDANCE_PEN_CAP, score])
+	# THE SCORE IS N/A ON AN INCOMPLETE ARC, and the reason is not fastidiousness. `pace` is elapsed frames
+	# over FULL-RUN par, so an arc that dead-ends at step 3 elapses very few frames and scores as
+	# gloriously fast — the earlier it fails, the better it looks. This layer printed **98.6 / 100** for a
+	# run whose arc never completed and whose process exited 1, and that number was then read as evidence
+	# that a worktree was ready to merge. Raw diagnostics stay (they are what you debug from); the scalar
+	# is withheld, because a scalar computed from a truncated run is not a small error, it is backwards.
+	print("  penalties: pace=-%.1f (cap %.0f) friction=-%.1f (cap %.0f) guidance=-%.1f (cap %.0f)  =>  LOOP-HEALTH SCORE = %s"
+		% [pace_pen, PACE_PEN_CAP, friction_pen, FRICTION_PEN_CAP, guidance_pen, GUIDANCE_PEN_CAP,
+			("%.1f / 100" % score) if completed else "N/A — the arc did not complete"])
 
 	# GATE first: an incomplete arc is a hard fail regardless of the number (the loop dead-ended).
 	_check(completed, "the first-automation arc COMPLETES (the loop is playable to its first goal)")
-	_check(pace_pen <= PACE_PEN_CAP, "pace penalty within cap (-%.1f <= %.0f)" % [pace_pen, PACE_PEN_CAP])
-	_check(friction_pen <= FRICTION_PEN_CAP, "friction penalty within cap (-%.1f <= %.0f)" % [friction_pen, FRICTION_PEN_CAP])
-	_check(guidance_pen <= GUIDANCE_PEN_CAP, "guidance-gap penalty within cap (-%.1f <= %.0f)" % [guidance_pen, GUIDANCE_PEN_CAP])
-	_check(score >= SCORE_FLOOR, "LOOP-HEALTH SCORE %.1f >= floor %.1f" % [score, SCORE_FLOOR])
+
+	# THESE THREE USED TO READ `clampf(x, 0.0, CAP) <= CAP`. That is not a test, it is the definition of
+	# clampf — three assertions that could not fail, inflating the pass count and making the layer look
+	# like it watched three things it never watched. What a cap actually hides is SATURATION: a component
+	# pinned at its ceiling has stopped measuring, the total is being carried by the other two, and the
+	# score can still clear the floor while one whole dimension of the loop is as bad as it is allowed to
+	# get. So the question is not "is it within the cap" (always) but "has it hit the cap" (a real event).
+	# Current margins on main are wide — pace 0.0, friction 0.9, guidance 0.4 against caps of 25/25/40 —
+	# so these bite only on a genuine collapse.
+	_check(pace_pen < PACE_PEN_CAP,
+		"the pace penalty is not SATURATED (-%.1f of %.0f) — the run is not simply over budget"
+			% [pace_pen, PACE_PEN_CAP])
+	_check(friction_pen < FRICTION_PEN_CAP,
+		"the friction penalty is not SATURATED (-%.1f of %.0f) — the body is not stuck for the whole arc"
+			% [friction_pen, FRICTION_PEN_CAP])
+	_check(guidance_pen < GUIDANCE_PEN_CAP,
+		"the guidance penalty is not SATURATED (-%.1f of %.0f) — the game is not silent about what to do next"
+			% [guidance_pen, GUIDANCE_PEN_CAP])
+	_check(completed and score >= SCORE_FLOOR,
+		"LOOP-HEALTH SCORE %s >= floor %.1f"
+			% [("%.1f" % score) if completed else "N/A", SCORE_FLOOR])
 
 	agent.main.queue_free()
 	await physics_frame

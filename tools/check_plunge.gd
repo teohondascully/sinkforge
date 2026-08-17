@@ -120,8 +120,15 @@ func _run() -> void:
 	var purchase: float = float(roped["bit"]) / maxf(float(roped["shots"]), 1.0)
 	_check(roped["rows"] >= TARGET_ROWS,
 		"the hole GOES somewhere (%d rows, asked for %d)" % [roped["rows"], TARGET_ROWS])
-	_check(roped["mines"] == 0,
-		"...and going down it costs no digging (%d blocks broken)" % roped["mines"])
+	# THIS USED TO ASSERT `roped["mines"] == 0`, and `_ride` never presses mine — its own docstring says
+	# "Nothing is mined and nothing is placed". So the number was zero because of how the fixture was
+	# written, not because of anything the game does, and the sentence it was standing behind ("going down
+	# costs no digging") was already fully carried by the rows assertion above: the body got TARGET_ROWS
+	# down without ever mining. The real claim is about the ROCK — you fall through the hole the generator
+	# cut, and it is still there afterwards, which is what makes it a route rather than a thing you carve.
+	_check(bool(roped["untouched"]) and int(roped["rock"]) > 1000,
+		"...and the %d cells of rock around it are untouched by the trip — the hole was already there"
+			% int(roped["rock"]))
 	_check(speedup >= SPEEDUP_FLOOR,
 		"...and it is worth walking to (%.1fx the shaft, floor %.1fx)" % [speedup, SPEEDUP_FLOOR])
 	_check(purchase >= PURCHASE_FLOOR,
@@ -164,6 +171,11 @@ func _ride(with_rope: bool) -> Dictionary:
 		return {}
 
 	var start_row: int = main._cell_at(p.position).y
+	# THE ROCK AS IT WAS, before a single frame of the descent. `agent.mines` counts mine calls the DRIVER
+	# made, and this driver never makes any — so an assertion on it says something about the fixture and
+	# nothing about the world. This says something about the world: whatever happened on the way down and
+	# back, the terrain is the terrain the generator laid.
+	var rock_before: Dictionary = sim.solid.duplicate()
 	var frames: int = 0
 	var deepest: int = start_row
 	var shots: int = 0
@@ -222,6 +234,7 @@ func _ride(with_rope: bool) -> Dictionary:
 	var out := {
 		"rows": deepest - start_row, "frames": frames - probed, "mines": agent.mines,
 		"mouth": lip, "shots": shots, "bit": bit, "hops": hops, "back": back,
+		"rock": rock_before.size(), "untouched": rock_before == sim.solid,
 	}
 	main.queue_free()
 	await physics_frame

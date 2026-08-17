@@ -84,8 +84,32 @@ func _field() -> void:
 	_check(density >= MIN_DENSITY and density <= MAX_DENSITY,
 		"between %.0f%% and %.0f%% of the rock is grained" % [MIN_DENSITY * 100.0, MAX_DENSITY * 100.0])
 
-	var probe := Vector2i(37, 61)
-	_check(Seams.at(probe, seed) == Seams.at(probe, seed), "a cell's seam is stable when asked twice")
+	# THIS READ `Seams.at(probe, seed) == Seams.at(probe, seed)` — the identical call on both sides of the
+	# equals, at one hand-picked cell. It could only have failed for a function that answered two adjacent
+	# invocations differently, and it would have passed just as cheerfully for a `Seams.at` that returned
+	# NONE for the entire world. The property its label claims is PURITY: the answer depends on (cell,
+	# seed) and on nothing else — not on call order, not on what was asked before it. So take a spread of
+	# cells, keep the answers, then ask again in REVERSE order with a different seed interleaved between
+	# every pair, which is where a memo on "the last seed I was given" would die.
+	var probes: Array[Vector2i] = []
+	var first: Array[int] = []
+	for i: int in range(0, 96):
+		var c := Vector2i((i * 7 + 5) % FactorySim.GRID_COLS, (i * 11 + 3) % FactorySim.GRID_ROWS)
+		probes.append(c)
+		first.append(Seams.at(c, seed))
+	var grained_probes: int = 0
+	for f: int in first:
+		if f != Seams.NONE:
+			grained_probes += 1
+	_check(grained_probes > 0 and grained_probes < first.size(),
+		"the probe spread caught both grained and plain rock (%d of %d) — there is something to compare"
+			% [grained_probes, first.size()])
+	var stable: bool = true
+	for j: int in range(probes.size() - 1, -1, -1):
+		Seams.at(probes[j], seed + 1)      # another seed between every pair
+		if Seams.at(probes[j], seed) != first[j]:
+			stable = false
+	_check(stable, "a cell's seam is the same answer re-asked out of order with another seed in between")
 	var differs: int = 0
 	for y: int in range(0, 64):
 		if Seams.at(Vector2i(3, y), seed) != Seams.at(Vector2i(3, y), seed + 1):

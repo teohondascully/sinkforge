@@ -97,12 +97,19 @@ func _initialize() -> void:
 
 	# --- SAME SHAPE EVERYWHERE (fix #4). Away from a Bazaar only the VERBS are gated. ---
 	var at_stall: Dictionary = hud._bazaar_geometry()
+	var rows_at_stall: int = hud.bazaar_row_count()
 	hud.can_craft = false
 	var in_a_shaft: Dictionary = hud._bazaar_geometry()
 	_assert_fits(hud, canvas, "no-bazaar")
 	_check(at_stall["origin"] == in_a_shaft["origin"] and is_equal_approx(at_stall["h"], in_a_shaft["h"]),
 		"the panel is the same size and place away from a Bazaar as at one")
-	_check(hud.bazaar_row_count() >= 0, "…and the counter still lists its rows down a shaft")
+	# THIS ASSERTION USED TO READ `bazaar_row_count() >= 0`. A row count is an integer count; it is never
+	# negative; the check could not fail, and it was the only thing standing behind the claim its own
+	# label made. The property that sentence is actually about is that the list does not SHRINK when the
+	# verbs gate — away from a Bazaar you still READ everything it would sell you, you just cannot buy it
+	# here, which is what makes the screen the same screen in both places.
+	_check(rows_at_stall > 0 and hud.bazaar_row_count() == rows_at_stall,
+		"…and the counter lists the SAME %d rows down a shaft — only the verbs gate" % rows_at_stall)
 	hud.can_craft = true
 
 	# --- THE CURSOR walks both columns and never leaves the list. ---
