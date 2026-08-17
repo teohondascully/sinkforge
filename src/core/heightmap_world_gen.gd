@@ -150,8 +150,19 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 ## minute, which is the case the beds and the hints actually live in.
 ##
 ## It costs nothing to hand out: only constants and the static `terrace`, so it needs no instance, no
-## seed, no retained heightmap and no save field, and it stays correct on a world loaded from disk with
-## its generator long gone. Seven consumers outside this file needed it and could not have it —
+## seed and no retained heightmap.
+##
+## KNOW WHAT IT IS NOT: it RECOMPUTES the ground, it does not remember it. The generated surface is never
+## persisted — `generate` builds a `surface` array and drops it on the floor, and nothing in the save
+## format carries it. So this is the right answer for a loaded world only while the constants it reads are
+## the ones that world was BUILT with. Change FLAT_SURFACE_ROW, the relief amplitudes, or `terrace`, and
+## every save written before the change gets an answer describing terrain it does not have — silently, and
+## most visibly wherever the two are differenced (a depth that reads high or negative on old ground). That
+## is a real cost and it is the price of not persisting; it is worth paying while the surface is
+## seed-independent and worth revisiting the moment it is not. If a future generator makes the surface
+## seeded, this function cannot follow it and the array `generate` currently discards has to be kept.
+##
+## Seven consumers outside this file needed it and could not have it —
 ## `FineTerrain.walked_surface`, `check_relief` and `play_tests` each invented a private threshold (three
 ## numbers for one bound), and `test_worldgen` reached through the underscore five times with a comment
 ## noting it is seed-independent. That is what a private answer everybody needs looks like.
