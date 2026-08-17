@@ -9,6 +9,7 @@ extends "res://tests/test_base.gd"
 func _initialize() -> void:
 	print("== worldgen tests ==")
 	_test_terrain()
+	_test_ground_survives_digging()
 	_test_surface_silhouette()
 	_test_surface_walkable()
 	_test_worldgen()
@@ -18,6 +19,59 @@ func _initialize() -> void:
 	_test_rich_ore()
 	_test_fine_terrain()
 	_finish("worldgen tests")
+
+
+## THE GROUND STAYS WHERE IT WAS WHEN YOU DIG — the property `FactorySim.surface_row` cannot have and
+## `HeightmapWorldGen.ground_row` exists to provide.
+##
+## `surface_row` scans from row 0 for the first solid cell. On a generated, untouched world that IS the
+## ground, which is why it reads as the surface authority and why consumers kept picking it up. Sink a
+## shaft and it starts reporting the floor under your own boots, so every `body.y - surface_row(body.x)`
+## in the codebase collapses to about -1 REGARDLESS OF DEPTH. Two shipped consumers computed exactly that:
+## the ambience crossfade (full surface wind, no cave bed and no drips, at the bottom of a hole you dug)
+## and the GRAPPLE hint, which fires at 10 "rows below the local surface that make the climb a real trip"
+## and so could not be reached by climbing down.
+##
+## The depths here are the boundary case ON PURPOSE. A pad column's ground is FLAT_SURFACE_ROW (20) and
+## SURFACE_ROW_MAX is 31, so an eleven-row shaft floors at exactly 31 — still inside the legal ground band.
+## That is the case `FineTerrain.walked_surface` is blind to by construction (it can only reject answers
+## that leave the band, so it catches the forty-row rift and not the shaft you dug this minute), and it is
+## the same eleven rows that put the body one row past the hint threshold. One dig, both claims.
+func _test_ground_survives_digging() -> void:
+	print("- ground survives digging")
+	var sim: FactorySim = FactorySim.new()
+	sim.load_world(LayeredWorldGen.new().generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337))
+	var col: int = (HeightmapWorldGen.BASE_PAD_START + HeightmapWorldGen.BASE_PAD_END) / 2
+	var ground: int = HeightmapWorldGen.ground_row(col)
+	_check(ground == HeightmapWorldGen.FLAT_SURFACE_ROW, "a pad column's ground is the flat row (%d)" % ground)
+	_check(sim.surface_row(col) == ground,
+		"BEFORE digging the two authorities agree — which is how the wrong one got adopted")
+
+	var shaft: int = 11
+	for row: int in range(ground, ground + shaft):
+		sim.mine(Vector2i(col, row))
+	var body: int = ground + shaft - 1                  # standing on the floor of what we just dug
+
+	_check(HeightmapWorldGen.ground_row(col) == ground, "ground_row is unmoved by the shaft")
+	_check(sim.surface_row(col) == ground + shaft,
+		"surface_row followed the body down to the shaft floor (%d)" % sim.surface_row(col))
+	_check(body - HeightmapWorldGen.ground_row(col) == shaft - 1, "depth off the ground reads the real 10")
+	_check(body - sim.surface_row(col) < 0,
+		"depth off surface_row reads NEGATIVE eleven rows down — the defect, pinned so it cannot return")
+
+	# The consumer thresholds, both sides. These are the two shipped bugs stated as assertions.
+	_check(body - HeightmapWorldGen.ground_row(col) >= Hints.DEPTH_HINT_ROWS, "the GRAPPLE hint can fire")
+	_check(body - sim.surface_row(col) < Hints.DEPTH_HINT_ROWS, "...and off surface_row it never could")
+	_check(clampf(1.0 - float(body - HeightmapWorldGen.ground_row(col)) / 4.0, 0.0, 1.0) == 0.0,
+		"the wind bed is silent at the bottom of the shaft")
+	_check(clampf(1.0 - float(body - sim.surface_row(col)) / 4.0, 0.0, 1.0) == 1.0,
+		"...and off surface_row it was at FULL surface wind down there")
+
+	# And why the existing band guard was not already catching this: the shaft floor is legal ground.
+	_check(sim.surface_row(col) <= HeightmapWorldGen.SURFACE_ROW_MAX,
+		"the shaft floor is still inside the legal ground band")
+	_check(FineTerrain.walked_surface(sim.surface_row(col)) != FineTerrain.NO_SURFACE,
+		"walked_surface accepts the shaft floor as ground — it rejects rifts, not shafts")
 
 
 ## Terrain is authoritative world state: solid cells block placement, mining clears them, and the
@@ -219,7 +273,7 @@ func _test_layered_worldgen() -> void:
 	var solid_below: int = 0
 	var hm := HeightmapWorldGen.new()
 	for col: int in cols:
-		var top: int = hm._surface_row(col)
+		var top: int = hm.ground_row(col)
 		for row: int in range(top, rows):
 			var cell: Vector2i = Vector2i(col, row)
 			if not a.blocks.has(cell) and a.walls.has(cell):
@@ -306,7 +360,7 @@ func _test_layered_worldgen() -> void:
 		if lvl < 1 or lvl > FactorySim.WATER_MAX:
 			bad_level += 1
 		# DEEP + BASE-SAFE: every watered cell sits below its column's base-safe band, never near the surface.
-		if wc.y < hm._surface_row(wc.x) + LayeredWorldGen.CAVE_MIN_DEPTH:
+		if wc.y < hm.ground_row(wc.x) + LayeredWorldGen.CAVE_MIN_DEPTH:
 			near_surface += 1
 		# NO watered cell is also solid rock (water only lives in the cells the aquifer pass carved open).
 		if a.blocks.has(wc):
@@ -377,8 +431,8 @@ func _test_layered_worldgen() -> void:
 func _test_worldgen_fuzz() -> void:
 	print("- worldgen fuzz (seeds × sizes)")
 	var gen := LayeredWorldGen.new()
-	# _surface_row is seed/size-independent; a fresh heightmap gen gives us the same surface authority the
-	# generator uses internally (base-safe band = _surface_row(col) + CAVE_MIN_DEPTH).
+	# ground_row is seed/size-independent; a fresh heightmap gen gives us the same surface authority the
+	# generator uses internally (base-safe band = ground_row(col) + CAVE_MIN_DEPTH).
 	var hm := HeightmapWorldGen.new()
 
 	var seeds: Array[int] = [0, 1, 7, 42, 1337, 99999, 20260807, 314159, 2, 123456789, 555, 88888]
@@ -430,7 +484,7 @@ func _test_worldgen_fuzz() -> void:
 			# never sit within CAVE_MIN_DEPTH of the column surface — the spawn base stays solid + dry.
 			if basesafe_fail == "":
 				for col: int in cols:
-					var top: int = hm._surface_row(col)
+					var top: int = hm.ground_row(col)
 					var safe_bottom: int = top + LayeredWorldGen.CAVE_MIN_DEPTH   # first cave-eligible row
 					for row: int in range(top, mini(safe_bottom, rows)):
 						var cell := Vector2i(col, row)
@@ -470,7 +524,7 @@ func _test_worldgen_fuzz() -> void:
 					water_level_fail = "%s water level %d at %s out of 1..%d" \
 						% [tag, lvl, str(wc), FactorySim.WATER_MAX]
 				# --- 5. WATER DEEP: below the base-safe band AND at/below the deep aquifer band. ---
-				var wtop: int = hm._surface_row(wc.x)
+				var wtop: int = hm.ground_row(wc.x)
 				if wc.y < wtop + LayeredWorldGen.CAVE_MIN_DEPTH and water_deep_fail == "":
 					water_deep_fail = "%s water at %s within base-safe band (surface=%d)" % [tag, str(wc), wtop]
 				if wc.y < LayeredWorldGen.AQUIFER_MIN_ROW and water_deep_fail == "":

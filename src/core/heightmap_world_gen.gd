@@ -83,7 +83,7 @@ const SCARP_SPAN: int = 2            ## columns the face takes to fall — 2 kee
 const FLAT_SURFACE_ROW: int = 20
 
 ## THE BAND THE GENERATED GROUND CAN OCCUPY, and it is a promise other code needs to be able to rely on.
-## `_surface_row` clamps into these, so no column's ground is ever outside them, on either generator —
+## `ground_row` clamps into these, so no column's ground is ever outside them, on either generator —
 ## `LayeredWorldGen extends HeightmapWorldGen`, so this bound governs both.
 ##
 ## They are public because the RENDERER has to be able to ask "is that a surface, or the floor of a hole?"
@@ -112,7 +112,7 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# reveals a background WALL of the matching rock (Terraria-style carved room), not empty void.
 	var surface: PackedInt32Array = PackedInt32Array()
 	for col: int in cols:
-		var top: int = _surface_row(col)
+		var top: int = ground_row(col)
 		surface.append(top)
 		for row: int in range(top, rows):
 			var below: int = row - top
@@ -135,10 +135,27 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	return world
 
 
+## THE GROUND OF A COLUMN — where the sky stops, for the whole codebase and not just for generation.
+##
 ## Topmost solid row for a column: flat across the spawn/forge region, gentle layered-sine hills
 ## beyond (so steps render as smooth diagonal slopes). Seed-independent for now — a future generator
 ## can make the surface seeded; the seam already supports it.
-func _surface_row(col: int) -> int:
+##
+## PUBLIC AND STATIC because this is the only truthful answer to "how far below the sky is that?" once
+## the world has been PLAYED. `FactorySim.surface_row` scans from row 0 for the first solid cell, which
+## is the same question only while the world is untouched: dig a shaft and it answers with the rock under
+## your own boots, so the depth every consumer computes from it collapses to about -1 no matter how deep
+## you are. `SURFACE_ROW_MIN/MAX` were made public for the same reason and are only half an answer — they
+## bound the band, so they can reject a rift floor forty rows down but not the ten-row shaft you dug this
+## minute, which is the case the beds and the hints actually live in.
+##
+## It costs nothing to hand out: only constants and the static `terrace`, so it needs no instance, no
+## seed, no retained heightmap and no save field, and it stays correct on a world loaded from disk with
+## its generator long gone. Seven consumers outside this file needed it and could not have it —
+## `FineTerrain.walked_surface`, `check_relief` and `play_tests` each invented a private threshold (three
+## numbers for one bound), and `test_worldgen` reached through the underscore five times with a comment
+## noting it is seed-independent. That is what a private answer everybody needs looks like.
+static func ground_row(col: int) -> int:
 	var out: int = maxi(BASE_PAD_START - col, col - BASE_PAD_END)
 	if out <= 0:
 		return FLAT_SURFACE_ROW                      # the fixtures' ground — dead flat by contract

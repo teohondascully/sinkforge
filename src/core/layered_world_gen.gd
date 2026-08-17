@@ -391,7 +391,7 @@ func _carve_caves(world: WorldData, seed: int) -> void:
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.frequency = CAVE_FREQ
 	for col: int in world.cols:
-		var top: int = _surface_row(col)
+		var top: int = ground_row(col)
 		var cave_start: int = top + CAVE_MIN_DEPTH
 		for row: int in range(cave_start, world.rows):
 			var cell: Vector2i = Vector2i(col, row)
@@ -441,7 +441,7 @@ func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
 				var cell := Vector2i(cx + dx, cy + dy)
 				if not world.in_bounds(cell):
 					continue
-				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+				if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 					continue                                  # protect the near-surface base
 				if world.blocks.has(cell):
 					world.blocks.erase(cell)                  # open; wall kept (carved room)
@@ -455,7 +455,7 @@ func _carve_tunnels(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var worms: int = maxi(3, _density_count(world, TUNNEL_PER_COL))
 	for _w: int in worms:
 		var x: float = float(rng.randi_range(2, world.cols - 3))
-		var min_row: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + 2
+		var min_row: int = ground_row(int(x)) + CAVE_MIN_DEPTH + 2
 		if min_row >= world.rows - 2:
 			continue
 		var y: float = float(rng.randi_range(min_row, world.rows - 2))
@@ -480,7 +480,7 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 			var cell: Vector2i = center + Vector2i(dx, dy)
 			if not world.in_bounds(cell):
 				continue
-			if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+			if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 				continue                                 # protect the near-surface base
 			if world.blocks.has(cell):
 				world.blocks.erase(cell)
@@ -500,7 +500,7 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 		if absf(x - float(SPAWN_COL)) < float(RIFT_SPAWN_KEEPOUT):
 			var away: float = 1.0 if x >= float(SPAWN_COL) else -1.0
 			x = clampf(float(SPAWN_COL) + away * float(RIFT_SPAWN_KEEPOUT), 5.0, float(world.cols - 6))
-		var top: int = _surface_row(int(x)) + CAVE_MIN_DEPTH + rng.randi_range(2, 10)
+		var top: int = ground_row(int(x)) + CAVE_MIN_DEPTH + rng.randi_range(2, 10)
 		var length: int = rng.randi_range(RIFT_MIN_LEN, RIFT_MAX_LEN)
 		var drift: float = rng.randf_range(-RIFT_WANDER, RIFT_WANDER)
 		var phase: float = rng.randf_range(0.0, TAU)
@@ -518,7 +518,7 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 				var cell := Vector2i(col, row)
 				if not world.in_bounds(cell):
 					continue
-				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+				if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
 				world.blocks.erase(cell)
 				world.routes[cell] = true          # deliberate vertical structure, not undirected cave
@@ -611,7 +611,7 @@ func _drop_below(world: WorldData, col: int, ceiling: int) -> int:
 
 ## Carve one flaring shaft from a rift's ceiling up through the lid to daylight.
 func _cut_throat(world: WorldData, rng: RandomNumberGenerator, col: int, rift_top: int) -> void:
-	var sky: int = _surface_row(col)
+	var sky: int = ground_row(col)
 	if rift_top <= sky + 2:
 		return                                          # already open enough to be its own mouth
 	var x: float = float(col)
@@ -750,7 +750,7 @@ func _structural_rock(source: StringName) -> StringName:
 func _open_cells(world: WorldData) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for col: int in world.cols:
-		var top: int = _surface_row(col) + CAVE_MIN_DEPTH
+		var top: int = ground_row(col) + CAVE_MIN_DEPTH
 		for row: int in range(top, world.rows - 1):
 			var cell := Vector2i(col, row)
 			if not world.blocks.has(cell):
@@ -790,7 +790,7 @@ const PLAIN_ROCK: Array[StringName] = [&"earth", &"stone", &"shale", &"deepslate
 
 func _seed_droughts(world: WorldData, rng: RandomNumberGenerator) -> void:
 	for col: int in world.cols:
-		var top: int = _surface_row(col) + CAVE_MIN_DEPTH
+		var top: int = ground_row(col) + CAVE_MIN_DEPTH
 		var run: int = 0
 		for row: int in range(top, world.rows):
 			if not _is_plain(world, Vector2i(col, row)):
@@ -805,8 +805,8 @@ func _seed_droughts(world: WorldData, rng: RandomNumberGenerator) -> void:
 			if rng.randf() < DROUGHT_VUG_CHANCE:
 				_carve_disc(world, at, 1)
 			else:
-				var span: int = maxi(1, world.rows - _surface_row(col))
-				var depth_frac: float = float(at.y - _surface_row(col)) / float(span)
+				var span: int = maxi(1, world.rows - ground_row(col))
+				var depth_frac: float = float(at.y - ground_row(col)) / float(span)
 				var coal: bool = rng.randf() < DROUGHT_COAL_BIAS
 				var base: int = COAL_AMOUNT_BASE if coal else ORE_AMOUNT_BASE
 				var bonus: int = COAL_AMOUNT_DEPTH_BONUS if coal else ORE_AMOUNT_DEPTH_BONUS
@@ -827,7 +827,7 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 	var attempts: int = _density_count(world, ORE_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
-		var top: int = _surface_row(cx)
+		var top: int = ground_row(cx)
 		if top + 1 >= world.rows:
 			continue
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
@@ -855,7 +855,7 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedF
 	var attempts: int = _density_count(world, COAL_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
 		var cx: int = rng.randi_range(0, world.cols - 1)
-		var top: int = _surface_row(cx)
+		var top: int = ground_row(cx)
 		if top + 1 >= world.rows:
 			continue
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
@@ -960,7 +960,7 @@ func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 				if not world.in_bounds(cell):
 					continue
 				# BASE-SAFE: never within CAVE_MIN_DEPTH of the column's surface (base stays dry).
-				if cell.y < _surface_row(cell.x) + CAVE_MIN_DEPTH:
+				if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
 				# Never in the seal band (the seal is inviolate solid) and never above the deep aquifer band.
 				if cell.y < AQUIFER_MIN_ROW or (cell.y >= seal_lo and cell.y <= seal_hi):
@@ -1020,7 +1020,7 @@ func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 	for col: int in range(start, world.cols):
 		if col - last < TREE_GAP or rng.randf() > TREE_CHANCE:
 			continue
-		var ground: int = _surface_row(col)
+		var ground: int = ground_row(col)
 		if not world.blocks.has(Vector2i(col, ground)):
 			continue                                   # column has no solid surface here (cave mouth) — skip
 		var trunk: int = rng.randi_range(2, 3)

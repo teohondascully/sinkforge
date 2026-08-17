@@ -745,7 +745,12 @@ func _process(delta: float) -> void:
 		if _player != null:
 			_hints.note_in_water(_player._in_water())   # feed the body's wet state for the AQUIFER edge
 			var pc: Vector2i = _cell_at(_player.position)
-			_hints.note_depth(pc.y - sim.surface_row(pc.x))   # ...and its depth, for the GRAPPLE edge
+			# ...and its depth, for the GRAPPLE edge. Against the GENERATED ground for the same reason as
+			# the ambience bed below: the hint fires at DEPTH_HINT_ROWS, "rows below the local surface
+			# that make the climb a real trip", and `sim.surface_row` hands back the floor of the shaft
+			# you are standing in — so the number it fed could not reach 10 by digging. A hint about the
+			# climb out of your own hole was unreachable by digging a hole.
+			_hints.note_depth(pc.y - HeightmapWorldGen.ground_row(pc.x))
 			_note_rope_moments()                              # ...and the three the ROPE teaches by itself
 			# A bubble's clock only runs while you could plausibly have read it. Full stride is 232 px/s,
 			# so this sits just above a cruise: walking and reading is fine, flying and reading is not.
@@ -868,7 +873,12 @@ func _update_juice(delta: float) -> void:
 		# AMBIENCE BEDS (audio slice 2): where the body IS, heard. Wind above ground, dying within a
 		# few rows of descent; cave-air (+ intermittent drips) swelling to full ~10 rows under the
 		# surface of your column. Crossfaded inside Sfx, so climbing a shaft trades earth for sky.
-		var below: float = float(_body_cell().y - sim.surface_row(_body_cell().x))
+		# Measured against the GENERATED ground, not `sim.surface_row`. That scans for the first solid
+		# cell, so the moment you dig it starts answering with the floor of your own shaft: `below` is
+		# pinned to about -1 forever, which is full surface wind and a silent cave bed at the bottom of a
+		# forty-row hole. The bed that exists to sell descent was loudest exactly where descent had
+		# happened, and it inverted on the most ordinary action in the game.
+		var below: float = float(_body_cell().y - HeightmapWorldGen.ground_row(_body_cell().x))
 		_sfx.set_ambience(clampf(1.0 - below / 4.0, 0.0, 1.0), clampf(below / 10.0, 0.0, 1.0),
 			_player.position, delta)
 		# THE RUSH: how fast you are going, heard. Measured from RUN_SPEED up — a walk is the zero

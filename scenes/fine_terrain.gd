@@ -389,8 +389,16 @@ const SURFACE_KEEP: int = 2
 ## `_soil` keyed its humus/subsoil profile to depth below it, which painted TOPSOIL COLOUR at the foot of
 ## any shaft — the exact case its own docstring promises is "left alone entirely".
 ##
-## The bound is derived, not guessed: `HeightmapWorldGen._surface_row` clamps every column into
+## The bound is derived, not guessed: `HeightmapWorldGen.ground_row` clamps every column into
 ## [SURFACE_ROW_MIN, SURFACE_ROW_MAX], so a first-solid below that band is provably not ground.
+##
+## KNOW WHAT THIS IS AND IS NOT. It is a REJECTION test, and it can only reject what leaves the band: a
+## rift floor at row 70, yes; the ten-row shaft you dug from row 20 down to row 30, no — that answer is
+## still inside [MIN, MAX] and still comes back dressed as ground. That is the right trade for the passes
+## below, which paint, and for which the visible failure was grass eight hundred pixels underground. It is
+## the WRONG tool for anything asking *how deep am I*, because the shallow shaft is exactly the case those
+## consumers live in. Where the caller has a COLUMN rather than a row, `HeightmapWorldGen.ground_row(col)`
+## answers directly and without the hole in the middle.
 const NO_SURFACE: int = -1
 
 
