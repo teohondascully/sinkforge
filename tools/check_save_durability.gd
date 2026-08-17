@@ -190,6 +190,14 @@ func _transactional_restore() -> void:
 		var intact: bool = [live.solid.size(), int(live.inventory.get(&"ore", 0)), live.world_seed,
 			live.water.size(), live.deposits.size()] == fingerprint
 		_check(refused and intact, "an envelope missing \"%s\" is refused WHOLE — nothing was written" % key)
+		# …and refused by the PRESENCE gate specifically. Both the presence loop and the type loop under
+		# it reject a missing key, so the assertion above passes with the presence loop deleted — which
+		# makes it blind to the thing that loop is actually for. It is what refuses CLEANLY: without it
+		# the type loop indexes `data[key]` on a key that is not there, and Godot answers with an engine
+		# error per miss (measured 2026-08-17: 2 error lines became 16). Naming the reason is what lets a
+		# test tell the two guards apart.
+		_check(SaveGame.last_invalid == "missing key: %s" % key,
+			"…caught by the presence gate, not by an index into a hole (reason: %s)" % SaveGame.last_invalid)
 
 	# …and a well-formed one still goes in, so the refusals above are not just "restore never works".
 	_check(SaveGame.restore(live, SaveGame.capture(_world(77))), "a complete envelope restores")

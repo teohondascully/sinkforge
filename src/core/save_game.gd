@@ -107,24 +107,39 @@ static func capture(sim: FactorySim) -> Dictionary:
 	}
 
 
+## Why the last envelope was refused. Not diagnostics for their own sake: the PRESENCE loop below and the
+## TYPE loop under it both refuse an envelope that is missing a key, so deleting the presence loop changes
+## nothing any assertion could see — the per-key ablation in `check_save_durability` passes either way.
+## It is not redundant, though. Without it the type loop reaches `data[key2]` on a key that isn't there,
+## and Godot answers with an engine error per miss: refusing a holed save went from 2 error lines to 16
+## when the presence loop was deleted to test exactly this (2026-08-17). So the guard's real job is to
+## refuse CLEANLY, and this string is what makes that job visible to a test.
+static var last_invalid: String = ""
+
 ## Does this dictionary look like a save at all? Cheap structural gate, run on anything coming off disk
 ## BEFORE it is allowed near the sim — a truncated file decodes to null, a foreign file decodes to
 ## something without these keys, and both must be told apart from a good save without a crash.
 static func _valid_envelope(data: Dictionary) -> bool:
+	last_invalid = ""
 	if data.is_empty():
+		last_invalid = "empty"
 		return false
 	var v: int = int(data.get("version", -1))
 	if v < OLDEST_READABLE or v > VERSION:
+		last_invalid = "version %d outside [%d, %d]" % [v, OLDEST_READABLE, VERSION]
 		return false
 	for key: String in REQUIRED_KEYS:
 		if not data.has(key):
+			last_invalid = "missing key: %s" % key
 			return false
 	if not (data["machines"] is Array):
+		last_invalid = "machines is not an Array"
 		return false
 	for key2: String in REQUIRED_KEYS:
 		if key2 == "version" or key2 == "machines":
 			continue
 		if not (data[key2] is Dictionary):
+			last_invalid = "wrong type: %s" % key2
 			return false
 	return true
 
