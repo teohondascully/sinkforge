@@ -38,6 +38,84 @@ const MACHINE_STYLE: Dictionary = {
 }
 
 
+## THE STATUS VOCABULARY — what each of `FactorySim.machine_status`'s answers looks like on the machine.
+##
+## THIS EXISTS BECAUSE THE RENDERER ONLY KNEW HALF OF THEM. The sim returns ten statuses; the status lamp
+## matched on five and let the rest fall through to the grey "idle" default. So a drill whose ore had no
+## drain below it, a rig with a jammed spoil column, an unpowered crusher and a Spur wired to nothing all
+## displayed the one colour that means "nothing is wrong here" — and then fell through to the need bubble,
+## which defaults to ore, and told you to feed ore to a machine whose actual problem was that it had no
+## power. A silent wrong state is worse than a missing one: it sends you to fix something that isn't broken.
+##
+## COLOUR ALONE WAS NEVER ENOUGH ANYWAY (audit 195). Green working against red no-fuel is the single most
+## common colour confusion there is, with amber starved joining them; for a deuteranope those three lamps
+## were one lamp. So every status carries a MARK as well as a colour, and either channel alone answers it.
+##
+##   mark   the silhouette drawn in the lamp. Chosen to differ in OUTLINE rather than in detail, because
+##          detail is the first thing a four-pixel mark loses.
+##   fix    what the player would have to DO about it. This is the field with a rule attached: two statuses
+##          calling for different fixes must never share a mark, or the lamp sends you to the wrong job.
+##          Two statuses calling for the SAME fix are welcome to share one — `no_fuel` and `no_input` are
+##          both "put something in", and which something is what the need bubble is for.
+##   feeds  whether the floating need bubble — which can only draw an ITEM — is capable of telling the
+##          truth about this status. False for power, jams and wiring, where it would have to invent one.
+##
+## The three `blocked*` states deliberately look identical: the lamp's job is to name the KIND of problem,
+## and "a column behind this machine is jammed, dig it out" is one problem. Which column is the hover
+## inspector's answer, not a four-pixel dot's.
+const STATUS_LOOK: Dictionary = {
+	&"working":       {"color": Color(0.35, 0.92, 0.42), "mark": &"disc",  "fix": &"none",     "feeds": false},
+	&"idle":          {"color": Color(0.52, 0.55, 0.62), "mark": &"bar",   "fix": &"none",     "feeds": false},
+	&"spent":         {"color": Color(0.46, 0.58, 0.78), "mark": &"ring",  "fix": &"relocate", "feeds": false},
+	&"no_fuel":       {"color": Color(0.96, 0.26, 0.20), "mark": &"feed",  "fix": &"feed",     "feeds": true},
+	&"no_input":      {"color": Color(0.97, 0.72, 0.22), "mark": &"feed",  "fix": &"feed",     "feeds": true},
+	&"no_power":      {"color": Color(0.36, 0.84, 0.98), "mark": &"power", "fix": &"power",    "feeds": false},
+	&"blocked":       {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
+	&"blocked_pay":   {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
+	&"blocked_spoil": {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
+	&"unlinked":      {"color": Color(0.86, 0.40, 0.92), "mark": &"link",  "fix": &"link",     "feeds": false},
+}
+
+## The look of a status, falling back on idle's neutral bar for anything the table has not heard of. The
+## fallback is a safety net and not a licence: `check_status_reads` walks the sim's own source and fails if
+## any status it can return is missing here, so a new one is caught at the harness rather than in play.
+static func status_look(status: StringName) -> Dictionary:
+	return STATUS_LOOK.get(status, STATUS_LOOK[&"idle"])
+
+
+## Draw a status lamp's MARK — the geometry half of the redundant coding, centred at `c` with radius `r`.
+##
+##   ● disc    a full disc — complete and running
+##   ▬ bar     a bar at rest
+##   ○ ring    hollow, because the machine is fine and the vein is empty
+##   ▲ feed    pointing UP, at the need bubble it is asking for
+##   ◆ power   a diamond — the power motif, and the one mark that is neither round nor square
+##   ■ clear   a hard stop: something behind this machine is jammed
+##   ✕ link    a cross — placed, but joined to nothing
+static func draw_status_mark(canvas: CanvasItem, c: Vector2, r: float, mark: StringName,
+		col: Color) -> void:
+	match mark:
+		&"feed":
+			canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -r),
+				c + Vector2(r * 0.95, r * 0.72), c + Vector2(-r * 0.95, r * 0.72)]), col)
+		&"clear":
+			canvas.draw_rect(Rect2(c - Vector2(r, r) * 0.84, Vector2(r, r) * 1.68), col)
+		&"ring":
+			canvas.draw_arc(c, r * 0.78, 0.0, TAU, 14, col, maxf(1.0, r * 0.44))
+		&"power":
+			canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -r), c + Vector2(r, 0.0),
+				c + Vector2(0.0, r), c + Vector2(-r, 0.0)]), col)
+		&"link":
+			var a: float = r * 0.82
+			var w: float = maxf(1.2, r * 0.40)
+			canvas.draw_line(c + Vector2(-a, -a), c + Vector2(a, a), col, w)
+			canvas.draw_line(c + Vector2(-a, a), c + Vector2(a, -a), col, w)
+		&"bar":
+			canvas.draw_rect(Rect2(c - Vector2(r * 0.92, r * 0.32), Vector2(r * 1.84, r * 0.64)), col)
+		_:
+			canvas.draw_circle(c, r, col)
+
+
 ## The icon "kind" of a machine: its style entry, else furnace (no-input source) / gear (runner).
 static func machine_kind(def: MachineDef) -> String:
 	if MACHINE_STYLE.has(def.behavior):

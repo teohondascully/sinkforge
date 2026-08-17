@@ -2443,35 +2443,54 @@ func _draw_construct(pos: Vector2, t: float) -> void:
 		draw_line(p, p + (cn[2] as Vector2) * bl, bc, 1.5)
 
 
-## Factorio-style legibility: a small STATUS LAMP on every machine (green working / red no-fuel /
-## amber starved / grey idle) + a blinking floating NEED bubble carrying the missing item's glyph when
-## a machine is stalled (no fuel → coal, starved → its input). Reads FactorySim.machine_status (the sim's
-## own run-gates, so it can't lie). Pure cosmetic — drawn glyphs, no emojis. The direct fix for "why has
-## my drill gone quiet?" — the answer is now ON the machine, like Factorio.
+## Factorio-style legibility: a small STATUS LAMP on every machine + a blinking floating NEED bubble
+## carrying the missing item's glyph when a machine is stalled on one (no fuel → coal, starved → its input).
+## Reads FactorySim.machine_status (the sim's own run-gates, so it can't lie). Pure cosmetic — drawn glyphs,
+## no emojis. The direct fix for "why has my drill gone quiet?" — the answer is now ON the machine.
+##
+## The look of each status lives in `Visuals.STATUS_LOOK`, not in a match here, and that move is the bug fix
+## rather than a tidy-up: the match this replaced knew five of the sim's ten statuses and swept the other
+## five into the grey that means "nothing is wrong". See the table for what that was showing people.
 func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool = true) -> void:
 	var status: StringName = sim.machine_status(machine)
-	var lamp: Color
-	match status:
-		&"working": lamp = Color(0.35, 0.92, 0.42)
-		&"no_fuel": lamp = Color(0.96, 0.26, 0.20)
-		&"no_input": lamp = Color(0.97, 0.72, 0.22)
-		&"spent": lamp = Color(0.46, 0.58, 0.78)   # cool, not alarmed: a finished job is not a fault
-		_: lamp = Color(0.52, 0.55, 0.62)          # idle
-	# Status lamp: a rimmed dot in the machine's top-left corner (mirrors Factorio's entity status light).
-	# The lamp is a glanceable COLOUR (like the glyph), not text — it stays ALWAYS on so a red/amber
-	# stall still reads from across a zoomed-out base. Only the floating text-ish NEED bubble is gated.
-	var lamp_c: Vector2 = pos + Vector2(5.5, 5.5)
-	draw_circle(lamp_c, 4.2, Color(0.03, 0.03, 0.05, 0.9))
-	draw_circle(lamp_c, 3.1, lamp)
-	if status == &"working":
-		return                                       # green = fine; no floating alarm
-	if status == &"idle":
-		return                                       # benign (empty mover); lamp is enough
-	if status == &"spent":
-		return                                       # the vein is finished, not the machine — no alarm bubble
+	var look: Dictionary = Visuals.status_look(status)
+	var lamp: Color = look["color"]
+	# Status lamp: a rimmed mark in the machine's top-left corner (mirrors Factorio's entity status light).
+	#
+	# IT GROWS AS YOU ZOOM OUT. At the inspect zoom this is exactly the dot it always was; at the survey
+	# zoom the same world-space dot covers about one screen pixel, which is where audit 195 — "machine
+	# states become colour-only at survey zoom" — comes from. A lamp that shrinks with the machine answers
+	# the question at the one zoom where you were already close enough to read the machine itself. So the
+	# mark holds roughly its screen size instead, capped so it never eats the casing it sits on.
+	var k: float = clampf(1.0 / maxf(_zoom, 0.2), 1.0, 1.8)
+	var r: float = 3.1 * k
+	var lamp_c: Vector2 = pos + Vector2(2.4 + r, 2.4 + r)
+	draw_circle(lamp_c, 4.2 * k, Color(0.03, 0.03, 0.05, 0.9))
+	Visuals.draw_status_mark(self, lamp_c, r, look["mark"], lamp)
+	# Nothing to raise an alarm about: running, resting, or finished. `fix` is the sim's word for what the
+	# player would have to DO, so "none" is exactly the set that needs no floating anything, and a status
+	# added later inherits the right behaviour from its table entry instead of from a list of names here.
+	if StringName(look["fix"]) == &"none" or status == &"spent":
+		return
 	if not show_bubble:
-		return                                       # zoomed out + not hovered: lamp is enough, drop the bubble
-	# Stalled (no_fuel / no_input) → a blinking bubble floats above the machine carrying WHAT it needs.
+		# THE BUBBLE IS GONE AT THIS ZOOM, AND A STALL IS THE ONE THING THAT MUST STILL REACH YOU. This is
+		# the branch the audit was describing: zoomed out, the need bubble is dropped as unreadable clutter
+		# and the machine falls back on a coloured dot roughly a pixel across. So the alarm moves to the
+		# only scale that survives out here — the whole cell — and to the one channel that needs no
+		# resolution at all: MOTION. A stalled machine breathes a ring around itself; a working one does
+		# nothing, because "no alarm" has to stay the quiet state or a mature base becomes a light show.
+		var alarm: float = 0.40 + 0.60 * absf(sin(_anim_time * 2.6))
+		draw_rect(Rect2(pos - Vector2(1.5, 1.5), Vector2(float(CELL) + 3.0, float(CELL) + 3.0)),
+			Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 2.0)
+		return
+	# THE BUBBLE CAN ONLY DRAW AN ITEM, SO IT ONLY SPEAKS WHEN THE ANSWER IS ONE. A jam, a dead power net
+	# and an unwired Spur have no item to hold up, and the code that used to reach here defaulted to `ore`
+	# and floated it over all three — telling you to feed a machine that was not hungry. Those states now
+	# stop at the lamp, whose mark and colour do name the problem, and the hover inspector carries the
+	# sentence. Saying less is not the ideal fix; the ideal fix is a bolt glyph, a chevron and a broken
+	# link, and that is the next slice. Saying nothing beats saying something false in the meantime.
+	if not bool(look["feeds"]):
+		return
 	var need: StringName = &"ore"
 	if status == &"no_fuel":
 		need = &"coal"
