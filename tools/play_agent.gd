@@ -55,7 +55,7 @@ func stats() -> String:
 
 ## Friction summary — the byproduct effort spent this journey (the play-FEEL numbers, not pass/fail).
 func friction() -> String:
-	return "mines=%d places=%d jumps=%d frames=%d stuck=%d | peak carried: %s" % [mines, places, jumps, frames, stuck_frames, peaks()]
+	return "mines=%d places=%d jumps=%d frames=%d stuck=%d | PEAKBULK=%d HANDED=%d MINED=%d%s | peak carried: %s" % [mines, places, jumps, frames, stuck_frames, peak_bulk, handed_bulk, maxi(0, peak_bulk - handed_bulk), ("" if unclassified.is_empty() else " UNCLASSIFIED=" + str(unclassified.keys())), peaks()]
 
 
 ## PEAK CARRIED QUANTITY PER ITEM, across this agent's whole journey.
@@ -70,12 +70,44 @@ func friction() -> String:
 ## project cares about passes through a frame boundary or a mine, both of which are here.
 var peak: Dictionary = {}
 
+## WHAT COUNTS AS BULK — the set the carry cap would govern.
+##
+## The user's shape is that tools and construction components stay convenient while raw ore and bulk
+## freight consume cargo capacity, so the two lists are separate and BOTH are enumerated. Anything in
+## neither is reported as UNCLASSIFIED rather than silently assumed harmless: a hand-kept list that fails
+## open is the defect this project has found in the icon list, the CI job list and the worktree count, and
+## a new material appearing here would otherwise vanish from the measurement that picks the cap.
+const BULK: Array[StringName] = [&"ore", &"rich_ore", &"ingot", &"earth", &"stone", &"deepslate",
+	&"coal", &"iron", &"plate", &"gravel", &"sand", &"clay"]
+const CARRIED_FREE: Array[StringName] = [&"rope", &"conduit", &"torch", &"wood", &"sapling", &"leaves"]
+
+## Peak of the SUM over BULK, which is the quantity a PACK actually limits.
+##
+## The first version of this recorded only per-item peaks, and a curve built on those models a per-item
+## cap — under which you could carry 20 of each of eight bulk items and never trip a "20 limit", which is
+## not a limited pack, it is eight limited packs. Peaks of different items also need not co-occur, so the
+## per-item numbers cannot be re-sliced into this one; it has to be sampled at the same instant.
+var peak_bulk: int = 0
+var handed_bulk: int = 0              ## bulk held at the FIRST sample — the loadout, before any mining
+var _sampled_once: bool = false
+var unclassified: Dictionary = {}
+
 
 func _sample_peak() -> void:
+	var total: int = 0
 	for item: StringName in main.sim.inventory:
 		var n: int = int(main.sim.inventory[item])
 		if n > int(peak.get(item, 0)):
 			peak[item] = n
+		if BULK.has(item):
+			total += n
+		elif not CARRIED_FREE.has(item) and not String(item).contains("pickaxe"):
+			unclassified[item] = n
+	if total > peak_bulk:
+		peak_bulk = total
+	if not _sampled_once:
+		_sampled_once = true
+		handed_bulk = total
 
 
 ## The peaks as a printable line, biggest first. Empty if the journey never carried anything.
