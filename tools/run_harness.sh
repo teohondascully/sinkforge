@@ -208,6 +208,9 @@ add "check_draw_cull (offscreen)"     "res://tools/check_draw_cull.gd"
 add_gl "check_opening (no dead space)" "res://tools/check_opening.gd"
 add_gl "check_underground (lit rock)"  "res://tools/check_underground.gd"
 add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
+# add_gl, not add_excl: its answer is a SEPARATION between two pixel populations sampled from one frame.
+# Contention changes how long the delve takes and nothing about what the frame contains.
+add_gl "check_rock_reads (rock vs air)" "res://tools/check_rock_reads.gd"
 # add_gl and NOT add_excl: it renders every item icon and compares silhouettes and CIELab means. Contention
 # changes how LONG that takes and not one pixel of what comes back, and exclusivity is the scheduler's most
 # expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
