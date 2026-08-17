@@ -95,6 +95,9 @@ var _main: MainView = null
 ## Non-empty = controlled hardware, named by whoever set it, and the absolute budget applies.
 var _perf_host: String = OS.get_environment("SF_PERF_HOST")
 
+## Per-phase proof that the phase did the work its name claims — filled by _phase, judged by _workload.
+var _work: Dictionary = {}
+
 
 func _initialize() -> void:
 	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
@@ -146,6 +149,10 @@ func _run() -> void:
 	print("  draw calls in the last frame: %d   objects: %d"
 		% [int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))])
+
+	# BEFORE any verdict about the timings: did the phases do their work at all? A timing distribution
+	# gathered while nothing happened is not a slow result or a fast one, it is a mislabelled one.
+	ok = _workload() and ok
 
 	var phases: Array[PackedFloat32Array] = [idle, run_ms, dig_ms, swing_ms]
 	ok = _absolute(PackedStringArray(["IDLE", "RUN", "DIG", "SWING"]), phases, quiet) and ok
@@ -279,40 +286,138 @@ func _phase(kind: StringName) -> PackedFloat32Array:
 	var ms := PackedFloat32Array()
 	if kind == &"swing":
 		_fire_rope()
+	var moved: float = 0.0
+	var mined: int = 0
+	var anchored: int = 0
+	var prev: Vector2 = player.position
 	var last: int = Time.get_ticks_usec()
 	for i: int in SAMPLE:
-		_drive(kind, player, i)
+		if _drive(kind, player, i):
+			mined += 1
 		await RenderingServer.frame_post_draw
 		var now: int = Time.get_ticks_usec()
 		ms.append(float(now - last) / 1000.0)
 		last = now
+		# Evidence that this phase did the work its NAME claims — gathered inside the timed loop because
+		# that is the only place it is true of the frames actually measured. See _workload.
+		moved += player.position.distance_to(prev)
+		prev = player.position
+		if player.grapple.state == Grapple.State.ANCHORED:
+			anchored += 1
 	player.input_dir = 0.0
 	player.input_climb = 0.0
+	_work[kind] = {"moved": moved, "mined": mined, "anchored": anchored, "at": _main._cell_at(player.position)}
 	ms.sort()
 	return ms
 
 
 ## Per-frame input for a phase. Everything here goes through the same fields the keyboard drives, so the
 ## body does exactly what a player's body would — no teleporting, no synthetic load.
-func _drive(kind: StringName, player: Player, i: int) -> void:
+##
+## Returns whether this frame did the phase's characteristic WORK — currently only meaningful for dig,
+## whose `try_mine` reports success. The return value used to be discarded, which is how a DIG phase that
+## mined nothing would still have reported a timing distribution under the name DIG.
+func _drive(kind: StringName, player: Player, i: int) -> bool:
 	match kind:
 		&"run":
 			# Reverse periodically so the run stays inside the generated world instead of hitting its edge.
 			player.input_dir = 1.0 if (i / 60) % 2 == 0 else -1.0
 		&"dig":
-			var c: Vector2i = _main._cell_at(player.position) + Vector2i(0, 1)
-			_main.try_mine(c)
+			var hit: bool = _main.try_mine(_dig_target(player))
 			player.input_dir = 0.0
+			return hit
 		&"swing":
 			player.input_climb = 1.0 if (i / 30) % 2 == 0 else -1.0
 		_:
 			player.input_dir = 0.0
+	return false
+
+
+## THE FIRST SOLID CELL AT OR BELOW THE BODY, rather than blindly the one row down.
+##
+## The blind version made this phase depend on the body's exact sub-pixel position at the moment RUN handed
+## over, which is not a stable thing to depend on. Same commit, same machine, measured: an isolated run
+## landed 46 mines and finished 53 rows deeper; a full-suite run landed ONE and never moved, because RUN
+## had ended 10px further along and the cell under the feet was already open. The phase then timed 200
+## frames of a body standing still and reported the distribution under the name DIG — and reported it as
+## 9.36ms p95 against the honest 33.37ms, so the broken fixture looked like a 3.5x performance win.
+##
+## Searching downward for real rock is what check_dig_hitch already does, for exactly this reason. Bounded
+## by DIG_REACH so that a body genuinely standing over a void still fails the workload floor rather than
+## silently teleporting its dig to the bottom of the world — the failure must stay visible.
+const DIG_REACH: int = 4
+func _dig_target(player: Player) -> Vector2i:
+	var here: Vector2i = _main._cell_at(player.position)
+	for dy: int in range(1, DIG_REACH + 1):
+		var c: Vector2i = here + Vector2i(0, dy)
+		if _main.sim.is_solid(c):
+			return c
+	return here + Vector2i(0, 1)
 
 
 ## Put the body on a rope so the SWING phase measures a real swing rather than a fall.
 func _fire_rope() -> void:
 	var player: Player = _main._player
 	player.grapple.fire(player.hand(), player.hand() + Vector2(96.0, -192.0))
+
+
+## DID THE PHASES ACTUALLY DO THEIR WORK? An external audit found that they might not, and that the layer
+## could not tell:
+##
+##   "RUN does not require a minimum distance. DIG discards try_mine()'s result and does not require
+##    successful mines. SWING does not require an anchored grapple. A fixture drift can produce green
+##    timing ratios for idle or failed phases."
+##
+## That is exactly right, and it is the vacuity shape this project keeps finding, arriving in a perf
+## fixture instead of an assertion: the numbers were real measurements OF SOMETHING, and nothing checked
+## that the something was digging. A DIG phase whose mines all failed against bedrock would report a
+## beautiful flat distribution and pass every ratio gate, and the greener it looked the more wrong it
+## would be.
+##
+## THE FLOORS ARE HALF THE OBSERVED MINIMUM, and they were set after measuring rather than before, because
+## guessing a floor before observing the thing has been wrong every time it was tried in this repo. Four
+## consecutive runs on m4pro-arm64-local, same commit:
+##
+##   RUN moved       205 · 208 · 208 · 210 px          (spread ~2%)
+##   DIG landed       47 ·  47 ·  42 ·  46 mines/200   (spread ~11%)
+##   SWING anchored  195 · 196 · 200 · 200 frames/200  (spread ~3%)
+##
+## Every floor sits at roughly half the smallest observed value, which is 20-25x the measured run-to-run
+## spread in each case. That is deliberately loose: this guard's job is to catch a phase that stopped doing
+## its work — a body that cannot move, mines that all fail, a rope that never takes — and NOT to police
+## small changes in how far the fixture happens to travel. A tight floor here would fail on honest fixture
+## edits and teach everyone to raise it, which is how a guard becomes a formality.
+const RUN_MIN_PX: float = 100.0
+const DIG_MIN_MINES: int = 20
+const SWING_MIN_ANCHORED: int = 100
+func _workload() -> bool:
+	var run_moved: float = float(_work.get(&"run", {}).get("moved", 0.0))
+	var dig_mined: int = int(_work.get(&"dig", {}).get("mined", 0))
+	var swing_anchored: int = int(_work.get(&"swing", {}).get("anchored", 0))
+	print("  workload: RUN moved %.0fpx · DIG landed %d mines of %d frames · SWING anchored %d frames of %d"
+		% [run_moved, dig_mined, SAMPLE, swing_anchored, SAMPLE]
+		+ "   (body ended RUN at %s, DIG at %s, SWING at %s)"
+			% [_work.get(&"run", {}).get("at", Vector2i.ZERO),
+				_work.get(&"dig", {}).get("at", Vector2i.ZERO),
+				_work.get(&"swing", {}).get("at", Vector2i.ZERO)])
+	var ok: bool = true
+	if run_moved < RUN_MIN_PX:
+		printerr("      FAIL: RUN moved the body %.0fpx, under the %.0fpx floor — the phase is timing a"
+			% [run_moved, RUN_MIN_PX]
+			+ " body that is stuck or standing still, under the name RUN")
+		ok = false
+	if dig_mined < DIG_MIN_MINES:
+		printerr("      FAIL: DIG landed %d successful mines across %d frames, under the %d floor — little"
+			% [dig_mined, SAMPLE, DIG_MIN_MINES]
+			+ " or nothing was excavated, so this distribution is not the cost of mining and the ratio"
+			+ " gate above is measuring something else entirely")
+		ok = false
+	if swing_anchored < SWING_MIN_ANCHORED:
+		printerr("      FAIL: SWING was anchored for %d of %d frames, under the %d floor — the rope did not"
+			% [swing_anchored, SAMPLE, SWING_MIN_ANCHORED]
+			+ " take the body, so the phase timed a fall rather than a swing")
+		ok = false
+	return ok
 
 
 ## The value at a percentile of the already-sorted samples.
