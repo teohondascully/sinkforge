@@ -200,6 +200,11 @@ var _band_now: int = -1
 var _line_hailed: bool = false
 const LINE_HAIL_SHAKE: float = 2.6
 const SWING_PERIOD: float = 0.28   ## seconds between pick-blows while charge-mining (the swing cadence)
+## Seconds of work per unit off an exposed LODE (`docs/LODE.md` §5), before tool speed and rhythm. Short on
+## purpose: this is a drum of small payouts, not a charge that ends in a break — the vein does not shatter,
+## it gives. Deliberately POORER than a drill per unit; the hand is how you get your first ore and how you
+## top up, never how you supply a factory.
+const LODE_CYCLE: float = 0.55
 var _swing_clock: float = SWING_PERIOD  ## primed so a fresh charge's first blow lands instantly
 
 ## THE DIG RHYTHM. The single biggest source of tedium was that mining had no MOMENTUM: every block
@@ -1241,16 +1246,25 @@ func _update_mining(delta: float) -> void:
 		else:
 			_skid_clock = SKID_PERIOD        # primed: the first skid of the next attempt lands instantly
 		return
-	var mat: StringName = sim.material_at(work)
+	# TWO KINDS OF WORK THROUGH ONE HOLD (`docs/LODE.md` §5). Rock BREAKS: a charge that ends in a cell
+	# vanishing, and the charge is banked on the cell so looking away does not cost you it. A lode is WORKED:
+	# a short repeating cycle that yields a unit and changes nothing, so there is nothing to bank and nothing
+	# to crack — the payout IS the progress read. The cadence, the pose, the blows and the rhythm are shared,
+	# because both are a miner swinging at a face.
+	var lode_face: bool = sim.lode_workable(work)
+	var mat: StringName = sim.lode_at(work) if lode_face else sim.material_at(work)
 	if work != _mine_target:                 # moved to a fresh block → RESUME whatever it already owes us
 		_mine_target = work
-		_mine_charge = _banked_charge(work)
+		_mine_charge = 0.0 if lode_face else _banked_charge(work)
 	var cls: StringName = MiningRules.required_tool(mat)
 	var speed: float = MiningRules.best_speed(cls, sim.inventory) if cls != &"" else 1.0
 	_mine_charge += delta * speed * (1.0 + _rhythm * RHYTHM_SPEED)
-	var hard: float = MiningRules.hardness(mat)
-	_cracks[work] = Vector2(_mine_charge, 0.0)                # bank it: this cell stays cracked if we look away
-	_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
+	var hard: float = LODE_CYCLE if lode_face else MiningRules.hardness(mat)
+	if not lode_face:
+		_cracks[work] = Vector2(_mine_charge, 0.0)            # bank it: this cell stays cracked if we look away
+		_renderer.set_mine_progress(work, clampf(_mine_charge / hard, 0.0, 1.0))
+	else:
+		_renderer.set_mine_progress(Vector2i(-999, -999), 0.0)  # nothing is breaking, so nothing is cracking
 	# Swing FEEL: while charging, the body holds the dig pose facing the block, and on a
 	# steady cadence a BLOW lands — a chip of the rock's dust off the struck face + a micro-shake — so
 	# mining reads as pick-strikes landing, not a progress bar silently filling.
@@ -1271,7 +1285,7 @@ func _update_mining(delta: float) -> void:
 			# same, the wall does not. Volume rides the reading, so closing on a cavity is a crescendo you
 			# can act on rather than a flag that flips.
 			var dir: Vector2i = _swing_dir(work)
-			var hollow: float = _hollow_at(work, dir)
+			var hollow: float = 0.0 if lode_face else _hollow_at(work, dir)
 			if hollow > 0.12:
 				_sfx.play(&"hollow", center, clampf(1.05 - hollow * 0.25, 0.7, 1.15),
 					lerpf(-26.0, -9.0, hollow))
@@ -1282,6 +1296,9 @@ func _update_mining(delta: float) -> void:
 					Visuals.terrain_dust(mat).lightened(0.25), Vector2(dir), 1 + int(2.0 * hollow))
 	if _mine_charge >= hard:
 		_mine_charge = 0.0
+		if lode_face:
+			try_work_lode(work)                              # one unit off the vein; the vein stays
+			return
 		_cracks.erase(work)                                  # broken: nothing left to remember
 		var was_hollow: float = _hollow_at(work, _swing_dir(work))
 		if try_mine(work):                                   # charge full → land the breaking blow
@@ -1375,6 +1392,10 @@ func _heal_cracks(delta: float, working: Vector2i) -> void:
 ## the one case the cursor has to draw differently.
 func _drive_bites(cell: Vector2i) -> bool:
 	if not sim.is_solid(cell):
+		# An exposed LODE is the other thing a drive can be under (`docs/LODE.md` §5). Answering it here
+		# means the crossed cursor and the skid cover ore with no new code — the ladder is one ladder.
+		if sim.lode_workable(cell):
+			return MiningRules.can_mine(sim.lode_at(cell), sim.inventory)
 		return true
 	return MiningRules.can_mine(sim.material_at(cell), sim.inventory) \
 		and _bit_bites(BitRules.equipped(_selected_item()), cell)
@@ -1386,8 +1407,11 @@ func _drive_bites(cell: Vector2i) -> bool:
 ## so the mining loop and `check_refusal` assert the same sentence, and kept separate from `_mineable` —
 ## which must stay false here, or the charge would spider forever on a cell that never breaks (#S32).
 func _refuses(cell: Vector2i) -> bool:
-	if not (sim.is_solid(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)):
+	if not (_can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)):
 		return false
+	if not sim.is_solid(cell):
+		# …or a vein whose ore is over your drive: the same refusal, the same tells, a different face.
+		return sim.lode_workable(cell) and not MiningRules.can_mine(sim.lode_at(cell), sim.inventory)
 	if not MiningRules.can_mine(sim.material_at(cell), sim.inventory):
 		return true
 	return not _bit_bites(BitRules.equipped(_selected_item()), cell)
@@ -1448,7 +1472,19 @@ func _thing_name(id: StringName) -> String:
 ## A cell the miner can WORK right now: breakable (solid + reach + LOS, the try_mine gate) AND the
 ## carried tools are up to its rock. The single predicate both the hover target and the queue use.
 func _workable(cell: Vector2i) -> bool:
+	if _lode_workable(cell):
+		return true
 	return _mineable(cell) and MiningRules.can_mine(sim.material_at(cell), sim.inventory)
+
+
+## Can the body work an exposed LODE here (`docs/LODE.md` §5)? Reach and line of sight, exactly as for rock,
+## and the same DRIVE gate — the tool ladder is the tool ladder, and honouring it here is what lets #S37's
+## crossed cursor and skid answer a lode with no extra code. What does NOT apply is the bit: bits decide the
+## shape of a HOLE, and working a vein cuts no hole. A Wedge in your hand never refuses ore.
+func _lode_workable(cell: Vector2i) -> bool:
+	if not (sim.lode_workable(cell) and _can_reach(cell) and _line_of_sight_clear(_body_cell(), cell)):
+		return false
+	return MiningRules.can_mine(sim.lode_at(cell), sim.inventory)
 
 
 ## Sweep-paint the dig plan: every solid cell the cursor crossed since last frame gets a mark (the
@@ -1606,6 +1642,29 @@ func try_mine(cell: Vector2i) -> bool:
 		_sfx.play(&"thump", center, 1.1 if rich else 1.0, 2.0 if rich else 0.0)
 		_note_strike(cell, mat)
 	return mined != &""
+
+
+## WORK ONE UNIT OFF AN EXPOSED LODE (`docs/LODE.md` §5) — the hand half of extraction, and a different verb
+## from `try_mine` on purpose. Mining ENDS a cell: a charge, a break, a hole, and everything the bit shapes
+## around it. Working a vein ends nothing — you take a unit, the face is still there, and the only thing that
+## changed is how much is left. So there is no calve, no shape, no break-dust and no shatter: a fleck-spray
+## in the ore's own colour, a light strike, and the payout tick naming what you got.
+func try_work_lode(cell: Vector2i) -> bool:
+	if _paused or not _lode_workable(cell):
+		return false
+	var before: Dictionary = sim.inventory.duplicate()
+	var item: StringName = sim.take_lode(cell)
+	if item == &"":
+		return false
+	var center: Vector2 = _cell_center(cell)
+	_show_gains(before, center + Vector2(0.0, -float(CELL) * 0.35))
+	_particles.spark(center, Visuals.item_color(item).lightened(0.35))
+	_shake = maxf(_shake, 1.4)                            # lighter than a break: nothing collapsed
+	_sfx.play(&"thump", center, 1.18, 1.0)
+	if _player != null:
+		_player.note_dig(int(signf(center.x - _player.position.x)))
+	_note_strike(cell, item)
+	return true
 
 
 ## THE ROCK HAS A GRAIN, AND THE BLOW FOLLOWS IT (#S31, `docs/BITS.md` §4).

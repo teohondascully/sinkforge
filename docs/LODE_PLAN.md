@@ -68,8 +68,15 @@ of ore blocks — plus deleting a path that by then has no users. Small, reviewa
 
 Each phase is one commit (or a tight run), lands green, and is independently revertable.
 
-### Phase 1 — the lode exists, and the trap is gone
+### Phase 1 — the lode exists, and the trap is gone ✅ SHIPPED as STRIKE 38
 *Player-visible change: mining ore stops destroying the vein. Nothing is removed.*
+
+> Landed green at **56/56** with all seven §5c invariants passing unchanged. `check_lode` (39 assertions)
+> is the new layer; `test_sim`'s flagged inversion and the save round-trip were the two existing assertions
+> changed, both argued in place. One thing the plan did not anticipate: the lode's *rendering* wanted to be
+> part of the wall bake rather than an overlay — see `docs/LODE.md`'s recorded deviations. One assertion in
+> `check_lode` was caught passing **vacuously** (the Wedge never landed a blow, so "nothing was destroyed"
+> meant nothing) and the fixture was rebuilt as an ore body so every bit in the set really bites.
 
 - `factory_sim.gd`: `lode` dict (cell → ore id); `lode_at` / `lode_workable` / `lode_fraction` / `take_lode`;
   `mine()` takes the burst **out of** the deposit and leaves the remainder as a lode; `ore_deposit_at` reads

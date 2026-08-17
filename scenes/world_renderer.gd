@@ -581,6 +581,7 @@ func _draw() -> void:
 	_draw_crumble()   # a just-mined block shattering away at the terrain layer (#18)
 	_draw_seams()     # the rock's grain — the planes a blow can follow (#S31)
 	_draw_drop_paths()
+	_draw_lode()      # ore in the BACK WALL — the vein you cleared the rock off, and how much is left
 	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
@@ -881,6 +882,49 @@ func _seam_glow_color(cells: Array) -> Color:
 	# Push toward saturation: emitted light is a purer hue than the fleck. Nudge S up, keep V bright.
 	glow = Color.from_hsv(glow.h, minf(1.0, glow.s + 0.20), maxf(glow.v, 0.85))
 	return glow
+
+
+## THE LODE IN THE WALL (`docs/LODE.md` §4). Ore stopped being a block you punch out and became a face you
+## work, so it needs to draw as a FACE: a wash of the ore's colour on the backing plus its flecks embedded in
+## it, permanent, sitting there while you decide what to do about it. This is not the glint — the glint is a
+## rare twinkle that says "something is over there", and it still fires on top of this. This is the thing
+## itself, and it has to hold up being looked at for a long time, because you are going to build on it.
+##
+## AND IT THINS AS IT DRAINS, which is the part that has never existed. `deposits` is the number the player is
+## meant to plan around and it has never once been visible: a 250-unit cell and a 4-unit cell were pixel
+## identical, which broke the Drift Rig's own capture (docs/DRIFT.md — the rig chewed one cell forever and the
+## photograph had to seed thin seams by hand to show a cycle). The fleck set is deterministic per cell and the
+## draw takes a PREFIX of it, so flecks disappear one by one as the vein is worked rather than reshuffling —
+## a half-worked vein looks like the same vein, half worked.
+##
+## Only EXPOSED lode draws. Ore still behind rock is the stain's job (`docs/LODE.md` §10, phase 4); until then
+## the rock keeps its secret, exactly as it does today.
+func _draw_lode() -> void:
+	if sim.lode.is_empty():
+		return
+	var view: Rect2 = _view_world_rect()
+	var cell_f: float = float(CELL)
+	for key: Variant in sim.lode:
+		var c: Vector2i = key
+		var base := Vector2(c) * cell_f
+		if not view.has_point(base) or sim.is_solid(c):
+			continue
+		var frac: float = sim.lode_fraction(c)
+		if frac <= 0.0:
+			continue
+		var def: MaterialDef = _material(sim.lode[c])
+		if not def.has_nuggets():
+			continue
+		# The MATRIX is baked into the wall plane (see `_wall_base_color`); what is left for the live pass is
+		# the metal in it — and how much of it is left, which is the whole reason this draw exists.
+		var nug: Color = _zone_tinted(def.nugget_color, c.y)
+		var all: Array[Vector2] = _cell_speckles(c, def.nugget_count)
+		var n: int = maxi(1, int(round(frac * float(all.size()))))
+		for i: int in n:
+			var p: Vector2 = base + all[i]
+			draw_circle(p + Vector2(0.6, 1.0), 3.0, Color(0.0, 0.0, 0.0, 0.34))   # seated in the wall
+			draw_circle(p, 2.5, Color(nug, 0.94))
+			draw_circle(p + Vector2(-0.6, -0.7), 1.1, Color(nug.lightened(0.55), 0.95))  # the catch of light
 
 
 func _draw_ore_glints() -> void:
@@ -2401,6 +2445,20 @@ func _wall_fill_color(c: Vector2i) -> Color:
 ## the bedding between coarse samples rather than inheriting one flat value per 32px cell. The coarse pass
 ## puts the two straight back together above, so its output is unchanged.
 func _wall_base_color(c: Vector2i) -> Color:
+	# A LODE IS WALL (`docs/LODE.md`). Ore in the background plane paints as the background plane — which
+	# means it inherits the molding, the bedding, the recess shadow and the veil that every other wall gets,
+	# for free, and cannot read as a decal stuck on top of the rock. The first cut of this drew the lode as
+	# its own translucent wash in the dynamic pass and looked like a poster; the second looked like smoke.
+	# Routing it through the wall's own colour authority is not a trick to make it look better, it is the
+	# thesis implemented literally: the vein is what the wall is MADE OF here.
+	if sim.lode.has(c):
+		# MINERALISED, not just "ore-coloured". An ore block's matrix is within a hair of stone's — ore reads
+		# as ore because of its pale flecks, not its rock — so painting the wall the ore's base colour is
+		# literally correct and completely invisible. A real vein face is STAINED by what is in it, so the
+		# wall here is the rock carried a quarter of the way toward the metal. That derives per material
+		# rather than being picked: coal stains the wall dark, iron rusty, ore pale. One rule, four answers.
+		var vein: MaterialDef = _material(sim.lode[c])
+		return _zone_tinted(vein.base_color.lerp(vein.nugget_color, 0.42), c.y)
 	if not sim.wall.has(c):
 		return WALL_NONE
 	return _zone_tinted(_material(sim.wall[c]).base_color, c.y)
@@ -2413,7 +2471,7 @@ func _wall_strata(c: Vector2i) -> float:
 
 
 func _has_wall(c: Vector2i) -> bool:
-	return sim.wall.has(c)
+	return sim.wall.has(c) or sim.lode.has(c)   # a vein is always something to see, wall behind it or not
 
 
 func _paint_darkness(layer: LightLayer) -> void:

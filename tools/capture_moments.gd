@@ -96,6 +96,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> void:
 			await _at_the_packing(main)
 		"refuse":
 			await _at_the_refusal(main)
+		"lode":
+			await _at_the_lode(main)
 		"map":
 			await _dig_in(main)
 			main._minimap_mode = 2       # MainView owns the mode and pushes it to the HUD each frame
@@ -586,6 +588,65 @@ func _at_the_refusal(main: MainView) -> void:
 		main._hints._life = 0.0
 	main._hud._arrival_life = 0.0      # the stratum plate fired on the way in; it isn't this shot's subject
 	main._hud.objectives = null        # …and neither is the opening ladder. Staging, not a game change.
+
+
+## THE VEIN IN THE WALL. A working cut into ore-rich rock, with the face opened at four different states of
+## depletion side by side: full, two-thirds, a third, and worked dry. That progression IS the subject —
+## `deposits` is the number the player is meant to plan around and until this strike it was never once on
+## screen, so a fat vein and a spent one were the same pixels. Staged rather than played, for the same reason
+## the Drift shot seeds thin seams: showing four states at once is a photograph of a rule, not of a session.
+func _at_the_lode(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	var row: int = 46
+	var x0: int = 40
+	for x: int in range(x0 - 14, x0 + 15):
+		for y: int in range(row - 8, row + 8):
+			sim.set_solid(Vector2i(x, y), &"stone")
+			sim.lode.erase(Vector2i(x, y))
+			sim.deposits.erase(Vector2i(x, y))
+	for x2: int in range(x0 - 8, x0 + 6):                      # the chamber you cleared to see the wall
+		for y2: int in range(row - 3, row + 1):
+			sim.set_solid(Vector2i(x2, y2), &"")
+	# THE FACE: four cells of the same vein, opened, at four states of depletion. Left to right so the eye
+	# reads it as one vein being worked rather than four different things.
+	var states: Array[int] = [FactorySim.DEFAULT_ORE_DEPOSIT, 160, 70, 0]
+	for i: int in states.size():
+		for dy: int in [-1, -2]:                               # at eye level, and two cells tall, so it READS
+			var c := Vector2i(x0 - 6 + i * 3, row + dy)
+			sim.lode[c] = &"ore"
+			if states[i] > 0:
+				sim.deposits[c] = states[i]
+			else:
+				sim.lode.erase(c)                              # worked dry: it stops being a vein at all
+	# …and one still BEHIND rock, untouched, so the shot also says what you have not got to yet.
+	for dy2: int in [-1, -2]:
+		var buried := Vector2i(x0 + 6, row + dy2)
+		sim.set_solid(buried, &"ore")
+		sim.deposits[buried] = FactorySim.DEFAULT_ORE_DEPOSIT
+	for t: int in [x0 - 8, x0 - 3, x0 + 2]:
+		sim.torch[Vector2i(t, row - 1)] = true
+	sim.inventory[&"wood_pickaxe"] = 1
+	main._inv_selected = 0
+	main._renderer.repaint_world()
+	main._player.auto_input = false
+	main._player.place(Vector2(float(x0 - 5) * 32.0, float(row) * 32.0 - Player.HEIGHT))
+	for _i: int in 30:
+		await physics_frame
+	Input.warp_mouse(Vector2(960.0 + 2.0 * 32.0 * 1.5, 540.0 - 32.0))   # cursor on the half-worked face
+	Input.action_press(Controls.MINE)
+	for _i2: int in 30:
+		await physics_frame
+	Input.action_release(Controls.MINE)
+	for _i3: int in 4:
+		await physics_frame
+	print("LODE  aim=%s  lode=%s  left=%d  frac=%.2f" % [main._aim, str(sim.lode_at(main._aim)),
+		sim.ore_deposit_at(main._aim), sim.lode_fraction(main._aim)])
+	if main._hints != null:
+		main._hints._active = &""
+		main._hints._queue.clear()
+		main._hints._life = 0.0
+	main._hud._arrival_life = 0.0
+	main._hud.objectives = null
 
 
 ## THE WALL THAT WEEPS, and the wall that doesn't. One reservoir with a gallery running out of either side

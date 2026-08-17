@@ -1,6 +1,22 @@
 # THE LODE — ore lives in the wall, and mining stops being a trap
 
-> **Status: SPEC (2026-08-16).** Opened by the user's question — *"is having ores that you put drills under
+> **Status: PHASE 1 SHIPPED as STRIKE 38 (2026-08-16); phases 2-4 SPEC.** The lode layer, the hand-work
+> verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
+> `take_lode` / `lode_fraction`, `MainView.try_work_lode`, `WorldRenderer._draw_lode` and the lode's entry
+> into `_wall_base_color` — held by `tools/check_lode.gd` (harness layer 56, 39 assertions) and photographed
+> at `history/118-the-vein-outlives-the-blow.png`. Ore is still authored SOLID by the generator; the cutover
+> is phase 3. Migration plan, blast radius and eval gate: `docs/LODE_PLAN.md`.
+>
+> **Recorded deviations so far.** **A lode is painted by the WALL BAKE, not by an overlay.** Three cuts were
+> needed to learn why: a filled rect with a rim read as a poster stuck on the rock, soft blobs read as smoke,
+> and routing it through `_wall_base_color` — the single authority the fine-terrain bake already uses — made
+> it inherit the molding, bedding, recess shadow and veil every other wall gets, which is the thesis
+> implemented literally rather than a trick. **And the wall is STAINED, not tinted the ore's colour.** An ore
+> block's matrix is within a hair of stone's (ore reads as ore because of its pale flecks), so painting the
+> wall the ore's own base colour is exactly correct and completely invisible; the wall is now the rock
+> carried 42% of the way toward the metal, which derives per material — coal stains dark, iron rusty.
+>
+> **Original spec (2026-08-16).** Opened by the user's question — *"is having ores that you put drills under
 > still valuable? it's odd that you can mine an ore and it disappears, but you can drill an ore and it might
 > have 400 deposit."* It is odd, and chasing it down found a real contradiction at the centre of the loop
 > rather than a balance wart. Provisional and reversible; numbers are placeholders that want play.

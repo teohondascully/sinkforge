@@ -526,12 +526,21 @@ func _test_finite_deposit_and_drill() -> void:
 	var sim: FactorySim = FactorySim.new()
 	var cell := Vector2i(4, 6)
 	sim.set_solid(cell, &"ore")
-	sim.deposits[cell] = 12                             # the vein's drill-yield (discarded when hand-mined)
+	sim.deposits[cell] = 12                             # the vein's yield — the burst is a BITE out of this
 	var mat: StringName = sim.mine(cell)
 	var burst: int = int(sim.inventory.get(&"ore", 0))
 	_check(mat == &"ore" and not sim.is_solid(cell), "one strike breaks the whole ore block")
 	_check(burst >= 3 and burst <= 6, "hand-mining drops a 3-6 loose burst (got %d)" % burst)
-	_check(sim.ore_deposit_at(cell) == 0, "a hand-mined (now-open) cell is no vein — no confusing cavity left behind")
+	# THE INVERSION (`docs/LODE.md`, `docs/LODE_PLAN.md` §5a). This assertion used to read "a hand-mined
+	# (now-open) cell is no vein — no confusing cavity left behind", and it was the trap in one line: the
+	# other ~245 units of a 250-unit cell were erased by the blow, silently, and the game called that tidy.
+	# The blow now OPENS the vein instead of ending it. What is left behind is not a confusing cavity — it
+	# is a face, with a number on it, that you can keep working or cover with a machine.
+	_check(sim.ore_deposit_at(cell) == 12 - burst,
+		"a hand-mined cell IS a vein, less what the blow took (%d - %d = %d)"
+			% [12, burst, sim.ore_deposit_at(cell)])
+	_check(sim.lode_at(cell) == &"ore" and sim.lode_workable(cell),
+		"…exposed in the wall, and workable — the swing opened it, it did not destroy it")
 	_check(_items_present(sim, &"ore") == int(sim.total_produced.get(&"ore", 0)), "burst ore conserved")
 	# ore_deposit_at reads the richness of a SOLID visible vein (for the hover), defaulting when unseeded.
 	var solid_small := Vector2i(9, 9)
@@ -1508,8 +1517,9 @@ func _test_save_load() -> void:
 	_check(not back.is_empty(), "…and reads back")
 	var sim2: FactorySim = FactorySim.new()
 	_check(SaveGame.restore(sim2, back), "the restore lands")
-	_check(sim2.solid == sim.solid and sim2.wall == sim.wall and sim2.deposits == sim.deposits,
-		"terrain + walls + deposits round-trip")
+	_check(sim2.solid == sim.solid and sim2.wall == sim.wall and sim2.deposits == sim.deposits
+			and sim2.lode == sim.lode,
+		"terrain + walls + deposits + lodes round-trip")
 	_check(sim2.inventory == sim.inventory and sim2.ground == sim.ground and sim2.sink == sim.sink,
 		"pack + ground + sink round-trip")
 	_check(sim2.conduit == sim.conduit and sim2.rope == sim.rope and sim2.torch == sim.torch,

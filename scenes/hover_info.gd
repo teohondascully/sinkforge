@@ -20,6 +20,18 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 	if m == null:
 		# A visible SOLID ore vein — show how much ore is in it + the nudge to automate it. The readout the
 		# user asked for ("hover to see how much ore is left"), now on the vein itself (no cavity to explain).
+		# AN EXPOSED LODE (`docs/LODE.md`) answers first, because it is the same question with a different
+		# answer: the rock in front of it is gone, so there is nothing to drop a drill ABOVE — you work the
+		# face. The tier line comes before the amount, since "you cannot touch this yet" outranks "there is
+		# a lot of it".
+		var vein: StringName = sim.lode_at(aim)
+		if vein != &"" and not sim.is_solid(aim):
+			if not MiningRules.can_mine(vein, sim.inventory):
+				return {"name": "%s Lode" % String(vein).capitalize(), "in": [], "out": [], "holding": [],
+					"mode": "too hard — the %s (tier %d) bites it" % [
+						MiningRules.tool_name(MiningRules.drive_for(vein)), MiningRules.required_tier(vein)]}
+			return {"name": "%s Lode" % String(vein).capitalize(), "in": [], "out": [], "holding": [],
+				"mode": "%d left — hold LMB on the face to work it" % sim.ore_deposit_at(aim)}
 		var dep: int = sim.ore_deposit_at(aim)
 		if dep > 0:
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],

@@ -182,6 +182,16 @@ var deposits: Dictionary = {}
 ## near-spawn and deep alike. Factorio-scale: seeded deposits run HUNDREDS near spawn, THOUSANDS deep — the
 ## factory feeds off a vein for a long time (the 3-6 hand burst is just a taste; the drill mines the patch).
 const DEFAULT_ORE_DEPOSIT: int = 250
+## THE LODE (cell -> ore item id): ore in the BACKGROUND plane, over cells whose solid block is gone.
+## `docs/LODE.md` — terrain is what you CARVE, the lode is what you EXTRACT, and they stopped being the
+## same object. Before this, hand-mining an ore block pocketed a 3-6 burst and then `deposits.erase()`d the
+## other ~245 units out of existence: swinging your pick at ore was the most destructive act in the game and
+## nothing said so, which punished exactly the free room-clearing the bit set exists to enable. Now the blow
+## OPENS the vein instead of ending it — what the burst did not take stays in the cell as a lode you can keep
+## working. Not collision (you walk through it), not "items present" (latent, like `deposits`, which holds
+## the remaining amount for solid ore blocks and lodes alike). Cleared only by load_world and by being
+## worked dry; placing a block back over a lode covers it, it does not destroy it.
+var lode: Dictionary = {}
 ## What the player is carrying (item StringName -> count). Session state owned by the sim (so it is
 ## deterministic + serializable); the avatar only triggers discrete mine/deposit calls. Counted as
 ## "items present" for conservation. Rendered as the inventory hotbar (see `inventory_slots`).
@@ -547,6 +557,7 @@ func load_world(world: WorldData) -> void:
 	solid.clear()
 	wall.clear()
 	deposits.clear()
+	lode.clear()
 	water.clear()
 	fill.clear()                       # a fresh world has no construction in it
 	world_seed = world.seed
@@ -629,11 +640,18 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 		# DOWN through the solid ore, draining each cell dry. So hand-mining is how you grab your
 		# FIRST few ore (to craft the drill); the drill is how you mine the vein. The burst counts as produced
 		# when it enters the pack; the discarded latent yield was never produced, so conservation holds.
-		var burst: int = _ore_burst(cell) if keep else 0
+		var latent: int = int(deposits.get(cell, DEFAULT_ORE_DEPOSIT))
+		var burst: int = mini(_ore_burst(cell) if keep else 0, latent)
 		if burst > 0:
 			inventory[material] = int(inventory.get(material, 0)) + burst
 			total_produced[material] = int(total_produced.get(material, 0)) + burst
-		deposits.erase(cell)
+		var left: int = latent - burst
+		if left > 0:
+			lode[cell] = material          # the blow OPENED the vein; the rest of it is still there to work
+			deposits[cell] = left
+		else:
+			deposits.erase(cell)           # a thin seam the burst took whole — nothing left to open
+			lode.erase(cell)
 		solid.erase(cell)
 		_dirty_terrain(cell)                # repaint the chunk + re-mold the fine block now the cell is air
 		_resettle_pile_above(cell)          # the floor under any resting pile just vanished — it falls
@@ -1148,7 +1166,51 @@ func _ore_burst(cell: Vector2i) -> int:
 func ore_deposit_at(cell: Vector2i) -> int:
 	if solid.has(cell) and _is_ore_like(solid[cell]):
 		return int(deposits.get(cell, DEFAULT_ORE_DEPOSIT))
+	if lode.has(cell):
+		return int(deposits.get(cell, 0))
 	return 0
+
+
+## The ore in the background at `cell`, or &"" — an EXPOSED vein you can work by hand or (from strike 2 of
+## `docs/LODE.md` §10) cover with a drill. A lode under a solid block still exists; it is simply behind rock.
+func lode_at(cell: Vector2i) -> StringName:
+	return lode.get(cell, &"")
+
+
+## Is there a lode here you can actually get at — one whose face is open? The lode survives being built over
+## (it is background, and covering it is not destroying it), so "there is ore here" and "you can work it" are
+## two different questions and the mining loop wants the second one.
+func lode_workable(cell: Vector2i) -> bool:
+	return lode.has(cell) and not solid.has(cell) and int(deposits.get(cell, 0)) > 0
+
+
+## TAKE ONE UNIT from an exposed lode — the hand verb. Deliberately one unit per call: the vein does not
+## break, nothing is cleared, and the cell is still there when you look up. Returns the item taken, or &""
+## if there was nothing workable here. Realises latent world resource into production, exactly as the drill
+## does, so conservation reads the same through either hand.
+func take_lode(cell: Vector2i) -> StringName:
+	if not lode_workable(cell):
+		return &""
+	var item: StringName = lode[cell]
+	var left: int = int(deposits.get(cell, 0)) - 1
+	inventory[item] = int(inventory.get(item, 0)) + 1
+	total_produced[item] = int(total_produced.get(item, 0)) + 1
+	if left > 0:
+		deposits[cell] = left
+	else:
+		deposits.erase(cell)               # worked dry — the vein is spent, and it stops drawing as one
+		lode.erase(cell)
+	terrain_dirty.append(cell)
+	return item
+
+
+## How much of a lode is left, as a fraction of what a fresh one holds — the number the renderer thins the
+## fleck field by, so a worked-out vein LOOKS worked out. Until now a 250-unit cell and a 4-unit cell were
+## pixel-identical, which is a poor way to treat the one number the player is meant to plan around.
+func lode_fraction(cell: Vector2i) -> float:
+	if not lode.has(cell):
+		return 0.0
+	return clampf(float(deposits.get(cell, 0)) / float(DEFAULT_ORE_DEPOSIT), 0.0, 1.0)
 
 
 ## The carried pack as an ordered list of {item, count} for the inventory hotbar UI. Dictionaries
