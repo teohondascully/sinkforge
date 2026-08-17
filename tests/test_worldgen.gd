@@ -10,6 +10,7 @@ func _initialize() -> void:
 	print("== worldgen tests ==")
 	_test_terrain()
 	_test_ground_survives_digging()
+	_test_generated_lodes()
 	_test_surface_silhouette()
 	_test_surface_walkable()
 	_test_worldgen()
@@ -72,6 +73,109 @@ func _test_ground_survives_digging() -> void:
 		"the shaft floor is still inside the legal ground band")
 	_check(FineTerrain.walked_surface(sim.surface_row(col)) != FineTerrain.NO_SURFACE,
 		"walked_surface accepts the shaft floor as ground — it rejects rifts, not shafts")
+
+
+## A GENERATED WORLD CONTAINS USABLE EXTRACTION SITES — and every assertion here runs on a world the
+## GENERATOR built, never on a seeded fixture. That distinction is the entire point of this test.
+##
+## The sim has carried a complete lode system for two strikes: `take_lode`, the Drill Head, Spur chaining,
+## the drain fraction, the through-rock stain. None of it could fire on a real world, because the only
+## thing that ever wrote to `sim.lode` outside save/load was the mining branch — the blow that OPENS a
+## vein. Lode was DERIVED from destroying an ore block and never generated. So a fresh world held exactly
+## zero, the Borer and the Drift Rig cut rock with nothing behind it, and "generated deep pockets create
+## usable extraction sites" was false by construction rather than by degree.
+##
+## It stayed invisible because every lode fixture in the suite INJECTS its lode through `world_seeder`.
+## The seeded path was green for months while the generated path did not exist, and no assertion in the
+## project could tell them apart — a controlled lode proves the extraction path GIVEN a lode, which is a
+## different claim and fails differently. Hence the labelling, and hence a green here may never be cited
+## for a seeded fixture nor a seeded green cited for this.
+##
+## The last four checks are the chain end to end: generator → WorldData → sim → the hand verb. Buried, it
+## is not workable; clear the rock in front of it and it is; work it and it yields its ore. That sequence
+## is the claim, and it is the one nothing in the suite could make before.
+func _test_generated_lodes() -> void:
+	print("- generated lodes (GENERATED WORLD — not a seeded fixture)")
+	var gen := LayeredWorldGen.new()
+	var cols: int = FactorySim.GRID_COLS
+	var rows: int = FactorySim.GRID_ROWS
+	var a: WorldData = gen.generate(cols, rows, 1337)
+
+	_check(a.lodes.size() > 20, "a generated world contains lode at all (%d cells)" % a.lodes.size())
+	_check(a.lodes == gen.generate(cols, rows, 1337).lodes, "same seed → identical lodes")
+	_check(gen.generate(cols, rows, 99).lodes != a.lodes, "a different seed → different lodes")
+
+	# THAT FLOOR IS WEAK AND I AM NOT PRETENDING OTHERWISE: 20 against an actual 378 would still pass with
+	# the feature all but dead, and a floor I tuned to today's number would be a number I made up rather
+	# than a property. So the load-bearing check is STRUCTURAL instead — the tier split. Lode follows the
+	# division the world already means (ore above the seal, iron below it), and that cannot be satisfied by
+	# accident: it fails if the pass stops running, if the depth banding breaks, or if everything piles into
+	# one band. What density a player should actually MEET is a question for play, not for a constant
+	# guessed here, and guessing it before playing has been wrong every time it has been tried.
+	var above: int = 0
+	var below: int = 0
+	var kinds: Dictionary = {}
+	for key: Variant in a.lodes:
+		var c: Vector2i = key
+		kinds[a.lodes[c]] = true
+		if c.y >= LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS:
+			below += 1
+		else:
+			above += 1
+	_check(above > 0 and below > 0,
+		"lode is generated in BOTH tiers — %d above the seal, %d below it" % [above, below])
+	_check(kinds.has(&"ore") and kinds.has(&"iron"),
+		"and it carries each tier's own material rather than one everywhere (%s)" % [kinds.keys()])
+
+	# --- the overlap guards, checked over EVERY lode cell rather than a sample ---
+	var on_ore: int = 0
+	var off_host: int = 0
+	var wall_less: int = 0
+	var too_shallow: int = 0
+	var flooded: int = 0
+	var empty: int = 0
+	for key: Variant in a.lodes:
+		var c: Vector2i = key
+		var blk: StringName = a.blocks.get(c, &"")
+		if blk == &"ore" or blk == &"rich_ore" or blk == &"iron" or blk == &"coal":
+			on_ore += 1
+		if blk != &"earth" and blk != &"stone" and blk != &"deepslate" and blk != &"shale":
+			off_host += 1
+		if not a.walls.has(c):
+			wall_less += 1
+		if c.y < HeightmapWorldGen.ground_row(c.x) + LayeredWorldGen.LODE_MIN_DEPTH:
+			too_shallow += 1
+		if a.water.has(c):
+			flooded += 1
+		if int(a.amounts.get(c, 0)) <= 0:
+			empty += 1
+	_check(on_ore == 0, "no lode shares a cell with a solid ore-like block — the double-source guard (%d)" % on_ore)
+	_check(off_host == 0, "every lode sits behind host rock, never air/seal/foliage (%d bad)" % off_host)
+	_check(wall_less == 0, "every lode has a wall behind it (%d without)" % wall_less)
+	_check(too_shallow == 0, "no lode is in the near-surface shell (%d too shallow)" % too_shallow)
+	_check(flooded == 0, "no lode was seeded inside an aquifer (%d flooded)" % flooded)
+	_check(empty == 0, "every lode carries a positive deposit (%d empty)" % empty)
+
+	# --- generator -> WorldData -> sim -> the hand verb ---
+	var sim: FactorySim = FactorySim.new()
+	sim.load_world(a)
+	var in_grid: int = 0
+	for key: Variant in a.lodes:
+		if sim.in_bounds(key):
+			in_grid += 1
+	_check(sim.lode.size() == in_grid, "the sim ingested every in-bounds lode (%d)" % sim.lode.size())
+
+	var probe: Vector2i = Vector2i(-1, -1)
+	for key: Variant in a.lodes:
+		if sim.is_solid(key):
+			probe = key
+			break
+	_check(probe.x >= 0, "there is a lode behind solid rock to work (the case the whole design is about)")
+	if probe.x >= 0:
+		_check(not sim.lode_workable(probe), "a buried lode is NOT workable until the rock is cleared")
+		sim.mine(probe)
+		_check(sim.lode_workable(probe), "clearing the host rock EXPOSES a workable lode")
+		_check(sim.take_lode(probe) == a.lodes[probe], "working the exposed lode yields its ore")
 
 
 ## Terrain is authoritative world state: solid cells block placement, mining clears them, and the

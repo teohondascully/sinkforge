@@ -230,6 +230,32 @@ const IRON_SIZE_MIN: int = 10
 const IRON_SIZE_DEPTH_BONUS: int = 30
 const IRON_AMOUNT: int = 220
 
+# --- LODES: ore born in the WALL, which is where the extraction machines have always been looking ---
+## Terrain is what you CARVE, the lode is what you EXTRACT (`docs/LODE.md`). Every pass above stamps ore
+## as a SOLID BLOCK — the thing you destroy to get at. These bodies go into the background plane behind
+## rock that stays solid, so the vein is something you UNCOVER and then keep working, and the Head, the
+## Spur, the Borer and the Drift Rig finally have something generated to draw from.
+##
+## THIS IS ADDITIVE, DELIBERATELY. The full cutover converts the ore blocks themselves and deletes the
+## solid-ore path in one commit (`docs/LODE_PLAN.md` phase 3); that also rewrites the tutorial ladder and
+## every ore fixture, and it is not what this is. Nothing above is touched, so the existing economy, every
+## richness assertion and every fixture keep their current meaning — and "a generated world contains
+## usable extraction sites" stops being false by construction, which was the blocking half.
+##
+## No new render work: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
+## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid. So
+## these are visible as a tell the moment they exist, and prospecting starts meaning something.
+const LODE_ATTEMPTS_PER_COL: float = 0.35
+const LODE_SIZE_MIN: int = 6
+const LODE_SIZE_DEPTH_BONUS: int = 12
+const LODE_AMOUNT_BASE: int = 40
+const LODE_AMOUNT_DEPTH_BONUS: int = 170
+## A lode never sits in the near-surface shell. Same reasoning as CAVE_MIN_DEPTH: the spawn base has to
+## stay legible rock, and a vein you can reach by scuffing the topsoil is not an extraction SITE — the
+## whole point is that reaching it is a trip. Measured off the column's generated ground, so it follows
+## the relief instead of cutting a flat line through the hills.
+const LODE_MIN_DEPTH: int = 14
+
 # --- aquifers (L3 water pockets you BREACH) ---
 ## Sealed pressurised water pockets carved deep into SOLID rock (block erased, wall KEPT — a flooded carved
 ## room), filled to WATER_MAX so digging in RELEASES them. DEEP + BASE-SAFE by construction: a pocket never
@@ -306,6 +332,12 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	_stamp_bazaar_ruin(world)
 	_stamp_seal(world)          # LAST solid pass: the gate band overwrites everything, so nothing can hole it
 	_seed_aquifers(world, rng)  # AFTER the seal — carves + fills water into solid rock; no later pass touches it
+	# DEAD LAST, and for a reason the other passes do not have: every lode guard tests the FINAL world
+	# (host rock, no water, nothing already there), and the seal overwrites blocks wholesale while the
+	# aquifers carve rock away and flood it. Anywhere earlier and a later pass could falsify a guard after
+	# it had been checked — burying a vein inside the unmineable seal, or leaving one hanging in a flooded
+	# void. Nothing runs after this, so nothing can.
+	_seed_lodes(world, rng, hfield)
 	return world
 
 
@@ -889,6 +921,82 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 			continue                                # only replace SOLID rock (never fill a carved cave)
 		world.blocks[cell] = material
 		world.amounts[cell] = richness
+		filled[cell] = true
+		placed += 1
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			frontier.append(cell + d)
+
+
+## LODE BODIES — the same accretion machinery as every vein above, writing to the BACKGROUND plane and
+## leaving the host rock exactly where it was. That single difference is the whole design: an ore block is
+## something you destroy, a lode is something you uncover.
+##
+## Runs DEAD LAST in `generate`, after the seal and after the aquifers, and that is load-bearing rather
+## than tidy. Every guard below tests the world as it will finally be — host rock, wall behind it, no water
+## in the cell — and a later pass could invalidate any of them: the seal overwrites blocks wholesale, and
+## the aquifers carve solid rock away and flood it. Seeding lodes earlier would let the seal bury a vein
+## inside an unmineable band and let an aquifer leave one hanging in a flooded void. Being last means no
+## pass can falsify a guard after it has been checked.
+##
+## The material follows the tier the depth already means, rather than inventing a third convention: ore
+## above the seal, iron below it, exactly as `_scatter_veins` and `_scatter_iron` divide the world.
+func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
+	var l2_top: int = SEAL_TOP + SEAL_ROWS
+	for _i: int in _density_count(world, LODE_ATTEMPTS_PER_COL):
+		var cx: int = rng.randi_range(0, world.cols - 1)
+		var floor_row: int = ground_row(cx) + LODE_MIN_DEPTH
+		if floor_row >= world.rows - 1:
+			continue
+		var cy: int = rng.randi_range(floor_row, world.rows - 1)
+		# Depth sets size and richness, and the horizontal field tilts the fat ones AWAY from spawn — the
+		# same frontier pull the ore uses, so a lode obeys the economic geography the rest of the world
+		# already has instead of scattering flat through it.
+		var depth_frac: float = float(cy) / float(maxi(1, world.rows - 1))
+		var hmul: float = hfield[cx] if cx < hfield.size() else 1.0
+		var size: int = LODE_SIZE_MIN + int(round(depth_frac * float(LODE_SIZE_DEPTH_BONUS)))
+		var richness: int = LODE_AMOUNT_BASE \
+			+ int(round(depth_frac * float(LODE_AMOUNT_DEPTH_BONUS) * hmul))
+		_grow_lode(world, rng, Vector2i(cx, cy), size, maxi(1, richness),
+			&"iron" if cy >= l2_top else &"ore", floor_row)
+
+
+## Grow one lode body. Identical accretion to `_grow_vein` — random-frontier blob, deterministic in the
+## rng sequence — with the one difference that it writes `world.lodes` and NEVER touches `world.blocks`.
+##
+## THE FOUR GUARDS, each of which is a way this could be silently wrong rather than a style preference:
+##
+##   HOST ROCK ONLY.       Plain earth/stone/deepslate/shale. Never sealrock (the one band worldgen
+##                         promises is solid and unmineable — a vein nobody can ever reach), never
+##                         foliage or bazaar structure, and never a carved-open cell, which would leave
+##                         ore hanging in mid-air in a cave instead of behind a face you clear.
+##   NEVER ON ORE-LIKE.    The double-source guard. Mining an ore block WRITES a lode into its own cell
+##                         (`factory_sim.gd`, the blow that opens a vein), so a lode already there would be
+##                         overwritten along with its richness. One vein per cell, from one source.
+##   NEVER TWICE.          Two bodies overlapping would fight over `amounts`, and the second one's number
+##                         would win for cells that belong to both — a vein whose richness depends on
+##                         iteration order is not deterministic in any useful sense.
+##   NEVER IN WATER.       An aquifer cell is carved open and flooded; a lode there is both exposed and
+##                         underwater before anyone has touched it.
+##
+## A wall behind it is not guarded because the base pass fills a wall under every rock cell in the world,
+## and `WorldRenderer` draws a vein whether or not there is a wall behind it. It is asserted in the test
+## rather than defended here, so if that ever stops being true it fails loudly instead of silently.
+func _grow_lode(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int,
+		richness: int, material: StringName, min_row: int) -> void:
+	var filled: Dictionary = {}
+	var frontier: Array[Vector2i] = [seed_cell]
+	var placed: int = 0
+	while placed < size and not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
+		if filled.has(cell) or not world.in_bounds(cell) or cell.y < min_row:
+			continue
+		var here: StringName = world.blocks.get(cell, &"")
+		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
+			continue                                # host rock only — never ore-like, sealrock, wood, air
+		if world.lodes.has(cell) or world.water.has(cell):
+			continue                                # one vein per cell, and never inside an aquifer
+		world.lodes[cell] = material
+		world.amounts[cell] = richness              # a lode's richness IS its deposit; the sim reads both
 		filled[cell] = true
 		placed += 1
 		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:

@@ -22,6 +22,25 @@ var walls: Dictionary = {}
 ## that doesn't fill this still produces today's one-hit ore). The gen→sim channel for finite,
 ## depth-scaled deposits: generation decides how rich each vein cell is.
 var amounts: Dictionary = {}
+## THE LODE PLANE: cell (Vector2i) -> ore material id. Ore that lives in the BACKGROUND plane, behind
+## whatever rock the `blocks` grid puts in front of it. Sparse; a cell absent here simply has no vein.
+##
+## This is the gen→sim channel the lode was missing, and its absence was not a degree of wrongness but a
+## structural one. `FactorySim` has carried a full lode system for two strikes — `take_lode`, the Drill
+## Head, Spur chaining, the drain fraction, the through-rock stain — and the ONLY thing that ever wrote to
+## it outside save/load was `factory_sim.gd`'s mining branch, the blow that OPENS a vein. So lode was
+## *derived from mining an ore block* and never generated: a fresh world held exactly zero, the Borer and
+## the Drift Rig cut rock with nothing behind it to expose, and every fixture that appeared to prove
+## otherwise injected its own lode through `world_seeder`. The seeded path was green for months while the
+## generated path was false BY CONSTRUCTION, and nothing in the harness could tell the two apart.
+##
+## THE INVARIANT THAT MATTERS, because `blocks` and this grid address the same cells: a lode may sit under
+## solid HOST ROCK — that is the entire point, you clear rock to expose a vein — but it must never share a
+## cell with a solid ORE-LIKE block. That cell would be double-sourced: mining the ore block writes its own
+## lode there and would overwrite this one's richness. The generator enforces it (see `_grow_lode`);
+## `load_world` ingests faithfully rather than silently dropping, so a violation shows up as a test failure
+## instead of as quietly missing ore.
+var lodes: Dictionary = {}
 ## Aquifer water (L3): cell (Vector2i) -> level (1..FactorySim.WATER_MAX). Sparse — only
 ## watered cells appear, and only in CARVED-OPEN cells deep in the rock (a generator seeds sealed pressurized
 ## pockets you BREACH). Ingested by FactorySim.load_world into `sim.water`; an older WorldData without this

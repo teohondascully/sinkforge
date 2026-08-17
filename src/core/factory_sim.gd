@@ -681,6 +681,23 @@ func load_world(world: WorldData) -> void:
 	for cell: Vector2i in world.amounts:
 		if in_bounds(cell):
 			deposits[cell] = int(world.amounts[cell])
+	# THE LODE PLANE: ore born in the wall rather than derived from mining an ore block. Ingested AFTER
+	# `amounts`, because a lode's richness IS its deposit — the two grids describe one vein from different
+	# sides, and `lode_max` (the denominator the fleck field thins against) has to read the amount that was
+	# actually loaded, not the default. A generated lode has never been worked, so what it holds now is
+	# what it held when it was opened.
+	#
+	# Ingested FAITHFULLY: bounds-checked and nothing else. The one illegal arrangement — a lode sharing a
+	# cell with a solid ore-like block, which would be double-sourced — is a generator-side invariant, and
+	# silently dropping it here would turn a generator bug into missing ore that nobody can see. It fails
+	# in a test instead. A lode under ordinary rock is not illegal, it is the whole design: you clear the
+	# rock to expose the vein. Guard an older WorldData that predates this grid (default empty → no lode,
+	# which is exactly the world we had).
+	if world.lodes != null:
+		for cell: Vector2i in world.lodes:
+			if in_bounds(cell):
+				lode[cell] = world.lodes[cell]
+				lode_max[cell] = maxi(1, int(deposits.get(cell, DEFAULT_ORE_DEPOSIT)))
 	# AQUIFERS (L3): seeded water in carved-open pockets (generator guarantees no watered cell is solid).
 	# Guard an older WorldData that predates the water grid (default empty → dry world).
 	if world.water != null:
