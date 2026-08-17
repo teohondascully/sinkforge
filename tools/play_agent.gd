@@ -270,7 +270,34 @@ func _settle(col: int) -> bool:
 ## the column, mine the cell under the feet, FALL into it, repeat — exactly how a player sinks a shaft.
 ## Digging is GATED on staying centred over the column (so it sinks plumb, never carving off sideways),
 ## and the vein itself is mined the moment it's in reach. Returns whether the target got mined.
-func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
+##
+## TWO CONTRACTS LIVE HERE, and until the first eight-seed corpus sweep only one of them was true.
+##
+##   require_arrival = false (default) — "MAKE THIS CELL NOT SOLID". The buried-vein case, and what almost
+##     every caller wants: the ore goes in the pack and where the body ends up is nobody's business.
+##   require_arrival = true — "PUT THE BODY DOWN THERE". For callers that use the shaft to reach a PLACE,
+##     not a resource: a capture, a frame to judge, a descent to time.
+##
+## They differ on exactly one world: the one where the target is ALREADY open. A cave, a void, an old
+## shaft — `is_solid` is false on the first iteration, and this returned true immediately, having dug
+## nothing and gone nowhere. For contract one that is correct and even efficient. For contract two it is a
+## silent no-op that leaves the body standing in daylight while the caller believes it is 16 rows down.
+##
+## That is not hypothetical. `check_underground` spent its whole life this way on seed 99, which has a void
+## under the spawn column: it judged a sunlit surface frame against a dead-space standard written for
+## lamp-lit deep rock, scored 23%, and reported it as the rock failing. Seven other seeds dug their shaft
+## and scored 0%. See the audit notes, Strike 11.
+##
+## The default is unchanged on purpose. Twenty-two call sites use this and most of them mean contract one;
+## quietly giving all of them a new meaning to fix one caller would be trading a known bug for an unknown
+## number of them.
+##
+## ARRIVE_SLACK is measured, not chosen: across the committed corpus every successful descent settles the
+## body two rows above the deepest cell it cut, because `_cell_at` reports the centre and the miner stands
+## ON the floor. Three leaves one row of margin.
+const ARRIVE_SLACK: int = 3
+
+func dig_down_to(cell: Vector2i, budget: int = 2400, require_arrival: bool = false) -> bool:
 	var col: int = cell.x
 	var col_x: float = main._cell_center(Vector2i(col, 0)).x
 	if not await walk_to_column(col):
@@ -278,7 +305,7 @@ func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
 		return false
 	var t: int = 0
 	while t < budget:
-		if not sim.is_solid(cell):
+		if not sim.is_solid(cell) and _arrived(cell, require_arrival):
 			player.input_dir = 0.0
 			return true                              # the vein is mined → in the pack
 		var dx: float = col_x - player.position.x
@@ -302,7 +329,15 @@ func dig_down_to(cell: Vector2i, budget: int = 2400) -> bool:
 		t += 1
 	player.input_dir = 0.0
 	_note("ran out of budget digging to %s (stuck near %s)" % [cell, main._cell_at(player.position)])
-	return not sim.is_solid(cell)
+	return not sim.is_solid(cell) and _arrived(cell, require_arrival)
+
+
+## Whether the descent counts as finished. Under contract one it always does — the cell is open, which was
+## the whole ask. Under contract two the BODY has to be down there too.
+func _arrived(cell: Vector2i, require_arrival: bool) -> bool:
+	if not require_arrival:
+		return true
+	return main._cell_at(player.position).y >= cell.y - ARRIVE_SLACK
 
 
 ## Climb from the bottom of a shaft back UP to the surface — the BYPRODUCT step a player MUST do after

@@ -36,6 +36,13 @@ const DELVE_ROWS: int = 16
 const ROOM_W: int = 11
 const ROOM_H: int = 6
 
+## How deep the shaft must ACTUALLY get before the frame is worth judging. Set from measurement, not from
+## taste: across the committed eight-seed corpus a successful delve lands at 14 rows every time — the body
+## stands on the chamber floor, two rows above the cell it dug to — while the one world where the dig never
+## started reads -1. Anything between 0 and 14 separates them; 12 leaves two rows of slack for terrain that
+## makes the descent awkward without coming near the failure it is there to catch.
+const MIN_DELVE: int = 12
+
 ## The judged slab: everything but the objective banner at the top and the hotbar at the bottom. There is
 ## no sky down here, so unlike the opening there is nothing to exclude in the middle.
 const HUD_TOP: float = 0.16
@@ -71,9 +78,33 @@ func _run() -> void:
 	get_root().add_child(main)
 	for _i: int in SETTLE:
 		await physics_frame
-	await _delve(main)
+	var reached: int = await _delve(main)
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw          # the veil/light layers repaint a frame behind a move
+	print("    the delve reached %d rows below the surface (asked for %d, floor %d)"
+		% [reached, DELVE_ROWS, MIN_DELVE])
+
+	# PROVE THE PREMISE BEFORE JUDGING THE PICTURE. Everything below is written about lamp-lit deep rock:
+	# the DEAD_CAP is tighter than the surface's precisely because the sample has "already been filtered
+	# down to the part of the frame the lamp is pointing at". None of that is true of a frame taken in
+	# daylight, and until this check existed nothing noticed the difference.
+	#
+	# The first multi-seed sweep found it (the audit notes, Strike 11). On seed 99 the delve
+	# reached -1 rows — it never started — and the layer judged the surface, in sunlight, against the
+	# underground standard, and reported 23% dead as though the rock had failed. Seven other seeds reached
+	# 14 and scored 0%. The tell was not the verdict but the DENOMINATOR: 74 lit tiles where every other
+	# world had ~12. A frame six times brighter is not the same frame.
+	#
+	# So this fails as a FIXTURE failure, in its own words, and never as a legibility verdict. A layer that
+	# cannot get to the place it judges has not judged it.
+	if reached < MIN_DELVE:
+		printerr("check_underground: FAIL — the delve reached %d rows of %d, so the frame below is NOT"
+			% [reached, DELVE_ROWS]
+			+ " lamp-lit deep rock and the dead-space standard written for it does not apply.")
+		printerr("  This is the FIXTURE failing to reach its subject, not a verdict on the rock. Something"
+			+ " stopped `dig_down_to` on this world; fix that before reading any number below.")
+		quit(1)
+		return
 
 	var img: Image = get_root().get_texture().get_image()
 	var h: int = img.get_height()
@@ -107,11 +138,27 @@ func _run() -> void:
 
 ## Sink a shaft and cut a work chamber at the bottom of it — the pocket a player carves when they stop to
 ## set up a drill site, and the only view that shows the back wall as a plane rather than as a sliver.
-func _delve(main: MainView) -> void:
+##
+## Returns HOW MANY ROWS BELOW ITS SURFACE the body actually ended up. `dig_down_to` can give up — blocked,
+## out of durability, out of patience — and this used to discard that entirely: whatever depth the agent
+## reached, the chamber was cut there and the frame was judged as though it were lamp-lit deep rock. A
+## shaft that stopped short is still in the daylight soak, and dim soil in daylight is a different picture
+## being held to a standard written for something else. The caller checks this before judging anything.
+func _delve(main: MainView) -> int:
 	var agent: PlayAgent = AGENT.new(self, main)
 	agent.give(&"stone_pickaxe", 1)
 	var here: Vector2i = main._cell_at(agent.player.position)
-	await agent.dig_down_to(Vector2i(here.x, main.sim.surface_row(here.x) + DELVE_ROWS))
+	var from_surface: int = main.sim.surface_row(here.x)
+	# require_arrival: this layer uses the shaft to reach a PLACE, not a resource. On a world with a void
+	# under the spawn column the default contract returns true instantly and leaves the body in daylight.
+	await agent.dig_down_to(Vector2i(here.x, from_surface + DELVE_ROWS), 2400, true)
+	# Against the surface captured BEFORE the dig, never a fresh `surface_row`. Sinking a shaft down a
+	# column MOVES that column's surface to the bottom of the shaft, so re-reading it here measures the
+	# body against the hole it just made and reports roughly -3 no matter how deep it actually went. That
+	# is what the first version of this line did, on all eight seeds, and the constant answer is what gave
+	# it away — a depth gauge that reads the same in every world is not reading depth.
+	var landed: Vector2i = main._cell_at(agent.player.position)
+	var reached: int = landed.y - from_surface
 	# Cut through sim.mine rather than main.try_mine: try_mine enforces the player's 3.2-cell REACH, and a
 	# chamber wider than the miner's arms would silently come out as a blob around them. Reach is a
 	# gameplay rule; the shot only needs the geometry that walking around would leave.
@@ -124,3 +171,4 @@ func _delve(main: MainView) -> void:
 	main._renderer.repaint_world()
 	for _i: int in 30:
 		await physics_frame
+	return reached
