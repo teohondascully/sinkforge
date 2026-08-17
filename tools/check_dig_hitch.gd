@@ -52,6 +52,11 @@ const TIME_SAMPLES: int = 3
 ## The absolutes drift together as the machine warms; the RATIO barely moves. That is exactly the property
 ## that makes it portable, and the reason the gate is a ratio rather than a millisecond count.
 ##
+## Confirmed on foreign hardware AND a foreign renderer, which is the claim that actually needed testing:
+## measured 1.175 on x86 Linux under xvfb + lavapipe (software rasterisation) against 1.19-1.28 on an M4
+## Pro under Metal. Two architectures, two drivers, one number. A millisecond budget would have had to be
+## re-derived for each; the ratio did not move.
+##
 ## Why the ratio exceeds 1.0 at all, and why the gate is not tighter: both paths end with the SAME fixed
 ## full-image set_data + texture upload of the whole 512x512 image. Call it U. Then
 ##   region per-cell = U/576 + p        full per-cell = U/262144 + p ~= p

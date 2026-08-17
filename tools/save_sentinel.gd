@@ -18,6 +18,9 @@ extends SceneTree
 
 const SLOT: String = "user://sinkforge.save"
 const PLANT: String = "SINKFORGE-HARNESS-SENTINEL // not a save; delete me freely"
+## The leading bytes of PLANT, used to recognise OUR OWN marker in the slot. Matching a prefix rather than
+## the whole string on purpose: a run killed mid-plant leaves a truncated marker, and that is still litter.
+const MARKER_HEAD: String = "SINKFORGE-HARNESS-SENTINEL"
 
 
 func _initialize() -> void:
@@ -31,8 +34,18 @@ func _initialize() -> void:
 	var real: String = ProjectSettings.globalize_path(SLOT)
 
 	if mode == "arm":
-		var planted: bool = not FileAccess.file_exists(SLOT)
-		if planted:
+		# "Is there a real save here?" is NOT the same question as "does the file exist". A marker left
+		# behind by a run that was killed, or by a concurrent run on this machine (user:// is keyed on the
+		# project NAME, so worktrees share one slot), exists — and arming on existence alone recorded it as
+		# kind=real, which meant verify would never clean it up and every later run reported "REAL SAVE
+		# PRESENT" for the harness's own litter. That happened, and it cost an investigation.
+		# Our own bytes are recognisable, so recognise them: a marker is ours to own and ours to remove.
+		var existing: bool = FileAccess.file_exists(SLOT)
+		var stale: bool = existing and FileAccess.get_file_as_string(SLOT).begins_with(MARKER_HEAD)
+		var planted: bool = not existing or stale
+		if stale:
+			print("save_sentinel: adopting a stale marker left by an earlier run — it is litter, not a save")
+		if planted and not existing:
 			var f: FileAccess = FileAccess.open(SLOT, FileAccess.WRITE)
 			if f == null:
 				printerr("save_sentinel: cannot plant a sentinel at %s — refusing to run unguarded" % real)
@@ -45,7 +58,12 @@ func _initialize() -> void:
 		out.store_line("planted" if planted else "real")
 		out.store_line(digest)
 		out.close()
-		print("save_sentinel: armed (%s, sha=%s)" % ["planted" if planted else "REAL SAVE PRESENT", digest.substr(0, 12)])
+		var what: String = "planted"
+		if stale:
+			what = "re-planted over stale marker"
+		elif not planted:
+			what = "REAL SAVE PRESENT"
+		print("save_sentinel: armed (%s, sha=%s)" % [what, digest.substr(0, 12)])
 		quit(0)
 		return
 
