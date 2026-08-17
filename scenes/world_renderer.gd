@@ -261,6 +261,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	for path: String in [
 		"res://src/data/materials/earth.tres",
 		"res://src/data/materials/ore.tres",
+		"res://src/data/materials/rich_ore.tres",
 		"res://src/data/materials/coal.tres",
 		"res://src/data/materials/stone.tres",
 		"res://src/data/materials/shale.tres",
@@ -598,6 +599,7 @@ func _draw() -> void:
 	# held-count badge, I/O ports, status bubble and contact shadow (all reaching past its own cell)
 	# aren't clipped at the view edge. Off-screen machines aren't visible → skipping is pixel-identical.
 	var mview: Rect2 = _view_world_rect(3.0)
+	_plan_machine_labels(mview)   # nameplates are laid out for the whole frame before any of them draws
 	for machine: MachineState in sim.machines:
 		if not mview.has_point(Vector2(machine.cell) * float(CELL)):
 			continue
@@ -2339,9 +2341,15 @@ func _draw_machine(machine: MachineState) -> void:
 
 	var held: int = _held(machine)
 	if show_text and held > 0:
-		var badge := Vector2(pos.x + float(CELL) - 12.0, pos.y + 4.0)
-		draw_rect(Rect2(badge, Vector2(10.0, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
-		draw_string(_font, badge + Vector2(1.5, 9.0), str(held),
+		# THE BADGE IS SIZED TO ITS NUMBER. It used to be a fixed 10px box, which is exactly one digit wide;
+		# a Head sitting on a fat vein counts into the hundreds and the same viewer who caught the nameplate
+		# collision read the result as two UI layers fighting — `889` painted across the machine and clipped
+		# by its neighbour's plate. A count that outgrows its box is a count you cannot trust.
+		var tag: String = str(held)
+		var tw: float = _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 3.0
+		var badge := Vector2(pos.x + float(CELL) - 2.0 - tw, pos.y + 4.0)
+		draw_rect(Rect2(badge, Vector2(tw, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
+		draw_string(_font, badge + Vector2(1.5, 9.0), tag,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.97, 0.97, 0.99))
 
 	if recipe != null and recipe.time > 0.0:
@@ -2425,17 +2433,87 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 ## A small NAME plate centred just above the machine (FORGE / DRILL / LIFT / GENERATOR), so a new player
 ## can read what each box IS at a glance — the direct fix for "which one is the forge?". Dark pill backing
 ## keeps it legible over any terrain; uppercased + tight so it reads as a label, not prose. Pure cosmetic.
+##
+## THE PLATES ARE LAID OUT FOR THE WHOLE FRAME, NOT ONE MACHINE AT A TIME (`_plan_machine_labels`), which
+## is the fix for a defect a blind first-time viewer found in a screenshot and read as a straight bug: a
+## bank of three generators rendered as `GENER/ GENER/ GENERATOR`, three plates centred on adjacent 32px
+## cells with ~45px of text each, overlapping into garbage. A machine cannot see its neighbours, so no
+## amount of per-machine cleverness fixes that; something has to look at all of them at once.
+const LABEL_FS: int = 8
+const LABEL_H: float = 11.0
+## How many rows of plates may stack above a machine before the rest are dropped. Two, and not more: the
+## third row would start colliding with the machine one cell UP, which trades a text collision for a
+## worse one. Run-collapsing below makes deep stacks rare enough that two is generous.
+const LABEL_SHELVES: int = 2
+const LABEL_SHELF_H: float = 12.0
+
+## cell -> {text, shelf, cx, w} for every nameplate that will actually be drawn this frame.
+var _label_plan: Dictionary = {}
+
+
+## Lay out this frame's machine nameplates. Two passes, and the first one is the interesting one.
+##
+## RUNS COLLAPSE. A row of contiguous machines with the same name is labelled ONCE, as `SPUR ×5`. This
+## started as collision avoidance and turned out to be the better read anyway: the same viewer who caught
+## the overlap looked at a row of five Spurs beside a Drill and asked *"is this a conveyor? a bank of
+## drills? did I build it or find it?"* — five identical plates say "five things", which is exactly the
+## wrong sentence about a chain that is one Head plus its reach. One plate with a count says the truth,
+## and says it in less ink.
+##
+## Then what is left is SHELF-PACKED left to right, dropping to a second row when a plate would land on
+## the one before it. The aimed machine is packed first so that pointing at something always names it —
+## that is the promise `_text_visible` makes when it exempts the aimed cell from the zoom gate, and a
+## packer that silently dropped that plate would quietly break it.
+func _plan_machine_labels(mview: Rect2) -> void:
+	_label_plan.clear()
+	var named: Dictionary = {}
+	for m: MachineState in sim.machines:
+		if not mview.has_point(Vector2(m.cell) * float(CELL)) or not _text_visible(m.cell):
+			continue
+		if not m.def.display_name.is_empty():
+			named[m.cell] = m.def.display_name.to_upper()
+	var runs: Array[Dictionary] = []
+	for key: Variant in named:
+		var c: Vector2i = key
+		var west: Vector2i = c - Vector2i(1, 0)
+		if named.get(west, &"") == named[c]:
+			continue                          # mid-run: the westmost machine owns the plate for all of us
+		var n: int = 1
+		while named.get(c + Vector2i(n, 0), &"") == named[c]:
+			n += 1
+		var text: String = named[c] if n == 1 else "%s ×%d" % [named[c], n]
+		var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FS).x + 6.0
+		runs.append({"cell": c, "row": c.y, "x0": c.x, "span": n, "text": text, "w": w,
+			"aimed": 0 if (_aim.y == c.y and _aim.x >= c.x and _aim.x < c.x + n) else 1})
+	runs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["aimed"]) != int(b["aimed"]):
+			return int(a["aimed"]) < int(b["aimed"])
+		if int(a["row"]) != int(b["row"]):
+			return int(a["row"]) < int(b["row"])
+		return int(a["x0"]) < int(b["x0"]))
+	var claimed: Dictionary = {}              # "row:shelf" -> the x this shelf is occupied up to
+	for r: Dictionary in runs:
+		var w2: float = float(r["w"])
+		var cx: float = (float(r["x0"]) + float(r["span"]) * 0.5) * float(CELL)
+		for shelf: int in LABEL_SHELVES:
+			var slot: String = "%d:%d" % [int(r["row"]), shelf]
+			if cx - w2 * 0.5 < float(claimed.get(slot, -1.0e9)):
+				continue
+			claimed[slot] = cx + w2 * 0.5 + 2.0
+			_label_plan[r["cell"]] = {"text": r["text"], "shelf": shelf, "cx": cx, "w": w2}
+			break
+
+
 func _draw_machine_label(machine: MachineState, pos: Vector2) -> void:
-	var name: String = machine.def.display_name.to_upper()
-	if name.is_empty():
-		return
-	var fs: int = 8
-	var w: float = _font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var cx: float = pos.x + float(CELL) * 0.5
-	var top: float = pos.y - 11.0
-	draw_rect(Rect2(cx - w * 0.5 - 3.0, top, w + 6.0, 11.0), Color(0.04, 0.05, 0.08, 0.82))
-	draw_string(_font, Vector2(cx - w * 0.5, top + 8.5), name,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.86, 0.90, 0.98))
+	if not _label_plan.has(machine.cell):
+		return                                # collapsed into a neighbour's plate, or packed out
+	var plan: Dictionary = _label_plan[machine.cell]
+	var w: float = float(plan["w"])
+	var left: float = float(plan["cx"]) - w * 0.5
+	var top: float = pos.y - LABEL_H - float(int(plan["shelf"])) * LABEL_SHELF_H
+	draw_rect(Rect2(left, top, w, LABEL_H), Color(0.04, 0.05, 0.08, 0.82))
+	draw_string(_font, Vector2(left + 3.0, top + 8.5), String(plan["text"]),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FS, Color(0.86, 0.90, 0.98))
 
 
 ## Small item-tinted PORTS on a machine's edges: where it EATS (input mouth, top, points IN) and where

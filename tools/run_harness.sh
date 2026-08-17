@@ -3,7 +3,7 @@
 # The whole safety net behind autonomous sprints, in one invocation:
 #   tools/run_harness.sh
 #
-# PARALLEL by default: the 19 layers are independent Godot headless processes that
+# PARALLEL by default: the layers are independent Godot processes that
 # write only uniquely-named user:// files (or none), so wall-clock is max(layers),
 # not sum(layers). Concurrency is bounded to the CPU count.
 #   JOBS=1   tools/run_harness.sh   # serialize (debug; old behavior)
@@ -21,8 +21,26 @@ JOBS="${JOBS:-$NCPU}"
 
 # --- the layers, in declaration order (order is cosmetic; results stream as they finish) ---
 # A layer is normally headless. `add_gl` marks one that must render for real — the dummy renderer paints
-# blank frames, so any layer that judges PIXELS has to own a window. Those layers self-skip (green) when
-# no display exists, which is how CI stays honest without pretending to have tested a picture.
+# blank frames, so any layer that judges PIXELS has to own a window.
+#
+# THE SELF-SKIP ONLY WORKS IF WE LET IT RUN. Those layers guard themselves with
+# `DisplayServer.get_name() == "headless"` and pass trivially when there is no display — but that line is
+# GDScript, and GDScript never executes if Godot cannot bring up a DisplayServer in the first place. So
+# handing an `add_gl` layer a window flag on a machine with no window does not produce an honest skip; it
+# produces `Unable to create DisplayServer, all display drivers failed` and a dead process, which is
+# exactly what CI had been reporting on every push for weeks while this comment claimed otherwise.
+# The display test therefore lives out here, in the runner, where it can still choose the flag.
+# Is there a real display for an `add_gl` layer to open a window on? macOS always has one (Godot uses the
+# native driver, and there is no DISPLAY variable to consult); elsewhere, ask X11/Wayland. `SF_HEADLESS=1`
+# forces the no-display path, which is how you reproduce a CI run on a developer machine.
+HAVE_DISPLAY=0
+if [ "${SF_HEADLESS:-0}" != "1" ]; then
+	case "$(uname -s)" in
+		Darwin) HAVE_DISPLAY=1 ;;
+		*) [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && HAVE_DISPLAY=1 ;;
+	esac
+fi
+
 NAMES=(); SCRIPTS=(); GLFLAG=()
 add() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); }
 add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); }
@@ -107,7 +125,7 @@ while [ "$done_count" -lt "$total" ]; do
 		i="$launched"
 		(
 			s=$SECONDS
-			if [ "${GLFLAG[$i]}" = "1" ]; then
+			if [ "${GLFLAG[$i]}" = "1" ] && [ "$HAVE_DISPLAY" = "1" ]; then
 				if "$GODOT" --path . --script "${SCRIPTS[$i]}" >"$DIR/$i.log" 2>&1; then r=0; else r=1; fi
 			elif "$GODOT" --headless --path . --script "${SCRIPTS[$i]}" >"$DIR/$i.log" 2>&1; then r=0; else r=1; fi
 			printf '%d %d' "$r" "$((SECONDS - s))" >"$DIR/$i.done"
