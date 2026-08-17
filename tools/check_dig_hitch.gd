@@ -263,6 +263,19 @@ func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
 		full_us = mini(full_us, Time.get_ticks_usec() - t0)
 		full_cells = ref.last_baked_cells
 
+	# THE SAME FULL BAKE WITH THE FINE GRID HANDED OVER WHOLE — the boot/load path the game actually takes.
+	# The loop above times the Callable path, which is what check_texture uses (it bakes a synthetic world
+	# with no sim behind it) and what this file measured for its whole life. Timing only that was how a
+	# 262144-dispatch loop stayed the dominant cost of every boot without ever appearing in a number.
+	var bulk: PackedByteArray = r.sim.fine_solid_bytes()
+	_check(bulk.size() == FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV,
+		"the sim handed over a full fine grid to time the bulk path against (%d bytes)" % bulk.size())
+	var bulk_us: int = 1 << 62
+	for i: int in TIME_SAMPLES:
+		var t0: int = Time.get_ticks_usec()
+		ref.rebake(solid_at, fine_at, mat_at, r._wall_base_color, surf_at, r._cell_tone, r._has_wall, bulk)
+		bulk_us = mini(bulk_us, Time.get_ticks_usec() - t0)
+
 	var region_us: int = 1 << 62
 	var region_cells: int = 0
 	for i: int in TIME_SAMPLES:
@@ -278,6 +291,12 @@ func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
 	var region_pc: float = float(region_us) / float(maxi(region_cells, 1))
 	var ratio: float = region_pc / maxf(full_pc, 0.001)
 	print("  COST full bake %.2f ms / %d cells (%.3f us/cell)" % [full_us / 1000.0, full_cells, full_pc])
+	print("  COST full bake, BULK fine grid %.2f ms (%.3f us/cell) — %.2fx the per-cell Callable path"
+		% [bulk_us / 1000.0, float(bulk_us) / float(maxi(full_cells, 1)),
+			float(full_us) / maxf(float(bulk_us), 1.0)])
+	_check(bulk_us <= full_us,
+		"handing the fine grid over whole is not SLOWER than reading it a cell at a time (%.2f vs %.2f ms)"
+			% [bulk_us / 1000.0, full_us / 1000.0])
 	print("  COST dig region %.2f ms / %d cells (%.3f us/cell)" % [region_us / 1000.0, region_cells, region_pc])
 	print("  COST per-cell region/full = %.3f (gate %.2f), best of %d each; total ratio %.4f"
 		% [ratio, MAX_PERCELL_RATIO, TIME_SAMPLES, float(region_us) / float(maxi(full_us, 1))])

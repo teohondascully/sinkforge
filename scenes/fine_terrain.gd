@@ -381,8 +381,12 @@ const SURFACE_KEEP: int = 2
 ## Runs the WHOLE fine grid; called on the initial paint + a wholesale change (load/repaint_world). The
 ## per-dig fast lane is rebake_region (dirty-chunks, #102). Fills the persisted caches, then paints every
 ## fine cell via _paint_fine (shared with the region path).
+## `fine_solid_bulk` is the sim's fine grid handed over WHOLE instead of read a cell at a time. It is
+## optional and the per-cell Callable remains the fallback, so callers that have no array (check_texture
+## builds a synthetic world) are unaffected. See the loop below for why it exists.
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
-		surface_at: Callable, tone_at: Callable, has_wall_at: Callable) -> void:
+		surface_at: Callable, tone_at: Callable, has_wall_at: Callable,
+		fine_solid_bulk: PackedByteArray = PackedByteArray()) -> void:
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)
@@ -403,18 +407,35 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 	for cy: int in _rows:
 		for cx: int in _cols:
 			var idx: int = cy * _cols + cx
+			# One Vector2i per cell rather than four identical ones — same four Callables, a quarter of
+			# the allocations feeding them.
+			var cell := Vector2i(cx, cy)
 			if _solid_mask[idx] > 0.5:
-				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
-			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
-			_tone[idx] = tone_at.call(Vector2i(cx, cy)) as Vector2
-			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
+				_mat_col[idx] = material_color_at.call(cell) as Color
+			_wall_col[idx] = wall_color_at.call(cell) as Color
+			_tone[idx] = tone_at.call(cell) as Vector2
+			_wall_has[idx] = 1 if bool(has_wall_at.call(cell)) else 0
 	_data.resize(_fcols * _frows * 4)
 	# Read the REAL fine solid/air shape from the sim's fine grid (P2 — the molding lives in the sim's fine
 	# DATA), stashed so the paint can read neighbours for fine AO.
-	_fine_solid.resize(_fcols * _frows)
-	for fy: int in _frows:
-		for fx: int in _fcols:
-			_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
+	# ONE COPY INSTEAD OF 262144 DYNAMIC DISPATCHES. This loop called a Callable once per fine cell, and
+	# the boot/load bake it belongs to measured 1671.79ms — 6.377us per cell, on a body of work that is
+	# an array read. `Callable.call()` is dynamic dispatch with argument boxing; at a quarter of a million
+	# invocations it dominates everything the bake actually computes.
+	#
+	# The sim already holds exactly this array — `FactorySim._fine_solid`, a PackedByteArray of 0/1 with
+	# the same `fy * width + fx` layout and the same dimensions — so the whole loop is a memcpy. Duplicated
+	# rather than aliased: the baker's copy is a SNAPSHOT, and rebake_region writes into it later.
+	#
+	# The Callable path is kept, and is not dead code: check_texture bakes a synthetic world that has no
+	# sim behind it. A size mismatch also falls back here rather than baking a wrong-shaped grid.
+	if fine_solid_bulk.size() == _fcols * _frows:
+		_fine_solid = fine_solid_bulk.duplicate()
+	else:
+		_fine_solid.resize(_fcols * _frows)
+		for fy: int in _frows:
+			for fx: int in _fcols:
+				_fine_solid[fy * _fcols + fx] = 1 if bool(fine_solid_at.call(fx, fy)) else 0
 	for fy: int in _frows:
 		for fx: int in _fcols:
 			_paint_fine(fx, fy)

@@ -703,6 +703,15 @@ func fine_h() -> int:
 
 
 ## Is the fine cell at (fx, fy) solid? Out of bounds reads AIR (so world edges mold as carved faces).
+## The whole fine solid/air grid at once, for consumers that would otherwise call fine_is_solid() a quarter
+## of a million times. The renderer's boot bake did exactly that and spent 1.67s on it; handing the array
+## over turns that loop into a memcpy. Empty when the grid has not been built, so callers can fall back.
+func fine_solid_bytes() -> PackedByteArray:
+	if _fine_solid.size() != fine_w() * fine_h():
+		return PackedByteArray()
+	return _fine_solid
+
+
 func fine_is_solid(fx: int, fy: int) -> bool:
 	if fx < 0 or fy < 0 or fx >= fine_w() or fy >= fine_h():
 		return false

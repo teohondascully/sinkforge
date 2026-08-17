@@ -192,22 +192,23 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 
 	var refresh: float = DisplayServer.screen_get_refresh_rate()
 	var interval: float = (1000.0 / refresh) if refresh > 0.0 else 0.0
+	var paced: bool = false
 	if interval > 0.0:
 		var fastest: float = _fastest(phases)
-		var paced: float = _paced_fraction(phases, interval)
-		print("  absolute: vsync evidence — fastest frame %.2fms against a %.2fms refresh; %.0f%% of all"
-			% [fastest, interval, paced * 100.0]
+		var quiet_paced: float = _paced_fraction(phases[0], interval)
+		paced = quiet_paced > PACED_FRACTION
+		print("  absolute: vsync evidence — fastest frame %.2fms against a %.2fms refresh; %.0f%% of QUIET"
+			% [fastest, interval, quiet_paced * 100.0]
 			+ " samples land on a refresh multiple."
-			+ (" The quiet frame is %.2fms, ON the interval: the game renders AT the panel's rate, so" % quiet
-				+ " there is no headroom before it drops under it."
+			+ (" The quiet frame is %.2fms, ON the interval." % quiet
 				if absf(quiet - interval) < VSYNC_PINNED_MS else ""))
-		if paced > PACED_FRACTION:
-			print("  absolute: CAUTION — that clustering is what vsync pacing looks like, so a FAIL below"
-				+ " may be inflated. The budget is asserted anyway, and that is deliberate: vsync makes a"
-				+ " frame WAIT for the next refresh, so it can only report times that are the same or"
-				+ " SLOWER, never faster. A paced run can therefore produce a false FAIL but never a false"
-				+ " PASS — and refusing to measure is exactly how this budget went unrun for its whole"
-				+ " life. An honest red beats a silent nothing.")
+		if paced:
+			print("  absolute: PACED — the quiet phase is waiting on the panel, so a frame that fits inside"
+				+ " the refresh reports as the refresh and its true cost is invisible. On a 120Hz display"
+				+ " the interval (%.2fms) IS the budget, which makes 'we hit 120fps' and 'we are pinned at" % interval
+				+ " 120fps' the same number. Under-budget phases below therefore STAND DOWN rather than"
+				+ " pass. Over-budget phases still FAIL, and that is sound: pacing only ever makes a frame"
+				+ " report the same or SLOWER, so a phase that exceeded the budget really did exceed it.")
 
 	print("  absolute: SF_PERF_HOST=%s — every phase p95 must fit in %.2fms (120fps); the display refreshes"
 		% [_perf_host, FRAME_BUDGET_MS]
@@ -224,6 +225,14 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget — that phase is under 120fps on %s"
 				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host])
 			ok = false
+		elif paced:
+			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
+			# game costing 0.2ms and with one costing 8.3ms, and the harness counts this line, so the run
+			# reports "passed without verifying everything" rather than banking a green nobody earned.
+			print("  SKIP: %s p95 %.2fms is inside the %.2fms budget, but the run is vsync-paced — a frame"
+				% [labels[i], p95, FRAME_BUDGET_MS]
+				+ " that fits inside the refresh reports AS the refresh, so this number cannot tell a fast"
+				+ " phase from a pinned one. Not asserted.")
 		else:
 			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
 	return ok
@@ -265,18 +274,20 @@ func _fastest(phases: Array[PackedFloat32Array]) -> float:
 ##
 ## What survives both is CLUSTERING. Paced frames pile up on multiples of the interval; unpaced ones spread.
 ## Forced on: four phase p95s at 16.56 / 16.51 / 16.61 / 16.59. Forced off: 15.59 / 13.60 / 32.58 / 16.42.
-func _paced_fraction(phases: Array[PackedFloat32Array], interval: float) -> float:
-	if interval <= 0.0:
+## MEASURED ON THE QUIET PHASE ALONE, and pooling every phase was a real defect in the first version.
+## Pacing is only visible where the game is FASTER than the panel: a DIG frame at 33ms is not waiting on
+## anything, so its samples land wherever they like and dilute the signal. Pooled over four phases this
+## reported 18-39% on a machine the peer's independent profiler measured at 72.5% of STILL frames on a
+## multiple — under the 0.6 threshold, so the pooled version said "not paced" about a run that was.
+func _paced_fraction(ms: PackedFloat32Array, interval: float) -> float:
+	if interval <= 0.0 or ms.is_empty():
 		return 0.0
 	var on: int = 0
-	var total: int = 0
-	for ms: PackedFloat32Array in phases:
-		for s: float in ms:
-			total += 1
-			var off: float = fmod(s, interval)
-			if minf(off, interval - off) < VSYNC_PINNED_MS:
-				on += 1
-	return (float(on) / float(total)) if total > 0 else 0.0
+	for s: float in ms:
+		var off: float = fmod(s, interval)
+		if minf(off, interval - off) < VSYNC_PINNED_MS:
+			on += 1
+	return float(on) / float(ms.size())
 
 
 ## Run one phase for SAMPLE drawn frames, driving the body as that phase requires and timing each frame

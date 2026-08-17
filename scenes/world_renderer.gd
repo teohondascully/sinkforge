@@ -2602,7 +2602,8 @@ func _bake_fine_terrain() -> void:
 		_wall_base_color,
 		func(col: int) -> int: return sim.surface_row(col),
 		_cell_tone,
-		_has_wall)
+		_has_wall,
+		sim.fine_solid_bytes())   # the same fine grid handed over WHOLE — see rebake()'s bulk path
 	if _fine_layer != null:
 		_fine_layer.queue_redraw()
 
