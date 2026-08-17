@@ -13,6 +13,13 @@ const FALL_DURATION: float = 0.30
 ## (a pouring column at 240 reads identically to one at 400). Spawns beyond it simply aren't visualized.
 const MAX_ITEMS: int = 240
 
+## How far past the flight path a drop can still paint, in px — the widest thing drawn at or near an
+## endpoint. The landing ring is the winner at radius 15 (4 + 11 fully expanded); the motion smear reaches
+## 8 below the head and the leading trail rect 6 around it. 16 covers all three with a little room, and
+## being generous here costs one comparison while being stingy would clip a visible sparkle at the screen
+## edge — the kind of bug that only appears when the player is walking away from a working machine.
+const DRAW_PAD: float = 16.0
+
 ## Each drop: {from, to: Vector2 (world), t: 0..1 progress, color: Color}.
 var _items: Array[Dictionary] = []
 ## Retired drop dicts, reused by the next spawn — the high-churn pooling the principles doc asks for
@@ -106,31 +113,62 @@ func _sample(from: Vector2, to: Vector2, t: float) -> Vector2:
 	t = clampf(t, 0.0, 1.0)
 	var ex: float = 1.0 - (1.0 - t) * (1.0 - t)        # ease-out horizontal
 	var x: float = lerpf(from.x, to.x, ex)
-	var bow: float = 10.0 + absf(to.x - from.x) * 0.28  # launch hop, taller the further it's tossed
-	var y: float = lerpf(from.y, to.y, t) - sin(t * PI) * bow
+	var y: float = lerpf(from.y, to.y, t) - sin(t * PI) * _bow(from, to)
 	return Vector2(x, y)
+
+
+## The height of the launch hop, taller the further the item is tossed. Factored out because the cull box
+## has to know exactly how far above the straight line the arc reaches — if these two ever disagreed, drops
+## would vanish at the top of a long toss and the bug would only show on wide machine spacings.
+func _bow(from: Vector2, to: Vector2) -> float:
+	return 10.0 + absf(to.x - from.x) * 0.28
 
 
 ## Paint the stream on `canvas`: a fading comet-trail + a chunky glowing nugget with a vertical motion-
 ## smear + a landing sparkle — the gravity pour made loud (the glow itself is added by MainView's lights).
-func draw(canvas: CanvasItem) -> void:
+func draw(canvas: CanvasItem, view: Rect2) -> void:
 	for f: Dictionary in _items:
-		var from: Vector2 = f["from"]
-		var to: Vector2 = f["to"]
-		var t: float = clampf(float(f["t"]), 0.0, 1.0)
-		var col: Color = f["color"]
-		var trail: int = 5
-		for i: int in range(trail, 0, -1):
-			var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
-			var pp: Vector2 = _sample(from, to, tt)
-			var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
-			var sz: float = 5.5 - float(i) * 0.6
-			canvas.draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
-		var p: Vector2 = _pos(f)
-		if t > 0.84:  # landing sparkle: an expanding ring as it nears its rest pile
-			var lt: float = (t - 0.84) / 0.16
-			canvas.draw_arc(to, 4.0 + lt * 11.0, 0.0, TAU, 18, Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), 2.0)
-		canvas.draw_rect(Rect2(p - Vector2(3.0, 8.0), Vector2(6.0, 16.0)), Color(col.r, col.g, col.b, 0.45))  # smear
-		canvas.draw_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0)), Color(0.05, 0.05, 0.07))
-		canvas.draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), col)
-		canvas.draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.5))  # bright core
+		if not view.intersects(_bounds(f)):
+			continue                      # off-screen: invisible, so drawing it is pure cost
+		_draw_item(canvas, f)
+
+
+## Everything one drop paints this frame — about ten primitives, which is the whole reason the cull above
+## matters. MAX_ITEMS is 240, so an unculled pour costs the frame ~2400 draw calls whether or not the
+## player can see a single one of them, and a factory you have left running upstairs while you mine is
+## exactly the case where none of them are on screen.
+func _draw_item(canvas: CanvasItem, f: Dictionary) -> void:
+	var from: Vector2 = f["from"]
+	var to: Vector2 = f["to"]
+	var t: float = clampf(float(f["t"]), 0.0, 1.0)
+	var col: Color = f["color"]
+	var trail: int = 5
+	for i: int in range(trail, 0, -1):
+		var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
+		var pp: Vector2 = _sample(from, to, tt)
+		var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
+		var sz: float = 5.5 - float(i) * 0.6
+		canvas.draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
+	var p: Vector2 = _pos(f)
+	if t > 0.84:  # landing sparkle: an expanding ring as it nears its rest pile
+		var lt: float = (t - 0.84) / 0.16
+		canvas.draw_arc(to, 4.0 + lt * 11.0, 0.0, TAU, 18, Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), 2.0)
+	canvas.draw_rect(Rect2(p - Vector2(3.0, 8.0), Vector2(6.0, 16.0)), Color(col.r, col.g, col.b, 0.45))  # smear
+	canvas.draw_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0)), Color(0.05, 0.05, 0.07))
+	canvas.draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), col)
+	canvas.draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.5))  # bright core
+
+
+## The world box this drop can paint into, for the whole of its flight.
+##
+## Deliberately the WHOLE arc rather than the drop's position this instant: the trail lags the head by up
+## to five samples and the landing ring expands around `to`, so a box around the current point alone would
+## clip a trail that is still on screen after the head has left it. Bounding the flight also makes the
+## test cheap and stable — it does not change as `t` advances, so an item cannot flicker in and out at the
+## screen edge across frames.
+func _bounds(f: Dictionary) -> Rect2:
+	var from: Vector2 = f["from"]
+	var to: Vector2 = f["to"]
+	var lo := Vector2(minf(from.x, to.x), minf(from.y, to.y) - _bow(from, to))   # the arc rises ABOVE both ends
+	var hi := Vector2(maxf(from.x, to.x), maxf(from.y, to.y))
+	return Rect2(lo - Vector2(DRAW_PAD, DRAW_PAD), (hi - lo) + Vector2(DRAW_PAD, DRAW_PAD) * 2.0)

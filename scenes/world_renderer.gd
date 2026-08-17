@@ -594,7 +594,7 @@ func _draw() -> void:
 	_draw_water()      # the L3 fluid layer — translucent blue pools filling each cell to its water line
 	_draw_fill_tells() # YOUR OWN construction: packed fill reads as aggregate, loose fill weeps
 	_draw_surface_life()  # drifting leaves off the canopies + the occasional bird — the surface breathes
-	falling.draw(self)
+	falling.draw(self, _view_world_rect(2.0))
 	# Cull machines whose cell is off-screen. Margin 3 cells so a partially-on-screen machine's glow,
 	# held-count badge, I/O ports, status bubble and contact shadow (all reaching past its own cell)
 	# aren't clipped at the view edge. Off-screen machines aren't visible → skipping is pixel-identical.
@@ -3379,9 +3379,16 @@ func _paint_lights(layer: LightLayer) -> void:
 		for c: Vector2i in seam["cells"]:
 			var cb: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(c.x) * 0.6 + float(c.y) * 0.4)
 			layer.draw_circle(_cell_center(c), 1.4 + 0.6 * cb, Color(core_pip.r, core_pip.g, core_pip.b, (0.55 + 0.30 * cb) * seam_dark))
+	# The same cull the item bodies get (FallingItems.draw). A glow is one textured quad, but there can be
+	# MAX_ITEMS=240 of them and its radius is a single cell — so a mote more than two cells outside the view
+	# cannot put a pixel on screen, and the whole pour of a factory running somewhere you are not was being
+	# painted into the light layer every frame.
+	var mote_view: Rect2 = _view_world_rect(2.0)
 	for m: Dictionary in falling.motes():
 		# Dropped/falling items GLOW (the gravity-pour visual), but a dropped STACK overlaps many motes into
 		# a "mini sun" (playtest). Dimmer + tighter per mote so a stream reads warm without blowing out.
+		if not mote_view.has_point(m["pos"]):
+			continue
 		_draw_glow(layer, m["pos"], float(CELL) * 1.0, m["color"], 0.38)
 	# WATER SELF-SHEEN (L3 legibility): each on-screen water cell adds a FAINT cool bloom so a flooded
 	# pocket reads as a dim blue presence in the near-black deep — you can perceive the flood hazard before
