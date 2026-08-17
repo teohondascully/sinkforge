@@ -626,8 +626,18 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_axe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.64, 0.67, 0.73))
 		&"broad_bit", &"sinker_bit", &"lance_bit", &"wedge_bit":
 			_item_bit(canvas, center, size, item)
-		&"earth", &"stone", &"shale", &"deepslate", &"sealrock":
+		&"stone":
 			_item_block(canvas, center, size, item_color(item))
+		&"earth":
+			_item_clod(canvas, center, size)
+		&"gravel":
+			_item_gravel(canvas, center, size)
+		&"shale":
+			_item_shale(canvas, center, size)
+		&"deepslate":
+			_item_deepslate(canvas, center, size)
+		&"sealrock":
+			_item_sealrock(canvas, center, size)
 		_:
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
 
@@ -669,10 +679,17 @@ static func _item_bit(canvas: CanvasItem, c: Vector2, size: float, kind: StringN
 			canvas.draw_line(c + Vector2(0.0, -u * 0.88), c + Vector2(-u * 0.50, u * 0.10), edge, 1.5)
 
 
-## A CARRIED BLOCK of plain terrain (earth / stone / shale / deepslate / sealrock) — the dig-and-carry
-## stock you backfill, bridge and pillar with. Drawn as a chunk with a lit top face and a shadowed base
-## so it reads as a solid piece of ground you could set down, rather than the flat colour swatch these
-## used to get. The top-lit reading matches the world's own key light, which comes from above.
+## THE CARRIED GROUND, and each one's SILHOUETTE IS WHAT IT DOES — the same argument _item_bit makes for
+## cutting heads, applied to the stock you dig, carry and backfill with.
+##
+## All six of these used to share this one cube and differ only by tint, and four of those tints sit within
+## dE 8 of a neighbour in CIELab, which at hotbar size is a coin-flip. Gravel was worse than that: it had no
+## entry at all and fell through to a flat coloured square. That is the material the whole Drift Rig
+## contract turns on — a gallery backfilled with the stone you dug out of it is a SIEVE, and the same
+## gallery packed with crushed gravel is a BULKHEAD (FactorySim, `## gravel packs`). Deciding whether your
+## gallery floods was a matter of telling two grey squares apart.
+##
+## So stone keeps the cube and is the reference every other one reads against; the rest are shaped.
 static func _item_block(canvas: CanvasItem, c: Vector2, size: float, col: Color) -> void:
 	var h: float = size * 0.40
 	canvas.draw_rect(Rect2(c - Vector2(h, h), Vector2(h, h) * 2.0), col)
@@ -680,6 +697,72 @@ static func _item_block(canvas: CanvasItem, c: Vector2, size: float, col: Color)
 	canvas.draw_rect(Rect2(c + Vector2(-h, h * 0.62), Vector2(h * 2.0, h * 0.38)), col.darkened(0.34))
 	for g: Vector2 in [Vector2(-0.42, 0.10), Vector2(0.22, -0.14), Vector2(0.06, 0.34)]:
 		canvas.draw_rect(Rect2(c + g * size, Vector2(size * 0.10, size * 0.10)), col.darkened(0.22))
+
+
+## GRAVEL — a heap of loose pebbles, and pointedly NOT a block. It is aggregate: the one material that
+## PACKS, and the one you reach for when a gallery has to hold water back. Its outline is lumpy where every
+## other carried material's is straight, so it separates from stone by shape at any size, which is the only
+## thing that survives being 40px wide in a hotbar.
+static func _item_gravel(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var col: Color = item_color(&"gravel")
+	for s: Array in [[-0.30, 0.16, 0.115], [0.02, 0.06, 0.145], [0.29, 0.17, 0.105],
+			[-0.14, -0.15, 0.100], [0.16, -0.14, 0.090]]:
+		var pc: Vector2 = c + Vector2(float(s[0]), float(s[1])) * size
+		var r: float = size * float(s[2])
+		canvas.draw_circle(pc, r, col)
+		canvas.draw_circle(pc - Vector2(size * 0.028, size * 0.034), r * 0.46, col.lightened(0.26))
+
+
+## SHALE — fissile rock, so it reads as a STACK OF THIN PLATES. That is also exactly what it does when you
+## hit it in the world: it splits along its partings rather than crumbling.
+static func _item_shale(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var col: Color = item_color(&"shale")
+	var w: float = size * 0.42
+	for i: int in 4:
+		var inset: float = absf(float(i) - 1.5) * size * 0.038          # the stack tapers off its middle
+		var plate := Rect2(c + Vector2(-w + inset, (float(i) - 2.0) * size * 0.158),
+			Vector2((w - inset) * 2.0, size * 0.118))
+		canvas.draw_rect(plate, col if i % 2 == 0 else col.darkened(0.13))
+		canvas.draw_rect(Rect2(plate.position, Vector2(plate.size.x, size * 0.030)), col.lightened(0.28))
+
+
+## DEEPSLATE — a tall faceted shard. It is harder than stone and breaks to an edge instead of a rubble, so
+## the silhouette says "this came from further down" before the colour has to carry it.
+static func _item_deepslate(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var col: Color = item_color(&"deepslate")
+	_poly(canvas, c, size, [Vector2(-0.12, -0.46), Vector2(0.20, -0.34), Vector2(0.30, 0.12),
+		Vector2(0.10, 0.44), Vector2(-0.22, 0.34), Vector2(-0.30, -0.10)], col)
+	canvas.draw_colored_polygon(PackedVector2Array([                     # one lit facet down the shard
+		c + Vector2(-0.12, -0.46) * size, c + Vector2(0.20, -0.34) * size,
+		c + Vector2(0.04, 0.08) * size, c + Vector2(-0.16, -0.02) * size]), col.lightened(0.30))
+
+
+## SEALROCK — this one KEEPS the block, because it genuinely is one: it is what the Seal is built of, the
+## floor of a layer. It is marked instead, with a bright parting across the face — the line the descent has
+## to break. Shape says "block"; the seam says "not ordinary".
+static func _item_sealrock(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var col: Color = item_color(&"sealrock")
+	_item_block(canvas, c, size, col)
+	var h: float = size * 0.40
+	var seam := Color(0.87, 0.79, 1.0)
+	canvas.draw_line(c + Vector2(-h, h * 0.20), c + Vector2(h, -h * 0.24),
+		Color(seam.r, seam.g, seam.b, 0.85), maxf(1.0, size * 0.045))
+	canvas.draw_line(c + Vector2(-h * 0.22, h * 0.64), c + Vector2(h * 0.44, h * 0.04),
+		Color(seam.r, seam.g, seam.b, 0.48), maxf(1.0, size * 0.030))
+
+
+## EARTH — a rounded clod with crumbs off it: loose ground, not masonry.
+##
+## Earth is the one carried material that is already safe on colour (the only warm one in the set, dE 30+
+## from every other). It is shaped anyway, because if it kept the cube while the rest were given
+## silhouettes, the cube would come to mean "earth" by elimination — and that is a deduction, not a read.
+static func _item_clod(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var col: Color = item_color(&"earth")
+	_poly(canvas, c, size, [Vector2(-0.36, 0.04), Vector2(-0.24, -0.28), Vector2(0.10, -0.36),
+		Vector2(0.34, -0.14), Vector2(0.32, 0.20), Vector2(0.02, 0.36), Vector2(-0.26, 0.28)], col)
+	canvas.draw_circle(c + Vector2(-0.10, -0.16) * size, size * 0.070, col.lightened(0.22))
+	for crumb: Vector2 in [Vector2(0.40, 0.30), Vector2(-0.42, 0.26)]:
+		canvas.draw_circle(c + crumb * size, size * 0.045, col.darkened(0.18))
 
 
 ## RICH ORE (#48) — the same rough nugget, crowded with brighter white-gold flecks: quality READS.
