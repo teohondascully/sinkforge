@@ -175,60 +175,43 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
 ## cells at a junction patch their own face, so the scoop is symmetric with zero cross-cell drawing.
 ##
-## MEASURED 2026-08-18, BECAUSE ALMOST NONE OF THE ABOVE REACHES A PLAYER UNDERGROUND. This pass draws on
-## the COARSE layer at z=-10. `FineTerrain` draws its mold at z=-9 and writes alpha 255 over every solid
-## cell (`fine_terrain.gd:822`), so the only place a coarse pixel survives is where the mold — which is
+## MEASURED 2026-08-18, BECAUSE NONE OF THE ABOVE REACHES A PLAYER UNDERGROUND. This pass draws on the
+## COARSE layer at z=-10. `FineTerrain` draws its mold at z=-9 and writes alpha 255 over every solid cell
+## (`fine_terrain.gd:822`), so the only place a coarse pixel can survive is where the mold — which is
 ## organic and does not fill a cell to its square boundary — has eroded away from the edge. That is exactly
-## the band these strips are drawn in, which is why the answer is "some" rather than "none", and why the
-## coarse FILL and this TREATMENT had to be mutated separately to tell them apart.
+## the band these strips are drawn in, which is why the question needed measuring rather than deducing.
 ##
 ## Every colour in this function forced to opaque magenta, the mold allowed to finish baking first
-## (`pending_rows() == 0`, 164-203 frames of waiting), seed 1337, one standing each:
+## (`pending_rows() == 0`), a gallery fifty rows down so the surface cannot enter frame at any zoom,
+## seed 1337 — AND THE SAME RUN REPEATED WITH NO PATCH AT ALL, because the count is meaningless without it:
 ##
-##                                          magenta px   open faces   px per face
-##   SURFACE, at the opening, 1.00x             4057          115        35.28
-##   UNDERGROUND, a carved gallery, 1.00x        247          184         1.34
-##   UNDERGROUND, zoomed out two steps          1759          640         2.75
+##                                    unpatched   patched   the treatment
+##   SURFACE, at the opening, 1.00x         621      4741          +4120
+##   UNDERGROUND, a deep gallery, 1.00x    7098      7082             -16
 ##
-## NORMALISED BY OPEN FACES, and the normalisation overturned my own first reading of it. An open face is
-## one side of a solid cell whose neighbour is air — exactly the unit this function draws one strip set for
-## — counted by projecting each cell centre through the live canvas transform. Without it, the zoomed-out
-## row reads as "more edges in frame", which is what I wrote down first and asked a peer to attack.
+## **Underground the pass contributes NOTHING that reaches the frame.** Minus sixteen is zero with noise on
+## it. At the surface it paints about four thousand pixels, a fifth of a percent of the frame, and that is
+## real work in the first view anybody ever sees — which is why this is not deleted.
 ##
-## It is not only that. Per face, the treatment survives TWICE AS WELL zoomed out (2.75 against 1.34) while
-## each face covers FEWER screen pixels — a purely geometric account predicts about a quarter, so the
-## measurement is roughly eight times the geometric prediction. Something non-geometric is letting the
-## coarse layer through at low zoom.
+## THE UNPATCHED COLUMN IS THE POINT, and three earlier readings of mine died on it. I reported 247 pixels
+## underground and built two explanations on top of it; 247 was the detector firing on the game's own dark
+## chroma, and the game fires it seven thousand times whether this function draws anything or not. A signal
+## measured without its baseline is not a small signal, it is an unknown one. I then normalised that
+## non-signal by open faces, got a monotonic-looking zoom curve, and proposed a mechanism for it — a curve
+## and a story built on a number that was never a measurement of this pass.
 ##
-## I PROPOSED A MECHANISM AND IT IS REFUTED BY ONE LINE. The story was that the mold's texture is stretched
-## over the world rect and FILTERED, so minifying it softens the alpha edge that does the covering.
-## `world_renderer.gd:402` sets `_fine_layer.texture_filter = TEXTURE_FILTER_NEAREST`. There is no softening;
-## a minified texel either covers a pixel or it does not.
+## The detector had to be rebuilt too. It first tested absolute channel levels (`r > 0.30 and b > 0.30`),
+## and underground the veil multiplies every channel down to a luma of eight to eleven, so it went blind at
+## exactly the depths under study. Hue survives a uniform darkening where levels do not — but the hue test
+## then fired on the world itself, which is what the unpatched column exposes.
 ##
-## So the effect is measured and UNEXPLAINED, and it is left that way deliberately. I wrote the filtering
-## story from an intuition about what minification does, without reading the line that decides it — an hour
-## after writing to a peer that every defect we found tonight was "prose written from an intention, never
-## re-derived from the artefact". A plausible wrong mechanism attached to a real number is worse than a
-## blank, because the next reader inherits the story and not the doubt.
+## What survives, and it is the useful half: whatever makes rock read as carved at depth, it is NOT this
+## function, whose own docstring above promised precisely that. It is `FineTerrain`'s own rim, rim_warm and
+## form sink. Any comment or layer rationale crediting this pass with the contact reading underground is
+## describing something the player cannot see there.
 ##
-## What survives: per open face the treatment is roughly twice as visible zoomed out as at 1.00x, against a
-## geometric prediction of a quarter, on one seed and one standing per row. If that generalises, the coarse
-## layer shows through more at exactly the scales a player uses to read the shape of a dig — which is worth
-## explaining and is not explained here.
-##
-## So: REAL AT THE SURFACE at 35 pixels per face, and 1.34 pixels per face in the view the game is actually
-## played in. The
-## carved reading underground is not coming from here — `FineTerrain`'s own rim, rim_warm and form sink are
-## what a player sees at depth. A peer measured the coarse FILL as 7398 at the surface and 0 underground on
-## the same day; the two results are complementary rather than contradictory, and together they say the
-## fill is fully covered while the treatment survives only in the mold's erosion.
-##
-## NOT DELETED, and the number is the reason: at the surface it is doing visible work, and the surface is
-## the first frame anybody sees. What is retired is the BELIEF — any comment or layer rationale that credits
-## this pass with the contact reading at depth is describing a pass the player cannot see there.
-##
-## Caveats, so the figures are not over-read: one seed, one gallery shape, one standing per row, and a pixel
-## count is a statement about area rather than about noticeability.
+## Caveats: one seed, one gallery shape, one standing per row, and a pixel count is a statement about area
+## rather than about noticeability.
 static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
 	const STEPS: int = 3
 	const CH: float = 7.0                              # the silhouette's chamfer radius — keep in lockstep
