@@ -346,7 +346,10 @@ func _ids_the_pack_can_hold() -> Array[StringName]:
 			if not f.ends_with(".tres"):
 				continue
 			var mat: MaterialDef = load("res://src/data/materials/%s" % f) as MaterialDef
-			if mat == null or mat.layer == &"wall" or mat.id == &"leaves":
+			# sealrock is `REQUIRED_TIER: 99` — un-hand-mineable by any pick, forever, because the L1->L2
+			# gate is a throughput wall and only a fed Descent Engine breaches it. `mine()` would pocket it
+			# if it were ever reached; it never is.
+			if mat == null or mat.layer == &"wall" or mat.id == &"leaves" or mat.id == &"sealrock":
 				continue
 			_add(out, mat.id)
 	var r: DirAccess = DirAccess.open("res://src/data/recipes")

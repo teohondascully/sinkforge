@@ -209,6 +209,16 @@ const ITEM_PURPOSE: Dictionary = {
 	&"wood_axe": "an old hatchet — your pick chops trees now; this is a keepsake",
 	&"sapling": "RMB plants it on grassy ground — a new tree grows (renewable wood)",
 	&"rich_ore": "high-grade ore from the deep shelf — a Blast Furnace pours 2 ingots from 1",
+	&"shale": "placeable block — the banded rock of the middle band; nothing is made from it yet",
+	# THE RACK'S FOUR CUTTING HEADS, which had no sentence at all until the menu matrix photographed one.
+	# Each line is the bit's OWN entry in `BitRules.BIT` said in the second person — `keeps: false` is why
+	# the Broad's says nothing reaches your pack, `recovery: 0.85` is the Lance's long pause, and
+	# `grain_only: true` is why the Wedge does nothing across the grain. The icons already say this in
+	# silhouette (`Visuals._item_bit`); the plate that exists to explain the selected thing said "—".
+	&"broad_bit": "2x2 head — but it PULVERISES: nothing it breaks reaches your pack. Rooms, never veins",
+	&"sinker_bit": "sinks three cells straight down, walls untouched — the clean 1-wide shaft",
+	&"lance_bit": "drives five the way you face, then a long recovery — a commitment, not a rhythm",
+	&"wedge_bit": "splits eight ALONG a seam — and does nothing whatsoever across the grain",
 	&"blast_furnace": "smelts RICH ore 1 → 2 ingots — the deep veins' payoff",
 	&"scanner": "sonar — select it, RMB pulses: nearby veins echo through the rock",
 	&"rope": "RMB above a drop — it unrolls down; W/S climbs it",
@@ -216,6 +226,8 @@ const ITEM_PURPOSE: Dictionary = {
 	&"conduit": "RMB lays power tube — power flows down + sideways, never up",
 	&"processor": "the Forge — smelts what falls into it (ore → ingots)",
 	&"splitter": "routes falling items DOWN + RIGHT (aim R at it: ratio)",
+	&"spur": "one more mouth on a Head — reaches across a vein the drill alone cannot (it says 'unlinked' if it reaches nothing)",
+	&"pump": "POWERED, it drains water from its own cell and the ones below — the way back out of a flood",
 	&"lift": "hauls goods — and YOU — up its column; power multiplies it",
 	&"drill": "bores straight down through an ore vein — burns coal",
 	&"hopper": "banks what falls in, meters it DOWN — keeps the first item it tastes",

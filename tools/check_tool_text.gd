@@ -112,6 +112,7 @@ func _run() -> void:
 	# file would go on looking like it was guarding something. Assert the premise out loud instead.
 	_check(_class_is_flat(&"pick"),
 		"every pick still cuts at the same rate, so the speed rule above is live and not merely inert")
+	_check_every_selectable_says_something()
 
 
 ## Does `blurb` name material `m` as a word? Substring alone would let "ore" match "before", so the match is
@@ -123,6 +124,94 @@ func _run() -> void:
 ## inside a longer name — an over-strict result, never a permissive one, and over-strict is the correct
 ## direction for a guard on what the game promises a player. Tightening it would mean ranking overlapping
 ## names by length, which is more machinery than a five-row table is worth.
+## ...AND IT MUST TELL YOU SOMETHING AT ALL, which is the half above this one cannot see.
+##
+## Everything above judges the CONTENT of a tooltip against the rules it describes: if a blurb claims a
+## tier, the tier table must agree. Its population is "ids that have a blurb". An id with NO blurb makes no
+## claim, contradicts no table, and passes every assertion in this file by making itself absent from them.
+##
+## `Hud._draw_bazaar_detail` does `blurb = ITEM_PURPOSE.get(id, "—")`, so the detail plate — the one surface
+## in the game whose entire job is explaining the selected thing — prints a lone em-dash and looks
+## deliberate. Eight ids were in that state when this was written, including ALL FOUR cutting bits, whose
+## icons are drawn as their cut on purpose (`Visuals._item_bit`: "you can tell what a bit does to rock by
+## looking at what it is") and whose plate said nothing. The silhouette carried the design thesis and the
+## sentence carried an em-dash.
+##
+## The population is every id the Bazaar can put ON that plate: the machines `_craftable` sells, the tools
+## on the Rack, and everything the pack can hold — derived from the data rather than listed here, for the
+## same reason `_items_the_view_knows` scans visuals.gd instead of mirroring it.
+func _check_every_selectable_says_something() -> void:
+	var ids: Array[StringName] = []
+	for f: String in ["res://src/data/materials", "res://src/data/recipes"]:
+		var d: DirAccess = DirAccess.open(f)
+		if d == null:
+			continue
+		for n: String in d.get_files():
+			if not n.ends_with(".tres"):
+				continue
+			if f.ends_with("materials"):
+				var mat: MaterialDef = load("%s/%s" % [f, n]) as MaterialDef
+				# Wall-plane rock is never carried; leaves chop into a sapling; the seal is REQUIRED_TIER 99
+				# and no pick has ever broken one. None of the three can reach the plate.
+				if mat == null or mat.layer == &"wall" or mat.id == &"leaves" or mat.id == &"sealrock":
+					continue
+				_add_id(ids, mat.id)
+			else:
+				var rec: RecipeDef = load("%s/%s" % [f, n]) as RecipeDef
+				if rec == null:
+					continue
+				for side: Dictionary in [rec.inputs, rec.outputs]:
+					for k: Variant in side:
+						_add_id(ids, StringName(k))
+	for t: Dictionary in MainView.CRAFT_TOOLS:
+		_add_id(ids, t["id"])
+	_add_id(ids, &"wood_pickaxe")
+	_add_id(ids, &"sapling")
+	var d2: DirAccess = DirAccess.open("res://src/data/machines")
+	if d2 != null:
+		for n: String in d2.get_files():
+			if not n.ends_with(".tres"):
+				continue
+			var def: MachineDef = load("res://src/data/machines/%s" % n) as MachineDef
+			if def != null and ResearchRules.locking_tech(def.id) != &"" or _is_craftable(def):
+				_add_id(ids, def.id)
+
+	var silent: Array[String] = []
+	for id: StringName in ids:
+		var text: String = str(Hud.ITEM_PURPOSE.get(id, ""))
+		if text.strip_edges() == "" or text.strip_edges() == "—":
+			silent.append(String(id))
+	_check(silent.is_empty(),
+		"every one of the %d things the counter can put on the detail plate says what it is for%s"
+			% [ids.size(), "" if silent.is_empty() else " — SILENT (the plate prints an em-dash): "
+				+ ", ".join(silent)])
+	# NON-VACUITY: an empty id list satisfies the above perfectly, which is what a renamed data directory
+	# produces, and the failure mode of "nothing was silent" over nothing is a silent pass.
+	_check(ids.size() >= 30, "the scan found %d selectable ids to check" % ids.size())
+	# CONTROL: the same predicate over an id the table certainly does not carry.
+	var probe: String = str(Hud.ITEM_PURPOSE.get(&"not_a_real_item", ""))
+	_check(probe.strip_edges() == "", "the same lookup comes back empty for an id with no entry")
+
+
+func _add_id(into: Array[StringName], id: StringName) -> void:
+	if id != &"" and not into.has(id):
+		into.append(id)
+
+
+## A machine is on the counter if `MainView._craftable` carries it. That list is a hardcoded array built in
+## `_ready`, so it is read from the source rather than from a booted scene here — this layer never boots one,
+## and `check_craftable_registry` is the one that reads the LIVE list.
+func _is_craftable(def: MachineDef) -> bool:
+	if def == null:
+		return false
+	var f: FileAccess = FileAccess.open("res://scenes/main.gd", FileAccess.READ)
+	if f == null:
+		return false
+	var body: String = f.get_as_text()
+	f.close()
+	return body.contains("machines/%s.tres" % String(def.id))
+
+
 func _names(blurb: String, m: String) -> bool:
 	var word: String = m.replace("_", "[ _]")
 	var re := RegEx.new()
