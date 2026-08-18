@@ -30,6 +30,11 @@ GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 CORPUS=(1337 4242 7 99 20260817 31337 512 8675309)
 [ "$#" -gt 0 ] && CORPUS=("$@")
 
+# NARROW TO ONE LAYER when you are chasing a specific finding rather than sweeping. Extended regex against
+# the layer name, same shape as the harness's SF_ONLY so there is one thing to remember:
+#   SF_CORPUS_ONLY=check_pacing bash tools/seed_corpus.sh
+# A subset is never a corpus run, and the header below says which it was.
+
 # The seed-sensitive layers: each boots a GENERATED world and measures a property of it. Layers asserting
 # something seed-independent (save durability, controls, registries) are deliberately absent — running them
 # per seed would burn minutes to re-prove the same thing. A layer that builds its own FIXTURE does not
@@ -47,6 +52,13 @@ LAYERS=(
 	check_relief
 	check_room_reads
 	check_underground
+	# ADDED 2026-08-17 on the peer's finding, and it is the exact class this tool exists for: they ran
+	# `check_pacing` across four ad-hoc seeds and it failed two of them on floors that are green in the
+	# harness, because the harness runs ONE seed. A layer whose subject is "the shape of a session" is
+	# seed-sensitive by construction — the session happens in a generated world — and it had never been
+	# pointed at more than one. Whatever the distribution says, it is a finding about the worlds and not a
+	# licence to move a floor; read the warning at the top of this file before touching one.
+	check_pacing
 )
 
 # WHICH LAYERS NEED A REAL WINDOW. `check_underground` judges PIXELS, and the headless driver paints blank
@@ -90,7 +102,21 @@ if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 	trap 'rm -rf "$DIR"; [ "$LOCK_HELD" = "1" ] && rm -rf "$LOCK"' EXIT
 fi
 
-echo "SEED CORPUS — ${#LAYERS[@]} layers x ${#CORPUS[@]} seeds"
+if [ -n "${SF_CORPUS_ONLY:-}" ]; then
+	KEEP=()
+	for l in "${LAYERS[@]}"; do
+		printf '%s' "$l" | grep -Eq -- "$SF_CORPUS_ONLY" && KEEP+=("$l")
+	done
+	if [ "${#KEEP[@]}" -eq 0 ]; then
+		echo "!! SF_CORPUS_ONLY='${SF_CORPUS_ONLY}' matched none of: ${LAYERS[*]}" >&2
+		exit 2
+	fi
+	LAYERS=("${KEEP[@]}")
+fi
+subset=""
+[ -n "${SF_CORPUS_ONLY:-}" ] && subset=" — SUBSET, SF_CORPUS_ONLY='${SF_CORPUS_ONLY}'"
+echo "tree: $(cd "$(dirname "$0")/.." && pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null)  head: $(git rev-parse --short HEAD 2>/dev/null)"
+echo "SEED CORPUS — ${#LAYERS[@]} layers x ${#CORPUS[@]} seeds${subset}"
 echo "godot: $GODOT"
 echo
 
