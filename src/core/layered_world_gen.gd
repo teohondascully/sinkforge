@@ -245,21 +245,12 @@ const IRON_AMOUNT: int = 220
 ## No new render CODE: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
 ## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid.
 ##
-## WHETHER A PLAYER CAN SEE ANY OF THIS IS UNVERIFIED, and this comment has now been wrong in BOTH
-## directions in one afternoon, which is the only reason it is worth the space.
-##
-## It first read "so these are visible as a tell the moment they exist, and prospecting starts meaning
-## something" — reasoning from the existence of `_stain()` to a claim about what a player SEES, without
-## looking at anything. I then took one capture, saw dark rock, and rewrote it to say the tell is not
-## discernible by eye. That was worse: the centre of the subject in that frame is covered by the GRAPPLE
-## tutorial bubble, so it is evidence about HUD occlusion and not about rock. **I read an occluded frame
-## as evidence about what it occludes.**
-##
-## So: unverified. Not "visible", not "invisible". A capture that could settle it has to set and record
-## the tutorial/objective state first so the vein is unoccluded, and is a diagnostic frame rather than a
-## first-impression one. Until then the honest statement is that the lode plane is correct, generated,
-## deterministic, ingested and workable — none of which depends on the tell — and that nobody has yet
-## established what it looks like to a person.
+## That the stain code RUNS over these cells is a mechanism claim and it holds. WHETHER A PLAYER CAN SEE
+## THE RESULT IS UNVERIFIED — neither "visible" nor "invisible" — and nothing here should be read as
+## either. A capture that could settle it must set and RECORD the tutorial/objective HUD state so the vein
+## is unoccluded, and is a diagnostic frame rather than a first-impression one; see `docs/LODE_PLAN.md` §5.
+## What this generator is answerable for is that the lode plane is correct, deterministic, ingested and
+## workable — none of which depends on the tell.
 const LODE_ATTEMPTS_PER_COL: float = 0.35
 const LODE_SIZE_MIN: int = 6
 const LODE_SIZE_DEPTH_BONUS: int = 12
