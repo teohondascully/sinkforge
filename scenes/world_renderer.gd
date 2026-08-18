@@ -307,6 +307,7 @@ var _crystal_seams_valid: bool = false
 var _crystal_seams_view: Rect2 = Rect2()
 var _lights: LightLayer
 var _tooth: LightLayer                                 ## post-veil rock tooth (rock_tooth.gdshader)
+var _marks: LightLayer                                 ## post-veil PLAYER-INTENT markers (see _paint_marks)
 var _haze: LightLayer      ## the shared DISTORTION pass (#20) — heat shimmer now, water/L4 later
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
 var _leaf_cache_dirty: bool = true
@@ -429,10 +430,22 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_tooth = LightLayer.new()
 	_tooth.setup(52, _paint_fine_terrain)
 	_tooth.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
 	var tooth_mat := ShaderMaterial.new()
 	tooth_mat.shader = load("res://scenes/rock_tooth.gdshader")
 	_tooth.material = tooth_mat
 	add_child(_tooth)
+	# PLAYER INTENT SITS ABOVE THE DARK. The map beacon, the dig plan and the objective ring are not part
+	# of the world — they are things YOU put there, and the veil was taking two thirds of each. Measured,
+	# at 24 metres, by differencing per-pixel maxima with the cue placed against the cue cleared (null
+	# control: peak +1.0 over 0 px): the beacon asks for luma 205.4 and delivered 63.3; the dig bracket
+	# asks for ~104 and delivered 32.1. **Both keep 31%**, which is one multiplicative factor and not two
+	# coincidences. MIX rather than ADD, deliberately: a marker should arrive at the colour it was authored
+	# in, and an additive pass here would blow out over the lamp — see _paint_lights, where exactly that
+	# happened once and washed the centre of the frame.
+	_marks = LightLayer.new()
+	_marks.setup(53, _paint_marks)
+	add_child(_marks)
 	# THE DISTORTION PASS: one shared screen-warp shader; consumers draw masked quads.
 	# Proven here on machine heat-haze. Sits ABOVE the world + veil but UNDER the additive light pools
 	# (hot air bends the scene, lamplight stays crisp).
@@ -544,6 +557,8 @@ func _process(delta: float) -> void:
 	_update_veil()              # the lightmap veil (#17): rebake the base if dirty, re-cut the live lights
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
+	if _marks != null:
+		_marks.queue_redraw()   # ping ring, dig pulse and objective ring all breathe on _anim_time
 	if _haze != null:
 		_haze.queue_redraw()    # working furnaces convect (#20 — the shader's TIME drives the ripple)
 	if _back != null:
@@ -698,10 +713,7 @@ func _draw() -> void:
 		bazaars.draw(self)  # decorated stall + the block-by-block transform, over the wood frame
 	if particles != null:
 		particles.draw(self)
-	_draw_dig_marks()      # the painted dig PLAN — corner-bracketed cells waiting for the pick
 	_draw_mine_cracks()    # spider cracks on the block you're charge-mining (the felt friction)
-	_draw_guide_targets()  # pulsing "do it HERE" ring/ghost for the current objective step
-	_draw_ping()           # the map-click beacon — the spot you marked, findable on foot
 	_draw_scan()           # the sonar pulse + vein echoes (the scanner's whole voice)
 	_draw_speed_streaks()  # motion lines behind a body moving faster than it can run
 	_draw_grapple()        # the live line + its hook, over the world and under the HUD
@@ -745,26 +757,36 @@ func _draw_scan() -> void:
 
 ## The in-world PING beacon: a cyan pin bobbing over the marked spot + an expanding
 ## sonar ring, so the bookmark you clicked on the map is visible from across a cavern when you arrive.
-func _draw_ping() -> void:
+## The post-veil marker pass. Everything here is something the PLAYER put on the world rather than
+## something the world contains, which is why it is exempt from the darkness the world obeys — the same
+## exemption `_player` already has at z 60. Drawn MIX so each mark arrives at the colour it was authored
+## in; see the note where `_marks` is created for the measurements that put it here.
+func _paint_marks(layer: LightLayer) -> void:
+	_draw_dig_marks(layer)      # the painted dig PLAN — corner-bracketed cells waiting for the pick
+	_draw_guide_targets(layer)  # pulsing "do it HERE" ring/ghost for the current objective step
+	_draw_ping(layer)           # the map-click beacon — the spot you marked, findable on foot
+
+
+func _draw_ping(canvas: CanvasItem) -> void:
 	if _ping_world.x == INF:
 		return
 	var ring: float = fmod(_anim_time, 1.6) / 1.6
 	var col := Color(0.45, 0.95, 1.0)
-	draw_arc(_ping_world, 6.0 + ring * 26.0, 0.0, TAU, 28,
+	canvas.draw_arc(_ping_world, 6.0 + ring * 26.0, 0.0, TAU, 28,
 		Color(col.r, col.g, col.b, 0.5 * (1.0 - ring)), 2.0)
 	var bob: float = sin(_anim_time * 3.0) * 2.5
 	var tip: Vector2 = _ping_world + Vector2(0.0, -4.0 + bob)
-	draw_line(tip, tip + Vector2(0.0, -10.0), Color(col.r, col.g, col.b, 0.85), 1.5)
+	canvas.draw_line(tip, tip + Vector2(0.0, -10.0), Color(col.r, col.g, col.b, 0.85), 1.5)
 	var head: Vector2 = tip + Vector2(0.0, -13.0)
-	draw_colored_polygon(PackedVector2Array([head + Vector2(0.0, -4.5), head + Vector2(4.0, 0.0),
+	canvas.draw_colored_polygon(PackedVector2Array([head + Vector2(0.0, -4.5), head + Vector2(4.0, 0.0),
 		head + Vector2(0.0, 4.5), head + Vector2(-4.0, 0.0)]), col)
-	draw_circle(head, 1.4, Color(0.06, 0.10, 0.14))
+	canvas.draw_circle(head, 1.4, Color(0.06, 0.10, 0.14))
 
 
 ## The painted dig PLAN: each marked cell wears amber corner brackets + a whisper of
 ## fill, breathing gently so the plan reads as "queued for the pick", quieter than the aim cursor and
 ## the objective rings. Marks are the controller's live dict; stale entries are its job to prune.
-func _draw_dig_marks() -> void:
+func _draw_dig_marks(canvas: CanvasItem) -> void:
 	if _dig_marks.is_empty():
 		return
 	var view: Rect2 = _view_world_rect()
@@ -776,12 +798,12 @@ func _draw_dig_marks() -> void:
 		var pos := Vector2(key as Vector2i) * float(CELL)
 		if not view.has_point(pos):
 			continue
-		draw_rect(Rect2(pos + Vector2.ONE * 2.0, Vector2.ONE * float(CELL - 4)), fill)
+		canvas.draw_rect(Rect2(pos + Vector2.ONE * 2.0, Vector2.ONE * float(CELL - 4)), fill)
 		for corner: Vector2 in [Vector2.ZERO, Vector2(1, 0), Vector2(0, 1), Vector2.ONE]:
 			var c: Vector2 = pos + corner * float(CELL) + (Vector2.ONE * 0.5 - corner) * 4.0
 			var dir := Vector2.ONE * 0.5 - corner   # points inward
-			draw_line(c, c + Vector2(signf(dir.x) * arm, 0.0), edge, 1.5)
-			draw_line(c, c + Vector2(0.0, signf(dir.y) * arm), edge, 1.5)
+			canvas.draw_line(c, c + Vector2(signf(dir.x) * arm, 0.0), edge, 1.5)
+			canvas.draw_line(c, c + Vector2(0.0, signf(dir.y) * arm), edge, 1.5)
 
 
 ## Spider cracks across the block currently being charge-mined, growing with the break progress (pushed
@@ -1519,7 +1541,7 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 ## The current objective's WHERE-cell(s), drawn as a breathing beacon so a new player can't miss where to
 ## act. "act" = a pulsing white reticle + a bobbing down-arrow over the target (dig this / feed this forge);
 ## "ghost" = a pulsing green dashed cell showing where to place the next machine (cap the forge). Cosmetic.
-func _draw_guide_targets() -> void:
+func _draw_guide_targets(canvas: CanvasItem) -> void:
 	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)         # 0..1 breathing
 	for t: Dictionary in _guide_targets:
 		var cell: Vector2i = t["cell"]
@@ -1530,7 +1552,7 @@ func _draw_guide_targets() -> void:
 		if String(t.get("mode", "act")) == "ghost":
 			var g := Color(0.45, 1.0, 0.55, 0.35 + 0.45 * pulse)
 			var pad: float = 2.0 + 2.0 * pulse
-			draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
+			canvas.draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
 		else:
 			# NEUTRAL-WHITE targeting reticle. History: amber read as a campfire (warm ring at ground level),
 			# then cyan read faintly as an "energy node" against the ore. A near-white ring on a dark backing
@@ -1539,9 +1561,9 @@ func _draw_guide_targets() -> void:
 			var r: float = float(CELL) * (0.62 + 0.12 * pulse)
 			# A dark backing ring first so the cyan reads even INSIDE the warm head-lamp pool (the
 			# starter vein sits under the miner's lamp).
-			draw_arc(center, r, 0.0, TAU, 28, Color(0.02, 0.05, 0.07, 0.6), 4.5)
-			draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
-			draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
+			canvas.draw_arc(center, r, 0.0, TAU, 28, Color(0.02, 0.05, 0.07, 0.6), 4.5)
+			canvas.draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
+			canvas.draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
 		# A bobbing down-pointer floated HIGH ABOVE the cell — out of the lamp wash, into open air —
 		# with a tether line back down to the exact rock so the eye tracks marker → target. Dark-outlined
 		# so it punches through both the bright lamp AND the bright day sky (reads on any background).
@@ -1550,11 +1572,11 @@ func _draw_guide_targets() -> void:
 		var arrow := Color(0.95, 0.98, 1.0, 0.94)
 		var dark := Color(0.02, 0.04, 0.06, 0.85)
 		# tether: marker down to the cell top
-		draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(0.88, 0.93, 1.0, 0.30 + 0.20 * pulse), 2.0)
+		canvas.draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(0.88, 0.93, 1.0, 0.30 + 0.20 * pulse), 2.0)
 		# the pointer: a bold outlined chevron, ~1.6x the old size
 		var back := PackedVector2Array([tip + Vector2(0, 12), tip + Vector2(-11, -7), tip + Vector2(11, -7)])
-		draw_colored_polygon(back, dark)
-		draw_colored_polygon([tip + Vector2(0, 9), tip + Vector2(-8, -5), tip + Vector2(8, -5)], arrow)
+		canvas.draw_colored_polygon(back, dark)
+		canvas.draw_colored_polygon([tip + Vector2(0, 9), tip + Vector2(-8, -5), tip + Vector2(8, -5)], arrow)
 
 
 ## An INTERACTABLE outline pulse: a breathing coloured outline + solid corner brackets
