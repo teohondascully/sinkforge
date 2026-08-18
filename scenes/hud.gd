@@ -636,6 +636,10 @@ func _draw_forged() -> void:
 ## to sit on one step before it comes back (#B4).
 const HINT_HOLD: float = 9.0
 const HOVER_MAX_W: float = 300.0   ## the inspector may grow to fit its widest line, but no further
+## ...and never shrinks below this, so a one-word machine name still reads as a panel rather than a chip.
+## Named because `check_hud_layout` needs the same number to reason about the right column, and a test
+## that re-types a literal is checking its own arithmetic against itself.
+const HOVER_MIN_W: float = 218.0
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 
@@ -807,6 +811,12 @@ func _draw_hover() -> void:
 	_hover_rect = Rect2()
 	if hover_info.is_empty():
 		return
+	# THE BIG MAP IS THE SCREEN — the third element to take this rule, after the goal plate (:699) and the
+	# pack bar (:2290), and for the reason :696 wrote down once for all three. Standing down BEFORE the
+	# rect is built, so `_hover_rect` stays empty and `_cursor_on_hover_panel()` (main.gd:2154) reports
+	# false — otherwise the config-panel PIN at main.gd:769 would latch a machine nobody can see.
+	if minimap_large:
+		return
 	var ins: Array = hover_info.get("in", [])
 	var outs: Array = hover_info.get("out", [])
 	var holding: Array = hover_info.get("holding", [])
@@ -828,14 +838,25 @@ func _draw_hover() -> void:
 	for line: String in [mode_text, rate_text]:
 		if line != "":
 			widest = maxf(widest, _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x)
-	var width: float = clampf(widest + pad * 2.0, 218.0, HOVER_MAX_W)
+	var width: float = clampf(widest + pad * 2.0, HOVER_MIN_W, HOVER_MAX_W)
 	name_text = _fit_text(name_text, 13, width - pad * 2.0)
 	mode_text = _fit_text(mode_text, 11, width - pad * 2.0)
 	rate_text = _fit_text(rate_text, 11, width - pad * 2.0)
 	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate) \
 		+ knobs.size() + int(not bar.is_empty())
-	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
-	# is centred, off this column), else just the FORGED chip — so the inspector never collides.
+	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown, else just the
+	# FORGED chip.
+	#
+	# THIS COMMENT USED TO SAY "(the large map is centred, off this column) — so the inspector never
+	# collides", AND THAT WAS FALSE. Centred does not mean narrow: at 128x128 the large map spans x
+	# 181..459, while this panel is right-anchored with a HOVER_MIN_W floor, so its left edge is at most
+	# 640 - 218 - 12 = 410. Measured overlap 49x50 — and the collision was reachable in ordinary play
+	# (open the map with M, aim at a machine). The `else 34.0` below is what caused it: the fallback fires
+	# exactly when `minimap_large`, placing the panel high on a column the map does occupy.
+	#
+	# The comment asserted the impossibility of the thing the code was doing, which is why it survived so
+	# long — anyone auditing this column read the guarantee and stopped. `_draw_hover` now returns early
+	# under the large map, so the branch below only ever runs for the corner form, where the claim is true.
 	var mini_bottom: float = minimap_frame().end.y if (show_minimap and not minimap_large) else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_hover_rect = Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0))

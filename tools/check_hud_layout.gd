@@ -94,7 +94,8 @@ func _run() -> void:
 		{"name": "paused", "modal": false, "set": {"_paused": true}},
 		{"name": "running fast (the ▶▶ chip beside the depth readout)", "modal": false,
 			"set": {"_time_scale_idx": 2}},
-		{"name": "a machine hovered (the inspector under FORGED)", "modal": false, "set": {}, "hover": true},
+		{"name": "a machine hovered (the inspector under FORGED)", "modal": false, "set": {}, "hover": true,
+			"keep": "hover"},
 		{"name": "running fast AND hovering at once", "modal": false,
 			"set": {"_time_scale_idx": 3}, "hover": true},
 		{"name": "the minimap up", "modal": false, "set": {"_minimap_mode": 1}},
@@ -105,6 +106,13 @@ func _run() -> void:
 		# for IT (hud.gd:696). So it must face the same collision sweep as the bare screen.
 		{"name": "the BIG map up (M twice)", "modal": false, "set": {"_minimap_mode": 2},
 			"keep": "big_map"},
+		# ...and the big map WITH a machine hovered. The inspector is right-anchored and its width has a
+		# 218px floor (hud.gd:831), so its left edge is at most 640-218-12 = 410 against a large map
+		# spanning x 181..459. `hud.gd:837` asserts in prose that "the large map is centred, off this
+		# column — so the inspector never collides"; that is false for a 128-wide world, and this row is
+		# what makes the claim answerable instead of asserted.
+		{"name": "the BIG map WITH a machine hovered", "modal": false, "set": {"_minimap_mode": 2},
+			"hover": true, "keep": "big_hover"},
 		{"name": "the Bazaar open", "modal": true, "set": {"_inventory_open": true}},
 		{"name": "the dashboard open", "modal": true, "set": {"_show_dashboard": true}},
 		{"name": "the help overlay", "modal": true, "set": {"_show_help": true}},
@@ -114,11 +122,15 @@ func _run() -> void:
 	var total_panels: int = 0
 	var bare: Array[Rect2] = []
 	var big: Array[Rect2] = []
+	var hover: Array[Rect2] = []
+	var big_hover: Array[Rect2] = []
 	for st: Dictionary in states:
 		var rects: Array[Rect2] = await _snapshot(hud, st)
 		match String(st.get("keep", "")):
 			"bare": bare = rects
 			"big_map": big = rects
+			"hover": hover = rects
+			"big_hover": big_hover = rects
 		total_panels += rects.size()
 		var name: String = st["name"]
 
@@ -156,6 +168,7 @@ func _run() -> void:
 	# tested eleven times.
 	_check_help_text()
 	_check_big_map(bare, big)
+	_check_hover(bare, hover, big_hover)
 
 	_check(total_panels >= states.size() * 2,
 		"the matrix drew %d panels across %d states, so there was geometry to judge"
@@ -230,6 +243,56 @@ func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
 		"the big map suppresses the goal plate (found %s)" % survivor)
 
 
+## THE MACHINE INSPECTOR — the panel this matrix has claimed to judge since it was written, and never has.
+##
+## Two rows carry `"hover": true`. Both were inert: they set `_main._hover_latch`, which main.gd:770-774
+## overwrites from `_aim` every frame. So the inspector was never drawn under test, and what WAS drawn
+## depended on the operator's real mouse. `_snapshot` now warps the cursor onto the probe machine instead,
+## and this proves the warp WORKED — because a hover fixture that silently fails to hover is the same
+## vacuity one level up, and it would make the collision below look fixed.
+func _check_hover(bare: Array[Rect2], hover: Array[Rect2], big_hover: Array[Rect2]) -> void:
+	# THE FIXTURE DID ITS JOB. The inspector is right-anchored with a 218px width floor (hud.gd:831), so
+	# it is the panel hugging the right edge that the bare screen does not have. If this fails, the warp
+	# did not take and every verdict below is void — reported as a FIXTURE failure, not as a HUD verdict.
+	_check(hover.size() > bare.size(),
+		"hovering a machine drew MORE panels than the bare screen (%d vs %d) — the cursor reached it"
+			% [hover.size(), bare.size()])
+	var panel: Rect2 = _right_edge_panel(hover)
+	_check(panel.size.x >= Hud.HOVER_MIN_W - TOUCH,
+		"...and the extra panel is the inspector, at its %.0fpx floor or wider (%s)"
+			% [Hud.HOVER_MIN_W, panel])
+
+	# THE COLLISION. hud.gd:837 claims the large map "is centred, off this column — so the inspector never
+	# collides". The inspector's left edge is at most CANVAS.x - HOVER_MIN_W - 12 = 410; the large map runs
+	# to x=459. The prose asserted the impossibility of the thing the code caused.
+	var map := Rect2()
+	for r: Rect2 in big_hover:
+		if r.get_area() > map.get_area():
+			map = r
+	_check(map.size.x > Hud.MINI_W and map.size.y > Hud.MINI_H,
+		"the big-map-plus-hover state drew the LARGE map (%.0fx%.0f)" % [map.size.x, map.size.y])
+	var over_map: Array[String] = []
+	for r: Rect2 in big_hover:
+		if r == map or r.size.x < MIN_PANEL or r.size.y < MIN_PANEL:
+			continue
+		var over: Rect2 = r.intersection(map)
+		if over.size.x > TOUCH and over.size.y > TOUCH:
+			over_map.append("%s (overlap %.0fx%.0f)" % [r, over.size.x, over.size.y])
+	_check(over_map.is_empty(), "the inspector stands down under the big map%s"
+		% ["" if over_map.is_empty() else " — " + "; ".join(over_map)])
+
+
+## The panel hugging the canvas's right edge, which is the inspector's anchor (hud.gd:840). `Rect2()` if
+## no panel reaches it.
+func _right_edge_panel(rects: Array[Rect2]) -> Rect2:
+	var out := Rect2()
+	for r: Rect2 in rects:
+		if r.size.x >= MIN_PANEL and r.size.y >= MIN_PANEL \
+				and absf(r.end.x - (Hud.CANVAS.x - 12.0)) <= TOUCH and r.size.x > out.size.x:
+			out = r
+	return out
+
+
 ## The lowest box a state drew, ignoring rules and separators. `Rect2()` if there is none.
 func _bottom_panel(rects: Array[Rect2]) -> Rect2:
 	var out := Rect2()
@@ -272,10 +335,25 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 	_main._hover_latch = Vector2i(-9999, -9999)
 	for k: Variant in (st["set"] as Dictionary):
 		_main.set(String(k), (st["set"] as Dictionary)[k])
-	# The inspector is pinned by cell through MainView's own latch, so `hover_info` is built by
-	# HoverInfo.describe() exactly as it is in play rather than by a dictionary invented here.
+	# THE CURSOR IS THE INPUT; THE LATCH IS ONLY EVER AN ECHO OF IT.
+	#
+	# This used to read `_main._hover_latch = _probe_cell`, with a comment claiming the inspector was
+	# therefore built "exactly as it is in play". It was not built at all. main.gd:770-774 recomputes
+	# `_hover_latch` from `_aim` on every frame, and `_update_mining` refreshes `_aim` from the real OS
+	# mouse on every `_process` — unconditionally, pause included (main.gd:709). So the assignment was
+	# discarded before the frame drew, and BOTH "hover" rows in the matrix have never once drawn the
+	# inspector they exist to judge.
+	#
+	# The second half is worse than the first. With the latch overwritten, where the aim landed was
+	# wherever the operator's mouse happened to be sitting — so those rows did not merely test nothing,
+	# they tested something DIFFERENT on every run, on a machine nobody controls. Warping fixes both: the
+	# hover rows drive the real aim path, and every other row is pinned to a corner so a stray cursor
+	# cannot quietly add an inspector to a state that is supposed to be bare.
+	var vp: Viewport = _main.get_viewport()
 	if bool(st.get("hover", false)):
-		_main._hover_latch = _probe_cell
+		vp.warp_mouse(vp.get_canvas_transform() * _main._cell_center(_probe_cell))
+	else:
+		vp.warp_mouse(Vector2(2.0, 2.0))
 
 	# EXACTLY ONE FRAME. The first version armed the probe and then awaited twice, so the HUD drew twice
 	# and every panel was recorded two or three times — which the overlap test dutifully reported as each
