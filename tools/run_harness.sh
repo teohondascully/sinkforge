@@ -260,15 +260,29 @@ add "check_draw_cull (offscreen)"     "res://tools/check_draw_cull.gd"
 add_gl "check_opening (no dead space)" "res://tools/check_opening.gd"
 add_gl "check_underground (lit rock)"  "res://tools/check_underground.gd"
 add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
-# DELIBERATELY NOT REGISTERED while 6a is open. check_rock_reads measures a defect that has not been
-# fixed yet, so it fails every run by design, and a permanently-red layer catches no regression and trains
-# everyone to skim past the summary. Registering it would make the suite red for as long as the bug lives,
-# which is the opposite of what a suite is for.
+# REGISTERED 2026-08-18, ON THE CONDITION THIS NOTE ITSELF SET: "register it the day it passes." It was
+# unregistered while 6a was open, because a layer that fails every run by design catches no regression and
+# trains everyone to skim past the summary. The floor never moved to make this happen; it is 75% today and
+# it was 75% then. What changed is the picture.
 #
-# This is NOT the floor being lowered. The floor stays at 75%. What changes is whether an OPEN BUG fails
-# the build, which is a different question from how good the picture has to be. Run it by hand:
-#   bash tools/with_machine.sh --script res://tools/check_rock_reads.gd
-# and register it the day it passes. Current reading and the open item live in docs/PRIORITY.md.
+#   cue                       tooth OFF    tooth ON     floor
+#   pooled VALUE                   51%         70%        --
+#   pooled GRAIN                   61%         87%        75%
+#   plain interior ON GRAIN        53%         86%        75%
+#   plain BOUNDARY ON GRAIN        90%         95%        75%
+#   layer exit                       1           0
+#
+# Four runs on the fixed tree: VALUE 70/70/70, GRAIN 88/87/87, CHROMA 94/94/94, interior 66/66/66 on value.
+# The OFF column is a temporary knockout of rock_tooth.gdshader's two amplitudes -- never a shipped switch,
+# same rule that removed SF_DEAD_HORIZ_ONLY -- and it reproduces the recorded pre-tooth pooled figures (50%
+# value, 62% grain), which is what proves this configuration is the one that produced them. So the layer has
+# a demonstrated red state and is not merely green.
+#
+# 6a IS CLOSED ON MEASUREMENT AND NOT ON PERCEPTION, and this layer cannot tell the difference. Rock's patch
+# grain is 3.01 against air's 1.65 at a median luma of 11; a statistic can separate at 86% on a difference an
+# eye cannot use. The blind vision tester is the instrument that rules on the ticket. What this gate buys is
+# narrower and still worth having: the renderer encodes the distinction TODAY, and if that stops being true
+# the suite says so.
 #
 # check_contact_edge (6b) is unregistered for the SAME reason and on the same terms:
 #   bash tools/with_machine.sh --script res://tools/check_contact_edge.gd
@@ -329,6 +343,7 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # add_gl and NOT add_excl: it renders every item icon and compares silhouettes and CIELab means. Contention
 # changes how LONG that takes and not one pixel of what comes back, and exclusivity is the scheduler's most
 # expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
+add_gl "check_rock_reads (rock vs void)" "res://tools/check_rock_reads.gd"
 add_gl "check_item_reads (icons)"      "res://tools/check_item_reads.gd"
 # Named for what it asserts everywhere, which is a RATIO — a dig may cost a few quiet frames, never twenty.
 # It read "120fps" for its whole life and never once asserted 8.33ms; that absolute now exists, but only on
