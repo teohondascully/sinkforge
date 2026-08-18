@@ -36,13 +36,20 @@
 # drawing sources as they stood in that commit's tree, so two frames sharing a signature are pictures of the
 # same renderer no matter which day they were taken.
 #
-# IT NECESSARILY LAGS BY ONE COMMIT, and that is a property of what it records rather than a wart. Each row
-# names the commit that last wrote its capture, and that sha does not exist until the commit exists — so a
-# manifest cannot be committed alongside the captures it describes. Adding or re-shooting a capture is two
-# commits: the frames, then the manifest. Amending the first to squeeze the manifest in changes its sha and
-# invalidates the manifest again, which is how this was discovered. `--check` is a gate on the PUSHED tip,
-# where the preceding commit is already history, so the two-commit shape passes CI and a mid-sequence
-# checkout does not.
+# NO COMMIT SHA IN THE TABLE, AND THAT IS THE SECOND DESIGN THIS FILE HAS HAD. The first version printed
+# the sha of the commit that last wrote each capture, which is the obvious identifier and the wrong one:
+# a sha does not exist until its commit does, so the manifest could not ride in the same commit as the
+# frames; amending to squeeze it in changed the sha and invalidated it again; and then a routine rebase onto
+# a peer's work rewrote the sha a third time and invalidated it once more. An identifier that changes every
+# time history is tidied is a standing invitation to regenerate a file nobody read.
+#
+# The AUTHOR DATE and the RENDERER SIGNATURE both survive a rebase, and the signature is the better answer
+# to the question anyway: "which commit" is a pointer, "which renderer" is the fact. `git log -1 -- <file>`
+# recovers the sha in one command when somebody actually wants it.
+#
+# It still lags by one commit — a capture must be committed before this can describe it — so adding or
+# re-shooting frames is two commits: the frames, then the manifest. `--check` gates the PUSHED tip, where
+# the first is already history.
 #
 # THE MANIFEST IS GENERATED, NEVER EDITED. `--check` regenerates it and diffs, so it cannot drift from the
 # repository the way a hand-kept list would — the failure this project has now hit in `check_item_reads`'s
@@ -125,8 +132,8 @@ n=0
 	echo "**Generated. Do not edit.** \`bash tools/capture_manifest.sh\` rewrites it;"
 	echo "\`--check\` fails if it is out of date."
 	echo
-	echo "Every tracked \`_moment_*.png\`, the commit that wrote it, and a signature of the drawing sources as"
-	echo "they stood in that commit's tree. **Two frames sharing a RENDERER signature are pictures of the same"
+	echo "Every tracked \`_moment_*.png\`, the date it was written, and a signature of the drawing sources as"
+	echo "they stood in the tree that wrote it. **Two frames sharing a RENDERER signature are pictures of the same"
 	echo "renderer**, whatever day they were taken; two frames that differ are not comparable to each other and"
 	echo "a vision agent judging them together is judging two builds."
 	echo
@@ -135,14 +142,13 @@ n=0
 	echo "frame cannot be re-shot faithfully and is an archival record rather than a reproducible baseline."
 	echo "A recipe invented to fill that column would be worse than a blank one, because it would be run."
 	echo
-	echo "| capture | commit | date | renderer | recipe |"
-	echo "|---|---|---|---|---|"
+	echo "| capture | date | renderer | recipe |"
+	echo "|---|---|---|---|"
 	while IFS= read -r f; do
 		stem="${f#_moment_}"; stem="${stem%.png}"
 		sha="$(git log -1 --format=%H -- "$f")"
-		printf '| `%s` | `%s` | %s | `%s` | `%s` |\n' \
-			"$stem" "$(git log -1 --format=%h "$sha")" \
-			"$(git log -1 --format=%ad --date=format:'%Y-%m-%d %H:%M' "$sha")" \
+		printf '| `%s` | %s | `%s` | `%s` |\n' \
+			"$stem" "$(git log -1 --format=%ad --date=format:'%Y-%m-%d %H:%M' "$sha")" \
 			"$(sig_for_commit "$sha")" "$(recipe_for "$stem")"
 		n=$((n + 1))
 	done < <(git ls-files '_moment_*.png')
