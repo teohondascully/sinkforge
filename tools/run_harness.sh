@@ -360,6 +360,14 @@ add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 # existed in any object in this repository. So nothing checked that correct snap arithmetic reaches the
 # framebuffer. This renders two frames and diffs them, which the dummy renderer cannot do at all.
 add_gl "check_snap_frame (snap on screen)" "res://tools/check_snap_frame.gd"
+
+# THE BAKE MUST BE RE-DRAWN, NOT RE-PROCESSED. The coarse terrain bake retains its render target between
+# updates, and while it also inherited the WorldEnvironment the colour grade was re-applied to those stored
+# pixels on every dig -- saturation compounding 1.18^n until the walked surface line read as a neon band
+# across the whole frame. Eighty layers passed that frame, because every one of them photographs a freshly
+# booted world and 1.18^1 is not a defect: the population excluded the state the bug lives in. This layer
+# digs first and asserts second, which is why it is registered here rather than folded into a frame check.
+add_gl "check_bake_idempotent (bake holds)" "res://tools/check_bake_idempotent.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
 add "check_grapple (swing score)"     "res://tools/check_grapple.gd"
 add "check_loop_health (loop score)"  "res://tools/check_loop_health.gd"
