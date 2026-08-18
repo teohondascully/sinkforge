@@ -479,7 +479,7 @@ func _at_the_counter_fresh(main: MainView, which: String) -> void:
 ## catalogue" is a list that stops being full the first time somebody adds a machine.
 func _at_the_counter_full(main: MainView, which: String) -> void:
 	var sim: FactorySim = main.sim
-	for id: StringName in _catalogue():
+	for id: StringName in _catalogue(main):
 		sim.inventory[id] = 64
 		sim.total_produced[id] = 640
 	for tech: StringName in ResearchRules.ORDER:
@@ -494,19 +494,38 @@ func _at_the_counter_full(main: MainView, which: String) -> void:
 const _TAB: Dictionary = {"pack": 0, "works": 1, "bench": 2}
 
 
-## Every id the game can put in a pack: the materials it mines, the recipes' inputs and outputs, the
-## machines it builds, and the placeables and tools that are carried rather than produced.
-func _catalogue() -> Array[StringName]:
+## Every id the game can ACTUALLY put in a pack, which is not the same as every id on disk and the
+## difference is the whole point of the rung.
+##
+## The first version of this walked `src/data/materials` and `src/data/machines` and took every `.tres`.
+## That produced a "full" PACK carrying six things the game cannot give you — the four wall materials
+## (`layer = &"wall"`: background plane, never mined into a pack), `leaves` (chopping one yields a SAPLING
+## or nothing — `FactorySim.mine`, the foliage branch), and the machines that are placed by worldgen rather
+## than built. None of the six has an item glyph, so `Visuals.draw_item` fell through to its default arm
+## and drew each as a flat `Color.WHITE` square, and the capture showed six blazing white tiles in the
+## middle of the pack.
+##
+## I read that as a defect in the game for most of an hour. It is a defect in THIS FUNCTION. A fixture that
+## reaches a state the game cannot reach does not surface bugs, it manufactures them — and it manufactures
+## them in the most convincing possible form, a screenshot. The ticket says do not optimise only for a
+## fully unlocked developer state; the same sentence forbids optimising for an UNREACHABLE one.
+##
+## So the universe is built the way the pack is filled: what `mine()` pockets, what the recipes make and
+## consume, what `MainView._craftable` and `CRAFT_TOOLS` sell, and the tools you start with.
+func _catalogue(main: MainView) -> Array[StringName]:
 	var out: Array[StringName] = []
-	for dir_path: String in ["res://src/data/materials", "res://src/data/machines"]:
-		var d: DirAccess = DirAccess.open(dir_path)
-		if d == null:
-			continue
+	var d: DirAccess = DirAccess.open("res://src/data/materials")
+	if d != null:
 		for f: String in d.get_files():
-			if f.ends_with(".tres"):
-				var id := StringName(f.trim_suffix(".tres"))
-				if not out.has(id):
-					out.append(id)
+			if not f.ends_with(".tres"):
+				continue
+			var mat: MaterialDef = load("res://src/data/materials/%s" % f) as MaterialDef
+			if mat == null or mat.layer == &"wall":
+				continue          # the background plane — you dig THROUGH it, you never carry it
+			if mat.id == &"leaves":
+				continue          # chops into a sapling or into nothing; the leaf itself is never pocketed
+			if not out.has(mat.id):
+				out.append(mat.id)
 	var r: DirAccess = DirAccess.open("res://src/data/recipes")
 	if r != null:
 		for f: String in r.get_files():
@@ -519,9 +538,17 @@ func _catalogue() -> Array[StringName]:
 				for id: Variant in side:
 					if not out.has(StringName(id)):
 						out.append(StringName(id))
-	# Carried, never produced by a recipe: the tools you climb and dig and light with.
-	for id: StringName in [&"wood_pickaxe", &"stone_pickaxe", &"iron_pickaxe", &"sapling", &"rope",
-			&"torch", &"conduit", &"wood", &"gravel"]:
+	# The machines you can BUILD, read off the live list rather than the directory, because the directory
+	# also holds the ones the world places for you.
+	for def: MachineDef in main._craftable:
+		if def != null and not out.has(def.id):
+			out.append(def.id)
+	for t: Dictionary in MainView.CRAFT_TOOLS:
+		var tid: StringName = t["id"]
+		if not out.has(tid):
+			out.append(tid)
+	# Carried from the first frame or planted rather than crafted.
+	for id: StringName in [&"wood_pickaxe", &"sapling"]:
 		if not out.has(id):
 			out.append(id)
 	out.sort()
