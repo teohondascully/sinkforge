@@ -23,6 +23,8 @@ extends SceneTree
 ##           earn without being told to earn it, and the one hint P1's subtraction pass must not remove.
 ##           The sapling enters the pack the way a pickup puts it there and `Hints.refresh` fires its own
 ##           acquisition edge; nothing poses `_active`. If the bubble does not come up, the shutter refuses.
+##   quiet — UI-08: the surface with the announce channel EMPTY and nothing hovered. The frame P1's
+##           completion review is judged on, because everything left in it was chosen rather than timed.
 ##   teach — a line caught on a corner WITH the bubble the game raises for it, so the one thing a still
 ##           frame can say about onboarding — does the lesson arrive on the moment it explains? — is
 ##           answerable from the picture
@@ -161,6 +163,16 @@ func _contamination(main: MainView, moment: String) -> String:
 	# the same fields the renderer draws from. `taut` is the grapple's own record of whether the constraint
 	# did work last step; `on_floor` is the body's. Neither can be true of the frame this moment used to
 	# produce, which is the whole point of adding them.
+	# The quiet frame's subject is an ABSENCE, so the guard reads the three things that must not be there.
+	# A moment defined by absence is the easiest kind to photograph wrongly and the hardest to notice: a
+	# frame with a lesson in it still looks like a screenshot of the game.
+	if moment == "quiet":
+		if main._hud != null and main._hud.announcing():
+			wrong.append("a ceremony is still up — this is not a quiet frame, it is a frame with an "
+				+ "interrupt in it")
+		if main._hints != null and main._hints.active_alpha() > 0.0:
+			wrong.append("a lesson is on screen at alpha %.2f — the one thing this frame is defined by "
+				% main._hints.active_alpha() + "not containing")
 	if moment == "swing":
 		var pl: Player = main._player
 		if pl.grapple.state != Grapple.State.ANCHORED:
@@ -231,6 +243,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _teaching(main)
 		"sapling":
 			await _the_sapling(main)
+		"quiet":
+			await _the_quiet(main)
 		"counter", "works", "bench":
 			await _at_the_counter(main, moment)
 		"drift":
@@ -453,6 +467,25 @@ func _at_the_counter(main: MainView, which: String) -> void:
 ## It is an environment switch rather than a hand-edit because a mutant's danger is its LIFETIME, not the
 ## run's — a commented-out line in a shared tree is live for every other session until it is put back, and
 ## the lock does not cover the minutes spent editing.
+## UI-08 — THE QUIET FRAME, and it is the only state on this list defined by what is NOT in it.
+##
+## *"Capture normal surface with no hover, tutorial, or selection transient. Player and intended route
+## become first read."* `boot` cannot serve: the TOPSOIL ceremony is up on frame one, so the game's own
+## opening shot contains an interrupt and every judgement made on it is a judgement of the interrupt.
+##
+## This is the same world a few seconds later, with the announce channel empty and the cursor parked off
+## the world. **It is the frame `P1`'s completion review is entitled to** — every remaining surface in it
+## is one the design chose to keep, so there is nothing left to blame the composition on.
+func _the_quiet(main: MainView) -> void:
+	var wait: int = 0
+	while main._hud != null and main._hud.announcing() and wait < 420:
+		await physics_frame
+		wait += 1
+	main._hover_latch = Vector2i(-9999, -9999)
+	for _i: int in 20:
+		await physics_frame
+
+
 func _the_sapling(main: MainView) -> void:
 	var sim: FactorySim = main.sim
 	if OS.get_environment("SF_MOMENT_MUTANT") == "nosapling":

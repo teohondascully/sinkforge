@@ -311,6 +311,83 @@ func _bazaar_ease() -> float:
 	return 1.0 - u * u * u
 
 
+## UI-07 — EVERY HELPER SURFACE, CLASSIFIED. The ticket's bounded treatment is *"inventory all active
+## helpers and tag as critical/active/discoverable/ambient"*, with the rule *"only one primary attention
+## state at a time"*, and this is that inventory. It is a constant rather than a document because
+## `check_hud_layout` asserts that **every `_draw_*` method on this class appears here** — so adding a
+## surface and not deciding what kind of thing it is fails the harness instead of quietly becoming the
+## eighth thing on the screen.
+##
+## The tags, and what each one is allowed to do:
+##
+##   `critical`      interrupts. It arrives on its own schedule and expects to be read NOW. **At most one
+##                   may be on screen at a time** — that is the rule, and it is the only tag the rule is
+##                   about. The `P0` baseline photographed two of them sharing pixels in three frames.
+##   `active`        describes what you are doing or looking at THIS moment. Several may coexist; they are
+##                   answers to questions you just asked with the cursor or the verb.
+##   `discoverable`  you summoned it. It may cover everything, because you asked it to.
+##   `ambient`       always-on state you read at a glance and never respond to. It must never move, and it
+##                   is not allowed to become any of the above.
+##   `internal`      not a surface — a drawing helper another entry uses. Listed so the registry check
+##                   above is total, and so "is this a helper or a screen" is a decision someone made.
+##
+## `_draw_title` is `discoverable` on a technicality worth stating: you did not summon it, but it owns the
+## whole screen by design and returns before anything else draws, so nothing can collide with it.
+const HELPER_TAGS: Dictionary = {
+	# critical — the interrupt channel, and the one with a one-at-a-time rule
+	"_draw_arrival": &"critical",         # the stratum plate: "stop, look"
+	"_draw_flash": &"critical",           # save/load toast
+	"_draw_alerts": &"critical",          # a machine is stalled and will stay stalled
+	"_draw_hint_bubble": &"critical",     # a lesson, which is why strike 1 made it yield to the plate
+	# active — about the thing under your hand right now
+	"_draw_objective_line": &"active",
+	"_draw_hover": &"active",
+	"_draw_item_tooltip": &"active",
+	# discoverable — you pressed a key to get it
+	"_draw_minimap": &"discoverable",
+	"_draw_inventory_overlay": &"discoverable",
+	"_draw_dashboard_overlay": &"discoverable",
+	"_draw_help_overlay": &"discoverable",
+	"_draw_settings_overlay": &"discoverable",
+	"_draw_title": &"discoverable",
+	# ambient — state, read at a glance, never answered
+	"_draw_depth": &"ambient",
+	"_draw_forged": &"ambient",
+	"_draw_inventory": &"ambient",        # the hotbar
+	"_draw_hint": &"ambient",             # the bottom-left key legend
+	"_draw_fastforward": &"ambient",
+	# internal — helpers, not screens
+	"_draw": &"internal",
+	"_draw_scrim": &"internal",
+	"_draw_tracked": &"internal",
+	"_draw_thing_icon": &"internal",
+	"_draw_tech_art": &"internal",
+	"_draw_tech_chip": &"internal",
+	"_draw_bazaar_rail": &"internal",
+	"_draw_bazaar_head": &"internal",
+	"_draw_bazaar_foot": &"internal",
+	"_draw_bazaar_detail": &"internal",
+}
+
+## THE PAUSED CHIP IS A CRITICAL SURFACE WITHOUT A FUNCTION OF ITS OWN — it is eight lines inline in
+## `_draw()`. It is named here so the registry is honest about it, and so the collision below has
+## somewhere to be written down.
+##
+## **IT WAS MOVED ONCE, INTO THE PLACE IT THEN COLLIDED.** It used to print across the objective line at
+## y=8, so it was pushed down to y 50..76 — straight into the arrival plate's scrim core, which sits at
+## `CANVAS.y * 0.26 - SCRIM_ABOVE` = y 61.6..111.6. Pausing on the frame you cross a stratum is not an
+## exotic input: crossing a band is exactly when a player stops to read. *A fix that relocates a collision
+## instead of resolving it is indistinguishable from a fix, until the second surface shows up.*
+##
+## **So it leaves the centre column entirely** and joins the left stack the depth readout owns — under the
+## fast-forward chip, in the one column where nothing centred can reach it. Moving it in Y was the trap;
+## the ceremony, the objective line and the lesson bubble are all centred, so the centre column has three
+## occupants competing for a strip 100px tall while the left column has two chips and 300px of nothing.
+## Being paused is also the least surprising thing on this list — the player did it a moment ago — so of
+## the two criticals it is the one that can afford the quiet corner.
+const PAUSED_CHIP: Rect2 = Rect2(10.0, 60.0, 104.0, 22.0)
+
+
 func _draw() -> void:
 	_tooltip_item = &""    # re-captured by whichever slot the cursor sits on this frame
 	_alert_hits.clear()    # stale unless _draw_alerts repopulates it this frame (menus suppress it)
@@ -343,9 +420,8 @@ func _draw() -> void:
 		# UNDER the objective line, not on top of it. Both were aimed at top-centre at y=8 and the
 		# objective panel is 37 tall, so PAUSED printed straight across the one line telling you what to
 		# do next — and pausing is exactly when a player stops to read it.
-		var p := Rect2(CANVAS.x * 0.5 - 52.0, 50.0, 104.0, 26.0)
-		_panel(p, true)
-		draw_string(_font, p.position + Vector2(20.0, 18.0), "PAUSED (P)",
+		_panel(PAUSED_CHIP, true)
+		draw_string(_font, PAUSED_CHIP.position + Vector2(12.0, 15.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
 	# The stratum plate is the one channel that means "stop, look" — so it does not fire over a menu, where

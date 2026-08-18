@@ -71,7 +71,22 @@ func _initialize() -> void:
 		quit(1)
 
 
+## A SLOT OF THIS LAYER'S OWN, SET BEFORE THE SCENE EXISTS.
+##
+## `_judge_persistence` drives the real F5/F9 verbs, and `MainView.save_path` defaults to the game's
+## canonical slot — so the first version of that test **rewrote the slot `save_sentinel` had just planted a
+## canary in**, and the harness correctly declared the whole run moot. It was the isolated `user://` and
+## never the player's real save, but the rule is not "do not destroy player data", it is "no layer writes
+## the save slot", and the sentinel exists precisely so that a layer which starts writing saves cannot do
+## it quietly. **The guard caught a new writer on its first run**, which is the only useful moment to catch
+## one.
+##
+## Static and read at call time, so it must be set before anything can read it, and cleaned up after —
+## a layer that tidies only the file it first thought of leaves litter for the next run to trip over.
+const TEST_SLOT: String = "user://check_teaching.save"
+
 func _run() -> void:
+	MainView.save_path = TEST_SLOT
 	var main: MainView = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(main)
 	for _i: int in SETTLE:
@@ -81,9 +96,13 @@ func _run() -> void:
 	_judge_texts(hints)
 	await _judge_rope(main, hints)
 	await _judge_sapling(main, hints)
+	await _judge_persistence(main, hints)
 
 	main.queue_free()
 	await physics_frame
+	for leftover: String in [TEST_SLOT, TEST_SLOT + SaveGame.BAK_SUFFIX]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
 
 
 ## HAS THIS HINT LATCHED YET? Waits a bounded number of frames for it, and says how long it took.
@@ -387,6 +406,54 @@ func _judge_sapling(main: MainView, hints: Hints) -> void:
 	print("  a second plant (%s) taught %d more thing(s)"
 		% ["rooted" if second else "refused", hints._done.size() - taught])
 	_check(hints._done.size() == taught, "...and it is never said twice")
+
+
+## UI-04 — "IT FIRES ONCE" HAD A PERIOD, AND THE PERIOD WAS ONE PROCESS.
+##
+## This layer already holds the game to *"none of it is ever said twice"* and the game passed, because both
+## the assertion and the play session live inside a single boot. `Hints._done` was never written to disk,
+## so **every state-edge lesson re-taught itself in full on every launch** — the grapple, the wrap, the
+## chain, the hard landing, the aquifer. That is the same failure the layer's own docstring names (*"a tip
+## that re-teaches every swing is the reason players learn to ignore tips"*) at a period long enough that
+## nothing inside one process could see it.
+##
+## Driven through `_save_game` and `_load_game`, the real F5/F9 verbs, against a FRESH `Hints` standing in
+## for a new launch. Testing `restore_taught` directly would prove the function works and prove nothing
+## about the two lines in `main.gd` that call it — which is where a wrong key name lives.
+func _judge_persistence(main: MainView, hints: Hints) -> void:
+	var taught: Array[String] = hints.taught_ids()
+	_check(taught.size() >= 5,
+		"CONTROL: %d lessons have been given, so there is something for the save to carry (%s)"
+			% [taught.size(), ", ".join(taught)])
+	if taught.is_empty():
+		return
+	main._save_game()
+	# A FRESH SESSION, as far as the hint system is concerned: `Hints.new` rebuilds `_done` empty, which is
+	# exactly the state a relaunch produces and exactly the state that used to survive a load.
+	var reborn := Hints.new(main.sim)
+	main._hints = reborn
+	_check(reborn.taught_ids().is_empty(),
+		"CONTROL: a fresh hint system starts having taught nothing (this is what a relaunch is)")
+	main._load_game()
+	var after: Array[String] = reborn.taught_ids()
+	var lost: Array[String] = []
+	for id: String in taught:
+		if not after.has(id):
+			lost.append(id)
+	_check(lost.is_empty(), "a save carries which lessons have already been given%s"
+		% ("" if lost.is_empty() else " — RE-TEACHES: " + ", ".join(lost)))
+	# ...and it must not invent any, which is the failure mode of restoring a list you did not write.
+	var extra: Array[String] = []
+	for id: String in after:
+		if not taught.has(id):
+			extra.append(id)
+	_check(extra.is_empty(), "...and marks nothing taught that never was%s"
+		% ("" if extra.is_empty() else " — INVENTED: " + ", ".join(extra)))
+	# An id the game no longer has must not be able to suppress a future lesson that reuses its name.
+	reborn.restore_taught(["a_lesson_that_does_not_exist"])
+	_check(not reborn.taught_ids().has("a_lesson_that_does_not_exist"),
+		"...and an unknown id in an old save is dropped rather than latched forever")
+	main._hints = hints          # put the layer's own instance back for anything that follows
 
 
 ## The chamber, the hook's roof, the spur the line catches on, and a floor to land hard on.

@@ -754,7 +754,20 @@ func _process(delta: float) -> void:
 			_note_rope_moments()                              # ...and the three the ROPE teaches by itself
 			# A bubble's clock only runs while you could plausibly have read it. Full stride is 232 px/s,
 			# so this sits just above a cruise: walking and reading is fine, flying and reading is not.
-			_hints.note_busy(_player.velocity.length() > Player.RUN_SPEED * 1.25)
+			#
+			# UI-03 asks for the display to follow the clock: *suppress non-critical help while grappling,
+			# falling or moving quickly.* Grappling and falling are both speed, so one threshold covers
+			# three of the ticket's four cases. **Aiming is deliberately not included** — the cursor is
+			# live every frame of normal play, so gating on it would suppress the lesson permanently,
+			# which is UI-04's retirement wearing UI-03's clothes.
+			#
+			# HYSTERESIS, because the alternative is a bubble that strobes. One threshold means a body
+			# cruising near it flips busy on and off every few frames and the lesson flickers — a
+			# suppression rule that is worse than no rule. It arms at 1.25x stride and only releases below
+			# 0.9x, so crossing the line is a decision rather than a coin toss.
+			var spd: float = _player.velocity.length()
+			_hint_busy = (spd > Player.RUN_SPEED * (0.9 if _hint_busy else 1.25))
+			_hints.note_busy(_hint_busy)
 			# ...and whether the ceremony currently owns the announce channel, so a lesson waits for it
 			# instead of being stacked under it. Read from the HUD rather than mirrored here: a second
 			# copy of "is the plate up" is a second thing that can be wrong, and only one of them draws.
@@ -1202,6 +1215,7 @@ func _line_load(g: Grapple) -> float:
 ## enough into the bottom of the arc that a haul is nearly all tangential gain.
 const PUMP_HINT_DOWN: float = 0.85
 
+var _hint_busy: bool = false         ## moving too fast to read a lesson (hysteretic — see the poke)
 var _was_anchored: bool = false      ## line held last frame — the falling edge is a RELEASE
 
 
@@ -2109,6 +2123,10 @@ func _save_game() -> void:
 	var data: Dictionary = SaveGame.capture(sim)
 	data["player_pos"] = _player.position
 	data["lamp_tint"] = MainView.boot_tint          # representation keys ride beside the sim envelope
+	# UI-04: which lessons have already been given. Without this the game re-teaches the grapple, the
+	# wrap, the chain and the hard landing on EVERY LAUNCH — the latch lived only in memory.
+	if _hints != null:
+		data["hints_taught"] = _hints.taught_ids()
 	# NB: no `world_seed` line here. `capture` already wrote `sim.world_seed`, and the controller
 	# overwriting it with a second copy of the same fact is precisely the bug documented at `_title_seed`.
 	_hud.flash("SAVED" if SaveGame.write(save_path, data) else "save FAILED")
@@ -2138,6 +2156,11 @@ func _load_game() -> void:
 	_renderer.repaint_world()
 	_prime_breach_watch()   # a breach that happened before this save doesn't boom retroactively
 	if _hints != null:
+		# Order matters and only one order is correct: restore the taught-list FIRST, then `resync`.
+		# `resync` re-arms the pack snapshot and clears the queue; restoring after it would be harmless
+		# today and is one refactor away from a lesson being re-queued and then marked as already given.
+		# Absent in an older save, which restores today's behaviour rather than breaking on it.
+		_hints.restore_taught(data.get("hints_taught", []) as Array)
 		_hints.resync()     # whatever the save already carries is old news, not a fresh acquisition
 	_hud.flash("RECOVERED (backup)" if SaveGame.last_read == SaveGame.Read.RECOVERED else "LOADED")
 

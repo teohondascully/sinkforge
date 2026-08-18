@@ -127,6 +127,15 @@ func _run() -> void:
 		# the states-differ check is told about it here instead of being loosened for everyone.
 		{"name": "the BIG map WITH a machine hovered", "modal": false, "set": {"_minimap_mode": 2},
 			"hover": true, "keep": "big_hover", "twin": "the BIG map up (M twice)"},
+		# UI-07 PREDICTED THIS ROW BEFORE IT WAS RUN, which is the only reason it is worth adding.
+		# Tag the always-on surfaces and the CRITICAL ones separately (Hud.HELPER_TAGS) and two of the
+		# criticals turn out to aim at the same strip: `PAUSED (P)` is pinned at y 50..76, and the arrival
+		# plate's scrim core sits at `CANVAS.y * 0.26 - SCRIM_ABOVE` = y 61.6..111.6. The PAUSED chip has
+		# already been moved once for exactly this reason — it used to print across the objective line —
+		# and it was moved INTO the ceremony's strip. Pausing on the frame you cross a stratum is not
+		# exotic; crossing a band is when a player stops to read.
+		{"name": "PAUSED during a stratum arrival", "modal": false, "set": {"_paused": true},
+			"announce": true},
 		{"name": "the Bazaar open", "modal": true, "set": {"_inventory_open": true}},
 		{"name": "the dashboard open", "modal": true, "set": {"_show_dashboard": true}},
 		{"name": "the help overlay", "modal": true, "set": {"_show_help": true}},
@@ -201,6 +210,7 @@ func _run() -> void:
 	await _check_pack_window()
 	await _check_announce_channel()
 	_check_lesson_footprint()
+	_check_helper_registry()
 	await _check_probe_is_off()
 	_report_footprint(foot_names, foots)
 
@@ -760,6 +770,75 @@ func _check_lesson_footprint() -> void:
 	_check(tallest <= LESSON_MAX_H and Hud.hint_box(font, "x").y < LESSON_MAX_H,
 		"CONTROL: a one-word lesson measures %.0fpx, so the ceiling is not simply above everything"
 			% Hud.hint_box(font, "x").y)
+
+
+## UI-07 — THE HELPER INVENTORY HAS TO BE TOTAL OR IT IS DECORATION.
+##
+## `Hud.HELPER_TAGS` classifies every surface as critical/active/discoverable/ambient (or `internal` for a
+## drawing helper that is not a screen). A tag table that the code can drift away from is worth nothing, so
+## this asserts BOTH directions against the live method list: every `_draw*` the class actually has is
+## classified, and every name in the table still exists. **Adding a surface without deciding what kind of
+## thing it is fails here rather than quietly becoming the eighth thing on the screen.**
+func _check_helper_registry() -> void:
+	var hud: Hud = _main._hud
+	var found: Array[String] = []
+	for m: Dictionary in hud.get_method_list():
+		var n: String = String(m["name"])
+		if n.begins_with("_draw") and not found.has(n):
+			found.append(n)
+	_check(found.size() >= 20,
+		"the HUD reports %d _draw* methods to classify (if this collapses, everything below passes empty)"
+			% found.size())
+	var untagged: Array[String] = []
+	for n: String in found:
+		if not Hud.HELPER_TAGS.has(n):
+			untagged.append(n)
+	_check(untagged.is_empty(), "every drawing surface is classified by UI-07%s"
+		% ("" if untagged.is_empty() else " — UNTAGGED: " + ", ".join(untagged)))
+	var stale: Array[String] = []
+	for k: Variant in Hud.HELPER_TAGS.keys():
+		if not found.has(String(k)):
+			stale.append(String(k))
+	_check(stale.is_empty(), "...and the table names nothing that has been deleted%s"
+		% ("" if stale.is_empty() else " — STALE: " + ", ".join(stale)))
+	var tally: Dictionary = {}
+	for k: Variant in Hud.HELPER_TAGS.keys():
+		var t: String = String(Hud.HELPER_TAGS[k])
+		tally[t] = int(tally.get(t, 0)) + 1
+	var parts: Array[String] = []
+	for t: Variant in ["critical", "active", "discoverable", "ambient", "internal"]:
+		parts.append("%s %d" % [t, int(tally.get(t, 0))])
+	print("    helpers: " + " · ".join(parts))
+	_check(int(tally.get("critical", 0)) >= 3 and int(tally.get("ambient", 0)) >= 3,
+		"CONTROL: the tags are actually distributed, not all one bucket (%s)" % " ".join(parts))
+	# THE ONE RULE UI-07 ACTUALLY STATES, checked where it can be checked from constants: the PAUSED chip
+	# and the arrival plate are both `critical` and both aim at the upper-middle strip. The matrix row
+	# "PAUSED during a stratum arrival" is the empirical form of this; this is the arithmetic form, and it
+	# fails the moment either constant is nudged back into the other.
+	var chip: Rect2 = Hud.PAUSED_CHIP
+	var plate_top: float = Hud.CANVAS.y * 0.26 - Hud.SCRIM_ABOVE
+	var plate_bot: float = Hud.CANVAS.y * 0.26 + Hud.SCRIM_BELOW
+	# THE PLATE IS CENTRED AND ITS WIDTH IS ITS TEXT, so the box is built from the WIDEST BAND NAME THE
+	# GAME CAN ANNOUNCE, measured with the HUD's own `_tracked_width` at the HUD's own constants. The first
+	# version of this used "nearly the whole centre column" as a generous bound — 600px wide — and failed a
+	# chip sitting at x 10..114, in a column the plate cannot reach at any text length. **A bound invented
+	# to be safe is not conservative, it is wrong in a direction that feels responsible**, and it condemns
+	# real estate that was never contested.
+	var widest: float = 0.0
+	var widest_name: String = ""
+	for b: Dictionary in Strata.BANDS:
+		var w: float = hud._tracked_width(String(b["name"]), Hud.ARRIVAL_SIZE, Hud.ARRIVAL_TRACK)
+		if w > widest:
+			widest = w
+			widest_name = String(b["name"])
+	var core_half: float = widest * 0.5 + Hud.SCRIM_PAD
+	var plate := Rect2(Hud.CANVAS.x * 0.5 - core_half, plate_top, core_half * 2.0, plate_bot - plate_top)
+	print("    widest arrival plate: \"%s\" -> %.0fpx of text, core %s" % [widest_name, widest, plate])
+	_check(widest > 40.0, "CONTROL: the widest band name measures %.0fpx (a zero here empties the check)"
+		% widest)
+	_check(not chip.intersects(plate),
+		"the PAUSED chip %s clears the arrival plate's widest possible core %s — two criticals, one strip"
+			% [chip, plate])
 
 
 ## Panels whose centre sits in the band the arrival plate occupies. The objective line is top-centre too

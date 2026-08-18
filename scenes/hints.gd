@@ -237,11 +237,51 @@ func active_text() -> String:
 
 
 ## Fade envelope: 0..1 over the bubble's life (quick in, gentle out).
+## UI-03: `_busy` now hides as well as freezes. The clock already stopped while the body was moving too
+## fast to read — *"a lesson fired mid-swing is still on screen when the swing ends"* — but leaving it
+## DRAWN through the swing is the half that fails the ticket: it is one more thing over the rope at the
+## exact moment the rope is the thing to look at, and it was never being read anyway. Frozen and hidden is
+## the same promise kept properly; the lesson arrives with its full life the moment the body settles.
 func active_alpha() -> float:
-	if _active == &"" or _ceremony:
+	if _active == &"" or _ceremony or _busy:
 		return 0.0
 	var shown: float = SHOW_SECONDS - _life
 	return clampf(minf(shown / FADE_IN, _life / FADE_OUT), 0.0, 1.0)
+
+
+## UI-04 — WHICH LESSONS HAVE ALREADY BEEN GIVEN, so a save can carry them.
+##
+## **The latch was per-SESSION, and nothing wrote it down.** `_done` is the "never say this twice" record,
+## `resync()` preserves it across an in-process load, and it is rebuilt empty by `_init` on every boot —
+## so every state-edge lesson (the grapple, the wrap, the chain, the hard landing, the aquifer, the plant)
+## **re-taught itself in full every time the player launched the game.** `check_teaching`'s own standard is
+## *"a tip that re-teaches every swing is the reason players learn to ignore tips"*, and this was that
+## failure with a longer period — long enough that neither the layer nor a play session could see it,
+## because both live inside one process.
+##
+## Written as a plain id list rather than the dictionary: the file should carry the DECISION ("these have
+## been taught"), not this class's bookkeeping, and a list survives the dictionary being restructured.
+func taught_ids() -> Array[String]:
+	var out: Array[String] = []
+	for k: Variant in _done.keys():
+		out.append(String(k))
+	out.sort()                    # stable on disk, so two saves of the same state are byte-identical
+	return out
+
+
+## The mirror. Ids that no longer exist are dropped rather than kept: a lesson deleted from the game must
+## not be able to suppress a future lesson that reuses its name, and an unknown id in `_done` would do
+## exactly that, silently, forever.
+func restore_taught(ids: Array) -> void:
+	var known: Dictionary = {}
+	for d: Dictionary in _defs:
+		known[d["id"]] = true
+	for m: Dictionary in _moments:
+		known[m["id"]] = true
+	for v: Variant in ids:
+		var id := StringName(String(v))
+		if known.has(id):
+			_done[id] = true
 
 
 ## Re-arm the acquisition snapshot to the CURRENT pack (call after a load): whatever the restored save
