@@ -171,6 +171,23 @@ controls remain at least as reliable under direct player use.
 **Priority placement.** New **T3 grapple visual language** item alongside T3.10 swing-release momentum.
 It may run after V1 and V2; it should not become an input-feel rewrite.
 
+### V5 — Bazaar and settings as an installed industrial interface
+
+**Problem.** The Pack, Works, Bench, and Settings frames are not merely oversized. They use a generic stack
+of dark rounded cards, widely tracked uppercase labels, gold rectangular fills, floating resource chips,
+and large dead zones. The result reads as a 2008 presentation/dashboard placed over the game, rather than
+part of a kinetic industrial world.
+
+**Design rule.** The Bazaar should feel like an operated workbench or field terminal with a clear current
+decision—not a slideshow of the whole catalogue. Settings should be a quiet utility surface, not a second
+dashboard. The world should remain context only when that context helps the decision; it must not show
+through as competing scenery.
+
+**Priority placement.** Create a menu-overhaul parent under T2.1 immediately after V1’s tutorial quietness.
+It may run in parallel with T3.1 because it is a contained UI/system pass, but it must begin with a visual
+language and information-architecture prototype, not a piecemeal reskin. See the `MNU-*` queue in
+`VISUAL_RECOMMENDATIONS_SURFACE.md`.
+
 ## Candidate visual backlog — symptoms grouped under roots
 
 These are observations to preserve, not twenty independent implementation tickets.

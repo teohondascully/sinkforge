@@ -7,12 +7,22 @@ extends SceneTree
 ## GL context — headless is the dummy renderer and saves blank frames):
 ##   godot --path . --script res://tools/capture_moments.gd -- boot
 ##   godot --path . --script res://tools/capture_moments.gd -- boot 1   # optional zoom-index (Z levels)
+##
+## `SF_MOMENT_DIR=<dir>` redirects the write and changes nothing else — same scene, same settle, same
+## helper, same shutter. It exists so a BASELINE can be archived without a canonical `_moment_*.png` being
+## touched, and so the baseline is a frame from THIS path rather than from a convenient second one. It
+## fails closed: an unusable directory refuses the capture rather than falling back to the root.
+##
 ## Moments:
 ##   boot  — the clean new-player opening (the surface, first frame a player ever sees)
 ##   delve — standing at the bottom of a dug shaft, lamp-lit, rock on every side
 ##   swing — mid-arc on a live grapple line, so the rope, the hook and the pose can be judged together
 ##   map   — the LARGE minimap over a dug world: the one view that shows the world's whole shape, and
 ##           so the only way to judge whether the descent reads as a journey rather than as a grid
+##   sapling — the SAPLING lesson with its bubble up: the first thing the game teaches that a player can
+##           earn without being told to earn it, and the one hint P1's subtraction pass must not remove.
+##           The sapling enters the pack the way a pickup puts it there and `Hints.refresh` fires its own
+##           acquisition edge; nothing poses `_active`. If the bubble does not come up, the shutter refuses.
 ##   teach — a line caught on a corner WITH the bubble the game raises for it, so the one thing a still
 ##           frame can say about onboarding — does the lesson arrive on the moment it explains? — is
 ##           answerable from the picture
@@ -142,6 +152,21 @@ func _contamination(main: MainView, moment: String) -> String:
 		wrong.append("live input POLLING is still connected — player.gd reads the move/climb/jump state "
 			+ "and main.gd reads MINE every physics frame, so a key held down during this capture walked "
 			+ "or mined the miner and the shot is of the keyboard, not the fixture")
+	# THE SAPLING SHOT'S SUBJECT IS THE BUBBLE, so the bubble is what is checked — not the pack, not the
+	# hint's internal latch. `active_text()` is the string the HUD draws, and `active_alpha()` is the
+	# opacity it draws it at; together they are the closest thing to "is the lesson legible in this frame"
+	# that is available without reading pixels. A guard on `inventory[&"sapling"] > 0` would have passed on
+	# a frame with no bubble in it at all, which is the failure it exists to catch.
+	if moment == "sapling":
+		var hints: Object = main._hints
+		if hints == null:
+			wrong.append("the hint system does not exist, so there is no lesson in this frame")
+		elif not str(hints.active_text()).begins_with("SAPLING"):
+			wrong.append("the visible lesson is '%s', not the SAPLING one — this frame is named for a "
+				% str(hints.active_text()).substr(0, 24) + "bubble it does not contain")
+		elif hints.active_alpha() < 0.9:
+			wrong.append("the SAPLING bubble is at alpha %.2f — mid-fade, so the shot understates it"
+				% hints.active_alpha())
 	for field: Variant in want.keys():
 		var got: Variant = main.get(String(field))
 		if got == null:
@@ -190,6 +215,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _at_the_scarp(main)
 		"teach":
 			await _teaching(main)
+		"sapling":
+			await _the_sapling(main)
 		"counter", "works", "bench":
 			await _at_the_counter(main, moment)
 		"drift":
@@ -231,7 +258,34 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw    # the veil/light layers repaint a frame behind a camera move
-	var path := "res://_moment_%s%s%s.png" % [moment, suffix, name_suffix]
+	# WHERE THE FRAME IS WRITTEN, and the whole reason this override exists.
+	#
+	# The default is the repo root, where the 44 canonical `_moment_*.png` live and where every consumer
+	# looks. `SF_MOMENT_DIR` moves ONLY the destination: the same script, the same scene, the same settle,
+	# the same moment helper, the same shutter. That is the point. A baseline archived by a second,
+	# convenient capture path is not a baseline of this one — the divergence between two capture paths is
+	# SILENT AND TOTAL, not marginal, and it has already happened here once: a standalone probe of the
+	# opening, same scene and same `dev_start`, differing only in settle frames, photographed the Bazaar
+	# modal over a dimmed world with no terrain in the frame at all. Judged as a baseline it would have
+	# "confirmed" a working layer was measuring a scrim.
+	#
+	# FAILS CLOSED. If the redirect is set and unusable, this REFUSES rather than falling back to the
+	# root — because the fallback would quietly overwrite a canonical capture with a baseline, which is
+	# precisely the outcome the redirect exists to make impossible. `mkdir -p` that only warns is the same
+	# defect as a guard that cannot be false: the error path arrives at the dangerous state anyway.
+	var out_dir: String = "res://"
+	var redirect: String = OS.get_environment("SF_MOMENT_DIR")
+	if redirect != "":
+		out_dir = redirect if redirect.ends_with("/") else redirect + "/"
+		var abs_dir: String = ProjectSettings.globalize_path(out_dir)
+		DirAccess.make_dir_recursive_absolute(abs_dir)
+		if not DirAccess.dir_exists_absolute(abs_dir):
+			printerr("capture_moments: REFUSED '%s' — SF_MOMENT_DIR=%s could not be created or reached."
+				% [moment, redirect])
+			printerr("capture_moments: NOT falling back to the repo root; that would overwrite a canonical"
+				+ " capture with a redirected one, which is the exact accident this redirect prevents.")
+			return 2
+	var path := "%s_moment_%s%s%s.png" % [out_dir, moment, suffix, name_suffix]
 
 	# A moment's helper may have added nodes of its own since the first pass, and a new node arrives with
 	# its ears on. Re-deafen, then let the gate below confirm it took.
@@ -269,7 +323,7 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 	# One generation is enough to be an undo. If the copy cannot be made, REFUSE — a capture is worth less
 	# than the capture it would destroy, so the failing side is the side that keeps what already exists.
 	if FileAccess.file_exists(path):
-		var keep: String = "res://_moment_prev/"
+		var keep: String = out_dir + "_moment_prev/"
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(keep))
 		var prev: String = keep + path.get_file()
 		var err: int = DirAccess.copy_absolute(ProjectSettings.globalize_path(path),
@@ -367,6 +421,37 @@ func _at_the_counter(main: MainView, which: String) -> void:
 	elif which == "bench":
 		main._hud.bazaar_move(0, 1)
 	for _i in 6:
+		await physics_frame
+
+
+## THE SAPLING LESSON — the required opening treatment, and the one hint that has to survive P1's
+## subtraction pass. It is the first bubble a new player can earn without being told to earn it: chop the
+## leaves you are standing under and the game explains that wood is renewable.
+##
+## FIRED, NOT POSED. `_teaching` reaches its state by real play and then sets `_hints._active` by hand,
+## which is right for a lesson whose precondition (a line wrapped on a corner) cannot be conjured. This one
+## can be reached honestly, so it is: the sapling enters the pack exactly as a pickup puts it there, and
+## `Hints.refresh` detects its own acquisition edge. Nothing here writes `_active`, `_queue` or `_done`.
+## If the bubble does not come up on its own the shutter refuses — see `_contamination`.
+##
+## `SF_MOMENT_MUTANT=nosapling` withholds the sapling, which is the POSITIVE CONTROL for the guard above:
+## a shutter check that refuses a bubble-less frame is only worth having if it has been SEEN to refuse one.
+## It is an environment switch rather than a hand-edit because a mutant's danger is its LIFETIME, not the
+## run's — a commented-out line in a shared tree is live for every other session until it is put back, and
+## the lock does not cover the minutes spent editing.
+func _the_sapling(main: MainView) -> void:
+	var sim: FactorySim = main.sim
+	if OS.get_environment("SF_MOMENT_MUTANT") == "nosapling":
+		printerr("capture_moments: MUTANT — withholding the sapling; the shutter guard must refuse this")
+		for _i: int in 30:
+			await physics_frame
+		return
+	sim.inventory[&"sapling"] = int(sim.inventory.get(&"sapling", 0)) + 1
+	sim.total_produced[&"sapling"] = int(sim.total_produced.get(&"sapling", 0)) + 1
+	# Two frames for the edge to be seen and promoted out of the queue, then far enough into SHOW_SECONDS
+	# to clear FADE_IN — a bubble photographed at alpha 0.1 is a picture of nothing that will read as a
+	# picture of a faint lesson.
+	for _i: int in 30:
 		await physics_frame
 
 
