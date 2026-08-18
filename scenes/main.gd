@@ -322,7 +322,7 @@ func _ready() -> void:
 
 	_camera = Camera2D.new()
 	# Zoom: 0.7 frames the body as a readable character while keeping enough world to see a vertical
-	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
+	# chain (provisional — tuned by eye). Smaller = further out.
 	_camera.zoom = Vector2(_current_zoom(), _current_zoom())
 	# PIXEL-SNAP the follow (playtest: "texture blurs while running"). The built-in position_smoothing
 	# renders the camera at a fractional position, so every terrain texel samples between screen pixels

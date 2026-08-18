@@ -304,8 +304,17 @@ Costs as glyphs. **Never a wall of locked rows** — the future belongs on the r
 
 > **Attestation repaired 2026-08-17.** This line cited `docs/VIBE_GAP.md`, **a file that has
 > never existed** — no add, no contents, no deletion, in reachable or unreachable history. **The decision
-> itself is real and is not reopened:** the user made it on 2026-06-28 and has restated it since. What was
-> fictitious was its evidence. Note the artifacts now cited are *later* than the decision —
+> itself is real and is not reopened:** the user has stated and restated it, and the ordering is quoted
+> consistently across the repo. What was fictitious was its evidence.
+>
+> **A DATE THAT WAS IN THIS NOTE HAS BEEN REMOVED, and the removal is the point.** It said the decision was
+> made on 2026-06-28. **No artifact in this repository records that.** `git log -S` on both "Presentation is
+> the priority" and "real art > audio > onboarding" puts their first appearance at **2026-08-16**; the
+> section heading is undated, unlike its dated neighbours; and the only 2026-06-28 entry in this log is a
+> different decision. What *is* on that day is a `VIBE_GAP #3 / #8` provenance tag in four commit subjects
+> — circumstantial, and not the same thing. **I asserted a specific date for a specific decision, from
+> memory, inside a note whose entire subject is attestations pointing at things that are not there.**
+> Note the artifacts now cited are *later* than the decision —
 > `VIBE_AUDIT_RESPONSE.md` is the 2026-08-17 audit — so they corroborate the ordering rather than record
 > its origin, and no document written at the time survives. Said plainly rather than papered over, because
 > an attestation pointing at a substitute is how this got here.
@@ -422,9 +431,16 @@ Committing serves the locked rule instead of straining against it: it is the str
 not destroying these files. And the disclosure worry the word "publish" implies does not survive being
 stated — the repo is the user's own MIT-licensed game, and these are pictures of it.
 
-The premise under the old note was wrong too. These captures are not regenerable. Re-running `tools/sees.sh`
-does not reproduce them, because the game it photographs has changed; each one is a record of a world that
-no longer exists. That is the argument for versioning them rather than against it.
+The premise under the old note was wrong too. These captures are not regenerable. Re-running the capture
+instrument (`tools/capture_moments.gd`) does not reproduce them, because the game it photographs has
+changed; each one is a record of a world that no longer exists. That is the argument for versioning them
+rather than against it.
+
+> *(Corrected 2026-08-17: this sentence named `tools/sees.sh`, which has never existed in this repository —
+> zero tree entries, reachable or unreachable. The real instrument is `tools/capture_moments.gd`, whose own
+> header calls itself "The 'Sees' blind-vision instrument's renderer". A phantom tool was carrying the
+> load-bearing premise of a LOCKED decision, 120 lines below the note that repairs the same defect in a
+> different attestation.)*
 
 **Cost, recorded because git history is permanent:** ~237MB (`history/` 171MB, moments 66MB) onto a 53MB
 `.git`. There is no lossless win to take first — they are 8-bit RGB PNGs at 1920x1080, already near 3:1 —
