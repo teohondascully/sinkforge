@@ -544,7 +544,7 @@ func _draw_arrival() -> void:
 	# colliding with map, rope and action"). Registered as the SOLID CORE only, not the feathered extent:
 	# the feather fades to nothing by construction and calling it occupied would report collisions with
 	# regions that are visually empty.
-	if panel_probe != null:
+	if probing:
 		panel_probe.append(Rect2(CANVAS.x * 0.5 - core_half, y - SCRIM_ABOVE,
 			core_half * 2.0, SCRIM_ABOVE + SCRIM_BELOW))
 	_draw_scrim(core_half, y, a)
@@ -806,20 +806,38 @@ func _fit_text(text: String, size: int, max_w: float) -> String:
 ## A framed, lightly-beveled panel backing — the shared skin for every HUD widget (objectives,
 ## inspector, minimap, the bottom pack). A faint lit top edge makes it read as raised rather than a
 ## flat sticker; `accent` paints a gold cap bar for headlined panels.
-## TEST HOOK — when non-null, every panel this frame appends its rect here and nothing else changes.
+## TEST HOOK — while `probing`, every panel this frame appends its rect here and nothing else changes.
 ##
 ## The HUD is immediate-mode: there are no Control nodes, so nothing about the layout can be read off the
 ## scene tree, and a layout test would otherwise have to RE-DERIVE where each chip goes. A test that
 ## recomputes the layout it is checking agrees with itself by construction and catches nothing. This is
 ## two lines that let `check_hud_layout` observe the boxes the HUD ACTUALLY DREW, at real screen size, in
-## the real scene. Left null in play, so it costs one null check per panel.
+## the real scene.
+## THE PROBES ARE OFF UNLESS A FIXTURE TURNS THEM ON, and this flag is the whole guard because the one it
+## replaces could never be false. `if panel_probe != null:` reads as "unset", and the comment above said
+## "left null in play" — but a `static var panel_probe: Array[Rect2]` initialises to `[]`, and in GDScript
+## `[] != null` is TRUE (checked against 4.6.2, not assumed). So the guard fell open on every frame of
+## every real session: one Rect2 appended per panel, ~6-10 panels a frame at 60fps, into a static array
+## nothing clears and nothing frees. A test instrument that only costs a null check in play was, in play,
+## an unbounded leak. Fixtures set `Hud.probing = true`; `check_hud_layout` asserts it is false by default
+## and that the probes stay empty when it is, so this cannot silently fall open again.
+static var probing: bool = false
 static var panel_probe: Array[Rect2]
+
+## The hotbar, measured the same way and for the same reason — except this one counts WELLS THE LOOP
+## ACTUALLY DREW rather than the `n` the loop was given, because the interesting failure is exactly the
+## case where those two disagree. Keys: carried (how many item types the pack holds), wells (how many got
+## a box), sel (the active index), sel_lit (did any DRAWN well light up as the selection), window (the pack
+## index the first well shows), backing (the framed rect), label (the selected item's name plate, or a zero
+## Rect2 when none was drawn). The bar's
+## early returns leave it untouched, so an empty probe under `probing` means "the bar did not draw".
+static var hotbar_probe: Dictionary
 
 
 ## `alpha` modulates the whole skin so a panel can FADE rather than blink out. Panels that fade fully are
 ## expected to return before calling this at all, so the probe keeps recording only what was really drawn.
 func _panel(rect: Rect2, accent: bool = false, alpha: float = 1.0) -> void:
-	if panel_probe != null:
+	if probing:
 		panel_probe.append(rect)
 	draw_rect(rect, Color(UI_BG, UI_BG.a * alpha))
 	draw_line(rect.position + Vector2(1.0, 1.0), rect.position + Vector2(rect.size.x - 1.0, 1.0),
@@ -1914,7 +1932,7 @@ func _round_rect(rect: Rect2, r: float, col: Color) -> void:
 	# panels and nothing else, and the layer's headline claim ("the HUD must not print on top of itself")
 	# had never once covered the largest overlay in the game. The states-differ assertion is what found it:
 	# the Bazaar's screen was byte-identical to the bare screen's.
-	if panel_probe != null:
+	if probing:
 		panel_probe.append(rect)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
@@ -2352,16 +2370,36 @@ func _draw_inventory() -> void:
 	# as "broken / what goes here?". The bar grows/shrinks with your pack (min 1 so it never vanishes).
 	var n: int = clampi(slots.size(), 1, FactorySim.INVENTORY_SLOTS)
 	var sel: int = int(inv_selected_getter.call()) if inv_selected_getter.is_valid() else 0
+	# THE BAR IS A WINDOW ONTO THE PACK, NOT THE PACK. `inventory_slots()` has no cap — it returns one entry
+	# per item TYPE, and the type universe is 20 machines plus 16 materials plus the crafted intermediates —
+	# while this bar is capped at ten and `clampi` used to swallow the difference in silence. Carrying
+	# eleven types drew ten wells and said nothing about the eleventh, in a bar whose stated contract two
+	# lines up is that it grows and shrinks with your pack. Worse, `_cycle_inventory` wraps modulo the FULL
+	# count (main.gd:2214), so the wheel walks the selection to index 10+ where the loop below never reaches
+	# it: no glow, no accent border, no lit well anywhere on the bar — and the name plate, whose guard is
+	# `sel < slots.size()` and not `sel < n`, was still drawn at the selection's arithmetic position, off
+	# the right end of the bar and eventually off the canvas. A floating item name over empty space, naming
+	# the thing your next click will place. It is reachable on frame one of a dev start: the dev kit is ten
+	# types and the starter pickaxe is an eleventh, seeded independently.
+	# So the window is placed to CONTAIN the selection instead of assuming it does. Centred, derived purely
+	# from `sel` — no persistent scroll state to desynchronise from the thing it is scrolling.
+	var w0: int = clampi(sel - n / 2, 0, maxi(slots.size() - n, 0))
 	var total_w: float = n * SLOT + (n - 1) * SLOT_GAP
 	var x0: float = (CANVAS.x - total_w) * 0.5
 	var y: float = CANVAS.y - 28.0 - SLOT
 	# A clean framed backing just for the hotbar (the craft strip that used to share this panel now lives
 	# in the E screen). Keeps the bar reading as one deliberate unit, not floating slots.
-	_panel(Rect2(x0 - 8.0, y - 7.0, total_w + 16.0, SLOT + 14.0), true)
-	for i: int in n:
-		var sx: float = x0 + float(i) * (SLOT + SLOT_GAP)
+	var backing := Rect2(x0 - 8.0, y - 7.0, total_w + 16.0, SLOT + 14.0)
+	_panel(backing, true)
+	var wells: int = 0
+	var sel_lit: bool = false
+	for k: int in n:
+		var i: int = w0 + k                                      # window slot -> the pack index it shows
+		var sx: float = x0 + float(k) * (SLOT + SLOT_GAP)
 		var slot_rect := Rect2(sx, y, SLOT, SLOT)
 		var active: bool = i == sel
+		wells += 1
+		sel_lit = sel_lit or active
 		if i < slots.size() and slot_rect.has_point(get_viewport().get_mouse_position()):
 			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip
 			_tooltip_count = int(slots[i]["count"])
@@ -2372,9 +2410,14 @@ func _draw_inventory() -> void:
 		draw_line(slot_rect.position + Vector2(1.0, 1.0), slot_rect.position + Vector2(SLOT - 1.0, 1.0),
 			UI_EDGE_HI, 1.0)                                                                      # top bevel
 		draw_rect(slot_rect, UI_ACCENT if active else UI_EDGE, false, 2.0 if active else 1.0)
-		# Faint keybind number in the slot corner (1-8) so the hotbar reads as keyed.
-		draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), str(i + 1),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.45, 0.48, 0.56))
+		# Faint keybind number in the slot corner so the hotbar reads as keyed — and ONLY where a key really
+		# exists. The row is 1-9 then 0 for the tenth (main.gd:1092), so the tenth well said "10" for a key
+		# nobody has, and once the window can scroll, `k + 1` would relabel whichever items happen to be on
+		# screen. The digit follows the PACK INDEX and stops when the keys do; past that the well is
+		# wheel-and-PACK territory and says so by staying blank rather than by lying.
+		if i < 10:
+			draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), "0" if i == 9 else str(i + 1),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.45, 0.48, 0.56))
 		if i < slots.size():
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
@@ -2398,14 +2441,37 @@ func _draw_inventory() -> void:
 			draw_rect(Rect2(sx + SLOT - cw - 5.0, y + SLOT - 13.0, cw + 4.0, 12.0), Color(0.03, 0.03, 0.05, 0.85))
 			draw_string(_font, Vector2(sx + SLOT - cw - 3.0, y + SLOT - 3.0), cnt,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
+	# THE PACK CONTINUES THAT WAY. A chevron at whichever end has more pack behind it — the one thing the
+	# clamp never said. It is deliberately a mark and not a count: the number of types you are carrying is
+	# the PACK screen's job, and a bar that starts reporting totals is on its way to being a second
+	# inventory. This only says "not all of it is here", which is the fact the bar was concealing.
+	if w0 > 0:
+		_more_mark(Vector2(backing.position.x - 5.0, y + SLOT * 0.5), -1.0)
+	if w0 + n < slots.size():
+		_more_mark(Vector2(backing.end.x + 5.0, y + SLOT * 0.5), 1.0)
 	# Name the SELECTED item just above the bar — so the coloured chips stop being mystery squares.
-	if sel < slots.size():
+	var label_rect := Rect2()
+	if sel >= w0 and sel < mini(w0 + n, slots.size()):
 		var label: String = _item_label(slots[sel]["item"])
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		var lx: float = x0 + float(sel) * (SLOT + SLOT_GAP) + (SLOT - lw) * 0.5
+		var lx: float = x0 + float(sel - w0) * (SLOT + SLOT_GAP) + (SLOT - lw) * 0.5
 		var ly: float = y - 12.0
-		draw_rect(Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0), Color(0.05, 0.06, 0.09, 0.88))
+		var plate := Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0)
+		draw_rect(plate, Color(0.05, 0.06, 0.09, 0.88))
 		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
+		label_rect = plate
+	if probing:
+		hotbar_probe = {"carried": slots.size(), "wells": wells, "sel": sel, "sel_lit": sel_lit,
+			"window": w0, "backing": backing, "label": label_rect}
+
+
+## "There is more pack this way." A chevron pointing outward from the end of the hotbar, drawn only when
+## the window is actually hiding something in that direction. Dim on purpose — it is a hint that the bar is
+## a view, not a control, and nothing about it is clickable.
+func _more_mark(at: Vector2, dir: float) -> void:
+	var col := Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.55)
+	draw_line(at + Vector2(-3.0 * dir, -5.0), at + Vector2(2.0 * dir, 0.0), col, 1.5)
+	draw_line(at + Vector2(2.0 * dir, 0.0), at + Vector2(-3.0 * dir, 5.0), col, 1.5)
 
 
 ## The hovered slot's TOOLTIP: the item's name, the count you hold, and one purpose

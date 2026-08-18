@@ -189,6 +189,8 @@ func _run() -> void:
 	_check_help_text()
 	_check_big_map(bare, big)
 	_check_hover(bare, hover, big_hover)
+	await _check_pack_window()
+	await _check_probe_is_off()
 
 	_check(total_panels >= states.size() * 2,
 		"the matrix drew %d panels across %d states, so there was geometry to judge"
@@ -441,10 +443,14 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 		# ARRIVAL_HOLD is 3.4s against one drawn frame, so the plate is at full life when the probe fires.
 		hud.announce("THE DEEPSLATE", "120 METRES DOWN", Color(0.56, 0.50, 0.78))
 	await RenderingServer.frame_post_draw            # one frame for the new aim to reach `hover_info`
+	Hud.probing = true
 	Hud.panel_probe = ([] as Array[Rect2])
+	Hud.hotbar_probe = {}
 	await RenderingServer.frame_post_draw
 	var out: Array[Rect2] = Hud.panel_probe.duplicate()
+	Hud.probing = false
 	Hud.panel_probe = ([] as Array[Rect2])
+	Hud.hotbar_probe = {}
 	return out
 
 
@@ -474,3 +480,136 @@ func _check_help_text() -> void:
 	_check(Hud.HELP_LINES.size() >= 12 and widest > budget * 0.5,
 		"the card carries %d lines and the widest uses %.0f%% of its column — there was text to measure"
 			% [Hud.HELP_LINES.size(), 100.0 * widest / budget])
+
+
+## THE HOTBAR IS A WINDOW, AND A WINDOW THAT LOSES THE SELECTION IS WORSE THAN A SHORT LIST.
+##
+## `FactorySim.inventory_slots()` has NO CAP — one entry per item type, and the universe is twenty machine
+## types plus sixteen materials plus the crafted intermediates. The bar draws ten. Nothing in the suite
+## had ever put an eleventh type in the pack, so nothing had ever seen what the eleventh does, and the
+## answer was: nothing at all, silently, in a bar whose own comment promises it "grows/shrinks with your
+## pack". Reachable on frame one of a dev start — the kit is ten types and the starter pickaxe is an
+## eleventh, seeded by a different function.
+##
+## Three cases, and the middle one is the POSITIVE CONTROL. A test that only ever asserts the overflowing
+## pack cannot distinguish "the window works" from "the probe reports ten no matter what", so the small
+## pack is measured with the same instrument first and has to come back DIFFERENT.
+func _check_pack_window() -> void:
+	var saved: Dictionary = _main.sim.inventory.duplicate()
+	var saved_sel: int = _main._inv_selected
+
+	# A control pack that FITS. Everything about the bar should be ordinary here.
+	var small: Dictionary = await _pack_shot(5, 3)
+	_check(int(small.get("carried", -1)) == 5 and int(small.get("wells", -1)) == 5,
+		"a pack of 5 types draws 5 wells (carried %s, wells %s)"
+			% [small.get("carried", "?"), small.get("wells", "?")])
+	_check(bool(small.get("sel_lit", false)),
+		"...and the selected well is lit")
+	# Deliberately NOT `backing.encloses(plate)`: the plate is centred on its slot and is routinely wider
+	# than one, so enclosure is false for legitimate layouts and the assertion would be testing the wrong
+	# property. What is being claimed here is only that the plate exists at all in the ordinary case.
+	_check((small.get("label", Rect2()) as Rect2).size.x > 0.0,
+		"...and the name plate was drawn (%s)" % [small.get("label", Rect2())])
+
+	# The same pack overflowing, selection still inside the window.
+	var big_pack: Dictionary = await _pack_shot(13, 3)
+	_check(int(big_pack.get("carried", -1)) == 13,
+		"a pack of 13 types reports 13 carried (got %s)" % [big_pack.get("carried", "?")])
+	_check(int(big_pack.get("wells", -1)) == FactorySim.INVENTORY_SLOTS,
+		"...and the bar still draws exactly %d wells (got %s)"
+			% [FactorySim.INVENTORY_SLOTS, big_pack.get("wells", "?")])
+	_check(int(big_pack.get("wells", 0)) < int(big_pack.get("carried", 0)),
+		"...so the window is genuinely smaller than the pack, which is the case under test")
+
+	# ...AND THE SELECTION PAST THE END, which is what the wheel reaches and what used to vanish. The LAST
+	# type is chosen deliberately rather than an arbitrary high index: `inventory` is insertion-ordered, so
+	# a type you have just picked up for the first time appends at the end. "The item you just found" is
+	# the common case, not the corner one.
+	var far: Dictionary = await _pack_shot(15, 14)
+	_check(bool(far.get("sel_lit", false)),
+		"selecting the 15th of 15 types still lights a DRAWN well (window starts at %s)"
+			% [far.get("window", "?")])
+	_check(int(far.get("window", 0)) > 0,
+		"...because the window scrolled to contain it (starts at %s)" % [far.get("window", "?")])
+	var plate: Rect2 = far.get("label", Rect2()) as Rect2
+	var back: Rect2 = far.get("backing", Rect2()) as Rect2
+	_check(plate.size.x > 0.0 and plate.position.x >= back.position.x - 40.0
+			and plate.position.x + plate.size.x <= back.position.x + back.size.x + 40.0,
+		"...and its name plate sits over the bar, not off the end of it (plate %s vs bar %s)"
+			% [plate, back])
+	_check(plate.position.x >= -TOUCH and plate.position.x + plate.size.x <= Hud.CANVAS.x + TOUCH,
+		"...and on the canvas (plate %s)" % [plate])
+
+	_main.sim.inventory = saved
+	_main._inv_selected = saved_sel
+
+
+## Stuff the pack with `types` distinct item types, select `sel`, and draw ONE probed frame. The ids are
+## real ones — the bar looks up sprites and labels by id, and a made-up id would exercise a drawing path
+## no player ever sees.
+func _pack_shot(types: int, sel: int) -> Dictionary:
+	const IDS: Array[StringName] = [&"ore", &"ingot", &"wood", &"coal", &"conduit", &"rope", &"torch",
+		&"sapling", &"stone", &"iron", &"gravel", &"shale", &"rich_ore", &"processor", &"splitter"]
+	var pack: Dictionary = {}
+	for i: int in mini(types, IDS.size()):
+		pack[IDS[i]] = i + 1
+	_main.sim.inventory = pack
+	_main._paused = false
+	_main._inventory_open = false
+	_main._minimap_mode = 0
+	_main._show_help = false
+	_main._show_dashboard = false
+	_main._settings_open = false
+	_main._inv_selected = sel
+	for _i: int in 2:
+		await RenderingServer.frame_post_draw
+	# The selection is re-set immediately before the probed frame: MainView owns nothing here, but the
+	# settle frames run real input handling and a stray wheel event would move it.
+	_main._inv_selected = sel
+	Hud.probing = true
+	Hud.hotbar_probe = {}
+	await RenderingServer.frame_post_draw
+	var out: Dictionary = Hud.hotbar_probe.duplicate()
+	Hud.probing = false
+	Hud.hotbar_probe = {}
+	return out
+
+
+## THE INSTRUMENT MUST BE OFF WHEN NOBODY IS LOOKING, AND THIS IS THE ASSERTION THAT SAYS SO.
+##
+## `Hud.panel_probe` was guarded by `if panel_probe != null:` with a comment promising it was "left null in
+## play". A `static var panel_probe: Array[Rect2]` initialises to `[]`, and `[] != null` is TRUE in
+## GDScript — verified against 4.6.2 rather than assumed. So the guard fell open on every frame of every
+## real session and the array grew forever, in a static nothing clears. The fix is a real flag; this is
+## what stops it falling open again.
+##
+## The order matters. Asserting "the probe is empty" ALONE passes on a HUD that draws nothing, on a broken
+## flag, on a deleted probe — so the flag is turned back ON afterwards and the probe has to FILL. Absence
+## is only evidence once the instrument has proved it can detect presence.
+func _check_probe_is_off() -> void:
+	_check(not Hud.probing, "the probe flag is off once the matrix has finished with it")
+	Hud.panel_probe = ([] as Array[Rect2])
+	Hud.hotbar_probe = {}
+	for _i: int in 3:
+		await RenderingServer.frame_post_draw
+	var leaked: int = Hud.panel_probe.size()
+	var leaked_bar: bool = not Hud.hotbar_probe.is_empty()
+
+	# POSITIVE CONTROL — the same three frames with the flag on.
+	Hud.probing = true
+	Hud.panel_probe = ([] as Array[Rect2])
+	Hud.hotbar_probe = {}
+	for _i: int in 3:
+		await RenderingServer.frame_post_draw
+	var recorded: int = Hud.panel_probe.size()
+	var recorded_bar: bool = not Hud.hotbar_probe.is_empty()
+	Hud.probing = false
+	Hud.panel_probe = ([] as Array[Rect2])
+	Hud.hotbar_probe = {}
+
+	_check(recorded > 0 and recorded_bar,
+		"the probe records while it is on — %d panels, hotbar %s (if this fails the check below means nothing)"
+			% [recorded, "yes" if recorded_bar else "no"])
+	_check(leaked == 0 and not leaked_bar,
+		"...and records NOTHING while it is off — %d panels, hotbar %s"
+			% [leaked, "yes" if leaked_bar else "no"])
