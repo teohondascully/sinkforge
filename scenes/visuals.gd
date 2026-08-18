@@ -35,6 +35,12 @@ const MACHINE_STYLE: Dictionary = {
 	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal — powered, heavy
 	&"crush": {"kind": "crush", "color": Color(0.38, 0.33, 0.30)},        # crusher iron — spoil in, gravel out
 	&"spur": {"kind": "spur", "color": Color(0.66, 0.53, 0.32)},          # the Head's own amber — it IS the Head
+	# THE ORE VENT IS NOT A FURNACE, and until this entry existed it was drawn as one. `machine_kind` treats
+	# "a recipe with empty inputs" as a furnace, which is true of the base Forge and false of every SOURCE --
+	# a vent takes nothing in because it draws ore out of the ground, not because it smelts. It shipped with
+	# the Forge's sooty casing and a fire glyph. Cosmetic tag only: `&"ore_vent"` has no `_BEHAVIORS` entry,
+	# so the sim still falls through to the recipe runner exactly as it did with no behavior at all.
+	&"ore_vent": {"kind": "vent", "color": Color(0.24, 0.27, 0.31)},      # cold basalt — a hole in dark rock
 }
 
 
@@ -478,6 +484,8 @@ static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String
 			_fork(canvas, center, s)
 		"drill":
 			_drill(canvas, center, s, active, t)
+		"vent":
+			_vent(canvas, center, s, active, t)
 		"generator":
 			_generator(canvas, center, s, active, t)
 		"conduit":
@@ -544,6 +552,44 @@ static func _lift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 
 ## Drill: a boxy housing over a downward-pointing bit with helical flutes. The bit BOBS down and the
 ## flutes MARCH while boring — the "it's chewing into the rock below" read (mirrors what _run_drill does).
+## Ore Vent (an ore SOURCE): a fissure in rock with a lintel over it, and ore rising out of the dark on the
+## draught while it is producing. Deliberately NOT a fire and NOT a bit -- the two things it kept being
+## mistaken for. A furnace's light comes from inside its mouth and stays there; a vent's mouth is unlit and
+## the moving thing LEAVES it, which is the whole difference between something that consumes and something
+## that yields.
+##
+## No MACHINE_PROFILE entry on purpose: a kind with none keeps the full square, which the profile table
+## calls the honest default. The crown shapes already in that table are a drill's two mounts and a hopper's
+## flange, and a vent invented at speed would land next to one of them -- a silhouette that collides is
+## worse than a silhouette that abstains. Identity here is carried by colour and glyph until PC-01's gauge
+## can score a candidate crown against the others.
+static func _vent(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
+	var dark := Color(0.04, 0.05, 0.06)
+	var lip := Color(0.62, 0.67, 0.71)
+	var ore := Color(1.0, 0.74, 0.34)
+	# ONE SHAPE, NOT FIVE. The first version stacked a lintel, a fissure and six jaw teeth into a 32px cell
+	# and the whole thing resolved to a dark blob at play size -- legible in the source, mush on the screen.
+	# What survives is the read that matters: a black opening under a bright lip, which is what says "a hole
+	# in something" at any size. The detail went out because there was no room for it, not because it was wrong.
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(c.x - 3.4 * s, c.y - 5.5 * s), Vector2(c.x + 3.4 * s, c.y - 5.5 * s),
+		Vector2(c.x + 6.2 * s, c.y + 8.0 * s), Vector2(c.x - 6.2 * s, c.y + 8.0 * s)]), dark)
+	# The lit lip: the one bright element, and the reason the hole reads as cut rather than painted.
+	canvas.draw_rect(Rect2(c.x - 4.2 * s, c.y - 6.8 * s, 8.4 * s, 1.6 * s), lip)
+	if not active:
+		return
+	# THE YIELD: chips of ore drifting UP out of the mouth. A furnace's light lives inside its mouth and stays
+	# there; a vent's mouth is unlit and the moving thing LEAVES it. That is the whole difference between a
+	# machine that consumes and one that yields, and it is carried by motion rather than by another shape.
+	for k: int in 2:
+		var phase: float = fmod(t * 0.55 + float(k) * 0.5, 1.0)
+		var y: float = c.y + 6.0 * s - phase * 12.0 * s
+		var x: float = c.x + sin(phase * 4.0 + float(k) * 2.4) * 2.2 * s
+		var fade: float = clampf(1.0 - phase, 0.0, 1.0) * clampf(phase * 5.0, 0.0, 1.0)
+		canvas.draw_rect(Rect2(x - 1.1 * s, y - 1.1 * s, 2.2 * s, 2.2 * s),
+			Color(ore.r, ore.g, ore.b, fade))
+
+
 static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var steel := Color(0.16, 0.18, 0.22)
 	var edge := Color(0.78, 0.66, 0.40)
