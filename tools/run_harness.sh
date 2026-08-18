@@ -258,20 +258,40 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # check_contact_edge (6b) is unregistered for the SAME reason and on the same terms:
 #   bash tools/with_machine.sh --script res://tools/check_contact_edge.gd
 #
-# CURRENT READING, generated world, all three arms non-vacuous, against a rock-interior texture of 2.1:
-#   rock TOP (lit lip)     n=60  step 3.71  polarity 62%
-#   rock UNDER (ceiling)   n=63  step 3.01  polarity 62%
-#   rock SIDE (wall)       n=70  step 1.38  polarity 57%
-# Floor is 75% and does not move. TOP and UNDER carry a real contact; SIDE steps BELOW the material's own
-# texture, so a wall boundary is quieter than the noise it must be seen against — and sides are the
-# majority of contacts in a dug world.
+# CURRENT READING (generated world, repaired capture geometry):
+#   rock|air step median 11.7 against a rock-interior texture of 2.8
+#   detectability 76%   polarity 91%   floor 75% for both, and the floor does not move
+# Per-orientation is NOT reportable: reach is 33 / 26 / 11 against an unchanged floor of 40, because the
+# corrected view is smaller than the fixture was built for. No orientation conclusion is drawn from it.
+# The 76% clears the floor by ONE POINT on a capture-based measure of an animated scene, so it is not yet
+# a result anyone should build on; the spread across repeat runs decides whether the GATE is sound, which
+# is a different claim from whether the FINDING is (c2's distinction, and it is the right one).
 #
-# THIS NOTE PREVIOUSLY SAID "detectability 52%, polarity 51%… the contact carries very nearly no
-# information at all", and that is corrected here rather than only in the trace. Two reasons it was wrong,
-# both found later: pooled POLARITY is invalid for this subject (`_draw_edge_ao` and `_sky_form` are a KEY
-# LIGHT — rock is brighter at a sky-facing face and darker at a ceiling BY DESIGN, so a perfect key light
-# scores ~50% on a pooled measure by construction), and the pooled step averaged a lit lip against a
-# ceiling AO until both cancelled. The number was not small, it was CANCELLED.
+# EVERYTHING THIS NOTE PREVIOUSLY REPORTED IS WITHDRAWN, AND SO IS THE THEORY IT USED TO EXPLAIN ITSELF.
+# It has now been wrong twice in opposite directions, and the second correction voids the first:
+#   1st  "detectability 52%, polarity 51% ... the contact carries very nearly no information at all"
+#   2nd  TOP n=60 step 3.71 62% / UNDER n=63 step 3.01 62% / SIDE n=70 step 1.38 57%
+#
+# Both were taken through a broken lens. This project renders the canvas at 1280x720 and composites it 1.5x
+# into the 1920x1080 framebuffer that get_texture().get_image() returns; the fixture projected world to
+# pixel by hand as though those were one space, so a face at offset D from the camera centre was sampled at
+# the pixel belonging to the world point at 2/3 D -- always inboard, toward the middle of the view, where
+# rock is most ordinary. An instrument asking whether an EDGE reads was handed the interior beside it, which
+# is precisely why SIDE appeared to "step BELOW the material own texture": it was interior rock compared
+# against interior rock. Repaired with get_final_transform() * get_canvas_transform().
+#
+# THE EXPLANATION WAS WRONG TOO, AND THAT IS THE PART WORTH KEEPING. The 2nd reading argued that pooled
+# polarity is invalid for this subject -- that _draw_edge_ao and _sky_form are a KEY LIGHT, so a perfect one
+# scores ~50% on a pooled measure BY CONSTRUCTION, and the number was "not small, it was CANCELLED". Clean,
+# plausible, checkable -- and the repaired measurement refutes it. Pooled polarity is 91%, and the UNDER arm,
+# the one the theory said must run dark, reads 81% rock-brighter. Nothing was cancelling. A mechanism was
+# built to explain an artifact, and it was convincing enough that it nearly justified replacing the
+# statistic. A theory that explains a broken instrument is worse than no theory, because it makes the
+# instrument look understood.
+#
+# REMOVED, per directive 0027: this note used to assert that "sides are the majority of contacts in a dug
+# world". The fixture MANUFACTURES its orientation mix by carving a chamber and a gallery, so it cannot
+# establish how often anything occurs in a world a player actually digs. It never could, at any reading.
 #
 # Correcting it here because a correction that lives only where it was noticed is compliance rather than a
 # correction — a reader greps the harness, not somebody's tracelog. (c2 made the same catch against their
