@@ -216,6 +216,10 @@ func _run() -> void:
 		% [_median(rock_v), _median(air_v), absf(_median(rock_v) - _median(air_v)), v_auc * 100.0])
 	print("  GRAIN: rock median %.2f, air median %.2f, gap %.2f -> you would be right %.0f%% of the time"
 		% [_median(rock_g), _median(air_g), absf(_median(rock_g) - _median(air_g)), g_auc * 100.0])
+	var ra: Array[float] = s["rock_aniso"]
+	var aa: Array[float] = s["air_aniso"]
+	print("  ORIENTATION (diagnostic, not gated): rock median %+.3f, air median %+.3f -> %.0f%% of the time"
+		% [_median(ra), _median(aa), _readability(ra, aa) * 100.0])
 	print("  the better cue is %s at %.0f%% (a coin flip is 50%%, the floor is %.0f%%)"
 		% ["VALUE" if v_auc >= g_auc else "GRAIN", best * 100.0, READ_FLOOR * 100.0])
 
@@ -301,6 +305,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var rock_pe: Array[float] = []      # plain, touching air
 	var rock_si: Array[float] = []      # lode-stained interior
 	var rock_se: Array[float] = []      # lode-stained, touching air
+	## DIAGNOSTIC THIRD CUE, ORIENTATION. `_patch_stats` returns a mean and a scalar standard deviation, and a
+	## scalar variance IS BLIND TO DIRECTION -- it cannot tell horizontal banding from isotropic mottling, only
+	## that both wobble. That matters here because the renderer already makes rock anisotropic and the wall not:
+	## rock's grain is sampled through GRAIN_XSTRETCH = 0.38, which stretches its features horizontally into
+	## bedding, while the back wall's mottling has no such stretch. So a cue a player may well be reading is one
+	## this layer is constructed not to see. Reported, never gated, until it has earned it.
+	var rock_aniso: Array[float] = []
+	var air_aniso: Array[float] = []
 	var rock_grain: Array[float] = []
 	var air_grain: Array[float] = []
 	var rock_row: Array[float] = []
@@ -359,6 +371,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 			if main.sim.is_solid(c):
 				rock_value.append(stat.x)
 				rock_grain.append(stat.y)
+				rock_aniso.append(_patch_aniso(img, px, py, patch))
 				rock_row.append(float(cy))
 				# THE PARTITION IS DECLARED BEFORE ROCK STOPS BEING ONE THING, which is the whole point of
 				# it existing today rather than the day it matters. This layer draws its solid population at
@@ -401,9 +414,10 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 			else:
 				air_value.append(stat.x)
 				air_grain.append(stat.y)
+				air_aniso.append(_patch_aniso(img, px, py, patch))
 				air_row.append(float(cy))
 
-	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain,
+	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain, "rock_aniso": rock_aniso, "air_aniso": air_aniso,
 		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
 		"rock_pi": rock_pi, "rock_pe": rock_pe, "rock_si": rock_si, "rock_se": rock_se,
 		"skipped": near_surface + lit + offslab}
@@ -440,6 +454,31 @@ func _touches_air(sim: FactorySim, c: Vector2i) -> bool:
 
 
 ## Mean luminance and standard deviation over a square patch — x is VALUE, y is GRAIN.
+## HOW DIRECTIONAL THE TEXTURE IS, in [-1, 1]. Mean absolute VERTICAL neighbour difference against mean
+## absolute HORIZONTAL, normalised by their sum. Horizontal bedding changes value as you move UP or DOWN
+## across the bands and barely as you move along them, so it reads POSITIVE; isotropic mottling reads ~0.
+##
+## Normalised on purpose: the ratio survives the darkness veil in a way an amplitude does not, because the
+## veil scales both gradients together. That is the property an unlit cue needs, and it is precisely what a
+## standard deviation loses.
+func _patch_aniso(img: Image, cx: int, cy: int, r: int) -> float:
+	var gh: float = 0.0
+	var gv: float = 0.0
+	var n: int = 0
+	for y: int in range(cy - r, cy + r):
+		for x: int in range(cx - r, cx + r):
+			var c0: Color = img.get_pixel(x, y)
+			var l0: float = c0.r * 0.299 + c0.g * 0.587 + c0.b * 0.114
+			var cx1: Color = img.get_pixel(x + 1, y)
+			var cy1: Color = img.get_pixel(x, y + 1)
+			gh += absf((cx1.r * 0.299 + cx1.g * 0.587 + cx1.b * 0.114) - l0)
+			gv += absf((cy1.r * 0.299 + cy1.g * 0.587 + cy1.b * 0.114) - l0)
+			n += 1
+	if n == 0 or gh + gv <= 0.0:
+		return 0.0
+	return (gv - gh) / (gv + gh)
+
+
 func _patch_stats(img: Image, cx: int, cy: int, r: int) -> Vector2:
 	var n: int = 0
 	var sum: float = 0.0
