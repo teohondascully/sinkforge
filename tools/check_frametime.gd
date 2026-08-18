@@ -106,6 +106,36 @@ const PACED_FRACTION: float = 0.6
 var _main: MainView = null
 ## Non-empty = controlled hardware, named by whoever set it, and the absolute budget applies.
 var _perf_host: String = OS.get_environment("SF_PERF_HOST")
+## LET THE GAME HEAR THE DIG BUTTON, and make sure the button means DIG.
+##
+## `Controls.deaf` gates `Controls.pressed()`, which is what `_update_mining` consults. It is true for the
+## whole run because a stray PAUSE keystroke once landed DIG 0 of 40 with the world in perfect condition.
+## Clearing it here does not bring that back: `_deafen(_main)` disabled `_unhandled_input` across the tree
+## and PAUSE is an event handler. Only one of the two doors is being opened.
+##
+## WITH A PLACEABLE SELECTED, LMB BUILDS -- IT DOES NOT MINE. `_effective_aim` returns the raw cell for a
+## build and the click goes to placement, so a run reaching this phase holding a pack of stone would quietly
+## place blocks and report a DIG distribution over zero breaks. No `try_mine` fixture can meet this, because
+## none of them has a hotbar; converting to the real path inherits the hotbar and this hazard with it.
+func _arm_real_dig() -> void:
+	var slots: Array[Dictionary] = _main.sim.inventory_slots()
+	var picked: int = -1
+	for si: int in slots.size():
+		var item: StringName = slots[si]["item"]
+		if _main._machine_defs_by_id.has(item) or item in MainView.BUILD_MATERIALS:
+			continue
+		picked = si
+		break
+	if picked >= 0:
+		_main._inv_selected = picked
+	else:
+		printerr("    !! every pack slot is placeable (%d) — holding LMB would BUILD, not mine" % slots.size())
+	Controls.deaf = false
+
+
+## The cell the cursor was aimed at last frame. `_update_mining` breaks on its own clock, so the only honest
+## way to count a break is to look at what the previous aim did, one frame later.
+var _dig_prev_target: Vector2i = Vector2i(-1, -1)
 
 ## Per-phase proof that the phase did the work its name claims — filled by _phase, judged by _workload.
 var _work: Dictionary = {}
@@ -202,7 +232,8 @@ func _run() -> void:
 	for _s: int in 12:
 		await physics_frame                          # let the body settle onto the ground it was placed on
 	print("      (dig site: %d rows of solid rock under the body, needs %d)" % [seam, DIG_MINES])
-	var dig_ms: PackedFloat32Array = await _phase(&"dig", DIG_MINES, SAMPLE * 2)
+	# until_mines 0: a fixed WINDOW, not a fixed quantity of work. See DIG_MIN_MINES.
+	var dig_ms: PackedFloat32Array = await _phase(&"dig", 0, SAMPLE * 2)
 	ok = _gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO) and ok
 	var swing_ms: PackedFloat32Array = await _phase(&"swing")
 	ok = _gate("SWING on the rope at speed", swing_ms, quiet, MOVE_HITCH_RATIO) and ok
@@ -446,6 +477,8 @@ func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> Packed
 	var ms := PackedFloat32Array()
 	if kind == &"swing":
 		_fire_rope()
+	if kind == &"dig":
+		_arm_real_dig()
 	var moved: float = 0.0
 	var mined: int = 0
 	var anchored: int = 0
@@ -466,6 +499,12 @@ func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> Packed
 		prev = player.position
 		if player.grapple.state == Grapple.State.ANCHORED:
 			anchored += 1
+	if kind == &"dig":
+		# Hand the ears back before anything else runs. A latched MINE would carry a held button into the
+		# SWING phase measured immediately after this one.
+		Input.action_release(Controls.MINE)
+		Controls.deaf = true
+		_dig_prev_target = Vector2i(-1, -1)
 	player.input_dir = 0.0
 	player.input_climb = 0.0
 	_work[kind] = {"moved": moved, "mined": mined, "anchored": anchored, "frames": ms.size(),
@@ -486,9 +525,38 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 			# Reverse periodically so the run stays inside the generated world instead of hitting its edge.
 			player.input_dir = 1.0 if (i / 60) % 2 == 0 else -1.0
 		&"dig":
+			# THE REAL INPUT PATH, not `try_mine`. What stood here called `_main.try_mine(target)` once per
+			# frame, which skips `_update_mining` entirely -- and with it the hardness, tool-speed, rhythm and
+			# recovery rules that decide WHEN a player's hold is allowed to break a block. Measured against a
+			# probe driving the real path in the same world, same tree, three runs:
+			#
+			#     arm                            broken   blocks/s   p50 ms        p95 ms
+			#     direct try_mine                    64       9.15   30.5-32.1     34.5-34.9
+			#     the real input path                 8       1.14   16.60-16.63   24.0-25.0
+			#
+			# The fixture broke blocks EIGHT TIMES faster than the game lets a player break them, so the DIG
+			# distribution was the cost of a workload no play can produce. The withdrawn 32-35ms "DIG stall"
+			# is almost exactly the direct arm's p50/p95 above.
+			#
+			# Warping the cursor and holding MINE is safe here for reasons that are each load-bearing:
+			#   * `_deafen(_main)` has already cleared `_unhandled_input` across the tree, so the PAUSE key --
+			#     the intermittent that once landed DIG 0 of 40 with the world in perfect condition -- cannot
+			#     fire whatever `Controls.deaf` says. Polling and events are separate doors.
+			#   * `player.auto_input = false`, and Player polls `Controls` only when it is true, so a held key
+			#     cannot walk the body out from under the dig.
+			#   * this layer QUITS on a headless display (exit 42), so `warp_mouse` is never a no-op when this
+			#     code runs, and no stand-down is needed.
+			#
+			# A break is OBSERVED rather than returned: `_update_mining` finishes on its own clock, so the
+			# cell that was solid when it was aimed at is checked on the following frame.
+			var broke: bool = _dig_prev_target.x >= 0 and not _main.sim.is_solid(_dig_prev_target)
 			var target: Vector2i = _dig_target(player)
-			var hit: bool = _main.try_mine(target)
-			if hit:
+			_dig_prev_target = target
+			var to_px: Transform2D = _main.get_viewport().get_final_transform() \
+				* _main.get_viewport().get_canvas_transform()
+			Input.warp_mouse(to_px * _main._cell_center(target))
+			Input.action_press(Controls.MINE)
+			if broke:
 				_dig_refusals_running = 0
 			else:
 				_dig_refusals_running += 1
@@ -496,7 +564,7 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 					_dig_refusal_reported = true
 					_report_refusal(player, target)
 			player.input_dir = 0.0
-			return hit
+			return broke
 		&"swing":
 			player.input_climb = 1.0 if (i / 30) % 2 == 0 else -1.0
 		_:
@@ -713,16 +781,34 @@ func _fire_rope() -> void:
 ## its work — a body that cannot move, mines that all fail, a rope that never takes — and NOT to police
 ## small changes in how far the fixture happens to travel. A tight floor here would fail on honest fixture
 ## edits and teach everyone to raise it, which is how a guard becomes a formality.
-## DIG's floor is not half-the-observed like the other two: the phase now stops AT DIG_MINES, so anything
-## short of it means the cap was hit and the fixed work did not complete. Exact, and it cannot pass vacuously.
+## DIG'S FLOOR CHANGED SUBJECT WHEN THE PHASE CHANGED ARM. This is not a floor lowered to buy green -- it
+## is a floor whose old subject stopped existing.
+##
+## It read `DIG_MIN_MINES = DIG_MINES` and meant "the phase stops AT 40 mines, so fewer means the cap was hit
+## and the fixed work did not complete". Exact and correct FOR A FIXTURE THAT CALLS `try_mine` ONCE A FRAME.
+## The real input path breaks blocks at 1.14/s against that arm's 9.15/s, so 40 mines inside a 400-frame
+## window is not merely unmet, it is unreachable by playing -- about 2100 frames. A floor nothing can
+## satisfy fails every run and guards nothing.
+##
+## So the phase is now a FIXED WINDOW rather than a fixed quantity of work (`until_mines` is 0, every run
+## measures exactly SAMPLE * 2 frames), and the mine count went from being the STOP CONDITION to being the
+## workload WITNESS -- which is what the other two arms' floors already are. Strictly better for a timing
+## distribution: the old phase ran a VARIABLE number of frames, stopping whenever 40 mines landed at about
+## 260, so its sample size moved with dig speed. Now it does not.
+##
+## Set from measurement, not preference. Seven consecutive runs on the real path landed 10, 12, 10, 10, 11,
+## 11, 10 mines in 400 frames. The floor is 6 -- 40% below the observed minimum, the same "leave room for
+## honest fixture drift" reasoning the RUN floor above is written from, and far enough under that a run has
+## to be genuinely not-mining to trip it. PROVEN ABLE TO FAIL: with the MINE hold removed the phase lands 0
+## and this reddens by name, exit 1.
 const RUN_MIN_PX: float = 100.0
-const DIG_MIN_MINES: int = DIG_MINES
+const DIG_MIN_MINES: int = 6
 const SWING_MIN_ANCHORED: int = 100
 func _workload() -> bool:
 	var run_moved: float = float(_work.get(&"run", {}).get("moved", 0.0))
 	var dig_mined: int = int(_work.get(&"dig", {}).get("mined", 0))
 	var swing_anchored: int = int(_work.get(&"swing", {}).get("anchored", 0))
-	print("  workload: RUN moved %.0fpx · DIG landed %d mines in %d frames (fixed work) · SWING anchored"
+	print("  workload: RUN moved %.0fpx · DIG landed %d mines in %d frames (window) · SWING anchored"
 		% [run_moved, dig_mined, int(_work.get(&"dig", {}).get("frames", 0))]
 		+ " %d frames of %d" % [swing_anchored, SAMPLE]
 		+ "   (body ended RUN at %s, DIG at %s, SWING at %s)"
@@ -736,10 +822,10 @@ func _workload() -> bool:
 			+ " body that is stuck or standing still, under the name RUN")
 		ok = false
 	if dig_mined < DIG_MIN_MINES:
-		printerr("      FAIL: DIG landed only %d of its %d fixed mines before the %d-frame cap — the phase"
-			% [dig_mined, DIG_MIN_MINES, SAMPLE * 2]
-			+ " did not complete its work, so this distribution is not comparable to any other run's and"
-			+ " is not the cost of mining")
+		printerr("      FAIL: DIG landed %d mines in its %d-frame window, under the floor of %d — the phase"
+			% [dig_mined, SAMPLE * 2, DIG_MIN_MINES]
+			+ " was not meaningfully mining, so this distribution is a picture of standing still under the"
+			+ " name DIG")
 		ok = false
 	if swing_anchored < SWING_MIN_ANCHORED:
 		printerr("      FAIL: SWING was anchored for %d of %d frames, under the %d floor — the rope did not"
