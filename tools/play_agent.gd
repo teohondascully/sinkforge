@@ -396,8 +396,37 @@ func dig_down_to(cell: Vector2i, budget: int = 2400, require_arrival: bool = fal
 	return not sim.is_solid(cell) and _arrived(cell, require_arrival)
 
 
+## THE TWO CONTRACTS, WITH NAMES. A boolean that silently changes a postcondition is a trap you can only
+## avoid by reading the callee, and the paragraph above is the proof: it describes `check_underground`
+## falling into it, and `check_pacing` — a caller that literally TIMES A DESCENT, the docstring's own
+## example of contract two — was still passing contract one two files away from the warning. Naming a
+## behaviour is how it becomes visible at the CALL SITE, which is the only place anyone is looking.
+##
+## These are wrappers, not a migration. The 22 existing callers keep working and keep meaning contract one;
+## quietly re-pointing them is the exact trade the paragraph above refuses. New callers should use a name.
+
+## Contract one — "make this cell not solid". You want what is IN it; where the body ends up is not your
+## business. Returns whether the cell is open.
+func excavate_to(cell: Vector2i, budget: int = 2400) -> bool:
+	return await dig_down_to(cell, budget, false)
+
+## Contract two — "put the body down there". You want the PLACE: a frame to judge, a depth to read, a
+## descent to time. Returns whether the body actually arrived, and returns FALSE on the already-open world
+## where contract one would have returned true having gone nowhere.
+func descend_to(cell: Vector2i, budget: int = 2400) -> bool:
+	return await dig_down_to(cell, budget, true)
+
+
 ## Whether the descent counts as finished. Under contract one it always does — the cell is open, which was
 ## the whole ask. Under contract two the BODY has to be down there too.
+## IT IS ONE-SIDED, AND A CALLER USING IT AS A VETO NEEDS TO KNOW. The test is "deep ENOUGH", so a body
+## that is already BELOW the target satisfies it without moving: point contract two at an open cell
+## overhead and it returns true having dug nothing and walked nowhere — measured at descent 0 frames, body
+## parked at row 19, target row 2, arrival granted. That is correct for the question it asks ("am I at
+## least that deep") and wrong for the question a veto asks ("did a descent happen"). It is left one-sided
+## because every real caller descends and a two-sided test would change the meaning under 22 of them; a
+## caller that needs "a descent occurred" must assert a DEPTH FLOOR against its own target, as
+## `check_pacing` now does, and not lean on this.
 func _arrived(cell: Vector2i, require_arrival: bool) -> bool:
 	if not require_arrival:
 		return true

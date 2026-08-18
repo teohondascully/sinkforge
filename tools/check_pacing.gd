@@ -38,6 +38,10 @@ const ARC := preload("res://tools/arc_driver.gd")
 const DESCENT_ROW: int = 62
 const DESCENT_BUDGET: int = 6000
 
+## Mirrors `PlayAgent.ARRIVE_SLACK`: the body settles a couple of rows above the deepest cell it cut,
+## because `_cell_at` reports the centre and the miner stands ON the floor.
+const ARRIVE_SLACK: int = 3
+
 ## Every this many rows of new personal depth counts as news — the depth readout moving is the quietest
 ## real signal the game has, and it is what keeps a long dig from being a blank.
 const DEPTH_STEP: int = 6
@@ -108,19 +112,45 @@ func _run() -> void:
 
 	# ACT TWO — and then you go down. The player's own answer to "what now": pick a column and dig.
 	var col: int = main._cell_at(agent.player.position).x
-	await agent.dig_down_to(Vector2i(col, DESCENT_ROW), DESCENT_BUDGET)
+	# `descend_to`, NOT `dig_down_to` — and the difference is this layer's whole validity. This call used to
+	# pass contract one ("make the cell not solid") and DISCARD the result, while every number below is
+	# about a session that contains a descent. On any world where row 62 is already open — a cave, a void,
+	# an old shaft — contract one returns true on its first iteration having dug nothing and gone nowhere,
+	# and act two becomes a walk to a column. The silence share and the density would still be computed,
+	# still printed under the words "descent %d", and still pass. `play_agent.gd` names timing a descent as
+	# its example of contract two, and this layer sat two files away doing the opposite.
+	var from_row: int = main._cell_at(agent.player.position).y
+	var sank: bool = await agent.descend_to(Vector2i(col, DESCENT_ROW), DESCENT_BUDGET)
+	var reached: int = main._cell_at(agent.player.position).y
 	var total: int = maxi(1, Engine.get_physics_frames() - _f0)
 	sampler.queue_free()
 
 	# --- the shape ----------------------------------------------------------------------------------
-	print("  played %d frames (opening %d, descent %d) and the game said %d things:"
-		% [total, act1, total - act1, _events.size()])
+	print("  played %d frames (opening %d, descent %d to row %d of %d) and the game said %d things:"
+		% [total, act1, total - act1, reached, DESCENT_ROW, _events.size()])
 	for e: Dictionary in _events:
 		print("    %5d  %s" % [int(e["at"]), str(e["what"])])
 	print("    %s" % _shape(total))
 	print("           ^ one column per %.0f frames; | = the game said something" % (float(total) / float(BAR)))
 
 	_check(arc_ok, "the session is playable at all (the opening reached first automation)")
+	# VETO, before any ratio is computed. A share and a density are statements about a session of a given
+	# SHAPE; if act two did not happen, they are true statements about a different session than the one this
+	# layer claims to have played. Reporting them anyway is how a gauge keeps passing while the thing it
+	# measures stops occurring — so this returns rather than warns.
+	# The veto is a DEPTH FLOOR, not `sank`, and the difference is a hole I found by trying to break this.
+	# `PlayAgent._arrived` is one-sided — `body.y >= cell.y - ARRIVE_SLACK` — so it is satisfied by a body
+	# that is already BELOW the target. Aim act two at a cell that is open and overhead and contract two
+	# returns TRUE having moved nobody: measured, descent 0 frames, body parked at row 19, "arrival"
+	# granted. A veto resting on that would have inherited the same blind spot from one file away, which is
+	# precisely how this layer got into trouble the first time.
+	var dropped: int = reached - from_row
+	_check(sank and reached >= DESCENT_ROW - ARRIVE_SLACK,
+		"the descent this layer times ACTUALLY HAPPENED (row %d → %d, %d rows, asked for %d)"
+		% [from_row, reached, dropped, DESCENT_ROW])
+	if not (sank and reached >= DESCENT_ROW - ARRIVE_SLACK):
+		printerr("    ...so the silence and density below would describe a session with no descent in it.")
+		return
 	_check(not _events.is_empty(), "the game says something during a session")
 	if _events.is_empty():
 		return
