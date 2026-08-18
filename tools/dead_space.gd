@@ -21,6 +21,10 @@ extends RefCounted
 ## place they spend the rest of the game. Two definitions of dead space would be two standards.
 
 const TILE: int = 120                ## px per judged tile — about a sixteenth of a 1080p frame across
+## TEMPORARY A/B SWITCH, default ON. Three registered layers share this metric (check_opening,
+## check_underground, check_water_reads), so the horizontal-only defect has to be measured against all
+## three before it is called a repair. Set SF_DEAD_HORIZ_ONLY=1 to get the old one-axis behaviour back.
+static var _vert: bool = OS.get_environment("SF_DEAD_HORIZ_ONLY") != "1"
 
 ## A tile is DEAD when both of these fall through. Absolute units, in luminance bytes.
 const DEAD_DETAIL: float = 2.2       ## mean |neighbour difference| — under this there is no visible texture
@@ -97,11 +101,21 @@ static func _tile(img: Image, x0: int, y0: int) -> Array:
 	hist.resize(256)
 	var diff: float = 0.0
 	var n: int = 0
-	for y: int in range(y0, y0 + TILE, 2):
+	for y: int in range(y0, y0 + TILE - 2, 2):
 		for x: int in range(x0, x0 + TILE - 2, 2):
 			var a: float = _luma(img, x, y)
 			hist[int(a)] += 1
-			diff += absf(a - _luma(img, x + 2, y))
+			# HORIZONTAL AND VERTICAL, averaged. This measured only |luma(x,y) - luma(x+2,y)| -- one axis --
+			# so a tile whose content varies VERTICALLY scored zero detail and was reported DEAD. That is
+			# exactly the structure this terrain draws: strata, bedding, partings and the cast shadow on the
+			# back wall all vary up-the-frame and are near-constant along it.
+			#
+			# Averaging the two axes rather than summing keeps the scale: isotropic content reads the same as
+			# before, so the calibrated caps still mean what they meant. Only tiles that are detailed on the
+			# axis nobody was looking at move, which is precisely the false negative being repaired.
+			var dh: float = absf(a - _luma(img, x + 2, y))
+			var dv: float = absf(a - _luma(img, x, y + 2))
+			diff += (dh + dv) * 0.5 if _vert else dh
 			n += 1
 	if n == 0:
 		return [0.0, 0.0, 0.0]
