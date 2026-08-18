@@ -41,6 +41,32 @@ extends "res://tools/check_base.gd"
 ## comment rather than the history because the shape is the lesson.
 ## It sees exactly one shape, and that shape is the one that bit us.
 ##
+## AND THE SIM HALF HAS THE SAME SHAPE, WHICH THIS EXTRACTOR CANNOT SEE. Measured by c1 rather than assumed
+## by me, and recorded here because "we checked and it is not there" and "nobody looked" are two states a
+## reader cannot tell apart from a green layer. Fixtures pose **13 distinct sim fields across ~129 sites**
+## (`inventory[]` 37, `deposits[]` 21, `total_produced[]` 15, `torch[]` 12, `lode[]` 12, `research[]` 11,
+## and the tail). `FactorySim.tick()` assigns exactly ONE field in its own body — `_seep_tick += 1` — and
+## fans the rest out through `PowerFlow.compute(self)`, `WaterFlow.step(self)` and `Flora.grow(self)`,
+## static helpers in other files taking the sim as a parameter, which between them write six sim fields.
+## **Every one of those six is a subscript write**, `sim.water[c] = …`.
+##
+## Both of this file's rules exclude that subject by construction: `_assigned_pair` returns "" on any left
+## side containing `[`, correct for node fields and fatal in a container-shaped state; and a lexical body
+## scan finds 1 of 7 because the tick's per-frame work is a fan-out while `_process`'s is not. **A direct
+## port would report a clean population and be clean because the instrument cannot register the writes** —
+## which is the thing this layer exists to catch, arriving as this layer. The sim version needs a different
+## extractor (subscripts) and a different population rule (the tick's transitive closure, not its body).
+## Filed by c1 as a ticket in `docs/PRIORITY.md`; if that ticket is not there, the paragraph above is the
+## ticket.
+##
+## ONE RULE HERE IS LOAD-BEARING FOR A REASON I DID NOT REASON TO. `_assigned_pair` rejects `+=`, which I
+## wrote because a compound assignment is a read-modify-write of a field the fixture never established.
+## c1's reading is better and is the one to keep: **`=` DESTROYS a pose, `+=` PRESERVES it as an offset.**
+## `check_save_durability` poses `phase_b._seep_tick = phase_a._seep_tick + SEEP_INTERVAL / 2`, then
+## advances both sims and asserts they diverge — under a naive port that is a textbook offence, and it is
+## in fact one of the better fixtures in the tree, because the pose IS the subject. Both halves are written
+## down because a reviewer needs the rule and the next person to port this needs the reason.
+##
 ##   godot --headless --path . --script res://tools/check_posed_fields.gd
 
 ## Writes that are known-safe, each with the reason, because a bare allow-list is a place to hide a bug.
