@@ -5,7 +5,8 @@ extends SceneTree
 ## _mock_settings.png (gitignored, like every _moment_*.png).
 ##
 ## Run WITHOUT --headless (needs a real GL context — headless is the dummy renderer and saves blank frames):
-##   godot --path . --script res://tools/mock_settings.gd
+##   godot --path . --script res://tools/mock_settings.gd -- a     the counter's fourth face
+##   godot --path . --script res://tools/mock_settings.gd -- b     the brief's compact utility page
 ##
 ## WHY THIS SCREEN AND NOT THE COUNTER. `tools/mock_bazaar.gd` put three proposals over a real frame and the
 ## Bazaar we have today came out of that round (docs/FEEL_GAP.md §the counter). Settings never went through
@@ -80,10 +81,14 @@ const ROWS: Array[Array] = [
 const PICKED: int = 6
 
 var _font: Font
+var _variant: String = "a"
 
 
 func _initialize() -> void:
 	_font = ThemeDB.fallback_font
+	var argv: PackedStringArray = OS.get_cmdline_user_args()
+	if argv.size() > 0:
+		_variant = argv[0]
 	await _render()
 	quit()
 
@@ -115,7 +120,7 @@ func _render() -> void:
 		await process_frame
 
 	var out: Image = get_root().get_texture().get_image()
-	var path: String = "res://_mock_settings.png"
+	var path: String = "res://_mock_settings_%s.png" % _variant
 	out.save_png(ProjectSettings.globalize_path(path))
 	print("wrote %s (%dx%d)" % [path, out.get_width(), out.get_height()])
 
@@ -134,6 +139,9 @@ func _blurred(src: Image, factor: int) -> Image:
 
 
 func _draw_mock(c: Control, blur: ImageTexture) -> void:
+	if _variant == "b":
+		_variant_b(c, blur)
+		return
 	c.draw_texture_rect(blur, Rect2(Vector2.ZERO, CANVAS), false)
 	c.draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42))
 	_vignette(c, 0.5)
@@ -221,6 +229,75 @@ func _draw_mock(c: Control, blur: ImageTexture) -> void:
 	# --- the foot: the same legend the counter carries, with the fourth digit on it ---------------------
 	c.draw_string(_font, Vector2(inner_x, panel.end.y - 5.0), "arrows  pick     1 2 3 4  tab     E  close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, FAINT)
+
+
+# =========================================================================================================
+# B — THE COMPACT UTILITY PAGE, which is what `T2.1m` actually asked for: *"an independent compact utility
+# layout instead of the Bazaar shell"*.
+#
+# The argument the brief is making, once you look at the counter: THE COUNTER IS A PLACE. You walk to a
+# claimed Bazaar and stand at it, and `at a claimed Bazaar` is printed on the WORKS plate as a precondition
+# of building anything. Settings is not a place and has no precondition — it is the pause menu. Folding it
+# into the counter would say the game's audio levels live at a ruin you have to reach.
+#
+# So this borrows the counter's MATERIAL and none of its shell: a rounded plate with elevation instead of a
+# border, a blurred backdrop, key caps instead of bordered rectangles, one accent doing one job. 296x214
+# against the counter's 608x348 — a third of the area, which is the whole point of the word "compact".
+#
+# AND IT SOLVES THE THING THAT BROKE THE OLD PAGE, which a repaint would not. Twenty-two bindings do not fit
+# in a compact utility page and never will; the current fix (two columns of eleven, `d3e4be7`) only fits
+# because the page is nearly full-screen. So the remap TABLE becomes its own page, opened from a single row
+# here. That is the honest split: the four things a player touches often are small and immediate, and the
+# table they touch twice a year gets the width it needs when they ask for it.
+func _variant_b(c: Control, blur: ImageTexture) -> void:
+	c.draw_texture_rect(blur, Rect2(Vector2.ZERO, CANVAS), false)
+	c.draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42))
+	_vignette(c, 0.5)
+
+	# 266 AND NOT 214, WHICH IS WHERE I FIRST PUT IT. The first render of this page — a mock whose entire
+	# argument is that the settings page outgrew its panel — put its own `keys` row 29px BELOW the bottom of
+	# its own plate. The content is 253px tall and I sized the box by eye. Written down rather than quietly
+	# corrected: the defect I had spent the evening fixing in the real page reappeared in the drawing of the
+	# proposal, in the same session, by the same method (a height chosen instead of a height summed).
+	var panel := Rect2((CANVAS.x - 296.0) * 0.5, (CANVAS.y - 266.0) * 0.5, 296.0, 266.0)
+	_shadow(c, panel, 12, 0.34)
+	_round_rect(c, panel, 8.0, PLATE)
+	_sheen(c, panel)
+	var x0: float = panel.position.x + 18.0
+	var right: float = panel.end.x - 18.0
+	_tracked(c, "SETTINGS", Vector2(x0, panel.position.y + 26.0), 13, 2.6, TEXT)
+	c.draw_string(_font, Vector2(right - 46.0, panel.position.y + 26.0), "ESC closes",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, FAINT)
+
+	var y: float = panel.position.y + 48.0
+	_tracked(c, "AUDIO", Vector2(x0, y), 8, 1.8, ACCENT)
+	_toggle(c, Vector2(right, y - 10.0), "MUTED", false)
+	y += 14.0
+	for pair: Array in [["master", 1.0], ["sound", 1.0], ["ambience", 0.7], ["music", 0.4]]:
+		c.draw_string(_font, Vector2(x0, y + 8.0), str(pair[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
+		_slider(c, Rect2(x0 + 58.0, y + 1.0, right - x0 - 58.0, 8.0), float(pair[1]))
+		y += 16.0
+
+	y += 14.0
+	_tracked(c, "FEEL", Vector2(x0, y), 8, 1.8, ACCENT)
+	y += 14.0
+	for pair: Array in [["screen shake", "ON"], ["auto-pickup", "ON"], ["zoom", "1.00x"]]:
+		c.draw_string(_font, Vector2(x0, y + 9.0), str(pair[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM)
+		_toggle(c, Vector2(right, y), str(pair[1]), str(pair[1]) == "ON")
+		y += 17.0
+
+	# THE ONE ROW THAT IS A DOOR, not a control. The table is not on this page and the row says so — with
+	# the count, so "how many keys does this game have" is answered without opening it, and with the key it
+	# is bound to, because a door with no key legend is the thing the whole page is about.
+	y += 12.0
+	c.draw_rect(Rect2(x0, y - 2.0, right - x0, 1.0), Color(1.0, 1.0, 1.0, 0.06))
+	y += 12.0
+	var door := Rect2(x0, y, right - x0, 24.0)
+	_round_rect(c, door, 5.0, Color(1.0, 1.0, 1.0, 0.04))
+	c.draw_string(_font, Vector2(x0 + 9.0, y + 16.0), "keys", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, TEXT)
+	c.draw_string(_font, Vector2(x0 + 42.0, y + 16.0), "22 bindings, all rebindable",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, FAINT)
+	_cap(c, "K", Vector2(right - 8.0, y + 6.0), true)
 
 
 ## The rail with FOUR faces. The fourth slot costs nothing: the rail is 348 tall and three tabs use 242 of

@@ -40,6 +40,19 @@
 # repository the way a hand-kept list would — the failure this project has now hit in `check_item_reads`'s
 # ITEMS list, in the capture count, and in the material registry.
 #
+# A CORRECTION TO `3c46c8c`, PLACED HERE BECAUSE A COMMIT MESSAGE CANNOT BE EDITED. That commit bars lossy
+# compression of these frames on the grounds that "the harness samples these pixels (check_rock_reads and
+# neighbours read values off them)". It does not. `grep -rln "_moment_"` over `tools/*.gd` finds
+# capture_moments (writes them), the two mocks (write their own), zoom.gd (reads one in order to crop it),
+# and one COMMENT in check_hud_layout citing `docs/media/baseline/_moment_map.png`, a different path. No
+# layer reads a canonical capture as input, and the `tools/sees.sh` the same message cites does not exist.
+# The knockout evidence is decisive the other way: `check_rock_reads` moved 61% -> 87% across a shader
+# mutation with no capture re-shot, which is only possible if it renders live.
+#
+# The bar on lossy is probably still right — an archive of pixel evidence should not be requantized — but
+# it is resting on a coupling that is not there, and a rule with a false reason is a rule that gets refuted
+# and taken down with it.
+#
 # Needs no Godot and no display. Pure git.
 
 set -uo pipefail
