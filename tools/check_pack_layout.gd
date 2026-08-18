@@ -75,8 +75,16 @@ func _initialize() -> void:
 	hud.sim = sim
 	hud.can_craft = true
 
-	# --- THE REAL LISTS FIT WITHOUT SCROLLING. This is the assertion that replaced the scrollbar: the whole
-	# counter, at the largest it can currently be, has to be readable in one look. ---
+	# --- THE COUNTER FITS AT A CONTROLLED SIZE. This used to say "THE REAL LISTS ... at the largest it can
+	# currently be", and 10 and 7 are neither. Measured on the shipping scene: 19 craftable machines, all 19
+	# open once the tech tree is finished, plus 7 on the Rack — so this stand-in is HALF the machine list, and every
+	# assertion below about columns and windows was being made against a population smaller than the one it
+	# named. That is the measurement-boundary error, not a rounding one: the numbers are right about what
+	# they measured and the sentence was about something else.
+	#
+	# The synthetic case is KEPT, because a fixed size is what makes the geometry assertions readable, and
+	# 10+7 sits exactly on the 3-column boundary where a regression would show first. What it is NOT is a
+	# statement about the shipping catalogue — `_real_catalogue()` at the bottom of this file is. ---
 	hud.craft_options = _craft_options(10)
 	hud.rack_options = _craft_options(7)
 	_assert_fits(hud, canvas, "real")
@@ -259,9 +267,92 @@ func _initialize() -> void:
 		"map-corner: stays in the top half (bot=%.0f)" % corner.end.y)
 
 	hud.free()
+	await _real_catalogue()
 	if _failures == 0:
 		print("PACK LAYOUT OK")
 		quit(0)
 	else:
 		printerr("%d FAILURE(S)" % _failures)
 		quit(1)
+
+
+## THE SHIPPING CATALOGUE, IN THE TWO RESEARCH STATES THAT ARE DIFFERENT SHAPES.
+##
+## Everything above runs on a stand-in of 10 machines and 7 Rack rows. The real one is bigger, and the
+## interesting thing about it only appears at the far end of the tech tree — which no fixture in this suite
+## has ever stood in. `check_pack_layout` researched exactly one locked tech and erased it four lines later.
+##
+##   FRESH      machines= 4 rack= 6   ask 1+1 = 2 of 3   no squeeze
+##   FULL TECH  machines=19 rack= 7   ask 3+1 = 4 of 3   SQUEEZED, granted 2+1
+##
+## So `hud.gd`'s "this branch never fires" was a universal produced by a fixture that visits one state, and
+## it fires for every player who finishes the tree. BOTH properties are held here, keyed on research
+## completeness, rather than the unsqueezed one being weakened to accommodate the squeezed one — "it never
+## squeezes" and "it squeezes when the tree is done" are different claims and the layer should say which
+## one it is standing on.
+##
+## The window is asserted through `Hud.works_window_first`, the function the DRAWING code calls, so this is
+## a property of the subject's own output and not a second implementation of the arithmetic agreeing with
+## the first.
+func _real_catalogue() -> void:
+	MainView.dev_start = false
+	MainView.boot_skip_title = true
+	var main: MainView = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	get_root().add_child(main)
+	for _i: int in 8:
+		await physics_frame
+	var hud: Hud = main._hud
+	if hud == null:
+		_check(false, "the real scene has a HUD whose catalogue can be read")
+		return
+	var per_col: int = int(hud._bazaar_geometry()["rows"])
+	var cols: int = Hud.BAZAAR_COLS
+
+	# POSITIVE CONTROL. Every assertion below is about list sizes, and all of them pass on empty lists.
+	_check(hud.craft_options.size() > 0 and hud.rack_options.size() > 0,
+		"the shipping catalogue is %d machines and %d Rack rows, so there are lists to judge"
+			% [hud.craft_options.size(), hud.rack_options.size()])
+
+	# FRESH — the state the ticket's "never fires" claim is actually true in.
+	var fm: int = hud.open_machines().size()
+	var fr: int = hud.open_rack().size()
+	_check(_want(fm, per_col) + _want(fr, per_col) <= cols,
+		"fresh: both lists fit UNSQUEEZED (%d machines + %d rack ask %d of %d columns)"
+			% [fm, fr, _want(fm, per_col) + _want(fr, per_col), cols])
+
+	# FULL TECH — the state nothing has ever visited.
+	for tid: StringName in ResearchRules.ORDER:
+		main.sim.research[tid] = true
+	var tm: int = hud.open_machines().size()
+	var tr: int = hud.open_rack().size()
+	_check(tm > fm, "researching the whole ladder opened more machines (%d -> %d)" % [fm, tm])
+	var want: int = _want(tm, per_col) + _want(tr, per_col)
+	_check(want > cols,
+		"full tech: the counter IS squeezed (%d machines + %d rack ask %d of %d) — the state hud.gd said never happens"
+			% [tm, tr, want, cols])
+
+	# ...AND THE WINDOW STILL CONTAINS THE CURSOR, which is what makes the squeeze survivable and what
+	# nothing has ever checked. Walked over every row of both groups, not sampled.
+	var lay: Dictionary = hud.works_columns(per_col)
+	var lost: Array[String] = []
+	_walk_window(tm, per_col * int(lay["machines"]), 0, lost, "MACHINES")
+	_walk_window(tr, per_col * int(lay["rack"]), tm, lost, "THE RACK")
+	_check(lost.is_empty(),
+		"full tech: every row of both groups is inside the drawn window when the cursor is on it%s"
+			% ["" if lost.is_empty() else " — LOST: " + ", ".join(lost.slice(0, 6))])
+	main.queue_free()
+
+
+## What one list ASKS for, before `works_columns` clamps it.
+func _want(count: int, per_col: int) -> int:
+	return maxi(1, ceili(float(count) / float(maxi(per_col, 1))))
+
+
+## Put the cursor on every row of a group and record any that the drawing code would not have drawn.
+func _walk_window(count: int, capacity: int, base: int, lost: Array[String], tag: String) -> void:
+	var drawn: int = mini(capacity, count)
+	for i: int in count:
+		var cursor: int = base + i
+		var first: int = Hud.works_window_first(count, capacity, base, cursor)
+		if i < first or i >= first + drawn:
+			lost.append("%s row %d (window %d..%d)" % [tag, i, first, first + drawn - 1])

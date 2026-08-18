@@ -90,6 +90,15 @@
 #   3  the production save slot was touched (layer results are moot)
 #   4  something was skipped while SF_STRICT was on: not a full sweep
 #   5  another harness run holds the lock
+#
+# THEY ARE ORDERED BY SEVERITY AND THAT MEANS 1 MASKS 4. A run that both fails a layer AND stands an
+# assertion group down exits 1, so the exit code alone cannot say the run was also incomplete — the words
+# are printed ("PASSED WITHOUT VERIFYING EVERYTHING", "this run does not count as a full sweep") and only
+# the words carry it. A caller that reads the integer and not the summary will record a failing run as a
+# COMPLETE failing run, and the day the failure is fixed it will record a green that was never full.
+# Found the hard way on 2026-08-17, when two separate runs reported "exit 0" for sweeps that exited 4 and 1 —
+# in both cases because the status being read belonged to the `tail`/`grep` at the end of the command, not
+# to the harness. Put the harness LAST, or grep the exit line out of the file, before saying anything.
 set -uo pipefail
 
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
