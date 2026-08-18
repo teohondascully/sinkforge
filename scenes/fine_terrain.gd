@@ -144,8 +144,17 @@ const GRAM_GRAIN: Array[float] = [1.60, 0.85, 0.30]    ## grain amplitude: soil 
 const GRAM_XSTR: Array[float] = [1.00, 0.35, 1.60]     ## <1 stretches features along the horizontal
 const GRAM_CLUMP: Array[float] = [1.45, 0.60, 0.25]    ## embedded aggregate — pebbles in soil, not in stone
 const GRAM_SEAM: Array[float] = [0.15, 1.20, 2.20]     ## fracture seam strength
-const GRAM_SEAM_X: Array[float] = [1.40, 3.00, 0.40]   ## seam sampling: bedded runs flat, massive runs steep
-const GRAM_SEAM_Y: Array[float] = [1.00, 0.35, 3.40]
+## SEAM SAMPLING — and these were INVERTED for their whole first life, with a comment asserting the
+## opposite of what the arithmetic did. `get_noise_2d(x * a, y * b)`: a LARGE multiplier makes the field
+## vary fast on that axis, which makes features NARROW on it. So elongated-horizontally (bedding) needs a
+## SMALL x and a LARGE y, and the original [3.00, 0.35] for Bedded gave features 3.7 cells wide by 31.7
+## tall — vertical laminae, in the material named for flat ones. Massive had the mirror error.
+##
+## It was invisible to every number the layer prints because ANISO is disqualified by its own null rig, so
+## the one cue that could have registered a direction error was excluded on independent grounds. Caught by
+## computing 1/(freq * multiplier) per grammar and reading the answer against the comment.
+const GRAM_SEAM_X: Array[float] = [1.00, 0.35, 3.40]   ## bedded runs FLAT (small x), massive runs STEEP
+const GRAM_SEAM_Y: Array[float] = [1.00, 3.00, 0.40]
 const GRAM_SEAM_W: Array[float] = [1.00, 1.35, 1.70]   ## seam band width — a plane's fracture is a LINE, not a fleck
 ## BROAD MASS BEFORE MICROTEXTURE, which is TR-03 and which is also what made the first attempt fail.
 ## The broad tonal patch field is the largest single variation term in this bake (PATCH_AMP 0.22, additive,
