@@ -37,10 +37,19 @@ const SETTLE: int = 60
 ## that puts a large carved VOID and the solid rock around it in one frame, underground, at a depth past
 ## the daylight soak. Kept in step with check_underground deliberately — if the two layers judged different
 ## places, a fix that satisfied one could quietly ruin the other's subject.
-const DELVE_ROWS: int = 16
+# 30, not 16, and this is a FIXTURE-REACH change rather than a threshold change: every floor in this file
+# (MIN_SAMPLES 40, READ_FLOOR 0.75, DARK_CEILING 34.0) is untouched, and MIN_DELVE moves UP, which is
+# stricter. The old 16 only ever appeared to work because the span was computed from image pixels as if they
+# were world units, sweeping a box half again wider than the screen; the layer was judging cells that were
+# never in the captured frame at all, reading whatever pixel the broken projection happened to land on.
+# With the span inverted out of the real transform, the judged slab is HUD_TOP..1-HUD_BOTTOM = 692px, which
+# at the true 48px/cell is about 14 rows centred on the body. To put 40 unlit cells below
+# SURFACE_LINE + SURFACE_CLEAR (row 42) inside that band, the body has to stand near row 49 -- about 29 rows
+# under a surface that sits around row 20. 30 is the depth 6b already reaches on the same world.
+const DELVE_ROWS: int = 30
 const ROOM_W: int = 11
 const ROOM_H: int = 6
-const MIN_DELVE: int = 12
+const MIN_DELVE: int = 24
 
 ## The judged slab: the banner and the hotbar are chrome, and chrome is neither rock nor air.
 const HUD_TOP: float = 0.16
@@ -236,10 +245,20 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
 	var bottom: int = int(float(h) * (1.0 - HUD_BOTTOM))
-	var cam: Vector2 = main._camera.global_position
-	var zoom: float = main._current_zoom()
-	var half := Vector2(float(w), float(h)) * 0.5
-	var cell_px: float = float(WorldRenderer.CELL) * zoom
+	# THE ENGINE'S OWN WORLD->PIXEL MAPPING. What stood here was `(world - cam) * zoom + image_size * 0.5`,
+	# which assumes the captured image and the canvas share a coordinate space. They do not: project.godot
+	# sets viewport 1280x720 with a 1920x1080 window override under stretch mode "canvas_items", so the canvas
+	# is drawn at 1280x720 and composited 1.5x up into the framebuffer this layer reads.
+	#
+	# THE ERROR IS BIASED, NOT NOISY, AND IT BIASES TOWARD THIS LAYER'S OWN NULL. A cell at offset D from the
+	# camera was sampled at the pixel belonging to the world point at 2/3 D -- always pulled inboard, toward
+	# the centre of the view, where rock is most ordinary. So a measurement of whether an EDGE reads was
+	# quietly fed the interior next to it, and "the contact carries no information" was the expected answer
+	# whether or not it was true. In 6b the corrected lens moved the edge step from 1.38 to 11.7 against an
+	# interior of 2.8, and detectability from 53% to 76%, with no renderer change whatsoever.
+	var to_px: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
+	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
 	# The two lighting buffers, read straight off the renderer. Their difference IS the set of lit cells.
 	var scratch: PackedByteArray = main._renderer._veil_scratch
@@ -273,9 +292,13 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 
 	# The cell rect the camera can see, widened by two so nothing on the edge is missed, then clamped to the
 	# grid. Derived from the camera rather than from the player, because the two are not the same point.
-	var span: Vector2 = Vector2(float(w), float(h)) / zoom * 0.5
-	var c0: Vector2i = main._cell_at(cam - span) - Vector2i(2, 2)
-	var c1: Vector2i = main._cell_at(cam + span) + Vector2i(2, 2)
+	# Inverted out of the same transform. The old `Vector2(w, h) / zoom * 0.5` read image pixels as world
+	# units, sweeping a box half again wider than anything actually on screen.
+	var inv: Transform2D = to_px.affine_inverse()
+	var wa: Vector2 = inv * Vector2.ZERO
+	var wb: Vector2 = inv * Vector2(float(w), float(h))
+	var c0: Vector2i = main._cell_at(Vector2(minf(wa.x, wb.x), minf(wa.y, wb.y))) - Vector2i(2, 2)
+	var c1: Vector2i = main._cell_at(Vector2(maxf(wa.x, wb.x), maxf(wa.y, wb.y))) + Vector2i(2, 2)
 	c0 = Vector2i(maxi(c0.x, 0), maxi(c0.y, 0))
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
@@ -300,7 +323,7 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 				lit += 1
 				continue
 			var centre: Vector2 = main._cell_center(c)
-			var p: Vector2 = (centre - cam) * zoom + half
+			var p: Vector2 = to_px * centre
 			var px: int = int(p.x)
 			var py: int = int(p.y)
 			if px - patch < 0 or px + patch >= w or py - patch < top or py + patch >= bottom:

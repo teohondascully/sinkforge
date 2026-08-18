@@ -108,8 +108,14 @@ func _initialize() -> void:
 ## Screen row of the walked surface line, straight out of the sim and the live camera — so the judged
 ## region starts exactly where the ground starts, whatever the terrain and zoom happen to be.
 func _horizon_y(main: MainView, h: int) -> int:
-	var cam: Vector2 = main._camera.global_position
-	var zoom: float = main._current_zoom()
+	# THE ENGINE'S TRANSFORM, NOT A RE-DERIVATION. This was `(world_y - cam.y) * zoom + h * 0.5`, which reads
+	# the captured image and the canvas as one space. They are not: viewport 1280x720 under a 1920x1080 window
+	# with stretch mode "canvas_items" composites the canvas 1.5x on the way to the framebuffer, so the form
+	# was exact only on the camera's own row and pulled INBOARD everywhere else -- a horizon ten cells
+	# off-centre landed about 3.3 cells toward the middle of the frame. Found by the same defect in
+	# check_contact_edge, where correcting it moved the edge step from 1.38 to 11.7 with no renderer change.
+	var to_px: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
 	var col: int = main._cell_at(main._player.position).x
 	var world_y: float = float(main.sim.surface_row(col) + 1) * float(WorldRenderer.CELL)
-	return clampi(int((world_y - cam.y) * zoom + float(h) * 0.5), 0, h - 1)
+	return clampi(int((to_px * Vector2(main._camera.global_position.x, world_y)).y), 0, h - 1)

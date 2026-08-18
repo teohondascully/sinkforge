@@ -201,7 +201,15 @@ func _flood(sim: FactorySim) -> void:
 ## below runs over. Derived from the camera rather than assumed, so a zoom change cannot quietly point
 ## this layer at the wrong pixels and keep passing.
 func _on_screen(main: MainView, img: Image) -> Rect2i:
-	var xf: Transform2D = main.get_viewport().get_canvas_transform()
+	# get_final_transform() * get_canvas_transform(), not the canvas transform alone. The canvas transform
+	# stops in the 1280x720 logical space; this project composites that 1.5x into the 1920x1080 framebuffer
+	# that get_image() returns, so the canvas transform alone yields a rect at two-thirds scale. Because it
+	# is then intersected with the full image it never came back EMPTY -- it came back plausible and wrong,
+	# which is why the docstring above ('so a zoom change cannot quietly point this layer at the wrong
+	# pixels and keep passing') described the exact failure it was written to prevent, via stretch instead
+	# of zoom.
+	var xf: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
 	var a: Vector2 = xf * (Vector2(POOL_LEFT + 1, POOL_TOP) * float(CELL))
 	var b: Vector2 = xf * (Vector2(POOL_RIGHT, POOL_BOTTOM + 1) * float(CELL))
 	var r := Rect2i(Vector2i(a.floor()), Vector2i((b - a).floor()))
@@ -211,7 +219,15 @@ func _on_screen(main: MainView, img: Image) -> Rect2i:
 ## The cistern's own sealed WALL — rock by construction, at the same depth and under the same light as the
 ## water beside it, which is what makes it a fair thing to compare against.
 func _rock_below(main: MainView, img: Image) -> Rect2i:
-	var xf: Transform2D = main.get_viewport().get_canvas_transform()
+	# get_final_transform() * get_canvas_transform(), not the canvas transform alone. The canvas transform
+	# stops in the 1280x720 logical space; this project composites that 1.5x into the 1920x1080 framebuffer
+	# that get_image() returns, so the canvas transform alone yields a rect at two-thirds scale. Because it
+	# is then intersected with the full image it never came back EMPTY -- it came back plausible and wrong,
+	# which is why the docstring above ('so a zoom change cannot quietly point this layer at the wrong
+	# pixels and keep passing') described the exact failure it was written to prevent, via stretch instead
+	# of zoom.
+	var xf: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
 	var a: Vector2 = xf * (Vector2(POOL_LEFT - WALL, POOL_TOP) * float(CELL))
 	var b: Vector2 = xf * (Vector2(POOL_LEFT, POOL_BOTTOM + 1) * float(CELL))
 	var r := Rect2i(Vector2i(a.floor()), Vector2i((b - a).floor()))
