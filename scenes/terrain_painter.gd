@@ -185,11 +185,27 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## Every colour in this function forced to opaque magenta, the mold allowed to finish baking first
 ## (`pending_rows() == 0`, 164-203 frames of waiting), seed 1337, one standing each:
 ##
-##   SURFACE, at the opening, 1.00x            4072 of 2073600 px    0.196%
-##   UNDERGROUND, a carved gallery, 1.00x       247 of 2073600 px    0.012%   <- sixteen times less
-##   UNDERGROUND, zoomed out two steps         2479 of 2073600 px    0.120%   <- more edges in frame
+##                                          magenta px   open faces   px per face
+##   SURFACE, at the opening, 1.00x             4057          115        35.28
+##   UNDERGROUND, a carved gallery, 1.00x        247          184         1.34
+##   UNDERGROUND, zoomed out two steps          1759          640         2.75
 ##
-## So: REAL AT THE SURFACE, and 247 scattered pixels in the view the game is actually played in. The
+## NORMALISED BY OPEN FACES, and the normalisation overturned my own first reading of it. An open face is
+## one side of a solid cell whose neighbour is air — exactly the unit this function draws one strip set for
+## — counted by projecting each cell centre through the live canvas transform. Without it, the zoomed-out
+## row reads as "more edges in frame", which is what I wrote down first and asked a peer to attack.
+##
+## It is not only that. Per face, the treatment survives TWICE AS WELL zoomed out (2.75 against 1.34) while
+## each face covers FEWER screen pixels — a purely geometric account predicts about a quarter, so the
+## measurement is roughly eight times the geometric prediction. Something non-geometric is letting the
+## coarse layer through at low zoom, and the likeliest candidate is the mold itself: `FineTerrain`'s texture
+## is stretched over the world rect and filtered, so minifying it softens the alpha edge that does the
+## covering. If that is right, the fine mold covers LESS WELL the further out you zoom, and the older,
+## blockier coarse layer shows through more at exactly the scales a player uses to read the shape of a dig.
+## Stated as a hypothesis with a number attached, not as a finding: one seed, one standing per row.
+##
+## So: REAL AT THE SURFACE at 35 pixels per face, and 1.34 pixels per face in the view the game is actually
+## played in. The
 ## carved reading underground is not coming from here — `FineTerrain`'s own rim, rim_warm and form sink are
 ## what a player sees at depth. A peer measured the coarse FILL as 7398 at the surface and 0 underground on
 ## the same day; the two results are complementary rather than contradictory, and together they say the
