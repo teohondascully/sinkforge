@@ -2279,6 +2279,16 @@ func _cost_text(cost: Dictionary) -> String:
 ## The carried pack as a hotbar of slots (icon + count), centred along the bottom. The active slot
 ## (mouse-wheel) is highlighted; it's the item E deposits. Reads `sim.inventory_slots()`.
 func _draw_inventory() -> void:
+	# THE BIG MAP IS THE SCREEN — the same rule as the goal plate at :699, decided there for the same
+	# reason. The map's panel runs y 41..319 of a 360 canvas and this bar's backing starts at y=295, and the
+	# map draws SECOND (:270 after :263). So the bar was not overlapped, it was BURIED: rows 319..339 poked
+	# out below the map's edge, which is exactly where each slot's count badge sits (:2330) — every count
+	# legible, every icon it counts cut in half. That is worse than either showing the bar or hiding it.
+	# Standing down rather than nudging the map, because :696 already rejected nudging in writing: the map
+	# is the one screen that is purely for reading the world, and your pack is not what you are reading.
+	# M puts it back. Held by `check_hud_layout:_check_big_map`.
+	if minimap_large:
+		return
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	# Show ONLY the slots you actually carry, not a fixed row of empty wells — a trailing empty slot reads
 	# as "broken / what goes here?". The bar grows/shrinks with your pack (min 1 so it never vanishes).

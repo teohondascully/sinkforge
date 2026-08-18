@@ -90,7 +90,7 @@ func _run() -> void:
 	# The matrix. `modal` marks the states where an overlay is MEANT to sit over the furniture, so overlap
 	# is not judged there — see the header. Everything is judged for clipping.
 	var states: Array[Dictionary] = [
-		{"name": "the bare screen", "modal": false, "set": {}},
+		{"name": "the bare screen", "modal": false, "set": {}, "keep": "bare"},
 		{"name": "paused", "modal": false, "set": {"_paused": true}},
 		{"name": "running fast (the ▶▶ chip beside the depth readout)", "modal": false,
 			"set": {"_time_scale_idx": 2}},
@@ -98,6 +98,13 @@ func _run() -> void:
 		{"name": "running fast AND hovering at once", "modal": false,
 			"set": {"_time_scale_idx": 3}, "hover": true},
 		{"name": "the minimap up", "modal": false, "set": {"_minimap_mode": 1}},
+		# ...and the LARGE form, which no state here has ever produced. `_minimap_mode` cycles
+		# hidden -> corner -> LARGE (main.gd:1012) and only a 2 sets `minimap_large` (main.gd:778); this
+		# matrix shipped with a 1 and nothing else in the file ever wrote a 2. NOT modal: an overlay is
+		# allowed to cover furniture, and the big map's rule is the opposite — the furniture stands down
+		# for IT (hud.gd:696). So it must face the same collision sweep as the bare screen.
+		{"name": "the BIG map up (M twice)", "modal": false, "set": {"_minimap_mode": 2},
+			"keep": "big_map"},
 		{"name": "the Bazaar open", "modal": true, "set": {"_inventory_open": true}},
 		{"name": "the dashboard open", "modal": true, "set": {"_show_dashboard": true}},
 		{"name": "the help overlay", "modal": true, "set": {"_show_help": true}},
@@ -105,8 +112,13 @@ func _run() -> void:
 	]
 
 	var total_panels: int = 0
+	var bare: Array[Rect2] = []
+	var big: Array[Rect2] = []
 	for st: Dictionary in states:
 		var rects: Array[Rect2] = await _snapshot(hud, st)
+		match String(st.get("keep", "")):
+			"bare": bare = rects
+			"big_map": big = rects
 		total_panels += rects.size()
 		var name: String = st["name"]
 
@@ -143,6 +155,7 @@ func _run() -> void:
 	# to differ from each other too — if they all reported the same panels, the matrix would be one state
 	# tested eleven times.
 	_check_help_text()
+	_check_big_map(bare, big)
 
 	_check(total_panels >= states.size() * 2,
 		"the matrix drew %d panels across %d states, so there was geometry to judge"
@@ -150,6 +163,94 @@ func _run() -> void:
 
 	_main.queue_free()
 	await physics_frame
+
+
+## THE BIG MAP IS THE SCREEN, so nothing may be left under it — and nothing may be left HALF under it.
+##
+## This layer already CAUGHT this, once, and then stopped being able to. A real failing log
+## (`the working notes`) named two collisions against the large map; the banner was fixed by
+## standing it down at `hud.gd:699`, and the second — a 46x44 panel at (297,295), overlap 46x24 — was left
+## as an open lead: *"either that panel moved, or it is state-dependent and the current fixture no longer
+## samples it."* It is the second. The panel is `_draw_inventory`'s backing at ONE slot
+## (`hud.gd:2292`: x0 = (640-30)/2 = 305, so Rect2(297, 295, 46, 44)), drawn unconditionally at
+## `hud.gd:263`. It never moved. The matrix asked for `_minimap_mode` **1**, which is the CORNER map —
+## 122x122 in the top-right, 142px clear of the bar — so the state that collides was never entered.
+##
+## THE FIX TO THE FIRST COLLISION IS WHAT HID THE SECOND. Once the banner stood down the sweep went green,
+## and a green sweep is indistinguishable from a sweep that is no longer looking.
+##
+## WHY THIS IS NAMED RATHER THAN LEFT TO THE GENERIC SWEEP ABOVE. That sweep judges whatever a state
+## HAPPENED to draw, so it also passes the moment a panel stops being drawn at all — and `_draw_minimap`
+## returns before its first `_panel()` when the sim or the colour callable is unbound (`hud.gd:977-978`).
+## A map that never drew collides with nothing. So the subject is proved PRESENT first, and the stand-down
+## is asserted as its own property rather than inferred from a quiet sweep.
+func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
+	# A. THE SUBJECT EXISTS, and it is the LARGE form. "Bigger than the corner map's own box" is the
+	#    cheapest statement that cannot be satisfied by the corner map, by an empty state, or by a probe
+	#    that returned nothing.
+	var map := Rect2()
+	for r: Rect2 in big:
+		if r.get_area() > map.get_area():
+			map = r
+	_check(map.size.x > Hud.MINI_W and map.size.y > Hud.MINI_H,
+		"the big-map state drew the LARGE map: %.0fx%.0f, past the %.0fx%.0f corner box"
+			% [map.size.x, map.size.y, Hud.MINI_W, Hud.MINI_H])
+
+	# B. THE COLLISION ITSELF.
+	var buried: Array[String] = []
+	for r: Rect2 in big:
+		if r == map or r.size.x < MIN_PANEL or r.size.y < MIN_PANEL:
+			continue
+		var over: Rect2 = r.intersection(map)
+		if over.size.x > TOUCH and over.size.y > TOUCH:
+			buried.append("%s (overlap %.0fx%.0f)" % [r, over.size.x, over.size.y])
+	_check(buried.is_empty(), "the big map has nothing buried under it%s"
+		% ["" if buried.is_empty() else " — " + "; ".join(buried)])
+
+	# C. NON-VACUITY FOR B, AND THE STAND-DOWN AS A PROPERTY. B passes trivially if the bar simply never
+	#    drew, so the bar is proved present on the bare screen and then proved GONE here. Asserting the
+	#    absence alone would go green on a HUD with no hotbar at all.
+	var bar: Rect2 = _bottom_panel(bare)
+	_check(bar.size.y >= MIN_PANEL and bar.position.y > Hud.CANVAS.y * 0.5,
+		"the bare screen drew the pack bar along the bottom (%s) — there was something to stand down" % bar)
+	var still_there: Rect2 = _bottom_panel(big)
+	_check(still_there.position.y <= Hud.CANVAS.y * 0.5,
+		"the pack bar stands down while the big map is up (found %s)" % still_there)
+
+	# D. THE GOAL PLATE STANDS DOWN (`hud.gd:699-700`). That guard has never once executed under test:
+	#    `minimap_large` comes only from `_minimap_mode == 2` (main.gd:778) and no fixture reached a 2, so
+	#    deleting it would have been invisible. Proved by DIFFERENCE in both directions — absence alone
+	#    proves nothing, because the plate legitimately hides itself when the chain is finished
+	#    (`hud.gd:690`) or once `goal_a` has decayed (`hud.gd:724`, `:728`).
+	var plate: Rect2 = _goal_plate(bare)
+	_check(plate.size.y >= MIN_PANEL,
+		"the bare screen drew the goal plate at top-centre (%s) — there was something to suppress" % plate)
+	var survivor: Rect2 = _goal_plate(big)
+	_check(survivor.size.y < MIN_PANEL,
+		"the big map suppresses the goal plate (found %s)" % survivor)
+
+
+## The lowest box a state drew, ignoring rules and separators. `Rect2()` if there is none.
+func _bottom_panel(rects: Array[Rect2]) -> Rect2:
+	var out := Rect2()
+	for r: Rect2 in rects:
+		if r.size.x >= MIN_PANEL and r.size.y >= MIN_PANEL and r.end.y > out.end.y:
+			out = r
+	return out
+
+
+## The objective plate: the ONE panel centred on the canvas at y=8 (`hud.gd:744`). The depth chip is
+## left-anchored at x=10 (`:477`), FORGED is right-anchored (`:623`), the fast-forward chip sits at y=34
+## (`:602`) and PAUSED at y=50 (`:283`) — so the anchor identifies it and nothing else does. Deliberately
+## BLIND TO HEIGHT: the plate is 24px or 37px depending on `step_age` (`hud.gd:743`), and that is the exact
+## timing dependence that made the last collision here intermittent.
+func _goal_plate(rects: Array[Rect2]) -> Rect2:
+	for r: Rect2 in rects:
+		if r.size.x >= MIN_PANEL and r.size.y >= MIN_PANEL \
+				and absf(r.position.y - 8.0) <= TOUCH \
+				and absf(r.get_center().x - Hud.CANVAS.x * 0.5) <= TOUCH:
+			return r
+	return Rect2()
 
 
 ## Put the HUD in one state, let it draw, and hand back the boxes it drew. State is reset each time so a
