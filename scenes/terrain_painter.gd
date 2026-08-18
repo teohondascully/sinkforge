@@ -181,29 +181,44 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## organic and does not fill a cell to its square boundary — has eroded away from the edge. That is exactly
 ## the band these strips are drawn in, which is why the question needed measuring rather than deducing.
 ##
-## Every colour in this function forced to opaque magenta, the mold allowed to finish baking first
-## (`pending_rows() == 0`), a gallery fifty rows down so the surface cannot enter frame at any zoom,
-## seed 1337 — AND THE SAME RUN REPEATED WITH NO PATCH AT ALL, because the count is meaningless without it:
+## THE MEASUREMENT THAT FINALLY FITS THE QUESTION, after two that did not. The world is FROZEN
+## (`Engine.time_scale = 0`), the mold is allowed to finish baking (`pending_rows() == 0`), and the same
+## process captures the frame with this function drawing and with it skipped, counting pixels that differ
+## AT ALL — any channel, more than one 8-bit step. No classifier, no threshold, no dependence on how dark
+## the contribution is: half a level still moves a byte. Three runs, and every signal is printed beside a
+## same-vs-same capture of the untouched scene, because a difference count without its own noise floor is
+## the exact mistake this docstring made twice:
 ##
-##                                    unpatched   patched   the treatment
-##   SURFACE, at the opening, 1.00x         621      4741          +4120
-##   UNDERGROUND, a deep gallery, 1.00x    7098      7082             -16
+##                              floor   drawn-vs-skipped
+##   SURFACE, at the opening      24 /  72 /  21     4427 / 4531 / 4559
+##   UNDERGROUND, 50 rows down    15 /  38 /   9       48 /   43 /    9
 ##
-## **Underground the pass contributes NOTHING that reaches the frame.** Minus sixteen is zero with noise on
-## it. At the surface it paints about four thousand pixels, a fifth of a percent of the frame, and that is
-## real work in the first view anybody ever sees — which is why this is not deleted.
+## **At the surface the pass paints about 4,500 pixels — sixty to two hundred times its own noise floor.**
+## **Underground the signal is the floor.** Paired, the excess is +33 / +5 / 0 out of 2,073,600, and two of
+## three runs show nothing at all. So the pass contributes less than about forty pixels down there, which
+## is 0.002% of the frame, and the honest form of that is *not separable from noise* rather than *zero*.
 ##
-## THE UNPATCHED COLUMN IS THE POINT, and three earlier readings of mine died on it. I reported 247 pixels
-## underground and built two explanations on top of it; 247 was the detector firing on the game's own dark
-## chroma, and the game fires it seven thousand times whether this function draws anything or not. A signal
-## measured without its baseline is not a small signal, it is an unknown one. I then normalised that
-## non-signal by open faces, got a monotonic-looking zoom curve, and proposed a mechanism for it — a curve
-## and a story built on a number that was never a measurement of this pass.
+## Not deleted, because four and a half thousand pixels in the first view anybody ever sees is real work.
 ##
-## The detector had to be rebuilt too. It first tested absolute channel levels (`r > 0.30 and b > 0.30`),
-## and underground the veil multiplies every channel down to a luma of eight to eleven, so it went blind at
-## exactly the depths under study. Hue survives a uniform darkening where levels do not — but the hue test
-## then fired on the world itself, which is what the unpatched column exposes.
+## FOUR DETECTORS DIED GETTING HERE AND EACH ONE FAILED DIFFERENTLY, which is the useful part.
+##
+## 1. ABSOLUTE CHANNEL LEVELS (`r > 0.30 and b > 0.30`). The veil multiplies every channel down to a luma of
+##    eight to eleven underground, so the detector went blind at exactly the depths under study — its
+##    sensitivity varying with the variable being studied.
+## 2. A HUE RATIO (`min(r,b) > 2g`), which a uniform darkening cannot break. It fired on the world instead:
+##    7098 hits with the patch and 7082 without, so the underground reading was the game's own dark chroma
+##    and I read the −16 as "zero". I had reported 247 before that, normalised it by open faces, derived a
+##    monotonic zoom curve and proposed a mechanism for the curve. **A signal measured without its baseline
+##    is not a small signal, it is an unknown one.**
+## 3. THE HUE RATIO AGAIN, WITH THE BASELINE — still wrong, and this one took a peer's defence of it to
+##    expose. This pass draws at ALPHA (`LIT_RIM` 0.14, `LIT_LIP` 0.30). Forcing the colours to magenta
+##    does not force the alpha, so a real contribution composites to 14-30% magenta over dark blue-grey
+##    rock and need never clear a 2:1 ratio. **Absent and present-but-dim are the same reading to it.**
+## 4. CHANGED BYTES, UNFROZEN. Two consecutive untouched captures differed in **818,528 of 2,073,600
+##    pixels** — 40% of the frame from animation phase alone. A floor forty thousand times the underground
+##    subject.
+##
+## Only the fifth — changed bytes with the world stopped — has a floor smaller than what it measures.
 ##
 ## What survives, and it is the useful half: whatever makes rock read as carved at depth, it is NOT this
 ## function, whose own docstring above promised precisely that. It is `FineTerrain`'s own rim, rim_warm and
