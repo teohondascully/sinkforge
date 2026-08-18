@@ -380,6 +380,10 @@ add "check_controls"                  "res://tools/check_controls.gd"
 add "check_input_deafness (shutter)"  "res://tools/check_input_deafness.gd"
 add "check_seam_flood (same picture)" "res://tools/check_seam_flood.gd"
 add "check_paint_terms (per-texel)" "res://tools/check_paint_terms.gd"
+# A pure source scan — no scene, no display, no save. It reads scenes/ and src/ for fields the game
+# recomputes every frame and tools/ for fixtures that write one, which is the class that put ten menu
+# captures of a counter nobody was standing at into the archive.
+add "check_posed_fields (poses hold)" "res://tools/check_posed_fields.gd"
 add "check_casing_light (machines lit)" "res://tools/check_casing_light.gd"
 add "check_status_reads (every state)" "res://tools/check_status_reads.gd"
 # add_gl: its whole answer is pixels. check_status_reads asks whether the STATUS LAMP names the state and
