@@ -64,8 +64,34 @@ const SETTLE: int = 60
 ## same KIND of place — deep unlit rock against carved void — at a depth where the filter both layers share
 ## actually admits it. Comparing the two numbers is still meaningful; claiming they are one frame is not.
 const DELVE_ROWS: int = 30
-const ROOM_W: int = 41
-const ROOM_H: int = 7
+# 37, not 41. The corrected transform makes the visible frame 1920/48 = 40 cells wide, so a 41-wide chamber
+# put both its walls past the edge of the judged slab and every SIDE face the room could contribute was
+# discarded as off-slab. That is most of why the side arm starved at 11.
+const ROOM_W: int = 39
+const PILLAR_W: int = 3
+const PILLAR_H: int = 2
+const PILLAR_PITCH: int = 4                  ## 3 rock + 1 air: every gap column is two SIDE faces
+## WHY THE THREE ARMS STILL DO NOT REACH 40, MEASURED RATHER THAN GUESSED. Six fixture iterations, each one
+## run and read:
+##   room only, gallery at +4 and +9      TOP 33  UNDER 26  SIDE 11
+##   floating blocks, pitch 6, W 37       TOP 21  UNDER 15  SIDE 16
+##   pitch 5, W 39, ROOM_H 8, gallery +2  TOP 37  UNDER 28  SIDE 26
+##   pitch 4                              TOP 39  UNDER 30  SIDE 26   <- this configuration
+##   ROOM_H 7 (ceiling pulled into band)  TOP 26  UNDER 23  SIDE 25
+##   DELVE_ROWS 44                        34 faces total, 0 near-surface skips, 843 still lit
+##
+## The binding constraint is NOT geometry and NOT depth. It is that ~840 of ~2100 excluded pairs are LIT on
+## every configuration, and the lamp rides the player, who is the point the camera centres on -- so the lit
+## region is always the middle of the judged slab and no amount of carving moves it. Depth does not help:
+## at 41 rows down, with the near-surface skip at zero, the lit count barely moved.
+##
+## THE FIX IS MORE VIEWPOINTS, NOT A BIGGER ROOM. The 40-sample floor is about statistical power, not about
+## one frame, and a single screen at this zoom cannot hold 40 unlit faces of all three orientations at once.
+## Pooling several captures from different standing positions is strictly better evidence than one, and it
+## is the change this fixture needs. Not attempted here: directive 0037 bars threshold and renderer changes
+## following from the transform repair, per-orientation stays unreportable until it lands, and inventing it
+## in the same commit as the geometry repair would confuse two questions again.                 ## 3 rock + 3 air, so blocks never touch and every flank is a face
+const ROOM_H: int = 8
 const MIN_DELVE: int = 24
 
 ## THE ORIENTATION MIX IS MANUFACTURED, AND THAT IS STATED RATHER THAN HIDDEN.
@@ -90,9 +116,13 @@ const MIN_DELVE: int = 24
 ## and 20% off the frame, so of ~39 visible rows only the middle band is judgeable and a third gallery
 ## lower down would fall entirely outside it. Horizontal extent has no such crop — only the patch bounds —
 ## so the galleries grow sideways, where the lamp's 9-cell cut also stops mattering fastest.
-const GALLERY_W: int = 55
-const GALLERY_H: int = 3
-const GALLERY_DROPS: Array[int] = [4, 9]    ## rows below the body, both kept inside the judged slab
+const GALLERY_W: int = 39
+const GALLERY_H: int = 5                    ## air, block, block, air -- one floating row inside it
+# WAS [4, 9], AND 9 WAS OUTSIDE THE PICTURE. The judged slab is HUD_TOP..1-HUD_BOTTOM = 691px, which at the
+# true 48px/cell is 14.4 rows: roughly body-7 to body+6. A gallery dropped 9 rows below the body occupied
+# rows +9..+11 and was discarded whole, every run, while the comment beside it asserted both drops were "kept
+# inside the judged slab". That was true at the 32px/cell the broken transform reported, and false in the frame.
+const GALLERY_DROPS: Array[int] = [2]       ## rows +3..+6, measured against the real slab rather than assumed
 
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
@@ -115,7 +145,7 @@ const MIN_PATCH: int = 1
 ## Distances from the face, in world px, at which the luminance profile is taken. Negative is INTO THE AIR,
 ## positive is INTO THE ROCK. Dense in the first six pixels because that is the entire span
 ## `_draw_edge_ao` paints into — 3 steps x 2px of strip, plus the lit lip in step 0.
-const PROFILE_PX: Array[float] = [-9.0, -5.0, -2.0, 1.0, 3.0, 5.0, 7.0, 9.0, 13.0, 17.0]
+const PROFILE_PX: Array[float] = [-33.0, -25.0, -17.0, -9.0, -3.0, 1.0, 5.0, 9.0, 17.0, 25.0, 33.0, 41.0]
 
 ## Face orientations, because the treatment under test is directional by design.
 const ORIENT_TOP: int = 0      ## the rock's sky-facing face — `_draw_edge_ao` paints a warm LIT lip here
@@ -247,6 +277,13 @@ func _run() -> void:
 			var arr: Array[float] = por[o][k]
 			ln += "%+d:%s  " % [int(PROFILE_PX[k]), ("%.1f" % _median(arr)) if not arr.is_empty() else "--"]
 		print("    %-22s %s" % [ORIENT_NAME[o], ln])
+	var pred: Array = s["prof_red"]
+	for o: int in 3:
+		var rl: String = ""
+		for k: int in PROFILE_PX.size():
+			var ra: Array[float] = pred[o][k]
+			rl += "%+d:%s  " % [int(PROFILE_PX[k]), ("%.0f" % _median(ra)) if not ra.is_empty() else "--"]
+		print("    RED %-18s %s" % [ORIENT_NAME[o], rl])
 	print("  by orientation — n, step median, polarity WITHIN that orientation:")
 	for o: int in 3:
 		var sg: Array[float] = sor[o]
@@ -295,6 +332,25 @@ func _run() -> void:
 		% [edge_step.size(), flat_step.size(), detect * 100.0, polarity * 100.0, WORLD_KIND])
 
 
+## Is this cell part of a block left standing inside the chamber? The blocks FLOAT -- a row of air separates
+## each from the chamber floor and ceiling -- and that is the whole point. A carved room can only ever offer
+## its own floor (TOP), its own ceiling (UNDER) and its two end walls (SIDE), so SIDE is structurally rare no
+## matter how large the room grows: a room has two walls and one floor of length W. A block of rock standing
+## in mid-air offers all three at once, and its flanks sit in the middle of the frame rather than parked at
+## the edge of the judged slab where the room's walls were being discarded.
+##
+## Terrain here is static -- mining leaves voids and rock does not collapse -- so a block with air beneath it
+## is legal geometry rather than a physics accident.
+##
+## `dy` runs -ROOM_H+1..0 with the body at 0 and the floor it stands on at +1, so the two block rows sit at
+## -5..-4 and -2..-1, each with clear air above and below, and row 0 stays open for the body.
+func _is_pillar(dx: int, dy: int) -> bool:
+	if (dx % PILLAR_PITCH) >= PILLAR_W:
+		return false
+	return dy == -6 or dy == -5 or dy == -3 or dy == -2
+
+
+
 ## Walk every horizontally- and vertically-adjacent cell pair on the judged slab and record the luminance
 ## step across the shared face, split by what the sim says the pair actually is.
 func _sample(main: MainView, img: Image) -> Dictionary:
@@ -302,10 +358,21 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
 	var bottom: int = int(float(h) * (1.0 - HUD_BOTTOM))
-	var cam: Vector2 = main._camera.global_position
-	var zoom: float = main._current_zoom()
-	var half := Vector2(float(w), float(h)) * 0.5
-	var cell_px: float = float(WorldRenderer.CELL) * zoom
+	# THE ENGINE'S OWN WORLD->PIXEL MAPPING, ASKED FOR RATHER THAN RE-DERIVED. What stood here was
+	# `(world - cam) * zoom + image_size * 0.5`, which silently assumes the captured image and the canvas are
+	# one coordinate space. project.godot sets viewport 1280x720 with a 1920x1080 window override under
+	# stretch mode "canvas_items", so the canvas is drawn at 1280x720 and composited 1.5x up into the
+	# framebuffer this layer reads. The formula was therefore exact at the camera centre and wrong by 1.5x
+	# everywhere else -- a face ten cells out was sampled about 3.3 cells inboard of where it actually is.
+	# That, and not the renderer, is why a 16px band of pure red painted on every side face was invisible
+	# here while a pixel probe counted it in the thousands.
+	#
+	# get_final_transform() carries the stretch, get_canvas_transform() carries the camera. Composed they are
+	# what the frame was drawn with, and they stay right if either project setting ever moves. Same principle
+	# already applied twice here: ASK THE VERB, DO NOT MODEL IT.
+	var to_px: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
+	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
 	# WORLD UNITS, because it is subtracted in world space and transformed afterwards. It was
 	# `cell_px * FACE_OFFSET`, which is CELL * zoom * FACE_OFFSET — a SCREEN-space length applied before the
@@ -331,6 +398,7 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	for _k: int in PROFILE_PX.size():
 		profile.append([] as Array[float])
 	var prof_or: Array[Array] = []
+	var prof_red: Array[Array] = []
 	var signed_or: Array[Array] = []
 	var step_or: Array[Array] = []
 	for _o: int in 3:
@@ -338,6 +406,10 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 		for _k: int in PROFILE_PX.size():
 			per.append([] as Array[float])
 		prof_or.append(per)
+		var perr: Array[Array] = []
+		for _k: int in PROFILE_PX.size():
+			perr.append([] as Array[float])
+		prof_red.append(perr)
 		signed_or.append([] as Array[float])
 		step_or.append([] as Array[float])
 	var edge_step: Array[float] = []
@@ -352,9 +424,16 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var wet: int = 0
 	var airair: int = 0
 
-	var span: Vector2 = Vector2(float(w), float(h)) / zoom * 0.5
-	var c0: Vector2i = main._cell_at(cam - span) - Vector2i(2, 2)
-	var c1: Vector2i = main._cell_at(cam + span) + Vector2i(2, 2)
+	# THE VISIBLE WORLD RECT, INVERTED OUT OF THE SAME TRANSFORM instead of rebuilt from the image size. The
+	# old `Vector2(w, h) / zoom * 0.5` read image pixels as world units, which under this project's 1.5x
+	# stretch swept a box half again wider than anything on screen; the walk spent its budget on cells that
+	# were never drawn and `_on_slab` discarded them as off-slab, which reads as a quiet fixture-reach
+	# problem rather than as the geometry error it was.
+	var inv: Transform2D = to_px.affine_inverse()
+	var wa: Vector2 = inv * Vector2.ZERO
+	var wb: Vector2 = inv * Vector2(float(w), float(h))
+	var c0: Vector2i = main._cell_at(Vector2(minf(wa.x, wb.x), minf(wa.y, wb.y))) - Vector2i(2, 2)
+	var c1: Vector2i = main._cell_at(Vector2(maxf(wa.x, wb.x), maxf(wa.y, wb.y))) + Vector2i(2, 2)
 	c0 = Vector2i(maxi(c0.x, 0), maxi(c0.y, 0))
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
@@ -370,6 +449,26 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	# not standing where the effect is.
 	print("  view: %d x %d cells (cols %d..%d, rows %d..%d), cell %.1fpx, patch %dpx, face offset %.1fpx"
 		% [c1.x - c0.x + 1, c1.y - c0.y + 1, c0.x, c1.x, c0.y, c1.y, cell_px, patch, off])
+	# DIRECTIVE 0032'S THREE-STAGE CONTROL, REPORTED BY THE RUN THAT PRODUCES THE VERDICT. A comment saying a
+	# throwaway probe once counted 1574 red pixels is not evidence -- it describes a different process on a
+	# different frame. These three numbers are printed by the same run as the profile below, so they cannot be
+	# about some other execution:
+	#   [1] was the switch actually on?
+	#   [2] did any fine cell execute the pure-red branch?
+	#   [3] did any red survive into the captured frame?
+	# Zero at [2] means the predicate or the fixture never met. Nonzero at [2] with zero at [3] means a
+	# consumer or compositing path. Nonzero at [3] with a flat registered profile means this layer's own
+	# sampling geometry -- which is the branch that was true, and is what the transform above repairs.
+	var mutant_env: String = OS.get_environment("SF_SIDE_MUTANT")
+	var frame_red: int = 0
+	for py: int in range(0, h, 2):
+		for px: int in range(0, w, 2):
+			var q: Color = img.get_pixel(px, py)
+			if q.r > 0.30 and q.r > q.g * 2.0 and q.r > q.b * 2.0:
+				frame_red += 1
+	print("  side-mutant control: [1] SF_SIDE_MUTANT=%s  [2] fine cells painted %d  [3] red in frame %d (of %d sampled)"
+		% ["<unset>" if mutant_env.is_empty() else mutant_env, FineTerrain._side_mutant_cells,
+			frame_red, (w / 2) * (h / 2)])
 
 	for cx: int in range(c0.x, c1.x + 1):
 		for cy: int in range(c0.y, c1.y + 1):
@@ -398,8 +497,8 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 					continue
 				var face: Vector2 = (main._cell_center(a) + main._cell_center(b)) * 0.5
 				var n: Vector2 = Vector2(float(d.x), float(d.y))
-				var pa: Vector2 = ((face - n * off) - cam) * zoom + half
-				var pb: Vector2 = ((face + n * off) - cam) * zoom + half
+				var pa: Vector2 = to_px * (face - n * off)
+				var pb: Vector2 = to_px * (face + n * off)
 				if not _on_slab(pa, patch, w, top, bottom) or not _on_slab(pb, patch, w, top, bottom):
 					offslab += 1
 					continue
@@ -432,12 +531,19 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 					var rock_dir: Vector2 = -n if sa else n
 					for k: int in PROFILE_PX.size():
 						var wp: Vector2 = face + rock_dir * PROFILE_PX[k]
-						var sp: Vector2 = (wp - cam) * zoom + half
+						var sp: Vector2 = to_px * wp
 						if sp.x < 1.0 or sp.y < float(top) or sp.x >= float(w - 1) or sp.y >= float(bottom):
 							continue
 						var v: float = _patch_luma(img, int(sp.x), int(sp.y), 0)
 						profile[k].append(v)
 						prof_or[orient][k].append(v)
+						# RAW RED, alongside luma, purely to localise a null. Directive 0025's side mutant
+						# paints a 16px band of pure red on every side face; the pixel probe finds 1574 of
+						# them underground, and this layer reports the side profile as flat. Luma cannot
+						# hide that — pure red is luma 76 against rock's 13 — so either these samples are
+						# not landing on the band, or they are not landing where I think at all. The red
+						# channel says which without another run.
+						prof_red[orient][k].append(img.get_pixel(int(sp.x), int(sp.y)).r * 255.0)
 				var la: float = _patch_luma(img, int(pa.x), int(pa.y), patch)
 				var lb: float = _patch_luma(img, int(pb.x), int(pb.y), patch)
 				luma.append(la)
@@ -462,7 +568,7 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	return {"edge_step": edge_step, "flat_step": flat_step, "edge_signed": edge_signed,
 		"edge_signed_stained": edge_signed_stained, "edge_signed_plain": edge_signed_plain,
 		"luma": luma, "near_surface": near_surface, "lit": lit, "offslab": offslab, "wet": wet,
-		"airair": airair, "profile": profile, "prof_or": prof_or, "signed_or": signed_or,
+		"airair": airair, "profile": profile, "prof_or": prof_or, "prof_red": prof_red, "signed_or": signed_or,
 		"step_or": step_or,
 		"skipped": near_surface + lit + offslab + wet + airair}
 
@@ -583,6 +689,8 @@ func _delve(main: MainView) -> int:
 	var left: int = c.x - ROOM_W / 2
 	for dy: int in range(-ROOM_H + 1, 1):
 		for dx: int in range(ROOM_W):
+			if _is_pillar(dx, dy):
+				continue
 			main.sim.mine(Vector2i(left + dx, c.y + dy))
 		await physics_frame
 	# The galleries. Carved AFTER the chamber so the chamber still frames the camera, and separated by
@@ -593,6 +701,10 @@ func _delve(main: MainView) -> int:
 			if row >= FactorySim.GRID_ROWS - 2:
 				continue
 			for dx: int in GALLERY_W:
+				# Same trick one storey down: the middle rows of a 4-row gallery stay solid on the pillar
+				# columns, so it contributes floating blocks rather than only its own floor and ceiling.
+				if dy >= 1 and dy <= PILLAR_H and (dx % PILLAR_PITCH) < PILLAR_W:
+					continue
 				main.sim.mine(Vector2i(c.x - GALLERY_W / 2 + dx, row))
 			await physics_frame
 	main._renderer.repaint_world()

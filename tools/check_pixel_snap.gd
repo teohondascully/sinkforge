@@ -8,8 +8,16 @@ extends "res://tools/check_base.gd"
 ##   - a snapped position lands EXACTLY on the screen-pixel grid (snap*zoom is integer) at every zoom
 ##   - a sub-pixel nudge of the follow target yields the SAME snapped output → identical frame → no crawl
 ##   - the snap never moves the camera more than half a screen-pixel from the true position
-## (The end-to-end frame-diff — render twice, assert identical terrain — lives in the headed fixture
-## tools/capture_pixel_snap.gd, which also saves the screenshot; rendering needs a real GPU context.)
+## WHAT THIS LAYER DOES NOT DO, stated plainly because it used to be stated as a delegation. This comment
+## previously said the end-to-end frame-diff — render twice, assert identical terrain — "lives in the headed
+## fixture tools/capture_pixel_snap.gd". THAT FILE HAS NEVER EXISTED. Zero tree entries across every object
+## in the repository, reachable and unreachable, against a positive control that finds this file 205 times.
+## Nothing renders twice and compares. Nothing checks that the snapped camera actually produces an identical
+## frame; only that the arithmetic which is supposed to produce one is correct.
+##
+## A disclaimer that points at a stronger sibling is more dangerous than no disclaimer, because it reads as
+## rigour: anyone auditing whether terrain rendering is pixel-verified reads that line and stops looking.
+## The gap is real and it is here, not somewhere else.
 ##   godot --headless --path . --script res://tools/check_pixel_snap.gd
 
 func _initialize() -> void:
