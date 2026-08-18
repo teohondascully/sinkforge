@@ -37,7 +37,11 @@ _zoom_*.png
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
 
-# THE VISUAL RECORD — history/ (the curated archive) and the 51 canonical _moment_*.png captures — is
+# COUNT THEM WITH `git ls-files '_moment_*.png' | wc -l`, NOT WITH `ls`. There are 51 _moment_*.png on
+# disk and 48 of them are tracked; the other three are the water diagnostics ignored below. The figure
+# in this comment said 44 for a long time, which was the tracked 41 plus those three — a directory
+# listing written down as a count of the record.
+# THE VISUAL RECORD — history/ (the curated archive) and the 48 canonical _moment_*.png captures — is
 # COMMITTED, at the user's instruction on 2026-08-17. Both sat here ignored before, history/ under a note
 # reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
 # (docs/DECISIONS.md, "Never destroy anything the user made") forbids DESTROYING them, and it exists
