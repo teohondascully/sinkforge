@@ -169,8 +169,14 @@ const GRAM_PATCH: Array[float] = [1.35, 1.00, 0.50]
 ## bake. So these are additive companions in value levels: what they write is what arrives, at any
 ## brightness. Kept SMALL — the tooth adds 0.030 at peak and reads clearly on dark rock, so a few
 ## thousandths is a legible mark underground and nothing at all in daylight.
-const GRAM_GRAIN_ADD: Array[float] = [0.016, 0.008, 0.003]  ## granularity in absolute value levels
-const GRAM_SEAM_ADD: Array[float] = [0.002, 0.012, 0.020]   ## how deep a fracture seam cuts, absolutely
+## REMOVED AFTER MEASUREMENT, and the removal is the point. Additive companions to the marks below were
+## added on the reasoning above — sound arithmetic, and the same root cause that decided 6a. They moved
+## dirt-vs-stone separability 65% -> 64%, i.e. nothing, while costing two extra noise lookups per fine
+## cell in the path `check_dig_hitch` guards. A mechanism that has been right twice is the one that stops
+## being checked on its third outing; this was its third and it lost. The constraint above is still true
+## and still worth reading — it is why the marks CANNOT read at depth — but "additive" turns out to be
+## necessary rather than sufficient, and paying frame time for a disproved hypothesis is how a renderer
+## accumulates weight. Reinstate only against a lit-band measurement that shows a need.
 ## ROCK HUE VARIATION (diff-04 #3): the reference rock isn't one blue-grey — it drifts subtly teal ↔
 ## faint brown ↔ faint violet by region. A very-low-freq 2-noise field picks a hue offset per region;
 ## kept DARK + subtle so it breaks the monochrome without turning the rock colourful.
@@ -382,6 +388,12 @@ var _mat_gram: PackedByteArray = PackedByteArray()      ## coarse body texture G
 ## is byte-identical to the behaviour before grammars existed — deliberately, because `rebake` has eight
 ## call sites across five files and one of them passes its arguments positionally out of an array. A new
 ## required parameter would have churned five harness fixtures to say "unchanged".
+##
+## THE COST OF THAT CHOICE, PAID ONCE ALREADY: this is an INPUT to the bake that does not appear in the
+## bake's signature, so a caller can omit it and get a silently different world rather than an error.
+## Anyone constructing a second FineTerrain to compare against the renderer's — `check_dig_hitch` builds
+## one to prove the region path is byte-identical to the full path — MUST copy this across, or the two
+## differ by configuration while the comparison claims they differ by path.
 var grammar_at: Callable = Callable()
 var _tone: PackedVector2Array = PackedVector2Array()    ## coarse (jitter, strata) samples, reconstructed per fine cell
 var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall BASE colour, tone NOT applied
@@ -554,9 +566,15 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 			# One Vector2i per cell rather than four identical ones — same four Callables, a quarter of
 			# the allocations feeding them.
 			var cell := Vector2i(cx, cy)
+			# THE GRAMMAR IS WRITTEN ON EVERY CELL, solid or not, for the same reason the tone above is:
+			# the reconstruction reads a fine cell's surrounding coarse samples and an air cell beside a
+			# rock face is one of them. Leaving air cells unwritten is what broke byte-identity — an
+			# unwritten entry keeps whatever an earlier bake left, a fresh instance holds zero, and the two
+			# disagree by a couple of pixels in accreted rock. Stale is not merely wrong, it is
+			# INSTANCE-DEPENDENT, which is the one thing a region-vs-full comparison cannot tolerate.
+			_mat_gram[idx] = _grammar_of(cell) if _solid_mask[idx] > 0.5 else GRAM_CLASTIC
 			if _solid_mask[idx] > 0.5:
 				_mat_col[idx] = material_color_at.call(cell) as Color
-				_mat_gram[idx] = _grammar_of(cell)
 			_wall_col[idx] = wall_color_at.call(cell) as Color
 			_tone[idx] = tone_at.call(cell) as Vector2
 			_wall_has[idx] = 1 if bool(has_wall_at.call(cell)) else 0
@@ -765,6 +783,8 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			if s:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 				_mat_gram[idx] = _grammar_of(Vector2i(cx, cy))
+			else:
+				_mat_gram[idx] = GRAM_CLASTIC   # never leave an entry to go stale — see rebake()
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	# _tone is deliberately NOT refreshed: a tone is a pure function of (x, y), so mining cannot change
@@ -811,6 +831,24 @@ func _clear_fine(i4: int) -> void:
 ## Paint ONE fine cell into _data from the cached coarse + fine grids — the per-cell body shared by the full
 ## rebake and the region fast lane. Solid → the parent's molded body colour with fine AO/hue/grain/moss/rim;
 ## eroded (parent solid, now fine-air) → recessed back-rock; genuine open air / surface cap → transparent.
+## The grammar of the nearest solid coarse neighbour — the grammar half of `_accreted_color`, and it walks
+## the same eight neighbours in the same order so a fine cell's grammar and its colour always come from the
+## SAME coarse cell. Falls back to Clastic when a fine cell is genuinely isolated, which is the same
+## fallback the colour path uses and is deterministic rather than left over.
+func _accreted_gram(fx: int, fy: int) -> int:
+	var pcx: int = fx / SUBDIV
+	var pcy: int = fy / SUBDIV
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0),
+			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var nx: int = pcx + d.x
+		var ny: int = pcy + d.y
+		if nx < 0 or ny < 0 or nx >= _cols or ny >= _rows:
+			continue
+		if _solid_mask[ny * _cols + nx] > 0.5:
+			return _gram_at(ny * _cols + nx)
+	return GRAM_CLASTIC
+
+
 ## The grammar cached for a coarse index, tolerant of an unfilled cache so the paint cannot fault on a
 ## world baked before `grammar_at` was set.
 func _gram_at(idx: int) -> int:
@@ -867,7 +905,17 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# THE MATERIAL'S OWN LANGUAGE. `gram` is read at the WARPED index, the same one the colour came
 		# from, so grammar and hue never disagree about which material a fine cell belongs to — reading it
 		# at `cidx` would put stone's seams a few pixels into the dirt at every contact.
-		var gram: int = _gram_at(midx)
+		# MIRROR THE COLOUR'S BRANCH EXACTLY. `_mat_gram` is only written for SOLID coarse cells, so a fine
+		# cell whose coarse parent is AIR — accreted rock reaching over a hole — has no fresh entry to read
+		# and `_gram_at(midx)` hands back whatever an older bake left there. Colour never had this problem
+		# because it already takes `_accreted_color` on that branch; the grammar was reading straight
+		# through it.
+		#
+		# STALE IS NOT MERELY WRONG, IT IS INSTANCE-DEPENDENT: a FineTerrain that did one full bake and one
+		# that accumulated region bakes hold different leftovers, so the region path stopped being
+		# byte-identical to the full path. `check_dig_hitch` reds on precisely that and it found this within
+		# one sweep of the grammars landing.
+		var gram: int = _gram_at(midx) if parent_solid else _accreted_gram(fx, fy)
 		var gx: float = float(fx) * GRAIN_XSTRETCH * GRAM_XSTR[gram]
 		var gamp: float = GRAIN_AMP * GRAM_GRAIN[gram]
 		var grain: float = _grain.get_noise_2d(gx, float(fy)) * gamp \
@@ -876,9 +924,6 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# into an embedded darker stone; a ridged near-zero band of a second field cuts a thin dark crack.
 		# Both are now the material's, not the world's: soil gets the clumps and almost no seams, stone gets
 		# the seams and almost no clumps.
-		# The additive companion to the multiplicative grain above — see GRAM_GRAIN_ADD.
-		var mark: float = (_grain.get_noise_2d(gx, float(fy)) * 0.7
-			+ _grain2.get_noise_2d(gx, float(fy)) * 0.3) * GRAM_GRAIN_ADD[gram]
 		var stone: float = _stone.get_noise_2d(float(fx), float(fy))
 		if stone > STONE_THRESH:
 			grain -= STONE_DARKEN * GRAM_CLUMP[gram] \
@@ -887,9 +932,8 @@ func _paint_fine(fx: int, fy: int) -> void:
 			float(fy) * GRAM_SEAM_Y[gram]))
 		var seam_band: float = CRACK_BAND * GRAM_SEAM_W[gram]
 		if crackv < seam_band:
-			var cut: float = smoothstep(0.0, 1.0, 1.0 - crackv / seam_band)
-			grain -= CRACK_DARKEN * GRAM_SEAM[gram] * cut
-			mark -= GRAM_SEAM_ADD[gram] * cut
+			grain -= CRACK_DARKEN * GRAM_SEAM[gram] \
+				* smoothstep(0.0, 1.0, 1.0 - crackv / seam_band)
 		# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches a
 		# bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
 		# ...and it fades over RIM_DEPTH rows rather than lighting exactly one. A binary rim lights the
@@ -908,12 +952,8 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# black, which prints as a puncture in an otherwise continuous face — the same wrong note as a
 		# blown highlight, at the other end.
 		var vmul: float = maxf(0.22, shade + grain + _sky_form(fx, fy))
-		# `mark` rides beside `drift` because both are absolute: it is the material's own texture stated in
-		# value levels rather than as a fraction of a colour that is nearly zero. Floored at 0 for the same
-		# reason vmul is floored at 0.22 — rock in shadow is dark rock, never a hole.
-		var out := Color(maxf(col.r * vmul + drift + mark + rim + rim_warm, 0.0),
-			maxf(col.g * vmul + drift + mark + rim, 0.0),
-			maxf(col.b * vmul + drift + mark + rim, 0.0), 1.0)
+		var out := Color(col.r * vmul + drift + rim + rim_warm, col.g * vmul + drift + rim,
+			col.b * vmul + drift + rim, 1.0)
 		out = _soil(out, fx, fy, pcol)
 		# MOSS (diff 5 / diff-04 #2): tint the exposed rock TOPS toward olive-moss. A top edge = open air
 		# above; the top MOSS_DEPTH rows below it wear moss in organic patches (noise-masked), fading down.
