@@ -138,11 +138,27 @@ func _run() -> void:
 	var bare: PackedFloat32Array = await _luma_patch()
 	var bare2: PackedFloat32Array = await _luma_patch()
 	var floor_noise: float = _max_abs(bare, bare2)
-	print("    empty stage: mean luma %.1f, and two captures of it differ by at most %.1f levels"
-		% [_mean(bare), floor_noise])
-	_check(floor_noise < MASK_LEVEL * 0.75,
-		"CONTROL: the mask threshold (%.0f) clears the still-frame noise floor (%.1f) with room"
-			% [MASK_LEVEL, floor_noise])
+	var noisy: int = _count_over(bare, bare2, MASK_LEVEL)
+	var noisy_share: float = float(noisy) / float(maxi(bare.size(), 1))
+	print("    empty stage: mean luma %.1f, largest still-frame difference %.1f levels, %d of %d pixels (%.4f of the cell) clear the mask threshold"
+		% [_mean(bare), floor_noise, noisy, bare.size(), noisy_share])
+	# THE CONTROL IS IN MASK UNITS, NOT IN LEVELS, and it was not always — that cost a red sweep.
+	#
+	# It used to assert `_max_abs(bare, bare2) < MASK_LEVEL * 0.75`: the LARGEST difference between two
+	# captures of an unchanging cell, against three quarters of the threshold. A max over a thousand pixels
+	# is the statistic most sensitive to a single one, so it is a noisy estimator of exactly the thing it
+	# estimates — it read 3.9 the night the threshold was set and 10.7 four runs later with nothing changed,
+	# and the second reading failed a layer whose subject had not moved. The stage is not perfectly still
+	# either: the body's lamp pulses a few cells away, so a handful of pixels genuinely swing ten levels.
+	#
+	# The claim that matters is not "no pixel ever wobbles". It is "wobble cannot be mistaken for a machine",
+	# and that is answerable in the units the layer actually judges in — the share of the cell a mask covers,
+	# against the share two machines must differ by. A max in levels was never comparable to SHAPE_FLOOR;
+	# this is. The level figure stays PRINTED, because it is the diagnostic that says whether the stage has
+	# started moving, and it should not be the thing that fails.
+	_check(noisy_share < SHAPE_FLOOR,
+		"CONTROL: still-frame noise masks %.4f of the cell, under the %.3f two machines must differ by"
+			% [noisy_share, SHAPE_FLOOR])
 	_dump_luma("_stage", bare)
 
 	var subjects: Array[Dictionary] = []
@@ -331,6 +347,17 @@ func _luma_patch() -> PackedFloat32Array:
 ## The LARGEST single-pixel difference between two captures, not the mean. A mean over 2352 pixels hides a
 ## handful of moving ones, and it is exactly a handful of moving pixels that a mask threshold has to
 ## survive.
+## How many pixels of an unchanging cell move further than `level` between two captures. The population is
+## pixels and the answer is a count, so it can be turned into a share of the cell and compared with the
+## floor the shape assertion uses — which a maximum in luma levels never could be.
+func _count_over(a: PackedFloat32Array, b: PackedFloat32Array, level: float) -> int:
+	var n: int = 0
+	for i: int in mini(a.size(), b.size()):
+		if absf(a[i] - b[i]) > level:
+			n += 1
+	return n
+
+
 func _max_abs(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 	if a.size() != b.size() or a.is_empty():
 		return -1.0
