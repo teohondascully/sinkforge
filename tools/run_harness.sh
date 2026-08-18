@@ -317,13 +317,19 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # 51% with steps 1.26-4.49. Repaired and pooled across three standings in 3b161b6: detectability 95/95/95,
 # polarity 98/97/97, edge step median 10.4 against a flat-rock step of 1.5, 116 faces against a floor of 40.
 #
-# STILL NOT REGISTERED, and now the reason IS a verdict rather than a mechanism. The layer credits
-# TerrainPainter._draw_edge_ao for the contact it measures, and that pass does not reach the frame it
-# judges: it draws into the COARSE bake at z=-10 and fine_terrain writes alpha 255 over every solid cell at
-# z=-9. Liveness control, coarse fill forced to pure magenta -- 7398 magenta pixels at the surface, ZERO
-# underground. Knocking the pass out leaves this layer byte-identical. The measurement is sound and the
-# rationale was wrong, which is why the numbers held while the prose did not; corrected at the head of
-# check_contact_edge.gd, and it should be READ before this gate is trusted. Register after that.
+# REGISTERED once the rationale was corrected rather than merely noticed. The layer credited
+# TerrainPainter._draw_edge_ao for the contact it measures and that pass does not reach the frame it judges:
+# it draws into the COARSE bake at z=-10 under fine_terrain's alpha 255 at z=-9. Liveness control on the
+# coarse fill -- 7398 magenta pixels at the surface, ZERO underground; c2 then mutated _draw_edge_ao alone
+# and got 0.196% at the surface against 0.012% underground, 247 scattered pixels, surviving only in the band
+# the organic mold fails to cover. Knocking the pass out leaves this layer byte-identical.
+#
+# What it actually measures is the rock-versus-back-wall MATERIAL step, and the numbers were always sound --
+# it was the prose that was wrong. Corrected at the head of check_contact_edge.gd before this line moved.
+#
+# Red states, demonstrated rather than assumed: the broken lens fails it at 51%; the non-vacuity floor fires
+# at 33 faces against 40 and refuses to report; and it moves 95% -> 91% with the rock tooth removed, so it is
+# sensitive to the renderer rather than merely stable.
 #
 # EVERYTHING THIS NOTE PREVIOUSLY REPORTED IS WITHDRAWN, AND SO IS THE THEORY IT USED TO EXPLAIN ITSELF.
 # It has now been wrong twice in opposite directions, and the second correction voids the first:
@@ -361,6 +367,7 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # changes how LONG that takes and not one pixel of what comes back, and exclusivity is the scheduler's most
 # expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
 add_gl "check_rock_reads (rock vs void)" "res://tools/check_rock_reads.gd"
+add_gl "check_contact_edge (rock meets air)" "res://tools/check_contact_edge.gd"
 add_gl "check_item_reads (icons)"      "res://tools/check_item_reads.gd"
 # Named for what it asserts everywhere, which is a RATIO — a dig may cost a few quiet frames, never twenty.
 # It read "120fps" for its whole life and never once asserted 8.33ms; that absolute now exists, but only on
