@@ -205,8 +205,29 @@ static func machine_color(def: MachineDef) -> Color:
 ## no image attached. So the fine work draws only when it is resolvable, and the cheap tier carries the
 ## whole load at play zoom, which is right on both counts: shading and silhouette are what read when small,
 ## and they are also the part that fits in the frame budget on a mature base.
-static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float, col: Color,
+## COLD IRON — how far an idle machine falls away from its working colour. `PC-05`: *"give installed
+## machines a visible active/idle distinction"*, guarded by *"causality survives labels hidden and
+## grayscale."*
+##
+## **THE DISTINCTION IS SUBTRACTED FROM IDLE RATHER THAN ADDED TO WORKING, and that direction is the whole
+## design.** The obvious move is to brighten a running machine — and this file already records that A/B
+## being decisive against it: a broad pale wash lifted the body's mid-value until it met the glyph painted
+## on top of it, and the Drift Rig's white rails stopped separating from their own casing. *"Legibility
+## outranks the look, and the glyph is the part that has to be read."* Taking value AWAY from the idle
+## state leaves the working state — the one a player spends their time looking at, and the one every
+## glyph in the vocabulary was drawn against — **byte-identical**.
+##
+## MEASURED, NOT CHOSEN BY EYE. `check_machine_state` photographs each machine working and stopped with
+## its label, badge and status lamp suppressed, converts to Rec.709 luma, and separates the state
+## difference from what the animation contributes on its own. Before this, the Drill's state difference
+## was 14.4 levels against a 7.6-level motion baseline — **a still frame of a running drill and a stopped
+## one were the same picture with the gear at a different angle.**
+const COLD_DARKEN: float = 0.22       ## how much value an idle casing gives up
+const COLD_DESAT: float = 0.18        ## ...and how far it drifts toward grey, so it reads cold not shadowed
+
+static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float, col_in: Color,
 		active: bool, detail: bool) -> void:
+	var col: Color = col_in if active else _cold_iron(col_in)
 	var c: float = cell_px
 	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(c - 2.0, c - 2.0))
 	canvas.draw_rect(body, col)
@@ -271,6 +292,14 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 			Vector2(c - 4.0, c - 4.0)]:
 		canvas.draw_circle(pos + corner, 1.4, Color(0.0, 0.0, 0.02, 0.55))
 		canvas.draw_circle(pos + corner - Vector2(0.4, 0.4), 0.7, col.lightened(0.40))
+
+
+## An idle casing: value gone and the hue pulled toward grey. Both, because darkening alone reads as a
+## machine standing in shadow — which is a fact about the lighting, not about the machine — while
+## desaturation alone reads as a different material. Together they read as switched off.
+static func _cold_iron(c: Color) -> Color:
+	var grey: float = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+	return c.lerp(Color(grey, grey, grey), COLD_DESAT).darkened(COLD_DARKEN)
 
 
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,

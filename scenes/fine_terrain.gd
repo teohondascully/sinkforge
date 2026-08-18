@@ -816,28 +816,6 @@ func _paint_fine(fx: int, fy: int) -> void:
 					var hband: float = (1.0 - float(hang) / float(HANG_DEPTH)) \
 						* clampf((hp - HANG_GATE) * 3.0, 0.0, 1.0)
 					out = out.lerp(MOSS_COLOR.darkened(0.12), 0.55 * hband * alive)
-		# SIDE-EDGE MUTANT (directive 0025). Opt-in, off in every normal run, and deliberately the most
-		# unmistakable thing the bake can produce: solid fine cells within SIDE_MUTANT_DEPTH of open air to
-		# their LEFT or RIGHT are painted pure red at full strength — no blend, no falloff, applied last so
-		# nothing downstream can soften it.
-		#
-		# It exists to settle a question the reverted wall-form left open. That term was live (cranking it
-		# 20x moved the rock-interior texture 2.1 -> 2.6) and yet moved the side CONTACT STEP not at all,
-		# and I could not say why. Three candidates and this separates them: if the profile shows the band
-		# and the step metric does not, the measurement GEOMETRY is wrong; if neither shows it, the
-		# rendering or bake PATH is not what reaches those pixels; if both show it, the bake is fine and the
-		# original term was simply too weak to survive whatever sits on top of it.
-		#
-		# 2 fine cells = 16px, chosen so it fully covers the metric's own sample window (centre 9px from the
-		# face, radius 5px, so 4..14px). If the metric misses a 16px band of pure red centred on its own
-		# sampling site, the failure is not that the band is too narrow to hit.
-		if _side_mutant and (_fine_air(_fine_solid, fx - 1, fy) or _fine_air(_fine_solid, fx + 1, fy) \
-				or _fine_air(_fine_solid, fx - 2, fy) or _fine_air(_fine_solid, fx + 2, fy)):
-			out = Color(1.0, 0.0, 0.0, 1.0)
-			# COUNTED AT THE BRANCH, because "the mutant painted nothing" and "the mutant painted and nothing
-			# downstream consumed it" are opposite diagnoses that look identical from the far end. Directive 0032
-			# wants the branch proven where the branch is, not inferred backwards from a pixel count.
-			_side_mutant_cells += 1
 		_data[i4] = int(clampf(out.r, 0.0, 1.0) * 255.0)
 		_data[i4 + 1] = int(clampf(out.g, 0.0, 1.0) * 255.0)
 		_data[i4 + 2] = int(clampf(out.b, 0.0, 1.0) * 255.0)
@@ -1015,11 +993,6 @@ func _moss_life(fy: int) -> float:
 ## out on _air_weight: this runs up to 2*FORM_REACH times per texel and was the second-largest helper in
 ## the paint (~0.96ms of a 4.5ms dig region). The column bound is hoisted because it cannot change inside
 ## either loop.
-## Directive 0025's side-edge mutant switch, read once rather than per fine cell — the bake runs this
-## millions of times. Off unless SF_SIDE_MUTANT=1, so a normal run and CI cannot see it.
-static var _side_mutant: bool = OS.get_environment("SF_SIDE_MUTANT") == "1"
-static var _side_mutant_cells: int = 0
-
 
 func _sky_form(fx: int, fy: int) -> float:
 	var f: float = 0.0
