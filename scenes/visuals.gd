@@ -1307,6 +1307,29 @@ static func _item_gear(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 ## IRON — the ore nugget silhouette in cold deepslate tones with pale steel flecks (L2's new find —
 ## visibly kin to ore, visibly NOT copper).
+##
+## **AND IT WAS DESIGNED AGAINST THE WRONG NEIGHBOUR.** "Visibly NOT copper" is the comparison the line
+## above was written for and it succeeds at it. The comparison nobody made was against the rock it is
+## named after: measured on the drawn icons, `deepslate/iron` was the closest colour pair in the whole
+## catalogue at **dE 1.0**, which is at or below a just-noticeable difference, with silhouettes overlapping
+## 0.72. Both are carried, so both can sit in the hotbar at once. `check_item_reads` was green and
+## correctly so — it asserts on outline AND tint together, and this pair clears the shape half.
+##
+## **AND IT CANNOT BE FIXED BY MOVING A COLOUR, WHICH I FOUND BY TRYING.** This icon is `_item_ore`'s
+## polygon and `_item_ore`'s fleck POSITIONS, byte for byte — the two are the same nugget separated by one
+## parameter, the matrix value: ore's body is 0.44/0.46/0.52 and iron's is 0.30/0.33/0.42. That single
+## number carries two separations in opposite directions. Dark enough to be told from ore, and it is
+## deepslate. Light enough to be told from deepslate, and it is ore.
+##
+## Measured, not reasoned. Enlarging the flecks to four at r=0.085 — the docstring's own promise, since
+## three dots at r=0.06 were a tenth of the covered pixels and the metal was rounding error — cleared
+## `deepslate/iron` out of the closest six entirely (dE 1.0 → `shale/iron` 3.8) and immediately reddened
+## `check_item_reads` with **`ore/iron` at IoU 1.00, dE 9.5**: the exact conjunction the layer asserts on.
+## Reverted. The guard did its job and the trade is real.
+##
+## **So T3.4's fix is a SILHOUETTE and not a tint.** Iron sharing ore's outline is what forces value to do
+## both jobs; give it its own shape and the value is free to leave deepslate. That is a spend the ticket
+## says to authorise only after re-verification, and this is the re-verification.
 static func _item_iron(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
 		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.30, 0.33, 0.42))
