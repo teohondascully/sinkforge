@@ -754,8 +754,8 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it reads
 		# granular. Multiplicative on value so it rides the material's own colour.
 		var gx: float = float(fx) * GRAIN_XSTRETCH
-		var grain: float = _grain.get_noise_2d(gx, float(fy)) * GRAIN_AMP \
-			+ _grain2.get_noise_2d(gx, float(fy)) * (GRAIN_AMP * 0.35)
+		var grain: float = (_grain.get_noise_2d(gx, float(fy)) * GRAIN_AMP \
+			+ _grain2.get_noise_2d(gx, float(fy)) * (GRAIN_AMP * 0.35)) * _rock_grain_k
 		# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole cluster
 		# into an embedded darker stone; a ridged near-zero band of a second field cuts a thin dark crack.
 		var stone: float = _stone.get_noise_2d(float(fx), float(fy))
@@ -846,8 +846,8 @@ func _paint_fine(fx: int, fy: int) -> void:
 		# than left to the coarse pass's flat per-cell rect, with the reconstructed tone, its own quieter
 		# grain, and the cast shadow re-thrown from the fine grid so the recess still reads.
 		var wall: Color = _wall_body(fx, fy, cidx)
-		var wgrain: float = _grain.get_noise_2d(float(fx) * GRAIN_XSTRETCH, float(fy)) * WALL_GRAIN \
-			+ _patch.get_noise_2d(float(fx), float(fy)) * WALL_PATCH
+		var wgrain: float = (_grain.get_noise_2d(float(fx) * GRAIN_XSTRETCH, float(fy)) * WALL_GRAIN \
+			+ _patch.get_noise_2d(float(fx), float(fy)) * WALL_PATCH) * _wall_grain_k
 		var wshade: float = 1.0 - _wall_shade(fx, fy)
 		var wout := Color(maxf(wall.r * wshade + wgrain, 0.0), maxf(wall.g * wshade + wgrain, 0.0),
 			maxf(wall.b * wshade + wgrain, 0.0), 1.0)
@@ -1007,6 +1007,27 @@ func _moss_life(fy: int) -> float:
 ## millions of times. Off unless SF_SIDE_MUTANT=1, so a normal run and CI cannot see it.
 static var _side_mutant: bool = OS.get_environment("SF_SIDE_MUTANT") == "1"
 static var _side_mutant_cells: int = 0
+## EXPERIMENTAL KNOB, DEFAULT 1.0 SO THE TREE IS UNCHANGED UNLESS IT IS SET. 6a says a flat expanse of
+## unlit rock against a flat expanse of unlit air is a coin flip (interior arm 56%, n=302), while a rock
+## BOUNDARY already reads at 79%. GRAIN is the better of the two cues at 62% and VALUE is 50% -- dead -- so
+## the question is whether rock's own texture can carry the distinction that its brightness cannot.
+##
+## Worth knowing before reading any sweep from this: rock's noise constants are already about twice the
+## wall's (GRAIN_AMP 0.10 / PATCH_AMP 0.22 against WALL_GRAIN 0.055 / WALL_PATCH 0.11), and rock still
+## measures LESS grainy than air. The likely reason is that the back wall also carries the cast shadow
+## (_wall_shade, WALL_AO_UNDER 0.62 over a 5-cell reach), and a local-variance statistic reads that gradient
+## as texture. If that is right, turning this knob up will move rock's grain and barely move separability,
+## because the thing being out-textured is a shadow rather than a material. That is a prediction, registered
+## here before the sweep, so the sweep can refute it.
+static var _rock_grain_k: float = float(OS.get_environment("SF_ROCK_GRAIN")) \
+	if OS.get_environment("SF_ROCK_GRAIN") != "" else 1.0
+## THE OTHER SIDE OF THE SAME QUESTION. Zeroing rock's grain moved measured rock grain 1.79 -> 1.74, so
+## GRAIN_AMP is very nearly absent from UNLIT rock and the cue does not live there. Air holds a steady 2.05
+## across every rock-side setting, which points at the wall's own texture and its cast shadow. If the
+## distinction is carried by the WALL being textured rather than the rock being smooth, then the lever is
+## here, it costs nothing on the rock side, and it raises no global brightness.
+static var _wall_grain_k: float = float(OS.get_environment("SF_WALL_GRAIN")) \
+	if OS.get_environment("SF_WALL_GRAIN") != "" else 1.0
 
 
 func _sky_form(fx: int, fy: int) -> float:
