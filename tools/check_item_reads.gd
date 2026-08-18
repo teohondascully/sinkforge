@@ -132,6 +132,25 @@ func _run() -> void:
 				clashes.append("%s/%s (IoU %.2f, dE %.1f)" % [a, b, iou, de])
 	print("  %d items, %d pairs; the most alike outlines are %s at IoU %.2f"
 		% [ITEMS.size(), ITEMS.size() * (ITEMS.size() - 1) / 2, worst_pair, worst_iou])
+	# THE CLOSEST PAIRS BY COLOUR, REPORTED AND NOT ASSERTED. `T3.4` says the hotbar has two identical grey
+	# icons and asks for re-verification against current art rather than for spending on it, and this layer
+	# was answering a narrower question: it prints the worst OUTLINE and then asserts on the CONJUNCTION of
+	# outline and tint. A pair that is separated by shape and nearly identical in colour is invisible in
+	# both of those numbers, and at a 16px hotbar slot against a dark moving background it is exactly what
+	# the ticket is describing. Six lines, no new assertion — the ranking is the evidence the ticket asked
+	# for, and turning it into a floor would be inventing a threshold nobody has looked at a screen to set.
+	var by_tint: Array[Dictionary] = []
+	for i: int in ITEMS.size():
+		for j: int in range(i + 1, ITEMS.size()):
+			by_tint.append({"de": _de(_mean_lab(shots[ITEMS[i]]), _mean_lab(shots[ITEMS[j]])),
+				"iou": _iou(shots[ITEMS[i]], shots[ITEMS[j]]),
+				"pair": "%s/%s" % [ITEMS[i], ITEMS[j]]})
+	by_tint.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["de"]) < float(y["de"]))
+	print("  the six most alike COLOURS (dE on the drawn icon; the clash floor is dE %.0f + IoU %.2f):"
+		% [SAME_TINT, SAME_SHAPE])
+	for k: int in mini(6, by_tint.size()):
+		print("    dE %5.1f  IoU %.2f  %s" % [float(by_tint[k]["de"]), float(by_tint[k]["iou"]),
+			str(by_tint[k]["pair"])])
 	for c: String in clashes:
 		printerr("    %s" % c)
 	_check(clashes.is_empty(),
