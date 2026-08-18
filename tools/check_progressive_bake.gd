@@ -63,7 +63,20 @@ func _authorities(r: WorldRenderer) -> Array:
 	]
 
 
+## `grammar_at` does NOT travel in the `rebake` signature, so a FineTerrain this fixture builds itself
+## bakes every material as GRAM_CLASTIC unless it is set here. That did not make this layer's answer wrong
+## — it compares two bakes of the SAME world and both sides were flattened identically, so
+## order-independence still held for the right reason — but it made the POPULATION narrow, and narrow in
+## exactly the wrong place: this layer's own header says it exists to catch "a paint term that read a
+## neighbour's PAINTED BYTES rather than its solidity", and the grammar terms are the newest paint terms
+## in `_paint_fine`. They were the only ones it never exercised. (Checked at the time: they read noise
+## fields and the `_mat_gram` / `_accreted_gram` caches, never a painted byte, so the gap was theoretical.
+## One line makes it permanent.) Found by `c2` auditing every `rebake` call site after `check_texture`
+## turned out to have the same omission with a live regression behind it.
 func _bake(fine: FineTerrain, a: Array, bulk: PackedByteArray, view: Rect2) -> void:
+	if not fine.grammar_at.is_valid():
+		var rr: WorldRenderer = _main._renderer
+		fine.grammar_at = func(c: Vector2i) -> int: return rr._material(rr.sim.material_at(c)).grammar
 	fine.rebake(a[0], a[1], a[2], a[3], a[4], a[5], a[6], bulk, view)
 
 

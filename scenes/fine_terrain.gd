@@ -143,7 +143,33 @@ enum { GRAM_CLASTIC = 0, GRAM_BEDDED = 1, GRAM_MASSIVE = 2 }
 const GRAM_GRAIN: Array[float] = [1.60, 0.85, 0.30]    ## grain amplitude: soil granular, stone restrained
 const GRAM_XSTR: Array[float] = [1.00, 0.35, 1.60]     ## <1 stretches features along the horizontal
 const GRAM_CLUMP: Array[float] = [1.45, 0.60, 0.25]    ## embedded aggregate — pebbles in soil, not in stone
-const GRAM_SEAM: Array[float] = [0.15, 1.20, 2.20]     ## fracture seam strength
+## MASSIVE'S 2.20 BROKE A CALIBRATED CEILING AND check_texture COULD NOT SEE IT.
+##
+## `check_texture` holds the painted rock to a roughness ceiling of 6.5% — mean |L[i-1] - 2L[i] + L[i+1]|
+## over mean luminance — and its comment calibrates that scale: the rock once printed **12.7% across a
+## face** and was "unmistakably a grid of tiles at any magnification"; the retune that made it read as rock
+## landed at **5.9%**. With the grammars wired, stone printed **10.40%** and its lag-1 fell 0.94 -> 0.63.
+## Most of the way back to the tile grid, shipped, and passing every sweep — because that layer's fixture
+## never wired `grammar_at`, so it baked every material as Clastic and measured a world that has never run.
+##
+## KNOCKED OUT ONE TERM AT A TIME, because the first guess was wrong: narrowing the seam's x-frequency
+## (3.40 -> 2.60, which is real — CRACK_FREQ 0.09 x 3.40 puts a feature every 3.3 fine cells, on the
+## layer's own three-samples-per-feature boundary) moved roughness 9.2% -> 9.2%. Nothing.
+##
+##     Massive term set to Clastic's       roughness across a face
+##     GRAM_SEAM        2.20 -> 0.15              5.5%   PASS
+##     GRAM_SEAM_W      1.70 -> 1.00              7.7%   FAIL
+##     GRAM_XSTR        1.60 -> 1.00              9.1%   FAIL
+##
+## The amplitude is the whole of it, and the arithmetic says why: `CRACK_DARKEN` is 0.15, so at 2.20 a
+## seam removed **0.33 of a 0.42 base — 79% of the value** — which is a black line, not the "restrained
+## chips" TR-04 asks for. Amplitude sweep: 1.40 -> 7.6%, 1.20 -> 6.8%, 1.00 -> 6.9%, **0.70 -> 6.3% PASS**.
+## Trading amplitude for width does not help (1.20 with W 1.25 -> 6.8%; 1.00 with W 1.35 -> 6.6%).
+##
+## 0.70 is chosen as the value that clears the calibrated ceiling, NOT as a taste judgement — it is a 3x
+## cut from what finding 8 shipped, so **TR-04's "how strong should a seam be" is reopened, now with a
+## measured ceiling on it** rather than an open question.
+const GRAM_SEAM: Array[float] = [0.15, 1.20, 0.70]     ## fracture seam strength
 ## SEAM SAMPLING — and these were INVERTED for their whole first life, with a comment asserting the
 ## opposite of what the arithmetic did. `get_noise_2d(x * a, y * b)`: a LARGE multiplier makes the field
 ## vary fast on that axis, which makes features NARROW on it. So elongated-horizontally (bedding) needs a
@@ -404,6 +430,10 @@ var _mat_gram: PackedByteArray = PackedByteArray()      ## coarse body texture G
 ## one to prove the region path is byte-identical to the full path — MUST copy this across, or the two
 ## differ by configuration while the comparison claims they differ by path.
 var grammar_at: Callable = Callable()
+## Set by `rebake` when it ran with no `grammar_at`, i.e. baked every material as GRAM_CLASTIC. A fixture
+## can assert on it; see the note on `_warn_if_flat`.
+var baked_flat: bool = false
+var _flat_warned: bool = false
 var _tone: PackedVector2Array = PackedVector2Array()    ## coarse (jitter, strata) samples, reconstructed per fine cell
 var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall BASE colour, tone NOT applied
 var _wall_has: PackedByteArray = PackedByteArray()      ## #S13: 1 where the coarse cell actually HAS a wall
@@ -548,9 +578,33 @@ static func walked_surface(row: int) -> int:
 ## PROGRESSIVE: the visible fine cells are painted now and the rest are owed to `bake_pending`. Left empty
 ## (every existing caller, and both harness layers) the whole grid is painted in one go, exactly as before.
 ## See `bake_pending` for why this is safe and what the world looks like in between.
+## A SILENT DEFAULT IS A FIXTURE-OMISSION AMPLIFIER; AN AUDIBLE ONE IS A DETECTOR. (`c2`'s phrasing.)
+##
+## `grammar_at` is an INPUT that does not travel in the `rebake` signature, and `_grammar_of` guards it
+## with `.is_valid()` — which is the CORRECT guard, the one this repo's catalogue insists on because
+## `Callable() != null` is true. The guard worked perfectly, and that is exactly why nobody found out for
+## 89 green layers that `tools/check_texture` was baking every material as GRAM_CLASTIC and holding a
+## world that has never shipped to a calibrated ceiling. Stone printed 10.40% roughness against a 6.5%
+## ceiling while that layer measured 5.93% and passed.
+##
+## So the default is now audible. It is NOT a failure — it warns once per instance and sets a flag a
+## fixture can assert on — because the point is that an omitted input should be impossible to not notice,
+## not that it should be impossible.
+func _warn_if_flat() -> void:
+	if grammar_at.is_valid():
+		return
+	baked_flat = true
+	if _flat_warned:
+		return
+	_flat_warned = true
+	push_warning("FineTerrain baked with no grammar_at: every material paints as GRAM_CLASTIC. "
+		+ "That is a world that does not ship — see the note above _warn_if_flat.")
+
+
 func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Callable, wall_color_at: Callable,
 		surface_at: Callable, tone_at: Callable, has_wall_at: Callable,
 		fine_solid_bulk: PackedByteArray = PackedByteArray(), view: Rect2 = Rect2()) -> void:
+	_warn_if_flat()
 	# The walkable-surface row per column (cache the coarse authority once) so the mold can leave that
 	# cell's cap band to the coarse grass/ramp pass beneath it.
 	_surf_row.resize(_cols)

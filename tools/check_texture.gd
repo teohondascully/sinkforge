@@ -131,6 +131,31 @@ func _check_paint() -> int:
 	sim.load_world(LayeredWorldGen.new().generate(cols, rows, 1337))
 	sim.rebuild_fine_terrain()
 	var fine: FineTerrain = FineTerrain.new(cols, rows, 1337)
+	# THE GRAMMARS HAVE TO BE WIRED OR THIS LAYER MEASURES A WORLD IT FLATTENED ITSELF.
+	#
+	# `FineTerrain.grammar_at` is an INPUT that does not travel in the `rebake` signature (its own
+	# docstring says so). Omitting it here does not disable the grammars — it bakes every material as
+	# GRAM_CLASTIC, which is a world that has never shipped. Measured both ways on the same bake, same
+	# seed, same population:
+	#
+	#                     flattened      as shipped
+	#     stone across    lag-1 0.94     lag-1 0.63
+	#                     rough 5.93%    rough 10.40%
+	#     deepslate       lag-1 0.94     lag-1 0.64
+	#                     rough 5.91%    rough 10.77%
+	#
+	# So this layer was passing at 5.9% while the game printed 10.4%, and the ceiling's own comment puts
+	# 5.9% at "reads as rock" and 12.7% at "unmistakably a grid of tiles". The guard existed, the number
+	# was calibrated, and the fixture was measuring something else.
+	var defs: Dictionary = {}
+	var mdir := DirAccess.open("res://src/data/materials")
+	for f: String in mdir.get_files():
+		var mdef: MaterialDef = load("res://src/data/materials/" + f.trim_suffix(".remap")) as MaterialDef
+		if mdef != null:
+			defs[mdef.id] = mdef
+	fine.grammar_at = func(c: Vector2i) -> int:
+		var dd: MaterialDef = defs.get(sim.material_at(c))
+		return dd.grammar if dd != null else 0
 	var grey := Color(0.42, 0.42, 0.42)
 	fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
