@@ -380,6 +380,25 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # expensive favour — it is for layers whose ANSWER is a duration. This one's answer is a shape.
 add_gl "check_rock_reads (rock vs void)" "res://tools/check_rock_reads.gd"
 add_gl "check_contact_edge (rock meets air)" "res://tools/check_contact_edge.gd"
+# TR-02: dirt and stone have to be different MATERIALS, not one material in two colours. Registered only
+# once it passed, the way check_rock_reads was held out through 6a — a layer that is red on arrival is a
+# ticket with a runner attached.
+#
+# Reads a controlled dirt->stone cross-section: mirrored window pairs matched on lamp-distance and depth,
+# pooled over three independent rig placements, judged on STRUCTURE with colour removed (grain as a
+# coefficient of variation, because the fine layer applies grain multiplicatively and raw std would
+# separate the materials on brightness while printing GRAIN over it). Four arms, three of which exist to
+# invalidate the fourth: a NULL rig with the same material both sides, a BASELINE with stone's grammar
+# flattened, and the treatment with the tooth pass off.
+#
+# Verdict cues DISQUALIFY THEMSELVES: any cue that separates the null rig above the ceiling is dropped by
+# rule. ANISO currently reads 80% on the null and is excluded — the per-grammar seam DIRECTION does not
+# reach the frame, which is the multiplicative constraint at the head of fine_terrain.gd costing the half
+# of the grammar it costs most.
+#
+# Reads (3 runs, stable): structure 86/86/86, colour control 93, null 53/53/51, baseline 61/63/61.
+# Proved red by knockout: setting stone.tres grammar = 0 drops structure to 63% and the layer FAILS.
+add_gl "check_material_grammar (dirt vs stone)" "res://tools/check_material_grammar.gd"
 add_gl "check_item_reads (icons)"      "res://tools/check_item_reads.gd"
 # Named for what it asserts everywhere, which is a RATIO — a dig may cost a few quiet frames, never twenty.
 # It read "120fps" for its whole life and never once asserted 8.33ms; that absolute now exists, but only on

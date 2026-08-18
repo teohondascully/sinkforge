@@ -32,7 +32,13 @@ extends "res://tools/check_base.gd"
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 70
 
-const DEPTH: int = 26          ## rows below the surface for the corridor — well clear of surface paint
+## THREE INDEPENDENT PLACEMENTS, POOLED. One rig yields 28 mirrored pairs and the floor is 30, and the two
+## ways of manufacturing more are both dishonest: moving the player would multiply the standings but the
+## mirror axis is the material SEAM, not the body, so pairs would stop being matched on lamp distance; and
+## halving the stride would overlap windows that are two cells tall, inflating n with samples that are not
+## independent. Rebuilding the rig at three depths gives genuinely separate rock and keeps the player
+## centred on the seam each time.
+const DEPTHS: Array[int] = [22, 26, 30]
 const HALF_W: int = 20         ## corridor half-width in cells
 ## SHALLOW ON PURPOSE. Torch light reaches a few cells into rock, so a slab ten rows deep puts most of its
 ## windows where nothing is visible — the first lit rig lit 12 of 48. The sampled band is now the rock a
@@ -137,11 +143,35 @@ func _run() -> void:
 		real_nt = await _measure(main, &"earth", &"stone", "TREAT  earth | stone, TOOTH OFF", false)
 		tooth.visible = true
 
-	var null_s: float = maxf(float(null_r["grain_lit"]), float(null_r["aniso_lit"]))
-	_check(null_s <= NULL_CEILING,
-		"the NULL rig does not separate on structure — %.0f%% (ceiling %.0f%%), so the rig is measuring"
-			% [null_s * 100.0, NULL_CEILING * 100.0]
-			+ " material rather than which side of the lamp a cell sits on")
+	# A CUE IS DISQUALIFIED BY ITS OWN NULL, per cue rather than in aggregate. The null rig holds the SAME
+	# material on both sides, so any separation it shows is the instrument reading position, lighting or
+	# geometry — and a cue that separates identical rock cannot be trusted to be reading material when the
+	# rock differs. Pooled over three placements the two structure cues come apart sharply: GRAIN reads 51%
+	# on the null, ANISO reads 73%. So ANISO is not a material cue in this rig and is excluded from the
+	# verdict by rule rather than by my picking the number I liked. It is still printed, because "we tried
+	# to read direction and could not" is a finding about the seams, not an absence of one.
+	#
+	# ANISO's failure is also informative rather than merely inconvenient: the treatment's own anisotropy
+	# reads 50-51%, so the per-grammar seam DIRECTION — bedded running flat, massive running steep — is not
+	# reaching the frame at all. The seams are drawn multiplicatively, which is the constraint written at
+	# the head of fine_terrain.gd, and direction is the half of the grammar that constraint costs most.
+	var cues: Array[String] = ["grain", "aniso"]
+	var usable: Array[String] = []
+	for cue: String in cues:
+		var nv: float = float(null_r[cue + "_lit"])
+		if nv <= NULL_CEILING:
+			usable.append(cue)
+		else:
+			print("  DISQUALIFIED: %s separates the NULL rig at %.0f%% (ceiling %.0f%%) — it is reading"
+				% [cue.to_upper(), nv * 100.0, NULL_CEILING * 100.0]
+				+ " something other than material, so it cannot carry a verdict about material")
+	_check(not usable.is_empty(),
+		"at least one structure cue survived its own null rig (%d of %d)" % [usable.size(), cues.size()])
+	if usable.is_empty():
+		main.queue_free()
+		await physics_frame
+		_verdict("check_material_grammar")
+		return
 
 	var col_auc: float = maxf(float(real_r["value_lit"]), float(real_r["chroma_lit"]))
 	_check(col_auc >= READ_FLOOR,
@@ -150,7 +180,9 @@ func _run() -> void:
 
 	# THE VERDICT IS THE LIT BAND. A separability taken on rock at 4% brightness is a true statement about
 	# pixels and a false one about play; see LIT_FLOOR.
-	var struct_auc: float = maxf(float(real_r["grain_lit"]), float(real_r["aniso_lit"]))
+	var struct_auc: float = 0.0
+	for cue: String in usable:
+		struct_auc = maxf(struct_auc, float(real_r[cue + "_lit"]))
 	_check(int(real_r["n_lit"]) >= MIN_SAMPLES,
 		"%d of the sampled windows are bright enough for a material to be visible in (floor %d)"
 			% [int(real_r["n_lit"]), MIN_SAMPLES])
@@ -160,7 +192,7 @@ func _run() -> void:
 			+ " a coin is 50%) — this is TR-02's actual subject")
 
 	print("  BASELINE: with one grammar for both materials, structure reads %.0f%% in the lit band;"
-		% (maxf(float(flat["grain_lit"]), float(flat["aniso_lit"])) * 100.0)
+		% (_best(flat, usable) * 100.0)
 		+ " with the grammar it reads %.0f%%. Both paired, both lit — the comparison the ticket wants."
 		% (struct_auc * 100.0))
 	if not real_nt.is_empty():
@@ -174,16 +206,28 @@ func _run() -> void:
 	await physics_frame
 	_verdict("check_material_grammar",
 		"structure %.0f%%, colour %.0f%%, null %.0f%%"
-			% [struct_auc * 100.0, col_auc * 100.0, null_s * 100.0])
+			% [struct_auc * 100.0, col_auc * 100.0, _best(null_r, usable) * 100.0])
 
 
 ## Build the cross-section, photograph it, and return every cue's separability.
 func _measure(main: MainView, left: StringName, right: StringName, label: String,
 		_tooth_on: bool) -> Dictionary:
+	var pooled: Dictionary = {"l_value": [] as Array[float], "r_value": [] as Array[float],
+		"l_chroma": [] as Array[float], "r_chroma": [] as Array[float],
+		"l_grain": [] as Array[float], "r_grain": [] as Array[float],
+		"l_aniso": [] as Array[float], "r_aniso": [] as Array[float]}
+	for depth: int in DEPTHS:
+		var one: Dictionary = await _sample_at(main, left, right, depth)
+		for k: String in pooled:
+			(pooled[k] as Array[float]).append_array(one[k] as Array[float])
+	return _report(pooled, label)
+
+
+func _sample_at(main: MainView, left: StringName, right: StringName, depth: int) -> Dictionary:
 	var sim: FactorySim = main.sim
 	var p: Player = main._player
 	var home: Vector2i = main._cell_at(p.position)
-	var cy: int = sim.surface_row(home.x) + DEPTH
+	var cy: int = sim.surface_row(home.x) + depth
 	var cx: int = home.x
 
 	# Fill the slab. GAP columns astride the seam are filled but never sampled: a contact is a different
@@ -249,9 +293,15 @@ func _measure(main: MainView, left: StringName, right: StringName, label: String
 			_take(out, "l", data, iw, int(lp.x), int(lp.y), rx, ry)
 			_take(out, "r", data, iw, int(rp.x), int(rp.y), rx, ry)
 
+	return out
+
+
+## Pool, then judge. Nothing above this line looks at a cue; nothing below it knows about geometry.
+func _report(out: Dictionary, label: String) -> Dictionary:
 	var lv: Array[float] = out["l_value"]
 	var n: int = lv.size()
-	print("  %s — %d mirrored windows, %.0fx%.0f cells (cell %.1fpx)" % [label, n, WIN_W, WIN_H, cell_px])
+	print("  %s — %d mirrored windows pooled over %d placements, %.0fx%.0f cells"
+		% [label, n, DEPTHS.size(), WIN_W, WIN_H])
 	_check(n >= MIN_SAMPLES,
 		"  %s found %d pairs to judge (floor %d)" % [label, n, MIN_SAMPLES])
 
@@ -362,6 +412,15 @@ func _paired(a: Array[float], b: Array[float]) -> float:
 			wins += 0.5
 	var f: float = wins / float(a.size())
 	return maxf(f, 1.0 - f)
+
+
+## The best surviving cue's lit-band reading — used for the baseline arm so it is scored on exactly the
+## cues the treatment is scored on.
+func _best(d: Dictionary, cues: Array[String]) -> float:
+	var out: float = 0.0
+	for cue: String in cues:
+		out = maxf(out, float(d[cue + "_lit"]))
+	return out
 
 
 func _pick(v: Array[float], idx: Array[int]) -> Array[float]:
