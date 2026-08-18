@@ -198,11 +198,23 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## It is not only that. Per face, the treatment survives TWICE AS WELL zoomed out (2.75 against 1.34) while
 ## each face covers FEWER screen pixels — a purely geometric account predicts about a quarter, so the
 ## measurement is roughly eight times the geometric prediction. Something non-geometric is letting the
-## coarse layer through at low zoom, and the likeliest candidate is the mold itself: `FineTerrain`'s texture
-## is stretched over the world rect and filtered, so minifying it softens the alpha edge that does the
-## covering. If that is right, the fine mold covers LESS WELL the further out you zoom, and the older,
-## blockier coarse layer shows through more at exactly the scales a player uses to read the shape of a dig.
-## Stated as a hypothesis with a number attached, not as a finding: one seed, one standing per row.
+## coarse layer through at low zoom.
+##
+## I PROPOSED A MECHANISM AND IT IS REFUTED BY ONE LINE. The story was that the mold's texture is stretched
+## over the world rect and FILTERED, so minifying it softens the alpha edge that does the covering.
+## `world_renderer.gd:402` sets `_fine_layer.texture_filter = TEXTURE_FILTER_NEAREST`. There is no softening;
+## a minified texel either covers a pixel or it does not.
+##
+## So the effect is measured and UNEXPLAINED, and it is left that way deliberately. I wrote the filtering
+## story from an intuition about what minification does, without reading the line that decides it — an hour
+## after writing to a peer that every defect we found tonight was "prose written from an intention, never
+## re-derived from the artefact". A plausible wrong mechanism attached to a real number is worse than a
+## blank, because the next reader inherits the story and not the doubt.
+##
+## What survives: per open face the treatment is roughly twice as visible zoomed out as at 1.00x, against a
+## geometric prediction of a quarter, on one seed and one standing per row. If that generalises, the coarse
+## layer shows through more at exactly the scales a player uses to read the shape of a dig — which is worth
+## explaining and is not explained here.
 ##
 ## So: REAL AT THE SURFACE at 35 pixels per face, and 1.34 pixels per face in the view the game is actually
 ## played in. The
