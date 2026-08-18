@@ -71,3 +71,41 @@ func _run() -> void:
 			_check(registered.has(uid),
 				"'%s' (unlocked by %s) is registered in MainView._craftable — researchable AND placeable" % [uid, tid])
 	_check(checked > 0, "the guard actually walked machine unlocks (%d checked)" % checked)
+
+	# ------------------------------------------------------------------------------------------------
+	# AND THE OTHER WAY IN. `try_build` (main.gd) picks a placed machine back UP — it gates on reach and
+	# on there BEING a machine in the cell, not on whether that machine is craftable and not on whether
+	# you placed it. So `pickup_machine` (factory_sim.gd) can put ANY placed def's id into the pack, by a
+	# route that never touches `_craftable`.
+	#
+	# `Hud.machine_icons` is built by iterating `_craftable` (main.gd), and `_draw_thing_icon` sends
+	# anything absent from it to `Visuals.draw_item`, whose default arm fills a flat rect with
+	# `item_color` — last line `return Color.WHITE`. A machine that reaches the pack without a craft path
+	# therefore draws as a blank white square, which is a failure mode this project has already shipped
+	# once (docs/FEEL_GAP.md, the carried terrain blocks).
+	#
+	# It is not reachable today, and the reason is worth writing down because it is NOT the one I first
+	# gave: it is not that nothing crafts these defs, it is that nothing PLACES them. `world_seeder`
+	# seeds exactly one machine def and it is a craftable one. That is a worldgen fact, not an icon fact,
+	# and it can change in a commit that has nothing to do with icons.
+	#
+	# So the assertion is tied to what the world ACTUALLY placed, read off the booted sim rather than
+	# parsed out of the seeder: every machine standing in a fresh world must be one the pack can draw.
+	var placed: Dictionary = {}
+	for st: MachineState in _main.sim.machines:
+		if st != null and st.def != null:
+			placed[st.def.id] = true
+	var iconless: Array[String] = []
+	for id: StringName in placed:
+		if not _main._hud.machine_icons.has(id):
+			iconless.append(String(id))
+	_check(iconless.is_empty(),
+		"every one of the %d machine kinds the world placed can be drawn in the pack if you pick it up%s"
+			% [placed.size(), "" if iconless.is_empty() else " — NO ICON (draws as a white square): "
+				+ ", ".join(iconless)])
+	# NON-VACUITY: a world with no machines in it satisfies the above perfectly, and a fresh save that
+	# seeds nothing would be its own, larger finding.
+	_check(placed.size() > 0, "the fresh world placed %d machine kinds to check" % placed.size())
+	# CONTROL: an id the registry certainly does not carry, through the same predicate.
+	_check(not _main._hud.machine_icons.has(&"not_a_real_machine"),
+		"the same lookup rejects an id that was never registered")
