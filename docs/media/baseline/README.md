@@ -43,7 +43,7 @@ accident the redirect exists to prevent.
 | `_moment_boot.png` | `boot` | **surface** — the first frame a player ever sees |
 | `_moment_sapling.png` | `sapling` | **sapling-help** — the one lesson a player can earn without being told to; `P1`'s required opening treatment |
 | `_moment_delve.png` | `delve` | **underground** — lamp-lit rock on every side; the frame `P2` is about |
-| `_moment_swing.png` | `swing` | **grapple** — the frame `P4` is about. **See the defect below: it does not currently show a swing.** |
+| `_moment_swing.png` | `swing` | **grapple** — the frame `P4` is about. **The moment was broken and is now fixed; see below. This file is the corrected frame** (the frame it replaced is in this commit's parent). |
 | `_moment_map.png` | `map` | **map-open** — the only view that shows the descent's whole shape |
 | `_moment_line.png` | `line` | **first-machine** — the first-automation beat. **See the defect below: it contains a surface rendering anomaly.** |
 | `_moment_haul.png` | `haul` | not one of the six; captured as a control for the `line` anomaly |
@@ -76,7 +76,7 @@ for them.**
 
 ## 1. Two defects in the instruments themselves — found by looking at what the instrument produced
 
-### `swing` does not photograph a swing, and nothing could have told us
+### `swing` did not photograph a swing, and nothing could have told us — FIXED
 
 `_moment_swing.png`'s docstring says *"mid-arc on a live grapple line, so the rope, the hook and the pose
 can be judged together."* **The body in the frame is standing on a ledge.** The rope is a single faint
@@ -85,7 +85,22 @@ line, most of it behind the GRAPPLE lesson bubble, with the anchor out of shot.
 The contamination table checks that delved moments are underground, that input is deaf, that no modal is
 open. **It has nothing that can observe whether the line is taut or the body is airborne** — so this moment
 can photograph a standing body and exit 0, exactly as it just did. It is the same shape as the day's other
-findings: *a guard that cannot register what its frame is named for.* `P4` cannot start on this frame.
+findings: *a guard that cannot register what its frame is named for.*
+
+**Why it survived:** the old helper waited up to 90 frames for an anchor **without caring whether one
+arrived**, then teleported the body up-left — which *shortens* the distance to the anchor and drops the
+line slack — shoved it right, and shuttered 26 frames later, by which time it had landed.
+
+**Fixed.** It is a real pendulum now: anchor up-and-right, shove the body *away* from the anchor and off
+the ledge so gravity loads the line, then step until both conditions the picture is about hold —
+`grapple.taut` (the constraint did work last step, which is what drives the render) and `not on_floor`.
+`_contamination` re-checks both **at the shutter**, so if the frames between there and the write land the
+body, the capture is refused rather than repeating the old lie.
+
+`SF_MOMENT_MUTANT=noswing` is the positive control and it has been run: it takes the anchor and stays on
+the ledge — **the exact frame that used to pass** — and the guard refuses it with both reasons named,
+leaving the existing file untouched. The corrected frame is a body mid-arc with a lit, loaded rope and
+motion streaks; it is archived as `history/125-the-swing-that-was-never-a-swing.png`.
 
 ### The frame that exists to judge the grapple is covered by the text explaining the grapple
 

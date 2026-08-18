@@ -157,6 +157,20 @@ func _contamination(main: MainView, moment: String) -> String:
 	# opacity it draws it at; together they are the closest thing to "is the lesson legible in this frame"
 	# that is available without reading pixels. A guard on `inventory[&"sapling"] > 0` would have passed on
 	# a frame with no bubble in it at all, which is the failure it exists to catch.
+	# THE SWING SHOT'S SUBJECT IS A LOADED ROPE AND A BODY IN THE AIR, so both are read at the shutter from
+	# the same fields the renderer draws from. `taut` is the grapple's own record of whether the constraint
+	# did work last step; `on_floor` is the body's. Neither can be true of the frame this moment used to
+	# produce, which is the whole point of adding them.
+	if moment == "swing":
+		var pl: Player = main._player
+		if pl.grapple.state != Grapple.State.ANCHORED:
+			wrong.append("the grapple is not anchored — there is no line in a frame named for one")
+		elif not pl.grapple.taut:
+			wrong.append("the line is SLACK: the constraint did no work last step, so this photographs a "
+				+ "rope lying in the air rather than one under load")
+		if pl.on_floor:
+			wrong.append("the body is STANDING — a swing shot of a body on the ground is the exact frame "
+				+ "this moment produced for its entire life while exiting 0")
 	if moment == "sapling":
 		var hints: Object = main._hints
 		if hints == null:
@@ -1218,17 +1232,60 @@ func _hollow_room(main: MainView) -> void:
 ## Hang the body off a live line in the middle of a swing. The grapple is the one thing in the game that
 ## cannot be judged from a still of it at rest — a rope reads as a rope only when it is under load — so
 ## the shot is taken mid-arc, with the body already moving.
+## THE SWING — and it did not swing.
+##
+## THE FRAME THIS PRODUCED FOR ITS ENTIRE LIFE WAS A BODY STANDING ON A LEDGE. The old version fired at a
+## cell up and to the right, waited up to 90 frames for an anchor WITHOUT CARING WHETHER ONE ARRIVED, then
+## teleported the body up-left — which SHORTENS the distance to the anchor and drops the line slack — gave
+## it a rightward shove, and shuttered 26 frames later, by which time it had landed. `_moment_swing.png` in
+## the P0 baseline is that: a standing body, a faint slack line mostly hidden behind the GRAPPLE bubble,
+## and the anchor out of shot. Exit 0 every time.
+##
+## **The reason it survived is that nothing in the contamination table can observe a rope.** The table
+## checks depth, deafness and modals; a moment whose entire subject is "the line is taut and the body is
+## in the air" had no guard that could register either. It is the day's dominant defect wearing a fixture's
+## clothes: an instrument that cannot detect its own subject reports success by default.
+##
+## Now it is a real pendulum. Anchor up-and-right, then shove the body AWAY from the anchor and off the
+## ledge so gravity brings the line taut, then step until the two conditions the picture is actually about
+## both hold — `grapple.taut` (the constraint did work last step, which is what drives the render) and
+## `not on_floor`. `_contamination` re-checks both AT THE SHUTTER, so if the extra frames between here and
+## the write land the body, the capture is refused rather than repeating the old lie.
+##
+## `SF_MOMENT_MUTANT=noswing` skips the shove: the anchor is taken and the body stays on its ledge, which
+## is the positive control for the guard — the exact frame that used to pass.
+const SWING_ANCHOR_WAIT: int = 90     ## frames the hook is given to bite
+const SWING_ARC_WAIT: int = 150       ## ...and the body to leave the ledge and load the line
+
 func _swing(main: MainView) -> void:
 	var p: Player = main._player
 	var c: Vector2i = main._cell_at(p.position)
 	p.auto_input = false
 	p.grapple.fire(p.hand(), main._cell_center(Vector2i(c.x + 4, c.y - 6)))
-	for _i in 90:
+	var bit: bool = false
+	for _i: int in SWING_ANCHOR_WAIT:
 		await physics_frame
 		if p.grapple.state == Grapple.State.ANCHORED:
+			bit = true
 			break
-	p.position += Vector2(-40.0, -70.0)
-	p.velocity = Vector2(240.0, 40.0)
-	p.input_dir = 1.0
-	for _i in 26:
+	if not bit:
+		printerr("capture_moments: the hook never bit in %d frames — the guard will refuse this"
+			% SWING_ANCHOR_WAIT)
+		return
+	if OS.get_environment("SF_MOMENT_MUTANT") == "noswing":
+		printerr("capture_moments: MUTANT — anchored but never left the ledge; the guard must refuse this")
+		for _i: int in 30:
+			await physics_frame
+		return
+	# AWAY from the anchor and off the edge, so the rope is loaded by the fall rather than by a teleport.
+	p.velocity = Vector2(-300.0, -150.0)
+	p.input_dir = -1.0
+	var arced: bool = false
+	for _i: int in SWING_ARC_WAIT:
 		await physics_frame
+		if p.grapple.taut and not p.on_floor:
+			arced = true
+			break
+	if not arced:
+		printerr("capture_moments: the line never loaded with the body airborne in %d frames"
+			% SWING_ARC_WAIT)
