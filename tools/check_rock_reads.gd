@@ -251,6 +251,14 @@ func _run() -> void:
 		print("    %-18s n=%4d  median %6.2f  vs air %.0f%%%s"
 			% [a[0], arr.size(), _median(arr), _readability(arr, air_v) * 100.0,
 				"" if arr.size() >= MIN_SAMPLES else "   [below the %d floor — no conclusion]" % MIN_SAMPLES])
+	var arms_g: Array = [["plain interior", s["rock_pi_g"]], ["plain BOUNDARY", s["rock_pe_g"]],
+		["stained interior", s["rock_si_g"]], ["stained BOUNDARY", s["rock_se_g"]]]
+	print("  rock partition ON GRAIN — the cue the verdict is actually made of (diagnostic only):")
+	for a: Array in arms_g:
+		var arr: Array[float] = a[1]
+		print("    %-18s n=%4d  median %6.2f  vs air %.0f%%%s"
+			% [a[0], arr.size(), _median(arr), _readability(arr, air_g) * 100.0,
+				"" if arr.size() >= MIN_SAMPLES else "   [below the %d floor — no conclusion]" % MIN_SAMPLES])
 	print("  sampled rows: rock median %d, air median %d (the two populations should be looking at the"
 		% [int(_median(s["rock_row"])), int(_median(s["air_row"]))]
 		+ " same depths; far apart means they are not the same picture)")
@@ -309,6 +317,21 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var rock_pe: Array[float] = []      # plain, touching air
 	var rock_si: Array[float] = []      # lode-stained interior
 	var rock_se: Array[float] = []      # lode-stained, touching air
+	## THE SAME 2x2 ON GRAIN, and its absence was a hole big enough to draw the wrong conclusion through.
+	## The four arms above are fed `stat.x`, the patch MEAN -- they are a VALUE partition, judged against
+	## air's VALUE. But the VERDICT is the better of value and grain, and since the tooth landed that better
+	## cue is GRAIN. So the one question 6a actually asks -- does a flat INTERIOR of rock read against a flat
+	## expanse of air -- was being answered on the weaker cue while the headline came from the stronger one.
+	## Read together they invite a straight category error: "interior 66% against a 75% floor" looks like the
+	## interior failing, when 66% is an interior VALUE number and the 75% floor is being cleared by a pooled
+	## GRAIN number of 88%. Those are two different statistics and neither is evidence about the other.
+	##
+	## Same defect class as everything else in this file's history: an arm that cannot register the thing the
+	## verdict is made of. Diagnostic only, like its value twin -- the verdict stays pooled and global.
+	var rock_pi_g: Array[float] = []
+	var rock_pe_g: Array[float] = []
+	var rock_si_g: Array[float] = []
+	var rock_se_g: Array[float] = []
 	## DIAGNOSTIC THIRD CUE, ORIENTATION. `_patch_stats` returns a mean and a scalar standard deviation, and a
 	## scalar variance IS BLIND TO DIRECTION -- it cannot tell horizontal banding from isotropic mottling, only
 	## that both wobble. That matters here because the renderer already makes rock anisotropic and the wall not:
@@ -407,12 +430,16 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				var edge: bool = _touches_air(main.sim, c)
 				if stained and edge:
 					rock_se.append(stat.x)
+					rock_se_g.append(stat.y)
 				elif stained:
 					rock_si.append(stat.x)
+					rock_si_g.append(stat.y)
 				elif edge:
 					rock_pe.append(stat.x)
+					rock_pe_g.append(stat.y)
 				else:
 					rock_pi.append(stat.x)
+					rock_pi_g.append(stat.y)
 			elif main.sim.water_at(c) > 0:
 				# THE THIRD THING, and finding it is why the air population was bimodal. `is_solid` is
 				# `solid.has(cell)` and water lives in a SEPARATE dictionary, so a flooded cell is
@@ -434,6 +461,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain, "rock_aniso": rock_aniso, "air_aniso": air_aniso, "rock_chroma": rock_chroma, "air_chroma": air_chroma,
 		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
 		"rock_pi": rock_pi, "rock_pe": rock_pe, "rock_si": rock_si, "rock_se": rock_se,
+		"rock_pi_g": rock_pi_g, "rock_pe_g": rock_pe_g, "rock_si_g": rock_si_g, "rock_se_g": rock_se_g,
 		"skipped": near_surface + lit + offslab}
 
 
