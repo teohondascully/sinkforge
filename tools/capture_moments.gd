@@ -55,6 +55,21 @@ const DELVE_ROWS := 14            ## how far below the surface the delve shot di
 ## moment which delves and forgetting to list it is the only way to escape the guard.
 const DELVED: Array[String] = ["delve", "room", "swing"]
 
+## THE MOMENTS THAT CLAIM THE BODY IS AT THE COUNTER, and the ones that claim it is not. `can_craft` is
+## what decides whether the Bazaar's verb is a gold button or a dead plate with a note naming its
+## precondition, so it is the difference between a photograph of a shop and a photograph of a catalogue —
+## and it is recomputed from the world every `_process`, which is how seven captures came back saying
+## "at a claimed Bazaar" while posing as the counter.
+##
+## Listed in BOTH directions on purpose. A guard that only checks the at-the-counter moments would pass a
+## fresh rung that had wandered into a Bazaar, and the fresh rung's whole claim is that it is the opening
+## state — where the ruin is unclaimed and the dead button is honest. Whichever way the fixture drifts, one
+## of these two lists notices.
+const AT_THE_COUNTER: Array[String] = [
+	"counter", "works", "bench", "bench_next", "pack_full", "works_full", "bench_full", "works_short",
+]
+const AWAY_FROM_THE_COUNTER: Array[String] = ["pack_fresh", "works_fresh", "bench_fresh"]
+
 ## Rows the body actually descended during `_dig_in`, measured against the surface as it stood BEFORE the
 ## shaft was cut. -1 = no delve was attempted, which is correct for the moments that do not need one and is
 ## why the guard below only consults it for DELVED.
@@ -96,6 +111,7 @@ const EXPECT: Dictionary = {
 	"works_full": {"_inventory_open": true},
 	"bench_full": {"_inventory_open": true},
 	"works_short": {"_inventory_open": true},
+	"bench_next": {"_inventory_open": true},
 	"settings": {"_settings_open": true},
 	"map": {"_minimap_mode": 2},
 }
@@ -159,6 +175,18 @@ func _contamination(main: MainView, moment: String) -> String:
 	if moment in DELVED and _delve_rows < DELVE_ROWS / 2:
 		wrong.append(("this moment is cut from a shaft and the body is only %d rows below where the "
 			+ "surface was — the delve did not happen, so the frame is of daylight") % _delve_rows)
+	# THE COUNTER GUARD. Read from `main._hud.can_craft` and not from the fixture's intention, because the
+	# intention is exactly what was wrong: the poser set the field, the game recomputed it, and nothing
+	# between them ever compared the two. This is the same field `_draw_bazaar_detail` branches on, so it
+	# cannot answer a different question than the picture does.
+	if main._hud != null and moment in AT_THE_COUNTER and not main._hud.can_craft:
+		wrong.append("this moment poses the player AT a claimed Bazaar and `can_craft` is false at the "
+			+ "shutter — every verb on this screen will draw as a dead plate under the note naming the "
+			+ "precondition, so the frame is of a catalogue and not of a shop")
+	if main._hud != null and moment in AWAY_FROM_THE_COUNTER and main._hud.can_craft:
+		wrong.append("this moment claims to be the game's OPENING state, where the Bazaar is still an "
+			+ "unclaimed ruin, and `can_craft` is true — the body has reached a counter, so the frame is "
+			+ "no longer the one a new player opens")
 	if main.is_processing_unhandled_input():
 		wrong.append("the scene is still LISTENING to input — _deafen did not take, so this frame is not "
 			+ "a pure function of the fixture")
@@ -263,6 +291,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _at_the_counter_fresh(main, moment.split("_")[0])
 		"pack_full", "works_full", "bench_full":
 			await _at_the_counter_full(main, moment.split("_")[0])
+		"bench_next":
+			await _at_the_bench_next(main)
 		"works_short":
 			await _at_the_counter_short(main)
 		"settings":
@@ -466,11 +496,56 @@ func _bending_geometry(main: MainView) -> void:
 ## detail card that takes the bottom third, and a full BENCH is eleven techs competing at the same weight.
 ## A redesign judged on the middle rung would be tuned for the one state that never looks broken.
 ##
+## STANDING AT THE COUNTER, WHICH IS NOT THE SAME AS WRITING `can_craft = true`.
+##
+## Every menu pose in this file used to set `main._hud.can_craft = true` and shutter six frames later.
+## `main.gd:793` re-derives that field from `_near_bazaar()` on EVERY `_process`, so the write was gone
+## before the picture was taken and the whole matrix — seven captures built to be the redesign's baseline —
+## photographed the counter as seen by someone standing nowhere near it. The tell was in the frames the
+## entire time: BUILD greyed out under the note "at a claimed Bazaar" in `works_full`, where the pack holds
+## 64 of every input and the price chip is green.
+##
+## It also destroyed the one capture made to answer the brief's "WORKS with available and unavailable
+## selected". Both arms drew the same dead button for the same reason — a variable neither arm controlled —
+## so the contrast the shot exists to show was not in it. **A fixture that writes a field the game
+## recomputes has posed nothing; it has left a note for a frame that was never read.**
+##
+## The fix poses the WORLD instead of the flag: claim the ruin worldgen leaves near the surface by placing
+## its last post through `place_block` (the real path — it consumes the wood, marks `_bazaars_dirty`, and
+## sets `fill`), then stand the body in the frame's interior. `can_craft` then becomes true by the same
+## computation the game uses, and there is nothing left to overwrite.
+##
+## The wood it costs is NOT refunded. Callers grant their staples after standing, so the pose is exact
+## without a rollback that would put the pack in a state the placing player could not be in.
+func _stand_at_a_bazaar(main: MainView) -> bool:
+	var sim: FactorySim = main.sim
+	if sim.find_bazaars().is_empty():
+		var gap: Vector2i = sim.bazaar_completion_cell()
+		if gap.x < 0:
+			printerr("capture_moments: no bazaar and no ruin one block from done — cannot stand at a counter")
+			return false
+		if int(sim.inventory.get(&"wood", 0)) <= 0:
+			sim.inventory[&"wood"] = 1
+		if not sim.place_block(gap, &"wood"):
+			printerr("capture_moments: could not place the ruin's last post at %s" % gap)
+			return false
+	var frames: Array[Vector2i] = sim.find_bazaars()
+	if frames.is_empty():
+		return false
+	main._player.position = main._cell_center(sim.bazaar_center(frames[0]))
+	for _i: int in 4:
+		await physics_frame
+	return true
+
+
 ## FRESH IS THE GAME'S OWN OPENING STATE, not an emptied one. Nothing is taken away and nothing is added:
 ## the dev kit is whatever `MainView` starts a new game with, which is the pack a first-time player opens.
+## AND THIS RUNG STAYS AWAY FROM THE COUNTER, deliberately. A player who has just started is not standing
+## at a Bazaar — the ruin is still a ruin — so the greyed BUY and the note naming its precondition are the
+## TRUE fresh-game state, and the only rung where they are. The `can_craft = true` that used to be here was
+## both ineffective and wrong about the game.
 func _at_the_counter_fresh(main: MainView, which: String) -> void:
 	main._inventory_open = true
-	main._hud.can_craft = true
 	main._hud.set_bazaar_tab(_TAB.get(which, 0))
 	for _i: int in 6:
 		await physics_frame
@@ -482,13 +557,13 @@ func _at_the_counter_fresh(main: MainView, which: String) -> void:
 ## catalogue" is a list that stops being full the first time somebody adds a machine.
 func _at_the_counter_full(main: MainView, which: String) -> void:
 	var sim: FactorySim = main.sim
+	await _stand_at_a_bazaar(main)
 	for id: StringName in _catalogue(main):
 		sim.inventory[id] = 64
 		sim.total_produced[id] = 640
 	for tech: StringName in ResearchRules.ORDER:
 		sim.research[tech] = true
 	main._inventory_open = true
-	main._hud.can_craft = true
 	main._hud.set_bazaar_tab(_TAB.get(which, 0))
 	for _i: int in 6:
 		await physics_frame
@@ -580,6 +655,26 @@ func _at_the_settings(main: MainView) -> void:
 ## opened (#S34b — the locked future lives on the BENCH), so an unresearched machine is not a row at all.
 ## The pose is therefore the midgame counter with the metal taken back out of the pack: same unlocks, same
 ## rows, nothing to pay with.
+## BENCH WITH THE ACTIONABLE NODE SELECTED, which the brief asks for as *"BENCH with one actionable path
+## and late locked branches"* and which the register did not have. `bench` selects Prospecting — a LOCKED
+## node behind Automation — so the only research plate ever photographed was a dead one, and the same was
+## true of `bench_full` (everything researched, verb RESEARCHED). The board's whole job is "what comes
+## next", and the one node that answers it had never been shown selected.
+##
+## It is also the only state that produces the longest verb this screen has. RESEARCH is eight tracked
+## characters against a button that was sized for BUY, which is a thing you cannot find out from a capture
+## of a locked node.
+##
+## The pose is the midgame counter with the selection put back on row 0, which is the actionable rung —
+## `_at_the_counter` steps one down from it for `bench` because that capture wanted a locked node. Re-setting
+## the tab is what resets the row (`set_bazaar_tab` clears `bazaar_row`), so this is not a second move.
+func _at_the_bench_next(main: MainView) -> void:
+	await _at_the_counter(main, "bench")
+	main._hud.set_bazaar_tab(2)
+	for _i: int in 6:
+		await physics_frame
+
+
 func _at_the_counter_short(main: MainView) -> void:
 	await _at_the_counter(main, "works")
 	for item: StringName in [&"ingot", &"iron_ingot"]:
@@ -590,11 +685,11 @@ func _at_the_counter_short(main: MainView) -> void:
 
 
 func _at_the_counter(main: MainView, which: String) -> void:
+	await _stand_at_a_bazaar(main)
 	for item: StringName in [&"ingot", &"ore", &"coal", &"stone", &"wood", &"iron_ingot"]:
 		main.sim.inventory[item] = 24
 		main.sim.total_produced[item] = 24
 	main._inventory_open = true
-	main._hud.can_craft = true
 	main._hud.set_bazaar_tab(1 if which == "works" else (2 if which == "bench" else 0))
 	if which == "works":
 		main._hud.bazaar_move(0, 2)

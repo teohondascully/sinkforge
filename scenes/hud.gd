@@ -1777,6 +1777,59 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 		Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, id)
 
 
+## THE COUNTER HAS EXACTLY ONE VERB BUTTON, and until now it was drawn twice from two sets of numbers.
+##
+## It was never photographed live. `capture_moments` set `_hud.can_craft = true` and `main.gd:793`
+## recomputed it from `_near_bazaar()` before the shutter, so every menu capture in the archive shows the
+## dead branch of this if. The first frame ever taken with `ready` true read **`BUILDENTER`** — the key
+## hint starting four pixels after the verb's last stroke, at 10pt against 8pt, which is one word.
+##
+## `_detail_hold` drew the same construct with the hint hardcoded at `x + 58.0`, a ~20px gap, so the two
+## buttons in the same plate disagreed by a factor of five about how far apart a verb and its key sit. Both
+## numbers were guesses; only one of them was ever looked at.
+##
+## And the fixed 104px plate could not hold the longest verb this screen produces. RESEARCH is eight
+## tracked characters — the button was sized for BUY.
+##
+## So: one function, one gap constant, and a width that is DERIVED from the verb rather than asserted over
+## it. The button stays anchored to the plate's right edge, so growing it moves its left edge inward and
+## nothing downstream shifts. Returns the rect it drew, because the caller prints the precondition note
+## centred above it.
+const VERB_SIZE: int = 10
+const VERB_TRACK: float = 2.0
+const VERB_HINT_SIZE: int = 8
+const VERB_GAP: float = 14.0          ## verb ink → key hint. 4.0 was the shipped value and it read as one word.
+const VERB_PAD: float = 12.0          ## plate edge → ink, both ends
+const VERB_MIN_W: float = 104.0       ## BUY and BUILD keep the width the layout was drawn around
+const VERB_H: float = 24.0
+## How wide the button has to be for this verb. Separate from the drawing because the blurb beside it wraps
+## against the button's left edge, and a blurb that wraps against a guessed width runs under a real one.
+func _verb_button_w(verb: String, hint: String) -> float:
+	var hw: float = 0.0 if hint == "" else _font.get_string_size(
+		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE).x
+	return maxf(VERB_MIN_W, VERB_PAD * 2.0 + _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+		+ (0.0 if hint == "" else VERB_GAP + hw))
+
+
+func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
+	var vw: float = _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+	var w: float = _verb_button_w(verb, hint)
+	var btn := Rect2(box.end.x - w - 10.0, box.position.y + box.size.y - 34.0, w, VERB_H)
+	var ty: float = btn.position.y + 16.0
+	if live:
+		_round_rect(btn, 5.0, UI_ACCENT)
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
+			Color(0.08, 0.07, 0.04))
+		if hint != "":
+			draw_string(_font, Vector2(btn.position.x + VERB_PAD + vw + VERB_GAP, ty), hint,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE, Color(0.08, 0.07, 0.04, 0.62))
+	else:
+		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
+			Color(0.44, 0.46, 0.52))
+	return btn
+
+
 # --- the detail plate -----------------------------------------------------------------------------------
 
 ## THE DETAIL PLATE. The selected thing, drawn large under a lamp, with one sentence of what it is for, its
@@ -1835,7 +1888,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			verb = "RESEARCH"
 			ready = can_craft and _can_afford(cost) \
 				and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
-			note = "" if can_craft else "at a claimed Bazaar"
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, sample)
 	else:
 		var opts: Array[Dictionary] = craft_options if kind == "machine" else rack_options
 		var row: int = int(act.get("row", 0))
@@ -1851,7 +1904,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		else:
 			verb = "BUILD" if kind == "machine" else "BUY"
 			ready = can_craft and _can_afford(cost)
-			note = "" if can_craft else "at a claimed Bazaar"
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
 
 	# The lamp. Three rings behind the goods is the whole trick, and it is what makes a 44px glyph read as
 	# lit rather than as big.
@@ -1864,8 +1917,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
 
 	var tx: float = art.end.x + 14.0
-	var btn_w: float = 104.0
-	var text_w: float = box.end.x - tx - btn_w - 24.0
+	var text_w: float = box.end.x - tx - _verb_button_w(verb, "ENTER" if ready else "") - 24.0
 	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), blurb, HORIZONTAL_ALIGNMENT_LEFT,
 		text_w, 9, 2, UI_TEXT_DIM)
@@ -1876,20 +1928,36 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		var have: int = int(sim.inventory.get(item, 0))
 		cx = _detail_chip(Vector2(cx, box.position.y + 62.0), item, need, have) + 6.0
 
-	var btn := Rect2(box.end.x - btn_w - 10.0, box.position.y + box.size.y - 34.0, btn_w, 24.0)
-	if ready:
-		_round_rect(btn, 5.0, UI_ACCENT)
-		var vw: float = _tracked_w(verb, 10, 2.0)
-		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
-		draw_string(_font, Vector2(btn.position.x + 16.0 + vw, btn.position.y + 16.0), "ENTER",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
-	else:
-		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
-		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.44, 0.46, 0.52))
+	var btn: Rect2 = _verb_button(box, verb, "ENTER" if ready else "", ready)
 	if note != "":
 		var nw: float = _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 		draw_string(_font, Vector2(btn.get_center().x - nw * 0.5, btn.position.y - 6.0), note,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.58, 0.48, 0.32))
+
+
+## WHY THE BUTTON IS DEAD, when the reason is the pack and not the place.
+##
+## The plate has always had a line for the precondition it cannot meet — "at a claimed Bazaar", "behind
+## Automation", "research Ironworks first" — and every one of those fires for a reason OUTSIDE the pack.
+## Stand at a counter you cannot afford anything at and the line was blank: a grey button, no sentence, and
+## a red numeral in a price chip as the only account of why nothing happens when you press ENTER.
+##
+## That gap was invisible for as long as the captures were, because a fixture standing away from the Bazaar
+## always took the "at a claimed Bazaar" branch — the one state where the note is never empty. **The screen
+## explained every blocker except the one a player actually hits.**
+##
+## Says the DEFICIT and not the price, because the price is already on the chips two lines up and repeating
+## it answers a question nobody asked. The sample material (a tech's analysis input) is a cost the chips do
+## NOT show, so it is named here or it is named nowhere.
+func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
+	var parts: PackedStringArray = []
+	for item: StringName in cost:
+		var gap: int = int(cost[item]) - int(sim.inventory.get(item, 0))
+		if gap > 0:
+			parts.append("%d %s" % [gap, _item_label(item)])
+	if sample != &"" and int(sim.inventory.get(sample, 0)) < 1:
+		parts.append("a sample of %s" % _item_label(sample))
+	return "" if parts.is_empty() else "short " + " · ".join(parts)
 
 
 ## A machine's display name if it is one, an item's label otherwise. The tech ladder names both.
@@ -1938,16 +2006,10 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 		"carrying %d   ·   %d gathered all told" % [carried, made],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
-	var btn := Rect2(box.end.x - 114.0, box.position.y + box.size.y - 34.0, 104.0, 24.0)
 	if row == held:
-		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
-		_tracked("IN HAND", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0,
-			Color(0.44, 0.46, 0.52))
+		_verb_button(box, "IN HAND", "", false)
 	else:
-		_round_rect(btn, 5.0, UI_ACCENT)
-		_tracked("HOLD", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
-		draw_string(_font, Vector2(btn.position.x + 58.0, btn.position.y + 16.0), "ENTER",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
+		_verb_button(box, "HOLD", "ENTER", true)
 
 
 ## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
