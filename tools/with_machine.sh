@@ -81,6 +81,37 @@ if [ "$#" -eq 0 ] || { [ "${SF_ALLOW_POSITIONAL:-0}" != "1" ] && case "$1" in -*
 	exit 2
 fi
 
+# --- THE CLAIM FILE. The lock used to say a pid and a tree, and the waiter printed only the pid, so
+# "waiting for the machine lock (held by pid 65489)" required a `ps` on another terminal to find out what
+# was running and whether it was nearly done. A lock that makes you go and look is a lock that gets
+# overridden. Four lines now: pid, tree, what is running, and when it started — so the message answers the
+# three questions a waiting session actually has.
+#
+# APPEND-ONLY BY DESIGN. Line 1 stays the pid and line 2 stays the tree, because the stale-holder check is
+# `head -1` and both scripts already read those; a lock written by an older copy of either script is
+# missing lines 3 and 4 and the reader falls back rather than failing. Parallel checkouts do not upgrade at the
+# same instant.
+lock_claim_write() {
+	printf '%s\n%s\n%s\n%s\n' "$$" "$ROOT" "${1:-?}" "$(date +%s)" > "$LOCK/owner"
+}
+
+# One line describing the current holder: pid, what it is running, which tree, how long. Every field is
+# optional — a missing one is simply left out rather than printed as a question mark next to real data.
+lock_claim() {
+	_p="$(sed -n 1p "$LOCK/owner" 2>/dev/null)"
+	_t="$(sed -n 2p "$LOCK/owner" 2>/dev/null)"
+	_w="$(sed -n 3p "$LOCK/owner" 2>/dev/null)"
+	_s="$(sed -n 4p "$LOCK/owner" 2>/dev/null)"
+	_msg="held by pid ${_p:-?}"
+	[ -n "$_w" ] && _msg="$_msg running ${_w}"
+	[ -n "$_t" ] && _msg="$_msg in $(basename "$_t")"
+	if [ -n "$_s" ]; then
+		_e=$(( $(date +%s) - _s ))
+		[ "$_e" -ge 0 ] && _msg="$_msg for ${_e}s"
+	fi
+	printf '%s' "$_msg"
+}
+
 waited=0
 until mkdir "$LOCK" 2>/dev/null; do
 	holder="$(head -1 "$LOCK/owner" 2>/dev/null)"
@@ -96,16 +127,25 @@ until mkdir "$LOCK" 2>/dev/null; do
 		# mode is not that somebody misreads the exit code — it is that nothing downstream ever looks at
 		# it. A backgrounded call reports "completed"; a shell that appends `; echo done` reports 0. So
 		# say in words, in the output a human actually skims, that no test ran.
-		echo "with_machine: GAVE UP after ${waited}s waiting for the lock (held by pid ${holder:-?})" >&2
+		echo "with_machine: GAVE UP after ${waited}s waiting for the lock — $(lock_claim)" >&2
 		echo "with_machine: NOTHING RAN — this is not a pass (exit 5)" >&2
 		echo "with_machine: GAVE UP — NOTHING RAN. Not a pass."
 		exit 5
 	fi
-	[ $((waited % 30)) -eq 0 ] && echo "  waiting for the machine lock (held by pid ${holder:-?}) ..." >&2
+	[ $((waited % 30)) -eq 0 ] && echo "  waiting for the machine lock — $(lock_claim)" >&2
 	sleep 1
 	waited=$((waited + 1))
 done
-printf '%s\n%s\n' "$$" "$ROOT" > "$LOCK/owner"
+# The claim reads better as "running check_walk.gd" than as the whole argv, and the script is the only part
+# of it a waiting session cares about. Falls back to the full arguments when there is no --script, because a
+# claim that cannot name what it is doing should say everything rather than nothing.
+_claim="$*"
+_prev=""
+for _a in "$@"; do
+	if [ "$_prev" = "--script" ]; then _claim="$(basename "$_a")"; break; fi
+	_prev="$_a"
+done
+lock_claim_write "$_claim"
 trap 'rm -rf "$LOCK"' EXIT INT TERM
 
 "$GODOT" --path "$ROOT" "$@"
