@@ -80,6 +80,13 @@ const STAND_ROW: int = 44
 ## photograph it, and the value is printed so a run that missed the window is visible rather than silent.
 const PLATEAU: float = 2.20
 const QUIET_MAX: int = 600
+## A COLUMN FAR ENOUGH FROM SPAWN that the surface there is ordinary ground rather than the opening scene's
+## dug pit — the same reason `check_grapple_reads` picks 96. The first version stood the body at the rig's
+## own column and the arm stood down half the time: near spawn the game is still TEACHING, so a lesson
+## bubble is up, and the plate suppresses it, so the two captures differ by a surface that is not the
+## subject. Waiting longer is the wrong fix; the arm needs somewhere the teaching is finished.
+const SURFACE_COL: int = 96
+const SURFACE_QUIET_MAX: int = 1500
 ## HOW WIDE THE SEARCH FOR THE FIBRE IS, and the first version searched five image px either side, which
 ## is wide enough to catch something else. The control band's dE distribution came back with a mean of 4.6
 ## and a 95th percentile of 34.5 — a tail that heavy in a band where nothing is over the rope is not drift,
@@ -240,6 +247,17 @@ func _run() -> void:
 		"the band below the plate stayed still enough to serve as a control (%.1f dE, cap %.1f)"
 			% [under["rope_de"], DRIFT_CAP])
 
+	# WHAT THE SCRIM IS FOR, measured, because the obvious treatment for everything above is to weaken it —
+	# and weakening the sole guarantor of a property without an instrument on that property is how a
+	# disqualified cue takes a defect with it. The words are the pixels the ceremony ADDS light to; their
+	# ground is everything else inside the same strip. If a later commit shrinks the veil, this number says
+	# what it cost.
+	var ink: Dictionary = _ink(p, q, cx, top, bot, int(120.0 * scale))
+	_check(int(ink["px"]) >= 400,
+		"the ceremony's own words were found in the frame (%d ink pixels)" % ink["px"])
+	print("  the words: %d ink px, reading %.1f dE against the ground they sit on"
+		% [ink["px"], ink["de"]])
+
 	print("")
 	print("  %-26s %6s %10s %10s %10s" % ["band", "rows", "rope med", "rope mean", "rock mean"])
 	print("  %-26s %6d %10.1f %10.1f %10.1f"
@@ -253,6 +271,8 @@ func _run() -> void:
 	# from the foreground has its effect inverted relative to its purpose.
 	print("  the ceremony takes %.1fx more from the rope than from the rock behind it"
 		% (float(over["rope_de"]) / maxf(float(over["rock_de"]), 0.001)))
+	await _on_the_surface(main, ink)
+
 	_stand_down("how much of the rope an interrupt may take",
 		"no design decision has been made about what the ceremony owes the world it interrupts; a bound "
 		+ "guessed before that decision has been wrong four times in this repository")
@@ -308,6 +328,97 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 		"contrast": sep_acc / n,
 		"med": med,
 	}
+
+
+## THE SECOND STANDING, AND IT EXISTS BECAUSE OF WHAT WAS CHANGED TO GET THE FIRST ONE'S NUMBER DOWN.
+##
+## The plate's field veil dropped from alpha 0.80 to 0.28 and the words took their contrast locally
+## instead, from a near-black shadow a pixel behind each glyph. That trade was measured **underground**,
+## where the background is rock at a luma near ten — the case where the veil was doing least. **The surface
+## is the case where it was doing most**, and a treatment validated only where the thing it replaced was
+## useless has not been validated at all.
+##
+## Only the WORDS arm runs here. There is no rope on the surface to measure, and inventing one would be a
+## rig answering the question it was built to ask.
+func _on_the_surface(main: MainView, deep: Dictionary) -> void:
+	var col: int = SURFACE_COL
+	var row: int = int(main.sim.surface_row(col)) - 2
+	main._player.grapple.cut()
+	main._player.position = main._cell_center(Vector2i(col, row))
+	main._player.velocity = Vector2.ZERO
+	for _i: int in 60:
+		await physics_frame
+	await _drain(main)
+	var quiet: int = 0
+	while (main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01) and quiet < SURFACE_QUIET_MAX:
+		await physics_frame
+		quiet += 1
+	if main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01:
+		_stand_down("the words against open sky",
+			"the HUD would not go quiet at the surface, so there was no uninterrupted reference to read "
+			+ "the words against")
+		return
+	var cx: int = int(round(_screen(main, Vector2(float(col * CELL) + float(CELL) * 0.5, 0.0)).x))
+	var p2: Image = await _shot()
+	main._hud.announce("THE SURFACE", "", Color(0.82, 0.78, 0.60))
+	var waited: int = 0
+	while main._hud._arrival_life > PLATEAU and waited < 400:
+		await physics_frame
+		waited += 1
+	var q2: Image = await _shot()
+	var dump2: String = OS.get_environment("SF_CEREMONY_DUMP")
+	if dump2 != "":
+		p2.save_png(dump2 + "/ceremony_sky_reference.png")
+		q2.save_png(dump2 + "/ceremony_sky_plate.png")
+	var scale: float = float(_h) / 360.0
+	var top: int = int(round((0.26 * 360.0 - 32.0) * scale))
+	var bot: int = int(round((0.26 * 360.0 + 18.0) * scale))
+	var ink: Dictionary = _ink(p2, q2, cx, top, bot, int(120.0 * scale))
+	_check(int(ink["px"]) >= 400,
+		"the words were found against open sky too (%d ink pixels at row %d)" % [ink["px"], row])
+	# READ THIS AS A POSITIVE CONTROL, NOT AS A MEASUREMENT. Three samples either side of a treatment came
+	# back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4 — bimodal in BOTH configurations, ranges overlapping
+	# completely, and the highest of all six readings on the treated side. The background here is a live sky
+	# over vegetation at a surface row the rig does not pin, and it swings 25% run to run. What this arm
+	# establishes is that the words are drawn and separate from their ground at the surface at all. It does
+	# not establish how well, and a single number from it must not be quoted as though it did.
+	print("  the words, against open sky: %d ink px, reading %.1f dE — underground they read %.1f "
+		% [ink["px"], ink["de"], deep["de"]] + "(sky varies ~25% run to run; a control, not a measurement)")
+
+
+## HOW WELL THE CEREMONY'S OWN TYPE READS, row by row, inside the strip the words occupy.
+##
+## Ink is separated from ground by what the ceremony DID rather than by colour: the words add light, the
+## veil takes it away, so `luma(with) - luma(without)` splits them without a palette assumption — which
+## matters because a colour classifier keyed on the arrival tint would go blind under the very veil being
+## measured, and because the tint changes per stratum.
+func _ink(p: Image, q: Image, cx: int, y0: int, y1: int, half: int) -> Dictionary:
+	var acc: float = 0.0
+	var rows: int = 0
+	var px: int = 0
+	for y: int in range(maxi(0, y0), mini(_h, y1 + 1)):
+		var ink_c := Color(0, 0, 0)
+		var gnd_c := Color(0, 0, 0)
+		var ni: int = 0
+		var ng: int = 0
+		for x: int in range(maxi(0, cx - half), mini(_w, cx + half + 1)):
+			var a: Color = p.get_pixel(x, y)
+			var b: Color = q.get_pixel(x, y)
+			var d: float = (0.2126 * b.r + 0.7152 * b.g + 0.0722 * b.b) \
+				- (0.2126 * a.r + 0.7152 * a.g + 0.0722 * a.b)
+			if d > 0.05:
+				ink_c += b
+				ni += 1
+			else:
+				gnd_c += b
+				ng += 1
+		px += ni
+		if ni < 4 or ng < 4:
+			continue
+		acc += _de(_lab(Color(ink_c.r / ni, ink_c.g / ni, ink_c.b / ni)),
+			_lab(Color(gnd_c.r / ng, gnd_c.g / ng, gnd_c.b / ng)))
+		rows += 1
+	return {"px": px, "de": acc / maxf(float(rows), 1.0), "rows": rows}
 
 
 ## Mean per-channel change across a rectangle — the positive control's statistic. Deliberately NOT a

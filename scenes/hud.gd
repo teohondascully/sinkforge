@@ -688,8 +688,27 @@ const ARRIVAL_TRACK: float = 3.4         ## extra px between letters — what ma
 ## sits in its own patch of evening wherever it lands.
 const SCRIM_COLS: int = 12               ## quads across the field...
 const SCRIM_ROWS: int = 8                ## ...and down it
-const SCRIM_ALPHA: float = 0.80          ## peak darkening, dead centre
+## PEAK DARKENING, DEAD CENTRE — 0.80 until it was measured, and the measurement is why it is 0.28.
+##
+## The scrim exists so the words separate from what is behind them. It is `Color(0.02, 0.025, 0.04)` drawn
+## over the frame, which is a MULTIPLY in all but name: it keeps a fixed fraction of whatever is underneath.
+## Underground the rock behind it sits at a luma near ten, so eighty percent of it is nearly nothing and
+## the veil is almost invisible over the mass of the frame. The ROPE is hemp at 0.76/0.63/0.42.
+##
+## `check_ceremony_reads` measured what that costs: across the plate the rope moved a mean of **26.5 dE**
+## out of the **41.4** of separation it had from its backing, while the rock behind the rope moved **6.6**.
+## **The veil took four times more from the line you are hanging from than from the background it was drawn
+## to suppress** — and the plate cannot be moved out of the way, because the camera centres the body and
+## the plate is centred too, so its 420 px footprint on a 640 px canvas always contains the miner's column.
+##
+## So the words got their contrast LOCALLY instead — a near-black shadow a pixel behind each glyph, which
+## buys the same separation inside a letter's width and works on bright sky as well as on dark rock — and
+## the field veil dropped to what a compositional weight needs rather than what legibility was leaning on.
+const SCRIM_ALPHA: float = 0.28
 const SCRIM_PAD: float = 34.0            ## px of solid core beyond the widest line
+const SCRIM_INK := Color(0.02, 0.025, 0.04)   ## the veil's own colour, now spent per glyph instead
+const SCRIM_INK_OFF := Vector2(1.0, 1.0)      ## a pixel down and right — enough at this type size
+const SCRIM_INK_A: float = 0.90
 const SCRIM_FEATHER: float = 96.0        ## px the core fades out over, left and right
 const SCRIM_ABOVE: float = 32.0
 const SCRIM_BELOW: float = 18.0
@@ -714,9 +733,15 @@ func _draw_arrival() -> void:
 		panel_probe.append(Rect2(CANVAS.x * 0.5 - core_half, y - SCRIM_ABOVE,
 			core_half * 2.0, SCRIM_ABOVE + SCRIM_BELOW))
 	_draw_scrim(core_half, y, a)
+	# The shadow carries the contrast the veil used to. Drawn under every glyph rather than under the whole
+	# plate, so what it costs the world is a pixel around each letter instead of a 420x50 field.
 	if _arrival_kicker != "":
+		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0) + SCRIM_INK_OFF, 9, 2.6,
+			Color(SCRIM_INK, SCRIM_INK_A * a))
 		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
 			Color(_arrival_color, 0.80 * a))
+	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y) + SCRIM_INK_OFF, ARRIVAL_SIZE,
+		ARRIVAL_TRACK, Color(SCRIM_INK, SCRIM_INK_A * a))
 	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y), ARRIVAL_SIZE, ARRIVAL_TRACK,
 		Color(_arrival_color, a))
 	# Two hairlines the width of the words: a frame that says "plate" without drawing a panel.
