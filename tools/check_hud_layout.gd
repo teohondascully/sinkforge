@@ -99,6 +99,12 @@ func _run() -> void:
 		{"name": "running fast AND hovering at once", "modal": false,
 			"set": {"_time_scale_idx": 3}, "hover": true},
 		{"name": "the minimap up", "modal": false, "set": {"_minimap_mode": 1}},
+		# THE ZONE CEREMONY, which T2.1 reports as "colliding with map, rope and action". It draws no
+		# `_panel()` by design, so the sweep above was blind to it until `_draw_arrival` began registering
+		# its scrim core. Paired WITH the corner map because that is the reported collision and because a
+		# descent is exactly when both are up: you cross a stratum line with the map open.
+		{"name": "a stratum arrival, map up", "modal": false, "set": {"_minimap_mode": 1},
+			"announce": true},
 		# ...and the LARGE form, which no state here has ever produced. `_minimap_mode` cycles
 		# hidden -> corner -> LARGE (main.gd:1012) and only a 2 sets `minimap_large` (main.gd:778); this
 		# matrix shipped with a 1 and nothing else in the file ever wrote a 2. NOT modal: an overlay is
@@ -106,6 +112,11 @@ func _run() -> void:
 		# for IT (hud.gd:696). So it must face the same collision sweep as the bare screen.
 		{"name": "the BIG map up (M twice)", "modal": false, "set": {"_minimap_mode": 2},
 			"keep": "big_map"},
+		# The ceremony against the LARGE map. The corner form clears it (measured: no collision), but the
+		# large form spans x 181..459 / y 41..319 and the arrival plate sits centred at y ~62..112 — so
+		# this is where "zone ceremony colliding with map" would actually bite, if it bites anywhere.
+		{"name": "a stratum arrival, BIG map up", "modal": false, "set": {"_minimap_mode": 2},
+			"announce": true, "twin": "the BIG map up (M twice)"},
 		# ...and the big map WITH a machine hovered. The inspector is right-anchored and its width has a
 		# 218px floor (hud.gd:831), so its left edge is at most 640-218-12 = 410 against a large map
 		# spanning x 181..459. `hud.gd:837` asserts in prose that "the large map is centred, off this
@@ -189,22 +200,29 @@ func _run() -> void:
 	# it, and ~50 panels clears a floor of 20 whether or not any state is distinct. Two of these rows were
 	# in exactly that condition until this commit: both "hover" rows drew the bare screen, because the
 	# latch they set was overwritten before the frame.
+	# Declared identities are resolved to a GROUP rather than checked pairwise. Three states now draw the
+	# same screen by design — the big map alone, with a machine hovered, and with a stratum arrival held —
+	# and pairwise naming cannot express that: the arrival row and the hover row are twins of each other
+	# only transitively, through the row they both name.
 	var twins: Array[String] = []
 	var declared: int = 0
 	for i: int in sigs.size():
+		var gi: String = twin_of[i] if twin_of[i] != "" else sig_names[i]
 		for j: int in range(i + 1, sigs.size()):
 			if sigs[i] != sigs[j]:
 				continue
-			if twin_of[i] == sig_names[j] or twin_of[j] == sig_names[i]:
+			var gj: String = twin_of[j] if twin_of[j] != "" else sig_names[j]
+			if gi == gj:
 				declared += 1                       # an identity the matrix expects, named at its row
 				continue
 			twins.append("'%s' == '%s'" % [sig_names[i], sig_names[j]])
 	_check(twins.is_empty(), "every state drew a different screen from every other%s"
 		% ["" if twins.is_empty() else " — IDENTICAL: " + "; ".join(twins)])
-	# ...and a declared twin must ACTUALLY be a twin, or the declaration is just an exemption. If the
-	# inspector stops standing down, this drops to 0 and the pair above starts failing again.
-	_check(declared == 1, "the one declared twin (big map with/without hover) really is identical (%d)"
-		% declared)
+	# ...and every declared twin must ACTUALLY be a twin, or the declaration is just an exemption. Three
+	# states in one group = three pairs. If the inspector stops standing down, or the arrival stops being
+	# held, this drops and the pairs above start failing again.
+	_check(declared == 3,
+		"all 3 declared identities in the big-map group really are identical (%d)" % declared)
 
 	_main.queue_free()
 	await physics_frame
@@ -392,17 +410,37 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 	# they tested something DIFFERENT on every run, on a machine nobody controls. Warping fixes both: the
 	# hover rows drive the real aim path, and every other row is pinned to a corner so a stray cursor
 	# cannot quietly add an inspector to a state that is supposed to be bare.
-	var vp: Viewport = _main.get_viewport()
-	if bool(st.get("hover", false)):
-		vp.warp_mouse(vp.get_canvas_transform() * _main._cell_center(_probe_cell))
-	else:
-		vp.warp_mouse(Vector2(2.0, 2.0))
 
 	# EXACTLY ONE FRAME. The first version armed the probe and then awaited twice, so the HUD drew twice
 	# and every panel was recorded two or three times — which the overlap test dutifully reported as each
 	# panel colliding with ITSELF, a screenful of failures that were entirely the instrument.
 	for _i: int in 3:
 		await RenderingServer.frame_post_draw       # let MainView push the new state into the HUD
+
+	# THE CEREMONY IS SET AFTER THE SETTLE, NOT BEFORE, and that ordering is the whole point.
+	# `_arrival_life` is HUD-owned and decays in `Hud._process`, but MainView ANNOUNCES on its own during
+	# those settle frames whenever the body crosses a stratum line (main.gd:1248). Clearing before the
+	# settle therefore cleared nothing: the plate reappeared on rows that never asked for it, and the bare
+	# screen silently gained a sixth panel. That is the same defect as the uncontrolled mouse — a row
+	# whose content depends on something the fixture does not own — and it surfaced the moment
+	# `_draw_arrival` started registering, having been invisible before.
+	# THE CURSOR IS WARPED HERE TOO, AFTER THE SETTLE, FOR THE SAME REASON AND IT WAS NOT ALWAYS.
+	# Warping before the settle frames let the body drift under them — at `_time_scale_idx: 3` the sim
+	# advances further per frame — so the camera moved after the cursor was placed and the aim no longer
+	# landed on the probe machine. That row then drew no inspector and came out byte-identical to the
+	# plain fast-forward row, INTERMITTENTLY: it passed on one run and failed on the next, which is worse
+	# than a steady failure because the green looks like the answer. Placing the cursor last removes the
+	# window in which anything can move underneath it.
+	var vp: Viewport = _main.get_viewport()
+	if bool(st.get("hover", false)):
+		vp.warp_mouse(vp.get_canvas_transform() * _main._cell_center(_probe_cell))
+	else:
+		vp.warp_mouse(Vector2(2.0, 2.0))
+	hud._arrival_life = 0.0
+	if bool(st.get("announce", false)):
+		# ARRIVAL_HOLD is 3.4s against one drawn frame, so the plate is at full life when the probe fires.
+		hud.announce("THE DEEPSLATE", "120 METRES DOWN", Color(0.56, 0.50, 0.78))
+	await RenderingServer.frame_post_draw            # one frame for the new aim to reach `hover_info`
 	Hud.panel_probe = ([] as Array[Rect2])
 	await RenderingServer.frame_post_draw
 	var out: Array[Rect2] = Hud.panel_probe.duplicate()

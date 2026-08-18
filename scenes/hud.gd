@@ -224,14 +224,34 @@ func flash(text: String) -> void:
 
 
 ## Announce arrival in a new stratum — the one moment the descent gets to be an EVENT.
+##
+## HELD, NOT DROPPED, WHILE THE BIG MAP IS UP. The plate is centred at y ~62..112 and the large map's panel
+## spans 181..459 by 41..319, so an arrival crossed with the map open lands squarely inside it — measured
+## overlap 222x50, held by `check_hud_layout`. The other three elements that collide with that map (the
+## goal plate :699, the pack bar :2290, the inspector :812) simply stand down, because they are PERSISTENT
+## and standing down costs nothing: they come back. This one is a ONE-SHOT with a 3.4s life, so standing it
+## down would not compose it safely, it would delete it — you would cross into THE DEEPSLATE and never be
+## told. T2.1 asks for "announce once, in a safe composition", and dropping the announcement is not a
+## composition. So it waits for the map to close and then fires in full.
 func announce(text: String, kicker: String, color: Color) -> void:
+	if minimap_large:
+		_pending_arrival = [text, kicker, color]
+		return
 	_arrival_text = text
 	_arrival_kicker = kicker
 	_arrival_color = color
 	_arrival_life = ARRIVAL_HOLD
 
 
+## An arrival that fired while the whole-world view was open, waiting for it to close. Empty when none.
+var _pending_arrival: Array = []
+
+
 func _process(delta: float) -> void:
+	if not _pending_arrival.is_empty() and not minimap_large:
+		var held: Array = _pending_arrival
+		_pending_arrival = []
+		announce(String(held[0]), String(held[1]), held[2] as Color)
 	_flash_life = maxf(0.0, _flash_life - delta)
 	_arrival_life = maxf(0.0, _arrival_life - delta)
 	# The counter's arrival. Eased OUT, so it decelerates into place rather than sliding at a constant rate —
@@ -517,7 +537,17 @@ func _draw_arrival() -> void:
 	var w: float = _tracked_width(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
 	var half: float = w * 0.5 + 12.0
 	var kw: float = _tracked_width(_arrival_kicker, 9, 2.6) if _arrival_kicker != "" else 0.0
-	_draw_scrim(maxf(w, kw) * 0.5 + SCRIM_PAD, y, a)
+	var core_half: float = maxf(w, kw) * 0.5 + SCRIM_PAD
+	# THE CEREMONY IS FURNITURE WHILE IT IS UP, so the layout layer has to be able to see it. It draws no
+	# `_panel()` — deliberately, a panel is the modal dialog this design escapes — so `panel_probe` was
+	# blind to it and `check_hud_layout` could not judge the collision T2.1 reports ("zone ceremony
+	# colliding with map, rope and action"). Registered as the SOLID CORE only, not the feathered extent:
+	# the feather fades to nothing by construction and calling it occupied would report collisions with
+	# regions that are visually empty.
+	if panel_probe != null:
+		panel_probe.append(Rect2(CANVAS.x * 0.5 - core_half, y - SCRIM_ABOVE,
+			core_half * 2.0, SCRIM_ABOVE + SCRIM_BELOW))
+	_draw_scrim(core_half, y, a)
 	if _arrival_kicker != "":
 		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
 			Color(_arrival_color, 0.80 * a))
