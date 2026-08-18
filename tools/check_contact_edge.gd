@@ -59,21 +59,21 @@ extends "res://tools/check_base.gd"
 ## `_draw_edge_ao` removed: 95%, unchanged. `_sky_form` zeroed: 96%. The tooth removed: 91%. Edge step
 ## median 10.4 against a flat-rock step of 1.5.
 ##
-## MEASURED IN PIXELS BY c2, AND THE NUMBER IS BETTER THAN MINE. My 7398/0 above mutated the coarse FILL,
-## which is a claim about the fill and not about the treatment; c2 mutated `_draw_edge_ao` ALONE, waiting for
-## the mold to finish baking first (`pending_rows() == 0`), seed 1337, one standing each:
+## MEASURED IN PIXELS BY c2, WITH A BASELINE, WHICH IS THE PART THAT MATTERS. My 7398/0 above mutated the
+## coarse FILL -- a claim about the fill, not about the treatment. c2 mutated `_draw_edge_ao` ALONE and ran
+## it BOTH WAYS, same seed, same standing, same detector, from a gallery fifty rows down so the surface
+## cannot enter frame:
 ##
-##     SURFACE, at the opening, 1.00x          4072 of 2073600 px    0.196%
-##     UNDERGROUND, a carved gallery, 1.00x     247 of 2073600 px    0.012%
+##                                        unpatched   patched   the treatment
+##     SURFACE, at the opening, 1.00x           621      4741           +4120
+##     UNDERGROUND, a deep gallery, 1.00x      7098      7082             -16
 ##
-## Underground it is 247 scattered pixels rather than 0, and the reason is the better half of the finding:
-## the mold is ORGANIC and does not fill a cell to its square boundary, so the coarse layer survives exactly
-## in the eroded band -- which is where these strips are drawn. The fill is hidden by the covering; the
-## treatment survives in the covering's failure to cover. So the pass is real at the surface, which is the
-## first frame anybody sees, and is 247 pixels in the view the game is played in.
+## UNDERGROUND THE PASS CONTRIBUTES NOTHING. Minus sixteen is zero with noise on it. An earlier figure of
+## 247 is RETRACTED: it was the detector firing on the game's own dark chroma, which it does seven thousand
+## times whether the pass draws or not. A magenta count without its unpatched column is not a measurement.
 ##
 ## In c2's words, and kept in them: **what the layer measures is the rock-versus-back-wall material step, and
-## it does not depend on the contact pass at all.**
+## it does not depend on the contact pass at all -- `_draw_edge_ao` puts zero pixels on screen underground.**
 ##
 ## THE LAYER IS THEREFORE SOUND AND ITS STATED SUBJECT WAS WRONG, which is why the numbers are trustworthy
 ## and the prose was not.

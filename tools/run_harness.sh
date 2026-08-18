@@ -320,9 +320,10 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # REGISTERED once the rationale was corrected rather than merely noticed. The layer credited
 # TerrainPainter._draw_edge_ao for the contact it measures and that pass does not reach the frame it judges:
 # it draws into the COARSE bake at z=-10 under fine_terrain's alpha 255 at z=-9. Liveness control on the
-# coarse fill -- 7398 magenta pixels at the surface, ZERO underground; c2 then mutated _draw_edge_ao alone
-# and got 0.196% at the surface against 0.012% underground, 247 scattered pixels, surviving only in the band
-# the organic mold fails to cover. Knocking the pass out leaves this layer byte-identical.
+# coarse fill -- 7398 magenta pixels at the surface, ZERO underground. c2 then mutated _draw_edge_ao ALONE
+# and ran it both ways, which is the part that matters: surface 621 unpatched against 4741 patched, and
+# underground 7098 against 7082 -- minus sixteen, i.e. nothing. The pass puts ZERO pixels on screen
+# underground. Knocking it out leaves this layer byte-identical.
 #
 # What it actually measures is the rock-versus-back-wall MATERIAL step, and the numbers were always sound --
 # it was the prose that was wrong. Corrected at the head of check_contact_edge.gd before this line moved.
