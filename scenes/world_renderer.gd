@@ -320,6 +320,14 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_terrain_viewport.transparent_bg = true
 	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_terrain_viewport.disable_3d = true
+	# ITS OWN WORLD, SO THE COLOUR GRADE CANNOT REACH IT. The WorldEnvironment's adjustment pass runs as a
+	# viewport post-process, and this viewport RETAINS its render target between updates (CLEAR_MODE_NEVER on
+	# the partial-bake path -- that retention is what makes a dig cost one chunk instead of the whole world).
+	# Inheriting the grade meant saturation 1.18 was re-applied to the same stored pixels on every bake, so
+	# the terrain compounded 1.18^n: grass measured (87,130,47) at boot and (42,255,0) after a play arc, and
+	# the walked surface line -- the one strip the fine layer does not cover -- read as a neon red-and-green
+	# band across the whole frame. Measured: 24 colour-change events during one arc before this, 0 after.
+	_terrain_viewport.own_world_3d = true
 	_terrain_viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 	add_child(_terrain_viewport)
 	for cy: int in _chunk_rows:
