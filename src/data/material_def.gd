@@ -23,6 +23,19 @@ extends Resource
 @export var base_color: Color = Color(0.30, 0.22, 0.16)
 ## Dirt-grain speckle on/off (deterministic per-cell texture so it isn't a flat fill).
 @export var grain: bool = true
+## HOW THIS MATERIAL VARIES — its texture GRAMMAR, as opposed to its colour (TR-02 / TR-04).
+##
+## `grain` above is a boolean: texture, or none. That was the whole vocabulary, so every grained material
+## in the world ran one identical noise at a different hue, and "both read as square variation before
+## material" was structural rather than a tuning choice. This says WHICH LANGUAGE, and the renderer's fine
+## baker reads it:
+##   Clastic — soil, gravel, clay. Loud granular noise and rounded aggregate clumps; barely seams, because
+##             loose ground does not fracture along planes.
+##   Bedded  — shale and anything laid down in layers. Features stretched far along the horizontal and
+##             long flat laminae, so the rock reads as stacked sheets.
+##   Massive — stone, deepslate. Restrained speckle over broad planes, cut by steeply-dipping fracture
+##             seams. Quiet surface, strong lines.
+@export_enum("Clastic", "Bedded", "Massive") var grammar: int = 0
 ## Grass-style cap drawn on the exposed top surface. Off when alpha == 0.
 @export var cap_color: Color = Color(0, 0, 0, 0)
 ## Embedded specks (ore nuggets) drawn scattered in the tile. Off when alpha == 0.
