@@ -35,6 +35,33 @@ extends "res://tools/check_base.gd"
 ##
 ##   godot --path . --script res://tools/check_contact_edge.gd     (NO --headless: it judges pixels)
 
+## WHAT THIS LAYER CREDITS FOR THE CONTACT IS NOT WHAT DRAWS IT — measured 2026-08-18, and it supersedes
+## every mention of `_draw_edge_ao` below.
+##
+## This file is written as though `TerrainPainter._draw_edge_ao` is the treatment under test: a warm lit lip
+## on sky-facing tops, a rim on side walls, three 2px AO steps, concave scoops. That pass runs from
+## `_paint_terrain_chunk`, the COARSE bake at z=-10, and `fine_terrain` writes alpha 255 over every solid
+## cell at z=-9. Underground the fine layer covers it completely.
+##
+## Liveness control, because "the mutant changed nothing" and "the mutant never ran" are opposite
+## conclusions that look identical: the coarse cell fill was forced to pure magenta and the pixels counted.
+##
+##     SURFACE (spawn view)              magenta = 7398
+##     UNDERGROUND (a carved gallery)    magenta = 0
+##
+## The mutation is live and the coarse pass reaches the surface. It reaches NOTHING underground, which is
+## where this layer judges. So `_draw_edge_ao` is baked on every dig and never seen here, and knocking it
+## out leaves this layer's output byte-identical.
+##
+## WHAT THE STEP ACTUALLY IS, then: the rock-versus-back-wall MATERIAL difference, plus whatever
+## `fine_terrain` itself draws at a face (`rim`, `rim_warm`, `_sky_form`, the "carved-edge AO" and "form
+## sink" its own comment names). Measured against three independent knockouts, the subject is robust —
+## `_draw_edge_ao` removed: 95%, unchanged. `_sky_form` zeroed: 96%. The tooth removed: 91%. Edge step
+## median 10.4 against a flat-rock step of 1.5.
+##
+## THE LAYER IS THEREFORE SOUND AND ITS STATED SUBJECT WAS WRONG, which is why the numbers are trustworthy
+## and the prose was not. Kept unregistered until this correction has been read rather than merely written.
+
 const SCENE: String = "res://scenes/main.tscn"
 const AGENT := preload("res://tools/play_agent.gd")
 const SETTLE: int = 60
@@ -230,11 +257,12 @@ func _run() -> void:
 	print("  edge step spread: %s" % _shape(edge_step))
 	print("  flat step spread: %s" % _shape(flat_step))
 
-	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. `_draw_edge_ao` paints
-	# only the first 6px of a 32px cell, so if a contact treatment is reaching the screen at all it shows up
-	# here as a bump at +1..+5 that has decayed by +9 — and the two-patch measure above, centred at 9px,
-	# would be looking straight past it. If the profile is flat, the treatment is not reaching the eye and
-	# the verdict above is about the world rather than about where this layer looked.
+	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. It was sized against
+	# `_draw_edge_ao` painting "the first 6px of a 32px cell" — both halves of which are false. The cell is
+	# 48px captured, not 32 (the broken lens's figure), and that pass does not reach this frame at all. The
+	# profile survives the correction because what it actually does is show WHERE the step lives, which is
+	# worth printing whatever draws it: a flat profile means the verdict above is about where this layer
+	# looked, and a stepped one means it is about the world.
 	var prof: Array = s["profile"]
 	var line: String = ""
 	for k: int in PROFILE_PX.size():
@@ -307,9 +335,12 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	# run_harness.sh came from the peer's branch, where it had been applied; main has been running the
 	# withdrawn lens ever since, and reproduces the withdrawn numbers (51%, steps 1.26-4.49) on demand.
 	#
-	# It also explains the one null nobody could account for: forcing `_draw_edge_ao`'s lip to pure magenta
-	# and its rim to pure green changed NOTHING here. Of course it did not. The layer was not looking at the
-	# face it painted. That null is evidence about this arithmetic and about nothing in the renderer.
+	# I THEN CLAIMED THIS EXPLAINED THE MAGENTA NULL, AND IT DOES NOT. Forcing `_draw_edge_ao`'s lip to pure
+	# magenta once changed NOTHING here, and I wrote that off as the broken lens looking past the face it
+	# painted. Then I knocked the whole pass out under the REPAIRED lens and the output was byte-identical
+	# -- so the lens was never the reason. See the header: the coarse pass this layer credits is invisible
+	# underground, measured at zero. Two independent faults stacked, and I attributed both to the one I had
+	# just fixed, which is the more seductive error because the fix was real.
 	var to_px: Transform2D = main.get_viewport().get_final_transform() \
 		* main.get_viewport().get_canvas_transform()
 	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
