@@ -480,7 +480,7 @@ func _draw() -> void:
 		# UNDER the objective line, not on top of it. Both were aimed at top-centre at y=8 and the
 		# objective panel is 37 tall, so PAUSED printed straight across the one line telling you what to
 		# do next — and pausing is exactly when a player stops to read it.
-		_panel(PAUSED_CHIP, true)
+		_panel(PAUSED_CHIP)
 		draw_string(_font, PAUSED_CHIP.position + Vector2(12.0, 15.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
@@ -513,7 +513,7 @@ func _draw_title() -> void:
 	# The choices card.
 	y += 48.0
 	var card := Rect2(cx - 128.0, y, 256.0, 84.0)
-	_panel(card, true)
+	_panel(card)
 	var x0: float = card.position.x + 14.0
 	var ly: float = y + 22.0
 	draw_string(_font, Vector2(x0, ly), "world seed", HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
@@ -848,7 +848,7 @@ func _draw_fastforward() -> void:
 	var label: String = "▶▶ %dx" % int(time_scale)
 	var tw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 	var chip := Rect2(10.0, 34.0, tw + 24.0, 22.0)   # under the depth chip, which owns the corner
-	_panel(chip, true)
+	_panel(chip)
 	draw_string(_font, chip.position + Vector2(12.0, 15.0), label,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 
@@ -994,7 +994,7 @@ func _draw_objective_line() -> void:
 	var w: float = minf(maxf(tw, hw) + pad * 2.0, free_w)
 	var h: float = 24.0 + (13.0 if hint != "" else 0.0)
 	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, h)
-	_panel(rect, true, maxf(goal_a, hint_a))   # the skin is as present as its most visible line
+	_panel(rect, maxf(goal_a, hint_a))   # the skin is as present as its most visible line
 	var cy: float = rect.position.y + 12.0
 	if not objectives.all_done():
 		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, Color(UI_ACCENT, UI_ACCENT.a * goal_a))
@@ -1062,15 +1062,30 @@ static var hotbar_probe: Dictionary
 
 ## `alpha` modulates the whole skin so a panel can FADE rather than blink out. Panels that fade fully are
 ## expected to return before calling this at all, so the probe keeps recording only what was really drawn.
-func _panel(rect: Rect2, accent: bool = false, alpha: float = 1.0) -> void:
+## MNU-06 — A PANEL DOES NOT WEAR THE SELECTION COLOUR.
+##
+## This used to take an `accent` flag that drew a 2px `UI_ACCENT` rule across the panel's top, and eight
+## surfaces asked for it: PAUSED, the title's choices card, the fast-forward chip, the objective line, the
+## dashboard, the help page, settings, and the hotbar backing. `UI_ACCENT` is documented one line from its
+## own declaration as *"selection, the live verb, the next step"* — so on the bare screen the colour that is
+## supposed to mean "this is the thing your next keystroke acts on" was also the trim on the pause chip and
+## the speed chip and the shelf your items sit on.
+##
+## **A mark that appears on eight things marks nothing.** The rule is now: gold goes on the thing you can
+## act on — a selection spine, the live verb button, the next research step, the objective's own goal dot,
+## the lit hotbar slot — and never on the furniture around it. What made panels read as raised was never
+## the gold anyway; it is `UI_EDGE_HI`, the one-pixel bevel along the top, which is the elevation language
+## the rest of this file is written in.
+##
+## The parameter is REMOVED rather than defaulted to false. A flag with no caller is a switch waiting to be
+## flipped back by someone who reads it as an available option instead of as a retired one.
+func _panel(rect: Rect2, alpha: float = 1.0) -> void:
 	if probing:
 		panel_probe.append(rect)
 	draw_rect(rect, Color(UI_BG, UI_BG.a * alpha))
 	draw_line(rect.position + Vector2(1.0, 1.0), rect.position + Vector2(rect.size.x - 1.0, 1.0),
 		Color(UI_EDGE_HI, UI_EDGE_HI.a * alpha), 1.0)
 	draw_rect(rect, Color(UI_EDGE, UI_EDGE.a * alpha), false, 1.0)
-	if accent:
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(UI_ACCENT, UI_ACCENT.a * alpha))
 
 
 ## The machine INSPECTOR (top-right, under FORGED) — appears when you aim at one of your machines in
@@ -2423,7 +2438,7 @@ func _draw_dashboard_overlay() -> void:
 	var w: float = 392.0
 	var h: float = 238.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
-	_panel(Rect2(origin, Vector2(w, h)), true)
+	_panel(Rect2(origin, Vector2(w, h)))
 	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, origin + Vector2(w - 108.0, 21.0), "G / Esc to close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
@@ -2577,7 +2592,7 @@ func _draw_help_overlay() -> void:
 	var w: float = col_w * 2.0 + 16.0
 	var h: float = 30.0 + float(half) * 16.0 + 10.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
-	_panel(Rect2(origin, Vector2(w, h)), true)
+	_panel(Rect2(origin, Vector2(w, h)))
 	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	for i: int in lines.size():
 		var col: int = i / half
@@ -2632,7 +2647,7 @@ func _draw_settings_overlay() -> void:
 	# twice the panel's own value, which is more than enough to be legible, and it makes the page look like
 	# a transparency rather than a screen you are on.
 	draw_rect(panel, Color(UI_BG.r, UI_BG.g, UI_BG.b, 1.0))
-	_panel(panel, true)
+	_panel(panel)
 	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, panel.position + Vector2(panel.size.x - 78.0, 24.0), "ESC closes",
@@ -2843,7 +2858,7 @@ func _draw_inventory() -> void:
 	# A clean framed backing just for the hotbar (the craft strip that used to share this panel now lives
 	# in the E screen). Keeps the bar reading as one deliberate unit, not floating slots.
 	var backing := Rect2(x0 - 8.0, HOTBAR_BAND_TOP, total_w + 16.0, HOTBAR_BAND_H)
-	_panel(backing, true)
+	_panel(backing)
 	var wells: Array[Rect2] = []
 	var sel_lit: bool = false
 	for k: int in n:
@@ -2911,7 +2926,9 @@ func _draw_inventory() -> void:
 		var ly: float = y - 12.0
 		var plate := Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0)
 		draw_rect(plate, Color(0.05, 0.06, 0.09, 0.88))
-		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_ACCENT)
+		# The NAME of the selected item, not the selection. The slot itself already carries a gold border and
+		# a gold glow; a third gold on the same object is emphasis competing with itself.
+		draw_string(_font, Vector2(lx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
 		label_rect = plate
 	if probing:
 		hotbar_probe = {"carried": slots.size(), "wells": wells, "sel": sel, "sel_lit": sel_lit,
@@ -2947,7 +2964,9 @@ func _draw_item_tooltip() -> void:
 	var rect := Rect2(origin, Vector2(w, h))
 	draw_rect(rect, Color(UI_BG.r, UI_BG.g, UI_BG.b, 0.96))
 	draw_rect(rect, UI_EDGE, false, 1.0)
-	draw_rect(Rect2(rect.position, Vector2(2.0, rect.size.y)), UI_ACCENT)   # a gold spine, not a cap
+	# A spine rather than a cap — and no longer gold: a tooltip describes what the cursor is OVER, which is
+	# `active`, not the thing a keystroke acts on. `UI_EDGE_HI` keeps the edge without claiming the verb.
+	draw_rect(Rect2(rect.position, Vector2(2.0, rect.size.y)), Color(UI_EDGE_HI, 1.0))
 	draw_string(_font, origin + Vector2(9.0, 15.0), name_line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
 	if purpose != "":
 		draw_multiline_string(_font, origin + Vector2(9.0, 29.0), purpose,
