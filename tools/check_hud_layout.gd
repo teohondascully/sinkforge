@@ -725,6 +725,13 @@ const BARE_FOOTPRINT_CEILING: float = 0.080
 
 
 func _report_footprint(names: Array[String], fracs: Array[float]) -> void:
+	# THE BOUNDARY PRINTS BESIDE THE NUMBERS, not only in this file and in PRIORITY.md. A lower bound that
+	# appears next to a subjective composition claim gets read as measuring it however carefully the comment
+	# is written, and nobody who reads a harness log is holding either document.
+	print("    footprint = union area of HUD PANELS / canvas. Panels only — bare draw_rect/draw_string")
+	print("    (chips, legends, glyphs, loose text) are NOT counted, so each figure is a LOWER BOUND.")
+	print("    NOT a test of \"~85-90% of the interface floats above the world\": that is composition")
+	print("    (screen-space vs diegetic), a different population, from a subjective audit.")
 	for i: int in names.size():
 		print("    footprint  %6.2f%%  %s" % [fracs[i] * 100.0, names[i]])
 	var bare: float = -1.0

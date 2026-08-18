@@ -1258,13 +1258,22 @@ func works_columns(rows: int) -> Dictionary:
 	# window around the cursor, which is ugly but reachable. This clamp is the FAILURE MODE made legible
 	# instead of invisible, not the intended layout.
 	#
-	# THE PROPERTY: today the two lists together ask for no more columns than the counter has, so this
-	# branch never fires. `check_pack_layout` holds that — and holds it correctly, which this comment used
-	# to claim without it being true. It read `lay["total"] <= cols`, a number this function had *just*
-	# clamped into range, so the assertion could not fail however far the lists overflowed and the citation
-	# was vouching for a guarantee nobody was making. It now computes what the lists ask for BEFORE the
-	# clamp sees it. Naming the property rather than only the test is the point: a citation is an assertion
-	# made somewhere it cannot run, and this one was wrong for as long as it took someone to read both files.
+	# THE PROPERTY, CORRECTED — and the correction is the more interesting half. This said "today the two
+	# lists together ask for no more columns than the counter has, so this branch never fires." IT FIRES.
+	# Measured on the real scene:
+	#
+	#   FRESH      machines= 4 rack= 6   ask 1+1=2 of 3   no squeeze
+	#   FULL TECH  machines=19 rack= 7   ask 3+1=4 of 3   SQUEEZED, granted 2+1
+	#
+	# So it fires for every player who finishes the tech tree, which makes the "safety valve" the late-game
+	# NORMAL. `check_pack_layout` did hold the unsqueezed property correctly — it asks the DEMAND rather
+	# than this function's already-clamped answer, which was a real repair — but it only ever evaluated it
+	# in the fresh state, where it cannot fail. A property true where it is checked and false where it is
+	# not is the same shape as an assertion that cannot fail, wearing better clothes.
+	#
+	# The squeeze is kept, because the alternative is worse and that was measured too: a fourth column is
+	# 124.5px, and `_works_row` would give the name about 48px, truncating every machine. Three columns and
+	# a cursor window is the design. `works_window_first` is what makes the window testable.
 	if m + r > BAZAAR_COLS:
 		r = clampi(r, 1, BAZAAR_COLS - 1)
 		m = BAZAAR_COLS - r
@@ -1537,6 +1546,25 @@ func _tab_works(g: Dictionary) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, content.size.x, 9, Color(0.451, 0.402, 0.280))
 
 
+## THE WINDOW'S FIRST ROW. A group shorter than its columns starts at 0 and this is a no-op; a longer one
+## shows `capacity` rows centred on the cursor, clamped so it never runs past either end of the list.
+##
+## IT IS THE LATE-GAME NORMAL, NOT A SAFETY VALVE, and the comment beside the clamp in `works_columns` used
+## to say the opposite — *"today the two lists together ask for no more columns than the counter has, so
+## this branch never fires."* Measured on the real scene: fresh, MACHINES and THE RACK ask for 1+1 of 3 and
+## it does not fire; with the tech tree finished they hold 19 and 7 and ask for 3+1 of 3, and it fires for
+## every player who gets there. `check_pack_layout` only ever evaluated the unsqueezed property in the
+## fresh state, so a claim that is false for a finished game read as green for as long as it existed.
+##
+## Three columns and a window is nonetheless the right answer rather than a fourth column: 528px of content
+## over four columns is 124.5px a row, and `_works_row` gives the name `width - 36 - cost glyphs`, about
+## 48px at size 10. Four columns truncates every machine name. Measured before choosing.
+static func works_window_first(count: int, capacity: int, base: int, cursor: int) -> int:
+	if count <= capacity:
+		return 0
+	return clampi(cursor - base - capacity / 2, 0, count - capacity)
+
+
 ## One GROUP — a list poured down as many columns as it needs, left to right. `base` is where the group
 ## starts in the panel's flat cursor index, so the highlight and `bazaar_action()` cannot disagree.
 func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int, title: String,
@@ -1547,12 +1575,13 @@ func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int,
 		draw_string(_font, Vector2(x0 + 1.0, content.position.y + 16.0), "(nothing unlocked yet)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
 		return
-	# A group longer than its columns shows a WINDOW around the cursor rather than truncating — the safety
-	# valve, not the plan. It only moves when the cursor leaves it, so the rows never slide about.
+	# A group longer than its columns shows a WINDOW around the cursor rather than truncating. Named and
+	# lifted out of this loop so `check_pack_layout` can assert a PROPERTY of what the drawing code
+	# computes — that the cursor is always inside the window — instead of re-deriving the arithmetic and
+	# agreeing with itself. It also runs headless, which `_works_group` cannot: this only executes inside
+	# `_draw`.
 	var capacity: int = rows * cols
-	var first: int = 0
-	if open_rows.size() > capacity:
-		first = clampi(bazaar_row - base - capacity / 2, 0, open_rows.size() - capacity)
+	var first: int = works_window_first(open_rows.size(), capacity, base, bazaar_row)
 	for i: int in mini(capacity, open_rows.size()):
 		var oi: int = open_rows[first + i]
 		var rr := Rect2(x0 + float(i / rows) * (col_w + BAZAAR_GUTTER),
