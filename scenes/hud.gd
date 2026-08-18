@@ -7,6 +7,23 @@ extends Node2D
 const CANVAS := Vector2(640, 360)
 const SLOT: float = 30.0        ## inventory hotbar slot size
 const SLOT_GAP: float = 4.0
+## WHERE THE BOTTOM FURNITURE STARTS, in canvas space, as ONE definition rather than two.
+##
+## `_draw_inventory` derives the bar's y from these; anything outside the HUD that needs to know where the
+## furniture begins should read `bottom_furniture_fraction()` rather than carry its own number. It exists
+## because `check_opening.gd` carries `HUD_BOTTOM = 0.20` — a hardcoded guess at this band, with nothing
+## tying it to the HUD. The real band starts at 295/360 = 0.819, so that layer currently excludes about
+## eight percent of the frame as "HUD" while it is ground, and if this bar ever moves the layer will keep
+## excluding the rectangle where it used to be, silently, with no assertion anywhere that would notice.
+## Whether to adopt the derived figure is a calibration decision for that layer's owner — the number
+## changes what it judges — so this only makes the truth readable from outside.
+const HOTBAR_BAND_TOP: float = CANVAS.y - 28.0 - SLOT - 7.0
+const HOTBAR_BAND_H: float = SLOT + 14.0
+
+
+## The fraction of the canvas ABOVE the bottom furniture — i.e. the last row that is still world.
+static func bottom_furniture_fraction() -> float:
+	return HOTBAR_BAND_TOP / CANVAS.y
 const MINI_W: float = 150.0     ## minimap BOX in the top-right corner; the world fits inside it,
 const MINI_H: float = 116.0     ## ...whatever shape the world happens to be
 const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
@@ -2394,10 +2411,10 @@ func _draw_inventory() -> void:
 	var w0: int = clampi(sel - n / 2, 0, maxi(slots.size() - n, 0))
 	var total_w: float = n * SLOT + (n - 1) * SLOT_GAP
 	var x0: float = (CANVAS.x - total_w) * 0.5
-	var y: float = CANVAS.y - 28.0 - SLOT
+	var y: float = HOTBAR_BAND_TOP + 7.0            # the band is the definition; the well row sits inside it
 	# A clean framed backing just for the hotbar (the craft strip that used to share this panel now lives
 	# in the E screen). Keeps the bar reading as one deliberate unit, not floating slots.
-	var backing := Rect2(x0 - 8.0, y - 7.0, total_w + 16.0, SLOT + 14.0)
+	var backing := Rect2(x0 - 8.0, HOTBAR_BAND_TOP, total_w + 16.0, HOTBAR_BAND_H)
 	_panel(backing, true)
 	var wells: Array[Rect2] = []
 	var sel_lit: bool = false
