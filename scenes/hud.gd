@@ -40,7 +40,16 @@ const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill
 const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
 const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → panels read as raised
-const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent (FORGED, selected slot, current step)
+## GOLD, AND IT MEANS NINE THINGS. Counted from source rather than from this comment, which used to read
+## "(FORGED, selected slot, current step)" — three examples standing in for a definition, and the three it
+## happened to name are three DIFFERENT roles. Full enumeration with call sites in `docs/MENU_MATRIX.md`.
+## Eight of the nine are all "look here" and cost nothing but precision. The ninth was a contradiction: the
+## dashboard drew a machine's stalled count in it, so gold meant "something is wrong" on the one screen
+## where it also meant "this is the total you are producing" — see UI_WARN, which the game already had.
+const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selection, the live verb, the next step
+## The colour the alert stack has always used for a machine in trouble. Named so that the OTHER place which
+## reports the same fact can say it the same way, instead of reaching for the accent and inverting it.
+const UI_WARN := Color(0.96, 0.46, 0.30)
 const UI_TEXT := Color(0.80, 0.83, 0.89)
 const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
 const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
@@ -583,7 +592,7 @@ func _draw_alerts() -> void:
 		var lit: bool = rect.has_point(mouse)
 		draw_rect(rect, Color(0.20, 0.11, 0.10, 0.95) if lit else Color(0.15, 0.09, 0.09, 0.92))
 		draw_rect(rect, Color(0.78, 0.40, 0.32, 0.7 if lit else 0.45), false, 1.0)
-		draw_rect(Rect2(x, y, 2.5, rh - 3.0), Color(0.96, 0.46, 0.30))          # the warning edge
+		draw_rect(Rect2(x, y, 2.5, rh - 3.0), UI_WARN)                          # the warning edge
 		var mdef: MachineDef = a["def"]
 		var box := Rect2(x + 6.0, y + 2.5, 13.0, 13.0)
 		draw_rect(box, Visuals.machine_color(mdef))
@@ -2332,10 +2341,15 @@ func _draw_dashboard_overlay() -> void:
 			Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
 				Visuals.machine_kind(mdef), box.size.y / 20.0, false, 0.0)
 			draw_string(_font, Vector2(rx + 20.0, y2), str(row["name"]), HORIZONTAL_ALIGNMENT_LEFT, 96.0, 9, UI_TEXT)
-			# count · working — green when all are running, amber when some are stalled
+			# count · working — green when all are running, the ALERT colour when some are stalled.
+			# This line used to say "amber when some are stalled" and draw UI_ACCENT, which is the colour
+			# this same panel uses for its heading and its grand total. A player who has learned that gold
+			# means "selected, available, yours" was being shown a fault in it, two rows under a gold number
+			# that means the opposite. The left-edge alert stack already reports this exact fact — the same
+			# machines, from `sim.machine_problems()` — in UI_WARN. Now both say it the same way.
 			var cnt: int = int(row["count"])
 			var wrk: int = int(row["working"])
-			var stat_col: Color = Color(0.55, 0.78, 0.55) if wrk == cnt else UI_ACCENT
+			var stat_col: Color = Color(0.55, 0.78, 0.55) if wrk == cnt else UI_WARN
 			draw_string(_font, Vector2(rx + 118.0, y2), "%d" % cnt, HORIZONTAL_ALIGNMENT_RIGHT, 24.0, 10, UI_TEXT)
 			draw_string(_font, Vector2(rx + 144.0, y2), "%d▸" % wrk, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, stat_col)
 			y2 += 16.6
