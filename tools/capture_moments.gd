@@ -95,6 +95,7 @@ const EXPECT: Dictionary = {
 	"pack_full": {"_inventory_open": true},
 	"works_full": {"_inventory_open": true},
 	"bench_full": {"_inventory_open": true},
+	"works_short": {"_inventory_open": true},
 	"settings": {"_settings_open": true},
 	"map": {"_minimap_mode": 2},
 }
@@ -262,6 +263,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _at_the_counter_fresh(main, moment.split("_")[0])
 		"pack_full", "works_full", "bench_full":
 			await _at_the_counter_full(main, moment.split("_")[0])
+		"works_short":
+			await _at_the_counter_short(main)
 		"settings":
 			await _at_the_settings(main)
 		"drift":
@@ -524,6 +527,8 @@ func _catalogue(main: MainView) -> Array[StringName]:
 				continue          # the background plane — you dig THROUGH it, you never carry it
 			if mat.id == &"leaves":
 				continue          # chops into a sapling or into nothing; the leaf itself is never pocketed
+			if mat.id == &"sealrock":
+				continue          # REQUIRED_TIER 99 — no pick breaks the seal, so it never enters a pack
 			if not out.has(mat.id):
 				out.append(mat.id)
 	var r: DirAccess = DirAccess.open("res://src/data/recipes")
@@ -560,6 +565,27 @@ func _catalogue(main: MainView) -> Array[StringName]:
 func _at_the_settings(main: MainView) -> void:
 	main._settings_open = true
 	for _i: int in 8:
+		await physics_frame
+
+
+## WORKS WITH A ROW YOU CANNOT HAVE SELECTED, which the brief asks for by name and no capture showed:
+## *"WORKS with available and unavailable selected"*.
+##
+## Every WORKS capture so far has the Forge selected, and the Forge is the row a midgame save can afford.
+## So the one state where the detail plate has to answer WHY NOT — the red half of the price chip, the
+## button that must not read as pressable, whatever stands in for "you are short two ingots" — has never
+## been photographed, in the screen whose entire job is deciding what to build.
+##
+## Unavailable here means UNAFFORDABLE and not unresearched, because WORKS lists only what research has
+## opened (#S34b — the locked future lives on the BENCH), so an unresearched machine is not a row at all.
+## The pose is therefore the midgame counter with the metal taken back out of the pack: same unlocks, same
+## rows, nothing to pay with.
+func _at_the_counter_short(main: MainView) -> void:
+	await _at_the_counter(main, "works")
+	for item: StringName in [&"ingot", &"iron_ingot"]:
+		main.sim.inventory.erase(item)
+	main._hud.bazaar_move(0, 4)     # down the list to a row the empty pack cannot cover
+	for _i: int in 6:
 		await physics_frame
 
 

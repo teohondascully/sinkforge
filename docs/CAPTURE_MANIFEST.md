@@ -63,11 +63,13 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `works` | `3c46c8c` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- works` |
 | `works_fresh` | `d0ac976` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_fresh` |
 | `works_full` | `d0ac976` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_full` |
+| `works_short` | `406d83b` | 2026-08-18 03:44 | `66090e4d89` | `capture_moments.gd -- works_short` |
 
 ## Cohorts
 
 - `9aa816436b` — 41 frames
 - `9f26ff4788` — 7 frames
+- `66090e4d89` — 1 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
 permitted and described rather than forbidden: re-shooting is not available for every frame, so
