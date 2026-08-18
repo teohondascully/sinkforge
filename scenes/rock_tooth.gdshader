@@ -26,6 +26,34 @@ render_mode blend_add;
 // reads as more substantial than the thing you dig. This is not a global brighten: air, sky and every lit
 // surface are untouched, and the amount is a couple of levels on the darkest rock in the frame.
 
+// TRIED AND REVERTED: giving the BACK WALL a share of this tooth (TR-07, 2026-08-18).
+//
+// The mask below is `step(0.998, src.a)` — solids only — and the note above explains why: before it, air
+// carried MORE tooth than rock. That was right about the VOID and questionable about the back WALL, which
+// is not void but the earth you did not dig, one plane behind the face. And the wall is measurably flat:
+// inside the lamp at 22 rows, local texture (mean |luma delta| to the neighbouring pixel) is 4.13 on rock
+// against 2.02 on the wall, at medians of 31.5 and 18.8. **The hole is not dark, it is SMOOTH** — similar
+// value with no structure is exactly what a cut-out looks like, so TR-07's complaint is real and its word
+// "black" points the wrong way. Knocking this pass out costs the rock 1.43 levels/px and the wall NOTHING,
+// so this one mask is two thirds of the gap.
+//
+// A `wall_frac = 0.5` band was added and measured. It works, and it is not worth it:
+//
+//     wall texture   2.02 -> 2.30   (+14%, and the wall's median rises 2 levels with it)
+//     check_contact_edge DETECTABILITY   95% -> 94%,  edge step median 15.5 -> 14.9
+//     lit edge step  23.27 -> 21.57      POLARITY unchanged at 97%
+//
+// The gain is subliminal — across the frame 55% of pixels move by >=2 levels but only **0.04% by >=10** —
+// and the cost lands on the rock/void gate that TR-06 is PROVED against and whose guard reads "existing
+// rock/void gate must not regress". Trading a guarded property for one below the perceptual threshold is
+// the wrong trade even when both are small.
+//
+// WHY IT CANNOT BE FIXED BY TUNING, which is the part worth keeping: this pass is `blend_add` and
+// POSITIVE ONLY, so any texture it gives the wall also RAISES the wall's mean, and raising the wall's mean
+// is precisely what narrows the face step. The wall does not need brightness, it needs STRUCTURE — a
+// zero-mean texture that darkens as much as it lightens. An additive pass cannot make one at any
+// amplitude. A post-veil MIX layer can, and one now exists at z 53 (`_marks`); that is where a back-wall
+// grain belongs, not here.
 uniform float tooth_add : hint_range(0.0, 0.06) = 0.030;   // absolute value added at peak, post-veil
 uniform float mottle_add : hint_range(0.0, 0.03) = 0.006;  // coarser octave so the tooth is not uniform
 uniform float mottle_scale : hint_range(1.0, 16.0) = 5.0;  // world px per mottle sample
