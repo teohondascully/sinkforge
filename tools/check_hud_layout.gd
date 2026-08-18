@@ -140,6 +140,8 @@ func _run() -> void:
 	var big_hover: Array[Rect2] = []
 	var sigs: Array[String] = []
 	var sig_names: Array[String] = []
+	var foots: Array[float] = []
+	var foot_names: Array[String] = []
 	var twin_of: Array[String] = []
 	for st: Dictionary in states:
 		var rects: Array[Rect2] = await _snapshot(hud, st)
@@ -163,6 +165,13 @@ func _run() -> void:
 				off.append("%s" % r)
 		_check(off.is_empty(), "%s: all %d panels are on screen%s"
 			% [name, rects.size(), "" if off.is_empty() else " — OFF: " + ", ".join(off)])
+
+		# FOOTPRINT, reported and not judged here — see `_report_footprint`. IT GOES ABOVE THE MODAL
+		# EARLY-OUT, and it did not the first time: four states returned before reaching it and the report
+		# simply had ten rows instead of fourteen, with nothing saying which four were missing. A report
+		# that silently omits its most-covered cases is worse than no report.
+		foot_names.append(name)
+		foots.append(_covered_fraction(rects))
 
 		# --- overlap: only where every panel is furniture ---
 		if bool(st["modal"]):
@@ -191,6 +200,7 @@ func _run() -> void:
 	_check_hover(bare, hover, big_hover)
 	await _check_pack_window()
 	await _check_probe_is_off()
+	_report_footprint(foot_names, foots)
 
 	_check(total_panels >= states.size() * 2,
 		"the matrix drew %d panels across %d states, so there was geometry to judge"
@@ -656,3 +666,87 @@ func _wells_report(probe: Dictionary) -> String:
 	var last: Rect2 = wells[wells.size() - 1] as Rect2
 	return " — %d wells, x %.0f..%.0f, backing %s" % [wells.size(), first.position.x,
 		last.position.x + last.size.x, probe.get("backing", Rect2())]
+
+
+## HOW MUCH OF THE SCREEN THE HUD IS ON, so that "subtraction" stops being an adjective.
+##
+## T2.1 opens with *"the HUD is currently the art director; ~85-90% of the interface floats above the
+## world"* and three of its four lines have now shipped, and **nobody can say whether the HUD got
+## smaller.** That is not a small gap in a ticket whose entire verb is *subtract*.
+##
+## READ THE BOUNDARY BEFORE READING THE NUMBER, because they are not the same claim. `panel_probe` sees
+## `_panel()`, `_round_rect()` and the arrival scrim. It does not see bare `draw_rect`/`draw_string` —
+## chips, legends, glyphs and text drawn outside any panel. So this measures **the share of the canvas
+## covered by HUD PANELS**, which is a LOWER BOUND on the HUD's footprint and is not the ~85-90% figure at
+## all: that one is about the composition of the interface (how much of it is screen-space rather than
+## diegetic), a different population, and it came from a subjective audit rather than a measurement.
+## Nothing here confirms or refutes it. What this gives is a baseline the same instrument can re-measure.
+##
+## Union area, not summed area — overlapping panels must not be counted twice, and the modal states
+## overlap by design. Rasterised at 1px on the 640x360 canvas, so it is exact rather than sampled.
+func _covered_fraction(rects: Array[Rect2]) -> float:
+	var w: int = int(Hud.CANVAS.x)
+	var h: int = int(Hud.CANVAS.y)
+	var mask := PackedByteArray()
+	mask.resize(w * h)
+	for r: Rect2 in rects:
+		var x0: int = clampi(int(floor(r.position.x)), 0, w)
+		var x1: int = clampi(int(ceil(r.position.x + r.size.x)), 0, w)
+		var y0: int = clampi(int(floor(r.position.y)), 0, h)
+		var y1: int = clampi(int(ceil(r.position.y + r.size.y)), 0, h)
+		for y: int in range(y0, y1):
+			var row: int = y * w
+			for x: int in range(x0, x1):
+				mask[row + x] = 1
+	var on: int = 0
+	for i: int in mask.size():
+		on += mask[i]
+	return float(on) / float(w * h)
+
+
+## THE RATCHET, and it is a ratchet on purpose.
+##
+## The floor below is not a guess about what a good HUD costs — this project has been wrong four times
+## running guessing a threshold before playing the thing. It is the footprint MEASURED on the day the
+## three shipped subtractions landed, written down so that the next change has to say which direction it
+## went. It may be LOWERED by measurement after a real subtraction. It must never be raised to buy green:
+## raising it is the change that made the HUD bigger, wearing the costume of a calibration.
+##
+## Only the bare screen is held. The modal states are supposed to cover the screen — that is what a modal
+## is — and ratcheting them would be asserting that the Bazaar must not grow, which is not a thing anyone
+## has decided.
+##
+## THE NUMBER: measured 7.83% on three consecutive runs, identical to the digit. The ceiling is 8.0%, and
+## the 0.17pp of headroom is for ONE stated reason — the goal plate and the inspector size themselves to
+## their TEXT, so a machine whose fallback font metrics differ by a pixel moves this without anything
+## having changed. It is not slack for a new panel: the smallest panel in the bare screen is worth more
+## than 0.17pp on its own, so anything added still fails.
+const BARE_FOOTPRINT_CEILING: float = 0.080
+
+
+func _report_footprint(names: Array[String], fracs: Array[float]) -> void:
+	for i: int in names.size():
+		print("    footprint  %6.2f%%  %s" % [fracs[i] * 100.0, names[i]])
+	var bare: float = -1.0
+	for i: int in names.size():
+		if names[i] == "the bare screen":
+			bare = fracs[i]
+	_check(bare >= 0.0, "the bare screen was measured for footprint")
+	# POSITIVE CONTROL. A ceiling is satisfied perfectly by a probe that recorded nothing.
+	_check(bare > 0.0, "...and it is not zero (%.1f%% of the canvas is HUD panel)" % [bare * 100.0])
+	# ...AND THE INSTRUMENT SEPARATES ONE SCREEN FROM ANOTHER, which the ceiling alone cannot show. A
+	# modal is DEFINED as an overlay that covers the furniture, so every modal must cover more canvas than
+	# the bare screen. That is a definitional property rather than a tuned one — no number to calibrate,
+	# and it fails the moment the probe stops seeing a modal or starts reporting the same rects for
+	# everything. Without it, a probe frozen on one state would satisfy every other assertion here.
+	var quiet: Array[String] = []
+	for i: int in names.size():
+		if names[i].begins_with("the Bazaar") or names[i].begins_with("the dashboard") \
+				or names[i].begins_with("the help") or names[i].begins_with("settings"):
+			if fracs[i] <= bare:
+				quiet.append("%s at %.2f%%" % [names[i], fracs[i] * 100.0])
+	_check(quiet.is_empty(), "...and every modal covers more than the bare screen%s"
+		% ["" if quiet.is_empty() else " — NOT: " + ", ".join(quiet)])
+	_check(bare <= BARE_FOOTPRINT_CEILING,
+		"...and no larger than the day the T2.1 subtractions landed (%.2f%% vs ceiling %.2f%%)"
+			% [bare * 100.0, BARE_FOOTPRINT_CEILING * 100.0])
