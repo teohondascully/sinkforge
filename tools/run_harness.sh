@@ -258,14 +258,26 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # check_contact_edge (6b) is unregistered for the SAME reason and on the same terms:
 #   bash tools/with_machine.sh --script res://tools/check_contact_edge.gd
 #
-# CURRENT READING (generated world, repaired capture geometry):
-#   rock|air step median 11.7 against a rock-interior texture of 2.8
-#   detectability 76%   polarity 91%   floor 75% for both, and the floor does not move
-# Per-orientation is NOT reportable: reach is 33 / 26 / 11 against an unchanged floor of 40, because the
-# corrected view is smaller than the fixture was built for. No orientation conclusion is drawn from it.
-# The 76% clears the floor by ONE POINT on a capture-based measure of an animated scene, so it is not yet
-# a result anyone should build on; the spread across repeat runs decides whether the GATE is sound, which
-# is a different claim from whether the FINDING is (c2's distinction, and it is the right one).
+# CURRENT READING (generated world, repaired capture geometry, three pooled viewpoints). 6b PASSES, and
+# for the first time every arm is non-vacuous, so the per-orientation numbers are reportable:
+#   detectability 86%   polarity 95%      floor 75% for both, and the floor did not move
+#   rock TOP (lit lip)     n=75  step 13.09  polarity 100%
+#   rock UNDER (ceiling)   n=65  step  6.47  polarity  92%
+#   rock SIDE (wall)       n=75  step  8.16  polarity  92%
+#   against a rock-interior texture of 1.8
+# Three clean runs: detect 86 / 85 / 86, polarity 95 / 95 / 95, arm sizes identical every run. The margin is
+# 10-11 points, not the ONE point the single-viewpoint reading cleared by -- pooling did not merely raise the
+# number, it made the gate sound. Positive control, side mutant on the pooled fixture: SIDE step 8.16 -> 10.99
+# and RED rock SIDE +1:68 +5:65 +9:60 +17:40, a decay curve on the rock side of side faces and nowhere else.
+#
+# SO THE QUESTION THIS LAYER WAS BUILT TO ASK IS ANSWERED, AND THE ANSWER IS THE OPPOSITE OF THE PREMISE.
+# A rock/air contact IS visible, in all three orientations, at 86% against a 75% floor. The lane began from
+# "the contact carries very nearly no information"; that was an instrument reading its own interior.
+#
+# NOT REGISTERED YET, and the reason is mechanical rather than a verdict: check_contact_edge reads
+# FineTerrain._side_mutant_cells, which lives in the test-only SF_SIDE_MUTANT patch that directive 0031 says
+# to keep unmerged. Registering it would drag that patch into the suite. Decoupling is a design call, not
+# mine -- the counter is inert unless the env var is set, but "inert" is not "authorised".
 #
 # EVERYTHING THIS NOTE PREVIOUSLY REPORTED IS WITHDRAWN, AND SO IS THE THEORY IT USED TO EXPLAIN ITSELF.
 # It has now been wrong twice in opposite directions, and the second correction voids the first:

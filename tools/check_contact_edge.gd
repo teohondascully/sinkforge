@@ -71,6 +71,18 @@ const ROOM_W: int = 39
 const PILLAR_W: int = 3
 const PILLAR_H: int = 2
 const PILLAR_PITCH: int = 4                  ## 3 rock + 1 air: every gap column is two SIDE faces
+## MORE VIEWPOINTS, NOT A BIGGER ROOM. The 40-sample floor is about statistical power, not about one frame,
+## and one screen at this zoom cannot hold 40 unlit faces of all three orientations at once -- roughly 840 of
+## 2100 excluded pairs are LIT in every configuration tried, and the lamp rides the player, who is the point
+## the camera centres on, so the lit region is always the middle of the judged slab and carving cannot move
+## it. Standing somewhere else moves it. Each viewpoint lights a different third of the chamber and leaves
+## the rest dark, so the union covers what no single frame can.
+##
+## Pairs are de-duplicated across viewpoints by cell, and ONLY once a pair has passed every filter -- a face
+## rejected as lit from one position must stay eligible from another, which is the entire point. Counting the
+## same face twice would inflate n without adding one bit of evidence, which is the failure this floor exists
+## to catch.
+const VIEWPOINTS: Array[int] = [0, -12, 12]  ## column offsets from the delve column, all inside ROOM_W/2
 ## WHY THE THREE ARMS STILL DO NOT REACH 40, MEASURED RATHER THAN GUESSED. Six fixture iterations, each one
 ## run and read:
 ##   room only, gallery at +4 and +9      TOP 33  UNDER 26  SIDE 11
@@ -211,8 +223,18 @@ func _run() -> void:
 		quit(1)
 		return
 
-	var img: Image = get_root().get_texture().get_image()
-	var s: Dictionary = _sample(main, img)
+	var seen: Dictionary = {}
+	var s: Dictionary = {}
+	var home: Vector2 = main._player.position
+	for off: int in VIEWPOINTS:
+		main._player.position = home + Vector2(float(off * WorldRenderer.CELL), 0.0)
+		main._player.velocity = Vector2.ZERO
+		for _i: int in 24:
+			await physics_frame
+		await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw       # veil/light repaint a frame behind a move
+		print("  viewpoint %+d cells:" % off)
+		s = _merge(s, _sample(main, get_root().get_texture().get_image(), seen))
 	var edge_step: Array[float] = s["edge_step"]
 	var flat_step: Array[float] = s["flat_step"]
 	var signed: Array[float] = s["edge_signed"]
@@ -351,9 +373,31 @@ func _is_pillar(dx: int, dy: int) -> bool:
 
 
 
+## Pool one viewpoint's tally into the running one. Counters add; every array concatenates at whatever depth
+## it nests to, so the profile grids merge element-wise rather than becoming a list of grids.
+func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
+	if dst.is_empty():
+		return src
+	for k: String in src:
+		if dst[k] is Array and src[k] is Array:
+			dst[k] = _merge_arr(dst[k] as Array, src[k] as Array)
+		else:
+			dst[k] = int(dst[k]) + int(src[k])
+	return dst
+
+
+func _merge_arr(a: Array, b: Array) -> Array:
+	if not a.is_empty() and a[0] is Array and a.size() == b.size():
+		for i: int in a.size():
+			a[i] = _merge_arr(a[i] as Array, b[i] as Array)
+		return a
+	a.append_array(b)
+	return a
+
+
 ## Walk every horizontally- and vertically-adjacent cell pair on the judged slab and record the luminance
 ## step across the shared face, split by what the sim says the pair actually is.
-func _sample(main: MainView, img: Image) -> Dictionary:
+func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var w: int = img.get_width()
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
@@ -502,6 +546,13 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 				if not _on_slab(pa, patch, w, top, bottom) or not _on_slab(pb, patch, w, top, bottom):
 					offslab += 1
 					continue
+				# DE-DUPLICATED HERE AND NOWHERE EARLIER. A pair rejected as lit from one standing position
+				# must remain eligible from the next, so the ledger records only faces that actually reached
+				# the sample.
+				var pair_key: String = "%d,%d,%d,%d" % [a.x, a.y, b.x, b.y]
+				if seen.has(pair_key):
+					continue
+				seen[pair_key] = true
 				# THE PROFILE ACROSS THE FACE, sampled at single pixels rather than in a patch, because the
 				# thing it is looking for is only a few pixels wide and a patch would average it away.
 				#
