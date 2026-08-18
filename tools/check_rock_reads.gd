@@ -220,6 +220,10 @@ func _run() -> void:
 	var aa: Array[float] = s["air_aniso"]
 	print("  ORIENTATION (diagnostic, not gated): rock median %+.3f, air median %+.3f -> %.0f%% of the time"
 		% [_median(ra), _median(aa), _readability(ra, aa) * 100.0])
+	var rc: Array[float] = s["rock_chroma"]
+	var ac: Array[float] = s["air_chroma"]
+	print("  CHROMA b-r (diagnostic, not gated): rock median %+.2f, air median %+.2f, gap %.2f -> %.0f%% of the time"
+		% [_median(rc), _median(ac), absf(_median(rc) - _median(ac)), _readability(rc, ac) * 100.0])
 	print("  the better cue is %s at %.0f%% (a coin flip is 50%%, the floor is %.0f%%)"
 		% ["VALUE" if v_auc >= g_auc else "GRAIN", best * 100.0, READ_FLOOR * 100.0])
 
@@ -311,6 +315,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	## rock's grain is sampled through GRAIN_XSTRETCH = 0.38, which stretches its features horizontally into
 	## bedding, while the back wall's mottling has no such stretch. So a cue a player may well be reading is one
 	## this layer is constructed not to see. Reported, never gated, until it has earned it.
+	## DIAGNOSTIC FOURTH CUE, CHROMA. Every statistic above collapses the pixel to LUMA
+	## (0.299r + 0.587g + 0.114b), so two materials that differ only in HUE are identical to this layer and
+	## fully visible to a player. That is not hypothetical in this codebase: check_water_reads separates water
+	## from the rock beneath it by 54.3 levels of BLUE MINUS RED and passes comfortably, on a subject sitting
+	## in the same darkness. Rock is tinted toward teal/brown/violet poles (HUE_TEAL/BROWN/VIOLET) and the back
+	## wall toward BACKROCK_COOL, so there is every reason to expect a difference the luma cues cannot report.
+	var rock_chroma: Array[float] = []
+	var air_chroma: Array[float] = []
 	var rock_aniso: Array[float] = []
 	var air_aniso: Array[float] = []
 	var rock_grain: Array[float] = []
@@ -372,6 +384,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				rock_value.append(stat.x)
 				rock_grain.append(stat.y)
 				rock_aniso.append(_patch_aniso(img, px, py, patch))
+				rock_chroma.append(_patch_chroma(img, px, py, patch))
 				rock_row.append(float(cy))
 				# THE PARTITION IS DECLARED BEFORE ROCK STOPS BEING ONE THING, which is the whole point of
 				# it existing today rather than the day it matters. This layer draws its solid population at
@@ -415,9 +428,10 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				air_value.append(stat.x)
 				air_grain.append(stat.y)
 				air_aniso.append(_patch_aniso(img, px, py, patch))
+				air_chroma.append(_patch_chroma(img, px, py, patch))
 				air_row.append(float(cy))
 
-	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain, "rock_aniso": rock_aniso, "air_aniso": air_aniso,
+	return {"rock_value": rock_value, "air_value": air_value, "rock_grain": rock_grain, "rock_aniso": rock_aniso, "air_aniso": air_aniso, "rock_chroma": rock_chroma, "air_chroma": air_chroma,
 		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
 		"rock_pi": rock_pi, "rock_pe": rock_pe, "rock_si": rock_si, "rock_se": rock_se,
 		"skipped": near_surface + lit + offslab}
@@ -461,6 +475,20 @@ func _touches_air(sim: FactorySim, c: Vector2i) -> bool:
 ## Normalised on purpose: the ratio survives the darkness veil in a way an amplitude does not, because the
 ## veil scales both gradients together. That is the property an unlit cue needs, and it is precisely what a
 ## standard deviation loses.
+## MEAN BLUE-MINUS-RED over the patch, in 0-255 levels. The same axis check_water_reads uses, for the same
+## reason: it survives darkness because it is a DIFFERENCE between channels rather than a level, so the veil
+## scales both sides of it together and the sign is preserved when the magnitude is not.
+func _patch_chroma(img: Image, cx: int, cy: int, r: int) -> float:
+	var total: float = 0.0
+	var n: int = 0
+	for y: int in range(cy - r, cy + r + 1):
+		for x: int in range(cx - r, cx + r + 1):
+			var c: Color = img.get_pixel(x, y)
+			total += (c.b - c.r) * 255.0
+			n += 1
+	return total / float(n) if n > 0 else 0.0
+
+
 func _patch_aniso(img: Image, cx: int, cy: int, r: int) -> float:
 	var gh: float = 0.0
 	var gv: float = 0.0
