@@ -3055,7 +3055,19 @@ const AIM_RING: float = 6.0
 const AIM_LEAD := Color(0.86, 0.80, 0.62, 0.34)
 const AIM_MARK := Color(0.99, 0.88, 0.56, 0.88)
 const AIM_MISS := Color(0.62, 0.64, 0.70, 0.16)   ## nothing in range: the lead fades out and there is no ring
-const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)  ## a dark backing ring, so the mark survives pale rock too
+## A DARK BACKING RING, SO THE MARK SURVIVES PALE ROCK — and it was tuned for pale rock and then drawn
+## everywhere. `GR-04`: *"the guide rivals the miner silhouette against calm sky."* Measured on the surface
+## with the guidance quiet and the shot aimed over open sky, the preview added **207 levels** of local
+## gradient at its brightest tenth against the miner's own silhouette step of **87**. Nearly all of it is
+## this ring: a near-black stroke at 0.55 over a pale sky is the highest-contrast edge in the frame, and it
+## is there to solve a problem the sky does not have.
+##
+## Thinner and quieter. The ring is a distinctive SHAPE, and a shape does not need a black halo to be found
+## — what the halo buys is survival against a background as pale as the mark itself, which is worth 0.34 of
+## an edge rather than 0.55 of one. Acquisition is untouched: the trace, the ring's position and its radius
+## are all the same, so what changes is how loudly the answer is delivered and not what it is.
+const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)
+const AIM_SHADE_W: float = 3.0
 
 
 ## SUPPRESSES THE AIM PREVIEW SO IT CAN BE PHOTOGRAPHED. `check_grapple_reads` isolates the preview by
@@ -3094,7 +3106,7 @@ func _draw_aim_ghost() -> void:
 		draw_line(from.lerp(to, t0), from.lerp(to, t1),
 			(AIM_LEAD if hit else AIM_MISS) * Color(1, 1, 1, fade), 1.0)
 	if hit:
-		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_SHADE, 3.0)
+		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_SHADE, AIM_SHADE_W)
 		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_MARK, 1.5)
 		draw_arc(to, AIM_RING * 0.30, 0.0, TAU, 8, AIM_MARK, 1.5)
 

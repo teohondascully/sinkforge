@@ -10,7 +10,10 @@ extends "res://tools/check_base.gd"
 ##   `GR-01`  the persistent dashed guide reads as construction geometry, not as a tool
 ##   `GR-02`  aim and attachment are visually conflated
 ##   `GR-03`  tension has no visible state in a still frame
-##   `GR-04`  the guide rivals the miner's silhouette against calm sky
+##   `GR-04`  the guide rivals the miner's silhouette against calm sky — REPRODUCES, and it is the endpoint
+##            MARK rather than the lead: the same preview adds ~15 levels of edge on dark rock and its ring
+##            alone carries ~208 against open sky. Reported, never asserted: how loud an aim mark should be
+##            is a design call, and the two numbers a floor would compare are not the same quantity.
 ##   `GR-05`  the preview occupies most of the frame instead of the endpoint
 ##   `GR-06`  the player must out-rank their own tool telemetry
 ##   `GR-07`  judge it in motion, not only in screenshots
@@ -26,11 +29,16 @@ extends "res://tools/check_base.gd"
 ## against a bar-taut **0.012**. Those are the same picture. The ticket was right, and the code read as
 ## though it disagreed — which is the most expensive kind of wrong comment there is.
 ##
-## HOW THE GUIDE IS ISOLATED, WITHOUT A TEST SWITCH TO DRAW IT. Two captures of an otherwise identical
-## frame: one with the cursor parked ON the miner's own hand, where the trace collapses to nothing, and
-## one with the cursor on the target. The difference is the guide and only the guide — no flag, no
-## suppression, nothing that could be left switched on. A disc around the hand is excluded, because the
-## collapsed preview still marks its own origin and that residue is not the guide.
+## HOW THE GUIDE IS ISOLATED, and this comment described the opposite of the code for one commit, which is
+## the failure the paragraph above is about. The first version parked the cursor ON the miner's own hand
+## for the reference frame, so no test switch was needed — and that also swings the HEAD-LAMP, which is
+## aimed. Five and a half cells of light moved between the two captures and the difference mask ate it;
+## excluding a lamp-sized disc to compensate then blinded the layer to the near field, the only place a
+## shortened lead lives, and it measured 0.04 of the throw inked while seeing the endpoint ring alone.
+##
+## So there IS a switch — `WorldRenderer.AIM_GHOST_OFF` — and the reference frame has the cursor in exactly
+## the same place, the lamp in exactly the same position, and the body in exactly the same pose. The
+## difference is the preview and nothing else.
 ##
 ##   godot --path . --script res://tools/check_grapple_reads.gd
 ##
@@ -53,6 +61,9 @@ const FLOOR_ROW: int = 30
 ## Where the body stands, and what it aims at: a long diagonal, which is the shot the tickets are about.
 const STAND_COL: int = RIG_LEFT + 5
 const TARGET_COL: int = RIG_LEFT + 13
+## A column far enough from spawn that the surface there is ordinary ground rather than the opening scene's
+## dug pit, and the sky above it is the flat daylight gradient the ticket is about.
+const SKY_COL: int = 96
 const HAND_RADIUS: float = 14.0       ## excluded from the guide mask — the collapsed preview's own origin
 
 ## How far from the background a pixel must be to count as drawn ON it. Read against a measured
@@ -98,6 +109,10 @@ const BODY_MARGIN: float = 1.15
 var _skipped: bool = false
 var _main: MainView = null
 var _full := Rect2i()
+## Carried from the underground phase into the surface one, so `GR-04`'s report can state the same
+## preview's contrast on both backgrounds instead of quoting one and asserting against the other.
+var _rock_gain: float = -1.0
+var _rock_px: int = 0
 
 
 func _initialize() -> void:
@@ -124,17 +139,7 @@ func _run() -> void:
 	_build_rig(_main.sim)
 	_main._renderer.repaint_world()
 	await _stand(STAND_COL, FLOOR_ROW - 2)
-	# WAIT OUT THE CEREMONY. Teleporting the body into the rig crosses a stratum boundary, so the arrival
-	# plate is mid-animation over half the frame: two captures of the "still" rig differed by 248 levels and
-	# the guide mask swallowed 119156 pixels of fading serif type. **A layer that photographs a transient
-	# is measuring the transient**, which is the third time today the same sentence has been the answer.
-	var waited: int = 0
-	while _main._hud.announcing() and waited < 600:
-		waited += 1
-		await physics_frame
-	for _i: int in 30:
-		await physics_frame
-	print("    waited %d frames for the arrival plate to clear" % waited)
+	await _quiet()
 	var img: Image = get_root().get_texture().get_image()
 	_full = Rect2i(0, 0, img.get_width(), img.get_height())
 
@@ -188,7 +193,7 @@ func _run() -> void:
 	var aim: PackedFloat32Array = await _luma()
 	_dump("aim")
 	var hand: Vector2 = p.hand()
-	var guide: PackedByteArray = _mask(aim, bg, hand, moving)
+	var guide: PackedByteArray = _without(_mask(aim, bg, hand, moving), _body_mask())
 	_dump_mask("aim_guide", guide)
 	var reach: float = _screen(hand).distance_to(_screen(target))
 	var span: float = _corridor_reach(guide, _screen(hand), _screen(target))
@@ -202,9 +207,12 @@ func _run() -> void:
 	# --- GR-06 / GR-04: does the miner out-read the miner's tool? ---------------------
 	var body: PackedByteArray = _body_mask()
 	_dump_mask("body", body)
-	var guide_edge: float = _edge_p90(aim, guide)   # measured outside the lamp pool, per `_mask`
+	var guide_edge: float = _edge_gain(aim, bg, guide)
 	var body_edge: float = _edge_p90(aim, body)
-	print("    peak edge strength — miner %.1f levels, preview %.1f levels" % [body_edge, guide_edge])
+	print("    against dark rock — miner %.1f levels, preview %.1f levels (%d preview pixels)"
+		% [body_edge, guide_edge, _count(guide)])
+	_rock_gain = guide_edge
+	_rock_px = _count(guide)
 	_check(guide_edge > 1.0,
 		"CONTROL: the preview was actually drawn (%.1f levels of edge, over %d pixels)"
 			% [guide_edge, _count(guide)])
@@ -310,8 +318,126 @@ func _run() -> void:
 	else:
 		_check(false, "the rig anchors, so the attached states can be judged at all")
 
+	await _check_against_sky()
+
 	_main.queue_free()
 	await physics_frame
+
+
+## `GR-04` — *"reduce rope contrast against calm sky until it is needed"*, evidence *"the guide rivals the
+## miner silhouette against blue sky."*
+##
+## EVERYTHING ABOVE THIS RUNS IN A ROCK POCKET, which is the half of the constraint that reads *"cable
+## remains readable against dark underground"* — and it is the easy half. A pale warm line on near-black
+## rock has contrast to spare. The claim being made here is the opposite one, on a background that is
+## bright, flat and uniform, where a dark miner and a pale rope are competing on different signs.
+##
+## The miner is left standing on real surface ground rather than in a built rig, because the ticket is
+## about the surface as it ships and a rig would be me choosing the sky.
+func _check_against_sky() -> void:
+	var p: Player = _main._player
+	var sim: FactorySim = _main.sim
+	p.grapple.cut()
+	var col: int = SKY_COL
+	var row: int = sim.surface_row(col)
+	p.position = _main._cell_center(Vector2i(col, row - 2))
+	p.velocity = Vector2.ZERO
+	for _i: int in 60:
+		await physics_frame
+	await _quiet()
+
+	# ONE BLOCK ALONE IN THE SKY, and the first version of this did not build one. It aimed at empty air nine
+	# cells across and twelve up, the trace stopped on the nearest tree trunk, and the ring landed a cell
+	# from the miner's head against foliage — so a measurement labelled "against calm sky" was taken against
+	# a tree. The ticket is about a mark on an open background, so the rig makes one: everything cleared for
+	# five cells around, a single solid cell in the middle of it, sky behind and on every side.
+	var perch := Vector2i(col + 8, row - 9)
+	for dx: int in range(-5, 6):
+		for dy: int in range(-5, 6):
+			sim.set_solid(perch + Vector2i(dx, dy), &"")
+	sim.set_solid(perch, &"stone")
+	_main._renderer.repaint_world()
+	for _i: int in 20:
+		await physics_frame
+	var target: Vector2 = _main._cell_center(perch)
+	# THE REFERENCE IS TAKEN ON BOTH SIDES OF THE MEASUREMENT, and on the surface that is not fussiness.
+	# **Clouds drift.** A reference captured thirty frames before the shot has clouds thirty frames out of
+	# position, so every cloud edge in the frame reads as something the preview drew — the first version of
+	# this scored the preview at 202 levels against the miner's 87 and its mask image was cloud outlines and
+	# the serifs of the word "ore". Sandwiching the shot means anything a cloud touched on either side of it
+	# is excluded, and the nearer reference is four frames away rather than thirty.
+	WorldRenderer.AIM_GHOST_OFF = true
+	await _look_at(target)
+	var bg_before: PackedFloat32Array = await _luma()
+	_dump("sky_bare")
+	for _i: int in QUIET_GAP:
+		await physics_frame
+	WorldRenderer.AIM_GHOST_OFF = false
+	for _i: int in 4:
+		await physics_frame
+	var aim: PackedFloat32Array = await _luma()
+	_dump("sky_aim")
+	WorldRenderer.AIM_GHOST_OFF = true
+	for _i: int in 4:
+		await physics_frame
+	var bg: PackedFloat32Array = await _luma()
+	WorldRenderer.AIM_GHOST_OFF = false
+	var moving: PackedByteArray = _moving(bg_before, bg)
+	# RESTRICTED TO THE CORRIDOR, and the surface is why it has to be. Underground the background is flat
+	# dark rock and a difference mask is the preview; up here it is **clouds**, which drift, and the lesson
+	# plate, which fades. The first version measured 177 levels against the miner's 87 and the mask image
+	# was cloud outlines and the serifs of the word "ore". None of that is within forty pixels of the throw.
+	var lane: PackedByteArray = _corridor(_screen(p.hand()), _screen(target))
+	# THE MINER IS NOT THE PREVIEW. The body's idle animation lives inside the throw corridor, a few pixels
+	# past the hand disc, and a two-sample temporal control CANNOT remove a periodic thing: the two
+	# references are 38 frames apart, and an idle cycle near that period matches in both of them while
+	# differing in the shot between. **A control sampled at the signal's own period is blind by
+	# construction.** The body is excluded by geometry instead, which no phase can defeat.
+	var guide: PackedByteArray = _without(
+		_without(_mask(aim, bg, p.hand(), moving), _invert(lane)), _body_mask())
+	_dump_mask("sky_guide", guide)
+	var body: PackedByteArray = _body_mask()
+	var guide_edge: float = _edge_gain(aim, bg, guide)
+	var body_edge: float = _edge_p90(aim, body)
+	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels)"
+		% [body_edge, guide_edge, _count(guide)])
+	_check(_count(guide) > 60,
+		"CONTROL: the preview drew something against the sky at all (%d pixels)" % _count(guide))
+	_check(_aim_lands_on().distance_to(target) < 3.0,
+		"CONTROL: the surface shot is aimed where the fixture pointed it (%.1f px off)"
+			% _aim_lands_on().distance_to(target))
+	# REPORTED, NOT ASSERTED, AND THAT IS `GR-04`'s OWN SHAPE. Its approach line is *"state-based alpha and
+	# endpoint emphasis"* — how loud an aim mark should be is a design call, and the two candidate floors
+	# here are not comparable quantities: the miner's number is the step between an opaque body and what is
+	# behind it, while the ring's is the contrast it carries WITHIN itself, a dark backing stroke against a
+	# pale mark. Asserting one against the other would be the ruler-mismatch this repository keeps finding.
+	#
+	# What IS asserted is the constraint the ticket states in the other direction — *"cable remains readable
+	# against dark underground"* — because that one compares a thing to itself in the place it must work.
+	print("    GR-04 REPRODUCES: on dark rock the whole preview adds %.0f levels of edge over %d pixels; "
+		% [_rock_gain, _rock_px] + "on open sky the endpoint mark alone carries %.0f over %d, against a "
+		% [guide_edge, _count(guide)] + "miner whose own silhouette step is %.0f. How loud an aim mark "
+		% body_edge + "should be is a design call, not a harness one.")
+
+
+## WAIT UNTIL THE GUIDANCE HAS FINISHED TALKING, and the layer needed this twice for two different
+## reasons. Teleporting into the underground rig crosses a stratum boundary, so the ARRIVAL PLATE is
+## mid-animation over half the frame — two captures of the "still" rig differed by 248 levels and the guide
+## mask swallowed 119156 pixels of fading serif type. Teleporting to the surface lands the body in the air,
+## which fires the CHAIN IT lesson: a high-contrast plate the width of the frame, appearing between the
+## reference capture and the shot, with its edge straight through the throw corridor. That is where "the
+## preview reads 194 levels against the miner's 88" came from — a number that would have confirmed `GR-04`
+## on the strength of a tutorial bubble.
+##
+## **A layer that photographs a transient is measuring the transient**, three times over now.
+func _quiet() -> void:
+	var waited: int = 0
+	while waited < 900 and (_main._hud.announcing() or _main._hints.active_alpha() > 0.02):
+		waited += 1
+		await physics_frame
+	for _i: int in 30:
+		await physics_frame
+	print("    waited %d frames for the guidance to go quiet" % waited)
 
 
 func _build_rig(sim: FactorySim) -> void:
@@ -516,6 +642,41 @@ func _outside_corridor(mask: PackedByteArray, from: Vector2, to: Vector2) -> int
 ## HOW HARD A THING'S EDGES HIT, at the 90th percentile rather than the peak. A single antialiased pixel
 ## somewhere on the rope should not decide whether the rope out-shouts the miner, and a mean should not
 ## either — most of a body's pixels are its flat interior, which has no edge in it at all.
+## THE GRADIENT THE PREVIEW ADDS, not the gradient that happens to be under it.
+##
+## `_edge_p90` reads the local step at every masked pixel, which is correct for the MINER — an opaque body
+## whose silhouette step is entirely its own — and wrong for a thin translucent line, because the step it
+## reports belongs to whatever the line was drawn across. Underground that is flat dark rock and the
+## distinction never showed. On the surface it is clouds and a lesson plate, and the preview measured
+## **202 levels** against the miner's 87 while its own mask image was cloud outlines and the serifs of the
+## word "ore". Subtracting the same gradient computed on the reference frame leaves the line's own
+## contribution and nothing else.
+func _edge_gain(shot: PackedFloat32Array, bg: PackedFloat32Array, mask: PackedByteArray) -> float:
+	var w: int = _full.size.x
+	var gains := PackedFloat32Array()
+	for i: int in mask.size():
+		if mask[i] == 0:
+			continue
+		var x: int = i % w
+		var y: int = i / w
+		var best_shot: float = 0.0
+		var best_bg: float = 0.0
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = x + d.x
+			var ny: int = y + d.y
+			if nx < 0 or ny < 0 or nx >= w or ny >= _full.size.y:
+				continue
+			var j: int = ny * w + nx
+			best_shot = maxf(best_shot, absf(shot[i] - shot[j]))
+			best_bg = maxf(best_bg, absf(bg[i] - bg[j]))
+		gains.append(maxf(best_shot - best_bg, 0.0))
+	if gains.is_empty():
+		return 0.0
+	var arr: Array = Array(gains)
+	arr.sort()
+	return float(arr[int(float(arr.size() - 1) * 0.90)]) * 255.0
+
+
 func _edge_p90(luma: PackedFloat32Array, mask: PackedByteArray) -> float:
 	var w: int = _full.size.x
 	var edges := PackedFloat32Array()
@@ -612,6 +773,13 @@ func _either(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
 	var out := PackedByteArray()
 	for i: int in a.size():
 		out.append(1 if a[i] == 1 or b[i] == 1 else 0)
+	return out
+
+
+func _invert(a: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	for v: int in a:
+		out.append(0 if v == 1 else 1)
 	return out
 
 
