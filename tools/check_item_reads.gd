@@ -84,6 +84,7 @@ func _run() -> void:
 	# THE VOCABULARY CHECK RUNS FIRST AND WITHOUT A DISPLAY, because it is the one assertion here a headless
 	# CI can still make. Everything below it needs pixels; this needs a source file.
 	_check_vocabulary()
+	_check_pack_vocabulary()
 	if DisplayServer.get_name() == "headless":
 		# AND IF IT FAILED, THIS IS A FAILURE AND NOT A SKIP. Reporting 42 here would hand the runner "I did
 		# not run" while holding a real failure in _failures — a broken build filed under "not attempted",
@@ -277,6 +278,94 @@ func _check_vocabulary() -> void:
 			% ["" if stale.is_empty() else " — STALE: " + ", ".join(stale)])
 	# NON-VACUITY: both assertions above are perfectly satisfied by an empty scan and an empty list.
 	_check(known.size() >= 20, "the scan read %d items out of visuals.gd" % known.size())
+
+
+## THE THIRD DIRECTION: EVERY ID THE GAME CAN ACTUALLY HAND A PLAYER.
+##
+## `_check_vocabulary` above closes the drift between the hand-kept ITEMS list and what visuals.gd draws,
+## in both directions, with a non-vacuity floor. It is a good guard and it cannot see the failure it most
+## needs to. Its universe is `_items_the_view_knows()`, read out of visuals.gd — so an id the GAME can put
+## in a pack and the VIEW has never heard of is absent from BOTH sides of the comparison, and passes by
+## construction. The list agrees with the code; nobody asked whether either agrees with the game.
+##
+## What that blindness costs is not subtle. `draw_item`'s default arm fills a flat rect with
+## `item_color`, whose last line is `return Color.WHITE`, so an unknown id renders as the brightest,
+## highest-contrast mark available on a dark screen, wearing no name and looking entirely deliberate.
+##
+## So this population comes from the DATA, by the rule the pack is actually filled:
+##
+##   materials   every `.tres` whose `layer` is not `&"wall"` (the wall plane is dug THROUGH, never
+##               carried) minus `leaves`, which `FactorySim.mine`'s foliage branch turns into a SAPLING
+##               or into nothing — the leaf block itself is never pocketed.
+##   recipes     every input and every output of every recipe on disk.
+##   tools       `MainView.CRAFT_TOOLS`, plus the pickaxe you start holding and the sapling you plant.
+##
+## MACHINES ARE DELIBERATELY OUT. A carried machine draws through `Hud.machine_icons`, not through
+## `draw_item`, and whether that registry is complete is `check_craftable_registry`'s question. Widening
+## this population to machines would be asserting someone else's contract through the wrong instrument.
+##
+## THE COST OF NOT HAVING THIS, stated because it is the reason it exists: a menu capture built from every
+## `.tres` on disk showed six white squares, and I read them as a shipped defect — mechanism confirmed in
+## source, screenshot in hand, a message out to a peer who independently confirmed the mechanism — for
+## most of an hour. Every one of the six was an id the game cannot give you. Two people agreeing about a
+## mechanism says nothing about whether the population is real.
+func _check_pack_vocabulary() -> void:
+	var known: Array[StringName] = _items_the_view_knows()
+	var pack: Array[StringName] = _ids_the_pack_can_hold()
+	var unknown: Array[String] = []
+	for id: StringName in pack:
+		if not known.has(id):
+			unknown.append(String(id))
+	_check(unknown.is_empty(),
+		"every one of the %d ids the game can put in a pack is one the view draws%s"
+			% [pack.size(), "" if unknown.is_empty() else " — NO GLYPH (draws as a white square): "
+				+ ", ".join(unknown)])
+	# NON-VACUITY: the assertion above is perfectly satisfied by an empty population, which is what a
+	# broken DirAccess or a renamed directory produces.
+	_check(pack.size() >= 18, "the pack universe read %d ids off disk" % pack.size())
+	# CONTROL: the same comparison, with one id the view certainly does not know.
+	var planted: Array[StringName] = pack.duplicate()
+	planted.append(&"not_a_real_item")
+	var caught: int = 0
+	for id: StringName in planted:
+		if not known.has(id):
+			caught += 1
+	_check(caught == unknown.size() + 1,
+		"the same comparison catches one more once an unknown id is planted (%d -> %d)"
+			% [unknown.size(), caught])
+
+
+## The ids `FactorySim.inventory` can hold, derived from the data the way the pack is filled. See the
+## header above `_check_pack_vocabulary` for why each exclusion is there — every one of them is a state
+## the game cannot reach, and reaching it in a fixture manufactures defects rather than finding them.
+func _ids_the_pack_can_hold() -> Array[StringName]:
+	var out: Array[StringName] = []
+	var d: DirAccess = DirAccess.open("res://src/data/materials")
+	if d != null:
+		for f: String in d.get_files():
+			if not f.ends_with(".tres"):
+				continue
+			var mat: MaterialDef = load("res://src/data/materials/%s" % f) as MaterialDef
+			if mat == null or mat.layer == &"wall" or mat.id == &"leaves":
+				continue
+			_add(out, mat.id)
+	var r: DirAccess = DirAccess.open("res://src/data/recipes")
+	if r != null:
+		for f: String in r.get_files():
+			if not f.ends_with(".tres"):
+				continue
+			var rec: RecipeDef = load("res://src/data/recipes/%s" % f) as RecipeDef
+			if rec == null:
+				continue
+			for side: Dictionary in [rec.inputs, rec.outputs]:
+				for id: Variant in side:
+					_add(out, StringName(id))
+	for t: Dictionary in MainView.CRAFT_TOOLS:
+		_add(out, t["id"])
+	_add(out, &"wood_pickaxe")
+	_add(out, &"sapling")
+	out.sort()
+	return out
 
 
 ## Every item `visuals.gd` declares a look for: a branch in the `item_color` ladder, or a `match` arm in
