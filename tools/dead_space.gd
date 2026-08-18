@@ -97,11 +97,27 @@ static func _tile(img: Image, x0: int, y0: int) -> Array:
 	hist.resize(256)
 	var diff: float = 0.0
 	var n: int = 0
-	for y: int in range(y0, y0 + TILE, 2):
+	for y: int in range(y0, y0 + TILE - 2, 2):
 		for x: int in range(x0, x0 + TILE - 2, 2):
 			var a: float = _luma(img, x, y)
 			hist[int(a)] += 1
-			diff += absf(a - _luma(img, x + 2, y))
+			# HORIZONTAL AND VERTICAL, averaged. This measured only |luma(x,y) - luma(x+2,y)| -- one axis --
+			# so a tile whose content varies VERTICALLY scored zero detail and was reported DEAD. That is
+			# exactly the structure this terrain draws: strata, bedding, partings and the cast shadow on the
+			# back wall all vary up-the-frame and are near-constant along it.
+			#
+			# Averaging the two axes rather than summing keeps the scale: isotropic content reads the same as
+			# before, so the calibrated caps still mean what they meant. Only tiles that are detailed on the
+			# axis nobody was looking at move, which is precisely the false negative being repaired.
+			#
+			# A/B'd across every layer that shares this metric before landing, because a change here moves all of
+			# them at once: check_opening went 1/32 -> 7/32 dead (a real dead region the one-axis metric could not
+			# see), check_underground and check_water_reads both unchanged and passing. That measurement is why
+			# there is no env switch back to the old behaviour -- an escape hatch to a metric known to under-report
+			# is a way to buy green, and the A/B it would have served is already done and written down here.
+			var dh: float = absf(a - _luma(img, x + 2, y))
+			var dv: float = absf(a - _luma(img, x, y + 2))
+			diff += (dh + dv) * 0.5
 			n += 1
 	if n == 0:
 		return [0.0, 0.0, 0.0]
