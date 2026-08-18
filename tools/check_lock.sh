@@ -21,6 +21,9 @@
 #                            travel through the wrapper. A wrapper that flattened 42 to 0 would turn every
 #                            skipped layer into a passing one.
 #   ONE AT A TIME.           The whole point. Two runs racing for the lock must not overlap.
+#   A HANG IS NOT A RUN.     A fixture that errors before its `quit()` idles forever holding the lock. The
+#                            holder is alive and healthy, so no check above can see it; a wall-clock cap
+#                            kills it and exits 6.
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -123,6 +126,45 @@ code=$?
 case "$out" in *"NOTHING RAN"*) r=0 ;; *) r=1 ;; esac
 check $r "...and says NOTHING RAN, on stdout, before taking the lock"
 [ ! -d "$LOCK" ]; check $? "...and a refused call never took the lock at all"
+
+# --- A HANG IS NOT A RUN ---
+# The fifth property, and the newest. A scratch fixture put its work in `_init()` rather than
+# `_initialize()`; `_init` is the Object constructor, so the error there aborted the function before it
+# ever reached `quit(0)`, and the SceneTree then came up normally and idled — forever, holding this lock.
+#
+#   A FIXTURE THAT DIES BEFORE ITS `quit()` DOES NOT FAIL. IT HANGS.
+#
+# None of the four properties above can see that. GIVE UP guards the waiter, not the holder. STALE LOCKS
+# CLEAR reads `kill -0` on the holder's pid and that pid is alive. THE INNER CODE SURVIVES needs an inner
+# code, and there is never going to be one. The holder is healthy; it is simply never going to stop, and
+# the next run queued behind it for eight minutes at 0.6% CPU with 94% of samples in the frame delay.
+runcap() { _c="$1"; shift; SF_LOCK="$LOCK" SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" SF_RUN_CAP="$_c" bash "$WITH" "$@"; }
+
+rm -rf "$LOCK"
+pidf="$TMP/hangpid"; : > "$pidf"
+out="$(runcap 3 /bin/sh -c "echo \$\$ > '$pidf'; while :; do sleep 1; done" 2>/dev/null)"
+code=$?
+[ "$code" -eq 6 ]; check $? "a fixture that hangs forever is KILLED by the cap (exit 6, got $code)"
+case "$out" in *"CAPPED"*) r=0 ;; *) r=1 ;; esac
+check $r "...and says CAPPED on stdout, for every caller that drops the code"
+[ ! -d "$LOCK" ]; check $? "...and the lock is released, which is the whole point"
+# NON-VACUITY, and the assertion that actually matters to the next session: exiting 6 while leaving the
+# process alive would free the lock and keep the box. The stub records its own pid so this can be checked
+# rather than assumed.
+hp="$(cat "$pidf" 2>/dev/null)"
+[ -n "$hp" ] && ! kill -0 "$hp" 2>/dev/null; check $? "...and the hung process is GONE, not merely disowned (pid $hp)"
+
+# THE OTHER HALF, without which the cap would be free to fire on everything: a run that finishes inside its
+# cap must be untouched. A watchdog that cannot tell work from a hang is worse than no watchdog, because it
+# turns a slow honest layer into a red one.
+rm -rf "$LOCK"
+runcap 30 /bin/sh -c "sleep 2" >/dev/null 2>&1
+code=$?
+[ "$code" -eq 0 ]; check $? "a run that finishes inside its cap is untouched (exit 0, got $code)"
+rm -rf "$LOCK"
+runcap 0 /bin/sh -c "sleep 2; exit 42" >/dev/null 2>&1
+code=$?
+[ "$code" -eq 42 ]; check $? "SF_RUN_CAP=0 disables the cap and the inner code still survives (got $code)"
 
 echo
 if [ "$fails" -eq 0 ]; then

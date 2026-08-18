@@ -16,7 +16,8 @@
 # A protocol that depends on remembering to check is not a protocol, and this is the third piece of
 # evidence for that in one session. Run one-off scripts through here.
 #
-# Exit 5 = gave up waiting. Otherwise Godot's own exit code is passed through, so `SKIP_CODE=42` and the
+# Exit 5 = gave up waiting; exit 6 = killed by the wall-clock cap (see CAP below). Otherwise Godot's
+# own exit code is passed through, so `SKIP_CODE=42` and the
 # harness's three-state protocol survive the wrapper.
 
 set -uo pipefail
@@ -146,6 +147,67 @@ for _a in "$@"; do
 	_prev="$_a"
 done
 lock_claim_write "$_claim"
-trap 'rm -rf "$LOCK"' EXIT INT TERM
+# THE WALL-CLOCK CAP, and the failure that bought it. A scratch fixture of mine put its work in `_init()`
+# instead of `_initialize()`. `_init` is the Object CONSTRUCTOR: it runs before the tree is up, the error
+# there aborted the function before it ever reached `quit(0)`, and the SceneTree then came up normally and
+# idled — forever, holding this lock, at 0.6% CPU with 94% of samples parked in `OS::add_frame_delay`.
+#
+#   A FIXTURE THAT DIES BEFORE ITS `quit()` DOES NOT FAIL. IT HANGS, HOLDING THE LOCK.
+#
+# Nothing above catches that. The stale-lock sweep clears a holder whose PID is GONE; this holder's PID is
+# very much alive, and a health check calls it healthy because it IS healthy. It is just never going to
+# stop. The next run queued behind it for eight minutes and the only thing that eventually freed
+# the box was a timeout in my terminal client — which is to say, nothing the harness owns.
+#
+# The alternative fix was a rule ("scratch scripts get `_initialize()` and a `quit()` on every path"). That
+# only works on the days you remember, and this is the third lock hazard closed here that a rule was
+# already supposed to prevent. So the cap goes in the tool, where it binds without being remembered.
+#
+# Deliberately GENEROUS rather than tight. The job is to turn "forever" into "bounded", not to police how
+# long a fixture may legitimately take, so the default would not have interrupted any real run in this
+# repo's history. `SF_RUN_CAP=0` disables it for a run that genuinely needs longer.
+CAP="${SF_RUN_CAP:-1800}"
+CAPMARK="$(mktemp "${TMPDIR:-/tmp}/sinkforge-cap.XXXXXX")"
 
-"$GODOT" --path "$ROOT" "$@"
+"$GODOT" --path "$ROOT" "$@" &
+_child=$!
+# The child joins the trap: a SIGTERM to the wrapper must not leave an orphaned Godot holding the box after
+# the lock directory it was blocking on has already been removed.
+trap 'rm -rf "$LOCK"; kill "$_child" 2>/dev/null; rm -f "$CAPMARK"' EXIT INT TERM
+
+_dog=""
+if [ "$CAP" -gt 0 ]; then
+	(
+		sleep "$CAP"
+		if kill -0 "$_child" 2>/dev/null; then
+			# Mark BEFORE killing, so the status below can tell a cap from a fixture that chose to die on
+			# a signal. Without the mark both arrive as 143 and the cap would be invisible in the log.
+			printf 'capped\n' > "$CAPMARK"
+			echo "with_machine: CAP REACHED after ${CAP}s — killing $_claim (pid $_child)" >&2
+			echo "with_machine: it was still alive but may not have been WORKING; a fixture that errors" >&2
+			echo "with_machine: before its quit() idles here forever. Check for _init vs _initialize." >&2
+			kill -TERM "$_child" 2>/dev/null
+			sleep 5
+			kill -KILL "$_child" 2>/dev/null
+		fi
+	) &
+	_dog=$!
+fi
+
+wait "$_child"
+status=$?
+if [ -n "$_dog" ]; then
+	kill "$_dog" 2>/dev/null
+	wait "$_dog" 2>/dev/null
+fi
+
+if [ -s "$CAPMARK" ]; then
+	rm -f "$CAPMARK"
+	# LOUD, on stdout as well as stderr, and for the same reason exit 5 is: a capped run is a run that did
+	# not finish, and the failure mode is not a misread exit code but that nothing downstream ever looks.
+	echo "with_machine: KILLED BY THE ${CAP}s CAP — this is not a pass (exit 6)" >&2
+	echo "with_machine: CAPPED — the run did not finish. Not a pass."
+	exit 6
+fi
+rm -f "$CAPMARK"
+exit "$status"
