@@ -5,8 +5,9 @@
 > verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
 > `take_lode` / `lode_fraction`, `MainView.try_work_lode`, `WorldRenderer._draw_lode` and the lode's entry
 > into `_wall_base_color` — held by `tools/check_lode.gd` (harness layer 56, 39 assertions) and photographed
-> at `history/118-the-vein-outlives-the-blow.png`. Ore is still authored SOLID by the generator; the cutover
-> is phase 3. **§5's Drill Head shipped as #S39** — a drill placed ON a lode drains it in place and pours
+> at `history/118-the-vein-outlives-the-blow.png`. Ore is still authored SOLID by the generator in the BLOCK
+> plane and converting it is phase 3b — but as of 2026-08-17 the generator also seeds a separate LODE plane,
+> so "a generated world contains no lode" is no longer true. **§5's Drill Head shipped as #S39** — a drill placed ON a lode drains it in place and pours
 > down its own column, held by `tools/check_head.gd` (harness layer 57) and photographed at
 > `history/119-stand-it-on-the-thing-it-eats.png`. The Spur is 2b.
 > Migration plan, blast radius and eval gate: `docs/LODE_PLAN.md`.
@@ -233,7 +234,11 @@ Three strikes, each provable on its own and each leaving the game playable:
 > made the starter adit look like a scuff. **Buried rock may not brighten** — a lit patch on a wall reads as
 > a light source, and worse, underground the veil crushes saturation long before it touches brightness, so
 > value is the only channel with any reach down there. Measured on-screen: **−13.2% luma** against a ~2%
-> capture noise floor. Loud enough to steer a dig, quiet enough that §7's reveal is still a reveal.
+> capture noise floor. **That is an instrumented pixel measurement, and it is all it is.** Whether it is
+> "loud enough to steer a dig" — the claim this line used to make — is a statement about a person, and a
+> luma delta a differ can resolve is not the same quantity as a tell a player notices. Unverified, behind
+> the unmet capture gate in `LODE_PLAN.md` §5. The intent is loud enough to steer a dig and quiet enough
+> that §7's reveal is still a reveal; nobody has yet established that it lands.
 >
 > `check_lode:_the_rock_tells_on_itself` holds all of it, including the one that is easy to lose: the buried
 > tell must be **still**. `_draw_ore_glints` learned at cost that sparkling sealed cells read as a starfield,

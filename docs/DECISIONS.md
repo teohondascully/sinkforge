@@ -263,13 +263,25 @@ opening that backs itself speaks a dialect the world does not — and reads as a
 Ore moves out of the terrain plane into a background lode plane. The old model made a vein *be* the rock,
 so a tunnel driven through an ore body destroyed everything it did not pocket.
 
-**User decision locked: Option A — no solid ore survives the cutover.** Deletion of the solid-ore code path
-is deliberately split into a **separate later commit**: bisectable beats bundled, and nothing generates
-solid ore any more, so the old path is simply unreached in the meantime.
+**User decision locked: Option A — no solid ore survives the cutover.** That remains the target and is not
+reopened here. Deletion of the solid-ore code path is deliberately split into a **separate later commit**:
+bisectable beats bundled.
 
-Phases 1, 2, 2b and part of 4 have shipped. **Phase 3, the cutover, is not done**, and as of the
-2026-08-17 audit its completion, pacing, and deep-pocket play gates are red. It must not be merged on the
-strength of the 98.6/100 its own scorer prints.
+> **CORRECTED 2026-08-17 — this passage previously asserted "nothing generates solid ore any more, so the
+> old path is simply unreached in the meantime". That is the PHASE-3b POSTCONDITION, not current runtime.**
+> `LayeredWorldGen` still scatters solid `ore` / `coal` / `iron` / `rich_ore` into `world.blocks`, and
+> `_seed_lodes` runs **dead last and is purely additive** — it writes `world.lodes` and never touches
+> `world.blocks`. That additivity is exactly why 3a could ship without disturbing the economy, so the old
+> claim contradicted the shipped design as well as the runtime.
+> **Why this one mattered more than a stale sentence:** it supplied the *reason* the deletion could be
+> safely deferred. A false premise carrying a deferral decision outlives its own correction, because the
+> decision it justified stays in force after the premise stops being true. The split is still right — for
+> the bisectability reason alone, which does not depend on the false half.
+
+Phases 1, 2, 2b and part of 4 have shipped. **Phase 3 was later split: 3a (generated lode plane) shipped
+2026-08-17 in `303d1f5` + `8498ae3`; 3b (converting the solid ore blocks) is not done.** As of the
+2026-08-17 audit the *cutover branch's* completion, pacing, and deep-pocket play gates are red. It must not
+be merged on the strength of the 98.6/100 its own scorer prints — that instruction is unaffected by 3a.
 
 *Attested: `docs/LODE.md`, `docs/LODE_PLAN.md`, `the cutover handover`;
 the architecture handover §12.*
@@ -288,7 +300,15 @@ harder to read in motion?"*
 dated. Elevation, not borders. Defocus the world behind a modal. A detail plate for the selected thing.
 Costs as glyphs. **Never a wall of locked rows** — the future belongs on the research screen.
 
-*Attested: `docs/VIBE_GAP.md`; the architecture handover §1 and §10.*
+*Attested: the architecture handover §10; `docs/PRIORITY.md`; `the vibe audit response`.*
+
+> **Attestation repaired 2026-08-17.** This line cited `docs/VIBE_GAP.md`, **a file that has
+> never existed** — no add, no contents, no deletion, in reachable or unreachable history. **The decision
+> itself is real and is not reopened:** the user made it on 2026-06-28 and has restated it since. What was
+> fictitious was its evidence. Note the artifacts now cited are *later* than the decision —
+> `VIBE_AUDIT_RESPONSE.md` is the 2026-08-17 audit — so they corroborate the ordering rather than record
+> its origin, and no document written at the time survives. Said plainly rather than papered over, because
+> an attestation pointing at a substitute is how this got here.
 
 ### 2026-08-16 — default zoom 0.70× → 1.00× — LOCKED, with its derivation
 

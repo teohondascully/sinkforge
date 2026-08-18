@@ -376,10 +376,20 @@ func _reset_pack() -> void:
 ## THE ROCK TELLS ON ITSELF (`docs/LODE.md` §10 phase 4).
 ##
 ## Once ore stops being a block, a world with no stain is uniform stone and the only way to find anything is
-## to dig at random — so this is not a cosmetic pass, it is the prerequisite that keeps the cutover from
-## being a legibility regression. Asserted on the RULE rather than on pixels: the tell is a HUE move that
-## holds the host's value, it is real enough to see, and it is markedly quieter than an open face, because
-## a buried vein you can read as clearly as an exposed one makes clearing the rock pointless.
+## to dig at random. That is the DESIGN ARGUMENT for building the stain; it is not something this layer
+## measures, and the distinction matters because the prose here used to claim the second.
+##
+## WHAT THIS LAYER ACTUALLY TESTS — a COLORIMETRIC RULE, and nothing wider. It calls `_stain()` directly and
+## compares HSV components of the returned Color: the buried tell is a hue/saturation move that holds most
+## of the host's value, an open face never darkens, and a face stains further than a buried vein (so
+## clearing rock still changes what you see). Those assertions are correct about what they cover.
+##
+## WHAT IT DOES NOT TEST, DESPITE WHAT THIS DOCSTRING ONCE SAID: that the tell "is real enough to see", or
+## that a player can read a buried vein at all. Nothing here renders, captures, samples a screen, or
+## involves a person — a delta in colour space is not a delta a person notices, and no assertion below can
+## become evidence about perception no matter how it is worded. Player readability is UNVERIFIED and sits
+## behind the unmet capture gate in `docs/LODE_PLAN.md` §5: a diagnostic frame that sets and RECORDS the
+## tutorial/objective HUD state so the vein is unoccluded.
 func _the_rock_tells_on_itself() -> void:
 	var r: WorldRenderer = _main._renderer
 	var host := Color(0.29, 0.30, 0.34)                     # plain stone, untouched

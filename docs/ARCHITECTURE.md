@@ -154,8 +154,12 @@ and every production count is identical.**
   the **Spur** (`&"spur"`) is a passive coverage extender chained off a Head; the **Drift Rig** (`&"drift"`)
   cuts rock and sorts pay from spoil into two columns (which is why it owns a `flow` hook — the default
   round-robin deal is exactly wrong for a machine that already sorted at the face).
-  **Status: the cutover (phase 3) is NOT done** — see `docs/LODE_PLAN.md`. The Borer and Drift Rig expose
-  lode but their pay chute draws nothing on a generated world.
+  **Status (2026-08-17): phase 3a shipped, phase 3b is NOT done** — see `docs/LODE_PLAN.md`. Generated
+  worlds now carry a lode plane (`WorldData.lodes` → `FactorySim.lode`), proven across 12 seeds × 5 sizes;
+  ore blocks still exist alongside it, and converting them is 3b. The Borer and Drift Rig expose lode, but
+  **whether their pay chute draws on a generated world is UNTESTED, not exonerated** — the symptom that
+  produced "draws nothing" had an upstream cause (no generated lode existed at all) which 3a removed, and
+  no fixture has since driven either machine on a generated world and watched it pay.
 - **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
   ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
   by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT
