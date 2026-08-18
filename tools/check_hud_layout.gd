@@ -111,8 +111,11 @@ func _run() -> void:
 		# spanning x 181..459. `hud.gd:837` asserts in prose that "the large map is centred, off this
 		# column — so the inspector never collides"; that is false for a 128-wide world, and this row is
 		# what makes the claim answerable instead of asserted.
+		# EXPECTED TWIN of the row above, and declared rather than tolerated: once the inspector stands
+		# down under the large map, these two states draw the same screen BY DESIGN. That is the fix, so
+		# the states-differ check is told about it here instead of being loosened for everyone.
 		{"name": "the BIG map WITH a machine hovered", "modal": false, "set": {"_minimap_mode": 2},
-			"hover": true, "keep": "big_hover"},
+			"hover": true, "keep": "big_hover", "twin": "the BIG map up (M twice)"},
 		{"name": "the Bazaar open", "modal": true, "set": {"_inventory_open": true}},
 		{"name": "the dashboard open", "modal": true, "set": {"_show_dashboard": true}},
 		{"name": "the help overlay", "modal": true, "set": {"_show_help": true}},
@@ -124,6 +127,9 @@ func _run() -> void:
 	var big: Array[Rect2] = []
 	var hover: Array[Rect2] = []
 	var big_hover: Array[Rect2] = []
+	var sigs: Array[String] = []
+	var sig_names: Array[String] = []
+	var twin_of: Array[String] = []
 	for st: Dictionary in states:
 		var rects: Array[Rect2] = await _snapshot(hud, st)
 		match String(st.get("keep", "")):
@@ -131,6 +137,9 @@ func _run() -> void:
 			"big_map": big = rects
 			"hover": hover = rects
 			"big_hover": big_hover = rects
+		sig_names.append(String(st["name"]))
+		sigs.append(_signature(rects))
+		twin_of.append(String(st.get("twin", "")))
 		total_panels += rects.size()
 		var name: String = st["name"]
 
@@ -173,6 +182,29 @@ func _run() -> void:
 	_check(total_panels >= states.size() * 2,
 		"the matrix drew %d panels across %d states, so there was geometry to judge"
 			% [total_panels, states.size()])
+
+	# ...AND THE STATES ACTUALLY DIFFER, which the paragraph above has always PROMISED and nothing has ever
+	# CHECKED. "If they all reported the same panels, the matrix would be one state tested eleven times" was
+	# the stated reason for the panel-count floor — but a count cannot tell one screen from eleven copies of
+	# it, and ~50 panels clears a floor of 20 whether or not any state is distinct. Two of these rows were
+	# in exactly that condition until this commit: both "hover" rows drew the bare screen, because the
+	# latch they set was overwritten before the frame.
+	var twins: Array[String] = []
+	var declared: int = 0
+	for i: int in sigs.size():
+		for j: int in range(i + 1, sigs.size()):
+			if sigs[i] != sigs[j]:
+				continue
+			if twin_of[i] == sig_names[j] or twin_of[j] == sig_names[i]:
+				declared += 1                       # an identity the matrix expects, named at its row
+				continue
+			twins.append("'%s' == '%s'" % [sig_names[i], sig_names[j]])
+	_check(twins.is_empty(), "every state drew a different screen from every other%s"
+		% ["" if twins.is_empty() else " — IDENTICAL: " + "; ".join(twins)])
+	# ...and a declared twin must ACTUALLY be a twin, or the declaration is just an exemption. If the
+	# inspector stops standing down, this drops to 0 and the pair above starts failing again.
+	_check(declared == 1, "the one declared twin (big map with/without hover) really is identical (%d)"
+		% declared)
 
 	_main.queue_free()
 	await physics_frame
@@ -280,6 +312,17 @@ func _check_hover(bare: Array[Rect2], hover: Array[Rect2], big_hover: Array[Rect
 			over_map.append("%s (overlap %.0fx%.0f)" % [r, over.size.x, over.size.y])
 	_check(over_map.is_empty(), "the inspector stands down under the big map%s"
 		% ["" if over_map.is_empty() else " — " + "; ".join(over_map)])
+
+
+## A state's screen, reduced to something comparable: every panel it drew, sorted, so two states that drew
+## the same boxes in a different ORDER still read as the same screen. Order is a draw-sequence detail; the
+## claim being tested is about what is on screen.
+func _signature(rects: Array[Rect2]) -> String:
+	var parts: Array[String] = []
+	for r: Rect2 in rects:
+		parts.append("%.0f,%.0f,%.0f,%.0f" % [r.position.x, r.position.y, r.size.x, r.size.y])
+	parts.sort()
+	return "|".join(parts)
 
 
 ## The panel hugging the canvas's right edge, which is the inspector's anchor (hud.gd:840). `Rect2()` if

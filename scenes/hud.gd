@@ -1879,6 +1879,13 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool = f
 ## A REAL rounded rect. Composing one from a rect plus four circles double-blends every corner the moment
 ## the fill is translucent, which is exactly what a modern surface tint is.
 func _round_rect(rect: Rect2, r: float, col: Color) -> void:
+	# ROUNDED BOXES ARE PANELS TOO. `panel_probe` used to see only `_panel()`, and the BAZAAR is built
+	# entirely out of these — so `check_hud_layout`'s "Bazaar open" row recorded the bare screen's four
+	# panels and nothing else, and the layer's headline claim ("the HUD must not print on top of itself")
+	# had never once covered the largest overlay in the game. The states-differ assertion is what found it:
+	# the Bazaar's screen was byte-identical to the bare screen's.
+	if panel_probe != null:
+		panel_probe.append(rect)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
 	sb.set_corner_radius_all(int(r))
