@@ -21,10 +21,6 @@ extends RefCounted
 ## place they spend the rest of the game. Two definitions of dead space would be two standards.
 
 const TILE: int = 120                ## px per judged tile — about a sixteenth of a 1080p frame across
-## TEMPORARY A/B SWITCH, default ON. Three registered layers share this metric (check_opening,
-## check_underground, check_water_reads), so the horizontal-only defect has to be measured against all
-## three before it is called a repair. Set SF_DEAD_HORIZ_ONLY=1 to get the old one-axis behaviour back.
-static var _vert: bool = OS.get_environment("SF_DEAD_HORIZ_ONLY") != "1"
 
 ## A tile is DEAD when both of these fall through. Absolute units, in luminance bytes.
 const DEAD_DETAIL: float = 2.2       ## mean |neighbour difference| — under this there is no visible texture
@@ -113,9 +109,15 @@ static func _tile(img: Image, x0: int, y0: int) -> Array:
 			# Averaging the two axes rather than summing keeps the scale: isotropic content reads the same as
 			# before, so the calibrated caps still mean what they meant. Only tiles that are detailed on the
 			# axis nobody was looking at move, which is precisely the false negative being repaired.
+			#
+			# A/B'd across every layer that shares this metric before landing, because a change here moves all of
+			# them at once: check_opening went 1/32 -> 7/32 dead (a real dead region the one-axis metric could not
+			# see), check_underground and check_water_reads both unchanged and passing. That measurement is why
+			# there is no env switch back to the old behaviour -- an escape hatch to a metric known to under-report
+			# is a way to buy green, and the A/B it would have served is already done and written down here.
 			var dh: float = absf(a - _luma(img, x + 2, y))
 			var dv: float = absf(a - _luma(img, x, y + 2))
-			diff += (dh + dv) * 0.5 if _vert else dh
+			diff += (dh + dv) * 0.5
 			n += 1
 	if n == 0:
 		return [0.0, 0.0, 0.0]

@@ -71,7 +71,22 @@ func _initialize() -> void:
 		quit(1)
 
 
+## A SLOT OF THIS LAYER'S OWN, SET BEFORE THE SCENE EXISTS.
+##
+## `_judge_persistence` drives the real F5/F9 verbs, and `MainView.save_path` defaults to the game's
+## canonical slot — so the first version of that test **rewrote the slot `save_sentinel` had just planted a
+## canary in**, and the harness correctly declared the whole run moot. It was the isolated `user://` and
+## never the player's real save, but the rule is not "do not destroy player data", it is "no layer writes
+## the save slot", and the sentinel exists precisely so that a layer which starts writing saves cannot do
+## it quietly. **The guard caught a new writer on its first run**, which is the only useful moment to catch
+## one.
+##
+## Static and read at call time, so it must be set before anything can read it, and cleaned up after —
+## a layer that tidies only the file it first thought of leaves litter for the next run to trip over.
+const TEST_SLOT: String = "user://check_teaching.save"
+
 func _run() -> void:
+	MainView.save_path = TEST_SLOT
 	var main: MainView = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(main)
 	for _i: int in SETTLE:
@@ -80,9 +95,14 @@ func _run() -> void:
 
 	_judge_texts(hints)
 	await _judge_rope(main, hints)
+	await _judge_sapling(main, hints)
+	await _judge_persistence(main, hints)
 
 	main.queue_free()
 	await physics_frame
+	for leftover: String in [TEST_SLOT, TEST_SLOT + SaveGame.BAK_SUFFIX]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(leftover))
 
 
 ## HAS THIS HINT LATCHED YET? Waits a bounded number of frames for it, and says how long it took.
@@ -329,6 +349,111 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 	_check(hints._done.size() == taught and hints._queue.size() == queued,
 		"...and none of it is ever said twice (%d hints latched, %d queued)"
 			% [hints._done.size(), hints._queue.size()])
+
+
+## THE SAPLING'S SECOND HALF — the one lesson whose situation is a PLAYER ACTION rather than a physics
+## state, and therefore the one this layer's rope drills could never have reached.
+##
+## `UI-05` moved *"it grows into a NEW TREE: wood is renewable"* off the pickup bubble, where it was a
+## second concept competing with the instruction, and onto the first sapling that actually roots — where
+## it is a payoff rather than a promise. **That move is only honest if the payoff fires.** This layer's own
+## standard: *"a hint whose condition never occurs in play is not a lesson, it is a comment in a shipped
+## file"*, and a lesson relocated onto a condition nobody drives is exactly that, with the added insult
+## that the text it replaced is gone.
+##
+## Driven through `try_build`, the real verb, with a real selection — not `sim.plant_sapling`, which would
+## bypass the poke in `main.gd` that is the actual thing under test and pass while it was missing.
+func _judge_sapling(main: MainView, hints: Hints) -> void:
+	var sim: FactorySim = main.sim
+	var soil := Vector2i(BODY_COL, HALL_BOTTOM)          # inside the carved hall, on its stone floor
+	sim.set_solid(soil + Vector2i(0, 1), &"earth")       # SAPLING_SOILS is [&"earth"] — give it ground
+	# ESTABLISH "YOU DO NOT HAVE ONE" BEFORE TESTING THE FIRST ONE, and this setup is itself a finding.
+	# `Hints._init` snapshots the pack, deliberately — whatever you are already holding at construction is
+	# not a fresh acquisition. This layer boots with `dev_start` at its default, and THE DEV KIT ALREADY
+	# CONTAINS A SAPLING, so `_had[&"sapling"]` is true from frame zero and the pickup lesson can never
+	# fire in this fixture. Measured, not assumed: the first version of this check failed with
+	# `had_sapling=true` and `_done` holding five other ids.
+	#
+	# So the pre-state is constructed rather than assumed: empty the slot, re-arm the snapshot the same
+	# way a load does, and only then acquire. That is the state a real opening player is in, and it is the
+	# difference between testing the edge and testing the kit.
+	sim.inventory.erase(&"sapling")
+	hints._snapshot()
+	sim.inventory[&"sapling"] = 2
+	var idx: int = -1
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	for i: int in slots.size():
+		if StringName(slots[i]["item"]) == &"sapling":
+			idx = i
+	_check(idx >= 0, "the sapling is in the pack and selectable (slot %d)" % idx)
+	if idx < 0:
+		return
+	main._inv_selected = idx
+	_check(await _latched(hints, &"sapling"),
+		"picking up a sapling teaches how to plant it")
+	var before: bool = hints._done.has(&"planted")
+	_check(not before,
+		"CONTROL: the payoff has NOT fired before anything is planted (if it had, the check below is empty)")
+	var rooted: bool = main.try_build(soil)
+	_check(rooted, "the real place verb roots a sapling at %s" % soil)
+	if not rooted:
+		return
+	_check(await _latched(hints, &"planted"),
+		"...and the renewability lesson UI-05 moved off the pickup lands on the plant that earns it")
+	# ONCE, the same standard the rope moments are held to.
+	var taught: int = hints._done.size()
+	var second: bool = main.try_build(soil + Vector2i(-1, 0))
+	print("  a second plant (%s) taught %d more thing(s)"
+		% ["rooted" if second else "refused", hints._done.size() - taught])
+	_check(hints._done.size() == taught, "...and it is never said twice")
+
+
+## UI-04 — "IT FIRES ONCE" HAD A PERIOD, AND THE PERIOD WAS ONE PROCESS.
+##
+## This layer already holds the game to *"none of it is ever said twice"* and the game passed, because both
+## the assertion and the play session live inside a single boot. `Hints._done` was never written to disk,
+## so **every state-edge lesson re-taught itself in full on every launch** — the grapple, the wrap, the
+## chain, the hard landing, the aquifer. That is the same failure the layer's own docstring names (*"a tip
+## that re-teaches every swing is the reason players learn to ignore tips"*) at a period long enough that
+## nothing inside one process could see it.
+##
+## Driven through `_save_game` and `_load_game`, the real F5/F9 verbs, against a FRESH `Hints` standing in
+## for a new launch. Testing `restore_taught` directly would prove the function works and prove nothing
+## about the two lines in `main.gd` that call it — which is where a wrong key name lives.
+func _judge_persistence(main: MainView, hints: Hints) -> void:
+	var taught: Array[String] = hints.taught_ids()
+	_check(taught.size() >= 5,
+		"CONTROL: %d lessons have been given, so there is something for the save to carry (%s)"
+			% [taught.size(), ", ".join(taught)])
+	if taught.is_empty():
+		return
+	main._save_game()
+	# A FRESH SESSION, as far as the hint system is concerned: `Hints.new` rebuilds `_done` empty, which is
+	# exactly the state a relaunch produces and exactly the state that used to survive a load.
+	var reborn := Hints.new(main.sim)
+	main._hints = reborn
+	_check(reborn.taught_ids().is_empty(),
+		"CONTROL: a fresh hint system starts having taught nothing (this is what a relaunch is)")
+	main._load_game()
+	var after: Array[String] = reborn.taught_ids()
+	var lost: Array[String] = []
+	for id: String in taught:
+		if not after.has(id):
+			lost.append(id)
+	_check(lost.is_empty(), "a save carries which lessons have already been given%s"
+		% ("" if lost.is_empty() else " — RE-TEACHES: " + ", ".join(lost)))
+	# ...and it must not invent any, which is the failure mode of restoring a list you did not write.
+	var extra: Array[String] = []
+	for id: String in after:
+		if not taught.has(id):
+			extra.append(id)
+	_check(extra.is_empty(), "...and marks nothing taught that never was%s"
+		% ("" if extra.is_empty() else " — INVENTED: " + ", ".join(extra)))
+	# An id the game no longer has must not be able to suppress a future lesson that reuses its name.
+	reborn.restore_taught(["a_lesson_that_does_not_exist"])
+	_check(not reborn.taught_ids().has("a_lesson_that_does_not_exist"),
+		"...and an unknown id in an old save is dropped rather than latched forever")
+	main._hints = hints          # put the layer's own instance back for anything that follows
 
 
 ## The chamber, the hook's roof, the spur the line catches on, and a floor to land hard on.
