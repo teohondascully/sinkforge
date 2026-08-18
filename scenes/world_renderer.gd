@@ -138,6 +138,21 @@ const VOID_FLOOR: float = 0.35
 ## Read once at load: a renderer that consults the environment per frame is a renderer whose output
 ## depends on when you asked.
 static var BARE_MACHINES: bool = OS.get_environment("SF_MACHINE_BARE") == "1"
+## SILHOUETTE ONLY — the casing and nothing else: no glyph, no light pool, no label. `PC-01` asks whether
+## the machine's BODY carries its identity, and every other channel is a way of answering a different
+## question. The glyph especially: it is a decal on the front, it is the thing a toolbar uses, and leaving
+## it in would let `check_machine_identity` pass on twenty identical boxes wearing twenty different icons —
+## which is the exact state the ticket was filed about. Suppressing it makes the assertion HARDER, which is
+## the only kind of test switch that belongs in shipped code.
+static var SILHOUETTE_ONLY: bool = OS.get_environment("SF_MACHINE_SILHOUETTE") == "1"
+## ...AND ONE COLOUR FOR ALL OF THEM, which is the half that took two attempts to get right. The first
+## version left every machine its registry hue and masked "material" as "far enough from bare rock", and
+## that mask could not register its subject: the Descent Engine's shadowed foot lands within 3 levels of
+## the rock behind it, so a DARK machine measured as a SMALLER machine. Twenty bodies scored a mean pair
+## difference of 0.201 and the layer read that as twenty distinguishable shapes, when what it had measured
+## was twenty different paint jobs on one rectangle. Painted identically, any difference left in the patch
+## is geometry and nothing else.
+const SILHOUETTE_GREY := Color(0.75, 0.75, 0.77)
 
 ## What is left of a machine's light pool once it stops working. Not zero: an installed machine in a dark
 ## gallery still has to be findable, and a base that vanishes when it idles is a base you cannot navigate.
@@ -2426,6 +2441,13 @@ func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
 	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
+	# THE FACE, NOT THE CELL. Everything drawn ON a machine — glyph, badge, progress bar, ports, status
+	# lamp — used to be positioned against the cell, which was correct for exactly as long as every machine
+	# filled its cell. With `PC-01`'s profiles in, the Forge's input port hung in the air above its chimney
+	# and the Ore Vent's progress bar ran across the rock beside its foot. `machine_face` is where the body
+	# actually is; `check_casing_light` asserts it stays on one of the body's own parts.
+	var face_u: Rect2 = Visuals.machine_face(Visuals.machine_kind(machine.def))
+	var face := Rect2(pos + face_u.position * float(CELL), face_u.size * float(CELL))
 	if _is_head(machine):
 		# A Head is BOLTED TO THE WALL, so it gets no contact shadow at its feet — it is not standing on
 		# anything. What it gets instead is a shadow cast onto the plane BEHIND it, offset down-right, which
@@ -2463,10 +2485,19 @@ func _draw_machine(machine: MachineState) -> void:
 			"spur" if machine.def.behavior == &"spur" else "collar", 1.0, active, clock, false,
 			sim.lode_fraction(machine.cell))
 	else:
-		Visuals.draw_machine_casing(self, pos, float(CELL), Visuals.machine_color(machine.def),
-			active, _zoom >= DETAIL_ZOOM)
-		Visuals.draw_machine_glyph(self, center, Visuals.machine_kind(machine.def), 1.0, active, clock,
-			machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
+		Visuals.draw_machine_casing(self, pos, float(CELL),
+			SILHOUETTE_GREY if SILHOUETTE_ONLY else Visuals.machine_color(machine.def),
+			active, _zoom >= DETAIL_ZOOM, Visuals.machine_kind(machine.def))
+		if not SILHOUETTE_ONLY:
+			# Scaled to the face it is stamped on, never larger than 1.0: a glyph that overhangs its own
+			# casing is the "sticker" read the recessed faceplate exists to defeat.
+			# FULL SIZE. The glyph is scaled to the FACE only where a face is genuinely small; every
+			# shipped profile's face is the full-width body, and shrinking the glyph to fit it was the
+			# single most damaging thing in the first carved version — a 0.8x gear at 16 screen pixels is
+			# not a smaller gear, it is a smudge.
+			Visuals.draw_machine_glyph(self, face.get_center(), Visuals.machine_kind(machine.def),
+				clampf(minf(face.size.x, face.size.y) / float(CELL) + 0.24, 0.6, 1.0), active, clock,
+				machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
 	# TEXT DECORATIONS are gated (perf + de-clutter): the name label, the held-count badge, and the
 	# stalled NEED bubble are drawn ONLY when the text is actually readable (zoomed IN past _text_zoom)
@@ -2486,20 +2517,20 @@ func _draw_machine(machine: MachineState) -> void:
 		# by its neighbour's plate. A count that outgrows its box is a count you cannot trust.
 		var tag: String = str(held)
 		var tw: float = _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 3.0
-		var badge := Vector2(pos.x + float(CELL) - 2.0 - tw, pos.y + 4.0)
+		var badge := Vector2(face.end.x - 2.0 - tw, face.position.y + 2.0)
 		draw_rect(Rect2(badge, Vector2(tw, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
 		draw_string(_font, badge + Vector2(1.5, 9.0), tag,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.97, 0.97, 0.99))
 
 	if recipe != null and recipe.time > 0.0:
-		var bar_y: float = pos.y + float(CELL) - 3.0
-		draw_rect(Rect2(pos.x, bar_y, float(CELL), 3.0), Color(0.0, 0.0, 0.0, 0.35))
+		var bar_y: float = face.end.y - 3.0
+		draw_rect(Rect2(face.position.x, bar_y, face.size.x, 3.0), Color(0.0, 0.0, 0.0, 0.35))
 		var frac: float = clampf(machine.progress / recipe.time, 0.0, 1.0)
-		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
+		draw_rect(Rect2(face.position.x, bar_y, face.size.x * frac, 3.0), Color(0.40, 0.90, 0.45))
 
-	_draw_machine_io(machine, pos)
+	_draw_machine_io(machine, pos, face)
 	if not BARE_MACHINES:
-		_draw_machine_status(machine, pos, show_text)
+		_draw_machine_status(machine, face, show_text)
 	if _construct.has(machine.cell):     # the one-shot assemble overlay (#9), on top of the finished draw
 		_draw_construct(pos, clampf(float(_construct[machine.cell]) / CONSTRUCT_DUR, 0.0, 1.0))
 
@@ -2534,7 +2565,8 @@ func _draw_construct(pos: Vector2, t: float) -> void:
 ## The look of each status lives in `Visuals.STATUS_LOOK`, not in a match here, and that move is the bug fix
 ## rather than a tidy-up: the match this replaced knew five of the sim's ten statuses and swept the other
 ## five into the grey that means "nothing is wrong". See the table for what that was showing people.
-func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool = true) -> void:
+func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool = true) -> void:
+	var pos: Vector2 = face.position   # the lamp rides the machine's own corner, not the cell's
 	var status: StringName = sim.machine_status(machine)
 	var look: Dictionary = Visuals.status_look(status)
 	var lamp: Color = look["color"]
@@ -2563,12 +2595,12 @@ func _draw_machine_status(machine: MachineState, pos: Vector2, show_bubble: bool
 		# resolution at all: MOTION. A stalled machine breathes a ring around itself; a working one does
 		# nothing, because "no alarm" has to stay the quiet state or a mature base becomes a light show.
 		var alarm: float = 0.40 + 0.60 * absf(sin(_anim_time * 2.6))
-		draw_rect(Rect2(pos - Vector2(1.5, 1.5), Vector2(float(CELL) + 3.0, float(CELL) + 3.0)),
+		draw_rect(Rect2(face.position - Vector2(1.5, 1.5), face.size + Vector2(3.0, 3.0)),
 			Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 2.0)
 		return
 	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
 	var bob: float = sin(_anim_time * 3.0) * 1.5
-	var bc: Vector2 = pos + Vector2(float(CELL) * 0.5, -24.0 + bob)
+	var bc: Vector2 = Vector2(face.get_center().x, face.position.y - 24.0 + bob)
 	draw_circle(bc, 9.0, Color(0.05, 0.04, 0.06, 0.82 * pulse))
 	draw_arc(bc, 9.0, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
 
@@ -2681,23 +2713,29 @@ func _draw_machine_label(machine: MachineState, pos: Vector2) -> void:
 ## it SPITS (output spout, in the flow direction — down for a recipe-runner/source, down+right for a
 ## splitter, up for a lift). Tinted by the item so you learn "orange goes in here, yellow comes out
 ## there" at a glance — the in-world half of the I/O affordances. Pure cosmetic.
-func _draw_machine_io(machine: MachineState, pos: Vector2) -> void:
+func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	var c: float = float(CELL)
+	# THE MOUTH SITS ON THE MACHINE; THE SPOUT SITS ON THE CELL. Goods fall in from above and land on the
+	# body, so the input wedge belongs on the face's top edge — over the chimney's shoulder for a Forge,
+	# not floating where the chimney is not. Output is the opposite claim: it says which neighbouring CELL
+	# the goods leave into, and every profile in the set keeps a flat foot at the cell line for exactly
+	# that reason. Both stay on the face's centre column so they read as one throughput line.
+	var mid: float = face.get_center().x
 	if recipe != null and not recipe.inputs.is_empty():
 		var in_item: StringName = recipe.inputs.keys()[0]
-		_port(pos + Vector2(c * 0.5, 0.0), Vector2(0, 1), Visuals.item_color(in_item))   # mouth: points in
+		_port(Vector2(mid, face.position.y), Vector2(0, 1), Visuals.item_color(in_item))
 	var out_col := Color(0.80, 0.86, 0.94)                                                # neutral "routes"
 	if recipe != null and not recipe.outputs.is_empty():
 		out_col = Visuals.item_color(recipe.outputs.keys()[0])
 	match machine.def.behavior:
 		&"lift":
-			_port(pos + Vector2(c * 0.5, c), Vector2(0, -1), Color(0.5, 1.0, 0.92))       # spouts UP
+			_port(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts UP
 		&"splitter":
-			_port(pos + Vector2(c * 0.5, c), Vector2(0, 1), out_col)                      # down
-			_port(pos + Vector2(c, c * 0.5), Vector2(1, 0), out_col)                      # + right
+			_port(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # down
+			_port(Vector2(pos.x + c, face.get_center().y), Vector2(1, 0), out_col)        # + right
 		_:
-			_port(pos + Vector2(c * 0.5, c), Vector2(0, 1), out_col)                      # spouts down
+			_port(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # spouts down
 
 
 ## One little triangular port: base sits on the casing edge at `base`, apex juts out by `dir`.
@@ -3556,6 +3594,8 @@ func _paint_lights(layer: LightLayer) -> void:
 		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.38)
 		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.06 * lamp_scale)  # close body glow
 	for machine: MachineState in sim.machines:
+		if SILHOUETTE_ONLY:
+			continue          # a body's shape is not its glow (see the flag's note)
 		var kind: String = Visuals.machine_kind(machine.def)
 		# Saturated cores (diffs 2, 9): each machine's pool blazes in its OWN colour out of the black — a
 		# hot orange forge, an amber burner, a cyan-teal lift — the coloured-pools-on-black Noita read.

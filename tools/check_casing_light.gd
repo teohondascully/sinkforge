@@ -126,6 +126,7 @@ func _run() -> void:
 	# numbers go stale and this layer keeps proving a lighting model nothing uses any more — vacuity by a
 	# premise nobody re-measured. There is no way to read a literal back out of a function, so the constants
 	# are duplicated and this is the tripwire on the duplicate: change the drawing code and land here.
+	_check_face_sits_on_body()
 	_check(is_equal_approx(TOP_LIGHTEN, 0.34) and is_equal_approx(BOT_DARKEN, 0.50),
 		"the bevel constants here still match draw_machine_casing's (%.2f up, %.2f down)"
 			% [TOP_LIGHTEN, BOT_DARKEN])
@@ -158,6 +159,31 @@ func _run() -> void:
 ## second tripwire to keep in step, and the bevel constants below are already the one place that has to be.
 func _both_states(col: Color) -> Array:
 	return [["working", col], ["idle", Visuals._cold_iron(col)]]
+
+
+## THE FACE TABLE CANNOT DRIFT AWAY FROM THE PROFILE TABLE. `machine_face` names where a machine's glyph,
+## badge, progress bar and ports are drawn, and `machine_profile` names where its body actually is. They
+## are two dictionaries keyed by the same strings, which is a promise nothing enforces — and the failure is
+## silent and total: a face that has slipped off its parts draws every cue on the machine onto bare rock,
+## and looks exactly like a face that has not.
+func _check_face_sits_on_body() -> void:
+	var judged: int = 0
+	for kind: Variant in Visuals.MACHINE_PROFILE:
+		var face: Rect2 = Visuals.machine_face(String(kind))
+		var on_body: bool = false
+		for part: Rect2 in Visuals.machine_profile(String(kind)):
+			if part.encloses(face):
+				on_body = true
+		_check(on_body, "%s's face sits on one of its own body parts" % String(kind))
+		judged += 1
+	_check(judged >= 10, "%d profiles were judged" % judged)
+	# THE GUARD MUST BITE: a face deliberately off the body must be rejected, or the loop above is a loop.
+	var stray := Rect2(0.0, 0.0, 1.0, 1.0)
+	var any: bool = false
+	for part: Rect2 in Visuals.machine_profile("drill"):
+		if part.encloses(stray):
+			any = true
+	_check(not any, "CONTROL: a full-cell face is REJECTED against the drill's carved body — the test bites")
 
 
 ## How far the nearer of the two lit edges stands off the body between them. The MINIMUM of the two steps,

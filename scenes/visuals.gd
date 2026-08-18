@@ -225,73 +225,228 @@ static func machine_color(def: MachineDef) -> Color:
 const COLD_DARKEN: float = 0.22       ## how much value an idle casing gives up
 const COLD_DESAT: float = 0.18        ## ...and how far it drifts toward grey, so it reads cold not shadowed
 
+## THE PROFILE — the shape a machine's body actually occupies inside its cell.
+##
+## `PC-01`: *"make the machine silhouette carry more identity than its label."* The header above already
+## quotes the audit finding — *"the same 30x30 flat square in a different hue with an icon on it"* — and the
+## lighting model that answered it made the square read as an OBJECT without making it read as a PARTICULAR
+## object. Measured with the glyphs off, the light pools off and every body painted one grey
+## (`check_machine_identity`), 171 of 190 machine pairs occupied the same cell pixels to within 3%. The only
+## machine with its own outline was the Spur, and only because a Head deliberately draws no casing at all.
+##
+## SO THE BODIES ARE BUILT FROM RECTANGLES AND NOT FROM A POLYGON, and that is a decision about pixels
+## rather than about convenience. The play zoom is 0.50x, so a 32px cell is **16 screen pixels**: a
+## diagonal is four grey steps, a curve is a smudge, and both cost their legibility to antialiasing before
+## they cost it to distance. Stacked rectangles of decreasing width ARE how pixel art draws a dome, a
+## funnel and a ziggurat, and every seam between two of them lands on the pixel grid.
+##
+## Each entry is in UNIT SPACE (0..1 across the cell, y down) so the profiles survive any cell size, and
+## every one of them keeps a FLAT FOOT at y=1.0 — the plinth and the contact shadow are what bolt a machine
+## to the floor, and a body that floats loses more than a silhouette gains.
+##
+## A kind with no entry keeps the full square. That is the honest default for the placeables (torch, rope,
+## conduit) whose in-world drawing is not this function at all.
+## ONE SOLID BODY AND A CROWN, AND THE FIRST VERSION OF THIS CARVED THE BODY INSTEAD.
+##
+## That version measured better and looked worse, which is the whole reason this comment is long. Splitting
+## each machine into two and three sub-bodies took `check_machine_identity`'s mean pair difference from
+## 0.093 to 0.352 — a real, large, correctly-measured gain — and the side-by-side capture at play zoom was
+## unambiguous in the other direction: the machines read as **broken**, not as different. Each part carried
+## its own bevel and its own outline, so a 32px cell filled with internal seams; the glyph shrank to fit the
+## largest surviving part and clipped; and the solid block of registry colour that made a machine read as
+## ONE object at 16 screen pixels was gone. **The gauge went green while the subject got worse**, which is
+## the exact failure this repository has spent the day cataloguing, arriving through a door I built myself.
+##
+## So the body is one rectangle — full width, from the crown line to the foot — and identity lives in the
+## TOP BAND, which is the only part of a machine's outline that has sky behind it. A chimney, a pair of
+## gantry posts, three crusher teeth, a hopper's flange: each is one small addition against the background
+## rather than a subtraction from the mass. The glyph keeps its size and sits on solid metal.
+##
+## Rectangles, not polygons, and that is a decision about pixels rather than convenience. Play zoom is
+## 0.50x, so a 32px cell is **16 screen pixels**: a diagonal is four grey steps and a curve is a smudge.
+## Stacked rectangles of decreasing width ARE how pixel art draws a dome, and every seam lands on the grid.
+##
+## Unit space (0..1 across the cell, y down). Every profile keeps a FLAT FOOT at y=1.0 — the plinth and the
+## contact shadow are what bolt a machine to the floor, and a body that floats loses more than it gains.
+## A kind with no entry keeps the full square, which is the honest default for the placeables (torch, rope,
+## conduit) whose in-world drawing is not this function at all.
+const CROWN: float = 0.20                    ## the top band, where a machine is allowed to differ
+const BODY := Rect2(0.0, CROWN, 1.0, 1.0 - CROWN)
+const MACHINE_PROFILE: Dictionary = {
+	# A FURNACE HAS A CHIMNEY. One tall element off-centre against the sky is the oldest industrial
+	# silhouette there is, and the only one in this set that survives a screenshot at thumbnail size.
+	"furnace": [BODY, Rect2(0.56, 0.0, 0.26, 0.22)],
+	# A GENERATOR IS A DRUM: a domed cap, which at this size is one rectangle narrower than the body.
+	# Wide and LOW, deliberately: a tall centred cap put it 0.038 from the Descent Engine's stepped one.
+	"generator": [BODY, Rect2(0.14, 0.09, 0.72, 0.13)],
+	# A DRILL IS SLUNG BETWEEN TWO MOUNTS. Two short posts with a gap — the machine hangs in its frame.
+	"drill": [BODY, Rect2(0.06, 0.02, 0.24, 0.20), Rect2(0.70, 0.02, 0.24, 0.20)],
+	# THE BORER IS THE DRILL TURNED SIDEWAYS and its crown says so: one mount, hard against the left.
+	"h_drill": [BODY, Rect2(0.02, 0.02, 0.34, 0.20)],
+	# A HOPPER IS A MOUTH. A full-width flange overhanging the body: goods land ON this.
+	"hopper": [BODY, Rect2(0.0, 0.0, 1.0, 0.14)],
+	# A LIFT IS A GANTRY — two tall posts, taller and thinner than the drill's mounts, open between them.
+	"lift": [BODY, Rect2(0.08, 0.0, 0.18, 0.22), Rect2(0.74, 0.0, 0.18, 0.22)],
+	# A SPLITTER TAKES ONE INLET. A single central stack over a body that fans out below it.
+	"fork": [BODY, Rect2(0.36, 0.0, 0.28, 0.22)],
+	# A CRUSHER HAS TEETH.
+	"crush": [BODY, Rect2(0.08, 0.04, 0.18, 0.18), Rect2(0.41, 0.04, 0.18, 0.18),
+		Rect2(0.74, 0.04, 0.18, 0.18)],
+	# A PRESS IS A RAM: one heavy block, centred, wider than a chimney and shorter than a post.
+	"press": [BODY, Rect2(0.26, 0.06, 0.48, 0.16)],
+	# A MILL IS DRIVEN FROM ABOVE: a narrow drive shaft off-centre the other way from the furnace stack,
+	# so the two never read as each other in a row.
+	"gear": [BODY, Rect2(0.18, 0.0, 0.20, 0.22)],
+	# A PUMP HAS A SPOUT, and it leaves to one side.
+	"pump": [BODY, Rect2(0.62, 0.06, 0.34, 0.16)],
+	# THE DRIFT RIG IS A FRAME, NOT A LID. Its crown was one full-width canopy and measured 0.028 from the
+	# Hopper's flange — two machines that do nothing alike wearing the same outline. Two brackets with the
+	# sky between them reads as a rig and cannot be confused with a mouth.
+	"drift": [BODY, Rect2(0.0, 0.02, 0.32, 0.16), Rect2(0.68, 0.02, 0.32, 0.16)],
+	# THE DESCENT ENGINE IS AN ALTAR — the one machine in the game that is a GATE. A stepped cap, narrower
+	# than the generator's dome and taller, so the two are not the same object at a glance.
+	"descent": [BODY, Rect2(0.34, 0.0, 0.32, 0.22), Rect2(0.14, 0.12, 0.72, 0.10)],
+	# THE THREE PLACEABLES. `draw_machine_casing` is not how a rope, a torch or a conduit is drawn in the
+	# world — each has its own draw — but `place_machine` accepts their defs, the ghost preview reaches
+	# them, and with no entry here all three were the same full square and scored 0.003 from each other.
+	# A default that is wrong for three of twenty registry entries is a default worth overriding.
+	"rope": [Rect2(0.38, 0.0, 0.24, 1.0)],
+	"torch": [Rect2(0.36, 0.28, 0.28, 0.72), Rect2(0.22, 0.04, 0.56, 0.22)],
+	"conduit": [Rect2(0.0, 0.32, 1.0, 0.36)],
+}
+const FULL_PROFILE: Array = [Rect2(0.0, 0.0, 1.0, 1.0)]
+
+## WHERE THE GLYPH, THE BADGE, THE BAR AND THE PORTS BELONG once the body no longer fills the cell.
+##
+## Everything that used to be positioned against the CELL is now positioned against the FACE, and the
+## reason is a picture: with the profiles in and nothing else changed, the Forge's input port — an orange
+## wedge marking where ore drops in — hung in the empty air above the chimney, and the Ore Vent's progress
+## bar ran across rock beside its foot. **A cue anchored to a rectangle the machine no longer occupies is a
+## cue pointing at nothing**, and it is the exact cost of carving a silhouette out of a full square.
+##
+## The default is the largest part by area, which is right for eleven of the thirteen. `lift` is the
+## exception the default gets wrong: its two gantry posts are each fractionally larger than the base beam
+## they stand on, so the glyph would ride up one leg. `check_casing_light` asserts every face here is
+## contained in one of its kind's own parts, so this table cannot drift away from the profile above it.
+## Empty on purpose, and kept because the moment a profile stops being "one body plus a crown" the default
+## stops being right. The default is the largest part by area, which for every entry above is `BODY` — so
+## the glyph, the badge, the bar and the ports all sit on the same solid rectangle they always sat on,
+## three pixels lower than the cell's centre and never on a crown.
+const MACHINE_FACE: Dictionary = {}
+
+
+## The body rectangles for a kind, in unit space. Never empty — an unknown kind is a full square, which is
+## what every machine was before this existed.
+static func machine_profile(kind: String) -> Array:
+	return MACHINE_PROFILE.get(kind, FULL_PROFILE)
+
+
+## The part of a kind's body that carries everything drawn ON the machine, in unit space.
+static func machine_face(kind: String) -> Rect2:
+	if MACHINE_FACE.has(kind):
+		return MACHINE_FACE[kind]
+	var parts: Array = machine_profile(kind)
+	var best: Rect2 = parts[0]
+	for r: Rect2 in parts:
+		if r.size.x * r.size.y > best.size.x * best.size.y:
+			best = r
+	return best
+
+
 static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float, col_in: Color,
-		active: bool, detail: bool) -> void:
+		active: bool, detail: bool, kind: String = "") -> void:
 	var col: Color = col_in if active else _cold_iron(col_in)
 	var c: float = cell_px
-	var body := Rect2(pos + Vector2(1.0, 1.0), Vector2(c - 2.0, c - 2.0))
-	canvas.draw_rect(body, col)
+	var parts: Array = machine_profile(kind)
 
-	# --- the light: A THIN CATCH AND A DEEP SHADOW, not a wash --------------------
-	# The first version of this lit the top THIRD with a broad pale wash, and the A/B was decisive against
-	# it: the body's mid-value climbed until it met the glyph painted on top of it, and the Drift Rig's white
-	# rails stopped separating from their own casing. Under a torch — where the world light is already
-	# multiplying everything — it read as a blown-out cream tile, which is a worse UI tile than the flat one
-	# it replaced. LEGIBILITY OUTRANKS THE LOOK, and the glyph is the part that has to be read.
-	#
-	# So the light is where light actually is on a 32px object: a couple of pixels catching it along the top,
-	# and a real shadow across the foot. The body keeps its registry colour in the middle, which is the value
-	# every glyph in the vocabulary was drawn against.
-	canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, 3.0)), Color(1.0, 0.98, 0.92, 0.07))
-	canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - c * 0.30),
-		Vector2(body.size.x, c * 0.30)), Color(0.0, 0.0, 0.02, 0.30))
+	# The biggest part is the FACE: the one that carries the recessed plate, the vents and the rivets. A
+	# chimney with its own faceplate is a chimney with a door in it.
+	var face_i: int = 0
+	var face_area: float = -1.0
+	for i: int in parts.size():
+		var u: Rect2 = parts[i]
+		if u.size.x * u.size.y > face_area:
+			face_area = u.size.x * u.size.y
+			face_i = i
 
-	# --- the bevel: two edges catch it, two do not --------------------------------
-	# A WORKING machine takes its top light warm. This is the only emissive the casing has, and it is
-	# deliberately one pixel: the glyphs already animate, and a body that pulses too would give every
-	# powered machine on screen its own heartbeat competing with the avatar.
-	var top: Color = col.lightened(0.34) if not active else col.lightened(0.34).lerp(Color(1.0, 0.86, 0.58), 0.30)
-	canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, 1.0)), top)
-	canvas.draw_rect(Rect2(body.position, Vector2(1.0, body.size.y)), col.lightened(0.16))
-	canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - 1.0), Vector2(body.size.x, 1.0)),
-		col.darkened(0.50))
-	canvas.draw_rect(Rect2(body.position + Vector2(body.size.x - 1.0, 0.0), Vector2(1.0, body.size.y)),
-		col.darkened(0.42))
+	for i: int in parts.size():
+		var u: Rect2 = parts[i]
+		var body := Rect2(pos + Vector2(u.position.x * c + 1.0, u.position.y * c + 1.0),
+			Vector2(maxf(u.size.x * c - 2.0, 2.0), maxf(u.size.y * c - 2.0, 2.0)))
+		canvas.draw_rect(body, col)
+
+		# --- the light: A THIN CATCH AND A DEEP SHADOW, not a wash --------------------
+		# The first version of this lit the top THIRD with a broad pale wash, and the A/B was decisive
+		# against it: the body's mid-value climbed until it met the glyph painted on top of it, and the
+		# Drift Rig's white rails stopped separating from their own casing. Under a torch — where the world
+		# light is already multiplying everything — it read as a blown-out cream tile, which is a worse UI
+		# tile than the flat one it replaced. LEGIBILITY OUTRANKS THE LOOK, and the glyph has to be read.
+		#
+		# So the light is where light actually is on a 32px object: a couple of pixels catching it along
+		# the top, and a real shadow across the foot. The body keeps its registry colour in the middle,
+		# which is the value every glyph in the vocabulary was drawn against. Per PART, now — a stepped
+		# dome whose steps are unlit is a stack of flat cards, and the step edges are the whole shape.
+		canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, minf(3.0, body.size.y))),
+			Color(1.0, 0.98, 0.92, 0.07))
+		var shade: float = minf(c * 0.30, body.size.y * 0.5)
+		canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - shade),
+			Vector2(body.size.x, shade)), Color(0.0, 0.0, 0.02, 0.30))
+
+		# --- the bevel: two edges catch it, two do not --------------------------------
+		# A WORKING machine takes its top light warm. This is the only emissive the casing has, and it is
+		# deliberately one pixel: the glyphs already animate, and a body that pulses too would give every
+		# powered machine on screen its own heartbeat competing with the avatar.
+		var top: Color = col.lightened(0.34) if not active \
+			else col.lightened(0.34).lerp(Color(1.0, 0.86, 0.58), 0.30)
+		canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, 1.0)), top)
+		canvas.draw_rect(Rect2(body.position, Vector2(1.0, body.size.y)), col.lightened(0.16))
+		canvas.draw_rect(Rect2(body.position + Vector2(0.0, body.size.y - 1.0),
+			Vector2(body.size.x, 1.0)), col.darkened(0.50))
+		canvas.draw_rect(Rect2(body.position + Vector2(body.size.x - 1.0, 0.0),
+			Vector2(1.0, body.size.y)), col.darkened(0.42))
+		# and the hard outline that keeps it off the rock behind it
+		canvas.draw_rect(Rect2(pos + u.position * c, u.size * c), Color(0.03, 0.03, 0.05, 0.85), false, 1.0)
+
+		if not detail or i != face_i:
+			continue
+		# --- the tier that only exists when you can see it ----------------------------
+		# A RECESSED FACEPLATE: the glyph sits in a panel sunk into the body, which is why it reads as
+		# stamped into the machine instead of stickered onto it. The bevel runs the OTHER WAY here — dark
+		# on top, light on the bottom — because that inversion is the only thing that distinguishes a hole
+		# from a bump.
+		#
+		# The plate also does legibility work, and it is the reason the number here is 0.26 and not the
+		# 0.20 it started at: sinking the panel DARKENS the ground the glyph is drawn on, so every glyph in
+		# the vocabulary gains contrast against its own machine.
+		var inset: float = minf(4.0, minf(body.size.x, body.size.y) * 0.22)
+		var face := Rect2(body.position + Vector2(inset, inset),
+			Vector2(body.size.x - inset * 2.0, body.size.y - inset * 2.0))
+		if face.size.x < 4.0 or face.size.y < 4.0:
+			continue
+		canvas.draw_rect(face, Color(0.0, 0.0, 0.02, 0.26))
+		canvas.draw_rect(Rect2(face.position, Vector2(face.size.x, 1.0)), Color(0.0, 0.0, 0.02, 0.38))
+		canvas.draw_rect(Rect2(face.position + Vector2(0.0, face.size.y - 1.0),
+			Vector2(face.size.x, 1.0)), col.lightened(0.22))
+
+		# VENTS: slots cut in the lower body. Sheet metal with a hole in it is unmistakably manufactured,
+		# and this is the cheapest manufactured thing to draw. Fitted to the part rather than to the cell,
+		# because a profile can be narrower than three slots.
+		var slots: int = int(clampf(floorf((body.size.x - 8.0) / 4.0), 0.0, 3.0))
+		for s: int in slots:
+			canvas.draw_rect(Rect2(body.position.x + 4.0 + float(s) * 4.0,
+				body.position.y + body.size.y - 6.0, 2.0, 3.0), Color(0.0, 0.0, 0.02, 0.42))
+
+		# RIVETS: a dark seat with a lit crown offset up-left, toward the same sun the bevel assumes. A
+		# rivet drawn as a single black dot — which is what shipped — is a hole, not a fastener.
+		if body.size.x >= 10.0 and body.size.y >= 10.0:
+			for corner: Vector2 in [Vector2(3.0, 3.0), Vector2(body.size.x - 3.0, 3.0),
+					Vector2(3.0, body.size.y - 3.0), Vector2(body.size.x - 3.0, body.size.y - 3.0)]:
+				canvas.draw_circle(body.position + corner, 1.4, Color(0.0, 0.0, 0.02, 0.55))
+				canvas.draw_circle(body.position + corner - Vector2(0.4, 0.4), 0.7, col.lightened(0.40))
 
 	# --- the plinth: this thing is bolted to the floor ----------------------------
+	# Drawn ONCE, across whatever parts reach the foot, so a gantry gets one base and not two.
 	canvas.draw_rect(Rect2(pos.x + 2.0, pos.y + c - 4.0, c - 4.0, 3.0), Color(0.05, 0.05, 0.07, 0.55))
-	# and the hard outline that keeps it off the rock behind it
-	canvas.draw_rect(Rect2(pos, Vector2(c, c)), Color(0.03, 0.03, 0.05, 0.85), false, 1.0)
-
-	if not detail:
-		return
-
-	# --- the tier that only exists when you can see it ----------------------------
-	# A RECESSED FACEPLATE: the glyph sits in a panel sunk into the body, which is why it reads as stamped
-	# into the machine instead of stickered onto it. The bevel runs the OTHER WAY here — dark on top, light
-	# on the bottom — because that inversion is the only thing that distinguishes a hole from a bump.
-	#
-	# The plate also does legibility work, and it is the reason the number here is 0.26 and not the 0.20 it
-	# started at: sinking the panel DARKENS the ground the glyph is drawn on, so every glyph in the
-	# vocabulary gains contrast against its own machine. The recess and the readability want the same thing.
-	var face := Rect2(pos + Vector2(5.0, 5.0), Vector2(c - 10.0, c - 10.0))
-	canvas.draw_rect(face, Color(0.0, 0.0, 0.02, 0.26))
-	canvas.draw_rect(Rect2(face.position, Vector2(face.size.x, 1.0)), Color(0.0, 0.0, 0.02, 0.38))
-	canvas.draw_rect(Rect2(face.position + Vector2(0.0, face.size.y - 1.0), Vector2(face.size.x, 1.0)),
-		col.lightened(0.22))
-
-	# VENTS: three slots cut in the lower body. Sheet metal with a hole in it is unmistakably manufactured,
-	# and this is the cheapest manufactured thing to draw.
-	for i: int in 3:
-		canvas.draw_rect(Rect2(pos.x + 6.0 + float(i) * 4.0, pos.y + c - 8.0, 2.0, 3.0),
-			Color(0.0, 0.0, 0.02, 0.42))
-
-	# RIVETS: a dark seat with a lit crown offset up-left, toward the same sun the bevel assumes. A rivet
-	# drawn as a single black dot — which is what shipped — is a hole, not a fastener.
-	for corner: Vector2 in [Vector2(4.0, 4.0), Vector2(c - 4.0, 4.0), Vector2(4.0, c - 4.0),
-			Vector2(c - 4.0, c - 4.0)]:
-		canvas.draw_circle(pos + corner, 1.4, Color(0.0, 0.0, 0.02, 0.55))
-		canvas.draw_circle(pos + corner - Vector2(0.4, 0.4), 0.7, col.lightened(0.40))
 
 
 ## An idle casing: value gone and the hue pulled toward grey. Both, because darkening alone reads as a

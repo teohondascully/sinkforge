@@ -347,6 +347,10 @@ add "check_status_reads (every state)" "res://tools/check_status_reads.gd"
 # actually asks from across a room, which is whether the HARDWARE looks like it is running. That question
 # has no headless form; the light pool it measures is drawn, not modelled.
 add_gl "check_machine_state (running reads)" "res://tools/check_machine_state.gd"
+# add_gl for the same reason as its sibling, and one more: it measures OCCUPANCY, and the dummy renderer
+# occupies nothing. Twenty empty masks are perfectly identical, which is the one input that would make this
+# layer's central assertion pass for the worst possible reason.
+add_gl "check_machine_identity (which box)" "res://tools/check_machine_identity.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
 add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
