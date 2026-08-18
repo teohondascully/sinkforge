@@ -37,7 +37,7 @@ _zoom_*.png
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
 
-# THE VISUAL RECORD — history/ (the curated archive) and the 44 canonical _moment_*.png captures — is
+# THE VISUAL RECORD — history/ (the curated archive) and the 51 canonical _moment_*.png captures — is
 # COMMITTED, at the user's instruction on 2026-08-17. Both sat here ignored before, history/ under a note
 # reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
 # (docs/DECISIONS.md, "Never destroy anything the user made") forbids DESTROYING them, and it exists

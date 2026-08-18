@@ -420,7 +420,7 @@ sacred.
 
 ### The visual record is committed, not merely kept
 
-`history/` and the 44 canonical `_moment_*.png` captures are tracked in git, at the user's instruction on
+`history/` and the 51 canonical `_moment_*.png` captures are tracked in git, at the user's instruction on
 2026-08-17. Until then both were ignored, `history/` under a `.gitignore` note reading *"keep on disk,
 NEVER publish or delete"* — one line asserting two rules that have nothing to do with each other. Only the
 **delete** half was ever a decision (the LOCKED rule directly above); the **publish** half was never
