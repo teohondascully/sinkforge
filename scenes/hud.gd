@@ -1972,15 +1972,21 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 ## One have/need chip. Green when the pack covers it, red when it does not — the affordability answer given
 ## per ingredient rather than as one verdict, so a short shopping list says WHICH thing is short.
 func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
-	var label: String = "%d/%d" % [need, have]
+	# HAVE OVER NEED, which is what the three comments above this one have always said it was and what the
+	# code did not do. It drew `need/have`, so a fresh save priced the Forge at "3/0" — a fraction with a
+	# zero denominator, in the one screen state nobody had ever photographed — and a finished save priced
+	# it at "3/64", which reads as five percent of the way there while you are carrying twenty-one times
+	# what it asks. The numerator is now the number that MOVES while you play, which is also the one the
+	# affordability colour belongs on.
+	var label: String = "%d/%d" % [have, need]
 	var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 26.0
 	_round_rect(Rect2(at, Vector2(w, 19.0)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
 	Visuals.draw_item(self, at + Vector2(11.0, 9.5), 13.0, item)
 	var ok: bool = have >= need
-	draw_string(_font, at + Vector2(19.0, 13.5), str(need), HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+	draw_string(_font, at + Vector2(19.0, 13.5), str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
 		Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
-	var nw: float = _font.get_string_size(str(need), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(_font, at + Vector2(19.0 + nw, 13.5), "/%d" % have, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(_font, at + Vector2(19.0 + hw, 13.5), "/%d" % need, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
 		Color(0.36, 0.39, 0.45))
 	return at.x + w
 
