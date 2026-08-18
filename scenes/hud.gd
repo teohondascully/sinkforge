@@ -145,7 +145,23 @@ var can_craft: bool = false        ## are we near a claimed Bazaar? gates the VE
 ## DETAIL PLATE along the bottom — the thing you are about to buy, drawn large enough to want, with its
 ## price and its verb in the same look. Twenty-one rows fit without scrolling; `check_pack_layout` asserts
 ## it rather than trusting it.
+## THE COUNTER'S WIDTH, AND THE HEIGHT IT IS ALLOWED TO REACH — not the height it takes.
+##
+## 608x348 on a 640x360 canvas is 91.95% of the screen, and T2.1's complaint was never that the panel is
+## large but that it is large REGARDLESS: a fresh game's PACK tab holds one item and drew the same 92% as a
+## finished game's nineteen-machine WORKS list. The counter now takes the height its ACTIVE TAB asks for
+## (`_bazaar_wanted_h`), clamped between `BAZAAR_MIN_H` and this. A fresh PACK lands at 196 -- **51.7% of
+## the canvas instead of 91.95%** -- and BENCH still asks for more than this and still gets clamped to it,
+## so the deep end of the game is unchanged.
+##
+## THE WIDTH DOES NOT MOVE, deliberately. The detail plate along the bottom carries a machine's whole
+## sentence ("breaks tier-1 rock (earth / stone / ore / coal) -- hold LMB"), and that is what the 528px of
+## content width is bought for. Shrinking width to match one 46px well would trade a void for a truncation.
 const BAZAAR_SIZE := Vector2(608.0, 348.0)
+## Head + one row of pack wells + the gap + the detail plate + the foot. Below this the counter would be
+## smaller than the thing it is a counter for.
+const BAZAAR_MIN_H: float = 196.0
+const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
 const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
 const BAZAAR_PAD: float = 12.0
 const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
@@ -165,6 +181,7 @@ const TAB_BENCH: int = 2
 const TAB_NAMES: Array[String] = ["PACK", "WORKS", "BENCH"]
 var bazaar_tab: int = TAB_PACK
 var _bazaar_t: float = 0.0            ## 0..1 open ease, driven in _process
+var _bazaar_h: float = BAZAAR_SIZE.y  ## the height the counter is currently at, eased toward its tab's
 ## THE RACK — the shop half of WORKS. Set by MainView beside `craft_options`, same {name, cost} shape, with
 ## `rack_ids` parallel to it. Kept a SEPARATE list rather than appended to the craft list because the two
 ## columns mean different things: the left is what you build from your own materials, the right is what you
@@ -335,6 +352,16 @@ func _process(delta: float) -> void:
 	var target: float = 1.0 if inventory_open else 0.0
 	var step: float = delta / BAZAAR_RISE
 	_bazaar_t = clampf(_bazaar_t + (step if target > _bazaar_t else -step * 2.0), 0.0, 1.0)
+	# The counter's HEIGHT follows the tab, on the same clock as its rise. Snapped when closed so opening
+	# never animates a size, and snapped near the target so a settled frame is a settled measurement rather
+	# than a lerp caught mid-flight -- `check_hud_layout` photographs this panel and a footprint that
+	# depends on how many frames have passed is not a footprint.
+	if inventory_open or _bazaar_t > 0.0:
+		var want: float = _bazaar_wanted_h()
+		if _bazaar_t <= 0.0 or absf(want - _bazaar_h) < 0.5:
+			_bazaar_h = want
+		else:
+			_bazaar_h += (want - _bazaar_h) * clampf(delta / BAZAAR_RISE, 0.0, 1.0)
 	queue_redraw()
 
 
@@ -1380,19 +1407,94 @@ func _rebuild_minimap() -> void:
 ## the plate is for wanting. Splitting those two jobs is also what let the rows get denser — a row no longer
 ## has to carry a description, because there is somewhere for the description to live.
 func _bazaar_geometry() -> Dictionary:
-	var origin := Vector2((CANVAS.x - BAZAAR_SIZE.x) * 0.5, (CANVAS.y - BAZAAR_SIZE.y) * 0.5)
+	var h: float = _bazaar_h
+	var origin := Vector2((CANVAS.x - BAZAAR_SIZE.x) * 0.5, (CANVAS.y - h) * 0.5)
 	var inner_x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
 	var inner_w: float = BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0
-	var body_h: float = BAZAAR_SIZE.y - BAZAAR_HEAD - BAZAAR_FOOT
+	var body_h: float = h - BAZAAR_HEAD - BAZAAR_FOOT
 	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w, body_h - BAZAAR_DETAIL - 8.0)
 	var detail := Rect2(inner_x, content.end.y + 8.0, inner_w, BAZAAR_DETAIL)
 	return {
-		"origin": origin, "w": BAZAAR_SIZE.x, "h": BAZAAR_SIZE.y,
+		"origin": origin, "w": BAZAAR_SIZE.x, "h": h,
 		"content": content, "detail": detail, "cols": BAZAAR_COLS,
 		"col_w": (content.size.x - BAZAAR_GUTTER * float(BAZAAR_COLS - 1)) / float(BAZAAR_COLS),
 		"row_h": BAZAAR_ROW_H,
 		"rows": int(content.size.y / BAZAAR_ROW_H),
 	}
+
+
+## HOW TALL THE COUNTER WANTS TO BE, for the tab that is open.
+##
+## EVERY TERM HERE COMES FROM THE FUNCTION THAT DRAWS IT, never from a second copy of its arithmetic. A
+## height computed from a duplicated layout rule is a number that is right on the day it is written and
+## silently wrong the day either copy moves -- and this panel already has one instance of that in its
+## history (`_cycle_inventory` wrapping modulo a count the drawing did not share). So `_pack_cols` is the
+## single source for the well grid, `_works_rows_needed` asks `works_columns` itself rather than
+## re-deriving the split, and `_bench_tiers` is the tier walk lifted out of `_tab_bench` whole.
+func _bazaar_wanted_h() -> float:
+	if sim == null:
+		return BAZAAR_SIZE.y
+	var inner_w: float = BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0
+	var need: float = 0.0
+	match bazaar_tab:
+		TAB_WORKS:
+			need = float(_works_rows_needed()) * BAZAAR_ROW_H
+		TAB_BENCH:
+			# The tree sizes its own chips down to fit whatever it is given; what it WANTS is the tallest
+			# tier at full chip height. Today that asks for more than the panel may ever be, so BENCH is
+			# clamped and unchanged -- which is the correct outcome, not a coincidence to rely on.
+			var tall: int = maxi(1, _bench_tallest())
+			need = float(tall) * 64.0 + float(tall - 1) * 6.0
+		_:
+			need = float(_pack_rows(inner_w)) * PACK_CELL
+	return clampf(BAZAAR_HEAD + need + 8.0 + BAZAAR_DETAIL + BAZAAR_FOOT,
+		BAZAAR_MIN_H, BAZAAR_SIZE.y)
+
+
+## How many wells fit across the content, and how many rows they take. `_tab_pack` calls the first of these
+## rather than keeping its own copy of the division.
+func _pack_cols(w: float) -> int:
+	return maxi(1, int(w / PACK_CELL))
+
+
+func _pack_rows(w: float) -> int:
+	var n: int = sim.inventory_slots().size()
+	return maxi(1, ceili(float(n) / float(_pack_cols(w))))
+
+
+## The fewest rows at which the two WORKS lists fit the counter's columns — asked of `works_columns`
+## itself, so the squeeze rule and this measure can never disagree. Fresh: machines 4 + rack 6 fit in three
+## columns at four rows. Full tech (machines 19, rack 7) it wants ten rows, which asks for more height than
+## the counter has and is clamped — which is the squeeze the panel already applies, arrived at from the
+## other side.
+func _works_rows_needed() -> int:
+	for r: int in range(1, 25):
+		if int(works_demand(r)["total"]) <= BAZAAR_COLS:
+			return r
+	return 24
+
+
+## The research tree, grouped by how many prerequisites deep each tech is. Lifted out of `_tab_bench` so
+## the drawing and the sizing read the same tiers.
+func _bench_tiers() -> Array:
+	var tiers: Array = []
+	for tid: StringName in ResearchRules.ORDER:
+		var d: int = 0
+		var cur: StringName = ResearchRules.tech(tid).get("requires", &"")
+		while cur != &"":
+			d += 1
+			cur = ResearchRules.tech(cur).get("requires", &"")
+		while tiers.size() <= d:
+			tiers.append([])
+		(tiers[d] as Array).append(tid)
+	return tiers
+
+
+func _bench_tallest() -> int:
+	var tallest: int = 1
+	for tier: Array in _bench_tiers():
+		tallest = maxi(tallest, tier.size())
+	return tallest
 
 
 ## WHAT THE COUNTER WILL SELL YOU TODAY — the indices of the rows whose tech is already yours.
@@ -1425,8 +1527,9 @@ func open_rack() -> Array[int]:
 ## share a column, because the left list is what you BUILD from your own materials and the right is what you
 ## BUY with refined goods — a player should never have to work out which is which from a row's position.
 func works_columns(rows: int) -> Dictionary:
-	var m: int = maxi(1, ceili(float(open_machines().size()) / float(maxi(rows, 1))))
-	var r: int = maxi(1, ceili(float(open_rack().size()) / float(maxi(rows, 1))))
+	var want: Dictionary = works_demand(rows)
+	var m: int = int(want["machines"])
+	var r: int = int(want["rack"])
 	# The counter has a fixed number of columns, so if the two lists ever ask for more than it has, they get
 	# SQUEEZED rather than allowed to run off the panel's edge — the group that overflows falls back to a
 	# window around the cursor, which is ugly but reachable. This clamp is the FAILURE MODE made legible
@@ -1451,6 +1554,21 @@ func works_columns(rows: int) -> Dictionary:
 	if m + r > BAZAAR_COLS:
 		r = clampi(r, 1, BAZAAR_COLS - 1)
 		m = BAZAAR_COLS - r
+	return {"machines": m, "rack": r, "total": m + r}
+
+
+## WHAT THE TWO LISTS ASK FOR at a given row count, BEFORE the squeeze — and the split exists because a
+## caller that needs the demand and gets the grant reads a constant.
+##
+## `works_columns` clamps its answer to `BAZAAR_COLS`, so its `total` is never above three whatever the
+## catalogue does. `_works_rows_needed` scanned for the first row count whose total fits, got three at one
+## row, and sized the counter for a single row of WORKS — the panel came out at its floor with the content
+## squeezed to 36px. The file's own comment eighteen lines above says exactly this about a different
+## caller: *"it asks the DEMAND rather than this function's already-clamped answer."* Reading that and then
+## writing the clamped version anyway is the whole reason it is now a separate function with a name.
+func works_demand(rows: int) -> Dictionary:
+	var m: int = maxi(1, ceili(float(open_machines().size()) / float(maxi(rows, 1))))
+	var r: int = maxi(1, ceili(float(open_rack().size()) / float(maxi(rows, 1))))
 	return {"machines": m, "rack": r, "total": m + r}
 
 
@@ -1551,8 +1669,14 @@ func _draw_inventory_overlay() -> void:
 func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
+	# THE RAIL'S PITCH FOLLOWS THE PANEL. At full height these are the numbers they always were — top 62,
+	# pitch 58 — and on a short counter they close up rather than running off the bottom edge. 62 and 58
+	# were constants when the panel was one size; a fixed pitch in a panel that can be 196 tall puts the
+	# third label 30px past the frame.
+	var pitch: float = minf(58.0, (rail.size.y - 110.0) * 0.5)
+	var top: float = minf(62.0, rail.size.y * 0.18)
 	for i: int in 3:
-		var y: float = rail.position.y + 62.0 + float(i) * 58.0
+		var y: float = rail.position.y + top + float(i) * pitch
 		var on: bool = i == bazaar_tab
 		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
 		if on:
@@ -1626,8 +1750,8 @@ func _tab_pack(g: Dictionary) -> void:
 		draw_string(_font, content.position + Vector2(2.0, 20.0), "(empty — go dig)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
 		return
-	var cell: float = 46.0
-	var cols: int = maxi(1, int(content.size.x / cell))
+	var cell: float = PACK_CELL
+	var cols: int = _pack_cols(content.size.x)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	for i: int in slots.size():
 		var box := Rect2(content.position.x + float(i % cols) * cell, content.position.y + float(i / cols) * cell,
@@ -1662,8 +1786,8 @@ func _tab_pack(g: Dictionary) -> void:
 ## three and the least reason for it — this is the one screen where "is the flywheel spinning" is worth
 ## asking, because you are standing still looking at what you own.
 func _pack_ledger(content: Rect2, slots: Array[Dictionary]) -> void:
-	var cell: float = 46.0
-	var cols: int = maxi(1, int(content.size.x / cell))
+	var cell: float = PACK_CELL
+	var cols: int = _pack_cols(content.size.x)
 	var top: float = content.position.y + float((slots.size() + cols - 1) / cols) * cell + 14.0
 	if top > content.end.y - 30.0:
 		return
@@ -2125,21 +2249,10 @@ func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
 ## grows, the counter does not.
 func _tab_bench(g: Dictionary) -> void:
 	var content: Rect2 = g["content"]
-	var tiers: Array = []
-	for tid: StringName in ResearchRules.ORDER:
-		var d: int = 0
-		var cur: StringName = ResearchRules.tech(tid).get("requires", &"")
-		while cur != &"":
-			d += 1
-			cur = ResearchRules.tech(cur).get("requires", &"")
-		while tiers.size() <= d:
-			tiers.append([])
-		(tiers[d] as Array).append(tid)
+	var tiers: Array = _bench_tiers()
 	if tiers.is_empty():
 		return
-	var tallest: int = 1
-	for tier: Array in tiers:
-		tallest = maxi(tallest, tier.size())
+	var tallest: int = _bench_tallest()
 	var gap := Vector2(10.0, 6.0)
 	var chip := Vector2(
 		minf(108.0, (content.size.x - float(tiers.size() - 1) * gap.x) / float(tiers.size())),
