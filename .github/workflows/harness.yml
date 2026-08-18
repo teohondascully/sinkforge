@@ -69,6 +69,14 @@ jobs:
       - name: No assistant co-author trailer on any ref
         run: bash tools/check_trailers.sh
 
+      # The capture manifest is GENERATED from git, so this is not a style check — it fails only when the
+      # tracked file has stopped describing the repository, which happens the moment somebody adds or
+      # re-shoots a capture without regenerating it. `fetch-depth: 0` above is load-bearing here too: the
+      # manifest reads each capture's last-writing commit, and a shallow clone would attribute all 48 to
+      # the checkout tip and report one tidy cohort that does not exist.
+      - name: The capture manifest still describes the archive
+        run: bash tools/capture_manifest.sh --check
+
   headless:
     name: every layer, headless (the pixel layers skip here)
     runs-on: ubuntu-latest
