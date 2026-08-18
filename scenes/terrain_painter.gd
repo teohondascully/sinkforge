@@ -174,6 +174,33 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## neighbour solid but the diagonal past it solid too — a concave inside corner) a nested SCOOP patch
 ## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
 ## cells at a junction patch their own face, so the scoop is symmetric with zero cross-cell drawing.
+##
+## MEASURED 2026-08-18, BECAUSE ALMOST NONE OF THE ABOVE REACHES A PLAYER UNDERGROUND. This pass draws on
+## the COARSE layer at z=-10. `FineTerrain` draws its mold at z=-9 and writes alpha 255 over every solid
+## cell (`fine_terrain.gd:822`), so the only place a coarse pixel survives is where the mold — which is
+## organic and does not fill a cell to its square boundary — has eroded away from the edge. That is exactly
+## the band these strips are drawn in, which is why the answer is "some" rather than "none", and why the
+## coarse FILL and this TREATMENT had to be mutated separately to tell them apart.
+##
+## Every colour in this function forced to opaque magenta, the mold allowed to finish baking first
+## (`pending_rows() == 0`, 164-203 frames of waiting), seed 1337, one standing each:
+##
+##   SURFACE, at the opening, 1.00x            4072 of 2073600 px    0.196%
+##   UNDERGROUND, a carved gallery, 1.00x       247 of 2073600 px    0.012%   <- sixteen times less
+##   UNDERGROUND, zoomed out two steps         2479 of 2073600 px    0.120%   <- more edges in frame
+##
+## So: REAL AT THE SURFACE, and 247 scattered pixels in the view the game is actually played in. The
+## carved reading underground is not coming from here — `FineTerrain`'s own rim, rim_warm and form sink are
+## what a player sees at depth. A peer measured the coarse FILL as 7398 at the surface and 0 underground on
+## the same day; the two results are complementary rather than contradictory, and together they say the
+## fill is fully covered while the treatment survives only in the mold's erosion.
+##
+## NOT DELETED, and the number is the reason: at the surface it is doing visible work, and the surface is
+## the first frame anybody sees. What is retired is the BELIEF — any comment or layer rationale that credits
+## this pass with the contact reading at depth is describing a pass the player cannot see there.
+##
+## Caveats, so the figures are not over-read: one seed, one gallery shape, one standing per row, and a pixel
+## count is a statement about area rather than about noticeability.
 static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
 	const STEPS: int = 3
 	const CH: float = 7.0                              # the silhouette's chamfer radius — keep in lockstep
