@@ -223,6 +223,7 @@ func _run() -> void:
 
 	var home: Vector2i = main._cell_at(main._player.position)
 	var seen: Dictionary = {}
+	var seen_lit: Dictionary = {}
 	var s: Dictionary = {}
 	for off: int in VIEWPOINTS:
 		main._player.position = main._cell_center(Vector2i(home.x + off, home.y))
@@ -231,7 +232,7 @@ func _run() -> void:
 			await physics_frame
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
-		s = _merge(s, _sample(main, get_root().get_texture().get_image(), seen))
+		s = _merge(s, _sample(main, get_root().get_texture().get_image(), seen, seen_lit))
 	var edge_step: Array[float] = s["edge_step"]
 	var flat_step: Array[float] = s["flat_step"]
 	var signed: Array[float] = s["edge_signed"]
@@ -272,6 +273,25 @@ func _run() -> void:
 
 	print("  edge step spread: %s" % _shape(edge_step))
 	print("  flat step spread: %s" % _shape(flat_step))
+	# THE LAMP, PRINTED AND NOT GATED. 6b's headline is about the lit pool and this layer excluded it, so
+	# the ticket has been quoting a number about the opposite population. Reported so somebody can look at
+	# it before anyone writes a floor for it.
+	var lit_edge: Array[float] = s["lit_edge_step"]
+	var lit_flat: Array[float] = s["lit_flat_step"]
+	var lit_sgn: Array[float] = s["lit_edge_signed"]
+	if lit_edge.is_empty():
+		print("  INSIDE THE LAMP: no lit rock|air faces landed on the judged slab — nothing to report")
+	else:
+		var lit_pol: float = 0.0
+		for v: float in lit_sgn:
+			if v > 0.0:
+				lit_pol += 1.0
+		print("  INSIDE THE LAMP (diagnostic, never gated): %d rock|air faces, step median %.2f against a"
+			% [lit_edge.size(), _median(lit_edge)]
+			+ " lit flat-rock step of %.2f (n=%d); rock brighter on %.0f%% of them"
+			% [_median(lit_flat), lit_flat.size(), 100.0 * lit_pol / float(maxi(lit_sgn.size(), 1))])
+		print("    this is 6b's ACTUAL subject — the blind tester's complaint was about the rock inside the"
+			+ " lamp, and every number above this line is about the dark outside it")
 
 	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. It was sized against
 	# `_draw_edge_ao` painting "the first 6px of a 32px cell" — both halves of which are false. The cell is
@@ -330,7 +350,7 @@ func _run() -> void:
 
 ## Walk every horizontally- and vertically-adjacent cell pair on the judged slab and record the luminance
 ## step across the shared face, split by what the sim says the pair actually is.
-func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
+func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary) -> Dictionary:
 	var w: int = img.get_width()
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
@@ -394,6 +414,10 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 		prof_or.append(per)
 		signed_or.append([] as Array[float])
 		step_or.append([] as Array[float])
+	## THE LAMP ARM — same measurement, the population this layer used to discard. Diagnostic only.
+	var lit_edge_step: Array[float] = []
+	var lit_flat_step: Array[float] = []
+	var lit_edge_signed: Array[float] = []
 	var edge_step: Array[float] = []
 	var flat_step: Array[float] = []
 	var edge_signed: Array[float] = []
@@ -439,14 +463,26 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				# DE-DUPLICATED HERE AND NOWHERE EARLIER, so a face rejected as LIT from one standing stays
 				# eligible from the next — which is the entire point of moving the camera.
 				var fkey: String = "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
-				if seen.has(fkey):
+				# The two arms dedupe SEPARATELY. Sharing one set would let a face measured while lit
+				# block its own unlit measurement from the next standing, quietly shrinking the population
+				# this layer actually gates on.
+				if seen.has(fkey) and seen_lit.has(fkey):
 					continue
 				if a.y <= floor_row or b.y <= floor_row:
 					near_surface += 1
 					continue
-				if _is_lit(scratch, base, a) or _is_lit(scratch, base, b):
+				# THE LAMP ARM (diagnostic, 2026-08-18). This used to `continue`, and that exclusion is why
+				# this layer could not answer the ticket it is filed under: 6b's complaint is *"inside the
+				# LIT POOL the rock has no edges"*, from a blind tester describing the rock INSIDE the lamp
+				# as a soft mottled gradient, and every lit face was being thrown away — 667 of them from a
+				# single standing. The layer measured the dark outside the complaint and passed.
+				#
+				# Lit faces are now measured into their own arms and PRINTED. Nothing is asserted on them:
+				# this file's own rule is that a floor invented before the measurement is the error it has
+				# already made once, and nobody has looked at this population yet.
+				var in_lamp: bool = _is_lit(scratch, base, a) or _is_lit(scratch, base, b)
+				if in_lamp:
 					lit += 1
-					continue
 				# Water is neither wall nor hole and a player is never confused about which it is;
 				# check_water_reads owns whether it reads. Counting it here would not make the measurement
 				# harder, it would make it about something else. (6a found this the hard way: flooded cells
@@ -469,7 +505,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				# MARKED SEEN ONLY HERE, past every rejection above. A face excluded for being lit or off
 				# the slab from this standing must stay eligible from the next one, or pooling would lock
 				# in the first viewpoint's exclusions and three standings would sample the same biased set.
-				seen[fkey] = true
+				if in_lamp:
+					if seen_lit.has(fkey):
+						continue
+					seen_lit[fkey] = true
+				else:
+					if seen.has(fkey):
+						continue
+					seen[fkey] = true
 				# THE PROFILE ACROSS THE FACE, sampled at single pixels rather than in a patch, because the
 				# thing it is looking for is only a few pixels wide and a patch would average it away.
 				#
@@ -509,6 +552,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				var lb: float = _patch_luma(img, int(pb.x), int(pb.y), patch)
 				luma.append(la)
 				luma.append(lb)
+				if in_lamp:
+					if sa and sb:
+						lit_flat_step.append(absf(la - lb))
+					else:
+						lit_edge_step.append(absf(la - lb))
+						var lit_rock_first: bool = sa
+						lit_edge_signed.append((la - lb) if lit_rock_first else (lb - la))
+					continue
 				if sa and sb:
 					flat_step.append(absf(la - lb))
 				else:
@@ -526,7 +577,9 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 					signed_or[orient].append(sgn)
 					step_or[orient].append(absf(la - lb))
 
-	return {"edge_step": edge_step, "flat_step": flat_step, "edge_signed": edge_signed,
+	return {"lit_edge_step": lit_edge_step, "lit_flat_step": lit_flat_step,
+		"lit_edge_signed": lit_edge_signed,
+		"edge_step": edge_step, "flat_step": flat_step, "edge_signed": edge_signed,
 		"edge_signed_stained": edge_signed_stained, "edge_signed_plain": edge_signed_plain,
 		"luma": luma, "near_surface": near_surface, "lit": lit, "offslab": offslab, "wet": wet,
 		"airair": airair, "profile": profile, "prof_or": prof_or, "signed_or": signed_or,
