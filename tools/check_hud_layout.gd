@@ -205,6 +205,7 @@ func _run() -> void:
 	# to differ from each other too — if they all reported the same panels, the matrix would be one state
 	# tested eleven times.
 	_check_help_text()
+	await _check_controls_reachable()
 	_check_big_map(bare, big)
 	_check_hover(bare, hover, big_hover)
 	await _check_pack_window()
@@ -474,6 +475,121 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 	Hud.panel_probe = ([] as Array[Rect2])
 	Hud.hotbar_probe = {}
 	return out
+
+
+## A CONTROL YOU CANNOT SEE IS A CONTROL YOU CANNOT PRESS.
+##
+## Every assertion above judges PANELS, because `panel_probe` collects what `_panel()` drew. The claim at
+## the top of this file is larger than that population: "the HUD must not print off the edge of the
+## screen". A row of text and a chip drawn INSIDE a perfectly legal panel, past its floor, is invisible to
+## all of it — and the settings page has been drawing the last two of its twenty-two key bindings below
+## the panel, one of them below the SCREEN, for as long as the remap list has had that many rows:
+##
+##   panel   Rect2(90, 14, 460, 332)   floor y = 346, canvas is 360 tall
+##   rows    y = 74 + i * 13.8
+##   quickload        y = 350.0   below the plate
+##   clear dig plan   y = 363.8   below the screen
+##
+## "settings open" is IN the matrix above and has been green throughout, which is the point: the layer was
+## never wrong, it was answering about panels while its name promised the HUD.
+##
+## The HUD already publishes the right population, for a different reason. `_settings_hits`, `_knob_hits`
+## and `_alert_hits` are the rects `settings_click` / `hover_click` / `alert_click` route a real press
+## through. Judging THOSE cannot drift from what is clickable, because they are what is clickable — the
+## same reason this file probes the drawn panels instead of re-deriving where they ought to be.
+##
+## Two claims, and the second is the one with teeth:
+##   ON SCREEN     no registered control may leave the canvas. You cannot press what was never drawn.
+##   ON ITS PLATE  a modal's controls must sit on the modal's own panel. A chip four pixels past the
+##                 plate is still on screen and still clickable, and it reads as a rendering fault.
+##
+## The REJECTION CONTROL is not decoration. Both claims pass perfectly against an empty hit list, which is
+## exactly what a state that failed to open would produce, so the same predicate is run once more over the
+## same rects with one of them displaced off the canvas, and is required to catch it.
+const CONTROL_SLOP: float = 1.0
+## Sliders, chips, the mute, the reset, and one per binding. A count far below this means the page did not
+## open and the assertions above are agreeing with an empty list.
+const SETTINGS_CONTROLS_MIN: int = 26
+
+
+func _check_controls_reachable() -> void:
+	var shot: Dictionary = await _controls_shot({"_settings_open": true})
+	var hits: Array[Rect2] = shot["hits"]
+	var plate: Rect2 = shot["plate"]
+
+	_check(hits.size() >= SETTINGS_CONTROLS_MIN,
+		"the settings page registered %d clickable controls (at least %d, or it never opened)"
+			% [hits.size(), SETTINGS_CONTROLS_MIN])
+
+	var off: Array[String] = _outside_canvas(hits)
+	_check(off.is_empty(), "settings open: all %d clickable controls are on screen%s"
+		% [hits.size(), "" if off.is_empty() else " — OFF: " + ", ".join(off)])
+
+	var spilled: Array[String] = []
+	for r: Rect2 in hits:
+		if not plate.grow(CONTROL_SLOP).encloses(r):
+			spilled.append("%s" % r)
+	_check(spilled.is_empty(),
+		"...and every one sits on the %.0fx%.0f plate that owns them%s"
+			% [plate.size.x, plate.size.y, "" if spilled.is_empty() else " — OFF THE PLATE: "
+				+ ", ".join(spilled)])
+
+	# The control: the same predicate, the same rects, one of them moved off the bottom of the canvas. It
+	# is stated as a DIFFERENCE from the live count and not as "catches exactly one", because the first
+	# version was written expecting the page to be clean and reported `caught 2` the moment the page was
+	# not — the control failing for the same reason as the subject, and saying nothing about the predicate.
+	var planted: Array[Rect2] = hits.duplicate()
+	if not planted.is_empty():
+		planted[0] = Rect2(planted[0].position + Vector2(0.0, Hud.CANVAS.y), planted[0].size)
+	var caught: int = _outside_canvas(planted).size()
+	_check(caught == off.size() + 1,
+		"the same check catches one more control once one is pushed off the bottom edge (%d -> %d)"
+			% [off.size(), caught])
+
+	_main._settings_open = false
+	await RenderingServer.frame_post_draw
+
+
+## The rects that leave the canvas, described. Shared by the claim and by its rejection control, so the
+## control cannot pass by testing a second, gentler copy of the predicate.
+func _outside_canvas(rects: Array[Rect2]) -> Array[String]:
+	var out: Array[String] = []
+	for r: Rect2 in rects:
+		if r.position.x < -CONTROL_SLOP or r.position.y < -CONTROL_SLOP \
+				or r.end.x > Hud.CANVAS.x + CONTROL_SLOP or r.end.y > Hud.CANVAS.y + CONTROL_SLOP:
+			out.append("%s" % r)
+	return out
+
+
+## One state, one drawn frame, and the two things it registered: every clickable rect, and the biggest
+## panel — which for a modal state is the modal's own plate.
+func _controls_shot(set_flags: Dictionary) -> Dictionary:
+	_main._paused = false
+	_main._inventory_open = false
+	_main._minimap_mode = 0
+	_main._show_help = false
+	_main._show_dashboard = false
+	_main._settings_open = false
+	for k: Variant in set_flags:
+		_main.set(String(k), set_flags[k])
+	for _i: int in 3:
+		await RenderingServer.frame_post_draw
+	Hud.probing = true
+	Hud.panel_probe = ([] as Array[Rect2])
+	await RenderingServer.frame_post_draw
+	var panels: Array[Rect2] = Hud.panel_probe.duplicate()
+	Hud.probing = false
+	Hud.panel_probe = ([] as Array[Rect2])
+	var hud: Hud = _main._hud
+	var hits: Array[Rect2] = []
+	for src: Array in [hud._settings_hits, hud._knob_hits, hud._alert_hits]:
+		for h: Dictionary in src:
+			hits.append(h["rect"] as Rect2)
+	var plate := Rect2()
+	for pr: Rect2 in panels:
+		if pr.size.x * pr.size.y > plate.size.x * plate.size.y:
+			plate = pr
+	return {"hits": hits, "plate": plate}
 
 
 ## THE TEXT, WHICH A PANEL-RECT TEST CANNOT SEE.

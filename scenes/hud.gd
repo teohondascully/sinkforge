@@ -2357,11 +2357,32 @@ const REMAP_ROWS: Array[Array] = [
 ]
 
 
+## THE PAGE ITSELF. Centred rather than top-pinned, and named rather than typed inline, because a layout
+## assertion that re-derives these numbers is checking its own arithmetic against itself.
+const SETTINGS_PANEL := Rect2(24.0, 37.0, 592.0, 286.0)
+## Where CONTROLS starts, measured from the panel's left edge: past the widest thing the AUDIO block draws
+## (a 100px bar at +62 plus its percentage) with a real gutter, not the 4px the two columns used to share.
+const REMAP_X: float = 236.0
+## One binding column. The widest label is "research / config" at 81px and the widest chip is the capture
+## prompt at 73px, so 162 carries the worst row with 8px between them.
+const REMAP_COL_W: float = 162.0
+const REMAP_GAP: float = 16.0
+
+
 func _draw_settings_overlay() -> void:
 	_settings_hits.clear()
 	_slider_rects.clear()
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.55))
-	var panel := Rect2(90.0, 14.0, 460.0, 332.0)
+	var panel := SETTINGS_PANEL
+	var top: float = panel.position.y
+	var floor_y: float = panel.end.y
+	# AN OPAQUE PLATE, WHICH `_panel()` ALONE DOES NOT GIVE. `UI_BG` is 90% opaque because the furniture
+	# panels sit over the world and are MEANT to. A modal is not furniture: at 0.90 the objective banner —
+	# which draws earlier, in the same strip, on its own dark plate with bright type — reads straight
+	# through the settings page in a capture. Ten percent of a lit banner over an unlit panel is roughly
+	# twice the panel's own value, which is more than enough to be legible, and it makes the page look like
+	# a transparency rather than a screen you are on.
+	draw_rect(panel, Color(UI_BG.r, UI_BG.g, UI_BG.b, 1.0))
 	_panel(panel, true)
 	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
@@ -2370,50 +2391,63 @@ func _draw_settings_overlay() -> void:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
 	# --- left column: AUDIO + FEEL ---
 	var x0: float = panel.position.x + 16.0
-	draw_string(_font, Vector2(x0, 58.0), "AUDIO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	draw_string(_font, Vector2(x0, top + 44.0), "AUDIO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	# The mute sits ON the AUDIO header, above the levels it overrides, because that is what it does: one
 	# switch over the whole block. It reads as its STATE ("MUTED" / "SOUND ON"), never as an instruction —
 	# a chip that says the opposite of what is happening is the oldest bug in settings UI.
-	_settings_chip(x0 + 92.0, 58.0, "MUTED" if Settings.muted else "SOUND ON",
+	_settings_chip(x0 + 92.0, top + 44.0, "MUTED" if Settings.muted else "SOUND ON",
 		{"toggle": "mute"}, not Settings.muted, mouse)
-	_settings_slider(x0, 78.0, "master", "master", Settings.master)
-	_settings_slider(x0, 98.0, "sound", "sound", Settings.sound)
-	_settings_slider(x0, 118.0, "ambience", "ambience", Settings.ambience)
-	_settings_slider(x0, 138.0, "music", "music", Settings.music)
-	draw_string(_font, Vector2(x0, 170.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	draw_string(_font, Vector2(x0, 190.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 190.0, "ON" if Settings.screen_shake else "OFF",
+	_settings_slider(x0, top + 64.0, "master", "master", Settings.master)
+	_settings_slider(x0, top + 84.0, "sound", "sound", Settings.sound)
+	_settings_slider(x0, top + 104.0, "ambience", "ambience", Settings.ambience)
+	_settings_slider(x0, top + 124.0, "music", "music", Settings.music)
+	draw_string(_font, Vector2(x0, top + 156.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	draw_string(_font, Vector2(x0, top + 176.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, top + 176.0, "ON" if Settings.screen_shake else "OFF",
 		{"toggle": "shake"}, Settings.screen_shake, mouse)
-	draw_string(_font, Vector2(x0, 210.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 210.0, "%.2fx" % MainView.ZOOM_LEVELS[
+	draw_string(_font, Vector2(x0, top + 196.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, top + 196.0, "%.2fx" % MainView.ZOOM_LEVELS[
 		clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)], {"cycle": "zoom"}, false, mouse)
-	draw_string(_font, Vector2(x0, 230.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, 230.0, "ON" if Settings.auto_pickup else "OFF",
+	draw_string(_font, Vector2(x0, top + 216.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	_settings_chip(x0 + 92.0, top + 216.0, "ON" if Settings.auto_pickup else "OFF",
 		{"toggle": "auto_pickup"}, Settings.auto_pickup, mouse)
-	_settings_chip(x0, panel.position.y + panel.size.y - 20.0, "RESET KEYS TO DEFAULTS",
-		{"reset": true}, false, mouse)
-	draw_string(_font, Vector2(x0, panel.position.y + panel.size.y - 38.0),
+	_settings_chip(x0, floor_y - 20.0, "RESET KEYS TO DEFAULTS", {"reset": true}, false, mouse)
+	draw_string(_font, Vector2(x0, floor_y - 38.0),
 		"click a binding, then press its new key", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
 	# --- right column: CONTROLS (the remap page) ---
-	var x1: float = panel.position.x + 212.0
-	var chip_right: float = panel.position.x + panel.size.x - 16.0
-	draw_string(_font, Vector2(x1, 58.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	var y: float = 74.0
-	for row: Array in REMAP_ROWS:
+	#
+	# TWO COLUMNS, BECAUSE ONE DOES NOT FIT AND HAS NOT FOR A LONG TIME. Twenty-two bindings at 13.8px from
+	# y=74 put the last two below the panel and one of them below the SCREEN — `clear dig plan` was drawn
+	# and registered as clickable at y 353.8 on a 360-tall canvas. Nothing caught it: `check_hud_layout`
+	# probes the rects `_panel()` drew, and a binding chip is not a panel, so the layer whose entire job is
+	# geometry had "settings open" in its matrix and passed it every run. It now judges the rects the page
+	# registers for CLICKING, which is the population the claim was always about.
+	#
+	# The list is split rather than crammed: the step that would fit 22 rows between the header and the
+	# floor is 12.4px against 10pt type, which trades an invisible control for an illegible one.
+	var col_w: float = REMAP_COL_W
+	var y0: float = top + 60.0
+	var per_col: int = int(ceil(float(REMAP_ROWS.size()) * 0.5))
+	draw_string(_font, Vector2(panel.position.x + REMAP_X, top + 44.0), "CONTROLS",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	for i: int in REMAP_ROWS.size():
+		var row: Array = REMAP_ROWS[i]
+		var col: int = i / per_col
+		var x1: float = panel.position.x + REMAP_X + float(col) * (col_w + REMAP_GAP)
+		var y: float = y0 + float(i % per_col) * 13.8
 		var action: StringName = row[0]
 		var label: String = str(row[1])
 		draw_string(_font, Vector2(x1, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 		var capturing: bool = settings_capture == action
 		var bind_text: String = "press a key…" if capturing else Settings.binding_label(action)
 		var bw: float = _font.get_string_size(bind_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
-		var chip := Rect2(chip_right - bw, y - 10.0, bw, 13.0)
+		var chip := Rect2(x1 + col_w - bw, y - 10.0, bw, 13.0)
 		var lit: bool = chip.has_point(mouse)
 		draw_rect(chip, UI_ACCENT if capturing else (Color(0.30, 0.34, 0.44) if lit else UI_SLOT))
 		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
 		draw_string(_font, Vector2(chip.position.x + 5.0, y), bind_text, HORIZONTAL_ALIGNMENT_LEFT,
 			-1, 10, Color(0.10, 0.10, 0.12) if capturing else UI_TEXT)
 		_settings_hits.append({"rect": chip, "payload": {"bind": String(action)}})
-		y += 13.8
 
 
 ## One slider row: label + a clickable/drag-able bar + the live percentage.
