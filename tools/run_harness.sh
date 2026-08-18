@@ -303,10 +303,27 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # A rock/air contact IS visible, in all three orientations, at 86% against a 75% floor. The lane began from
 # "the contact carries very nearly no information"; that was an instrument reading its own interior.
 #
-# NOT REGISTERED YET, and the reason is mechanical rather than a verdict: check_contact_edge reads
-# FineTerrain._side_mutant_cells, which lives in the test-only SF_SIDE_MUTANT patch that directive 0031 says
-# to keep unmerged. Registering it would drag that patch into the suite. Decoupling is a design call, not
-# mine -- the counter is inert unless the env var is set, but "inert" is not "authorised".
+# THAT MECHANICAL BLOCKER EXPIRED AND THE NUMBERS ABOVE ARE WITHDRAWN -- c1, 2026-08-18.
+#
+# This note said check_contact_edge could not be registered because it reads FineTerrain._side_mutant_cells,
+# from the SF_SIDE_MUTANT patch directive 0031 keeps unmerged. There is nothing left to decouple:
+#   grep -nE "mutant|_side_|SF_" tools/check_contact_edge.gd   -> empty
+#   grep -n  "_side_mutant_cells" scenes/fine_terrain.gd       -> empty
+# The coupling came off with the patch (3df923c) and directive 0031 still holds. A blocker made of text.
+#
+# THE 86%/95% ABOVE WAS NEVER TRUE OF main. That reading came from the peer's branch, where c6f23b8's
+# projection repair had been applied; it never reached this file -- absent from its own git log -- so main
+# was still running `(face - cam) * zoom + image_size * 0.5` and reproduced the WITHDRAWN numbers on demand,
+# 51% with steps 1.26-4.49. Repaired and pooled across three standings in 3b161b6: detectability 95/95/95,
+# polarity 98/97/97, edge step median 10.4 against a flat-rock step of 1.5, 116 faces against a floor of 40.
+#
+# STILL NOT REGISTERED, and now the reason IS a verdict rather than a mechanism. The layer credits
+# TerrainPainter._draw_edge_ao for the contact it measures, and that pass does not reach the frame it
+# judges: it draws into the COARSE bake at z=-10 and fine_terrain writes alpha 255 over every solid cell at
+# z=-9. Liveness control, coarse fill forced to pure magenta -- 7398 magenta pixels at the surface, ZERO
+# underground. Knocking the pass out leaves this layer byte-identical. The measurement is sound and the
+# rationale was wrong, which is why the numbers held while the prose did not; corrected at the head of
+# check_contact_edge.gd, and it should be READ before this gate is trusted. Register after that.
 #
 # EVERYTHING THIS NOTE PREVIOUSLY REPORTED IS WITHDRAWN, AND SO IS THE THEORY IT USED TO EXPLAIN ITSELF.
 # It has now been wrong twice in opposite directions, and the second correction voids the first:
