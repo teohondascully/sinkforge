@@ -53,10 +53,16 @@ const EXEMPT: Dictionary = {
 	"check_pack_layout.gd:hud.minimap_large":
 		"same bare Hud — and this one is swept deliberately through both values to check the frame fits",
 	"check_snap_frame.gd:camera.global_position":
-		"MEASURED, not argued. The camera IS lerped back toward the body 12.5%/frame by main.gd:735, but "
-		+ "`_shoot` awaits two frames and the drift arrives at 0.000 px: the pull is sub-pixel and "
-		+ "`snap_to_pixel` rounds it away. The mechanism that makes this fixture safe is the mechanism the "
-		+ "layer exists to test, which is a nice thing to have written down and a bad thing to assume",
+		"MEASURED at 0.000 px of drift, four shots of four — and the FIRST reason given for that number was "
+		+ "a story. I wrote that `snap_to_pixel` rounds the sub-pixel pull away, which is true and is not "
+		+ "what makes this safe. The probe printed the load-bearing fact beside the drift and I did not "
+		+ "read it: the distance from the camera's requested position to the BODY was 0.0, 0.0, 0.0 and "
+		+ "1.0 px. This fixture photographs the camera essentially at the player, and main.gd:735 lerps the "
+		+ "camera toward the player — so there is nothing to pull toward, however many or few lerps run. "
+		+ "That is what makes it independent of convergence, and therefore of contention. The snap handles "
+		+ "only the residual, which is the <=1px nudge itself. c1 asked whether a standalone probe can "
+		+ "certify behaviour under contention when the quantity depends on convergence; it cannot, and the "
+		+ "answer is that this quantity does not depend on convergence for a reason that was in the data",
 }
 
 ## The one field this layer must find recomputed, or its scan of the game read nothing and every green

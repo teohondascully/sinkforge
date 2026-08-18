@@ -397,7 +397,30 @@ add_gl "check_machine_state (running reads)" "res://tools/check_machine_state.gd
 add_gl "check_machine_identity (which box)" "res://tools/check_machine_identity.gd"
 # add_gl: `check_grapple` scores what the rope DOES and every number in it is a velocity; this one scores
 # what the rope LOOKS like, and none of its numbers exist without a surface to draw on.
-add_gl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"
+#
+# ...AND add_excl, WHICH IS NOT A TIMING CLAIM. This layer went red on 2 of 4 sweeps and green on every
+# standalone run of the same commit, which is the worst shape a layer has: an intermittent red that lands
+# on whoever's change happens to be in the tree. Measured rather than reasoned about — twelve concurrent
+# copies of it, five failed, all five on the same assertion:
+#
+#   a slack rope and a taut one are different pictures (4410..4604 px vs a 2845..4765 px clock baseline)
+#   the same three runs, alone:                        (4622..4748 px vs a    1..4    px clock baseline)
+#
+# **THE SIGNAL IS STABLE AND THE CONTROL IS NOT.** ~4400-4750 px of rope difference either way; the noise
+# floor it must clear goes from THREE pixels to four THOUSAND. That floor is two untouched captures
+# differenced, and the world's animation advances on `delta` — on wall time — while the fixture counts
+# frames between them. Contended, far more animation phase elapses per frame, and the layer's own estimate
+# of "how much moves when nothing is asked to move" grows until it swallows a signal that never moved.
+# A control that fails for the same reason as its subject says nothing; this one is worse, because it
+# fails HARDER than its subject and takes the assertion down with it.
+#
+# The other observed contention red — `the renderer's cursor is where the fixture put it (415..435 px off)`
+# on two sweeps — is NOT explained. It did not reproduce in twelve concurrent runs, the mouse warp lands at
+# 1.0 px with `window_is_focused=false` so it is not focus, and the camera-lerp story is two orders of
+# magnitude short of the number (and `main.gd:731` snaps rather than lerps the large jumps that could
+# produce it). **`add_excl` removes the condition, not the cause**, and that is worth saying out loud
+# because the layer will now be green without anybody having found out why it was not.
+add_excl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
 add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
