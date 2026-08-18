@@ -755,6 +755,10 @@ func _process(delta: float) -> void:
 			# A bubble's clock only runs while you could plausibly have read it. Full stride is 232 px/s,
 			# so this sits just above a cruise: walking and reading is fine, flying and reading is not.
 			_hints.note_busy(_player.velocity.length() > Player.RUN_SPEED * 1.25)
+			# ...and whether the ceremony currently owns the announce channel, so a lesson waits for it
+			# instead of being stacked under it. Read from the HUD rather than mirrored here: a second
+			# copy of "is the plate up" is a second thing that can be wrong, and only one of them draws.
+			_hints.note_ceremony(_hud.announcing())
 			# The FEET, not the body centre: standing on the grass the centre cell is the air above it,
 			# which read as "+1 m, OPEN SKY" while the miner was plainly stood on the ground.
 			_note_stratum(_cell_at(_player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0)).y)

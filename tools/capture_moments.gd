@@ -462,9 +462,18 @@ func _the_sapling(main: MainView) -> void:
 		return
 	sim.inventory[&"sapling"] = int(sim.inventory.get(&"sapling", 0)) + 1
 	sim.total_produced[&"sapling"] = int(sim.total_produced.get(&"sapling", 0)) + 1
-	# Two frames for the edge to be seen and promoted out of the queue, then far enough into SHOW_SECONDS
-	# to clear FADE_IN — a bubble photographed at alpha 0.1 is a picture of nothing that will read as a
-	# picture of a faint lesson.
+	# WAIT OUT THE OPENING CEREMONY FIRST, and this wait is itself the change under test. The TOPSOIL
+	# arrival plate is up at boot, and a lesson now HOLDS while the ceremony owns the announce channel
+	# (P1: one primary attention state at a time). Before that rule the two simply drew on top of each
+	# other, which is what `_moment_sapling.png` photographed in the P0 baseline. So: let the plate
+	# finish, and the bubble arrives alone in the frame it is entitled to.
+	var wait: int = 0
+	while main._hud != null and main._hud.announcing() and wait < 420:
+		await physics_frame
+		wait += 1
+	# ...then far enough into SHOW_SECONDS to clear FADE_IN — a bubble photographed at alpha 0.1 is a
+	# picture of nothing that will read as a picture of a faint lesson. The shutter guard checks the
+	# opacity rather than trusting this count.
 	for _i: int in 30:
 		await physics_frame
 

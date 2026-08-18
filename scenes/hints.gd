@@ -119,6 +119,7 @@ var _active: StringName = &""
 var _life: float = 0.0              ## READABLE seconds left on the bubble (frozen while the body is busy)
 var _lingered: float = 0.0          ## ...and wall seconds it has been up, which is what MAX_LINGER caps
 var _busy: bool = false             ## body moving too fast to read anything (poked by note_busy)
+var _ceremony: bool = false         ## the arrival plate owns the announce channel (poked by note_ceremony)
 var _now: Dictionary = {}           ## moment id -> condition true THIS frame (poked by note())
 var _was: Dictionary = {}           ## moment id -> ...and last frame; the pair is the rising-edge detector
 
@@ -134,6 +135,23 @@ func _init(factory: FactorySim) -> void:
 ## Everything defaults to false until the controller starts playing, so a spawn never fires retroactively.
 func note(id: StringName, on: bool) -> void:
 	_now[id] = on
+
+
+## THE CEREMONY OWNS THE CHANNEL WHILE IT IS UP, AND THIS IS `P1`'S ONE RULE MADE ENFORCEABLE.
+##
+## *Only one primary attention state at a time.* The `P0` baseline caught the two announce systems sharing
+## pixels three separate times, and the worst of them costs something real: in
+## `docs/media/baseline/_moment_line.png` the first-automation plate — *"IT WORKS WITHOUT YOU / THE LINE
+## RUNS"*, the single biggest emotional beat the opening has — is overlapped by a bubble explaining that
+## wood is renewable.
+##
+## THE LESSON IS HELD, NOT DROPPED, and the distinction is the whole design. A queued lesson is not
+## promoted while a ceremony runs; an already-active one keeps its text, stops its clock and draws nothing,
+## then comes back with its full remaining life. Dropping it would be the cheap version of quietness — the
+## screen gets calmer by teaching less — and `UI-04` asks for retirement on DEMONSTRATED USE, not on bad
+## timing. Nothing here latches, expires or forgets: the only thing that changes is when it is legible.
+func note_ceremony(on: bool) -> void:
+	_ceremony = on
 
 
 ## Poked with whether the body is moving too fast to read a bubble. Freezes the active hint's countdown
@@ -170,13 +188,15 @@ func refresh(delta: float) -> void:
 			_done[id] = true
 			_queue.append(id)
 		_was[id] = on
-	if _active != &"":
+	if _active != &"" and not _ceremony:
+		# Both clocks stop under a ceremony, not just `_life`. `_lingered` is the cap on how long a frozen
+		# bubble may hang around, and a bubble that is not being SHOWN cannot be wearing out its welcome.
 		_lingered += delta
 		if not _busy:
 			_life -= delta          # only calm seconds count as read
 		if _life <= 0.0 or _lingered >= MAX_LINGER:
 			_active = &""
-	if _active == &"" and not _queue.is_empty():
+	if _active == &"" and not _queue.is_empty() and not _ceremony:
 		_active = _queue.pop_front()
 		_life = SHOW_SECONDS
 		_lingered = 0.0
@@ -197,7 +217,7 @@ func active_text() -> String:
 
 ## Fade envelope: 0..1 over the bubble's life (quick in, gentle out).
 func active_alpha() -> float:
-	if _active == &"":
+	if _active == &"" or _ceremony:
 		return 0.0
 	var shown: float = SHOW_SECONDS - _life
 	return clampf(minf(shown / FADE_IN, _life / FADE_OUT), 0.0, 1.0)

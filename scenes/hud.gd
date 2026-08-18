@@ -264,13 +264,39 @@ func announce(text: String, kicker: String, color: Color) -> void:
 var _pending_arrival: Array = []
 
 
+## IS THE ANNOUNCE CHANNEL OCCUPIED RIGHT NOW? One caller: the controller, which uses it to hold a
+## just-in-time lesson back rather than stacking it under the ceremony. `P1`'s rule is *only one primary
+## attention state at a time*, and this is the predicate that makes it enforceable rather than aspirational.
+func announcing() -> bool:
+	return _arrival_life > 0.0
+
+
+## THE DEFERRAL WAS ONE-SIDED, AND THE BASELINE PHOTOGRAPHED THE SIDE IT DID NOT COVER.
+##
+## `announce()` already holds a ceremony that fires WHILE the whole-world map is open — added for T2.1's
+## *"announce once, in a safe composition"*. It has nothing to say about the other order: a ceremony
+## already up when the map OPENS is drawn straight over it, and `_draw_arrival` runs after `_draw_minimap`
+## so it lands on top. `docs/media/baseline/_moment_map.png` is that frame — the plate crossing the map's
+## `TOPSOIL` band label and its `0 m` reading.
+##
+## **A guard that handles one direction of a two-directional collision is not half a guard, it is a guard
+## with a hole**, and the hole is invisible because the covered direction is the one anybody tests.
+##
+## The fix keeps the promise the deferral was making: the ceremony is HELD, not dropped. Its clock stops
+## and it draws nothing while the map is up, then it resumes with its remaining life intact — so crossing
+## into THE DEEPSLATE and opening the map still tells you, in full, once, when there is room for it.
+func _announce_held() -> bool:
+	return minimap_large
+
+
 func _process(delta: float) -> void:
 	if not _pending_arrival.is_empty() and not minimap_large:
 		var held: Array = _pending_arrival
 		_pending_arrival = []
 		announce(String(held[0]), String(held[1]), held[2] as Color)
 	_flash_life = maxf(0.0, _flash_life - delta)
-	_arrival_life = maxf(0.0, _arrival_life - delta)
+	if not _announce_held():
+		_arrival_life = maxf(0.0, _arrival_life - delta)
 	# The counter's arrival. Eased OUT, so it decelerates into place rather than sliding at a constant rate —
 	# the difference between a panel that lands and a panel that is dragged on.
 	var target: float = 1.0 if inventory_open else 0.0
@@ -546,7 +572,7 @@ const SCRIM_ABOVE: float = 32.0
 const SCRIM_BELOW: float = 18.0
 
 func _draw_arrival() -> void:
-	if _arrival_life <= 0.0:
+	if _arrival_life <= 0.0 or _announce_held():
 		return
 	var t: float = _arrival_life / ARRIVAL_HOLD
 	var a: float = clampf(minf((1.0 - t) * 6.0, t * 2.4), 0.0, 1.0)     # fast in, slow out
