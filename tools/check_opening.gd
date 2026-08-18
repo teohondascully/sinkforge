@@ -36,6 +36,7 @@ const DEAD := preload("res://tools/dead_space.gd")
 ## keeps excluding the old rectangle and starts judging ground it should not, or excusing ground it should
 ## judge, with no assertion anywhere to notice. Not fixed here -- scenes/hud.gd is not this layer's to read
 ## and the peer holds it -- but recorded so the next person does not assume the two are linked.
+## SUPERSEDED by Hud.bottom_furniture_fraction() at the call site; kept only for the note above.
 const HUD_BOTTOM: float = 0.20       ## fraction of the frame the hotbar + key strip occupy
 
 ## Fraction of judged ground tiles allowed to be dead. Not zero — a dark cave mouth or an unlit overhang
@@ -69,7 +70,15 @@ func _initialize() -> void:
 	var w: int = img.get_width()
 	var h: int = img.get_height()
 	var y0: int = _horizon_y(main, h)
-	var y1: int = int(float(h) * (1.0 - HUD_BOTTOM))
+	# ASKED, NOT ASSUMED. This was int(h * (1.0 - HUD_BOTTOM)) with HUD_BOTTOM = 0.20 hardcoded and nothing
+	# tying it to the HUD. The peer has since made the real geometry readable -- Hud.HOTBAR_BAND_TOP is the
+	# canvas y where the bottom furniture starts, and _draw_inventory derives its own layout from it, so the
+	# two cannot drift. The true edge is 0.8194, not 0.80: the old constant excluded about 1.9% of the frame
+	# that is ground, and would have kept excluding the old rectangle if the hotbar ever moved.
+	#
+	# Judged band is unchanged in practice -- tiles are laid from y0 downward and 120px rows still give two
+	# of them -- so this moves no verdict today. It stops the number being a guess, which is the point.
+	var y1: int = int(float(h) * Hud.bottom_furniture_fraction())
 
 	var j: Dictionary = DEAD.judge(img, y0, y1)
 	print("== the ground in the opening frame has to have something in it ==  (%dx%d, horizon at y=%d, %d tiles)"
