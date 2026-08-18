@@ -57,8 +57,26 @@ const SETTLE: int = 60
 ##
 ## The chamber is also widened, and for an independent reason: the lamp's widest veil cut is 9 cells, so an
 ## 11-wide room centred on the body is lit end to end and every contact edge in it is excluded as lit. The
-## carved space has to be wider than the light that stands in the middle of it. Measured, not guessed — the
-## visible frame is 65x39 cells at zoom 1.0, so a 41-wide chamber fits with margin.
+## carved space has to be wider than the light that stands in the middle of it.
+##
+## THE FRAME IS 45x28 CELLS AT 48.0 CAPTURED PIXELS PER CELL, and the layer PRINTS that every run rather
+## than anyone asserting it. The old "65x39 at zoom 1.0" was the broken projection below measuring itself:
+## 65 columns falls out of ~29.5px per cell, which is what the hand-rolled arithmetic believed.
+##
+## I THEN GOT IT WRONG A SECOND TIME IN THIS COMMENT, and it is left recorded because the error is the
+## interesting part. Replacing 65x39 I wrote "26x15", derived from 48 world units x 1.5 composite = 72px
+## and 1920/72 -- reasoning from constants instead of reading the number the fixture prints. The composite
+## does not multiply out that way at this camera; the engine transform reports 48.0px per cell and the view
+## is 45 wide. Both wrong figures came from computing a measurement I could have run.
+##
+## A 41-WIDE CHAMBER THEREFORE FITS, and the single-viewpoint shortfall was never about the room being too
+## wide. With the lens repaired, one standing found 33 rock|air faces against a floor of 40 and correctly
+## refused to report, and the exclusion tally says why: 667 lit, 331 off the judged slab. The LAMP is the
+## dominant term. It rides the body and the camera centres on the body, so the faces nearest the light are
+## excluded for being lit, from every standing, and they are different faces each time.
+##
+## So the camera moves and the faces are deduped by cell pair: 33 -> 116, more than the 3x three standings
+## would give, because pooling de-excludes as well as adds.
 ##
 ## CONSEQUENCE, STATED RATHER THAN BURIED: 6b no longer judges the identical frame 6a does. It judges the
 ## same KIND of place — deep unlit rock against carved void — at a depth where the filter both layers share
@@ -67,6 +85,11 @@ const DELVE_ROWS: int = 30
 const ROOM_W: int = 41
 const ROOM_H: int = 7
 const MIN_DELVE: int = 24
+## Column offsets from the delve column, pooled. Same device as check_rock_reads, and for a sharper reason
+## here: the lamp rides the body and the camera centres on the body, so ONE standing always judges the
+## faces nearest the light and excludes them for being lit. One viewpoint is not a small sample of the
+## chamber, it is a biased one, and the bias points at the cells the layer is built to exclude.
+const VIEWPOINTS: Array[int] = [-13, 0, 13]
 
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
@@ -155,8 +178,17 @@ func _run() -> void:
 		quit(1)
 		return
 
-	var img: Image = get_root().get_texture().get_image()
-	var s: Dictionary = _sample(main, img)
+	var home: Vector2i = main._cell_at(main._player.position)
+	var seen: Dictionary = {}
+	var s: Dictionary = {}
+	for off: int in VIEWPOINTS:
+		main._player.position = main._cell_center(Vector2i(home.x + off, home.y))
+		main._player.velocity = Vector2.ZERO
+		for _i: int in 16:
+			await physics_frame
+		await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw
+		s = _merge(s, _sample(main, get_root().get_texture().get_image(), seen))
 	var edge_step: Array[float] = s["edge_step"]
 	var flat_step: Array[float] = s["flat_step"]
 	var signed: Array[float] = s["edge_signed"]
@@ -254,15 +286,33 @@ func _run() -> void:
 
 ## Walk every horizontally- and vertically-adjacent cell pair on the judged slab and record the luminance
 ## step across the shared face, split by what the sim says the pair actually is.
-func _sample(main: MainView, img: Image) -> Dictionary:
+func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var w: int = img.get_width()
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
 	var bottom: int = int(float(h) * (1.0 - HUD_BOTTOM))
-	var cam: Vector2 = main._camera.global_position
-	var zoom: float = main._current_zoom()
-	var half := Vector2(float(w), float(h)) * 0.5
-	var cell_px: float = float(WorldRenderer.CELL) * zoom
+	# THE ENGINE'S OWN WORLD->PIXEL MAPPING, and its absence here is why every number this layer has ever
+	# printed was taken through a broken lens. What stood here was `(world - cam) * zoom + image_size * 0.5`,
+	# which assumes the captured image and the canvas share a coordinate space. They do not: project.godot
+	# renders the canvas at 1280x720 and composites it 1.5x into the 1920x1080 framebuffer that
+	# get_texture().get_image() returns, so a cell is 48 captured pixels where this arithmetic believed 32.
+	#
+	# THE ERROR IS BIASED, NOT NOISY, AND IT BIASES TOWARD THIS LAYER'S OWN NULL. A face at offset D from the
+	# camera was sampled at the pixel belonging to the world point at 2/3 D -- always pulled inboard, toward
+	# the centre of the view. An instrument asking whether an EDGE reads was handed the INTERIOR beside it,
+	# so "the contact carries no information" was the answer it was built to give whether or not it was true.
+	#
+	# `c6f23b8` repaired exactly this in check_rock_reads and check_opening on 2026-08-17 and NEVER REACHED
+	# THIS FILE -- it is absent from `git log -- tools/check_contact_edge.gd`. The 86%/95% reading in
+	# run_harness.sh came from the peer's branch, where it had been applied; main has been running the
+	# withdrawn lens ever since, and reproduces the withdrawn numbers (51%, steps 1.26-4.49) on demand.
+	#
+	# It also explains the one null nobody could account for: forcing `_draw_edge_ao`'s lip to pure magenta
+	# and its rim to pure green changed NOTHING here. Of course it did not. The layer was not looking at the
+	# face it painted. That null is evidence about this arithmetic and about nothing in the renderer.
+	var to_px: Transform2D = main.get_viewport().get_final_transform() \
+		* main.get_viewport().get_canvas_transform()
+	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
 	# WORLD UNITS, because it is subtracted in world space and transformed afterwards. It was
 	# `cell_px * FACE_OFFSET`, which is CELL * zoom * FACE_OFFSET — a SCREEN-space length applied before the
@@ -309,9 +359,13 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 	var wet: int = 0
 	var airair: int = 0
 
-	var span: Vector2 = Vector2(float(w), float(h)) / zoom * 0.5
-	var c0: Vector2i = main._cell_at(cam - span) - Vector2i(2, 2)
-	var c1: Vector2i = main._cell_at(cam + span) + Vector2i(2, 2)
+	# Inverted out of the same transform. `Vector2(w, h) / zoom * 0.5` read IMAGE pixels as world units and
+	# swept a box half again wider than anything on screen.
+	var inv: Transform2D = to_px.affine_inverse()
+	var wa: Vector2 = inv * Vector2.ZERO
+	var wb: Vector2 = inv * Vector2(float(w), float(h))
+	var c0: Vector2i = main._cell_at(Vector2(minf(wa.x, wb.x), minf(wa.y, wb.y))) - Vector2i(2, 2)
+	var c1: Vector2i = main._cell_at(Vector2(maxf(wa.x, wb.x), maxf(wa.y, wb.y))) + Vector2i(2, 2)
 	c0 = Vector2i(maxi(c0.x, 0), maxi(c0.y, 0))
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
@@ -335,6 +389,11 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 				var b: Vector2i = a + d
 				if b.x > c1.x or b.y > c1.y:
 					continue
+				# DE-DUPLICATED HERE AND NOWHERE EARLIER, so a face rejected as LIT from one standing stays
+				# eligible from the next — which is the entire point of moving the camera.
+				var fkey: String = "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
+				if seen.has(fkey):
+					continue
 				if a.y <= floor_row or b.y <= floor_row:
 					near_surface += 1
 					continue
@@ -355,11 +414,15 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 					continue
 				var face: Vector2 = (main._cell_center(a) + main._cell_center(b)) * 0.5
 				var n: Vector2 = Vector2(float(d.x), float(d.y))
-				var pa: Vector2 = ((face - n * off) - cam) * zoom + half
-				var pb: Vector2 = ((face + n * off) - cam) * zoom + half
+				var pa: Vector2 = to_px * (face - n * off)
+				var pb: Vector2 = to_px * (face + n * off)
 				if not _on_slab(pa, patch, w, top, bottom) or not _on_slab(pb, patch, w, top, bottom):
 					offslab += 1
 					continue
+				# MARKED SEEN ONLY HERE, past every rejection above. A face excluded for being lit or off
+				# the slab from this standing must stay eligible from the next one, or pooling would lock
+				# in the first viewpoint's exclusions and three standings would sample the same biased set.
+				seen[fkey] = true
 				# THE PROFILE ACROSS THE FACE, sampled at single pixels rather than in a patch, because the
 				# thing it is looking for is only a few pixels wide and a patch would average it away.
 				#
@@ -389,7 +452,7 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 					var rock_dir: Vector2 = -n if sa else n
 					for k: int in PROFILE_PX.size():
 						var wp: Vector2 = face + rock_dir * PROFILE_PX[k]
-						var sp: Vector2 = (wp - cam) * zoom + half
+						var sp: Vector2 = to_px * wp
 						if sp.x < 1.0 or sp.y < float(top) or sp.x >= float(w - 1) or sp.y >= float(bottom):
 							continue
 						var v: float = _patch_luma(img, int(sp.x), int(sp.y), 0)
@@ -422,6 +485,44 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 		"airair": airair, "profile": profile, "prof_or": prof_or, "signed_or": signed_or,
 		"step_or": step_or,
 		"skipped": near_surface + lit + offslab + wet + airair}
+
+
+## POOL TWO SAMPLES. The payloads are three shapes and each needs its own rule: flat Array[float] arms
+## concatenate, the per-index Array[Array] profiles (profile, prof_or, signed_or, step_or) concatenate
+## INSIDE each index, and the exclusion counters add. A generic "append if Array" would flatten the nested
+## ones into a single bucket and silently destroy the per-orientation split that this layer's whole
+## argument rests on — the key light makes TOP and UNDER point opposite ways, and merging them is the
+## error the layer already documents at the verdict level.
+func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
+	if src.is_empty():
+		return dst
+	if dst.is_empty():
+		return src
+	for k: String in src:
+		if k == "prof_or":
+			# NESTED TWICE: orientation, then profile index. A single-level merge here would append the
+			# inner per-index ARRAYS as elements instead of concatenating their contents, turning three
+			# 10-slot profiles into a 30-slot list of arrays and quietly destroying the per-orientation
+			# split the layer's whole argument rests on.
+			var doo: Array = dst[k]
+			var soo: Array = src[k]
+			for o: int in soo.size():
+				var dk: Array = doo[o]
+				var sk: Array = soo[o]
+				for i: int in sk.size():
+					var dii: Array = dk[i]
+					dii.append_array(sk[i] as Array)
+		elif k == "profile" or k == "signed_or" or k == "step_or":
+			var da: Array = dst[k]
+			var sa: Array = src[k]
+			for i: int in sa.size():
+				var di: Array = da[i]
+				di.append_array(sa[i] as Array)
+		elif dst[k] is Array:
+			(dst[k] as Array).append_array(src[k] as Array)
+		else:
+			dst[k] = int(dst[k]) + int(src[k])
+	return dst
 
 
 ## A cell the veil never brightened — scratch bytes still equal base bytes, so no source reached it. Any
