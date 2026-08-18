@@ -63,7 +63,7 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `works` | `3c46c8c` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- works` |
 | `works_fresh` | `d0ac976` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_fresh` |
 | `works_full` | `d0ac976` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_full` |
-| `works_short` | `406d83b` | 2026-08-18 03:44 | `66090e4d89` | `capture_moments.gd -- works_short` |
+| `works_short` | `6b4817f` | 2026-08-18 03:44 | `66090e4d89` | `capture_moments.gd -- works_short` |
 
 ## Cohorts
 

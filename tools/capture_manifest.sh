@@ -36,6 +36,14 @@
 # drawing sources as they stood in that commit's tree, so two frames sharing a signature are pictures of the
 # same renderer no matter which day they were taken.
 #
+# IT NECESSARILY LAGS BY ONE COMMIT, and that is a property of what it records rather than a wart. Each row
+# names the commit that last wrote its capture, and that sha does not exist until the commit exists — so a
+# manifest cannot be committed alongside the captures it describes. Adding or re-shooting a capture is two
+# commits: the frames, then the manifest. Amending the first to squeeze the manifest in changes its sha and
+# invalidates the manifest again, which is how this was discovered. `--check` is a gate on the PUSHED tip,
+# where the preceding commit is already history, so the two-commit shape passes CI and a mid-sequence
+# checkout does not.
+#
 # THE MANIFEST IS GENERATED, NEVER EDITED. `--check` regenerates it and diffs, so it cannot drift from the
 # repository the way a hand-kept list would — the failure this project has now hit in `check_item_reads`'s
 # ITEMS list, in the capture count, and in the material registry.
