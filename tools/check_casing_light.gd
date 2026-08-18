@@ -70,14 +70,17 @@ func _run() -> void:
 	for behavior: Variant in Visuals.MACHINE_STYLE:
 		var style: Dictionary = Visuals.MACHINE_STYLE[behavior]
 		var col: Color = style["color"]
-		var margin: float = _margin(col)
-		_check(margin >= MIN_STEP,
-			"%s: its edges stand off its body by %.3f (floor %.2f)" % [String(behavior), margin, MIN_STEP])
-		lums.append(_lum(col))
-		judged += 1
-		if margin < tightest:
-			tightest = margin
-			tightest_name = String(behavior)
+		for state: Array in _both_states(col):
+			var margin: float = _margin(state[1])
+			_check(margin >= MIN_STEP,
+				"%s %s: its edges stand off its body by %.3f (floor %.2f)"
+					% [String(behavior), state[0], margin, MIN_STEP])
+			if state[0] == "working":
+				lums.append(_lum(state[1]))
+			judged += 1
+			if margin < tightest:
+				tightest = margin
+				tightest_name = String(behavior) + " " + String(state[0])
 
 	# THE TWO FALLBACKS ARE MACHINES TOO. `machine_color` answers for defs with no registry entry — the
 	# sooty furnace and the steel-blue runner — and those bodies get the identical casing. A test that
@@ -85,14 +88,16 @@ func _run() -> void:
 	# which is the darkest body the game ships and therefore the closest to the floor.
 	for fb: Array in [["the sooty furnace", Color(0.28, 0.23, 0.20)],
 			["the generic runner", Color(0.30, 0.55, 0.75)]]:
-		var margin: float = _margin(fb[1])
-		_check(margin >= MIN_STEP,
-			"fallback %s: its edges stand off its body by %.3f" % [fb[0], margin])
-		lums.append(_lum(fb[1]))
-		judged += 1
-		if margin < tightest:
-			tightest = margin
-			tightest_name = "fallback " + String(fb[0])
+		for state: Array in _both_states(fb[1]):
+			var margin: float = _margin(state[1])
+			_check(margin >= MIN_STEP,
+				"fallback %s %s: its edges stand off its body by %.3f" % [fb[0], state[0], margin])
+			if state[0] == "working":
+				lums.append(_lum(state[1]))
+			judged += 1
+			if margin < tightest:
+				tightest = margin
+				tightest_name = "fallback " + String(fb[0]) + " " + String(state[0])
 
 	# THE GUARD MUST BITE. Not "did it bite once when I wrote it" — every run, on colours chosen to be
 	# exactly the two failures this model has. If either of these passes, the check above is decoration.
@@ -104,12 +109,15 @@ func _run() -> void:
 	# NON-VACUITY, and it is not the loop count. Every assertion above is satisfied by a registry of one
 	# entry, and satisfied perfectly by eighteen identical greys — which is the failure this layer exists to
 	# catch, wearing a passing scorecard. The registry must be large AND its colours must genuinely differ.
-	_check(judged >= 15, "%d machine colours were judged" % judged)
+	_check(judged >= 30, "%d machine bodies were judged (every registry colour, in both states)" % judged)
 	var lo: float = 9.0
 	var hi: float = -9.0
 	for l: float in lums:
 		lo = minf(lo, l)
 		hi = maxf(hi, l)
+	# WORKING BODIES ONLY, and that is not tidiness. Pooling both states here would let the spread be
+	# manufactured by `_cold_iron` itself: eighteen identical greys, half of them darkened, still report a
+	# range. The claim is that the game AUTHORED different machines, so only authored colours may prove it.
 	_check(hi - lo > 0.20,
 		"the bodies really are different colours (luminance %.3f..%.3f)" % [lo, hi])
 	print("  tightest margin: %s at %.3f (floor %.2f)" % [tightest_name, tightest, MIN_STEP])
@@ -121,6 +129,35 @@ func _run() -> void:
 	_check(is_equal_approx(TOP_LIGHTEN, 0.34) and is_equal_approx(BOT_DARKEN, 0.50),
 		"the bevel constants here still match draw_machine_casing's (%.2f up, %.2f down)"
 			% [TOP_LIGHTEN, BOT_DARKEN])
+
+	# AND THE IDLE PALETTE MUST STILL BE A PALETTE. `_cold_iron` is the game's, called not copied, so it
+	# cannot go stale the way the bevel constants can — but it CAN be turned up until every idle machine is
+	# the same black, which is the failure mode of "make it look off": the distinction arrives and the
+	# machines stop being told apart from each other. So the spread is asserted on the cold bodies alone.
+	var cold: Array[float] = []
+	for behavior: Variant in Visuals.MACHINE_STYLE:
+		cold.append(_lum(Visuals._cold_iron(Visuals.MACHINE_STYLE[behavior]["color"])))
+	var clo: float = 9.0
+	var chi: float = -9.0
+	for l: float in cold:
+		clo = minf(clo, l)
+		chi = maxf(chi, l)
+	_check(chi - clo > 0.12,
+		"idle machines are still different machines (cold luminance %.3f..%.3f)" % [clo, chi])
+	_check(chi < hi,
+		"idle really is darker than working at the top of the range (%.3f cold vs %.3f lit)" % [chi, hi])
+
+
+## THE GAME DRAWS EVERY MACHINE IN TWO PALETTES AND THIS LAYER USED TO KNOW ABOUT ONE. `draw_machine_casing`
+## takes an `active` flag and runs an idle body through `Visuals._cold_iron` — darkened 0.22 and pulled 0.18
+## toward grey — so the colours in MACHINE_STYLE are the working half of what ships, and the half nearer the
+## floor was the half nobody judged. That matters here specifically: the near-black sentinel below is
+## REJECTED for having no shadow left to give, and darkening is the operation that walks a body toward it.
+##
+## Calls the game's own function rather than re-deriving it. A copy of `_cold_iron` in this file would be a
+## second tripwire to keep in step, and the bevel constants below are already the one place that has to be.
+func _both_states(col: Color) -> Array:
+	return [["working", col], ["idle", Visuals._cold_iron(col)]]
 
 
 ## How far the nearer of the two lit edges stands off the body between them. The MINIMUM of the two steps,

@@ -342,6 +342,11 @@ add "check_seam_flood (same picture)" "res://tools/check_seam_flood.gd"
 add "check_paint_terms (per-texel)" "res://tools/check_paint_terms.gd"
 add "check_casing_light (machines lit)" "res://tools/check_casing_light.gd"
 add "check_status_reads (every state)" "res://tools/check_status_reads.gd"
+# add_gl: its whole answer is pixels. check_status_reads asks whether the STATUS LAMP names the state and
+# check_casing_light asks whether a casing has a top face — neither one ever asks the question a player
+# actually asks from across a room, which is whether the HARDWARE looks like it is running. That question
+# has no headless form; the light pool it measures is drawn, not modelled.
+add_gl "check_machine_state (running reads)" "res://tools/check_machine_state.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
 add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"

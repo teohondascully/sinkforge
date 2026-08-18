@@ -126,6 +126,25 @@ const AMBIENT_LIGHT := Color(0.34, 0.35, 0.42)
 ## whole change is subtractive on cells that hold nothing. "Bring your own light" gets stronger, not weaker:
 ## the space you have carved is now the darkest thing in frame until you light it.
 const VOID_FLOOR: float = 0.35
+## `SF_MACHINE_BARE=1` strips a machine of everything that is UI ABOUT the machine — its name label, its
+## held-count badge, its status lamp and its need bubble — leaving only the object. **It exists to make
+## `PC-05`'s guard executable**: *"causality survives labels hidden and grayscale."* A guard phrased as a
+## condition needs some way to establish that condition, and the alternative — reasoning about what the
+## frame would look like without the labels — is exactly the kind of claim that is never wrong until it is.
+##
+## **IT MAKES THE ASSERTION HARDER, NEVER EASIER, AND THAT IS THE WHOLE TEST FOR WHETHER A SWITCH LIKE
+## THIS BELONGS IN SHIPPED CODE.** A flag that restores a weaker measurement is a documented way to buy
+## green; a flag that removes the crutches the measurement is not allowed to lean on is the measurement.
+## Read once at load: a renderer that consults the environment per frame is a renderer whose output
+## depends on when you asked.
+static var BARE_MACHINES: bool = OS.get_environment("SF_MACHINE_BARE") == "1"
+
+## What is left of a machine's light pool once it stops working. Not zero: an installed machine in a dark
+## gallery still has to be findable, and a base that vanishes when it idles is a base you cannot navigate.
+## This is the value the furnace has used since its own gate was written; the change is that every other
+## machine now gets it too — see `_paint_lights`.
+const IDLE_GLOW: float = 0.12
+
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
                                                    ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
                                                    ## a white wash (diff 11)
@@ -2447,7 +2466,7 @@ func _draw_machine(machine: MachineState) -> void:
 	# zoomed out). At the locked 0.50× default those labels are a few px tall — unreadable clutter — and
 	# draw_string is the priciest per-call, so on a mature base the non-hovered machines drop their text.
 	# The info isn't lost: the HUD hover inspector shows a machine's full details on hover regardless.
-	var show_text: bool = _text_visible(machine.cell)
+	var show_text: bool = _text_visible(machine.cell) and not BARE_MACHINES
 	if show_text:
 		_draw_machine_label(machine, pos)
 
@@ -2471,7 +2490,8 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(pos.x, bar_y, float(CELL) * frac, 3.0), Color(0.40, 0.90, 0.45))
 
 	_draw_machine_io(machine, pos)
-	_draw_machine_status(machine, pos, show_text)
+	if not BARE_MACHINES:
+		_draw_machine_status(machine, pos, show_text)
 	if _construct.has(machine.cell):     # the one-shot assemble overlay (#9), on top of the finished draw
 		_draw_construct(pos, clampf(float(_construct[machine.cell]) / CONSTRUCT_DUR, 0.0, 1.0))
 
@@ -3533,11 +3553,27 @@ func _paint_lights(layer: LightLayer) -> void:
 		# hot orange forge, an amber burner, a cyan-teal lift — the coloured-pools-on-black Noita read.
 		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
 		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
-		# A COLD/idle forge barely glows — it blazes only while smelting (like the generator going dark when
-		# it runs dry). Fixes the idle spawn-forge washing warm light over the starter ore beside it, and
-		# reads truthfully: light = working. (Non-furnace runners keep their steady casing glow.)
-		if kind == "furnace" and not _machine_active(machine):
-			pulse *= 0.12
+		# A COLD/idle machine barely glows — it blazes only while it is doing its job. The rule reads
+		# truthfully in one direction only: **light = working.**
+		#
+		# THIS WAS A FURNACE-ONLY RULE AND THE EXCEPTION WAS WRITTEN DOWN AS A FEATURE. The line read
+		# `if kind == "furnace" and not _machine_active(machine)`, with the parenthetical *"(Non-furnace
+		# runners keep their steady casing glow.)"* — so a stopped drill, hopper, splitter, crusher, borer,
+		# press, mill and pump each lit the rock around them exactly as brightly as a running one. That is
+		# `PC-05`'s evidence line word for word: *"labels/pointers carry state because hardware does not."*
+		# The hardware was not merely silent about its state, it was **asserting the wrong one**, and the
+		# phrasing turned a defect into a design note nobody would think to question.
+		#
+		# MEASURED with the name label, held badge and status lamp suppressed (`check_machine_state`): a
+		# working Drill and a stopped Drill differed by **~14 levels of luma against a ~7-level animation
+		# baseline** — a still frame of each was the same picture with the bit at a different angle. The
+		# Forge, whose pool was already gated, differed by 92. **The gate was the entire difference between
+		# them**; the casings, the glyphs and the two machines' art were never the variable.
+		#
+		# The generator keeps its own harder gate below (`fuel > 0` → pool off entirely, not dimmed): a
+		# burner with no coal is not idling, it is out.
+		if not _machine_active(machine):
+			pulse *= IDLE_GLOW
 		if kind == "generator":
 			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
 			# Breathes while fueled, goes DARK when it runs dry — the "is it making power?" read.
