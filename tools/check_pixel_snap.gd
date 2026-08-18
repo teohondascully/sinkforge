@@ -12,12 +12,15 @@ extends "res://tools/check_base.gd"
 ## previously said the end-to-end frame-diff — render twice, assert identical terrain — "lives in the headed
 ## fixture tools/capture_pixel_snap.gd". THAT FILE HAS NEVER EXISTED. Zero tree entries across every object
 ## in the repository, reachable and unreachable, against a positive control that finds this file 205 times.
-## Nothing renders twice and compares. Nothing checks that the snapped camera actually produces an identical
-## frame; only that the arithmetic which is supposed to produce one is correct.
 ##
 ## A disclaimer that points at a stronger sibling is more dangerous than no disclaimer, because it reads as
 ## rigour: anyone auditing whether terrain rendering is pixel-verified reads that line and stops looking.
-## The gap is real and it is here, not somewhere else.
+##
+## THE GAP IS NOW FILLED, by `tools/check_snap_frame.gd` — which is a real path, and the way to know that
+## without trusting this sentence is that it is registered in `run_harness.sh` and fails when you break
+## `snap_to_pixel`. It renders two frames and diffs them: a follow target nudged inside one pixel bucket
+## must leave the picture alone, and a target one bucket over must visibly move it. This layer keeps its
+## own job — the function, headless, cheap — and no longer claims anyone else's.
 ##   godot --headless --path . --script res://tools/check_pixel_snap.gd
 
 func _initialize() -> void:

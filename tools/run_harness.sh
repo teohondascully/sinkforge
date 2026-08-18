@@ -337,6 +337,11 @@ add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
 add_gl "check_hud_layout (no collisions)" "res://tools/check_hud_layout.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
+# add_gl, and the other half of check_pixel_snap. That layer proves snap_to_pixel is correct AS A FUNCTION;
+# its docstring then claimed the end-to-end frame-diff lived in tools/capture_pixel_snap.gd, which has never
+# existed in any object in this repository. So nothing checked that correct snap arithmetic reaches the
+# framebuffer. This renders two frames and diffs them, which the dummy renderer cannot do at all.
+add_gl "check_snap_frame (snap on screen)" "res://tools/check_snap_frame.gd"
 add "check_agility (movement score)"  "res://tools/check_agility.gd"
 add "check_grapple (swing score)"     "res://tools/check_grapple.gd"
 add "check_loop_health (loop score)"  "res://tools/check_loop_health.gd"
