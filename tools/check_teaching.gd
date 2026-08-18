@@ -80,6 +80,7 @@ func _run() -> void:
 
 	_judge_texts(hints)
 	await _judge_rope(main, hints)
+	await _judge_sapling(main, hints)
 
 	main.queue_free()
 	await physics_frame
@@ -329,6 +330,63 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 	_check(hints._done.size() == taught and hints._queue.size() == queued,
 		"...and none of it is ever said twice (%d hints latched, %d queued)"
 			% [hints._done.size(), hints._queue.size()])
+
+
+## THE SAPLING'S SECOND HALF — the one lesson whose situation is a PLAYER ACTION rather than a physics
+## state, and therefore the one this layer's rope drills could never have reached.
+##
+## `UI-05` moved *"it grows into a NEW TREE: wood is renewable"* off the pickup bubble, where it was a
+## second concept competing with the instruction, and onto the first sapling that actually roots — where
+## it is a payoff rather than a promise. **That move is only honest if the payoff fires.** This layer's own
+## standard: *"a hint whose condition never occurs in play is not a lesson, it is a comment in a shipped
+## file"*, and a lesson relocated onto a condition nobody drives is exactly that, with the added insult
+## that the text it replaced is gone.
+##
+## Driven through `try_build`, the real verb, with a real selection — not `sim.plant_sapling`, which would
+## bypass the poke in `main.gd` that is the actual thing under test and pass while it was missing.
+func _judge_sapling(main: MainView, hints: Hints) -> void:
+	var sim: FactorySim = main.sim
+	var soil := Vector2i(BODY_COL, HALL_BOTTOM)          # inside the carved hall, on its stone floor
+	sim.set_solid(soil + Vector2i(0, 1), &"earth")       # SAPLING_SOILS is [&"earth"] — give it ground
+	# ESTABLISH "YOU DO NOT HAVE ONE" BEFORE TESTING THE FIRST ONE, and this setup is itself a finding.
+	# `Hints._init` snapshots the pack, deliberately — whatever you are already holding at construction is
+	# not a fresh acquisition. This layer boots with `dev_start` at its default, and THE DEV KIT ALREADY
+	# CONTAINS A SAPLING, so `_had[&"sapling"]` is true from frame zero and the pickup lesson can never
+	# fire in this fixture. Measured, not assumed: the first version of this check failed with
+	# `had_sapling=true` and `_done` holding five other ids.
+	#
+	# So the pre-state is constructed rather than assumed: empty the slot, re-arm the snapshot the same
+	# way a load does, and only then acquire. That is the state a real opening player is in, and it is the
+	# difference between testing the edge and testing the kit.
+	sim.inventory.erase(&"sapling")
+	hints._snapshot()
+	sim.inventory[&"sapling"] = 2
+	var idx: int = -1
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	for i: int in slots.size():
+		if StringName(slots[i]["item"]) == &"sapling":
+			idx = i
+	_check(idx >= 0, "the sapling is in the pack and selectable (slot %d)" % idx)
+	if idx < 0:
+		return
+	main._inv_selected = idx
+	_check(await _latched(hints, &"sapling"),
+		"picking up a sapling teaches how to plant it")
+	var before: bool = hints._done.has(&"planted")
+	_check(not before,
+		"CONTROL: the payoff has NOT fired before anything is planted (if it had, the check below is empty)")
+	var rooted: bool = main.try_build(soil)
+	_check(rooted, "the real place verb roots a sapling at %s" % soil)
+	if not rooted:
+		return
+	_check(await _latched(hints, &"planted"),
+		"...and the renewability lesson UI-05 moved off the pickup lands on the plant that earns it")
+	# ONCE, the same standard the rope moments are held to.
+	var taught: int = hints._done.size()
+	var second: bool = main.try_build(soil + Vector2i(-1, 0))
+	print("  a second plant (%s) taught %d more thing(s)"
+		% ["rooted" if second else "refused", hints._done.size() - taught])
+	_check(hints._done.size() == taught, "...and it is never said twice")
 
 
 ## The chamber, the hook's roof, the spur the line catches on, and a floor to land hard on.

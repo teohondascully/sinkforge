@@ -2324,6 +2324,11 @@ func try_build(cell: Vector2i) -> bool:
 		if rooted:
 			_particles.dust(_cell_center(cell) + Vector2(0.0, 8.0), Color(0.35, 0.55, 0.25), 5)
 			_sfx.play(&"pop", _cell_center(cell), 1.3)
+			# UI-04/UI-05: the renewability claim rides the FIRST successful plant rather than the pickup.
+			# Poked once and never unpoked — `Hints` latches on the rising edge and again in `_done`, so a
+			# second sapling is not a second lesson.
+			if _hints != null:
+				_hints.note(&"planted", true)
 		return rooted
 	var def: MachineDef = _selected_machine_def()
 	if def != null and def.behavior == &"torch":

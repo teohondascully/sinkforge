@@ -190,8 +190,19 @@ frame is its strongest evidence.
 **Outside the lamp, rock and void are the same near-black.** In `delve` the left third of the frame cannot
 be parsed into solid and empty by eye. That is `T3.1` **6a**, and it is `P2`'s subject.
 
-> **STATUS, and it moved while this page was being written.** `c1` has since landed a treatment
+> **STATUS, and it moved while this page was being written.** `c1` has a treatment
 > (`scenes/rock_tooth.gdshader`) taking VALUE 52% → 67% and GRAIN 61% → 79% against a 75% floor, with the
-> rock/air value relation no longer inverted, `check_opening` 5–6 dead tiles of 32 → **0 of 32**, and no
-> threshold moved. **These frames are therefore a genuine BEFORE.** They should not be regenerated; the
-> after belongs beside them under a different name.
+> rock/air value relation no longer inverted. **These frames are therefore a genuine BEFORE.** They should
+> not be regenerated; the after belongs beside them under a different name.
+
+> **AND ONE NUMBER ON THIS PAGE HAS TO BE READ WITH ITS RULER NAMED.** `check_opening` measured
+> **2/32 dead, PASS**, four times on `origin/main` at `f225eaa` — the commit these frames were taken at.
+> That is **not** evidence the opening is fine. Main's copy of the layer locates the horizon with a broken
+> projection (y=589 instead of y=613) and so **judges a band ~24px too high, missing the deadest subsoil
+> row entirely**, and `dead_space` scores a tile on **horizontal** neighbour differences alone, so ground
+> that is banded horizontally and flat vertically reads as alive. The corrected instrument scores the same
+> renderer at **6/32, FAIL, three times with zero variance.** Both repairs are unmerged.
+>
+> **These PNGs are unaffected — they are pixels, and the pixels are what they are.** What is affected is
+> any dead-space FIGURE quoted from this commit: it is a **lower bound**, and this page does not use it as
+> a baseline.

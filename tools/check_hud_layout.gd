@@ -200,6 +200,7 @@ func _run() -> void:
 	_check_hover(bare, hover, big_hover)
 	await _check_pack_window()
 	await _check_announce_channel()
+	_check_lesson_footprint()
 	await _check_probe_is_off()
 	_report_footprint(foot_names, foots)
 
@@ -698,6 +699,67 @@ func _check_announce_channel() -> void:
 	_check(hints.active_alpha() > 0.9 and hints.active_text() == taught,
 		"...and the same lesson returns at full opacity once the channel is free (alpha %.2f)"
 			% hints.active_alpha())
+
+
+## UI-06 — NO LESSON MAY GROW. A RATCHET, SET FROM MEASUREMENT AND NEVER FROM TASTE.
+##
+## The ticket asks for *"a capture-reviewed max height/coverage for non-modal lessons"* and guards it with
+## *"do not treat panel area alone as an aesthetic score"* — so this caps the bubble and claims nothing
+## about whether the bubble is good. It is a floor under a regression, not a verdict on a design.
+##
+## **61px is three drawn lines at size 11, and it is where the game already is** — measured across all
+## nineteen lessons after the UI-05 cuts, worst case `rope`/`torch`/`generator` at exactly 61.0. A fourth
+## line is 77px, so this fails the moment any lesson grows one. It was 77 before this strike (`pump`,
+## `chain`, `wrapped`); the number moved because the SUBJECT changed, which is the only direction a
+## threshold is ever allowed to move.
+##
+## **WIDTH IS NOT ASSERTED, DELIBERATELY.** `hint_box` clamps to `HINT_WRAP + 20`, so every lesson at or
+## near the cap reports 250.0 by construction and a `w <= 250` assertion could not fail for any string —
+## it would be a guard written in a quantity that cannot exceed its own bound. Height is the axis the text
+## can actually push on.
+const LESSON_MAX_H: float = 61.0
+
+func _check_lesson_footprint() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var hints: Hints = _main._hints
+	if hints == null:
+		_check(false, "there is a hint system whose lessons can be measured")
+		return
+	var texts: Array[Array] = []
+	for d: Dictionary in hints._defs:
+		texts.append([String(d["id"]), String(d["text"])])
+	for m: Dictionary in hints._moments:
+		texts.append([String(m["id"]), String(m["text"])])
+	_check(texts.size() >= 15,
+		"there are %d lessons to measure (if this collapses, everything below passes empty)" % texts.size())
+	var over: Array[String] = []
+	var tallest: float = 0.0
+	var widest_cover: float = 0.0
+	var worst_id: String = ""
+	for t: Array in texts:
+		var box: Vector2 = Hud.hint_box(font, String(t[1]))
+		var cover: float = box.x * box.y / (Hud.CANVAS.x * Hud.CANVAS.y)
+		if box.y > tallest:
+			tallest = box.y
+		if cover > widest_cover:
+			widest_cover = cover
+			worst_id = String(t[0])
+		if box.y > LESSON_MAX_H:
+			over.append("%s %.0fpx" % [t[0], box.y])
+	print("    lessons: %d measured, tallest %.0fpx (ceiling %.0f), largest %.2f%% of canvas (%s)"
+		% [texts.size(), tallest, LESSON_MAX_H, widest_cover * 100.0, worst_id])
+	_check(over.is_empty(), "every lesson fits the %.0fpx tutorial ceiling%s"
+		% [LESSON_MAX_H, "" if over.is_empty() else " — OVER: " + ", ".join(over)])
+	# THE CONTROL. Without it the line above is a claim that the strings are short, dressed as a claim that
+	# the measurement works. A fourth line must be visible to the same function that judges the real ones.
+	var stretched: String = String(texts[0][1]) + " And then a further sentence, long enough that this "
+	stretched += "cannot possibly fit in the same three lines the real lessons fit in."
+	_check(Hud.hint_box(font, stretched).y > LESSON_MAX_H,
+		"CONTROL: a deliberately over-long lesson measures %.0fpx and would fail this ceiling"
+			% Hud.hint_box(font, stretched).y)
+	_check(tallest <= LESSON_MAX_H and Hud.hint_box(font, "x").y < LESSON_MAX_H,
+		"CONTROL: a one-word lesson measures %.0fpx, so the ceiling is not simply above everything"
+			% Hud.hint_box(font, "x").y)
 
 
 ## Panels whose centre sits in the band the arrival plate occupies. The objective line is top-centre too

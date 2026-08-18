@@ -38,10 +38,18 @@ var _defs: Array[Dictionary] = [
 		"text": "TORCH — RMB mounts it on a wall-backed cell (or beside rock). Its light STAYS — claim the dark."},
 	{"id": &"scanner", "item": &"scanner",
 		"text": "SCANNER — select it and RMB fires a sonar pulse: every vein in range echoes through the rock."},
+	# UI-05, and this is the ticket's own example. "It grows into a NEW TREE: wood is renewable" is a
+	# SECOND CONCEPT — an economics claim — competing with the one input instruction the bubble exists to
+	# give. It is not deleted; it is moved to `planted`, where it lands on the moment it describes and is
+	# a payoff instead of a promise. *One action, one immediate consequence.*
 	{"id": &"sapling", "item": &"sapling",
-		"text": "SAPLING — RMB plants it on grassy ground. It grows into a NEW TREE: wood is renewable."},
+		"text": "SAPLING — RMB plants it on grassy ground."},
+	# Same cut. "Too dense for the Forge" is the immediate consequence of what just entered the pack and
+	# answers the question the player is about to ask. The Blast Furnace is a research path, and a research
+	# path is a plan rather than a consequence — it belongs on the BENCH, which is where the player goes
+	# to make plans.
 	{"id": &"rich_ore", "item": &"rich_ore",
-		"text": "RICH ORE — too dense for the Forge. Research ENRICHMENT: a Blast Furnace pours TWO ingots from one."},
+		"text": "RICH ORE — too dense for the Forge. The BENCH knows what to do with it."},
 	{"id": &"generator", "item": &"generator",
 		"text": "GENERATOR — place it, then drop COAL on it (Q). It radiates POWER to machines nearby."},
 	{"id": &"conduit", "item": &"conduit",
@@ -95,17 +103,30 @@ var _moments: Array[Dictionary] = [
 		"text": "GRAPPLE — F fires the winch at whatever you're aiming at. W reels you UP it, "
 			+ "SPACE leaps off. The climb back is the swing."},
 	{"id": &"pump",
-		"text": "PUMP IT — reel W at the BOTTOM of the arc: a shorter line swings faster. Pay S back out "
-			+ "at the top. In rhythm, the swing winds itself up."},
+		# Was four lines. "A shorter line swings faster" is the MECHANISM — true, and a third concept
+		# between the two halves of the input it is explaining. The action and its consequence survive.
+		"text": "PUMP IT — reel W at the BOTTOM of the arc, pay S back out at the top. "
+			+ "In rhythm, the swing winds itself up."},
 	{"id": &"chain",
-		"text": "CHAIN IT — you never have to land. F again in mid-air plants the next line, "
-			+ "and the speed you left with is the speed you keep."},
+		# "You never have to land" is a slogan, and it arrives BEFORE the instruction that earns it.
+		"text": "CHAIN IT — F again in mid-air plants the next line, and the speed you left with "
+			+ "is the speed you keep."},
 	{"id": &"wrapped",
-		"text": "THE LINE CAUGHT — it bent around the rock instead of through it. A short line whips "
-			+ "you round harder; S pays out to swing wide."},
+		# The first clause stays: it explains the thing that just happened on screen, which is the whole
+		# reason this lesson exists (unannounced, a wrap reads as the rope glitching). The second control
+		# goes — one consequence.
+		"text": "THE LINE CAUGHT — it bent around the rock instead of through it. "
+			+ "A short line whips you round harder."},
 	{"id": &"hard_landing",
 		"text": "HARD LANDING — a long drop costs your footing. F on the way DOWN catches you: "
 			+ "the line takes the fall instead of your legs."},
+	# THE PAYOFF HALF OF THE SAPLING LESSON, and the reason UI-05's cut is a move rather than a deletion.
+	# It fires on the first sapling that actually roots, so the claim arrives attached to the thing it is
+	# a claim about — a player who has just watched one go into the ground is being told what they now
+	# own, not what they might one day do.
+	{"id": &"planted",
+		"text": "It takes root. Give it time and it is a whole tree — wood is the one thing "
+			+ "down here that grows back."},
 ]
 
 const DEPTH_HINT_ID: StringName = &"deep_enough"

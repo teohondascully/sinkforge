@@ -431,14 +431,28 @@ func _draw_flash() -> void:
 ## The just-in-time HINT BUBBLE: a small speech bubble with a tail pointing down at the body, teaching
 ## the item that just landed in the pack. Word-wrapped, gold-capped like every panel,
 ## faded by the tracker's envelope. Clamped on-canvas so a body near a world edge still gets taught.
+## UI-06 — THE TUTORIAL'S FOOTPRINT, AS A FUNCTION RATHER THAN AS ARITHMETIC IN A DRAW CALL.
+##
+## The ticket asks for *"a capture-reviewed max height/coverage for non-modal lessons"*, and a ceiling is
+## only a ceiling if something can measure the thing it caps. This is the box `_draw_hint_bubble` actually
+## draws, extracted so the harness can size every lesson in the game **without reimplementing the layout**
+## — a second copy of this arithmetic would be a gauge that agrees with itself and not with the screen.
+const HINT_FS: int = 11
+const HINT_WRAP: float = 230.0
+
+static func hint_box(font: Font, text: String) -> Vector2:
+	var ts: Vector2 = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, HINT_WRAP, HINT_FS)
+	return Vector2(minf(ts.x, HINT_WRAP) + 20.0, ts.y + 13.0)
+
+
 func _draw_hint_bubble() -> void:
 	if hint_text == "" or hint_alpha <= 0.01:
 		return
-	var fs: int = 11
-	var wrap_w: float = 230.0
-	var text_size: Vector2 = _font.get_multiline_string_size(hint_text, HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs)
-	var w: float = minf(text_size.x, wrap_w) + 20.0
-	var h: float = text_size.y + 13.0
+	var fs: int = HINT_FS
+	var wrap_w: float = HINT_WRAP
+	var box: Vector2 = hint_box(_font, hint_text)
+	var w: float = box.x
+	var h: float = box.y
 	var tail := Vector2(clampf(hint_anchor.x, 8.0, CANVAS.x - 8.0), clampf(hint_anchor.y, 60.0, CANVAS.y - 12.0))
 	var origin := Vector2(clampf(tail.x - w * 0.5, 6.0, CANVAS.x - w - 6.0), tail.y - 7.0 - h)
 	if origin.y < 38.0:                       # never under the objective line — flip below the anchor
