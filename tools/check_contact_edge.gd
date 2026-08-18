@@ -133,6 +133,9 @@ const MIN_DELVE: int = 24
 ## faces nearest the light and excludes them for being lit. One viewpoint is not a small sample of the
 ## chamber, it is a biased one, and the bias points at the cells the layer is built to exclude.
 const VIEWPOINTS: Array[int] = [-13, 0, 13]
+## Per-orientation floor for the lit-rock form arm. Lower than MIN_SAMPLES because these are sub-buckets
+## of an already-gated pool, but far above the n=12 that was measured to swing 16 levels run to run.
+const ORIENT_MIN: int = 30
 
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
@@ -241,8 +244,13 @@ func _run() -> void:
 
 	print("  sampled %d rock|air faces and %d rock|rock faces (%d skipped: %d near the surface, %d lit,"
 		% [edge_step.size(), flat_step.size(), int(s["skipped"]), int(s["near_surface"]), int(s["lit"])]
-		+ " %d off the judged slab, %d touching water, %d air|air by design)"
-		% [int(s["offslab"]), int(s["wet"]), int(s["airair"])])
+		+ " %d off the judged slab, %d touching water, %d air|air by design, %d straddling the lamp edge)"
+		% [int(s["offslab"]), int(s["wet"]), int(s["airair"]), int(s["lamp_edge"])])
+	# The components must sum to the total. An accounting line that does not add up is a line that has
+	# quietly stopped naming where its population went.
+	_check(int(s["near_surface"]) + int(s["lit"]) + int(s["offslab"]) + int(s["wet"]) + int(s["airair"])
+		+ int(s["lamp_edge"]) == int(s["skipped"]),
+		"the skip breakdown accounts for every skipped face")
 
 	# NON-VACUITY FIRST. Both statistics below are ratios over pairs, and a ratio over a handful of faces is
 	# not a small result, it is no result — and it flatters.
@@ -279,6 +287,7 @@ func _run() -> void:
 	var lit_edge: Array[float] = s["lit_edge_step"]
 	var lit_flat: Array[float] = s["lit_flat_step"]
 	var lit_sgn: Array[float] = s["lit_edge_signed"]
+	print("  %d faces straddled the lamp's edge (one side lit) and are in NEITHER arm" % int(s["lamp_edge"]))
 	if lit_edge.is_empty():
 		print("  INSIDE THE LAMP: no lit rock|air faces landed on the judged slab — nothing to report")
 	else:
@@ -286,12 +295,31 @@ func _run() -> void:
 		for v: float in lit_sgn:
 			if v > 0.0:
 				lit_pol += 1.0
-		print("  INSIDE THE LAMP (diagnostic, never gated): %d rock|air faces, step median %.2f against a"
-			% [lit_edge.size(), _median(lit_edge)]
+		print("  INSIDE THE LAMP — both sides lit (diagnostic, never gated): %d rock|air faces, step"
+			% lit_edge.size() + " median %.2f against a" % _median(lit_edge)
 			+ " lit flat-rock step of %.2f (n=%d); rock brighter on %.0f%% of them"
 			% [_median(lit_flat), lit_flat.size(), 100.0 * lit_pol / float(maxi(lit_sgn.size(), 1))])
 		print("    this is 6b's ACTUAL subject — the blind tester's complaint was about the rock inside the"
 			+ " lamp, and every number above this line is about the dark outside it")
+		var lo: Array = s["lit_or"]
+		var t: Array[float] = lo[ORIENT_TOP]
+		var u: Array[float] = lo[ORIENT_UNDER]
+		var w: Array[float] = lo[ORIENT_SIDE]
+		# EACH BUCKET CARRIES ITS OWN FLOOR, and a bucket under it prints no median at all. Measured, not
+		# assumed: across five runs TOP (n=41) held 43.7-44.6 and SIDE (n=42) held 28.7-29.5 — both stable
+		# inside one level — while UNDER (n=12) swung 26.8-42.8, landing either below SIDE or level with
+		# TOP depending on which faces the sample caught. At that size the median moves a whole rank when
+		# one face enters, so the number is not a weak result, it is a coin. Widening VIEWPOINTS to seven
+		# standings did not help: UNDER stayed at n=12, which says down-facing rock inside a lamp is rare
+		# in this world rather than merely unsampled. Printing "UNDER 41.2" beside two solid numbers would
+		# read as the third leg of an ordering, and someone (me) would quote it.
+		print("    lit ROCK by face orientation — TOP %s, SIDE %s, UNDER %s"
+			% [_orient_cell(t), _orient_cell(w), _orient_cell(u)])
+		if t.size() >= ORIENT_MIN and w.size() >= ORIENT_MIN:
+			print("    TOP sits %.1f levels above SIDE. Fog has no orientation; a mass lit from above does,"
+				% (_median(t) - _median(w))
+				+ " so a key light reaching the lit pool is what separates them. UNDER is NOT measured here"
+				+ " — the ordering claim is TOP vs SIDE only, and the third leg is an open question.")
 
 	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. It was sized against
 	# `_draw_edge_ao` painting "the first 6px of a 32px cell" — both halves of which are false. The cell is
@@ -418,6 +446,9 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	var lit_edge_step: Array[float] = []
 	var lit_flat_step: Array[float] = []
 	var lit_edge_signed: Array[float] = []
+	var lit_or: Array[Array] = []
+	for _o: int in 3:
+		lit_or.append([] as Array[float])
 	var edge_step: Array[float] = []
 	var flat_step: Array[float] = []
 	var edge_signed: Array[float] = []
@@ -428,6 +459,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	var lit: int = 0
 	var offslab: int = 0
 	var wet: int = 0
+	var lamp_edge: int = 0   ## faces with exactly one side lit — the lamp's own boundary, in neither arm
 	var airair: int = 0
 
 	# Inverted out of the same transform. `Vector2(w, h) / zoom * 0.5` read IMAGE pixels as world units and
@@ -480,7 +512,23 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				# Lit faces are now measured into their own arms and PRINTED. Nothing is asserted on them:
 				# this file's own rule is that a floor invented before the measurement is the error it has
 				# already made once, and nobody has looked at this population yet.
-				var in_lamp: bool = _is_lit(scratch, base, a) or _is_lit(scratch, base, b)
+				# BOTH SIDES, NOT EITHER, and the difference is the whole population. The unlit arm skips a
+				# face when EITHER cell is lit, and the naive complement of that is "either is lit" — which
+				# sweeps in every face where the lamp fills the VOID while the rock stays dark. That is the
+				# commonest lit-contact geometry there is, and a big step across it is a statement about the
+				# LAMP'S OWN BOUNDARY, not about how lit rock reads. 6b's claim is about the rock INSIDE the
+				# pool, so the arm takes only faces with light on both sides. (c2 caught this before the
+				# first number was quoted anywhere; "either" and "both" are two populations wearing one name.)
+				#
+				# Faces with exactly one side lit now belong to NEITHER arm. They are counted and printed
+				# rather than dropped, because a face straddling the edge of the light is a third thing and
+				# silently discarding it is how a population goes missing.
+				var lit_a: bool = _is_lit(scratch, base, a)
+				var lit_b: bool = _is_lit(scratch, base, b)
+				var in_lamp: bool = lit_a and lit_b
+				if lit_a != lit_b:
+					lamp_edge += 1
+					continue
 				if in_lamp:
 					lit += 1
 				# Water is neither wall nor hole and a player is never confused about which it is;
@@ -559,6 +607,16 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 						lit_edge_step.append(absf(la - lb))
 						var lit_rock_first: bool = sa
 						lit_edge_signed.append((la - lb) if lit_rock_first else (lb - la))
+						# THE OTHER HALF OF 6b, and the half a contact step cannot answer. The tester's
+						# words were "a soft mottled gradient — FOG, NOT CARVED MASS", which is a complaint
+						# about FORM rather than about edges: a contact can be perfectly crisp while the
+						# solid behind it still reads as vapour. Fog has no orientation; a carved mass lit
+						# from above does. The renderer claims a key light — sky-facing tops catch a warm
+						# lip, undersides fall into the darkest thing in the world, walls sit between — so
+						# if that reaches the lit pool the ROCK-side luma must ORDER by face orientation,
+						# TOP > SIDE > UNDER. If the three medians sit on top of each other, the lit rock is
+						# being shaded uniformly and "fog" is the right word for it.
+						lit_or[orient].append(la if lit_rock_first else lb)
 					continue
 				if sa and sb:
 					flat_step.append(absf(la - lb))
@@ -577,14 +635,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 					signed_or[orient].append(sgn)
 					step_or[orient].append(absf(la - lb))
 
-	return {"lit_edge_step": lit_edge_step, "lit_flat_step": lit_flat_step,
+	return {"lit_edge_step": lit_edge_step, "lit_flat_step": lit_flat_step, "lit_or": lit_or,
 		"lit_edge_signed": lit_edge_signed,
 		"edge_step": edge_step, "flat_step": flat_step, "edge_signed": edge_signed,
 		"edge_signed_stained": edge_signed_stained, "edge_signed_plain": edge_signed_plain,
-		"luma": luma, "near_surface": near_surface, "lit": lit, "offslab": offslab, "wet": wet,
+		"luma": luma, "near_surface": near_surface, "lit": lit, "offslab": offslab, "wet": wet, "lamp_edge": lamp_edge,
 		"airair": airair, "profile": profile, "prof_or": prof_or, "signed_or": signed_or,
 		"step_or": step_or,
-		"skipped": near_surface + lit + offslab + wet + airair}
+		"skipped": near_surface + lit + offslab + wet + airair + lamp_edge}
 
 
 ## POOL TWO SAMPLES. The payloads are three shapes and each needs its own rule: flat Array[float] arms
@@ -612,7 +670,7 @@ func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
 				for i: int in sk.size():
 					var dii: Array = dk[i]
 					dii.append_array(sk[i] as Array)
-		elif k == "profile" or k == "signed_or" or k == "step_or":
+		elif k == "profile" or k == "signed_or" or k == "step_or" or k == "lit_or":
 			var da: Array = dst[k]
 			var sa: Array = src[k]
 			for i: int in sa.size():
@@ -628,6 +686,13 @@ func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
 ## A cell the veil never brightened — scratch bytes still equal base bytes, so no source reached it. Any
 ## light source added later appears in the buffer and is excluded automatically, where a hand-kept radius
 ## list would have to be remembered.
+## A median, or an honest refusal to give one. Under the floor the count is all that gets printed.
+func _orient_cell(v: Array[float]) -> String:
+	if v.size() < ORIENT_MIN:
+		return "n=%d, under the %d floor — no median reported" % [v.size(), ORIENT_MIN]
+	return "%.1f (n=%d)" % [_median(v), v.size()]
+
+
 func _is_lit(scratch: PackedByteArray, base: PackedByteArray, c: Vector2i) -> bool:
 	var i: int = (c.y * FactorySim.GRID_COLS + c.x) * 4
 	return scratch[i] != base[i] or scratch[i + 1] != base[i + 1] or scratch[i + 2] != base[i + 2]
