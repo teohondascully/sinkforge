@@ -2833,6 +2833,9 @@ func _bake_fine_terrain() -> void:
 	_fine_dirty = false
 	if _fine == null:
 		return
+	# The material's texture grammar, beside its colour. Set here rather than passed through `rebake`
+	# because the region path and five harness fixtures call that signature too; see `grammar_at`.
+	_fine.grammar_at = func(c: Vector2i) -> int: return _material(sim.material_at(c)).grammar
 	_fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),   # P2: the sim's real fine grid
@@ -2853,6 +2856,7 @@ func _bake_fine_terrain() -> void:
 func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 	if _fine == null:
 		return
+	_fine.grammar_at = func(c: Vector2i) -> int: return _material(sim.material_at(c)).grammar
 	_fine.rebake_region(cmin, cmax,
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
 		func(fx: int, fy: int) -> bool: return sim.fine_is_solid(fx, fy),

@@ -232,6 +232,12 @@ func _on_frame() -> void:
 		# stale solidity behind has no later chance to repair it, because the sites do not overlap.
 		var r: WorldRenderer = _main._renderer
 		var ref := FineTerrain.new(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, FINE_SEED)
+		# THE TEXTURE GRAMMAR IS AN INPUT, and it does not travel in the `rebake` signature — it is a
+		# property, so a caller that forgets it gets Clastic everywhere and no error. Without this line the
+		# reference bakes one grammar for the whole world while the renderer bakes real ones, and the
+		# byte-identity check below reds on a CONFIGURATION difference while claiming a PATH difference.
+		# It caught exactly that within one sweep of grammars landing.
+		ref.grammar_at = func(c: Vector2i) -> int: return r._material(r.sim.material_at(c)).grammar
 		ref.rebake(
 			func(c: Vector2i) -> bool: return r.sim.is_solid(c),
 			func(fx: int, fy: int) -> bool: return r.sim.fine_is_solid(fx, fy),

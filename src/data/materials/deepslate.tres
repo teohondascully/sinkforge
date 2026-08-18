@@ -12,3 +12,4 @@ grain = true
 cap_color = Color(0, 0, 0, 0)
 nugget_color = Color(0, 0, 0, 0)
 depth_darken = 0.35
+grammar = 2

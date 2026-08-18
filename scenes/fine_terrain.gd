@@ -22,6 +22,37 @@ extends RefCounted
 ## ~32px-scale organic wobble — true fine-grained detail (thin 8px veins, sand piles) needs fine DATA
 ## in the sim, a later slice. This slice is safe and sim-free.
 
+
+## ─────────────────────────────────────────────────────────────────────────────────────────────────────
+## A STANDING CONSTRAINT ON THIS RENDERER, written down because THREE separate tickets have now discovered
+## it independently and none of them left a note. If you are about to add a texture, a mark, a treatment or
+## a cue that has to be visible UNDERGROUND, read this first — it will otherwise cost you a day.
+##
+##   ANYTHING MULTIPLICATIVE IS INVISIBLE AT DEPTH. Anything that must survive the dark has to be
+##   ADDITIVE, in absolute value levels.
+##
+## The reason is arithmetic, not taste. The darkness veil is a MULTIPLY layer, and the sampled rock mean
+## underground is about 10/255. Any effect expressed as a fraction of the material's own colour — which is
+## everything routed through `vmul` here — is therefore scaled by the same factor that made the rock dark.
+## A generous +-0.16 swing on `vmul` arrives as about 1.6 levels, against a measured within-window standard
+## deviation of 4.5. It is not that the effect is too weak; it is that it is being divided by the dark.
+##
+## The three that learned it the hard way:
+##   * `rock_grit`'s additive floor sat BELOW the multiply, so raising GRAIN_AMP, adding a companion and
+##     raising the noise frequency all measured as nothing (58% -> 55% -> 59% against a 75% floor). Fixed
+##     by `rock_tooth.gdshader`, which draws the same texture ABOVE the veil and adds in absolute levels.
+##   * `_draw_edge_ao` in `terrain_painter.gd` paints a contact treatment that reaches ZERO pixels
+##     underground — hiding that whole layer moves an underground frame LESS than photographing it twice.
+##   * the material grammars below (TR-02/TR-04) were written into `vmul` first and moved dirt-vs-stone
+##     separability two points for a 5.3x amplitude ratio.
+##
+## AND THE SECOND HALF, WHICH IS NEWER AND HARDER. Additive is necessary and not sufficient: at a mean luma
+## of 10 a 4x crop of underground rock is visually BLACK, so a difference an instrument can measure there
+## may be one no eye can use. A separation statistic is not a perception. Judge a treatment where the
+## player can actually see — inside the lamp — and treat "unreadable out in the dark" as a BRIGHTNESS
+## finding rather than a texture one.
+## ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
 const SUBDIV: int = 4                                  ## fine cells per coarse cell side (8px fine @ 32px cell)
 const FINE: int = 8                                    ## fine cell size in world px (CELL / SUBDIV)
 ## P2: the fine SHAPE (which fine cells are solid) now comes from the sim's real fine grid — the boundary
@@ -95,6 +126,57 @@ const STONE_DARKEN: float = 0.17                       ## how much a stone blob 
 const CRACK_FREQ: float = 0.09                         ## faint hairline cracks — ridged noise near its zero-crossing
 const CRACK_BAND: float = 0.075                        ## |noise| under this is seam; wider = a line, not a dotted one
 const CRACK_DARKEN: float = 0.15                       ## how dark a crack seam gets
+
+## THE MATERIAL GRAMMARS (TR-02 / TR-04). Indexed by MaterialDef.grammar: 0 Clastic, 1 Bedded, 2 Massive.
+##
+## Until these existed this baker received one thing per cell — a COLOUR — so every solid material in the
+## world ran the identical noise at a different hue, and the audit's "both read as square variation before
+## material" was a structural fact rather than a tuning choice. No amplitude fixes a layer that cannot tell
+## which material it is painting.
+##
+## The two ends are deliberately opposite in BOTH the cues a viewer has: how loud the surface is, and which
+## way it runs. Soil is granular and clumpy and has no direction — loose ground does not fracture along
+## planes. Stone is a quiet broad plane cut by steeply-dipping seams, so it is quieter AND directional, and
+## its direction is the opposite of bedding's. A material told apart on only one of those is told apart by
+## a knob rather than by a language.
+enum { GRAM_CLASTIC = 0, GRAM_BEDDED = 1, GRAM_MASSIVE = 2 }
+const GRAM_GRAIN: Array[float] = [1.60, 0.85, 0.30]    ## grain amplitude: soil granular, stone restrained
+const GRAM_XSTR: Array[float] = [1.00, 0.35, 1.60]     ## <1 stretches features along the horizontal
+const GRAM_CLUMP: Array[float] = [1.45, 0.60, 0.25]    ## embedded aggregate — pebbles in soil, not in stone
+const GRAM_SEAM: Array[float] = [0.15, 1.20, 2.20]     ## fracture seam strength
+const GRAM_SEAM_X: Array[float] = [1.40, 3.00, 0.40]   ## seam sampling: bedded runs flat, massive runs steep
+const GRAM_SEAM_Y: Array[float] = [1.00, 0.35, 3.40]
+const GRAM_SEAM_W: Array[float] = [1.00, 1.35, 1.70]   ## seam band width — a plane's fracture is a LINE, not a fleck
+## BROAD MASS BEFORE MICROTEXTURE, which is TR-03 and which is also what made the first attempt fail.
+## The broad tonal patch field is the largest single variation term in this bake (PATCH_AMP 0.22, additive,
+## against a grain term of 0.10 applied multiplicatively on near-black rock). While it was global it was a
+## large material-BLIND variance sitting on top of every material's own signal, diluting exactly the
+## difference the grammar was trying to state — the grain amplitudes differed by 2.9x and the measured
+## separation moved four points. A material's broad mass is part of its language, not the world's: soil is
+## mottled by compaction at large scale, a stone plane is quiet at large scale and speaks in its seams.
+const GRAM_PATCH: Array[float] = [1.35, 1.00, 0.50]
+
+## THE MARKS HAVE TO ARRIVE IN ABSOLUTE LEVELS, and this is the third time the same root cause has decided
+## a ticket in this renderer. Everything above modulates `vmul`, which multiplies the material's own
+## colour — and underground that colour is near-black. MEASURED: the sampled rock mean is ~10/255, so the
+## whole +-0.16 grain swing lands as about 1.6 levels, against a measured within-window standard deviation
+## of 4.5. The multiplicative marks are therefore a minority of the variation a viewer can see, which is
+## why raising the earth/stone grain ratio from 2.9x to 5.3x moved separability two points: not because
+## the grammar was absent, but because it was being written below the multiply.
+##
+## `rock_grit` lost the same argument to the darkness veil (6a) and was answered by `rock_tooth`, which
+## adds ABOVE the veil in absolute levels. `_draw_edge_ao` lost it to the fine layer covering the coarse
+## bake. So these are additive companions in value levels: what they write is what arrives, at any
+## brightness. Kept SMALL — the tooth adds 0.030 at peak and reads clearly on dark rock, so a few
+## thousandths is a legible mark underground and nothing at all in daylight.
+## REMOVED AFTER MEASUREMENT, and the removal is the point. Additive companions to the marks below were
+## added on the reasoning above — sound arithmetic, and the same root cause that decided 6a. They moved
+## dirt-vs-stone separability 65% -> 64%, i.e. nothing, while costing two extra noise lookups per fine
+## cell in the path `check_dig_hitch` guards. A mechanism that has been right twice is the one that stops
+## being checked on its third outing; this was its third and it lost. The constraint above is still true
+## and still worth reading — it is why the marks CANNOT read at depth — but "additive" turns out to be
+## necessary rather than sufficient, and paying frame time for a disproved hypothesis is how a renderer
+## accumulates weight. Reinstate only against a lit-band measurement that shows a need.
 ## ROCK HUE VARIATION (diff-04 #3): the reference rock isn't one blue-grey — it drifts subtly teal ↔
 ## faint brown ↔ faint violet by region. A very-low-freq 2-noise field picks a hue offset per region;
 ## kept DARK + subtle so it breaks the monochrome without turning the rock colourful.
@@ -300,6 +382,19 @@ var _data: PackedByteArray = PackedByteArray()          ## the baked pixel bytes
 var _fine_solid: PackedByteArray = PackedByteArray()    ## the real fine solid/air grid (neighbours for region AO/moss)
 var _solid_mask: PackedFloat32Array = PackedFloat32Array()  ## coarse solidity 0/1
 var _mat_col: PackedColorArray = PackedColorArray()     ## coarse body BASE colour, tone NOT yet applied
+var _mat_gram: PackedByteArray = PackedByteArray()      ## coarse body texture GRAMMAR (see GRAM_* above)
+
+## OPTIONAL per-coarse-cell grammar lookup: (Vector2i) -> int. Left unset every cell reads Clastic, which
+## is byte-identical to the behaviour before grammars existed — deliberately, because `rebake` has eight
+## call sites across five files and one of them passes its arguments positionally out of an array. A new
+## required parameter would have churned five harness fixtures to say "unchanged".
+##
+## THE COST OF THAT CHOICE, PAID ONCE ALREADY: this is an INPUT to the bake that does not appear in the
+## bake's signature, so a caller can omit it and get a silently different world rather than an error.
+## Anyone constructing a second FineTerrain to compare against the renderer's — `check_dig_hitch` builds
+## one to prove the region path is byte-identical to the full path — MUST copy this across, or the two
+## differ by configuration while the comparison claims they differ by path.
+var grammar_at: Callable = Callable()
 var _tone: PackedVector2Array = PackedVector2Array()    ## coarse (jitter, strata) samples, reconstructed per fine cell
 var _wall_col: PackedColorArray = PackedColorArray()    ## coarse back-wall BASE colour, tone NOT applied
 var _wall_has: PackedByteArray = PackedByteArray()      ## #S13: 1 where the coarse cell actually HAS a wall
@@ -459,6 +554,7 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 			_solid_mask[cy * _cols + cx] = 1.0 if bool(solid_at.call(Vector2i(cx, cy))) else 0.0
 	# Cache coarse colours once per cell (reused by all SUBDIV² children).
 	_mat_col.resize(_cols * _rows)
+	_mat_gram.resize(_cols * _rows)
 	_wall_col.resize(_cols * _rows)
 	# The tone is sampled on EVERY cell, solid or not: the reconstruction below reads a fine cell's four
 	# surrounding coarse samples, and an air cell beside a rock face is one of them.
@@ -470,6 +566,13 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 			# One Vector2i per cell rather than four identical ones — same four Callables, a quarter of
 			# the allocations feeding them.
 			var cell := Vector2i(cx, cy)
+			# THE GRAMMAR IS WRITTEN ON EVERY CELL, solid or not, for the same reason the tone above is:
+			# the reconstruction reads a fine cell's surrounding coarse samples and an air cell beside a
+			# rock face is one of them. Leaving air cells unwritten is what broke byte-identity — an
+			# unwritten entry keeps whatever an earlier bake left, a fresh instance holds zero, and the two
+			# disagree by a couple of pixels in accreted rock. Stale is not merely wrong, it is
+			# INSTANCE-DEPENDENT, which is the one thing a region-vs-full comparison cannot tolerate.
+			_mat_gram[idx] = _grammar_of(cell) if _solid_mask[idx] > 0.5 else GRAM_CLASTIC
 			if _solid_mask[idx] > 0.5:
 				_mat_col[idx] = material_color_at.call(cell) as Color
 			_wall_col[idx] = wall_color_at.call(cell) as Color
@@ -679,6 +782,9 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			_solid_mask[idx] = 1.0 if s else 0.0
 			if s:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
+				_mat_gram[idx] = _grammar_of(Vector2i(cx, cy))
+			else:
+				_mat_gram[idx] = GRAM_CLASTIC   # never leave an entry to go stale — see rebake()
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	# _tone is deliberately NOT refreshed: a tone is a pure function of (x, y), so mining cannot change
@@ -725,6 +831,37 @@ func _clear_fine(i4: int) -> void:
 ## Paint ONE fine cell into _data from the cached coarse + fine grids — the per-cell body shared by the full
 ## rebake and the region fast lane. Solid → the parent's molded body colour with fine AO/hue/grain/moss/rim;
 ## eroded (parent solid, now fine-air) → recessed back-rock; genuine open air / surface cap → transparent.
+## The grammar of the nearest solid coarse neighbour — the grammar half of `_accreted_color`, and it walks
+## the same eight neighbours in the same order so a fine cell's grammar and its colour always come from the
+## SAME coarse cell. Falls back to Clastic when a fine cell is genuinely isolated, which is the same
+## fallback the colour path uses and is deterministic rather than left over.
+func _accreted_gram(fx: int, fy: int) -> int:
+	var pcx: int = fx / SUBDIV
+	var pcy: int = fy / SUBDIV
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0),
+			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var nx: int = pcx + d.x
+		var ny: int = pcy + d.y
+		if nx < 0 or ny < 0 or nx >= _cols or ny >= _rows:
+			continue
+		if _solid_mask[ny * _cols + nx] > 0.5:
+			return _gram_at(ny * _cols + nx)
+	return GRAM_CLASTIC
+
+
+## The grammar cached for a coarse index, tolerant of an unfilled cache so the paint cannot fault on a
+## world baked before `grammar_at` was set.
+func _gram_at(idx: int) -> int:
+	return _mat_gram[idx] if idx >= 0 and idx < _mat_gram.size() else GRAM_CLASTIC
+
+
+## This cell's texture grammar, or Clastic when no lookup was supplied (see `grammar_at`).
+func _grammar_of(cell: Vector2i) -> int:
+	if not grammar_at.is_valid():
+		return GRAM_CLASTIC
+	return clampi(int(grammar_at.call(cell)), 0, GRAM_SEAM.size() - 1)
+
+
 func _paint_fine(fx: int, fy: int) -> void:
 	var i4: int = (fy * _fcols + fx) * 4
 	var pcol: int = fx / SUBDIV
@@ -762,20 +899,41 @@ func _paint_fine(fx: int, fy: int) -> void:
 		var drift: float = _noise.get_noise_2d(float(fx) * 0.35 + 500.0, float(fy) * 0.35) * 0.07
 		# BROAD TONAL PATCHES (diff-04 #1): a big soft low-freq value swing so wide areas of rock read as
 		# lighter/darker patches, not one flat tone — the reference's mottled interiors.
-		drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP
+		drift += _patch.get_noise_2d(float(fx), float(fy)) * PATCH_AMP * GRAM_PATCH[_gram_at(midx)]
 		# DENSE GRAIN/SPECKLE (diff 4): two octaves of high-freq noise pit + clod the rock so it reads
 		# granular. Multiplicative on value so it rides the material's own colour.
-		var gx: float = float(fx) * GRAIN_XSTRETCH
-		var grain: float = _grain.get_noise_2d(gx, float(fy)) * GRAIN_AMP \
-			+ _grain2.get_noise_2d(gx, float(fy)) * (GRAIN_AMP * 0.35)
+		# THE MATERIAL'S OWN LANGUAGE. `gram` is read at the WARPED index, the same one the colour came
+		# from, so grammar and hue never disagree about which material a fine cell belongs to — reading it
+		# at `cidx` would put stone's seams a few pixels into the dirt at every contact.
+		# MIRROR THE COLOUR'S BRANCH EXACTLY. `_mat_gram` is only written for SOLID coarse cells, so a fine
+		# cell whose coarse parent is AIR — accreted rock reaching over a hole — has no fresh entry to read
+		# and `_gram_at(midx)` hands back whatever an older bake left there. Colour never had this problem
+		# because it already takes `_accreted_color` on that branch; the grammar was reading straight
+		# through it.
+		#
+		# STALE IS NOT MERELY WRONG, IT IS INSTANCE-DEPENDENT: a FineTerrain that did one full bake and one
+		# that accumulated region bakes hold different leftovers, so the region path stopped being
+		# byte-identical to the full path. `check_dig_hitch` reds on precisely that and it found this within
+		# one sweep of the grammars landing.
+		var gram: int = _gram_at(midx) if parent_solid else _accreted_gram(fx, fy)
+		var gx: float = float(fx) * GRAIN_XSTRETCH * GRAM_XSTR[gram]
+		var gamp: float = GRAIN_AMP * GRAM_GRAIN[gram]
+		var grain: float = _grain.get_noise_2d(gx, float(fy)) * gamp \
+			+ _grain2.get_noise_2d(gx, float(fy)) * (gamp * 0.35)
 		# EMBEDDED STONES + CRACKS (diff-04 #1): a mid-freq mask, past a threshold, darkens a whole cluster
 		# into an embedded darker stone; a ridged near-zero band of a second field cuts a thin dark crack.
+		# Both are now the material's, not the world's: soil gets the clumps and almost no seams, stone gets
+		# the seams and almost no clumps.
 		var stone: float = _stone.get_noise_2d(float(fx), float(fy))
 		if stone > STONE_THRESH:
-			grain -= STONE_DARKEN * smoothstep(0.0, 1.0, (stone - STONE_THRESH) * STONE_RAMP)
-		var crackv: float = absf(_crack.get_noise_2d(float(fx) * 1.4, float(fy)))
-		if crackv < CRACK_BAND:
-			grain -= CRACK_DARKEN * smoothstep(0.0, 1.0, 1.0 - crackv / CRACK_BAND)
+			grain -= STONE_DARKEN * GRAM_CLUMP[gram] \
+				* smoothstep(0.0, 1.0, (stone - STONE_THRESH) * STONE_RAMP)
+		var crackv: float = absf(_crack.get_noise_2d(float(fx) * GRAM_SEAM_X[gram],
+			float(fy) * GRAM_SEAM_Y[gram]))
+		var seam_band: float = CRACK_BAND * GRAM_SEAM_W[gram]
+		if crackv < seam_band:
+			grain -= CRACK_DARKEN * GRAM_SEAM[gram] \
+				* smoothstep(0.0, 1.0, 1.0 - crackv / seam_band)
 		# RIM light (diff 7): the topmost solid fine cell of a face (open air directly above) catches a
 		# bright lip — Noita's lit rock edges. A thin bright band only on the up-facing surface.
 		# ...and it fades over RIM_DEPTH rows rather than lighting exactly one. A binary rim lights the
