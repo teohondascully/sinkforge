@@ -457,6 +457,14 @@ add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
 # add_gl: it measures the boxes the HUD actually DREW, and the dummy renderer draws none of them — so
 # headless every state reports zero panels and every overlap assertion passes on an empty screen.
 add_gl "check_hud_layout (no collisions)" "res://tools/check_hud_layout.gd"
+
+# THE OTHER PLANE. `check_hud_layout` compares HUD rectangles against HUD rectangles, which is a complete
+# instrument for the question it asks and structurally unable to ask this one: every rope in this game is
+# drawn in WORLD space by `world_renderer.gd`, so a stratum plate printed across the line you are hanging
+# from is not a collision that layer declines to report -- it is one its population does not contain. Not a
+# missing state. A missing plane. T2.1's "colliding with map, rope and action" had its map half green for
+# weeks on that account.
+add_gl "check_ceremony_reads (interrupt vs world)" "res://tools/check_ceremony_reads.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 # add_gl, and the other half of check_pixel_snap. That layer proves snap_to_pixel is correct AS A FUNCTION;
