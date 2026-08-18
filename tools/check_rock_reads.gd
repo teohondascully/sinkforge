@@ -50,6 +50,17 @@ const DELVE_ROWS: int = 30
 const ROOM_W: int = 11
 const ROOM_H: int = 6
 const MIN_DELVE: int = 24
+## THREE VIEWPOINTS, POOLED, FOR THE REASON 6b ESTABLISHED. The lamp rides the player and the camera centres
+## on the player, so the lit region is always the middle of the judged slab: no amount of digging moves it,
+## but standing somewhere else does. A single frame therefore samples one lighting posture and calls it the
+## world. 6a is not vacuous at one viewpoint -- it clears the 40-sample floor comfortably -- but "not
+## vacuous" and "well sampled" are different claims, and 6b's single-viewpoint reading cleared its floor by
+## exactly one point before pooling took it to eleven.
+##
+## Cells are de-duplicated across viewpoints, and ONLY once a cell has passed every filter: one rejected as
+## lit from one position must stay eligible from another, which is the entire mechanism. Counting a cell
+## twice would inflate n without adding evidence, which is what the floor exists to catch.
+const VIEWPOINTS: Array[int] = [0, -12, 12]  ## column offsets from the delve column
 
 ## The judged slab: the banner and the hotbar are chrome, and chrome is neither rock nor air.
 const HUD_TOP: float = 0.16
@@ -157,8 +168,17 @@ func _run() -> void:
 		quit(1)
 		return
 
-	var img: Image = get_root().get_texture().get_image()
-	var s: Dictionary = _sample(main, img)
+	var seen: Dictionary = {}
+	var s: Dictionary = {}
+	var home: Vector2 = main._player.position
+	for off: int in VIEWPOINTS:
+		main._player.position = home + Vector2(float(off * WorldRenderer.CELL), 0.0)
+		main._player.velocity = Vector2.ZERO
+		for _i: int in 24:
+			await physics_frame
+		await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw
+		s = _merge(s, _sample(main, get_root().get_texture().get_image(), seen))
 	var rock_v: Array[float] = s["rock_value"]
 	var air_v: Array[float] = s["air_value"]
 	var rock_g: Array[float] = s["rock_grain"]
@@ -240,7 +260,7 @@ func _run() -> void:
 ## Walk every cell whose screen box lands on the judged slab, keep the ones that are deep and unlit, and
 ## record what the frame put there. Returns the two populations twice over — once by value, once by grain —
 ## plus the tally of what was excluded and why.
-func _sample(main: MainView, img: Image) -> Dictionary:
+func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var w: int = img.get_width()
 	var h: int = img.get_height()
 	var top: int = int(float(h) * HUD_TOP)
@@ -329,6 +349,12 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 			if px - patch < 0 or px + patch >= w or py - patch < top or py + patch >= bottom:
 				offslab += 1
 				continue
+			# DE-DUPLICATED HERE AND NOWHERE EARLIER, so a cell rejected as lit from one standing
+			# position stays eligible from the next.
+			var cell_key: String = "%d,%d" % [cx, cy]
+			if seen.has(cell_key):
+				continue
+			seen[cell_key] = true
 			var stat: Vector2 = _patch_stats(img, px, py, patch)
 			if main.sim.is_solid(c):
 				rock_value.append(stat.x)
@@ -381,6 +407,18 @@ func _sample(main: MainView, img: Image) -> Dictionary:
 		"air_grain": air_grain, "rock_row": rock_row, "air_row": air_row, "wet": wet, "near_surface": near_surface, "lit": lit, "offslab": offslab,
 		"rock_pi": rock_pi, "rock_pe": rock_pe, "rock_si": rock_si, "rock_se": rock_se,
 		"skipped": near_surface + lit + offslab}
+
+
+## Pool one viewpoint's tally into the running one. Counters add, arrays concatenate.
+func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
+	if dst.is_empty():
+		return src
+	for k: String in src:
+		if dst[k] is Array and src[k] is Array:
+			(dst[k] as Array).append_array(src[k] as Array)
+		else:
+			dst[k] = int(dst[k]) + int(src[k])
+	return dst
 
 
 ## Does this solid cell have a face onto open air? The property a contact rim would change, and therefore
