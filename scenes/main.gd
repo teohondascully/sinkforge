@@ -696,7 +696,10 @@ func _update_defocus() -> void:
 		return
 	var mat: ShaderMaterial = _lens.material as ShaderMaterial
 	if mat != null:
-		mat.set_shader_parameter("defocus", _hud._bazaar_ease() * 3.4)
+		# THE SETTINGS PAGE RACKS IT TOO. Whichever modal is up owns the lens; taking the max rather than
+		# adding them means opening one while the other falls does not double the blur.
+		mat.set_shader_parameter("defocus",
+			maxf(_hud._bazaar_ease(), _hud.settings_ease()) * 3.4)
 
 
 func _process(delta: float) -> void:
@@ -1138,6 +1141,14 @@ func _settings_input(event: InputEvent) -> void:
 		_settings_open = false
 		_settings_drag = ""
 		return
+	# THE NUMBER ROW PICKS A CATEGORY — and it sits BELOW the capture branch above, which returns before
+	# reaching here. That order is the whole reason Settings is not the counter's fourth face: a page that
+	# can bind any key to anything cannot also spend the digits on navigation unless capture gets them
+	# first (docs/MENU_MATRIX.md, the `MNU-26` ruling).
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode >= KEY_1 and event.keycode <= KEY_3:
+		_hud.set_settings_cat(event.keycode - KEY_1)
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_apply_setting(_hud.settings_click(get_viewport().get_mouse_position()))
@@ -1173,6 +1184,8 @@ func _apply_setting(payload: Dictionary) -> void:
 	elif payload.has("reset"):
 		Settings.reset_bindings()
 		_hud.flash("bindings reset to defaults")
+	elif payload.has("cat"):
+		_hud.set_settings_cat(int(payload["cat"]))
 
 
 ## THE THREE THINGS THE ROPE CAN TEACH ITSELF.

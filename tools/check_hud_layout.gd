@@ -507,44 +507,73 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 ## exactly what a state that failed to open would produce, so the same predicate is run once more over the
 ## same rects with one of them displaced off the canvas, and is required to catch it.
 const CONTROL_SLOP: float = 1.0
-## Sliders, chips, the mute, the reset, and one per binding. A count far below this means the page did not
-## open and the assertions above are agreeing with an empty list.
-const SETTINGS_CONTROLS_MIN: int = 26
+## PER CATEGORY, because the page now shows one at a time.
+##
+## This floor used to be a single 26 — "sliders, chips, the mute, the reset, and one per binding" — over a
+## page that drew all of that at once. `MNU-26` ended that: one category is open and the panel is only as
+## tall as that category needs. A single total would now be satisfied by CONTROLS alone while AUDIO and
+## FEEL went unvisited, which is the shape of a floor that has stopped measuring its subject.
+##
+## So the floor is split and the layer visits all three faces. **The teeth are unchanged and land where
+## they always did**: CONTROLS still has to register every one of the twenty-two bindings plus its reset,
+## still all on screen, still all on the plate — that was the defect this assertion was written for and it
+## is asserted against the same population, at the same strength. The other two faces are coverage the
+## old single-screen check never had, because they were never separately addressable.
+const SETTINGS_CAT_MIN: Array[int] = [8, 25, 6]     # AUDIO: rail+mute+4 levels. CONTROLS: rail+22. FEEL: rail+3.
+const SETTINGS_CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL"]
+## Frames a category change is allowed before its panel has to have stopped moving. The page eases its
+## height toward the open category (`Hud._set_h`), and a rect read mid-lerp is a measurement of how many
+## frames elapsed before the shutter, not of the layout — this project has paid for that lesson twice.
+const SETTLE_FRAMES: int = 150
 
 
 func _check_controls_reachable() -> void:
-	var shot: Dictionary = await _controls_shot({"_settings_open": true})
-	var hits: Array[Rect2] = shot["hits"]
-	var plate: Rect2 = shot["plate"]
+	var total: int = 0
+	for cat: int in SETTINGS_CAT_MIN.size():
+		var shot: Dictionary = await _controls_shot({"_settings_open": true}, cat)
+		var hits: Array[Rect2] = shot["hits"]
+		var plate: Rect2 = shot["plate"]
+		var name: String = SETTINGS_CAT_NAMES[cat]
+		total += hits.size()
 
-	_check(hits.size() >= SETTINGS_CONTROLS_MIN,
-		"the settings page registered %d clickable controls (at least %d, or it never opened)"
-			% [hits.size(), SETTINGS_CONTROLS_MIN])
+		_check(bool(shot["settled"]), "%s settled before it was measured (%.2fpx from its target height)"
+			% [name, float(shot["drift"])])
+		_check(hits.size() >= SETTINGS_CAT_MIN[cat],
+			"settings %s registered %d clickable controls (at least %d, or it never opened)"
+				% [name, hits.size(), SETTINGS_CAT_MIN[cat]])
 
-	var off: Array[String] = _outside_canvas(hits)
-	_check(off.is_empty(), "settings open: all %d clickable controls are on screen%s"
-		% [hits.size(), "" if off.is_empty() else " — OFF: " + ", ".join(off)])
+		var off: Array[String] = _outside_canvas(hits)
+		_check(off.is_empty(), "settings %s: all %d clickable controls are on screen%s"
+			% [name, hits.size(), "" if off.is_empty() else " — OFF: " + ", ".join(off)])
 
-	var spilled: Array[String] = []
-	for r: Rect2 in hits:
-		if not plate.grow(CONTROL_SLOP).encloses(r):
-			spilled.append("%s" % r)
-	_check(spilled.is_empty(),
-		"...and every one sits on the %.0fx%.0f plate that owns them%s"
-			% [plate.size.x, plate.size.y, "" if spilled.is_empty() else " — OFF THE PLATE: "
-				+ ", ".join(spilled)])
+		var spilled: Array[String] = []
+		for r: Rect2 in hits:
+			if not plate.grow(CONTROL_SLOP).encloses(r):
+				spilled.append("%s" % r)
+		_check(spilled.is_empty(),
+			"...and every one sits on the %.0fx%.0f plate that owns them%s"
+				% [plate.size.x, plate.size.y, "" if spilled.is_empty() else " — OFF THE PLATE: "
+					+ ", ".join(spilled)])
 
-	# The control: the same predicate, the same rects, one of them moved off the bottom of the canvas. It
-	# is stated as a DIFFERENCE from the live count and not as "catches exactly one", because the first
-	# version was written expecting the page to be clean and reported `caught 2` the moment the page was
-	# not — the control failing for the same reason as the subject, and saying nothing about the predicate.
-	var planted: Array[Rect2] = hits.duplicate()
-	if not planted.is_empty():
-		planted[0] = Rect2(planted[0].position + Vector2(0.0, Hud.CANVAS.y), planted[0].size)
-	var caught: int = _outside_canvas(planted).size()
-	_check(caught == off.size() + 1,
-		"the same check catches one more control once one is pushed off the bottom edge (%d -> %d)"
-			% [off.size(), caught])
+		# The control: the same predicate, the same rects, one of them moved off the bottom of the canvas.
+		# It is stated as a DIFFERENCE from the live count and not as "catches exactly one", because the
+		# first version was written expecting the page to be clean and reported `caught 2` the moment the
+		# page was not — the control failing for the same reason as the subject, and saying nothing about
+		# the predicate. Run per category: a control that only ever ran on one face is a control that
+		# vouches for two faces it never saw.
+		var planted: Array[Rect2] = hits.duplicate()
+		if not planted.is_empty():
+			planted[0] = Rect2(planted[0].position + Vector2(0.0, Hud.CANVAS.y), planted[0].size)
+		var caught: int = _outside_canvas(planted).size()
+		_check(caught == off.size() + 1,
+			"settings %s: the same check catches one more once one is pushed off the bottom (%d -> %d)"
+				% [name, off.size(), caught])
+
+	# NOT A FLOOR — a ledger. The three faces together must still offer at least what the one crowded page
+	# did, so a category quietly losing its controls in some future rearrangement cannot pass by being
+	# short in a place no single assertion is looking.
+	_check(total >= 39, "the three faces register %d controls between them (the old single page: 26)"
+		% total)
 
 	_main._settings_open = false
 	await RenderingServer.frame_post_draw
@@ -563,7 +592,13 @@ func _outside_canvas(rects: Array[Rect2]) -> Array[String]:
 
 ## One state, one drawn frame, and the two things it registered: every clickable rect, and the biggest
 ## panel — which for a modal state is the modal's own plate.
-func _controls_shot(set_flags: Dictionary) -> Dictionary:
+## `cat` >= 0 selects a settings category before the shot and WAITS FOR THE PANEL TO STOP MOVING.
+##
+## The category is set through `Hud.set_settings_cat`, on the HUD, because that is where the page keeps it
+## — `main.gd` asks for the change and never pushes the field. That distinction is not pedantry: this
+## project has a probe that posed `hud.inventory_open` and photographed a field its owner overwrote before
+## the first frame, and reported the resulting nothing as a measurement.
+func _controls_shot(set_flags: Dictionary, cat: int = -1) -> Dictionary:
 	_main._paused = false
 	_main._inventory_open = false
 	_main._minimap_mode = 0
@@ -572,8 +607,24 @@ func _controls_shot(set_flags: Dictionary) -> Dictionary:
 	_main._settings_open = false
 	for k: Variant in set_flags:
 		_main.set(String(k), set_flags[k])
+	var hud0: Hud = _main._hud
+	if cat >= 0:
+		hud0.set_settings_cat(cat)
 	for _i: int in 3:
 		await RenderingServer.frame_post_draw
+	# Wait for the height to arrive rather than assuming a fixed number of frames is enough. Reported, not
+	# just waited on: if it never settles the layer says so instead of quietly measuring a lerp.
+	var drift: float = 0.0
+	var settled: bool = true
+	if cat >= 0:
+		settled = false
+		for _i: int in SETTLE_FRAMES:
+			drift = absf(hud0._set_h - hud0._settings_wanted_h())
+			if drift < 0.5:
+				settled = true
+				break
+			await RenderingServer.frame_post_draw
+		drift = absf(hud0._set_h - hud0._settings_wanted_h())
 	Hud.probing = true
 	Hud.panel_probe = ([] as Array[Rect2])
 	await RenderingServer.frame_post_draw
@@ -589,7 +640,7 @@ func _controls_shot(set_flags: Dictionary) -> Dictionary:
 	for pr: Rect2 in panels:
 		if pr.size.x * pr.size.y > plate.size.x * plate.size.y:
 			plate = pr
-	return {"hits": hits, "plate": plate}
+	return {"hits": hits, "plate": plate, "settled": settled, "drift": drift}
 
 
 ## THE TEXT, WHICH A PANEL-RECT TEST CANNOT SEE.

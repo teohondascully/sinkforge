@@ -205,6 +205,9 @@ var settings_open: bool = false
 var settings_capture: StringName = &""     ## the action awaiting its new key ("press a key…")
 var _settings_hits: Array[Dictionary] = [] ## clickable controls this frame: [{rect, payload}]
 var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this frame (drag support)
+var settings_cat: int = CAT_AUDIO          ## which face of the page is open (the rail's selection)
+var _set_h: float = SET_MIN_H              ## eased toward `_settings_wanted_h()`, like the counter
+var _set_t: float = 0.0                    ## the page's own rise, 0..1 — drives the scrim AND the defocus
 
 ## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
 var _flash_text: String = ""
@@ -362,12 +365,29 @@ func _process(delta: float) -> void:
 			_bazaar_h = want
 		else:
 			_bazaar_h += (want - _bazaar_h) * clampf(delta / BAZAAR_RISE, 0.0, 1.0)
+	# THE SETTINGS PAGE FOLLOWS ITS CATEGORY, on the counter's clock and by the counter's rule. Snapped
+	# while closed for the reason above: a settled frame has to be a settled measurement, or a footprint
+	# is a statement about how many frames elapsed before the shutter.
+	_set_t = clampf(_set_t + (step if settings_open else -step * 2.0), 0.0, 1.0)
+	var set_want: float = _settings_wanted_h()
+	if not settings_open or absf(set_want - _set_h) < 0.5:
+		_set_h = set_want
+	else:
+		_set_h += (set_want - _set_h) * clampf(delta / BAZAAR_RISE, 0.0, 1.0)
 	queue_redraw()
 
 
 ## Ease-out cubic. The counter's rise reads as arriving because it slows down at the end.
 func _bazaar_ease() -> float:
 	var u: float = 1.0 - _bazaar_t
+	return 1.0 - u * u * u
+
+
+## The settings page's rise, on the same curve. Public because `MainView._update_defocus` racks the world
+## out of focus behind it — a modal that leaves the world sharp behind it reads as a sticker on the frame,
+## which is `MNU-07`'s whole complaint.
+func settings_ease() -> float:
+	var u: float = 1.0 - _set_t
 	return 1.0 - u * u * u
 
 
@@ -425,6 +445,9 @@ const HELPER_TAGS: Dictionary = {
 	"_draw_tech_chip": &"internal",
 	"_draw_bazaar_rail": &"internal",
 	"_draw_bazaar_head": &"internal",
+	"_draw_settings_rail": &"internal",
+	"_draw_settings_head": &"internal",
+	"_draw_settings_detail": &"internal",
 	"_draw_bazaar_foot": &"internal",
 	"_draw_bazaar_detail": &"internal",
 }
@@ -1684,14 +1707,12 @@ func _draw_inventory_overlay() -> void:
 func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
-	# THE RAIL'S PITCH FOLLOWS THE PANEL. At full height these are the numbers they always were — top 62,
-	# pitch 58 — and on a short counter they close up rather than running off the bottom edge. 62 and 58
-	# were constants when the panel was one size; a fixed pitch in a panel that can be 196 tall puts the
-	# third label 30px past the frame.
-	var pitch: float = minf(58.0, (rail.size.y - 110.0) * 0.5)
-	var top: float = minf(62.0, rail.size.y * 0.18)
+	# THE RAIL'S PITCH FOLLOWS THE PANEL, and the arithmetic that makes it follow now lives in
+	# `_rail_slots`, shared with the settings rail. At full height these are the numbers they always were
+	# — top 62, pitch 58 — and on a short counter they close up rather than running off the bottom edge.
+	var ys: Array = _rail_slots(rail, 3)
 	for i: int in 3:
-		var y: float = rail.position.y + top + float(i) * pitch
+		var y: float = ys[i]
 		var on: bool = i == bazaar_tab
 		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
 		if on:
@@ -2601,145 +2622,467 @@ func _draw_help_overlay() -> void:
 			lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, HELP_TEXT_SIZE, UI_TEXT)
 
 
-## THE SETTINGS page: audio sliders + feel chips on the left, the full REMAP list on
-## the right (the page the Controls foundation was built for). Every interactive control registers a
-## hit-rect + payload; MainView routes clicks through settings_click() — the knob pattern (#32).
+## THE SETTINGS PAGE — THE COUNTER'S GRAMMAR, ITS OWN STATE.
+##
+## `MNU-26` filed one complaint: the settings page "shares none of the panel's grammar". Two prototypes
+## were drawn for it (`tools/mock_settings.gd` a/b) and NEITHER was adopted — see
+## docs/MENU_MATRIX.md for the ruling and its two facts. The short form:
+##
+##   * the reason recorded for making Settings independent was that the counter is a PLACE with a
+##     precondition. It is not. `E` sets `_inventory_open` with no proximity check (`main.gd:1024`);
+##     `_near_bazaar()` gates exactly one field, `can_craft`.
+##   * the reason not to make Settings the counter's fourth face is real and lives in the input handlers.
+##     `main.gd:1006` routes EVERY event to `_settings_input` and returns — a total intercept, which is
+##     what key capture requires, because it must be able to swallow any key. The counter binds the digit
+##     row AND the mouse wheel to tab selection. A binding capture cannot live inside a tab strip.
+##
+## So: share the language, keep the state. The plate, the rail, the head, the detail plate and the
+## sizing behaviour are the counter's; `_settings_open` and ESC are still Settings' own.
+##
+## THE GRID, which is `MNU-27`. The old page put slider bars at x0+62 and chips at x0+92 — two control
+## columns in one stack, 30px apart, which is what "several unrelated columns" meant. There is now ONE
+## label x, ONE control x and ONE value x, and every control in every category lands on them.
+##
+## THE HEIGHT, which is `MNU-26`'s "modal bulk". The old page was a fixed 592x286 whatever it was showing.
+## One category at a time on a panel that sizes to it makes FEEL barely half the height of CONTROLS —
+## the same treatment the counter got, by the same helper shape.
+const SET_W: float = 432.0
+const SET_HEAD: float = 40.0          ## title + category name
+const SET_FOOT: float = 16.0          ## the key legend
+const SET_DETAIL: float = 56.0        ## the plate that says what the control under your hand DOES
+const SET_ROW: float = 22.0           ## an audio/feel row
+const SET_MIN_H: float = 150.0
+## The shared grid, measured from the content's left edge. Named because a layout assertion that
+## re-derives them is checking its own arithmetic against itself (the counter's rule, same reason).
+const SET_CTRL_DX: float = 116.0
+const SET_BAR_W: float = 116.0
+const SET_VALUE_DX: float = 242.0     ## SET_CTRL_DX + SET_BAR_W + 10
+
+const CAT_AUDIO: int = 0
+const CAT_CONTROLS: int = 1
+const CAT_FEEL: int = 2
+const CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL"]
+
+## THE BINDINGS, each with the sentence its key does not tell you. A key legend that says what the key is
+## FOR is a different document from one that says which key it is; the rows that say nothing here are the
+## ones whose label already said it ("jump", "map"), and an empty string draws no plate rather than a
+## padded restatement of the label.
 const REMAP_ROWS: Array[Array] = [
-	[Controls.LEFT, "move left"], [Controls.RIGHT, "move right"],
-	[Controls.UP, "climb up"], [Controls.DOWN, "climb down"],
-	[Controls.JUMP, "jump"], [Controls.MINE, "mine (hold)"],
-	[Controls.GRAPPLE, "grapple"],
-	[Controls.BUILD, "build / place"], [Controls.DROP, "drop / feed"],
-	[Controls.CRAFT, "pack"], [Controls.RESEARCH, "research / config"],
-	[Controls.MAP, "map"], [Controls.TECH, "tech tree"],
-	[Controls.MUTE, "mute sound"],
-	[Controls.DASHBOARD, "dashboard"], [Controls.HELP, "help"],
-	[Controls.PAUSE, "pause"],
-	[Controls.SPEED, "game speed"], [Controls.ZOOM, "zoom"],
-	[Controls.SAVE, "quicksave"], [Controls.LOAD, "quickload"],
-	[Controls.CLEAR_MARKS, "clear dig plan"],
+	[Controls.LEFT, "move left", ""], [Controls.RIGHT, "move right", ""],
+	[Controls.UP, "climb up", "ladders, ropes and lift shafts"],
+	[Controls.DOWN, "climb down", ""],
+	[Controls.JUMP, "jump", ""],
+	[Controls.MINE, "mine (hold)", "hold on rock; the pickaxe decides what breaks"],
+	[Controls.GRAPPLE, "grapple",
+		"throw a line at what you are aiming at — it takes your weight, and pays out as you fall"],
+	[Controls.BUILD, "build / place", "puts the held thing where you are aiming"],
+	[Controls.DROP, "drop / feed", "into a machine's mouth if one is there"],
+	[Controls.CRAFT, "pack", "the counter: what you carry, what you can build"],
+	[Controls.RESEARCH, "research / config", ""],
+	[Controls.MAP, "map", "press twice for the whole world"],
+	[Controls.TECH, "tech tree", ""],
+	[Controls.MUTE, "mute sound", ""],
+	[Controls.DASHBOARD, "dashboard", ""], [Controls.HELP, "help", ""],
+	[Controls.PAUSE, "pause", ""],
+	[Controls.SPEED, "game speed", ""], [Controls.ZOOM, "zoom", ""],
+	[Controls.SAVE, "quicksave", ""], [Controls.LOAD, "quickload", ""],
+	[Controls.CLEAR_MARKS, "clear dig plan", ""],
 ]
-
-
-## THE PAGE ITSELF. Centred rather than top-pinned, and named rather than typed inline, because a layout
-## assertion that re-derives these numbers is checking its own arithmetic against itself.
-const SETTINGS_PANEL := Rect2(24.0, 37.0, 592.0, 286.0)
-## Where CONTROLS starts, measured from the panel's left edge: past the widest thing the AUDIO block draws
-## (a 100px bar at +62 plus its percentage) with a real gutter, not the 4px the two columns used to share.
-const REMAP_X: float = 236.0
-## One binding column. The widest label is "research / config" at 81px and the widest chip is the capture
-## prompt at 73px, so 162 carries the worst row with 8px between them.
-const REMAP_COL_W: float = 162.0
+const REMAP_ROW_H: float = 15.0
 const REMAP_GAP: float = 16.0
+
+
+## The page's geometry for the category that is open — the counter's `_bazaar_geometry` in every respect
+## except its numbers, so the two pages cannot drift into different shapes.
+func _settings_geometry() -> Dictionary:
+	var h: float = _set_h
+	var origin := Vector2((CANVAS.x - SET_W) * 0.5, (CANVAS.y - h) * 0.5)
+	var inner_x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
+	var inner_w: float = SET_W - BAZAAR_RAIL - BAZAAR_PAD * 2.0
+	var body_h: float = h - SET_HEAD - SET_FOOT
+	var content := Rect2(inner_x, origin.y + SET_HEAD, inner_w, body_h - SET_DETAIL - 8.0)
+	return {
+		"origin": origin, "w": SET_W, "h": h, "content": content,
+		"detail": Rect2(inner_x, content.end.y + 8.0, inner_w, SET_DETAIL),
+		"col_w": (inner_w - REMAP_GAP) * 0.5,
+	}
+
+
+## How tall the page wants to be for the category that is open. Every term is taken from the function
+## that draws it — see `_bazaar_wanted_h`, which learned this the hard way.
+func _settings_wanted_h() -> float:
+	var need: float = 0.0
+	match settings_cat:
+		CAT_CONTROLS:
+			need = float(_remap_per_col()) * REMAP_ROW_H + 8.0
+		CAT_FEEL:
+			need = float(FEEL_ROWS.size()) * SET_ROW
+		_:
+			need = float(AUDIO_ROWS.size() + 1) * SET_ROW    # the levels, plus the mute above them
+	return maxf(SET_HEAD + need + 8.0 + SET_DETAIL + SET_FOOT, SET_MIN_H)
+
+
+## Rows per binding column. The single source for the split: `_settings_wanted_h` asks this rather than
+## re-deriving it, because a height computed from a second copy of a layout rule is right on the day it
+## is written and silently wrong the day either copy moves.
+func _remap_per_col() -> int:
+	return int(ceil(float(REMAP_ROWS.size()) * 0.5))
+
+
+## The audio levels and the feel toggles, as data, so the drawing is one loop over a table and the
+## detail plate has somewhere to read its sentence from.
+const AUDIO_ROWS: Array[Array] = [
+	["master", "master", "everything, including the ambience bed"],
+	["sound", "sound", "picks, impacts, machines — the things you cause"],
+	["ambience", "ambience", "the layer's own voice: water, wind, the deep hum"],
+	["music", "music", ""],
+]
+const FEEL_ROWS: Array[Array] = [
+	["screen shake", "shake", "impacts and blasts kick the camera"],
+	["zoom", "zoom", "how much of the shaft you can see at once"],
+	["auto-pickup", "auto_pickup", "walk over a dropped thing to take it"],
+]
 
 
 func _draw_settings_overlay() -> void:
 	_settings_hits.clear()
 	_slider_rects.clear()
-	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.55))
-	var panel := SETTINGS_PANEL
-	var top: float = panel.position.y
-	var floor_y: float = panel.end.y
-	# AN OPAQUE PLATE, WHICH `_panel()` ALONE DOES NOT GIVE. `UI_BG` is 90% opaque because the furniture
-	# panels sit over the world and are MEANT to. A modal is not furniture: at 0.90 the objective banner —
-	# which draws earlier, in the same strip, on its own dark plate with bright type — reads straight
-	# through the settings page in a capture. Ten percent of a lit banner over an unlit panel is roughly
-	# twice the panel's own value, which is more than enough to be legible, and it makes the page look like
-	# a transparency rather than a screen you are on.
-	draw_rect(panel, Color(UI_BG.r, UI_BG.g, UI_BG.b, 1.0))
-	_panel(panel)
-	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
-	draw_string(_font, panel.position + Vector2(panel.size.x - 78.0, 24.0), "ESC closes",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	# The counter's ground, not the old page's: a tinted scrim rather than pure black, because a modal
+	# that blacks the world out reads as a different application and one that tints it reads as a screen
+	# you are ON. `MNU-07`'s remaining question is which of those Settings wants; this answers it the
+	# same way the counter did.
+	var t: float = settings_ease()
+	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42 * t))
+	_bazaar_vignette(0.5 * t)
+	var g: Dictionary = _settings_geometry()
+	var origin: Vector2 = g["origin"]
 	var mouse: Vector2 = get_viewport().get_mouse_position()
-	# --- left column: AUDIO + FEEL ---
-	var x0: float = panel.position.x + 16.0
-	draw_string(_font, Vector2(x0, top + 44.0), "AUDIO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	# The mute sits ON the AUDIO header, above the levels it overrides, because that is what it does: one
-	# switch over the whole block. It reads as its STATE ("MUTED" / "SOUND ON"), never as an instruction —
-	# a chip that says the opposite of what is happening is the oldest bug in settings UI.
-	_settings_chip(x0 + 92.0, top + 44.0, "MUTED" if Settings.muted else "SOUND ON",
-		{"toggle": "mute"}, not Settings.muted, mouse)
-	_settings_slider(x0, top + 64.0, "master", "master", Settings.master)
-	_settings_slider(x0, top + 84.0, "sound", "sound", Settings.sound)
-	_settings_slider(x0, top + 104.0, "ambience", "ambience", Settings.ambience)
-	_settings_slider(x0, top + 124.0, "music", "music", Settings.music)
-	draw_string(_font, Vector2(x0, top + 156.0), "FEEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	draw_string(_font, Vector2(x0, top + 176.0), "screen shake", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, top + 176.0, "ON" if Settings.screen_shake else "OFF",
-		{"toggle": "shake"}, Settings.screen_shake, mouse)
-	draw_string(_font, Vector2(x0, top + 196.0), "zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, top + 196.0, "%.2fx" % MainView.ZOOM_LEVELS[
-		clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)], {"cycle": "zoom"}, false, mouse)
-	draw_string(_font, Vector2(x0, top + 216.0), "auto-pickup", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-	_settings_chip(x0 + 92.0, top + 216.0, "ON" if Settings.auto_pickup else "OFF",
-		{"toggle": "auto_pickup"}, Settings.auto_pickup, mouse)
-	_settings_chip(x0, floor_y - 20.0, "RESET KEYS TO DEFAULTS", {"reset": true}, false, mouse)
-	draw_string(_font, Vector2(x0, floor_y - 38.0),
-		"click a binding, then press its new key", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
-	# --- right column: CONTROLS (the remap page) ---
-	#
-	# TWO COLUMNS, BECAUSE ONE DOES NOT FIT AND HAS NOT FOR A LONG TIME. Twenty-two bindings at 13.8px from
-	# y=74 put the last two below the panel and one of them below the SCREEN — `clear dig plan` was drawn
-	# and registered as clickable at y 353.8 on a 360-tall canvas. Nothing caught it: `check_hud_layout`
-	# probes the rects `_panel()` drew, and a binding chip is not a panel, so the layer whose entire job is
-	# geometry had "settings open" in its matrix and passed it every run. It now judges the rects the page
-	# registers for CLICKING, which is the population the claim was always about.
-	#
-	# The list is split rather than crammed: the step that would fit 22 rows between the header and the
-	# floor is 12.4px against 10pt type, which trades an invisible control for an illegible one.
-	var col_w: float = REMAP_COL_W
-	var y0: float = top + 60.0
-	var per_col: int = int(ceil(float(REMAP_ROWS.size()) * 0.5))
-	draw_string(_font, Vector2(panel.position.x + REMAP_X, top + 44.0), "CONTROLS",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+	var plate := Rect2(origin, Vector2(SET_W, float(g["h"])))
+	# The page rises the last few pixels into place, one transform, exactly as the counter does.
+	draw_set_transform(Vector2(0.0, (1.0 - t) * 14.0), 0.0, Vector2.ONE)
+	# ELEVATION, NOT A BORDER. The old page was a hard-cornered rectangle with a 1px edge, which is the
+	# single most 2003 thing a menu can be; the counter earned its depth from a soft shadow and a sheen
+	# and this page now gets the same two.
+	_soft_shadow(plate, 12, 0.34)
+	# OPAQUE, and the comment that earned it stays: `UI_BG` is 90% because furniture sits over the world
+	# and is MEANT to. A modal is not furniture — at 0.90 the objective banner read straight through this
+	# page, and ten percent of a lit banner over an unlit panel is about twice the panel's own value.
+	_round_rect(plate, 8.0, Color(0.062, 0.070, 0.094, 0.985))
+	_panel_sheen(plate)
+	_draw_settings_rail(origin, g, mouse)
+	_draw_settings_head(origin, g)
+	# The plate follows the mouse: whatever control is under your hand explains itself. Nothing under it
+	# falls back to the category's own line, so the plate is never blank and never stale.
+	var told: String = _settings_body(g, mouse)
+	_draw_settings_detail(g, told, mouse)
+	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0),
+		"1 2 3 category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.36, 0.39, 0.45))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The category rail. Shares `_rail_slots` with the counter's rail so the two cannot drift apart, and
+## registers a hit per category — the rail is how you change page with the mouse.
+func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void:
+	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
+	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
+	var ys: Array = _rail_slots(rail, CAT_NAMES.size())
+	for i: int in CAT_NAMES.size():
+		var y: float = ys[i]
+		var on: bool = i == settings_cat
+		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
+		if on:
+			_round_rect(box, 6.0, Color(0.145, 0.129, 0.082))
+			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
+		_settings_glyph(box.get_center(), i, on or box.has_point(mouse))
+		var label: String = CAT_NAMES[i]
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
+		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
+		draw_string(_font, Vector2(box.position.x + 1.0, y + 10.0), str(i + 1),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.34, 0.30, 0.22) if on else Color(0.24, 0.26, 0.31))
+		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": i}})
+
+
+## Where a rail's boxes sit, for a rail of any height and any number of slots. Extracted from the
+## counter's rail rather than copied into this one: two rails that compute their own pitch are two rails
+## that eventually disagree, and this project has a catalogue of exactly that.
+func _rail_slots(rail: Rect2, n: int) -> Array:
+	var pitch: float = minf(58.0, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0))
+	var top: float = minf(62.0, rail.size.y * 0.18)
+	var out: Array = []
+	for i: int in n:
+		out.append(rail.position.y + top + float(i) * pitch)
+	return out
+
+
+## Three category glyphs, drawn rather than lettered, in the counter's hand: a speaker cone with two arcs,
+## a key cap, three sliders at different settings.
+func _settings_glyph(at: Vector2, kind: int, on: bool) -> void:
+	var col: Color = Color(0.949, 0.831, 0.549) if on else Color(0.40, 0.43, 0.50)
+	match kind:
+		CAT_AUDIO:
+			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(4.0, 6.0)), col)
+			var pts := PackedVector2Array([at + Vector2(-4.0, -1.0), at + Vector2(1.0, -7.0),
+				at + Vector2(1.0, 7.0), at + Vector2(-4.0, 1.0)])
+			draw_colored_polygon(pts, col)
+			draw_arc(at + Vector2(1.0, 0.0), 5.5, -PI * 0.4, PI * 0.4, 8, col, 1.4)
+			draw_arc(at + Vector2(1.0, 0.0), 8.5, -PI * 0.4, PI * 0.4, 8, col, 1.4)
+		CAT_CONTROLS:
+			draw_rect(Rect2(at + Vector2(-8.0, -6.0), Vector2(16.0, 13.0)), Color(col, 0.35))
+			draw_rect(Rect2(at + Vector2(-8.0, -6.0), Vector2(16.0, 13.0)), col, false, 1.4)
+			draw_rect(Rect2(at + Vector2(-3.0, -2.0), Vector2(6.0, 5.0)), col)
+		_:
+			for i: int in 3:
+				var y: float = at.y - 6.0 + float(i) * 6.0
+				draw_rect(Rect2(at.x - 9.0, y - 0.7, 18.0, 1.6), Color(col, 0.45))
+				draw_rect(Rect2(at.x - 9.0 + float(3 - i) * 4.5, y - 3.0, 2.6, 6.0), col)
+
+
+## The head: what page this is, and which face of it you are on — the counter's title pair exactly.
+func _draw_settings_head(origin: Vector2, g: Dictionary) -> void:
+	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
+	_tracked("SETTINGS", Vector2(x, origin.y + 26.0), 15, 2.8, UI_TEXT)
+	_tracked(CAT_NAMES[settings_cat],
+		Vector2(x + _tracked_w("SETTINGS", 15, 2.8) + 16.0, origin.y + 26.0), 15, 2.8,
+		Color(0.26, 0.28, 0.34))
+
+
+## The open category, returning the sentence the detail plate should say — which is whatever the mouse is
+## over. Returning it rather than storing it keeps the plate's content derived from the same pass that
+## decided what was under the cursor.
+func _settings_body(g: Dictionary, mouse: Vector2) -> String:
+	var c: Rect2 = g["content"]
+	match settings_cat:
+		CAT_CONTROLS:
+			return _settings_controls(g, c, mouse)
+		CAT_FEEL:
+			return _settings_feel(c, mouse)
+		_:
+			return _settings_audio(c, mouse)
+
+
+## Named rather than fetched. `Settings` is a `class_name` of STATIC vars, and a dynamic `get()` against
+## one is a lookup that fails at runtime rather than at parse time — the wrong trade in a page that four
+## harness layers photograph.
+func _audio_level(id: String) -> float:
+	match id:
+		"master": return Settings.master
+		"sound": return Settings.sound
+		"ambience": return Settings.ambience
+		_: return Settings.music
+
+
+func _settings_audio(c: Rect2, mouse: Vector2) -> String:
+	var said: String = ""
+	var y: float = c.position.y + 14.0
+	draw_string(_font, Vector2(c.position.x, y), "sound", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
+	# The mute reads as its STATE, never as an instruction — a chip that says the opposite of what is
+	# happening is the oldest bug in settings UI.
+	if _settings_chip(c.position.x + SET_CTRL_DX, y, "MUTED" if Settings.muted else "SOUND ON",
+			{"toggle": "mute"}, Settings.muted, mouse):
+		said = "silences everything at once; the levels below are kept"
+	for row: Array in AUDIO_ROWS:
+		y += SET_ROW
+		var id: String = str(row[1])
+		if _settings_slider(c.position.x, y, id, str(row[0]), _audio_level(id), mouse):
+			said = str(row[2])
+	return said
+
+
+func _settings_feel(c: Rect2, mouse: Vector2) -> String:
+	var said: String = ""
+	var y: float = c.position.y + 14.0
+	for row: Array in FEEL_ROWS:
+		var id: String = str(row[1])
+		draw_string(_font, Vector2(c.position.x, y), str(row[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+			UI_TEXT)
+		var text: String = ""
+		var payload: Dictionary = {}
+		var on: bool = false
+		if id == "zoom":
+			text = "%.2fx" % MainView.ZOOM_LEVELS[
+				clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)]
+			payload = {"cycle": "zoom"}
+		else:
+			on = Settings.screen_shake if id == "shake" else Settings.auto_pickup
+			text = "ON" if on else "OFF"
+			payload = {"toggle": id}
+		if _settings_chip(c.position.x + SET_CTRL_DX, y, text, payload, on, mouse):
+			said = str(row[2])
+		y += SET_ROW
+	return said
+
+
+## WHICH BINDINGS SHARE A KEY WITH ANOTHER, and who with.
+##
+## `Settings.rebind` writes the new key and returns; **it has never checked for a conflict**. Bind `jump`
+## to `W` and `W` is now `climb up` AND `jump`, both fire, and nothing anywhere says so. `MNU-29` asks for
+## a conflict state by name and `MNU-30` asks that conflicts stay explicit, so the page shows it rather
+## than the rebind refusing it — refusing would be the page overruling a deliberate choice, and silently
+## unbinding the other action would be worse than either.
+##
+## Compared on the LABEL, which is what the row displays: a clash the page draws has to be a clash the page
+## can show you. `unbound` and `?` are excluded — two actions with no key are not in conflict, and a naive
+## equality would have called them the loudest clash on the board.
+func _binding_clashes() -> Dictionary:
+	var by_key: Dictionary = {}
+	for row: Array in REMAP_ROWS:
+		var label: String = Settings.binding_label(row[0])
+		if label == "unbound" or label == "?":
+			continue
+		var seen: Array = by_key.get(label, [])
+		seen.append(str(row[1]))
+		by_key[label] = seen
+	var out: Dictionary = {}
+	for row: Array in REMAP_ROWS:
+		var shared: Array = by_key.get(Settings.binding_label(row[0]), [])
+		if shared.size() < 2:
+			continue
+		var others: Array = []
+		for other: String in shared:
+			if other != str(row[1]):
+				others.append(other)
+		out[row[0]] = others
+	return out
+
+
+## The bindings: two columns of eleven, each row a label and the key that does it. `MNU-30` — the capture
+## state is now ON the row that is capturing ("press a key…"), not a sentence at the bottom of the page
+## competing with the reset control.
+func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
+	var said: String = ""
+	var per_col: int = _remap_per_col()
+	var col_w: float = float(g["col_w"])
+	var clashes: Dictionary = _binding_clashes()
 	for i: int in REMAP_ROWS.size():
 		var row: Array = REMAP_ROWS[i]
 		var col: int = i / per_col
-		var x1: float = panel.position.x + REMAP_X + float(col) * (col_w + REMAP_GAP)
-		var y: float = y0 + float(i % per_col) * 13.8
+		var x: float = c.position.x + float(col) * (col_w + REMAP_GAP)
+		var y: float = c.position.y + 12.0 + float(i % per_col) * REMAP_ROW_H
 		var action: StringName = row[0]
-		var label: String = str(row[1])
-		draw_string(_font, Vector2(x1, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 		var capturing: bool = settings_capture == action
-		var bind_text: String = "press a key…" if capturing else Settings.binding_label(action)
-		var bw: float = _font.get_string_size(bind_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
-		var chip := Rect2(x1 + col_w - bw, y - 10.0, bw, 13.0)
+		var clash: Array = clashes.get(action, [])
+		var text: String = "press a key…" if capturing else Settings.binding_label(action)
+		var bw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
+		var chip := Rect2(x + col_w - bw, y - 10.0, bw, 13.0)
 		var lit: bool = chip.has_point(mouse)
-		draw_rect(chip, UI_ACCENT if capturing else (Color(0.30, 0.34, 0.44) if lit else UI_SLOT))
+		if lit or capturing:
+			# The whole row lights, not just the chip — the row is the thing you are choosing, which is
+			# what makes the plate below it read as being ABOUT something.
+			_round_rect(Rect2(x - 4.0, y - 11.0, col_w + 8.0, 15.0), 3.0, Color(0.145, 0.129, 0.082))
+			if capturing:
+				said = "press any key to bind it — ESC cancels"
+			elif not clash.is_empty():
+				said = "%s is also %s" % [Settings.binding_label(action), " and ".join(clash)]
+			else:
+				said = str(row[2])
+		draw_string(_font, Vector2(x, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+			UI_TEXT if (lit or capturing) else UI_TEXT_DIM)
+		# A CLASHING KEY IS NOT A SELECTED ONE, so it does not get the gold — it gets the warn colour the
+		# stalled-machine alerts use, which is the only other thing in this UI that means "this will not do
+		# what you think". Dark type on both, because light grey on either is unreadable.
+		var fill: Color = UI_ACCENT if capturing else (
+			UI_WARN if not clash.is_empty() else (Color(0.30, 0.34, 0.44) if lit else UI_SLOT))
+		draw_rect(chip, fill)
 		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
-		draw_string(_font, Vector2(chip.position.x + 5.0, y), bind_text, HORIZONTAL_ALIGNMENT_LEFT,
-			-1, 10, Color(0.10, 0.10, 0.12) if capturing else UI_TEXT)
+		draw_string(_font, Vector2(chip.position.x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+			Color(0.10, 0.10, 0.12) if (capturing or not clash.is_empty()) else UI_TEXT)
 		_settings_hits.append({"rect": chip, "payload": {"bind": String(action)}})
+	return said
 
 
-## One slider row: label + a clickable/drag-able bar + the live percentage.
-func _settings_slider(x0: float, y: float, id: String, label: String, value: float) -> void:
-	# Dimmed while muted: the levels are still yours and still remembered, but nothing they say is audible,
-	# and a bright slider over a silent game is the page lying about which control is in charge.
+## The detail plate. The counter's answer to "twenty-two rows of equal weight" was to make the SELECTED
+## thing large, say what it is FOR, and put the verb on a real button; a key binding wants that more than
+## a machine does, because the row `grapple  F` tells a first-timer nothing whatever.
+func _draw_settings_detail(g: Dictionary, said: String, mouse: Vector2) -> void:
+	var d: Rect2 = g["detail"]
+	_round_rect(d, 5.0, Color(0.0, 0.0, 0.0, 0.22))
+	var line: String = said
+	if line == "":
+		line = CATEGORY_LINE[settings_cat]
+	# Wrapped by hand at the plate's width: `draw_string` will not wrap and a sentence that runs off a
+	# plate is the defect this page was opened to fix.
+	var y: float = d.position.y + 20.0
+	for part: String in _wrap(line, d.size.x - 24.0, 10):
+		draw_string(_font, Vector2(d.position.x + 12.0, y), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+			UI_TEXT if said != "" else Color(0.40, 0.43, 0.50))
+		y += 13.0
+	if settings_cat == CAT_CONTROLS:
+		var w: float = _font.get_string_size("RESET KEYS", HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 14.0
+		_settings_chip(d.end.x - w, d.end.y - 8.0, "RESET KEYS", {"reset": true}, false, mouse, 9)
+
+
+## What each category says when your hand is not on anything — the page describing itself rather than
+## sitting blank, which is the state it is in most of the time it is open.
+const CATEGORY_LINE: Array[String] = [
+	"levels are remembered while muted",
+	"click a binding, then press its new key",
+	"how the game moves and what it does for you",
+]
+
+
+## Break a sentence to a pixel width. Words only; a plate this size never needs more.
+func _wrap(text: String, width: float, size: int) -> Array:
+	var out: Array = []
+	var line: String = ""
+	for word: String in text.split(" ", false):
+		var probe: String = word if line == "" else line + " " + word
+		if _font.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and line != "":
+			out.append(line)
+			line = word
+		else:
+			line = probe
+	if line != "":
+		out.append(line)
+	return out
+
+
+## One level: label, bar, percentage — all three on the shared grid. Returns whether the mouse is on it,
+## so the caller can hand its sentence to the detail plate.
+func _settings_slider(x0: float, y: float, id: String, label: String, value: float,
+		mouse: Vector2) -> bool:
+	var bar := Rect2(x0 + SET_CTRL_DX, y - 9.0, SET_BAR_W, 10.0)
+	_slider_rects[id] = bar
+	var hot: bool = bar.grow(4.0).has_point(mouse)
+	# Dimmed while muted: the levels are still yours and still remembered, but nothing they say is
+	# audible, and a bright slider over a silent game is the page lying about which control is in charge.
 	draw_string(_font, Vector2(x0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 		UI_TEXT_DIM if Settings.muted else UI_TEXT)
-	var bar := Rect2(x0 + 62.0, y - 9.0, 100.0, 10.0)
-	_slider_rects[id] = bar
 	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.5))
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(value, 0.0, 1.0), bar.size.y)), UI_ACCENT)
-	draw_rect(bar, UI_EDGE, false, 1.0)
-	draw_string(_font, Vector2(bar.position.x + bar.size.x + 8.0, y), "%d%%" % int(round(value * 100.0)),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-	# The whole bar (with a touch of slop) is the hit zone; the payload carries the clicked fraction.
+	var fill := Rect2(bar.position, Vector2(bar.size.x * clampf(value, 0.0, 1.0), bar.size.y))
+	draw_rect(fill, Color(UI_ACCENT, 0.55) if Settings.muted else UI_ACCENT)
+	# The travelled end gets a bright cap rather than the bar getting brighter: `MNU-28`'s complaint about
+	# these bars is that a long gold fill reads as a progress meter, and a meter is a thing you watch
+	# rather than a thing you drag.
+	if value > 0.0:
+		draw_rect(Rect2(fill.end.x - 2.0, bar.position.y - 2.0, 2.5, bar.size.y + 4.0),
+			Color(0.949, 0.831, 0.549) if hot else Color(0.80, 0.83, 0.89))
+	draw_rect(bar, UI_EDGE_HI if hot else UI_EDGE, false, 1.0)
+	draw_string(_font, Vector2(x0 + SET_VALUE_DX, y), "%d%%" % int(round(value * 100.0)),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT if hot else UI_TEXT_DIM)
 	_settings_hits.append({"rect": bar.grow(3.0), "payload": {"slider": id}})
+	return hot
 
 
+## One chip. Returns whether the mouse is on it, for the same reason the slider does.
 func _settings_chip(x: float, y: float, text: String, payload: Dictionary, active: bool,
-		mouse: Vector2) -> void:
-	var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 12.0
+		mouse: Vector2, size: int = 10) -> bool:
+	var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 12.0
 	var chip := Rect2(x, y - 11.0, w, 15.0)
-	draw_rect(chip, UI_ACCENT if active else (Color(0.30, 0.34, 0.44) if chip.has_point(mouse) else UI_SLOT))
+	var hot: bool = chip.has_point(mouse)
+	draw_rect(chip, UI_ACCENT if active else (Color(0.30, 0.34, 0.44) if hot else UI_SLOT))
 	draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
-	draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+	draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
 		Color(0.10, 0.10, 0.12) if active else UI_TEXT)
 	_settings_hits.append({"rect": chip, "payload": payload})
+	return hot
+
+
+## Move to a category. Named like `set_bazaar_tab` and for the same reason: the page owns which face it
+## is showing, and `main.gd` asks for a change rather than pushing the field every frame.
+func set_settings_cat(cat: int) -> void:
+	settings_cat = clampi(cat, 0, CAT_NAMES.size() - 1)
+
 
 
 ## The control payload under a canvas point ({} = none) — sliders add the clicked fraction so a

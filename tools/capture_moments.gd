@@ -114,6 +114,12 @@ const EXPECT: Dictionary = {
 	"bench_next": {"_inventory_open": true},
 	"dashboard": {"_show_dashboard": true},
 	"settings": {"_settings_open": true},
+	# ONE PER FACE. The page shows a single category at a time now (`MNU-26`), so a lone "settings" shot
+	# photographs AUDIO and says nothing whatever about the other two — and CONTROLS is the tall one, the
+	# one with twenty-two rows, the one every clipping defect this page has ever had lived in.
+	"settings_audio": {"_settings_open": true},
+	"settings_controls": {"_settings_open": true},
+	"settings_feel": {"_settings_open": true},
 	"map": {"_minimap_mode": 2},
 }
 
@@ -300,6 +306,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _at_the_counter_short(main)
 		"settings":
 			await _at_the_settings(main)
+		"settings_audio", "settings_controls", "settings_feel":
+			await _at_the_settings_cat(main, moment.split("_")[1])
 		"drift":
 			await _at_the_drift(main)
 		"pack":
@@ -644,6 +652,23 @@ func _at_the_settings(main: MainView) -> void:
 	main._settings_open = true
 	for _i: int in 8:
 		await physics_frame
+
+
+## ONE FACE OF THE SETTINGS PAGE, waited on rather than counted out.
+##
+## The page eases its height toward the open category, so a fixed frame count photographs whatever the
+## lerp had reached — a picture of the shutter, not of the layout. This waits for the height to arrive and
+## says so if it never does, which is the difference between a settled measurement and a lucky one.
+func _at_the_settings_cat(main: MainView, cat: String) -> void:
+	main._settings_open = true
+	var hud: Hud = main._hud
+	hud.set_settings_cat(["audio", "controls", "feel"].find(cat))
+	for _i: int in 240:
+		await physics_frame
+		if absf(hud._set_h - hud._settings_wanted_h()) < 0.5 and hud.settings_ease() > 0.999:
+			break
+	print("    settings %s: %.1fpx tall, %.2fpx from its target"
+		% [cat, hud._set_h, absf(hud._set_h - hud._settings_wanted_h())])
 
 
 ## WORKS WITH A ROW YOU CANNOT HAVE SELECTED, which the brief asks for by name and no capture showed:
