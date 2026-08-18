@@ -691,19 +691,24 @@ func load_world(world: WorldData) -> void:
 	# cell with a solid ore-like block, which would be double-sourced — is a generator-side invariant, and
 	# silently dropping it here would turn a generator bug into missing ore that nobody can see. It fails
 	# in a test instead. A lode under ordinary rock is not illegal, it is the whole design: you clear the
-	# rock to expose the vein. Guard an older WorldData that predates this grid (default empty → no lode,
-	# which is exactly the world we had).
-	if world.lodes != null:
-		for cell: Vector2i in world.lodes:
-			if in_bounds(cell):
-				lode[cell] = world.lodes[cell]
-				lode_max[cell] = maxi(1, int(deposits.get(cell, DEFAULT_ORE_DEPOSIT)))
+	# rock to expose the vein.
+	# THE OLD-WORLDDATA GUARDS THAT USED TO WRAP THESE TWO LOOPS ARE GONE, and their absence changes
+	# nothing, which is the point. They read `if world.lodes != null:` / `if world.water != null:` under
+	# comments promising they protected an older `WorldData` that predates each grid. `lodes` and `water`
+	# are `Dictionary` (world_data.gd:43,48), a Dictionary is never null, and `{} != null` is TRUE in
+	# GDScript — so neither guard could be false and neither was ever protecting anything. The version
+	# compatibility they claimed was real, but it was being provided by the DEFAULT: an older WorldData
+	# arrives with `{}`, and iterating an empty Dictionary is already a no-op. Deleting the `if` keeps the
+	# behaviour byte for byte and stops the file claiming a mechanism it does not have.
+	for cell: Vector2i in world.lodes:
+		if in_bounds(cell):
+			lode[cell] = world.lodes[cell]
+			lode_max[cell] = maxi(1, int(deposits.get(cell, DEFAULT_ORE_DEPOSIT)))
 	# AQUIFERS (L3): seeded water in carved-open pockets (generator guarantees no watered cell is solid).
-	# Guard an older WorldData that predates the water grid (default empty → dry world).
-	if world.water != null:
-		for cell: Vector2i in world.water:
-			if in_bounds(cell) and not solid.has(cell):
-				water[cell] = clampi(int(world.water[cell]), 1, WATER_MAX)
+	# An older WorldData has no water grid, arrives `{}`, and falls through this loop into a dry world.
+	for cell: Vector2i in world.water:
+		if in_bounds(cell) and not solid.has(cell):
+			water[cell] = clampi(int(world.water[cell]), 1, WATER_MAX)
 	rebuild_fine_terrain()   # derive the fine grid from the freshly loaded coarse terrain (deterministic)
 
 

@@ -98,9 +98,24 @@ func _initialize() -> void:
 	var not_re: String = _yaml_value(flow, "SF_NOT")
 	_check(not not_re.is_empty(), "the display job states its exclusions in SF_NOT rather than by omission")
 	var excluded: Array[String] = []
+	# `create_from_string` ALWAYS returns an object — a pattern that fails to compile comes back non-null
+	# with `is_valid()` false, and its `search` then matches nothing. Measured against 4.6.2 rather than
+	# assumed: `RegEx.create_from_string("check_(unclosed")` gives `!= null -> true`, `is_valid() -> false`.
+	# So `_check(re != null, ...)` could not fail, and it was standing in front of the exact input it was
+	# supposed to be validating. A broken SF_NOT would have been caught one assertion further down, by
+	# `excluded.size() > 0` — but by the wrong line, saying the wrong thing.
 	var re: RegEx = RegEx.create_from_string(not_re)
-	_check(re != null, "SF_NOT ('%s') is a regex the runner's grep -E could actually use" % not_re)
-	if re != null:
+	_check(re.is_valid(), "SF_NOT ('%s') compiles as a pattern at all" % not_re)
+	# AND THE CLAIM THIS USED TO MAKE IS STILL NOT PROVEN BY THAT. Godot's RegEx is PCRE2; the runner
+	# filters with `grep -Eq` (run_harness.sh:317), which is POSIX ERE. `\d`, `(?i)` and lookarounds are
+	# valid PCRE2 and are not ERE, so "Godot compiled it" is not "grep will use it the same way". Rather
+	# than assert a cross-engine equivalence this layer cannot test, the pattern is held to the subset where
+	# the two engines cannot disagree: layer names and alternation, which is all SF_NOT has ever needed.
+	var plain: RegEx = RegEx.create_from_string("^[A-Za-z0-9_|]+$")
+	_check(plain.search(not_re) != null,
+		"SF_NOT ('%s') stays inside the names-and-alternation subset where PCRE2 and grep -E agree"
+			% not_re + " — anything richer must be verified against grep by hand")
+	if re.is_valid():
 		for name: String in needs_surface:
 			if re.search(name) != null:
 				excluded.append(name)
