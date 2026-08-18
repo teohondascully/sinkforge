@@ -112,6 +112,7 @@ const EXPECT: Dictionary = {
 	"bench_full": {"_inventory_open": true},
 	"works_short": {"_inventory_open": true},
 	"bench_next": {"_inventory_open": true},
+	"dashboard": {"_show_dashboard": true},
 	"settings": {"_settings_open": true},
 	"map": {"_minimap_mode": 2},
 }
@@ -293,6 +294,8 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _at_the_counter_full(main, moment.split("_")[0])
 		"bench_next":
 			await _at_the_bench_next(main)
+		"dashboard":
+			await _at_the_dashboard(main)
 		"works_short":
 			await _at_the_counter_short(main)
 		"settings":
@@ -668,6 +671,25 @@ func _at_the_settings(main: MainView) -> void:
 ## The pose is the midgame counter with the selection put back on row 0, which is the actionable rung —
 ## `_at_the_counter` steps one down from it for `bench` because that capture wanted a locked node. Re-setting
 ## the tab is what resets the row (`set_bazaar_tab` clears `bazaar_row`), so this is not a second move.
+## THE PRODUCTION PANEL, WHICH HAD NEVER BEEN PHOTOGRAPHED EITHER. It is not a Bazaar tab and not a modal,
+## so no rung of the matrix reached it — and two of the nine gold meanings live on it (the PRODUCTION
+## heading and the grand total), as did the one that meant the opposite of the other eight: a machine's
+## STALLED count, drawn in the same accent as the total above it.
+##
+## The stalled arm is the point, so the pose waits for the world's own machines to report a problem rather
+## than manufacturing one. `sim.machine_problems()` is what the left-edge alert stack reads; if it is empty
+## the panel still draws and the shot is of a healthy line, which is a state worth having too — the shutter
+## prints which one it got so the frame is never ambiguous about it.
+func _at_the_dashboard(main: MainView) -> void:
+	main._show_dashboard = true
+	for _i: int in 30:
+		await physics_frame
+	print("capture_moments: the dashboard has %d machine problem(s) to report"
+		% (main.sim.machine_problems() as Array).size())
+	for _i: int in 6:
+		await physics_frame
+
+
 func _at_the_bench_next(main: MainView) -> void:
 	await _at_the_counter(main, "bench")
 	main._hud.set_bazaar_tab(2)

@@ -40,7 +40,19 @@ const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill
 const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
 const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → panels read as raised
-## GOLD, AND IT MEANS NINE THINGS. Counted from source rather than from this comment, which used to read
+## **GOLD NEVER LABELS AND NEVER COUNTS.** The first step of `MNU-06` ("reassign gold to a single semantic
+## meaning"), taken as a rule rather than as nine separate opinions, and deliberately the smallest step that
+## is a rule at all: the nine sites where the accent was pure INFORMATION — three headings, three headline
+## numbers, two mode chips and the off-screen-more mark — now draw in text colours. Gold is left on every
+## site where the player's input is connected to the thing: the selection, the verb that acts on it, the
+## next available research node, an engaged control.
+##
+## What this does NOT do is split the remaining twenty into named roles. Nine constants resolving to the
+## same gold would document the ambiguity and change nothing a player sees, and the pair a naive split
+## would separate — the selected row's spine and the button that acts on it — is the one place the doubling
+## CARRIES meaning. That is a design call and it is not this.
+##
+## GOLD, AND IT MEANT NINE THINGS. Counted from source rather than from this comment, which used to read
 ## "(FORGED, selected slot, current step)" — three examples standing in for a definition, and the three it
 ## happened to name are three DIFFERENT roles. Full enumeration with call sites in `docs/MENU_MATRIX.md`.
 ## Eight of the nine are all "look here" and cost nothing but precision. The ninth was a contradiction: the
@@ -443,7 +455,7 @@ func _draw() -> void:
 		# do next — and pausing is exactly when a player stops to read it.
 		_panel(PAUSED_CHIP, true)
 		draw_string(_font, PAUSED_CHIP.position + Vector2(12.0, 15.0), "PAUSED (P)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
 	# The stratum plate is the one channel that means "stop, look" — so it does not fire over a menu, where
 	# there is nothing to look at and it prints straight through the price column. It is a transient; if you
@@ -652,7 +664,7 @@ func _draw_depth() -> void:
 	_panel(chip)
 	var cy: float = chip.position.y + chip.size.y * 0.5
 	draw_string(_font, Vector2(chip.position.x + 12.0, cy + 6.0), label,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_TEXT)
 	draw_string(_font, Vector2(chip.position.x + 12.0 + lw + 10.0, cy + 5.0), band,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, tint)
 
@@ -786,7 +798,7 @@ func _draw_fastforward() -> void:
 	var chip := Rect2(10.0, 34.0, tw + 24.0, 22.0)   # under the depth chip, which owns the corner
 	_panel(chip, true)
 	draw_string(_font, chip.position + Vector2(12.0, 15.0), label,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 
 
 ## FORGED production chip (top-right): an ingot swatch + the lifetime ingot count, in a small panel —
@@ -813,7 +825,7 @@ func _draw_forged() -> void:
 	x += 14.0 + 8.0
 	draw_string(_font, Vector2(x, cy + 5.0), "FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT_DIM)
 	x += label_w + 8.0
-	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_TEXT)
 
 
 ## How long a fresh step shows its full how-to line, how long that takes to fade, and how long you have
@@ -2274,7 +2286,7 @@ func _draw_dashboard_overlay() -> void:
 	var h: float = 238.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
-	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, origin + Vector2(w - 108.0, 21.0), "G / Esc to close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	draw_line(origin + Vector2(206.0, 34.0), origin + Vector2(206.0, h - 12.0), UI_EDGE, 1.0)  # column rule
@@ -2289,7 +2301,7 @@ func _draw_dashboard_overlay() -> void:
 		top = maxf(top, float(r["rate"]))
 	draw_string(_font, Vector2(lx, origin.y + 48.0), "THROUGHPUT · last 60s",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
-	draw_string(_font, Vector2(lx, origin.y + 66.0), "%.1f" % grand, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI_ACCENT)
+	draw_string(_font, Vector2(lx, origin.y + 66.0), "%.1f" % grand, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI_TEXT)
 	draw_string(_font, Vector2(lx + 4.0 + _font.get_string_size("%.1f" % grand,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, origin.y + 66.0), "items/min",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
@@ -2330,8 +2342,13 @@ func _draw_dashboard_overlay() -> void:
 		draw_string(_font, Vector2(rx, origin.y + 84.0), "craft one (E), place it (RMB).",
 			HORIZONTAL_ALIGNMENT_LEFT, 160.0, 10, UI_TEXT_DIM)
 	else:
+		# THE SUMMARY IS GREEN WHEN IT IS TRUE, and it used to be green unconditionally. `0 working` sat in
+		# the healthy colour directly above a row flagging the same machines as stalled — the two lines
+		# describing one fact with opposite valence, one of which could not change. A colour that is the
+		# same for every value of the number beside it is not reporting the number.
+		var all_up: bool = working_m >= total_m and total_m > 0
 		draw_string(_font, Vector2(rx, origin.y + 63.0), "%d working" % working_m,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.78, 0.55))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.78, 0.55) if all_up else UI_WARN)
 		var y2: float = origin.y + 84.0
 		for i: int in mini(9, census.size()):
 			var row: Dictionary = census[i]
@@ -2423,7 +2440,7 @@ func _draw_help_overlay() -> void:
 	var h: float = 30.0 + float(half) * 16.0 + 10.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
-	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	for i: int in lines.size():
 		var col: int = i / half
 		var row: int = i % half
@@ -2479,7 +2496,7 @@ func _draw_settings_overlay() -> void:
 	draw_rect(panel, Color(UI_BG.r, UI_BG.g, UI_BG.b, 1.0))
 	_panel(panel, true)
 	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, panel.position + Vector2(panel.size.x - 78.0, 24.0), "ESC closes",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	var mouse: Vector2 = get_viewport().get_mouse_position()
@@ -2767,7 +2784,7 @@ func _draw_inventory() -> void:
 ## the window is actually hiding something in that direction. Dim on purpose — it is a hint that the bar is
 ## a view, not a control, and nothing about it is clickable.
 func _more_mark(at: Vector2, dir: float) -> void:
-	var col := Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.55)
+	var col := Color(UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 0.55)
 	draw_line(at + Vector2(-3.0 * dir, -5.0), at + Vector2(2.0 * dir, 0.0), col, 1.5)
 	draw_line(at + Vector2(2.0 * dir, 0.0), at + Vector2(-3.0 * dir, 5.0), col, 1.5)
 
