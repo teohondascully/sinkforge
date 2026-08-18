@@ -469,6 +469,12 @@ add_gl "check_hud_layout (no collisions)" "res://tools/check_hud_layout.gd"
 # missing state. A missing plane. T2.1's "colliding with map, rope and action" had its map half green for
 # weeks on that account.
 add_gl "check_ceremony_reads (interrupt vs world)" "res://tools/check_ceremony_reads.gd"
+
+# MNU-06 concentrated "you can act on this" into one colour and took it off the seven surfaces wearing it
+# as trim. That is the right rule and it puts the game's whole affordance signal into a single channel, so
+# this asks the question the tidying made sharper: move the selection, and see whether LUMINANCE notices.
+# A mark carried by hue alone collapses to the floor here while staying large in RGB.
+add_gl "check_selection_reads (no colour)" "res://tools/check_selection_reads.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 # add_gl, and the other half of check_pixel_snap. That layer proves snap_to_pixel is correct AS A FUNCTION;
