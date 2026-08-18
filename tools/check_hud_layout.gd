@@ -199,6 +199,7 @@ func _run() -> void:
 	_check_big_map(bare, big)
 	_check_hover(bare, hover, big_hover)
 	await _check_pack_window()
+	await _check_announce_channel()
 	await _check_probe_is_off()
 	_report_footprint(foot_names, foots)
 
@@ -602,6 +603,129 @@ func _pack_shot(types: int, sel: int) -> Dictionary:
 ## The order matters. Asserting "the probe is empty" ALONE passes on a HUD that draws nothing, on a broken
 ## flag, on a deleted probe — so the flag is turned back ON afterwards and the probe has to FILL. Absence
 ## is only evidence once the instrument has proved it can detect presence.
+## THE ANNOUNCE CHANNEL HAS ONE OCCUPANT AT A TIME — `P1`'s only structural rule, and the matrix above
+## could not see either half of it.
+##
+## **The matrix row that looks like it covers this covers the opposite case.** `"a stratum arrival, BIG map
+## up"` sets `_minimap_mode: 2` and THEN calls `announce()`, and `announce()` defers when the map is
+## already open — so that row exercises the direction that was already guarded, gets a deferral, and is
+## correctly declared a twin of the plain big-map row. **The unguarded direction is the other order:
+## ceremony up FIRST, map opened second**, which `_draw_arrival` (drawn after `_draw_minimap`) rendered
+## straight over the map. `docs/media/baseline/_moment_map.png` is that frame.
+##
+## *A guard that handles one direction of a two-directional collision is not half a guard, it is a guard
+## with a hole, and the hole is invisible because the covered direction is the one anybody tests.*
+##
+## Every assertion below is paired with the control that makes it capable of failing: the freeze is only
+## meaningful against a run of the same length that does NOT freeze, and "the plate is absent" is only
+## meaningful if the same probe finds it present when it should be.
+const CEREMONY_BAND_TOP: float = Hud.CANVAS.y * 0.26 - 40.0
+const CEREMONY_BAND_BOT: float = Hud.CANVAS.y * 0.26 + 25.0
+
+func _check_announce_channel() -> void:
+	var hud: Hud = _main._hud
+	_main._inventory_open = false
+	_main._show_help = false
+	_main._show_dashboard = false
+	_main._settings_open = false
+
+	# ---- the plate under the LARGE map -------------------------------------------------------------
+	_main._minimap_mode = 0
+	hud._arrival_life = 0.0
+	await RenderingServer.frame_post_draw
+	hud.announce("THE DEEPSLATE", "120 METRES DOWN", Color(0.56, 0.50, 0.78))
+	var lit: Array[Rect2] = await _probe_frames(2)
+	var life_open: float = hud._arrival_life
+	_check(_in_ceremony_band(lit).size() == 1,
+		"CONTROL: with the map closed, the arrival plate registers exactly one panel in its band (%d)"
+			% _in_ceremony_band(lit).size())
+	_check(life_open < Hud.ARRIVAL_HOLD,
+		"CONTROL: with the map closed the plate's clock RUNS (%.3f of %.1f used)"
+			% [Hud.ARRIVAL_HOLD - life_open, Hud.ARRIVAL_HOLD])
+
+	_main._minimap_mode = 2                       # ...and NOW the map opens, under a live ceremony
+	var held: Array[Rect2] = await _probe_frames(4)
+	var life_held: float = hud._arrival_life
+	_check(_in_ceremony_band(held).is_empty(),
+		"the arrival plate draws NOTHING once the big map opens under it (%d panels in its band)"
+			% _in_ceremony_band(held).size())
+	_check(is_equal_approx(life_held, life_open),
+		"...and it is HELD, not spent: %.3f s left before the map opened, %.3f s after four frames"
+			% [life_open, life_held])
+
+	_main._minimap_mode = 0                       # the map closes; the announcement is still owed
+	var back: Array[Rect2] = await _probe_frames(2)
+	_check(_in_ceremony_band(back).size() == 1,
+		"...and it comes back when the map closes, with its remaining life intact (%.3f s)"
+			% hud._arrival_life)
+
+	# ---- the lesson under the plate ----------------------------------------------------------------
+	var hints: Hints = _main._hints
+	hud._arrival_life = 0.0
+	_main.sim.inventory[&"rope"] = int(_main.sim.inventory.get(&"rope", 0)) + 1
+	var armed: bool = false
+	for _i: int in 30:
+		await physics_frame
+		if hints.active_alpha() > 0.9:
+			armed = true
+			break
+	_check(armed, "CONTROL: a lesson reaches full opacity with the announce channel free")
+	if not armed:
+		return
+	var taught: String = hints.active_text()
+	var life_before: float = hints._life
+	for _i: int in 6:
+		await physics_frame
+	_check(hints._life < life_before,
+		"CONTROL: with no ceremony up, the lesson's clock RUNS (%.3f -> %.3f)"
+			% [life_before, hints._life])
+
+	hud.announce("THE CLAYBAND", "10 METRES DOWN", Color(0.7, 0.6, 0.4))
+	await physics_frame                            # one frame for note_ceremony to reach Hints
+	var life_under: float = hints._life
+	for _i: int in 6:
+		await physics_frame
+	_check(hints.active_alpha() == 0.0,
+		"a lesson draws nothing while the ceremony owns the channel (alpha %.2f)" % hints.active_alpha())
+	_check(hints.active_text() == taught,
+		"...and it is HELD rather than dropped: the same lesson is still the active one")
+	_check(is_equal_approx(hints._life, life_under),
+		"...with its clock stopped, not burning down unseen (%.3f -> %.3f)" % [life_under, hints._life])
+
+	hud._arrival_life = 0.0                        # the ceremony ends
+	await physics_frame
+	await physics_frame
+	_check(hints.active_alpha() > 0.9 and hints.active_text() == taught,
+		"...and the same lesson returns at full opacity once the channel is free (alpha %.2f)"
+			% hints.active_alpha())
+
+
+## Panels whose centre sits in the band the arrival plate occupies. The objective line is top-centre too
+## but ends around y 48, well above `CANVAS.y * 0.26 - 40`, so the band contains the ceremony and nothing
+## else on any state this function drives.
+func _in_ceremony_band(rects: Array[Rect2]) -> Array[Rect2]:
+	var hit: Array[Rect2] = []
+	for r: Rect2 in rects:
+		var cy: float = r.position.y + r.size.y * 0.5
+		if cy >= CEREMONY_BAND_TOP and cy <= CEREMONY_BAND_BOT:
+			hit.append(r)
+	return hit
+
+
+## Draw `n` frames with the probe armed and return what the last one registered.
+func _probe_frames(n: int) -> Array[Rect2]:
+	Hud.probing = true
+	Hud.panel_probe = ([] as Array[Rect2])
+	for i: int in n:
+		if i == n - 1:
+			Hud.panel_probe = ([] as Array[Rect2])
+		await RenderingServer.frame_post_draw
+	var out: Array[Rect2] = Hud.panel_probe.duplicate()
+	Hud.probing = false
+	Hud.panel_probe = ([] as Array[Rect2])
+	return out
+
+
 func _check_probe_is_off() -> void:
 	_check(not Hud.probing, "the probe flag is off once the matrix has finished with it")
 	Hud.panel_probe = ([] as Array[Rect2])
