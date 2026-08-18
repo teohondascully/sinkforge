@@ -58,6 +58,7 @@ const FULL_PX: float = 1.0           ## screen px — one bucket over, must show
 const DIFF_TOL: int = 8              ## per-channel level a pixel must exceed to count as changed
 const STRUCT_TOL: float = 6.0        ## luma levels across 2px a pixel needs to be able to reveal a shift
 const NOISE_CAP: float = 0.02        ## same-bucket changed fraction may not exceed this
+const MIN_STRUCTURED: int = 20000    ## the judged population may not quietly collapse
 const CONTROL_RATIO: float = 4.0     ## next-bucket must differ at least this many times more than same
 const BAND_TOP: float = 0.16         ## skip the HUD, same crop both arms
 const BAND_BOTTOM: float = 0.80
@@ -98,6 +99,22 @@ func _run() -> void:
 	print("  NEXT bucket (+%.1fpx): %d of %d structured pixels changed (%.2f%%)"
 		% [FULL_PX, over, int(over_r[1]), float(over) / maxf(1.0, float(over_r[1])) * 100.0])
 
+	# POPULATION FLOOR, and I found the need for it by auditing other layers and landing on my own. Every
+	# number above is a fraction of `structured`, and nothing yet asserted that `structured` is a real
+	# population. If the crop drifted onto flat sky, or the structure threshold rose past the terrain's
+	# actual contrast, the denominator would shrink toward nothing and BOTH arms would go quiet together --
+	# a layer reporting 0.00% and 0.00% with a control that cannot fire. Measured at ~155,400 across four
+	# runs, stable to a third of a percent; the floor is 20,000, an order below the observed and a long way
+	# above a collapse. It is a veto, not a scaling factor: it runs BEFORE either ratio is judged.
+	_check(int(same_r[1]) >= MIN_STRUCTURED and int(over_r[1]) >= MIN_STRUCTURED,
+		"there is enough structure on screen to see a shift at all (%d and %d pixels, floor %d)"
+		% [int(same_r[1]), int(over_r[1]), MIN_STRUCTURED])
+	if int(same_r[1]) < MIN_STRUCTURED or int(over_r[1]) < MIN_STRUCTURED:
+		printerr("    ...so the two fractions below are shares of nearly nothing and mean nothing.")
+		_fail += 1
+		printerr("check_snap_frame: %d FAILURE(S)" % _fail)
+		quit(1)
+		return
 	_check(same_f <= NOISE_CAP,
 		"a target inside one pixel bucket leaves the frame alone — %.2f%% changed (cap %.2f%%)"
 		% [same_f * 100.0, NOISE_CAP * 100.0])
