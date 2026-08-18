@@ -435,7 +435,7 @@ func _the_rock_tells_on_itself() -> void:
 	_check(not _sim.lode_workable(veined) and _sim.lode_workable(open_cell),
 		"…and only the OPEN one carries metal you can see and work — that is what the swing buys")
 
-	# NO MOTION. `_draw_ore_glints` learned at some cost that sparkling sealed cells read as a starfield;
+	# NO MOTION. `_draw_glint_flares` learned at some cost that sparkling sealed cells read as a starfield;
 	# the buried tell must stay still, so a sealed cell is not allowed to be a glint candidate.
 	var sealed: bool = _sim.is_solid(veined + Vector2i(0, -1)) and _sim.is_solid(veined + Vector2i(0, 1)) \
 		and _sim.is_solid(veined + Vector2i(-1, 0)) and _sim.is_solid(veined + Vector2i(1, 0))

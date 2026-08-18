@@ -670,7 +670,10 @@ func _draw() -> void:
 	_draw_seams()     # the rock's grain — the planes a blow can follow (#S31)
 	_draw_drop_paths()
 	_draw_lode()      # ore in the BACK WALL — the vein you cleared the rock off, and how much is left
-	_draw_ore_glints()  # veins glitter in the dark — discovery reads from across a cavern
+	_draw_seal_pulse(_view_world_rect())  # the unbreakable band's slow violet breath — a wash ON rock, so
+	                                      # it belongs under the veil with the rock it is painted on. The
+	                                      # ore FLARES used to be drawn here too and are not any more; they
+	                                      # are a light, and _paint_lights draws them above the veil now.
 	_draw_updrafts()  # rising shimmer in each lift's shaft, so "this column lifts UP" reads
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
 	_draw_power_pulses()  # bright beads flowing DOWN the live network — energy visibly moving (#19)
@@ -1099,8 +1102,32 @@ func _draw_grain(p: Vector2, r: float, spin: float, nug: Color) -> void:
 	draw_colored_polygon(PackedVector2Array([q[1], q[2], p]), body.darkened(GRAIN_SHADE))
 
 
-func _draw_ore_glints() -> void:
-	var view: Rect2 = _view_world_rect()
+## KNOCKOUT SEAM, default true; only measurement code ever sets it false. A cosmetic cue that cannot be
+## switched off cannot be measured by SUBTRACTION, and subtraction is the one instrument whose answer does
+## not depend on how the subject happens to be distributed on screen. The thing it replaced — splitting
+## exposed ore into clustered and lone and comparing them — had SIX cells in it, because `_cluster_seams`
+## absorbs ~87% of exposed ore, and three of its nine runs divided 0 by 0 and printed a confident zero.
+var draw_glints: bool = true
+
+
+## THE GLINT HAD TO CROSS THE VEIL — the same layer-order bug as rock_grit, found by a different route.
+##
+## This ran inside WorldRenderer._draw, at z 0. `_dark` is a LightLayer at z 50 with BLEND_MODE_MUL. So
+## every flare was scaled by exactly the factor that made the rock dark, and `glint_dark` below — which
+## RAISES the flare's alpha as the surround darkens — was cancelled by the veil almost exactly. The
+## compensation and the attenuation were the same number.
+##
+## MEASURED, by knockout: suppressing the flares entirely changed which ore cells reach the frame's
+## brightest 1% by NOTHING — 9 of 13, 12 of 20, 20 of 30 discovered, identical cell for cell with the cue
+## on and off — and moved ore's share of that band by -10.5%, -0.35% and +0.6%. The +0.6% is the tell: the
+## cut is a per-frame quantile, so deleting pixels lowers the bar and lets others in. The cue was inside
+## the noise of its own removal. Every ore cell that DID reach the bright band got there on the seam light
+## pool, which `_paint_lights` draws at z 51, above the veil.
+##
+## So it is drawn from `_paint_lights` now, additive and post-veil, on the same canvas as the pools it was
+## losing to. `glint_dark` is KEPT and now does what its comment always claimed: a surface vein in daylight
+## stays quiet, a vein in the deep flares at full strength — with nothing downstream to take it back.
+func _draw_glint_flares(view: Rect2, canvas: CanvasItem) -> void:
 	const PERIOD: float = 3.4
 	const FLARE_LEN: float = 0.5
 	for key: Variant in sim.deposits:
@@ -1133,10 +1160,9 @@ func _draw_ore_glints() -> void:
 		var col: Color = def.nugget_color.lightened(0.65)
 		col.a = 0.85 * flare * glint_dark
 		var r: float = 2.0 + 2.5 * flare                        # a little 4-point star, not a lens flare
-		draw_line(p + Vector2(-r, 0.0), p + Vector2(r, 0.0), col, 1.2)
-		draw_line(p + Vector2(0.0, -r), p + Vector2(0.0, r), col, 1.2)
-		draw_circle(p, 1.1 + 0.8 * flare, Color(col, minf(1.0, col.a + 0.15)))
-	_draw_seal_pulse(view)
+		canvas.draw_line(p + Vector2(-r, 0.0), p + Vector2(r, 0.0), col, 1.2)
+		canvas.draw_line(p + Vector2(0.0, -r), p + Vector2(0.0, r), col, 1.2)
+		canvas.draw_circle(p, 1.1 + 0.8 * flare, Color(col, minf(1.0, col.a + 0.15)))
 
 
 ## THE SEAL's slow violet breath: the unbreakable band reads as dormant power, not just dark rock.
@@ -1383,7 +1409,7 @@ func _cell_base_color(c: Vector2i, def: MaterialDef) -> Color:
 	# anything is to dig at random. This is the answer to the question that opened the whole migration:
 	# "maybe the rock has some signal so you know there's a specific ore behind it".
 	#
-	# It is a DISCOLOURATION and nothing else. Not a glint: `_draw_ore_glints` already learned, at some cost,
+	# It is a DISCOLOURATION and nothing else. Not a glint: `_draw_glint_flares` already learned, at some cost,
 	# that sparkling cells sealed inside stone read as a floating starfield rather than as a vein, so buried
 	# ore gets no motion at all — §11's motion budget is spent entirely on the faces you have opened. And it
 	# is far weaker than an exposed face, because it has to be findable without being a map marker: what you
@@ -2765,7 +2791,7 @@ func _cell_center(cell: Vector2i) -> Vector2:
 ## VIEW CULLING: the on-screen world-space rectangle, grown by `margin_cells` so partially-on-screen
 ## content (and its glow / labels / shadows that reach past its cell) isn't clipped at the edge. The
 ## per-frame draw passes test `if not view.has_point(Vector2(cell) * CELL): continue` BEFORE emitting
-## any draw call for an element — the same cull _draw_water/_draw_ore_glints already used inline, now
+## any draw call for an element — the same cull _draw_water/_draw_glint_flares already used inline, now
 ## shared so every pass reads the identical rect. Off-screen draws aren't visible, so skipping them is
 ## pixel-identical on-screen. `margin_cells` is generous (≥ 2-3) for passes whose visual overspills its
 ## cell (machines have glow/badges/IO ports; a big lamp-lit item glow reaches further).
@@ -3626,6 +3652,8 @@ func _paint_heat_haze(layer: LightLayer) -> void:
 ## + a glow per falling drop (the gravity stream made loud).
 func _paint_lights(layer: LightLayer) -> void:
 	_paint_godrays(layer)  # under the pools: daylight SHAFTS pouring down dug columns
+	if draw_glints:        # exposed ore twinkles HERE, above the veil — see _draw_glint_flares
+		_draw_glint_flares(_view_world_rect(), layer)
 	# Sonar echoes GLOW through the darkness veil (#27) — an answer from inside unlit rock must read
 	# in the black, or the scanner is useless exactly where prospecting matters.
 	if _scan_age >= 0.0:
