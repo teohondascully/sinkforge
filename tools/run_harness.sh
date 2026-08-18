@@ -396,7 +396,11 @@ add_gl "check_contact_edge (rock meets air)" "res://tools/check_contact_edge.gd"
 # reach the frame, which is the multiplicative constraint at the head of fine_terrain.gd costing the half
 # of the grammar it costs most.
 #
-# Reads (3 runs, stable): structure 86/86/86, colour control 93, null 53/53/51, baseline 61/63/61.
+# Reads (3 runs, stable): structure 81/81/81, colour control 93, null 53/55/53, baseline 60/61/61.
+# Was 86 before the seam AXES were corrected — bedded and massive had their orientations inverted, and
+# putting the direction right cost 5 points of grain separability. The trade is recorded rather than
+# reverted: TR-04 asks for stone as plane/fracture, and a material whose seams run the wrong way scores
+# better while being wrong.
 # Proved red by knockout: setting stone.tres grammar = 0 drops structure to 63% and the layer FAILS.
 add_gl "check_material_grammar (dirt vs stone)" "res://tools/check_material_grammar.gd"
 add_gl "check_item_reads (icons)"      "res://tools/check_item_reads.gd"
