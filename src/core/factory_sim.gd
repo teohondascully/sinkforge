@@ -1369,6 +1369,26 @@ func ore_deposit_at(cell: Vector2i) -> int:
 	return 0
 
 
+## WHICH ore the yield at `cell` belongs to — `ore_deposit_at`'s companion, branch for branch, and it
+## exists because those two answers were being read from different planes.
+##
+## `deposits` is one grid shared by the solid-ore blocks and the background lode. A caller that took the
+## AMOUNT from here and the IDENTITY from `material_at` got the right number attached to the wrong thing
+## for every buried vein, because `material_at` returns the SOLID standing in front of it — stone. The
+## sonar did exactly that (main.gd), and since the renderer paints an echo's arc, pip and through-rock
+## glow from that one material's `nugget_color`, and stone's is fully transparent, a buried vein answered
+## with a colour that draws nothing. Held by `tools/check_scan.gd`.
+##
+## Returns &"" when the cell holds no yield of either kind, so `ore_deposit_at(c) > 0` and
+## `deposit_material_at(c) != &""` are the same question asked twice — which the layer asserts.
+func deposit_material_at(cell: Vector2i) -> StringName:
+	if solid.has(cell) and _is_ore_like(solid[cell]):
+		return solid[cell]
+	if lode.has(cell):
+		return lode[cell]
+	return &""
+
+
 ## The ore in the background at `cell`, or &"" — an EXPOSED vein you can work by hand or (from strike 2 of
 ## `docs/LODE.md` §10) cover with a drill. A lode under a solid block still exists; it is simply behind rock.
 func lode_at(cell: Vector2i) -> StringName:

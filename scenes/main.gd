@@ -1974,7 +1974,12 @@ func try_scan() -> bool:
 		var pos: Vector2 = _cell_center(cell)
 		var dist: float = origin.distance_to(pos)
 		if dist <= range_px:
-			echoes.append({"cell": cell, "pos": pos, "dist": dist, "material": sim.material_at(cell)})
+			# The identity comes from the SAME branch as the amount (`deposit_material_at`), not from
+			# `material_at`. A buried vein's solid is the stone in front of it, and stone's nugget_color is
+			# transparent — so taking the identity from the rock plane made every buried echo draw its arc,
+			# its pip and its through-rock glow in nothing. That is the one case the glow exists for.
+			echoes.append({"cell": cell, "pos": pos, "dist": dist,
+				"material": sim.deposit_material_at(cell)})
 	echoes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["dist"]) < float(b["dist"]))
 	_scan_cooldown = SCAN_COOLDOWN
 	_renderer.start_scan(origin, echoes)
