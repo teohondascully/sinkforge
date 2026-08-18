@@ -493,7 +493,14 @@ say() {
 mode="display"; [ "$HAVE_DISPLAY" = "1" ] || mode="NO DISPLAY — the pixel layers will skip"
 strictness="skips tolerated"; [ "$STRICT" = "1" ] && strictness="STRICT: any skip fails the run"
 subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_ONLY='${SF_ONLY:-}'"
+# WHICH TREE THIS RAN IN, printed because cwd is an UNMEASURED INPUT to every result this script produces
+# and no result line has ever named it. Parallel work runs in separate git worktrees, and a
+# `cd` that silently resets to the repo root makes a sweep report on somebody else's checkout while looking
+# exactly like a normal green -- that is not hypothetical, it cost a false green on 2026-08-17. `pwd -P`
+# resolves symlinks, and the branch is printed beside it because "which tree" and "which branch" are
+# different questions and both have been wrong.
 say "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total$subset, $mode, $strictness) =="
+say "   tree: $(pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  head: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
 # Take the machine-wide lock before anything touches user://. A run that was killed cannot release its own
 # lock, so a holder whose pid is gone gets cleared rather than being allowed to wedge every future run —
