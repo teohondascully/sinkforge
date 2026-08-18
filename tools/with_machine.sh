@@ -35,11 +35,22 @@ WAIT="${SF_LOCK_WAIT:-900}"
 sf_hash() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
 if [ "${SF_REAL_HOME:-0}" != "1" ]; then
 	SF_HOME="${SF_HOME:-${TMPDIR:-/tmp}/sinkforge-home-$(printf '%s' "$ROOT" | sf_hash | cut -c1-12)}"
-	if mkdir -p "$SF_HOME/.local/share" "$SF_HOME/.config"; then
-		export HOME="$SF_HOME"
-		export XDG_DATA_HOME="$SF_HOME/.local/share"
-		export XDG_CONFIG_HOME="$SF_HOME/.config"
-	fi
+	# IT FAILS CLOSED, AND IT USED TO FAIL OPEN — SILENTLY, INTO THE PLAYER'S REAL SAVE SLOT. This was
+	# `if mkdir -p ...; then export HOME=...; fi`. If the mkdir failed for any reason — a full disk, a
+	# stale root-owned $TMPDIR entry, a sandbox that will not let us write there — the exports simply did
+	# not happen, `HOME` stayed the real one, and Godot booted against
+	# `~/Library/Application Support/Godot/app_userdata/Sinkforge/sinkforge.save`. No message, no
+	# non-zero status, no sentinel on this path to witness it: the one failure mode this whole mechanism
+	# exists to prevent, reached by the mechanism failing rather than by anyone making a mistake.
+	# `run_harness.sh:131-132` has always failed CLOSED here (`|| exit 2`); the two drifted, and the
+	# comment above promising "the same isolated user:// the harness uses, by the same key" was true of
+	# the happy path and false of every other. Found by the blind-evaluation readiness audit, gate 1.
+	mkdir -p "$SF_HOME/.local/share" "$SF_HOME/.config" \
+		|| { echo "!! could not create the isolated home at $SF_HOME — REFUSING to boot Godot against the" \
+			"player's real save slot. Fix the path or set SF_REAL_HOME=1 if you genuinely mean it." >&2; exit 2; }
+	export HOME="$SF_HOME"
+	export XDG_DATA_HOME="$SF_HOME/.local/share"
+	export XDG_CONFIG_HOME="$SF_HOME/.config"
 fi
 
 # THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine
