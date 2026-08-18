@@ -2997,7 +2997,29 @@ func _draw_speed_streaks() -> void:
 ## small dark wedge at the anchor with a bright chip on its lit side, because a hook that reads as a dot
 ## makes the whole tool read as a laser pointer.
 const ROPE_SEGMENTS: int = 14
-const ROPE_SAG: float = 26.0            ## px the fully-slack line bows below the chord
+## HOW FAR A SLACK LINE HANGS BELOW ITS OWN CHORD — and this was a FLAT 26 PIXELS for as long as the rope
+## existed, scaled only by how slack the line was and never by how long it was.
+##
+## `GR-03`: *"encode tension through cable form/motion, not added UI"*, evidence *"no visible physical state
+## distinction in still frame."* Measured by `check_grapple_reads` with the body standing on the floor so
+## the pose is stable and the camera cannot move: a rope at 0.55 slack differed from the same rope pulled
+## bar-taut by **10 levels of luma in its own corridor**, and the side-by-side is two straight lines. Of
+## course it was: 0.55 x 26px is a 14px bow across a 500px span — under 3%, which is a wobble, not a hang.
+##
+## **A rope's sag is a fact about its LENGTH, not a constant.** For a chord `d` and a rope of length `L`,
+## the parabolic approximation gives extra length ~ (8/3)(h^2/d), so h = d * sqrt(3s / (8(1-s))) where
+## `s` is the slack fraction the winch already computes. At 10% slack that is a fifth of the span; at half
+## slack it is six tenths of it. Capped, because past a point the loop leaves the screen and stops being
+## information — and floored at a couple of pixels so a nearly-taut line still reads as rope rather than
+## as a drawn ray.
+const SAG_CAP: float = 0.42             ## most of the chord the hang may ever be
+const SAG_MIN: float = 2.0              ## px, so even a tight line keeps a whisker of curve
+
+
+## The hang of a line, in pixels, from the chord it spans and how much line is spare.
+static func rope_sag(span: float, slack: float) -> float:
+	var s: float = clampf(slack, 0.0, 0.94)
+	return clampf(span * sqrt(3.0 * s / (8.0 * (1.0 - s))), SAG_MIN, span * SAG_CAP)
 const ROPE_CORE := Color(0.78, 0.70, 0.52)
 const ROPE_SHADE := Color(0.20, 0.16, 0.12)
 
@@ -3014,7 +3036,21 @@ const ROPE_SHADE := Color(0.20, 0.16, 0.12)
 ## or the crack overlay. And drawn ONLY when the line is stowed — once you are on the rope your attention
 ## belongs on the arc, and a second line racing your cursor across the rock is noise at exactly the moment
 ## you can least afford it.
-const AIM_DOTS: int = 11
+## THE LEAD IS A STUB, NOT A LINE, and it was a line for as long as the tool existed.
+##
+## `GR-01`/`GR-05`: *"the vertical dashed line reads as construction/debug geometry, not as a physical
+## tool"*, and *"the long guide occupies most of the frame."* Measured by `check_grapple_reads`: the
+## preview drew **0.96 of the throw** — hand to target, the whole way, at even spacing. That is a
+## dimension line. It is how a CAD package indicates a distance and how a debug build draws a raycast, and
+## eleven evenly-spaced dashes crossing the frame is that drawing whatever else is in the scene.
+##
+## What the preview is FOR is the endpoint: where will the hook bite. That information is entirely in the
+## ring, and the lead's job is only to say which throw the ring belongs to — which takes a stub off the
+## hand, not a tether. The trace is unchanged, so acquisition is exactly as reliable as it was
+## (`GR-01`'s stated constraint); what changes is how much of the frame is spent saying so.
+const AIM_STUB: float = 0.26            ## how much of the throw the lead draws before it lets go
+const AIM_STUB_MAX: float = 74.0        ## ...and never more than this many px, so a long throw stays a stub
+const AIM_DOTS: int = 4
 const AIM_RING: float = 6.0
 const AIM_LEAD := Color(0.86, 0.80, 0.62, 0.34)
 const AIM_MARK := Color(0.99, 0.88, 0.56, 0.88)
@@ -3022,18 +3058,39 @@ const AIM_MISS := Color(0.62, 0.64, 0.70, 0.16)   ## nothing in range: the lead 
 const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)  ## a dark backing ring, so the mark survives pale rock too
 
 
+## SUPPRESSES THE AIM PREVIEW SO IT CAN BE PHOTOGRAPHED. `check_grapple_reads` isolates the preview by
+## differencing two otherwise identical frames, and its first version got the reference frame by parking
+## the cursor on the miner's own hand — which also swings the HEAD-LAMP, because the lamp is aimed. Five
+## and a half cells of light moved between the two captures and the difference mask ate it. Excluding a
+## lamp-sized disc then blinded the layer to the near field, which is the only place the shortened lead
+## lives: it measured 0.04 of the throw inked and was seeing the endpoint ring alone.
+##
+## With this, the reference frame has the cursor in exactly the same place and the lamp in exactly the same
+## position, and the difference is the preview and nothing else.
+static var AIM_GHOST_OFF: bool = OS.get_environment("SF_AIM_GHOST_OFF") == "1"
+
+
 func _draw_aim_ghost() -> void:
-	if player == null or player.grapple.live() or sim == null:
+	if player == null or player.grapple.live() or sim == null or AIM_GHOST_OFF:
 		return
 	var from: Vector2 = player.hand()
 	var shot: Dictionary = player.grapple.trace(sim, from, get_global_mouse_position())
 	var to: Vector2 = shot["at"]
 	var hit: bool = shot["hit"]
-	# A dotted lead rather than a solid one: a solid line reads as a rope that is already there.
+	# A dotted lead rather than a solid one: a solid line reads as a rope that is already there. And it
+	# runs a fraction of the way rather than all of it — the stub says WHICH throw, the ring says where it
+	# lands, and nothing in between needs drawing.
+	var full: float = from.distance_to(to)
+	var stub: float = minf(full * AIM_STUB, AIM_STUB_MAX) / maxf(full, 1.0)
 	for i: int in AIM_DOTS:
-		var t0: float = float(i) / float(AIM_DOTS)
-		var t1: float = t0 + 0.5 / float(AIM_DOTS)
-		var fade: float = 1.0 if hit else 1.0 - t0            # out of range, the throw trails off into nothing
+		var t0: float = stub * float(i) / float(AIM_DOTS)
+		var t1: float = t0 + stub * 0.5 / float(AIM_DOTS)
+		# The stub fades OUT along its length in both cases now. It reads as a throw leaving the hand
+		# rather than as a measurement between two points, and that is the whole difference between a tool
+		# and a dimension line.
+		var fade: float = 1.0 - 0.65 * float(i) / float(AIM_DOTS)
+		if not hit:
+			fade *= 0.6                                       # nothing in range: quieter still, and no ring
 		draw_line(from.lerp(to, t0), from.lerp(to, t1),
 			(AIM_LEAD if hit else AIM_MISS) * Color(1, 1, 1, fade), 1.0)
 	if hit:
@@ -3059,7 +3116,7 @@ func _draw_grapple() -> void:
 		for pivot: Vector2 in g.pivots:
 			_draw_cord(at, pivot, 0.0)
 			at = pivot
-		_draw_cord(from, at, g.slack(from) * ROPE_SAG)
+		_draw_cord(from, at, rope_sag(from.distance_to(at), g.slack(from)))
 		# The piton belongs at the HOOK and nowhere else, pointed back down the first span of line.
 		_draw_hook(g.pivots[0] if not g.pivots.is_empty() else from, g.anchor, 0.0)
 	if g.throwing():

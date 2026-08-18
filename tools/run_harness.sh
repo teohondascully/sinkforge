@@ -351,6 +351,9 @@ add_gl "check_machine_state (running reads)" "res://tools/check_machine_state.gd
 # occupies nothing. Twenty empty masks are perfectly identical, which is the one input that would make this
 # layer's central assertion pass for the worst possible reason.
 add_gl "check_machine_identity (which box)" "res://tools/check_machine_identity.gd"
+# add_gl: `check_grapple` scores what the rope DOES and every number in it is a velocity; this one scores
+# what the rope LOOKS like, and none of its numbers exist without a surface to draw on.
+add_gl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
 add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
