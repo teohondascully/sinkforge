@@ -83,9 +83,10 @@ static func _seed_starter_adit(sim: FactorySim) -> void:
 		sim.lode[c2] = &"ore"
 		sim.deposits[c2] = MainView.ADIT_FACE_AMOUNT
 		sim.lode_max[c2] = MainView.ADIT_FACE_AMOUNT      # untouched, so it draws FULL however small it is
-	# …and the same vein CONTINUING, behind solid rock, straight down off the bottom of the face. Nothing
-	# reveals it yet (the stain is phase 4) — it is there so that the first player who thinks "the vein must
-	# go somewhere" and digs one block down is immediately right. Being rewarded for reading the world is the
+	# …and the same vein CONTINUING, behind solid rock, straight down off the bottom of the face. The stain
+	# (phase 4) does now run over these cells, so the renderer tints them — whether that reads to a player is
+	# unverified, and this seed does not depend on it: it is there so that the first player who thinks "the
+	# vein must go somewhere" and digs one block down is immediately right. Being rewarded for reading the world is the
 	# lesson; a vein that simply stopped at the exact edge of the free part would teach the opposite.
 	for dy: int in range(4, 7):                # from the first row BELOW the chamber floor, which is exposed
 		var deep := Vector2i(room, top + dy)

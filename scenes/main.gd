@@ -322,7 +322,7 @@ func _ready() -> void:
 
 	_camera = Camera2D.new()
 	# Zoom: 0.7 frames the body as a readable character while keeping enough world to see a vertical
-	# chain (provisional — tuned by eye, see tools/capture_zoom.gd). Smaller = further out.
+	# chain (provisional — tuned by eye). Smaller = further out.
 	_camera.zoom = Vector2(_current_zoom(), _current_zoom())
 	# PIXEL-SNAP the follow (playtest: "texture blurs while running"). The built-in position_smoothing
 	# renders the camera at a fractional position, so every terrain texel samples between screen pixels
@@ -1974,7 +1974,12 @@ func try_scan() -> bool:
 		var pos: Vector2 = _cell_center(cell)
 		var dist: float = origin.distance_to(pos)
 		if dist <= range_px:
-			echoes.append({"cell": cell, "pos": pos, "dist": dist, "material": sim.material_at(cell)})
+			# The identity comes from the SAME branch as the amount (`deposit_material_at`), not from
+			# `material_at`. A buried vein's solid is the stone in front of it, and stone's nugget_color is
+			# transparent — so taking the identity from the rock plane made every buried echo draw its arc,
+			# its pip and its through-rock glow in nothing. That is the one case the glow exists for.
+			echoes.append({"cell": cell, "pos": pos, "dist": dist,
+				"material": sim.deposit_material_at(cell)})
 	echoes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["dist"]) < float(b["dist"]))
 	_scan_cooldown = SCAN_COOLDOWN
 	_renderer.start_scan(origin, echoes)

@@ -26,7 +26,8 @@ build/
 /_capture*.png
 /_capture*.png.import
 _zoom_*.png
-# The "Sees" tier canonical-moment captures (tools/sees.sh) are TRACKED — see THE VISUAL RECORD below.
+# The "Sees" tier canonical-moment captures (tools/capture_moments.gd) are TRACKED — see THE VISUAL RECORD
+# below. (Was "tools/sees.sh", which has never existed in this repository.)
 # Boot diagnostics and mock renders are not: they answer one question and stop mattering.
 /_mock_*.png
 /_mock_*.png.import

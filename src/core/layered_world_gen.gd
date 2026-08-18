@@ -242,9 +242,15 @@ const IRON_AMOUNT: int = 220
 ## richness assertion and every fixture keep their current meaning — and "a generated world contains
 ## usable extraction sites" stops being false by construction, which was the blocking half.
 ##
-## No new render work: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
-## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid. So
-## these are visible as a tell the moment they exist, and prospecting starts meaning something.
+## No new render CODE: `WorldRenderer` already stains a buried lode through rock (LODE §10, phase 4) and
+## already draws an exposed one, both keyed off `sim.lode` without asking whether the cell is solid.
+##
+## That the stain code RUNS over these cells is a mechanism claim and it holds. WHETHER A PLAYER CAN SEE
+## THE RESULT IS UNVERIFIED — neither "visible" nor "invisible" — and nothing here should be read as
+## either. A capture that could settle it must set and RECORD the tutorial/objective HUD state so the vein
+## is unoccluded, and is a diagnostic frame rather than a first-impression one; see `docs/LODE_PLAN.md` §5.
+## What this generator is answerable for is that the lode plane is correct, deterministic, ingested and
+## workable — none of which depends on the tell.
 const LODE_ATTEMPTS_PER_COL: float = 0.35
 const LODE_SIZE_MIN: int = 6
 const LODE_SIZE_DEPTH_BONUS: int = 12

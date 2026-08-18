@@ -224,14 +224,34 @@ func flash(text: String) -> void:
 
 
 ## Announce arrival in a new stratum — the one moment the descent gets to be an EVENT.
+##
+## HELD, NOT DROPPED, WHILE THE BIG MAP IS UP. The plate is centred at y ~62..112 and the large map's panel
+## spans 181..459 by 41..319, so an arrival crossed with the map open lands squarely inside it — measured
+## overlap 222x50, held by `check_hud_layout`. The other three elements that collide with that map (the
+## goal plate :699, the pack bar :2290, the inspector :812) simply stand down, because they are PERSISTENT
+## and standing down costs nothing: they come back. This one is a ONE-SHOT with a 3.4s life, so standing it
+## down would not compose it safely, it would delete it — you would cross into THE DEEPSLATE and never be
+## told. T2.1 asks for "announce once, in a safe composition", and dropping the announcement is not a
+## composition. So it waits for the map to close and then fires in full.
 func announce(text: String, kicker: String, color: Color) -> void:
+	if minimap_large:
+		_pending_arrival = [text, kicker, color]
+		return
 	_arrival_text = text
 	_arrival_kicker = kicker
 	_arrival_color = color
 	_arrival_life = ARRIVAL_HOLD
 
 
+## An arrival that fired while the whole-world view was open, waiting for it to close. Empty when none.
+var _pending_arrival: Array = []
+
+
 func _process(delta: float) -> void:
+	if not _pending_arrival.is_empty() and not minimap_large:
+		var held: Array = _pending_arrival
+		_pending_arrival = []
+		announce(String(held[0]), String(held[1]), held[2] as Color)
 	_flash_life = maxf(0.0, _flash_life - delta)
 	_arrival_life = maxf(0.0, _arrival_life - delta)
 	# The counter's arrival. Eased OUT, so it decelerates into place rather than sliding at a constant rate —
@@ -517,7 +537,17 @@ func _draw_arrival() -> void:
 	var w: float = _tracked_width(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
 	var half: float = w * 0.5 + 12.0
 	var kw: float = _tracked_width(_arrival_kicker, 9, 2.6) if _arrival_kicker != "" else 0.0
-	_draw_scrim(maxf(w, kw) * 0.5 + SCRIM_PAD, y, a)
+	var core_half: float = maxf(w, kw) * 0.5 + SCRIM_PAD
+	# THE CEREMONY IS FURNITURE WHILE IT IS UP, so the layout layer has to be able to see it. It draws no
+	# `_panel()` — deliberately, a panel is the modal dialog this design escapes — so `panel_probe` was
+	# blind to it and `check_hud_layout` could not judge the collision T2.1 reports ("zone ceremony
+	# colliding with map, rope and action"). Registered as the SOLID CORE only, not the feathered extent:
+	# the feather fades to nothing by construction and calling it occupied would report collisions with
+	# regions that are visually empty.
+	if panel_probe != null:
+		panel_probe.append(Rect2(CANVAS.x * 0.5 - core_half, y - SCRIM_ABOVE,
+			core_half * 2.0, SCRIM_ABOVE + SCRIM_BELOW))
+	_draw_scrim(core_half, y, a)
 	if _arrival_kicker != "":
 		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
 			Color(_arrival_color, 0.80 * a))
@@ -636,6 +666,10 @@ func _draw_forged() -> void:
 ## to sit on one step before it comes back (#B4).
 const HINT_HOLD: float = 9.0
 const HOVER_MAX_W: float = 300.0   ## the inspector may grow to fit its widest line, but no further
+## ...and never shrinks below this, so a one-word machine name still reads as a panel rather than a chip.
+## Named because `check_hud_layout` needs the same number to reason about the right column, and a test
+## that re-types a literal is checking its own arithmetic against itself.
+const HOVER_MIN_W: float = 218.0
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 
@@ -807,6 +841,12 @@ func _draw_hover() -> void:
 	_hover_rect = Rect2()
 	if hover_info.is_empty():
 		return
+	# THE BIG MAP IS THE SCREEN — the third element to take this rule, after the goal plate (:699) and the
+	# pack bar (:2290), and for the reason :696 wrote down once for all three. Standing down BEFORE the
+	# rect is built, so `_hover_rect` stays empty and `_cursor_on_hover_panel()` (main.gd:2154) reports
+	# false — otherwise the config-panel PIN at main.gd:769 would latch a machine nobody can see.
+	if minimap_large:
+		return
 	var ins: Array = hover_info.get("in", [])
 	var outs: Array = hover_info.get("out", [])
 	var holding: Array = hover_info.get("holding", [])
@@ -828,14 +868,25 @@ func _draw_hover() -> void:
 	for line: String in [mode_text, rate_text]:
 		if line != "":
 			widest = maxf(widest, _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x)
-	var width: float = clampf(widest + pad * 2.0, 218.0, HOVER_MAX_W)
+	var width: float = clampf(widest + pad * 2.0, HOVER_MIN_W, HOVER_MAX_W)
 	name_text = _fit_text(name_text, 13, width - pad * 2.0)
 	mode_text = _fit_text(mode_text, 11, width - pad * 2.0)
 	rate_text = _fit_text(rate_text, 11, width - pad * 2.0)
 	var rows: int = 1 + int(has_recipe) + int(has_mode) + int(not holding.is_empty()) + int(has_rate) \
 		+ knobs.size() + int(not bar.is_empty())
-	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown (the large map
-	# is centred, off this column), else just the FORGED chip — so the inspector never collides.
+	# Sits below whatever occupies the top-right column: the CORNER minimap if it's shown, else just the
+	# FORGED chip.
+	#
+	# THIS COMMENT USED TO SAY "(the large map is centred, off this column) — so the inspector never
+	# collides", AND THAT WAS FALSE. Centred does not mean narrow: at 128x128 the large map spans x
+	# 181..459, while this panel is right-anchored with a HOVER_MIN_W floor, so its left edge is at most
+	# 640 - 218 - 12 = 410. Measured overlap 49x50 — and the collision was reachable in ordinary play
+	# (open the map with M, aim at a machine). The `else 34.0` below is what caused it: the fallback fires
+	# exactly when `minimap_large`, placing the panel high on a column the map does occupy.
+	#
+	# The comment asserted the impossibility of the thing the code was doing, which is why it survived so
+	# long — anyone auditing this column read the guarantee and stopped. `_draw_hover` now returns early
+	# under the large map, so the branch below only ever runs for the corner form, where the claim is true.
 	var mini_bottom: float = minimap_frame().end.y if (show_minimap and not minimap_large) else 34.0
 	var origin := Vector2(CANVAS.x - width - 12.0, mini_bottom + 10.0)
 	_hover_rect = Rect2(origin, Vector2(width, 10.0 + float(rows) * line_h + 4.0))
@@ -1858,6 +1909,13 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool = f
 ## A REAL rounded rect. Composing one from a rect plus four circles double-blends every corner the moment
 ## the fill is translucent, which is exactly what a modern surface tint is.
 func _round_rect(rect: Rect2, r: float, col: Color) -> void:
+	# ROUNDED BOXES ARE PANELS TOO. `panel_probe` used to see only `_panel()`, and the BAZAAR is built
+	# entirely out of these — so `check_hud_layout`'s "Bazaar open" row recorded the bare screen's four
+	# panels and nothing else, and the layer's headline claim ("the HUD must not print on top of itself")
+	# had never once covered the largest overlay in the game. The states-differ assertion is what found it:
+	# the Bazaar's screen was byte-identical to the bare screen's.
+	if panel_probe != null:
+		panel_probe.append(rect)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
 	sb.set_corner_radius_all(int(r))
@@ -2279,6 +2337,16 @@ func _cost_text(cost: Dictionary) -> String:
 ## The carried pack as a hotbar of slots (icon + count), centred along the bottom. The active slot
 ## (mouse-wheel) is highlighted; it's the item E deposits. Reads `sim.inventory_slots()`.
 func _draw_inventory() -> void:
+	# THE BIG MAP IS THE SCREEN — the same rule as the goal plate at :699, decided there for the same
+	# reason. The map's panel runs y 41..319 of a 360 canvas and this bar's backing starts at y=295, and the
+	# map draws SECOND (:270 after :263). So the bar was not overlapped, it was BURIED: rows 319..339 poked
+	# out below the map's edge, which is exactly where each slot's count badge sits (:2330) — every count
+	# legible, every icon it counts cut in half. That is worse than either showing the bar or hiding it.
+	# Standing down rather than nudging the map, because :696 already rejected nudging in writing: the map
+	# is the one screen that is purely for reading the world, and your pack is not what you are reading.
+	# M puts it back. Held by `check_hud_layout:_check_big_map`.
+	if minimap_large:
+		return
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	# Show ONLY the slots you actually carry, not a fixed row of empty wells — a trailing empty slot reads
 	# as "broken / what goes here?". The bar grows/shrinks with your pack (min 1 so it never vanishes).

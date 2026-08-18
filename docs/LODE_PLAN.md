@@ -168,11 +168,19 @@ Each phase is one commit (or a tight run), lands green, and is independently rev
 ### Phase 4 — the stain, and the shot
 *The stain half is **LANDED**, out of order, ahead of phase 3 — see below for why.*
 
-- **DONE — the through-rock tell.** `WorldRenderer._stain()`, shared by the exposed face and the buried tell
-  with an asymmetry in the value channel (face holds value, buried darkens ×0.78). −13.2% on-screen luma
-  against a ~2% noise floor. Held by `check_lode:_the_rock_tells_on_itself`, `history/124-*`, `docs/LODE.md`
-  §10. Spec detail in LODE §10; the reason it moved is one line: *after the cutover, a world without the
-  stain is featureless stone and nobody can tell where to dig.* Phase 3 needs it, so it went first.
+- **CODE LANDED / PERCEPTUALLY UNVERIFIED — the through-rock tell.** `WorldRenderer._stain()`, shared by the
+  exposed face and the buried tell with an asymmetry in the value channel (face holds value, buried darkens
+  ×0.78). Held by `check_lode:_the_rock_tells_on_itself`, `history/124-*`, `docs/LODE.md` §10.
+  **What is established:** the stain path runs over buried lode cells and lowers their measured on-screen
+  luma by 13.2% against a ~2% noise floor. That is an instrumented pixel-difference claim about the
+  renderer, and it stands.
+  **What is NOT established:** that a player looking at the screen can locate a vein by it. A luma delta a
+  differ can resolve is not the same quantity as a tell a person notices, and no capture has yet been taken
+  under controlled HUD state. The motivating line — *after the cutover, a world without the stain is
+  featureless stone and nobody can tell where to dig* — is the DESIGN ARGUMENT for building it, not a
+  finding about the built thing, and it is now the thing under test rather than a premise.
+  **Gate (unmet):** a diagnostic capture that sets and RECORDS the tutorial/objective state so the vein is
+  unoccluded. Phase 3 shipped without it; see §5.
 - **DONE — draining density.** `lode_max` (the per-vein denominator) plus the angular grain field, so a
   worked-out vein looks worked out and a fat one looks fat.
 - **TODO** — spent-vein look at the *host rock* level (a cleared-out wall that still stains reads as a lie),
@@ -250,6 +258,30 @@ player-visible change · `history/` archived · docs updated in the same commit.
 > through-rock tell appeared in every generated world** the moment the generator moved. Nobody has looked
 > at it. It is asserted structurally and unverified visually — the same split I have now made three times
 > (code-verified, not pixel-verified), and the one my own tracelog flags as a habit rather than a standard.
+>
+> **A CAPTURE WAS TAKEN AND IT CANNOT SETTLE THE GATE. THE GATE REMAINS UNMET AND THE QUESTION REMAINS
+> OPEN.** `_diag_lode_face.png` shows a worked lateral face at depth 44 with buried cells inside the lamp's
+> brightest pool — and **the centre of that subject is covered by the GRAPPLE tutorial bubble**, with the
+> objective rail across the top.
+>
+> I wrote here, briefly, that the capture proved the tell invisible. It proves nothing of the sort: I read
+> an occluded frame as evidence about what it occludes. That correction stands (0017), and is not
+> mine, and it arrived because someone reviewed the pixels I had already drawn a conclusion from.
+>
+> **So the claim has now been wrong in both directions in one afternoon** — first "visible", asserted from
+> the existence of `_stain()` without looking; then "invisible", asserted from a frame whose subject was
+> hidden. The honest state is UNVERIFIED. A capture that could settle it must set and RECORD the
+> tutorial/objective state so the vein is unoccluded, and is a diagnostic post-tutorial frame rather than a
+> first-impression one.
+>
+> The frame is preserved and re-filed as what it actually documents: **a first-time HUD-interference
+> artifact.** On that it is good evidence — a first-time player standing at a lateral face has the subject
+> of the moment hidden behind a tutorial bubble, which is T2.1's argument made in pixels instead of prose.
+>
+> **What is unaffected either way:** the lode plane is correct, generated, deterministic, ingested and
+> workable. None of that rests on the tell. What nobody has established is what it looks like to a person,
+> and phase 3b's "sonar re-pointed at lodes through rock" should not assume the stain covers it in the
+> meantime.
 >
 > It also means every luma measurement in this project now has a **pre-lode / post-lode** side, and the
 > boundary is `303d1f5`. That is a project-wide line, not a property of any one number.

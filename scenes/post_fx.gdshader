@@ -1,6 +1,6 @@
 shader_type canvas_item;
 
-// Screen-space post pass (docs/MODERN_FEEL.md): a vignette + animated film grain + a whisper of
+// Screen-space post pass: a vignette + animated film grain + a whisper of
 // chromatic aberration at the edges — the "lens" that makes the framebuffer read as a shot through
 // real glass rather than flat pixels — plus the PALETTE GRADE (FABLE_50 #18): a gentle filmic
 // S-curve and a split-tone that pulls shadows toward the underworld's cool blue-black and

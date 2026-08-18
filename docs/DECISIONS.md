@@ -263,13 +263,25 @@ opening that backs itself speaks a dialect the world does not — and reads as a
 Ore moves out of the terrain plane into a background lode plane. The old model made a vein *be* the rock,
 so a tunnel driven through an ore body destroyed everything it did not pocket.
 
-**User decision locked: Option A — no solid ore survives the cutover.** Deletion of the solid-ore code path
-is deliberately split into a **separate later commit**: bisectable beats bundled, and nothing generates
-solid ore any more, so the old path is simply unreached in the meantime.
+**User decision locked: Option A — no solid ore survives the cutover.** That remains the target and is not
+reopened here. Deletion of the solid-ore code path is deliberately split into a **separate later commit**:
+bisectable beats bundled.
 
-Phases 1, 2, 2b and part of 4 have shipped. **Phase 3, the cutover, is not done**, and as of the
-2026-08-17 audit its completion, pacing, and deep-pocket play gates are red. It must not be merged on the
-strength of the 98.6/100 its own scorer prints.
+> **CORRECTED 2026-08-17 — this passage previously asserted "nothing generates solid ore any more, so the
+> old path is simply unreached in the meantime". That is the PHASE-3b POSTCONDITION, not current runtime.**
+> `LayeredWorldGen` still scatters solid `ore` / `coal` / `iron` / `rich_ore` into `world.blocks`, and
+> `_seed_lodes` runs **dead last and is purely additive** — it writes `world.lodes` and never touches
+> `world.blocks`. That additivity is exactly why 3a could ship without disturbing the economy, so the old
+> claim contradicted the shipped design as well as the runtime.
+> **Why this one mattered more than a stale sentence:** it supplied the *reason* the deletion could be
+> safely deferred. A false premise carrying a deferral decision outlives its own correction, because the
+> decision it justified stays in force after the premise stops being true. The split is still right — for
+> the bisectability reason alone, which does not depend on the false half.
+
+Phases 1, 2, 2b and part of 4 have shipped. **Phase 3 was later split: 3a (generated lode plane) shipped
+2026-08-17 in `303d1f5` + `8498ae3`; 3b (converting the solid ore blocks) is not done.** As of the
+2026-08-17 audit the *cutover branch's* completion, pacing, and deep-pocket play gates are red. It must not
+be merged on the strength of the 98.6/100 its own scorer prints — that instruction is unaffected by 3a.
 
 *Attested: `docs/LODE.md`, `docs/LODE_PLAN.md`, `the cutover handover`;
 the architecture handover §12.*
@@ -288,7 +300,24 @@ harder to read in motion?"*
 dated. Elevation, not borders. Defocus the world behind a modal. A detail plate for the selected thing.
 Costs as glyphs. **Never a wall of locked rows** — the future belongs on the research screen.
 
-*Attested: `docs/VIBE_GAP.md`; the architecture handover §1 and §10.*
+*Attested: the architecture handover §10; `docs/PRIORITY.md`; `the vibe audit response`.*
+
+> **Attestation repaired 2026-08-17.** This line cited `docs/VIBE_GAP.md`, **a file that has
+> never existed** — no add, no contents, no deletion, in reachable or unreachable history. **The decision
+> itself is real and is not reopened:** the user has stated and restated it, and the ordering is quoted
+> consistently across the repo. What was fictitious was its evidence.
+>
+> **A DATE THAT WAS IN THIS NOTE HAS BEEN REMOVED, and the removal is the point.** It said the decision was
+> made on 2026-06-28. **No artifact in this repository records that.** `git log -S` on both "Presentation is
+> the priority" and "real art > audio > onboarding" puts their first appearance at **2026-08-16**; the
+> section heading is undated, unlike its dated neighbours; and the only 2026-06-28 entry in this log is a
+> different decision. What *is* on that day is a `VIBE_GAP #3 / #8` provenance tag in four commit subjects
+> — circumstantial, and not the same thing. **I asserted a specific date for a specific decision, from
+> memory, inside a note whose entire subject is attestations pointing at things that are not there.**
+> Note the artifacts now cited are *later* than the decision —
+> `VIBE_AUDIT_RESPONSE.md` is the 2026-08-17 audit — so they corroborate the ordering rather than record
+> its origin, and no document written at the time survives. Said plainly rather than papered over, because
+> an attestation pointing at a substitute is how this got here.
 
 ### 2026-08-16 — default zoom 0.70× → 1.00× — LOCKED, with its derivation
 
@@ -402,9 +431,16 @@ Committing serves the locked rule instead of straining against it: it is the str
 not destroying these files. And the disclosure worry the word "publish" implies does not survive being
 stated — the repo is the user's own MIT-licensed game, and these are pictures of it.
 
-The premise under the old note was wrong too. These captures are not regenerable. Re-running `tools/sees.sh`
-does not reproduce them, because the game it photographs has changed; each one is a record of a world that
-no longer exists. That is the argument for versioning them rather than against it.
+The premise under the old note was wrong too. These captures are not regenerable. Re-running the capture
+instrument (`tools/capture_moments.gd`) does not reproduce them, because the game it photographs has
+changed; each one is a record of a world that no longer exists. That is the argument for versioning them
+rather than against it.
+
+> *(Corrected 2026-08-17: this sentence named `tools/sees.sh`, which has never existed in this repository —
+> zero tree entries, reachable or unreachable. The real instrument is `tools/capture_moments.gd`, whose own
+> header calls itself "The 'Sees' blind-vision instrument's renderer". A phantom tool was carrying the
+> load-bearing premise of a LOCKED decision, 120 lines below the note that repairs the same defect in a
+> different attestation.)*
 
 **Cost, recorded because git history is permanent:** ~237MB (`history/` 171MB, moments 66MB) onto a 53MB
 `.git`. There is no lossless win to take first — they are 8-bit RGB PNGs at 1920x1080, already near 3:1 —
