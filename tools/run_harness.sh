@@ -101,6 +101,17 @@
 # to the harness. Put the harness LAST, or grep the exit line out of the file, before saying anything.
 set -uo pipefail
 
+# THIS SCRIPT'S OWN CONTENT, CHECKSUMMED BEFORE IT DOES ANYTHING. Bash reads a script incrementally from a
+# byte offset, so editing this file while a sweep is in flight makes the running shell resume inside the
+# NEW text at the OLD offset. It does not crash cleanly; it produces a plausible error about something
+# else — a real run of mine died on `lock_claim: command not found` for a function that is defined a
+# hundred lines above its use, and the obvious reading was "the change I just made is broken". The change
+# was fine. The runner had been rewritten underneath it.
+#
+# Parallel work shares this repo and this file is edited from more than one place, so the hazard is not hypothetical and the
+# damage is not the crash — it is a sweep that finishes and gets believed. Checked again at exit; if the
+# bytes moved, the run says so in the summary, loudly, whatever its verdict was.
+SELF_SUM="$(cksum < "$0" 2>/dev/null || echo unknown)"
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -566,6 +577,14 @@ SENTINEL_ARMED=0
 
 harness_cleanup() {
 	local rc=$?
+	# See SELF_SUM. A runner that changed mid-flight produced a result from two different scripts.
+	if [ "$SELF_SUM" != "unknown" ] && [ "$(cksum < "$0" 2>/dev/null || echo unknown)" != "$SELF_SUM" ]; then
+		echo "!! THE RUNNER WAS EDITED WHILE THIS SWEEP WAS RUNNING — $0 changed between start and exit."
+		echo "   bash resumes an edited script at its old byte offset, so part of this run came from one"
+		echo "   version and part from another. WHATEVER THIS RUN REPORTED, IT IS NOT A RESULT. Re-run it."
+		[ -n "${DIR:-}" ] && [ -w "${DIR:-}/summary.txt" ] \
+			&& echo "!! THE RUNNER WAS EDITED MID-RUN — this is not a result, re-run it" >>"$DIR/summary.txt"
+	fi
 	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed
 	# further down. A run that never reached `verify` (Ctrl-C, a crash, an early exit on any of the codes
 	# above) has still left a marker at the player's REAL save path, and leaving it there is the one piece
