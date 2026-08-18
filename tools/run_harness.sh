@@ -101,6 +101,17 @@
 # to the harness. Put the harness LAST, or grep the exit line out of the file, before saying anything.
 set -uo pipefail
 
+# THIS SCRIPT'S OWN CONTENT, CHECKSUMMED BEFORE IT DOES ANYTHING. Bash reads a script incrementally from a
+# byte offset, so editing this file while a sweep is in flight makes the running shell resume inside the
+# NEW text at the OLD offset. It does not crash cleanly; it produces a plausible error about something
+# else — a real run of mine died on `lock_claim: command not found` for a function that is defined a
+# hundred lines above its use, and the obvious reading was "the change I just made is broken". The change
+# was fine. The runner had been rewritten underneath it.
+#
+# Parallel work shares this repo and this file is edited from more than one place, so the hazard is not hypothetical and the
+# damage is not the crash — it is a sweep that finishes and gets believed. Checked again at exit; if the
+# bytes moved, the run says so in the summary, loudly, whatever its verdict was.
+SELF_SUM="$(cksum < "$0" 2>/dev/null || echo unknown)"
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -380,6 +391,10 @@ add "check_controls"                  "res://tools/check_controls.gd"
 add "check_input_deafness (shutter)"  "res://tools/check_input_deafness.gd"
 add "check_seam_flood (same picture)" "res://tools/check_seam_flood.gd"
 add "check_paint_terms (per-texel)" "res://tools/check_paint_terms.gd"
+# A pure source scan — no scene, no display, no save. It reads scenes/ and src/ for fields the game
+# recomputes every frame and tools/ for fixtures that write one, which is the class that put ten menu
+# captures of a counter nobody was standing at into the archive.
+add "check_posed_fields (poses hold)" "res://tools/check_posed_fields.gd"
 add "check_casing_light (machines lit)" "res://tools/check_casing_light.gd"
 add "check_status_reads (every state)" "res://tools/check_status_reads.gd"
 # add_gl: its whole answer is pixels. check_status_reads asks whether the STATUS LAMP names the state and
@@ -393,7 +408,30 @@ add_gl "check_machine_state (running reads)" "res://tools/check_machine_state.gd
 add_gl "check_machine_identity (which box)" "res://tools/check_machine_identity.gd"
 # add_gl: `check_grapple` scores what the rope DOES and every number in it is a velocity; this one scores
 # what the rope LOOKS like, and none of its numbers exist without a surface to draw on.
-add_gl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"
+#
+# ...AND add_excl, WHICH IS NOT A TIMING CLAIM. This layer went red on 2 of 4 sweeps and green on every
+# standalone run of the same commit, which is the worst shape a layer has: an intermittent red that lands
+# on whoever's change happens to be in the tree. Measured rather than reasoned about — twelve concurrent
+# copies of it, five failed, all five on the same assertion:
+#
+#   a slack rope and a taut one are different pictures (4410..4604 px vs a 2845..4765 px clock baseline)
+#   the same three runs, alone:                        (4622..4748 px vs a    1..4    px clock baseline)
+#
+# **THE SIGNAL IS STABLE AND THE CONTROL IS NOT.** ~4400-4750 px of rope difference either way; the noise
+# floor it must clear goes from THREE pixels to four THOUSAND. That floor is two untouched captures
+# differenced, and the world's animation advances on `delta` — on wall time — while the fixture counts
+# frames between them. Contended, far more animation phase elapses per frame, and the layer's own estimate
+# of "how much moves when nothing is asked to move" grows until it swallows a signal that never moved.
+# A control that fails for the same reason as its subject says nothing; this one is worse, because it
+# fails HARDER than its subject and takes the assertion down with it.
+#
+# The other observed contention red — `the renderer's cursor is where the fixture put it (415..435 px off)`
+# on two sweeps — is NOT explained. It did not reproduce in twelve concurrent runs, the mouse warp lands at
+# 1.0 px with `window_is_focused=false` so it is not focus, and the camera-lerp story is two orders of
+# magnitude short of the number (and `main.gd:731` snaps rather than lerps the large jumps that could
+# produce it). **`add_excl` removes the condition, not the cause**, and that is worth saying out loud
+# because the layer will now be green without anybody having found out why it was not.
+add_excl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"
 add "check_tool_text (says=does)" "res://tools/check_tool_text.gd"
 add "check_binding_text (keys=jobs)" "res://tools/check_binding_text.gd"
 add "check_gamepad (playable on a pad)" "res://tools/check_gamepad.gd"
@@ -539,6 +577,14 @@ SENTINEL_ARMED=0
 
 harness_cleanup() {
 	local rc=$?
+	# See SELF_SUM. A runner that changed mid-flight produced a result from two different scripts.
+	if [ "$SELF_SUM" != "unknown" ] && [ "$(cksum < "$0" 2>/dev/null || echo unknown)" != "$SELF_SUM" ]; then
+		echo "!! THE RUNNER WAS EDITED WHILE THIS SWEEP WAS RUNNING — $0 changed between start and exit."
+		echo "   bash resumes an edited script at its old byte offset, so part of this run came from one"
+		echo "   version and part from another. WHATEVER THIS RUN REPORTED, IT IS NOT A RESULT. Re-run it."
+		[ -n "${DIR:-}" ] && [ -w "${DIR:-}/summary.txt" ] \
+			&& echo "!! THE RUNNER WAS EDITED MID-RUN — this is not a result, re-run it" >>"$DIR/summary.txt"
+	fi
 	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed
 	# further down. A run that never reached `verify` (Ctrl-C, a crash, an early exit on any of the codes
 	# above) has still left a marker at the player's REAL save path, and leaving it there is the one piece
@@ -581,6 +627,30 @@ subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_
 say "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total$subset, $mode, $strictness) =="
 say "   tree: $(pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  head: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
+# --- THE CLAIM FILE, shared in shape with tools/with_machine.sh. The lock used to say a pid and a tree
+# and the waiter printed only the pid, so "waiting for the harness lock (held by pid 65489)" required a
+# `ps` on another terminal to learn what was running and whether it was nearly done. A lock that makes you
+# go and look is a lock that gets overridden. Four lines: pid, tree, what is running, when it started.
+# Line 1 stays the pid and line 2 the tree because the stale-holder check is `head -1`; an owner file
+# written by an older copy simply has no lines 3-4 and the reader leaves those fields out.
+lock_claim_write() {
+	printf '%s\n%s\n%s\n%s\n' "$$" "$ROOT" "${1:-?}" "$(date +%s)" >"$LOCK/owner"
+}
+lock_claim() {
+	_p="$(sed -n 1p "$LOCK/owner" 2>/dev/null)"
+	_t="$(sed -n 2p "$LOCK/owner" 2>/dev/null)"
+	_w="$(sed -n 3p "$LOCK/owner" 2>/dev/null)"
+	_s="$(sed -n 4p "$LOCK/owner" 2>/dev/null)"
+	_msg="held by pid ${_p:-?}"
+	[ -n "$_w" ] && _msg="$_msg running ${_w}"
+	[ -n "$_t" ] && _msg="$_msg in $(basename "$_t")"
+	if [ -n "$_s" ]; then
+		_e=$(( $(date +%s) - _s ))
+		[ "$_e" -ge 0 ] && _msg="$_msg for ${_e}s"
+	fi
+	printf '%s' "$_msg"
+}
+
 # Take the machine-wide lock before anything touches user://. A run that was killed cannot release its own
 # lock, so a holder whose pid is gone gets cleared rather than being allowed to wedge every future run —
 # the cure must not be worse than the disease. SF_NO_LOCK=1 opts out for anyone who knows better.
@@ -588,7 +658,7 @@ if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 	waited=0
 	while true; do
 		if mkdir "$LOCK" 2>/dev/null; then
-			printf '%s\n%s\n' "$$" "$ROOT" >"$LOCK/owner"
+			lock_claim_write "the harness ($total layers, JOBS=$JOBS)"
 			LOCK_HELD=1
 			break
 		fi
@@ -605,11 +675,14 @@ if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 			continue
 		fi
 		if [ "$waited" -ge "$LOCK_WAIT" ]; then
-			echo "!! another harness has held $LOCK for ${waited}s (pid ${holder:-unknown}) — refusing to run"
+			# Two durations, and they are different questions: how long THIS run has waited, and how long
+			# the holder has held. Printing them as one number is how "held for 900s" got read as a wedged
+			# lock when it was a long layer that started ten seconds ago.
+			echo "!! refusing to run — $(lock_claim); this run waited ${waited}s"
 			echo "   concurrently, because both results would then be worthless. SF_NO_LOCK=1 overrides."
 			exit 5
 		fi
-		[ $((waited % 30)) -eq 0 ] && echo "  waiting for the harness lock (held by pid ${holder:-?}) ..."
+		[ $((waited % 30)) -eq 0 ] && echo "  waiting for the harness lock — $(lock_claim) ..."
 		sleep 2
 		waited=$((waited + 2))
 	done

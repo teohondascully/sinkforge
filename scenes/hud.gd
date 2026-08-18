@@ -40,7 +40,28 @@ const MINI_TOP: float = 34.0    ## minimap y (just under the FORGED counter)
 const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill
 const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
 const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → panels read as raised
-const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent (FORGED, selected slot, current step)
+## **GOLD NEVER LABELS AND NEVER COUNTS.** The first step of `MNU-06` ("reassign gold to a single semantic
+## meaning"), taken as a rule rather than as nine separate opinions, and deliberately the smallest step that
+## is a rule at all: the nine sites where the accent was pure INFORMATION — three headings, three headline
+## numbers, two mode chips and the off-screen-more mark — now draw in text colours. Gold is left on every
+## site where the player's input is connected to the thing: the selection, the verb that acts on it, the
+## next available research node, an engaged control.
+##
+## What this does NOT do is split the remaining twenty into named roles. Nine constants resolving to the
+## same gold would document the ambiguity and change nothing a player sees, and the pair a naive split
+## would separate — the selected row's spine and the button that acts on it — is the one place the doubling
+## CARRIES meaning. That is a design call and it is not this.
+##
+## GOLD, AND IT MEANT NINE THINGS. Counted from source rather than from this comment, which used to read
+## "(FORGED, selected slot, current step)" — three examples standing in for a definition, and the three it
+## happened to name are three DIFFERENT roles. Full enumeration with call sites in `docs/MENU_MATRIX.md`.
+## Eight of the nine are all "look here" and cost nothing but precision. The ninth was a contradiction: the
+## dashboard drew a machine's stalled count in it, so gold meant "something is wrong" on the one screen
+## where it also meant "this is the total you are producing" — see UI_WARN, which the game already had.
+const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selection, the live verb, the next step
+## The colour the alert stack has always used for a machine in trouble. Named so that the OTHER place which
+## reports the same fact can say it the same way, instead of reaching for the accent and inverting it.
+const UI_WARN := Color(0.96, 0.46, 0.30)
 const UI_TEXT := Color(0.80, 0.83, 0.89)
 const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
 const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
@@ -434,7 +455,7 @@ func _draw() -> void:
 		# do next — and pausing is exactly when a player stops to read it.
 		_panel(PAUSED_CHIP, true)
 		draw_string(_font, PAUSED_CHIP.position + Vector2(12.0, 15.0), "PAUSED (P)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
 	# The stratum plate is the one channel that means "stop, look" — so it does not fire over a menu, where
 	# there is nothing to look at and it prints straight through the price column. It is a transient; if you
@@ -583,7 +604,7 @@ func _draw_alerts() -> void:
 		var lit: bool = rect.has_point(mouse)
 		draw_rect(rect, Color(0.20, 0.11, 0.10, 0.95) if lit else Color(0.15, 0.09, 0.09, 0.92))
 		draw_rect(rect, Color(0.78, 0.40, 0.32, 0.7 if lit else 0.45), false, 1.0)
-		draw_rect(Rect2(x, y, 2.5, rh - 3.0), Color(0.96, 0.46, 0.30))          # the warning edge
+		draw_rect(Rect2(x, y, 2.5, rh - 3.0), UI_WARN)                          # the warning edge
 		var mdef: MachineDef = a["def"]
 		var box := Rect2(x + 6.0, y + 2.5, 13.0, 13.0)
 		draw_rect(box, Visuals.machine_color(mdef))
@@ -643,7 +664,7 @@ func _draw_depth() -> void:
 	_panel(chip)
 	var cy: float = chip.position.y + chip.size.y * 0.5
 	draw_string(_font, Vector2(chip.position.x + 12.0, cy + 6.0), label,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_TEXT)
 	draw_string(_font, Vector2(chip.position.x + 12.0 + lw + 10.0, cy + 5.0), band,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, tint)
 
@@ -777,7 +798,7 @@ func _draw_fastforward() -> void:
 	var chip := Rect2(10.0, 34.0, tw + 24.0, 22.0)   # under the depth chip, which owns the corner
 	_panel(chip, true)
 	draw_string(_font, chip.position + Vector2(12.0, 15.0), label,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 
 
 ## FORGED production chip (top-right): an ingot swatch + the lifetime ingot count, in a small panel —
@@ -804,7 +825,7 @@ func _draw_forged() -> void:
 	x += 14.0 + 8.0
 	draw_string(_font, Vector2(x, cy + 5.0), "FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT_DIM)
 	x += label_w + 8.0
-	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_ACCENT)
+	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_TEXT)
 
 
 ## How long a fresh step shows its full how-to line, how long that takes to fade, and how long you have
@@ -1777,6 +1798,59 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 		Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, id)
 
 
+## THE COUNTER HAS EXACTLY ONE VERB BUTTON, and until now it was drawn twice from two sets of numbers.
+##
+## It was never photographed live. `capture_moments` set `_hud.can_craft = true` and `main.gd:793`
+## recomputed it from `_near_bazaar()` before the shutter, so every menu capture in the archive shows the
+## dead branch of this if. The first frame ever taken with `ready` true read **`BUILDENTER`** — the key
+## hint starting four pixels after the verb's last stroke, at 10pt against 8pt, which is one word.
+##
+## `_detail_hold` drew the same construct with the hint hardcoded at `x + 58.0`, a ~20px gap, so the two
+## buttons in the same plate disagreed by a factor of five about how far apart a verb and its key sit. Both
+## numbers were guesses; only one of them was ever looked at.
+##
+## And the fixed 104px plate could not hold the longest verb this screen produces. RESEARCH is eight
+## tracked characters — the button was sized for BUY.
+##
+## So: one function, one gap constant, and a width that is DERIVED from the verb rather than asserted over
+## it. The button stays anchored to the plate's right edge, so growing it moves its left edge inward and
+## nothing downstream shifts. Returns the rect it drew, because the caller prints the precondition note
+## centred above it.
+const VERB_SIZE: int = 10
+const VERB_TRACK: float = 2.0
+const VERB_HINT_SIZE: int = 8
+const VERB_GAP: float = 14.0          ## verb ink → key hint. 4.0 was the shipped value and it read as one word.
+const VERB_PAD: float = 12.0          ## plate edge → ink, both ends
+const VERB_MIN_W: float = 104.0       ## BUY and BUILD keep the width the layout was drawn around
+const VERB_H: float = 24.0
+## How wide the button has to be for this verb. Separate from the drawing because the blurb beside it wraps
+## against the button's left edge, and a blurb that wraps against a guessed width runs under a real one.
+func _verb_button_w(verb: String, hint: String) -> float:
+	var hw: float = 0.0 if hint == "" else _font.get_string_size(
+		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE).x
+	return maxf(VERB_MIN_W, VERB_PAD * 2.0 + _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+		+ (0.0 if hint == "" else VERB_GAP + hw))
+
+
+func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
+	var vw: float = _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+	var w: float = _verb_button_w(verb, hint)
+	var btn := Rect2(box.end.x - w - 10.0, box.position.y + box.size.y - 34.0, w, VERB_H)
+	var ty: float = btn.position.y + 16.0
+	if live:
+		_round_rect(btn, 5.0, UI_ACCENT)
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
+			Color(0.08, 0.07, 0.04))
+		if hint != "":
+			draw_string(_font, Vector2(btn.position.x + VERB_PAD + vw + VERB_GAP, ty), hint,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE, Color(0.08, 0.07, 0.04, 0.62))
+	else:
+		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
+			Color(0.44, 0.46, 0.52))
+	return btn
+
+
 # --- the detail plate -----------------------------------------------------------------------------------
 
 ## THE DETAIL PLATE. The selected thing, drawn large under a lamp, with one sentence of what it is for, its
@@ -1835,7 +1909,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			verb = "RESEARCH"
 			ready = can_craft and _can_afford(cost) \
 				and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
-			note = "" if can_craft else "at a claimed Bazaar"
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, sample)
 	else:
 		var opts: Array[Dictionary] = craft_options if kind == "machine" else rack_options
 		var row: int = int(act.get("row", 0))
@@ -1851,7 +1925,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		else:
 			verb = "BUILD" if kind == "machine" else "BUY"
 			ready = can_craft and _can_afford(cost)
-			note = "" if can_craft else "at a claimed Bazaar"
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
 
 	# The lamp. Three rings behind the goods is the whole trick, and it is what makes a 44px glyph read as
 	# lit rather than as big.
@@ -1864,8 +1938,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
 
 	var tx: float = art.end.x + 14.0
-	var btn_w: float = 104.0
-	var text_w: float = box.end.x - tx - btn_w - 24.0
+	var text_w: float = box.end.x - tx - _verb_button_w(verb, "ENTER" if ready else "") - 24.0
 	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), blurb, HORIZONTAL_ALIGNMENT_LEFT,
 		text_w, 9, 2, UI_TEXT_DIM)
@@ -1876,20 +1949,36 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		var have: int = int(sim.inventory.get(item, 0))
 		cx = _detail_chip(Vector2(cx, box.position.y + 62.0), item, need, have) + 6.0
 
-	var btn := Rect2(box.end.x - btn_w - 10.0, box.position.y + box.size.y - 34.0, btn_w, 24.0)
-	if ready:
-		_round_rect(btn, 5.0, UI_ACCENT)
-		var vw: float = _tracked_w(verb, 10, 2.0)
-		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
-		draw_string(_font, Vector2(btn.position.x + 16.0 + vw, btn.position.y + 16.0), "ENTER",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
-	else:
-		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
-		_tracked(verb, Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.44, 0.46, 0.52))
+	var btn: Rect2 = _verb_button(box, verb, "ENTER" if ready else "", ready)
 	if note != "":
 		var nw: float = _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 		draw_string(_font, Vector2(btn.get_center().x - nw * 0.5, btn.position.y - 6.0), note,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.58, 0.48, 0.32))
+
+
+## WHY THE BUTTON IS DEAD, when the reason is the pack and not the place.
+##
+## The plate has always had a line for the precondition it cannot meet — "at a claimed Bazaar", "behind
+## Automation", "research Ironworks first" — and every one of those fires for a reason OUTSIDE the pack.
+## Stand at a counter you cannot afford anything at and the line was blank: a grey button, no sentence, and
+## a red numeral in a price chip as the only account of why nothing happens when you press ENTER.
+##
+## That gap was invisible for as long as the captures were, because a fixture standing away from the Bazaar
+## always took the "at a claimed Bazaar" branch — the one state where the note is never empty. **The screen
+## explained every blocker except the one a player actually hits.**
+##
+## Says the DEFICIT and not the price, because the price is already on the chips two lines up and repeating
+## it answers a question nobody asked. The sample material (a tech's analysis input) is a cost the chips do
+## NOT show, so it is named here or it is named nowhere.
+func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
+	var parts: PackedStringArray = []
+	for item: StringName in cost:
+		var gap: int = int(cost[item]) - int(sim.inventory.get(item, 0))
+		if gap > 0:
+			parts.append("%d %s" % [gap, _item_label(item)])
+	if sample != &"" and int(sim.inventory.get(sample, 0)) < 1:
+		parts.append("a sample of %s" % _item_label(sample))
+	return "" if parts.is_empty() else "short " + " · ".join(parts)
 
 
 ## A machine's display name if it is one, an item's label otherwise. The tech ladder names both.
@@ -1938,16 +2027,10 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 		"carrying %d   ·   %d gathered all told" % [carried, made],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
-	var btn := Rect2(box.end.x - 114.0, box.position.y + box.size.y - 34.0, 104.0, 24.0)
 	if row == held:
-		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
-		_tracked("IN HAND", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0,
-			Color(0.44, 0.46, 0.52))
+		_verb_button(box, "IN HAND", "", false)
 	else:
-		_round_rect(btn, 5.0, UI_ACCENT)
-		_tracked("HOLD", Vector2(btn.position.x + 12.0, btn.position.y + 16.0), 10, 2.0, Color(0.08, 0.07, 0.04))
-		draw_string(_font, Vector2(btn.position.x + 58.0, btn.position.y + 16.0), "ENTER",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.08, 0.07, 0.04, 0.62))
+		_verb_button(box, "HOLD", "ENTER", true)
 
 
 ## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
@@ -2203,7 +2286,7 @@ func _draw_dashboard_overlay() -> void:
 	var h: float = 238.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
-	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "PRODUCTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, origin + Vector2(w - 108.0, 21.0), "G / Esc to close",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	draw_line(origin + Vector2(206.0, 34.0), origin + Vector2(206.0, h - 12.0), UI_EDGE, 1.0)  # column rule
@@ -2218,7 +2301,7 @@ func _draw_dashboard_overlay() -> void:
 		top = maxf(top, float(r["rate"]))
 	draw_string(_font, Vector2(lx, origin.y + 48.0), "THROUGHPUT · last 60s",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
-	draw_string(_font, Vector2(lx, origin.y + 66.0), "%.1f" % grand, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI_ACCENT)
+	draw_string(_font, Vector2(lx, origin.y + 66.0), "%.1f" % grand, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI_TEXT)
 	draw_string(_font, Vector2(lx + 4.0 + _font.get_string_size("%.1f" % grand,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, origin.y + 66.0), "items/min",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
@@ -2259,8 +2342,13 @@ func _draw_dashboard_overlay() -> void:
 		draw_string(_font, Vector2(rx, origin.y + 84.0), "craft one (E), place it (RMB).",
 			HORIZONTAL_ALIGNMENT_LEFT, 160.0, 10, UI_TEXT_DIM)
 	else:
+		# THE SUMMARY IS GREEN WHEN IT IS TRUE, and it used to be green unconditionally. `0 working` sat in
+		# the healthy colour directly above a row flagging the same machines as stalled — the two lines
+		# describing one fact with opposite valence, one of which could not change. A colour that is the
+		# same for every value of the number beside it is not reporting the number.
+		var all_up: bool = working_m >= total_m and total_m > 0
 		draw_string(_font, Vector2(rx, origin.y + 63.0), "%d working" % working_m,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.78, 0.55))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.78, 0.55) if all_up else UI_WARN)
 		var y2: float = origin.y + 84.0
 		for i: int in mini(9, census.size()):
 			var row: Dictionary = census[i]
@@ -2270,10 +2358,15 @@ func _draw_dashboard_overlay() -> void:
 			Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
 				Visuals.machine_kind(mdef), box.size.y / 20.0, false, 0.0)
 			draw_string(_font, Vector2(rx + 20.0, y2), str(row["name"]), HORIZONTAL_ALIGNMENT_LEFT, 96.0, 9, UI_TEXT)
-			# count · working — green when all are running, amber when some are stalled
+			# count · working — green when all are running, the ALERT colour when some are stalled.
+			# This line used to say "amber when some are stalled" and draw UI_ACCENT, which is the colour
+			# this same panel uses for its heading and its grand total. A player who has learned that gold
+			# means "selected, available, yours" was being shown a fault in it, two rows under a gold number
+			# that means the opposite. The left-edge alert stack already reports this exact fact — the same
+			# machines, from `sim.machine_problems()` — in UI_WARN. Now both say it the same way.
 			var cnt: int = int(row["count"])
 			var wrk: int = int(row["working"])
-			var stat_col: Color = Color(0.55, 0.78, 0.55) if wrk == cnt else UI_ACCENT
+			var stat_col: Color = Color(0.55, 0.78, 0.55) if wrk == cnt else UI_WARN
 			draw_string(_font, Vector2(rx + 118.0, y2), "%d" % cnt, HORIZONTAL_ALIGNMENT_RIGHT, 24.0, 10, UI_TEXT)
 			draw_string(_font, Vector2(rx + 144.0, y2), "%d▸" % wrk, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, stat_col)
 			y2 += 16.6
@@ -2347,7 +2440,7 @@ func _draw_help_overlay() -> void:
 	var h: float = 30.0 + float(half) * 16.0 + 10.0
 	var origin := Vector2((CANVAS.x - w) * 0.5, (CANVAS.y - h) * 0.5)
 	_panel(Rect2(origin, Vector2(w, h)), true)
-	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+	draw_string(_font, origin + Vector2(14.0, 22.0), "CONTROLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	for i: int in lines.size():
 		var col: int = i / half
 		var row: int = i % half
@@ -2403,7 +2496,7 @@ func _draw_settings_overlay() -> void:
 	draw_rect(panel, Color(UI_BG.r, UI_BG.g, UI_BG.b, 1.0))
 	_panel(panel, true)
 	draw_string(_font, panel.position + Vector2(16.0, 24.0), "SETTINGS",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_ACCENT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI_TEXT_DIM)
 	draw_string(_font, panel.position + Vector2(panel.size.x - 78.0, 24.0), "ESC closes",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 	var mouse: Vector2 = get_viewport().get_mouse_position()
@@ -2691,7 +2784,7 @@ func _draw_inventory() -> void:
 ## the window is actually hiding something in that direction. Dim on purpose — it is a hint that the bar is
 ## a view, not a control, and nothing about it is clickable.
 func _more_mark(at: Vector2, dir: float) -> void:
-	var col := Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.55)
+	var col := Color(UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 0.55)
 	draw_line(at + Vector2(-3.0 * dir, -5.0), at + Vector2(2.0 * dir, 0.0), col, 1.5)
 	draw_line(at + Vector2(2.0 * dir, 0.0), at + Vector2(-3.0 * dir, 5.0), col, 1.5)
 

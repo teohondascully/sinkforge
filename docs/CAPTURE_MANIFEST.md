@@ -17,9 +17,10 @@ A recipe invented to fill that column would be worse than a blank one, because i
 |---|---|---|---|
 | `adit` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- adit` |
 | `aim` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- aim` |
-| `bench` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- bench` |
+| `bench` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench` |
 | `bench_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- bench_fresh` |
-| `bench_full` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- bench_full` |
+| `bench_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench_full` |
+| `bench_next` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench_next` |
 | `bench_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_bench.png <crop UNRECORDED>` |
 | `bend` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- bend` |
 | `boot` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- boot` |
@@ -30,7 +31,8 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `boot_z2` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- boot 2` |
 | `boot_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_boot.png <crop UNRECORDED>` |
 | `chain` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- chain` |
-| `counter` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- counter` |
+| `counter` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- counter` |
+| `dashboard` | 2026-08-18 04:58 | `4ac6a5416a` | `capture_moments.gd -- dashboard` |
 | `delve` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- delve` |
 | `delve_after` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
 | `delve_z1` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- delve 1` |
@@ -48,8 +50,9 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `mouth` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- mouth` |
 | `pack` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- pack` |
 | `pack_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- pack_fresh` |
-| `pack_full` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- pack_full` |
+| `pack_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- pack_full` |
 | `plunge` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- plunge` |
+| `quiet` | 2026-08-18 04:58 | `4ac6a5416a` | `capture_moments.gd -- quiet` |
 | `refuse` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- refuse` |
 | `room` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- room` |
 | `room_after` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
@@ -60,16 +63,17 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `stain` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- stain` |
 | `swing` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- swing` |
 | `swing_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_swing.png <crop UNRECORDED>` |
-| `works` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- works` |
+| `works` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works` |
 | `works_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_fresh` |
-| `works_full` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_full` |
-| `works_short` | 2026-08-18 03:44 | `66090e4d89` | `capture_moments.gd -- works_short` |
+| `works_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works_full` |
+| `works_short` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works_short` |
 
 ## Cohorts
 
-- `9aa816436b` — 41 frames
-- `9f26ff4788` — 7 frames
-- `66090e4d89` — 1 frames
+- `9aa816436b` — 38 frames
+- `f9d47ba9d0` — 8 frames
+- `9f26ff4788` — 4 frames
+- `4ac6a5416a` — 2 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
 permitted and described rather than forbidden: re-shooting is not available for every frame, so
