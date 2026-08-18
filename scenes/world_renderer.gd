@@ -272,6 +272,7 @@ var _crystal_seams_cache: Array[Dictionary] = []
 var _crystal_seams_valid: bool = false
 var _crystal_seams_view: Rect2 = Rect2()
 var _lights: LightLayer
+var _tooth: LightLayer                                 ## post-veil rock tooth (rock_tooth.gdshader)
 var _haze: LightLayer      ## the shared DISTORTION pass (#20) — heat shimmer now, water/L4 later
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells (surface life #15); rebuilt on terrain change
 var _leaf_cache_dirty: bool = true
@@ -379,6 +380,17 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_lights = LightLayer.new()
 	_lights.setup(51, _paint_lights, CanvasItemMaterial.BLEND_MODE_ADD)
 	add_child(_lights)
+	# ...and the tooth AGAIN, above the veil, because below it there is no tooth at all. rock_grit paints
+	# into the terrain layer at z=-9 and `_dark` MULTIPLIES at z=50, so its additive floor — the one written
+	# "so rock that the veil has taken most of the way down still has something in it" — is scaled by the
+	# very factor that made the rock dark. See scenes/rock_tooth.gdshader; measured by check_rock_reads.
+	_tooth = LightLayer.new()
+	_tooth.setup(52, _paint_fine_terrain)
+	_tooth.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var tooth_mat := ShaderMaterial.new()
+	tooth_mat.shader = load("res://scenes/rock_tooth.gdshader")
+	_tooth.material = tooth_mat
+	add_child(_tooth)
 	# THE DISTORTION PASS: one shared screen-warp shader; consumers draw masked quads.
 	# Proven here on machine heat-haze. Sits ABOVE the world + veil but UNDER the additive light pools
 	# (hot air bends the scene, lamplight stays crisp).

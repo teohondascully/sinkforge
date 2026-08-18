@@ -204,7 +204,12 @@ func _wall_interior(fine: FineTerrain, data: PackedByteArray, solid: PackedByteA
 				return false
 			if solid[y * fcols + x] == 1:
 				return false
-			if data[(y * fcols + x) * 4 + 3] != 255:
+			# A WALL CELL IS NOW NAMED, NOT INFERRED. This read `!= 255`, which meant "opaque" — true of
+			# solid rock as well, so it leaned on the two neighbouring tests to exclude rock and would have
+			# been silently wrong if either changed. `FineTerrain` now stamps air-with-something-behind-it
+			# with VOID_ALPHA so the tooth pass can mask on it (rock_grit spent its life texturing the void
+			# because opacity was the only signal available); this asks for that mark directly.
+			if data[(y * fcols + x) * 4 + 3] != FineTerrain.VOID_ALPHA:
 				return false
 			if fine._solid_mask[(y / sub) * fine._cols + (x / sub)] > 0.5:
 				return false

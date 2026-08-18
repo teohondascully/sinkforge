@@ -45,7 +45,12 @@ void vertex() {
 // squares the value, which is not a subtle bug: it darkened the whole world to 0.4x and took a while to
 // pin down precisely because an inert version of this shader did it too. Only ever MODULATE what is here.
 void fragment() {
-	float solid = step(0.004, COLOR.a);   // air gets none of this; no branch, no early return
+	// SOLID ROCK ONLY, and this used to be step(0.004, COLOR.a) — which is true of the VOID as well,
+	// because fine_terrain paints the back wall opaque and clears only the sky. So this pass spent its
+	// life putting rock's tooth on the air, and the two came out equally textured: measured air grain
+	// 2.06 against rock 1.83, the void slightly rougher than the material. fine_terrain now stamps air
+	// with VOID_ALPHA (254), one level below solid, so the mask has something true to read.
+	float solid = step(0.998, COLOR.a);   // air gets none of this; no branch, no early return
 	float tooth = (hash(floor(world_pos)) - 0.5) * solid;
 	float mottle = (hash(floor(world_pos / mottle_scale) + 17.0) - 0.5) * solid;
 	float k = 1.0 + tooth * 2.0 * grit_mul + mottle * 2.0 * mottle_mul;

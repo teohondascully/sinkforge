@@ -220,6 +220,18 @@ const WALL_AO_MAX: float = 0.74                        ## a corner stacks three 
 ## The wall is a DISTANT plane, so its texture is deliberately quieter than the foreground's. Matching the
 ## front rock's grain amplitude here would collapse the depth cue the recess exists to create: two surfaces
 ## at the same visual roughness read as one surface.
+## THE VOID IS OPAQUE TOO, AND THAT BROKE THE ONE MASK THAT MATTERED. `rock_grit.gdshader` is titled
+## "SUB-CELL TOOTH FOR THE ROCK" and says "air gets none of this", masking with `step(0.004, COLOR.a)`.
+## But only the SKY is cleared here — both void branches (the back wall you have dug into, and the wall
+## behind a foreground shelf) write alpha 255 exactly like solid rock. So the tooth written to make rock
+## read as rock has been applied to the void at equal strength for its whole life, and the measurement
+## says so: air's local grain is 2.06 against rock's 1.83. **The void is textured slightly MORE than the
+## material.** That is not a tuning problem and no amplitude fixes it — texturing both equally cannot
+## separate them by construction.
+##
+## One level of alpha, invisible at 254/255 on an opaque layer, gives the pass something true to mask on.
+const VOID_ALPHA: int = 254
+
 const WALL_GRAIN: float = 0.055
 const WALL_PATCH: float = 0.11
 
@@ -839,7 +851,7 @@ func _paint_fine(fx: int, fy: int) -> void:
 		_data[i4] = int(clampf(wc.r * back_ao, 0.0, 1.0) * 255.0)
 		_data[i4 + 1] = int(clampf(wc.g * back_ao, 0.0, 1.0) * 255.0)
 		_data[i4 + 2] = int(clampf(wc.b * back_ao, 0.0, 1.0) * 255.0)
-		_data[i4 + 3] = 255
+		_data[i4 + 3] = VOID_ALPHA   # NOT 255: this is air, and the tooth pass masks on it
 	elif _wall_has[cidx] == 1:
 		# #S13 THE BACK WALL. Genuine open air, but the coarse cell carries a wall — so this is the inside
 		# of something you have dug, and it is most of what is on screen once you have. Painted here rather
@@ -854,7 +866,7 @@ func _paint_fine(fx: int, fy: int) -> void:
 		_data[i4] = int(clampf(wout.r, 0.0, 1.0) * 255.0)
 		_data[i4 + 1] = int(clampf(wout.g, 0.0, 1.0) * 255.0)
 		_data[i4 + 2] = int(clampf(wout.b, 0.0, 1.0) * 255.0)
-		_data[i4 + 3] = 255
+		_data[i4 + 3] = VOID_ALPHA   # NOT 255: this is air, and the tooth pass masks on it
 	else:
 		_clear_fine(i4)   # genuine open air with nothing behind it (the sky) — transparent
 
