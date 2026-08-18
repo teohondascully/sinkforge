@@ -68,6 +68,32 @@ const ROOM_W: int = 41
 const ROOM_H: int = 7
 const MIN_DELVE: int = 24
 
+## THE ORIENTATION MIX IS MANUFACTURED, AND THAT IS STATED RATHER THAN HIDDEN.
+##
+## A single rectangular chamber yields side walls in abundance and few horizontal faces — 69 / 25 / 21 for
+## SIDE / TOP / UNDER — because its shape decides the mix. That is an accident of the fixture, not a
+## property of the world, and it left two of the three arms under the 40-sample floor while a verdict was
+## proposed that needed all three.
+##
+## So the fixture now carves STACKED GALLERIES below the chamber. Each one adds a floor (a sky-facing rock
+## face) and a ceiling (an underside) the full width of the gallery, and each sits further from the lamp
+## than the last, so the faces land outside the light rather than inside it.
+##
+## What this does NOT do is make the mix representative. A real world's ratio of ceilings to walls is
+## whatever the caves and strata produce; this is a laboratory specimen cut to expose all three surfaces.
+## That is legitimate for asking "does the renderer treat a ceiling differently from a wall" and it is NOT
+## evidence about how often a player meets each. Any claim from this layer is about the TREATMENT of an
+## orientation, never about its frequency.
+## WIDER RATHER THAN DEEPER, and the reason is a measurement rather than a preference. The first galleries
+## at drops 5 and 10 lifted TOP 25 -> 36 and UNDER 21 -> 34, still short of 40, with 600+ contacts thrown
+## out as off-slab. The binding constraint is not depth, it is the JUDGED SLAB: HUD_TOP/HUD_BOTTOM crop 16%
+## and 20% off the frame, so of ~39 visible rows only the middle band is judgeable and a third gallery
+## lower down would fall entirely outside it. Horizontal extent has no such crop — only the patch bounds —
+## so the galleries grow sideways, where the lamp's 9-cell cut also stops mattering fastest.
+const GALLERY_W: int = 55
+const GALLERY_H: int = 3
+const GALLERY_DROPS: Array[int] = [4, 9]    ## rows below the body, both kept inside the judged slab
+
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
 const SURFACE_CLEAR: int = 20
@@ -228,6 +254,23 @@ func _run() -> void:
 		print("    %-22s n=%3d  step %5.2f  polarity %3.0f%%%s"
 			% [ORIENT_NAME[o], sg.size(), _median(st), _consistency(sg) * 100.0,
 				"" if sg.size() >= MIN_SAMPLES else "   [below the %d floor — no conclusion]" % MIN_SAMPLES])
+
+	# FIXTURE REACH IS ASSERTED, NOT NOTED. An arm below the floor used to print a warning and carry on,
+	# which is how an under-sampled orientation ends up sitting quietly beneath a verdict that needs it.
+	# The distinction this preserves is the one that matters: a fixture that did not expose a surface is a
+	# FIXTURE failure, and it must not be reported in the same voice as a finding about the renderer.
+	var short: Array[String] = []
+	for o: int in 3:
+		var sg: Array[float] = sor[o]
+		_check(sg.size() >= MIN_SAMPLES, "fixture reach: %s exposed %d judged contacts (floor %d)"
+			% [ORIENT_NAME[o], sg.size(), MIN_SAMPLES])
+		if sg.size() < MIN_SAMPLES:
+			short.append("%s %d/%d" % [ORIENT_NAME[o], sg.size(), MIN_SAMPLES])
+	if not short.is_empty():
+		printerr("check_contact_edge: FIXTURE REACH FAILURE — %s." % ", ".join(short))
+		printerr("  The carved geometry did not expose enough of these surfaces OUTSIDE the lamp. This is the"
+			+ " fixture failing to present its subject, NOT a verdict on how the renderer treats it, and the"
+			+ " per-orientation numbers above must not be read as one.")
 
 	# THE STAINED ARM, REPORTED SEPARATELY AND NEVER FOLDED IN. Pre-registered above. If these two disagree
 	# it means ore tell is carrying legibility that plain rock does not have, which is a finding about what
@@ -542,6 +585,16 @@ func _delve(main: MainView) -> int:
 		for dx: int in range(ROOM_W):
 			main.sim.mine(Vector2i(left + dx, c.y + dy))
 		await physics_frame
+	# The galleries. Carved AFTER the chamber so the chamber still frames the camera, and separated by
+	# GALLERY_DROPS - GALLERY_H rows of intact rock, which is what supplies the ceiling/floor pairs.
+	for drop: int in GALLERY_DROPS:
+		for dy: int in GALLERY_H:
+			var row: int = c.y + drop + dy
+			if row >= FactorySim.GRID_ROWS - 2:
+				continue
+			for dx: int in GALLERY_W:
+				main.sim.mine(Vector2i(c.x - GALLERY_W / 2 + dx, row))
+			await physics_frame
 	main._renderer.repaint_world()
 	for _i: int in 30:
 		await physics_frame
