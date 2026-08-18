@@ -57,7 +57,18 @@ const TORCH_EVERY: int = 2     ## columns between torches along the corridor
 ## Two cells across (~96 px, ~8 fine cells) sits under the feature scale and above the pixel scale. It is
 ## deliberately NOT larger: the broad tonal patch field runs at ~22 fine cells and is global, so a window
 ## wide enough to average that in would dilute the material's own signal with the world's.
-const WIN_CELLS: float = 2.0   ## window diameter in coarse cells
+## THE WINDOW IS WIDE AND SHALLOW BECAUSE THE VISIBLE REGION IS. Torchlight reaches about two cells into
+## a rock face, so the only rock whose material a player ever sees is a thin skin behind whatever they
+## have just dug — while a grain feature spans ~11 fine cells, which is 2.75 coarse cells. **The texture's
+## features are larger than the band in which they can be seen**, and that is a finding about the grammar's
+## scale rather than about the rig: a square window big enough to contain a feature necessarily reaches
+## into rock nobody can see, which is how the first lit band ended up at 11 of 32 windows.
+##
+## So the window is 4 cells across and 2 deep — wide enough horizontally to contain a feature, shallow
+## enough vertically to stay inside the lit skin. Matching the sampling shape to the shape of the region
+## the question is about, rather than to the shape of the thing being measured.
+const WIN_W: float = 4.0       ## window width in coarse cells — spans a grain feature
+const WIN_H: float = 2.0       ## window height in coarse cells — stays inside the torch-lit skin
 const MIN_SAMPLES: int = 30    ## a ratio over a handful of windows is not a small result, it is no result
 ## Every Nth pixel, both axes. The window is 193px across and the finest thing in it is a 12px fine cell,
 ## so a 3px lattice is still four samples per fine cell — nowhere near the structure being measured. The
@@ -205,7 +216,8 @@ func _measure(main: MainView, left: StringName, right: StringName, label: String
 	var to_px: Transform2D = main.get_viewport().get_final_transform() \
 		* main.get_viewport().get_canvas_transform()
 	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
-	var r: int = int(cell_px * WIN_CELLS * 0.5)
+	var rx: int = int(cell_px * WIN_W * 0.5)
+	var ry: int = int(cell_px * WIN_H * 0.5)
 
 	var out: Dictionary = {"l_value": [] as Array[float], "r_value": [] as Array[float],
 		"l_chroma": [] as Array[float], "r_chroma": [] as Array[float],
@@ -216,29 +228,30 @@ func _measure(main: MainView, left: StringName, right: StringName, label: String
 	# two populations are matched on distance from the lamp and on depth. An unmatched sample would let a
 	# lighting gradient masquerade as a material difference, which is precisely what the null rig would
 	# then fail to catch — the null and the mirroring guard the same hole from two sides.
-	var half_cells: int = int(ceil(WIN_CELLS * 0.5))
+	var half_x: int = int(ceil(WIN_W * 0.5))
+	var half_y: int = int(ceil(WIN_H * 0.5))
 	for dy: int in range(-HALF_H, HALF_H + 1, STRIDE):
 		# The corridor, its rim band, AND a window radius clear of both — a window centred one cell from
 		# the corridor still reaches into it, and carved-edge AO is not a material property.
-		if absi(dy) <= CORRIDOR + 1 + half_cells:
+		if absi(dy) <= CORRIDOR + half_y:
 			continue
-		if absi(dy) + half_cells > HALF_H:
+		if absi(dy) + half_y > HALF_H:
 			continue
-		for dx: int in range(GAP + half_cells, HALF_W + 1 - half_cells, STRIDE):
+		for dx: int in range(GAP + half_x, HALF_W + 1 - half_x, STRIDE):
 			var lc := Vector2i(cx - dx, cy + dy)
 			var rc := Vector2i(cx + dx, cy + dy)
-			if not _solid_around(sim, lc, half_cells) or not _solid_around(sim, rc, half_cells):
+			if not _solid_around(sim, lc, half_x, half_y) or not _solid_around(sim, rc, half_x, half_y):
 				continue
 			var lp: Vector2 = to_px * main._cell_center(lc)
 			var rp: Vector2 = to_px * main._cell_center(rc)
-			if not _inside(img, lp, r) or not _inside(img, rp, r):
+			if not _inside(img, lp, rx, ry) or not _inside(img, rp, rx, ry):
 				continue
-			_take(out, "l", data, iw, int(lp.x), int(lp.y), r)
-			_take(out, "r", data, iw, int(rp.x), int(rp.y), r)
+			_take(out, "l", data, iw, int(lp.x), int(lp.y), rx, ry)
+			_take(out, "r", data, iw, int(rp.x), int(rp.y), rx, ry)
 
 	var lv: Array[float] = out["l_value"]
 	var n: int = lv.size()
-	print("  %s — %d mirrored windows sampled at radius %dpx (cell %.1fpx, window %.1f cells)" % [label, n, r, cell_px, WIN_CELLS])
+	print("  %s — %d mirrored windows, %.0fx%.0f cells (cell %.1fpx)" % [label, n, WIN_W, WIN_H, cell_px])
 	_check(n >= MIN_SAMPLES,
 		"  %s found %d pairs to judge (floor %d)" % [label, n, MIN_SAMPLES])
 
@@ -277,22 +290,23 @@ func _measure(main: MainView, left: StringName, right: StringName, label: String
 
 ## Every coarse cell the window covers must be solid, or the window is measuring air and rim as if they
 ## were the material's own texture.
-func _solid_around(sim: FactorySim, c: Vector2i, rad: int) -> bool:
-	for y: int in range(c.y - rad, c.y + rad + 1):
-		for x: int in range(c.x - rad, c.x + rad + 1):
+func _solid_around(sim: FactorySim, c: Vector2i, hx: int, hy: int) -> bool:
+	for y: int in range(c.y - hy, c.y + hy + 1):
+		for x: int in range(c.x - hx, c.x + hx + 1):
 			if not sim.is_solid(Vector2i(x, y)):
 				return false
 	return true
 
 
-func _inside(img: Image, p: Vector2, r: int) -> bool:
+func _inside(img: Image, p: Vector2, rx: int, ry: int) -> bool:
 	var s: Vector2i = img.get_size()
-	return p.x > float(r + STEP + 1) and p.y > float(r + STEP + 1) \
-		and p.x < float(s.x - r - STEP - 2) and p.y < float(s.y - r - STEP - 2)
+	return p.x > float(rx + STEP + 1) and p.y > float(ry + STEP + 1) \
+		and p.x < float(s.x - rx - STEP - 2) and p.y < float(s.y - ry - STEP - 2)
 
 
-func _take(out: Dictionary, side: String, d: PackedByteArray, w: int, x: int, y: int, r: int) -> void:
-	var m: Dictionary = _window(d, w, x, y, r)
+func _take(out: Dictionary, side: String, d: PackedByteArray, w: int, x: int, y: int,
+		rx: int, ry: int) -> void:
+	var m: Dictionary = _window(d, w, x, y, rx, ry)
 	(out[side + "_value"] as Array[float]).append(float(m["mean"]))
 	(out[side + "_chroma"] as Array[float]).append(float(m["chroma"]))
 	# COEFFICIENT OF VARIATION, not standard deviation — see the header. Multiplicative grain makes raw
@@ -304,16 +318,16 @@ func _take(out: Dictionary, side: String, d: PackedByteArray, w: int, x: int, y:
 ## All four descriptors in ONE walk of the window. Kept fused rather than split into readable helpers
 ## because three separate walks is what put this layer over a ten-minute timeout; the cost is real and the
 ## arithmetic is not complicated enough to need the separation.
-func _window(d: PackedByteArray, w: int, cx: int, cy: int, r: int) -> Dictionary:
+func _window(d: PackedByteArray, w: int, cx: int, cy: int, rx: int, ry: int) -> Dictionary:
 	var n: int = 0
 	var sum: float = 0.0
 	var sum2: float = 0.0
 	var chroma: float = 0.0
 	var gh: float = 0.0
 	var gv: float = 0.0
-	for y: int in range(cy - r, cy + r + 1, STEP):
+	for y: int in range(cy - ry, cy + ry + 1, STEP):
 		var row: int = y * w
-		for x: int in range(cx - r, cx + r + 1, STEP):
+		for x: int in range(cx - rx, cx + rx + 1, STEP):
 			var i: int = (row + x) * 4
 			var rr: float = float(d[i])
 			var bb: float = float(d[i + 2])
