@@ -175,10 +175,17 @@ func _run() -> void:
 		# three-arm match in the renderer that nothing checks against that vocabulary. **If a machine's
 		# pixels do not change, the first question is whether the renderer was ever told to change them**,
 		# and answering that from the outside is guesswork.
-		var live_work: bool = _main._renderer._machine_active(m)
+		var flash_work: bool = _main._renderer._machine_active(m)
 		var a0: PackedFloat32Array = await _luma_patch()
 		for _i: int in STEADY_FRAMES:
 			await physics_frame
+		# SAMPLED WITH `a1`, AND THE FIRST VERSION SAMPLED IT WITH `a0` — the same shutter error as the
+		# ignition flare, made twice, because I fixed it for the pixels and not for the predicate beside
+		# them. The Generator reported `OFF` at the working state on every run: `_status_generator` calls a
+		# machine working the moment it HOLDS coal, while `_machine_active` asks whether it is BURNING
+		# (`fuel > 0`), and the tick that converts one into the other had not run yet at the flip. Both
+		# samples are kept, because the gap between them is the only evidence of which of the two happened.
+		var live_work: bool = _main._renderer._machine_active(m)
 		var a1: PackedFloat32Array = await _luma_patch()
 		_dump("%s_work" % String(spec["name"]).to_lower().replace(" ", "_"))
 		for _i: int in PHASE_FRAMES:
@@ -202,7 +209,7 @@ func _run() -> void:
 			continue
 		var live_stop: bool = _main._renderer._machine_active(m)
 		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "i1": i1,
-			"live_work": live_work, "live_stop": live_stop,
+			"live_work": live_work, "live_stop": live_stop, "flash_work": flash_work,
 			"status": String(sim.machine_status(m)), "stopped": stopped})
 		sim.remove_machine(STAGE)
 		for _i: int in 6:
@@ -361,7 +368,8 @@ func _report(rows: Array[Dictionary]) -> void:
 	var weak: Array[String] = []
 	var blind: Array[String] = []
 	var clipped: Array[String] = []
-	var never_told: Array[String] = []
+	var disagrees: Array[String] = []
+	var lagged: Array[String] = []
 	for r: Dictionary in rows:
 		var a1: PackedFloat32Array = r["a1"]
 		var a2: PackedFloat32Array = r["a2"]
@@ -382,15 +390,33 @@ func _report(rows: Array[Dictionary]) -> void:
 		var ok: bool = d_state > d_motion * MOTION_MARGIN and d_state >= MIN_STATE_LEVELS
 		if not ok:
 			weak.append("%s (state %.1f vs motion %.1f)" % [r["name"], d_state, d_motion])
-		var told: String = "%s->%s" % ["on" if r["live_work"] else "OFF", "on" if r["live_stop"] else "off"]
-		if bool(r["live_work"]) and bool(r["live_stop"]):
-			never_told.append("%s (renderer sees it as running in BOTH states)" % r["name"])
+		var told: String = "%s->%s" % ["on" if r["live_work"] else "OFF",
+			"ON" if r["live_stop"] else "off"]
+		# TWO PREDICATES FOR ONE QUESTION, AND NOTHING IN THE REPOSITORY MADE THEM AGREE. The sim answers
+		# with `machine_status` — ten words, guarded by check_status_reads — and the renderer draws from
+		# `_machine_active`, a three-arm match whose default arm (`_held > 0 or progress > 0`) is a GUESS
+		# about every behaviour added after it was written. A new machine kind that the sim calls working
+		# and the default arm calls idle would ship dark and nothing would notice. It is asserted here, at
+		# steady state, in both directions.
+		if not bool(r["live_work"]):
+			disagrees.append("%s (sim says working, renderer says idle)" % r["name"])
+		if bool(r["live_stop"]):
+			disagrees.append("%s (sim says %s, renderer says running)" % [r["name"], r["status"]])
+		if bool(r["flash_work"]) != bool(r["live_work"]):
+			lagged.append("%s (%s at the flip, %s once settled)"
+				% [r["name"], "on" if r["flash_work"] else "off",
+					"on" if r["live_work"] else "off"])
 		print("    %-11s %8.1f %8.1f %8.1f %9.2f %9.2f %6.0f%% %6.0f%% %8s   %s"
 			% [r["name"], _mean(flare), _mean(a1), _mean(i1), d_motion, d_state,
 				flare_share * 100.0, share * 100.0, told, "reads" if ok else "DOES NOT READ"])
-	_check(never_told.is_empty(),
-		"the renderer is TOLD about every state change it is expected to draw%s"
-			% ("" if never_told.is_empty() else " — NOT TOLD: " + ", ".join(never_told)))
+	if not lagged.is_empty():
+		# REPORTED, NOT FAILED. A one-tick lag between "holds coal" and "is burning it" is 50ms of a
+		# generator drawn cold, which no eye resolves — but it is exactly the shape a real desync would
+		# take, so it is printed every run rather than smoothed away.
+		print("    settling lag (not a failure): " + ", ".join(lagged))
+	_check(disagrees.is_empty(),
+		"the renderer's `_machine_active` and the sim's `machine_status` agree once both have settled%s"
+			% ("" if disagrees.is_empty() else " — DISAGREE: " + ", ".join(disagrees)))
 	_check(clipped.is_empty(),
 		"no subject's working frame is clipped white, which would hide any cue it has%s"
 			% ("" if clipped.is_empty() else " — SATURATED: " + ", ".join(clipped)))
