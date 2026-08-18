@@ -824,13 +824,21 @@ func _fit_text(text: String, size: int, max_w: float) -> String:
 static var probing: bool = false
 static var panel_probe: Array[Rect2]
 
-## The hotbar, measured the same way and for the same reason — except this one counts WELLS THE LOOP
-## ACTUALLY DREW rather than the `n` the loop was given, because the interesting failure is exactly the
-## case where those two disagree. Keys: carried (how many item types the pack holds), wells (how many got
-## a box), sel (the active index), sel_lit (did any DRAWN well light up as the selection), window (the pack
-## index the first well shows), backing (the framed rect), label (the selected item's name plate, or a zero
-## Rect2 when none was drawn). The bar's
-## early returns leave it untouched, so an empty probe under `probing` means "the bar did not draw".
+## The hotbar, measured the same way and for the same reason. It reports RECTANGLES, and the first version
+## of it reported a COUNT — which was worth exactly nothing. `wells += 1` sat unconditionally inside `for k
+## in n`, so the count could only ever equal `n`, which is `clampi(carried, 1, INVENTORY_SLOTS)`, which is
+## arithmetic. Three assertions downstream compared it against numbers that were therefore already decided
+## the moment `carried` was set, under a docstring claiming it caught "the case where those two disagree".
+## They cannot disagree. Written, ironically, in the commit that fixed a different guard for being unable
+## to be false.
+##
+## Geometry can disagree. Had `sx` been derived from the PACK index rather than the window slot — the exact
+## sibling of the name-plate bug this probe exists to catch — the wells would have marched off the end of
+## their own backing and off the canvas, and no count would have moved. Keys: carried (item types held),
+## wells (the slot rect of every well drawn, in draw order), sel (the active index), sel_lit (did any DRAWN
+## well light up as the selection), window (the pack index the first well shows), backing (the framed
+## rect), label (the selected item's name plate, or a zero Rect2 when none was drawn). The bar's early
+## returns leave it untouched, so an empty probe under `probing` means "the bar did not draw".
 static var hotbar_probe: Dictionary
 
 
@@ -2391,14 +2399,14 @@ func _draw_inventory() -> void:
 	# in the E screen). Keeps the bar reading as one deliberate unit, not floating slots.
 	var backing := Rect2(x0 - 8.0, y - 7.0, total_w + 16.0, SLOT + 14.0)
 	_panel(backing, true)
-	var wells: int = 0
+	var wells: Array[Rect2] = []
 	var sel_lit: bool = false
 	for k: int in n:
 		var i: int = w0 + k                                      # window slot -> the pack index it shows
 		var sx: float = x0 + float(k) * (SLOT + SLOT_GAP)
 		var slot_rect := Rect2(sx, y, SLOT, SLOT)
 		var active: bool = i == sel
-		wells += 1
+		wells.append(slot_rect)
 		sel_lit = sel_lit or active
 		if i < slots.size() and slot_rect.has_point(get_viewport().get_mouse_position()):
 			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip

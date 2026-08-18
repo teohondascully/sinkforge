@@ -500,9 +500,12 @@ func _check_pack_window() -> void:
 
 	# A control pack that FITS. Everything about the bar should be ordinary here.
 	var small: Dictionary = await _pack_shot(5, 3)
-	_check(int(small.get("carried", -1)) == 5 and int(small.get("wells", -1)) == 5,
-		"a pack of 5 types draws 5 wells (carried %s, wells %s)"
-			% [small.get("carried", "?"), small.get("wells", "?")])
+	_check(int(small.get("carried", -1)) == 5,
+		"the fixture put 5 item types in the pack and the bar saw 5 (got %s)"
+			% [small.get("carried", "?")])
+	_check(_wells_are_sane(small),
+		"a pack of 5 draws wells that are whole, disjoint and inside their own backing%s"
+			% [_wells_report(small)])
 	_check(bool(small.get("sel_lit", false)),
 		"...and the selected well is lit")
 	# Deliberately NOT `backing.encloses(plate)`: the plate is centred on its slot and is routinely wider
@@ -511,15 +514,15 @@ func _check_pack_window() -> void:
 	_check((small.get("label", Rect2()) as Rect2).size.x > 0.0,
 		"...and the name plate was drawn (%s)" % [small.get("label", Rect2())])
 
-	# The same pack overflowing, selection still inside the window.
+	# The same pack overflowing. The SETUP is that the bar now shows fewer wells than the pack holds — that
+	# is `clampi(13, 1, 10)` and asserting it would be asserting arithmetic, so it is stated and not
+	# checked. What is checked is that the wells stay whole and on their backing once the window is short.
 	var big_pack: Dictionary = await _pack_shot(13, 3)
 	_check(int(big_pack.get("carried", -1)) == 13,
 		"a pack of 13 types reports 13 carried (got %s)" % [big_pack.get("carried", "?")])
-	_check(int(big_pack.get("wells", -1)) == FactorySim.INVENTORY_SLOTS,
-		"...and the bar still draws exactly %d wells (got %s)"
-			% [FactorySim.INVENTORY_SLOTS, big_pack.get("wells", "?")])
-	_check(int(big_pack.get("wells", 0)) < int(big_pack.get("carried", 0)),
-		"...so the window is genuinely smaller than the pack, which is the case under test")
+	_check(_wells_are_sane(big_pack),
+		"...and a short window still draws whole, disjoint wells inside their backing%s"
+			% [_wells_report(big_pack)])
 
 	# ...AND THE SELECTION PAST THE END, which is what the wheel reaches and what used to vanish. The LAST
 	# type is chosen deliberately rather than an arbitrary high index: `inventory` is insertion-ordered, so
@@ -539,6 +542,9 @@ func _check_pack_window() -> void:
 			% [plate, back])
 	_check(plate.position.x >= -TOUCH and plate.position.x + plate.size.x <= Hud.CANVAS.x + TOUCH,
 		"...and on the canvas (plate %s)" % [plate])
+	_check(_wells_are_sane(far),
+		"...and a SCROLLED window's wells are still whole, disjoint and on their backing%s"
+			% [_wells_report(far)])
 
 	_main.sim.inventory = saved
 	_main._inv_selected = saved_sel
@@ -613,3 +619,40 @@ func _check_probe_is_off() -> void:
 	_check(leaked == 0 and not leaked_bar,
 		"...and records NOTHING while it is off — %d panels, hotbar %s"
 			% [leaked, "yes" if leaked_bar else "no"])
+
+
+## GEOMETRY, BECAUSE A COUNT WAS WORTH NOTHING. The probe used to report how many wells the loop drew, and
+## the loop drew one per iteration unconditionally, so the number was `n` restated — decided by `clampi`
+## before a pixel moved. The failure this is really guarding against is positional: derive each well's `sx`
+## from the PACK index instead of the WINDOW slot — one character, and the same mistake the name plate
+## actually shipped with — and the wells march off their own backing and off the canvas while every count
+## in the file stays exactly right.
+func _wells_are_sane(probe: Dictionary) -> bool:
+	var wells: Array = probe.get("wells", []) as Array
+	var back: Rect2 = (probe.get("backing", Rect2()) as Rect2).grow(TOUCH)
+	if wells.is_empty():
+		return false
+	for i: int in wells.size():
+		var a: Rect2 = wells[i] as Rect2
+		if a.size.x <= 0.0 or a.size.y <= 0.0:
+			return false
+		if not back.encloses(a):
+			return false
+		if a.position.x < -TOUCH or a.position.x + a.size.x > Hud.CANVAS.x + TOUCH:
+			return false
+		for j: int in range(i + 1, wells.size()):
+			var over: Rect2 = a.intersection(wells[j] as Rect2)
+			if over.size.x > TOUCH and over.size.y > TOUCH:
+				return false
+	return true
+
+
+## What went wrong, said in numbers, so a failure does not need a debugger to read.
+func _wells_report(probe: Dictionary) -> String:
+	var wells: Array = probe.get("wells", []) as Array
+	if wells.is_empty():
+		return " — NO WELLS DRAWN"
+	var first: Rect2 = wells[0] as Rect2
+	var last: Rect2 = wells[wells.size() - 1] as Rect2
+	return " — %d wells, x %.0f..%.0f, backing %s" % [wells.size(), first.position.x,
+		last.position.x + last.size.x, probe.get("backing", Rect2())]
