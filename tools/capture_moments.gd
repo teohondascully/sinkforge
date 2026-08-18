@@ -85,6 +85,17 @@ const EXPECT: Dictionary = {
 	"counter": {"_inventory_open": true},
 	"works": {"_inventory_open": true},
 	"bench": {"_inventory_open": true},
+	# THE MENU MATRIX (`MNU-10`). Every rung of it claims a panel is open, and the fresh rung claims it on a
+	# game that has just started — which is exactly the state a guard written against the midgame rung would
+	# let through as "no panel". Each is listed, because a moment that inherits its expectations from a
+	# similarly-named sibling is a moment nothing is checking.
+	"pack_fresh": {"_inventory_open": true},
+	"works_fresh": {"_inventory_open": true},
+	"bench_fresh": {"_inventory_open": true},
+	"pack_full": {"_inventory_open": true},
+	"works_full": {"_inventory_open": true},
+	"bench_full": {"_inventory_open": true},
+	"settings": {"_settings_open": true},
 	"map": {"_minimap_mode": 2},
 }
 
@@ -247,6 +258,12 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 			await _the_quiet(main)
 		"counter", "works", "bench":
 			await _at_the_counter(main, moment)
+		"pack_fresh", "works_fresh", "bench_fresh":
+			await _at_the_counter_fresh(main, moment.split("_")[0])
+		"pack_full", "works_full", "bench_full":
+			await _at_the_counter_full(main, moment.split("_")[0])
+		"settings":
+			await _at_the_settings(main)
 		"drift":
 			await _at_the_drift(main)
 		"pack":
@@ -437,6 +454,88 @@ func _bending_geometry(main: MainView) -> void:
 ## the depth hint and the queue would otherwise show that one first.
 ## THE BAZAAR, open. Stocks the pack first so the counter has something to price against — an empty pack
 ## makes every row unaffordable and the whole panel greys out, which judges the wrong thing.
+## THE MENU MATRIX (`MNU-10`) — *"build a screenshot matrix for fresh, midgame, and full-catalogue menu
+## states... do not optimize only a fully unlocked developer state."*
+##
+## `_at_the_counter` above is the MIDGAME rung: it grants 24 each of six staples, which is what a player has
+## an hour in. It is also the only menu state anybody has ever photographed, and the ticket's evidence is
+## that **density changes drastically by progression** — a fresh PACK is one row in an empty grid under a
+## detail card that takes the bottom third, and a full BENCH is eleven techs competing at the same weight.
+## A redesign judged on the middle rung would be tuned for the one state that never looks broken.
+##
+## FRESH IS THE GAME'S OWN OPENING STATE, not an emptied one. Nothing is taken away and nothing is added:
+## the dev kit is whatever `MainView` starts a new game with, which is the pack a first-time player opens.
+func _at_the_counter_fresh(main: MainView, which: String) -> void:
+	main._inventory_open = true
+	main._hud.can_craft = true
+	main._hud.set_bazaar_tab(_TAB.get(which, 0))
+	for _i: int in 6:
+		await physics_frame
+
+
+## FULL IS EVERY ITEM AND EVERY TECH, and it is the rung the ticket warns about — worth capturing precisely
+## so a layout can be checked against the density it will eventually carry, never so it can be designed for.
+## The catalogue is READ FROM DISK rather than listed here: a hand-written list in a fixture about "the full
+## catalogue" is a list that stops being full the first time somebody adds a machine.
+func _at_the_counter_full(main: MainView, which: String) -> void:
+	var sim: FactorySim = main.sim
+	for id: StringName in _catalogue():
+		sim.inventory[id] = 64
+		sim.total_produced[id] = 640
+	for tech: StringName in ResearchRules.ORDER:
+		sim.research[tech] = true
+	main._inventory_open = true
+	main._hud.can_craft = true
+	main._hud.set_bazaar_tab(_TAB.get(which, 0))
+	for _i: int in 6:
+		await physics_frame
+
+
+const _TAB: Dictionary = {"pack": 0, "works": 1, "bench": 2}
+
+
+## Every id the game can put in a pack: the materials it mines, the recipes' inputs and outputs, the
+## machines it builds, and the placeables and tools that are carried rather than produced.
+func _catalogue() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for dir_path: String in ["res://src/data/materials", "res://src/data/machines"]:
+		var d: DirAccess = DirAccess.open(dir_path)
+		if d == null:
+			continue
+		for f: String in d.get_files():
+			if f.ends_with(".tres"):
+				var id := StringName(f.trim_suffix(".tres"))
+				if not out.has(id):
+					out.append(id)
+	var r: DirAccess = DirAccess.open("res://src/data/recipes")
+	if r != null:
+		for f: String in r.get_files():
+			if not f.ends_with(".tres"):
+				continue
+			var rec: RecipeDef = load("res://src/data/recipes/%s" % f) as RecipeDef
+			if rec == null:
+				continue
+			for side: Dictionary in [rec.inputs, rec.outputs]:
+				for id: Variant in side:
+					if not out.has(StringName(id)):
+						out.append(StringName(id))
+	# Carried, never produced by a recipe: the tools you climb and dig and light with.
+	for id: StringName in [&"wood_pickaxe", &"stone_pickaxe", &"iron_pickaxe", &"sapling", &"rope",
+			&"torch", &"conduit", &"wood", &"gravel"]:
+		if not out.has(id):
+			out.append(id)
+	out.sort()
+	return out
+
+
+## SETTINGS is its own screen and not a Bazaar tab, which is `MNU-26`'s complaint in one line: it is opened
+## by a different key, drawn by a different path, and shares none of the panel's grammar.
+func _at_the_settings(main: MainView) -> void:
+	main._settings_open = true
+	for _i: int in 8:
+		await physics_frame
+
+
 func _at_the_counter(main: MainView, which: String) -> void:
 	for item: StringName in [&"ingot", &"ore", &"coal", &"stone", &"wood", &"iron_ingot"]:
 		main.sim.inventory[item] = 24
