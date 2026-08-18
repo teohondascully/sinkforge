@@ -140,6 +140,10 @@ if [ "${SF_REAL_HOME:-0}" != "1" ]; then
 	export HOME="$SF_HOME"
 	export XDG_DATA_HOME="$SF_HOME/.local/share"
 	export XDG_CONFIG_HOME="$SF_HOME/.config"
+	# Declares the isolation to fixtures that write `user://`. See the same line in with_machine.sh for
+	# why it is a positive marker rather than a check for SF_PRODUCTION_SLOT (which only THIS file sets,
+	# so a guard keyed on it would refuse under with_machine.sh, which is isolated and legitimate).
+	export SF_ISOLATED_HOME="$SF_HOME"
 fi
 
 # Default concurrency = CPU count (bounds memory too); overridable via JOBS.

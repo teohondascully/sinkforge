@@ -295,7 +295,35 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 ## is a second full decode on top of the readback below. Saves are user/interval-triggered and the
 ## envelope is small, so the price is paid deliberately — the alternative is trusting a file we have not
 ## looked at, which is exactly the bug this replaced.
+## A FIXTURE MAY NOT WRITE `user://` UNLESS SOMEBODY DECLARED THE SANDBOX. Isolation lives in the two
+## wrappers, so it protects only runs that come through one — a bare `godot --script res://tests/...`
+## inherits the real HOME and writes straight into the player's Godot directory. That is not hypothetical:
+## `test_fine_terrain.save` from `tests/test_worldgen.gd:994` is sitting in
+## `~/Library/Application Support/Godot/app_userdata/Sinkforge/` at 847K, written by a bare run, and
+## nothing witnessed it — `save_sentinel` watches `sinkforge.save`, which this is not.
+##
+## Keyed on a POSITIVE marker exported by both wrappers, not on recognising the dangerous state. A guard
+## that has to recognise danger is wrong for every arrangement nobody thought of; absence of proof of
+## isolation is the refusal condition. `SF_REAL_HOME=1` stays honoured, because that flag IS the
+## declaration — it means "use my real home and I know it".
+##
+## `--script` is the fixture tell: the game proper never has it, so this cannot fire on a player's save.
+static func _fixture_may_not_write(path: String) -> bool:
+	if not path.begins_with("user://"):
+		return false
+	if not OS.get_environment("SF_ISOLATED_HOME").is_empty():
+		return false
+	if OS.get_environment("SF_REAL_HOME") == "1":
+		return false
+	return OS.get_cmdline_args().has("--script")
+
+
 static func write(path: String, data: Dictionary) -> bool:
+	if _fixture_may_not_write(path):
+		push_error("save: REFUSING to write %s — this is a --script fixture and no isolated home was "
+			% path + "declared, so user:// is the player's real directory. Run it through "
+			+ "tools/with_machine.sh (or tools/run_harness.sh), or set SF_REAL_HOME=1 to say you mean it.")
+		return false
 	var tmp: String = path + TMP_SUFFIX
 	var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:

@@ -51,6 +51,13 @@ if [ "${SF_REAL_HOME:-0}" != "1" ]; then
 	export HOME="$SF_HOME"
 	export XDG_DATA_HOME="$SF_HOME/.local/share"
 	export XDG_CONFIG_HOME="$SF_HOME/.config"
+	# THE POSITIVE MARKER a fixture checks before it writes to `user://`. The isolation above protects only
+	# invocations that come through a wrapper, so a bare `godot --script res://tests/test_worldgen.gd`
+	# inherits the real HOME and writes into the player's Godot directory — which is not hypothetical:
+	# `test_fine_terrain.save` is sitting in it, 847K, from a bare run. Announcing isolation rather than
+	# asking a fixture to RECOGNISE the dangerous state, because a guard that must recognise danger is
+	# wrong for every state nobody thought of. Absence of this marker is the refusal condition.
+	export SF_ISOLATED_HOME="$SF_HOME"
 fi
 
 # THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine
