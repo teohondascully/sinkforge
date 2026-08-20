@@ -49,14 +49,23 @@ class Bench extends Node2D:
 	var pad: float
 
 	func _draw() -> void:
-		# THE TWO ARGUMENTS BELOW ARE IN DIFFERENT UNITS AND NOTHING IN EITHER SIGNATURE SAYS SO.
-		# `draw_machine_casing` takes `cell_px` in PIXELS — `world_renderer.gd:2810` hands it `float(CELL)`.
-		# `draw_machine_glyph` takes `s` in CELLS — the same renderer hands it `1.0` for a full-size machine
-		# (`world_renderer.gd:1360`), and the HUD reaches the same place via `box.size.y / 20.0` because the
-		# glyphs are drawn in a ~20-unit design space. Passing pixels to the second one drew the family at
-		# 32x and 96x: every cell of the first sheet was a flat colour fill, which read as an art defect and
-		# was a driver defect. Derived from CELL rather than written as 20.0, so it cannot drift from the
-		# renderer's own convention.
+		# THE TWO ARGUMENTS BELOW ARE IN DIFFERENT UNITS. `draw_machine_casing` takes PIXELS,
+		# `draw_machine_glyph` takes CELLS, and passing pixels to the second drew the family at 32x and 96x —
+		# every cell of the first sheet a flat colour fill, which read as an art defect and was a driver
+		# defect.
+		#
+		# I first wrote here that neither signature said so. THAT WAS FALSE and the correction is the useful
+		# part. `draw_machine_casing`'s parameter is literally named `cell_px`, and `draw_machine_glyph`
+		# carried a docstring reading "scaled by `s` (1.0 = full 32px world icon, smaller for HUD chips)".
+		# Both units were documented. I read the two `static func` lines and not the four lines above one of
+		# them, then inferred the unit from the argument NAME — `s` reads as "size" — and from the fact that
+		# its neighbour took pixels. So this was not an undocumented API; it was me not reading it, and the
+		# remedy I proposed (add a docstring) was the remedy already in place and already failing.
+		#
+		# What actually reaches someone at a CALL SITE is the parameter name, because GDScript has no named
+		# arguments and the call shows a bare `1.0`. c1 made that fix in `c256d6e` by renaming the parameter
+		# `s` -> `cells`. Derived from CELL here rather than written as 20.0, so this tool cannot drift from
+		# the renderer's convention either.
 		Visuals.draw_machine_casing(self, Vector2(pad, pad), px, col, active, true, kind)
 		Visuals.draw_machine_glyph(self, Vector2(pad + px * 0.5, pad + px * 0.5),
 			kind, px / float(WorldRenderer.CELL), active, 0.35, false, 1.0)
