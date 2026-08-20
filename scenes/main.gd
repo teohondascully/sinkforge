@@ -796,6 +796,7 @@ func _process(delta: float) -> void:
 		_hud.can_craft = _near_bazaar()         # the E screen reveals recipes only at the Bazaar
 		_hud.show_minimap = _minimap_mode > 0
 		_hud.minimap_large = _minimap_mode == 2
+		_hud.rope_active = _player.grapple.state != Grapple.State.IDLE
 		_hud.ping_world = _ping_world
 		_hud.show_help = _show_help
 		_hud.show_dashboard = _show_dashboard

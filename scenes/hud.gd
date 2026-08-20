@@ -193,6 +193,10 @@ var rack_ids: Array[StringName] = []
 var bazaar_row: int = 0
 var show_minimap: bool = false
 var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden
+## True while a grapple line is on screen, hook in flight or anchored. MainView pushes it every frame.
+## An arrival ceremony is held while this is set: the plate is centred on the body and the rope hangs
+## through the same column, so the two cannot share a frame legibly.
+var rope_active: bool = false
 ## The player's PING marker in world coords (Vector2.INF = none) — set by clicking the open map;
 ## MainView owns it and pushes it here + to the renderer (which draws the in-world beacon).
 var ping_world: Vector2 = Vector2.INF
@@ -305,7 +309,7 @@ func flash(text: String) -> void:
 ## told. T2.1 asks for "announce once, in a safe composition", and dropping the announcement is not a
 ## composition. So it waits for the map to close and then fires in full.
 func announce(text: String, kicker: String, color: Color) -> void:
-	if minimap_large:
+	if _announce_held():
 		_pending_arrival = [text, kicker, color]
 		return
 	_arrival_text = text
@@ -325,26 +329,28 @@ func announcing() -> bool:
 	return _arrival_life > 0.0
 
 
-## THE DEFERRAL WAS ONE-SIDED, AND THE BASELINE PHOTOGRAPHED THE SIDE IT DID NOT COVER.
+## The conditions under which an arrival ceremony is held.
 ##
-## `announce()` already holds a ceremony that fires WHILE the whole-world map is open — added for T2.1's
-## *"announce once, in a safe composition"*. It has nothing to say about the other order: a ceremony
-## already up when the map OPENS is drawn straight over it, and `_draw_arrival` runs after `_draw_minimap`
-## so it lands on top. `docs/media/baseline/_moment_map.png` is that frame — the plate crossing the map's
-## `TOPSOIL` band label and its `0 m` reading.
+## Held, not dropped. The plate is a one-shot with a 3.4s life, so standing it down deletes the
+## announcement rather than composing it. Its clock stops and it draws nothing while held, then resumes
+## with its remaining life intact.
 ##
-## **A guard that handles one direction of a two-directional collision is not half a guard, it is a guard
-## with a hole**, and the hole is invisible because the covered direction is the one anybody tests.
+## Two conditions, for two different collisions. The large map shares the plate's rectangle, and the
+## collision runs both ways: a ceremony firing while the map is open waits in `_pending_arrival`, and one
+## already up when the map opens freezes here, since `_draw_arrival` runs after `_draw_minimap` and would
+## otherwise land on top of it. A live grapple line shares the plate's column instead: the camera centres
+## the body, so the plate spans canvas y 61.6 to 111.6 directly over the miner, and any rope reaching them
+## passes through it. There is no position on a 640-wide canvas that avoids this, so the rope case can
+## only be solved in time, not in space.
 ##
-## The fix keeps the promise the deferral was making: the ceremony is HELD, not dropped. Its clock stops
-## and it draws nothing while the map is up, then it resumes with its remaining life intact — so crossing
-## into THE DEEPSLATE and opening the map still tells you, in full, once, when there is room for it.
+## Every gate site calls this rather than testing the conditions inline. A hold condition added to some
+## sites and not others freezes the clock while the plate still fires and still draws.
 func _announce_held() -> bool:
-	return minimap_large
+	return minimap_large or rope_active
 
 
 func _process(delta: float) -> void:
-	if not _pending_arrival.is_empty() and not minimap_large:
+	if not _pending_arrival.is_empty() and not _announce_held():
 		var held: Array = _pending_arrival
 		_pending_arrival = []
 		announce(String(held[0]), String(held[1]), held[2] as Color)
@@ -925,34 +931,22 @@ const HOVER_MIN_W: float = 218.0
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 
-## THE PERMANENT PLATE IS THE PART THAT DIES (kill list #1; Diegetic 3.7).
+## The permanent objective plate is retired after the opening lesson.
 ##
-## The how-to line already knew how to leave: it holds, fades, and comes back when you stall. The GOAL line
-## did not — it sat at top-centre for every step, all thirteen of them, which is the "~85-90% of the
-## interface floats above the world" finding and the reason the audit called the presentation system the
-## art director. The complaint is PERMANENCE, not existence: a game may tell you what just became possible,
-## it may not stand over you while you do it.
+## The problem was permanence rather than existence: the game may say what has just become possible, but
+## it may not stand over the player while they do it. The how-to line already behaved that way, holding,
+## fading, and returning on a stall. The goal line did not, and sat at top-centre through every step.
 ##
-## So AFTER THE OPENING LESSON, NOTHING IS OFFERED. Later steps do not announce, do not hold, and do not
-## fade — the top of the screen is simply empty, and guidance is REACTIVE ONLY: it returns when you have
-## genuinely stalled, and not before. The world does the talking meanwhile —
-## `world_renderer._draw_guide_targets()` already pulses a ring on the cells the current step points at,
-## which is the "attach subsequent guidance to the relevant world object" half of the same recommendation,
-## and it was already built and previously drowned out.
+## After the opening lesson nothing is offered. Later steps do not announce, hold, or fade, and the top of
+## the screen stays empty. Guidance becomes reactive and returns only once the player has genuinely
+## stalled. The world carries it meanwhile: `world_renderer._draw_guide_targets()` pulses a ring on the
+## cells the current step points at.
 ##
-## This is the LITERAL reading, and it is a design call rather than a measurement one (2026-08-17). I built the
-## softer version first — announce, hold six seconds, fade — and logged it in `the working notes` as a
-## fork with the argument against my own choice: that reading an unambiguous kill-list item as ambiguous is
-## less work and less risk for me, and that is how a kill list gets negotiated down one entry at a time.
-## The directive chose literal. The soft version is one `else` branch away if it is ever wanted back.
+## A softer variant that announces, holds six seconds, then fades is one `else` branch away.
 ##
-## THIS IS ALSO THE PRECONDITION FOR MEASURING ANY OF IT. `docs/DIRECTOR_BRIEF.md` §4.4 scores whether a
-## player forms a desire when NO objective is supplied; while a permanent slab supplies one, that
-## evaluation reads the supervisor instead of the player and cannot return a valid result on this build.
-##
-## `GOAL_PERSISTS_THROUGH` is how many steps count as "the opening lesson" — the ones that keep the old
-## permanent plate, so nobody is stranded on the first thing they ever see. At 1 that is the first step
-## only. Raise it to teach longer; set it to 0 to remove the plate outright, including from the opening.
+## `GOAL_PERSISTS_THROUGH` is how many steps count as the opening lesson and keep the old permanent plate,
+## so nobody is stranded on the first thing they ever see. At 1 that is the first step only. Raise it to
+## teach for longer, or set it to 0 to remove the plate entirely, including from the opening.
 const GOAL_FADE: float = 1.2       ## how long reactive guidance takes to arrive once you have stalled
 const GOAL_PERSISTS_THROUGH: int = 1
 
