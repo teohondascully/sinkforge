@@ -692,10 +692,25 @@ say() {
 # in a fresh worktree is every layer at once because the `class_name` registry is empty. That is
 # indistinguishable from a real failure in a bare exit code and has cost real time here. Say which of the
 # two happened, then show the tail, because for a death the tail is exactly the right thing to show.
+# WHICH LINES OF A LOG ARE FAILURES. Deliberately NOT a single format, because there is no single
+# format: `check_base.gd` prints "  FAIL: label" and 79 layers inherit that, but the 11 layers that
+# extend SceneTree instead each rolled their own -- "  FAIL  label" with no colon in
+# check_fixture_pointer, "check_grid: FAIL -- ...", "2 FAILURE(S)", "1 PLAY-GOAL(S) FAILED". A pattern
+# written against the base class alone matches 79 layers and silently misses 11, and it misses them in
+# the worst possible way: zero hits routes them into the branch below that declares the layer DEAD, so
+# the summary would answer a real assertion failure with a confident wrong diagnosis.
+#
+# So match the word rather than the punctuation, and subtract the lines that are passes. Uppercase FAIL
+# is the token every one of these formats shares; a PASS or SKIP line that happens to say FAIL in its
+# label is excluded by its own prefix rather than by hoping the word never appears there.
+fail_lines() {   # fail_lines <logfile>
+	grep -E 'FAIL' "$1" 2>/dev/null | grep -vE '^[[:space:]]*(PASS|SKIP)' || true
+}
+
 excerpt() {   # excerpt <logfile>
 	local log="$1"
 	local hits
-	hits="$(grep -cE '^[[:space:]]*FAIL:|: FAIL|FAILURE' "$log" 2>/dev/null || true)"
+	hits="$(fail_lines "$log" | grep -c . || true)"
 	hits="${hits:-0}"
 	if [ "$hits" -eq 0 ]; then
 		echo "        | (no FAIL line in this log: the layer DIED before asserting rather than failing an"
@@ -703,7 +718,7 @@ excerpt() {   # excerpt <logfile>
 		sed 's/^/        | /' "$log" | tail -14
 		return 0
 	fi
-	grep -E '^[[:space:]]*FAIL:|: FAIL|FAILURE' "$log" | head -12 | sed 's/^/        | /'
+	fail_lines "$log" | head -12 | sed 's/^/        | /'
 	# Never truncate silently. A capped list that does not say it is capped reads as the whole story.
 	if [ "$hits" -gt 12 ]; then
 		echo "        | ...$((hits - 12)) further FAIL line(s) not shown -- whole log: $log"
