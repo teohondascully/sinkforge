@@ -2707,6 +2707,20 @@ const VERB_GAP: float = 14.0          ## verb ink → key hint. 4.0 was the ship
 const VERB_PAD: float = 12.0          ## plate edge → ink, both ends
 const VERB_MIN_W: float = 104.0       ## BUY and BUILD keep the width the layout was drawn around
 const VERB_H: float = 24.0
+const VERB_BASE: float = 16.0         ## button top → the verb's baseline. The state form shares the line.
+const DETAIL_ROW_GAP: float = 8.0     ## between the row's three parts: the price, the reason, the verb
+const DETAIL_NOTE_SIZE: int = 8       ## the reason the verb will not run — the smallest type on the plate
+## THE PLATE'S BOTTOM SHELF, computed once for everything that stands on it.
+##
+## `_verb_button` and `_state_plate` each wrote `box.size.y - 34.0`, and 34 is a number with no relation
+## anywhere in this file to the two it is the sum of: the 24 the button is tall and the `DETAIL_PAD` of
+## margin the plate keeps under everything else. Move the pad or the button height and the shelf stays
+## where it was, silently, having said in prose that it would not. It is the sum now — so the row's floor
+## is the plate's own bottom margin, which is the same line the art square's bottom edge sits on.
+func _detail_row(box: Rect2) -> Rect2:
+	return Rect2(box.position.x, box.end.y - DETAIL_PAD - VERB_H, box.size.x, VERB_H)
+
+
 ## How wide the button has to be for this verb. Separate from the drawing because the blurb beside it wraps
 ## against the button's left edge, and a blurb that wraps against a guessed width runs under a real one.
 func _verb_button_w(verb: String, hint: String) -> float:
@@ -2719,8 +2733,9 @@ func _verb_button_w(verb: String, hint: String) -> float:
 func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
 	var vw: float = _tracked_w(verb, VERB_SIZE, VERB_TRACK)
 	var w: float = _verb_button_w(verb, hint)
-	var btn := Rect2(box.end.x - w - 10.0, box.position.y + box.size.y - 34.0, w, VERB_H)
-	var ty: float = btn.position.y + 16.0
+	var row: Rect2 = _detail_row(box)
+	var btn := Rect2(row.end.x - DETAIL_PAD - w, row.position.y, w, VERB_H)
+	var ty: float = btn.position.y + VERB_BASE
 	if live:
 		_round_rect(btn, 5.0, UI_ACCENT)
 		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
@@ -2757,8 +2772,9 @@ func _state_plate_w(word: String) -> float:
 ## Set on the button's own baseline and against the plate's right edge, because a state and a verb are read
 ## in the same place at the same moment and only one of them is ever on a given plate.
 func _state_plate(box: Rect2, word: String) -> void:
-	var x: float = box.end.x - _state_plate_w(word) - 10.0
-	var ty: float = box.position.y + box.size.y - 34.0 + 16.0
+	var row: Rect2 = _detail_row(box)
+	var x: float = row.end.x - DETAIL_PAD - _state_plate_w(word)
+	var ty: float = row.position.y + VERB_BASE
 	var mid: float = ty - 4.0
 	draw_line(Vector2(x, mid), Vector2(x + 3.5, mid + 3.5), STATE_INK, 1.6)
 	draw_line(Vector2(x + 3.5, mid + 3.5), Vector2(x + STATE_TICK, mid - 4.5), STATE_INK, 1.6)
@@ -2906,18 +2922,63 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	if state != "":
 		_state_plate(box, state)
 		return
-	# The price as have/need chips: "can I afford this" answered in the same glance as "what does it cost".
-	var cx: float = tx
-	for item: StringName in cost:
-		var need: int = int(cost[item])
-		var have: int = int(sim.inventory.get(item, 0))
-		cx = _detail_chip(Vector2(cx, box.position.y + 62.0), item, need, have) + 6.0
-
+	# THE DECISION ROW — the price, the reason the verb will not run, and the verb, on one shelf, packed
+	# together against the plate's right margin (`MNU-25`).
+	#
+	# They were three things at three addresses. The chips started at the text column's left edge, the
+	# button was pinned to the plate's right edge with the better part of 300px of nothing between them,
+	# and the reason floated in that void, centred on the button and a line ABOVE it — so the one screen a
+	# player reads to decide "can I afford this, and if not why not, and what do I press" spread the
+	# answer across the full width of the plate and asked the eye to make three stops. Worse, the three were on three different lines: chip
+	# tops at 62, button top at 54, reason baseline at 48. Nothing lined up with anything.
+	#
+	# Now they read left to right as one sentence — `24/4 · behind Automation · LOCKED` — and the price
+	# sits where a price sits, next to the thing that spends it.
+	#
+	# PACKED FROM THE BUTTON LEFTWARD, because the button is the one element whose position may not move:
+	# `text_w` above measures the blurb's column against it, so a verb that walked with the length of a
+	# shortfall sentence would rewrap the sentence it stands under.
+	#
+	# AND THE BLURB'S RESERVE IS STILL THE BUTTON ALONE, which is the part worth stating because it reads
+	# like an oversight. The price and the reason now sit under the sentence's own column and they do
+	# overlap it in x — on the Prospecting plate the sentence runs some 20px past the first chip's left
+	# edge. They clear it in the other axis. The chips stand on the row's FLOOR, `DETAIL_CHIP_H` up from a
+	# shelf `DETAIL_PAD` off the plate's bottom, which puts their ceiling 59 down an 88px plate; the
+	# blurb's second line is `DETAIL_BLURB_Y` plus one of the font's own line heights, and on the BENCH
+	# plate at 3x that baseline lands 53 down with its descenders bottoming out at 55. Four pixels, and
+	# the eye is the only instrument that has ever checked them. Only the button is tall enough to reach
+	# the sentence's line, and the button is what the reserve pays for. What would spend that clearance is
+	# a bigger blurb face or a third reserved line, and either of those moves `BAZAAR_DETAIL_MIN`, which
+	# is a number that has to be argued anyway.
 	var btn: Rect2 = _verb_button(box, verb, "ENTER" if ready else "", ready)
+	var shelf: Rect2 = _detail_row(box)
+	var chips_w: float = 0.0
+	for item: StringName in cost:
+		if chips_w > 0.0:
+			chips_w += DETAIL_CHIP_GAP
+		chips_w += _detail_chip_w(int(sim.inventory.get(item, 0)), int(cost[item]))
+	var note_w: float = 0.0 if note == "" \
+		else _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+	var note_gap: float = 0.0 if note == "" else DETAIL_ROW_GAP
+	# THE ROW GIVES AT THE REASON, NEVER AT THE ART. The column is 426 wide — the panel's inner width less
+	# the square, its gaps and the plate's two margins — and nothing anywhere bounds a price and a
+	# shortfall sentence against it: the widest thing the catalogue quotes today is the Drift Rig's three
+	# ingredients with all three short, and a fourth ingredient is one `.tres` away. So the chips stop at
+	# the text column's left edge and the reason takes whatever room is left between them and the button,
+	# drawn to THAT width rather than through the art square. A sentence clipped at its own end is a bad
+	# frame; a sentence printed across the picture of the thing you are buying is a broken one.
+	var cx: float = maxf(tx, btn.position.x - DETAIL_ROW_GAP - note_w - note_gap - chips_w)
+	var chip_y: float = shelf.end.y - DETAIL_CHIP_H
+	for item: StringName in cost:
+		cx = _detail_chip(Vector2(cx, chip_y), item, int(cost[item]),
+			int(sim.inventory.get(item, 0))) + DETAIL_CHIP_GAP
 	if note != "":
-		var nw: float = _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-		draw_string(_font, Vector2(btn.get_center().x - nw * 0.5, btn.position.y - 6.0), note,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.58, 0.48, 0.32))
+		# On the price's own baseline, because the reason and the numbers it is derived from are one
+		# sentence. The verb's label sits a couple of pixels higher, centred in a pill half again as deep;
+		# text aligns to text, and a button's word aligns to its button.
+		var nx: float = maxf(cx - DETAIL_CHIP_GAP + note_gap, btn.position.x - DETAIL_ROW_GAP - note_w)
+		draw_string(_font, Vector2(nx, chip_y + DETAIL_CHIP_BASE), note, HORIZONTAL_ALIGNMENT_LEFT,
+			btn.position.x - DETAIL_ROW_GAP - nx, DETAIL_NOTE_SIZE, Color(0.58, 0.48, 0.32))
 
 
 ## THE LAMP. Three rings behind the goods is the whole trick, and it is what makes a glyph read as lit
@@ -2953,9 +3014,10 @@ func _detail_glyph(art: Rect2) -> Rect2:
 ## always took the "at a claimed Bazaar" branch — the one state where the note is never empty. **The screen
 ## explained every blocker except the one a player actually hits.**
 ##
-## Says the DEFICIT and not the price, because the price is already on the chips two lines up and repeating
-## it answers a question nobody asked. The sample material (a tech's analysis input) is a cost the chips do
-## NOT show, so it is named here or it is named nowhere.
+## Says the DEFICIT and not the price, because the price is already on the chips this sentence now sits
+## beside — `MNU-25` put the two on one row — and repeating it answers a question nobody asked. The sample
+## material (a tech's analysis input) is a cost the chips do NOT show, so it is named here or it is named
+## nowhere.
 func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
 	var parts: PackedStringArray = []
 	for item: StringName in cost:
@@ -3080,6 +3142,30 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 		cx += cw + 6.0
 
 
+## THE PRICE CHIP'S OWN MEASUREMENTS, named because the decision row packs from its right edge leftward and
+## therefore has to know how tall and how wide a chip is BEFORE it can place one. They were literals inside
+## the drawing, which was survivable while nothing else needed them. The height matters twice over now: it
+## is what seats the chips on the row's floor beside a button half again their depth.
+##
+## The `19.0` the text is indented by is NOT this height wearing another hat — it is the glyph well, and the
+## two are equal by coincidence. They are left as separate numbers on purpose; relating them here would be
+## exactly the invented relation this file keeps finding in its own past.
+const DETAIL_CHIP_H: float = 19.0
+const DETAIL_CHIP_BASE: float = 13.5  ## chip top → the have/need pair's baseline, which the reason shares
+const DETAIL_CHIP_SIZE: int = 9
+const DETAIL_CHIP_PAD: float = 26.0   ## the glyph well and the right margin, around the have/need pair
+## Chip to chip INSIDE the price, deliberately tighter than `DETAIL_ROW_GAP`. A four-ingredient price and
+## the three parts of the row set at one spacing would be seven equal things in a line; the price has to
+## read as one of the three.
+const DETAIL_CHIP_GAP: float = 6.0
+## Asked before the chip is drawn, and asked BY the chip when it draws itself, so the row cannot pack to one
+## width and paint at another. It measures the pair WHOLE while `_detail_chip` paints it in two halves, in
+## two colours — which is what the drawing already did with its own copy of this line.
+func _detail_chip_w(have: int, need: int) -> float:
+	return _font.get_string_size("%d/%d" % [have, need],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x + DETAIL_CHIP_PAD
+
+
 ## One have/need chip. Green when the pack covers it, red when it does not — the affordability answer given
 ## per ingredient rather than as one verdict, so a short shopping list says WHICH thing is short.
 func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
@@ -3089,16 +3175,15 @@ func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
 	# it at "3/64", which reads as five percent of the way there while you are carrying twenty-one times
 	# what it asks. The numerator is now the number that MOVES while you play, which is also the one the
 	# affordability colour belongs on.
-	var label: String = "%d/%d" % [have, need]
-	var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 26.0
-	_round_rect(Rect2(at, Vector2(w, 19.0)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
-	Visuals.draw_item(self, at + Vector2(11.0, 9.5), 13.0, item)
+	var w: float = _detail_chip_w(have, need)
+	_round_rect(Rect2(at, Vector2(w, DETAIL_CHIP_H)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
+	Visuals.draw_item(self, at + Vector2(11.0, DETAIL_CHIP_H * 0.5), 13.0, item)
 	var ok: bool = have >= need
-	draw_string(_font, at + Vector2(19.0, 13.5), str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
-	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(_font, at + Vector2(19.0 + hw, 13.5), "/%d" % need, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		UI_TEXT_FAINT)
+	draw_string(_font, at + Vector2(19.0, DETAIL_CHIP_BASE), str(have), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_CHIP_SIZE, Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
+	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
+	draw_string(_font, at + Vector2(19.0 + hw, DETAIL_CHIP_BASE), "/%d" % need,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE, UI_TEXT_FAINT)
 	return at.x + w
 
 
