@@ -49,8 +49,13 @@ const CANVAS := Vector2(640.0, 360.0)
 const PLATE := Color(0.062, 0.070, 0.094, 0.985)
 const RAIL_BG := Color(0.043, 0.049, 0.070, 0.92)
 const WELL := Color(0.0, 0.0, 0.0, 0.22)
-const ACCENT := Color(0.80, 0.66, 0.30)
-const ACCENT_HI := Color(0.949, 0.831, 0.549)
+## AND THE TWO GOLDS ARE READ OFF IT TOO, for the reason written under them and one more that is specific
+## to this pair. These were byte-identical copies of `UI_ACCENT` and of the `GOLD_PALE` derived from it, so
+## a page arguing about the settings screen was arguing in a gold that nothing in the file related to the
+## game's — and the accent is the constant most likely to move next, since it is the one whose MEANING is
+## under review. A copy of it diverges silently and shows up as a mock that looks right and is not.
+const ACCENT := Hud.UI_ACCENT
+const ACCENT_HI := Hud.GOLD_PALE
 ## THE INKS ARE READ OFF THE HUD, not copied from it. All three were byte-identical duplicates of the
 ## shipped palette, which is what a proposal wants -- the parts NOT being proposed have to match the thing
 ## it is judged against, or the comparison is between two different games. Copies cannot hold that: the
