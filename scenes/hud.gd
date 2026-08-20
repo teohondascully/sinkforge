@@ -2604,21 +2604,66 @@ func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> v
 ## The price as GLYPHS, not as prose. "6 Iron Ingot 3 Wood" is a hundred pixels of a hundred-and-seventy
 ## pixel row, and it was clipping the NAME off the thing you were buying — "Iron Pickax", "Blast Furnac".
 ## The same fact as two icons and two numbers is forty, and it reads faster besides: you are matching a
-## picture against the chips in the head rather than parsing a sentence. Green when the pack covers it, red
-## when it does not, per ingredient, so a short list says WHICH thing is short.
+## picture against the chips in the head rather than parsing a sentence.
+##
+## AN INGREDIENT YOU ARE SHORT OF NOW PRINTS WHAT YOU ARE SHORT BY — `-2` where this printed `2` in red and
+## left the subtraction to you. That is `MNU-20`'s complaint answered where it lands: the numeral stopped
+## being detached arithmetic the moment it became the number you can act on. It is also the same number
+## `_shortfall_note` prints in words under the detail button ("short 2 Iron Ingot"), so the row is the
+## compressed form of that sentence rather than a second, unrelated statement about the same pack. An
+## ingredient the pack covers still prints its price: there is nothing to be short by, and the price is
+## what an expert is scanning a row end for.
+##
+## THE SIGN IS THERE SO THE HUE IS NOT THE ONLY COPY OF IT. Green covered and red short is a hue
+## difference, which is nothing to a greyscale reader — and nothing to any reader on a one-ingredient
+## recipe, where there is no second numeral to compare a hue against. A leading minus needs no comparison:
+## it is present on the ingredients you are short of and absent on the rest, per ingredient, which is the
+## job the colour was doing alone. Both come off the same string below, so a reader who has only the sign
+## and a reader who has only the hue can never be told different things about one ingredient.
+##
+## IT COSTS 3px PER SHORT INGREDIENT AND NOTHING PER COVERED ONE. A deficit cannot carry more digits than
+## the price it was subtracted from, so the only growth is the sign itself — 3.0px at size 9 in Open Sans
+## SemiBold, which is what `ThemeDB.fallback_font` resolves to here. Measured at the tightest row this
+## panel can draw, three ingredients in a 169.3px column with every one of them short: the name's budget
+## goes 58.3 to 49.3, and the longest name a three-ingredient row can carry (Drift Rig, 40.0px at size 10)
+## still clears it by 9.3. Iron Pickaxe and Blast Furnace, the two names this function exists because of,
+## keep 17.3 and 11.3. Nothing clips.
+##
+## WHAT IT DOES NOT FIX IS THE RED. Against the SELECTED row's plate that literal measures 4.20:1 — under
+## the 4.5 `tools/check_text_contrast.gd` holds body text to, and under the 4.99 the same red reads on an
+## unselected row, which is `MNU-18`'s inversion again one level down. Every lift of it closes the value
+## gap between the green and the red, which used to be the only thing carrying affordability without
+## colour, and that is why the lift was refused; with the sign carrying that job the objection is gone and
+## the ink is free to move. It is not moved here, because this change is the one the ticket asked for and
+## the ink is a separate reading.
 func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 	var w: float = 0.0
 	for item: StringName in cost:
-		w += 12.0 + _font.get_string_size(str(int(cost[item])), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
+		w += 12.0 + _font.get_string_size(_cost_numeral(item, int(cost[item])),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
 	var x: float = rr.end.x - 5.0 - w
 	for item: StringName in cost:
-		var n: int = int(cost[item])
+		var label: String = _cost_numeral(item, int(cost[item]))
 		Visuals.draw_item(self, Vector2(x + 6.0, rr.position.y + 10.5), 12.0, item)
-		var label: String = str(n)
+		# The ink reads the SIGN rather than asking the pack a second time. `have < need` written out twice,
+		# three lines apart, is how the mark and the colour start disagreeing about one ingredient — and
+		# disagreeing is worse than either cue missing, because each reader sees only one of them.
 		draw_string(_font, Vector2(x + 13.0, rr.position.y + 14.5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-			Color(0.482, 0.796, 0.518) if int(sim.inventory.get(item, 0)) >= n else Color(0.804, 0.427, 0.376))
+			Color(0.804, 0.427, 0.376) if label.begins_with("-") else Color(0.482, 0.796, 0.518))
 		x += 12.0 + _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
 	return w
+
+
+## What one ingredient's numeral says: the DEFICIT when you are short of it, the PRICE when you are not.
+##
+## It exists as a function and not as an expression because the width pass and the draw pass above are two
+## walks of the same dictionary, and they used to each format the numeral for themselves. That was
+## survivable only while the two spellings could not differ. They can now, and the width is not cosmetic
+## here — `_works_row` subtracts this function's total from the NAME's budget, so a numeral that measures
+## narrower than it draws puts the price on top of the word it was widened to protect.
+func _cost_numeral(item: StringName, need: int) -> String:
+	var gap: int = need - int(sim.inventory.get(item, 0))
+	return ("-%d" % gap) if gap > 0 else str(need)
 
 
 ## A machine's sprite or an item's glyph, whichever this id is. Both the pack grid, the works rows and the
