@@ -460,7 +460,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	tooth_mat.shader = load("res://scenes/rock_tooth.gdshader")
 	_tooth.material = tooth_mat
 	add_child(_tooth)
-	# Player intent sits above the dark. The map beacon, the dig plan and the objective ring are not part of
+	# Player intent sits above the dark. The map beacon, the dig plan and the objective marker are not part of
 	# the world; they are things the player put there, and the veil was taking two thirds of each. Measured
 	# at 24 metres by differencing per-pixel maxima with the cue placed against the cue cleared (null
 	# control: peak +1.0 over 0 px): the beacon asks for luma 205.4 and delivered 63.3, the dig bracket asks
@@ -577,7 +577,7 @@ func _process(delta: float) -> void:
 	if _lights != null:
 		_lights.queue_redraw()  # the lamp follows the body + machines shimmer
 	if _marks != null:
-		_marks.queue_redraw()   # ping ring, dig pulse and objective ring all breathe on _anim_time
+		_marks.queue_redraw()   # ping ring, dig pulse and objective chevron all breathe on _anim_time
 	if _haze != null:
 		_haze.queue_redraw()    # working furnaces convect; the shader's TIME drives the ripple
 	if _back != null:
@@ -781,7 +781,7 @@ func _draw_scan() -> void:
 ## the note where `_marks` is created for the measurements that put it here.
 func _paint_marks(layer: LightLayer) -> void:
 	_draw_dig_marks(layer)      # the painted dig plan: corner-bracketed cells waiting for the pick
-	_draw_guide_targets(layer)  # pulsing ring or ghost on the current objective step
+	_draw_guide_targets(layer)  # bobbing chevron, or a placement ghost, on the current objective step
 	_draw_ping(layer)           # the map-click beacon: a cyan pin bobbing over the marked spot with an
 	                            # expanding sonar ring, findable from across a cavern on foot
 
@@ -803,7 +803,7 @@ func _draw_ping(canvas: CanvasItem) -> void:
 
 
 ## The painted dig plan: each marked cell wears amber corner brackets and a whisper of fill, breathing
-## gently so the plan reads as queued for the pick, quieter than the aim cursor and the objective rings.
+## gently so the plan reads as queued for the pick, quieter than the aim cursor and the objective marker.
 ## Marks are the controller's live dict; pruning stale entries is its job.
 func _draw_dig_marks(canvas: CanvasItem) -> void:
 	if _dig_marks.is_empty():
@@ -1546,9 +1546,37 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 	return out
 
 
-## The current objective's cells, drawn as a breathing beacon. Mode "act" is a pulsing white reticle plus a
-## bobbing down-arrow over the target (dig this, feed this forge); mode "ghost" is a pulsing green outlined
-## cell showing where to place the next machine. Cosmetic.
+## UI DRAWN INTO WORLD SPACE IS NOT WHITE. WHITE IS FOR IMPACT AND FOR PHYSICAL EVENTS.
+##
+## No such rule existed, and without one every mark drifted to the top of the value range, because the top
+## of the range is always the cheapest way to make one more thing read. A rock shattering under the pick
+## (`_draw_mine_cracks`, 0.92/0.94/1.00), a sonar return arriving (`_draw_scan`, a 1.0 core), a targeting
+## ring parked on the objective cell for the whole step and the cursor box all spoke in the same voice, and
+## the two that were events had nothing left to shout with.
+##
+## Pure white is the brightest mark this screen can make and there is exactly one of it, so it is spent on
+## the rarest thing: something that has just HAPPENED, at the moment it happens. Chrome is what the player
+## looks THROUGH rather than AT, and it has no moment: the cursor, the build ghost's border, guidance.
+## Chrome is allowed to be bright. It is not allowed to be white.
+##
+## One constant and not a palette, because the sites that take it differ only in alpha and each already
+## carries an alpha that was settled in place, some of them under the veil and some above it. Moving hue and
+## leaving every alpha exactly as it was keeps this one change rather than two.
+const CHROME := Color(0.78, 0.83, 0.92)
+
+
+## The current objective's cell. Mode "ghost" is a pulsing green outlined cell showing where to place the
+## next machine; mode "act" is a chevron bobbing in the air above the target with a tether down to it, over
+## a faint wash on the cell itself (dig this, feed this forge). Cosmetic.
+##
+## ONE RING GRAMMAR, AND IT BELONGS TO THE ACTIVE ACTION. "act" used to draw a near-white reticle over a
+## dark backing ring here, so the objective and the cursor were both breathing a shape around a cell, on
+## the same 4.0 rad/s clock, in two colour languages, at once. The cursor's ring is the one that survives
+## (`_draw_interact_pulse`): it appears only where the next action would land, it is drawn in the colour of
+## the thing being acted on so it says WHAT as well as where, and it leaves when you look elsewhere. An
+## objective is a destination rather than an action, it sits on screen for the length of a whole step, and
+## a mark that never goes away cannot be the mark that means now. So guidance points from above instead and
+## stays out of the ring language entirely.
 func _draw_guide_targets(canvas: CanvasItem) -> void:
 	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)         # 0..1 breathing
 	for t: Dictionary in _guide_targets:
@@ -1562,25 +1590,22 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 			var pad: float = 2.0 + 2.0 * pulse
 			canvas.draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
 		else:
-			# Neutral-white targeting reticle. Amber read as a campfire, a warm ring at ground level, and cyan
-			# read faintly as an energy node against the ore. A near-white ring on a dark backing reads as a UI
-			# marker rather than as heat or magic, and reads on any background.
-			var ring := Color(0.92, 0.96, 1.0, 0.55 + 0.40 * pulse)
-			var r: float = float(CELL) * (0.62 + 0.12 * pulse)
-			# A dark backing ring first so the reticle reads even inside the warm head-lamp pool; the starter
-			# vein sits under the miner's lamp.
-			canvas.draw_arc(center, r, 0.0, TAU, 28, Color(0.02, 0.05, 0.07, 0.6), 4.5)
-			canvas.draw_arc(center, r, 0.0, TAU, 28, ring, 2.5)
-			canvas.draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), Color(ring.r, ring.g, ring.b, 0.10 + 0.10 * pulse))
+			# The cell itself, so the tether lands on something definite rather than in the middle of rock that
+			# looks like every other cell. A wash and not an outline: an outline around a cell is the cursor's
+			# shape, and this is the one place that has to not borrow it. Chrome rather than the reticle's old
+			# near-white, at the alpha the wash already carried.
+			canvas.draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)),
+				Color(CHROME.r, CHROME.g, CHROME.b, 0.10 + 0.10 * pulse))
 		# A bobbing down-pointer floated high above the cell, out of the lamp wash and into open air, with a
 		# tether line back down to the exact rock so the eye tracks marker to target. Dark-outlined so it
 		# punches through both the bright lamp and the bright day sky.
 		var lift: float = float(CELL) * (2.9 + 0.35 * pulse)
 		var tip := center + Vector2(0.0, -lift)
-		var arrow := Color(0.95, 0.98, 1.0, 0.94)
+		var arrow := Color(CHROME.r, CHROME.g, CHROME.b, 0.94)
 		var dark := Color(0.02, 0.04, 0.06, 0.85)
 		# tether: marker down to the cell top
-		canvas.draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5), Color(0.88, 0.93, 1.0, 0.30 + 0.20 * pulse), 2.0)
+		canvas.draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5),
+			Color(CHROME.r, CHROME.g, CHROME.b, 0.30 + 0.20 * pulse), 2.0)
 		# the pointer: a bold outlined chevron
 		var back := PackedVector2Array([tip + Vector2(0, 12), tip + Vector2(-11, -7), tip + Vector2(11, -7)])
 		canvas.draw_colored_polygon(back, dark)
@@ -1591,6 +1616,11 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 ## thing, in the thing's OWN colour, so a drill pulses steel and an ore vein pulses ore. Drawn rather than
 ## shadered because machines and terrain here are procedural canvas paint, so there is no texture a shader
 ## outline could sample.
+##
+## THIS is the file's ring: a shape breathing around a cell means the next action lands there. Nothing else
+## may draw one, which is why the objective marker gave its reticle up (see `_draw_guide_targets`). The
+## colour is not decoration either, it is the second half of the sentence, naming what is under the cursor
+## without any text; that is the part a neutral reticle could not say and the reason this is the survivor.
 func _draw_interact_pulse(rect: Rect2, col: Color) -> void:
 	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)
 	var r: Rect2 = rect.grow(2.0 + pulse * 2.5)
@@ -1623,7 +1653,10 @@ func _draw_aim() -> void:
 			draw_line(pos + Vector2(5, 5), pos + Vector2(CELL - 5, CELL - 5), no, 2.0)
 			draw_line(pos + Vector2(CELL - 5, 5), pos + Vector2(5, CELL - 5), no, 2.0)
 			return
-		var col := Color(1, 1, 1, 0.85) if _aim_in_reach else Color(1, 1, 1, 0.18)
+		# Chrome, not white: the cursor is on screen every frame of the game, and a permanent mark cannot hold
+		# the brightest colour the screen has (see CHROME). Both alphas are the ones this box already used, so
+		# the near/far reach step is unchanged.
+		var col := Color(CHROME.r, CHROME.g, CHROME.b, 0.85) if _aim_in_reach else Color(CHROME.r, CHROME.g, CHROME.b, 0.18)
 		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
 		if _aim_in_reach and sim.ore_deposit_at(_aim) > 0:   # a rich vein reads as a thing, not just rock
 			_draw_interact_pulse(Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2)),
@@ -1657,8 +1690,10 @@ func _draw_aim() -> void:
 		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), bg)
 	else:
 		return  # the active hotbar item is not placeable, so there is nothing to ghost
-	# A bright white box hovering over the target cell; red when blocked.
-	var border := Color(0.97, 0.98, 1.0, 0.95) if _aim_placeable else Color(0.95, 0.45, 0.40, 0.95)
+	# A bright box hovering over the target cell; red when blocked. Chrome rather than the near-white it was,
+	# for the same reason the cursor moved: a preview is not an event. The blocked red is untouched, since a
+	# refusal is exactly the kind of thing that is allowed to interrupt.
+	var border := Color(CHROME.r, CHROME.g, CHROME.b, 0.95) if _aim_placeable else Color(0.95, 0.45, 0.40, 0.95)
 	draw_rect(inner, border, false, 2.5)
 
 
@@ -2454,10 +2489,47 @@ var _zoom: float = 1.0
 
 ## Should this machine's TEXT decorations draw? Yes when zoomed in enough to read them, or when it is the
 ## machine the player is aiming at, so pointing at any box reads its label and status even zoomed out.
+##
+## This is a LEGIBILITY test and only that: it answers "would 8px type survive at this scale", which is a
+## necessary condition for drawing a plate and not a sufficient one. It still gates the held-count badge and
+## the stalled need bubble, both of which are per-machine state that the player wants wherever the machine
+## is. The nameplate wants something stricter and asks `_label_visible` instead.
 func _text_visible(cell: Vector2i) -> bool:
 	if cell == _aim:
 		return true
 	return _zoom >= TEXT_ZOOM
+
+
+## How near the body has to be, in cells, before a machine says its own name unasked.
+##
+## Derived rather than picked. `MainView.REACH_CELLS` (scenes/main.gd:20) is 3.2, the distance at which the
+## body can act on a cell at all, so twice it is the ring you are about to be able to touch: near enough
+## that which box is which is a live question, far enough that walking toward a machine names it before you
+## arrive. At the default 1.00x zoom the view is 40x22 cells (scenes/main.gd:41), so this labels a
+## neighbourhood rather than a screen.
+const LABEL_NEAR_CELLS: float = MainView.REACH_CELLS * 2.0
+
+
+## Should this machine draw its NAMEPLATE? Aimed at, or standing near it.
+##
+## The plate used to ride `_text_visible` alone, which made it a pure zoom gate, and the zoom that gate
+## permitted was every zoom the game ships at except the two most distant: `TEXT_ZOOM` is 0.65 and
+## `MainView.ZOOM_LEVELS[0]`, the default the game boots at, is 1.00 (scenes/main.gd:49-50). So the
+## condition was true for every machine on screen from the first frame and stayed true, and a base of any
+## size wore a permanent band of text across it. A legibility threshold had been asked to answer a relevance
+## question, which it cannot: whether 8px type resolves says nothing about whether this box's name is worth
+## the player's attention right now.
+##
+## Relevance is proximity or intent. The zoom term is kept, as an AND rather than an OR, because it is still
+## true and still necessary: at 0.33x the plate is a few pixels tall and unreadable however close you stand.
+## The aim exemption stays an OR and stays first, because pointing at a thing IS the question being asked,
+## and it is the one case where a plate too small to read is still better than no answer.
+func _label_visible(cell: Vector2i) -> bool:
+	if cell == _aim:
+		return true
+	if _zoom < TEXT_ZOOM or player == null:
+		return false
+	return _cell_center(cell).distance_to(player.position) <= LABEL_NEAR_CELLS * float(CELL)
 
 
 ## Is this machine bolted to the wall rather than standing in the cell? True for a Head, meaning a drill
@@ -2530,13 +2602,16 @@ func _draw_machine(machine: MachineState) -> void:
 				clampf(minf(face.size.x, face.size.y) / float(CELL) + 0.24, 0.6, 1.0), active, clock,
 				machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
-	# Text decorations are gated, for both cost and clutter: the name label, the held-count badge and the
-	# stalled need bubble are drawn only when the text is readable, meaning zoomed in past TEXT_ZOOM, or when
-	# this is the hovered or aimed machine. At 0.50x and below those labels are a few px tall, and
-	# draw_string is the priciest per-call here, so on a mature base the non-hovered machines drop their
-	# text. The information is not lost: the HUD hover inspector shows a machine's full details regardless.
+	# Text decorations are gated, for both cost and clutter: the held-count badge and the stalled need bubble
+	# are drawn only when the text is readable, meaning zoomed in past TEXT_ZOOM, or when this is the hovered
+	# or aimed machine. At 0.50x and below those labels are a few px tall, and draw_string is the priciest
+	# per-call here, so on a mature base the non-hovered machines drop their text. The information is not
+	# lost: the HUD hover inspector shows a machine's full details regardless.
+	#
+	# The nameplate is gated harder, on `_label_visible`: a name is worth reading once and then never again,
+	# so it is spent on the machine you are pointing at or walking up to rather than on all of them forever.
 	var show_text: bool = _text_visible(machine.cell) and not BARE_MACHINES
-	if show_text:
+	if _label_visible(machine.cell) and not BARE_MACHINES:
 		_draw_machine_label(machine, pos)
 
 	var held: int = _held(machine)
@@ -2548,8 +2623,10 @@ func _draw_machine(machine: MachineState) -> void:
 		var tw: float = _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 3.0
 		var badge := Vector2(face.end.x - 2.0 - tw, face.position.y + 2.0)
 		draw_rect(Rect2(badge, Vector2(tw, 11.0)), Color(0.04, 0.04, 0.06, 0.85))
+		# CHROME, not white: a count is a standing quantity rather than something that just happened, and it
+		# sits on its own near-black plate, so it keeps every bit of its contrast at the lower value.
 		draw_string(_font, badge + Vector2(1.5, 9.0), tag,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.97, 0.97, 0.99))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, CHROME)
 
 	if recipe != null and recipe.time > 0.0:
 		var bar_y: float = face.end.y - 3.0
@@ -2584,6 +2661,16 @@ func _draw_construct(pos: Vector2, t: float) -> void:
 		var p: Vector2 = pos + (cn[0] as Vector2)
 		draw_line(p, p + (cn[1] as Vector2) * bl, bc, 1.5)
 		draw_line(p, p + (cn[2] as Vector2) * bl, bc, 1.5)
+
+
+## Is the current objective already pointing at this cell? Cheap to ask: `MainView._guide_targets` returns
+## at most one target per step (scenes/main.gd:2648-2673, one `out.append` per branch), so this is a scan of
+## a list of one, and the loop is written for the list rather than for today's length.
+func _guided(cell: Vector2i) -> bool:
+	for t: Dictionary in _guide_targets:
+		if Vector2i(t["cell"]) == cell:
+			return true
+	return false
 
 
 ## A small status lamp on every machine, plus a blinking floating need bubble carrying the missing item's
@@ -2623,9 +2710,30 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 		# the whole cell, and to the one channel that needs no resolution at all: MOTION. A stalled machine
 		# breathes a ring around itself and a working one does nothing, because "no alarm" has to stay the
 		# quiet state or a mature base becomes a light show.
+		#
+		# This branch is deliberately taken BEFORE the guidance check below. It is the only alarm a machine has
+		# left out here, and it is not the thing that check exists to stop: it sits ON the cell instead of
+		# floating in the column above it, so it does not stack under the chevron the way the bubble does.
+		#
+		# It is also the one other breathing outline in the file, which is a real tension with the cursor
+		# owning that shape (`_draw_interact_pulse`). It is left alone because it is not chrome: it is the
+		# machine's own state, in the status colour, on its own 2.6 rad/s clock, and it only exists below
+		# TEXT_ZOOM. Taking it away to tidy the grammar would take the alarm with it.
 		var alarm: float = 0.40 + 0.60 * absf(sin(_anim_time * 2.6))
 		draw_rect(Rect2(face.position - Vector2(1.5, 1.5), face.size + Vector2(3.0, 3.0)),
 			Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 2.0)
+		return
+	# ONE FLOATING MARK PER CELL. If guidance is already pointing at this machine there is a chevron bobbing
+	# in the air above it on a tether down onto its roof, and the bubble hangs in that same column, bobbing on
+	# its own clock, saying a version of the same sentence: this box is the one you have to deal with. Reaching
+	# this line at all means the machine is stalled and the step is still open, which is nearly always the same
+	# problem told twice.
+	#
+	# Guidance keeps the airspace because it ends: a step resolves, the chevron leaves, and the bubble comes
+	# straight back for whatever is still wrong. Nothing is silently lost meanwhile, either. The status lamp
+	# above is drawn before this returns, so the machine still carries its state in its own corner, and the HUD
+	# hover inspector still reads the whole thing out.
+	if _guided(machine.cell):
 		return
 	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
 	var bob: float = sin(_anim_time * 3.0) * 1.5
@@ -2679,15 +2787,24 @@ var _label_plan: Dictionary = {}
 ## which is the wrong sentence about a chain that is one Head plus its reach; one plate with a count says
 ## the truth in less ink.
 ##
+## Contiguous is the whole of it, and that is not an oversight to be fixed here. Two forges at opposite ends
+## of a base are two plates because they are two boxes in two places, and a merged plate would have to sit
+## on one of them and lie about the other. What stops that pair from being drawn at once is the gate rather
+## than the collapse: `_label_visible` wants the body near, and a body cannot be near both.
+##
 ## What is left is then shelf-packed left to right, dropping to a second row when a plate would land on the
 ## one before it. The aimed machine is packed FIRST, so that pointing at something always names it: that is
-## the promise `_text_visible` makes when it exempts the aimed cell from the zoom gate, and a packer that
+## the promise `_label_visible` makes when it exempts the aimed cell from the zoom gate, and a packer that
 ## silently dropped that plate would break it.
+##
+## The plan and the draw must ask the same question or the packer reserves shelf space for plates that never
+## appear, and a plate that IS drawn gets pushed to a second row to clear a gap. So both call
+## `_label_visible` and neither has its own copy of the rule.
 func _plan_machine_labels(mview: Rect2) -> void:
 	_label_plan.clear()
 	var named: Dictionary = {}
 	for m: MachineState in sim.machines:
-		if not mview.has_point(Vector2(m.cell) * float(CELL)) or not _text_visible(m.cell):
+		if not mview.has_point(Vector2(m.cell) * float(CELL)) or not _label_visible(m.cell):
 			continue
 		if not m.def.display_name.is_empty():
 			named[m.cell] = m.def.display_name.to_upper()
