@@ -79,22 +79,26 @@ func _initialize() -> void:
 	# --- THE FIXTURE-SIDE HALF OF INP-01, AS A RATCHET ---
 	# The GAME side is closed: `scenes/` now has zero raw cursor reads outside the seam in
 	# `controls.gd`. The assertion that would actually close the FIXTURE side is "no fixture calls
-	# warp_mouse", and it cannot be written as a flat ban today because ten real calls remain. A guard that
-	# fails on arrival gets disabled, and a guard that quietly asserts nothing is worse -- so this is a
-	# RATCHET: the known sites are written down by name and count, and the number may fall but never rise.
+	# warp_mouse". It was written as a RATCHET rather than a ban because ten real calls remained at the
+	# time -- a guard that fails on arrival gets disabled, and a guard that quietly asserts nothing is
+	# worse. THE DEBT IS NOW PAID: every one of the ten has moved to `Controls.pose_pointer`, so the
+	# ratchet has been tightened to its floor and this IS the flat ban the paragraph above wanted.
+	# The machinery is kept rather than deleted, because a ban is only the ratchet with an empty budget,
+	# and a reappearance has to fail by the same rule that a regression would have.
 	#
 	# Why it matters that these are named rather than counted in aggregate: `warp_mouse` moves the ACTUAL
 	# cursor on the user's actual desk. Every one of these is both a measurement that depends on nobody
 	# touching the mouse AND a fixture reaching over to move a working person's pointer. capture_moments
-	# holds seven of the ten and they are the ones that write into `history/`.
-	# Budget, not a ban: these may only ever FALL. check_hud_layout (2), check_frametime (1) and
-	# check_grapple_reads (5) have moved to `Controls.pose_pointer` and those entries are gone rather than
-	# zeroed, so a reappearance is caught by the unlisted-file rule below. capture_moments keeps seven
-	# because six of them regenerate PNGs that are byte-identical to curated `history/` entries and one
-	# tuned shipped constants -- that is a phased job behind a baseline capture, not a bulk sed.
-	var budget: Dictionary = {
-		"capture_moments.gd": 7,
-	}
+	# held seven of the ten and they were the ones that write into `history/`.
+	#
+	# WHY THE BUDGET IS EMPTY, STATED SO IT CANNOT ROT AGAIN. check_hud_layout (2), check_frametime (1)
+	# and check_grapple_reads (5) moved to `Controls.pose_pointer` first; capture_moments' seven followed,
+	# and the six sites that regenerated `history/` PNGs now carry a "POSED, NOT WARPED, AT PROVABLY THE
+	# SAME POINT" comment where the call used to be. An entry left at 7 against a real count of 0 is not a
+	# harmless leftover: it is SEVEN CALLS OF SLACK on a debt that was already paid, and every one of them
+	# would move a working person's cursor across their desk without turning this layer red. A ratchet that
+	# is not tightened when the debt is paid stops being a bound and becomes a licence.
+	var budget: Dictionary = {}
 	var found: Dictionary = {}
 	var dir := DirAccess.open("res://tools")
 	if dir != null:
