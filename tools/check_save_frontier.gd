@@ -52,6 +52,9 @@ const NOT_SAVED: Dictionary = {
 	"_fine_edge": "DERIVED — molding noise, built from world_seed on the first rebuild.",
 	"_fine_grit": "DERIVED — grit noise, likewise.",
 	"_fine_seed_built": "DERIVED — bookkeeping for the two noise fields above.",
+	"_bulk_class": "DERIVED — memo for is_bulk_item, item → bool. A pure function of MiningRules' tables"
+		+ " and the machine def directory, so it holds no world state and any world rebuilds it identically;"
+		+ " an entry is recomputed rather than restored the first time that item is weighed.",
 	"_tick_accumulator": "RESET — sub-tick phase. Not derivable, but zeroed on load so both paths agree.",
 	"_rate_tick": "RESET — drives the production-rate readout only; never read by production logic.",
 	"_rate_samples": "RESET — the rate ring buffer, cleared with the counter that indexes it.",
