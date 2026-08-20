@@ -1172,15 +1172,33 @@ func _settings_input(event: InputEvent) -> void:
 	# with `Controls.UP`/`DOWN` then rebinding `climb up` would change how you navigate the page you are
 	# rebinding it on — and rebinding it to something unreachable would strand you. Raw keycodes cannot be
 	# remapped, so the page stays operable no matter what the player does to their bindings.
+	#
+	# AND IT IS THE WHOLE PAGE NOW, not the binding list. `MNU-32`'s open half was that this block ran the
+	# cursor over CONTROLS and nothing else: `Hud.move_settings_row` returned immediately on the other two
+	# faces, so the levels, the toggles and RESET KEYS had no keyboard route to them at all — and a focus
+	# state cannot be drawn on a control that can never be focused.
+	#
+	# A LEVEL IS THE ONE CONTROL ON THIS PAGE THAT WANTS THE KEY REPEAT, and it is the only reason this
+	# branch sits ABOVE the echo guard rather than inside it. Everything else here moves a cursor or fires
+	# a verb, where an echo is a runaway — a held ENTER on a FEEL toggle would flip it once per repeat and
+	# land wherever the key happened to be released. A level is a range, and crossing it in twenty separate
+	# presses is the kind of control that makes a page feel broken; the guard is lifted for exactly the one
+	# case that asks for it, tested on the FOCUSED control rather than on the category, so it cannot leak.
+	if event is InputEventKey and event.pressed and event.echo \
+			and (event.keycode == KEY_LEFT or event.keycode == KEY_RIGHT) \
+			and _hud.settings_focus_payload().has("slider"):
+		_settings_horizontal(event.keycode)
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
-			KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT:
+			KEY_UP, KEY_DOWN:
 				_hud.move_settings_row(event.keycode)
 				return
+			KEY_LEFT, KEY_RIGHT:
+				_settings_horizontal(event.keycode)
+				return
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-				var picked: StringName = _hud.settings_row_action()
-				if picked != &"":
-					_capture_action = picked
+				_settings_activate()
 				return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
@@ -1190,6 +1208,61 @@ func _settings_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and _settings_drag != "":
 		_set_volume(_settings_drag,
 			_hud.settings_slider_frac(_settings_drag, Controls.pointer_viewport(self).x))
+
+
+## HOW FAR ONE PRESS MOVES A LEVEL. The page prints the level as a whole percent (`%d%%` on the value
+## column), so a step that is not a whole number of percent would put two presses on the same printed
+## number and read as a dropped keypress. 5 gives the bar twenty stops end to end, which is a tap count
+## only because the arrows also repeat — see the echo branch in `_settings_input`.
+const LEVEL_STEP: float = 0.05
+
+
+## LEFT and RIGHT on the settings page: ADJUST the focused control, or move the cursor when the control
+## under it has nothing to adjust.
+##
+## One rule, and it needs no per-category branch: a level and the zoom cycle hold a RANGE and the arrows
+## walk it; everything else hands the key back to the cursor. On CONTROLS that fallback is the column jump
+## the two-column layout has always meant, so the shipped behaviour is untouched — it is now the general
+## rule's default case rather than the only case. On AUDIO and FEEL there is one column, so the same
+## fallback moves the cursor by nothing and a horizontal press on a toggle is quiet: ENTER is a toggle's
+## verb, and inventing a direction for a control with two unordered states (the mute chip reads `MUTED` or
+## `SOUND ON`, not `ON` or `OFF`) would be picking which of them LEFT means.
+##
+## The range controls are exactly the two that a keyboard could not operate at all before this: a chip can
+## be activated by ENTER, but a slider has no verb, and "the settings page's own controls" in `MNU-32` is
+## mostly those four levels.
+func _settings_horizontal(keycode: int) -> void:
+	var payload: Dictionary = _hud.settings_focus_payload()
+	var dir: int = 1 if keycode == KEY_RIGHT else -1
+	if payload.has("slider"):
+		var id: String = str(payload["slider"])
+		_set_volume(id, Settings.level(id) + float(dir) * LEVEL_STEP)
+		return
+	if str(payload.get("cycle", "")) == "zoom":
+		_cycle_zoom(dir)
+		return
+	_hud.move_settings_row(keycode)
+
+
+## ENTER / SPACE: run the focused control's own verb, through THE SAME PAYLOAD a click on it produces.
+##
+## `Hud.settings_row_payload` is the one table both pointers read, so there is no second opinion here about
+## what a control does — the failure this page has already had once, in a page-side copy of a conflict rule
+## that drifted from the resolver's, is the reason to route the keyboard through the click path rather than
+## to give it a switch of its own.
+##
+## A SLIDER HAS NO VERB and gets none invented for it. `_apply_setting` reads a `slider` payload as the
+## start of a DRAG, which is a statement about a mouse button being held and is meaningless from a key;
+## LEFT and RIGHT are what move a level, and the page's own legend says so.
+func _settings_activate() -> void:
+	var picked: StringName = _hud.settings_row_action()
+	if picked != &"":
+		_capture_action = picked
+		return
+	var payload: Dictionary = _hud.settings_focus_payload()
+	if payload.has("slider"):
+		return
+	_apply_setting(payload)
 
 
 ## Say what a rebind COST. `Settings.rebind` returns every action it took the key from; those actions are
@@ -2168,8 +2241,12 @@ func _current_zoom() -> float:
 
 ## Cycle to the next zoom level (Z) and apply it to the camera — Terraria-style zoom-out/in.
 ## The pick persists as a setting (real boots restore it; save is a no-op on scripted boots).
-func _cycle_zoom() -> void:
-	_zoom_idx = (_zoom_idx + 1) % ZOOM_LEVELS.size()
+## EVERY CALLER THAT PREDATES THE PARAMETER STEPS FORWARD, which is why 1 is the default: the ZOOM action
+## and the settings chip both mean "next". The settings page's LEFT arrow is the only caller that asks for
+## -1, and it is ADDED to the modulus rather than negated, so stepping back off index 0 wraps to the top
+## instead of landing on a negative index.
+func _cycle_zoom(dir: int = 1) -> void:
+	_zoom_idx = (_zoom_idx + dir + ZOOM_LEVELS.size()) % ZOOM_LEVELS.size()
 	if _camera != null:
 		_camera.zoom = Vector2(_current_zoom(), _current_zoom())
 	Settings.zoom_idx = _zoom_idx
