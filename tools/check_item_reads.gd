@@ -46,11 +46,35 @@ const ITEMS: Array[StringName] = [
 ]
 
 const CANVAS: int = 64          ## px per icon render
-const ICON: float = 48.0        ## the size draw_item is asked for, roughly a hotbar cell
+## THE SIZE THIS LAYER MEASURES AT IS NOT THE SIZE THE GAME DRAWS AT, and the comment that used to sit here
+## said otherwise. It read "roughly a hotbar cell". It is roughly FOUR of them. Every `Visuals.draw_item`
+## call site in `scenes/`: **13.0** through most of the HUD (carried-count chips, pack rows, detail chips,
+## the legend), **12.0** at `hud.gd:2785`, **9.0** for an item lying in the world
+## (`world_renderer.gd:2321`), and the detail plate at 40 or a well's own height — the only large ones.
+##
+## **So a cue that exists at 48 and dies at 13 is invisible to every number below.** That is not
+## hypothetical: a glyph detail at `size * 0.035` is 1.7px here and 0.46px in the hotbar. The general form,
+## which is worth more than this instance — **a spatial metric should take its window from the transform
+## rather than from a number**; the terrain layers already do (`check_rock_reads:442` derives its patch from
+## the live viewport basis). Icons have no transform to read, because the size is chosen by each caller, so
+## the honest substitute is to make the size ASKABLE and to say what the callers use.
+##
+## The default is deliberately UNCHANGED at 48. Moving it would alter a floor and surface defects in the same
+## motion, and then neither could be attributed. `SF_ICON_PX=13` runs it where the player actually is; what
+## falls out of that is a finding about the icons, to be reported before anything here is re-pitched.
+const ICON: float = 48.0
 const SAME_SHAPE: float = 0.90  ## silhouette IoU at or above which two icons share an outline
 const SAME_TINT: float = 10.0   ## CIELab dE below which two icons share a colour
 
 var _skipped: bool = false
+var _icon_px: float = ICON
+## The render target scales WITH the icon, because `_coverage` divides by the image area and the blank
+## test is an absolute 0.02 of it. Hold the canvas at 64 while asking for a 13px glyph and the largest
+## possible coverage is (13/64)^2 = 4%, so thin glyphs read as BLANK and the layer reports 17 empty icons
+## that are drawn perfectly well. That is a defect in the harness, not in the art, and it is what the
+## first run at SF_ICON_PX=13 actually said. Scaling by the same ratio keeps every threshold meaning what
+## it meant, and at the default it is 64 exactly, so the shipped measurement does not move.
+var _canvas: int = CANVAS
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the geometry is handed to it
@@ -64,7 +88,13 @@ class Glyph extends Node2D:
 		Visuals.draw_item(self, at, icon, item)
 
 func _initialize() -> void:
+	var raw: String = str(OS.get_environment("SF_ICON_PX"))
+	if raw.is_valid_float():
+		_icon_px = float(raw)
+		_canvas = maxi(8, int(round(float(CANVAS) * _icon_px / ICON)))
 	print("== can you tell what you are holding ==")
+	if not is_equal_approx(_icon_px, ICON):
+		print("  NOTE: rendering at %.0f px, not the default %.0f (SF_ICON_PX)" % [_icon_px, ICON])
 	await _run()
 	# quit() sets the exit code and leaves at the end of the frame, so a SECOND quit overwrites the first.
 	# Without this guard the skip below returned 0, and the runner reads the exact code — so a layer that
@@ -216,13 +246,13 @@ func _run() -> void:
 
 func _render(item: StringName) -> Image:
 	var vp := SubViewport.new()
-	vp.size = Vector2i(CANVAS, CANVAS)
+	vp.size = Vector2i(_canvas, _canvas)
 	vp.transparent_bg = true
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var g := Glyph.new()
 	g.item = item
-	g.at = Vector2(CANVAS, CANVAS) * 0.5
-	g.icon = ICON
+	g.at = Vector2(_canvas, _canvas) * 0.5
+	g.icon = _icon_px
 	vp.add_child(g)
 	get_root().add_child(vp)
 	await process_frame
