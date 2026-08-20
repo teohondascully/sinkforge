@@ -62,6 +62,7 @@ func _initialize() -> void:
 	# Which layers each verb registered, and which of them set GLFLAG=1 — "this needs a real surface".
 	var needs_surface: Array[String] = []
 	var all_layers: Array[String] = []
+	var registered: Dictionary = {}
 	var gl_verbs: Array[String] = []
 	for v: String in verbs:
 		if _verb_sets_gl(runner, v):
@@ -75,6 +76,15 @@ func _initialize() -> void:
 			if name.is_empty():
 				continue
 			all_layers.append(name)
+			# The SCRIPT the line registers, kept because a later assertion needs to know what is genuinely
+			# wired up. Matching the path anywhere in the file's text would count a COMMENT that mentions a
+			# layer as a registration, and this runner is mostly comments that mention layers by path.
+			var q: int = t.find("res://tools/")
+			if q >= 0:
+				var tail: String = t.substr(q)
+				var endq: int = tail.find("\"")
+				if endq > 0:
+					registered[tail.substr(0, endq)] = true
 			if gl_verbs.has(v):
 				needs_surface.append(name)
 			break
@@ -84,6 +94,65 @@ func _initialize() -> void:
 	_check(needs_surface.size() > 0,
 		"%d of them need a real surface, via %s: %s"
 		% [needs_surface.size(), ", ".join(gl_verbs), ", ".join(needs_surface)])
+
+	# AND THE OTHER DIRECTION, which this file did not have and paid for. Everything above reasons about the
+	# layers the runner REGISTERS, so a finished layer that nothing registers is not in the population at
+	# all — it is not covered badly, it is invisible. `check_fixture_pointer.gd` sat that way: complete,
+	# thirteen passing assertions, guarding the mechanism that decides whether a contaminated run counts,
+	# and executed by nothing on any branch. The audit and the orphan passed each other exactly, and the
+	# audit is the one that should have noticed.
+	#
+	# Judged against the paths the registration LINES carry, not against the runner's text. The first
+	# version of this asked whether the file mentioned the path anywhere, which a commented-out registration
+	# satisfies — the knockout that was supposed to prove this assertion fires passed instead, because the
+	# `#` in front of the line it had just disabled changed nothing about the search.
+	#
+	# A LAYER IS IDENTIFIED BY WHAT IT INHERITS, NOT BY AN ALLOWLIST. `check_base.gd` is not a layer and is
+	# correctly registered nowhere, and the cheap way to say so would be to name it as an exception — but an
+	# exception list is the thing that grows quietly until the guard is a formality, and this file already
+	# exists because a hand-kept list went stale. Extending the harness base is what makes a file a layer, so
+	# that is the test, and `check_base.gd` falls out of it for the right reason rather than by name.
+	var layer_files: Array[String] = []
+	var orphans: Array[String] = []
+	var dir: DirAccess = DirAccess.open("res://tools")
+	if dir == null:
+		_check(false, "the tools directory opens, so the orphan scan has something to scan")
+	else:
+		var names: PackedStringArray = dir.get_files()
+		names.sort()
+		var sources: Dictionary = {}
+		var bases: Dictionary = {}
+		for f: String in names:
+			if not f.begins_with("check_") or not f.ends_with(".gd"):
+				continue
+			var src: String = _read("tools/" + f)
+			sources[f] = src
+			# Whatever this file inherits from is a base and not a layer, whichever file that turns out to
+			# be. Naming `check_base.gd` here would work today and is the shape of guard this file exists
+			# because of.
+			var at: int = src.find("extends \"res://tools/")
+			if at >= 0:
+				var rest: String = src.substr(at + 21)
+				bases[rest.substr(0, rest.find("\""))] = true
+		for f: String in sources:
+			var src: String = String(sources[f])
+			if bases.has(f):
+				continue
+			if not src.contains("res://tools/check_base.gd") and not src.contains("extends SceneTree"):
+				continue
+			layer_files.append(f)
+			if not registered.has("res://tools/" + f):
+				orphans.append(f)
+		layer_files.sort()
+		orphans.sort()
+		# Non-vacuity, because every assertion below passes over an empty list, and an empty list is exactly
+		# what a broken directory read or a changed naming convention produces.
+		_check(layer_files.size() >= MIN_LAYERS,
+			"found %d layer files on disk to check (floor %d — under it, assume the scan broke)"
+			% [layer_files.size(), MIN_LAYERS])
+		_check(orphans.is_empty(),
+			"every layer file on disk is registered in the runner%s"
+			% ("" if orphans.is_empty() else " — these are not, so they run nowhere: " + ", ".join(orphans)))
 
 	# THE DISPLAY JOB MUST NOT SELECT BY NAME. This is the regression itself, stated as an assertion: a
 	# workflow that enumerates pixel layers is a workflow that will be stale the next time one is added,
