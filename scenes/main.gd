@@ -707,6 +707,7 @@ func _process(delta: float) -> void:
 		sim.advance(delta)
 		_falling.spawn_from_events(sim, _cell_center)
 		_falling.advance(delta)
+		_land_drops()
 		_age_drop_grace(delta)
 		_collect_ground_under_player()
 	_update_mining(delta)  # refreshes _aim from the mouse
@@ -2187,6 +2188,11 @@ const COLLECT_REACH_CELLS: float = 2.5
 ## No-auto-pickup GRACE (playtest fix — a just-dropped item was instantly sucked back up): cell → seconds
 ## remaining. Set on Q-drop for the landing cell, aged each frame; a graced cell is skipped by auto-collect.
 const DROP_GRACE_S: float = 1.3
+## How far a drop must fall to count as a full-weight landing. Eight cells is the shaft the tutorial digs;
+## anything at or past it lands as hard as landing gets, and a one-cell hand-off barely registers.
+const DROP_IMPACT_CELLS: float = 8.0
+const DROP_VOICE_MIN: float = 0.15   ## below this it is a place-down, not a fall, and stays silent
+const DROP_VOICE_MAX: int = 2        ## simultaneous landing sounds; more is a rattle, not more landings
 var _no_pickup: Dictionary = {}
 
 
@@ -2200,6 +2206,42 @@ func _age_drop_grace(delta: float) -> void:
 			_no_pickup.erase(c)
 		else:
 			_no_pickup[c] = t
+
+
+## THE ARRIVAL — the half of a toss that had no cue at all.
+##
+## A drop already fires `_particles.pop` at the moment of the THROW, at the toss cell. But the item is in
+## the air for `FALL_DURATION` after that and comes down at `sim.last_drop_landing`, which for a toss into a
+## shaft is many rows below — so the only feedback the verb had was wrong in space AND in time, and the
+## landing, which is the part with any weight in it, was silent. This is subtraction rather than invention:
+## the impact-scaled vocabulary already exists for the BODY landing (dust count, shake and thump pitch all
+## ride `player.last_impact`) and nothing had ever called it for an item.
+##
+## SCALED BY THE FALL, because that is the only thing that distinguishes setting something down from
+## dropping it down a hole. A one-cell toss should tick; an eight-cell drop should land.
+##
+## NO SHAKE, deliberately, and it is the one piece of that vocabulary not borrowed. The body landing kicks
+## the camera because the camera is on the body. Shaking the screen for a pebble arriving twelve rows away
+## would say the wrong thing about where the player is, and drops are frequent enough that it would be
+## constant.
+func _land_drops() -> void:
+	var landings: Dictionary = _falling.take_landings()
+	if landings.is_empty():
+		return
+	# Sound is capped and dust is not: dust is per-cell and reads as one event however many cells it covers,
+	# but N simultaneous clunks is a rattle rather than N landings. The loudest few carry the moment.
+	var voices: int = 0
+	for key: Variant in landings:
+		var l: Dictionary = landings[key]
+		var pos: Vector2 = l["pos"]
+		var col: Color = l["color"]
+		var imp: float = clampf(float(l["drop"]) / (float(WorldRenderer.CELL) * DROP_IMPACT_CELLS), 0.0, 1.0)
+		_particles.dust(pos, col.darkened(0.35), 2 + int(imp * 6.0))
+		# Below this the drop is a place-down, not a fall, and a sound on it would fire on every routine
+		# hand-off between machines — which is most of what this channel carries once a factory is running.
+		if imp > DROP_VOICE_MIN and voices < DROP_VOICE_MAX:
+			voices += 1
+			_sfx.play(&"clunk", pos, 1.18 - imp * 0.30, -20.0 + imp * 9.0)
 
 
 func _collect_ground_under_player() -> void:

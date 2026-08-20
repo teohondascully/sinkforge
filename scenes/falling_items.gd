@@ -42,6 +42,9 @@ var _items: Array[Dictionary] = []
 ##: steady-state streaming allocates NOTHING per event.
 var _pool: Array[Dictionary] = []
 var _motes_scratch: Array[Dictionary] = []   ## reused motes() output (the light pass calls it per frame)
+## Landings retired this frame, keyed by the cell they came down on -> {pos, color, drop}. Drained by
+## `take_landings()`; see there for why it merges rather than lists.
+var _landed: Dictionary = {}
 
 
 ## Turn this tick's sim flow_events into drops (and consume them). `cell_center` maps a cell → world
@@ -91,10 +94,39 @@ func advance(delta: float) -> void:
 		if t < 1.0:
 			f["t"] = t
 		else:
+			# ARRIVED. Record it before the dict goes back to the pool and its fields are overwritten.
+			var to: Vector2 = f["to"]
+			var drop: float = absf(to.y - (f["from"] as Vector2).y)
+			# Derived, never written down: a literal 32 here would be correct today and silently wrong the day
+			# CELL moves, merging landings on the wrong grid. That constant is already duplicated across
+			# this repo more times than anyone wants; this is not becoming another one.
+			var key: Vector2i = Vector2i((to / float(WorldRenderer.CELL)).round())
+			if not _landed.has(key) or drop > float(_landed[key]["drop"]):
+				_landed[key] = {"pos": to, "color": f["color"], "drop": drop}
 			_items[i] = _items[_items.size() - 1]
 			_items.resize(_items.size() - 1)
 			_pool.append(f)
 		i -= 1
+
+
+## WHERE THE DROPS LANDED THIS FRAME, and the caller consumes them.
+##
+## A drop's feedback used to fire at the moment of the THROW and at the toss cell (`main.gd`, one
+## `_particles.pop` at `target`), while the item itself is still in the air for `FALL_DURATION` and comes
+## down at `sim.last_drop_landing`, which may be forty rows below. So the one cue the toss had was in the
+## wrong place at the wrong time, and the arrival — the part with any weight in it — had none at all.
+##
+## MERGED BY CELL, which is the whole reason this returns a dictionary rather than a list. A stack of ten
+## spawns ten flights (`spawn_from_events` loops `count` with jitter), and ten separate puffs on one cell is
+## not ten times the feedback, it is a smear. One landing per cell per frame, carrying the LONGEST fall of
+## the group, because the deepest drop is the one the sound and the dust should be sized to.
+##
+## Returns the accumulator and clears it: whoever calls this owns the events, and calling twice in a frame
+## gets nothing the second time. That is deliberate — two consumers would both fire the same landing.
+func take_landings() -> Dictionary:
+	var out: Dictionary = _landed
+	_landed = {}
+	return out
 
 
 func size() -> int:
