@@ -1565,6 +1565,40 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 const CHROME := Color(0.78, 0.83, 0.92)
 
 
+## AN ARROW IS MATTER MOVING. A CHEVRON IS ATTENTION. NOTHING ELSE POINTS.
+##
+## Four unrelated grammars had grown into the same handful of shapes, and every one of them read as "go
+## this way". A solid wedge on a machine's edge meant goods cross here. A solid wedge of the same size,
+## bobbing three cells up in the air on a line, meant your objective is down there. A stem with an open
+## head under the Drill's preview meant ore pours out into that cell, and the identical stem said the same
+## thing under the Borer and under each of the Drift Rig's two drop columns, in three separate copies of
+## the same six lines. Three of the four were describing a flow. The fourth was not, and it was the one
+## carrying the whole of the game's guidance.
+##
+## An ARROW says matter moves along the way it points. It is a solid head, with a stem when the goods
+## travel a distance to get there and without one when they only cross a boundary, and it is always drawn
+## in contact with the path it describes: on the casing edge the goods pass through, in the cell they land
+## in. `_matter_wedge` draws that head for every one of them, so a machine's spout and a drop column's
+## arrowhead are not two similar marks that have to be kept in step, they are one mark called twice.
+##
+## A CHEVRON says look here. It is an open stroke, it has no stem of its own, and it is the only mark in
+## the file that floats free of the thing it means. Guidance owns it and nothing else may draw one. Its
+## tether is dotted rather than drawn for the same reason the head opened up: a solid line running from a
+## head down onto a cell is a stem, and a stem would make the mark an arrow pouring something INTO that
+## rock, which is the drop column's sentence and the one thing guidance must not be caught saying.
+##
+## The rule reaches as far as the marks this file lays over the world and no further. `Visuals._lift`
+## marches open chevrons up the Lift's body to mean goods rise through it, which is matter wearing the
+## attention shape. That one sits inside the casing and is part of the picture of what the machine IS,
+## rather than a note laid on top of the world, so it is a boundary case and not a collision. It is still
+## the first place to look if the two ever start reading as each other.
+##
+## Half-width and rise of the one chevron there is, in pixels. Kept here rather than at the draw site
+## because it is the shape the rule names, and because a second chevron appearing anywhere with its own
+## numbers is exactly the drift this is written down to stop.
+const GUIDE_CHEVRON := Vector2(9.0, 10.0)
+
+
 ## The current objective's cell. Mode "ghost" is a pulsing green outlined cell showing where to place the
 ## next machine; mode "act" is a chevron bobbing in the air above the target with a tether down to it, over
 ## a faint wash on the cell itself (dig this, feed this forge). Cosmetic.
@@ -1596,20 +1630,53 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 			# near-white, at the alpha the wash already carried.
 			canvas.draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)),
 				Color(CHROME.r, CHROME.g, CHROME.b, 0.10 + 0.10 * pulse))
-		# A bobbing down-pointer floated high above the cell, out of the lamp wash and into open air, with a
-		# tether line back down to the exact rock so the eye tracks marker to target. Dark-outlined so it
-		# punches through both the bright lamp and the bright day sky.
+		# A bobbing chevron floats high above the cell, out of the lamp wash and into open air, on a tether
+		# back down to the exact rock so the eye tracks marker to target. Drawn twice, a thick dark stroke
+		# under a chrome one, so it punches through both the bright lamp and the bright day sky; that is
+		# what the filled wedge's dark backing polygon used to do and it is the property worth keeping.
 		var lift: float = float(CELL) * (2.9 + 0.35 * pulse)
+		# `lift` is where the mark hangs, and the chevron's point sits on it directly. The filled wedge that
+		# used to be here carried a second offset below `tip` for its apex, which was bookkeeping for
+		# building a triangle around a point rather than anything the mark meant. It goes with the triangle.
 		var tip := center + Vector2(0.0, -lift)
-		var arrow := Color(CHROME.r, CHROME.g, CHROME.b, 0.94)
-		var dark := Color(0.02, 0.04, 0.06, 0.85)
-		# tether: marker down to the cell top
-		canvas.draw_line(tip + Vector2(0, 4), center + Vector2(0.0, -float(CELL) * 0.5),
+		# The tether is ticked, not drawn. A solid line from a head down onto a cell is a stem, and a stem
+		# is what makes an arrow: the mark would then be saying something POURS into that rock, which is
+		# the drop column's sentence. Ticks with gaps in them read as a leader line instead, and the tick
+		# pattern is the one `_draw_dashed_rect` already uses on the build previews.
+		_dotted_line(canvas, tip + Vector2(0.0, 3.0), center + Vector2(0.0, -float(CELL) * 0.5),
 			Color(CHROME.r, CHROME.g, CHROME.b, 0.30 + 0.20 * pulse), 2.0)
-		# the pointer: a bold outlined chevron
-		var back := PackedVector2Array([tip + Vector2(0, 12), tip + Vector2(-11, -7), tip + Vector2(11, -7)])
-		canvas.draw_colored_polygon(back, dark)
-		canvas.draw_colored_polygon([tip + Vector2(0, 9), tip + Vector2(-8, -5), tip + Vector2(8, -5)], arrow)
+		# The mark itself: an open chevron. It used to be a filled wedge, which is the shape a machine's
+		# spout wears to mean goods leave here (`_matter_wedge`), and one shape cannot mean both.
+		_chevron(canvas, tip, Color(0.02, 0.04, 0.06, 0.85), 5.0)
+		_chevron(canvas, tip, Color(CHROME.r, CHROME.g, CHROME.b, 0.94), 2.6)
+
+
+## The attention mark: an open chevron whose point sits at `point`, arms rising away from it by
+## `GUIDE_CHEVRON`. One polyline rather than two lines so the arms meet in a joint instead of crossing at
+## the point, which at a 5px backing stroke is the difference between a chevron and a blob.
+##
+## Drawn to a passed canvas because guidance lives on the marks layer, above the veil, and not on `self`.
+func _chevron(canvas: CanvasItem, point: Vector2, col: Color, width: float) -> void:
+	canvas.draw_polyline(PackedVector2Array([
+		point + Vector2(-GUIDE_CHEVRON.x, -GUIDE_CHEVRON.y),
+		point,
+		point + Vector2(GUIDE_CHEVRON.x, -GUIDE_CHEVRON.y)]), col, width)
+
+
+## A ticked leader line: `dash`-length ticks with an equal gap after each, from `a` to `b`. Same pattern
+## and same default length as `_draw_dashed_rect`'s perimeter, so a broken line means the same thing
+## everywhere in the file: a line that relates two things rather than one that carries something between
+## them.
+func _dotted_line(canvas: CanvasItem, a: Vector2, b: Vector2, col: Color, width: float,
+		dash: float = 6.0) -> void:
+	var span: float = a.distance_to(b)
+	if span <= 0.0:
+		return
+	var dir: Vector2 = (b - a) / span
+	var t: float = 0.0
+	while t < span:
+		canvas.draw_line(a + dir * t, a + dir * minf(t + dash, span), col, width)
+		t += dash * 2.0
 
 
 ## An interactable outline pulse: a breathing coloured outline plus solid corner brackets around the hovered
@@ -1722,16 +1789,10 @@ func _draw_drill_preview() -> void:
 	var box := Rect2(Vector2(top) * float(CELL) + Vector2(1, 1),
 		Vector2(CELL - 2, float((bot.y - top.y + 1) * CELL) - 2))
 	_draw_dashed_rect(box, tint, 6.0, 2.5)
-	# The out-arrow: a downward chevron in the cell just below the bottommost ore, where the ore pours out.
+	# The out-arrow, in the cell just below the bottommost ore, where the ore pours out.
 	var drop: Vector2i = pv["drop_cell"]
 	if sim.in_bounds(drop):
-		var cx: float = float(drop.x * CELL) + float(CELL) * 0.5
-		var top_y: float = float(drop.y * CELL) + 3.0
-		var bot_y: float = top_y + float(CELL) * 0.55
-		draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
-		var head: float = 6.0
-		draw_line(Vector2(cx, bot_y), Vector2(cx - head, bot_y - head), tint, 2.5)
-		draw_line(Vector2(cx, bot_y), Vector2(cx + head, bot_y - head), tint, 2.5)
+		_out_arrow(drop, tint)
 
 
 ## Holding the Borer previews its GALLERY: tint every solid cell it can chew along the builder's facing,
@@ -1764,12 +1825,7 @@ func _draw_h_drill_preview() -> void:
 		Vector2(float((hi - lo + 1) * CELL) - 2.0, float(CELL) - 2.0))
 	_draw_dashed_rect(box, tint, 6.0, 2.5)
 	# The out-arrow under the borer's OWN cell: the on-hook rule made visible before you commit.
-	var cx: float = float(_aim.x * CELL) + float(CELL) * 0.5
-	var top_y: float = float(below.y * CELL) + 3.0
-	var bot_y: float = top_y + float(CELL) * 0.55
-	draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
-	draw_line(Vector2(cx, bot_y), Vector2(cx - 6.0, bot_y - 6.0), tint, 2.5)
-	draw_line(Vector2(cx, bot_y), Vector2(cx + 6.0, bot_y - 6.0), tint, 2.5)
+	_out_arrow(below, tint)
 
 
 ## Holding the Drift Rig previews the two things that make it a different machine from the Borer: the gallery
@@ -1821,14 +1877,11 @@ func _drift_chute(col: int, label: String) -> void:
 		return
 	var drained: bool = not sim.is_solid(below) or sim.machine_at(below) != null
 	var tint := Color(1.0, 0.80, 0.30, 0.95) if drained else Color(0.98, 0.45, 0.38, 0.95)
-	var cx: float = float(col * CELL) + float(CELL) * 0.5
-	var top_y: float = float(below.y * CELL) + 3.0
-	var bot_y: float = top_y + float(CELL) * 0.55
-	draw_line(Vector2(cx, top_y), Vector2(cx, bot_y), tint, 2.5)
-	draw_line(Vector2(cx, bot_y), Vector2(cx - 6.0, bot_y - 6.0), tint, 2.5)
-	draw_line(Vector2(cx, bot_y), Vector2(cx + 6.0, bot_y - 6.0), tint, 2.5)
+	var tip: Vector2 = _out_arrow(below, tint)
+	# The label hangs off the arrow's own tip rather than off a second copy of the arrow's length, so a
+	# retuned arrow takes its caption with it.
 	var w: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(_font, Vector2(cx - w * 0.5, bot_y + 12.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, tint)
+	draw_string(_font, tip + Vector2(-w * 0.5, 12.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, tint)
 
 
 ## Holding Rope over a valid anchor previews the unroll: a translucent hemp line from the anchor down every
@@ -1855,6 +1908,29 @@ func _draw_rope_preview() -> void:
 		var ky: float = float((_aim.y + k) * CELL)
 		draw_line(Vector2(x - 3.0, ky), Vector2(x + 3.0, ky), ghost, 1.5)
 	draw_line(bot + Vector2(-5.0, 0.0), bot + Vector2(5.0, 0.0), ghost, 2.2)   # the floor it reaches
+
+
+## A DROP-COLUMN ARROW: goods leave the machine above and fall into `cell`. A stem down the middle of the
+## column ending in `_matter_wedge`, which is the same head a machine's spout wears, because it is the same
+## claim about the same goods one cell further along.
+##
+## One function for what used to be three copies of the same six lines, one under the Drill's preview, one
+## under the Borer's and one under each of the Drift Rig's two columns. The three had already drifted: the
+## Drill's named its head size `6.0` in a local, the Borer's and the Rig's wrote the same `6.0` twice each
+## as bare literals. Three copies of a shape are three chances for it to stop being one shape, which is the
+## failure the rule above exists to prevent and which had already half happened here.
+##
+## Returns the tip, so a caller that hangs something off the end of the arrow does not need its own copy of
+## how long the arrow is.
+func _out_arrow(cell: Vector2i, tint: Color) -> Vector2:
+	var cx: float = float(cell.x * CELL) + float(CELL) * 0.5
+	var top_y: float = float(cell.y * CELL) + 3.0
+	var tip := Vector2(cx, top_y + float(CELL) * 0.55)
+	# The stem stops short by exactly the head's stand-off, so the mark still ends where the three hand
+	# rolled versions ended and the head is not a fourth thing added to the end of the old length.
+	draw_line(Vector2(cx, top_y), tip - Vector2(0.0, WEDGE_JUT), tint, 2.5)
+	_matter_wedge(tip - Vector2(0.0, WEDGE_JUT), Vector2(0, 1), tint)
+	return tip
 
 
 ## A dashed rectangle outline: the perimeter walked clockwise, laying `dash`-length ticks every other `dash`.
@@ -2856,6 +2932,9 @@ func _draw_machine_label(machine: MachineState, pos: Vector2) -> void:
 ## where it spits (the output spout, in the flow direction: down for a recipe-runner or source, down and
 ## right for a splitter, up for a lift). Tinted by the item, so orange goes in here and yellow comes out
 ## there reads at a glance. Pure cosmetic.
+##
+## Stemless arrows, in the vocabulary above: the goods are not travelling a distance to get here, they are
+## crossing a boundary, so the mark is a bare head sitting on the boundary it names.
 func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 	var recipe: RecipeDef = machine.def.recipe
 	var c: float = float(CELL)
@@ -2867,25 +2946,38 @@ func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 	var mid: float = face.get_center().x
 	if recipe != null and not recipe.inputs.is_empty():
 		var in_item: StringName = recipe.inputs.keys()[0]
-		_port(Vector2(mid, face.position.y), Vector2(0, 1), Visuals.item_color(in_item))
+		_matter_wedge(Vector2(mid, face.position.y), Vector2(0, 1), Visuals.item_color(in_item))
 	var out_col := Color(0.80, 0.86, 0.94)                                                # neutral "routes"
 	if recipe != null and not recipe.outputs.is_empty():
 		out_col = Visuals.item_color(recipe.outputs.keys()[0])
 	match machine.def.behavior:
 		&"lift":
-			_port(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts UP
+			_matter_wedge(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts UP
 		&"splitter":
-			_port(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # down
-			_port(Vector2(pos.x + c, face.get_center().y), Vector2(1, 0), out_col)        # + right
+			_matter_wedge(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # down
+			_matter_wedge(Vector2(pos.x + c, face.get_center().y), Vector2(1, 0), out_col)        # + right
 		_:
-			_port(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # spouts down
+			_matter_wedge(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # spouts down
 
 
-## One small triangular port: the base sits on the casing edge at `base`, the apex juts out along `dir`.
-func _port(base: Vector2, dir: Vector2, color: Color) -> void:
-	var size: float = 4.5
-	var perp := Vector2(dir.y, -dir.x) * size
-	var apex := base + dir * (size + 2.5)
+## Half-width of the matter wedge, and how far its apex stands off from its base. Both were literals
+## inside the one function that drew the shape, which was fine while there was one caller; `_out_arrow`
+## now ends on the same head, so the two callers have to be looking at one number rather than at two that
+## happen to agree today.
+const WEDGE_HALF: float = 4.5
+const WEDGE_JUT: float = WEDGE_HALF + 2.5
+
+
+## THE MATTER WEDGE, the one solid head in this file, and the whole of the arrow half of the vocabulary
+## above. `_draw_machine_io` sets it on a casing edge to say goods cross here; `_out_arrow` sets it on the
+## end of a stem to say goods fall to there. Both are the same sentence about the same kind of thing, so
+## they are one call and not two shapes to keep in step.
+##
+## The base sits on the edge at `base` and the apex juts out along `dir`. The dark line across the base is
+## what separates the head from whatever it is standing on, casing or stem.
+func _matter_wedge(base: Vector2, dir: Vector2, color: Color) -> void:
+	var perp := Vector2(dir.y, -dir.x) * WEDGE_HALF
+	var apex := base + dir * WEDGE_JUT
 	var p1 := base + perp
 	var p2 := base - perp
 	draw_colored_polygon(PackedVector2Array([apex, p1, p2]), Color(color.r, color.g, color.b, 0.95))
