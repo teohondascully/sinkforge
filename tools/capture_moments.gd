@@ -789,6 +789,34 @@ func _the_sapling(main: MainView) -> void:
 		return
 	sim.inventory[&"sapling"] = int(sim.inventory.get(&"sapling", 0)) + 1
 	sim.total_produced[&"sapling"] = int(sim.total_produced.get(&"sapling", 0)) + 1
+	# AIM AT GROUND THAT WOULD ACCEPT THE SEED, because the lesson is now gated on relevance: it arrives
+	# only while the cursor is over a cell `can_plant_sapling` accepts and the body can reach. A fixture
+	# that never aims photographs an empty channel, and the pointer is the real OS one until posed, so
+	# leaving it alone means the picture depends on where a hand left the mouse. Nearest cell first, so
+	# the shot frames a plausible aim rather than the far corner of the search box.
+	var body: Vector2i = main._cell_at(main._player.position)
+	var aim: Vector2i = Vector2i(-1, -1)
+	for ring: int in range(1, 6):
+		for dy: int in range(-ring, ring + 1):
+			for dx: int in range(-ring, ring + 1):
+				if maxi(absi(dx), absi(dy)) != ring:
+					continue                    # ring shell only; inner cells were tried already
+				var c: Vector2i = body + Vector2i(dx, dy)
+				if sim.can_plant_sapling(c) and main._can_reach(c):
+					aim = c
+					break
+			if aim.x >= 0:
+				break
+		if aim.x >= 0:
+			break
+	if aim.x < 0:
+		# Loud, not silent. The shutter guard downstream checks the bubble's opacity and would refuse
+		# anyway, but it would refuse with "the visible lesson is ''", which points at the hint system
+		# rather than at the ground under the body.
+		printerr("capture_moments: no plantable cell within reach of the body at %s; " % body
+			+ "the sapling lesson cannot become relevant and this shot will refuse")
+	else:
+		Controls.pose_pointer(main._cell_center(aim))
 	# WAIT OUT THE OPENING CEREMONY FIRST, and this wait is itself the change under test. The TOPSOIL
 	# arrival plate is up at boot, and a lesson now HOLDS while the ceremony owns the announce channel
 	# (P1: one primary attention state at a time). Before that rule the two simply drew on top of each
