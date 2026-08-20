@@ -2551,6 +2551,22 @@ func _draw_water() -> void:
 			right_y = 0.5 * (mid_y + _water_surface_y(c + Vector2i(1, 0), right_lvl))
 
 		var open_above: bool = sim.water_at(c - Vector2i(0, 1)) <= 0
+		# THE WATERLINE IS SAMPLED AT THE CELL MIDPOINT AS WELL AS ITS EDGES, AND WITHOUT THAT THE RIPPLE
+		# CONSTANT IS A LIE. The top edge used to carry two vertices per cell, both on cell boundaries, so
+		# the drawn line was a polyline through points 32px apart no matter what `WATER_RIPPLE_LEN` said.
+		# A 46px crest spacing sampled every 32px is below Nyquist — which needs period >= 2x spacing — and
+		# a sinusoid under Nyquist does not turn into noise, it FOLDS to a lower frequency: 32/46 is 0.696
+		# cycles per sample, folding to 0.304, so the ripple actually drew crests every 105px. Not a subtle
+		# error and not a tuning matter: the water was rippling at better than twice the wavelength anyone
+		# wrote down, and no amount of adjusting the constant would have found it, because every value below
+		# 64px lands somewhere else on the same fold.
+		#
+		# One extra sample halves the spacing to 16px and makes 46.0 mean 46. The midpoint takes this cell's
+		# OWN surface height, unsmoothed, which is right rather than merely convenient: the edges are averaged
+		# with their neighbours precisely so a level step tapers across the boundary, and the midpoint is
+		# interior to the cell, so a three-point top edge is a better piecewise-linear fit to the same surface
+		# than the straight line it replaces. The base shape improves even where the water is still.
+		var mid_top: float = mid_y
 		if not open_above:
 			# An interior cell is full. Its own level is a bookkeeping number about how much water lives here,
 			# not a height: the water above is resting ON it, so there is no air in this cell to draw.
@@ -2559,9 +2575,12 @@ func _draw_water() -> void:
 			# to even out, and what an unevenly-fed aquifer looks like permanently.
 			left_y = base.y
 			right_y = base.y
+			mid_top = base.y
 		if open_above:
 			# Only a cell with nothing above it owns a waterline, and only that line ripples.
 			left_y += sin((base.x) / WATER_RIPPLE_LEN * TAU + t * WATER_RIPPLE_SPEED * TAU) * WATER_RIPPLE_AMP
+			mid_top += sin((base.x + cell_f * 0.5) / WATER_RIPPLE_LEN * TAU
+				+ t * WATER_RIPPLE_SPEED * TAU) * WATER_RIPPLE_AMP
 			right_y += sin((base.x + cell_f) / WATER_RIPPLE_LEN * TAU
 				+ t * WATER_RIPPLE_SPEED * TAU) * WATER_RIPPLE_AMP
 
@@ -2579,22 +2598,28 @@ func _draw_water() -> void:
 		var fill := Color(body.r, body.g, body.b, alpha)
 
 		var tl := Vector2(base.x, left_y)
+		var tm := Vector2(base.x + cell_f * 0.5, mid_top)
 		var tr := Vector2(base.x + cell_f, right_y)
 		var br := Vector2(base.x + cell_f, floor_y)
 		var bl := Vector2(base.x, floor_y)
-		draw_colored_polygon(PackedVector2Array([tl, tr, br, bl]), fill)
+		draw_colored_polygon(PackedVector2Array([tl, tm, tr, br, bl]), fill)
 
 		if not open_above:
 			continue
 		# The meniscus: a soft band hung under the bright line so the surface has thickness. Without it the
 		# waterline is a drawn stroke sitting on a fill; with it, the fill appears to end in a surface.
 		var men := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, 0.22)
+		# Both of these hang off the SAME three points as the fill. A band that resampled the surface on its
+		# own would drift off the fill it is supposed to cap — a bright line floating above its own water
+		# reads as a rendering fault and would look worse than the aliasing this fixes.
 		draw_colored_polygon(PackedVector2Array([
-			tl, tr, Vector2(tr.x, right_y + WATER_MENISCUS), Vector2(tl.x, left_y + WATER_MENISCUS)]), men)
+			tl, tm, tr, Vector2(tr.x, right_y + WATER_MENISCUS), Vector2(tm.x, mid_top + WATER_MENISCUS),
+			Vector2(tl.x, left_y + WATER_MENISCUS)]), men)
 		var line := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b,
 			minf(1.0, WATER_ALPHA + 0.22))
 		draw_colored_polygon(PackedVector2Array([
-			tl, tr, Vector2(tr.x, right_y + 1.5), Vector2(tl.x, left_y + 1.5)]), line)
+			tl, tm, tr, Vector2(tr.x, right_y + 1.5), Vector2(tm.x, mid_top + 1.5),
+			Vector2(tl.x, left_y + 1.5)]), line)
 
 
 ## Is a machine visibly working this tick? Behavior-aware, so the glyph animates truthfully: a generator
