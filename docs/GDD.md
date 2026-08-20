@@ -13,7 +13,7 @@
 **Platform:** macOS dev (M4 Pro) → Steam (Windows/Mac/Linux)
 **Perspective:** Side-view; a character in a world; the camera lives at body-scale and pulls back to base-scale
 **Scope:** Ambitious / flagship project
-**Solo dev with Assistant Code as assistant**
+**Team:** Solo developer
 
 ---
 

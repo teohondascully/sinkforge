@@ -1,503 +1,494 @@
-# DECISIONS — the log
+# Decisions
 
-Seven places in this repo cite this file, including `project.godot`, which names it as the rationale for a
-compile-error tripwire. Until now it did not exist. Every one of those citations sent a reader looking for
-a document that was never written, which is worse than having no citation at all — it reads as a decision
-record that someone deleted.
+An architecture decision record for Sinkforge. Each entry states a decision, why it was made, and where in
+the repository you can check it. Entries that record a design intention with no artefact behind it say so
+rather than inventing evidence.
 
-So this is the reconstruction. **Every entry below is attested somewhere in the repo** — a doc, a code
-constant, `project.godot`, or a commit — and each one names its source so you can check it. Nothing here
-was invented to fill a gap. Where a decision was clearly made but its reasoning is not recorded anywhere,
-the entry says so rather than guessing.
+It is cited by name from `project.godot`, which calls it the rationale for a compile-error tripwire, and
+from `README.md`, `.gitignore`, `.githooks/commit-msg`, `tools/check_trailers.sh`,
+`tools/capture_moments.gd`, `docs/ARCHITECTURE.md`, `docs/PRIORITY.md` and
+`.github/workflows/harness.yml`.
 
-**How to read the status column:**
+## Status taxonomy
 
 | Status | Meaning |
 |---|---|
-| **LOCKED** | Decided, built, and load-bearing. Changing it breaks things on purpose. |
-| **PROVISIONAL** | Decided *for now*, deliberately reversible. The working model prefers these (see 2026-06-28). |
-| **PROPOSED** | Written down, argued for, **not adopted**. Needs the user. Do not build on it. |
-| **REOPENED** | Was settled, has been deliberately re-opened. |
-| **SUPERSEDED** | Replaced by a later entry, kept because the reasoning still matters. |
-
-When you make a real decision, add an entry. An undocumented decision gets re-litigated every session, and
-this project has already paid that cost more than once.
+| LOCKED | Decided, built, and load-bearing. Changing it breaks things on purpose. |
+| PROVISIONAL | Decided for now, deliberately reversible. |
+| PROPOSED | Written down and argued for, but not adopted. Nothing should be built on it. |
+| REOPENED | Was settled, has been deliberately re-opened. |
+| SUPERSEDED | Replaced by a later entry, kept because the reasoning still matters. |
 
 ---
 
 ## Engineering
 
-### The sim is node-free, and that seam is enforced — LOCKED
+### The sim is node-free, and the seam is enforced (LOCKED)
 
-`FactorySim` is `RefCounted`, has no engine dependencies, and cannot see a scene tree. `tests/test_base.gd`
-builds one with no tree at all. The README's claim — *"you could delete the player entirely and the
-production numbers would be identical"* — is architecturally enforced, not aspirational.
+`FactorySim` is a `RefCounted`. It has no engine dependencies and cannot see a scene tree.
+`tests/test_base.gd` constructs one with no tree at all, which is what makes the seam checkable rather
+than aspirational: the production numbers do not depend on the player existing.
 
-**Do not put a `get_tree()` in the sim.** Most codebases that claim this seam have already broken it; this
-one has not, and the only reason it has not is that every contributor has treated the rule as absolute.
+No `get_tree()` belongs in the sim. The rule holds only because it has been treated as absolute.
 
-*Attested: the architecture handover §4; `src/core/factory_sim.gd`; `tests/test_base.gd`.*
+*Attested: `src/core/factory_sim.gd`; `tests/test_base.gd`.*
 
-### Adding content is a data file, not a class — LOCKED
+### Adding content is a data file, not a class (LOCKED)
 
-A machine is a `.tres` in `src/data/machines/` (20 of them); a material is a `.tres` in
-`src/data/materials/` (16). The sim is generic over them. the architecture handover §4 calls this a
-"load-bearing decision" and it is: it is why content can be added without touching the sim.
+A machine is a `.tres` in `src/data/machines/` (20 of them). A material is a `.tres` in
+`src/data/materials/` (16). The sim is generic over both, which is why content can be added without
+touching it.
 
-**The known cost, and it has bitten:** registration is still split across several hand-maintained lists —
-the renderer, the sim's behaviour table, the craftable registry, save filename construction, and
-hand-written test frontiers. `WorldRenderer._material()` falls back to `earth` on a miss, so a material
-missing from its list renders as **dirt with no error** — `rich_ore`, the deep treasure, did exactly that
-for as long as it existed. `check_material_registry.gd` and `check_craftable_registry.gd` now guard both
-lists. **Any new hardcoded registry needs a guard.**
+The known cost is registration. Several hand-maintained lists still have to agree with the data
+directory: the renderer's material table, the sim's behaviour table, the craftable registry, save
+filename construction, and hand-written test frontiers. `WorldRenderer._material()` resolves an unknown
+id to `earth`, so a material missing from its list renders as dirt with no error at all. `rich_ore`, the
+deep treasure, did exactly that for as long as it existed. Two harness layers now guard both lists, and
+any new hardcoded registry needs its own.
 
-*Attested: the architecture handover §4 and §9 trap 4; `src/data/`; the two registry check layers.*
+*Attested: `src/data/machines/`, `src/data/materials/`; `scenes/world_renderer.gd` `_material()`;
+`tools/check_material_registry.gd`, `tools/check_craftable_registry.gd`.*
 
-### 2026-06-27 — the provisional machine model: a thin `behavior` tag, not a type enum — PROVISIONAL
+### 2026-06-27: the machine model is a thin `behavior` tag, not a type enum (PROVISIONAL)
 
-A machine is a named recipe-runner; a source is a recipe with no inputs; and a thin
-`behavior: StringName` tag (default empty) lets the few genuinely non-recipe machines — the splitter was
-the first — branch inside the sim **without introducing a type enum**. Every def carries a stable
+A machine is a named recipe-runner, and a source is a recipe with no inputs. A thin
+`behavior: StringName` tag (empty by default) lets the few genuinely non-recipe machines branch inside
+the sim without a type enum. The splitter was the first of them. Every def carries a stable
 `id: StringName` for save and reference safety.
 
-The reason it is provisional rather than locked: an enum would have forced every future machine to declare
-which of N kinds it is, before anyone knew what the kinds were. A tag defers that until the shape of the
+It is provisional rather than locked because an enum would have forced every future machine to declare
+which of N kinds it is before anyone knew what the kinds were. A tag defers that until the shape of the
 content is known.
 
-*Attested: `docs/ARCHITECTURE.md` §"Data Resources", which cites this entry by date.*
+*Attested: `docs/ARCHITECTURE.md` "Data Resources", which cites this entry by date;
+`src/core/factory_sim.gd`.*
 
-### Machine behaviours dispatch by METHOD NAME, not `Callable` — LOCKED
+### Machine behaviours dispatch by method name, not by `Callable` (LOCKED)
 
-`FactorySim._BEHAVIORS` maps a behaviour tag to a method **name**. This looks like the worse option and is
-not: a `Callable` bound to `self` stored on `self` **leaks a reference cycle per sim**, and this project
-constructs a lot of sims (every test, every harness layer, every seed in a corpus).
+`FactorySim._BEHAVIORS` maps a behaviour tag to a method name. A `Callable` bound to `self` and stored on
+`self` leaks a reference cycle per sim, and this project constructs a great many sims: one per test, one
+per harness layer, one per seed in a corpus.
 
-*Attested: the architecture handover §4; `src/core/factory_sim.gd`.*
+*Attested: `src/core/factory_sim.gd` `_BEHAVIORS`.*
 
-### Static typing everywhere, enforced as a compile error — LOCKED
+### Static typing everywhere, enforced as a compile error (LOCKED)
 
-`project.godot` sets `gdscript/warnings/untyped_declaration=2`, where 2 means **error**, not warn. Every
-declaration needs a type; `:=` inference satisfies it. `project.godot` calls this "Enforcement tripwire #1"
-and the phrase is the point — the rule is self-enforcing rather than a style note somebody has to remember
-to police in review.
+`project.godot` sets `gdscript/warnings/untyped_declaration=2`, where 2 means error rather than warning.
+Every declaration needs a type; `:=` inference satisfies it. `project.godot` calls this "Enforcement
+tripwire #1", and self-enforcement is what the entry is for. A style note somebody has to remember to
+police in review is not the same instrument.
 
-*Attested: `project.godot` `[debug]`.*
+*Attested: `project.godot`, `[debug]`.*
 
-### `_grow_vein` is the single funnel every ore body is born through — LOCKED
+### `_grow_vein` is the single funnel every ore body is born through (LOCKED)
 
-Every ore body in the game is created through one function in `src/core/layered_world_gen.gd`. This is what
-made the lode migration tractable at all: moving ore out of the terrain plane meant changing one funnel,
-not auditing every generator site.
+Every ore body in the game is created through one function in `src/core/layered_world_gen.gd`. That is
+what made the lode migration tractable: moving ore out of the terrain plane meant changing one funnel
+rather than every generator site.
 
-*Attested: the architecture handover §4; `src/core/layered_world_gen.gd`.*
+*Attested: `src/core/layered_world_gen.gd` `_grow_vein`.*
 
-### Same seed means an identical world — LOCKED
+### Same seed means an identical world (LOCKED)
 
-Moving or adding an `rng.randf()` call reshuffles everything downstream of it. A documented bug of exactly
-this kind once let iron crest through the seal onto the pre-breach shelf.
+Moving or adding an `rng.randf()` call reshuffles everything downstream of it. `_grow_vein` carries a
+`min_row` floor for exactly this reason: a body seeded just under the seal could otherwise climb through
+rows the seal stamp later re-fills and leave its crest above them, which is how iron once reached the
+pre-breach shelf.
 
-**Consequence for the harness:** every worldgen fixture must use fixed, committed seeds. A randomly-seeded
-worldgen check is worse than none.
+The consequence for the harness is that every worldgen fixture uses fixed, committed seeds. A
+randomly-seeded worldgen check is worse than none. `MainView.WORLD_SEED` is 1337 and
+`MainView.default_seed()` routes the `SF_SEED` override, so a seed corpus re-runs the real layers at
+their real floors on other worlds instead of re-implementing the measurements somewhere they can drift.
 
-*Attested: the architecture handover §9 trap 5.*
+*Attested: `src/core/layered_world_gen.gd` `_grow_vein`; `scenes/main.gd` `WORLD_SEED`, `default_seed()`;
+`tests/test_worldgen.gd`.*
 
 ---
 
-## The harness and how this project trusts itself
+## The harness
 
-### A green harness bought by moving a threshold is worse than a red one — LOCKED
+### A green harness bought by moving a threshold is worse than a red one (LOCKED)
 
-The single most important rule in the project. It has its own long section
-(the architecture handover §5); the short form:
+The most important rule in the project.
 
-1. **Guard against the vacuous pass.** An assertion that is trivially true because the fixture never
-   created the condition proves nothing. Assert that the fixture *did the thing* first.
-2. **Never lower a floor to make a red test green.** Guessing a harness floor before *playing* the thing
-   has been wrong every time it was tried. A floor may only move if you can write down **why the property
-   was never real**.
-3. **Thresholds carry their derivations** — the measurement, the date, and what the number's job is.
-4. **Prove a new guard is non-vacuous by breaking the code and watching it go red.** Every time.
-5. **A comment that states a number or a behaviour is a test with no runner.** Either derive the fact
-   (`% DESCENT_QUOTA`) or put it where the harness checks it.
+1. Guard against the vacuous pass. An assertion that is trivially true because the fixture never created
+   the condition proves nothing. Assert that the fixture did the thing first.
+2. Never lower a floor to make a red test green. A floor may only move when the reason the property was
+   never real can be written down.
+3. Thresholds carry their derivations: the measurement, the date, and what the number is for.
+4. Prove a new guard is non-vacuous by breaking the code and watching it go red.
+5. A comment that states a number or a behaviour is a test with no runner. Either derive the fact from
+   the constant or put it where the harness checks it.
 
 Rule 5 is why `hover_info.gd` prints the ingot quota with `% FactorySim.DESCENT_QUOTA` instead of typing
-"64". It is also why the entry below exists.
+"64".
 
-*Attested: the architecture handover §5; `tools/check_lode.gd`, `tools/check_wrap.gd`, `tools/check_texture.gd`
-each state the discipline in their own words.*
+*Attested: `scenes/hover_info.gd`; `tools/check_lode.gd`, `tools/check_wrap.gd`, `tools/check_texture.gd`,
+each of which states the discipline in its own words.*
 
-### Build playable loops validated by agent play-tests, not systems validated by unit tests — LOCKED
+### Build playable loops, validated by play-tests against the real input path (LOCKED)
 
-`tools/play_agent.gd` exposes the real verbs and drives `MainView`'s actual input path, not the sim
-directly. `tools/play_tests.gd` sets goal rungs with **friction ceilings** — a goal is met only if it
-completes *and* stays under its ceilings. **A failing play-test IS the spec.**
+`tools/play_agent.gd` drives the real `Player` body with real platformer physics and triggers the real,
+reach-gated verbs on `MainView` (`try_mine`, `try_build`, `try_deposit`, `try_craft`, `select`), which is
+the same surface a person drives with mouse and keys. Nothing in it reaches past the verb layer to fake a
+result, so a passing play-test means a person could actually do the thing.
 
-*Attested: the architecture handover §6; `tools/play_agent.gd`, `tools/play_tests.gd`.*
+`tools/play_tests.gd` sets goal rungs with friction ceilings: a goal is met only if it completes and
+stays under its ceilings. A failing play-test is the spec.
 
-### The blind-vision tier: a zero-context agent judges from pixels alone — LOCKED
+*Attested: `tools/play_agent.gd`, `tools/play_tests.gd`.*
 
-A fresh vision agent with **no access to code, docs, or commit messages** judges the game as a first-time
-player. That ignorance IS the instrument — it is the only judge that does not already know what everything
-means. It is the fix for gauges that read the sim and miss visual legibility.
+### Presentation is judged blind, from pixels (LOCKED)
 
-It works. Its most recent pass produced the most valuable finding of that session: *"I cannot reliably tell
-solid rock from empty air, and I want to say that loudly."*
+`tools/capture_moments.gd` renders the game's canonical moments so legibility can be judged from the
+frame by a reviewer with no access to the code, the docs, or the commit messages. That ignorance is the
+instrument. It is the only judge that does not already know what everything on screen means, and it is
+the fix for gauges that read the sim correctly and miss whether the screen is readable.
 
-**The naive agent is the judge, not "it looks better to me."**
+`SF_MOMENT_DIR` redirects the write and changes nothing else, so a baseline can be archived without a
+canonical capture being touched. It fails closed: an unusable directory refuses the capture rather than
+falling back to the repository root.
 
-*Attested: the architecture handover §6.*
+*Attested: `tools/capture_moments.gd`; the canonical `_moment_*.png` at the repository root.*
 
-### 2026-08-17 — the harness may never touch the player's save — LOCKED
+### 2026-08-17: the harness may never touch the player's save (LOCKED)
 
 `tools/check_saveload.gd` drove the real `user://sinkforge.save` through `_save_game()` and then deleted
-it, so the one command the project tells every contributor to run destroyed the developer's game every
-time. The runner's own header promised the opposite.
+it, so the one command every contributor is told to run destroyed the developer's game each time. The
+runner's own header promised the opposite.
 
-`MainView.SAVE_PATH` became `MainView.save_path`, a `static var` — the same treatment `Settings.path`
-already had, for the same reason. **The production default was deliberately left unchanged**, because
-moving where players save would have traded one data-loss bug for another. Two guards enforce it:
-`tools/check_save_isolation.gd` (a source scan, first layer, milliseconds) and `tools/save_sentinel.gd` (a
-runner instrument that hashes the real slot before and after the sweep).
+`MainView.SAVE_PATH` became `MainView.save_path`, a `static var`, the same treatment `Settings.path`
+already had. The production default was deliberately left unchanged, because moving where players save
+would have traded one data-loss bug for another. Two guards enforce it: `tools/check_save_isolation.gd`,
+a source scan that runs first and costs milliseconds, and `tools/save_sentinel.gd`, a runner instrument
+that hashes the real slot before and after the sweep.
 
-*Attested: commits `a6a681f`, `6a0dc8d`; `the audit notes` §2.*
+*Attested: commits `a6a681f`, `6a0dc8d`; `scenes/main.gd` `save_path`;
+`tools/check_save_isolation.gd`, `tools/save_sentinel.gd`.*
+
+### A layer that measures time runs alone (LOCKED)
+
+`tools/run_harness.sh` registers layers with `add`, `add_gl` (needs a real GL surface) or `add_excl`
+(needs the box to itself). A timing layer measures the machine, not the directory, so running it
+alongside others inverts its margins and it goes red for reasons that have nothing to do with the code.
+`check_frametime` and `check_dig_hitch` are registered `add_excl` for that reason.
+
+`add_excl` is not only for timing claims. `check_grapple_reads` went red on two sweeps of four and green
+on every isolated run, and it is registered exclusive too. That removes the condition rather than the
+cause, which the runner says out loud where it registers the layer.
+
+*Attested: `tools/run_harness.sh` (`add_excl` and its registrations).*
 
 ---
 
 ## Design
 
-### 2026-06-28 — the progression spine, and the working model that governs it — PROVISIONAL by design
+### 2026-06-28: the progression spine, and the working model that governs it (PROVISIONAL by design)
 
-A guided brainstorm resolved the long-open "what is the Sinkforge / tech graph / endgame" question and
-unblocked the crafter modules and ore quality, both of which had been waiting on a recipe graph.
+A guided design pass resolved the long-open question of what the Sinkforge, the tech graph and the
+endgame are, and unblocked the crafter modules and ore quality, both of which had been waiting on a
+recipe graph.
 
-The meta-decision matters more than the content: **names, counts, and per-layer twists can change; the
-SHAPE is what's locked.** Two sub-systems — **combat feel** and **power mechanics** — were deliberately
-left open to get their own brainstorm before being built.
+The meta-decision matters more than the content. Names, counts, and per-layer twists can change; the
+shape is what is locked. Two sub-systems, combat feel and power mechanics, were deliberately left open to
+be designed separately before being built.
 
-This is the project's general working model, and it exists because the user freezes at abstract design
-forks that might constrain an unsettled future vision. **Prefer provisional, reversible, demand-pull
-framings. Dissolve decisions rather than forcing them.** When a fork must be presented, present it with a
+This is the project's general working model. Prefer provisional, reversible, demand-pull framings, and
+dissolve a decision rather than forcing it. When a fork has to be presented, present it with a
 recommendation and a cheap first slice that commits to nothing.
 
-*Attested: `docs/PROGRESSION.md` header; the working model is in the architecture handover §10.*
+*Attested: `docs/PROGRESSION.md` header, which cites this entry by date.*
 
-### The danger model — "you open the wall" — REOPENED, then subsumed
+### The danger model: you open the wall (REOPENED, then subsumed)
 
-Your base is **safe by construction**: because you mine through solid earth, carved tunnels have no open
-space for anything to spawn into. Danger is **located, not ambient** — it lives in pre-existing caves,
-dungeons, and boss arenas you choose to breach. `docs/GDD.md` notes this deliberately **reopened** a
+The base is safe by construction. Because you mine through solid earth, a carved tunnel has no open space
+for anything to spawn into. Danger is located rather than ambient: it lives in pre-existing caves,
+dungeons and boss arenas you choose to breach. `docs/GDD.md` records this as deliberately reopening a
 previously-deferred hazards decision.
 
-**Superseded in emphasis by 2026-08-07 below**, which subsumes combat into environmental antagonism and
-defers it entirely. The "safe by construction" half is still true and still load-bearing; the
-dungeon/boss/arena half is not currently being built.
+Superseded in emphasis by the 2026-08-07 entry below, which subsumes combat into environmental
+antagonism and defers it. The safe-by-construction half is still true and still load-bearing. The
+dungeon, boss and arena half is not currently being built.
 
-*Attested: `docs/GDD.md` "The Danger Model (NEW IN v0.2)".*
+*Attested: `docs/GDD.md`, "The Danger Model".*
 
-### 2026-08-07 — the environment is the antagonist — LOCKED
+### 2026-08-07: the environment is the antagonist (LOCKED)
 
-Each layer's iconic physics twist **is** the tension — an aquifer that floods, magma, a hollow. Combat is
-subsumed into that and **stays undecided until layer 4**. A design that needs an army of enemies is
-fighting the game.
+Each layer's iconic physics twist is the tension: an aquifer that floods, magma, a hollow. Combat is
+subsumed into that and stays undecided until layer 4. A design that needs an army of enemies is fighting
+the game.
 
-First slice: L3 Aquifer/fluids, chosen because it is reversible.
+The first slice was the L3 aquifer and its fluids, chosen because it is reversible.
 
-*Attested: the architecture handover §2 pillar 3; the design-direction memory of the same date.*
+*Attested: `docs/PROGRESSION.md` layer ladder; `src/core/water_flow.gd`; `tools/check_water_move.gd`,
+`tools/check_water_reads.gd`, `tools/check_pump.gd`.*
 
-### 2026-08-08 — validate the loop before building the campaign — LOCKED
+### 2026-08-08: validate the loop before building the campaign (LOCKED)
 
-The Sinkforge/cannon is a **lighthouse** — a fixed direction on the horizon that gives every action
-meaning — **not a progress bar you watch fill for forty hours.** A charge meter you stare at demoralises;
-it makes the other thirty-nine hours feel like waiting. The discharge is a climax you *assemble* in the
-final act.
+The Sinkforge is a lighthouse: a fixed direction on the horizon that gives every action meaning. It is
+not a progress bar you watch fill for forty hours. A charge meter you stare at demoralises, because it
+makes the other thirty-nine hours feel like waiting. The discharge is a climax you assemble in the final
+act.
 
-**The corollary is the operative half: prove roughly two hours of real, human, moment-to-moment fun before
-building campaign structure.** Content is cheap once the loop is proven; a gorgeous campaign bolted onto an
-unfun loop is wasted work.
+The corollary is the operative half. Prove roughly two hours of real, moment-to-moment fun before
+building campaign structure. Content is cheap once the loop is proven, and a gorgeous campaign bolted
+onto an unfun loop is wasted work.
 
-As of the 2026-08-17 audit, only about **15 minutes** is agent-validated, and *no* human cohort has ever
-been observed. That gap is the single largest unknown in the project.
+What is actually measured today is much less than that. `tools/play_tests.gd` covers the opening arc up
+to first automation and a handful of friction goals below it. No human cohort has been observed at all,
+and that gap is the largest unknown in the project.
 
-*Attested: `docs/PROGRESSION.md` §10; `the comprehensive audit` "First 2 / 10 / 60 minutes".*
+*Attested: `docs/PROGRESSION.md` §10; `tools/play_tests.gd`.*
 
-### Dig your factory — the world is solid, caves are punctuation — LOCKED
+### Dig your factory: the world is solid, caves are punctuation (LOCKED)
 
-You dig *into* solid, ore-rich earth. You do not follow a cave. Caves are rare, opt-in danger/reward
-pockets — punctuation in rock, not the medium you travel through. **This is the identity; guard it.**
+You dig into solid, ore-rich earth. You do not follow a cave. Caves are rare, opt-in danger and reward
+pockets, punctuation in rock rather than the medium you travel through. This is the identity of the game
+and it needs guarding.
 
-*Attested: the architecture handover §2 pillar 1.*
+*Attested: `docs/GDD.md`; `src/core/layered_world_gen.gd`.*
 
-### Gravity is a mechanic — LOCKED
+### Gravity is a mechanic (LOCKED)
 
 Mined and produced items physically fall. Machines pour down their own column. Logistics run downhill for
 free and uphill at a cost.
 
-*Attested: the architecture handover §2 pillar 2.*
+*Attested: `docs/GDD.md`; `scenes/falling_items.gd`; `src/core/factory_sim.gd`.*
 
-### Demand-pull: never unlock a thing before the player has felt the problem it solves — LOCKED
+### Demand-pull: never unlock a thing before the player has felt the problem it solves (LOCKED)
 
 The Spur must not unlock with the drill, or you never feel that a Head covers one cell.
 
-**Its twin: don't invent chores.** A Head is never `blocked` — with no shaft under it the ore piles at its
-feet, like everything else in this game when it lands. Refusing to run in order to prevent a pile would
-invent a chore.
+Its twin is that chores must not be invented. A Head is never `blocked`. With no shaft under it the ore
+piles at its feet, like everything else in this game when it lands. Refusing to run in order to prevent a
+pile would be a chore with no gameplay in it.
 
-*Attested: the architecture handover §10.*
+*Attested: `docs/DRIFT.md` §5, "The rule that keeps this from becoming an errand"; `docs/LODE_PLAN.md`
+phase 2b.*
 
-### Ore does not glow. It answers your lamp. — LOCKED
+### Ore does not glow. It answers your lamp. (LOCKED)
 
-Emission is reserved. The user's framing: *"I want the lighting to make ores feel special but not so much
-so that it's hard to play the game from distractions and overstimulation."*
+Emission is reserved. The intent is for lighting to make ore feel special without making the game harder
+to play through distraction and overstimulation, so the glint pass is a response to light rather than a
+light source of its own.
 
-*Attested: the architecture handover §10 and §1.*
+*Attested: `scenes/world_renderer.gd`, the ore glint pass.*
 
-### Darkness is the game's word for "you can walk here" — LOCKED
+### Darkness is the game's word for "you can walk here" (LOCKED)
 
 Mining never writes a backing wall, so every player-dug tunnel is void and reads black. A hand-authored
-opening that backs itself speaks a dialect the world does not — and reads as a scuff, not a cave.
+opening that backs itself speaks a dialect the world does not, and reads as a scuff rather than a cave.
 
-*Attested: the architecture handover §10.*
+*Attested: `src/core/factory_sim.gd` `mine()`; `scenes/world_renderer.gd`.*
 
-### The lode migration: terrain is what you CARVE, the lode is what you EXTRACT — LOCKED
+### The lode migration: terrain is what you carve, the lode is what you extract (LOCKED)
 
-Ore moves out of the terrain plane into a background lode plane. The old model made a vein *be* the rock,
+Ore moves out of the terrain plane into a background lode plane. The old model made a vein be the rock,
 so a tunnel driven through an ore body destroyed everything it did not pocket.
 
-**User decision locked: Option A — no solid ore survives the cutover.** That remains the target and is not
-reopened here. Deletion of the solid-ore code path is deliberately split into a **separate later commit**:
-bisectable beats bundled.
+The target is that no solid ore survives the cutover. Deletion of the solid-ore code path is deliberately
+split into a separate later commit, because bisectable beats bundled.
 
-> **CORRECTED 2026-08-17 — this passage previously asserted "nothing generates solid ore any more, so the
-> old path is simply unreached in the meantime". That is the PHASE-3b POSTCONDITION, not current runtime.**
-> `LayeredWorldGen` still scatters solid `ore` / `coal` / `iron` / `rich_ore` into `world.blocks`, and
-> `_seed_lodes` runs **dead last and is purely additive** — it writes `world.lodes` and never touches
-> `world.blocks`. That additivity is exactly why 3a could ship without disturbing the economy, so the old
-> claim contradicted the shipped design as well as the runtime.
-> **Why this one mattered more than a stale sentence:** it supplied the *reason* the deletion could be
-> safely deferred. A false premise carrying a deferral decision outlives its own correction, because the
-> decision it justified stays in force after the premise stops being true. The split is still right — for
-> the bisectability reason alone, which does not depend on the false half.
+Phases 1, 2, 2b and part of 4 have shipped. Phase 3 was later split. 3a, the generated lode plane, shipped
+on 2026-08-17 in `303d1f5` and `8498ae3`; 3b, converting the solid ore blocks, is not done. 3a is purely
+additive: `LayeredWorldGen` still scatters solid `ore`, `coal`, `iron` and `rich_ore` into `world.blocks`,
+and `_seed_lodes` runs last and writes only `world.lodes`. That additivity is why 3a could ship without
+disturbing the economy, and it is also why a world is never half-migrated today. The half-migration risk
+returns the moment 3b starts deleting.
 
-Phases 1, 2, 2b and part of 4 have shipped. **Phase 3 was later split: 3a (generated lode plane) shipped
-2026-08-17 in `303d1f5` + `8498ae3`; 3b (converting the solid ore blocks) is not done.** As of the
-2026-08-17 audit the *cutover branch's* completion, pacing, and deep-pocket play gates are red. It must not
-be merged on the strength of the 98.6/100 its own scorer prints — that instruction is unaffected by 3a.
+*Attested: `docs/LODE.md`, `docs/LODE_PLAN.md`; commits `303d1f5`, `8498ae3`; tag `pre-lode`;
+`src/core/layered_world_gen.gd`, `src/core/world_data.gd`.*
 
-*Attested: `docs/LODE.md`, `docs/LODE_PLAN.md`, `the cutover handover`;
-the architecture handover §12.*
+### Presentation is the priority, not more simulation (LOCKED)
 
-### Presentation is the priority, not more simulation — LOCKED
+The agreed ordering is real art, then audio, then onboarding, then a movement rebuild. Not more sim, not
+more worldgen. The game is judged the way a player would judge it, holistically, against "Factorio ×
+Terraria with gravity". A mechanically correct build that reads as programmer art is a build with a real
+problem.
 
-The agreed ordering: **real art > audio > onboarding > movement rebuild.** Not more sim, not more worldgen.
-The user judges the game the way a player would, holistically, against *"Factorio × Terraria with
-gravity"*; a mechanically correct build that reads as programmer art gets called "shitty", and that
-judgement is correct.
+Legibility beats spectacle. Every effect has to survive the question of whether it makes the game harder
+to read in motion.
 
-**Legibility beats spectacle, always.** Every effect must survive the question *"does this make the game
-harder to read in motion?"*
+Menus have to read as current. Elevation rather than borders. Defocus the world behind a modal. A detail
+plate for the selected thing. Costs as glyphs. Never a wall of locked rows; the future belongs on the
+research screen.
 
-**Menus must read 2026.** *"This feels 2003 coded"* — on menus that were structurally right and visually
-dated. Elevation, not borders. Defocus the world behind a modal. A detail plate for the selected thing.
-Costs as glyphs. **Never a wall of locked rows** — the future belongs on the research screen.
+*Attested: `docs/PRIORITY.md`; `docs/FEEL_GAP.md`; `docs/MENU_MATRIX.md`;
+`docs/VISUAL_RECOMMENDATIONS_SURFACE.md`.*
 
-*Attested: the architecture handover §10; `docs/PRIORITY.md`; `the vibe audit response`.*
+### 2026-08-16: default zoom 0.70× to 1.00× (LOCKED, with its derivation)
 
-> **Attestation repaired 2026-08-17.** This line cited `docs/VIBE_GAP.md`, **a file that has
-> never existed** — no add, no contents, no deletion, in reachable or unreachable history. **The decision
-> itself is real and is not reopened:** the user has stated and restated it, and the ordering is quoted
-> consistently across the repo. What was fictitious was its evidence.
->
-> **A DATE THAT WAS IN THIS NOTE HAS BEEN REMOVED, and the removal is the point.** It said the decision was
-> made on 2026-06-28. **No artifact in this repository records that.** `git log -S` on both "Presentation is
-> the priority" and "real art > audio > onboarding" puts their first appearance at **2026-08-16**; the
-> section heading is undated, unlike its dated neighbours; and the only 2026-06-28 entry in this log is a
-> different decision. What *is* on that day is a `VIBE_GAP #3 / #8` provenance tag in four commit subjects
-> — circumstantial, and not the same thing. **I asserted a specific date for a specific decision, from
-> memory, inside a note whose entire subject is attestations pointing at things that are not there.**
-> Note the artifacts now cited are *later* than the decision —
-> `VIBE_AUDIT_RESPONSE.md` is the 2026-08-17 audit — so they corroborate the ordering rather than record
-> its origin, and no document written at the time survives. Said plainly rather than papered over, because
-> an attestation pointing at a substitute is how this got here.
+At 0.70× the field was 57×32 cells, which put the miner at well under one percent of the frame's width.
+That is the measured floor under "it's hard to see the character at base zoom". Every code lever for his
+presence (the cool two-tone rim, the head-lamp, the guide ring) had already been pulled and blind
+reviewers still located him by the marker rather than the sprite, because at that size there is no sprite
+left to find.
 
-### 2026-08-16 — default zoom 0.70× → 1.00× — LOCKED, with its derivation
+1.00× shows 40×22 cells, still comfortably wider than Terraria's field in tile terms, and buys back 43%
+of linear size on everything. Nothing was taken away: the old default survives one step out, then 0.50×
+and 0.33×.
 
-At 0.70× the field was 57×32 cells, putting the miner at well under one percent of the frame's width — the
-measured floor under *"it's hard to see the character at base zoom"*. Every code lever for his presence
-(cool two-tone rim, head-lamp, guide ring) had already been pulled and the blind judges still found him via
-the marker rather than the sprite, because at that size **there is no sprite left to find.**
+The reasoning lives in `scenes/main.gd` beside the constant, where someone changing it will read it.
 
-1.00× shows 40×22 cells — still wider than Terraria's in tile terms — and buys back 43% of linear size on
-everything. Nothing was taken away: the old default survives one step out.
+*Attested: `scenes/main.gd` `ZOOM_LEVELS` and the comment above it, tagged #A4.*
 
-This entry is here as the model for what a design decision record should look like. The reasoning lives in
-`scenes/main.gd` beside the constant, where someone changing it will actually read it.
+### Reference images are mood, not target (LOCKED)
 
-*Attested: `scenes/main.gd` `ZOOM_LEVELS`, tagged #A4.*
+Do not overfit to Noita or to generated concept images. The real reference is this build, screenshotted.
+Triangulate via negativa.
 
-### Reference images are mood, not target — LOCKED
-
-Don't overfit to Noita or to assistant-generated images. The real reference is our own build, screenshotted.
-Triangulate via negativa. (Done generating images.)
-
-*Attested: the architecture handover §10.*
+*No artefact records this beyond the decision itself.*
 
 ---
 
 ## Lore
 
-### "The Works Are Cold" — PROPOSED. NOT CANON. Do not build on it.
+### "The Works Are Cold" (PROPOSED, not canon)
 
-There is **no narrative text in the game.** The entire fiction on screen is the title card
-(`SINKFORGE / the way is down`), seven band names, "The Seal", "the Bazaar", and "Stonereach".
+There is no narrative text in the game. The entire fiction on screen is the title card
+(`SINKFORGE`, `the way is down`), the eight band names in `scenes/strata.gd` (OPEN SKY, TOPSOIL, THE
+CLAYBAND, SHALE REACH, THE LONG DARK, THE DEEPSLATE, THE SEAL, STONEREACH), and the Bazaar.
 
-The recommended route — endorsed in the earlier plan, **not yet adopted by the user** — is that
-the Sinkforge is a foundry sunk through the crust, cold for a century, and you are relighting it. Its
-arguments: the game's *title* is the premise; the first machine you build (a Forge) and the last (the
-Sinkforge) are the same machine at two scales; the `FORGED` counter has been in the HUD corner all along
-meaning nothing; and the finale is a throughput crescendo rather than a shot fired *upward*, which would
-reverse "the way is down".
+The proposed route is that the Sinkforge is a foundry sunk through the crust, cold for a century, and you
+are relighting it. Its arguments: the game's title is the premise; the first machine you build (a Forge)
+and the last (the Sinkforge) are the same machine at two scales; the `FORGED` counter has been in the HUD
+corner all along meaning nothing; and the finale is a throughput crescendo rather than a shot fired
+upward, which would reverse "the way is down".
 
-The **bore model** — a shaft bored through the crust, each layer hosting one system sited by its own
-geology, your factory becoming the missing crew — is likewise **proposed, not canon**.
+The bore model, in which a shaft is bored through the crust and each layer hosts one system sited by its
+own geology while your factory becomes the missing crew, is likewise proposed rather than canon.
 
-Two pieces of lore are already shipped **as art**, which is why this is worth resolving: a colossus on the
-horizon (`SkyPainter._sinkforge()`) — a broken cog-ring on a dead pylon, titanic chains, an ember breathing
-in the hub, *"dormant, not extinct"* — and a ruin at spawn (cols 40–43), an almost-complete bazaar frame
-one block short, whose generator comment calls it *"the first lore ('someone was here')"*.
+Two pieces of lore already ship as art, which is why resolving this is worth doing. A colossus stands on
+the horizon (`SkyPainter._sinkforge()`): a dead crown with an ember heart breathing in the cog hub,
+dormant rather than extinct. And a ruin sits at spawn (`LayeredWorldGen.RUIN_X`, columns 40 to 43), an
+almost-complete Bazaar frame one block short of working.
 
-**This is a vision-level fork and belongs to the user.** The cheapest first slice, which commits to
-nothing and is identical for the runner-up route: give `scenes/strata.gd` a third field, one clause of
-found signage per band in the hint table's voice, drawn under the band name on the arrival plate.
+The cheapest first slice, which commits to nothing and is identical for the runner-up route, is to give
+`scenes/strata.gd` a third field: one clause of found signage per band, in the hint table's voice, drawn
+under the band name on the arrival plate.
 
-*Attested: the architecture handover §11; `scenes/sky_painter.gd`; `src/core/layered_world_gen.gd`.*
+*Attested: `scenes/hud.gd` (title card, `FORGED`); `scenes/strata.gd` `BANDS`; `scenes/sky_painter.gd`
+`_sinkforge()`; `src/core/layered_world_gen.gd` `RUIN_X`.*
 
 ---
 
 ## Process
 
-### Commits carry no Assistant/Vendor/co-author trailer, ever — LOCKED
+### Commits carry no co-author trailer (LOCKED)
 
-Author is `teohondascully` only. Messages are prose, in the house voice: what changed and **why**,
+The author is `teohondascully` only. Messages are prose in the house voice: what changed, and why,
 including the failure that motivated it.
 
-**Enforced, as of 2026-08-17, because for months it was not.** The rule was LOCKED here and 23 pushed
-commits carried the trailer anyway — written by tooling that adds one by default, neither of
-which noticed. A rule that lives only in a document is enforced by whoever last read the document.
+The rule was written down long before it was enforced, and 23 pushed commits carried a trailer anyway. A
+rule that lives only in a document is enforced by whoever last read the document. Two mechanisms now
+carry it:
 
-Three layers, because the first two are each individually escapable:
+- `.githooks/commit-msg` refuses the ordinary path. It is tracked rather than sitting in `.git/hooks/`,
+  because an untracked hook reaches no clone and no worktree, and so guards only the one machine where it
+  was installed. Activate with `git config core.hooksPath .githooks`.
+- `tools/check_trailers.sh` runs in the harness, which is the real enforcement: `--no-verify` skips a
+  hook and no flag skips the suite. It sweeps every ref rather than the current branch, because a stale
+  branch brings the trailer straight back on merge. It asserts that `core.hooksPath` is wired, so the
+  guard's job includes checking that the guard is installed. It counts commits rather than matching
+  lines, because a message carrying two trailers would otherwise be reported as two refs. And it carries
+  a positive control that runs every time, because every other assertion in it is a search that found
+  nothing, and a detector that has quietly stopped matching reports a clean history in exactly the words
+  a clean history produces.
 
-- `.githooks/commit-msg` refuses the ordinary path. **Tracked**, not in `.git/hooks/` — an untracked hook
-  reaches no clone, no worktree and no other session, so it guards the one machine where it was installed
-  and is absent everywhere the rule actually gets broken. Activate with `git config core.hooksPath .githooks`.
-- `tools/check_trailers.sh` in the harness. This is the real enforcement: all commits land with
-  `--no-verify` by habit, which is exactly the flag that skips the hook, and no flag skips the suite. It
-  scans **every ref**, not just the current branch, because thirteen worktrees exist and a stale branch
-  brings the trailer straight back on merge. It asserts `core.hooksPath` is wired, so the guard's job
-  includes checking the guard is installed. It carries a positive control that runs every time, because
-  every other assertion in it is a search that found nothing, and a detector that quietly stopped matching
-  reports a clean history in precisely the words a clean history produces.
-- Neither session uses `--no-verify` any more.
+The scanner has no allowlist. There was one exemption for a while, covering a backup ref that held the
+23 original messages, and it was closed. An allowlist that can grow quietly is how a guard becomes a
+formality, and the cheapest way to stop one growing is not to have one.
 
-**The 23 historical commits were rewritten**, at the user's explicit instruction on 2026-08-17, superseding
-the earlier written recommendation to grandfather them. Trees are byte-identical; only messages changed.
-The pre-rewrite history is kept whole at `pre-trailer-strip` — locally as a tag, on origin as
-`refs/backup/pre-trailer-strip` — and `the trailer-strip map` records every old SHA against its
-new one. Nothing was deleted and the strip is reversible. That backup ref is the single named exemption in
-the scanner, and the scanner asserts it is the only one.
+The 23 historical commits were rewritten on 2026-08-17. Trees are byte-identical; only messages changed.
 
-*Attested: the architecture handover §8.*
+*Attested: `.githooks/commit-msg`; `tools/check_trailers.sh`;
+`.github/workflows/harness.yml`, the `authorship` job.*
 
-### Never destroy anything the user made — LOCKED
+### Never destroy a curated file (LOCKED)
 
-Never `rm`, `git rm`, or purge any file the user created or curates without explicit per-item
-confirmation. To exclude something from the repo use `.gitignore` or `git rm --cached` — **never `rm`**.
-`history/` (the curated screenshot archive), saves, notes, and `assets/sprites/` (hand-authored art) are
-sacred.
+Never `rm`, `git rm`, or purge a file that was authored or curated by hand, without explicit per-item
+confirmation. To exclude something from the repository use `.gitignore` or `git rm --cached`, never `rm`.
+`history/` (the curated screenshot archive), saves, notes and `assets/sprites/` (hand-authored art) are
+all covered.
 
-**This rule exists because 84 of the user's screenshots were once deleted during a refactor.**
-
-*Attested: the architecture handover §8.*
-
-### The visual record is committed, not merely kept
-
-`history/` and the 48 canonical `_moment_*.png` captures are tracked in git, at the user's instruction on
-2026-08-17. Until then both were ignored, `history/` under a `.gitignore` note reading *"keep on disk,
-NEVER publish or delete"* — one line asserting two rules that have nothing to do with each other. Only the
-**delete** half was ever a decision (the LOCKED rule directly above); the **publish** half was never
-recorded or argued anywhere, and it was the half doing the damage, because an ignored file has no undo. A
-capture overwritten in place was simply gone.
-
-Committing serves the locked rule instead of straining against it: it is the strongest available form of
-not destroying these files. And the disclosure worry the word "publish" implies does not survive being
-stated — the repo is the user's own MIT-licensed game, and these are pictures of it.
-
-The premise under the old note was wrong too. These captures are not regenerable. Re-running the capture
-instrument (`tools/capture_moments.gd`) does not reproduce them, because the game it photographs has
-changed; each one is a record of a world that no longer exists. That is the argument for versioning them
-rather than against it.
-
-> *(Corrected 2026-08-17: this sentence named `tools/sees.sh`, which has never existed in this repository —
-> zero tree entries, reachable or unreachable. The real instrument is `tools/capture_moments.gd`, whose own
-> header calls itself "The 'Sees' blind-vision instrument's renderer". A phantom tool was carrying the
-> load-bearing premise of a LOCKED decision, 120 lines below the note that repairs the same defect in a
-> different attestation.)*
-
-**Cost, recorded because git history is permanent:** ~237MB (`history/` 171MB, moments 66MB) onto a 53MB
-`.git`. There is no lossless win to take first — they are 8-bit RGB PNGs at 1920x1080, already near 3:1 —
-and lossy compression is barred outright, because the harness *samples these pixels* (`check_rock_reads`
-and its neighbours read values off them). Quantizing would corrupt the evidence rather than merely soften
-the picture. A full recapture adds ~66MB; git stores per file, so a partial one costs only what moved.
-
-**`history/.gdignore` keeps the archive out of Godot's resource scanner**, and it is not an optimization —
-CI runs `godot --headless --import` from a clean clone in *both* jobs with no cache, so every tracked image
-gets imported twice per push. Nothing anywhere references the archive, so that would have been 171MB of
-pure CI time bought for nothing. Its `.png.import` sidecars are untracked for the same reason (left on
-disk, per the rule above — untracking and deleting are different operations). The 44 moments stay visible
-to the scanner, because `tools/` addresses them by `res://` path; `save_png` and `Image.load` read the file
-rather than the imported resource, but the path still has to resolve.
+The rule exists because 84 screenshots from that archive were once purged during a refactor.
 
 *Attested: `.gitignore`, "THE VISUAL RECORD".*
 
-### Isolate parallel work in its own worktree; one integrator commits — LOCKED
+### The visual record is committed, not merely kept
 
-Parallel agents on a shared tree contaminate each other's harness runs — same `_moment_*.png` at repo root,
-same temp saves, same lockfiles. Every agent gets a **hard file contract** naming what it owns *and* what
-it must not touch, and is told: *if your change needs a file you don't own, STOP and report it.*
+`history/` and the canonical `_moment_*.png` captures are tracked in git, as of 2026-08-17. Both were
+ignored before that, `history/` under a `.gitignore` note reading "keep on disk, NEVER publish or
+delete", which welded two unrelated rules together. Only the delete half was ever decided. The publish
+half was never argued anywhere, and it was the half doing the damage, because an ignored file has no
+undo: a capture overwritten in place was simply gone.
 
-**Verify, don't trust.** Agents report green on red harnesses. Ask each explicitly for *"anything you could
-not verify"*, and tell them you will re-check what they flag and will not re-check what they assert — it
-produces markedly more honest reports.
+Committing serves the rule above rather than straining against it. It is the strongest available form of
+not destroying these files, and a public MIT-licensed repository of one's own game discloses nothing by
+carrying pictures of it.
 
-**Warn every agent about perf-gate flakiness:** with N harnesses running concurrently,
-`check_frametime`, `check_agility`, `check_stride`, `check_grapple`, `check_pump`, `check_traverse`,
-`check_plunge` and `play-tests` go red purely from CPU contention. An agent that "fixes" a spurious red will
-destroy good work.
+The captures are not regenerable. Re-running `tools/capture_moments.gd` does not reproduce them, because
+the game it photographs has changed, so each one records a world that no longer exists. That is the
+argument for versioning them rather than against it.
 
-*Attested: the architecture handover §7.*
+The cost is worth writing down, because git history is permanent. `history/` is about 227MB and the root
+captures about 72MB, against a `.git` that is now roughly 350MB. There is no lossless win to take first,
+since they are 8-bit RGB PNGs at 1920×1080 and already near 3:1. Lossy compression is barred outright,
+because several harness layers sample these pixels; quantising would corrupt the evidence rather than
+merely soften the picture.
+
+`history/.gdignore` keeps the archive out of Godot's resource scanner. That is not an optimisation. CI
+runs `godot --headless --import` from a clean clone in both of its build jobs with no cache, so every
+tracked image would otherwise be imported twice per push, and nothing in the project references the
+archive. Its `.png.import` sidecars are untracked for the same reason, and left on disk, because
+untracking and deleting are different operations. The root captures stay visible to the scanner, because
+`tools/` addresses them by `res://` path.
+
+*Attested: `.gitignore`, "THE VISUAL RECORD"; `history/.gdignore`; `.github/workflows/harness.yml`.*
 
 ---
 
 ## Measurements worth not re-deriving
 
-Not decisions, but hard-won numbers that a future session would otherwise pay for again.
+Not decisions, but numbers that were expensive to establish once.
 
-- **The capture noise floor.** Two captures of the same build differ by several percent — up to ±8% —
-  purely from animation phase. **Anything under ~5% is not a signal.** To prove a render change is
-  invisible, use a >0.20-threshold histogram plus a magenta diff map, and bisect behind a temporary env
-  switch. Never conclude from one number.
-- **The mining hitch was the coarse terrain pass** redrawing 64 cells under an opaque fine layer. The
-  *predicted* SubViewport-tiling fix measured **NEUTRAL and was reverted** — a good record of a plausible
-  optimisation that was simply wrong. `surface_row()` scans are hot; hoist them.
-- **Roughness terms add in quadrature, not linearly.** Ablate, don't derive. Three sines summing to a
-  nominal ±1 have RMS ≈ 0.42 and never reach their extremes, so a threshold aimed at ±1 fires at a fifth
-  strength forever.
-- **The body is two rows tall** (34 px against a 32 px cell). A passage that opens one row per column
-  without keeping the row above open is impassable — and sim-level tests will not catch it, because they
-  only check floor cells.
+- **Captures of the same build are not identical.** Animation phase alone moves pixels between two runs
+  of the same code. To show that a render change is invisible, count changed pixels against a
+  >0.20 threshold and produce a magenta difference map; do not average a luma delta, which inherits the
+  dark's compression and reads a crushed change as an absent one. Bisect behind a temporary environment
+  switch, and never conclude from a single number.
+- **The mining hitch was the terrain bake, in three separate forms.** Repainting the whole ~7700-cell
+  coarse world on every dig cost a ~300ms freeze, fixed by splitting the static terrain into 8×8-cell
+  chunk canvases so a dig repaints ~64 cells. The coarse bake was then ~72% of the frame's draw calls on
+  a mature base (~11,882 of them), fixed by hosting the chunk canvases in a world-sized `SubViewport` and
+  drawing its render target as one quad. Re-rendering that whole 4096×4096 viewport still cost ~100ms per
+  dig, two thirds of a 114ms hitch, fixed by retaining the target and re-rendering only dirty chunks.
+  Separately, the fine-terrain baker re-processed the whole ~120k-cell fine grid on every terrain change;
+  `src/core/fine_terrain.gd` `sync_block()` now re-molds one coarse cell's block plus a sync band, 144
+  fine cells at current settings.
+- **A retained render target compounds any post-process it inherits.** The terrain `SubViewport`
+  inherited the `WorldEnvironment`, whose adjustment pass runs as a viewport post-process, so saturation
+  1.18 was re-applied to the same stored pixels on every bake and the terrain compounded 1.18^n. A grass
+  cell measured (87,130,47) at boot and (42,255,0) after one play arc, and the walked surface line, the
+  one strip the fine layer does not cover, became a neon red-and-green band across the full width of the
+  frame. Fixed in `deff5e7` by giving the viewport its own `World2D`; guarded by
+  `tools/check_bake_idempotent.gd`.
+- **Eighty-odd harness layers passed that frame.** Every layer boots, settles and shutters, so the suite
+  was blind to a defect that compounds per event. Generate the state first, through the real path, then
+  assert idempotence.
+- **Roughness terms add in quadrature, not linearly.** Ablate rather than derive. Three sines summing to
+  a nominal ±1 have an RMS around 0.41 and never reach their extremes, so a threshold aimed at ±1 fires
+  at a fifth of its intended strength forever.
+- **The body is two rows tall.** `Player.HEIGHT` is 34px against a 32px cell, deliberately, so that two
+  tiles of clearance are required and a one-tall gap is an honest squeeze. A passage that opens one row
+  per column without keeping the row above open is impassable, and sim-level tests will not catch it
+  because they only check floor cells.
 - **Never put a hole in the spawn plateau's walking surface.** It cost four harness layers at once,
-  **twice, in two different columns.** That surface is simultaneously the tutorial corridor, the runway
-  `measure_player` runs WEST on from column 36, and the path `check_fastforward` walks EAST. It surfaces as
-  four *unrelated-looking* red layers: `check_fastforward`, `check_loop_health`, `check_pacing`,
-  `play-tests`. **If those four go red together, suspect the surface first.**
+  twice, in two different columns. That surface is simultaneously the tutorial corridor and the runway
+  several movement layers measure on. It surfaces as four unrelated-looking failures at once:
+  `check_fastforward`, `check_loop_health`, `check_pacing`, and the play-tests. If those four go red
+  together, suspect the surface first.
 
-*Attested: the architecture handover §3 and §9.*
+*Attested: `scenes/world_renderer.gd` (the chunk grid and terrain bake); `src/core/fine_terrain.gd`;
+`tools/check_dig_hitch.gd`, `tools/check_bake_idempotent.gd`, `tools/check_frametime.gd`;
+`scenes/player.gd` `HEIGHT`.*

@@ -1,334 +1,338 @@
-# THE LODE MIGRATION — plan, blast radius, and the eval gate
+# The lode migration: plan, blast radius, and the eval gate
 
-> **Companion to `docs/LODE.md`** (the design). This document is the *how*: what breaks, in what order it
-> gets fixed, what has to be true before each phase is allowed to land, and how to get back.
->
-> **Before-marker: tag `pre-lode` = `27fe6a3`** (pushed). The harness is **55/55 green** at that commit and
-> the working tree was clean. `git reset --hard pre-lode` returns the game to the pre-migration model in one
-> command. A slice-1 code sketch written before this plan is preserved in `git stash` ("wip: lode slice-1
-> sketch") and is **superseded** — it is a reference, not a starting point.
+Companion to `docs/LODE.md`, which is the design. This document is the how: what breaks, in what order it
+gets fixed, what has to be true before each phase is allowed to land, and how to get back.
 
-## 1. Why this needs a plan and not a strike
+Rollback marker: tag `pre-lode` = `27fe6a3`, pushed. The harness was green at that commit with a clean
+working tree. `git reset --hard pre-lode` returns the game to the pre-migration model in one command.
 
-Ore is the oldest system in the game and the most-depended-upon. It is read by the sim, the generator, the
-renderer, the HUD, the sonar, the tutorial ladder, the hint table, four machines, the scripted play-harness
-and **15 of the 55 harness layers**. Changing what an ore cell *is* changes the meaning of assertions written
-across nine months of strikes — including at least one that **inverts** (`test_sim.gd:534` currently asserts
-that a hand-mined ore cell is *no longer* a vein; that is precisely the behaviour being deleted).
+The table below cites files and symbols rather than line numbers. `factory_sim.gd` alone is over two
+thousand lines and moves constantly, so a line number in a plan is stale before the plan is finished.
 
-The failure mode to design against is not "a bug". It is **a half-migrated world**: two ore models coexisting
-where the generator believes one and the drill believes the other, with a green harness because every layer
-was updated to agree with whichever model it happened to touch. That is unbisectable and it is how this kind
-of change goes wrong.
+## 1. Why this needs a plan
 
-## 2. Blast radius (measured, not estimated)
+Ore is the oldest system in the game and the most depended upon. It is read by the sim, the generator,
+the renderer, the HUD, the sonar, the tutorial ladder, the hint table, four machines, the play harness
+and a large fraction of the harness suite. Changing what an ore cell *is* changes the meaning of
+assertions written across nine months of work, including at least one that inverts: `tests/test_sim.gd`
+used to assert that a hand-mined ore cell is no longer a vein, which is precisely the behaviour being
+deleted.
 
-| System | File(s) | What breaks |
+The failure mode to design against is not a bug. It is a half-migrated world: two ore models coexisting,
+where the generator believes one and the drill believes the other, with a green harness because every
+layer was updated to agree with whichever model it happened to touch. That state is unbisectable, and it
+is how this kind of change goes wrong.
+
+## 2. Blast radius
+
+| System | Where | What breaks |
 |---|---|---|
-| Ore identity | `factory_sim.gd:1134` `_is_ore_like` | the predicate that makes a *block* special stops being about blocks |
-| Hand-mining | `factory_sim.gd:625-637` | the destructive path — **the whole point** |
-| Drill | `factory_sim.gd:1731-1860` `drill_column_remaining`, `_run_drill` | "bore DOWN through solid ore" has no referent |
-| Borer | `factory_sim.gd:1926` | same, laterally |
-| Drift Rig | `factory_sim.gd:2025-2055` | its pay stream comes from eating ore blocks |
-| Generator | `layered_world_gen.gd:654-664, 740, 814, 845-891, 910, 1006` | every vein, coal patch, iron body and aquifer reward is authored as `blocks` + `amounts` |
-| World data | `world_data.gd:23` | needs a `lodes` grid alongside `blocks`/`walls`/`amounts` |
-| Spawn fixtures | `world_seeder.gd:25-45, 83` | starter vein, tutorial coal, mineshaft vein — the entire opening |
-| Sonar | `main.gd:1797-1815` | `if not sim.is_solid(cell)` — prospecting would find nothing |
-| Aim / hover | `main.gd:1572`, `hover_info.gd:23`, `world_renderer.gd:1334` | "a rich vein reads as a THING" is keyed on solid |
-| Glints | `world_renderer.gd:793, 886-925` | iterates `deposits` and requires `is_solid` |
-| Terrain paint | `terrain_painter.gd:117` | richness-tinted rock |
-| Minimap | `hud.gd:1025` | ore blocks colour the map |
-| **Tutorial** | `objectives.gd:38, 44, 45` | *"hold LMB on the metal-flecked rock"*, *"drop the Drill just ABOVE the ore vein"* — **false the instant worldgen flips** |
-| Hints | `hints.gd:43, 51, 56` | scanner / rich ore / borer copy |
-| Save | `save_game.gd:37, 83` | new layer to persist |
-| Play harness | `arc_driver.gd:73-83, 126-140`, `play_agent.gd` | step 1 *is* "hand-dig 4 ore"; the agent has no verb for working a lode |
+| Ore identity | `factory_sim.gd` `_is_ore_like` | the predicate that makes a *block* special stops being about blocks |
+| Hand-mining | `factory_sim.gd` `mine()`, the ore-like branch | the destructive path, which is the whole point |
+| Drill | `factory_sim.gd` `drill_column_remaining`, `_run_drill` | "bore down through solid ore" has no referent |
+| Borer | `factory_sim.gd` `h_drill_target`, `_run_h_drill` | the same, laterally |
+| Drift Rig | `factory_sim.gd` `drift_target`, `drift_is_pay`, `_run_drift` | its pay stream comes from eating ore blocks |
+| Generator | `layered_world_gen.gd` `_scatter_veins`, `_scatter_coal`, `_grow_vein`, `_scatter_iron`, `_seed_aquifer_treasure`, `_mineralize` | every vein, coal patch, iron body and aquifer reward is authored as `blocks` plus `amounts` |
+| World data | `world_data.gd` | needs a `lodes` grid alongside `blocks` / `walls` / `amounts` |
+| Spawn fixtures | `world_seeder.gd` `_seed_starter_vein`, `_seed_tutorial_coal`, `_seed_starter_adit`, the mineshaft vein | the entire opening |
+| Sonar | `main.gd` `try_scan()` | it guards on `sim.is_solid(cell)`, so prospecting would find nothing |
+| Aim and hover | `main.gd` `_hover_info_at`, `hover_info.gd` `describe`, `world_renderer.gd` `_draw_aim` | "a rich vein reads as a thing" is keyed on solid |
+| Glints | `world_renderer.gd` `_exposed_ore_cells`, `_draw_glint_flares` | both iterate `deposits` and require `is_solid` |
+| Terrain paint | `terrain_painter.gd` | richness-tinted rock reads `sim.deposits` |
+| Minimap | `hud.gd` `_draw_minimap` | ore blocks colour the map |
+| Tutorial | `objectives.gd` steps 38, 44, 45 | "Dig ore, hold LMB on the metal-flecked rock by spawn" and "Drop the Drill into the shaft just ABOVE the ore vein" both go false the instant worldgen flips |
+| Hints | `hints.gd` | scanner, rich ore and borer copy |
+| Save | `save_game.gd` | a new layer to persist |
+| Play harness | `arc_driver.gd` `_step_mine`, `play_agent.gd` | step 1 is "hand-dig 4 ore", and `PlayAgent` has no verb for working a lode |
 
-**Harness layers touching ore/drill, by reference count:** `test_sim` (273), `play_tests` (77),
-`test_stress` (66), `arc_driver` (25), `test_power_water` (19), `test_worldgen` (17), `check_saveload` (10),
-`check_bits` (10), `check_drift` (9), `check_spoil` (8), `capture_moments` (6), `mock_bazaar` (4),
-`check_underground` / `check_pack_layout` / `check_controls` (1 each).
+The layers that touch ore or drilling at all: `test_sim`, `play_tests`, `test_stress`, `arc_driver`,
+`test_power_water`, `test_worldgen`, `check_saveload`, `check_bits`, `check_drift`, `check_spoil`,
+`capture_moments`, `mock_bazaar`, `check_underground`, `check_pack_layout`, `check_controls`. An earlier
+draft of this section carried per-file reference counts. They were produced by counting lines matching
+`ore|drill`, which also matches "more", "before" and "stored", so the counts measured the word and not
+the system. They are omitted rather than corrected.
 
 ## 3. Strategy: build it fully, then cut over once
 
 Three candidate shapes were considered.
 
-- **Big bang** — flip everything in one commit. Rejected: the harness is red for a long stretch, which is
-  exactly when our working rule ("if RED, revert, don't patch") stops being usable, and nothing is bisectable.
-- **Permanent bridge** — keep solid ore *and* lodes forever. Rejected: two ore models is the failure mode in
+- **Big bang.** Flip everything in one commit. Rejected: the harness is red for a long stretch, which is
+  exactly when the working rule ("if red, revert, don't patch") stops being usable, and nothing is
+  bisectable.
+- **Permanent bridge.** Keep solid ore and lodes forever. Rejected: two ore models is the failure mode in
   §1 wearing a friendly face.
-- **Build → cut over → clean up.** ✅ **Chosen.**
+- **Build, cut over, clean up.** Chosen.
 
-The insight that makes it safe: **the entire lode mechanic — layer, verbs, rendering, drill coverage, tells —
-can be built, played and asserted while ore is still solid**, because hand-mining an ore block is a natural
-way to *create* a lode. So phases 1 and 2 are purely additive, the game stays playable and the harness stays
-green throughout. The cutover (phase 3) then reduces to a **data change** — the generator emits lodes instead
-of ore blocks — plus deleting a path that by then has no users. Small, reviewable, revertable on its own.
+What makes the chosen shape safe is that the entire lode mechanic (the layer, the verbs, the rendering,
+drill coverage, the tells) can be built, played and asserted while ore is still solid, because hand-mining
+an ore block is a natural way to *create* a lode. Phases 1 and 2 are therefore purely additive: the game
+stays playable and the harness stays green throughout. The cutover in phase 3 then reduces to a data
+change, where the generator emits lodes instead of ore blocks, plus deleting a path that by then has no
+users. Small, reviewable, revertable on its own.
 
 ## 4. Phases
 
-Each phase is one commit (or a tight run), lands green, and is independently revertable.
+Each phase is one commit or a tight run, lands green, and is independently revertable.
 
-### Phase 1 — the lode exists, and the trap is gone ✅ SHIPPED as STRIKE 38
-*Player-visible change: mining ore stops destroying the vein. Nothing is removed.*
+### Phase 1: the lode exists, and the trap is gone (SHIPPED)
 
-> Landed green at **56/56** with all seven §5c invariants passing unchanged. `check_lode` (39 assertions)
-> is the new layer; `test_sim`'s flagged inversion and the save round-trip were the two existing assertions
-> changed, both argued in place. One thing the plan did not anticipate: the lode's *rendering* wanted to be
-> part of the wall bake rather than an overlay — see `docs/LODE.md`'s recorded deviations. One assertion in
-> `check_lode` was caught passing **vacuously** (the Wedge never landed a blow, so "nothing was destroyed"
-> meant nothing) and the fixture was rebuilt as an ore body so every bit in the set really bites.
+Player-visible change: mining ore stops destroying the vein. Nothing is removed.
 
-- `factory_sim.gd`: `lode` dict (cell → ore id); `lode_at` / `lode_workable` / `lode_fraction` / `take_lode`;
-  `mine()` takes the burst **out of** the deposit and leaves the remainder as a lode; `ore_deposit_at` reads
-  both; `load_world` clears it.
-- `save_game.gd`: persist + additive restore (matches the `fill`/`spoil` precedent — no version bump).
-- `main.gd`: `_lode_workable`, the hold-to-work cycle inside `_update_mining` (a short repeating cycle that
-  yields and cracks nothing), `try_work_lode` verb, `_refuses`/`_drive_bites` extended so **#S37's crossed
-  cursor and skid answer an over-tier lode for free**.
-- `world_renderer.gd`: `_draw_lode` — a persistent fleck field on the back wall, **thinned by
-  `lode_fraction`** so a worked-out vein looks worked out; glint pass extended to lodes.
+- `factory_sim.gd`: a `lode` dictionary (cell to ore id) plus `lode_max`; `lode_at`, `lode_workable`,
+  `lode_fraction`, `take_lode`. `mine()` takes the burst *out of* the deposit and leaves the remainder as
+  a lode; `ore_deposit_at` reads both; `load_world` clears it.
+- `save_game.gd`: persist and restore additively, matching the `fill` and `spoil` precedent. `lode` is
+  deliberately absent from `REQUIRED_KEYS`, so an old save loads with an empty lode layer.
+- `main.gd`: `_lode_workable`, the hold-to-work cycle inside `_update_mining` (a short repeating cycle
+  that yields and cracks nothing), the `try_work_lode` verb, and `_refuses` / `_drive_bites` extended so
+  the existing crossed cursor and skid answer an over-tier lode for free.
+- `world_renderer.gd`: `_draw_lode`, a persistent fleck field on the back wall thinned by `lode_fraction`
+  so a worked-out vein looks worked out; the glint pass extended to lodes.
 - `hover_info.gd`: an exposed lode reads as a vein with what is left in it.
-- **New layer `check_lode`.** **Changed:** `test_sim` finite-deposit section (§5).
 
-### Phase 2a — the Drill Head ✅ SHIPPED as STRIKE 39
-*Player-visible change: drills can be placed ON an exposed lode. The old placement still works.*
+New layer `tools/check_lode.gd`, now 53 assertions. Two existing assertions changed and were argued in
+place: `test_sim`'s finite-deposit inversion, and the save round-trip. The lode's rendering wanted to be
+part of the wall bake rather than an overlay, which the plan had not anticipated; `docs/LODE.md` records
+the deviation. One assertion in `check_lode` was caught passing vacuously, because the Wedge never landed
+a blow and so "nothing was destroyed" meant nothing; the fixture was rebuilt as a real ore body.
 
-> Split out from phase 2 deliberately: the Head is a complete, playable, assertable unit, and the Spur is a
-> separate design commitment (a new machine, a research rung, a coverage model). Bisectable beats bundled on
-> the one migration where a bad commit is expensive. Landed green at **57/57** with `check_head` (23
-> assertions) passing on its first run and — the real result — **not one existing drill assertion needed to
-> change**, which is the phase-1/2 additive claim in §3 actually holding rather than being asserted.
+### Phase 2a: the Drill Head (SHIPPED)
 
-- Drill accepts a cell whose backing is a lode; drains it in place; still pours down its own column
-  (**on-hook rule asserted, not assumed**). Old bore-down-through-solid path untouched.
-- `drill_preview` over a lode shows ONE cell, not a column — the placement legibility win, taken by deleting
-  geometry rather than drawing more of it. `drill_column_remaining` reports the face it stands on.
-- `spent` status with its own words and a cool (not alarmed) lamp, distinct from `no_input`. Deciding between
-  them needs the Head to remember it has pulled something, so a *misplaced* drill still reads as starved.
-- **A Head is never `blocked`.** With no shaft under it the ore piles at its feet, like every other item in
+Player-visible change: drills can be placed on an exposed lode. The old placement still works.
+
+Split out from phase 2 deliberately. The Head is a complete, playable, assertable unit, and the Spur is a
+separate design commitment: a new machine, a research rung, and a coverage model. Not one existing drill
+assertion needed to change, which is the additive claim in §3 holding rather than being asserted.
+
+- The Drill accepts a cell whose backing is a lode, drains it in place, and still pours down its own
+  column. The on-hook rule is asserted rather than assumed. The old bore-down-through-solid path is
+  untouched.
+- `drill_preview` over a lode shows one cell rather than a column, which is a placement legibility win
+  taken by deleting geometry rather than drawing more of it. `drill_column_remaining` reports the face it
+  stands on.
+- A `spent` status with its own words and a cool (not alarmed) lamp, distinct from `no_input`. Choosing
+  between them requires the Head to remember it has pulled something, so a misplaced drill still reads as
+  starved.
+- A Head is never `blocked`. With no shaft under it the ore piles at its feet, like every other item in
   this game when it lands; refusing to run to prevent a pile would invent a chore (`docs/DRIFT.md` §5).
 
-### Phase 2b — the Spur
-*Player-visible change: one Head can work a whole vein.*
+New layer `tools/check_head.gd`, now 40 assertions.
 
-- `spur.tres`: a passive coverage extender placed adjacent to a Head or another Spur, adding its own cell's
-  lode to that Head's draw. Passive on purpose — no power question, and the Head keeps owning the fuel.
-- A new research rung: the Spur must NOT unlock with the drill, or you never feel that a Head covers one cell
-  (demand-pull). Coverage set, drain order, placement preview, `check_head` extensions.
-- **Changed:** `test_sim` drill cases, `test_stress` finite-deposit/drill cases, `check_drift`, `check_spoil`.
+### Phase 2b: the Spur (SHIPPED)
 
-### Phase 3 — THE CUTOVER (the dangerous one)
-*Was: one commit. Ore is born in the wall; the solid-ore path is deleted in the same breath.*
+Player-visible change: one Head can work a whole vein.
 
-> **SPLIT 3a / 3b ON 2026-08-17, AND 3a HAS LANDED (`303d1f5`).** T0.2 was scoped to the gen→sim
-> channel alone, so the plan's "one commit" is no longer what happened and a reader who trusts this section
-> would look for work that is already done and assume work that is not.
->
-> **3a — SHIPPED, and deliberately ADDITIVE.** `WorldData.lodes` exists; `LayeredWorldGen._seed_lodes` /
-> `_grow_lode` write lode bodies into the background plane behind rock that stays solid;
-> `FactorySim.load_world` ingests them (after `amounts`, because a lode's richness IS its deposit and
-> `lode_max` must read what was loaded). Determinism holds. Six overlap guards are asserted at zero, and
-> the chain is proven end to end on a GENERATED world — buried → not workable; clear the rock → workable;
-> work it → yields its ore.
->
-> **WHAT 3a IS NOT, stated plainly because the bullet below overstates it.** It does **not** make "every
-> vein/patch/body/reward emit a lode + host rock *instead of* an ore block". Nothing above it in `generate`
-> was touched: the existing ore blocks, the whole current economy, every richness assertion and every ore
-> fixture keep their exact previous meaning. 3a **adds** a new class of deposit; it **converts** nothing.
-> That is why it could land without the tutorial rewrite and without touching a single fixture.
->
-> What it bought: "a generated world contains usable extraction sites" stopped being false **by
-> construction**. That was the blocking half, and it blocked because `sim.lode`'s only writer outside
-> save/load was the blow that opens a vein — lode was derived from destroying an ore block and never
-> generated, so the Borer and Drift Rig cut rock with nothing behind it while every lode fixture in the
-> suite injected its own and stayed green.
->
-> **3b — STILL OPEN, and it is the dangerous half.** Everything below this box: converting the ore blocks
-> themselves, `world_seeder`, the tutorial ladder, sonar, the Borer/Drift re-source, and the deletions.
-> **The deletions are what make it dangerous, and none of them have happened.**
->
-> **Not claimed by 3a:** that the pay chute works. An empty world means everything downstream of it was
-> never exercised, so it is **untested, not exonerated** — it may hold independent defects that only become
-> visible now there is lode to draw. The first rig pointed at a generated lode is a real experiment.
+`src/data/machines/spur.tres` is a passive coverage extender placed adjacent to a Head or another Spur,
+adding its own cell's lode to that Head's draw. Passive on purpose: no power question, and the Head keeps
+owning the fuel. `MainView.spur_fits` gates placement on a lode with a reachable Head. It is behind its
+own research rung rather than unlocking with the drill, because otherwise you never feel that a Head
+covers one cell.
 
-- `world_data.gd`: `lodes` grid. `layered_world_gen.gd`: every vein/patch/body/reward emits a **lode + host
-  rock** instead of an ore block. Determinism preserved (same seed → same lodes).
-- `world_seeder.gd`: starter vein, tutorial coal, mineshaft vein.
-- **`objectives.gd`: the tutorial ladder rewritten** — the `mine`, `build` and `fuel` steps describe clearing
-  rock to expose a vein, working it, and covering it. Non-negotiable: shipping a tutorial that describes the
-  old game is worse than shipping the old game.
-- `hints.gd`, `hud.gd` minimap, `terrain_painter.gd`, `world_renderer.gd:1334`.
-- **Sonar re-pointed at lodes through rock** — prospecting stops being decoration and becomes the way you
+*Attested: `src/data/machines/spur.tres`; `factory_sim.gd` `_run_spur` / `_status_spur`;
+`scenes/main.gd` `spur_fits`, `spur_head`; `tools/check_head.gd` `_a_spur_is_one_more_mouth`,
+`_a_spur_must_reach_something`.*
+
+### Phase 3: the cutover
+
+Originally planned as one commit that both moves the generator and deletes the solid-ore path. It was
+split on 2026-08-17 and only the first half has landed.
+
+**3a shipped in `303d1f5` and `8498ae3`, and is deliberately additive.** `WorldData.lodes` exists.
+`LayeredWorldGen._seed_lodes` and `_grow_lode` write lode bodies into the background plane behind rock
+that stays solid; `_grow_lode` writes only `world.lodes` and `world.amounts`, reads `world.blocks` purely
+as a host-rock guard, and `_seed_lodes` runs last in `generate`, immediately before it returns.
+`FactorySim.load_world` ingests them after `amounts`, because a lode's richness is its deposit and
+`lode_max` has to read what was loaded. Determinism holds. `tests/test_worldgen.gd` runs the overlap
+guards over every lode cell rather than a sample, and the chain is proven end to end on a generated
+world: buried is not workable; clear the rock and it becomes workable; work it and it yields its ore.
+
+**What 3a is not.** It does not make every vein, patch, body and reward emit a lode plus host rock
+*instead of* an ore block. Nothing above it in `generate` was touched. `_grow_vein` still writes
+`world.blocks[cell]` for `ore`, `rich_ore`, `coal` and `iron`, and `_mineralize` still writes `rich_ore`
+and `ore` directly, so the existing ore blocks, the whole current economy, and every richness assertion
+and ore fixture keep their previous meaning. 3a adds a new class of deposit and converts nothing. That is
+why it could land without the tutorial rewrite and without touching a single fixture.
+
+What it bought is that "a generated world contains usable extraction sites" stopped being false by
+construction. That was the blocking half, and it blocked because `sim.lode`'s only writer outside
+save/load was the blow that opens a vein: lode was derived from destroying an ore block and never
+generated, so the Borer and the Drift Rig cut rock with nothing behind it while every lode fixture in the
+suite injected its own and stayed green.
+
+3a also does not establish that the pay chute works. An empty world means everything downstream of it was
+never exercised, so that path is untested rather than exonerated, and it may hold defects that only
+become visible now there is lode to draw.
+
+**3b is still open, and it is the dangerous half.** Everything below is 3b, and the deletions are what
+make it dangerous:
+
+- `layered_world_gen.gd`: every vein, patch, body and reward emits a lode plus host rock instead of an
+  ore block. Determinism preserved (same seed, same lodes).
+- `world_seeder.gd`: the starter vein, the tutorial coal, the mineshaft vein.
+- `objectives.gd`: the tutorial ladder rewritten, so the `mine`, `build` and `fuel` steps describe
+  clearing rock to expose a vein, working it, and covering it. Non-negotiable: shipping a tutorial that
+  describes the old game is worse than shipping the old game.
+- `hints.gd`, `hud.gd` minimap, `terrain_painter.gd`, `world_renderer.gd` aim.
+- Sonar re-pointed at lodes through rock, so prospecting stops being decoration and becomes the way you
   find what to clear.
-- Borer + Drift Rig re-sourced: they cut rock and *expose* lode; the pay chute draws from what they opened.
-- Delete: `mine()`'s ore-like branch, the drill's bore-through, `_is_ore_like`'s block role.
-- **Changed:** `test_worldgen`, `arc_driver`, `play_agent`, `play_tests`, `check_richness`, `mock_bazaar`,
+- Borer and Drift Rig re-sourced: they cut rock and *expose* lode, and the pay chute draws from what they
+  opened.
+- Deletions: `mine()`'s ore-like branch, the drill's bore-through, and `_is_ore_like`'s block role.
+- Changed: `test_worldgen`, `arc_driver`, `play_agent`, `play_tests`, `check_richness`, `mock_bazaar`,
   `capture_moments`, and every remaining ore fixture.
 
-### Phase 4 — the stain, and the shot
-*The stain half is **LANDED**, out of order, ahead of phase 3 — see below for why.*
+### Phase 4: the stain, and the shot
 
-- **CODE LANDED / PERCEPTUALLY UNVERIFIED — the through-rock tell.** `WorldRenderer._stain()`, shared by the
-  exposed face and the buried tell with an asymmetry in the value channel (face holds value, buried darkens
-  ×0.78). Held by `check_lode:_the_rock_tells_on_itself`, `history/124-*`, `docs/LODE.md` §10.
-  **What is established:** the stain path runs over buried lode cells and lowers their measured on-screen
-  luma by 13.2% against a ~2% noise floor. That is an instrumented pixel-difference claim about the
-  renderer, and it stands.
-  **What is NOT established:** that a player looking at the screen can locate a vein by it. A luma delta a
-  differ can resolve is not the same quantity as a tell a person notices, and no capture has yet been taken
-  under controlled HUD state. The motivating line — *after the cutover, a world without the stain is
-  featureless stone and nobody can tell where to dig* — is the DESIGN ARGUMENT for building it, not a
-  finding about the built thing, and it is now the thing under test rather than a premise.
-  **Gate (unmet):** a diagnostic capture that sets and RECORDS the tutorial/objective state so the vein is
-  unoccluded. Phase 3 shipped without it; see §5.
-- **DONE — draining density.** `lode_max` (the per-vein denominator) plus the angular grain field, so a
+The stain half landed ahead of phase 3.
+
+- **The through-rock tell: code landed, perceptually unverified.** `WorldRenderer._stain()` is shared by
+  the exposed face and the buried tell, with an asymmetry in the value channel: the face holds value and
+  the buried cell darkens by `LODE_STAIN_BURIED_DARK`, which is 0.78. Held by `check_lode`'s
+  `_the_rock_tells_on_itself`, `history/124-the-rock-tells-on-itself.png`, and `docs/LODE.md` §10.
+
+  What is established: the stain path runs over buried lode cells and lowers their measured on-screen
+  luma by 13.2% against a noise floor of about 2%. That is an instrumented pixel-difference claim about
+  the renderer, and it stands.
+
+  What is not established: that a player looking at the screen can locate a vein by it. A luma delta a
+  differ can resolve is not the same quantity as a tell a person notices, and no capture has yet been
+  taken under controlled HUD state. The motivating line, that after the cutover a world without the stain
+  is featureless stone and nobody can tell where to dig, is the design argument for building it rather
+  than a finding about the built thing.
+
+  Gate, unmet: a diagnostic capture that sets and records the tutorial and objective state so the vein is
+  unoccluded. Phase 3a shipped without it. See §5e.
+- **Draining density: done.** `lode_max`, the per-vein denominator, plus the angular grain field, so a
   worked-out vein looks worked out and a fat one looks fat.
-- **TODO** — spent-vein look at the *host rock* level (a cleared-out wall that still stains reads as a lie),
-  the shot itself, and doc status updates across DRIFT/BITS.
+- **Open:** the spent-vein look at the host rock level (a cleared-out wall that still stains reads as a
+  lie), the shot itself, and doc status updates across DRIFT and BITS.
 
 ## 5. The eval gate
 
-Nothing lands unless its column is satisfied. `≠` marks an assertion whose *meaning* changes — each one is a
-deliberate design decision that must be re-argued in the commit, never silently updated to match new output.
+Nothing lands unless its column is satisfied. `≠` marks an assertion whose *meaning* changes. Each one is
+a deliberate design decision that has to be re-argued in the commit, never silently updated to match new
+output.
 
-### 5a. Existing assertions that MUST change
+### 5a. Existing assertions that must change
 
-| Layer | Assertion today | New contract | Phase |
+| Layer | Assertion before | New contract | Phase |
 |---|---|---|---|
-| `test_sim:534` | ≠ "a hand-mined (now-open) cell is **no vein**" | "a hand-mined cell **IS** a vein you can keep working" — the inversion that *is* the migration | 1 |
-| `test_sim:518-542` | hand-mining discards the pool | the burst comes **out of** the pool; the remainder survives | 1 |
-| `test_sim:1511` | save round-trips solid+wall+deposits | …+ `lode` | 1 |
-| `test_sim:1029, 1165, 1712` | drill bores a solid vein | Head covers a lode | 2 |
-| `test_stress:303-322` | ≠ "finite — the drill drains it and STOPS" | still finite, still stops — via coverage, not via boring through | 2 |
-| `test_stress:514` | no negative deposit | unchanged, **extended to lodes** | 1 |
-| `test_worldgen:337-353` | rich_ore **cells** carry deposits | rich **lodes** carry deposits | 3 |
-| `test_worldgen:546` | same seed → identical `amounts` | …identical `amounts` **and** `lodes` | 3 |
-| `check_richness` | density/drought over solid ore | over lodes | 3 |
-| `arc_driver:73-83` | dig to an ore cell, mine it | clear the rock, **work** the exposed lode | 3 |
-| `check_drift` / `check_spoil` | pay stream from eaten ore blocks | pay from opened lode | 2→3 |
+| `test_sim` finite-deposit | ≠ a hand-mined (now-open) cell is no vein | a hand-mined cell IS a vein you can keep working, less what the blow took. This inversion is the migration | 1 |
+| `test_sim` finite-deposit | hand-mining discards the pool | the burst comes out of the pool; the remainder survives | 1 |
+| `test_sim` save round-trip | solid, wall and deposits | plus `lode` and `lode_max` | 1 |
+| `test_sim` `_test_machine_status`, `_test_automated_line`, `_test_descent_automation` | the drill bores a solid vein | the Head covers a lode | 2 |
+| `test_stress` drill farm | ≠ finite, so the drill drains it and stops | still finite, still stops, via coverage rather than boring through | 2 |
+| `test_stress` negative-deposit invariant | no negative deposit | unchanged, extended to lodes | 1 |
+| `test_worldgen` rich-ore depth and tier | rich_ore **cells** carry deposits | rich **lodes** carry deposits | 3 |
+| `test_worldgen` fuzz | same seed, identical `amounts` | identical `amounts` and `lodes` | 3 |
+| `check_richness` | density and drought over solid ore | over lodes | 3 |
+| `arc_driver` `_step_mine` | dig to an ore cell and mine it | clear the rock, then **work** the exposed lode | 3 |
+| `check_drift`, `check_spoil` | pay stream from eaten ore blocks | pay from opened lode | 2 to 3 |
 
 ### 5b. New layers
 
-- **`check_lode`** — the spec's own harness (`docs/LODE.md` §9). Its headline case is the one that justifies
-  the whole migration: **clear an N-cell room over a seeded lode with every bit in the set, and assert the
-  deposit total is unchanged.** Plus: hand-drain and Head-drain pull from the same pool; a lode survives
-  being built over; a spent lode stops drawing and stops reading as a vein; save round-trip.
-- **`check_head`** (phase 2) — coverage never crosses to a cell with no lode; a spent Head says so; a Spur
+- **`check_lode`**, the spec's own harness (`docs/LODE.md` §9). Its headline case is the one that
+  justifies the migration: clear an N-cell room over a seeded lode with every bit in the set, and assert
+  the deposit total is unchanged. Also: hand-drain and Head-drain pull from the same pool; a lode
+  survives being built over; a spent lode stops drawing and stops reading as a vein; save round-trip.
+- **`check_head`** (phase 2). Coverage never crosses to a cell with no lode; a spent Head says so; a Spur
   extends exactly what it claims; neither hand yield nor Head output ever moves sideways.
-- **`check_stain`** (phase 4) — the `check_tells` honesty contract, applied to the through-rock tell.
-  **Resolved as a case inside `check_lode` instead of a layer of its own** (`_the_rock_tells_on_itself`): the
-  contract is about one function's output, and a 57th process launch to assert four colours is a worse trade
-  than a case in the layer that already owns the lode's spec.
+- **`check_stain`** (phase 4) was folded into `check_lode` as `_the_rock_tells_on_itself` rather than
+  becoming a layer of its own. The contract is about one function's output, and an extra process launch
+  to assert four colours is a worse trade than a case in the layer that already owns the lode's spec.
 
-### 5c. Invariants that must NOT move (the regression guard)
+### 5c. Invariants that must not move
 
-These are the reason to be careful, and none of them is allowed to be "updated to match":
+These are the reason to be careful, and none of them may be updated to match new output.
 
-1. **Conservation.** `take_lode` realises latent→produced exactly as the drill does. `test_stress`'s
-   conservation and `check_spoil`'s ledger must pass **unchanged**.
-2. **Determinism.** Same seed → same world, same lodes, same amounts.
-3. **The on-hook rule.** Extraction may be lateral; logistics stays gravity-vertical. Nothing here bends it.
-4. **Save round-trip** (`check_saveload`), including old saves loading (additive read → empty lode layer).
-5. **Frametime** (`check_frametime`, 120fps) — a per-cell fleck field over a new dictionary is the obvious
-   place to regress. Measure it, don't assume it.
-6. **The opening still plays.** `check_loop_health`, `check_pacing`, `play_tests` — scores must not fall.
-7. **#S37 still holds.** `check_refusal` green, and its tells now cover lodes too.
+1. **Conservation.** `take_lode` realises latent to produced exactly as the drill does. `test_stress`'s
+   conservation and `check_spoil`'s ledger must pass unchanged.
+2. **Determinism.** Same seed, same world, same lodes, same amounts.
+3. **The on-hook rule.** Extraction may be lateral; logistics stays gravity-vertical.
+4. **Save round-trip** (`check_saveload`), including old saves loading, since an additive read gives them
+   an empty lode layer.
+5. **Frametime** (`check_frametime`, a 1000/120 ms budget). A per-cell fleck field over a new dictionary
+   is the obvious place to regress. Measure it rather than assuming.
+6. **The opening still plays.** `check_loop_health`, `check_pacing`, `play_tests`. Scores must not fall.
+7. **Refusal still holds.** `check_refusal` green, with its tells now covering lodes too.
 
 ### 5d. Feel evals (not assertable, still required)
 
-- **Captures** for: a stained face, a freshly-opened lode, a half-worked lode, a spent lode, a Head+Spur
-  covering a vein. Archived to `history/` per the standing rule.
-- **The blind-vision pass** — a fresh zero-context agent judges from pixels alone: *can it tell where the ore
-  is, whether that vein is worth covering, and whether that one is used up?* If it cannot, phase 4 is not done.
-- **A play-test rung**: walk in with a pick, find a stain, clear a face, cover it, leave with a line running —
-  no step explained by anything but the screen.
+- **Captures** of a stained face, a freshly-opened lode, a half-worked lode, a spent lode, and a Head
+  plus Spur covering a vein. Archived to `history/` per the standing rule.
+- **A blind pass.** Judged from pixels alone: can a first-time viewer tell where the ore is, whether that
+  vein is worth covering, and whether that one is used up? If not, phase 4 is not done.
+- **A play-test rung.** Walk in with a pick, find a stain, clear a face, cover it, leave with a line
+  running, with no step explained by anything but the screen.
 
 ### 5e. Go / no-go per phase
 
-Green harness (all 55 + new layers) · the changed assertions argued in the commit body · a capture proving the
-player-visible change · `history/` archived · docs updated in the same commit.
+Green harness, the changed assertions argued in the commit body, a capture proving the player-visible
+change, `history/` archived, and docs updated in the same commit.
 
-> **3a MET FOUR OF THESE FIVE AND I AM NAMING THE ONE IT DID NOT.** Harness: 77 PASS / 0 FAIL / 0 SKIP,
-> exit 4 — `check_frametime`'s 120fps budget stood down under `SF_PERF_HOST`, so **green on every layer and
-> not a full sweep by the harness's own verdict**. Assertions argued in the commit body: yes. Docs in the
-> same commit: yes, plus this section. **No capture, and `history/` not archived.**
->
-> That gap is not cosmetic here, because 3a HAS a player-visible change and it is a large one: the renderer
-> already stains buried lode off `sim.lode` without asking whether the cell is solid, so **378 cells of
-> through-rock tell appeared in every generated world** the moment the generator moved. Nobody has looked
-> at it. It is asserted structurally and unverified visually — the same split I have now made three times
-> (code-verified, not pixel-verified), and the one my own tracelog flags as a habit rather than a standard.
->
-> **A CAPTURE WAS TAKEN AND IT CANNOT SETTLE THE GATE. THE GATE REMAINS UNMET AND THE QUESTION REMAINS
-> OPEN.** `_diag_lode_face.png` shows a worked lateral face at depth 44 with buried cells inside the lamp's
-> brightest pool — and **the centre of that subject is covered by the GRAPPLE tutorial bubble**, with the
-> objective rail across the top.
->
-> I wrote here, briefly, that the capture proved the tell invisible. It proves nothing of the sort: I read
-> an occluded frame as evidence about what it occludes. That correction stands (0017), and is not
-> mine, and it arrived because someone reviewed the pixels I had already drawn a conclusion from.
->
-> **So the claim has now been wrong in both directions in one afternoon** — first "visible", asserted from
-> the existence of `_stain()` without looking; then "invisible", asserted from a frame whose subject was
-> hidden. The honest state is UNVERIFIED. A capture that could settle it must set and RECORD the
-> tutorial/objective state so the vein is unoccluded, and is a diagnostic post-tutorial frame rather than a
-> first-impression one.
->
-> The frame is preserved and re-filed as what it actually documents: **a first-time HUD-interference
-> artifact.** On that it is good evidence — a first-time player standing at a lateral face has the subject
-> of the moment hidden behind a tutorial bubble, which is T2.1's argument made in pixels instead of prose.
->
-> **What is unaffected either way:** the lode plane is correct, generated, deterministic, ingested and
-> workable. None of that rests on the tell. What nobody has established is what it looks like to a person,
-> and phase 3b's "sonar re-pointed at lodes through rock" should not assume the stain covers it in the
-> meantime.
->
-> It also means every luma measurement in this project now has a **pre-lode / post-lode** side, and the
-> boundary is `303d1f5`. That is a project-wide line, not a property of any one number.
+Phase 3a met four of these five. The one it did not meet is the capture. Nothing was archived to
+`history/`, and that gap is not cosmetic here, because 3a has a large player-visible change: the renderer
+stains buried lode off `sim.lode` without asking whether the cell is solid, so through-rock tell appeared
+across every generated world the moment the generator moved.
+
+The one diagnostic frame taken since cannot settle it. Its subject is covered by the grapple tutorial
+bubble, with the objective rail across the top, and it is not tracked. A frame that could settle the
+question has to set and record the tutorial and objective state so the vein is unoccluded, and has to be
+a diagnostic post-tutorial frame rather than a first-impression one. Until then the honest state of "can
+a player see the tell" is unverified, and phase 3b's sonar work should not assume the stain covers it in
+the meantime.
+
+What is unaffected either way: the lode plane is correct, generated, deterministic, ingested and
+workable. None of that rests on the tell.
+
+One consequence for every other measurement in the project: luma readings now have a pre-lode and a
+post-lode side, and the boundary is `303d1f5`.
 
 ## 6. Risk register
 
 | Risk | Mitigation |
 |---|---|
-| **Half-migrated world** (§1) | ~~the cutover is one commit that flips the generator and deletes the old path together~~ — **VOID since the 3a/3b split; see below** |
-| Conservation quietly breaks | conservation asserted **unchanged**, not rewritten; `take_lode` mirrors the drill's ledger exactly |
-| The opening arc stalls (agent can't get 4 ore) | `arc_driver` + a `work_lode` agent verb land **with** the cutover, in the same commit |
-| Tutorial describes the old game | tutorial rewrite is in the cutover commit, listed as non-negotiable |
-| Frametime regression from the fleck field | view-culled like `_draw_water`/`_draw_ore_glints`; `check_frametime` is a gate |
-| Discovery gets flatter (§7 of LODE) | the stain says *something is here*, never *400 iron is here*; judged by the blind-vision pass |
+| Half-migrated world (§1) | see the note below; the original mitigation no longer applies |
+| Conservation quietly breaks | conservation asserted unchanged rather than rewritten; `take_lode` mirrors the drill's ledger exactly |
+| The opening arc stalls, and the harness cannot get 4 ore | `arc_driver` plus a `work_lode` verb on `PlayAgent` land with the cutover, in the same commit |
+| Tutorial describes the old game | the tutorial rewrite is in the cutover commit, listed as non-negotiable |
+| Frametime regression from the fleck field | view-culled like `_draw_water` and the glint pass; `check_frametime` is a gate |
+| Discovery gets flatter (`docs/LODE.md` §7) | the stain says *something is here*, never *400 iron is here*; judged by the blind pass |
+| Old saves | additive read, absent becomes an empty lode layer, asserted in `check_saveload` |
+| Scope creep into the Spur | the Spur shipped separately and never blocked the cutover |
 
-> **THE TOP RISK'S MITIGATION WAS "THE CUTOVER IS ONE COMMIT", AND THE CUTOVER IS NO LONGER ONE COMMIT.**
-> 3a shipped and 3b is open, so that sentence is void and must not be leaned on. Whether the risk is still
-> mitigated is a separate question from whether the written mitigation survived, and the answer is yes —
-> **by the same property phases 1–2 relied on, not by the one that was retired.** 3a is purely additive:
-> ore blocks and lodes are both valid simultaneously, no conversion happened, and nothing was deleted. A
-> world is therefore never half-migrated; it carries both models, exactly as it did after phase 1.
->
-> What that costs is precision about WHEN the risk returns. It returns the instant 3b starts deleting,
-> because the deletions are what make a world unable to hold both models — and 3b no longer has "it all
-> lands together" protecting it. **Whoever picks up 3b inherits a real half-migration risk that this table
-> previously claimed was structurally impossible.** The mitigation it needs is its own, and it does not
-> exist yet.
-| Old saves | additive read; absent → empty lode layer; asserted in `check_saveload` |
-| Scope creep into the Spur | the Spur is phase 2 and may be deferred without blocking the cutover |
+The top risk's original mitigation was "the cutover is one commit that flips the generator and deletes
+the old path together", and the cutover is no longer one commit. That sentence is void. Whether the risk
+is still mitigated is a separate question, and today the answer is yes, but by a different property.
+Phase 3a is purely additive: ore blocks and lodes are both valid simultaneously, no conversion happened,
+and nothing was deleted, so a world carries both models rather than being caught between them, exactly as
+it did after phase 1.
+
+What that costs is precision about when the risk returns. It returns the instant 3b starts deleting,
+because the deletions are what make a world unable to hold both models, and 3b no longer has "it all
+lands together" protecting it. Whoever picks up 3b inherits a real half-migration risk that this table
+previously claimed was structurally impossible, and the mitigation it needs is its own.
 
 ## 7. Rollback
 
-- **Whole migration:** `git reset --hard pre-lode` (tag pushed).
-- **One phase:** each phase is one commit; `git revert <sha>`.
-- **Abort triggers** — stop and reassess rather than patch forward if: conservation cannot be kept without
-  rewriting the invariant; the opening arc cannot be driven to first automation; frametime falls below the
-  120fps gate and the fleck field is the cause; or the blind-vision pass cannot locate ore after phase 4.
+- **Whole migration:** `git reset --hard pre-lode`, tag pushed.
+- **One phase:** each phase is one commit, so `git revert <sha>`.
+- **Abort triggers.** Stop and reassess rather than patching forward if conservation cannot be kept
+  without rewriting the invariant; if the opening arc cannot be driven to first automation; if frametime
+  falls below its budget and the fleck field is the cause; or if a blind pass cannot locate ore after
+  phase 4.
 
-## 8. Calls made (reversible, flagged for your eyes)
+## 8. Calls made, all reversible
 
-1. **Coal moves too.** Same rule, no exception — it keeps the drill→coal demand web intact and avoids a
+1. **Coal moves too.** Same rule, no exception. It keeps the drill-to-coal demand web intact and avoids a
    second ore model for one material.
-2. **Working a lode obeys the drive/tier gate.** The tool ladder is the tool ladder; this also means #S37's
-   crossed cursor and skid answer lodes with no new code.
-3. **Bits do not gate lode work.** Bits shape *holes*; working a vein cuts no hole. A Wedge never refuses ore.
-4. **No solid ore survives** (LODE §8). A "massive ore" exception would rebuild the muddle being deleted.
-5. **No save version bump.** Additive read, matching the `fill`/`spoil` precedent.
+2. **Working a lode obeys the drive and tier gate.** The tool ladder is the tool ladder, which also means
+   the existing crossed cursor and skid answer lodes with no new code.
+3. **Bits do not gate lode work.** Bits shape holes, and working a vein cuts no hole. A Wedge never
+   refuses ore.
+4. **No solid ore survives** (`docs/LODE.md` §8). A "massive ore" exception would rebuild the muddle
+   being deleted.
+5. **No save version bump.** Additive read, matching the `fill` and `spoil` precedent.
 
-The one I would most want you to look at is **#4** — it is the only one that is hard to walk back after the
-cutover, and it is the difference between "ore is in the wall" and "ore is *usually* in the wall".
+Call 4 is the one worth the most scrutiny. It is the only one that is hard to walk back after the
+cutover, and it is the difference between "ore is in the wall" and "ore is usually in the wall".
