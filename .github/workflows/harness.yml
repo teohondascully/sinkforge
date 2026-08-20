@@ -47,13 +47,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # THE ONE GUARD NEITHER SESSION CAN WALK PAST. `docs/DECISIONS.md` locks the sole author of every commit
-  # as the developer; the rule was LOCKED for months and 23 pushed commits carried an assistant co-author trailer
-  # anyway. The tracked commit-msg hook catches the ordinary path, but all work in this repo
-  # commit with `--no-verify` as a matter of habit, so the hook is the guard they are most likely to skip.
-  # This job is not skippable, and it is thirty seconds.
+  # Every commit must be authored by the repository owner and carry no co-author trailer, per
+  # docs/DECISIONS.md. The tracked commit-msg hook covers the ordinary path but is skipped by
+  # --no-verify, so the same check runs here where it cannot be bypassed. Takes about thirty seconds.
   authorship:
-    name: sole author, no assistant trailers on any ref
+    name: authorship
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -66,7 +64,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: No assistant co-author trailer on any ref
+      - name: Check commit authorship
         run: bash tools/check_trailers.sh
 
       # The capture manifest is GENERATED from git, so this is not a style check — it fails only when the
