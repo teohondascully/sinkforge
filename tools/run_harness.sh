@@ -520,6 +520,13 @@ add "check_teaching (it teaches)"     "res://tools/check_teaching.gd"
 add "check_depth_reads (how deep)"    "res://tools/check_depth_reads.gd"
 add "check_pump (wind it up)"         "res://tools/check_pump.gd"
 add "check_plunge (ride it down)"     "res://tools/check_plunge.gd"
+# THE GUARD ON THE GUARD, and it had never run. `FixturePointer` is what turns "a person moved the mouse
+# while we were measuring" from a FAIL into a VOID, which is the mechanism that keeps every aim assertion
+# in this suite honest on a machine somebody is also working at. The layer that proves it fires in both
+# directions has existed, complete and passing, in no list: not here, not in either CI job, not in any
+# sweep. Nothing reported that, because `check_ci_coverage` audits the layers that ARE registered and a
+# file registered nowhere is outside the population it can see.
+add "check_fixture_pointer (void vs fail)" "res://tools/check_fixture_pointer.gd"
 add "check_aim (honest marker)"       "res://tools/check_aim.gd"
 add "check_impact (a fall costs)"     "res://tools/check_impact.gd"
 add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
