@@ -891,11 +891,16 @@ func _draw_surface_life() -> void:
 	var cyc: int = int(_anim_time / CYCLE)
 	var ct: float = fmod(_anim_time, CYCLE)
 	if ct < CROSS_T and daylight() > 0.5:
-		var bh: int = (cyc * 2654435761) & 0x7fffffff
+		# `Seams.grain` rather than a bare `cyc * 2654435761`: that constant is ODD, so its low bit is the
+		# low bit of `cyc` untouched, and `bh % 2` was EXACTLY `cyc % 2` — verified over 100,000 cycles. The
+		# bird reversed direction on every single crossing, a metronome rather than a choice, and altitude
+		# marched in steps of +23 for the same reason. Two salts so heading and height are independent.
+		var bh_dir: int = Seams.grain(Vector2i(cyc, 11))
+		var bh_alt: int = Seams.grain(Vector2i(cyc, 22))
 		var frac: float = ct / CROSS_T
 		var span: float = float(FactorySim.GRID_COLS * CELL)
-		var bx: float = lerpf(-80.0, span + 80.0, frac if bh % 2 == 0 else 1.0 - frac)
-		var by: float = float(SURFACE_LINE * CELL) - 190.0 - float(bh % 90) \
+		var bx: float = lerpf(-80.0, span + 80.0, frac if bh_dir % 2 == 0 else 1.0 - frac)
+		var by: float = float(SURFACE_LINE * CELL) - 190.0 - float(bh_alt % 90) \
 			+ sin(ct * 1.3) * 10.0
 		if view.has_point(Vector2(bx, by)):
 			var flap: float = absf(sin(ct * 9.0)) * 5.0

@@ -33,13 +33,19 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	if dl < 0.85:
 		var star_a: float = (1.0 - dl) * 0.9
 		for i: int in 42:
-			var sh: int = i * 2654435761
-			var sx: float = view.position.x + fposmod(float(sh % 4093) + cam.x * 0.04, view.size.x)
-			var sy: float = grad_top - 60.0 + float((sh / 7) % 380)
+			# A bare `i * 2654435761` is a LINEAR sequence, not a hash, and it showed: across these 42 stars
+			# the sorted x values had only THREE distinct gaps between them (76, 241, 317 — a three-distance
+			# lattice), y had five, all under 24px inside a 380px band, and the radii cycled 0,1,2,0,1,2 with
+			# the index. That is a comb of evenly spaced dots with marching sizes, not a sky. One salt per
+			# axis so position, twinkle and size are independent; x alone goes to 38 distinct gaps.
+			var sx: float = view.position.x + fposmod(
+				float(Seams.grain(Vector2i(i, 101)) % 4093) + cam.x * 0.04, view.size.x)
+			var sy: float = grad_top - 60.0 + float(Seams.grain(Vector2i(i, 202)) % 380)
 			if sy > horizon - 90.0:
 				continue
-			var tw: float = 0.55 + 0.45 * sin(r._anim_time * (1.1 + float(sh % 13) * 0.13) + float(i))
-			ci.draw_circle(Vector2(sx, sy), 1.1 + float(sh % 3) * 0.4,
+			var tw: float = 0.55 + 0.45 * sin(
+				r._anim_time * (1.1 + float(Seams.grain(Vector2i(i, 303)) % 13) * 0.13) + float(i))
+			ci.draw_circle(Vector2(sx, sy), 1.1 + float(Seams.grain(Vector2i(i, 404)) % 3) * 0.4,
 				Color(0.85, 0.88, 0.95, star_a * tw * 0.8))
 	# SUN / MOON: each rides a low arc across the view during its half of the cycle, pinned to the
 	# camera like any celestial thing. The sun is a warm bloom; the moon a small pale disc.
@@ -61,6 +67,9 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	# through the visible span on its own phase so the cover never visibly loops. Lit by the daylight.
 	var span: float = view.size.x + 500.0
 	for i: int in 5:
+		# Same bare multiply as the stars used, and it is the same arithmetic progression (0, .761, .522,
+		# .283, .044). Left alone deliberately: at FIVE samples a progression mod 1 is not distinguishable
+		# from a scatter, so there is nothing measured here to fix, and changing it would only move clouds.
 		var h: float = float((i * 2654435761) % 1000) / 1000.0
 		var p2: float = 0.10 + h * 0.06                                 # nearly pinned = far away
 		var cx: float = view.position.x - 250.0 + fposmod(
