@@ -2652,7 +2652,12 @@ const SET_HEAD: float = 40.0          ## title + category name
 const SET_FOOT: float = 16.0          ## the key legend
 const SET_DETAIL: float = 56.0        ## the plate that says what the control under your hand DOES
 const SET_ROW: float = 22.0           ## an audio/feel row
-const SET_MIN_H: float = 150.0
+const SET_MIN_H: float = 196.0
+## The rail's icon box is 38 tall and its label sits `RAIL_LABEL_DY` below the box top, so three labelled
+## slots need `top + 2 * pitch + RAIL_LABEL_DY` of rail. At the old 150 floor the FEEL page came out 186
+## tall, the pitch collapsed to exactly 38 — the box height — and the boxes met with no room between them.
+const RAIL_PITCH_MIN: float = 54.0
+const RAIL_LABEL_DY: float = 44.0
 ## The shared grid, measured from the content's left edge. Named because a layout assertion that
 ## re-derives them is checking its own arithmetic against itself (the counter's rule, same reason).
 const SET_CTRL_DX: float = 116.0
@@ -2786,7 +2791,7 @@ func _draw_settings_overlay() -> void:
 func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
-	var ys: Array = _rail_slots(rail, CAT_NAMES.size())
+	var ys: Array = _rail_slots(rail, CAT_NAMES.size(), RAIL_PITCH_MIN)
 	for i: int in CAT_NAMES.size():
 		var y: float = ys[i]
 		var on: bool = i == settings_cat
@@ -2795,20 +2800,27 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 			_round_rect(box, 6.0, Color(0.145, 0.129, 0.082))
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
 		_settings_glyph(box.get_center(), i, on or box.has_point(mouse))
-		var label: String = CAT_NAMES[i]
+		# THE NUMBER TRAVELS INSIDE THE WORD. It used to be drawn separately above the icon while the word
+		# sat below it, which put every word equidistant between the icon it names and the number of the
+		# NEXT one — measured on the shipped frames at 47px to its own icon against 46px to the wrong
+		# number, and on the shortest page they landed on the same baseline and the rail printed
+		# "2 AUDIO" when 2 is CONTROLS. One string cannot drift away from itself at any pitch.
+		var label: String = "%d %s" % [i + 1, CAT_NAMES[i]]
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
-		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
+		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + RAIL_LABEL_DY), label,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
-		draw_string(_font, Vector2(box.position.x + 1.0, y + 10.0), str(i + 1),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.34, 0.30, 0.22) if on else Color(0.24, 0.26, 0.31))
 		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": i}})
 
 
 ## Where a rail's boxes sit, for a rail of any height and any number of slots. Extracted from the
 ## counter's rail rather than copied into this one: two rails that compute their own pitch are two rails
 ## that eventually disagree, and this project has a catalogue of exactly that.
-func _rail_slots(rail: Rect2, n: int) -> Array:
-	var pitch: float = minf(58.0, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0))
+func _rail_slots(rail: Rect2, n: int, min_pitch: float = 0.0) -> Array:
+	# THE FLOOR IS NOT COSMETIC. Without one, a short page drives the pitch down to the icon box's own
+	# height (38) and the boxes become contiguous — see `RAIL_PITCH_MIN`. The default of 0.0 leaves the
+	# counter's rail exactly as it was; only a caller that draws text between the boxes needs to ask.
+	var pitch: float = maxf(min_pitch,
+		minf(58.0, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
 	var top: float = minf(62.0, rail.size.y * 0.18)
 	var out: Array = []
 	for i: int in n:
