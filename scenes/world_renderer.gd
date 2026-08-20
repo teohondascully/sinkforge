@@ -3408,6 +3408,20 @@ const LIGHT_TINT: float = 0.28
 const TORCH_LIGHT := Color(1.0, 0.72, 0.34)   ## a wall torch burns hotter and oranger than the head-lamp
 const SEAM_LIGHT := Color(0.46, 0.86, 1.0)    ## exposed-ore seams answer in cold cyan
 
+## Pool radii in CELLS for every veil source that gets view-culled. They are named here rather than written
+## at the call site because the cull margin below must be at least the largest of them: a source outside the
+## margin is skipped entirely, so any pool that reaches further than the margin is clipped where it crosses
+## the screen edge, and the clip pops in and out as the camera scrolls.
+const TORCH_GLOW_R: float = 7.6      ## the wide soft glow that makes a room habitable
+const TORCH_CORE_R: float = 4.4      ## the hot core at the flame
+const MACHINE_GLOW_R: float = 2.8
+const CONDUIT_GLOW_R: float = 1.8
+const MOTE_GLOW_R: float = 1.4
+## Derived, never written by hand: widen any pool above and the margin follows it. A hand-set margin was 6.0
+## against a 7.6-cell torch, which clipped the outer glow of every torch within 1.6 cells of the view edge.
+const VEIL_CULL_MARGIN: float = maxf(maxf(TORCH_GLOW_R, MACHINE_GLOW_R),
+	maxf(CONDUIT_GLOW_R, MOTE_GLOW_R))
+
 
 func _light_tint(source: Color) -> Color:
 	return Color.WHITE.lerp(source, LIGHT_TINT)
@@ -3435,11 +3449,10 @@ func _update_veil() -> void:
 	# Off-screen cut cull: the veil texture covers the whole world but only the on-screen portion is ever
 	# visible, so a light hole cut off-screen is invisible and skipping it is behaviour-preserving. Every
 	# unbounded source (machines, torches, conduits, motes) is culled against a grown view rect so a source
-	# just off-screen whose glow still reaches on-screen keeps cutting. The margin here is 6 cells, against
-	# pool radii of 2.8 for a machine, 1.8 for a conduit, 1.4 for a mote and 7.6 for a torch's outer glow, so
-	# a torch can still be clipped one cell short of its reach. The player lamp and the seams are on-screen by
-	# nature and are not culled.
-	var cull: Rect2 = _view_world_rect(6.0)
+	# just off-screen whose glow still reaches on-screen keeps cutting. The margin is the largest culled pool
+	# radius, so no source is ever dropped while it can still reach the screen. The player lamp and the seams
+	# are on-screen by nature and are not culled.
+	var cull: Rect2 = _view_world_rect(VEIL_CULL_MARGIN)
 	# Light cuts HARD to reveal rock: the pools open a bright core that falls off tight, so lit rock pops out
 	# of the gloom, and each cut carries its SOURCE's colour, so what the lamp uncovers is warm stone rather
 	# than grey stone with an amber sticker over it.
@@ -3471,22 +3484,22 @@ func _update_veil() -> void:
 		elif kind == "lift":
 			s = 0.35 + 0.55 * machine.power_factor
 		if s > 0.0:
-			_veil_cut(bytes, mpos, 2.8, s, _light_tint(Visuals.machine_color(machine.def)))
+			_veil_cut(bytes, mpos, MACHINE_GLOW_R, s, _light_tint(Visuals.machine_color(machine.def)))
 	for cell: Variant in sim.torch:
 		var tpos: Vector2 = _cell_center(cell as Vector2i)
 		if cull.has_point(tpos):
 			# Two cuts, the same shape as the head-lamp: a wide soft glow that makes the ROOM habitable and a
 			# hot core at the flame. One quadratic pool alone put a 2-cell bright disc on the wall and left the
 			# rest of a hung chamber black, which is not what a torch in a room looks like.
-			_veil_cut(bytes, tpos, 7.6, 0.52, _light_tint(TORCH_LIGHT))
-			_veil_cut(bytes, tpos, 4.4, 0.94, _light_tint(TORCH_LIGHT))
+			_veil_cut(bytes, tpos, TORCH_GLOW_R, 0.52, _light_tint(TORCH_LIGHT))
+			_veil_cut(bytes, tpos, TORCH_CORE_R, 0.94, _light_tint(TORCH_LIGHT))
 	for cell: Variant in sim.conduit:
 		var cpos: Vector2 = _cell_center(cell as Vector2i)
 		if not cull.has_point(cpos):
 			continue
 		var lvl: float = _conduit_level(cell as Vector2i)
 		if lvl > 0.04:
-			_veil_cut(bytes, cpos, 1.8, lvl * 0.7)
+			_veil_cut(bytes, cpos, CONDUIT_GLOW_R, lvl * 0.7)
 	# Crystal/ore seam glow: a few cohesive seams of clustered exposed ore each cut ONE larger cool hole in
 	# the gloom, so the vein's rock is revealed around it, and _paint_lights lays the saturated pool on top.
 	# Seams are already view-culled, since _exposed_ore_cells builds only from cells inside _view_world_rect.
@@ -3497,7 +3510,7 @@ func _update_veil() -> void:
 	for m: Dictionary in falling.motes():
 		var fpos: Vector2 = m["pos"]
 		if cull.has_point(fpos):
-			_veil_cut(bytes, fpos, 1.4, 0.5)
+			_veil_cut(bytes, fpos, MOTE_GLOW_R, 0.5)
 	_veil_img.set_data(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, false, Image.FORMAT_RGBA8, bytes)
 	_veil_tex.update(_veil_img)
 
