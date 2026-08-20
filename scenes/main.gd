@@ -2491,12 +2491,17 @@ func _selected_build_material() -> StringName:
 	return item if item in BUILD_MATERIALS else &""
 
 
-## A cell takes a hand-placed machine if it's in-bounds, open (not earth), unoccupied, and NOT the
-## cell the body is standing in — so you can never seal yourself inside a machine you place.
+## A cell takes a hand-placed machine if it's in-bounds, unoccupied, and NOT the cell the body is
+## standing in — so you can never seal yourself inside a machine you place. OCCUPANCY IS THE SIM'S
+## ANSWER, not a second opinion: `factory_sim.gd:855` documents the stress test that caught per-function
+## guards each checking a DIFFERENT subset of the placed layers, and this copy had drifted exactly that
+## way — it listed solid/machine/conduit/rope and never asked about `torch`, so the ghost drew its
+## PLACEABLE border (and unrolled the rope/drill previews, `world_renderer.gd:1689-1696`) over a mounted
+## torch, where the click is really the pickup at :2386 and every sim placement path refuses outright.
+## Bounds and the body are the two halves the sim cannot answer — it owns no avatar — so they stay
+## here; the placed LAYERS are asked once, over there, and the next one added there arrives here free.
 func _placeable(cell: Vector2i) -> bool:
-	return sim.in_bounds(cell) and not sim.is_solid(cell) \
-		and sim.machine_at(cell) == null and not sim.has_conduit(cell) \
-		and not sim.is_climbable(cell) and not _player_occupies(cell)
+	return sim.in_bounds(cell) and not sim.cell_occupied(cell) and not _player_occupies(cell)
 
 
 ## Placeable for the CURRENT selection: a machine only needs an open cell (_placeable), but a building

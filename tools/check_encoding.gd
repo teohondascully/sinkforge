@@ -28,7 +28,7 @@ const SKIP_DIRS: Array[String] = [".git", ".godot", "history"]
 ## carries in `CANARY`: named files that MUST be in the walk. A count alone passes on any 60 files at all.
 const MIN_FILES: int = 60
 const CANARY: Array[String] = [
-	"res://scenes/main.gd", "res://tools/run_harness.sh", "res://docs/MENU_MATRIX.md",
+	"res://scenes/main.gd", "res://tools/run_harness.sh", "res://docs/ARCHITECTURE.md",
 ]
 
 

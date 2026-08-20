@@ -2739,7 +2739,7 @@ func _remap_per_col() -> int:
 ## detail plate has somewhere to read its sentence from.
 const AUDIO_ROWS: Array[Array] = [
 	["master", "master", "everything, including the ambience bed"],
-	["sound", "sound", "picks, impacts, machines — the things you cause"],
+	["effects", "sound", "picks, impacts, machines — the things you cause"],
 	["ambience", "ambience", "the layer's own voice: water, wind, the deep hum"],
 	["music", "music", ""],
 ]
@@ -2782,7 +2782,7 @@ func _draw_settings_overlay() -> void:
 	var told: String = _settings_body(g, mouse)
 	_draw_settings_detail(g, told, mouse)
 	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0),
-		"1 2 3 category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.36, 0.39, 0.45))
+		"1 2 3 switch category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.36, 0.39, 0.45))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
