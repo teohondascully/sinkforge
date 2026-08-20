@@ -15,65 +15,65 @@ A recipe invented to fill that column would be worse than a blank one, because i
 
 | capture | date | renderer | recipe |
 |---|---|---|---|
-| `adit` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- adit` |
-| `aim` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- aim` |
-| `bench` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench` |
-| `bench_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- bench_fresh` |
-| `bench_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench_full` |
-| `bench_next` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- bench_next` |
-| `bench_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_bench.png <crop UNRECORDED>` |
-| `bend` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- bend` |
-| `boot` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- boot` |
-| `boot_green` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `boot_rust` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `boot_silver` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `boot_z1` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- boot 1` |
-| `boot_z2` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- boot 2` |
-| `boot_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_boot.png <crop UNRECORDED>` |
-| `chain` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- chain` |
-| `counter` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- counter` |
-| `dashboard` | 2026-08-18 04:58 | `4ac6a5416a` | `capture_moments.gd -- dashboard` |
-| `delve` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- delve` |
-| `delve_after` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `delve_z1` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- delve 1` |
-| `delve_z3` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- delve 3` |
-| `delve_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_delve.png <crop UNRECORDED>` |
-| `drift` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- drift` |
-| `haul` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- haul` |
-| `haul_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_haul.png <crop UNRECORDED>` |
-| `head` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- head` |
-| `head_z1` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- head 1` |
-| `land` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- land` |
-| `line` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- line` |
-| `lode` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- lode` |
-| `map` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- map` |
-| `mouth` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- mouth` |
-| `pack` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- pack` |
-| `pack_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- pack_fresh` |
-| `pack_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- pack_full` |
-| `plunge` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- plunge` |
-| `quiet` | 2026-08-18 04:58 | `4ac6a5416a` | `capture_moments.gd -- quiet` |
-| `refuse` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- refuse` |
-| `room` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- room` |
-| `room_after` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `room_before` | 2026-08-17 14:03 | `9aa816436b` | `UNRECORDED` |
-| `room_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_room.png <crop UNRECORDED>` |
-| `scarp` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- scarp` |
-| `settings` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- settings` |
-| `stain` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- stain` |
-| `swing` | 2026-08-17 14:03 | `9aa816436b` | `capture_moments.gd -- swing` |
-| `swing_zoom` | 2026-08-17 14:03 | `9aa816436b` | `zoom.gd -- _moment_swing.png <crop UNRECORDED>` |
-| `works` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works` |
-| `works_fresh` | 2026-08-18 03:12 | `9f26ff4788` | `capture_moments.gd -- works_fresh` |
-| `works_full` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works_full` |
-| `works_short` | 2026-08-18 04:33 | `f9d47ba9d0` | `capture_moments.gd -- works_short` |
+| `adit` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- adit` |
+| `aim` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- aim` |
+| `bench` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- bench` |
+| `bench_fresh` | 2026-08-18 03:12 | `8ba28b06f4` | `capture_moments.gd -- bench_fresh` |
+| `bench_full` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- bench_full` |
+| `bench_next` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- bench_next` |
+| `bench_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_bench.png <crop UNRECORDED>` |
+| `bend` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- bend` |
+| `boot` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- boot` |
+| `boot_green` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `boot_rust` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `boot_silver` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `boot_z1` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- boot 1` |
+| `boot_z2` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- boot 2` |
+| `boot_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_boot.png <crop UNRECORDED>` |
+| `chain` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- chain` |
+| `counter` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- counter` |
+| `dashboard` | 2026-08-18 04:58 | `03bd8f57df` | `capture_moments.gd -- dashboard` |
+| `delve` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- delve` |
+| `delve_after` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `delve_z1` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- delve 1` |
+| `delve_z3` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- delve 3` |
+| `delve_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_delve.png <crop UNRECORDED>` |
+| `drift` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- drift` |
+| `haul` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- haul` |
+| `haul_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_haul.png <crop UNRECORDED>` |
+| `head` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- head` |
+| `head_z1` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- head 1` |
+| `land` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- land` |
+| `line` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- line` |
+| `lode` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- lode` |
+| `map` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- map` |
+| `mouth` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- mouth` |
+| `pack` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- pack` |
+| `pack_fresh` | 2026-08-18 03:12 | `8ba28b06f4` | `capture_moments.gd -- pack_fresh` |
+| `pack_full` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- pack_full` |
+| `plunge` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- plunge` |
+| `quiet` | 2026-08-18 04:58 | `03bd8f57df` | `capture_moments.gd -- quiet` |
+| `refuse` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- refuse` |
+| `room` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- room` |
+| `room_after` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `room_before` | 2026-08-17 14:03 | `4ad3509248` | `UNRECORDED` |
+| `room_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_room.png <crop UNRECORDED>` |
+| `scarp` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- scarp` |
+| `settings` | 2026-08-18 03:12 | `8ba28b06f4` | `capture_moments.gd -- settings` |
+| `stain` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- stain` |
+| `swing` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- swing` |
+| `swing_zoom` | 2026-08-17 14:03 | `4ad3509248` | `zoom.gd -- _moment_swing.png <crop UNRECORDED>` |
+| `works` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- works` |
+| `works_fresh` | 2026-08-18 03:12 | `8ba28b06f4` | `capture_moments.gd -- works_fresh` |
+| `works_full` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- works_full` |
+| `works_short` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- works_short` |
 
 ## Cohorts
 
-- `9aa816436b` — 38 frames
-- `f9d47ba9d0` — 8 frames
-- `9f26ff4788` — 4 frames
-- `4ac6a5416a` — 2 frames
+- `4ad3509248` — 38 frames
+- `47992d44ab` — 8 frames
+- `8ba28b06f4` — 4 frames
+- `03bd8f57df` — 2 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
 permitted and described rather than forbidden: re-shooting is not available for every frame, so

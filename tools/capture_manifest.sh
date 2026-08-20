@@ -87,8 +87,24 @@ sed -n '/^	match moment:/,/^		_:/p' tools/capture_moments.gd \
 	| grep -v '^$' | sort -u > "$TMP/moments"
 
 # The files that decide what a frame LOOKS like. A capture is a picture of these.
+#
+# SKY AND BAZAAR WERE MISSING. This list is the whole basis of the signature, so a drawing file absent from it
+# is a renderer change the manifest cannot see: two frames taken either side of such a change report the SAME
+# signature and are read as pictures of the same renderer. `sky_painter.gd` draws the sky gradient, the star
+# field, the birds and the skyline cog; `bazaars.gd` draws every stall and ruin. Both are plainly in shot.
+#
+# WHAT WAS AND WAS NOT MEASURED, because the difference decides how much this fix is worth. Adding them did
+# NOT change the partition of the existing 52 captures: the same frames group together before and after, only
+# the labels moved. No frame in the manifest today was ever mislabelled. What IS true is that the collision is
+# reachable — 9 of the 283 commits that touch any drawer touch ONLY these two among them (four of those on
+# 2026-08-20, rewriting the star field and the clouds), and two captures either side of one of those nine
+# would have collided. The bug is real and unphotographed, not real and demonstrated.
+#
+# The test for membership is "does this file put pixels in a capture", not "is it part of terrain" — which
+# is the reading that let two obviously-drawing files sit outside a list named for drawing.
 { echo scenes/world_renderer.gd; echo scenes/visuals.gd; echo scenes/hud.gd
   echo scenes/fine_terrain.gd; echo scenes/terrain_painter.gd
+  echo scenes/sky_painter.gd; echo scenes/bazaars.gd
   git ls-files 'scenes/*.gdshader'; } | sort -u > "$TMP/drawers"
 
 # One signature per COMMIT, not per file, so 48 captures from 2 commits cost 2 lookups and not 48.
