@@ -3138,7 +3138,7 @@ func _draw_aim_ghost() -> void:
 	if player == null or player.grapple.live() or sim == null or AIM_GHOST_OFF:
 		return
 	var from: Vector2 = player.hand()
-	var shot: Dictionary = player.grapple.trace(sim, from, get_global_mouse_position())
+	var shot: Dictionary = player.grapple.trace(sim, from, Controls.pointer_world(self))
 	var to: Vector2 = shot["at"]
 	var hit: bool = shot["hit"]
 	# A dotted lead rather than a solid one: a solid line reads as a rope that is already there. And it

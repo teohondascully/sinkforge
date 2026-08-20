@@ -1077,13 +1077,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				try_build(_aim)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_alerts():
-		_ping_alert(get_viewport().get_mouse_position())      # click an alert → mark the culprit
+		_ping_alert(Controls.pointer_viewport(self))      # click an alert → mark the culprit
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_minimap():
-		_toggle_ping(get_viewport().get_mouse_position())     # click the map → set/clear the ping
+		_toggle_ping(Controls.pointer_viewport(self))     # click the map → set/clear the ping
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_hover_panel():
-		_apply_knob(_hud.hover_click(get_viewport().get_mouse_position()))   # config-panel chips (#32)
+		_apply_knob(_hud.hover_click(Controls.pointer_viewport(self)))   # config-panel chips (#32)
 	elif event.is_action_pressed(Controls.GRAPPLE):
 		_toggle_grapple()
 	elif event.is_action_pressed(Controls.ZOOM):
@@ -1131,10 +1131,10 @@ func _settings_input(event: InputEvent) -> void:
 				_capture_action = &""                    # cancel — keep the old binding
 			else:
 				var code: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
-				Settings.rebind(_capture_action, {"key": code})
+				_announce_rebind(Settings.rebind(_capture_action, {"key": code}))
 				_capture_action = &""
 		elif event is InputEventMouseButton and event.pressed:
-			Settings.rebind(_capture_action, {"button": event.button_index})
+			_announce_rebind(Settings.rebind(_capture_action, {"button": event.button_index}))
 			_capture_action = &""
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
@@ -1149,14 +1149,46 @@ func _settings_input(event: InputEvent) -> void:
 			and event.keycode >= KEY_1 and event.keycode <= KEY_3:
 		_hud.set_settings_cat(event.keycode - KEY_1)
 		return
+	# KEYBOARD OPERATION OF THE BINDING LIST (`MNU-29a`). Rebinding used to require a mouse: the only way
+	# to start a capture was to click a chip, which makes the one page a player goes to when their input
+	# is not working the page they cannot reach without it.
+	#
+	# THE ARROWS AND ENTER ARE READ AS PHYSICAL KEYS, NOT AS ACTIONS, on purpose. If this moved the cursor
+	# with `Controls.UP`/`DOWN` then rebinding `climb up` would change how you navigate the page you are
+	# rebinding it on — and rebinding it to something unreachable would strand you. Raw keycodes cannot be
+	# remapped, so the page stays operable no matter what the player does to their bindings.
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT:
+				_hud.move_settings_row(event.keycode)
+				return
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+				var picked: StringName = _hud.settings_row_action()
+				if picked != &"":
+					_capture_action = picked
+				return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_apply_setting(_hud.settings_click(get_viewport().get_mouse_position()))
+			_apply_setting(_hud.settings_click(Controls.pointer_viewport(self)))
 		else:
 			_settings_drag = ""                          # slider drag ends with the button
 	elif event is InputEventMouseMotion and _settings_drag != "":
 		_set_volume(_settings_drag,
-			_hud.settings_slider_frac(_settings_drag, get_viewport().get_mouse_position().x))
+			_hud.settings_slider_frac(_settings_drag, Controls.pointer_viewport(self).x))
+
+
+## Say what a rebind COST. `Settings.rebind` returns every action it took the key from; those actions are
+## now `unbound`, which is visible on their own rows but only if you happen to be looking at them.
+##
+## A silent steal would be the original defect wearing a fix: the duplicate would be gone and the player
+## would still not know what happened to the binding they lost.
+func _announce_rebind(displaced: Array[StringName]) -> void:
+	if displaced.is_empty():
+		return
+	var names: Array[String] = []
+	for a: StringName in displaced:
+		names.append(Hud.action_label(a))
+	_hud.flash("%s unbound — that key is taken" % " and ".join(names))
 
 
 ## Sound on or off, from the key or from the settings chip, saying so on screen either way — a mute you
@@ -1332,7 +1364,7 @@ func _toggle_grapple() -> void:
 	var g: Grapple = _player.grapple
 	if g.throwing():
 		return                                    # a hook is already out — let it land
-	g.fire(_player.hand(), get_global_mouse_position())
+	g.fire(_player.hand(), Controls.pointer_world(self))
 	_sfx.play(&"clunk", _player.position, 1.9, -10.0)
 
 
@@ -1346,7 +1378,7 @@ func _update_mining(delta: float) -> void:
 	_rhythm_idle += delta
 	if _rhythm_idle > RHYTHM_GRACE:
 		_rhythm = maxf(0.0, _rhythm - delta * RHYTHM_DECAY)
-	var mouse_world: Vector2 = get_global_mouse_position()
+	var mouse_world: Vector2 = Controls.pointer_world(self)
 	_aim = _effective_aim(mouse_world)
 	# Open UI (minimap / config panel) eats the cursor: LMB there clicks, never swings the pick.
 	var pressed: bool = not _paused and not _settings_open and Controls.pressed(Controls.MINE) \
@@ -2191,7 +2223,7 @@ func _prime_breach_watch() -> void:
 ## verb (mine/build) fires underneath — the "clicks on visible UI don't hit the world" rule.
 func _cursor_on_minimap() -> bool:
 	return _minimap_mode > 0 and _hud != null \
-		and _hud.minimap_frame().grow(3.0).has_point(get_viewport().get_mouse_position())
+		and _hud.minimap_frame().grow(3.0).has_point(Controls.pointer_viewport(self))
 
 
 ## Is the cursor over the machine inspector/config panel? While it is, LMB hits panel knobs and the
@@ -2200,7 +2232,7 @@ func _cursor_on_hover_panel() -> bool:
 	if _hud == null:
 		return false
 	var r: Rect2 = _hud.hover_panel_rect()
-	return r.size.x > 0.0 and r.has_point(get_viewport().get_mouse_position())
+	return r.size.x > 0.0 and r.has_point(Controls.pointer_viewport(self))
 
 
 ## Turn a clicked config-panel chip (#32) into the discrete sim call it stands for. The HUD only
@@ -2224,7 +2256,7 @@ func _apply_knob(payload: Dictionary) -> void:
 ## Is the cursor over the alert stack this frame? While it is, LMB marks the alert and the pick stays
 ## holstered (same "UI eats the click" rule as the open minimap / config panel).
 func _cursor_on_alerts() -> bool:
-	return _hud != null and _hud.cursor_on_alerts(get_viewport().get_mouse_position())
+	return _hud != null and _hud.cursor_on_alerts(Controls.pointer_viewport(self))
 
 
 ## Click an alert (#29) → drop the PING on the stalled machine so its in-world beacon + map dot lead you

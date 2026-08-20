@@ -198,3 +198,63 @@ static func register() -> void:
 		InputMap.add_action(action)
 		for spec: Dictionary in specs[action]:
 			InputMap.action_add_event(action, event_from_spec(spec))
+
+
+# --- INP-01: the pointer is ONE source, and a fixture may own it ------------------------------------
+#
+## Where the player is pointing had three readers (`_toggle_grapple`, `_update_mining`, `_draw_aim_ghost`)
+## and each called `get_global_mouse_position()` for itself, plus three more asking the VIEWPORT for the
+## same cursor to test whether it sits on a panel. Six independent reads of one physical thing.
+##
+## That was tolerable until it wasn't. Fixtures posed the aim by calling `warp_mouse` — which does not set
+## a variable, it asks the WINDOWING SYSTEM to move the actual cursor on the actual desk. When a person is
+## using the machine their hand moves it back, so the readback disagreed by however far they had travelled:
+## measured at 11 moved samples in 40 over four seconds, a largest jump of 21154.6 px, and the window
+## reporting `focused: false` while still tracking them. Every aim assertion in the suite was, in effect,
+## asserting that nobody had touched the mouse recently. The other half of that bug is ruder: we were
+## yanking their pointer across the screen while they worked.
+##
+## So the pointer gets a single source with a seam in it. In play `_posed` is false and every reader ends
+## up at the same `get_global_mouse_position()` it used before — this is not a new behaviour, it is the old
+## one with one name. Under a fixture, `pose_pointer()` states the world point directly and NOTHING touches
+## the OS cursor, which makes aim telemetry independent of whoever else is using the box.
+##
+## `_posed` is a real bool rather than a `Vector2` compared against null on purpose: in GDScript a Vector2
+## — like Array, Dictionary and Callable — compares `!= null` as TRUE, so a "is an override set?" guard
+## written that way could never be false. This file has been bitten by that shape before.
+static var _posed: bool = false
+static var _posed_world: Vector2 = Vector2.ZERO
+
+
+## Take the pointer. From here the game aims at `world` regardless of where the physical cursor is.
+static func pose_pointer(world: Vector2) -> void:
+	_posed = true
+	_posed_world = world
+
+
+## Give it back to the human.
+static func release_pointer() -> void:
+	_posed = false
+
+
+## Whether a fixture currently owns the pointer. A layer that means to measure the REAL cursor path should
+## assert this is false, so "I posed it and forgot" cannot masquerade as a passing hardware test.
+static func pointer_posed() -> bool:
+	return _posed
+
+
+## The pointer in world space — what you are aiming AT.
+static func pointer_world(node: CanvasItem) -> Vector2:
+	if _posed:
+		return _posed_world
+	return node.get_global_mouse_position()
+
+
+## The pointer in viewport space — what you are aiming OVER, for the "is the cursor on a panel?" tests.
+## Derived from the posed world point through the engine's own canvas transform rather than a hand-rolled
+## projection, so the two accessors cannot drift apart and neither can disagree with `warp_mouse`'s pair.
+static func pointer_viewport(node: CanvasItem) -> Vector2:
+	var vp: Viewport = node.get_viewport()
+	if _posed:
+		return vp.get_canvas_transform() * _posed_world
+	return vp.get_mouse_position()

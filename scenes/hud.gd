@@ -208,6 +208,7 @@ var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this fr
 var settings_cat: int = CAT_AUDIO          ## which face of the page is open (the rail's selection)
 var _set_h: float = SET_MIN_H              ## eased toward `_settings_wanted_h()`, like the counter
 var _set_t: float = 0.0                    ## the page's own rise, 0..1 — drives the scrim AND the defocus
+var settings_row: int = 0                  ## the keyboard cursor on the binding list (`MNU-29a`)
 
 ## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
 var _flash_text: String = ""
@@ -638,7 +639,7 @@ func _draw_hint_bubble() -> void:
 func _draw_alerts() -> void:
 	if alerts.is_empty():
 		return
-	var mouse: Vector2 = get_viewport().get_mouse_position()
+	var mouse: Vector2 = Controls.pointer_viewport(self)
 	var w: float = 184.0
 	var rh: float = 22.0
 	var x: float = 10.0
@@ -1204,7 +1205,7 @@ func _draw_hover() -> void:
 		draw_string(_font, Vector2(x0 + 3.0, y - 1.0), str(bar.get("label", "")),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.95, 0.94, 0.99))
 		y += line_h
-	var mouse: Vector2 = get_viewport().get_mouse_position()
+	var mouse: Vector2 = Controls.pointer_viewport(self)
 	for knob: Variant in knobs:
 		var k: Dictionary = knob
 		var x: float = x0
@@ -1795,7 +1796,7 @@ func _tab_pack(g: Dictionary) -> void:
 		if box.end.y > content.end.y:
 			break
 		var item: StringName = slots[i]["item"]
-		var hot: bool = box.has_point(get_viewport().get_mouse_position())
+		var hot: bool = box.has_point(Controls.pointer_viewport(self))
 		var picked: bool = i == bazaar_row
 		if picked:
 			_round_rect(box, 5.0, Color(0.176, 0.153, 0.098))
@@ -2756,7 +2757,7 @@ func _draw_settings_overlay() -> void:
 	_bazaar_vignette(0.5 * t)
 	var g: Dictionary = _settings_geometry()
 	var origin: Vector2 = g["origin"]
-	var mouse: Vector2 = get_viewport().get_mouse_position()
+	var mouse: Vector2 = Controls.pointer_viewport(self)
 	var plate := Rect2(origin, Vector2(SET_W, float(g["h"])))
 	# The page rises the last few pixels into place, one transform, exactly as the counter does.
 	draw_set_transform(Vector2(0.0, (1.0 - t) * 14.0), 0.0, Vector2.ONE)
@@ -2946,6 +2947,39 @@ func _binding_clashes() -> Dictionary:
 	return out
 
 
+## An action's human name, from the same table the page draws. Static because `MainView` needs it to say
+## which binding a rebind just took the key from, and a second copy of these names would be a second place
+## for them to go stale.
+static func action_label(action: StringName) -> String:
+	for row: Array in REMAP_ROWS:
+		if row[0] == action:
+			return str(row[1])
+	return String(action)
+
+
+## Move the keyboard cursor. Up/Down step within a column; Left/Right jump a column, which is what the
+## two-column layout makes them mean. Clamped rather than wrapped: a cursor that leaps from the last row
+## to the first reads as a lost keypress.
+func move_settings_row(keycode: int) -> void:
+	if settings_cat != CAT_CONTROLS:
+		return
+	var per_col: int = _remap_per_col()
+	var n: int = REMAP_ROWS.size()
+	match keycode:
+		KEY_UP: settings_row -= 1
+		KEY_DOWN: settings_row += 1
+		KEY_LEFT: settings_row -= per_col
+		KEY_RIGHT: settings_row += per_col
+	settings_row = clampi(settings_row, 0, n - 1)
+
+
+## The action under the keyboard cursor, or &"" when the cursor is not on a binding list.
+func settings_row_action() -> StringName:
+	if settings_cat != CAT_CONTROLS or settings_row < 0 or settings_row >= REMAP_ROWS.size():
+		return &""
+	return REMAP_ROWS[settings_row][0]
+
+
 ## The bindings: two columns of eleven, each row a label and the key that does it. `MNU-30` — the capture
 ## state is now ON the row that is capturing ("press a key…"), not a sentence at the bottom of the page
 ## competing with the reset control.
@@ -2966,16 +3000,26 @@ func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
 		var bw: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
 		var chip := Rect2(x + col_w - bw, y - 10.0, bw, 13.0)
 		var lit: bool = chip.has_point(mouse)
-		if lit or capturing:
+		var cursor: bool = i == settings_row
+		if lit or capturing or cursor:
 			# The whole row lights, not just the chip — the row is the thing you are choosing, which is
 			# what makes the plate below it read as being ABOUT something.
 			_round_rect(Rect2(x - 4.0, y - 11.0, col_w + 8.0, 15.0), 3.0, Color(0.145, 0.129, 0.082))
+		# THE KEYBOARD CURSOR IS NOT THE HOVER, and it must not look like it. Hover is a warm fill under
+		# whatever the mouse happens to be over; focus is a claim about where the NEXT keypress will land,
+		# and it persists with no pointer anywhere near it. So focus gets the rail's own gold edge bar —
+		# the mark this UI already uses for "this is the selected one" — and the two can coexist on
+		# different rows without either being ambiguous.
+		if cursor:
+			draw_rect(Rect2(x - 6.0, y - 11.0, 2.0, 15.0), UI_ACCENT)
+			# The mouse wins when it is on a row, because it is the more deliberate pointer; the cursor
+			# speaks when nothing is hovered, so the plate always describes the thing that would act.
 			if capturing:
 				said = "press any key to bind it — ESC cancels"
 			elif not clash.is_empty():
 				said = "%s is also %s" % [Settings.binding_label(action), " and ".join(clash)]
-			else:
-				said = str(row[2])
+			elif lit or said == "":
+				said = str(row[2]) if str(row[2]) != "" else "%s — press Enter to rebind" % str(row[1])
 		draw_string(_font, Vector2(x, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 			UI_TEXT if (lit or capturing) else UI_TEXT_DIM)
 		# A CLASHING KEY IS NOT A SELECTED ONE, so it does not get the gold — it gets the warn colour the
@@ -3211,7 +3255,7 @@ func _draw_inventory() -> void:
 		var active: bool = i == sel
 		wells.append(slot_rect)
 		sel_lit = sel_lit or active
-		if i < slots.size() and slot_rect.has_point(get_viewport().get_mouse_position()):
+		if i < slots.size() and slot_rect.has_point(Controls.pointer_viewport(self)):
 			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip
 			_tooltip_count = int(slots[i]["count"])
 			_tooltip_anchor = Vector2(slot_rect.get_center().x, slot_rect.position.y)

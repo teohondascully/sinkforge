@@ -107,10 +107,37 @@ static func music_db() -> float:
 
 ## Rebind an action to a single event spec, apply it live, persist. The old binding is fully replaced
 ## (one gesture per action keeps the page honest); reset_bindings() restores every default.
-static func rebind(action: StringName, spec: Dictionary) -> void:
+##
+## THE NEW BINDING TAKES THE KEY. Any other action already holding it is UNBOUND and returned, so the
+## caller can say so. `MNU-29a`: this function used to write the new key and return, with no conflict
+## check of any kind — bind `jump` to `W` and `W` became `climb up` AND `jump`, both fired on every press,
+## the config persisted it, and nothing anywhere said a word.
+##
+## STEAL RATHER THAN REFUSE, deliberately. Refusing would make a used key unbindable until you first went
+## and cleared its owner, which is a chore in a page whose whole job is rebinding. Stealing cannot leave a
+## duplicate behind, the displaced action is left VISIBLY `unbound` on its own row rather than quietly
+## losing its key, and `reset_bindings()` is one chip away.
+##
+## THE PREDICATE IS `binding_label`, AND THAT IS NOT AN IMPLEMENTATION DETAIL. `Hud._binding_clashes()`
+## marks a row as clashing by comparing the same labels. If the resolver compared something else —
+## `InputMap.action_has_event`, or a hand-rolled spec equality — then the page could display a conflict
+## the resolver did not resolve, or resolve one it never showed. **One predicate, or the display and the
+## fix are about different things.** A fresh spec always yields a real event, so `label` here is never
+## `"unbound"` and this cannot mass-unbind the actions that have no key.
+static func rebind(action: StringName, spec: Dictionary) -> Array[StringName]:
+	var label: String = event_label(Controls.event_from_spec(spec))
+	var displaced: Array[StringName] = []
+	for other: StringName in Controls.defaults():
+		if other == action or not InputMap.has_action(other):
+			continue
+		if binding_label(other) == label:
+			displaced.append(other)
+			bindings[other] = []
+			_apply_action(other, [])
 	bindings[action] = [spec]
 	_apply_action(action, [spec])
 	save_settings()
+	return displaced
 
 
 ## Push every saved override into InputMap (call AFTER Controls.register() has created the actions).
