@@ -150,15 +150,15 @@ var can_craft: bool = false        ## are we near a claimed Bazaar? gates the VE
 ## 608x348 on a 640x360 canvas is 91.8% of the screen BY AREA, and T2.1's complaint was never that the panel
 ## is large but that it is large REGARDLESS: a fresh game's PACK tab holds one item and drew the same 92% as
 ## a finished game's nineteen-machine WORKS list. The counter now takes the height its ACTIVE TAB asks for
-## (`_bazaar_wanted_h`), clamped between `BAZAAR_MIN_H` and this. A fresh PACK lands at 206 -- 54.4% of the
+## (`_bazaar_wanted_h`), clamped between `BAZAAR_MIN_H` and this. A fresh PACK lands at 190 -- 50.1% of the
 ## canvas instead of 91.8% -- and BENCH still asks for more than this and still gets clamped to it, so the
 ## deep end of the game is unchanged.
 ##
 ## BOTH PERCENTAGES ARE AREA and neither is a height, which is worth one line because the two frames give
-## different answers to the same question: as heights the same panels are 57.2% and 96.7% of the canvas.
+## different answers to the same question: as heights the same panels are 52.8% and 96.7% of the canvas.
 ## The 196 this paragraph used to name is not what a fresh PACK asks for: head 48 + one row of wells 46 +
-## the gap 8 + the plate 88 + the foot 16 is 206. 196 was the clamp floor, which sat ten pixels below its
-## own stated sum and so could never be the number that quoting it was meant to describe.
+## the gap 8 + the compact plate 72 + the foot 16 is 190. 196 was the clamp floor, which sat ten pixels
+## below its own stated sum and so could never be the number that quoting it was meant to describe.
 ##
 ## THE WIDTH DOES NOT MOVE, deliberately. The detail plate along the bottom carries a machine's whole
 ## sentence ("breaks tier-1 rock (earth / stone / ore / coal) -- hold LMB"), and that is what the 528px of
@@ -169,29 +169,61 @@ const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edg
 const BAZAAR_PAD: float = 12.0
 const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
 const BAZAAR_FOOT: float = 16.0       ## the key legend
-## THE DETAIL PLATE IS THE HEIGHT OF WHAT IT DRAWS, which is why it is written as a sum and not as 88.
+## THE DETAIL PLATE IS THE HEIGHT OF WHAT IT DRAWS — and it draws two different things, so it has two
+## heights and neither of them is written down.
 ##
-## The plate holds a lit square with the selected thing in it and, beside that, a title, a two-line blurb
-## and a row of have/need price chips. The square is `DETAIL_ART` on a side with `DETAIL_PAD` of margin
-## above and below it, which is the 88 exactly; the chips are the deepest thing in the text column beside
-## it, starting 62 below the plate's top and standing 19 tall. So 81 of the 88 is spoken for on every tab
-## and 78 of it by the square alone, and the two columns arrive at the same floor independently.
+## THE FULL PLATE, for a thing you are deciding whether to spend on. A lit square with the thing in it and,
+## beside that, a title, a two-line blurb and a row of have/need price chips. The square is `DETAIL_ART` on
+## a side with `DETAIL_PAD` of margin above and below it, which is the 88 exactly; the chips are the deepest
+## thing in the text column beside it, starting 62 below the plate's top and standing 19 tall. So 81 of the
+## 88 is spoken for and 78 of it by the square alone, and the two columns arrive at the same floor
+## independently. Nothing here can be scaled: a coefficient in front of the 88 clips the chips off the
+## bottom before it has taken a fifth of the height away.
 ##
-## THAT IS ALSO WHY THE PLATE DOES NOT SCALE WITH THE PANEL, though the ratio invites it. Now that the
-## counter takes its tab's height, the plate is 42.7% of a fresh PACK's 206 where it was 25.3% of the full
-## 348: the same plate, a worse share, bought by shrinking everything above it. But a plate cut to that
-## old share would be 52px, and the chips run off the bottom of it 29px before the share is reached. A
-## coefficient in front of this number can only clip the plate; the lever on the ratio is what the plate
-## DRAWS, so it belongs in `_draw_bazaar_detail` and not here.
+## THE COMPACT PLATE, for a thing there is nothing to weigh. What is already in your pack has no price, and
+## PACK's own summary of the line has no cost at all, so neither of them draws the chip row — and with the
+## chips gone the deepest thing left is the last blurb line and one fact under it. That sum is
+## `BAZAAR_DETAIL_MIN`, and the square is then whatever fits BESIDE it rather than the other way round,
+## which is why `_draw_bazaar_detail` reads the square off the plate's rect instead of off `DETAIL_ART`.
+## At both depths the plate and the square it holds are one number.
+##
+## THE SHARE THIS BUYS, AND WHY IT IS NEARLY ALL OF IT. The plate sits inside the height it is a share of:
+## a fresh PACK is 118px of head, wells, gap and foot PLUS the plate, so the share is plate/(118+plate) and
+## shrinking the plate shrinks the panel underneath it. 88 of 206 is 42.7% and 72 of 190 is 37.9%; the 25.3%
+## the plate held when the panel was a fixed 348 would need a 40px plate, which is under half of what the
+## compact plate has to draw. `check_pack_layout` floors the plate at 70px independently, so 37.2% is the
+## whole of what this lever has ever been worth and the 2px between it and 72 is the margin on that floor.
 const DETAIL_PAD: float = 10.0        ## plate edge to the art square, and the same again under it
-const DETAIL_ART: float = 68.0        ## the lit square the selected thing is drawn in
+const DETAIL_ART: float = 68.0        ## the lit square a thing on sale is drawn in
 const BAZAAR_DETAIL: float = DETAIL_PAD * 2.0 + DETAIL_ART
+## The lamp's rings and the thing inside them are sized off the SQUARE and not written down, because the
+## square is no longer one size: an 8px step off a 34px radius spills over the edge of a compact plate's
+## square, and a 44px glyph in it would have swallowed the rim the lamp needs to read against.
+const DETAIL_GLYPH_INSET: float = 12.0  ## square edge to the thing in it
+## Ring to ring, as a share of the square's radius rather than the 8px it is at the full depth.
+const DETAIL_LAMP_STEP: float = 8.0 / (DETAIL_ART * 0.5)
+## THE COMPACT PLATE'S TEXT COLUMN, which is the thing that sets its height. `DETAIL_LINE` is what the plate
+## RESERVES per blurb line rather than what the face draws — `draw_multiline_string` takes its own pitch from
+## the font, and the full plate already assumes no more than this by seating the chips 22px under a two-line
+## blurb. The tail is for what hangs off the last baseline.
+const DETAIL_BLURB_Y: float = 40.0    ## first blurb baseline, below the plate's top
+const DETAIL_BLURB_LINES: int = 2     ## and what the blurb is allowed to wrap to
+const DETAIL_LINE: float = 12.0       ## reserved per blurb line
+const DETAIL_TAIL: float = 8.0        ## last baseline to the bottom of the plate
+const DETAIL_FACT_Y: float = DETAIL_BLURB_Y + DETAIL_LINE * DETAIL_BLURB_LINES
+const BAZAAR_DETAIL_MIN: float = DETAIL_FACT_Y + DETAIL_TAIL
 const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, named once for its three sites
 ## Head + one row of pack wells + the gap + the detail plate + the foot, ADDED UP rather than written down.
 ## It was a 196 sitting beside that same sentence, which sums to 206, so the floor was ten pixels below the
 ## shape it named and nothing in the file could notice. Below this the counter would be smaller than the
 ## thing it is a counter for.
-const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT
+##
+## THE PLATE TERM IS THE COMPACT ONE, because this floor is PACK's floor and PACK never draws the other.
+## While the plate had a single height the distinction did not exist. Now that it has two, a floor carrying
+## the taller one would sit 16px above where a fresh pack's own sum lands, and `check_pack_layout` asserts
+## that the fresh pack LANDS on this floor rather than being caught by it — an assertion that would still
+## have gone green, on the clamp, saying nothing about the panel.
+const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL_MIN + BAZAAR_FOOT
 ## ELEVATION, NOT A GOLD SLAB. The live tab on both rails used to be a filled brass-tinted tile AND an
 ## accent edge AND a lit glyph: three signals for one bit of state, and the tinted fill is the one that reads
 ## as a pressed button from a decade ago. This is a plain lift off the rail's own 0.043/0.049/0.070, so the
@@ -1526,9 +1558,16 @@ func _rebuild_minimap() -> void:
 	_minimap_tex = ImageTexture.create_from_image(img)
 
 
-## THE BAZAAR'S GEOMETRY — one fixed shape, computed in one place, read by both the draw and the layout
-## test, so seen == tested. Nothing here depends on how long a list is or on whether you are standing at a
-## counter, which is the entire point: the panel that changes shape is the panel you cannot learn.
+## THE BAZAAR'S GEOMETRY — one shape, computed in one place, read by both the draw and the layout test, so
+## seen == tested. Nothing here depends on where you are standing, which is the half of the original claim
+## that still holds: the panel that changes shape depending on where you are is the panel you cannot learn.
+##
+## What it DOES depend on now is what the open tab holds — `h` through `_bazaar_wanted_h`, and the plate
+## through `_detail_wanted_h`. Both are read here rather than recomputed, so the content box is bought out
+## of the same number the plate is drawn at and the two cannot overlap or leave a gap between them. The
+## plate's depth is a property of the SELECTION, but the kinds a selection can have partition by tab
+## (`bazaar_action`), so it is constant while a tab is open — which is what keeps a cursor move from
+## reflowing the rows the cursor is moving through.
 ##
 ## The shape is a rail, a head, a grid of rows, and a DETAIL PLATE across the bottom. The plate is the whole
 ## argument of #S34: the old layout gave the goods a 16px glyph on a 22px row and then left a third of the
@@ -1541,9 +1580,10 @@ func _bazaar_geometry() -> Dictionary:
 	var inner_x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
 	var inner_w: float = BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0
 	var body_h: float = h - BAZAAR_HEAD - BAZAAR_FOOT
+	var plate: float = _detail_wanted_h()
 	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w,
-		body_h - BAZAAR_DETAIL - BAZAAR_DETAIL_GAP)
-	var detail := Rect2(inner_x, content.end.y + BAZAAR_DETAIL_GAP, inner_w, BAZAAR_DETAIL)
+		body_h - plate - BAZAAR_DETAIL_GAP)
+	var detail := Rect2(inner_x, content.end.y + BAZAAR_DETAIL_GAP, inner_w, plate)
 	return {
 		"origin": origin, "w": BAZAAR_SIZE.x, "h": h,
 		"content": content, "detail": detail, "cols": BAZAAR_COLS,
@@ -1560,7 +1600,8 @@ func _bazaar_geometry() -> Dictionary:
 ## silently wrong the day either copy moves -- and this panel already has one instance of that in its
 ## history (`_cycle_inventory` wrapping modulo a count the drawing did not share). So `_pack_cols` is the
 ## single source for the well grid, `_works_rows_needed` asks `works_columns` itself rather than
-## re-deriving the split, and `_bench_tiers` is the tier walk lifted out of `_tab_bench` whole.
+## re-deriving the split, `_bench_tiers` is the tier walk lifted out of `_tab_bench` whole, and the plate
+## term is `_detail_wanted_h` rather than the constant it sometimes equals.
 func _bazaar_wanted_h() -> float:
 	if sim == null:
 		return BAZAAR_SIZE.y
@@ -1580,8 +1621,32 @@ func _bazaar_wanted_h() -> float:
 			# summary's own guard was testing against a content box this sum had already decided, so the
 			# two could only agree by accident and did not. `_ledger_h` carries the reasoning.
 			need = float(_pack_rows(inner_w)) * PACK_CELL + _ledger_h()
-	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT,
+	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + _detail_wanted_h() + BAZAAR_FOOT,
 		BAZAAR_MIN_H, BAZAAR_SIZE.y)
+
+
+## HOW TALL THE PLATE WANTS TO BE, for the thing that is selected — the move above, one level down, and the
+## number every site that positions against the plate reads. There is deliberately no second copy of it:
+## `_bazaar_geometry` buys the content box out of this, the panel's asking height adds this, and
+## `_draw_bazaar_detail` takes the art square back off the rect it is handed, so the plate's depth is stated
+## once and everything else is downstream of it.
+##
+## THE PLATE EXPANDS FOR A CHOICE. A machine, a Rack row and a rung of the ladder all cost something, and
+## the chip row that says whether you can afford it is what the full 88 is for. What is already in your pack
+## has no price to weigh and PACK's summary of the line is not a purchase at all, so both of those get the
+## compact plate — the same title and blurb, one fact under them, and no chips.
+##
+## KEYED ON THE SELECTION, not on the tab, because it is the CONTENT that decides. The kinds partition by tab
+## all the same (`bazaar_action`: PACK yields "hold" or nothing, WORKS "machine" and "rack", BENCH "tech"),
+## which is what makes the depth constant while a tab is open — see `_bazaar_geometry` on why that matters.
+func _detail_wanted_h() -> float:
+	if sim == null:
+		return BAZAAR_DETAIL
+	match str(bazaar_action().get("kind", "")):
+		"machine", "rack", "tech":
+			return BAZAAR_DETAIL
+		_:
+			return BAZAAR_DETAIL_MIN
 
 
 ## How many wells fit across the content, and how many rows they take. `_tab_pack` calls the first of these
@@ -2413,13 +2478,20 @@ func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
 ## This is where the panel stops being a list and starts being a shop. It also puts the three answers a
 ## player is actually after — what is this, can I afford it, what do I press — in one place, at one glance,
 ## instead of spread across a row, a footer and a manual.
+##
+## AND IT IS WHERE THE PLATE'S SHARE OF THE PANEL IS DECIDED, because the plate is the height of what it
+## draws and this is what draws it. A thing on sale gets the full 88 and everything in it; a thing you
+## already own gets the compact plate, which is the same card with the price taken out of it.
 func _draw_bazaar_detail(g: Dictionary) -> void:
 	var box: Rect2 = g["detail"]
 	_round_rect(box, 6.0, Color(1.0, 1.0, 1.0, 0.028))
 	# The one place the art square is built, for all three plates: `_detail_hold` and `_detail_pack` are
-	# handed this rect rather than each writing the same 10 and 68 down again. It is also where
-	# `BAZAAR_DETAIL` gets its height from, so a bigger square grows the plate instead of overflowing it.
-	var art := Rect2(box.position + Vector2(DETAIL_PAD, DETAIL_PAD), Vector2(DETAIL_ART, DETAIL_ART))
+	# handed this rect rather than each writing the margin down again. It is READ OFF THE PLATE — the square
+	# is what is left of the plate's height once its margins are taken — so at the full depth it is the
+	# `DETAIL_ART` that `BAZAAR_DETAIL` is built from and at the compact depth it is whatever fits beside the
+	# text, and neither of them can drift from what `_detail_wanted_h` handed the geometry.
+	var side: float = box.size.y - DETAIL_PAD * 2.0
+	var art := Rect2(box.position + Vector2(DETAIL_PAD, DETAIL_PAD), Vector2(side, side))
 	var act: Dictionary = bazaar_action()
 	var kind: String = str(act.get("kind", ""))
 	if kind == "":
@@ -2484,21 +2556,17 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			ready = can_craft and _can_afford(cost)
 			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
 
-	# The lamp. Three rings behind the goods is the whole trick, and it is what makes a 44px glyph read as
-	# lit rather than as big.
-	for k: int in 3:
-		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.045))
-	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+	_detail_lamp(art, 0.045)
 	if kind == "tech":
 		_draw_tech_art(id, art)
 	else:
-		_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
+		_draw_thing_icon(id, _detail_glyph(art))
 
 	var tx: float = art.end.x + 14.0
 	var text_w: float = box.end.x - tx - _verb_button_w(verb, "ENTER" if ready else "") - 24.0
 	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
-	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), blurb, HORIZONTAL_ALIGNMENT_LEFT,
-		text_w, 9, 2, UI_TEXT_DIM)
+	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y), blurb,
+		HORIZONTAL_ALIGNMENT_LEFT, text_w, 9, DETAIL_BLURB_LINES, UI_TEXT_DIM)
 	# The price as have/need chips: "can I afford this" answered in the same glance as "what does it cost".
 	var cx: float = tx
 	for item: StringName in cost:
@@ -2511,6 +2579,28 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		var nw: float = _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 		draw_string(_font, Vector2(btn.get_center().x - nw * 0.5, btn.position.y - 6.0), note,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.58, 0.48, 0.32))
+
+
+## THE LAMP. Three rings behind the goods is the whole trick, and it is what makes a glyph read as lit
+## rather than as big. All three plates light their square the same way and each of them used to say so in
+## its own numbers, which was survivable while every square was 68 across and stopped being survivable the
+## moment the compact plate gave one of them a smaller square: a radius written as 34 hangs a third of the
+## outer ring over the edge of a 52px square and out through the side of the plate.
+func _detail_lamp(art: Rect2, alpha: float) -> void:
+	var r: float = art.size.x * 0.5
+	for k: int in 3:
+		draw_circle(art.get_center(), r * (1.0 - float(k) * DETAIL_LAMP_STEP),
+			Color(0.85, 0.70, 0.35, alpha))
+	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+
+
+## The thing itself, inside the square. Same reason: it is the square inset by a rim rather than a 44 written
+## at two of the three plates and a 40 at the third, which were the same intent recorded twice at sizes that
+## differ by nothing anyone decided, and both of which overflow the compact square. `_draw_tech_art` keeps
+## its own composition — it lays four unlock icons out in the square rather than centring one thing in it,
+## and a tech is only ever selected on BENCH, where the plate is always at full depth.
+func _detail_glyph(art: Rect2) -> Rect2:
+	return art.grow(-DETAIL_GLYPH_INSET)
 
 
 ## WHY THE BUTTON IS DEAD, when the reason is the pack and not the place.
@@ -2571,8 +2661,9 @@ func _draw_tech_art(tid: StringName, art: Rect2) -> void:
 ##
 ## TWO QUANTITIES, TWO WORDS, AND NEITHER OF THEM BORROWS THE OTHER'S. This one plate used to say
 ## "carrying 24" next to a button reading "IN HAND", over a grid whose lit well was badged "HELD": three
-## words for what a player reads as one relationship, on 88 pixels of screen. Carrying, holding and having
-## in hand are the same thing in English, so "carrying 24" could be read as 24 of them in your hand.
+## words for what a player reads as one relationship, on the shallowest plate in the panel. Carrying,
+## holding and having in hand are the same thing in English, so "carrying 24" could be read as 24 of them
+## in your hand.
 ##
 ## So the pack owns one vocabulary and the hand owns the other. What you have is IN THE PACK, the word the
 ## tab, the plate title and the head's chips already use. What you are wielding is HELD, the past tense of
@@ -2583,18 +2674,22 @@ func _draw_tech_art(tid: StringName, art: Rect2) -> void:
 ## was wrong for the third exactly as "made" is wrong for the first two. Against "in the pack" the contrast
 ## carries it. It is the only per-item total on any screen; the FORGED chip counts ingots and says so.
 func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
-	for k: int in 3:
-		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.045))
-	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
-	_draw_thing_icon(id, Rect2(art.get_center() - Vector2(22.0, 22.0), Vector2(44.0, 44.0)))
+	_detail_lamp(art, 0.045)
+	_draw_thing_icon(id, _detail_glyph(art))
 	var tx: float = art.end.x + 14.0
 	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8,
 		Color(0.949, 0.831, 0.549))
-	draw_multiline_string(_font, Vector2(tx, box.position.y + 40.0), str(ITEM_PURPOSE.get(id, "—")),
-		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 260.0, 9, 2, UI_TEXT_DIM)
+	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y),
+		str(ITEM_PURPOSE.get(id, "—")), HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 260.0, 9,
+		DETAIL_BLURB_LINES, UI_TEXT_DIM)
+	# THE TALLY SITS WHERE THE BLURB ENDS, not at a baseline of its own. It used to be written 76 down a
+	# plate that was always 88, which is the shop's chip row's depth borrowed by a plate that has no chips —
+	# and this is the plate that no longer has the height to spare. `DETAIL_FACT_Y` is the last line the
+	# blurb can reach, and it is also the sum the compact plate's height is built out of, so the fact cannot
+	# be placed below the plate that was sized to hold it.
 	var carried: int = int(sim.inventory.get(id, 0))
 	var made: int = int(sim.total_produced.get(id, 0))
-	draw_string(_font, Vector2(tx, box.position.y + 76.0),
+	draw_string(_font, Vector2(tx, box.position.y + DETAIL_FACT_Y),
 		"%d in the pack   ·   %d all told" % [carried, made],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
@@ -2607,10 +2702,8 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 ## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
 ## factory actually making for you while you stand here.
 func _detail_pack(box: Rect2, art: Rect2) -> void:
-	for k: int in 3:
-		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.035))
-	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
-	Visuals.draw_item(self, art.get_center(), 40.0, &"ingot")
+	_detail_lamp(art, 0.035)
+	Visuals.draw_item(self, art.get_center(), _detail_glyph(art).size.x, &"ingot")
 	var tx: float = art.end.x + 14.0
 	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	var rates: Array[Dictionary] = sim.production_rates()
@@ -2621,16 +2714,20 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 		return
 	draw_string(_font, Vector2(tx, box.position.y + 42.0), "your line is making",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	# The rate chips sit ON the compact plate's last line — the same `DETAIL_FACT_Y` the hold plate's tally
+	# uses, so the one plate that has two contents puts them both in the same place, and the row the plate's
+	# height was built to hold is the row the chips are drawn in rather than one written 50 down beside it.
 	var cx: float = tx
+	var base: float = box.position.y + DETAIL_FACT_Y
 	for i: int in mini(5, rates.size()):
 		var item: StringName = rates[i]["item"]
 		var label: String = "%.1f/min" % float(rates[i]["rate"])
 		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 25.0
 		if cx + cw > box.end.x - 12.0:
 			break
-		_round_rect(Rect2(cx, box.position.y + 50.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
-		Visuals.draw_item(self, Vector2(cx + 11.0, box.position.y + 60.0), 13.0, item)
-		draw_string(_font, Vector2(cx + 19.0, box.position.y + 64.0), label,
+		_round_rect(Rect2(cx, base - 14.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
+		Visuals.draw_item(self, Vector2(cx + 11.0, base - 4.0), 13.0, item)
+		draw_string(_font, Vector2(cx + 19.0, base), label,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.85, 0.72, 0.42))
 		cx += cw + 6.0
 
