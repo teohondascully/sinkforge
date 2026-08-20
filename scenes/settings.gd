@@ -245,13 +245,40 @@ static func binding_label(action: StringName) -> String:
 	return event_label(events[0])
 
 
+## Engine keycode names are developer identifiers, not keycaps. `OS.get_keycode_string(KEY_PERIOD)` is
+## `"Period"` — which shipped onto the CONTROLS page beside `M`, `T`, `Z` and `X`, in TitleCase, three
+## times wider than every other cap in the column. A keycap shows what is PRINTED ON THE KEY, so
+## punctuation resolves to its glyph and named keys to a short shout matching the existing `SPACE`/`ESC`.
+##
+## EVERY LABEL HERE MUST BE UNIQUE. This function is not only display: `_spec_conflict` decides whether
+## two bindings collide by comparing their labels (:142-163), so any two keycodes that share a label
+## become the same key to the conflict detector. That is why ENTER and the keypad's are `ENTER`/`NUM ENT`
+## and not both `ENTER`, and why the fallback upper-cases rather than truncating.
+const KEY_CAPS: Dictionary = {
+	KEY_SPACE: "SPACE", KEY_ESCAPE: "ESC", KEY_ENTER: "ENTER", KEY_TAB: "TAB",
+	KEY_BACKSPACE: "BKSP", KEY_DELETE: "DEL", KEY_INSERT: "INS",
+	KEY_HOME: "HOME", KEY_END: "END", KEY_PAGEUP: "PGUP", KEY_PAGEDOWN: "PGDN",
+	KEY_LEFT: "LEFT", KEY_RIGHT: "RIGHT", KEY_UP: "UP", KEY_DOWN: "DOWN",
+	KEY_SHIFT: "SHIFT", KEY_CTRL: "CTRL", KEY_ALT: "ALT", KEY_META: "CMD",
+	KEY_CAPSLOCK: "CAPS",
+	# The glyph on the key, not the engine's word for it.
+	KEY_PERIOD: ".", KEY_COMMA: ",", KEY_SLASH: "/", KEY_BACKSLASH: "\\",
+	KEY_MINUS: "-", KEY_EQUAL: "=", KEY_SEMICOLON: ";", KEY_APOSTROPHE: "'",
+	KEY_QUOTELEFT: "`", KEY_BRACKETLEFT: "[", KEY_BRACKETRIGHT: "]",
+	# Distinct from the main-block keys above — same glyph would merge them in the conflict check.
+	KEY_KP_ENTER: "NUM ENT", KEY_KP_ADD: "NUM +", KEY_KP_SUBTRACT: "NUM -",
+	KEY_KP_MULTIPLY: "NUM *", KEY_KP_DIVIDE: "NUM /", KEY_KP_PERIOD: "NUM .",
+}
+
+
 static func event_label(ev: InputEvent) -> String:
 	if ev is InputEventKey:
 		var code: int = ev.physical_keycode if ev.physical_keycode != 0 else ev.keycode
-		match code:
-			KEY_SPACE: return "SPACE"
-			KEY_ESCAPE: return "ESC"
-			_: return OS.get_keycode_string(code)
+		if KEY_CAPS.has(code):
+			return String(KEY_CAPS[code])
+		# Letters and digits already come back as bare caps. Upper-casing is the net for anything this
+		# table has not learned yet: a leak still leaks, but it leaks as a keycap and not as source code.
+		return OS.get_keycode_string(code).to_upper()
 	if ev is InputEventMouseButton:
 		match (ev as InputEventMouseButton).button_index:
 			MOUSE_BUTTON_LEFT: return "LMB"

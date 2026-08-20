@@ -2660,7 +2660,12 @@ func _draw_help_overlay() -> void:
 const SET_W: float = 432.0
 const SET_HEAD: float = 40.0          ## title + category name
 const SET_FOOT: float = 16.0          ## the key legend
-const SET_DETAIL: float = 56.0        ## the plate that says what the control under your hand DOES
+## The plate that says what the control under your hand DOES. Was 56, tall enough for three lines and
+## never given more than one; the CONTROLS face is the only one that puts anything else in it, and that
+## is a single RESET KEYS button on the same baseline. 36 holds both with room and takes 20px off every
+## page height, which is 20px less of the objective banner above and the hotbar below that this panel
+## prints over. Measured consequence: settings footprint 50.97% -> 47.22% of canvas, `check_hud_layout`.
+const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0           ## an audio/feel row
 const SET_MIN_H: float = 196.0
 ## The rail's icon box is 38 tall and its label sits `RAIL_LABEL_DY` below the box top, so three labelled
@@ -2864,10 +2869,13 @@ func _settings_glyph(at: Vector2, kind: int, on: bool) -> void:
 ## The head: what page this is, and which face of it you are on — the counter's title pair exactly.
 func _draw_settings_head(origin: Vector2, g: Dictionary) -> void:
 	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
-	_tracked("SETTINGS", Vector2(x, origin.y + 26.0), 15, 2.8, UI_TEXT)
+	# THE IDENTIFYING WORD CARRIES THE CONTRAST. This pair was the other way round: `SETTINGS` at 12.6:1
+	# and the category at 2.0:1 — the brightest text on the page was the word that is the same on all
+	# three faces, and the dimmest was the only one that says which face you are looking at. A blind read
+	# called it the most damaging defect on the screen: it fails at telling you what it is.
+	_tracked("SETTINGS", Vector2(x, origin.y + 26.0), 15, 2.8, Color(0.42, 0.45, 0.53))
 	_tracked(CAT_NAMES[settings_cat],
-		Vector2(x + _tracked_w("SETTINGS", 15, 2.8) + 16.0, origin.y + 26.0), 15, 2.8,
-		Color(0.26, 0.28, 0.34))
+		Vector2(x + _tracked_w("SETTINGS", 15, 2.8) + 16.0, origin.y + 26.0), 15, 2.8, UI_TEXT)
 
 
 ## The open category, returning the sentence the detail plate should say — which is whatever the mouse is
@@ -2902,7 +2910,7 @@ func _settings_audio(c: Rect2, mouse: Vector2) -> String:
 	# The mute reads as its STATE, never as an instruction — a chip that says the opposite of what is
 	# happening is the oldest bug in settings UI.
 	if _settings_chip(c.position.x + SET_CTRL_DX, y, "MUTED" if Settings.muted else "SOUND ON",
-			{"toggle": "mute"}, Settings.muted, mouse):
+			{"toggle": "mute"}, not Settings.muted, mouse, 10, Settings.muted):
 		said = "silences everything at once; the levels below are kept"
 	for row: Array in AUDIO_ROWS:
 		y += SET_ROW
@@ -3145,10 +3153,13 @@ func _settings_slider(x0: float, y: float, id: String, label: String, value: flo
 	# The travelled end gets a bright cap rather than the bar getting brighter: `MNU-28`'s complaint about
 	# these bars is that a long gold fill reads as a progress meter, and a meter is a thing you watch
 	# rather than a thing you drag.
+	# FRAME FIRST, THEN THE HANDLE. Drawn the other way round the frame overprints the handle where it
+	# crosses the bar, and a cap that stands 2px proud top and bottom renders as three disconnected
+	# pieces — a nub, a sliver, a nub. It reads as a rendering fault rather than as something to drag.
+	draw_rect(bar, UI_EDGE_HI if hot else UI_EDGE, false, 1.0)
 	if value > 0.0:
 		draw_rect(Rect2(fill.end.x - 2.0, bar.position.y - 2.0, 2.5, bar.size.y + 4.0),
 			Color(0.949, 0.831, 0.549) if hot else Color(0.80, 0.83, 0.89))
-	draw_rect(bar, UI_EDGE_HI if hot else UI_EDGE, false, 1.0)
 	draw_string(_font, Vector2(x0 + SET_VALUE_DX, y), "%d%%" % int(round(value * 100.0)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT if hot else UI_TEXT_DIM)
 	_settings_hits.append({"rect": bar.grow(3.0), "payload": {"slider": id}})
@@ -3156,15 +3167,29 @@ func _settings_slider(x0: float, y: float, id: String, label: String, value: flo
 
 
 ## One chip. Returns whether the mouse is on it, for the same reason the slider does.
+## `warn` is a THIRD state, and it exists because two were not enough. `UI_ACCENT` is spoken for one line
+## from its definition — "selection, the live verb, the next step" — so a chip filled with it asserts that
+## the thing it names is ON. The mute chip passed `Settings.muted` as `active`, which meant the loudest,
+## most saturated element on the AUDIO page lit up gold precisely when the audio was off, in the same
+## colour the rail uses for the selected category and the sliders use for their level. Flipping it to
+## `not muted` alone would have been wrong the other way: muted would then read as merely unselected, and
+## silence the player did not intend is worth noticing. Warm-on-dark says suppressed without claiming
+## chosen.
 func _settings_chip(x: float, y: float, text: String, payload: Dictionary, active: bool,
-		mouse: Vector2, size: int = 10) -> bool:
+		mouse: Vector2, size: int = 10, warn: bool = false) -> bool:
 	var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 12.0
 	var chip := Rect2(x, y - 11.0, w, 15.0)
 	var hot: bool = chip.has_point(mouse)
-	draw_rect(chip, UI_ACCENT if active else (Color(0.30, 0.34, 0.44) if hot else UI_SLOT))
-	draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
-	draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
-		Color(0.10, 0.10, 0.12) if active else UI_TEXT)
+	if warn:
+		draw_rect(chip, Color(0.22, 0.15, 0.11))
+		draw_rect(chip, Color(0.86, 0.47, 0.31, 0.95 if hot else 0.75), false, 1.0)
+		draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
+			Color(0.96, 0.64, 0.47))
+	else:
+		draw_rect(chip, UI_ACCENT if active else (Color(0.30, 0.34, 0.44) if hot else UI_SLOT))
+		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
+		draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
+			Color(0.10, 0.10, 0.12) if active else UI_TEXT)
 	_settings_hits.append({"rect": chip, "payload": payload})
 	return hot
 
