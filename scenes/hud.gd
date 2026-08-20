@@ -147,26 +147,51 @@ var can_craft: bool = false        ## are we near a claimed Bazaar? gates the VE
 ## it rather than trusting it.
 ## THE COUNTER'S WIDTH, AND THE HEIGHT IT IS ALLOWED TO REACH — not the height it takes.
 ##
-## 608x348 on a 640x360 canvas is 91.95% of the screen, and T2.1's complaint was never that the panel is
-## large but that it is large REGARDLESS: a fresh game's PACK tab holds one item and drew the same 92% as a
-## finished game's nineteen-machine WORKS list. The counter now takes the height its ACTIVE TAB asks for
-## (`_bazaar_wanted_h`), clamped between `BAZAAR_MIN_H` and this. A fresh PACK lands at 196 -- **51.7% of
-## the canvas instead of 91.95%** -- and BENCH still asks for more than this and still gets clamped to it,
-## so the deep end of the game is unchanged.
+## 608x348 on a 640x360 canvas is 91.8% of the screen BY AREA, and T2.1's complaint was never that the panel
+## is large but that it is large REGARDLESS: a fresh game's PACK tab holds one item and drew the same 92% as
+## a finished game's nineteen-machine WORKS list. The counter now takes the height its ACTIVE TAB asks for
+## (`_bazaar_wanted_h`), clamped between `BAZAAR_MIN_H` and this. A fresh PACK lands at 206 -- 54.4% of the
+## canvas instead of 91.8% -- and BENCH still asks for more than this and still gets clamped to it, so the
+## deep end of the game is unchanged.
+##
+## BOTH PERCENTAGES ARE AREA and neither is a height, which is worth one line because the two frames give
+## different answers to the same question: as heights the same panels are 57.2% and 96.7% of the canvas.
+## The 196 this paragraph used to name is not what a fresh PACK asks for: head 48 + one row of wells 46 +
+## the gap 8 + the plate 88 + the foot 16 is 206. 196 was the clamp floor, which sat ten pixels below its
+## own stated sum and so could never be the number that quoting it was meant to describe.
 ##
 ## THE WIDTH DOES NOT MOVE, deliberately. The detail plate along the bottom carries a machine's whole
 ## sentence ("breaks tier-1 rock (earth / stone / ore / coal) -- hold LMB"), and that is what the 528px of
 ## content width is bought for. Shrinking width to match one 46px well would trade a void for a truncation.
 const BAZAAR_SIZE := Vector2(608.0, 348.0)
-## Head + one row of pack wells + the gap + the detail plate + the foot. Below this the counter would be
-## smaller than the thing it is a counter for.
-const BAZAAR_MIN_H: float = 196.0
 const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
 const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
 const BAZAAR_PAD: float = 12.0
 const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
 const BAZAAR_FOOT: float = 16.0       ## the key legend
-const BAZAAR_DETAIL: float = 88.0     ## the detail plate along the bottom of the content
+## THE DETAIL PLATE IS THE HEIGHT OF WHAT IT DRAWS, which is why it is written as a sum and not as 88.
+##
+## The plate holds a lit square with the selected thing in it and, beside that, a title, a two-line blurb
+## and a row of have/need price chips. The square is `DETAIL_ART` on a side with `DETAIL_PAD` of margin
+## above and below it, which is the 88 exactly; the chips are the deepest thing in the text column beside
+## it, starting 62 below the plate's top and standing 19 tall. So 81 of the 88 is spoken for on every tab
+## and 78 of it by the square alone, and the two columns arrive at the same floor independently.
+##
+## THAT IS ALSO WHY THE PLATE DOES NOT SCALE WITH THE PANEL, though the ratio invites it. Now that the
+## counter takes its tab's height, the plate is 42.7% of a fresh PACK's 206 where it was 25.3% of the full
+## 348: the same plate, a worse share, bought by shrinking everything above it. But a plate cut to that
+## old share would be 52px, and the chips run off the bottom of it 29px before the share is reached. A
+## coefficient in front of this number can only clip the plate; the lever on the ratio is what the plate
+## DRAWS, so it belongs in `_draw_bazaar_detail` and not here.
+const DETAIL_PAD: float = 10.0        ## plate edge to the art square, and the same again under it
+const DETAIL_ART: float = 68.0        ## the lit square the selected thing is drawn in
+const BAZAAR_DETAIL: float = DETAIL_PAD * 2.0 + DETAIL_ART
+const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, named once for its three sites
+## Head + one row of pack wells + the gap + the detail plate + the foot, ADDED UP rather than written down.
+## It was a 196 sitting beside that same sentence, which sums to 206, so the floor was ten pixels below the
+## shape it named and nothing in the file could notice. Below this the counter would be smaller than the
+## thing it is a counter for.
+const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT
 const BAZAAR_GUTTER: float = 10.0
 ## 24 again, not the 22 the two-column layout needed: three columns of eight is twenty-four rows, so the row
 ## can afford the two pixels back and the type can breathe.
@@ -191,6 +216,12 @@ var rack_ids: Array[StringName] = []
 ## The highlighted row on the active tab. One cursor for the whole panel: Enter acts on it, and what "acts"
 ## means is the tab's business — buy, craft, research.
 var bazaar_row: int = 0
+## ...and where that cursor was left on each of the other two, one slot per tab. The cursor is shared but
+## the PLACE is not: walking down to the ninth machine on WORKS, checking what the ninth costs to research
+## on BENCH and coming back put you at the top of the list again, and the wheel changes tab, so a glance
+## sideways cost the whole walk. Kept here rather than as three cursors because everything that reads the
+## selection (`bazaar_action`, the three tab painters, the detail plate) asks the one that is live.
+var _bazaar_rows: PackedInt32Array = PackedInt32Array()
 var show_minimap: bool = false
 var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden
 ## True while a grapple line is on screen, hook in flight or anchored. MainView pushes it every frame.
@@ -478,6 +509,17 @@ const HELPER_TAGS: Dictionary = {
 const PAUSED_CHIP: Rect2 = Rect2(10.0, 60.0, 104.0, 22.0)
 
 
+## IS A MODAL UP: the counter, the dashboard, the controls page or the settings page. All four dim the
+## world behind them and put a plate over the middle of it, so for as long as one is open it IS the screen
+## and the furniture around it stands down. Written once because it was being spelled out three times, and
+## one of the three had a different idea of which screens counted (`_draw_arrival` left `show_help` out).
+##
+## The minimap is deliberately not in here. It is summoned, not modal, and it has the opposite rule: the
+## furniture stands down for the LARGE form only, inside the surfaces it collides with.
+func _modal_open() -> bool:
+	return inventory_open or show_dashboard or show_help or settings_open
+
+
 func _draw() -> void:
 	_tooltip_item = &""    # re-captured by whichever slot the cursor sits on this frame
 	_alert_hits.clear()    # stale unless _draw_alerts repopulates it this frame (menus suppress it)
@@ -485,16 +527,26 @@ func _draw() -> void:
 	if not title_info.is_empty():
 		_draw_title()
 		return
-	# --- always on (minimal): the anchor furniture only ---
-	_draw_forged()         # top-right production chip (small)
-	_draw_depth()          # top-left depth readout — the one number a descent game owes you
-	_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
-	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
-	_draw_inventory()      # bottom-centre hotbar
-	_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
-	if not (inventory_open or show_help or settings_open or show_dashboard):
+	# --- always on, unless a modal has taken the screen ---
+	# Every line in here is world furniture, and each of the four modals draws a plate across the middle of
+	# a 640x360 canvas: the counter alone is 608 wide and reaches 348 tall. Drawn unconditionally, the depth
+	# chip and the hotbar came out in two pieces, one half dimmed by the modal's own scrim and the other
+	# covered by its plate, and a chip cut by an edge reads as a drawing fault rather than as a chip. The
+	# bubble and the alert stack were already standing down for exactly this; the other five now do too, so
+	# there is one rule for the question instead of one per surface.
+	if not _modal_open():
+		_draw_forged()         # top-right production chip (small)
+		_draw_depth()          # top-left depth readout — the one number a descent game owes you
+		_draw_objective_line()  # top-centre, ONE current step — the signpost without the wall of text
+		_draw_inventory()      # bottom-centre hotbar
+		_draw_hint()           # tiny bottom-left "E craft · M map · H keys" — replaces the giant footer
 		_draw_hint_bubble()  # just-in-time teaching near the body (hidden while a menu dims the world)
 		_draw_alerts()       # left-edge stalled-machine stack (only when something's stuck)
+	# THE INSPECTOR STANDS DOWN INSIDE ITSELF, not here, because it owns a click region as well as a panel.
+	# Skipping the call would leave `_hover_rect` at whatever it held on the frame before the menu opened,
+	# and `_cursor_on_hover_panel()` reads that rect: a click on the counter would land on a config knob
+	# belonging to a machine nobody can see. Same reason `_draw_hover` returns AFTER clearing, not before.
+	_draw_hover()          # inspector for the machine under the cursor (only when one is hovered)
 	# --- on demand (summoned, so they never clutter) ---
 	if show_minimap:
 		_draw_minimap()    # M — top-right world map
@@ -514,10 +566,12 @@ func _draw() -> void:
 		draw_string(_font, PAUSED_CHIP.position + Vector2(12.0, 15.0), "PAUSED (P)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT)
 	_draw_fastforward()    # top-left "▶▶ Nx" chip when the game clock is sped up
-	# The stratum plate is the one channel that means "stop, look" — so it does not fire over a menu, where
-	# there is nothing to look at and it prints straight through the price column. It is a transient; if you
-	# were reading the counter when you crossed a band, the depth readout still says where you are.
-	if not (inventory_open or show_dashboard or settings_open):
+	# The stratum plate is the one channel that means "stop, look", so it does not fire over a modal, where
+	# there is nothing to look at and it prints straight through the price column. It is a transient, and
+	# holding it costs nothing: the depth readout comes back with the world and names the band you are in.
+	# This list used to be spelled out here with `show_help` missing from it while the other three were on
+	# it, so the one banner that means "look at the world" fired over the page that is purely for reading.
+	if not _modal_open():
 		_draw_arrival()    # the stratum banner, on the frames after you first cross into one
 	_draw_flash()          # transient toast (save/load feedback)
 	_draw_item_tooltip()   # hovered-slot tooltip — drawn last so it rides over every panel
@@ -1126,13 +1180,26 @@ func _panel(rect: Rect2, alpha: float = 1.0) -> void:
 func _draw_hover() -> void:
 	_knob_hits.clear()
 	_hover_rect = Rect2()
+	# Called every frame rather than from inside the not-modal branch, because those two clears are frame
+	# hygiene: skip the call and the knob hit-boxes and the panel rect survive into a frame that never drew
+	# them, and a click lands on a control that is no longer on screen. So the call stays and the DRAWING
+	# leaves instead. main.gd:798 recomputes hover_info off the world aim whichever menu is up, so without
+	# this the world inspector prints over an open pack or settings page.
+	if _modal_open():
+		return
 	if hover_info.is_empty():
 		return
-	# THE BIG MAP IS THE SCREEN — the third element to take this rule, after the goal plate (:699) and the
-	# pack bar (:2290), and for the reason :696 wrote down once for all three. Standing down BEFORE the
-	# rect is built, so `_hover_rect` stays empty and `_cursor_on_hover_panel()` (main.gd:2154) reports
-	# false — otherwise the config-panel PIN at main.gd:769 would latch a machine nobody can see.
-	if minimap_large:
+	# THE BIG MAP IS THE SCREEN — the third element to take this rule, after the goal plate
+	# (`_draw_objective_line`) and the pack bar (`_draw_inventory`), and for the reason written down once
+	# for all three there. Standing down BEFORE the rect is built, so `_hover_rect` stays empty and
+	# `_cursor_on_hover_panel()` reports false — otherwise the config-panel PIN in MainView's frame sync
+	# would latch a machine nobody can see.
+	#
+	# A MODAL EARNS THE SAME STAND-DOWN, and it has to happen here rather than at the call site for the
+	# second half of that sentence: the rect is a click region, so a skipped call leaves the last one
+	# behind and a click on the counter lands on an invisible knob. You also cannot aim at a machine while
+	# a plate covers the world, so an inspector under one is describing a cursor you are not driving.
+	if minimap_large or _modal_open():
 		return
 	var ins: Array = hover_info.get("in", [])
 	var outs: Array = hover_info.get("out", [])
@@ -1455,8 +1522,9 @@ func _bazaar_geometry() -> Dictionary:
 	var inner_x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
 	var inner_w: float = BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0
 	var body_h: float = h - BAZAAR_HEAD - BAZAAR_FOOT
-	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w, body_h - BAZAAR_DETAIL - 8.0)
-	var detail := Rect2(inner_x, content.end.y + 8.0, inner_w, BAZAAR_DETAIL)
+	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w,
+		body_h - BAZAAR_DETAIL - BAZAAR_DETAIL_GAP)
+	var detail := Rect2(inner_x, content.end.y + BAZAAR_DETAIL_GAP, inner_w, BAZAAR_DETAIL)
 	return {
 		"origin": origin, "w": BAZAAR_SIZE.x, "h": h,
 		"content": content, "detail": detail, "cols": BAZAAR_COLS,
@@ -1490,7 +1558,7 @@ func _bazaar_wanted_h() -> float:
 			need = float(tall) * 64.0 + float(tall - 1) * 6.0
 		_:
 			need = float(_pack_rows(inner_w)) * PACK_CELL
-	return clampf(BAZAAR_HEAD + need + 8.0 + BAZAAR_DETAIL + BAZAAR_FOOT,
+	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT,
 		BAZAAR_MIN_H, BAZAAR_SIZE.y)
 
 
@@ -1667,9 +1735,31 @@ func bazaar_move(dx: int, dy: int) -> void:
 	bazaar_row = clampi(bazaar_row + dy, 0, n - 1)
 
 
+## Change tab, keeping each tab's place in its own list.
+##
+## RE-PICKING THE TAB YOU ARE ALREADY ON STILL MEANS "BACK TO THE TOP". That is the same call and the same
+## outcome it has always had (pressing 2 while WORKS is up), and it is the only way left to send the cursor
+## home now that leaving and returning no longer does it.
 func set_bazaar_tab(tab: int) -> void:
-	bazaar_tab = clampi(tab, TAB_PACK, TAB_BENCH)
-	bazaar_row = 0
+	var want: int = clampi(tab, TAB_PACK, TAB_BENCH)
+	# Sized from the tab list itself, on first use, so a fourth tab does not need this line changed and
+	# cannot index past the end of the store. `resize` fills the new slots with zero, which is row one.
+	if _bazaar_rows.size() < TAB_NAMES.size():
+		_bazaar_rows.resize(TAB_NAMES.size())
+	if want == bazaar_tab:
+		bazaar_row = 0
+		_bazaar_rows[want] = 0
+		return
+	_bazaar_rows[bazaar_tab] = bazaar_row
+	bazaar_tab = want
+	# A LIST CAN SHRINK UNDER A STORED INDEX WHILE YOU ARE AWAY FROM IT: you spend the last of a material
+	# and its well leaves the pack, a machine you were looking at gets built and the rack row goes. So the
+	# stored row is re-clamped against the count the tab has NOW, never the one it had when you left it.
+	# `bazaar_row_count()` reads the sim on two of the three tabs, so a HUD without one keeps the old
+	# behaviour of landing at the top rather than reaching through a null.
+	var n: int = bazaar_row_count() if sim != null else 0
+	bazaar_row = clampi(_bazaar_rows[want], 0, maxi(n - 1, 0))
+	_bazaar_rows[want] = bazaar_row
 
 
 ## THE COUNTER. Drawn as a lamp-lit object rather than as a dialog box: elevation instead of a border, a
@@ -2052,7 +2142,10 @@ func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
 func _draw_bazaar_detail(g: Dictionary) -> void:
 	var box: Rect2 = g["detail"]
 	_round_rect(box, 6.0, Color(1.0, 1.0, 1.0, 0.028))
-	var art := Rect2(box.position + Vector2(10.0, 10.0), Vector2(68.0, 68.0))
+	# The one place the art square is built, for all three plates: `_detail_hold` and `_detail_pack` are
+	# handed this rect rather than each writing the same 10 and 68 down again. It is also where
+	# `BAZAAR_DETAIL` gets its height from, so a bigger square grows the plate instead of overflowing it.
+	var art := Rect2(box.position + Vector2(DETAIL_PAD, DETAIL_PAD), Vector2(DETAIL_ART, DETAIL_ART))
 	var act: Dictionary = bazaar_action()
 	var kind: String = str(act.get("kind", ""))
 	if kind == "":
@@ -2201,6 +2294,20 @@ func _draw_tech_art(tid: StringName, art: Rect2) -> void:
 
 ## The plate for a thing you are CARRYING: what it is for, how many you have, and the one verb the pack
 ## screen has — put it in your hand.
+##
+## TWO QUANTITIES, TWO WORDS, AND NEITHER OF THEM BORROWS THE OTHER'S. This one plate used to say
+## "carrying 24" next to a button reading "IN HAND", over a grid whose lit well was badged "HELD": three
+## words for what a player reads as one relationship, on 88 pixels of screen. Carrying, holding and having
+## in hand are the same thing in English, so "carrying 24" could be read as 24 of them in your hand.
+##
+## So the pack owns one vocabulary and the hand owns the other. What you have is IN THE PACK, the word the
+## tab, the plate title and the head's chips already use. What you are wielding is HELD, the past tense of
+## the button beside it, so the badge on the well and the dead button now say the same word as each other.
+##
+## The lifetime figure is ALL TOLD with no verb in front of it, because there is no verb that is true of
+## every row: this plate prices ore you mined, wood you chopped and ingots your line poured, and "gathered"
+## was wrong for the third exactly as "made" is wrong for the first two. Against "in the pack" the contrast
+## carries it. It is the only per-item total on any screen; the FORGED chip counts ingots and says so.
 func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	for k: int in 3:
 		draw_circle(art.get_center(), 34.0 - float(k) * 8.0, Color(0.85, 0.70, 0.35, 0.045))
@@ -2214,11 +2321,11 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	var carried: int = int(sim.inventory.get(id, 0))
 	var made: int = int(sim.total_produced.get(id, 0))
 	draw_string(_font, Vector2(tx, box.position.y + 76.0),
-		"carrying %d   ·   %d gathered all told" % [carried, made],
+		"%d in the pack   ·   %d all told" % [carried, made],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	if row == held:
-		_verb_button(box, "IN HAND", "", false)
+		_verb_button(box, "HELD", "", false)
 	else:
 		_verb_button(box, "HOLD", "ENTER", true)
 
