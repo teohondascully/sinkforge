@@ -413,6 +413,13 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 ##
 ## Only the WORDS arm runs here. There is no rope on the surface to measure, and inventing one would be a
 ## rig answering the question it was built to ask.
+##
+## AND IT NOW READS AGAINST A DRIFT FLOOR TAKEN IN ITS OWN RUN. Everything this arm reports is a difference
+## between two photographs of a background that moves whether or not the ceremony fires, so it takes a
+## third frame — a second reference, one plate-wait after the first, with nothing announced — and runs the
+## same comparison over the same band on that untreated pair. The plate's number is reported against it.
+## The block inside says why the control is temporal rather than spatial, how the two intervals are
+## matched, and what about them is not.
 func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	var col: int = SURFACE_COL
 	var row: int = int(main.sim.surface_row(col)) - 2
@@ -433,6 +440,64 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		return
 	var cx: int = int(round(_screen(main, Vector2(float(col * CELL) + float(CELL) * 0.5, 0.0)).x))
 	var p2: Image = await _shot()
+	# THE SKY MOVES ON ITS OWN, AND NOTHING IN THIS ARM COULD TELL THAT APART FROM THE PLATE ARRIVING. The
+	# underground standing has a spatial control — the band below the plate, same rope, same rock, same
+	# lamp, no plate — and that band reading 1.3 median against the plate band's 21.2 is the whole reason
+	# the deep arm's number is a measurement rather than a difference. Up here there is nowhere to put one,
+	# and it is worth writing down that this was worked out rather than skipped: the plate's core reaches
+	# ~114 canvas px either side of centre and `SCRIM_FEATHER` adds 96 more, some 420 px of a 640 px canvas,
+	# and vertically the words sit at canvas y 61.6..111.6 — so a band far enough ABOVE to clear the feather
+	# is off the top of the frame, and one far enough BELOW is ground rather than sky. The control cannot be
+	# placed in space here. It is placed in time instead.
+	#
+	# Two references with no announcement between them: `p2` at the moment the HUD went quiet, `p3` one
+	# plate-wait later. `_ink` then runs over the identical band on that untreated pair — same statistic,
+	# same pixels, same animation-phase separation, same run, same code path — and that is the floor the
+	# plate's reading has to beat, in the plate's own units. The plate is measured against `p3` and not
+	# `p2`, for two reasons: it keeps the treated interval exactly one plate-wait long, which is the
+	# interval this arm has always used and the one its old numbers were taken over, and it makes the
+	# control's second frame the treatment's first, so the two intervals abut with no gap between them.
+	#
+	# HOW THE INTERVALS ARE MATCHED, AND WHAT IS LEFT UNMATCHED. The plate wait is data-dependent — it spins
+	# until `_arrival_life` has fallen from `Hud.ARRIVAL_HOLD` to `PLATEAU`, and `_process` takes a
+	# real-time delta off that clock each rendered frame, so the wait is that many SECONDS of wall time
+	# however many frames it costs. The control cannot watch the same clock, because starting it would mean
+	# announcing, so it waits the frame count that interval comes to at the physics rate, with both terms
+	# read from the things that actually govern the loop rather than typed in as a literal. What is NOT
+	# matched is the box: physics frames only arrive at `physics_ticks_per_second` while the machine keeps
+	# up, and the arrival clock is paced by RENDERED frames, so on a box that is dropping them the two
+	# intervals come apart. Both counts print side by side below for exactly that reason. If they disagree
+	# by more than a few frames the ratio underneath them is not a comparison, and the honest repair is to
+	# re-derive the control interval from the measured `waited` rather than from the constants. The deep
+	# arm prints its own frames-to-plateau earlier in the run, which is a second reading of the same wait on
+	# the same machine to check this one against.
+	#
+	# AND ONE INTERVAL IS NOT A SAMPLE OF THIS BACKGROUND. What moves up here runs on several clocks and
+	# none of them is anywhere near a plate-wait long: five clouds drift at 4 to 7 px/s on phases chosen to
+	# be incommensurate, the bird crosses on `CYCLE = 47.0` and is only on screen for `CROSS_T = 16.0` of
+	# that and only by day, and the whole sky breathes on `DAY_SECONDS = 480.0`. So this measures ONE PHASE
+	# of each, not their envelope — and the bird is a duty-cycled cue, which is the exact shape that has
+	# already produced a wrong statistic in this repository by being sampled over less than a period. I am
+	# not going to invent a period to divide by. The answer is repeats at different phases, pooled, which is
+	# the same thing the surface reading itself needs before anything may be asserted about it.
+	var drift_frames: int = ceili((Hud.ARRIVAL_HOLD - PLATEAU) * float(Engine.physics_ticks_per_second))
+	for _i: int in drift_frames:
+		await physics_frame
+	var p3: Image = await _shot()
+	# WHAT ELSE COULD HAVE ARRIVED IN THAT WINDOW, RECORDED RATHER THAN ASSERTED. Underground the equivalent
+	# window carries a `_check` that no lesson bubble came between the captures, because one did once and
+	# put that control band at 73.6 dE. The same hazard is here and it is worse in one specific way: the
+	# plate SUPPRESSES the bubble across the treated interval (`_draw_hint_bubble` yields to it) and nothing
+	# suppresses it across the control interval, so a bubble can only ever inflate the FLOOR and never the
+	# reading above it — which is the direction that makes the ratio look worse than the truth rather than
+	# better, but is still a void and not a result. The arrival life goes beside it because the other way to
+	# ruin this pair is for the GAME to announce something into the control window, which is exactly how the
+	# deep arm's first reference frame came back reading `25 METRES DOWN`. Both are sampled at the end of
+	# the window, so a cue that rose and fell entirely inside it still hides, the same blind spot the deep
+	# arm's check has. They are printed and not asserted because nothing has yet been agreed about what this
+	# arm may demand, and a bound put here today would be a fifth guess ahead of its data.
+	var hint_at_ref: float = main._hud.hint_alpha
+	var arrival_at_ref: float = main._hud._arrival_life
 	main._hud.announce("THE SURFACE", "", Color(0.82, 0.78, 0.60))
 	var waited: int = 0
 	while main._hud._arrival_life > PLATEAU and waited < 400:
@@ -441,22 +506,60 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	var q2: Image = await _shot()
 	var dump2: String = OS.get_environment("SF_CEREMONY_DUMP")
 	if dump2 != "":
+		# Both references, because which pair makes which number is not readable off the names: the drift
+		# floor is (reference, reference_b) and the plate's reading is (reference_b, plate).
 		p2.save_png(dump2 + "/ceremony_sky_reference.png")
+		p3.save_png(dump2 + "/ceremony_sky_reference_b.png")
 		q2.save_png(dump2 + "/ceremony_sky_plate.png")
 	var scale: float = float(_h) / 360.0
 	var top: int = int(round((0.26 * 360.0 - 32.0) * scale))
 	var bot: int = int(round((0.26 * 360.0 + 18.0) * scale))
-	var ink: Dictionary = _ink(p2, q2, cx, top, bot, int(120.0 * scale))
+	var half: int = int(120.0 * scale)
+	var ink: Dictionary = _ink(p3, q2, cx, top, bot, half)
+	var drift: Dictionary = _ink(p2, p3, cx, top, bot, half)
 	_check(int(ink["px"]) >= 400,
 		"the words were found against open sky too (%d ink pixels at row %d)" % [ink["px"], row])
-	# READ THIS AS A POSITIVE CONTROL, NOT AS A MEASUREMENT. Three samples either side of a treatment came
-	# back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4 — bimodal in BOTH configurations, ranges overlapping
-	# completely, and the highest of all six readings on the treated side. The background here is a live sky
-	# over vegetation at a surface row the rig does not pin, and it swings 25% run to run. What this arm
-	# establishes is that the words are drawn and separate from their ground at the surface at all. It does
-	# not establish how well, and a single number from it must not be quoted as though it did.
-	print("  the words, against open sky: %d ink px, reading %.1f dE — underground they read %.1f "
-		% [ink["px"], ink["de"], deep["de"]] + "(sky varies ~25% run to run; a control, not a measurement)")
+	# WHAT THIS ARM COULD NOT SAY, AND WHAT THE LINE UNDER IT CHANGES. Three samples either side of a
+	# treatment came back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4 — bimodal in BOTH configurations, ranges
+	# overlapping completely, and the highest of all six readings on the treated side. The background is a
+	# live sky over vegetation at a surface row the rig does not pin, and it swings ~25% run to run, so the
+	# number this arm printed was the plate arriving PLUS the sky moving with no way to separate them, and
+	# all it could establish was that the words are drawn and separate from their ground at all.
+	#
+	# The drift line is the missing half of that: the same statistic over the same band on a pair of frames
+	# the ceremony never touched, so the sky's own contribution is measured in the run rather than argued
+	# about afterwards. It does not turn the reading into a claim — the ratio has to be watched across
+	# several runs before anyone can say what it may demand — but it is the difference between a number
+	# with a floor under it and a number floating on its own.
+	#
+	# THE PX COUNT IN THE DRIFT LINE IS THE ONE TO READ FIRST, and it is new evidence about an assertion
+	# that has been passing here since the arm was written. `_ink` calls a pixel INK when it gained 0.05
+	# luma between the two frames, and the `>= 400` above is that count. Nothing has ever established that
+	# the sky alone cannot clear 400 over the same interval; the drift pair's own px count is the first
+	# evidence either way. If it comes back anywhere near 400 then that assertion has been passing on drift
+	# and wants rewriting rather than tightening. It is left exactly as it stands until the number exists.
+	print("  the words, against open sky: %d ink px, %.1f dE mean, %.1f dE median (underground: %.1f mean)"
+		% [ink["px"], ink["de"], ink["med"], deep["de"]])
+	print("  the sky's own drift, same band, same length of interval, no plate: %d px, %.1f dE mean, "
+		% [drift["px"], drift["de"]]
+		+ "%.1f dE median over %d rows (at the second reference: hint alpha %.2f, arrival life %.2f)"
+		% [drift["med"], drift["rows"], hint_at_ref, arrival_at_ref])
+	print("  intervals: plate %d physics frames to plateau, drift control %d (derived, (%.2f - %.2f)s at "
+		% [waited, drift_frames, Hud.ARRIVAL_HOLD, PLATEAU]
+		+ "%d ticks/s) — a wide gap between those two means the pair is not a comparison"
+		% Engine.physics_ticks_per_second)
+	if int(drift["rows"]) == 0:
+		print("  no ratio this run: no row of the untreated pair had four pixels brighten, so the floor is "
+			+ "not a small number here, it is an empty one, and the ratio would be a division by nothing")
+	else:
+		print("  the plate reads %.1fx the drift on the means and %.1fx on the medians"
+			% [float(ink["de"]) / maxf(float(drift["de"]), 0.001),
+				float(ink["med"]) / maxf(float(drift["med"]), 0.001)])
+	_stand_down("how well the words read against open sky",
+		"the arm now carries a drift floor measured inside its own run — same band, same length of "
+		+ "interval, no ceremony — so the reading finally has something in its own units to be a ratio "
+		+ "against; what is still owed is the decision about what that ratio must be, and that needs the "
+		+ "distribution across several runs, not a bound argued from the first one")
 
 
 ## HOW WELL THE CEREMONY'S OWN TYPE READS, row by row, inside the strip the words occupy.
@@ -469,6 +572,7 @@ func _ink(p: Image, q: Image, cx: int, y0: int, y1: int, half: int) -> Dictionar
 	var acc: float = 0.0
 	var rows: int = 0
 	var px: int = 0
+	var des := PackedFloat32Array()
 	for y: int in range(maxi(0, y0), mini(_h, y1 + 1)):
 		var ink_c := Color(0, 0, 0)
 		var gnd_c := Color(0, 0, 0)
@@ -488,10 +592,24 @@ func _ink(p: Image, q: Image, cx: int, y0: int, y1: int, half: int) -> Dictionar
 		px += ni
 		if ni < 4 or ng < 4:
 			continue
-		acc += _de(_lab(Color(ink_c.r / ni, ink_c.g / ni, ink_c.b / ni)),
+		var sep: float = _de(_lab(Color(ink_c.r / ni, ink_c.g / ni, ink_c.b / ni)),
 			_lab(Color(gnd_c.r / ng, gnd_c.g / ng, gnd_c.b / ng)))
+		acc += sep
+		des.append(sep)
 		rows += 1
-	return {"px": px, "de": acc / maxf(float(rows), 1.0), "rows": rows}
+	# THE MEDIAN AS WELL AS THE MEAN, for the reason `_band` already carries one: this file has twice been
+	# fooled by a mean that a handful of rows lifted, and the surface arm is now comparing two of these
+	# numbers against each other, where a few loud rows on either side would move the ratio without
+	# anything having changed. A row here is a strip of the words, so a mean and a median that disagree say
+	# the separation is coming from one or two lines of type rather than from the type. The mean stays the
+	# headline because it is what every earlier reading of this arm was, and swapping the quantity under a
+	# name is how a comparison to old numbers goes quietly wrong.
+	var sorted: Array[float] = []
+	for v: float in des:
+		sorted.append(v)
+	sorted.sort()
+	var med: float = 0.0 if sorted.is_empty() else sorted[sorted.size() / 2]
+	return {"px": px, "de": acc / maxf(float(rows), 1.0), "rows": rows, "med": med}
 
 
 ## Mean per-channel change across a rectangle — the positive control's statistic. Deliberately NOT a
