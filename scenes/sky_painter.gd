@@ -7,6 +7,16 @@ extends RefCounted
 ## WorldRenderer consts (RIDGES / SINKFORGE_* / SURFACE_LINE). WorldRenderer._paint_backdrop is now a
 ## one-line delegator so the LightLayer draw-callback wiring is untouched. Purely cosmetic — never the sim.
 
+## The two colours the star field is made of, and neither one is new paint. star_cold is the night zenith
+## Color(0.045, 0.06, 0.105) that paint() lays down below, kept at its own hue 225.0 and saturation 0.571
+## and carried up to full value. star_warm is the dusk ember Color(0.62, 0.42, 0.34) that blushes the
+## horizon, kept at its hue 17.1 and saturation 0.452, with its value solved so that the two tints land on
+## the same Rec.709 luma, 145.8 of 255. The warm minority therefore differs from the cold field in hue and
+## in nothing else, and neither tint is ever the brighter speck. See _stars for why the field moved at all.
+const STAR_COLD := Color(0.429, 0.571, 1.0)
+const STAR_WARM := Color(0.776, 0.526, 0.426)
+
+
 ## Paint the whole backdrop for the far parallax layer `ci`: sky gradient + stars + sun/moon + clouds +
 ## the Sinkforge crown + the far-to-near ridgelines.
 static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
@@ -28,25 +38,8 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	if view.end.y > horizon:
 		ci.draw_rect(Rect2(Vector2(view.position.x, horizon),
 			Vector2(view.size.x, view.end.y - horizon)), hor_c)
-	# STARS: a hashed field in near-pinned sky space, fading in as the daylight dies; each twinkles on
-	# its own phase. Stateless — the ore-glint trick pointed at the sky.
 	if dl < 0.85:
-		var star_a: float = (1.0 - dl) * 0.9
-		for i: int in 42:
-			# A bare `i * 2654435761` is a LINEAR sequence, not a hash, and it showed: across these 42 stars
-			# the sorted x values had only THREE distinct gaps between them (76, 241, 317 — a three-distance
-			# lattice), y had five, all under 24px inside a 380px band, and the radii cycled 0,1,2,0,1,2 with
-			# the index. That is a comb of evenly spaced dots with marching sizes, not a sky. One salt per
-			# axis so position, twinkle and size are independent; x alone goes to 38 distinct gaps.
-			var sx: float = view.position.x + fposmod(
-				float(Seams.grain(Vector2i(i, 101)) % 4093) + cam.x * 0.04, view.size.x)
-			var sy: float = grad_top - 60.0 + float(Seams.grain(Vector2i(i, 202)) % 380)
-			if sy > horizon - 90.0:
-				continue
-			var tw: float = 0.55 + 0.45 * sin(
-				r._anim_time * (1.1 + float(Seams.grain(Vector2i(i, 303)) % 13) * 0.13) + float(i))
-			ci.draw_circle(Vector2(sx, sy), 1.1 + float(Seams.grain(Vector2i(i, 404)) % 3) * 0.4,
-				Color(0.85, 0.88, 0.95, star_a * tw * 0.8))
+		_stars(r, ci, view, cam, grad_top, horizon, dl)
 	# SUN / MOON: each rides a low arc across the view during its half of the cycle, pinned to the
 	# camera like any celestial thing. The sun is a warm bloom; the moon a small pale disc.
 	var p: float = r.day_phase()
@@ -129,6 +122,69 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 		# silhouette. Steepness is the point: an even haze across all three would only make one flat
 		# plane paler, where a gradient across them is the depth itself.
 		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * maxf(0.88 - f * 1.5, 0.0)))
+
+
+## The star field: a hashed scatter in near-pinned sky space, fading in as the daylight dies, each speck
+## shimmering on its own phase. Stateless like the rest of this file, the ore-glint trick pointed at the sky.
+##
+## The sky is not chrome and it is not an event, so it cannot borrow either voice. world_renderer.gd's
+## CHROME block spends white on something that has just happened and gives everything the player looks
+## through rather than at a bright non-white blue-grey; scenery is the third thing, and it had no voice of
+## its own. These 42 specks drew at Color(0.85, 0.88, 0.95), which over the night zenith at peak twinkle
+## composites to Rec.709 luma 165.6 of 255, hue 222.6, saturation 0.124. The aim cursor composites to
+## 181.3 at hue 219.0 and saturation 0.160, the guide chevron to 198.9. Three and a half degrees of hue
+## apart, 0.036 of saturation apart, and a peak sixteen luma steps under the dimmest permanent mark on the
+## screen: scenery wearing the interface's colour. It blinked, too. The old twinkle ran alpha 0.072 to
+## 0.720 and carried the speck from luma 30.4 to 165.6, an 82 percent modulation that reads as a mark
+## flashing rather than as air moving.
+##
+## The tints are now two colours this file already paints the sky with, so the field is made of sky instead
+## of made of palette. Peak composite lands at 109.3, which is 72.0 below the cursor, a wider gap than the
+## 42.2 separating the ghost border at 200.8 from the sonar core at 243.0. The sky is the outermost tier
+## rather than one more step inside the marker stack. Presence at rest barely moves, because the trough
+## comes up as the peak comes down: the mean over a twinkle cycle goes 98.0 to 83.0, a 15 percent drop
+## against the peak's 34, at the same 42 specks and the same radii. Five of the 42 take the warm tint on
+## salt 606.
+##
+## Density and contrast then answer to what the interface is doing. A guide chevron rides CELL * 3.25 above
+## the cell it names, with a tether back down to it, and a held build ghost puts a chrome box on the aim
+## cell; worked near the surface, both stand inside this field. Each clears a disc the size of that lift,
+## so specks fade to nothing across the marker and the cell it points at, and are untouched everywhere
+## else. One radius covers both marks, sized on the taller rig, since the ghost is only up in the sky while
+## you are placing something there and that is the moment the sky should be quietest of all. With no marker
+## in the sky none of this fires and the field is exactly what it was.
+static func _stars(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vector2,
+		grad_top: float, horizon: float, dl: float) -> void:
+	var cell_px: float = float(WorldRenderer.CELL)
+	var half := Vector2(cell_px, cell_px) * 0.5
+	var clear_r: float = cell_px * 3.25       # the chevron's own lift over the cell it points at
+	var marks := PackedVector2Array()
+	for t: Dictionary in r._guide_targets:
+		marks.append(Vector2(t["cell"] as Vector2i) * cell_px + half - Vector2(0.0, clear_r))
+	if r._aim_in_reach and (r._ghost_def != null or r._ghost_material != &""):
+		marks.append(Vector2(r._aim) * cell_px + half)
+	var star_a: float = (1.0 - dl) * 0.9
+	for i: int in 42:
+		# A bare `i * 2654435761` is a LINEAR sequence, not a hash, and it showed: across these 42 stars
+		# the sorted x values had only THREE distinct gaps between them (76, 241, 317 — a three-distance
+		# lattice), y had five, all under 24px inside a 380px band, and the radii cycled 0,1,2,0,1,2 with
+		# the index. That is a comb of evenly spaced dots with marching sizes, not a sky. One salt per
+		# axis so position, twinkle, size and tint are independent; x alone goes to 38 distinct gaps.
+		var sx: float = view.position.x + fposmod(
+			float(Seams.grain(Vector2i(i, 101)) % 4093) + cam.x * 0.04, view.size.x)
+		var sy: float = grad_top - 60.0 + float(Seams.grain(Vector2i(i, 202)) % 380)
+		if sy > horizon - 90.0:
+			continue
+		var quiet: float = 1.0
+		for m: Vector2 in marks:
+			quiet = minf(quiet, smoothstep(0.0, clear_r, Vector2(sx, sy).distance_to(m)))
+		if quiet < 0.02:
+			continue                          # under a marker there is no alpha left to draw with
+		var tw: float = 0.72 + 0.28 * sin(
+			r._anim_time * (1.1 + float(Seams.grain(Vector2i(i, 303)) % 13) * 0.13) + float(i))
+		var tint: Color = STAR_WARM if Seams.grain(Vector2i(i, 606)) % 5 == 0 else STAR_COLD
+		ci.draw_circle(Vector2(sx, sy), 1.1 + float(Seams.grain(Vector2i(i, 404)) % 3) * 0.4,
+			Color(tint.r, tint.g, tint.b, star_a * tw * quiet * 0.8))
 
 
 ## A soft filled ellipse (flat alpha — no scalloped edge, no overlap hotspot) — one lobe of a cloud lozenge.
