@@ -38,6 +38,8 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	if view.end.y > horizon:
 		ci.draw_rect(Rect2(Vector2(view.position.x, horizon),
 			Vector2(view.size.x, view.end.y - horizon)), hor_c)
+	# Stars, once the daylight has died back far enough for any of them to carry. The field's own voice, and
+	# why it is not the interface's, is written out over _stars.
 	if dl < 0.85:
 		_stars(r, ci, view, cam, grad_top, horizon, dl)
 	# SUN / MOON: each rides a low arc across the view during its half of the cycle, pinned to the
