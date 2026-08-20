@@ -110,13 +110,12 @@ _diag_*.png
 /_moment_water_rock.png
 
 # ---------------------------------------------------------------------------
-# THE AGENT-PROCESS CORPUS — kept on disk, kept out of the published tree.
+# WORKING NOTES — kept on disk, kept out of the published tree.
 #
-# These are process artifacts, not product documentation: session traces,
-# handoff prompts, audit responses, orchestration and peer-session protocol.
-# They describe HOW the work was done rather than WHAT was built, and this is
-# a public portfolio repository. Untracked with `git rm --cached`, never `rm`
-# — every file is still on disk at its original path, which is the same rule
+# Day-to-day notes rather than documentation: running logs, review responses,
+# scratch write-ups. They record HOW the work went rather than WHAT was built,
+# and this is a public repository. Untracked with `git rm --cached`, never
+# `rm` — every file is still on disk at its original path, which is the rule
 # the rest of this file already follows.
 #
 # Nothing load-bearing reads these paths. Every inbound reference found was
