@@ -1,20 +1,20 @@
 class_name Settings
 extends RefCounted
 
-## Player SETTINGS â the machine-local preferences: audio levels, screen-shake, zoom,
+## Player SETTINGS — the machine-local preferences: audio levels, screen-shake, zoom,
 ## and the key BINDINGS the Controls foundation was built for. All static (any layer reads without
-## wiring), persisted to a ConfigFile in user:// â deliberately SEPARATE from SaveGame: a save is a
+## wiring), persisted to a ConfigFile in user:// — deliberately SEPARATE from SaveGame: a save is a
 ## world, settings are this machine/person (they survive new games and never travel with a save).
 ##
 ## REPRESENTATION-ONLY: nothing here is sim state. Audio applies as dB offsets the Sfx layer adds at
 ## play time, shake gates one camera line, zoom is the camera index, bindings rebind InputMap actions.
 ##
 ## HARNESS RULE: `persist` is FALSE by default and only a real (unscripted) boot turns it on + loads
-## the file â so every fixture/test runs on pure defaults and can never read or clobber the dev's real
+## the file — so every fixture/test runs on pure defaults and can never read or clobber the dev's real
 ## settings. check_settings opts in explicitly on its own temp path.
 
-## SOUND IS ON. A first boot has to be able to hear the machine it is standing in â the drill biting, the
-## water finding a way down, the winch loading up â because roughly half of what this game tells you it
+## SOUND IS ON. A first boot has to be able to hear the machine it is standing in — the drill biting, the
+## water finding a way down, the winch loading up — because roughly half of what this game tells you it
 ## tells you by ear, and a player who never opens the settings page never learns the audio is there at all.
 ## The mute itself is unchanged: still one switch over the whole mix rather than levels pinned to zero (see
 ## apply_audio), still persisted, so turning it OFF is equally a one-time act.
@@ -23,10 +23,10 @@ extends RefCounted
 ## main.gd::_ready(), the same way and in the same place it declines to persist. The harness stays quiet
 ## without the shipped default having to lie about what a new player hears.
 static var muted: bool = false
-static var master: float = 1.0          ## 0..1 â the Master bus (everything)
-static var sound: float = 1.0           ## 0..1 â effect voices (positional pool + UI dings)
-static var ambience: float = 1.0        ## 0..1 â the beds (hum, wind, cave-air, drips)
-static var music: float = 1.0           ## 0..1 â the Score (the tonal beds that descend with you)
+static var master: float = 1.0          ## 0..1 — the Master bus (everything)
+static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
+static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
+static var music: float = 1.0           ## 0..1 — the Score (the tonal beds that descend with you)
 static var screen_shake: bool = true
 static var auto_pickup: bool = true    ## walk-over auto-collect of ground items (playtest: make it optional)
 static var zoom_idx: int = 0            ## index into MainView.ZOOM_LEVELS
@@ -91,7 +91,7 @@ static func toggle_mute() -> bool:
 	return muted
 
 
-## dB offsets the Sfx layer ADDS to its own baselines at play/frame time â 0 dB at full, ~-60 (gone)
+## dB offsets the Sfx layer ADDS to its own baselines at play/frame time — 0 dB at full, ~-60 (gone)
 ## at the bottom of the slider. Lazy application means no player-node bookkeeping here.
 static func sound_db() -> float:
 	return linear_to_db(clampf(sound, 0.001, 1.0))
@@ -262,7 +262,7 @@ static func event_label(ev: InputEvent) -> String:
 			_: return "MB%d" % (ev as InputEventMouseButton).button_index
 	# GAMEPAD LABELS ARE PREFIXED, every one of them, and that is not decoration. A bare "A" would collide
 	# with the keyboard's A on any screen that lists bindings, and worse, `check_binding_text` reads these
-	# labels to decide whether a key named in a tooltip is bound â an unprefixed pad face button would make
+	# labels to decide whether a key named in a tooltip is bound — an unprefixed pad face button would make
 	# the prose "press A" look satisfied by a gamepad the player does not own.
 	if ev is InputEventJoypadButton:
 		match (ev as InputEventJoypadButton).button_index:

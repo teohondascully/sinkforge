@@ -1,0 +1,32 @@
+#!/bin/sh
+# MOJIBAKE GATE. `perl -0777 -i -pe` and friends treat a file's bytes as Latin-1: feed one a UTF-8
+# source with an em dash in it and every `—` comes back as `Ã¢ÂÂ`, silently, while the tool prints
+# only "Wide character in print" to stderr. That happened here across five files and 925 characters,
+# including live assertion strings that go straight to the harness log, and it was committed twice
+# before an adversarial review caught it. ~30% of one commit's diff turned out to be encoding noise.
+#
+# U+0080..U+009F are C1 control characters. They never appear in legitimate prose or source, and one
+# round of the Latin-1/UTF-8 confusion always produces them. Testing for them catches the fault at the
+# only moment it is cheap to fix.
+files=$(git diff --cached --name-only --diff-filter=ACM -- '*.gd' '*.md' '*.sh' '*.cfg' '*.godot')
+[ -z "$files" ] && exit 0
+bad=""
+for f in $files; do
+	[ -f "$f" ] || continue
+	n=$(python3 -c "
+import sys
+try:
+    s = open('$f', encoding='utf-8').read()
+except Exception:
+    print(0); sys.exit()
+print(sum(1 for c in s if 0x80 <= ord(c) <= 0x9f))
+" 2>/dev/null)
+	[ "${n:-0}" -gt 0 ] && bad="$bad\n  $f ($n control characters)"
+done
+if [ -n "$bad" ]; then
+	printf 'COMMIT REFUSED: mojibake (U+0080-U+009F) in staged files:%b\n' "$bad" >&2
+	printf '\nA byte-oriented editor re-encoded UTF-8 as Latin-1. Repair before committing;\n' >&2
+	printf 'do not "fix" it by deleting the punctuation.\n' >&2
+	exit 1
+fi
+exit 0
