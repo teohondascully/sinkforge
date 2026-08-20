@@ -182,14 +182,22 @@ func _run() -> void:
 	var bg2: PackedFloat32Array = bg
 	var noise: float = 0.0
 	var moving: PackedByteArray = PackedByteArray()
+	# CONSECUTIVE PAIRS. The first version compared every sample against the SAME `bg`, so the four draws
+	# spanned 30, 60, 90 and 120 frames — four different intervals of a growing quantity, not four draws of
+	# one. Their median is then biased upward and moves with CHURN_SAMPLES, which is precisely the property
+	# a median is chosen to avoid. The numbers that fix produced were quoted in a commit message as
+	# "the median of several draws of the same quantity"; they were not, and they are re-derived below.
+	var prev_luma: PackedFloat32Array = bg
 	for _s: int in CHURN_SAMPLES:
 		for _i: int in QUIET_GAP:
 			await physics_frame
-		bg2 = await _luma()
-		noise = maxf(noise, _max_abs(bg, bg2))
-		var m: PackedByteArray = _moving(bg, bg2)
+		var cur: PackedFloat32Array = await _luma()
+		noise = maxf(noise, _max_abs(prev_luma, cur))
+		var m: PackedByteArray = _moving(prev_luma, cur)
 		moving = m if moving.is_empty() else _either(moving, m)
 		samples.append(_coverage(m))
+		prev_luma = cur
+		bg2 = cur
 	var churn: float = _median(samples)
 	var spread: String = ""
 	for v: float in samples:
@@ -298,7 +306,6 @@ func _run() -> void:
 			for _i: int in 8:
 				await physics_frame
 			phases.append(await _luma())
-		var taut2: PackedFloat32Array = phases[phases.size() - 1]
 		var slack: PackedFloat32Array = await _at_slack(0.55)
 		_dump("slack")
 		# COUNTED, NOT AVERAGED, and the mean was wrong for a reason worth writing down: widening the lane to
@@ -592,35 +599,66 @@ func _check_pointer_seam() -> void:
 ## warp was right, and replacing it with a single frame was not. This waits on the quantity that is
 ## actually still moving, and reads it from the renderer rather than assuming a frame count.
 const LAMP_SETTLE_MAX: int = 240
+## A RESIDUAL epsilon, not a step epsilon. The first version bounded the frame-to-frame STEP, which is
+## `residual * (1 - exp(-LAMP_EASE/60))` = residual * 0.1393 — so 0.05 as a step was really ~0.359 px of
+## residual. Kept at 0.05 as a residual deliberately: it is ~7x tighter, the body is at rest here, and the
+## measured settle still lands inside the budget with room (0.03 px, held 6).
 const LAMP_SETTLE_EPS: float = 0.05
 const LAMP_SETTLE_HOLD: int = 6
 
 
 func _look_at(world: Vector2) -> void:
 	Controls.pose_pointer(world)
-	var prev: Vector2 = Vector2.INF
+	# ASSERT THE RESIDUAL, DO NOT WATCH THE DERIVATIVE. The first version of this loop broke when
+	# `_lamp_offset` stopped CHANGING, which is a different question with the same answer most of the time
+	# and the opposite answer exactly when it matters: under `Engine.time_scale = 0` the ease multiplier is
+	# `1.0 - exp(0)` = 0, the offset cannot move, and a derivative test reads PERFECTLY STILL on every frame
+	# while the lamp sits pickled mid-slide. This layer never freezes, so that version was not wrong here —
+	# but it was one hoist away from being wrong in `check_ceremony_reads`, which does.
+	#
+	# It also awaited `physics_frame` while `_lamp_offset` is written in `_process`. More than one physics
+	# tick per rendered frame returns the same value twice, which a derivative test scores as settled on a
+	# frame where the lamp could not have moved. The residual does not care which clock it is sampled on.
 	var held: int = 0
+	var residual: float = 0.0
 	for _i: int in LAMP_SETTLE_MAX:
-		await physics_frame
-		var now: Vector2 = _main._renderer._lamp_offset
-		if prev != Vector2.INF and now.distance_to(prev) < LAMP_SETTLE_EPS:
+		await RenderingServer.frame_post_draw
+		residual = _main._renderer.lamp_residual()
+		if residual <= LAMP_SETTLE_EPS:
 			held += 1
 			if held >= LAMP_SETTLE_HOLD:
 				break
 		else:
 			held = 0
-		prev = now
+	# SAID OUT LOUD, and asserted. The previous version fell out of this loop silently, so a lamp that never
+	# settled was indistinguishable from one that did and the churn control downstream absorbed the
+	# difference as noise.
+	_check(held >= LAMP_SETTLE_HOLD,
+		"the head-lamp settled before the shutter (%.2f px residual after %d frames, held %d)"
+			% [residual, LAMP_SETTLE_MAX, held])
 	# Not a wait for the pose — that is immediate now — but for the frame that DRAWS through it, since
 	# every assertion downstream reads pixels rather than state.
-	if _aim_lands_on().distance_to(world) > AIM_SETTLE_EPS:
-		printerr("  NOTE: the posed aim did not take: asked for %s, the renderer reads %s"
-			% [str(world), str(_aim_lands_on())])
+	# READS THE CONSUMED VALUE, NOT THE SEAM. This check was written against `Controls.pointer_world`, which
+	# under a pose returns the posed point itself — so it compared `world` with `world` and could only ever
+	# be 0.0. That is the identical defect as the three assertions this file retired for being unable to
+	# fail, committed a hundred lines below the paragraph explaining why that is unacceptable, with a
+	# docstring claiming it "still has a channel to fail through". It did not.
+	#
+	# `_main._aim` is what `_update_mining` DERIVED from the pointer and what the renderer actually draws
+	# and lights from, so it diverges the moment the aim path breaks — which is the thing worth knowing.
+	# It is a CELL, so the tolerance is in cells and the posed point is converted the same way the game
+	# converts it.
+	var want: Vector2i = _main._cell_at(world)
+	var got: Vector2i = _main._aim
+	if Vector2(got - want).length() > AIM_SETTLE_CELLS:
+		printerr("  NOTE: the posed aim did not reach the game: posed %s, _update_mining derived %s"
+			% [str(want), str(got)])
 
 
-## How close the readback must sit to the posed point. With the OS cursor out of the loop this is an
-## identity check rather than a tolerance, but it is kept as a tolerance so the assertion still has a
-## channel to fail through if the seam is ever bypassed.
-const AIM_SETTLE_EPS: float = 2.0
+## How far the game's DERIVED aim cell may sit from the cell under the posed point. Not zero, because
+## `_effective_aim` legitimately snaps to the nearest reachable solid when the raw cell is out of reach —
+## so this bounds "the pose reached the game" without asserting that no snapping occurred.
+const AIM_SETTLE_CELLS: float = 2.0
 
 
 ## Where the RENDERER thinks the cursor is, in world space — the exact expression `_draw_aim_ghost` calls,
@@ -1025,7 +1063,10 @@ func _dump_mask(tag: String, mask: PackedByteArray) -> void:
 ## threshold set against it stays a statement about the picture rather than about how long the layer ran.
 func _median(vals: Array[float]) -> float:
 	if vals.is_empty():
-		return 0.0
+		# NOT 0.0. Both callers feed a `_check` where zero is the maximally PASSING value, so an empty
+		# sample set would turn a missing measurement into a green one. NAN loses every comparison, so the
+		# layer goes red and says so instead.
+		return NAN
 	var s: Array[float] = vals.duplicate()
 	s.sort()
 	var n: int = s.size()

@@ -3026,13 +3026,24 @@ func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
 		# different rows without either being ambiguous.
 		if cursor:
 			draw_rect(Rect2(x - 6.0, y - 11.0, 2.0, 15.0), UI_ACCENT)
-			# The mouse wins when it is on a row, because it is the more deliberate pointer; the cursor
-			# speaks when nothing is hovered, so the plate always describes the thing that would act.
+		# THE MOUSE WINS WHEN IT IS ON A ROW, because it is the more deliberate pointer; the keyboard cursor
+		# speaks when nothing is hovered, so the plate always describes the thing that would act.
+		#
+		# THAT SENTENCE WAS HERE WHILE THE CODE DID THE OPPOSITE. The whole block sat under `if cursor:`,
+		# so `said` was set only for the single row the keyboard cursor was parked on and hovering a row
+		# with the mouse produced no plate text at all. **The clash message is this ticket's entire payload,
+		# and it was unreachable by mouse** — visible only if the cursor happened to be on the clashing row.
+		#
+		# `lit` (hover) is checked FIRST and unconditionally; `cursor` fills in when nothing is hovered.
+		# The old `elif lit or said == "":` could not be false either, since exactly one row is the cursor
+		# row and `said` is still empty when it is reached — a guard that cannot fail, inside the fix for a
+		# ticket about guards that cannot fail.
+		if lit or (cursor and said == ""):
 			if capturing:
 				said = "press any key to bind it — ESC cancels"
 			elif not clash.is_empty():
 				said = " and ".join(clash)
-			elif lit or said == "":
+			else:
 				said = str(row[2]) if str(row[2]) != "" else "%s — press Enter to rebind" % str(row[1])
 		draw_string(_font, Vector2(x, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 			UI_TEXT if (lit or capturing) else UI_TEXT_DIM)

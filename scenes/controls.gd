@@ -244,10 +244,23 @@ static func pointer_posed() -> bool:
 
 
 ## The pointer in world space — what you are aiming AT.
+##
+## IT ASKS THE VIEWPORT, NOT THE NODE, and that is not a stylistic choice. `CanvasItem`'s own
+## `get_global_mouse_position()` divides by the node's CANVAS transform, which for anything under a
+## `CanvasLayer` is the LAYER's transform, not the viewport's — and the HUD lives under a `CanvasLayer`
+## scaled by `HUD_SCALE`. So the unposed branch would have returned HUD-layer coordinates for the HUD while
+## the posed branch returned world coordinates, and **the same accessor would have meant two different
+## spaces for the same node depending on whether a fixture was running.**
+##
+## Latent rather than live: today's three callers are `main` and `_renderer`, neither under a layer. But
+## the parameter is typed `CanvasItem`, the method is named for world space, and the HUD is the most
+## obvious `CanvasItem` in the project — so this is a trap set for whoever calls it next, and it costs one
+## line to disarm. Both branches now speak world space for every node.
 static func pointer_world(node: CanvasItem) -> Vector2:
 	if _posed:
 		return _posed_world
-	return node.get_global_mouse_position()
+	var vp: Viewport = node.get_viewport()
+	return vp.get_canvas_transform().affine_inverse() * vp.get_mouse_position()
 
 
 ## The pointer in viewport space — what you are aiming OVER, for the "is the cursor on a panel?" tests.

@@ -163,7 +163,63 @@ const IDLE_GLOW: float = 0.12
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp — a SATURATED amber core
                                                    ## (was pale 1.0/.90/.66) so the pool reads warm-gold, not
                                                    ## a white wash (diff 11)
+## The lamp's ease rate, named so a fixture can derive its own settle budget instead of hard-coding a
+## frame count. The recurrence collapses to `e_N = e0 * exp(-LAMP_EASE * T)`: decay depends only on
+## elapsed GAME time, not on how it is chopped into frames.
+const LAMP_EASE: float = 9.0
 const LAMP_RADIUS: float = CELL * 5.6               ## the ADDITIVE bloom halo — tracks the reveal radius
+
+
+## WHERE THE LAMP HANGS. The expression was written out four times in this file; a caller that copies it a
+## fifth time is one edit away from lighting a different point than the renderer does.
+func lamp_head() -> Vector2:
+	if player == null:
+		return Vector2.ZERO
+	return player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+
+
+## WHAT `_lamp_offset` IS EASING TOWARD, and the name says OFFSET because that is what it is: a vector
+## RELATIVE TO THE HEAD, not a world point. Every render site spends it as `head + _lamp_offset`
+## (`_veil_cut` twice, `_draw_glow` twice), so a caller that reads a method named `lamp_target` as a
+## position is wrong by the whole head vector and the error looks like a small lighting drift.
+##
+## Hoisted out of `_process` so a fixture asks instead of re-deriving: the head term, the `CELL * 0.9`
+## fallback and the `facing` branch are three chances to get it subtly wrong, and `_process` calls this
+## same method, so the two cannot drift apart.
+func lamp_target_offset() -> Vector2:
+	if player == null:
+		return _lamp_offset
+	var to_aim: Vector2 = _cell_center(_aim) - lamp_head()
+	if to_aim.length() > float(CELL) * 0.9:
+		return to_aim.limit_length(LAMP_LEAD)
+	return Vector2(float(player.facing) * float(CELL) * 0.7, -float(CELL) * 0.2)
+
+
+## The lamp's WORLD POSITION — what a layer measuring the lit pool actually wants.
+func lamp_pos() -> Vector2:
+	return lamp_head() + _lamp_offset
+
+
+## HOW FAR THE LAMP STILL HAS TO TRAVEL. A fixture waiting for the light to settle must assert THIS and
+## not watch `_lamp_offset` stop changing between frames. Those are different questions with the same
+## answer most of the time and opposite answers exactly when it matters: under `Engine.time_scale = 0` the
+## ease multiplier is `1.0 - exp(0)` = 0, so the offset cannot move at all, a derivative test reads
+## PERFECTLY STILL on every frame, and the layer photographs a lamp pickled mid-slide. A residual reports
+## the truth in that state, and is a number a layer can put in its log when it gives up.
+##
+## TWO LIMITS ON WHAT A SMALL RESIDUAL MEANS, both worth knowing before asserting on one:
+## * **It only means "settled" for a body AT REST.** The target is head-relative and recomputed from the
+##   live position, so a walking, falling or swinging body carries a permanent residual floor. A settle
+##   loop run during a spawn fall will spend its whole budget and prove nothing.
+## * **It is not monotone across the `CELL * 0.9` branch.** The two branches do not meet: at the threshold
+##   the aimed target has magnitude 28.80 and the fallback 23.30, and with the aim behind the facing they
+##   are ~51.6 px apart. A sub-pixel body move across that line teleports the target and spikes the
+##   residual with nothing wrong. Bound it at a moment of rest; never assert it stayed low over an
+##   interval, or the statistic is about the branch.
+func lamp_residual() -> float:
+	return _lamp_offset.distance_to(lamp_target_offset())
+
+
 const LAMP_LEAD: float = CELL * 1.9                 ## how far the beam pool leads toward the aim (#44)
 
 ## --- Day/night (cosmetic-first) ---------------------------------------------------
@@ -546,12 +602,7 @@ func _process(delta: float) -> void:
 	# (capped), eased so a mouse flick swings the beam like a worn lamp, not a snapped spotlight.
 	# Cursor on/next to the body → fall back to plain facing so the light never collapses onto you.
 	if player != null:
-		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
-		var to_aim: Vector2 = _cell_center(_aim) - head
-		var target: Vector2 = Vector2(float(player.facing) * float(CELL) * 0.7, -float(CELL) * 0.2)
-		if to_aim.length() > float(CELL) * 0.9:
-			target = to_aim.limit_length(LAMP_LEAD)
-		_lamp_offset = _lamp_offset.lerp(target, 1.0 - exp(-9.0 * delta))
+		_lamp_offset = _lamp_offset.lerp(lamp_target_offset(), 1.0 - exp(-LAMP_EASE * delta))
 	_spawn_water_drips(delta)   # cosmetic drips shed off pouring water — motion cue (view-culled, rate-limited)
 	queue_redraw()              # falling items, machine animation + the aim cursor move every frame
 	_update_veil()              # the lightmap veil (#17): rebake the base if dirty, re-cut the live lights
@@ -3521,7 +3572,7 @@ func _update_veil() -> void:
 	# out of the gloom (diffs 1, 11) — and each cut carries its SOURCE's colour (#S3), so what the lamp
 	# uncovers is warm stone rather than grey stone with an amber sticker over it.
 	if player != null:
-		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+		var head: Vector2 = lamp_head()
 		var lamp_lit: Color = _light_tint(lamp_color)
 		# HOW MUCH OF THE FRAME YOU CAN SEE (#S5). The camera shows 40x22 cells. A 5.4-cell reveal lights
 		# roughly a tenth of that, so the underground was played through a keyhole: whatever the terrain
@@ -3712,7 +3763,7 @@ func _paint_lights(layer: LightLayer) -> void:
 		# The AIM-FOLLOWING beam (#44): a bright cast pool where you're looking + a dimmer throat pool
 		# between it and the head — two glows along one line read as a directed beam, no shader needed. The
 		# inner/body pools are held well below the main so the overlapping centres don't sum past 1 → white.
-		var head: Vector2 = player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
+		var head: Vector2 = lamp_head()
 		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
 		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.38)
 		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.06 * lamp_scale)  # close body glow
