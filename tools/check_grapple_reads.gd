@@ -407,8 +407,41 @@ func _run() -> void:
 		var rim_taut: float = _bow_rim()
 		var bow_slack: float = await _bow_now(p.hand(), hitch, 0.55)
 		var rim_slack: float = _bow_rim()
+		# WHAT THE RENDERER SAYS IT DREW, beside what the mask read, because until this line existed the
+		# two had never been put next to each other and a constant was standing in for the prediction.
+		#
+		# `rope_sag` returns a hang in PIXELS OF Y — `_draw_cord` applies it as `p.y += sin(t * PI) * sag`,
+		# so the maximum is vertical. `_bow_now` measures the PERPENDICULAR departure from the chord
+		# (`|d.cross(axis)|`). On a diagonal those are not the same quantity: a vertical drop of `h` across
+		# a chord at angle theta departs it by `h * cos(theta)`. This shot is deliberately a long diagonal,
+		# so the factor is real and it is why a reading near 0.24 sits under a 0.42 cap without either
+		# number being wrong.
+		#
+		# REPORTED, NOT ASSERTED. The honest bound here is "the mask agrees with `rope_sag`", but the two
+		# have never been compared, the mask is known to shave the arc's most antialiased pixels, and
+		# guessing a tolerance before seeing the spread is how four invented bounds in this repository
+		# turned out wrong. The number goes in the log until there is a measurement to set it from.
+		var chord: Vector2 = _screen(hitch) - _screen(p.hand())
+		var cos_t: float = absf(chord.x) / maxf(chord.length(), 1.0)
+		var span_w: float = p.hand().distance_to(hitch)
+		var pred: float = (WorldRenderer.rope_sag(span_w, 0.55) / maxf(span_w, 1.0)) * cos_t
 		print("    bow: %s of the chord pulled tight, %s at 0.55 slack (mask rim %.4f / %.4f, drawn cap %.2f)"
 			% [_bow_str(bow_taut), _bow_str(bow_slack), rim_taut, rim_slack, WorldRenderer.SAG_CAP])
+		print(("      the renderer's own model predicts %.4f of the chord here: rope_sag is clamped to "
+			+ "SAG_CAP (slack 0.55 solves to 0.6770, every slack above 0.3199 pins) and the chord lies at "
+			+ "%.1f degrees, so a vertical hang of %.2f departs it by %.4f")
+			% [pred, rad_to_deg(acos(clampf(cos_t, -1.0, 1.0))), WorldRenderer.SAG_CAP, pred])
+		# THE SATURATION GUARD'S OWN PRECONDITION, asserted rather than assumed. `_bow_measured` refuses a
+		# reading at or above `SAG_CAP`, and that is only a saturation test while a legitimate reading
+		# cannot get there. It cannot here because the chord is diagonal, which costs the vertical hang a
+		# `cos(theta)`. Flatten the shot and the honest reading climbs toward 0.42 until the guard starts
+		# rejecting real ropes — the exact inversion this layer was suspected of and does not have. So the
+		# geometry that makes the threshold valid is checked beside the reading it protects.
+		_check(pred < WorldRenderer.SAG_CAP,
+			("the posed shot leaves the saturation guard room to be a saturation guard — the renderer's "
+				+ "predicted departure is %.4f of the chord against a %.2f threshold. If this fails, the "
+				+ "shot was flattened and `_bow_measured` will start refusing correct readings")
+				% [pred, WorldRenderer.SAG_CAP])
 
 		# THE REJECTION THAT HAD TO EXIST BEFORE EITHER ASSERTION BELOW MEANT ANYTHING.
 		#
@@ -1070,10 +1103,30 @@ func _bow_measured(which: String, v: float, rim: float) -> bool:
 			+ "the mask sat within ROPE_TOL of ROPE_HUE, which is a mask that missed and not a rope that "
 			+ "is straight") % which)
 		return false
+	# THIS THRESHOLD WAS MOVED TO THE MASK RIM AND THAT WAS WRONG, so the reasoning is kept rather than
+	# the change. The argument for moving it: `rope_sag` clamps at the posed slack (0.55 solves to
+	# 0.6770 against a `SAG_CAP` of 0.42, and every slack above 0.3199 pins), so the drawn hang IS the
+	# cap, and a 99th-percentile reading over a cord with thickness should therefore land at or just
+	# above `SAG_CAP` whenever the mask works — making this guard fire on success.
+	#
+	# IT NEGLECTS THE UNITS. `rope_sag` returns a hang in pixels of Y: `_draw_cord` applies it as
+	# `p.y += sin(t * PI) * sag`, so the maximum is VERTICAL. `_bow_now` measures the PERPENDICULAR
+	# departure from the chord, `|d.cross(axis)|`. A vertical drop of `h` across a chord at angle theta
+	# departs that chord by `h * cos(theta)`, and this shot is deliberately a long diagonal — measured
+	# at 49.3 degrees, where the cap's 0.42 of vertical is **0.2736 of the chord**, printed above.
+	#
+	# So a real rope here cannot read much past 0.28, the observed 0.4634 was nowhere near the arc and
+	# WAS the saturation this guard is named for, and `SAG_CAP` correctly sits between the two. The
+	# rejection was right; only the reason written on it was incomplete.
+	#
+	# `SAG_CAP` is nonetheless an upper bound that works by geometry rather than by derivation: as the
+	# chord flattens, `cos(theta)` approaches 1 and the legitimate reading climbs toward 0.42 until it
+	# collides with the threshold. That is not reachable at the posed shot and it is one repose away, so
+	# the condition is ASSERTED in `_run` beside the reading rather than left as a comment nobody re-checks.
 	if v >= WorldRenderer.SAG_CAP:
 		_check(false, ("the %s reading is a BOW and not a SATURATION of the mask — it reads %.4f with "
-			+ "its own rim at %.4f, and world_renderer.gd:3125 clamps the drawn hang to %.2f of the "
-			+ "chord, so at or above that there is nothing left for it to have measured")
+			+ "its own rim at %.4f, and the renderer clamps the drawn hang to %.2f of the chord in Y, "
+			+ "which on this chord is less still, so there is nothing left for it to have measured")
 			% [which, v, rim, WorldRenderer.SAG_CAP])
 		return false
 	return true
