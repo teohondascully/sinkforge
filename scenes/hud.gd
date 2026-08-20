@@ -2926,24 +2926,38 @@ func _settings_feel(c: Rect2, mouse: Vector2) -> String:
 ## can show you. `unbound` and `?` are excluded — two actions with no key are not in conflict, and a naive
 ## equality would have called them the loudest clash on the board.
 func _binding_clashes() -> Dictionary:
+	# THE POPULATION IS EVERY EVENT OF EVERY ACTION, and it used to be neither.
+	#
+	# It compared `Settings.binding_label`, which is `events[0]`, across the 22 REMAP_ROWS. Two things were
+	# wrong with that. Most actions have two or three events, so a collision on any event but the first was
+	# invisible — bind something to the up arrow and it silently shares with `climb up`, whose first event
+	# is W. And `Settings.rebind` scans all 25 of `Controls.defaults()`, so it could displace `close`,
+	# `cycle next` or `cycle prev`, none of which have a row here to show that it happened.
+	#
+	# Detecting over all 25 while DISPLAYING on the 22 is deliberate: the page owns 22 rows, but a warning
+	# that names an off-page action is still true and still actionable, and silence would not be.
 	var by_key: Dictionary = {}
-	for row: Array in REMAP_ROWS:
-		var label: String = Settings.binding_label(row[0])
-		if label == "unbound" or label == "?":
-			continue
-		var seen: Array = by_key.get(label, [])
-		seen.append(str(row[1]))
-		by_key[label] = seen
+	for act: StringName in Controls.defaults():
+		for label: String in Settings.event_labels(act):
+			if label == "unbound" or label == "?":
+				continue
+			var seen: Array = by_key.get(label, [])
+			seen.append(act)
+			by_key[label] = seen
+	# THE PHRASE NAMES THE COLLIDING KEY, not the row's chip. Once a clash can live on an action's second
+	# event, "%s is also %s" filled in with `binding_label(action)` would point at the wrong key — the row
+	# would turn orange over `A` while the actual collision was on the left arrow. **The display and the
+	# fix have to be about the same event**, which is the whole reason both sides share one predicate.
 	var out: Dictionary = {}
 	for row: Array in REMAP_ROWS:
-		var shared: Array = by_key.get(Settings.binding_label(row[0]), [])
-		if shared.size() < 2:
-			continue
-		var others: Array = []
-		for other: String in shared:
-			if other != str(row[1]):
-				others.append(other)
-		out[row[0]] = others
+		var act: StringName = row[0]
+		var said: Array = []
+		for label: String in Settings.event_labels(act):
+			for other_v: Variant in by_key.get(label, []):
+				if StringName(other_v) != act:
+					said.append("%s is also %s" % [label, action_label(StringName(other_v))])
+		if not said.is_empty():
+			out[act] = said
 	return out
 
 
@@ -3017,7 +3031,7 @@ func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
 			if capturing:
 				said = "press any key to bind it — ESC cancels"
 			elif not clash.is_empty():
-				said = "%s is also %s" % [Settings.binding_label(action), " and ".join(clash)]
+				said = " and ".join(clash)
 			elif lit or said == "":
 				said = str(row[2]) if str(row[2]) != "" else "%s — press Enter to rebind" % str(row[1])
 		draw_string(_font, Vector2(x, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,

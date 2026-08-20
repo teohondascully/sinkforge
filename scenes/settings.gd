@@ -1,20 +1,20 @@
 class_name Settings
 extends RefCounted
 
-## Player SETTINGS — the machine-local preferences: audio levels, screen-shake, zoom,
+## Player SETTINGS â the machine-local preferences: audio levels, screen-shake, zoom,
 ## and the key BINDINGS the Controls foundation was built for. All static (any layer reads without
-## wiring), persisted to a ConfigFile in user:// — deliberately SEPARATE from SaveGame: a save is a
+## wiring), persisted to a ConfigFile in user:// â deliberately SEPARATE from SaveGame: a save is a
 ## world, settings are this machine/person (they survive new games and never travel with a save).
 ##
 ## REPRESENTATION-ONLY: nothing here is sim state. Audio applies as dB offsets the Sfx layer adds at
 ## play time, shake gates one camera line, zoom is the camera index, bindings rebind InputMap actions.
 ##
 ## HARNESS RULE: `persist` is FALSE by default and only a real (unscripted) boot turns it on + loads
-## the file — so every fixture/test runs on pure defaults and can never read or clobber the dev's real
+## the file â so every fixture/test runs on pure defaults and can never read or clobber the dev's real
 ## settings. check_settings opts in explicitly on its own temp path.
 
-## SOUND IS ON. A first boot has to be able to hear the machine it is standing in — the drill biting, the
-## water finding a way down, the winch loading up — because roughly half of what this game tells you it
+## SOUND IS ON. A first boot has to be able to hear the machine it is standing in â the drill biting, the
+## water finding a way down, the winch loading up â because roughly half of what this game tells you it
 ## tells you by ear, and a player who never opens the settings page never learns the audio is there at all.
 ## The mute itself is unchanged: still one switch over the whole mix rather than levels pinned to zero (see
 ## apply_audio), still persisted, so turning it OFF is equally a one-time act.
@@ -23,10 +23,10 @@ extends RefCounted
 ## main.gd::_ready(), the same way and in the same place it declines to persist. The harness stays quiet
 ## without the shipped default having to lie about what a new player hears.
 static var muted: bool = false
-static var master: float = 1.0          ## 0..1 — the Master bus (everything)
-static var sound: float = 1.0           ## 0..1 — effect voices (positional pool + UI dings)
-static var ambience: float = 1.0        ## 0..1 — the beds (hum, wind, cave-air, drips)
-static var music: float = 1.0           ## 0..1 — the Score (the tonal beds that descend with you)
+static var master: float = 1.0          ## 0..1 â the Master bus (everything)
+static var sound: float = 1.0           ## 0..1 â effect voices (positional pool + UI dings)
+static var ambience: float = 1.0        ## 0..1 â the beds (hum, wind, cave-air, drips)
+static var music: float = 1.0           ## 0..1 â the Score (the tonal beds that descend with you)
 static var screen_shake: bool = true
 static var auto_pickup: bool = true    ## walk-over auto-collect of ground items (playtest: make it optional)
 static var zoom_idx: int = 0            ## index into MainView.ZOOM_LEVELS
@@ -91,7 +91,7 @@ static func toggle_mute() -> bool:
 	return muted
 
 
-## dB offsets the Sfx layer ADDS to its own baselines at play/frame time — 0 dB at full, ~-60 (gone)
+## dB offsets the Sfx layer ADDS to its own baselines at play/frame time â 0 dB at full, ~-60 (gone)
 ## at the bottom of the slider. Lazy application means no player-node bookkeeping here.
 static func sound_db() -> float:
 	return linear_to_db(clampf(sound, 0.001, 1.0))
@@ -105,39 +105,108 @@ static func music_db() -> float:
 	return linear_to_db(clampf(music, 0.001, 1.0))
 
 
-## Rebind an action to a single event spec, apply it live, persist. The old binding is fully replaced
-## (one gesture per action keeps the page honest); reset_bindings() restores every default.
+## Rebind an action to one event spec, apply it live, persist. `reset_bindings()` restores every default.
 ##
-## THE NEW BINDING TAKES THE KEY. Any other action already holding it is UNBOUND and returned, so the
-## caller can say so. `MNU-29a`: this function used to write the new key and return, with no conflict
-## check of any kind — bind `jump` to `W` and `W` became `climb up` AND `jump`, both fired on every press,
-## the config persisted it, and nothing anywhere said a word.
+## IT USED TO REPLACE THE WHOLE BINDING, and the docstring defended that: "the old binding is fully
+## replaced (one gesture per action keeps the page honest)". That sentence was true when a binding WAS one
+## gesture. It stopped being true when the gamepad layer landed. `Controls.defaults()` gives 14 of its 25
+## actions two or three events, so `bindings[action] = [spec]` followed by `_apply_action`'s
+## `action_erase_events` meant **every rebind silently destroyed that action's other events** — rebind
+## grapple to a key and middle-mouse-grapple and right-bumper-grapple are gone. On EVERY rebind, not only
+## a colliding one; with nothing announced, since `_announce_rebind` only reports displaced OTHER actions;
+## persisted by `save_settings` and reapplied by `load_settings` on every boot afterwards. `check_gamepad`
+## cannot see it, because it reads the static defaults TABLE and never asks `InputMap` what is live.
+##
+## Now a rebind moves ONE event: the new spec replaces the action's event of the same DEVICE — desk for
+## desk, pad for pad — and everything else is left alone. A player remapping their keyboard has not asked
+## to lose their controller.
 ##
 ## STEAL RATHER THAN REFUSE, deliberately. Refusing would make a used key unbindable until you first went
 ## and cleared its owner, which is a chore in a page whose whole job is rebinding. Stealing cannot leave a
-## duplicate behind, the displaced action is left VISIBLY `unbound` on its own row rather than quietly
-## losing its key, and `reset_bindings()` is one chip away.
+## duplicate behind, the displaced action loses only the ONE event that collided rather than its whole
+## binding, and `reset_bindings()` is one chip away.
 ##
-## THE PREDICATE IS `binding_label`, AND THAT IS NOT AN IMPLEMENTATION DETAIL. `Hud._binding_clashes()`
-## marks a row as clashing by comparing the same labels. If the resolver compared something else —
-## `InputMap.action_has_event`, or a hand-rolled spec equality — then the page could display a conflict
-## the resolver did not resolve, or resolve one it never showed. **One predicate, or the display and the
-## fix are about different things.** A fresh spec always yields a real event, so `label` here is never
-## `"unbound"` and this cannot mass-unbind the actions that have no key.
+## ONE PREDICATE, AND IT IS NOW AT THE RIGHT GRAIN. `Hud._binding_clashes()` marks a row as clashing with
+## the same comparison this resolver uses, so the page cannot show a conflict the resolver declines to fix
+## or fix one it never showed. That doctrine was already written here, and it was being applied to the
+## WRONG QUANTITY: both sides compared `binding_label`, which is `events[0]`. Most actions have more than
+## one event, so a collision on any of the others was invisible to the detector AND to the resolver. The
+## live repro was three inputs from the shipped page — CONTROLS, `jump`, press the up arrow — after which
+## the arrow climbs and jumps on every press and the page says nothing.
+##
+## **The original fix's own demonstration (`jump` -> `W`) passed only because `W` happens to be `sf_up`'s
+## FIRST event.** It was run on the one input where the bug was visible to the instrument measuring it.
+## Both sides now compare `event_labels()`, which is every event of every action. A fresh spec always
+## yields a real event, so `label` here is never `"unbound"` and this cannot mass-unbind keyless actions.
 static func rebind(action: StringName, spec: Dictionary) -> Array[StringName]:
 	var label: String = event_label(Controls.event_from_spec(spec))
 	var displaced: Array[StringName] = []
 	for other: StringName in Controls.defaults():
 		if other == action or not InputMap.has_action(other):
 			continue
-		if binding_label(other) == label:
+		var kept: Array = []
+		var took: bool = false
+		for s: Variant in specs_of(other):
+			if event_label(Controls.event_from_spec(s as Dictionary)) == label:
+				took = true          # this ONE event moves; the rest of the action stays where it was
+			else:
+				kept.append(s)
+		if took:
 			displaced.append(other)
-			bindings[other] = []
-			_apply_action(other, [])
-	bindings[action] = [spec]
-	_apply_action(action, [spec])
+			bindings[other] = kept
+			_apply_action(other, kept)
+	# The action being bound keeps everything that is not the same DEVICE and not the same key. Dropping the
+	# same-label entry first is what stops an action colliding with itself: binding grapple to the middle
+	# mouse button, which grapple already answers to, would otherwise leave it holding MMB twice.
+	var mine: Array = []
+	for s: Variant in specs_of(action):
+		if event_label(Controls.event_from_spec(s as Dictionary)) != label:
+			mine.append(s)
+	var device: int = _device_of(spec)
+	var placed: bool = false
+	for i: int in mine.size():
+		if _device_of(mine[i] as Dictionary) == device:
+			mine[i] = spec
+			placed = true
+			break
+	if not placed:
+		mine.insert(0, spec)
+	bindings[action] = mine
+	_apply_action(action, mine)
 	save_settings()
 	return displaced
+
+
+## WHICH DEVICE a spec speaks for. Rebinding a desk input replaces the action's desk input and leaves the
+## pad alone, which is the entire point of the distinction: a player remapping the keyboard has not asked
+## to lose their controller.
+const DESK: int = 0
+const PAD: int = 1
+
+
+static func _device_of(spec: Dictionary) -> int:
+	return PAD if (spec.has("pad") or spec.has("axis")) else DESK
+
+
+## The action's CURRENT full spec list — its override if it has one, otherwise the defaults it is still
+## running on. `bindings` holds only overrides, so reading it directly reports an empty list for every
+## action nobody has touched, and writing that back is how the whole binding got erased.
+static func specs_of(action: StringName) -> Array:
+	if bindings.has(action):
+		return (bindings[action] as Array).duplicate()
+	var d: Dictionary = Controls.defaults()
+	return (d[action] as Array).duplicate() if d.has(action) else []
+
+
+## EVERY label the action answers to, not just the first. `binding_label` returns `events[0]` because a row
+## has room for one chip; identity is a different question from display and needs all of them.
+static func event_labels(action: StringName) -> Array[String]:
+	var out: Array[String] = []
+	if not InputMap.has_action(action):
+		return out
+	for ev: InputEvent in InputMap.action_get_events(action):
+		out.append(event_label(ev))
+	return out
 
 
 ## Push every saved override into InputMap (call AFTER Controls.register() has created the actions).
@@ -193,7 +262,7 @@ static func event_label(ev: InputEvent) -> String:
 			_: return "MB%d" % (ev as InputEventMouseButton).button_index
 	# GAMEPAD LABELS ARE PREFIXED, every one of them, and that is not decoration. A bare "A" would collide
 	# with the keyboard's A on any screen that lists bindings, and worse, `check_binding_text` reads these
-	# labels to decide whether a key named in a tooltip is bound — an unprefixed pad face button would make
+	# labels to decide whether a key named in a tooltip is bound â an unprefixed pad face button would make
 	# the prose "press A" look satisfied by a gamepad the player does not own.
 	if ev is InputEventJoypadButton:
 		match (ev as InputEventJoypadButton).button_index:

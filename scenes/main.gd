@@ -1187,8 +1187,15 @@ func _announce_rebind(displaced: Array[StringName]) -> void:
 		return
 	var names: Array[String] = []
 	for a: StringName in displaced:
-		names.append(Hud.action_label(a))
-	_hud.flash("%s unbound — that key is taken" % " and ".join(names))
+		# WHAT IT LOST, NOT THAT IT DIED. A rebind used to erase the displaced action outright, so
+		# "unbound" was always true of it. Now it loses only the ONE event that collided — take the up
+		# arrow from `climb up` and it keeps W and the stick — so announcing "unbound" would be a false
+		# alarm about a binding that still works. That is this ticket's own bug in miniature: a message
+		# and a mechanism that are about different things.
+		var left: String = Settings.binding_label(a)
+		names.append("%s unbound" % Hud.action_label(a) if left == "unbound"
+			else "%s now %s" % [Hud.action_label(a), left])
+	_hud.flash("%s — that key is taken" % " and ".join(names))
 
 
 ## Sound on or off, from the key or from the settings chip, saying so on screen either way — a mute you
