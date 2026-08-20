@@ -3041,24 +3041,51 @@ var _label_plan: Dictionary = {}
 ## `_label_visible` and neither has its own copy of the rule.
 func _plan_machine_labels(mview: Rect2) -> void:
 	_label_plan.clear()
+	# HOW MANY MACHINES ARE THERE IS NOT HOW MANY YOU ARE STANDING NEAR. The run used to be counted over a
+	# `named` that had already been filtered by `mview` and `_label_visible`, and `_label_visible` is a radius
+	# around the PLAYER — so the number printed on the plate was a statement about where the body happened to
+	# be. Three generators in a row read GENERATOR ×2 from one step too far back, with the third machine
+	# drawn, lit and plainly on screen next to the plate undercounting it, and walking two cells changed the
+	# number while nothing in the world changed. A run straddling that radius came out worse than wrong: the
+	# middle machine dropping out of `named` broke the westward test, so one run of three published two
+	# separate plates, each reading GENERATOR, neither carrying a count.
+	#
+	# So the run is measured over every named machine in the factory, which is the thing the count claims to
+	# be about, and visibility decides only where a plate is DRAWN. Those were always two questions and one
+	# test was answering both.
 	var named: Dictionary = {}
+	var shown: Dictionary = {}
 	for m: MachineState in sim.machines:
-		if not mview.has_point(Vector2(m.cell) * float(CELL)) or not _label_visible(m.cell):
+		if m.def.display_name.is_empty():
 			continue
-		if not m.def.display_name.is_empty():
-			named[m.cell] = m.def.display_name.to_upper()
+		named[m.cell] = m.def.display_name.to_upper()
+		if mview.has_point(Vector2(m.cell) * float(CELL)) and _label_visible(m.cell):
+			shown[m.cell] = true
 	var runs: Array[Dictionary] = []
 	for key: Variant in named:
 		var c: Vector2i = key
 		var west: Vector2i = c - Vector2i(1, 0)
-		if named.get(west, &"") == named[c]:
+		if named.get(west, "") == named[c]:
 			continue                          # mid-run: the westmost machine owns the plate for the run
 		var n: int = 1
-		while named.get(c + Vector2i(n, 0), &"") == named[c]:
+		while named.get(c + Vector2i(n, 0), "") == named[c]:
 			n += 1
+		# The plate hangs over the part of the run you can actually see. Centring it over the whole run would
+		# push it off the edge for a row that leaves the view, and a run with nothing visible in it wants no
+		# plate at all — which is the one thing the old visibility filter was getting right.
+		var lo: int = -1
+		var hi: int = -1
+		for k: int in n:
+			if shown.has(Vector2i(c.x + k, c.y)):
+				if lo < 0:
+					lo = c.x + k
+				hi = c.x + k
+		if lo < 0:
+			continue
 		var text: String = named[c] if n == 1 else "%s ×%d" % [named[c], n]
 		var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FS).x + 6.0
-		runs.append({"cell": c, "row": c.y, "x0": c.x, "span": n, "text": text, "w": w,
+		runs.append({"cell": Vector2i(lo, c.y), "row": c.y, "x0": c.x, "span": n, "text": text, "w": w,
+			"lo": lo, "hi": hi,
 			"aimed": 0 if (_aim.y == c.y and _aim.x >= c.x and _aim.x < c.x + n) else 1})
 	runs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if int(a["aimed"]) != int(b["aimed"]):
@@ -3069,7 +3096,7 @@ func _plan_machine_labels(mview: Rect2) -> void:
 	var claimed: Dictionary = {}              # "row:shelf" -> the x this shelf is occupied up to
 	for r: Dictionary in runs:
 		var w2: float = float(r["w"])
-		var cx: float = (float(r["x0"]) + float(r["span"]) * 0.5) * float(CELL)
+		var cx: float = (float(int(r["lo"])) + float(int(r["hi"]) - int(r["lo"]) + 1) * 0.5) * float(CELL)
 		for shelf: int in LABEL_SHELVES:
 			var slot: String = "%d:%d" % [int(r["row"]), shelf]
 			if cx - w2 * 0.5 < float(claimed.get(slot, -1.0e9)):
