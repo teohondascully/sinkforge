@@ -1,4 +1,45 @@
 #!/bin/sh
+
+# IDENTITY GATE, AND IT RUNS FIRST ON PURPOSE. `commit-msg` refuses co-author and tool-generation
+# trailers and does not look at identity at all -- it only ever matched an author line by accident,
+# because "Co-Authored-By" contains the word. So there was no identity check anywhere in this repository
+# at any stage, and a second author identity reached a branch and sat one merge from main before a
+# harness layer noticed.
+#
+# ORDERING IS LOAD-BEARING. Written at the BOTTOM of this file, this gate was dead twice over: once after
+# the final `exit 0`, and then still dead because the mojibake section below opens with
+# `[ -z "$files" ] && exit 0`, so a commit staging none of the types it scans returned before reaching it.
+# An early return taken for an unrelated reason silently skips every guard after it. Identity does not
+# depend on which files are staged, so it is asserted before anything can return.
+#
+# ASSERTED AGAINST THE LOCAL CONFIG, NOT A LITERAL. Writing the expected address here would make this a
+# rule about a string that the next identity walks through, and the string could drift from the config
+# with nothing relating them. The real failure is precise: `user.email` is right in THIS repository and
+# wrong in the global one, so any checkout resolving to the global config authors as the wrong person.
+# Comparing the EFFECTIVE identity to the LOCAL one tests exactly that.
+#
+# COMMITTER as well as AUTHOR: they diverge independently, and the commit that prompted this had both
+# wrong. No message filter would ever have looked at either.
+#
+# A convenience, not the guard -- `--no-verify` is routine here and skips it. The gate that cannot be
+# skipped is `check_trailers` in the harness.
+want="$(git config --local user.email 2>/dev/null || true)"
+if [ -z "$want" ]; then
+	printf 'COMMIT REFUSED: this repository has no local user.email.\n' >&2
+	printf 'The identity would come from your global config, which is not the one this\n' >&2
+	printf 'history uses. Set it:  git config --local user.email <the address in git log>\n' >&2
+	exit 1
+fi
+ae="$(git var GIT_AUTHOR_IDENT | sed -n 's/^.*<\([^>]*\)>.*$/\1/p')"
+ce="$(git var GIT_COMMITTER_IDENT | sed -n 's/^.*<\([^>]*\)>.*$/\1/p')"
+if [ "$ae" != "$want" ] || [ "$ce" != "$want" ]; then
+	printf 'COMMIT REFUSED: identity does not match this repository.\n' >&2
+	printf '  author:    %s\n  committer: %s\n  expected:  %s\n' "$ae" "$ce" "$want" >&2
+	printf '\nEvery commit here shares one identity. A checkout that resolved to your GLOBAL\n' >&2
+	printf 'config produces this. Fix the checkout rather than amending afterwards.\n' >&2
+	exit 1
+fi
+
 # MOJIBAKE GATE. `perl -0777 -i -pe` and friends treat a file's bytes as Latin-1: feed one a UTF-8
 # source with an em dash in it and every `—` comes back as `Ã¢ÂÂ`, silently, while the tool prints
 # only "Wide character in print" to stderr. That happened here across five files and 925 characters,
