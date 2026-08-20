@@ -34,6 +34,21 @@ const CAVE_SHELF_BIAS: float = 0.10
 ## Rows per band. Every few bands is a HARD SHELF (shale) that resists caving.
 const STRATA_BAND_H: int = 4
 ## 1-in-N bands is a hard shelf. Deterministic per band index (a seeded hash), so the layering is stable.
+##
+## TWO WAS TRIED AND MEASURED, AND IT IS NOT THE ANSWER. Scattering the shelves fixed a real defect — they
+## used to land in bands 0 to 7, a contiguous 32-row slab across the whole shallow world with nothing below
+## it — but it also took the shallow count from eight shelves to six, and the frontier richness margin fell
+## from 3.05x spawn to 1.13x, under the 1.15x floor that separates a margin from noise.
+##
+## Density looked like the obvious lever and is not. At 2 the arithmetic gives nine shelves spread from row
+## 4 to row 71, more than the old eight and reaching full depth, and richness recovers to 1.51x — but three
+## `surface_row` assertions about a shaft floor staying inside the legal ground band go red, and they pass
+## at 3. Measured in both directions against the same fixture, so the attribution is a control rather than
+## a coincidence: one failure is traded for three.
+##
+## The two legibility gauges barely move either way (rock-versus-air 72% to 73%, paint roughness 6.5% to
+## 6.6%), which is the other half of the result — they are a RENDERING property and not a density one, so
+## no value of this constant was ever going to settle them.
 const STRATA_SHELF_EVERY: int = 3
 ## Added to the carve threshold inside a shelf band, so it survives as a continuous ledge.
 const STRATA_SHELF_RESIST: float = 0.34
