@@ -4125,8 +4125,172 @@ func _paint_heat_haze(layer: LightLayer) -> void:
 		layer.draw_polygon(pts, cols)
 
 
-## The additive light pools that punch back through the veil: the miner's head-lamp, a glow per machine and
-## a glow per falling drop.
+## The machine light pool's radius in cells, and the distance at which two of those pools are one light.
+##
+## Distinct from MACHINE_GLOW_R, which is the same lamp's hole in the darkness veil, and the two are free to
+## differ because they compose differently: the veil cuts are MULTIPLICATIVE, so overlapping holes deepen an
+## opening and can never over-subtract, while these pools are ADDITIVE and overlapping ones sum.
+##
+## The link distance is derived from the radius rather than picked. Two pools whose centres sit closer than
+## one radius overlap across their hot cores, which is exactly the sum that clips, so a pair that close is
+## one light by definition.
+const MACHINE_POOL_R: float = 2.6
+const MACHINE_POOL_LINK: int = ceili(MACHINE_POOL_R)
+
+
+## One cohesive pool per run of neighbouring same-coloured emitters, plus each machine's own hot core — and
+## why a row of burners used to be a slab.
+##
+## The light layer blends additive, so N overlapping pools sum to N times one pool's intensity and clip
+## against the framebuffer. Three generators in a row printed a featureless orange block with their own fuel
+## counters and status lamps drawn at z 0 underneath it and destroyed by it: on the drift capture 99.3% of
+## the pixels across the three casings clipped at 255 in some channel, and every counter and lamp rect on
+## all three machines was clipped edge to edge. A pool exists to say that a machine is working and it was
+## erasing what the machine had to say.
+##
+## The ore seam pass below already answers this for clustered ore, and this is the same treatment. Flood the
+## emitters into groups, lay ONE pool per group, and keep the per-machine pip, so a run of burners reads as
+## three machines inside one light rather than as one wide lamp. The radius is not a taste number either:
+## the group's pool is a single machine's radius plus half the group's diagonal extent, which is the size at
+## which the outermost member still keeps a full single-machine radius of light around it. A lone machine is
+## a group of one whose extent is zero, so its pool is the identical draw call it always was, arithmetically
+## and not approximately: photographed beside the run, the Drift Rig's casing clipped 15.36% to 15.50% over
+## three runs of the unchanged build and 15.26% to 15.31% over three of four runs of this one, with the
+## fourth at 16.30%.
+##
+## This fixes the stacking and not the burner's own tuning, and knockout separates the two. Suppress the two
+## neighbours' pools on that same capture and the surviving generator, now alone, still clips 96.4% of its
+## own counter and 87.7% of its own status lamp: one pool of (1.0, 0.62, 0.20) at a pulse near 0.9 lays some
+## 211 levels of red over a casing that is already electric gold in a torch-lit gallery. It is the BASE that
+## decides, not the pool alone — check_machine_state stages one machine in a dark room whose empty mean luma
+## is 17, and there the same generator's working frame clips 4%. So the outer machines of a run come back,
+## each casing 98.8% clipped and now 45.4% and 35.4%, while the one nearest the centroid, which by
+## construction receives exactly one machine's worth of pool and no more, stays where a lone burner standing
+## in its own light has always been.
+##
+## Grouped by POOL COLOUR rather than by machine kind, because the colour is what a merge would destroy: two
+## modules with different casings paint different pools and have to stay apart, while two emitters painting
+## the same hue on the same rock lose nothing by sharing one. Colour is the finer key of the two wherever
+## they differ, and no casing colour in MACHINE_STYLE coincides with the furnace, generator or lift pool
+## literals, so this never merges across kinds.
+##
+## The idle gate joins that key for the same reason. An idled pool and a working pool are different lights
+## even in one colour, and pooling them would publish a working machine's state over the stopped machine
+## beside it, which is the exact read IDLE_GLOW exists to make.
+func _paint_machine_pools(layer: LightLayer) -> void:
+	if SILHOUETTE_ONLY:
+		return          # a body's shape is not its glow; see SILHOUETTE_ONLY
+	# Every machine that actually emits, resolved once: where it is, what colour it paints, how hard it is
+	# painting this frame, whether the idle gate is what set that, and whether it burns hot enough for a core.
+	var lit: Array[Dictionary] = []
+	var at_cell: Dictionary = {}
+	for machine: MachineState in sim.machines:
+		var kind: String = Visuals.machine_kind(machine.def)
+		# Each machine's pool blazes in its OWN colour out of the black: a hot orange forge, an amber burner,
+		# a cyan-teal lift.
+		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
+		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
+		# A cold or idle machine barely glows: it blazes only while it is doing its job, so light means
+		# working. The gate applies to EVERY machine, not just the furnace.
+		#
+		# Gating only `kind == "furnace"` left a stopped drill, hopper, splitter, crusher, borer, press, mill
+		# and pump each lighting the rock around them exactly as brightly as a running one, so the hardware
+		# was not merely silent about its state, it was asserting the wrong one. Measured with the name label,
+		# held badge and status lamp suppressed (`check_machine_state`): a working Drill and a stopped Drill
+		# differed by ~14 levels of luma against a ~7-level animation baseline, while the Forge, whose pool
+		# was already gated, differed by 92. The gate is the entire difference; the casings, the glyphs and
+		# the two machines' art were never the variable.
+		#
+		# The generator keeps its own harder gate below, where `fuel > 0` fails and the pool goes off
+		# entirely rather than dimming: a burner with no coal is not idling, it is out.
+		var idled: bool = false
+		if not _machine_active(machine):
+			pulse *= IDLE_GLOW
+			idled = true
+		if kind == "generator":
+			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
+			# Breathes while fueled and goes dark when it runs dry: the "is it making power?" read. This
+			# REPLACES pulse rather than scaling it, so the idle multiplier above never reached a burner at
+			# all, and the flag has to follow the number rather than the test that set it.
+			pulse = (0.85 + 0.22 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
+			idled = false
+		elif kind == "lift":
+			col = Color(0.36, 1.0, 0.90)                   # lift teal, echoing the updraft motes
+			pulse = (0.55 + 0.5 * machine.power_factor) * (0.85 + 0.15 * sin(_anim_time * 3.0))
+			idled = false                                  # replaced, exactly as the burner's is
+		elif kind != "furnace":
+			# Each machine's pool takes its OWN casing colour, so a drill, hopper and splitter read as distinct
+			# devices in the dark instead of as a field of identical cyan blobs.
+			col = Visuals.machine_color(machine.def)
+		if pulse <= 0.0:
+			continue        # out, not dim: it neither pools nor widens the pool of the run it sits in
+		at_cell[machine.cell] = lit.size()
+		lit.append({
+			"cell": machine.cell, "col": col, "pulse": pulse, "idled": idled,
+			# Only the genuinely burning machines, meaning a furnace or a fueled generator, blaze a core.
+			"burning": kind == "furnace" or (kind == "generator" and machine.fuel > 0)})
+	# The flood: pop an unclaimed emitter and absorb every same-light neighbour within MACHINE_POOL_LINK of
+	# anything already in the group. One machine per cell, so the lookup is the cell dictionary rather than
+	# the spatial hash the ore flood needs, and the neighbourhood is walked in a fixed order so a group and
+	# its extent are the same every frame.
+	var claimed: Dictionary = {}
+	for start: int in lit.size():
+		if claimed.has(start):
+			continue
+		claimed[start] = true
+		var group: Array[int] = [start]
+		var head: int = 0
+		while head < group.size():
+			var g: Dictionary = lit[group[head]]
+			head += 1
+			var gc: Vector2i = g["cell"]
+			for dy: int in range(-MACHINE_POOL_LINK, MACHINE_POOL_LINK + 1):
+				for dx: int in range(-MACHINE_POOL_LINK, MACHINE_POOL_LINK + 1):
+					var probe: Vector2i = gc + Vector2i(dx, dy)
+					if not at_cell.has(probe):
+						continue
+					var other: int = at_cell[probe]
+					if claimed.has(other):
+						continue
+					var o: Dictionary = lit[other]
+					if (o["col"] as Color) != (g["col"] as Color) or bool(o["idled"]) != bool(g["idled"]):
+						continue
+					claimed[other] = true
+					group.append(other)
+		var sum := Vector2.ZERO
+		var lo := Vector2(lit[start]["cell"] as Vector2i)
+		var hi: Vector2 = lo
+		# The group's own brightest member sets the pool's intensity. Not the sum, which is the defect, and
+		# not the mean, which would make a run of burners weaker than one burner: a run is lit like a single
+		# machine stretched along its length rather than like N machines added together.
+		var pulse_max: float = 0.0
+		for gi: int in group:
+			var e: Dictionary = lit[gi]
+			var c := Vector2(e["cell"] as Vector2i)
+			sum += c
+			lo = lo.min(c)
+			hi = hi.max(c)
+			pulse_max = maxf(pulse_max, float(e["pulse"]))
+		var centroid: Vector2 = (sum / float(group.size()) + Vector2(0.5, 0.5)) * float(CELL)
+		var extent: float = (hi - lo).length() * float(CELL)        # diagonal span of the run
+		_draw_glow(layer, centroid, float(CELL) * MACHINE_POOL_R + extent * 0.5,
+			lit[start]["col"], pulse_max)
+	# The cores last, one per burning machine, on top of whatever pool covers them. A fire's centre is
+	# near-white rather than saturated, so the forge ember and the coal burner each get a small hot-white pip
+	# and the pool reads like flame rather than as a flat coloured disc. These are what keep a run of three
+	# from reading as one wide lamp, so they stay per-machine and at each machine's OWN pulse; the layer is
+	# additive, where draw order carries no meaning, so lifting them out of the pool loop changes nothing but
+	# the shape of this function.
+	for e: Dictionary in lit:
+		if not bool(e["burning"]):
+			continue
+		var p: float = float(e["pulse"])
+		var core: Color = Color(1.0, 0.94, 0.82).lerp(e["col"] as Color, 0.18)  # near-white, a whisper of the pool's hue
+		layer.draw_circle(_cell_center(e["cell"] as Vector2i), 2.4 + 1.1 * p, Color(core.r, core.g, core.b, 0.85 * p))
+
+
+## The additive light pools that punch back through the veil: the miner's head-lamp, a glow per run of
+## machines and a glow per falling drop.
 func _paint_lights(layer: LightLayer) -> void:
 	_paint_godrays(layer)  # under the pools: daylight shafts pouring down dug columns
 	if draw_glints:        # exposed ore twinkles here, above the veil; see _draw_glint_flares
@@ -4170,48 +4334,7 @@ func _paint_lights(layer: LightLayer) -> void:
 		_draw_glow(layer, head + _lamp_offset, LAMP_RADIUS, lamp_color, flick)
 		_draw_glow(layer, head + _lamp_offset * 0.45, LAMP_RADIUS * 0.62, lamp_color, flick * 0.38)
 		_draw_glow(layer, player.position, float(CELL) * 1.5, lamp_color, 0.06 * lamp_scale)  # close body glow
-	for machine: MachineState in sim.machines:
-		if SILHOUETTE_ONLY:
-			continue          # a body's shape is not its glow; see SILHOUETTE_ONLY
-		var kind: String = Visuals.machine_kind(machine.def)
-		# Each machine's pool blazes in its OWN colour out of the black: a hot orange forge, an amber burner,
-		# a cyan-teal lift.
-		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
-		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
-		# A cold or idle machine barely glows: it blazes only while it is doing its job, so light means
-		# working. The gate applies to EVERY machine, not just the furnace.
-		#
-		# Gating only `kind == "furnace"` left a stopped drill, hopper, splitter, crusher, borer, press, mill
-		# and pump each lighting the rock around them exactly as brightly as a running one, so the hardware
-		# was not merely silent about its state, it was asserting the wrong one. Measured with the name label,
-		# held badge and status lamp suppressed (`check_machine_state`): a working Drill and a stopped Drill
-		# differed by ~14 levels of luma against a ~7-level animation baseline, while the Forge, whose pool
-		# was already gated, differed by 92. The gate is the entire difference; the casings, the glyphs and
-		# the two machines' art were never the variable.
-		#
-		# The generator keeps its own harder gate below, where `fuel > 0` fails and the pool goes off
-		# entirely rather than dimming: a burner with no coal is not idling, it is out.
-		if not _machine_active(machine):
-			pulse *= IDLE_GLOW
-		if kind == "generator":
-			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
-			# Breathes while fueled and goes dark when it runs dry: the "is it making power?" read.
-			pulse = (0.85 + 0.22 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
-		elif kind == "lift":
-			col = Color(0.36, 1.0, 0.90)                   # lift teal, echoing the updraft motes
-			pulse = (0.55 + 0.5 * machine.power_factor) * (0.85 + 0.15 * sin(_anim_time * 3.0))
-		elif kind != "furnace":
-			# Each machine's pool takes its OWN casing colour, so a drill, hopper and splitter read as distinct
-			# devices in the dark instead of as a field of identical cyan blobs.
-			col = Visuals.machine_color(machine.def)
-		if pulse > 0.0:
-			_draw_glow(layer, _cell_center(machine.cell), float(CELL) * 2.6, col, pulse)
-			# A fire's centre is near-white rather than saturated, so the forge ember and the coal burner get
-			# a small hot-white pip and the pool reads like flame rather than as a flat coloured disc. Only the
-			# genuinely burning machines, meaning a furnace or a fueled generator, blaze a core.
-			if kind == "furnace" or (kind == "generator" and machine.fuel > 0):
-				var core := Color(1.0, 0.94, 0.82).lerp(col, 0.18)   # near-white, a whisper of the pool's hue
-				layer.draw_circle(_cell_center(machine.cell), 2.4 + 1.1 * pulse, Color(core.r, core.g, core.b, 0.85 * pulse))
+	_paint_machine_pools(layer)
 	# Torches: the placeable light. Each mounted torch casts a warm guttering pool, smaller than the
 	# head-lamp but permanent, so torches dropped along a dig mark the route home.
 	for cell: Variant in sim.torch:
