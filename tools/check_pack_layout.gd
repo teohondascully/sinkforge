@@ -340,6 +340,7 @@ func _real_catalogue() -> void:
 	_check(lost.is_empty(),
 		"full tech: every row of both groups is inside the drawn window when the cursor is on it%s"
 			% ["" if lost.is_empty() else " — LOST: " + ", ".join(lost.slice(0, 6))])
+	_adaptive_panel(main, hud)
 	main.queue_free()
 
 
@@ -356,3 +357,76 @@ func _walk_window(count: int, capacity: int, base: int, lost: Array[String], tag
 		var first: int = Hud.works_window_first(count, capacity, base, cursor)
 		if i < first or i >= first + drawn:
 			lost.append("%s row %d (window %d..%d)" % [tag, i, first, first + drawn - 1])
+
+
+## THE COUNTER TAKES THE HEIGHT ITS OPEN TAB ASKS FOR, and a fresh pack asks for less than a stocked one.
+##
+## The panel used to draw `BAZAAR_SIZE` whatever the tab held, so a fresh game's one-item PACK covered the
+## same 91.8% of the canvas as a finished game's nineteen-machine WORKS list. `_bazaar_wanted_h` ended that
+## and nothing anywhere held it — the only reader outside the class was a scratch probe — so a counter put
+## back on a fixed height would have passed every layer in this suite, this one included.
+##
+## ORDERED, NOT PINNED TO A NUMBER. `wanted == 206` would pin today's arithmetic, and it would go red the
+## first time somebody legitimately adds four pixels of padding, which teaches the next reader to edit the
+## number instead of reading it. What is asserted is the ORDER, plus the two clamp ends, which are the
+## places an adaptive panel stops being adaptive.
+##
+## AND THOSE ENDS ARE ASSERTED AS EQUALITIES ON PURPOSE. `_bazaar_wanted_h` finishes in a `clampf` between
+## `BAZAAR_MIN_H` and `BAZAAR_SIZE.y`, so `wanted >= BAZAAR_MIN_H` and `wanted <= BAZAAR_SIZE.y` are
+## properties of that clamp and hold whatever the tabs contain — the same shape as the column total this
+## file used to read back out of `works_columns` after `works_columns` had clamped it, and no more able to
+## fail. The equalities can fail. A fresh pack is one row of wells and `BAZAAR_MIN_H` is written as that row
+## plus the fixed furniture, so the floor is where PACK's sum LANDS and not where it is caught; BENCH's
+## deepest tier at full chip height asks for more than the panel may ever be, so a tree that had become
+## short enough to fit inside the ceiling would say so here rather than quietly stop being clamped.
+##
+## MEASURED ON `_bazaar_wanted_h`, NOT ON THE PANEL'S DRAWN HEIGHT. `_bazaar_geometry` reports `_bazaar_h`,
+## which `_process` eases toward the want and which starts at `BAZAAR_SIZE.y` — in a scene where nobody has
+## opened the counter that field is still sitting on its default, so all three readings would come back as
+## the full panel and the comparison would be between two copies of one constant.
+##
+## THE PACK IS FILLED THROUGH THE SIM, by resting a pile of real catalogue items on the ground and having
+## the sim scoop it, which is the collect half of the pack's own spit-out/fall/collect. The height derives
+## from `inventory_slots()`, which derives from `inventory`, so a fixture that wrote a row count would have
+## posed a number the counter never consults.
+func _adaptive_panel(main: MainView, hud: Hud) -> void:
+	# Nothing above this line puts anything in the pack, so this is still the pack a new game hands you.
+	# The research loop did run, and it does not reach these two: BENCH's height is the SHAPE of the tree,
+	# not how much of it is yours, and PACK's is what you carry.
+	var fresh_slots: int = main.sim.inventory_slots().size()
+	var fresh_h: float = _asks_for(hud, Hud.TAB_PACK)
+	var bench_h: float = _asks_for(hud, Hud.TAB_BENCH)
+	# The machines the counter sells, which are the items a pack fills up with. Taken from the catalogue
+	# rather than written out here, so this stays a stocked pack on the day a machine is added.
+	var pile: Dictionary = {}
+	for id: StringName in hud.craft_ids:
+		if id != &"":
+			pile[id] = 4
+	main.sim.ground[Vector2i.ZERO] = pile
+	var scooped: int = main.sim.collect_ground(Vector2i.ZERO)
+	var stocked_slots: int = main.sim.inventory_slots().size()
+	var stocked_h: float = _asks_for(hud, Hud.TAB_PACK)
+	print("  the counter asks for %.0f fresh (%d slots), %.0f stocked (%d), %.0f on BENCH — of %.0f..%.0f"
+		% [fresh_h, fresh_slots, stocked_h, stocked_slots, bench_h, Hud.BAZAAR_MIN_H, Hud.BAZAAR_SIZE.y])
+	# NON-VACUITY — a statement about the FIXTURE. If the scoop moved nothing the two PACK readings would be
+	# one reading taken twice, and the strict inequality below would be reporting that the pack never
+	# changed as if it were reporting that the panel never grew. It also fixes the attribution of a red:
+	# a pile too small to reach a second row of wells fails HERE, by name, and not as the ordering.
+	_check(scooped > 0 and stocked_slots > fresh_slots,
+		"fixture: the sim scooped %d items into the pack (%d slots -> %d)"
+			% [scooped, fresh_slots, stocked_slots])
+	_check(is_equal_approx(fresh_h, Hud.BAZAAR_MIN_H),
+		"a fresh pack asks for the counter's floor, exactly (%.0f of %.0f)" % [fresh_h, Hud.BAZAAR_MIN_H])
+	_check(stocked_h > fresh_h + 0.5,
+		"…and a stocked pack asks for MORE than a fresh one (%.0f -> %.0f)" % [fresh_h, stocked_h])
+	_check(is_equal_approx(bench_h, Hud.BAZAAR_SIZE.y),
+		"…and the deepest BENCH tier is still held at the ceiling, unchanged (%.0f of %.0f)"
+			% [bench_h, Hud.BAZAAR_SIZE.y])
+
+
+## What the counter asks for with `tab` open, reached through the setter the keys go through. The tab is
+## what selects the term inside `_bazaar_wanted_h`, and `set_bazaar_tab` is also where a tab change
+## re-clamps the row it remembers, so writing `bazaar_tab` here would measure a tab nobody switched to.
+func _asks_for(hud: Hud, tab: int) -> float:
+	hud.set_bazaar_tab(tab)
+	return hud._bazaar_wanted_h()
