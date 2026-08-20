@@ -477,6 +477,20 @@ add_gl "check_ceremony_reads (interrupt vs world)" "res://tools/check_ceremony_r
 # this asks the question the tidying made sharper: move the selection, and see whether LUMINANCE notices.
 # A mark carried by hue alone collapses to the floor here while staying large in RGB.
 add_gl "check_selection_reads (no colour)" "res://tools/check_selection_reads.gd"
+
+# THE STATIC HALF of the same question. `check_selection_reads` moves a mark and asks whether luminance
+# notices; this asks whether text nobody is moving can be READ AT ALL. Different failure: a mark that only
+# ever appears next to its own absence is judged against the frame before it, while a label sits there
+# being dim forever with nothing to compare it to, so no differencing layer can see it.
+#
+# `add`, not `add_gl`. It photographs nothing -- it reads the palette constants and does the WCAG
+# arithmetic, so a display would tell it nothing a headless boot does not. Not `add_excl` either: it times
+# nothing, so contention cannot move its numbers.
+#
+# It linearizes sRGB before weighting, which is NOT what this repository calls luma anywhere else (two
+# gamma-encoded conventions, both wrong for this question). The name in that file is `_relative_luminance`
+# for that reason and must not be shortened.
+add "check_text_contrast (text is readable)" "res://tools/check_text_contrast.gd"
 add "check_pack_layout"               "res://tools/check_pack_layout.gd"
 add "check_pixel_snap"                "res://tools/check_pixel_snap.gd"
 # add_gl, and the other half of check_pixel_snap. That layer proves snap_to_pixel is correct AS A FUNCTION;

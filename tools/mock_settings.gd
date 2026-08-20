@@ -51,9 +51,15 @@ const RAIL_BG := Color(0.043, 0.049, 0.070, 0.92)
 const WELL := Color(0.0, 0.0, 0.0, 0.22)
 const ACCENT := Color(0.80, 0.66, 0.30)
 const ACCENT_HI := Color(0.949, 0.831, 0.549)
-const TEXT := Color(0.80, 0.83, 0.89)
-const DIM := Color(0.54, 0.58, 0.66)
-const FAINT := Color(0.36, 0.39, 0.45)
+## THE INKS ARE READ OFF THE HUD, not copied from it. All three were byte-identical duplicates of the
+## shipped palette, which is what a proposal wants -- the parts NOT being proposed have to match the thing
+## it is judged against, or the comparison is between two different games. Copies cannot hold that: the
+## faint ink was raised for readability and this file went on drawing the old one, so the mock would have
+## argued its case in a colour the game no longer uses. Anything this page actually proposes changing
+## should be written here as its own literal, deliberately and with a reason.
+const TEXT := Hud.UI_TEXT
+const DIM := Hud.UI_TEXT_DIM
+const FAINT := Hud.UI_TEXT_FAINT
 const LIT_ROW := Color(0.145, 0.129, 0.082)
 
 ## The list, with the sentence each binding is missing. This is the proposal's real content: a key legend

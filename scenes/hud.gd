@@ -64,7 +64,29 @@ const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selectio
 const UI_WARN := Color(0.96, 0.46, 0.30)
 const UI_TEXT := Color(0.80, 0.83, 0.89)
 const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
+## THE THIRD RUNG OF THE TYPE RAMP, and it existed long before it had a name: four literals doing one job
+## across eight sites — `0.36/0.39/0.45` in five places, plus `0.34/0.37/0.43`, `0.45/0.48/0.56` and
+## `0.26/0.28/0.34` — with nothing in the file relating any of them to any other. Both key legends were
+## written in two different greys for the same purpose on two different screens.
+##
+## `MNU-32` measured them against the plates they are printed on and they came back between 2.04 and 3.96
+## to one, under every readability standard that has a number, while the two inks above them clear 4.5 with
+## room to spare. This is the same role at a value that clears it too. The loudest of the eight was the
+## counter's own tab name, set at title size beside BAZAAR at 2.04:1 — subordinate to the title was the
+## intent and it is still plainly subordinate here, but 2.04 is not subordinate, it is absent.
+##
+## Named as much as lifted: a literal is invisible to `tools/check_text_contrast.gd`, so the floor can only
+## be held against something that has somewhere to be held.
+const UI_TEXT_FAINT := Color(0.50, 0.54, 0.62)
 const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
+## The modal plate — the counter and the settings page — which the two of them carried as separate copies
+## of one literal. Opaque on purpose: `UI_BG` is 90% because furniture sits over the world and is meant to,
+## and a modal is not furniture; at 0.90 the objective banner read straight through the settings page.
+const UI_MODAL := Color(0.062, 0.070, 0.094, 0.985)
+## The rail behind both tab strips. `RAIL_ON_FILL` is defined as a plain lift off this value, and that
+## relation was stated in prose above it while the value itself sat in two unrelated literals below — so a
+## rail that moved would have taken its own lift with it and nothing in the file would have noticed.
+const UI_RAIL := Color(0.043, 0.049, 0.070, 0.92)
 
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
@@ -226,10 +248,19 @@ const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, name
 const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL_MIN + BAZAAR_FOOT
 ## ELEVATION, NOT A GOLD SLAB. The live tab on both rails used to be a filled brass-tinted tile AND an
 ## accent edge AND a lit glyph: three signals for one bit of state, and the tinted fill is the one that reads
-## as a pressed button from a decade ago. This is a plain lift off the rail's own 0.043/0.049/0.070, so the
-## brass is spent once, on the edge. Named because the bazaar rail and the settings rail were carrying the
-## same literal separately and had no way to notice if one of them moved.
-const RAIL_ON_FILL := Color(0.090, 0.100, 0.130)
+## as a pressed button from a decade ago. This is a lift off `UI_RAIL`, so the brass is spent once, on the
+## edge — and it is now DERIVED from that value rather than described as derived from it. It read
+## `Color(0.090, 0.100, 0.130)`, a literal whose comment claimed a relation nothing in the file held: move
+## the rail and the lit tile would have stayed where it was, silently, having said in prose that it would
+## not. The arithmetic below produces exactly the bytes that literal did.
+##
+## The lift is per-channel and deliberately not flat. 0.047 / 0.051 / 0.060 rises toward blue, so the lit
+## tile comes up slightly COOLER than the rail it sits in rather than just brighter, which is what keeps it
+## from reading as the gold it is standing next to. Alpha is zeroed: the rail is 92% and the tile that
+## lights up inside it is opaque, so this adds light without also adding transparency.
+const RAIL_ON_LIFT := Color(0.047, 0.051, 0.060, 0.0)
+const RAIL_ON_FILL := Color(UI_RAIL.r + RAIL_ON_LIFT.r, UI_RAIL.g + RAIL_ON_LIFT.g,
+	UI_RAIL.b + RAIL_ON_LIFT.b)
 const BAZAAR_GUTTER: float = 10.0
 ## 24 again, not the 22 the two-column layout needed: three columns of eight is twenty-four rows, so the row
 ## can afford the two pixels back and the type can breathe.
@@ -1866,7 +1897,7 @@ func _draw_inventory_overlay() -> void:
 	draw_set_transform(Vector2(0.0, (1.0 - t) * 14.0), 0.0, Vector2.ONE)
 
 	_soft_shadow(panel, 12, 0.34)
-	_round_rect(panel, 8.0, Color(0.062, 0.070, 0.094, 0.985))
+	_round_rect(panel, 8.0, UI_MODAL)
 	_panel_sheen(panel)
 	# The rail is the tab strip, turned on its side and given room to be an object. Three icons you can hit
 	# with a glance beat three words you have to read.
@@ -1903,7 +1934,7 @@ func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
 ## under each glyph as a cap, because a key legend nobody can find is a key nobody presses.
 func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
-	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
+	_round_rect_left(rail, 8.0, UI_RAIL)
 	# THE RAIL'S PITCH FOLLOWS THE PANEL, and the arithmetic that makes it follow now lives in
 	# `_rail_slots`, shared with the settings rail. At full height these are the numbers they always were
 	# — top 62, pitch 58 — and on a short counter they close up rather than running off the bottom edge.
@@ -1919,7 +1950,7 @@ func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 		var label: String = TAB_NAMES[i]
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
 		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else UI_TEXT_FAINT)
 		_keycap(Vector2(box.get_center().x - 7.0, y + 51.0), str(i + 1), 7)
 
 
@@ -1987,7 +2018,7 @@ func _draw_bazaar_head(origin: Vector2, g: Dictionary) -> void:
 	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
 	_tracked("BAZAAR", Vector2(x, origin.y + 29.0), 17, 2.8, UI_TEXT)
 	var tab_x: float = x + _tracked_w("BAZAAR", 17, 2.8) + 16.0
-	_tracked(TAB_NAMES[bazaar_tab], Vector2(tab_x, origin.y + 29.0), 17, 2.8, Color(0.26, 0.28, 0.34))
+	_tracked(TAB_NAMES[bazaar_tab], Vector2(tab_x, origin.y + 29.0), 17, 2.8, UI_TEXT_FAINT)
 	# The strip stops one panel pad short of the title's last stroke, measured off the title rather than
 	# guessed at. It was `x + 170.0`, which is a statement about the widths of "BAZAAR" and the longest tab
 	# name at 17pt with 2.8 of tracking, with nothing in the file relating it to either: move the type size
@@ -2024,8 +2055,7 @@ func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
 	for pair: Array in [["up/dn", "pick"], ["1-3", "tab"], ["E", "close"]]:
 		x += _keycap(Vector2(x, y), str(pair[0]), 8) + 5.0
 		var label: String = str(pair[1])
-		draw_string(_font, Vector2(x, y + 11.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-			Color(0.34, 0.37, 0.43))
+		draw_string(_font, Vector2(x, y + 11.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_FAINT)
 		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 16.0
 
 
@@ -2691,7 +2721,7 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	var made: int = int(sim.total_produced.get(id, 0))
 	draw_string(_font, Vector2(tx, box.position.y + DETAIL_FACT_Y),
 		"%d in the pack   ·   %d all told" % [carried, made],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.36, 0.39, 0.45))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_FAINT)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	if row == held:
 		_verb_button(box, "HELD", "", false)
@@ -2750,7 +2780,7 @@ func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
 		Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
 	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
 	draw_string(_font, at + Vector2(19.0 + hw, 13.5), "/%d" % need, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		Color(0.36, 0.39, 0.45))
+		UI_TEXT_FAINT)
 	return at.x + w
 
 
@@ -3260,7 +3290,7 @@ func _draw_settings_overlay() -> void:
 	# OPAQUE, and the comment that earned it stays: `UI_BG` is 90% because furniture sits over the world
 	# and is MEANT to. A modal is not furniture — at 0.90 the objective banner read straight through this
 	# page, and ten percent of a lit banner over an unlit panel is about twice the panel's own value.
-	_round_rect(plate, 8.0, Color(0.062, 0.070, 0.094, 0.985))
+	_round_rect(plate, 8.0, UI_MODAL)
 	_panel_sheen(plate)
 	_draw_settings_rail(origin, g, mouse)
 	_draw_settings_head(origin, g)
@@ -3269,7 +3299,7 @@ func _draw_settings_overlay() -> void:
 	var told: String = _settings_body(g, mouse)
 	_draw_settings_detail(g, told, mouse)
 	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0),
-		"1 2 3 switch category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.36, 0.39, 0.45))
+		"1 2 3 switch category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -3277,7 +3307,7 @@ func _draw_settings_overlay() -> void:
 ## registers a hit per category — the rail is how you change page with the mouse.
 func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
-	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
+	_round_rect_left(rail, 8.0, UI_RAIL)
 	var ys: Array = _rail_slots(rail, CAT_NAMES.size(), RAIL_PITCH_MIN)
 	for i: int in CAT_NAMES.size():
 		var y: float = ys[i]
@@ -3295,7 +3325,7 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 		var label: String = "%d %s" % [i + 1, CAT_NAMES[i]]
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
 		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + RAIL_LABEL_DY), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else UI_TEXT_FAINT)
 		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": i}})
 
 
@@ -3816,7 +3846,7 @@ func _draw_inventory() -> void:
 		# wheel-and-PACK territory and says so by staying blank rather than by lying.
 		if i < 10:
 			draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), "0" if i == 9 else str(i + 1),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.45, 0.48, 0.56))
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
 		if i < slots.size():
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
