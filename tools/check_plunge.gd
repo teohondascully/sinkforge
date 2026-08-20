@@ -206,7 +206,7 @@ func _ride(with_rope: bool) -> Dictionary:
 	p.auto_input = false
 	while frames < FALL_BUDGET:
 		var at: Vector2i = main._cell_at(p.position)
-		var dir: float = inward if frames < WALK_IN_FRAMES else _drain_dir(sim, at)
+		var dir: float = inward if frames < WALK_IN_FRAMES else _drain_dir(sim, at, p.position.x)
 		p.input_dir = dir
 		await physics_frame
 		frames += 1
@@ -220,8 +220,34 @@ func _ride(with_rope: bool) -> Dictionary:
 			break
 		# Can the rope find rock from here? Sample from where the body actually is, mid-descent, then let go
 		# immediately — this is asking whether purchase EXISTS, not riding it.
+		#
+		# AND THE SAMPLE HAS TO PUT THE BODY BACK, which is the third thing this layer has been wrong about
+		# and by far the worst, because it made the instrument the thing being measured. A FRESH plant takes
+		# up slack: Grapple.advance sets `length = distance * SLACK_TAKEUP` (0.90), and the distance
+		# constraint then projects the body onto that shorter circle in the same physics step. The shot here
+		# is aimed five cells sideways, so the projection is essentially horizontal and the body is snapped
+		# about a tenth of the reach TOWARD THE ANCHOR — measured at ten point seven pixels, from x=2552.9
+		# back to x=2563.6 against an anchor at 2663 on a line of 100.
+		#
+		# Ten pixels is not a rounding error at this scale. The body is fourteen pixels wide in a thirty-two
+		# pixel cell, so ten pixels is most of what it takes to walk off a ledge, and the shot fires every
+		# PURCHASE_EVERY frames whether the body needs it or not. On the shelf at (80,46) the legs-only ride
+		# was walking left toward a twenty-row drop in column 79, it needed about seven frames of walking to
+		# get its box clear of the ledge in column 80, and the probe reset it to the same tenth of a pixel
+		# every eight. Six hundred frames of that, reported as "27 rows, asked for 34" — a number that was
+		# about this fixture's sampling cadence and not about the hole at all.
+		#
+		# The frames were already billed to the instrument (`probed`), which is the same decision made once
+		# and then only half carried out: if the probe is outside the journey then its DISPLACEMENT is
+		# outside the journey too, or the ride is being driven by its own thermometer. So the body's state is
+		# taken before the shot and put back after it, and the probe becomes what the line above always
+		# claimed it was. Restoring is safe here in a way it would not be in the game: the shot cannot change
+		# the terrain (the `untouched` assertion is the standing evidence for that), so a position the body
+		# legally occupied four frames ago is still a position it can legally occupy.
 		if frames > WALK_IN_FRAMES and frames % PURCHASE_EVERY == 0:
 			shots += 1
+			var was_at: Vector2 = p.position
+			var was_v: Vector2 = p.velocity
 			p.grapple.fire(p.hand(), p.hand() + Vector2(inward * CELL * PURCHASE_REACH, 0.0))
 			var f: int = 0
 			while p.grapple.state == Grapple.State.FLYING and f < 20:
@@ -232,6 +258,8 @@ func _ride(with_rope: bool) -> Dictionary:
 			if p.grapple.state == Grapple.State.ANCHORED:
 				bit += 1
 			p.grapple.cut()
+			p.position = was_at
+			p.velocity = was_v
 		# ...and reach for it when the hole stops giving. On legs alone this branch never runs, which is the
 		# whole comparison: the same body, in the same hole, with and without the one tool for it.
 		if with_rope and stuck > STUCK_FRAMES and p.on_floor:
@@ -392,7 +420,37 @@ func _dig() -> Dictionary:
 const DRAIN_LOOK: int = 5          ## columns either side the read covers
 const DRAIN_DEPTH: int = 24        ## rows down each column is probed
 
-func _drain_dir(sim: FactorySim, at: Vector2i) -> float:
+## HOW CLOSE TO THE MIDDLE OF THE CHOSEN COLUMN COUNTS AS ARRIVED, in pixels. Derived, and it has to be:
+## a column is CELL wide and the body's box is Player.WIDTH, so centred over a column the body has
+## (CELL - WIDTH) / 2 of clearance on each side, and that is exactly the distance it may be off centre and
+## still have NO PART OF ITSELF over a neighbour. Nine pixels, today.
+##
+## THIS IS THE DEFECT THIS CONSTANT EXISTS FOR, written down because the shape of it is not obvious from
+## the code that had it. The old read returned `signf(best - at.x)` — cell index against cell index — so
+## the instant the body's CENTRE crossed into the chosen column the steering went to zero and the body was
+## told it had arrived. It had not. `at.x` is floor(x / 32) and the body is fourteen wide, so a body whose
+## centre is one pixel inside column 71 still has six pixels of itself hanging over column 70, and if
+## column 70 is rock those six pixels are a floor. That is not a hypothetical: the legs-only ride parked at
+## (71, 29), x = 2277.6, frozen to a tenth of a pixel for the whole remaining budget, standing on 1.4
+## pixels of the ledge in column 70 with a twenty-four row drop in the column it had already correctly
+## chosen, pressing nothing, because the driver believed it was where it wanted to be. Ten rows down a
+## sixty-row hole, reported as a fact about the terrain.
+##
+## The second thing the band has to do is not start a hunt of its own, and the arithmetic for that is the
+## coast. Input released, the controller rubs off speed at Player.FRICTION, so a body entering the band at
+## speed v travels a further v^2 / (2 * FRICTION) before it stops: 5.1 px at RUN_SPEED (150), 12.2 px at a
+## fully strided 232. The band is DRAIN_DEADBAND either side, so the far edge is 2 * DRAIN_DEADBAND = 18 px
+## from the near one, and a body that cannot coast past the far edge cannot be sent back the way it came.
+## 12.2 < 18 holds with the worst case, so there is no oscillation to add hysteresis against.
+##
+## WHAT WOULD MAKE THIS WRONG: a body as wide as a cell (the band goes to zero and there is no position
+## from which the body is clear of both neighbours — but such a body also cannot fit down a one-wide dug
+## shaft, so the game would have bigger news); or a top speed raised past sqrt(2 * FRICTION * 2 * BAND) =
+## 281 px/s, at which point releasing at one edge coasts out the other and this becomes the oscillation it
+## was written to prevent. Both are readable off Player, so if that file moves, re-run this arithmetic.
+const DRAIN_DEADBAND: float = (float(CELL) - Player.WIDTH) * 0.5
+
+func _drain_dir(sim: FactorySim, at: Vector2i, x: float) -> float:
 	var best: int = at.x
 	var best_run: int = _open_run(sim, at.x, at.y)
 	for dx: int in range(-DRAIN_LOOK, DRAIN_LOOK + 1):
@@ -404,7 +462,14 @@ func _drain_dir(sim: FactorySim, at: Vector2i) -> float:
 		if run > best_run or (run == best_run and absi(c - at.x) < absi(best - at.x)):
 			best_run = run
 			best = c
-	return signf(float(best - at.x))
+	# Steer at the MIDDLE of the chosen column, in pixels, not at its index. Nothing changes when the pick
+	# is a neighbouring column — its centre is at least sixteen pixels away, so the sign is what it always
+	# was — and everything changes when the pick is the column the body is already in, which used to be the
+	# one case the driver could not act on.
+	var want: float = float(best) * float(CELL) + float(CELL) * 0.5
+	if absf(want - x) <= DRAIN_DEADBAND:
+		return 0.0
+	return signf(want - x)
 
 
 ## How many unbroken open rows a column offers below a starting row.
