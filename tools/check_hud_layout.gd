@@ -249,6 +249,8 @@ func _run() -> void:
 	_check(declared == 3,
 		"all 3 declared identities in the big-map group really are identical (%d)" % declared)
 
+	await _check_bazaar_rail()
+
 	_main.queue_free()
 	await physics_frame
 
@@ -1243,3 +1245,184 @@ func _report_footprint(names: Array[String], fracs: Array[float]) -> void:
 	_check(bare <= BARE_FOOTPRINT_CEILING,
 		"...and no larger than the day the T2.1 subtractions landed (%.2f%% vs ceiling %.2f%%)"
 			% [bare * 100.0, BARE_FOOTPRINT_CEILING * 100.0])
+
+
+
+## A MODAL IS ALLOWED TO COVER THE FURNITURE. IT IS NOT ALLOWED TO COVER ITSELF.
+##
+## The sweep in `_run` skips overlap on every row marked `modal`, and the reason it gives is sound as far
+## as it goes: an overlay that did not sit over the depth chip and the pack bar would not be an overlay.
+## But the exemption is written at the STATE level while the thing it excuses is a RELATIONSHIP — overlay
+## against furniture — so it also excuses the overlay against its own parts, which nothing excuses. The
+## largest panel in the game has therefore been exempt from the only assertion this file is named for.
+##
+## What was hiding there is in the counter's left rail. Each tab draws a 38x38 tile, a word under it, and
+## the key that selects it as a cap at `y + 51`; the cap is 14 tall, so it ends at `y + 65`, and the next
+## tile begins at `y + pitch`. `_rail_slots` caps the pitch at 58. The cap of every slot therefore lands
+## inside the footprint of the slot below it at EVERY panel height the counter has, and the only reason
+## the screen does not always show it is that an unselected tile draws no fill. Select BENCH and the lit
+## tile paints over the bottom half of the `2` that selects WORKS: measured here at 14x7 of a 14x14 cap.
+## Select WORKS and the same 14x7 comes off the `1`. On the short PACK page the pitch falls to 40 and a
+## cap sits WHOLLY inside the tile beneath it, which a rect probe cannot see because that tile is unlit.
+##
+## THE POPULATION WAS NEVER THE PROBLEM, which is worth saying because it is the diagnosis that would have
+## sent a fix to the wrong place. `_round_rect` registers with `panel_probe` (hud.gd:2888) and the rail's
+## tiles and caps are all `_round_rect`, so every rect named above was in the array the matrix collected
+## and the matrix simply never compared them. The second half of the blindness is the fixture rather than
+## the predicate: the matrix opens the counter and never touches `bazaar_tab`, so it only ever photographs
+## PACK — the one tab of three whose lit tile is the topmost and has no cap above it to slice.
+##
+## WHAT THIS CHECKS AND WHAT IT CANNOT. It judges the rail COLUMN, `BAZAAR_RAIL` wide off the counter's own
+## left edge, on all three tabs, and it judges the rects the HUD drew rather than a second copy of
+## `_rail_slots` — a layout test that recomputes the layout agrees with itself no matter where the pixels
+## went, and the counter has already paid for that once. Two things it cannot see, stated so nobody reads
+## the green as wider than it is. It cannot see an unlit tile, so the PACK row can only ever report the
+## caps against each other and passes today with the same geometry fault present. And the SETTINGS rail,
+## the other caller of `_rail_slots` and the one that passes a pitch floor, draws its number inside its
+## word instead of as a cap, so its column holds one rect and the same check over it would be vacuous.
+##
+## The drop shadow is the one overlap here that is not a defect: `_keycap` draws the cap twice, once a
+## pixel lower in black. Same size, one pixel apart, and nothing else in this column is, so it is excused
+## by that description rather than by a containment rule — a cap swallowed WHOLE by the tile below it is
+## the worst form of this bug and a containment rule would wave it through.
+##
+## The column is the counter's own left band and it is bounded by the counter, which has a consequence the
+## census below is written to expose: a slot pushed past the bottom edge of the panel leaves the column
+## rather than colliding inside it, so it arrives as a SHORT COUNT and not as a quiet pass. That is not a
+## hypothetical reading of the guard. Raising the pitch far enough to clear the caps is what does it — the
+## rail then asks for more height than the counter has on its shortest page — and the census is the line
+## that says so.
+const SHADOW_SLOP: float = 1.5
+## Three tiles, three caps, three cap shadows — minus the two tiles the selected tab does not light. It is
+## the rail's census and not a floor picked to be survivable: a redesign that changes what a slot is made
+## of has to come back here and re-derive it, because a number lowered to whatever the new rail happens to
+## draw would be agreeing with the rail instead of measuring it.
+const RAIL_MIN_RECTS: int = 7
+
+
+func _check_bazaar_rail() -> void:
+	for tab: int in Hud.TAB_NAMES.size():
+		var name: String = Hud.TAB_NAMES[tab]
+		var shot: Dictionary = await _bazaar_shot(tab)
+		var rects: Array[Rect2] = shot["rects"]
+		var plate := Rect2()
+		for r: Rect2 in rects:
+			if r.get_area() > plate.get_area():
+				plate = r
+		var column := Rect2(plate.position, Vector2(Hud.BAZAAR_RAIL, plate.size.y))
+		var rail: Array[Rect2] = []
+		for r: Rect2 in rects:
+			if column.grow(TOUCH).encloses(r):
+				rail.append(r)
+
+		_check(bool(shot["settled"]),
+			"the %s counter stopped moving before it was measured (%.2fpx from its asking height)"
+				% [name, float(shot["drift"])])
+		# NON-VACUITY. Everything below is perfectly true of an empty column, which is what a counter that
+		# failed to open, a probe that was never armed, and a rail that stopped drawing all produce.
+		_check(rail.size() >= RAIL_MIN_RECTS,
+			"the %s rail drew %d boxes in the counter's %.0fpx left column (at least %d — short means the"
+				% [name, rail.size(), Hud.BAZAAR_RAIL, RAIL_MIN_RECTS]
+				+ " counter never opened, or a slot has been pushed off the bottom of it)")
+
+		# ...AND THE SUBJECT IS PRESENT. The collision needs a LIT tile, and lighting is the one thing in
+		# this column that varies. Stated as "one box is bigger than every other" rather than against a
+		# size, because the caps are all identical to each other: with nothing lit the largest box in the
+		# column ties, and with a tile lit it does not.
+		var lit := Rect2()
+		var runner_up: float = 0.0
+		for r: Rect2 in rail:
+			if r.get_area() > lit.get_area():
+				runner_up = lit.get_area()
+				lit = r
+			elif r.get_area() > runner_up:
+				runner_up = r.get_area()
+		_check(lit.get_area() > runner_up,
+			"...and %s is the lit tab, so one box in the column is larger than the rest (%s)"
+				% [name, lit])
+
+		var hits: Array[String] = _rail_slices(rail)
+		_check(hits.is_empty(), "the %s rail's %d boxes do not print over each other%s"
+			% [name, rail.size(), "" if hits.is_empty() else " — " + "; ".join(hits)])
+
+		# THE REJECTION CONTROL, and it ADDS a box rather than moving one. Displacing a rect can delete a
+		# collision it was already in as it creates a new one, which nets to zero and reads as a control
+		# that could not catch anything — this file has that mistake written into it one function up. A
+		# cap-sized box on the lit tile's centre lands clear of the caps above and below it, so the count
+		# must go up by exactly one, on the clean tabs and the dirty ones alike.
+		var cap := Vector2(lit.size)
+		for r: Rect2 in rail:
+			if r.get_area() < cap.x * cap.y:
+				cap = r.size
+		var planted: Array[Rect2] = rail.duplicate()
+		planted.append(Rect2(lit.get_center() - cap * 0.5, cap))
+		var caught: int = _rail_slices(planted).size()
+		_check(caught == hits.size() + 1,
+			"...and the same sweep catches one more once a %.0fx%.0f box is dropped on the tile (%d -> %d)"
+				% [cap.x, cap.y, hits.size(), caught])
+
+	_main._inventory_open = false
+	_main._hud.set_bazaar_tab(Hud.TAB_PACK)
+	await RenderingServer.frame_post_draw
+
+
+## Every pair in a rail column that shares more than a border, described. The cap's own drop shadow is the
+## single legitimate overlap and it is recognised by what it IS — the same box, within a pixel — so no
+## other overlap can arrive under its cover.
+func _rail_slices(rail: Array[Rect2]) -> Array[String]:
+	var out: Array[String] = []
+	for i: int in rail.size():
+		for j: int in range(i + 1, rail.size()):
+			var a: Rect2 = rail[i]
+			var b: Rect2 = rail[j]
+			var over: Rect2 = a.intersection(b)
+			if over.size.x <= TOUCH or over.size.y <= TOUCH:
+				continue
+			if a.size.is_equal_approx(b.size) \
+					and a.position.distance_to(b.position) <= SHADOW_SLOP:
+				continue
+			out.append("%s x %s (overlap %.0fx%.0f)" % [a, b, over.size.x, over.size.y])
+	return out
+
+
+## The counter open on one tab, settled, and the boxes one drawn frame of it registered.
+##
+## The tab is set on the HUD and not on MainView because that is where it lives: main.gd calls
+## `set_bazaar_tab` from the key handler and never pushes the field back, so posing it here is posing the
+## real thing rather than a value its owner overwrites. The height is WAITED FOR rather than counted out
+## in frames — `_bazaar_h` eases toward whatever the open tab asks for, the rail's pitch is bought out of
+## that height, and a rail read mid-ease is a measurement of the shutter speed and not of the layout.
+func _bazaar_shot(tab: int) -> Dictionary:
+	_main._paused = false
+	_main._inventory_open = true
+	_main._minimap_mode = 0
+	_main._show_help = false
+	_main._show_dashboard = false
+	_main._settings_open = false
+	var hud: Hud = _main._hud
+	hud.set_bazaar_tab(tab)
+	for _i: int in 3:
+		await RenderingServer.frame_post_draw
+	# Re-set after the settle frames: those run real input handling, and a stray key or wheel event on a
+	# machine somebody is using would move the tab out from under the shot.
+	hud.set_bazaar_tab(tab)
+	var settled: bool = false
+	var drift: float = 0.0
+	for _i: int in SETTLE_FRAMES:
+		drift = absf(hud._bazaar_h - hud._bazaar_wanted_h())
+		if drift < 0.5:
+			settled = true
+			break
+		await RenderingServer.frame_post_draw
+	drift = absf(hud._bazaar_h - hud._bazaar_wanted_h())
+	# The pointer is parked off the counter for the same reason `_snapshot` parks it: this layer runs in a
+	# real window, and a hand resting over the rail would light a tile the fixture did not ask for.
+	Controls.pose_pointer(_main.get_viewport().get_canvas_transform().affine_inverse()
+		* Vector2(2.0, 2.0))
+	Hud.probing = true
+	Hud.panel_probe = ([] as Array[Rect2])
+	await RenderingServer.frame_post_draw
+	var out: Array[Rect2] = Hud.panel_probe.duplicate()
+	Hud.probing = false
+	Hud.panel_probe = ([] as Array[Rect2])
+	return {"rects": out, "settled": settled, "drift": drift}
