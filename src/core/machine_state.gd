@@ -1,9 +1,8 @@
 class_name MachineState
 extends RefCounted
 
-## Runtime state of one placed machine in the simulation. PLAIN DATA — no Node, no sprite,
-## no scene-tree presence. Holds a reference to its shared MachineDef (flyweight), its grid
-## cell, and its own mutable buffers/progress. The representation layer reads this; never writes.
+## Runtime state of one placed machine. Plain data: no Node, no sprite, no scene tree. Holds its
+## shared MachineDef (flyweight), its grid cell, and its own buffers. The view reads, never writes.
 
 ## Shared definition (flyweight). The behaviour/numbers live here.
 var def: MachineDef
@@ -15,35 +14,30 @@ var input_buffer: Dictionary = {}
 var output_buffer: Dictionary = {}
 ## Seconds accumulated toward the current craft.
 var progress: float = 0.0
-## Splitter-only: a running counter used to alternate output between destinations item-by-item,
-## so an odd item count splits evenly over time (carries the remainder across ticks). Unused by
-## recipe-runners. Kept here (not a subclass) to honour composition-over-inheritance for now.
+## Splitter only: counter that alternates output between destinations item by item, so an odd count
+## splits evenly over time (the remainder carries across ticks).
 var route_toggle: int = 0
-## Generator-only: ticks of burn remaining from the current piece of fuel. >0 means the generator is
-## pouring power this tick; it refuels by consuming one coal when this hits 0 (see _run_generator).
-## Unused by other machines (same composition-over-inheritance stance as route_toggle).
+## Generator only: ticks of burn left from the current fuel. >0 means it pours power this tick; it
+## refuels by consuming one coal when this hits 0 (see _run_generator).
 var fuel: int = 0
-## Consumer-only (the lift, for now): 0..1 how much POWER boost it's getting this tick — 0 = running on
-## its unpowered baseline, 1 = fully powered. Set by the consumer's runner from the power field; the view
-## reads it to show the machine labouring vs surging (brownout). 1.0 default = "not power-gated / nominal".
+## Consumers only: 0..1 power boost this tick. 0 = unpowered baseline, 1 = fully powered. Set by the
+## consumer's runner from the power field; the view draws brownout from it. Default 1.0 = not gated.
 var power_factor: float = 1.0
-## Descent-Engine-only: refined goods it has EATEN toward its breach quota (DESCENT_QUOTA). The gate's
-## throughput-wall progress. Same composition-over-inheritance stance as route_toggle/fuel.
+## Units consumed, written by two runners and meaning something different in each. `_run_descent` counts
+## refined goods eaten toward the breach quota (DESCENT_QUOTA). `_run_drill` counts ore pulled, which
+## `_status_drill` reads to tell a spent Borer from a starved one. Do not split the field without
+## checking both.
 var fed: int = 0
-## Directional machines only (the horizontal drill): which way it works, ±1. Set once at placement
-## (the builder's facing — a discrete call, so determinism holds). 1 for machines that don't care.
+## Directional machines only: which way it works, plus or minus 1. Set once at placement from the
+## builder's facing (a discrete call, so determinism holds). 1 when unused.
 var facing: int = 1
-## Configurable machines only (the splitter's ratio, for now): a small mode index cycled by the
-## player's R-configure verb (a discrete call). 0 = the machine's default behaviour.
+## Configurable machines only: mode index cycled by the R-configure verb. 0 = default behaviour.
 var mode: int = 0
-## Drift-Rig-only: the SPOIL half of its haul, waiting to fall down the column BEHIND the rig while
-## `output_buffer` holds the pay half for the column under it. Two bellies rather than one because the rig's
-## whole point is that it sorts at the face — one buffer would mean sorting downstream, which is the problem
-## it exists to solve. Each jams on its own (docs/DRIFT.md §3). Same composition-over-inheritance stance as
-## route_toggle/fuel/fed: a plain field, unused by every other machine.
+## Drift Rig only: the SPOIL half of its haul, falling down the column BEHIND the rig while
+## `output_buffer` holds the pay half for the column under it. Each jams independently (DRIFT.md §3).
 var spoil_buffer: Dictionary = {}
-## Hopper-only: the ONE item id this hopper banks. Auto-latches on the first item it
-## banks ("keeps the first thing it tastes"); everything else passes through. &"" = not yet latched.
+## Hopper only: the one item id banked here. Auto-latches on the first item banked; everything else
+## passes through. &"" = not yet latched.
 var filter: StringName = &""
 
 

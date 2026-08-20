@@ -1,16 +1,12 @@
 extends RefCounted
 
-## THE SAPLING GROWTH STEP — the per-tick flora sweep that ages planted saplings into trees, extracted
-## from FactorySim so the tick reads as named subsystems. Pure domain logic, no state of its own: it
-## operates on the sim's `sapling` layer + terrain grids. FactorySim still owns the sapling STATE and its
-## public API (leaf_drops_sapling / plant_sapling / remove_sapling) plus the SAPLING_* constants; this
-## module is the ALGORITHM that grows them. Deterministic (cell-hash trunk heights, no RNG) so identical
-## sims grow identical groves, and conservation-safe (an uprooted seed is ledgered back into play).
+## Per-tick flora sweep: ages planted saplings into trees. Stateless, operating on the sim's
+## `sapling` layer and terrain grids; FactorySim owns the state, the SAPLING_* constants and the
+## public API. Deterministic (cell-hash trunk heights, no RNG) and conservation-safe: an uprooted
+## seed is ledgered back into play.
 
-## The tick's growth sweep: every sapling ages one tick; a sapling whose cell got built over is CRUSHED
-## (gone), one whose soil vanished is dropped as a ground item (it falls with the pile physics); at
-## SAPLING_GROW_TICKS it sprouts a TREE — trunk height from the cell hash, the worldgen canopy shape —
-## stamped only into cells still open, then the sapling entry retires.
+## The growth sweep. Every sapling ages one tick. One built over is destroyed; one whose soil
+## vanished drops as a ground item. At SAPLING_GROW_TICKS it sprouts a tree into cells still open.
 static func grow(sim: FactorySim) -> void:
 	if sim.sapling.is_empty():
 		return
@@ -40,10 +36,9 @@ static func grow(sim: FactorySim) -> void:
 		_stamp_tree(sim, c)
 
 
-## Stamp a tree with its trunk base at `base` (the sapling's cell): a 2-3 tall &"wood" trunk (height
-## from the cell hash — deterministic) under the worldgen's rounded 3-wide &"leaves" canopy. Only cells
-## still OPEN are stamped (a roof/machine simply prunes the tree). Stamped cells are world matter —
-## chopping them produces wood/saplings, exactly like a worldgen tree.
+## Stamp a tree with its trunk base at `base`: a 2-3 tall &"wood" trunk (height from the cell hash,
+## so deterministic) under the worldgen's rounded 3-wide &"leaves" canopy. Only open cells are
+## stamped, so a roof or machine prunes the tree. Stamped cells are world matter and chop like any.
 static func _stamp_tree(sim: FactorySim, base: Vector2i) -> void:
 	var trunk: int = 2 + absi((int(base.x) * 40503) ^ int(base.y)) % 2
 	for h: int in range(0, trunk):

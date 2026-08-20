@@ -1,21 +1,15 @@
 class_name MaterialDef
 extends Resource
 
-## A TERRAIN MATERIAL — the shared vocabulary of the world-engine handshake.
-## A cell in the world holds a material `id` (StringName); everything ELSE about that material lives
-## here. The GENERATOR emits ids only (it never imports these Resources); the VISUALISER maps
-## `id -> MaterialDef -> appearance` through the registry. So gen and viz share only the id
-## vocabulary + this def — improve generation OR the look without the other knowing.
-##
-## Richness later (new ores, rock types, biome looks) = new MaterialDefs, NOT a contract change.
-## Flyweight like MachineDef: one def shared by every cell of that material.
+## A terrain material. World cells hold a material `id`; everything else about it lives here. Generation emits
+## ids only and never imports these Resources; the visualiser maps `id -> MaterialDef -> appearance` through the
+## registry. Flyweight: one def per material.
 
-## Stable identifier — the world grids store this, lookups reference it (never the file path).
+## Stable identifier. The world grids store this and lookups reference it, never the file path.
 @export var id: StringName = &""
 ## Human-readable label for UI/debug. Kept out of sim logic so it stays localizable.
 @export var display_name: String = ""
-## Which terrain layer this material belongs to: &"block" (solid foreground you stand on / dig) or
-## &"wall" (background behind dug-out cells). The handshake's two grids.
+## Which terrain grid this belongs to: &"block" (solid foreground) or &"wall" (background).
 @export var layer: StringName = &"block"
 
 # --- appearance (the visualiser reads these; generation never does) ---
@@ -23,18 +17,11 @@ extends Resource
 @export var base_color: Color = Color(0.30, 0.22, 0.16)
 ## Dirt-grain speckle on/off (deterministic per-cell texture so it isn't a flat fill).
 @export var grain: bool = true
-## HOW THIS MATERIAL VARIES — its texture GRAMMAR, as opposed to its colour (TR-02 / TR-04).
-##
-## `grain` above is a boolean: texture, or none. That was the whole vocabulary, so every grained material
-## in the world ran one identical noise at a different hue, and "both read as square variation before
-## material" was structural rather than a tuning choice. This says WHICH LANGUAGE, and the renderer's fine
-## baker reads it:
-##   Clastic — soil, gravel, clay. Loud granular noise and rounded aggregate clumps; barely seams, because
-##             loose ground does not fracture along planes.
-##   Bedded  — shale and anything laid down in layers. Features stretched far along the horizontal and
-##             long flat laminae, so the rock reads as stacked sheets.
-##   Massive — stone, deepslate. Restrained speckle over broad planes, cut by steeply-dipping fracture
-##             seams. Quiet surface, strong lines.
+## Texture GRAMMAR, distinct from colour (TR-02 / TR-04). `grain` is only on/off, so every grained material ran
+## one identical noise at a different hue. This picks the fine baker's noise language:
+##   Clastic: soil, gravel, clay. Granular noise and rounded clumps, barely any seams.
+##   Bedded:  shale and other layered rock. Features stretched horizontally into flat laminae.
+##   Massive: stone, deepslate. Restrained speckle, cut by steeply-dipping fracture seams.
 @export_enum("Clastic", "Bedded", "Massive") var grammar: int = 0
 ## Grass-style cap drawn on the exposed top surface. Off when alpha == 0.
 @export var cap_color: Color = Color(0, 0, 0, 0)
@@ -42,12 +29,10 @@ extends Resource
 @export var nugget_color: Color = Color(0, 0, 0, 0)
 ## How many nuggets to scatter when nugget_color is visible (denser = reads more as a rich vein).
 @export var nugget_count: int = 3
-## How much the tile darkens with depth (0 = none). Sells "deeper = deeper".
+## How much the tile darkens with depth (0 = none).
 @export var depth_darken: float = 0.38
-## True when this material's exposed veins GLITTER — the luminous discovery accent + glint sparks that
-## make a metal vein catch the eye across a dark cavern. OFF for bulk fuels (coal) that should read as
-## dark textured clusters, not glowing gems. (A first-time player kept mistaking cool-glinting coal for
-## "some blue crystal" — the glitter belongs to precious ore, not fuel.)
+## True when exposed veins of this material glitter (discovery accent plus glint sparks). Off for bulk fuels
+## such as coal: glittering coal was being mistaken for a blue crystal.
 @export var glitters: bool = true
 
 

@@ -1,22 +1,16 @@
 extends RefCounted
 
-## THE WATER FLOW STEP — the deterministic per-tick fluid algorithm, extracted from FactorySim so the
-## sim's tick reads as a list of named subsystems rather than inlining ~80 lines of flow logic. Pure
-## domain logic, no state of its own: it operates on the sim's `water` + `solid` grids (FactorySim still
-## owns the water STATE and its public API — water_at / add_water / remove_water / total_water). Integer
-## levels only, snapshot-based, order-stable: two identical sims flow identically (the determinism test
-## depends on it), and the sum is invariant (water only MOVES — no source or drain here).
+## The deterministic per-tick fluid algorithm. Stateless, operating on the sim's `water` and `solid` grids.
+## Integer levels only, snapshot-based and order-stable, so two identical sims flow identically (the
+## determinism test depends on it). Water only MOVES: no source, no drain, sum invariant.
 
-## THE FLOW STEP — run every tick (see FactorySim.tick). Deterministic + integer + snapshot-based, so it is
-## order-stable and two identical sims flow identically. Two rules, computed over a SNAPSHOT of the
-## levels (so no cell is read after another already moved into/out of it this pass):
-##   1. DOWN (gravity — the hook): water falls into the open, non-full cell below it, as much as fits.
-##   2. LATERAL settle: whatever can't fall EVEN-FILLS its maximal horizontal run of open cells (a run =
-##      the contiguous non-solid cells sharing that row, bounded by walls / world edge). The run's total
-##      is redistributed evenly across the run — remainder biased LEFT, a fixed deterministic tie-break —
-##      so the pool reads a FLAT top (all wet cells within 1 unit). Computed directly from a snapshot, so
-##      it's flat by construction and cannot oscillate; excess above WATER_MAX simply stays and falls next
-##      tick via rule 1. Water never enters a solid cell; total is invariant (moves only, no source/drain).
+## THE FLOW STEP, run every tick. Two rules over a SNAPSHOT of the levels, so no cell is read after
+## another has moved into or out of it this pass:
+##   1. DOWN: water falls into the open, non-full cell below it, as much as fits.
+##   2. LATERAL settle: whatever cannot fall EVEN-FILLS its maximal horizontal run of open cells
+##      (contiguous non-solid cells in that row, bounded by walls or the world edge), remainder
+##      biased LEFT as a fixed tie-break. Flat by construction from the snapshot, so it cannot
+##      oscillate; excess above WATER_MAX stays and falls next tick under rule 1.
 static func step(sim: FactorySim) -> void:
 	if sim.water.is_empty():
 		return
@@ -63,7 +57,7 @@ static func step(sim: FactorySim) -> void:
 		while _open(sim, Vector2i(hi + 1, c.y)):
 			hi += 1
 		var span: int = hi - lo + 1
-		# Sum the run's water (from the post-gravity snapshot — order-independent), mark the whole run done.
+		# Sum the run's water from the post-gravity snapshot (order-independent), and mark the run done.
 		var sum: int = 0
 		for x: int in range(lo, hi + 1):
 			var cell := Vector2i(x, c.y)
@@ -73,10 +67,9 @@ static func step(sim: FactorySim) -> void:
 			for x2: int in range(lo, hi + 1):
 				sim.water.erase(Vector2i(x2, c.y))
 			continue
-		# Even split across the run, remainder biased LEFT (deterministic). If the run holds MORE than it
-		# can (sum > span*WATER_MAX — a big vertical dump just landed), every cell fills to WATER_MAX and
-		# the TRUE surplus is parked in the leftmost cell, which falls next tick via rule 1 — nothing is
-		# ever dropped, so the run's total is preserved exactly (conservation holds).
+		# Even split across the run, remainder biased LEFT. When the run holds more than it can
+		# (sum > span*WATER_MAX, after a vertical dump lands), every cell fills to WATER_MAX and the
+		# surplus rides the leftmost cell, falling next tick under rule 1. Nothing is dropped.
 		var cap_total: int = span * FactorySim.WATER_MAX
 		if sum > cap_total:
 			for x3: int in range(lo, hi + 1):
@@ -94,8 +87,8 @@ static func step(sim: FactorySim) -> void:
 				sim.water[cell2] = lvl
 
 
-## A cell water can flow laterally INTO: in bounds and not solid. (Machines/rope/torch/conduit don't block
-## water in this first slice — only rock does; interaction with those layers is a later slice.)
+## A cell water can flow laterally INTO: in bounds and not solid. Machines, rope, torch and conduit do not
+## block water in this slice; only rock does.
 static func _open(sim: FactorySim, cell: Vector2i) -> bool:
 	return sim.in_bounds(cell) and not sim.solid.has(cell)
 
