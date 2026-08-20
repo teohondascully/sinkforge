@@ -1915,43 +1915,83 @@ func _draw_inventory_overlay() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## WHAT A CAP IS MADE OF. Named rather than written inline because the cap is placed by callers who own a
+## baseline and not a box — the rail sets its key on the word's line — and a caller that works those numbers
+## out for itself is a second copy of them that stops agreeing the day the cap changes size.
+const KEYCAP_PAD_X: float = 8.0       ## ink to either edge
+const KEYCAP_MIN_W: float = 14.0      ## a single digit still wants a square-ish cap
+const KEYCAP_PAD_Y: float = 7.0       ## how much taller than its type the cap stands
+const KEYCAP_BASE: float = 5.0        ## the key's baseline, up from the cap's floor
+const KEYCAP_DROP: float = 1.0        ## and the shadow, one under the cap: the slot's last mark
+
+
+func _keycap_w(key: String, fs: int) -> float:
+	return maxf(_font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + KEYCAP_PAD_X,
+		KEYCAP_MIN_W)
+
+
+func _keycap_h(fs: int) -> float:
+	return float(fs) + KEYCAP_PAD_Y
+
+
 ## ONE KEY, DRAWN AS A KEY. A bare digit painted in the corner of a tile reads as a step number, which is
 ## what makes a three-tab counter feel like a three-page wizard; the same digit inside a raised cap reads as
 ## something to press. Returns the width it consumed so a row of them lays out without measuring twice.
 func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
 	var tw: float = _font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var w: float = maxf(tw + 8.0, 14.0)
-	var h: float = float(fs) + 7.0
+	var w: float = _keycap_w(key, fs)
+	var h: float = _keycap_h(fs)
 	var box := Rect2(at, Vector2(w, h))
-	_round_rect(Rect2(box.position + Vector2(0.0, 1.0), box.size), 3.0, Color(0.0, 0.0, 0.0, 0.35))
+	_round_rect(Rect2(box.position + Vector2(0.0, KEYCAP_DROP), box.size), 3.0,
+		Color(0.0, 0.0, 0.0, 0.35))
 	_round_rect(box, 3.0, Color(0.13, 0.145, 0.18))
-	draw_string(_font, at + Vector2((w - tw) * 0.5, h - 5.0), key,
+	draw_string(_font, at + Vector2((w - tw) * 0.5, h - KEYCAP_BASE), key,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.74, 0.78, 0.86))
 	return w
 
 
 ## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects it rides
-## under each glyph as a cap, because a key legend nobody can find is a key nobody presses.
+## on the word as a cap, because a key legend nobody can find is a key nobody presses.
+##
+## THE CAP USED TO HANG BELOW THE WORD and it was sliced in half by the tab under it. It sat at `y + 51`
+## and stands 14 tall, so a slot ran to `y + 65` while `_rail_slots` caps the pitch at 58: every cap in the
+## rail landed 7px inside the footprint of the tile beneath it, at every height the counter can take, and
+## the only reason the screen did not always show it is that an unlit tile paints no fill. Select BENCH and
+## the lit tile took the bottom half of the `2` that selects WORKS, measured at 14x7 of a 14x14 cap.
+##
+## NO PITCH FIXES THAT, which is worth stating because it is where a fix wants to go first. Clearing a cap
+## that ends at `y + 65` needs a pitch of at least 65, and three slots on the counter's shortest page — 190,
+## `BAZAAR_MIN_H` — leave room for 45. The two constraints do not overlap, so the cap has to move rather
+## than the tabs. It moves onto the word's own baseline, which is what the settings rail did with its
+## number for the same reason, and a slot then ends at `y + 54` where three of them fit any page this panel
+## has. The cap survives as a cap: a digit set into a sentence is a step number, and the whole argument for
+## drawing one is that a key legend has to look like a key.
 func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, UI_RAIL)
 	# THE RAIL'S PITCH FOLLOWS THE PANEL, and the arithmetic that makes it follow now lives in
 	# `_rail_slots`, shared with the settings rail. At full height these are the numbers they always were
-	# — top 62, pitch 58 — and on a short counter they close up rather than running off the bottom edge.
-	var ys: Array = _rail_slots(rail, 3)
+	# — top 62 — and on a short counter the slots close up to their floor rather than into each other.
+	var ys: Array = _rail_slots(rail, 3, _rail_key_slot_h() + RAIL_SLOT_AIR, _rail_key_slot_h())
 	for i: int in 3:
 		var y: float = ys[i]
 		var on: bool = i == bazaar_tab
-		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
+		var box := Rect2(rail.position.x + 9.0, y, RAIL_ICON, RAIL_ICON)
 		if on:
 			_round_rect(box, 6.0, RAIL_ON_FILL)
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
 		_rail_glyph(box.get_center(), i, on)
+		# The cap and the word are ONE thing, laid out and centred as one: the key belongs to the name it
+		# selects, and a cap centred on the tile with a word centred under it are two objects that only
+		# look related at the width they happen to have today.
+		var key: String = str(i + 1)
 		var label: String = TAB_NAMES[i]
-		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
-		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else UI_TEXT_FAINT)
-		_keycap(Vector2(box.get_center().x - 7.0, y + 51.0), str(i + 1), 7)
+		var kw: float = _keycap_w(key, RAIL_LABEL_FS)
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS).x
+		var lx: float = box.get_center().x - (kw + RAIL_KEY_GAP + lw) * 0.5
+		_keycap(Vector2(lx, y + _rail_key_dy()), key, RAIL_LABEL_FS)
+		draw_string(_font, Vector2(lx + kw + RAIL_KEY_GAP, y + _rail_word_dy()), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS, UI_TEXT if on else UI_TEXT_FAINT)
 
 
 ## The three tab glyphs, drawn rather than lettered: a satchel, a gear, a ladder of rungs.
@@ -2500,6 +2540,36 @@ func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
 	return btn
 
 
+## A WORD THAT IS TRUE OF YOU, NOT A BUTTON YOU FAILED TO PRESS.
+##
+## `_verb_button` draws two things and they are the right pair: one action, live or not yet — BUILD you can
+## afford and BUILD you cannot, LOCKED and the note naming what unlocks it. RESEARCHED and HELD are not that
+## pair's second half. They are states with no verb anywhere behind them, and drawn in the same grey pill
+## they read as an action whose button is broken: the plate said AUTOMATION, already yours, RESEARCHED, and
+## the last of those looked like something you would press if it worked.
+##
+## So the state gets a form of its own, and the difference is the SHAPE before it is the colour: no plate
+## under it, a tick, and the green the ladder already paints what is yours in — the done chip, the walked
+## arrow. Three marks now say three different things across the whole counter. Gold pill: the verb you can
+## run. Grey pill: the verb you cannot run yet. This: nothing to run.
+const STATE_INK := Color(0.48, 0.70, 0.52)
+const STATE_TICK: float = 9.0         ## the mark's width
+const STATE_GAP: float = 6.0          ## mark → word
+func _state_plate_w(word: String) -> float:
+	return STATE_TICK + STATE_GAP + _tracked_w(word, VERB_SIZE, VERB_TRACK)
+
+
+## Set on the button's own baseline and against the plate's right edge, because a state and a verb are read
+## in the same place at the same moment and only one of them is ever on a given plate.
+func _state_plate(box: Rect2, word: String) -> void:
+	var x: float = box.end.x - _state_plate_w(word) - 10.0
+	var ty: float = box.position.y + box.size.y - 34.0 + 16.0
+	var mid: float = ty - 4.0
+	draw_line(Vector2(x, mid), Vector2(x + 3.5, mid + 3.5), STATE_INK, 1.6)
+	draw_line(Vector2(x + 3.5, mid + 3.5), Vector2(x + STATE_TICK, mid - 4.5), STATE_INK, 1.6)
+	_tracked(word, Vector2(x + STATE_TICK + STATE_GAP, ty), VERB_SIZE, VERB_TRACK, STATE_INK)
+
+
 # --- the detail plate -----------------------------------------------------------------------------------
 
 ## THE DETAIL PLATE. The selected thing, drawn large under a lamp, with one sentence of what it is for, its
@@ -2537,6 +2607,9 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	var verb: String = ""
 	var ready: bool = false
 	var note: String = ""
+	# The word for a thing you ALREADY HAVE, and the counter's one flag for having it. Everything the plate
+	# does differently for such a thing hangs off this: the state form instead of the button, and no price.
+	var state: String = ""
 	if kind == "tech":
 		var t: Dictionary = ResearchRules.tech(id)
 		title = str(t["name"])
@@ -2558,8 +2631,11 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			blurb += "\nanalyze a sample of %s, then pour in the metal" % _item_label(sample)
 		var next: StringName = ResearchRules.next_tech(sim.research)
 		if sim.is_researched(id):
-			verb = "RESEARCHED"
-			note = "already yours"
+			# ONE PLATE SAID IT TWICE. The note under the button read "already yours" over a button reading
+			# RESEARCHED, which is the same sentence in two registers; the word that names the state keeps
+			# the job and the note stands down. What replaces it is nothing, because a rung you have climbed
+			# has no precondition left to name and the blurb above already says what it bought you.
+			state = "RESEARCHED"
 		elif id != next:
 			verb = "LOCKED"
 			var req: StringName = t.get("requires", &"")
@@ -2593,10 +2669,22 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		_draw_thing_icon(id, _detail_glyph(art))
 
 	var tx: float = art.end.x + 14.0
-	var text_w: float = box.end.x - tx - _verb_button_w(verb, "ENTER" if ready else "") - 24.0
+	var reserve: float = _state_plate_w(state) if state != "" \
+		else _verb_button_w(verb, "ENTER" if ready else "")
+	var text_w: float = box.end.x - tx - reserve - 24.0
 	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y), blurb,
 		HORIZONTAL_ALIGNMENT_LEFT, text_w, 9, DETAIL_BLURB_LINES, UI_TEXT_DIM)
+	# A THING YOU OWN HAS NO PRICE LEFT TO WEIGH AND NO VERB TO RUN, so the plate stops at the word for
+	# having it. It was printing the price: the AUTOMATION rung read RESEARCHED and still carried a "64/2"
+	# chip under it. That is noise on the reading it belongs to — you are not deciding anything — and worse
+	# than noise on its own terms, because a have/need pair on a rung nobody can buy invites being read as
+	# "64 of 3 required". The plate keeps its full depth all the same: `_detail_wanted_h` is keyed on the
+	# KIND so the tree does not reflow under a cursor walking across researched and unresearched rungs, and
+	# a plate that shrank on this one node is the reflow it exists to prevent.
+	if state != "":
+		_state_plate(box, state)
+		return
 	# The price as have/need chips: "can I afford this" answered in the same glance as "what does it cost".
 	var cx: float = tx
 	for item: StringName in cost:
@@ -2724,7 +2812,9 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_FAINT)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	if row == held:
-		_verb_button(box, "HELD", "", false)
+		# HELD is not HOLD greyed out — it is the answer to "which one is in my hand", and the pack screen is
+		# opened to ask it. The state form says that; the dead pill said the pack's one verb had broken.
+		_state_plate(box, "HELD")
 	else:
 		_verb_button(box, "HOLD", "ENTER", true)
 
@@ -2810,6 +2900,8 @@ func _tab_bench(g: Dictionary) -> void:
 		float(tallest) * chip.y + float(tallest - 1) * gap.y)
 	var at := Vector2(content.position.x + (content.size.x - span.x) * 0.5,
 		content.position.y + (content.size.y - span.y) * 0.5)
+	# ONE TYPE SIZE FOR THE WHOLE LADDER, chosen once here rather than per chip. See `_bench_name_fs`.
+	var fs: int = _bench_name_fs(chip.x)
 	var rects: Dictionary = {}
 	for ti: int in tiers.size():
 		var tier: Array = tiers[ti]
@@ -2837,13 +2929,63 @@ func _tab_bench(g: Dictionary) -> void:
 	if act.get("kind", "") == "tech":
 		picked = act["id"]
 	for tid: StringName in ResearchRules.ORDER:
-		_draw_tech_chip(tid, rects[tid], tid == next, tid == picked)
+		_draw_tech_chip(tid, rects[tid], tid == next, tid == picked, fs)
+
+
+## WHERE THE NAME STARTS, and how much of the chip is left for it. The lamp is the only other thing on that
+## line, so the indent is the lamp's own right edge plus air. It used to be 15 on a narrow chip and 19 on a
+## wide one, written down beside a dot drawn at 8 and 11 with a radius of 3.2 — 3.8 and 4.8 of dead space in
+## the one measurement the names were short of. Taken from the dot, the indent spends what the dot uses.
+const BENCH_NARROW: float = 96.0      ## under this a chip tucks its lamp in against the edge
+const BENCH_DOT_R: float = 3.2
+const BENCH_NAME_AIR: float = 1.8     ## lamp → first letter
+const BENCH_NAME_PAD: float = 4.0     ## last letter → the chip's right edge
+const BENCH_NAME_FS: int = 11         ## the size a name is set at when the chip has the room
+const BENCH_NAME_FS_MIN: int = 7
+func _bench_dot_x(w: float) -> float:
+	return 8.0 if w < BENCH_NARROW else 11.0
+
+
+func _bench_indent(w: float) -> float:
+	return _bench_dot_x(w) + BENCH_DOT_R + BENCH_NAME_AIR
+
+
+## THE LADDER'S ONE TYPE SIZE — the largest at which the LONGEST name on it fits a chip, so every name on
+## the board is set at the size the worst of them can take.
+##
+## Each chip used to shrink its own name until it fit, and a chip only knows its own string: on the finished
+## tree that printed Descent, Ironworks and Machining at 9, Prospecting and Enrichment at 8, and Automation
+## and Crosscutting at 7. Three sizes among things that are peers, and the size tracked the length of the
+## word — so the board quietly said that the two longest-named rungs were the least important ones on it.
+## Nothing about a rung's place on the ladder is in how long its name is.
+##
+## Measured on the finished ladder, whose seven tiers leave a chip 66.9 wide: the longest name is
+## Crosscutting, 49.0 across at size 8 against 49.9 of room, so the whole board sets at 8 — the two chips
+## that had shrunk to 7 come up to meet their neighbours and the seven at 9 come down. Size 9 is not
+## available at seven tiers, where Crosscutting asks for 55.0, and the honest consequence of setting from
+## the longest name is that the board drops a size TOGETHER the day the ladder grows a longer one.
+## Uniformly small is the smaller cost: a name smaller than its neighbours is read as worth less than
+## its neighbours.
+func _bench_name_fs(w: float) -> int:
+	var room: float = w - _bench_indent(w) - BENCH_NAME_PAD
+	var fs: int = BENCH_NAME_FS
+	while fs > BENCH_NAME_FS_MIN and _bench_name_w(fs) > room:
+		fs -= 1
+	return fs
+
+
+func _bench_name_w(fs: int) -> float:
+	var w: float = 0.0
+	for tid: StringName in ResearchRules.ORDER:
+		w = maxf(w, _font.get_string_size(str(ResearchRules.tech(tid)["name"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x)
+	return w
 
 
 ## One tech chip: a lamp, a name, and the machines it unlocks. Its PRICE moved to the detail plate — a chip
 ## that carried the price had to shrink the name to fit it, and a truncated name ("Prospecti") costs the
 ## player more than a second glance downward does.
-func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool = false) -> void:
+func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool, fs: int) -> void:
 	var t: Dictionary = ResearchRules.tech(tid)
 	var done: bool = sim.is_researched(tid)
 	if picked:
@@ -2853,18 +2995,11 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool = f
 		_round_rect(rr, 5.0, Color(0.078, 0.113, 0.086))
 	else:
 		_round_rect(rr, 5.0, Color(1.0, 1.0, 1.0, 0.040 if is_next else 0.022))
-	var name_col: Color = Color(0.48, 0.70, 0.52) if done \
+	var name_col: Color = STATE_INK if done \
 		else ((Color(0.949, 0.831, 0.549) if picked else UI_TEXT) if is_next else Color(0.40, 0.42, 0.48))
-	var narrow: bool = rr.size.x < 96.0
-	var indent: float = 15.0 if narrow else 19.0
-	# The largest size the NAME actually fits at, rather than a size picked from the chip's width. A chip
-	# guessed from its own geometry printed "Prospectin" and "Enrichmen" — a truncated name costs the player
-	# more than a point of type does, and only the string knows how wide it is.
-	var room: float = rr.size.x - indent - 5.0
-	var fs: int = 9 if narrow else 11
-	while fs > 7 and _font.get_string_size(str(t["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
-		fs -= 1
-	draw_circle(rr.position + Vector2(8.0 if narrow else 11.0, 13.0), 3.2,
+	var indent: float = _bench_indent(rr.size.x)
+	var room: float = rr.size.x - indent - BENCH_NAME_PAD
+	draw_circle(rr.position + Vector2(_bench_dot_x(rr.size.x), 13.0), BENCH_DOT_R,
 		Color(0.38, 0.78, 0.44) if done else (UI_ACCENT if is_next else Color(0.22, 0.24, 0.30)))
 	draw_string(_font, rr.position + Vector2(indent, 16.0), str(t["name"]),
 		HORIZONTAL_ALIGNMENT_LEFT, room, fs, name_col)
@@ -3170,11 +3305,26 @@ const SET_FOOT: float = 16.0          ## the key legend
 const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0           ## an audio/feel row
 const SET_MIN_H: float = 196.0
-## The rail's icon box is 38 tall and its label sits `RAIL_LABEL_DY` below the box top, so three labelled
-## slots need `top + 2 * pitch + RAIL_LABEL_DY` of rail. At the old 150 floor the FEEL page came out 186
-## tall, the pitch collapsed to exactly 38 — the box height — and the boxes met with no room between them.
-const RAIL_PITCH_MIN: float = 54.0
-const RAIL_LABEL_DY: float = 44.0
+## WHAT A RAIL SLOT IS MADE OF. Both rails stack a tile with one line of type under it and neither of them
+## may print into the slot below, so the pitch is a clearance and not a taste: at the old 150 floor the FEEL
+## page came out 186 tall, the pitch collapsed to exactly `RAIL_ICON` and the tiles met with no room between
+## them. What the two rails do not share is the LINE. The settings rail writes a word there and its slot
+## ends at the word's descender; the counter's rail puts the key that selects the tab on the same line as a
+## cap, and a cap is taller than a word, so its slot ends where the cap's shadow does.
+##
+## Both floors are therefore the same sentence — the slot's last mark, plus air — read off the two rails'
+## own drawing rather than written down beside it. Run for the settings rail that sentence returns 54.0,
+## which is the number this file shipped, and that agreement is the reason to trust it for the other rail.
+const RAIL_ICON: float = 38.0         ## the tile at the top of every slot, both rails
+const RAIL_LABEL_FS: int = 7          ## and the type on the line under it
+const RAIL_LABEL_DY: float = 44.0     ## the settings word's baseline, below the tile
+const RAIL_KEY_GAP: float = 3.0       ## cap to word, on the counter's rail
+const RAIL_TEXT_AIR: float = 2.0      ## tile to the top of the type under it
+const RAIL_SLOT_AIR: float = 7.0      ## a slot's last mark to the next slot's tile
+const RAIL_PITCH_MAX: float = 58.0    ## a tall rail spreads its tabs no further than this
+const RAIL_TOP: float = 62.0          ## where the first tile sits when the rail has the room
+const RAIL_TOP_FRAC: float = 0.18     ## ...and the share of a shorter rail it takes instead
+const RAIL_EDGE: float = 6.0          ## the margin no slot crosses at either end
 ## The shared grid, measured from the content's left edge. Named because a layout assertion that
 ## re-derives them is checking its own arithmetic against itself (the counter's rule, same reason).
 const SET_CTRL_DX: float = 116.0
@@ -3308,11 +3458,12 @@ func _draw_settings_overlay() -> void:
 func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, UI_RAIL)
-	var ys: Array = _rail_slots(rail, CAT_NAMES.size(), RAIL_PITCH_MIN)
+	var ys: Array = _rail_slots(rail, CAT_NAMES.size(),
+		_rail_word_slot_h() + RAIL_SLOT_AIR, _rail_word_slot_h())
 	for i: int in CAT_NAMES.size():
 		var y: float = ys[i]
 		var on: bool = i == settings_cat
-		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
+		var box := Rect2(rail.position.x + 9.0, y, RAIL_ICON, RAIL_ICON)
 		if on:
 			_round_rect(box, 6.0, RAIL_ON_FILL)
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
@@ -3323,22 +3474,56 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 		# number, and on the shortest page they landed on the same baseline and the rail printed
 		# "2 AUDIO" when 2 is CONTROLS. One string cannot drift away from itself at any pitch.
 		var label: String = "%d %s" % [i + 1, CAT_NAMES[i]]
-		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
+		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS).x
 		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + RAIL_LABEL_DY), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else UI_TEXT_FAINT)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS, UI_TEXT if on else UI_TEXT_FAINT)
 		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": i}})
+
+
+## THE TWO MEASUREMENTS OF A SLOT, taken off the drawing that makes them. The word clears the tile by the
+## font's own ascent, which is why the counter's word sits at 48 and not at the settings rail's 44; the cap
+## is then hung so its key lands on that same baseline, and the lowest thing the slot leaves behind is the
+## cap's shadow. Every one of these is read from the font at the size the rail actually draws, because a
+## metric copied into a constant is a metric that stops being true when the type changes.
+func _rail_word_dy() -> float:
+	return RAIL_ICON + _font.get_ascent(RAIL_LABEL_FS) + RAIL_TEXT_AIR
+
+
+func _rail_key_dy() -> float:
+	return _rail_word_dy() - (_keycap_h(RAIL_LABEL_FS) - KEYCAP_BASE)
+
+
+func _rail_key_slot_h() -> float:
+	return _rail_key_dy() + _keycap_h(RAIL_LABEL_FS) + KEYCAP_DROP
+
+
+func _rail_word_slot_h() -> float:
+	return RAIL_LABEL_DY + _font.get_descent(RAIL_LABEL_FS)
 
 
 ## Where a rail's boxes sit, for a rail of any height and any number of slots. Extracted from the
 ## counter's rail rather than copied into this one: two rails that compute their own pitch are two rails
 ## that eventually disagree, and this project has a catalogue of exactly that.
-func _rail_slots(rail: Rect2, n: int, min_pitch: float = 0.0) -> Array:
-	# THE FLOOR IS NOT COSMETIC. Without one, a short page drives the pitch down to the icon box's own
-	# height (38) and the boxes become contiguous — see `RAIL_PITCH_MIN`. The default of 0.0 leaves the
-	# counter's rail exactly as it was; only a caller that draws text between the boxes needs to ask.
+##
+## NEITHER MEASUREMENT HAS A DEFAULT ANY MORE. `min_pitch` used to default to 0.0 and the counter's rail was
+## the caller that took the default — the rail with the TALLER slot of the two, so the one rail that could
+## not do without a floor was the one drawing without one, and the rail that asked for a floor was the one
+## whose slots were short enough to survive without it. An optional argument is answered by whichever caller
+## thought about it, which is never the caller that needed the answer.
+##
+## `slot_h` is what a slot draws below its own top, and it is here so that a stack too tall for its rail
+## comes back INSIDE the panel rather than off the bottom of it: the floor clears the slot above, and this
+## clears the panel's own edge. Where there is room to spare — every height the counter reaches today — the
+## first tile sits at `RAIL_TOP` exactly as it always did.
+func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
+	# THE FLOOR IS NOT COSMETIC. Without one, a short page drives the pitch down to the tile's own height
+	# and the boxes become contiguous. A floor above `RAIL_PITCH_MAX` wins over it, because the cap is a
+	# limit on how far a tall rail may spread and the floor is a clearance the drawing cannot do without.
 	var pitch: float = maxf(min_pitch,
-		minf(58.0, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
-	var top: float = minf(62.0, rail.size.y * 0.18)
+		minf(RAIL_PITCH_MAX, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
+	var top: float = minf(minf(RAIL_TOP, rail.size.y * RAIL_TOP_FRAC),
+		rail.size.y - RAIL_EDGE - (float(n - 1) * pitch + slot_h))
+	top = maxf(top, RAIL_EDGE)
 	var out: Array = []
 	for i: int in n:
 		out.append(rail.position.y + top + float(i) * pitch)
