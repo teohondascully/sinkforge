@@ -59,6 +59,21 @@ const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → 
 ## dashboard drew a machine's stalled count in it, so gold meant "something is wrong" on the one screen
 ## where it also meant "this is the total you are producing" — see UI_WARN, which the game already had.
 const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selection, the live verb, the next step
+## THE SAME GOLD SEEN UNDER MORE LIGHT, and the file wrote it out as a bare literal nine times: the lit rail
+## glyph, the lit settings glyph, the HELD badge, all three detail-plate titles, the selected works row's
+## name, the picked bench chip's name and the hot slider's cap. Nine copies of one colour with nothing in
+## the file relating any of them to the accent they are a paler cut of — the same shape as the four literals
+## that became `UI_TEXT_FAINT`, one layer up.
+##
+## IT IS GOLD AND NOT A SECOND AMBER, which is worth stating because folding it in would be wrong if it were
+## not: in HSV it sits at hue 42.3° against `UI_ACCENT`'s 43.2°, at 0.67 of its saturation and 0.95 value.
+## The derivation is clean in HSV and not in RGB — no single scale on `UI_ACCENT` reproduces all three
+## channels — so it is written as the channel lift `RAIL_ON_FILL` already proved a `const` will take, and
+## the HSV sentence above is what that lift means. The point of the name is that moving the accent now moves
+## this with it, instead of leaving nine copies of the old hue behind.
+const GOLD_PALE_LIFT := Color(0.149, 0.171, 0.249, 0.0)
+const GOLD_PALE := Color(UI_ACCENT.r + GOLD_PALE_LIFT.r, UI_ACCENT.g + GOLD_PALE_LIFT.g,
+	UI_ACCENT.b + GOLD_PALE_LIFT.b)
 ## The colour the alert stack has always used for a machine in trouble. Named so that the OTHER place which
 ## reports the same fact can say it the same way, instead of reaching for the accent and inverting it.
 const UI_WARN := Color(0.96, 0.46, 0.30)
@@ -2098,7 +2113,7 @@ func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 
 ## The three tab glyphs, drawn rather than lettered: a satchel, a gear, a ladder of rungs.
 func _rail_glyph(at: Vector2, kind: int, on: bool) -> void:
-	var col: Color = Color(0.949, 0.831, 0.549) if on else Color(0.40, 0.43, 0.50)
+	var col: Color = GOLD_PALE if on else Color(0.40, 0.43, 0.50)
 	match kind:
 		TAB_PACK:
 			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(16.0, 11.0)), col)
@@ -2252,7 +2267,7 @@ func _tab_pack(g: Dictionary) -> void:
 		# screen is opened to answer and the hotbar is behind the panel while it is open.
 		if i == held:
 			draw_string(_font, box.position + Vector2(5.0, 12.0), "HELD",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.949, 0.831, 0.549))
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, GOLD_PALE)
 	_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
 
 
@@ -2535,6 +2550,39 @@ func _works_id(machines: bool, i: int) -> StringName:
 	return rack_ids[i] if i < rack_ids.size() else &""
 
 
+## THE INK FOR A ROW YOU CANNOT AFFORD, WITH THE CURSOR ON IT — the fourth combination, which for a long
+## time did not exist. The name colour read `(gold if selected else UI_TEXT) if afford else grey`: one
+## expression deciding two facts that have nothing to do with each other, with the test on `afford`
+## outermost, so it swallowed the test on `selected` whole. A short row drew the same grey whether or not it
+## was the row the cursor was on — while eight lines below, `if selected:` still lifted the plate from Y709
+## 24.7 to 39.2 and hung a gold spine off its left edge. Selecting a row you could not afford lifted its
+## background and left its ink where it was, which put the one row the player is actually reading at 3.74:1
+## against its own plate. The worst contrast on the screen, reliably, on the row under the cursor.
+##
+## Affordability and the cursor are orthogonal, so there are FOUR combinations and not three, and the same
+## `if selected` now hangs off both rungs of the ink ramp.
+##
+## The unselected short row moves off its own literal at the same time. `Color(0.48, 0.50, 0.56)` was
+## `UI_TEXT_FAINT` at 9.5 fewer steps of value and no relation to it, and it read 4.44:1 on the plain row
+## fill — under the 4.5 this repository holds named inks to, and invisible to the layer that holds it
+## because the floor can only be held against something that has a name. It is the faint rung now: 5.05:1,
+## and 74 steps below `UI_TEXT`, so the row still says "you cannot afford this" at a glance.
+##
+## THE LIFT IS THE RAMP'S OWN STEP rather than a value invented for this row. `UI_TEXT_DIM` is
+## `UI_TEXT_FAINT` plus exactly 0.04 on every channel, so the type ramp already carries a unit; one more of
+## that unit lands the selected short row at 5.51:1 against the 5.05:1 the same row reads unselected, so
+## putting the cursor on a row you cannot afford now costs it nothing and gains it a little. `UI_TEXT_DIM`
+## itself was measured first and came back at 4.86:1 — over the 4.5 floor, but under the unselected figure,
+## which is the same inversion in miniature. The step is written as the gap between the two named rungs and
+## not as `0.04`, because a literal here would have to equal a difference nothing in the file relates it to.
+##
+## Ratios are WCAG relative luminance, channels linearised before they are weighed, per
+## `tools/check_text_contrast.gd`. They are NOT the gamma-encoded Y709 quoted beside them for the plates;
+## the two differ by up to a factor of two and mistaking one for the other has flipped a sign here before.
+const SHORT_SELECTED := Color(
+	UI_TEXT_DIM.r + (UI_TEXT_DIM.r - UI_TEXT_FAINT.r),
+	UI_TEXT_DIM.g + (UI_TEXT_DIM.g - UI_TEXT_FAINT.g),
+	UI_TEXT_DIM.b + (UI_TEXT_DIM.b - UI_TEXT_FAINT.b))
 ## One row. A CARD, not an outlined box: a surface tint you can see through to the panel, a well for the
 ## glyph, and — when it is the one the cursor is on — a brass edge and a warmer fill. Nothing is outlined,
 ## because an outline around every row makes every row shout and the selected one shout no louder.
@@ -2546,8 +2594,8 @@ func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> v
 	else:
 		_round_rect(rr, 4.0, Color(1.0, 1.0, 1.0, 0.030))
 	_draw_thing_icon(id, Rect2(rr.position + Vector2(6.0, 2.5), Vector2(16.0, 16.0)))
-	var name_col: Color = (Color(0.949, 0.831, 0.549) if selected else UI_TEXT) if afford \
-		else Color(0.48, 0.50, 0.56)
+	var name_col: Color = (GOLD_PALE if selected else UI_TEXT) if afford \
+		else (SHORT_SELECTED if selected else UI_TEXT_FAINT)
 	var cw: float = _cost_glyphs(rr, opt["cost"])
 	draw_string(_font, rr.position + Vector2(26.0, 14.0), str(opt["name"]),
 		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 36.0 - cw, 10, name_col)
@@ -2762,6 +2810,26 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		cost = opts[row]["cost"]
 		blurb = str(ITEM_PURPOSE.get(id, "—"))
 		var lock: StringName = ResearchRules.locking_tech(id)
+		# THIS BRANCH CANNOT FIRE TODAY AND IT IS KEPT ANYWAY. `MNU-18`'s review called it dead by
+		# construction — "every id that arrives there has already passed through the `_unlocked` filter" —
+		# and the conclusion is right while the reason is not, which is the whole difference between a branch
+		# that is dead by construction and one that is dead for a reason nothing enforces.
+		#
+		# Traced rather than taken on the review's word. `kind`, `id` and `row` come from `bazaar_action()`
+		# and from nowhere else. Its RACK arm resolves the id as `rack_ids[r] if r < rack_ids.size() else &""`
+		# — textually the expression `_unlocked` filtered on, at the index `_unlocked` handed back — so for a
+		# Rack row this test is false by construction and always will be. Its MACHINE arm does not: it
+		# resolves through `_craft_id`, which falls back to `machine_icons.keys()[i]` when `craft_ids` is
+		# short, while `_unlocked` was handed `craft_ids` and filtered on the `&""` it read past the end.
+		# Two functions answering "which thing is works row i" by two different rules, agreeing only while
+		# `craft_ids` is as long as `craft_options` — which `main.gd` gets right by appending to both in one
+		# loop over `_craftable`, and which nothing in this tree asserts.
+		#
+		# So the counter cannot reach this, deleting it would change no state on any screen, and what
+		# deletion would cost is the plate offering a filled gold BUILD and an ENTER hint for a machine
+		# behind unresearched tech in the one configuration `_craft_id`'s fallback is written for — the
+		# configuration where the filter is reading `&""` and cannot catch it either. The defect worth
+		# fixing is the two resolvers, not the guard that outlives them, and that is a change to `_unlocked`.
 		if lock != &"" and not sim.is_researched(lock):
 			verb = "LOCKED"
 			note = "research %s first" % str(ResearchRules.tech(lock)["name"])
@@ -2780,7 +2848,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	var reserve: float = _state_plate_w(state) if state != "" \
 		else _verb_button_w(verb, "ENTER" if ready else "")
 	var text_w: float = box.end.x - tx - reserve - DETAIL_TEXT_RIGHT
-	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
+	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, GOLD_PALE)
 	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y), blurb,
 		HORIZONTAL_ALIGNMENT_LEFT, text_w, 9, DETAIL_BLURB_LINES, UI_TEXT_DIM)
 	# A THING YOU OWN HAS NO PRICE LEFT TO WEIGH AND NO VERB TO RUN, so the plate stops at the word for
@@ -2903,8 +2971,7 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	_detail_lamp(art, 0.045)
 	_draw_thing_icon(id, _detail_glyph(art))
 	var tx: float = art.end.x + DETAIL_TEXT_GAP
-	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8,
-		Color(0.949, 0.831, 0.549))
+	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, GOLD_PALE)
 	# NO LINE CAP, because the plate was sized to hold this. `_hold_overflow_h` measured every sentence in
 	# the pack at `_hold_text_w` and bought the deepest one its lines, so the count this used to be capped
 	# at is now a floor that the height already answered — and a cap here would be cutting a sentence the
@@ -2939,7 +3006,7 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 	_detail_lamp(art, 0.035)
 	Visuals.draw_item(self, art.get_center(), _detail_glyph(art).size.x, &"ingot")
 	var tx: float = art.end.x + DETAIL_TEXT_GAP
-	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
+	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, GOLD_PALE)
 	var rates: Array[Dictionary] = sim.production_rates()
 	if rates.is_empty():
 		draw_string(_font, Vector2(tx, box.position.y + 42.0),
@@ -3112,7 +3179,7 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool, fs
 	else:
 		_round_rect(rr, 5.0, Color(1.0, 1.0, 1.0, 0.040 if is_next else 0.022))
 	var name_col: Color = STATE_INK if done \
-		else ((Color(0.949, 0.831, 0.549) if picked else UI_TEXT) if is_next else Color(0.40, 0.42, 0.48))
+		else ((GOLD_PALE if picked else UI_TEXT) if is_next else Color(0.40, 0.42, 0.48))
 	var indent: float = _bench_indent(rr.size.x)
 	var room: float = rr.size.x - indent - BENCH_NAME_PAD
 	draw_circle(rr.position + Vector2(_bench_dot_x(rr.size.x), 13.0), BENCH_DOT_R,
@@ -3649,7 +3716,7 @@ func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
 ## Three category glyphs, drawn rather than lettered, in the counter's hand: a speaker cone with two arcs,
 ## a key cap, three sliders at different settings.
 func _settings_glyph(at: Vector2, kind: int, on: bool) -> void:
-	var col: Color = Color(0.949, 0.831, 0.549) if on else Color(0.40, 0.43, 0.50)
+	var col: Color = GOLD_PALE if on else Color(0.40, 0.43, 0.50)
 	match kind:
 		CAT_AUDIO:
 			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(4.0, 6.0)), col)
@@ -3962,7 +4029,7 @@ func _settings_slider(x0: float, y: float, id: String, label: String, value: flo
 	draw_rect(bar, UI_EDGE_HI if hot else UI_EDGE, false, 1.0)
 	if value > 0.0:
 		draw_rect(Rect2(fill.end.x - 2.0, bar.position.y - 2.0, 2.5, bar.size.y + 4.0),
-			Color(0.949, 0.831, 0.549) if hot else Color(0.80, 0.83, 0.89))
+			GOLD_PALE if hot else Color(0.80, 0.83, 0.89))
 	draw_string(_font, Vector2(x0 + SET_VALUE_DX, y), "%d%%" % int(round(value * 100.0)),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT if hot else UI_TEXT_DIM)
 	_settings_hits.append({"rect": bar.grow(3.0), "payload": {"slider": id}})
