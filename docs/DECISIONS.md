@@ -448,6 +448,45 @@ untracking and deleting are different operations. The root captures stay visible
 
 ---
 
+### A search's null bounds the search, never the world (LOCKED)
+
+An empty grep is a fact about the pattern, the population and the file types it ran over. It is never a
+fact about the program. Treating one as evidence of absence has cost this project more time than any
+other single habit.
+
+The case that named it. A band of pure green over pure red appeared at the top-left of a capture. Four
+searches were run for a source: colour literals across all `.gd`, named `Color.<NAME>` constants (which a
+`Color(` pattern structurally cannot see), pure primaries in all five `.gdshader` files, and `.tres` /
+`.tscn` / `.godot`. All four came back empty, and each null was read as *"therefore the colour is computed
+at runtime, therefore no search can find it."*
+
+The first half was true. The second half did not follow from it, and the truth was worse than either: the
+colour was computed **by the GPU, on stored pixels, by a pass that runs every frame**. A bake viewport
+retained its target and re-applied `adjustment_saturation = 1.18` to its own previous output on every
+incremental bake, compounding as `1.18^n` until each pixel's dominant channel clipped to 1 and the rest to
+0. A pure primary is the *fixed point* of that map. No source search over any population could ever have
+reached it, because no source contained it.
+
+> The failure was not that the searches were too narrow. It was that nobody asked whether a search was the
+> right instrument.
+
+**How to apply.**
+
+- Before widening a failed search, ask what kind of thing the answer would be, and whether the instrument
+  can represent it at all. A grep finds authored values. It cannot find computed ones, accumulated ones, or
+  values that are the fixed point of a transform applied repeatedly to its own output.
+- When a null is load-bearing, run a deliberately weaker search that MUST return something, and confirm it
+  does. A pattern that matches nothing is indistinguishable from a pattern that is wrong, and the two are
+  told apart only by a control.
+- State the population with the result, always: which paths, which file types, which pattern. "Nowhere in
+  the codebase" is not a finding until it says what was read.
+
+The same rule in its positive form, which is cheaper than any of the above: **look at the artifact.**
+Rendering the item icons to a single PNG found a glyph that measured cleanly distinct from all twenty-six
+others and read as a magnifying glass, and it found that the icon suite was grading art at 48px that the
+game draws at 13px. Both were invisible to a passing, correct test suite. An artifact you can look at is a
+population of one, and looking is cheap.
+
 ## Measurements worth not re-deriving
 
 Not decisions, but numbers that were expensive to establish once.
