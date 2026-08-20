@@ -52,6 +52,36 @@ const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → 
 ## would separate — the selected row's spine and the button that acts on it — is the one place the doubling
 ## CARRIES meaning. Splitting it is a separate decision from this one, and it is not this one to make.
 ##
+## THE THREE ROLES THE PARAGRAPH ABOVE LEFT OPEN, CLOSED — and closed by putting the same question to
+## every gold mark in this file rather than to the ones anybody remembered, because a decision made from
+## memory is a decision about the sites you happen to recall. The question: can a player's input reach the
+## thing this mark is on, right now? Twenty-four draw sites, and only the ones that answer yes keep it.
+##
+##   THE LIVE VERB keeps it. It is the definition. `_verb_button`'s slab and the title's `[ENTER] descend`.
+##
+##   THE SELECTION keeps it, and the reason is mechanical rather than a preference. Every gold selection
+##   mark in this file is the ARGUMENT of the gold verb beside it: the picked row is what `bazaar_action()`
+##   acts on, the lit hotbar slot is what a click places, the lit rail tab is the page the keys now drive.
+##   That is the verb's own sentence said about the noun, which is why the pair was never worth splitting.
+##   Two marks were hiding INSIDE the role and are not selection. The settings rail lit its glyph for
+##   `on` OR `the pointer is over it`, so two categories could wear the selection colour at once and the
+##   gold one under the hand was not the page you were on — the counter's rail passes `on` alone and the
+##   two rails are otherwise written to be one thing. And the PACK grid's `HELD` badge marks a well that is
+##   usually NOT the cursor, in the cursor's own colour family, two golds meaning two things on one grid.
+##
+##   THE NEXT STEP splits. The bench's `is_next` lamp keeps gold: it marks the one node a keystroke can
+##   buy, and it is the middle rung of a lamp whose other rungs are done and locked. The objective bullet
+##   and the hint bubble's spine do not — both are printed on plates that take no input at all, which is
+##   the sentence the item tooltip's spine was already moved off gold for. The bare screen carries gold on
+##   exactly one thing now, the lit hotbar slot.
+##
+## AN ENGAGED CONTROL is the fourth role the paragraph above names, and it stays open on purpose.
+## `_settings_chip` fills gold for ON while `_settings_controls` fills gold while it is CAPTURING a key —
+## a state and a live input in one colour on one page, which is the pair the enumeration flagged. The
+## SPLIT is decidable (capture is where every key you press is going; ON is a fact about the toggle) and
+## the repaint is not: the chip's dark type is a literal on a fill no contrast layer can name yet, so
+## moving it would swap a measured pair for an unmeasured one.
+##
 ## GOLD, AND IT MEANT NINE THINGS. Counted from source rather than from this comment, which used to read
 ## "(FORGED, selected slot, current step)" — three examples standing in for a definition, and the three it
 ## happened to name are three DIFFERENT roles. Full enumeration with call sites in `docs/MENU_MATRIX.md`.
@@ -74,8 +104,9 @@ const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selectio
 const GOLD_PALE_LIFT := Color(0.149, 0.171, 0.249, 0.0)
 const GOLD_PALE := Color(UI_ACCENT.r + GOLD_PALE_LIFT.r, UI_ACCENT.g + GOLD_PALE_LIFT.g,
 	UI_ACCENT.b + GOLD_PALE_LIFT.b)
-## THE SAME GOLD SEEN UNDER LESS LIGHT — `GOLD_PALE`'s opposite number, and the gold rung of the type ramp
-## whose grey rungs are `UI_TEXT` / `UI_TEXT_DIM` / `UI_TEXT_FAINT`. Three literals were doing this one job
+## THE SAME GOLD SEEN UNDER LESS LIGHT — `GOLD_PALE`'s opposite number, and it was written as the gold rung
+## of the type ramp whose grey rungs are `UI_TEXT` / `UI_TEXT_DIM` / `UI_TEXT_FAINT`. That claim did not
+## survive being tested; see below, and see where its callers went. Three literals were doing this one job
 ## across five sites with nothing in the file relating any of them to the accent they are a darker cut of:
 ## `0.451/0.365/0.180` on the pack ledger's heading and the works group titles, `0.451/0.402/0.280` on the
 ## "N more wait behind research" line and its BENCH pointer, and `0.58/0.48/0.32` on the detail plate's
@@ -88,10 +119,27 @@ const GOLD_PALE := Color(UI_ACCENT.r + GOLD_PALE_LIFT.r, UI_ACCENT.g + GOLD_PALE
 ## beside it is `UI_TEXT` at 12.57, so nothing has been promoted; a heading that measured 2.98 was not
 ## subordinate, it was absent.
 ##
-## A RUNG IS NOT A MEANING, which is worth stating next to `MNU-06`: that rule is about the gold that says
-## "your input is connected to this", and it stays on the selection, the live verb and the next node. This
-## is a TYPE WEIGHT that happens to be gold, the way `UI_TEXT_FAINT` is a type weight that happens to be
-## grey, and it carries no affordance claim at any of its five sites.
+## A RUNG IS NOT A MEANING was the argument for these headings being gold at all, and it does not hold.
+## It ran: this is a TYPE WEIGHT that happens to be gold, the way `UI_TEXT_FAINT` is a type weight that
+## happens to be grey, carrying no affordance claim at any of its sites. The parallel is exactly where it
+## fails. Grey is FREE — nothing in this file means anything by grey beyond "less of your attention" — so
+## a rung cut from it inherits nothing. Gold is not free: it is the single channel `MNU-06` concentrated
+## the whole act-on-this signal into, said one line from its own declaration. A rung cut from a colour
+## that already carries a meaning inherits the meaning and only changes the volume, so a gold heading says
+## "act on this, quietly" — which is the sentence that was stripped off seven surfaces to get here.
+##
+## AND THE DIRECTION OF THE DROP IS THE WORST ONE AVAILABLE, because dim is already spoken for. An
+## unaffordable row's name is `UI_TEXT_FAINT`, the dead verb is 0.44 grey, a muted slider is the accent at
+## 0.55 alpha: dim is this file's word for "not for you right now". So a dimmed cut of the affordance
+## colour reads as a DISABLED affordance — and it was sitting directly over the works rows, where dim
+## really does mean you cannot afford it.
+##
+## SO THE LABEL SITES MOVED TO `UI_TEXT_DIM`, the grey ramp's subordinate rung, which was already an
+## asserted pair on this plate rather than a colour invented to receive them: 5.40:1 → 6.15:1 on
+## `UI_MODAL`, brighter rather than quieter, and still a clear step under the `UI_TEXT` the rows and the
+## ledger's verdict beside them are drawn in. Three have gone — the ledger heading, both works group
+## titles, the research pointer. What is left here is the detail plate's refusal note, which is a state
+## and not a heading and belongs to a pass over that plate rather than to this one.
 ##
 ## THE DROP IS UNIFORM, AND THAT IS THE DERIVATION. Subtracting one value from all three channels leaves
 ## every channel DIFFERENCE untouched, so the hue is preserved exactly — 43.2° here and 43.2° on
@@ -751,12 +799,16 @@ func _draw_title() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(CANVAS)), Color(0.03, 0.035, 0.06, 0.82))
 	var cx: float = CANVAS.x * 0.5
 	var y: float = CANVAS.y * 0.30
-	# The name — tracked out wide, with the accent rule under it.
+	# The name — tracked out wide, with the rule under it in THE NAME'S OWN INK and not in the accent.
+	# `MNU-06` retired the 2px gold rule from eight panels; this was the ninth, and it survived that pass
+	# only because it is drawn by hand here instead of through `_panel`. A wordmark's rule is part of the
+	# wordmark, so it is one colour with the letters above it rather than a second one underneath them —
+	# and the only thing on this screen a keypress reaches, `[ENTER] descend`, is the only gold left here.
 	var title: String = "S I N K F O R G E"
+	var mark := Color(0.97, 0.90, 0.62)
 	var tw: float = _font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 30).x
-	draw_string(_font, Vector2(cx - tw * 0.5, y), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 30,
-		Color(0.97, 0.90, 0.62))
-	draw_rect(Rect2(cx - tw * 0.5, y + 7.0, tw, 2.0), UI_ACCENT)
+	draw_string(_font, Vector2(cx - tw * 0.5, y), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, mark)
+	draw_rect(Rect2(cx - tw * 0.5, y + 7.0, tw, 2.0), mark)
 	var tag: String = "the way is down"
 	var gw: float = _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 	draw_string(_font, Vector2(cx - gw * 0.5, y + 24.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
@@ -859,11 +911,17 @@ func _draw_hint_bubble() -> void:
 	var rect := Rect2(origin, Vector2(w, h))
 	# ELEVATION, NOT AN OUTLINE. A flat fill inside a 1px border with a full-width bar across the top is
 	# a dialog box, and it reads as one. A soft drop shadow puts the plate ABOVE the world instead of
-	# cut into it, and the accent shrinks to a left edge so the eye lands on the word, not the frame.
+	# cut into it, and the rule shrinks to a left edge so the eye lands on the word, not the frame.
+	#
+	# THE EDGE IS NOT THE ACCENT, because a hint is a thing to read and not a thing to press. That is the
+	# sentence the item tooltip's spine was moved off gold for, and this plate has even less claim to it:
+	# the tooltip at least describes what the cursor is over, while this one arrives on its own and points
+	# at your body. `UI_EDGE_HI` at full strength is what that spine draws in, and the swap costs nothing
+	# worth having — 6.24:1 against this plate before, 6.06:1 now.
 	_round_rect(Rect2(rect.position + Vector2(0.0, 1.5), rect.size), 4.0, Color(0.0, 0.0, 0.0, 0.38 * a))
 	_round_rect(rect, 4.0, Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
 	draw_rect(Rect2(rect.position + Vector2(0.0, 3.0), Vector2(1.5, h - 6.0)),
-		Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.85 * a))
+		Color(UI_EDGE_HI.r, UI_EDGE_HI.g, UI_EDGE_HI.b, a))
 	var tip_y: float = tail.y if origin.y < tail.y else origin.y - 1.0   # tail reaches toward the body
 	var base_y: float = (origin.y + h) if origin.y < tail.y else origin.y
 	var tx: float = clampf(tail.x, origin.x + 10.0, origin.x + w - 10.0)
@@ -1250,8 +1308,14 @@ func _draw_objective_line() -> void:
 	var rect := Rect2((CANVAS.x - w) * 0.5, 8.0, w, h)
 	_panel(rect, maxf(goal_a, hint_a))   # the skin is as present as its most visible line
 	var cy: float = rect.position.y + 12.0
+	# THE BULLET BELONGS TO THE SENTENCE, so it is drawn in the sentence's ink. It was the accent, which put
+	# "the thing you can act on" on a banner that takes no input at all — on the bare screen, a few dozen
+	# pixels from a lit hotbar slot that does. Nor is the colour carrying the state: the state is the dot's
+	# PRESENCE, since a finished ladder draws a tick inside the line instead of a dot beside it. So the
+	# colour here was free, and free is not a reason to spend the one colour that means something.
+	# 8.25:1 against this plate before, 15.91:1 now.
 	if not objectives.all_done():
-		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, Color(UI_ACCENT, UI_ACCENT.a * goal_a))
+		draw_circle(Vector2(rect.position.x + pad + 1.0, cy), 3.0, Color(col, col.a * goal_a))
 	draw_string(_font, Vector2(rect.position.x + pad + 14.0, cy + 5.0), text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col, col.a * goal_a))
 	if hint != "":
@@ -2317,9 +2381,17 @@ func _tab_pack(g: Dictionary) -> void:
 			str(int(slots[i]["count"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
 		# The thing actually in your hand wears a mark, because "what am I holding" is the question the pack
 		# screen is opened to answer and the hotbar is behind the panel while it is open.
+		#
+		# IT IS A STATE AND NOT THE CURSOR, which is why it is no longer in the cursor's colour. The held
+		# well is usually not the picked well, so the grid was carrying two golds a row apart saying two
+		# different things — the very doubling `MNU-06` exists to stop. `_state_plate` has always drawn this
+		# exact word in `STATE_INK` a couple of hundred pixels to the right, and green is already this
+		# file's colour for a fact that is true of you rather than an offer: the researched tech's name,
+		# the finished lamp. One word, one colour, on one screen. 12.22:1 → 7.20:1 on the well's wash and
+		# 10.29:1 → 6.06:1 on the picked row's brass, both clear of the 4.5 floor.
 		if i == held:
 			draw_string(_font, box.position + Vector2(5.0, 12.0), "HELD",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, GOLD_PALE)
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, STATE_INK)
 	_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
 
 
@@ -2439,7 +2511,11 @@ func _pack_ledger(band: Rect2) -> void:
 	var mute: Dictionary = off["mute"]
 	var hb: float = band.position.y + LEDGER_GAP
 	var head: String = "YOUR LINE IS MAKING"
-	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, GOLD_DIM)
+	# A HEADING IS A LABEL, and gold does not label — see `GOLD_DIM`, where the type-weight argument that
+	# put this in gold is taken apart. `UI_TEXT_DIM` is the grey ramp's subordinate rung and reads brighter
+	# here than the gold rung did (6.15:1 against 5.40), while staying a step under the `UI_TEXT` verdict
+	# printed beside it, which is the order the two lines are supposed to be read in.
+	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, UI_TEXT_DIM)
 	var vx: float = band.position.x + 1.0 + _tracked_w(head, 8, 2.0) + 12.0
 	var verdict: String = _ledger_verdict(rates, off)
 	if verdict != "" and band.end.x > vx:
@@ -2542,7 +2618,10 @@ func _tab_works(g: Dictionary) -> void:
 		# The key is a cap and not a word in a sentence. "press 3 for the BENCH" asks the reader to parse an
 		# instruction to find the one glyph that matters; the cap grammar the rail and footer already use
 		# puts it where the eye lands, and the sentence shrinks to what it is actually saying.
-		var dim: Color = GOLD_DIM
+		#
+		# The line is a POINTER, not an offer: the thing your input reaches is the cap, and the cap draws
+		# itself. Off the gold with the headings, for the reason written at `GOLD_DIM`.
+		var dim: Color = UI_TEXT_DIM
 		var y: float = content.end.y - 2.0
 		var head: String = "%d more wait behind research" % hidden
 		draw_string(_font, Vector2(content.position.x + 1.0, y), head,
@@ -2577,7 +2656,10 @@ static func works_window_first(count: int, capacity: int, base: int, cursor: int
 func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int, title: String,
 		opts: Array[Dictionary], open_rows: Array[int], base: int, machines: bool) -> void:
 	var x0: float = content.position.x + float(col0) * (col_w + BAZAAR_GUTTER)
-	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, GOLD_DIM)
+	# MACHINES / THE RACK are labels, in the grey ramp for the reason written at `GOLD_DIM`. This is the
+	# site where the gold rung was doing the most damage: a dimmed cut of the affordance colour, standing
+	# directly over rows where dim genuinely means you cannot afford the thing.
+	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, UI_TEXT_DIM)
 	if open_rows.is_empty():
 		draw_string(_font, Vector2(x0 + 1.0, content.position.y + 16.0), "(nothing unlocked yet)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
@@ -4030,7 +4112,7 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 		if on:
 			_round_rect(box, 6.0, RAIL_ON_FILL)
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
-		_settings_glyph(box.get_center(), i, on or box.has_point(mouse))
+		_settings_glyph(box.get_center(), i, on, box.has_point(mouse))
 		# THE NUMBER TRAVELS INSIDE THE WORD. It used to be drawn separately above the icon while the word
 		# sat below it, which put every word equidistant between the icon it names and the number of the
 		# NEXT one — measured on the shipped frames at 47px to its own icon against 46px to the wrong
@@ -4095,8 +4177,17 @@ func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
 
 ## Three category glyphs, drawn rather than lettered, in the counter's hand: a speaker cone with two arcs,
 ## a key cap, three sliders at different settings.
-func _settings_glyph(at: Vector2, kind: int, on: bool) -> void:
-	var col: Color = GOLD_PALE if on else Color(0.40, 0.43, 0.50)
+##
+## `hot` IS A SEPARATE ARGUMENT FROM `on` BECAUSE THEY ARE SEPARATE FACTS, and this took one call site's
+## `on or box.has_point(mouse)` to blur. Under a resting pointer the rail lit two glyphs in the selection
+## gold at once, and the brighter-looking one was not the page you were on: hover is where the hand
+## happens to be, and gold in this file says your input is CONNECTED to the thing. The counter's rail
+## (`_rail_glyph`) never had the bug — it passes `on` alone — and the two rails share their slot pitch,
+## their fill and their labels, so the odd one out was this signature. Hover keeps a cue and takes it out
+## of the gold family: `UI_TEXT_DIM` is one clear value step over the unlit glyph, 3.82:1 → 6.42:1 on the
+## rail, and nowhere near the 13.60:1 of the lit one.
+func _settings_glyph(at: Vector2, kind: int, on: bool, hot: bool = false) -> void:
+	var col: Color = GOLD_PALE if on else (UI_TEXT_DIM if hot else Color(0.40, 0.43, 0.50))
 	match kind:
 		CAT_AUDIO:
 			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(4.0, 6.0)), col)

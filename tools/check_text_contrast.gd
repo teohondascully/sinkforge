@@ -62,6 +62,14 @@ extends "res://tools/check_base.gd"
 ## literals across eleven sites became four constants, and a constant is the only thing a floor can be held
 ## against. The thinned row is the one that had actually failed, at 3.77 against a floor of 4.5.
 ##
+## `GOLD_DIM`'s ROW IS DOWN TO ONE CALL SITE, and the row is kept rather than dropped. `MNU-06`'s closing
+## pass moved the three headings it was lifted for onto `UI_TEXT_DIM` — a gold rung of a type ramp turned
+## out to be an affordance claim at a lower volume — and their figures are now carried by the row that
+## already asserted that ink on this plate. What is left is the detail plate's refusal note, which sits on
+## a wash this layer cannot name (see the stand-down), so the modal under it is the nearest ground a row
+## can hold. The site list is written out per row precisely so a shrinking one is visible here instead of
+## being a number that keeps measuring green over an empty population.
+##
 ## THE PLATE IS COMPOSITED, because every one of the four carries alpha and a translucent plate is not a
 ## colour — it is a colour plus a window onto whatever is behind it. The ground is black: that is the value
 ## the palette was authored against ("the HUD is still perfectly readable against its own near-black
@@ -155,7 +163,7 @@ func _calibrate() -> void:
 func _measure() -> void:
 	var pairs: Array[Dictionary] = [
 		{"ink": "GOLD_DIM", "plate": "UI_MODAL",
-			"at": "the ledger heading, both works group titles, the research pointer"},
+			"at": "the detail plate's refusal note — its one remaining site, over a wash on this plate"},
 		{"ink": "GOLD_PALE", "plate": "UI_MODAL", "at": "the hot slider's value cap"},
 		{"ink": "VERB_INK", "plate": "UI_ACCENT", "at": "the live verb's word"},
 		{"ink": "VERB_INK", "ink_a": "VERB_HINT_A", "plate": "UI_ACCENT",
@@ -168,7 +176,9 @@ func _measure() -> void:
 		{"ink": "UI_TEXT_FAINT", "plate": "UI_MODAL", "at": "the tab name, both key legends, the tally"},
 		{"ink": "UI_TEXT", "plate": "UI_RAIL", "at": "the lit rail label, on both rails"},
 		{"ink": "UI_TEXT_FAINT", "plate": "UI_RAIL", "at": "the unlit rail labels, on both rails"},
-		{"ink": "UI_TEXT_DIM", "plate": "UI_MODAL", "at": "the detail blurb, the settings rows"},
+		{"ink": "UI_TEXT_DIM", "plate": "UI_MODAL",
+			"at": "the detail blurb, the settings rows, the ledger heading, both works group titles, "
+				+ "the research pointer"},
 	]
 	# NON-VACUITY, both directions. A population that quietly shrank to nothing would satisfy every ratio
 	# assertion below by having none to make, and a table where every plate came back opaque would carry the
