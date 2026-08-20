@@ -227,6 +227,16 @@ const PAIR_CASES: Array = [
 func _initialize() -> void:
 	print("== no fixture poses a field the game recomputes every frame ==")
 
+	# The exclusion has to be known to work in both directions before anything below leans on it, and both
+	# probes are synthetic so the control does not depend on which scratch files happen to exist today.
+	_check(_ignore_globs().size() > 0,
+		"read the repository's own ignore rules (%d patterns) — with none, this scans everything"
+		% _ignore_globs().size())
+	_check(_is_ignored("res://tools/_scratch_example.gd"),
+		"CONTROL: a path the repository ignores is left out of the scan")
+	_check(not _is_ignored("res://tools/check_posed_fields.gd"),
+		"CONTROL: …and a tracked one is not")
+
 	var recomputed: Dictionary = {}      # "receiver.field" -> "file:line"
 	for f: String in _gd_files(["res://scenes", "res://src"]):
 		_scan_per_frame(_read(f), f.get_file(), recomputed)
@@ -484,6 +494,46 @@ func _read(path: String) -> String:
 	return "" if f == null else f.get_as_text()
 
 
+## THE REPOSITORY'S OWN STATEMENT ABOUT WHAT IS PART OF IT. This layer was failing the entire sweep on
+## `tools/_scratch_clock_tick.gd`, which `.gitignore` excludes by the glob `tools/_scratch_*.gd`: untracked
+## scratch work, not shipping, and not what a claim about this codebase is about. The detector was right
+## about the file — that fixture does write a field the game recomputes — but the POPULATION was wrong, and
+## a verdict on the codebase that depends on whatever scratch work happens to be lying around is not a
+## verdict on the codebase. That is this layer's own subject, one level up.
+##
+## READ, not restated. Writing `_scratch_*` into this file would work today and drift the moment the ignore
+## rule moved, and a guard that disagrees with the repository about what the repository contains is worse
+## than no guard at all. Directory rules and negations are skipped rather than half-implemented: this needs
+## to be right about the files it excludes, and a pattern language it only partly understands would be a
+## guess wearing a rule's clothes.
+var _ignored: PackedStringArray = PackedStringArray()
+var _ignored_read: bool = false
+
+
+func _ignore_globs() -> PackedStringArray:
+	if _ignored_read:
+		return _ignored
+	_ignored_read = true
+	var f: FileAccess = FileAccess.open("res://.gitignore", FileAccess.READ)
+	if f == null:
+		return _ignored
+	while not f.eof_reached():
+		var line: String = f.get_line().strip_edges()
+		if line.is_empty() or line.begins_with("#") or line.begins_with("!") or line.ends_with("/"):
+			continue
+		_ignored.append(line.trim_prefix("/"))
+	f.close()
+	return _ignored
+
+
+func _is_ignored(res_path: String) -> bool:
+	var rel: String = res_path.trim_prefix("res://")
+	for g: String in _ignore_globs():
+		if rel.match(g) or rel.get_file().match(g):
+			return true
+	return false
+
+
 func _gd_files(roots: Array) -> Array[String]:
 	var out: Array[String] = []
 	for root: String in roots:
@@ -502,7 +552,7 @@ func _walk(dir_path: String, out: Array[String]) -> void:
 		if d.current_is_dir():
 			if not n.begins_with("."):
 				_walk(dir_path.path_join(n), out)
-		elif n.ends_with(".gd"):
+		elif n.ends_with(".gd") and not _is_ignored(dir_path.path_join(n)):
 			out.append(dir_path.path_join(n))
 		n = d.get_next()
 	d.list_dir_end()
