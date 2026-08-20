@@ -192,6 +192,12 @@ const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, name
 ## shape it named and nothing in the file could notice. Below this the counter would be smaller than the
 ## thing it is a counter for.
 const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT
+## ELEVATION, NOT A GOLD SLAB. The live tab on both rails used to be a filled brass-tinted tile AND an
+## accent edge AND a lit glyph: three signals for one bit of state, and the tinted fill is the one that reads
+## as a pressed button from a decade ago. This is a plain lift off the rail's own 0.043/0.049/0.070, so the
+## brass is spent once, on the edge. Named because the bazaar rail and the settings rail were carrying the
+## same literal separately and had no way to notice if one of them moved.
+const RAIL_ON_FILL := Color(0.090, 0.100, 0.130)
 const BAZAAR_GUTTER: float = 10.0
 ## 24 again, not the 22 the two-column layout needed: three columns of eight is twenty-four rows, so the row
 ## can afford the two pixels back and the type can breathe.
@@ -1797,8 +1803,23 @@ func _draw_inventory_overlay() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The digit that selects it
-## rides under each glyph, because a key legend nobody can find is a key nobody presses.
+## ONE KEY, DRAWN AS A KEY. A bare digit painted in the corner of a tile reads as a step number, which is
+## what makes a three-tab counter feel like a three-page wizard; the same digit inside a raised cap reads as
+## something to press. Returns the width it consumed so a row of them lays out without measuring twice.
+func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
+	var tw: float = _font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var w: float = maxf(tw + 8.0, 14.0)
+	var h: float = float(fs) + 7.0
+	var box := Rect2(at, Vector2(w, h))
+	_round_rect(Rect2(box.position + Vector2(0.0, 1.0), box.size), 3.0, Color(0.0, 0.0, 0.0, 0.35))
+	_round_rect(box, 3.0, Color(0.13, 0.145, 0.18))
+	draw_string(_font, at + Vector2((w - tw) * 0.5, h - 5.0), key,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.74, 0.78, 0.86))
+	return w
+
+
+## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects it rides
+## under each glyph as a cap, because a key legend nobody can find is a key nobody presses.
 func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, Color(0.043, 0.049, 0.070, 0.92))
@@ -1811,15 +1832,14 @@ func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
 		var on: bool = i == bazaar_tab
 		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
 		if on:
-			_round_rect(box, 6.0, Color(0.145, 0.129, 0.082))
+			_round_rect(box, 6.0, RAIL_ON_FILL)
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
 		_rail_glyph(box.get_center(), i, on)
 		var label: String = TAB_NAMES[i]
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
 		draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + 48.0), label,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT if on else Color(0.36, 0.39, 0.45))
-		draw_string(_font, Vector2(box.position.x + 1.0, y + 10.0), str(i + 1),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.34, 0.30, 0.22) if on else Color(0.24, 0.26, 0.31))
+		_keycap(Vector2(box.get_center().x - 7.0, y + 51.0), str(i + 1), 7)
 
 
 ## The three tab glyphs, drawn rather than lettered: a satchel, a gear, a ladder of rungs.
@@ -1865,9 +1885,18 @@ func _draw_bazaar_head(origin: Vector2, g: Dictionary) -> void:
 ## The footer is now one line: the keys. What you are carrying moved to the head as chips, and where the
 ## verbs live moved onto the verb BUTTON, where it is answering the question you are actually asking.
 func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
-	var keys: String = "arrows  pick      1 2 3  tab      E  close"
-	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0), keys,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.34, 0.37, 0.43))
+	# ONE INPUT GRAMMAR, AND IT IS THE RAIL'S. This was a single run-on string using double spaces as
+	# structure, which reads as prose and gets skipped like prose: keys and verbs sat at the same weight, so
+	# nothing in the line said which half was the thing to press. Each key is a cap now with its verb beside
+	# it at the old dim weight, so the eye lands on the key.
+	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
+	var y: float = origin.y + float(g["h"]) - 15.0
+	for pair: Array in [["up/dn", "pick"], ["1-3", "tab"], ["E", "close"]]:
+		x += _keycap(Vector2(x, y), str(pair[0]), 8) + 5.0
+		var label: String = str(pair[1])
+		draw_string(_font, Vector2(x, y + 11.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+			Color(0.34, 0.37, 0.43))
+		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 16.0
 
 
 # --- the tabs -------------------------------------------------------------------------------------------
@@ -2913,7 +2942,7 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 		var on: bool = i == settings_cat
 		var box := Rect2(rail.position.x + 9.0, y, 38.0, 38.0)
 		if on:
-			_round_rect(box, 6.0, Color(0.145, 0.129, 0.082))
+			_round_rect(box, 6.0, RAIL_ON_FILL)
 			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
 		_settings_glyph(box.get_center(), i, on or box.has_point(mouse))
 		# THE NUMBER TRAVELS INSIDE THE WORD. It used to be drawn separately above the icon while the word
