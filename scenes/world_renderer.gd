@@ -812,17 +812,17 @@ func _draw_dig_marks(canvas: CanvasItem) -> void:
 	var pulse: float = 0.65 + 0.35 * sin(_anim_time * 2.6)
 	var edge := Color(0.95, 0.72, 0.30, 0.30 + 0.25 * pulse)
 	var fill := Color(0.95, 0.72, 0.30, 0.05)
-	var arm: float = float(CELL) * 0.28
 	for key: Variant in _dig_marks:
-		var pos := Vector2(key as Vector2i) * float(CELL)
-		if not view.has_point(pos):
+		var cell: Vector2i = key
+		if not view.has_point(Vector2(cell) * float(CELL)):
 			continue
-		canvas.draw_rect(Rect2(pos + Vector2.ONE * 2.0, Vector2.ONE * float(CELL - 4)), fill)
-		for corner: Vector2 in [Vector2.ZERO, Vector2(1, 0), Vector2(0, 1), Vector2.ONE]:
-			var c: Vector2 = pos + corner * float(CELL) + (Vector2.ONE * 0.5 - corner) * 4.0
-			var dir := Vector2.ONE * 0.5 - corner   # points inward
-			canvas.draw_line(c, c + Vector2(signf(dir.x) * arm, 0.0), edge, 1.5)
-			canvas.draw_line(c, c + Vector2(0.0, signf(dir.y) * arm), edge, 1.5)
+		# The same corners the cursor puts on the thing it is over, at a thinner stroke. A marked cell IS a
+		# thing the pick will act on, only later and not now, and the difference between now and later is
+		# worth a stroke width rather than a whole second shape. The loop that used to live here cut its
+		# corners at its own arm length and its own inset, which is how two copies of one mark stop being
+		# one mark.
+		canvas.draw_rect(_mark_wash(cell), fill)
+		_cell_corners(canvas, _mark_rect(cell), edge, 1.5)
 
 
 ## Spider cracks across the block currently being charge-mined, growing with the break progress pushed via
@@ -1599,8 +1599,85 @@ const CHROME := Color(0.78, 0.83, 0.92)
 const GUIDE_CHEVRON := Vector2(9.0, 10.0)
 
 
-## The current objective's cell. Mode "ghost" is a pulsing green outlined cell showing where to place the
-## next machine; mode "act" is a chevron bobbing in the air above the target with a tether down to it, over
+## A SQUARE IS WHERE YOU POINT. CORNERS ARE WHAT YOU WOULD ACT ON. A DASH IS A PLAN. A BAR IS A NO.
+##
+## Five marks were answering the same two questions — what is the cursor on, and may I act on it — and no
+## two of them were cut from the same parts. A chrome square at the cell's full width over rock. The same
+## square inset by a pixel and half a pixel heavier under a build ghost. Corner brackets at one arm length
+## on the thing under the cursor, and corner brackets at another arm length and another inset on a cell
+## painted for the pick. An outline breathing green around the cell guidance wants the next machine on. A
+## red square with an X drawn corner to corner over rock too hard to bite. Five, for two questions, and
+## every one of them has to be learned on its own.
+##
+## The worst of it was where two answers were NOT cut differently. Over an empty cell the build ghost's
+## border said yes in chrome and no in red at the same size and the same weight, so the difference between
+## a press that lands and a press that does nothing was a hue — which is no difference at all to a player
+## who cannot use hue, and that is the one place in the file where telling two marks apart costs a press.
+##
+## Four shapes now, and each answers a different question.
+##
+## A SQUARE is the cursor and says only HERE. One inset, one weight, chrome, and it neither breathes nor
+## grows: it is on screen every frame of the game, and a mark that never leaves cannot be the mark that
+## means now.
+##
+## CORNERS say this is the thing your next press acts on. They breathe, they grow, and they carry the
+## thing's OWN colour, so they name what is under the cursor as well as where it is — which is the half of
+## the sentence a neutral reticle could never say, and the reason this is the mark the active action keeps.
+## `_cell_corners` cuts them for the hovered thing and for the painted dig plan alike, the plan wearing a
+## thinner stroke of the same shape rather than a second shape to learn.
+##
+## A DASH is a plan: something happens to this cell later, by your hand or by a machine's. It was already
+## the build previews' shape and it is now the placement objective's too, which used to breathe an outline
+## around its cell — the one gesture corners own.
+##
+## A BAR is a refusal, struck ACROSS the cell it refuses, in the one red both refusals now share. This is
+## the part of the vocabulary that has to survive being glanced at rather than read, which is why the
+## answer is a shape and not only a colour.
+##
+## NOTHING THAT ALIGNS TO A CELL IS ROUND. The world keeps two rings and neither of them is a cell mark.
+## The hook's endpoint (`_draw_aim_ghost`) is put where the hook would touch and is not snapped to the
+## grid, so it reads as a contact point rather than as a square's worth of rock — which is exactly what
+## says it belongs to a different verb than the one the cursor is holding. The sonar's returns and the map
+## pin's beacon expand, and a growing ring is an arrival rather than a place. The need bubble over a
+## stalled machine was a third, and the worst of them — a thin circle with a bolt struck through it,
+## hanging in the dark over a machine too unlit to see, which is a prohibition sign in every language on
+## earth. It keeps its shape and gets a stem down onto the roof it speaks for, because a mark touching the
+## thing it is about is a label, and only a mark floating free of everything can be read as a sign.
+##
+## Where the rule stops: `Visuals.draw_status_mark` cuts a small cross for a machine wired to nothing, and
+## a cross on a machine is close to the bar this file now spends on refusal. That one is a lamp glyph
+## inside the casing rather than a note laid over the world, so it is a boundary case in the same way
+## `Visuals._lift`'s chevrons are, and it is the first place to look if the two start reading as each other.
+##
+## Inset from the cell edge that every mark here is drawn at, in pixels. One number rather than one per
+## site, so a cell wearing two of them shows no seam between them.
+const MARK_INSET: float = 1.0
+## Stroke weight of the cursor square, of the corners and of a plan's dashes.
+const MARK_W: float = 2.0
+## The bar is heavier than the square it crosses, derived rather than typed so the two cannot drift apart:
+## the square says where and the bar says no, and of the two only the bar has to arrive without being
+## looked at.
+const MARK_BAR_W: float = MARK_W * 1.5
+## Corner arm length as a fraction of the cell. A quarter still reads as a corner; much longer and the four
+## arms close up into the outline the square already owns.
+const MARK_ARM: float = 0.25
+## Where a wash inside a mark starts: clear of the outline's own stroke, so a fill under a square does not
+## show through the line. Derived from the two above rather than written as the 2.0 it happens to come to,
+## because a retuned stroke has to take its fill with it.
+const MARK_FILL: float = MARK_INSET + MARK_W * 0.5
+## The one red a refusal is drawn in. There were two, and nothing related them: rock over your drive's tier
+## wore one, a blocked placement the other. This is the brighter, kept because a refusal answers something
+## you are doing right now and is allowed to interrupt. Each site keeps the alpha it had already settled
+## on, so only the hue moves.
+##
+## The red-amber the build previews warn in is deliberately NOT this. A warning says the machine you are
+## about to place will sit there with nowhere to drain; a refusal says the press will not happen at all.
+## One of them stops you and the other does not, and they should not arrive in the same colour.
+const REFUSE := Color(0.95, 0.45, 0.40)
+
+
+## The current objective's cell. Mode "ghost" is a dashed green cell showing where to place the next
+## machine; mode "act" is a chevron bobbing in the air above the target with a tether down to it, over
 ## a faint wash on the cell itself (dig this, feed this forge). Cosmetic.
 ##
 ## ONE RING GRAMMAR, AND IT BELONGS TO THE ACTIVE ACTION. "act" used to draw a near-white reticle over a
@@ -1617,19 +1694,20 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 		var cell: Vector2i = t["cell"]
 		if not sim.in_bounds(cell):
 			continue
-		var pos := Vector2(cell) * float(CELL)
-		var center := pos + Vector2(CELL, CELL) * 0.5
+		var center: Vector2 = _cell_center(cell)
 		if String(t.get("mode", "act")) == "ghost":
+			# A dashed cell, not a breathing one. An outline that GROWS around a cell is what the cursor
+			# does when it lands on something you can act on, and a placement objective is not that: it is
+			# a plan, which is the shape the build previews already wear and which this cell is about to
+			# become one of. It still breathes in value, so it reads as live without borrowing the gesture.
 			var g := Color(0.45, 1.0, 0.55, 0.35 + 0.45 * pulse)
-			var pad: float = 2.0 + 2.0 * pulse
-			canvas.draw_rect(Rect2(pos + Vector2(pad, pad), Vector2(CELL - 2.0 * pad, CELL - 2.0 * pad)), g, false, 2.5)
+			_draw_dashed_rect(canvas, _mark_rect(cell), g, 6.0, MARK_W)
 		else:
 			# The cell itself, so the tether lands on something definite rather than in the middle of rock that
 			# looks like every other cell. A wash and not an outline: an outline around a cell is the cursor's
 			# shape, and this is the one place that has to not borrow it. Chrome rather than the reticle's old
 			# near-white, at the alpha the wash already carried.
-			canvas.draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)),
-				Color(CHROME.r, CHROME.g, CHROME.b, 0.10 + 0.10 * pulse))
+			canvas.draw_rect(_mark_wash(cell), Color(CHROME.r, CHROME.g, CHROME.b, 0.10 + 0.10 * pulse))
 		# A bobbing chevron floats high above the cell, out of the lamp wash and into open air, on a tether
 		# back down to the exact rock so the eye tracks marker to target. Drawn twice, a thick dark stroke
 		# under a chrome one, so it punches through both the bright lamp and the bright day sky; that is
@@ -1679,69 +1757,115 @@ func _dotted_line(canvas: CanvasItem, a: Vector2, b: Vector2, col: Color, width:
 		t += dash * 2.0
 
 
+## The rect every cell mark is drawn on. One function so the square, the corners, the dash and the bar
+## cannot come apart by a pixel as any one of them is retuned.
+func _mark_rect(cell: Vector2i) -> Rect2:
+	var span: float = float(CELL) - 2.0 * MARK_INSET
+	return Rect2(Vector2(cell) * float(CELL) + Vector2(MARK_INSET, MARK_INSET), Vector2(span, span))
+
+
+## The wash inside a mark: the same rect the outline sits on, pulled in clear of its stroke.
+func _mark_wash(cell: Vector2i) -> Rect2:
+	return _mark_rect(cell).grow(MARK_INSET - MARK_FILL)
+
+
+## THE CURSOR SQUARE: the cell you are pointing at, and nothing beyond that. Three sites used to cut their
+## own — over rock at the cell's full width, under a build ghost inset by a pixel and half a pixel heavier,
+## over refused rock inset by a pixel — so the cursor changed size and weight as it crossed from stone into
+## air. One mark in three colours now.
+func _cell_square(cell: Vector2i, col: Color) -> void:
+	draw_rect(_mark_rect(cell), col, false, MARK_W)
+
+
+## CORNERS: four L-brackets hugging `rect` with their arms turned inward. The hovered thing wears them
+## solid and the painted dig plan wears them thin, which is the whole of the difference between the two
+## sites that used to keep a corner loop each, at two arm lengths and two insets.
+##
+## Drawn to a passed canvas because the dig plan lives on the marks layer, above the veil, while the
+## cursor's own go on `self`.
+func _cell_corners(canvas: CanvasItem, rect: Rect2, col: Color, width: float) -> void:
+	var arm: float = float(CELL) * MARK_ARM
+	for corner: int in 4:
+		var c := Vector2(rect.position.x if corner % 2 == 0 else rect.end.x,
+			rect.position.y if corner < 2 else rect.end.y)
+		var d := Vector2(1.0 if corner % 2 == 0 else -1.0, 1.0 if corner < 2 else -1.0)
+		canvas.draw_line(c, c + Vector2(arm * d.x, 0.0), col, width)
+		canvas.draw_line(c, c + Vector2(0.0, arm * d.y), col, width)
+
+
+## A REFUSAL: the cursor square in the refusal red with a bar struck across it. Both of the game's hard NOs
+## come through here — rock over the carried drive's tier, and a cell with no room for the machine in hand
+## — because they were the pair that differed in hue and in nothing else, and a refusal is exactly the
+## answer that must not depend on telling two reds apart.
+##
+## One bar where there used to be a crossed pair: two strokes were never saying more than one, and a cross
+## is the mark a machine's lamp wears for a wire that leads nowhere. It starts half a corner arm in from
+## the mark's corners, which is where the cross it replaces started and is far enough in that a cell could
+## wear corners and a bar at once without them touching. `alpha` is whatever the calling site had already
+## settled on, so only the shape and the hue move.
+func _cell_refusal(cell: Vector2i, alpha: float) -> void:
+	var no := Color(REFUSE.r, REFUSE.g, REFUSE.b, alpha)
+	_cell_square(cell, no)
+	var rect: Rect2 = _mark_rect(cell)
+	var pull := Vector2.ONE * (float(CELL) * MARK_ARM * 0.5)
+	draw_line(rect.position + pull, rect.end - pull, no, MARK_BAR_W)
+
+
 ## An interactable outline pulse: a breathing coloured outline plus solid corner brackets around the hovered
 ## thing, in the thing's OWN colour, so a drill pulses steel and an ore vein pulses ore. Drawn rather than
 ## shadered because machines and terrain here are procedural canvas paint, so there is no texture a shader
 ## outline could sample.
 ##
-## THIS is the file's ring: a shape breathing around a cell means the next action lands there. Nothing else
-## may draw one, which is why the objective marker gave its reticle up (see `_draw_guide_targets`). The
-## colour is not decoration either, it is the second half of the sentence, naming what is under the cursor
-## without any text; that is the part a neutral reticle could not say and the reason this is the survivor.
+## THIS is the mark the active action keeps: an outline that grows around a cell means the next press lands
+## there. Nothing else may grow one, which is why the objective marker gave up first its reticle and then
+## its breathing outline (see `_draw_guide_targets`). The colour is not decoration either, it is the second
+## half of the sentence, naming what is under the cursor without any text; that is the part a neutral
+## reticle could not say and the reason this is the survivor.
 func _draw_interact_pulse(rect: Rect2, col: Color) -> void:
 	var pulse: float = 0.5 + 0.5 * sin(_anim_time * 4.0)
 	var r: Rect2 = rect.grow(2.0 + pulse * 2.5)
-	draw_rect(r, Color(col.r, col.g, col.b, 0.28 + 0.42 * pulse), false, 2.0)
-	var arm: float = float(CELL) * 0.22
-	var solid := Color(col.r, col.g, col.b, 0.95)
-	for corner: int in 4:
-		var c := Vector2(r.position.x if corner % 2 == 0 else r.end.x,
-			r.position.y if corner < 2 else r.end.y)
-		var d := Vector2(1.0 if corner % 2 == 0 else -1.0, 1.0 if corner < 2 else -1.0)
-		draw_line(c, c + Vector2(arm * d.x, 0.0), solid, 2.0)
-		draw_line(c, c + Vector2(0.0, arm * d.y), solid, 2.0)
+	draw_rect(r, Color(col.r, col.g, col.b, 0.28 + 0.42 * pulse), false, MARK_W)
+	_cell_corners(self, r, Color(col.r, col.g, col.b, 0.95), MARK_W)
 
 
 ## The cursor cell, drawn by context from the affordances MainView pushed via set_aim:
-##   solid earth -> mine box (white, faint out of reach; a vein adds an ore-coloured interact pulse)
-##   your machine -> interact pulse in its own colour
-##   open cell -> build ghost of the selected machine (white outline placeable, red blocked).
+##   solid earth -> the cursor square, faint out of reach; a vein adds ore-coloured corners
+##   your machine -> corners in the machine's own colour
+##   open cell -> a build ghost of the selected machine under the cursor square, barred when blocked.
 func _draw_aim() -> void:
 	if not sim.in_bounds(_aim):
 		return
-	var pos := Vector2(_aim) * float(CELL)
 	if sim.is_solid(_aim):
-		# Rock over the carried drive's tier: the cursor goes cold and crossed BEFORE you press
+		# Rock over the carried drive's tier: the cursor goes cold and barred BEFORE you press
 		# (`docs/BITS.md` §5). A binary gate is only honest if you can see it coming; finding out by clicking
 		# and watching nothing happen reads as a broken game rather than as a locked door.
 		if _aim_in_reach and not _aim_bites:
-			var no := Color(0.86, 0.42, 0.34, 0.60 + 0.16 * sin(_anim_time * 3.0))
-			draw_rect(Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2)), no, false, 2.0)
-			draw_line(pos + Vector2(5, 5), pos + Vector2(CELL - 5, CELL - 5), no, 2.0)
-			draw_line(pos + Vector2(CELL - 5, 5), pos + Vector2(5, CELL - 5), no, 2.0)
+			_cell_refusal(_aim, 0.60 + 0.16 * sin(_anim_time * 3.0))
 			return
 		# Chrome, not white: the cursor is on screen every frame of the game, and a permanent mark cannot hold
 		# the brightest colour the screen has (see CHROME). Both alphas are the ones this box already used, so
 		# the near/far reach step is unchanged.
 		var col := Color(CHROME.r, CHROME.g, CHROME.b, 0.85) if _aim_in_reach else Color(CHROME.r, CHROME.g, CHROME.b, 0.18)
-		draw_rect(Rect2(pos, Vector2(CELL, CELL)), col, false, 2.0)
+		_cell_square(_aim, col)
 		if _aim_in_reach and sim.ore_deposit_at(_aim) > 0:   # a rich vein reads as a thing, not just rock
-			_draw_interact_pulse(Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2)),
-				_material(sim.material_at(_aim)).nugget_color)
+			_draw_interact_pulse(_mark_rect(_aim), _material(sim.material_at(_aim)).nugget_color)
 		return
 	if not _aim_in_reach:
 		return
-	var inner := Rect2(pos + Vector2(1, 1), Vector2(CELL - 2, CELL - 2))
+	var inner: Rect2 = _mark_rect(_aim)
 	var m: MachineState = sim.machine_at(_aim)
 	if m != null:
 		_draw_interact_pulse(inner, Visuals.machine_color(m.def).lightened(0.25))
 		return
 	if _ghost_def != null:
-		# A bright, fairly opaque tint so the ghost reads as a translucent preview on its own.
-		var ghost: Color = Visuals.machine_color(_ghost_def).lerp(Color.WHITE, 0.20)
+		# A bright, fairly opaque tint so the ghost reads as a translucent preview on its own. Lifted toward
+		# chrome rather than toward white, because a preview is a thing you are still deciding about and
+		# white belongs to things that have already happened (see CHROME). The lift is what makes the ghost
+		# read as translucent; where it lands is what stops it reading as urgent.
+		var ghost: Color = Visuals.machine_color(_ghost_def).lerp(CHROME, 0.20)
 		ghost.a = 0.55
-		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), ghost)
-		Visuals.draw_machine_glyph(self, pos + Vector2(CELL, CELL) * 0.5, Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
+		draw_rect(_mark_wash(_aim), ghost)
+		Visuals.draw_machine_glyph(self, _cell_center(_aim), Visuals.machine_kind(_ghost_def), 1.0, false, 0.0)
 		if _ghost_def.behavior == &"drill" and _aim_placeable:
 			_draw_drill_preview()  # dashed ore column and out-arrow: what it bores, and where it pours
 		if _ghost_def.behavior == &"rope" and _aim_placeable:
@@ -1754,14 +1878,18 @@ func _draw_aim() -> void:
 		# Block-placement preview: a translucent material-tinted fill.
 		var bg: Color = _material(_ghost_material).base_color
 		bg.a = 0.55
-		draw_rect(Rect2(pos + Vector2(2, 2), Vector2(CELL - 4, CELL - 4)), bg)
+		draw_rect(_mark_wash(_aim), bg)
 	else:
 		return  # the active hotbar item is not placeable, so there is nothing to ghost
-	# A bright box hovering over the target cell; red when blocked. Chrome rather than the near-white it was,
-	# for the same reason the cursor moved: a preview is not an event. The blocked red is untouched, since a
-	# refusal is exactly the kind of thing that is allowed to interrupt.
-	var border := Color(CHROME.r, CHROME.g, CHROME.b, 0.95) if _aim_placeable else Color(0.95, 0.45, 0.40, 0.95)
-	draw_rect(inner, border, false, 2.5)
+	# The same cursor square as over rock, over a cell you may fill — chrome rather than the near-white it
+	# was, for the same reason the cursor moved: a preview is not an event. A cell you may NOT fill is
+	# barred, where it used to be a second red square differing from the placeable one only in hue. The two
+	# answers to "can this go here" are now two shapes, and the refusal is the same mark rock over your
+	# tier wears, since it is the same sentence about a different obstacle.
+	if _aim_placeable:
+		_cell_square(_aim, Color(CHROME.r, CHROME.g, CHROME.b, 0.95))
+	else:
+		_cell_refusal(_aim, 0.95)
 
 
 ## Holding a Drill over a valid spot previews what it will bore: a dashed outline around the ore column it
@@ -1788,7 +1916,7 @@ func _draw_drill_preview() -> void:
 	var bot: Vector2i = ore_cells[-1]
 	var box := Rect2(Vector2(top) * float(CELL) + Vector2(1, 1),
 		Vector2(CELL - 2, float((bot.y - top.y + 1) * CELL) - 2))
-	_draw_dashed_rect(box, tint, 6.0, 2.5)
+	_draw_dashed_rect(self, box, tint, 6.0, MARK_W)
 	# The out-arrow, in the cell just below the bottommost ore, where the ore pours out.
 	var drop: Vector2i = pv["drop_cell"]
 	if sim.in_bounds(drop):
@@ -1823,7 +1951,7 @@ func _draw_h_drill_preview() -> void:
 	var hi: int = maxi(cells[0].x, cells[-1].x)
 	var box := Rect2(Vector2(float(lo * CELL) + 1.0, float(_aim.y * CELL) + 1.0),
 		Vector2(float((hi - lo + 1) * CELL) - 2.0, float(CELL) - 2.0))
-	_draw_dashed_rect(box, tint, 6.0, 2.5)
+	_draw_dashed_rect(self, box, tint, 6.0, MARK_W)
 	# The out-arrow under the borer's OWN cell: the on-hook rule made visible before you commit.
 	_out_arrow(below, tint)
 
@@ -1865,7 +1993,7 @@ func _draw_drift_preview() -> void:
 		xs.sort()
 		var box := Rect2(Vector2(float(xs[0] * CELL) + 1.0, float((_aim.y - 1) * CELL) + 1.0),
 			Vector2(float((xs[-1] - xs[0] + 1) * CELL) - 2.0, float(CELL * 2) - 2.0))
-		_draw_dashed_rect(box, Color(1.0, 0.80, 0.30, 0.85), 6.0, 2.5)
+		_draw_dashed_rect(self, box, Color(1.0, 0.80, 0.30, 0.85), 6.0, MARK_W)
 	_drift_chute(_aim.x, "ORE")
 	_drift_chute(_aim.x - facing, "SPOIL")
 
@@ -1933,9 +2061,14 @@ func _out_arrow(cell: Vector2i, tint: Color) -> Vector2:
 	return tip
 
 
-## A dashed rectangle outline: the perimeter walked clockwise, laying `dash`-length ticks every other `dash`.
-## Used by the drill preview, so the overlay reads as a plan rather than as a solid selection box.
-func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> void:
+## A PLAN: the perimeter walked clockwise, laying `dash`-length ticks every other `dash`. Every site that
+## says something will happen to these cells later draws one — what a Drill will bore, the gallery a Borer
+## will chew, both of a Drift Rig's columns, and the cell guidance wants the next machine on.
+##
+## Drawn to a passed canvas, like `_dotted_line` and `_chevron`, because guidance's copy lives on the marks
+## layer above the veil while the build previews go on `self`. One weight for all of them: two of the four
+## used to be half a pixel heavier than the others for no reason either could state.
+func _draw_dashed_rect(canvas: CanvasItem, rect: Rect2, color: Color, dash: float, width: float) -> void:
 	var corners: Array[Vector2] = [
 		rect.position,
 		rect.position + Vector2(rect.size.x, 0),
@@ -1950,7 +2083,7 @@ func _draw_dashed_rect(rect: Rect2, color: Color, dash: float, width: float) -> 
 		var t: float = 0.0
 		while t < seg:
 			var t2: float = minf(t + dash, seg)
-			draw_line(a + dir * t, a + dir * t2, color, width)
+			canvas.draw_line(a + dir * t, a + dir * t2, color, width)
 			t += dash * 2.0
 
 
@@ -2829,8 +2962,23 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 	var pulse: float = 0.62 + 0.38 * sin(_anim_time * 6.5)
 	var bob: float = sin(_anim_time * 3.0) * 1.5
 	var bc: Vector2 = Vector2(face.get_center().x, face.position.y - 24.0 + bob)
-	draw_circle(bc, 9.0, Color(0.05, 0.04, 0.06, 0.82 * pulse))
-	draw_arc(bc, 9.0, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
+	var br: float = 9.0                       # the bubble's radius, named once because the stem hangs off it
+	# A STEM DOWN ONTO THE ROOF, because this bubble is the only mark in the file that floated free of the
+	# thing it meant, and guidance's chevron is supposed to be the only one that does. In a lit room the
+	# machine underneath carried the attachment on its own. In an unlit one it does not: what is left on
+	# screen is a thin ring with a bolt struck through it, hanging in rock, and a ring with a diagonal
+	# through it is a sign forbidding something in every language there is. Planted on a roof it is a label
+	# instead, and a label cannot be misread as a sign.
+	#
+	# No head at either end. A filled head pointing down into a machine is the drop column's sentence
+	# (`_out_arrow`), and this mark is not about anything moving. A foot where the stem lands says which
+	# roof, which is all it has to say.
+	var foot: Vector2 = Vector2(bc.x, face.position.y)
+	var stem := Color(lamp.r, lamp.g, lamp.b, 0.55 * pulse)
+	draw_line(bc + Vector2(0.0, br), foot, stem, 1.5)
+	draw_line(foot - Vector2(br * 0.4, 0.0), foot + Vector2(br * 0.4, 0.0), stem, 1.5)
+	draw_circle(bc, br, Color(0.05, 0.04, 0.06, 0.82 * pulse))
+	draw_arc(bc, br, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 1.6)
 
 	# The bubble holds up what the player would go and do about it, which for two statuses is an item to
 	# fetch and for three is a job to perform. Drawing items only meant the jam, dead-power and unwired states
@@ -3446,9 +3594,13 @@ func _draw_aim_ghost() -> void:
 		draw_line(from.lerp(to, t0), from.lerp(to, t1),
 			(AIM_LEAD if hit else AIM_MISS) * Color(1, 1, 1, fade), 1.0)
 	if hit:
+		# One ring, and nothing inside it. The dot that used to sit at the centre marked the point the ring
+		# already marks, and a ring with a mark in the middle of it is a selection reticle — which the
+		# cursor's own square is being, on the same rock, a few pixels away, every time the throw lands
+		# somewhere you could also swing at. Position, radius and backing stroke are all untouched, so the
+		# endpoint is exactly as findable as it was; there is simply one mark on it rather than two.
 		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_SHADE, AIM_SHADE_W)
 		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_MARK, 1.5)
-		draw_arc(to, AIM_RING * 0.30, 0.0, TAU, 8, AIM_MARK, 1.5)
 
 
 func _draw_grapple() -> void:
