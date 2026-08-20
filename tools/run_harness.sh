@@ -680,6 +680,37 @@ say() {
 	printf '%s\n' "$1" >>"$DIR/summary.txt"
 }
 
+# WHAT TO SHOW FROM A FAILING LAYER'S LOG. This used to be `tail -14`, and a positional rule is not a
+# selective one: it shows the END of the log, which is only the failure if the layer stopped at it. Layers
+# here do not stop. `worldgen` is 162 lines, its single `FAIL:` is on line 130, and the last fourteen lines
+# are thirteen passes and a count -- so the sweep summary reported "1 FAILURE(S)" and then showed the
+# reader everything except which one. That is the house defect turned on its own tooling: an instrument
+# that cannot register the thing it is named for. Grep for the failures and print those.
+#
+# THE NO-HITS BRANCH IS NOT A FALLBACK, IT IS A DIAGNOSIS. A failing layer with no `FAIL:` line anywhere
+# did not fail an assertion, it DIED before reaching one -- most often a parse error in a dependency, which
+# in a fresh worktree is every layer at once because the `class_name` registry is empty. That is
+# indistinguishable from a real failure in a bare exit code and has cost real time here. Say which of the
+# two happened, then show the tail, because for a death the tail is exactly the right thing to show.
+excerpt() {   # excerpt <logfile>
+	local log="$1"
+	local hits
+	hits="$(grep -cE '^[[:space:]]*FAIL:|: FAIL|FAILURE' "$log" 2>/dev/null || true)"
+	hits="${hits:-0}"
+	if [ "$hits" -eq 0 ]; then
+		echo "        | (no FAIL line in this log: the layer DIED before asserting rather than failing an"
+		echo "        |  assertion -- look below for a parse error, not for a broken property)"
+		sed 's/^/        | /' "$log" | tail -14
+		return 0
+	fi
+	grep -E '^[[:space:]]*FAIL:|: FAIL|FAILURE' "$log" | head -12 | sed 's/^/        | /'
+	# Never truncate silently. A capped list that does not say it is capped reads as the whole story.
+	if [ "$hits" -gt 12 ]; then
+		echo "        | ...$((hits - 12)) further FAIL line(s) not shown -- whole log: $log"
+	fi
+	return 0
+}
+
 # One line that says exactly what this run is, so a pasted transcript cannot be mistaken for another mode.
 mode="display"; [ "$HAVE_DISPLAY" = "1" ] || mode="NO DISPLAY — the pixel layers will skip"
 strictness="skips tolerated"; [ "$STRICT" = "1" ] && strictness="STRICT: any skip fails the run"
@@ -855,7 +886,7 @@ while [ "$done_count" -lt "$total" ]; do
 						"$done_count" "$total" "${NAMES[$i]}" "$el" "$SKIP_CODE")"
 					fail=$((fail + 1))
 					failed_names+=("${NAMES[$i]}")
-					sed 's/^/        | /' "$log" | tail -14
+					excerpt "$log"
 				else
 					say "$(printf '  [%2d/%2d] %-36s SKIP  %3ds  %s' \
 						"$done_count" "$total" "${NAMES[$i]}" "$el" "$why")"
@@ -867,7 +898,7 @@ while [ "$done_count" -lt "$total" ]; do
 					"$done_count" "$total" "${NAMES[$i]}" "$el" "$r")"
 				fail=$((fail + 1))
 				failed_names+=("${NAMES[$i]}")
-				sed 's/^/        | /' "$log" | tail -14
+				excerpt "$log"
 			fi
 		fi
 		i=$((i + 1))
