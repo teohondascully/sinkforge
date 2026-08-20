@@ -1576,7 +1576,10 @@ func _bazaar_wanted_h() -> float:
 			var tall: int = maxi(1, _bench_tallest())
 			need = float(tall) * 64.0 + float(tall - 1) * 6.0
 		_:
-			need = float(_pack_rows(inner_w)) * PACK_CELL
+			# The wells AND the summary band under them. The band was missing from this sum, and the
+			# summary's own guard was testing against a content box this sum had already decided, so the
+			# two could only agree by accident and did not. `_ledger_h` carries the reasoning.
+			need = float(_pack_rows(inner_w)) * PACK_CELL + _ledger_h()
 	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL + BAZAAR_FOOT,
 		BAZAAR_MIN_H, BAZAAR_SIZE.y)
 
@@ -1873,22 +1876,71 @@ func _rail_glyph(at: Vector2, kind: int, on: bool) -> void:
 					16.0 - float(i) * 4.0, 2.6), col)
 
 
-## The head: who you are talking to, which counter you are at, and — the thing the old footer buried in a
-## run-on sentence — what you are carrying, as chips you can count without reading.
+## The materials the open tab is pricing in, in the order that tab lists them, and empty for a tab that
+## prices nothing.
+##
+## The head strip used to be a literal six written into the drawing function, and against the prices it is
+## read next to it was wrong in both directions. `ore` is the cost of nothing the counter sells: no
+## `craft_cost` in `src/data/machines/*.tres` names it, no rung in `src/data/research_rules.gd` does, and
+## neither does a tool or bit recipe (`MiningRules.TOOL_RECIPES`, `BitRules.BIT_RECIPES`). Three materials
+## that ARE costs could never appear at all: `plate` and `gear` (research_rules.gd:69, 81, 96, and the
+## craft costs of the Crusher, Blast Furnace, Drift Rig and Borer) and `iron` (iron_forge.tres:14).
+## A strip assembled by hand cannot follow a cost table it has no link to, so it stops following it the
+## first time either one moves.
+##
+## Reading the costs is also the answer to where the strip belongs. It is a global account of the pack,
+## but it is only ever READ against a price, so it lives on the tabs that quote prices. PACK returns
+## nothing here: every chip it drew was a second copy of a well two rows underneath it, since the grid
+## below already lists the same ids with the same counts out of the same `sim.inventory`.
+##
+## BENCH walks the whole ladder rather than the reachable rungs, because the tree draws the whole ladder.
+## A tech's sample material is a real cost and is deliberately not in here: it is not in the rung's `cost`
+## dictionary either, and `_shortfall_note` is the one place that names it.
+func _priced_materials() -> Array[StringName]:
+	var out: Array[StringName] = []
+	match bazaar_tab:
+		TAB_WORKS:
+			for i: int in open_machines():
+				_price_items(craft_options[i]["cost"], out)
+			for i: int in open_rack():
+				_price_items(rack_options[i]["cost"], out)
+		TAB_BENCH:
+			for tid: StringName in ResearchRules.ORDER:
+				_price_items(ResearchRules.tech(tid).get("cost", {}), out)
+	return out
+
+
+func _price_items(cost: Dictionary, out: Array[StringName]) -> void:
+	for item: StringName in cost:
+		if not out.has(item):
+			out.append(item)
+
+
+## The head: who you are talking to, which counter you are at, and what you are carrying of what this tab
+## charges, as chips you can count without reading.
 func _draw_bazaar_head(origin: Vector2, g: Dictionary) -> void:
 	var x: float = origin.x + BAZAAR_RAIL + BAZAAR_PAD
 	_tracked("BAZAAR", Vector2(x, origin.y + 29.0), 17, 2.8, UI_TEXT)
-	_tracked(TAB_NAMES[bazaar_tab], Vector2(x + _tracked_w("BAZAAR", 17, 2.8) + 16.0, origin.y + 29.0),
-		17, 2.8, Color(0.26, 0.28, 0.34))
+	var tab_x: float = x + _tracked_w("BAZAAR", 17, 2.8) + 16.0
+	_tracked(TAB_NAMES[bazaar_tab], Vector2(tab_x, origin.y + 29.0), 17, 2.8, Color(0.26, 0.28, 0.34))
+	# The strip stops one panel pad short of the title's last stroke, measured off the title rather than
+	# guessed at. It was `x + 170.0`, which is a statement about the widths of "BAZAAR" and the longest tab
+	# name at 17pt with 2.8 of tracking, with nothing in the file relating it to either: move the type size
+	# and the guess is wrong in whichever direction nobody looks.
+	var floor_x: float = tab_x + _tracked_w(TAB_NAMES[bazaar_tab], 17, 2.8) + BAZAAR_PAD
 	var rx: float = origin.x + float(g["w"]) - BAZAAR_PAD
-	for item: StringName in [&"wood", &"stone", &"coal", &"ore", &"iron_ingot", &"ingot"]:
+	# A material priced but not held draws no chip, which is the behaviour this loop always had. The
+	# shortfall for the thing under the cursor is answered per ingredient on the detail plate instead
+	# (`_detail_chip`, `_shortfall_note`), and a strip of zeroes for everything the ladder will ever charge
+	# would be a wall of what you do not have on the tab where you are choosing what to do next.
+	for item: StringName in _priced_materials():
 		var n: int = int(sim.inventory.get(item, 0))
 		if n <= 0:
 			continue
 		var label: String = str(n)
 		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 25.0
 		rx -= cw + 5.0
-		if rx < x + 170.0:
+		if rx < floor_x:
 			break
 		_round_rect(Rect2(rx, origin.y + 6.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
 		Visuals.draw_item(self, Vector2(rx + 11.0, origin.y + 16.0), 13.0, item)
@@ -1919,17 +1971,29 @@ func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
 func _tab_pack(g: Dictionary) -> void:
 	var content: Rect2 = g["content"]
 	var slots: Array[Dictionary] = sim.inventory_slots()
+	var cell: float = PACK_CELL
+	var cols: int = _pack_cols(content.size.x)
+	# The wells are served first and the summary gets what is left. `_bazaar_wanted_h` asks for both, so
+	# below the panel's height cap this subtraction takes nothing the grid needed; above the cap the band
+	# is what gives way, because the grid is the tab's subject and the summary is a footnote on it.
+	#
+	# maxi(1, ...) rather than the slot count, so an empty pack reserves the one row `_pack_rows` charged
+	# the panel for and the band lands where the height was bought. An empty pack with a running factory
+	# is a real state, not a corner: it is what standing at the counter having just fed everything in
+	# looks like, and it is the state `_detail_pack` exists for.
+	var rows: int = maxi(1, (slots.size() + cols - 1) / cols)
+	var band: float = clampf(content.size.y - float(rows) * cell, 0.0, _ledger_h())
+	var wells := Rect2(content.position, Vector2(content.size.x, content.size.y - band))
 	if slots.is_empty():
 		draw_string(_font, content.position + Vector2(2.0, 20.0), "(empty — go dig)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
+		_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
 		return
-	var cell: float = PACK_CELL
-	var cols: int = _pack_cols(content.size.x)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	for i: int in slots.size():
 		var box := Rect2(content.position.x + float(i % cols) * cell, content.position.y + float(i / cols) * cell,
 			cell - 6.0, cell - 6.0)
-		if box.end.y > content.end.y:
+		if box.end.y > wells.end.y:
 			break
 		var item: StringName = slots[i]["item"]
 		var hot: bool = box.has_point(Controls.pointer_viewport(self))
@@ -1952,41 +2016,200 @@ func _tab_pack(g: Dictionary) -> void:
 		if i == held:
 			draw_string(_font, box.position + Vector2(5.0, 12.0), "HELD",
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.949, 0.831, 0.549))
-	_pack_ledger(content, slots)
+	_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
 
 
-## Under the grid: what the factory is making for you, as bars. The pack tab had the most empty space of the
-## three and the least reason for it — this is the one screen where "is the flywheel spinning" is worth
-## asking, because you are standing still looking at what you own.
-func _pack_ledger(content: Rect2, slots: Array[Dictionary]) -> void:
-	var cell: float = PACK_CELL
-	var cols: int = _pack_cols(content.size.x)
-	var top: float = content.position.y + float((slots.size() + cols - 1) / cols) * cell + 14.0
-	if top > content.end.y - 30.0:
-		return
+## How tall the summary under the wells is, and 0.0 when it has nothing to say. `_bazaar_wanted_h` adds
+## this to what PACK asks for and `_tab_pack` takes the same number back off the bottom of the grid, so
+## the band the summary draws into and the height the panel was sized to are one piece of arithmetic run
+## twice rather than two numbers that have to agree.
+##
+## They were two numbers, and they did not agree. The summary tested `top > content.end.y - 30.0`, which
+## needs `content.size.y >= rows*46 + 44`, while PACK's asking height was head + wells + gap + plate +
+## foot with no term for the summary in it, so `content` came out at exactly `rows*46`. Short by 44px at
+## every row count, and past four rows of wells the panel is at its 348 cap and the shortfall only widens.
+## The summary has therefore been reaching the screen at no settled height at all: only on the frames
+## where `_bazaar_h` is still easing down from a taller tab, or from the 348 it initialises to. Measured
+## across 1, 2, 3, 4, 5 and 6 rows of wells, the guard's two sides came back 185/141, 208/164, 231/187,
+## 254/210, 298/212 and 344/212, which is a block that has never once been photographed in a settled
+## frame and has been reviewed from the ones where the panel was still moving.
+##
+## Four rows because the band is bought out of the grid above it. At four the band is
+## 14 + 12 + 3*17 + 7 = 84px, which a one-row and a two-row pack both still fit under the 348 cap.
+const LEDGER_GAP: float = 14.0        ## last row of wells to the header's baseline
+const LEDGER_HEAD: float = 12.0       ## header baseline to the first row's baseline
+const LEDGER_ROW: float = 17.0        ## row pitch
+const LEDGER_TAIL: float = 7.0        ## last baseline to the bottom of the bar sitting on it
+const LEDGER_MAX: int = 4             ## goods listed; the verdict shares the header's line
+func _ledger_h() -> float:
+	if sim == null:
+		return 0.0
+	var n: int = mini(LEDGER_MAX, sim.production_rates().size())
+	if n <= 0:
+		return 0.0
+	return LEDGER_GAP + LEDGER_HEAD + float(n - 1) * LEDGER_ROW + LEDGER_TAIL
+
+
+## What the line takes back. Per input item, how many of it a minute the placed recipe machines are
+## consuming, derived from the measured output rates and nothing else: a forge measured at 2.2 ingot/min
+## has, by smelt_ingot's 2 ore for 1 ingot (src/data/recipes/smelt_ingot.tres), consumed exactly 4.4
+## ore/min. The ratio is the recipe's and the rate is the sim's, so there is no capacity model here and
+## nothing to calibrate.
+##
+## Returns {"draw": item -> per minute, "eater": item -> the machine's display name or "" when more than
+## one type is eating it, "mute": item -> true for the ones this cannot speak about}.
+##
+## The mute set is the point. Two placed machine types can output the same good, and a measured ingot rate
+## cannot be split between a Forge turning 2 ore into 1 and a Blast Furnace turning 1 rich_ore into 2
+## (smelt_ingot.tres, smelt_rich.tres). Attributing the whole rate to either one invents the other's
+## throughput, so every input of every candidate recipe goes mute instead: no bar, no clause, and out of
+## the verdict. Silence is the only honest output there, and it is a different state from an item nothing
+## consumes, which reports as a real zero.
+##
+## Machines that run their own tick rather than the recipe runner carry no recipe inputs to add up here:
+## a drill's mine_ore has none, and the descent engine eats ingots through DESCENT_EATS
+## (src/core/factory_sim.gd:149) with no recipe at all. So the clause names the machines this did add up
+## and says "to the Forge" rather than "consumed", which is true whatever else is also eating.
+func _line_offtake() -> Dictionary:
+	var makers: Dictionary = {}                       # output item -> [{recipe, name}, ...]
+	for row: Dictionary in sim.machine_census():
+		var rec: RecipeDef = (row["def"] as MachineDef).recipe
+		if rec == null or rec.inputs.is_empty():
+			continue
+		for out: StringName in rec.outputs:
+			if not makers.has(out):
+				makers[out] = []
+			(makers[out] as Array).append({"recipe": rec, "name": str(row["name"])})
+	var taken: Dictionary = {}
+	var eater: Dictionary = {}
+	var mute: Dictionary = {}
+	for r: Dictionary in sim.production_rates():
+		var out: StringName = r["item"]
+		var mk: Array = makers.get(out, [])
+		if mk.is_empty():
+			continue
+		if mk.size() > 1:
+			for m: Dictionary in mk:
+				for item: StringName in (m["recipe"] as RecipeDef).inputs:
+					mute[item] = true
+			continue
+		var rec: RecipeDef = mk[0]["recipe"]
+		var per: float = float(int(rec.outputs[out]))
+		if per <= 0.0:
+			continue
+		var who: String = str(mk[0]["name"])
+		for item: StringName in rec.inputs:
+			taken[item] = float(taken.get(item, 0.0)) \
+				+ float(r["rate"]) * float(int(rec.inputs[item])) / per
+			# Two machine types can share one ingredient (the Gear Mill and the Plate Press both eat iron
+			# ingots), and the total stays right while the name stops being. Naming neither beats naming
+			# whichever the census happened to yield last.
+			eater[item] = who if not eater.has(item) or str(eater[item]) == who else ""
+	return {"draw": taken, "eater": eater, "mute": mute}
+
+
+## Under the grid: what the factory is making for you, and what the rest of the line does with it.
+##
+## It was a list of rates and one bar grammar for all of them, scaled to whichever rate was largest. That
+## is a readout, and it is a readout that flattens the one thing worth reading: a bar drawn as a share of
+## the fastest number on the panel makes a trickle of a refined good and a flood of a common raw look like
+## the same kind of fact at two lengths, and the length moves when an unrelated row moves.
+##
+## So the bar is not a magnitude any more. It is the share of that item's own income the line is taking
+## back, which is a 0..1 quantity meaning the same thing on every row, and the /min number beside it keeps
+## the magnitude. Rows split themselves into two kinds out of the data rather than out of a rule: an item
+## the line consumes gets a bar and a clause naming what is eating it, an item nothing on the line touches
+## gets neither, and an item the offtake cannot attribute gets neither and says nothing.
+##
+## The verdict on the header's line is the decision the rows only imply. It is chosen over the items the
+## line actually consumes, so it is always about a live flow rather than about the earth and stone a
+## hand-mining player's rate list is otherwise full of. A deficit outranks a surplus: a step drawing more
+## than its feed earns is a step that will stall, and a pile that is growing can wait.
+func _pack_ledger(band: Rect2) -> void:
 	var rates: Array[Dictionary] = sim.production_rates()
-	if rates.is_empty():
+	if rates.is_empty() or band.size.y <= 0.0:
 		return
-	_tracked("YOUR LINE IS MAKING", Vector2(content.position.x + 1.0, top), 8, 2.0, Color(0.451, 0.365, 0.180))
-	var fastest: float = 0.001
-	for r: Dictionary in rates:
-		fastest = maxf(fastest, float(r["rate"]))
-	var bar_w: float = minf(240.0, content.size.x * 0.5)
-	for i: int in mini(5, rates.size()):
-		var y: float = top + 12.0 + float(i) * 17.0
-		if y > content.end.y - 4.0:
+	var off: Dictionary = _line_offtake()
+	var taken: Dictionary = off["draw"]
+	var eater: Dictionary = off["eater"]
+	var mute: Dictionary = off["mute"]
+	var hb: float = band.position.y + LEDGER_GAP
+	var head: String = "YOUR LINE IS MAKING"
+	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, Color(0.451, 0.365, 0.180))
+	var vx: float = band.position.x + 1.0 + _tracked_w(head, 8, 2.0) + 12.0
+	var verdict: String = _ledger_verdict(rates, off)
+	if verdict != "" and band.end.x > vx:
+		draw_string(_font, Vector2(vx, hb), verdict, HORIZONTAL_ALIGNMENT_RIGHT, band.end.x - vx, 9,
+			UI_TEXT)
+	# Columns: glyph, name, the rate right-aligned against the bar's left edge, the bar, the clause. The
+	# bar is 120 rather than the old `min(240, width/2)` because a share does not need half the panel to be
+	# read and the clause beside it does need the room: at 528 of content that leaves 246px for it.
+	var bar_x: float = band.position.x + 154.0
+	var bar_w: float = 120.0
+	for i: int in mini(LEDGER_MAX, rates.size()):
+		var y: float = hb + LEDGER_HEAD + float(i) * LEDGER_ROW
+		if y + LEDGER_TAIL > band.end.y:
 			return
 		var item: StringName = rates[i]["item"]
 		var rate: float = float(rates[i]["rate"])
-		Visuals.draw_item(self, Vector2(content.position.x + 8.0, y + 3.0), 13.0, item)
-		draw_string(_font, Vector2(content.position.x + 18.0, y + 7.0), _item_label(item),
+		Visuals.draw_item(self, Vector2(band.position.x + 8.0, y + 3.0), 13.0, item)
+		draw_string(_font, Vector2(band.position.x + 18.0, y + 7.0), _item_label(item),
 			HORIZONTAL_ALIGNMENT_LEFT, 80.0, 9, UI_TEXT)
-		var bx: float = content.position.x + 104.0
-		_round_rect(Rect2(bx, y - 3.0, bar_w, 10.0), 3.0, Color(1.0, 1.0, 1.0, 0.035))
-		_round_rect(Rect2(bx, y - 3.0, maxf(3.0, bar_w * (rate / fastest)), 10.0), 3.0,
-			Color(0.85, 0.72, 0.42, 0.62))
-		draw_string(_font, Vector2(bx + bar_w + 8.0, y + 6.0), "%.1f/min" % rate,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.85, 0.72, 0.42))
+		draw_string(_font, Vector2(band.position.x + 100.0, y + 7.0), "%.1f/min" % rate,
+			HORIZONTAL_ALIGNMENT_RIGHT, 46.0, 9, UI_TEXT)
+		var took: float = float(taken.get(item, 0.0))
+		if mute.has(item) or took <= 0.0 or rate <= 0.0:
+			continue
+		_round_rect(Rect2(bar_x, y - 3.0, bar_w, 10.0), 3.0, Color(1.0, 1.0, 1.0, 0.035))
+		# The item's own colour rather than the panel's gold. The dashboard's throughput bars already read
+		# this way (`Visuals.item_color`), and gold on this screen means selected, affordable and the live
+		# verb, which is not what a share of an income is.
+		_round_rect(Rect2(bar_x, y - 3.0, maxf(3.0, bar_w * clampf(took / rate, 0.0, 1.0)), 10.0), 3.0,
+			Color(Visuals.item_color(item), 0.62))
+		var who: String = str(eater.get(item, ""))
+		var clause: String = "%.1f/min back into the line" % took
+		if who != "":
+			clause = "%.1f/min to the %s" % [took, who]
+		draw_string(_font, Vector2(bar_x + bar_w + 8.0, y + 7.0), clause,
+			HORIZONTAL_ALIGNMENT_LEFT, band.end.x - bar_x - bar_w - 8.0, 9, UI_TEXT_DIM)
+
+
+## The one line of the summary that asks for a decision instead of reporting a number. Empty when the
+## offtake has nothing it can speak about, which is the same silence the rows keep in that state.
+func _ledger_verdict(rates: Array[Dictionary], off: Dictionary) -> String:
+	var taken: Dictionary = off["draw"]
+	var mute: Dictionary = off["mute"]
+	# Empty because nothing refines anything, and empty because everything that does is unattributable, are
+	# two different states and only the first of them is a fact about the factory. Measured: place a Forge
+	# and a Blast Furnace together and the offtake goes to {} with ore and rich_ore muted, which read as
+	# "nothing on the line refines any of it yet" while two machines were refining it.
+	if taken.is_empty():
+		return "" if not mute.is_empty() else "nothing on the line refines any of it yet"
+	var by_item: Dictionary = {}
+	for r: Dictionary in rates:
+		by_item[r["item"]] = float(r["rate"])
+	var pick: StringName = &""
+	var spare: float = 0.0
+	for item: StringName in taken:
+		if mute.has(item):
+			continue
+		var s: float = float(by_item.get(item, 0.0)) - float(taken[item])
+		# A deficit wins outright, and between two of the same sign the larger one wins.
+		var better: bool = (s < 0.0 and spare >= 0.0) \
+			or (spare < 0.0 and s < spare) \
+			or (spare >= 0.0 and s > spare)
+		if pick == &"" or better:
+			pick = item
+			spare = s
+	if pick == &"":
+		return ""
+	var label: String = _item_label(pick).to_lower()
+	var who: String = str((off["eater"] as Dictionary).get(pick, ""))
+	if who == "":
+		who = "line"
+	if spare < 0.0:
+		return "the %s outruns your %s by %.1f/min" % [who, label, -spare]
+	return "%.1f %s/min spare past the %s" % [spare, label, who]
 
 
 ## WORKS — the counter (what you BUILD from your own materials) and the Rack (what you BUY with refined
