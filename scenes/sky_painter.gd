@@ -67,10 +67,23 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	# through the visible span on its own phase so the cover never visibly loops. Lit by the daylight.
 	var span: float = view.size.x + 500.0
 	for i: int in 5:
-		# Same bare multiply as the stars used, and it is the same arithmetic progression (0, .761, .522,
-		# .283, .044). Left alone deliberately: at FIVE samples a progression mod 1 is not distinguishable
-		# from a scatter, so there is nothing measured here to fix, and changing it would only move clouds.
-		var h: float = float((i * 2654435761) % 1000) / 1000.0
+		# Fixed for the same reason as the stars, after I first stood this site down on the argument that
+		# five samples cannot show a lattice. That argument was WRONG, and the refutation is short enough
+		# to print: sorted, the old values ran 0.000, 0.044, 0.283, 0.522, 0.761, whose four gaps are
+		# 0.044, 0.239, 0.239, 0.239 — THREE IDENTICAL GAPS to six decimals, which is the three-distance
+		# theorem showing itself at n=5, not a scatter. Reasoning about the sample size in the abstract
+		# stood down a site the test in hand would have caught. Compute the gaps; do not estimate whether
+		# it is worth computing them.
+		#
+		# It also mattered more here than one axis, because `h` is a single scalar driving six properties:
+		# parallax, x, y, alpha, drift rate and radius. One lattice was replicated across all of them —
+		# sorted, `22.0 + h * 24.0` gave radii 22.0, 23.1, 28.8, 34.5, 40.3, stepping 5.736 three times
+		# running. Now four distinct gaps.
+		#
+		# Not claimed: that any of this was VISIBLE. At alpha 0.05 to 0.13 behind a horizon it may never
+		# have read, and that was never measured either way. A correct mixer costs nothing, so the site is
+		# fixed on the defect rather than on an improvement nobody has demonstrated.
+		var h: float = float(Seams.grain(Vector2i(i, 505)) % 1000) / 1000.0
 		var p2: float = 0.10 + h * 0.06                                 # nearly pinned = far away
 		var cx: float = view.position.x - 250.0 + fposmod(
 			h * 4000.0 + r._anim_time * (4.0 + h * 3.0) + cam.x * (1.0 - p2) - view.position.x, span)
