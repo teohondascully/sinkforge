@@ -38,7 +38,7 @@ names its frame, one visual hypothesis, a before/after review, and a regression 
 | A | Earth, stone and dark underground cells repeat bright tan and grey squares at similar scale and contrast. The eye finds many isolated marks before it finds a broad dirt mass or a rock plane. | The terrain generator and renderer lack a material hierarchy. They apply texture as decoration rather than using texture to describe substance. | High |
 | A | The grass line is a thin crisp green and brown strip while the cells immediately under it are much blurrier, darker and more varied. | The terrain layers are authored and rendered under incompatible edge, palette and pixel-scale rules. | High |
 | A | The dashed line beside the active grapple and aim state is prominent from surface to player, independent of whether the player is reading a route or feeling tension. | The line reads as tool or debug geometry more than as a physical cable, and it likely reduces the satisfaction of a movement verb intended to be expressive. | Medium. A motion clip is needed to judge timing. |
-| B | A three-line, screen-centred SAPLING tutorial panel obscures the player's immediate sky and world context while arrows, circles and machine labels remain visible beneath it. | The tutorial system explains a mechanic while interrupting the verb it is meant to teach. It is a comprehension aid with a high attention cost. | High |
+| B | A three-line SAPLING tutorial panel obscures the player's immediate sky and world context, and the tree the lesson is about, while arrows, circles and machine labels remain visible beneath it. **This row said "screen-centred" until 2026-08-20; that half is withdrawn.** The bubble is world-anchored, not screen-anchored: `hint_anchor` is a world position pushed through the canvas transform rather than a canvas coordinate, and in the audited frame that position is the miner's head (`scenes/main.gd:826-841`). The draw only clamps it on-canvas so a body near a world edge still gets taught; it never places it (`scenes/hud.gd:700-701`). It *read* as centred here because the body was near screen centre. **The occlusion is the half that was genuinely observed and it is not withdrawn** — for whether it has since been treated, read the ticket rather than this row. | The tutorial system explains a mechanic while interrupting the verb it is meant to teach. It is a comprehension aid with a high attention cost. | High |
 | Noita reference | The world holds most of the contrast and visual mass, the HUD is confined to corners, and terrain has a coherent dark silhouette with contained material variation. | Sinkforge should borrow its information discipline and value hierarchy, not its pixel density, palette, or destructive-pixel simulation. | High |
 
 ## Root workstreams
@@ -62,9 +62,12 @@ source in the world.
    - *Active:* the current targeted, held or attached object. Local, concise and stateful.
    - *Discoverable:* a new affordance. Appears once near its object, then fades or becomes contextual.
    - *Ambient:* learned or status information. Corner-bound, world-embedded, or hidden until requested.
-3. Convert the SAPLING lesson first. It should be a source-bound one-line affordance when a sapling is
-   held over valid grass, not a centred explanatory panel. Its full explanation belongs in an opt-in help
-   surface if it is needed at all.
+3. Convert the SAPLING lesson first. It should be a source-bound one-line affordance beside the valid
+   grass, not an explanatory panel riding over the body. *(This step read "not a centred explanatory
+   panel" until 2026-08-20. The panel has never been screen-centred — see the withdrawal in the Frame B
+   row above — and the step stands on its other half: bound to the ground it is about, rather than
+   following the miner and covering the tree.)* Its full explanation belongs in an opt-in help surface if
+   it is needed at all.
 4. Suppress non-critical teaching while the player is moving quickly, aiming, swinging, or in the middle
    of an interaction. Resume only when they settle and the cue is still relevant.
 5. Give helpers an expiry: the action demonstrated, relevance lost, explicit dismissal, or a short
@@ -197,7 +200,7 @@ Observations to preserve, not twenty independent implementation tickets.
 
 | Symptom | Root | Severity | First investigation |
 |---|---|---:|---|
-| Screen-centred multi-line tutorial panel | V1 | Frame-breaking | Measure duration and coverage; replace one lesson with a contextual first-use cue |
+| Multi-line tutorial panel over the body, occluding the thing it teaches (`UI-01`, still open) *(listed as "screen-centred" until 2026-08-20 — withdrawn: the anchor is a world position, the miner's head in the audited frame (`scenes/main.gd:826-841`), and the draw only clamps it on-canvas (`scenes/hud.gd:700-701`). Status lives on the ticket in `docs/VISUAL_RECOMMENDATIONS_SURFACE.md`.)* | V1 | Frame-breaking | Measure duration and coverage; replace one lesson with a contextual first-use cue |
 | Multiple arrows, rings and labels in one surface frame | V1 | Frame-breaking | Inventory simultaneous helper states and assign priority tiers |
 | `FORGE` labels and pointers read as duplicated UI | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
 | Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
