@@ -63,6 +63,10 @@ const CANVAS: int = 64          ## px per icon render
 ## motion, and then neither could be attributed. `SF_ICON_PX=13` runs it where the player actually is; what
 ## falls out of that is a finding about the icons, to be reported before anything here is re-pitched.
 const ICON: float = 48.0
+## The size the HUD actually asks for, at almost every call site (`hud.gd:2315`, `:2535`, `:3547`, `:3658`,
+## `:3984`). The second pass below runs here and REPORTS, so a pair that collides where the player is cannot
+## sit unseen behind a comfortable margin measured somewhere they never look.
+const HOTBAR_PX: float = 13.0
 const SAME_SHAPE: float = 0.90  ## silhouette IoU at or above which two icons share an outline
 const SAME_TINT: float = 10.0   ## CIELab dE below which two icons share a colour
 
@@ -241,6 +245,58 @@ func _run() -> void:
 	_check(gs < 0.75,
 		"gravel and stone are plainly different objects (IoU %.2f) — the sieve/bulkhead choice reads" % gs)
 
+	await _report_at_hotbar_size()
+
+
+
+## THE SAME COMPARISON AT THE SIZE THE PLAYER ACTUALLY SEES — REPORTED, NEVER ASSERTED.
+##
+## Everything above runs at `ICON` = 48. The HUD asks for 13. That gap is not a rounding difference: detail
+## which separates two glyphs at 48 can be gone at 13, so a margin measured up there is not a margin the
+## player has. Measured on the set as shipped, `ore`/`coal` goes 0.89 -> 0.92 and `earth`/`ore` 0.85 -> 0.90,
+## both crossing the outline floor that neither crosses at 48, and the closest COLOUR pair is not even the
+## same pair (`gravel`/`iron_pickaxe` at dE 1.5, absent from the top six at 48).
+##
+## It reports rather than asserts, deliberately. Turning this into a second floor would be inventing a
+## threshold at a size nobody has reviewed a screen at, and the disjunction this layer is built on — share an
+## outline OR a colour, never both — was calibrated at 48. What it DOES do is make a hotbar-size collision
+## impossible to miss: a pair sharing both axes down here prints as a WOULD-CLASH, which is the evidence a
+## floor would need before anyone argues for one.
+func _report_at_hotbar_size() -> void:
+	if not is_equal_approx(_icon_px, ICON):
+		return              # already running at an asked-for size; a second pass would just repeat it
+	var keep_px: float = _icon_px
+	var keep_canvas: int = _canvas
+	_icon_px = HOTBAR_PX
+	# Scaled by the same ratio, because `_coverage` and every threshold are relative to the image area.
+	_canvas = maxi(8, int(round(float(CANVAS) * HOTBAR_PX / ICON)))
+	var small: Dictionary = {}
+	for item: StringName in ITEMS:
+		small[item] = await _render(item)
+	var rows: Array[Dictionary] = []
+	var would_clash: Array[String] = []
+	for i: int in ITEMS.size():
+		for j: int in range(i + 1, ITEMS.size()):
+			var iou: float = _iou(small[ITEMS[i]], small[ITEMS[j]])
+			var de: float = _de(_mean_lab(small[ITEMS[i]]), _mean_lab(small[ITEMS[j]]))
+			var pair: String = "%s/%s" % [ITEMS[i], ITEMS[j]]
+			rows.append({"iou": iou, "de": de, "pair": pair})
+			if iou >= SAME_SHAPE and de < SAME_TINT:
+				would_clash.append("%s (IoU %.2f, dE %.1f)" % [pair, iou, de])
+	rows.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["de"]) < float(y["de"]))
+	print("  AT HOTBAR SIZE (%.0f px, what the HUD asks for) the three closest COLOURS are:" % HOTBAR_PX)
+	for k: int in mini(3, rows.size()):
+		print("    dE %5.1f  IoU %.2f  %s" % [float(rows[k]["de"]), float(rows[k]["iou"]), str(rows[k]["pair"])])
+	rows.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["iou"]) > float(y["iou"]))
+	print("  ...and the three closest OUTLINES:")
+	for k: int in mini(3, rows.size()):
+		print("    IoU %.2f  dE %5.1f  %s" % [float(rows[k]["iou"]), float(rows[k]["de"]), str(rows[k]["pair"])])
+	if would_clash.is_empty():
+		print("  no pair shares both an outline and a colour at hotbar size either")
+	else:
+		print("  WOULD-CLASH AT HOTBAR SIZE (not visible in any number above): %s" % ", ".join(would_clash))
+	_icon_px = keep_px
+	_canvas = keep_canvas
 
 # --- rendering + comparison ---------------------------------------------------------------------------
 
