@@ -54,6 +54,9 @@ static func load_settings() -> void:
 		for key: String in cfg.get_section_keys("bindings") if cfg.has_section("bindings") else []:
 			bindings[StringName(key)] = cfg.get_value("bindings", key)
 	apply_audio()
+	# THE DOOR IS GUARDED, THE ROOM WAS NOT — see `_reconcile_bindings`. Reconciled BEFORE it is applied, so
+	# InputMap never holds the duplicate at all, not even for the two lines between here and there.
+	_reconcile_bindings()
 	apply_bindings()
 
 
@@ -213,6 +216,163 @@ static func event_labels(action: StringName) -> Array[String]:
 static func apply_bindings() -> void:
 	for action: StringName in bindings:
 		_apply_action(action, bindings[action])
+
+
+## WHAT THE LAST LOAD-TIME RECONCILIATION DID. It exists because two of the three outcomes below leave an
+## InputMap that is indistinguishable from "the pass looked and found nothing" — `kept_duplicate` most of
+## all: an action still holding a duplicate because every alternative was taken looks EXACTLY like an
+## action nobody examined. The decision has to leave a trace somewhere or it cannot be told from an
+## oversight, by the CONTROLS page or by the layer that asserts it.
+##   moved           actions whose live events this pass changed (the restored ones are in here too)
+##   restored        actions that would have booted DEAD and were handed free defaults back
+##   kept_duplicate  actions left holding a duplicate deliberately, because the alternative was silence
+static var last_reconcile: Dictionary = {"moved": [], "restored": [], "kept_duplicate": []}
+
+
+## RECONCILE WHAT WAS JUST LOADED, before any of it reaches InputMap.
+##
+## `rebind` guards the door: it cannot create a duplicate any more, because it takes the colliding event
+## off whoever held it. NOTHING COUNTED WHAT WAS ALREADY IN THE ROOM. `load_settings` read the `bindings`
+## section straight off disk and handed it to `apply_bindings`, so a config written by the pre-fix build —
+## or hand-edited, or carried in from another machine — reinstated its duplicate on every boot forever, and
+## both actions fired on every press. The CONTROLS page would draw the clash if the player ever opened it,
+## so it is not perfectly silent; it was simply never resolved by anything.
+##
+## SAME PREDICATE AS THE DOOR, AT THE SAME GRAIN: `event_label` over EVERY event of EVERY action, which is
+## what `rebind` and `Hud._binding_clashes` compare. A resolver disagreeing with the detector would either
+## fix a clash the page never showed or leave one it did, and the whole point of that doctrine is that
+## there is one predicate here, not three.
+##
+## PRECEDENCE — who keeps a contested key — IS THE DESIGN, and it may NOT be read off the file.
+## `ConfigFile.get_section_keys` returns keys in the order they were written, and `save_settings` writes
+## them in `bindings` insertion order: the order the player happened to rebind things in, which a reset, a
+## hand edit or a config merged from another machine reorders freely. Two profiles holding an identical set
+## of bindings would then resolve the same duplicate differently, and one profile could resolve it
+## differently on two boots. So precedence comes from source, in two tiers:
+##
+##   1. AN OVERRIDE OUTRANKS A DEFAULT. An action in `bindings` is one the player deliberately bound; an
+##      action absent from it has never been chosen at all. This is not a new opinion — it is exactly what
+##      `rebind` did at the moment they pressed the key: steal it from whoever held it. Deciding the other
+##      way would make the load path overturn a choice the door had already granted, every boot: bind MUTE
+##      to W and the next launch quietly hands W back to climb-up. The loser of a repair gets an override
+##      written for it, so it counts as chosen from then on — which is right: after the first boot that is
+##      the binding the game committed to and showed the player, not a default nobody has looked at.
+##   2. AMONG EQUALS, `Controls.defaults()` ORDER. A literal in source — the same on every machine, every
+##      boot, every platform — and already the order `rebind` and `_binding_clashes` iterate, so all three
+##      agree about who is first. It also runs the core verbs before the conveniences, which is the way a
+##      tie ought to break when one of the two has to give a key up.
+##
+## MOVE ONE EVENT, NOT THE BINDING, again like `rebind`: the loser drops the single colliding spec and
+## keeps everything else. It needs no device test to keep a keyboard collision off a gamepad event, and
+## that is structural rather than lucky — `event_label` prefixes every pad label (`PAD A`, `STICK UP`), so
+## a keycap label and a pad label can never be equal and a dropped event is always of the same device as
+## the one that displaced it. `_device_of` earns its place in the rescue below instead.
+##
+## AN ACTION MAY NOT BOOT DEAD, and that is worth more than resolving the duplicate. Two rescues:
+##   * If a DEVICE emptied — the action lost its last desk event, or its last pad event — it gets back
+##     whichever of its own defaults for that device nobody is holding. Free keys only, so this can never
+##     manufacture a second duplicate; if none are free it simply does not fire, because an action that
+##     still answers a stick is not unreachable.
+##   * If the action emptied ENTIRELY, the duplicate stands: the loaded binding is left exactly as it was
+##     and the action goes into `kept_duplicate`. A duplicate is visible on the CONTROLS page and playable;
+##     a dead key is neither. This is the one branch that must not quietly return the tidy-looking answer,
+##     so it returns the untidy one and says so out loud.
+##
+## What it does NOT do is repair anything but collisions. A pre-fix rebind wrote `bindings[action] = [spec]`
+## and destroyed that action's other events; those are gone, and inventing them back here would be a second
+## resolver with a second opinion about what the player meant.
+static func _reconcile_bindings() -> void:
+	var owner: Dictionary = {}                     # label -> the action that already answers to it
+	var moved: Array[StringName] = []
+	var restored: Array[StringName] = []
+	var kept_duplicate: Array[StringName] = []
+	for action: StringName in _precedence():
+		var loaded: Array = specs_of(action)
+		var kept: Array = []
+		var lost: Array = []
+		for s: Variant in loaded:
+			var spec: Dictionary = s as Dictionary
+			var label: String = event_label(Controls.event_from_spec(spec))
+			if owner.has(label):
+				# ONE event moves. Note this also catches an action colliding with ITSELF — a spec list
+				# holding the same key twice — which is the same thing `rebind` drops the same-label entry
+				# for before it places the new one.
+				lost.append(spec)
+			else:
+				owner[label] = action
+				kept.append(spec)
+		if lost.is_empty():
+			continue
+		var gave_back: bool = false
+		for device: int in [DESK, PAD]:
+			if not _has_device(lost, device) or _has_device(kept, device):
+				continue
+			var back: Array = _free_defaults(action, device, owner)
+			if back.is_empty():
+				continue
+			for s: Variant in back:
+				owner[event_label(Controls.event_from_spec(s as Dictionary))] = action
+			# Desk first, pad after — the order every entry in `Controls.defaults()` is written in, and the
+			# order `binding_label` reads, so the chip on the CONTROLS row stays the key a desk player uses.
+			kept = (back + kept) if device == DESK else (kept + back)
+			gave_back = true
+		if kept.is_empty():
+			# Nothing survived and nothing was free. Leave the entry ALONE — not rewritten with the same
+			# contents, not erased — so the action keeps firing on the key it loaded with.
+			kept_duplicate.append(action)
+			continue
+		if gave_back:
+			restored.append(action)
+		bindings[action] = kept
+		moved.append(action)
+	last_reconcile = {"moved": moved, "restored": restored, "kept_duplicate": kept_duplicate}
+	# PERSIST THE REPAIR, once, and only when there was one — a clean config must come out of a boot byte
+	# for byte as it went in. `save_settings` early-returns while `persist` is false, which is the harness
+	# gate and not a special case to work around: the map above is already correct in memory either way, so
+	# a fixture gets the repaired InputMap and an untouched file, and the next real boot repairs the same
+	# file to the same shape because none of this reads anything that varies between boots.
+	if not moved.is_empty():
+		save_settings()
+
+
+## The order actions are offered a contested label in. Computed ONCE, up front, from the bindings as
+## LOADED: the pass writes into `bindings` as it goes, and precedence that re-read it would depend on how
+## far through itself it had got.
+static func _precedence() -> Array[StringName]:
+	var chosen: Array[StringName] = []
+	var untouched: Array[StringName] = []
+	for action: StringName in Controls.defaults():
+		if bindings.has(action):
+			chosen.append(action)
+		else:
+			untouched.append(action)
+	chosen.append_array(untouched)
+	return chosen
+
+
+static func _has_device(specs: Array, device: int) -> bool:
+	for s: Variant in specs:
+		if _device_of(s as Dictionary) == device:
+			return true
+	return false
+
+
+## The action's OWN defaults for one device that nobody in this pass is holding. Empty when the action has
+## no defaults for that device or every one of them is taken — and empty is the answer that makes the
+## caller leave the duplicate standing rather than the answer that makes it look resolved.
+static func _free_defaults(action: StringName, device: int, owner: Dictionary) -> Array:
+	var d: Dictionary = Controls.defaults()
+	if not d.has(action):
+		return []
+	var out: Array = []
+	for s: Variant in (d[action] as Array):
+		var spec: Dictionary = s as Dictionary
+		if _device_of(spec) != device:
+			continue
+		if owner.has(event_label(Controls.event_from_spec(spec))):
+			continue
+		out.append(spec)
+	return out
 
 
 static func reset_bindings() -> void:
