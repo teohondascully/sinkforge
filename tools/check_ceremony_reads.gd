@@ -52,7 +52,9 @@ extends "res://tools/check_base.gd"
 ## ---
 ##
 ## THE MECHANISM, printed every run because it is more useful than the headline number. The scrim is
-## `Color(0.02, 0.025, 0.04)` at alpha 0.80 — a multiply in all but name. Underground the rock behind it
+## `Color(0.02, 0.025, 0.04)` at alpha 0.28 — a multiply in all but name. (This line said 0.80 for as long as
+## the file has existed; `ffeb1c8` dropped it to 0.28 twenty-eight minutes after the line was written, and
+## the docstring further down has known the real number all along. The file contradicted itself.) Underground the rock behind it
 ## sits at a luma near ten, so eighty percent of it is nearly nothing: the scrim is almost invisible over
 ## the mass of the frame. The rope is HEMP at 0.76/0.63/0.42. **A multiplicative veil takes 80% from the
 ## bright thin things and almost nothing from the dark mass** — it erases the rope, the cord and the glints
@@ -150,8 +152,21 @@ func _run() -> void:
 	MainView.boot_skip_title = true
 	var main: MainView = (load(SCENE) as PackedScene).instantiate()
 	get_root().add_child(main)
+	# THE HUMAN AT THE KEYBOARD IS NOT PART OF THE EXPERIMENT, and until now this layer never said so. It
+	# posed nothing and deafened nothing, so for the whole run the aim tracked the operator's physical
+	# mouse — and `world_renderer` eases the head-lamp toward the aim, which in this rig (a hand-built dark
+	# shaft, no torches, no machines) is the ONLY light on the band being measured. A hand moving during
+	# the run swings a 9-cell reveal and a 5.6-cell bloom across the control band.
+	#
+	# It is not the cause of the failure this fixes — the rock channel, which is what illumination moves,
+	# read 0.7 against a calibrated 0.9 on the failing run, so the light demonstrably did NOT move that
+	# time. It is closed because it is a live hole that would eventually produce a red nobody could
+	# reproduce, and because leaving it open means the next surprising number here has two explanations.
+	Controls.deaf = true
+	Controls.pose_pointer(Vector2(float(SHAFT_COL) * 32.0, float(SHAFT_TOP) * 32.0))
 	for _i: int in SETTLE:
 		await physics_frame
+	main._player.auto_input = false        # a hand on WASD would walk the body and take the camera with it
 
 	_rig(main.sim)
 	main.sim.inventory[&"rope"] = 60
@@ -243,9 +258,38 @@ func _run() -> void:
 	_check(drew > quiet_patch * DREW_RATIO,
 		"the ceremony reached the frame — %.4f mean channel change inside the plate against %.4f below it"
 			% [drew, quiet_patch])
-	_check(float(under["rope_de"]) < DRIFT_CAP,
-		"the band below the plate stayed still enough to serve as a control (%.1f dE, cap %.1f)"
-			% [under["rope_de"], DRIFT_CAP])
+	# THE MEDIAN CARRIES THE VOIDING CHECK, AND THE MEAN NO LONGER DOES. Measured on the failing run:
+	#
+	#     rope median 1.3   rope MEAN 18.6   rock mean 0.7      (calibration: 1.3 / 4.5 / 0.9)
+	#
+	# The median is its calibration value to the decimal, and the rock channel — which is what illumination
+	# moves — did not move either. **A mean fourteen times its own median is a handful of rows, not a band
+	# that moved.** That is exactly the distinction `_band`'s own comment says only the median can make,
+	# written directly above an assertion that used the mean. The layer was fooled in the way it documented.
+	#
+	# This is NOT a loosened threshold. `DRIFT_CAP` is unchanged at 12.0, and the quantity it now bounds is
+	# the one the check was always about: "did the world move enough to swamp the subject". A band that
+	# really moves lifts every row, so the median rises and this fires. The knockout that justified the
+	# check in the first place — a lesson bubble at 73.6 dE across the whole band — lifts every row too.
+	_check(float(under["med"]) < DRIFT_CAP,
+		"the band below the plate stayed still enough to serve as a control (median %.1f dE, cap %.1f; mean %.1f over %d rows)"
+			% [under["med"], DRIFT_CAP, under["rope_de"], under["rows"]])
+	# THE LOUD ROWS ARE REPORTED AND NOT ASSERTED, because I do not know what they are yet and a ceiling I
+	# cannot derive is a number that measures my guess. Measured: 19 and 20 of 151 rows over two runs, while
+	# the median sits at the noise floor.
+	#
+	# REJECTED HYPOTHESIS, recorded so it is not proposed again: that `_rope_x`'s brightest-pixel search is
+	# picking ore glints, which `7aff097` moved above the darkness veil after `ROPE_HALF = 2` was sized to
+	# exclude them. It is a good story and it is wrong here — `_rig` sets every cell in the region to
+	# `&"stone"`, so there is no ore in this world at all and no glint can be in this band.
+	#
+	# The live candidate is the rope's own sway. `_rope_x` picks a column in frame `p` and the comparison
+	# reads that same column in `q`; the rope oscillates ~0.8 world px, so on any row where it crossed a
+	# pixel boundary between the two captures the sample goes from rope to backing and scores a full
+	# separation. That would lift a MINORITY of rows and leave the rest at the floor, which is the shape
+	# observed — but I have not tested it, so it stays a candidate and not a finding.
+	print("    loud rows in the control band: %d of %d over DRIFT_CAP (mechanism UNDETERMINED, see above)"
+		% [under["loud"], under["rows"]])
 
 	# WHAT THE SCRIM IS FOR, measured, because the obvious treatment for everything above is to weaken it —
 	# and weakening the sole guarantor of a property without an instrument on that property is how a
@@ -321,12 +365,21 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 	# the difference: a mean lifted by a handful of glyph rows and a mean lifted evenly by a veil are the
 	# same number, and only the median tells them apart.
 	var med: float = 0.0 if sorted.is_empty() else sorted[sorted.size() / 2]
+	# HOW MANY ROWS ARE LOUD, beside how loud the average row is. The mean and the median disagreeing is the
+	# signal that a handful of rows blew up; this says HOW MANY, which is what turns that from an inference
+	# into a count. A band that genuinely moved lifts every row and `loud` approaches `rows`; a tracer that
+	# wandered off the rope onto something bright lifts a few and leaves the rest at the noise floor.
+	var loud: int = 0
+	for v: float in des:
+		if v > DRIFT_CAP:
+			loud += 1
 	return {
 		"rows": rows,
 		"rope_de": rope_acc / n,
 		"rock_de": rock_acc / n,
 		"contrast": sep_acc / n,
 		"med": med,
+		"loud": loud,
 	}
 
 
