@@ -829,8 +829,16 @@ func _process(delta: float) -> void:
 			if _player != null:
 				# canvas transform maps world → RENDER-viewport (1280×720); the HUD draws in Hud.CANVAS
 				# (640×360) scaled by HUD_SCALE, so bring the mapped point back into HUD-draw space.
-				_hud.hint_anchor = (get_viewport().get_canvas_transform() \
-					* (_player.position + Vector2(0.0, -Player.HEIGHT * 0.5 - 6.0))) / HUD_SCALE
+				# A GATED LESSON POINTS AT ITS CELL, NOT AT THE MINER. The bubble used to hang over the
+				# head whatever it was about, so the planting lesson covered the ground it was describing
+				# and the tree beside it. A lesson with a relevance gate is only on screen because the
+				# cursor is over a cell that satisfies it, so that cell is the thing being talked about.
+				# The bubble draws ABOVE its anchor with the tail reaching down, so anchoring a cell-high
+				# above the cell points at it without sitting on it.
+				var anchor: Vector2 = _player.position + Vector2(0.0, -Player.HEIGHT * 0.5 - 6.0)
+				if _hints.active_gate() != &"":
+					anchor = _cell_center(_aim) + Vector2(0.0, -float(CELL) * 0.5 - 6.0)
+				_hud.hint_anchor = (get_viewport().get_canvas_transform() * anchor) / HUD_SCALE
 
 
 ## Reconcile the Bazaar view against the sim's detected frames. When one COMPLETES this frame, throw a

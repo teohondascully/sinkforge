@@ -282,6 +282,14 @@ func active_text() -> String:
 	return ""
 
 
+## The situation the visible lesson is waiting on, or &"" when it shows on arrival and is about nothing in
+## particular. A gated lesson is about a PLACE by construction: it is only up because the cursor is over a
+## cell that answers its question, so the controller can point the bubble at that cell instead of at the
+## body. Ungated lessons have no such place and stay over the miner.
+func active_gate() -> StringName:
+	return _gate_of.get(_active, &"")
+
+
 ## Fade envelope: 0..1 over the bubble's life (quick in, gentle out).
 ## UI-03: `_busy` now hides as well as freezes. The clock already stopped while the body was moving too
 ## fast to read — *"a lesson fired mid-swing is still on screen when the swing ends"* — but leaving it
