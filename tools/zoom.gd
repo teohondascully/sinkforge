@@ -40,8 +40,8 @@ func _initialize() -> void:
 	# A TOOL THAT INSPECTS CAPTURES MUST NOT BE ABLE TO OVERWRITE THEM.
 	#
 	# This wrote `<input>_zoom.png` beside its input, which for `_moment_boot.png` is `_moment_boot_zoom.png`
-	# — one of the 44 tracked canonical frames, with its own deliberate framing. The peer ran this to look at
-	# something and silently replaced two of them with their crops. They were recoverable only because the
+	# — one of the 44 tracked canonical frames, with its own deliberate framing. Running this to look at
+	# something silently replaced two of them with their crops. They were recoverable only because the
 	# captures had been committed hours earlier; a day before, that inspection would have destroyed the
 	# evidence it was performed on.
 	#
