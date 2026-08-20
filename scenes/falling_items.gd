@@ -13,12 +13,28 @@ const FALL_DURATION: float = 0.30
 ## (a pouring column at 240 reads identically to one at 400). Spawns beyond it simply aren't visualized.
 const MAX_ITEMS: int = 240
 
-## How far past the flight path a drop can still paint, in px — the widest thing drawn at or near an
-## endpoint. The landing ring is the winner at radius 15 (4 + 11 fully expanded); the motion smear reaches
-## 8 below the head and the leading trail rect 6 around it. 16 covers all three with a little room, and
-## being generous here costs one comparison while being stingy would clip a visible sparkle at the screen
-## edge — the kind of bug that only appears when the player is walking away from a working machine.
-const DRAW_PAD: float = 16.0
+## The landing sparkle ring, which is the widest thing a drop paints: it expands from RING_R0 out to
+## RING_R0 + RING_GROW over the last of the fall, stroked RING_WIDTH wide, so its outermost painted pixel
+## sits RING_R0 + RING_GROW + RING_WIDTH * 0.5 from the landing point.
+const RING_R0: float = 4.0
+const RING_GROW: float = 11.0
+const RING_WIDTH: float = 2.0
+## The nugget's own furniture, measured from the drop's centre: the vertical motion smear hangs
+## SMEAR_REACH below it, the dark backing rect covers NUGGET_R around it, and the comet trail is drawn
+## around that same centre at TRAIL_SIZE less one TRAIL_SHRINK step (4.9) at its very largest, so
+## NUGGET_R already covers the trail.
+const SMEAR_REACH: float = 8.0
+const NUGGET_R: float = 6.0
+const TRAIL_SIZE: float = 5.5
+const TRAIL_SHRINK: float = 0.6
+
+## How far past the flight path a drop can still paint, in px. DERIVED, and that is the point: this is a
+## cull margin, and a cull margin smaller than the thing it culls drops a sparkle that is still on screen,
+## which is the kind of bug that only appears when the player is walking away from a working machine.
+## It used to be 16.0 by hand, beside a comment that put the ring at radius 15 and called 16 generous.
+## The stroke's own half-width is the sixteenth pixel, so the margin was exactly saturated rather than
+## generous, and nothing in the code related the two numbers.
+const DRAW_PAD: float = maxf(RING_R0 + RING_GROW + RING_WIDTH * 0.5, maxf(SMEAR_REACH, NUGGET_R))
 
 ## Each drop: {from, to: Vector2 (world), t: 0..1 progress, color: Color}.
 var _items: Array[Dictionary] = []
@@ -147,14 +163,17 @@ func _draw_item(canvas: CanvasItem, f: Dictionary) -> void:
 		var tt: float = clampf(t - float(i) * 0.055, 0.0, 1.0)
 		var pp: Vector2 = _sample(from, to, tt)
 		var a: float = (1.0 - float(i) / float(trail + 1)) * 0.34
-		var sz: float = 5.5 - float(i) * 0.6
+		var sz: float = TRAIL_SIZE - float(i) * TRAIL_SHRINK
 		canvas.draw_rect(Rect2(pp - Vector2(sz, sz), Vector2(sz * 2.0, sz * 2.0)), Color(col.r, col.g, col.b, a))
 	var p: Vector2 = _pos(f)
 	if t > 0.84:  # landing sparkle: an expanding ring as it nears its rest pile
 		var lt: float = (t - 0.84) / 0.16
-		canvas.draw_arc(to, 4.0 + lt * 11.0, 0.0, TAU, 18, Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), 2.0)
-	canvas.draw_rect(Rect2(p - Vector2(3.0, 8.0), Vector2(6.0, 16.0)), Color(col.r, col.g, col.b, 0.45))  # smear
-	canvas.draw_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0)), Color(0.05, 0.05, 0.07))
+		canvas.draw_arc(to, RING_R0 + lt * RING_GROW, 0.0, TAU, 18,
+			Color(col.r, col.g, col.b, (1.0 - lt) * 0.7), RING_WIDTH)
+	canvas.draw_rect(Rect2(p - Vector2(3.0, SMEAR_REACH), Vector2(6.0, SMEAR_REACH * 2.0)),
+		Color(col.r, col.g, col.b, 0.45))  # smear
+	canvas.draw_rect(Rect2(p - Vector2(NUGGET_R, NUGGET_R), Vector2(NUGGET_R * 2.0, NUGGET_R * 2.0)),
+		Color(0.05, 0.05, 0.07))
 	canvas.draw_rect(Rect2(p - Vector2(4.5, 4.5), Vector2(9.0, 9.0)), col)
 	canvas.draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.lightened(0.5))  # bright core
 

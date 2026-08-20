@@ -20,6 +20,25 @@ const AO_TOP: float = 0.07       ## whisper of dark under that lip, just enough 
 const AO_SIDE: float = 0.26      ## walls — the mid tone
 const AO_UNDER: float = 0.46     ## overhangs/ceilings — nothing in the world is darker
 
+## THE CORNER RADIUS, named once because three passes have to agree on it and none of them could see the
+## other two. `_draw_cell_silhouette` cuts this much off every convex corner; `_draw_edge_ao` insets its
+## face strips by exactly the same amount, and that one is a HARD requirement rather than a preference,
+## because an inset smaller than the cut leaves an AO sliver floating in the air over the 45 degree face
+## and an inset larger than it leaves the corner unshaded. `_draw_inner_fillets` rounds concave junctions
+## to the same radius so that convex and concave corners read as one edge vocabulary.
+##
+## All three were separate 7.0 literals, related by a comment on one of them reading "keep in lockstep",
+## which is a note and not a mechanism.
+const CHAMFER: float = 7.0
+
+## The carved-edge strip stack on a foreground face: how many strips, and how thick each one is. The
+## stack's total depth is what `_ao_scoop` has to match to sit flush against it at a concave junction, so
+## the scoop derives its depth from these rather than restating the product as its own literal. (The
+## back-wall cast in `paint_wall_face` runs its own deeper stack; see the note there.)
+const AO_STEPS: int = 3
+const AO_STRIP: float = 2.0
+const AO_DEPTH: float = AO_STEPS * AO_STRIP
+
 ## Draw the solid cells in `rect`, then the concave fillets + the surface cap/ramp pass for its columns.
 static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 	# #S15: only the surface band survives the fine layer, so the rest is skipped — but ROW BY ROW, in the
@@ -51,7 +70,7 @@ static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 ## seams. Bottom corners take the FLOOR cell's colour, top corners the CEILING's. Runs per chunk after
 ## the cells; the surface cap/ramp pass paints after (over) it, so the walked line stays authoritative.
 static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
-	const R: float = 7.0
+	const R: float = CHAMFER
 	var s: float = float(WorldRenderer.CELL)
 	# Per corner: offsets of the two solid supports, the corner point in the open cell's box, the fan's
 	# start angle (degrees), and which support paints it (its own body colour).
@@ -140,7 +159,7 @@ static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) ->
 ## column's walkable surface cell: the cap/ramp pass owns that edge, and the seen line must stay
 ## exactly the walked line. Sprite tiles (tile_<id>.png) bypass this — art brings its own edges.
 static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
-	const R: float = 7.0
+	const R: float = CHAMFER
 	var open_u: bool = not r.sim.is_solid(c + Vector2i(0, -1))
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
@@ -228,8 +247,8 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## Caveats: one seed, one gallery shape, one standing per row, and a pixel count is a statement about area
 ## rather than about noticeability.
 static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
-	const STEPS: int = 3
-	const CH: float = 7.0                              # the silhouette's chamfer radius — keep in lockstep
+	const STEPS: int = AO_STEPS
+	const CH: float = CHAMFER                          # the silhouette's cut, so the strips inset off it
 	var open_u: bool = not r.sim.is_solid(c + Vector2i(0, -1))
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
@@ -251,8 +270,8 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 	var side_rim := Color(1.0, 0.94, 0.86, LIT_RIM)
 	for i: int in STEPS:
 		var fade: float = 1.0 - float(i) / float(STEPS)
-		var o: float = float(i) * 2.0
-		var s := 2.0
+		var o: float = float(i) * AO_STRIP
+		var s: float = AO_STRIP
 		if open_u:
 			var x0: float = CH if (open_l and not keep_top) else 0.0
 			var x1: float = cs - (CH if (open_r and not keep_top) else 0.0)
@@ -308,7 +327,7 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 ## direction), hugging the face surface. `near_edge` = the face lies on the min side of the perpendicular
 ## axis (top/left faces) vs the max side (bottom/right). Alphas stack on the face strips beneath.
 static func _ao_scoop(ci: CanvasItem, corner: Vector2, along: Vector2, near_edge: bool) -> void:
-	const DEPTH: float = 6.0                           # matches the strip stack (3 steps x 2 px)
+	const DEPTH: float = AO_DEPTH                      # flush with the strip stack it sits on top of
 	for ext: float in [9.0, 5.0]:                      # two nested patches = a cheap gradient
 		var run: Vector2 = along * ext
 		var thick := Vector2(DEPTH, DEPTH) - along.abs() * DEPTH
