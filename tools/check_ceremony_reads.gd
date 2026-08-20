@@ -370,9 +370,29 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 	# into a count. A band that genuinely moved lifts every row and `loud` approaches `rows`; a tracer that
 	# wandered off the rope onto something bright lifts a few and leaves the rest at the noise floor.
 	var loud: int = 0
+	var loud_ys: Array[int] = []
+	var y_at: int = maxi(0, y0)
 	for v: float in des:
 		if v > DRIFT_CAP:
 			loud += 1
+			loud_ys.append(y_at)
+		y_at += 1
+	# WHERE the loud rows are, not just how many. A mechanism that displaces a drawn line produces
+	# CONTIGUOUS runs at the line's own periodicity; one that changes illumination scatters them flat. The
+	# positions discriminate between those without another run.
+	if OS.get_environment("SF_BAND_ROWS") == "1" and not loud_ys.is_empty():
+		var runs: Array[String] = []
+		var a: int = loud_ys[0]
+		var b: int = loud_ys[0]
+		for i: int in range(1, loud_ys.size()):
+			if loud_ys[i] == b + 1:
+				b = loud_ys[i]
+			else:
+				runs.append("%d-%d" % [a, b] if b > a else str(a))
+				a = loud_ys[i]
+				b = loud_ys[i]
+		runs.append("%d-%d" % [a, b] if b > a else str(a))
+		print("      loud runs (y0=%d): %s" % [y0, ", ".join(runs)])
 	return {
 		"rows": rows,
 		"rope_de": rope_acc / n,
