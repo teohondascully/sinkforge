@@ -359,6 +359,14 @@ static func machine_face(kind: String) -> Rect2:
 	return best
 
 
+## THE GAP EACH BODY PART LEAVES AROUND ITSELF, so adjacent parts read as separate castings rather than
+## one poured shape. Named because it is not private to the drawing below: anything laid INSIDE a casing
+## has to clear the same edge, and the world renderer's load well does. Two files agreeing on 1.0 by both
+## happening to write 1.0 is the kind of pair nothing can assert on -- there is no line relating them, so
+## no assertion can fail when one moves. This is that line.
+const CASING_INSET: float = 1.0
+
+
 static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float, col_in: Color,
 		active: bool, detail: bool, kind: String = "") -> void:
 	var col: Color = col_in if active else _cold_iron(col_in)
@@ -377,8 +385,9 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 
 	for i: int in parts.size():
 		var u: Rect2 = parts[i]
-		var body := Rect2(pos + Vector2(u.position.x * c + 1.0, u.position.y * c + 1.0),
-			Vector2(maxf(u.size.x * c - 2.0, 2.0), maxf(u.size.y * c - 2.0, 2.0)))
+		var body := Rect2(pos + Vector2(u.position.x * c + CASING_INSET, u.position.y * c + CASING_INSET),
+			Vector2(maxf(u.size.x * c - CASING_INSET * 2.0, 2.0),
+				maxf(u.size.y * c - CASING_INSET * 2.0, 2.0)))
 		canvas.draw_rect(body, col)
 
 		# --- the light: A THIN CATCH AND A DEEP SHADOW, not a wash --------------------

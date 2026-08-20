@@ -1926,8 +1926,8 @@ func _out_arrow(cell: Vector2i, tint: Color) -> Vector2:
 	var cx: float = float(cell.x * CELL) + float(CELL) * 0.5
 	var top_y: float = float(cell.y * CELL) + 3.0
 	var tip := Vector2(cx, top_y + float(CELL) * 0.55)
-	# The stem stops short by exactly the head's stand-off, so the mark still ends where the three hand
-	# rolled versions ended and the head is not a fourth thing added to the end of the old length.
+	# The stem stops short by exactly the head's stand-off, so the mark still ends where the three
+	# hand-rolled versions ended and the head is not a fourth thing bolted onto the end of the old length.
 	draw_line(Vector2(cx, top_y), tip - Vector2(0.0, WEDGE_JUT), tint, 2.5)
 	_matter_wedge(tip - Vector2(0.0, WEDGE_JUT), Vector2(0, 1), tint)
 	return tip
@@ -2618,6 +2618,14 @@ func _is_head(machine: MachineState) -> bool:
 		or (machine.def.behavior == &"drill" and sim.lode.has(machine.cell))
 
 
+## Height of the craft-progress bar along the foot of a machine's face. Named because the belly gauge's
+## floor is derived from it: two cues sharing a body have to be related by something in the code, not by
+## two numbers that happen to miss each other. No machine wears both today, because none of the three the
+## sim caps a belly on carries a timed recipe, and that is a fact about the current registry rather than a
+## property of anything here.
+const PROGRESS_BAR_H: float = 3.0
+
+
 func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
@@ -2678,6 +2686,12 @@ func _draw_machine(machine: MachineState) -> void:
 				clampf(minf(face.size.x, face.size.y) / float(CELL) + 0.24, 0.6, 1.0), active, clock,
 				machine.facing < 0)   # directional machines (the Borer) draw mirrored when facing left
 
+	# What the machine is carrying, carried by the machine. Drawn over the casing and under everything that
+	# is stamped on it, because contents sit inside a body and the lamp, the ports and the plate are bolted
+	# to the outside of one.
+	if not BARE_MACHINES:
+		_draw_load_gauge(machine, face)
+
 	# Text decorations are gated, for both cost and clutter: the held-count badge and the stalled need bubble
 	# are drawn only when the text is readable, meaning zoomed in past TEXT_ZOOM, or when this is the hovered
 	# or aimed machine. At 0.50x and below those labels are a few px tall, and draw_string is the priciest
@@ -2705,10 +2719,11 @@ func _draw_machine(machine: MachineState) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, CHROME)
 
 	if recipe != null and recipe.time > 0.0:
-		var bar_y: float = face.end.y - 3.0
-		draw_rect(Rect2(face.position.x, bar_y, face.size.x, 3.0), Color(0.0, 0.0, 0.0, 0.35))
+		var bar_y: float = face.end.y - PROGRESS_BAR_H
+		draw_rect(Rect2(face.position.x, bar_y, face.size.x, PROGRESS_BAR_H), Color(0.0, 0.0, 0.0, 0.35))
 		var frac: float = clampf(machine.progress / recipe.time, 0.0, 1.0)
-		draw_rect(Rect2(face.position.x, bar_y, face.size.x * frac, 3.0), Color(0.40, 0.90, 0.45))
+		draw_rect(Rect2(face.position.x, bar_y, face.size.x * frac, PROGRESS_BAR_H),
+			Color(0.40, 0.90, 0.45))
 
 	_draw_machine_io(machine, pos, face)
 	if not BARE_MACHINES:
@@ -2946,10 +2961,10 @@ func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 	var mid: float = face.get_center().x
 	if recipe != null and not recipe.inputs.is_empty():
 		var in_item: StringName = recipe.inputs.keys()[0]
-		_matter_wedge(Vector2(mid, face.position.y), Vector2(0, 1), Visuals.item_color(in_item))
+		_matter_wedge(Vector2(mid, face.position.y), Vector2(0, 1), _item_ink(in_item))
 	var out_col := Color(0.80, 0.86, 0.94)                                                # neutral "routes"
 	if recipe != null and not recipe.outputs.is_empty():
-		out_col = Visuals.item_color(recipe.outputs.keys()[0])
+		out_col = _item_ink(recipe.outputs.keys()[0])
 	match machine.def.behavior:
 		&"lift":
 			_matter_wedge(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts UP
@@ -2985,12 +3000,129 @@ func _matter_wedge(base: Vector2, dir: Vector2, color: Color) -> void:
 
 
 func _held(machine: MachineState) -> int:
+	return _buffer_total(machine.input_buffer) + _buffer_total(machine.output_buffer)
+
+
+## Everything in one buffer, counted the way the sim counts it when it asks whether that belly is full.
+func _buffer_total(buffer: Dictionary) -> int:
 	var n: int = 0
-	for v: int in machine.input_buffer.values():
-		n += v
-	for v: int in machine.output_buffer.values():
+	for v: int in buffer.values():
 		n += v
 	return n
+
+
+## THE INK A MARK WEARS WHEN IT SPEAKS FOR AN ITEM, which is the item's own colour unless it has none.
+##
+## `Visuals.item_color` answers `Color.WHITE` for an item it has no table entry for, and white is the one
+## colour a mark drawn into the world may not be: it belongs to things that have just happened (see CHROME
+## above). An item added to a recipe and not to that table would take the brightest mark the screen has,
+## permanently, by falling off the end of a list. Chrome is the honest answer there anyway, being what a
+## mark wears when it has nothing of its own to say.
+##
+## Nothing shipped reaches the fallback today. This is for the item after the ones that exist.
+func _item_ink(item: StringName) -> Color:
+	var col: Color = Visuals.item_color(item)
+	return CHROME if col == Color.WHITE else col
+
+
+## The item a buffer mostly holds, which is the colour its well is drawn in, or &"" for an empty one.
+## Largest stack wins and a tie goes to whichever the dictionary yields first: a belly split evenly between
+## two items is a mixed colour whichever of them is chosen, and the well is a level rather than a manifest.
+func _bulk_item(buffer: Dictionary) -> StringName:
+	var best: StringName = &""
+	var most: int = 0
+	for item: StringName in buffer:
+		var n: int = int(buffer[item])
+		if n > most:
+			most = n
+			best = item
+	return best
+
+
+## HOW FULL THE BELLY IS, ON THE MACHINE, so a base says where it is backing up without a number stamped
+## on every box.
+##
+## A held-count badge answers the question the player is actually asking, which is "is this one jamming?",
+## only after they have read 9px type and compared it against a capacity nobody ever told them. The casing
+## can say it directly: the contents show through the body and rise as the machine fills, and the well
+## reaches the top at the same instant `machine_status` turns and the lamp beside it goes red.
+##
+## THREE BEHAVIOURS AND NOT ALL OF THEM, and the boundary is the sim's rather than a taste call. These are
+## the only machines whose buffer the sim caps, so they are the only ones where a fraction exists to draw
+## at all. A Forge holding two ore is not two percent of anything, and a well over it would be an invented
+## denominator dressed as a measurement.
+##
+##   Borer      output_buffer total   vs H_DRILL_BELLY_TOTAL  (src/core/factory_sim.gd:55, 2288-2294)
+##   Drift Rig  each stream's total   vs DRIFT_BELLY, twice   (src/core/factory_sim.gd:76, 2408-2412)
+##   Crusher    output_buffer gravel  vs CRUSH_BELLY          (src/core/factory_sim.gd:85, 2578-2585)
+##
+## Each numerator is read off the same buffer the sim's own jam gate reads, which is the part that is easy
+## to get wrong. `_held` sums input and output together, and the Borer's cap governs its output alone, so a
+## well fed by `_held` would have counted the coal in its fuel bunker toward a limit the coal cannot reach:
+## a gauge that overflows before its machine does. The Crusher is the same trap from the other side, its
+## cap counting gravel alone while pay passes straight through the same buffer without ever jamming it
+## (`_run_crush`). Numerator and denominator have to measure one set or the well is decoration.
+##
+## The badge is left exactly as it was. This adds a channel rather than moving one: the badge is the exact
+## number, it is the only channel the seventeen uncapped kinds have, and nothing here can replace it.
+func _draw_load_gauge(machine: MachineState, face: Rect2) -> void:
+	match machine.def.behavior:
+		&"h_drill":
+			_load_well(face, 0.0, 1.0, _buffer_total(machine.output_buffer),
+				FactorySim.H_DRILL_BELLY_TOTAL, machine.output_buffer)
+		&"drift":
+			# Two wells, because the rig jams its two hauls independently and the sim has a separate status
+			# for each (`blocked_pay`, `blocked_spoil`). Spoil is the one with a side: it drops down the
+			# column BEHIND the rig, so its well takes the half of the body facing that way and pay takes
+			# what is left. Pay falls down the rig's own column and has no side of its own, so putting it
+			# opposite the spoil is what makes the pair readable rather than a claim about where it goes.
+			# `_held` does not count `spoil_buffer` at all, so until now the spoil half of a Drift Rig had
+			# no channel anywhere in the world view.
+			var back: float = 0.0 if machine.facing > 0 else 0.5
+			_load_well(face, back, 0.5, _buffer_total(machine.spoil_buffer),
+				FactorySim.DRIFT_BELLY, machine.spoil_buffer)
+			_load_well(face, 0.5 - back, 0.5, _buffer_total(machine.output_buffer),
+				FactorySim.DRIFT_BELLY, machine.output_buffer)
+		&"crush":
+			var gravel: int = int(machine.output_buffer.get(&"gravel", 0))
+			_load_well(face, 0.0, 1.0, gravel, FactorySim.CRUSH_BELLY, {&"gravel": gravel})
+
+
+## The well has to clear the casing's own lit edge on both sides, or the level paints over the one trick
+## that sells a flat square as hardware. Read off `Visuals.CASING_INSET` rather than eyeballed or copied,
+## so a retuned casing cannot quietly leave the glass sitting on top of it -- the two move together or
+## neither does.
+const WELL_INSET: float = Visuals.CASING_INSET * 2.0
+
+## How much of the body the contents tint. Low, because this is a level seen THROUGH a casing and not a
+## panel painted on one: the glyph, the rivets and the lit edge all have to survive it.
+const WELL_ALPHA: float = 0.34
+
+
+## One well: contents rising inside the casing under a brighter line at their surface. `u0` and `uw` are
+## the fraction of the face's width this well takes, so a machine with two independent bellies gets two
+## side by side and a machine with one gets the whole body.
+##
+## The surface line is the contents lightened and never white. A level is a standing quantity rather than
+## something that just happened, which is the CHROME rule, and it is also the practical answer: at this
+## alpha a dark item against a dark casing is a level you can only find by its edge.
+func _load_well(face: Rect2, u0: float, uw: float, held: int, cap: int, contents: Dictionary) -> void:
+	if held <= 0 or cap <= 0:
+		return
+	var item: StringName = _bulk_item(contents)
+	if item == &"":
+		return
+	var x: float = face.position.x + face.size.x * u0 + WELL_INSET
+	var w: float = face.size.x * uw - WELL_INSET * 2.0
+	var floor_y: float = face.end.y - PROGRESS_BAR_H
+	var ceil_y: float = face.position.y + WELL_INSET
+	var h: float = (floor_y - ceil_y) * clampf(float(held) / float(cap), 0.0, 1.0)
+	if w <= 0.0 or h <= 0.0:
+		return
+	var col: Color = _item_ink(item)
+	draw_rect(Rect2(x, floor_y - h, w, h), Color(col.r, col.g, col.b, WELL_ALPHA))
+	var lit: Color = col.lightened(0.35)
+	draw_rect(Rect2(x, floor_y - h, w, minf(1.5, h)), Color(lit.r, lit.g, lit.b, 0.90))
 
 
 func _cell_center(cell: Vector2i) -> Vector2:
