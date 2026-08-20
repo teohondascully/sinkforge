@@ -686,8 +686,9 @@ func _at_the_settings_cat(main: MainView, cat: String) -> void:
 ## BENCH WITH THE ACTIONABLE NODE SELECTED, which the brief asks for as *"BENCH with one actionable path
 ## and late locked branches"* and which the register did not have. `bench` selects Prospecting — a LOCKED
 ## node behind Automation — so the only research plate ever photographed was a dead one, and the same was
-## true of `bench_full` (everything researched, verb RESEARCHED). The board's whole job is "what comes
-## next", and the one node that answers it had never been shown selected.
+## true of `bench_full` (everything researched, so every plate reads RESEARCHED -- which is a STATE since
+## the state-plate work and not the verb it used to be). The board's whole job is "what comes next", and
+## the one node that answers it had never been shown selected.
 ##
 ## It is also the only state that produces the longest verb this screen has. RESEARCH is eight tracked
 ## characters against a button that was sized for BUY, which is a thing you cannot find out from a capture
