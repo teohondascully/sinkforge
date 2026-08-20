@@ -252,6 +252,12 @@ add "check_climb"                     "res://tools/check_climb.gd"
 add "check_saveload"                  "res://tools/check_saveload.gd"
 add "check_settings"                  "res://tools/check_settings.gd"
 add "check_binding_conflict (one key, one job)" "res://tools/check_binding_conflict.gd"
+# AUTHORSHIP, AND IT WAS NOT REGISTERED ANYWHERE. `check_trailers.sh` argues in its own header that it
+# must be a harness layer rather than only a commit hook -- "committing with --no-verify is routine here,
+# and that is exactly the flag that skips it... this one runs inside the suite, so it fails the run rather
+# than the commit, and no flag skips the suite." It was in no sweep, so no flag needed to skip it. Found by
+# running it by hand, where it went red on a second author identity sitting one merge from main.
+add "check_trailers (one author, no trailers)" "res://tools/check_trailers.sh"
 add "check_binding_persistence (a boot may not re-duplicate)" "res://tools/check_binding_persistence.gd"
 add "check_row_identity (one row, one machine)" "res://tools/check_row_identity.gd"
 add "check_encoding (no mojibake)"     "res://tools/check_encoding.gd"
@@ -827,7 +833,14 @@ while [ "$done_count" -lt "$total" ]; do
 			s=$SECONDS
 			# The EXACT exit code, not a boolean. Collapsing it to 0/1 is what made a skip indistinguishable
 			# from a pass; 42 has to survive the trip back out here to mean anything.
-			if [ "${GLFLAG[$i]}" = "1" ] && [ "$HAVE_DISPLAY" = "1" ]; then
+			# A SHELL LAYER RUNS AS A SHELL SCRIPT. Registered by a path ending in `.sh` rather than by a
+			# fourth `add_*` helper, because the thing that differs is how it is INVOKED and that is
+			# derivable from the name; a parallel flag could disagree with the extension and one of the two
+			# would be wrong silently. `res://` is a Godot path scheme and means nothing to bash, so it is
+			# stripped -- the entry is written with it for consistency with every other row.
+			if [ "${SCRIPTS[$i]}" != "${SCRIPTS[$i]%.sh}" ]; then
+				bash "${SCRIPTS[$i]#res://}" >"$DIR/${LOGS[$i]}" 2>&1
+			elif [ "${GLFLAG[$i]}" = "1" ] && [ "$HAVE_DISPLAY" = "1" ]; then
 				"$GODOT" --path . --script "${SCRIPTS[$i]}" >"$DIR/${LOGS[$i]}" 2>&1
 			else
 				"$GODOT" --headless --path . --script "${SCRIPTS[$i]}" >"$DIR/${LOGS[$i]}" 2>&1
