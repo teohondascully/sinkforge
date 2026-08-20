@@ -1339,10 +1339,37 @@ static func _item_gear(canvas: CanvasItem, c: Vector2, size: float) -> void:
 ## **So T3.4's fix is a SILHOUETTE and not a tint.** Iron sharing ore's outline is what forces value to do
 ## both jobs; give it its own shape and the value is free to leave deepslate. That is a spend the ticket
 ## says to authorise only after re-verification, and this is the re-verification.
+##
+## **THE SHAPE IS A CLUSTER, and it is chosen for what the CATALOGUE does not already contain.** Every other
+## rock glyph here is one convex lump — ore's nugget, coal's faceted lump, deepslate's shard — so a shape
+## that is two lumps is separated from all of them by a cue that survives being 16px tall, where vertex
+## detail does not. The two are placed on a DIAGONAL, which is the part doing the work: it leaves the
+## upper-right and lower-left corners empty, so the union is concave and its footprint no longer fills the
+## square the way a single blob does. IoU against `_item_ore` falls out of that emptiness rather than out of
+## the outline, which is why it is a diagonal rather than a snowman.
+##
+## **AND ONLY NOW DOES THE VALUE MOVE**, to the steel band its own `item_color` has always promised. This is
+## the second half of the same fix and it is not independent of the first: the reverted attempt above moved
+## iron's tint while it still wore ore's outline, and `ore/iron` went to IoU 1.00 / dE 9.5 because the tint
+## was the only separation left. With the outline separated the tint is free, so it goes where the identity
+## already lives — `item_color(&"iron")` is pale steel 0.72/0.76/0.85, and the drawn icon was a dark blue-grey
+## that matched deepslate instead of matching iron. The host stays a rock rather than becoming the metal:
+## light enough to leave deepslate's band outright, cool enough not to read as ore's neutral grey.
+##
+## **NOT YET MEASURED — this awaits a `check_item_reads` run and must not be read as verified.** The layer is
+## `add_gl` and the machine was held elsewhere when this was written. Both halves of this change are exactly
+## the kind the file has already recorded being wrong about once, and the numbers above came from the
+## instrument rather than from reasoning about constants, which is the only reason they are trustworthy.
 static func _item_iron(canvas: CanvasItem, c: Vector2, size: float) -> void:
-	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
-		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.30, 0.33, 0.42))
-	for f: Vector2 in [Vector2(-0.10, 0.02), Vector2(0.14, -0.10), Vector2(-0.02, 0.18)]:
+	var host := Color(0.50, 0.55, 0.66)
+	# The smaller lump first, so the larger one overlaps it and the seam between them reads as a facet edge
+	# rather than as two icons that happen to be touching.
+	_poly(canvas, c, size, [Vector2(0.02, 0.06), Vector2(0.24, -0.02), Vector2(0.40, 0.16),
+		Vector2(0.28, 0.36), Vector2(0.02, 0.32)], host)
+	_poly(canvas, c, size, [Vector2(-0.42, -0.12), Vector2(-0.18, -0.36), Vector2(0.06, -0.28),
+		Vector2(0.10, 0.02), Vector2(-0.14, 0.20), Vector2(-0.40, 0.10)], host.lightened(0.06))
+	# Flecks sit on BOTH lumps — metal spread across the cluster, not a lit lump beside a bare one.
+	for f: Vector2 in [Vector2(-0.20, -0.10), Vector2(-0.06, 0.06), Vector2(0.22, 0.16)]:
 		canvas.draw_circle(c + f * size, size * 0.06, Color(0.78, 0.82, 0.92))
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(0.95, 0.97, 1.0))
 
