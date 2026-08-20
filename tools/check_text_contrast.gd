@@ -41,18 +41,26 @@ extends "res://tools/check_base.gd"
 ## constant map rather than through `Hud.` so the layer reads the FILE and cannot be satisfied by a stale
 ## global class cache.
 ##
-## THE POPULATION IS NINE PAIRS: the four named text inks that land on a named plate, against the four
+## THE POPULATION IS THIRTEEN PAIRS: every named text ink that lands on a named plate, against the five
 ## named plates that carry text. Every row names its call sites. What is NOT in it is written out here, at
-## length, because a layer called "text contrast" that measured nine pairs would otherwise be read as a
+## length, because a layer called "text contrast" that measured thirteen pairs would otherwise be read as a
 ## sweep of the HUD: the title screen and the tooltip draw their type in inline literals; the wash tiles
-## (`Color(1, 1, 1, 0.028…0.062)` over the modal) are plates this layer does not name and the cost chip's
-## shortfall sits on the heaviest of them; `RAIL_ON_FILL` carries a glyph and no text; the
-## disabled verb button is deliberately quiet and is exempt under every readability standard that has an
-## opinion about disabled controls; and text drawn at a fading alpha (`hint_a` on the objective hint) is
-## measured at full strength, because the values in between are a transition and not a state. `UI_ACCENT`
-## is absent for a reason that is itself a shipped decision: `MNU-06` moved gold off every site where it
-## was labelling anything, so gold is not a text ink on a named plate any more. Roughly a hundred
-## `draw_string` calls exist in that file. Nine pairs is what is asserted.
+## (`Color(1, 1, 1, 0.022…0.062)` over the modal) and the picked row's brass are plates this layer cannot
+## name, because they are literals in the drawing code and not constants — SEE THE STAND-DOWN BELOW, since
+## that is where the remaining exposure sits; `RAIL_ON_FILL` carries a glyph and no text; the disabled verb
+## button is deliberately quiet and is exempt under every readability standard that has an opinion about
+## disabled controls; and text drawn at a fading alpha (`hint_a` on the objective hint) is measured at full
+## strength, because the values in between are a transition and not a state. Roughly a hundred
+## `draw_string` calls exist in that file. Thirteen pairs is what is asserted.
+##
+## `UI_ACCENT` ENTERS AS A PLATE AND NOT AS AN INK, which is `MNU-06` holding rather than bending: gold was
+## moved off every site where it was labelling anything, so it is still not a text ink — but the live verb
+## button is a slab of it with dark type on top, and that is a plate carrying text like any other.
+##
+## THE FOUR ROWS ADDED BY `MNU-32`'s ink pass are `GOLD_DIM` and `GOLD_PALE` on the modal, and `VERB_INK`
+## on the accent at both of its strengths. They exist because the pass NAMED the colours it lifted: seven
+## literals across eleven sites became four constants, and a constant is the only thing a floor can be held
+## against. The thinned row is the one that had actually failed, at 3.77 against a floor of 4.5.
 ##
 ## THE PLATE IS COMPOSITED, because every one of the four carries alpha and a translucent plate is not a
 ## colour — it is a colour plus a window onto whatever is behind it. The ground is black: that is the value
@@ -116,6 +124,14 @@ func _initialize() -> void:
 	_measure()
 	_stand_down("the bright-backdrop column", "how much light the world can put through a 0.90 plate is a "
 		+ "property of the renderer, not of the palette, and this layer's lane is the palette")
+	# NAMED HONESTLY BECAUSE IT IS THE GAP, not because it is tidy. `MNU-32`'s ink pass measured these by
+	# hand and the worst of them was the cost shortfall at 4.20 on the picked row's brass, which is why
+	# that ink is `UI_WARN` now — but the FLOOR on it is not held here, and will not be until the wash
+	# tiles and the brass are constants this layer can name. Ten drawing sites would have to change colour
+	# nothing to get there, so it is a separate decision and not a silent one.
+	_stand_down("the wash tiles and the picked row's brass", "they are literals in the drawing code rather "
+		+ "than named constants, so no row here can reference them — the inks that land on them were "
+		+ "measured by hand for the ticket and cleared, but nothing re-measures them on the next edit")
 	_verdict("check_text_contrast", "every named HUD ink clears %.1f:1 on every named plate it lands on"
 		% FLOOR)
 
@@ -138,6 +154,12 @@ func _calibrate() -> void:
 ## a value that can drift out from under a copy.
 func _measure() -> void:
 	var pairs: Array[Dictionary] = [
+		{"ink": "GOLD_DIM", "plate": "UI_MODAL",
+			"at": "the ledger heading, both works group titles, the research pointer"},
+		{"ink": "GOLD_PALE", "plate": "UI_MODAL", "at": "the hot slider's value cap"},
+		{"ink": "VERB_INK", "plate": "UI_ACCENT", "at": "the live verb's word"},
+		{"ink": "VERB_INK", "ink_a": "VERB_HINT_A", "plate": "UI_ACCENT",
+			"at": "the live verb's key hint, thinned"},
 		{"ink": "UI_TEXT", "plate": "UI_BG", "at": "the FORGED count, the grand total, a machine name"},
 		{"ink": "UI_TEXT_DIM", "plate": "UI_BG", "at": "the FORGED label, PRODUCTION, CONTROLS, the hint"},
 		{"ink": "UI_WARN", "plate": "UI_BG", "at": "the dashboard's stalled counts"},
@@ -151,22 +173,47 @@ func _measure() -> void:
 	# NON-VACUITY, both directions. A population that quietly shrank to nothing would satisfy every ratio
 	# assertion below by having none to make, and a table where every plate came back opaque would carry the
 	# compositing path untested while looking like nine honest rows. Both are asserted before the rows are.
-	_check(pairs.size() == 9, "the population is the nine pairs the header enumerates (%d)" % pairs.size())
+	_check(pairs.size() == 13, "the population is the thirteen pairs the header enumerates (%d)"
+		% pairs.size())
 	var translucent: int = 0
 	for p: Dictionary in pairs:
 		if _colour(str(p["plate"])).a < OPAQUE:
 			translucent += 1
 	_check(translucent > 0, "at least one plate is translucent, so the compositing path is exercised "
 		+ "rather than being carried untested (%d of %d rows)" % [translucent, pairs.size()])
+	# THE THINNED ROW IS THE ONE THAT WAS BROKEN, so its path is asserted rather than assumed. A row that
+	# quietly lost its `ink_a` would be measured at full strength — which is exactly the reading that hid
+	# the verb hint's 3.77 for as long as it did — and would still print nine honest-looking figures.
+	var thinned: int = 0
+	for p: Dictionary in pairs:
+		if p.has("ink_a"):
+			thinned += 1
+	_check(thinned > 0, "at least one row carries an ink alpha, so the ink-compositing path is exercised "
+		+ "and not carried untested (%d of %d rows)" % [thinned, pairs.size()])
 
 	print("  %-16s %-10s %8s %8s   %s" % ["ink", "plate", "on dark", "on lit", "drawn at"])
 	for p: Dictionary in pairs:
 		var ink_name: String = str(p["ink"])
 		var plate_name: String = str(p["plate"])
-		var ink: Color = _colour(ink_name)
 		var plate: Color = _colour(plate_name)
-		var dark: float = _contrast(ink, _over(plate, Color.BLACK))
-		var lit: float = _contrast(ink, _over(plate, Color.WHITE))
+		# AN INK WITH AN ALPHA IS NOT ITS OWN COLOUR. `_verb_button` draws its key hint as the verb's ink
+		# thinned, and reading that constant at full strength measures a glyph nobody is looking at: the
+		# hint scored 8.30 that way and 3.77 as drawn. The ink is composited onto its own plate first, so
+		# the row measures the pixels the player sees.
+		var ink: Color = _colour(ink_name)
+		var dark_plate: Color = _over(plate, Color.BLACK)
+		var lit_plate: Color = _over(plate, Color.WHITE)
+		var dark_ink: Color = ink
+		var lit_ink: Color = ink
+		if p.has("ink_a"):
+			var a: float = _alpha(str(p["ink_a"]))
+			ink_name = "%s @%.2f" % [ink_name, a]
+			# Composited against EACH ground separately. Thinning the ink onto the dark plate and then
+			# measuring it against the lit one would mix two frames into one number.
+			dark_ink = _over(Color(ink, a), dark_plate)
+			lit_ink = _over(Color(ink, a), lit_plate)
+		var dark: float = _contrast(dark_ink, dark_plate)
+		var lit: float = _contrast(lit_ink, lit_plate)
 		print("  %-16s %-10s %8.2f %8.2f   %s" % [ink_name, plate_name, dark, lit, str(p["at"])])
 		_check(dark >= FLOOR, "%s on %s is readable — %.2f:1, floor %.1f (%s)"
 			% [ink_name, plate_name, dark, FLOOR, str(p["at"])])
@@ -179,6 +226,16 @@ func _colour(name: String) -> Color:
 		_check(false, "scenes/hud.gd still defines %s, which a row here measures" % name)
 		return Color.BLACK
 	return _consts[name] as Color
+
+
+## A named alpha out of `scenes/hud.gd`. Loud on absence for the same reason `_colour` is, and then some:
+## a missing alpha would fall back to 1.0, which is the value that makes the row PASS. An error path that
+## returns the passing value is how a thinned ink gets measured at full strength and reads green.
+func _alpha(name: String) -> float:
+	if not _consts.has(name):
+		_check(false, "scenes/hud.gd still defines %s, which a row here thins an ink by" % name)
+		return 0.0
+	return float(_consts[name])
 
 
 ## Relative luminance, per the sRGB definition the contrast ratio is written against. NOT `luma`: see the
