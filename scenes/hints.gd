@@ -11,8 +11,10 @@ extends RefCounted
 ## the tick — delete this and every production number is identical. Triggers are ACQUISITION EDGES: an
 ## item's count crossing 0 → >0 THIS session (a snapshot at construction means a pre-stocked dev pack or
 ## a loaded save doesn't fire a wall of bubbles at boot; resync() re-arms the snapshot after F9). Shown
-## hints LATCH for the session; one bubble at a time, later triggers queue behind it. Not saved — a hint
-## re-teaching once after a fresh boot is fine, spam within a session is not.
+## hints LATCH for the session; one bubble at a time, later triggers queue behind it — except a lesson that
+## named a relevance gate (SAPLING_GATE), which waits in the queue for its situation and lets the ones
+## behind it go first. Not saved — a hint re-teaching once after a fresh boot is fine, spam within a
+## session is not.
 
 const SHOW_SECONDS: float = 9.0     ## how long a bubble lingers (long enough to read twice)
 
@@ -26,6 +28,11 @@ const SHOW_SECONDS: float = 9.0     ## how long a bubble lingers (long enough to
 const MAX_LINGER: float = SHOW_SECONDS * 3.0
 const FADE_IN: float = 0.25
 const FADE_OUT: float = 0.6
+
+## The relevance gate a lesson may WAIT on: an optional `when` on a def names a situation id, and the
+## bubble is held in the queue until the controller pokes that id true (note_relevant). Acquisition says
+## the lesson exists; the gate says the moment has come.
+const SAPLING_GATE: StringName = &"plantable_ground"
 
 ## The teachable moments, scanned in order (order = priority when several fire the same frame). Each:
 ## the pack item whose first acquisition triggers it + what the bubble says. Deliberately ABSENT: the
@@ -42,7 +49,12 @@ var _defs: Array[Dictionary] = [
 	# SECOND CONCEPT — an economics claim — competing with the one input instruction the bubble exists to
 	# give. It is not deleted; it is moved to `planted`, where it lands on the moment it describes and is
 	# a payoff instead of a promise. *One action, one immediate consequence.*
-	{"id": &"sapling", "item": &"sapling",
+	# UI-02, and the `when` is the whole of it. The pickup told the player a sapling exists; "RMB plants it
+	# on grass" is an INSTRUCTION, and an instruction with nowhere to point is just words on the screen —
+	# it used to arrive on the pickup wherever the player happened to be standing and run its nine seconds
+	# out over a rock face. The gate holds it until there is a seed in the pack and the cursor is on ground
+	# that would take one, so the lesson opens on the answer to the question it is asking.
+	{"id": &"sapling", "item": &"sapling", "when": SAPLING_GATE,
 		"text": "SAPLING — RMB plants it on grass."},
 	# Same cut. "Too dense for the Forge" is the immediate consequence of what just entered the pack and
 	# answers the question the player is about to ask. The Blast Furnace is a research path, and a research
@@ -140,10 +152,15 @@ var _busy: bool = false             ## body moving too fast to read anything (po
 var _ceremony: bool = false         ## the arrival plate owns the announce channel (poked by note_ceremony)
 var _now: Dictionary = {}           ## moment id -> condition true THIS frame (poked by note())
 var _was: Dictionary = {}           ## moment id -> ...and last frame; the pair is the rising-edge detector
+var _relevant: Dictionary = {}      ## situation id -> live THIS frame (poked by note_relevant)
+var _gate_of: Dictionary = {}       ## hint id -> the situation it waits for; no entry = shows on arrival
 
 
 func _init(factory: FactorySim) -> void:
 	sim = factory
+	for def: Dictionary in _defs:
+		if def.has("when"):
+			_gate_of[def["id"]] = def["when"]
 	_snapshot()                     # what's already in the pack at construction never fires
 
 
@@ -176,6 +193,30 @@ func note_ceremony(on: bool) -> void:
 ## rather than its display, so a lesson fired mid-swing is still on screen when the swing ends.
 func note_busy(on: bool) -> void:
 	_busy = on
+
+
+## Poked with whether a gated lesson's situation is live right now (SAPLING_GATE: a seed in the pack and
+## the cursor over ground that would take it). A LEVEL, not an edge, and it lives in the controller with
+## the cursor for the same reason the body predicates do.
+##
+## It gates ARRIVAL only, and only for a def that named it. Nothing here fires, latches or forgets a
+## lesson: the acquisition edge still does that, the queue holds the bubble until the situation turns up,
+## and once it is on screen it lives its ordinary life. Suppressing the DISPLAY on the same flag was the
+## other option and it is the wrong one — the cursor moves every frame of normal play, so the bubble would
+## strobe as the aim crossed the edge of the soil, and a lesson explaining where to point cannot flicker
+## every time you point somewhere. UI-03 settled the same argument about speed with hysteresis; the aim
+## has no equivalent quiet state to settle into.
+func note_relevant(id: StringName, on: bool) -> void:
+	_relevant[id] = on
+
+
+## Can this hint be shown yet? True unless its def named a situation that has not been poked live. The
+## `has` is the guard rather than a null test: an absent gate and a gate that is currently false are
+## different answers and both have to be reachable.
+func _ready_to_show(id: StringName) -> bool:
+	if not _gate_of.has(id):
+		return true
+	return bool(_relevant.get(_gate_of[id], false))
 
 
 ## The wading edge, named. Kept as its own verb because the call site reads better for it.
@@ -215,9 +256,17 @@ func refresh(delta: float) -> void:
 		if _life <= 0.0 or _lingered >= MAX_LINGER:
 			_active = &""
 	if _active == &"" and not _queue.is_empty() and not _ceremony:
-		_active = _queue.pop_front()
-		_life = SHOW_SECONDS
-		_lingered = 0.0
+		# The first hint whose situation is live, which is the front one unless it is gated and waiting.
+		# A gated lesson lets the rest of the queue past rather than blocking it: it is waiting for a
+		# situation that may be minutes away, and the hints behind it are about things happening now.
+		for i: int in _queue.size():
+			if not _ready_to_show(_queue[i]):
+				continue
+			_active = _queue[i]
+			_queue.remove_at(i)
+			_life = SHOW_SECONDS
+			_lingered = 0.0
+			break
 
 
 ## The bubble to show right now ("" = none). The HUD anchors it near the body.

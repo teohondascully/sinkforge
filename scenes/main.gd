@@ -778,6 +778,12 @@ func _process(delta: float) -> void:
 			# The FEET, not the body centre: standing on the grass the centre cell is the air above it,
 			# which read as "+1 m, OPEN SKY" while the miner was plainly stood on the ground.
 			_note_stratum(_cell_at(_player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0)).y)
+			# UI-02: is the sapling lesson an instruction yet? Both halves of "a seed in the pack and the
+			# cursor on ground that would take one" are the sim's own planting guards, asked through
+			# `can_plant_sapling` — so what the bubble promises and what the click does cannot come apart.
+			# Reach is ours to add: the sim owns no avatar, and out past REACH_CELLS the RMB at try_build
+			# refuses whatever the ground under the cursor says.
+			_hints.note_relevant(Hints.SAPLING_GATE, _can_reach(_aim) and sim.can_plant_sapling(_aim))
 		_hints.refresh(delta)
 	# Push the cursor + its computed affordances to the view (it can't derive reach/placeable itself).
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(),

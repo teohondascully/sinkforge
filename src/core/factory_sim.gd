@@ -840,10 +840,10 @@ func block_supported(cell: Vector2i) -> bool:
 ## so the layers can never overlap. Per-function guards each checking a different subset let a cell
 ## become solid AND piped at once, corrupting state. A new placed layer adds ONE check here.
 ##
-## Known exception: `plant_sapling` still hand-rolls its own set, omitting `conduit` and adding
-## `sapling`. So a sapling may be planted into a piped cell, and every placement here will bury a
-## planted one. Closing that changes real placement behaviour in both directions and wants its own
-## test.
+## Known exception: the sapling gate (`can_plant_sapling`, the guards `plant_sapling` runs on) still
+## hand-rolls its own set, omitting `conduit` and adding `sapling`. So a sapling may be planted into a
+## piped cell, and every placement here will bury a planted one. Closing that changes real placement
+## behaviour in both directions and wants its own test.
 func cell_occupied(cell: Vector2i) -> bool:
 	return solid.has(cell) or grid.has(cell) or conduit.has(cell) or rope.has(cell) or torch.has(cell)
 
@@ -1119,16 +1119,28 @@ func leaf_drops_sapling(cell: Vector2i) -> bool:
 	return ((int(cell.x) * 73856093) ^ (int(cell.y) * 19349663)) % 3 == 0
 
 
-## Plant a carried &"sapling" on open ground: the cell must be open (no solid, machine, rope or torch)
-## and sit ON soil (SAPLING_SOILS). Consumed into the ledger; the eventual tree is world matter and
-## yields produced wood when chopped, like worldgen trees, so the ledger stays total.
-func plant_sapling(cell: Vector2i) -> bool:
+## Would a sapling go in here? The cell must be open (no solid, machine, rope or torch, and no sapling
+## already), you have to be carrying one, and it must sit ON soil (SAPLING_SOILS).
+##
+## These are plant_sapling's own guards, lifted out rather than copied: the representation wants to ask
+## the question BEFORE the click — the aim cursor knows whether the plant is on offer, and the lesson
+## about planting is only an instruction where one could actually go — and a second copy of the rules is
+## a second thing to keep in step with this one. The verb below is the only gate; this is what it refuses
+## on, so an answer of true here and a refusal there cannot happen.
+func can_plant_sapling(cell: Vector2i) -> bool:
 	if not in_bounds(cell) or solid.has(cell) or grid.has(cell) or rope.has(cell) \
 			or torch.has(cell) or sapling.has(cell):
 		return false
 	if int(inventory.get(&"sapling", 0)) <= 0:
 		return false
-	if not SAPLING_SOILS.has(solid.get(cell + Vector2i(0, 1), &"")):
+	return SAPLING_SOILS.has(solid.get(cell + Vector2i(0, 1), &""))
+
+
+## Plant a carried &"sapling" on open ground (can_plant_sapling decides where). Consumed into the ledger;
+## the eventual tree is world matter and yields produced wood when chopped, like worldgen trees, so the
+## ledger stays total.
+func plant_sapling(cell: Vector2i) -> bool:
+	if not can_plant_sapling(cell):
 		return false
 	_take_from_pack(&"sapling", 1)
 	total_consumed[&"sapling"] = int(total_consumed.get(&"sapling", 0)) + 1
