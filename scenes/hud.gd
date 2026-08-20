@@ -734,8 +734,13 @@ func _draw_title() -> void:
 	for i: int in tints.size():
 		var sw := Rect2(sx, ly - 11.0, 14.0, 14.0)
 		draw_rect(sw, (tints[i] as Dictionary)["color"])
+		# THE SWATCH ROW IS THE HARDEST CASE OF `MNU-32`, because here the thing being chosen IS a colour.
+		# A 1.5px `UI_ACCENT` outline was the whole mark, and gold is one of the five tints' own
+		# neighbourhood — miner's gold is (1.0, 0.90, 0.66) — so the caret was a hue laid over hues, at
+		# lighter weight than any other cursor in the game. The shared ring is 2px with a dark keyline
+		# under it, which is a value step and a shape whatever colour it lands beside.
 		if i == sel:
-			draw_rect(sw.grow(2.0), UI_ACCENT, false, 1.5)
+			_focus_ring(sw)
 		sx += 20.0
 	draw_string(_font, Vector2(card.end.x - 92.0, ly), "[<-/->] pick", HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 		Color(0.55, 0.60, 0.70))
@@ -3358,6 +3363,57 @@ func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
 	sb.draw(get_canvas_item(), rect)
 
 
+## THE FOCUS RING — where the NEXT KEYPRESS WILL LAND, on any control that can take the keyboard.
+##
+## `MNU-32` shipped the measurement for the two cursors that had one (the counter's row and the hotbar's
+## lit slot) and left the rest of the page open: every other traversable control loses the caret the
+## moment you leave those two surfaces. This is the mark the rest of them wear.
+##
+## IT IS THE IDIOM THE TWO MEASURED CURSORS ALREADY USE, not a third invention. The hotbar's lit slot
+## swaps a 1px `UI_EDGE` border for a 2px `UI_ACCENT` one and hangs a glow outside it — an OUTLINE at
+## double weight, sitting off the well's own edge. That is what this draws, in the same gold family
+## (`GOLD_PALE`, which is `UI_ACCENT` lifted, already the page's "the hot one" token), at the same 2px.
+## The counter's spine is the other half of the idiom, and row-shaped controls keep it (`spine`).
+##
+## IT IS NOT A HUE. `MNU-32`'s whole finding was that the game's affordance signal had been concentrated
+## into one colour channel, and a focus ring that is only a colour change repeats that on a new surface.
+## Three channels carry this mark, and any one of them alone would still say "focus":
+##   SHAPE    an unbroken ring is drawn in no other state on this page. Selection fills, hover lifts a
+##            fill; neither of them outlines. Present-vs-absent needs no colour to read.
+##   WEIGHT   2px, against the 1px every edge on the page is drawn at (the chip's keyline, the slider's
+##            frame, the row plates). Twice the ink of anything it could be confused with.
+##   INSET    it is drawn OUTSIDE the control's own box, which is the one place no other state paints.
+##            Focus is the only thing here that changes a control's FOOTPRINT rather than its interior,
+##            so it survives on a chip that is already filled gold for being ON.
+## The keyline is the fourth: one dark line immediately inside the ring, so the pale gold cannot merge
+## into a light fill under it. The lamp swatches on the title card are the case that needs it — there the
+## thing being chosen IS a colour, and five bright tints would each have argued with a bare gold ring.
+##
+## `grow` is the caller's, because the clearance is the caller's: a chip has air around it and takes the
+## default, while the binding rows are drawn on a 15px pitch with 15px plates and would have rung their
+## neighbours, so they pass 0.0 and the ring lands on the plate's own edge.
+const FOCUS_W: float = 2.0            ## the ring, at double the weight of every 1px edge near it
+const FOCUS_GROW: float = 2.5         ## how far outside the control it sits, where nothing else paints
+const FOCUS_KEYLINE := Color(0.0, 0.0, 0.0, 0.55)   ## one dark line inside it, so it reads on any fill
+const FOCUS_SPINE_W: float = 2.0      ## the counter's mark, kept for the controls that are rows
+## Far enough left of the plate that the two marks stay two marks. The ring at `grow` 0.0 straddles the
+## plate's edge, half a `FOCUS_W` either side of it, so a spine parked flush against that edge merges with
+## it into one thicker bar and the row loses the spine it is supposed to be carrying: 4.0 leaves 1px of
+## ground between them at the weights above, and any future change to either has to be checked against
+## that subtraction rather than against the picture.
+const FOCUS_SPINE_DX: float = 4.0
+const FOCUS_SPINE_INSET: float = 2.0  ## ...and how far short of the row's ends it stops, as the counter's
+
+
+## The mark itself. See the block above the constants for why it is shaped the way it is.
+func _focus_ring(box: Rect2, grow: float = FOCUS_GROW, spine: bool = false) -> void:
+	draw_rect(box.grow(grow - 1.0), FOCUS_KEYLINE, false, 1.0)
+	draw_rect(box.grow(grow), GOLD_PALE, false, FOCUS_W)
+	if spine:
+		draw_rect(Rect2(box.position.x - FOCUS_SPINE_DX, box.position.y + FOCUS_SPINE_INSET,
+			FOCUS_SPINE_W, box.size.y - FOCUS_SPINE_INSET * 2.0), UI_ACCENT)
+
+
 ## Elevation instead of a border. A modern panel does not outline itself; it casts. Concentric translucent
 ## rings are the cheap honest version of that, and they are what stop the counter reading as printed on the
 ## world behind it.
@@ -3761,8 +3817,16 @@ func _draw_settings_overlay() -> void:
 	# falls back to the category's own line, so the plate is never blank and never stale.
 	var told: String = _settings_body(g, mouse)
 	_draw_settings_detail(g, told, mouse)
+	# WHAT THE KEYBOARD CAN DO HERE, said on the page rather than left to be found. The line named 1 2 3 and
+	# ESC because those were the only two keys true of the whole page: the arrows moved a cursor on ONE of
+	# the three faces and every other control was mouse-only. They are true of all three now, and a control
+	# you can focus but cannot discover is the same defect one step further in — on the page a player opens
+	# precisely when their input is not doing what they expect.
+	var legend: String = "arrows move   ENTER rebinds   1 2 3 category   ESC closes" \
+		if settings_cat == CAT_CONTROLS \
+		else "arrows move and adjust   ENTER acts   1 2 3 category   ESC closes"
 	draw_string(_font, Vector2(origin.x + BAZAAR_RAIL + BAZAAR_PAD, origin.y + float(g["h"]) - 5.0),
-		"1 2 3 switch category    ESC closes", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
+		legend, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -3895,27 +3959,43 @@ func _settings_body(g: Dictionary, mouse: Vector2) -> String:
 ## Named rather than fetched. `Settings` is a `class_name` of STATIC vars, and a dynamic `get()` against
 ## one is a lookup that fails at runtime rather than at parse time — the wrong trade in a page that four
 ## harness layers photograph.
+##
+## THE MATCH MOVED TO `Settings` AND THIS IS THE FORWARDER. Keyboard adjustment of a level has to READ the
+## level before it can move it, and that read happens in `MainView` where the mutation lives — so the
+## alternative to one shared accessor was two copies of the same four names in two files, which is the
+## shape of defect this page has already shipped once.
 func _audio_level(id: String) -> float:
-	match id:
-		"master": return Settings.master
-		"sound": return Settings.sound
-		"ambience": return Settings.ambience
-		_: return Settings.music
+	return Settings.level(id)
 
 
+## THE PLATE FOLLOWS THE HAND, AND THEN THE CARET. `said` was set by hover alone, which is correct while
+## the mouse is on the page and leaves the plate saying the category's own line for a keyboard user who is
+## standing on a control that has a sentence written for it. The order is the one `_settings_controls`
+## already argued for and had to be corrected into: hover first and unconditionally, because it is the more
+## deliberate pointer, and focus fills in when nothing is hovered.
 func _settings_audio(c: Rect2, mouse: Vector2) -> String:
 	var said: String = ""
 	var y: float = c.position.y + 14.0
 	draw_string(_font, Vector2(c.position.x, y), "sound", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
 	# The mute reads as its STATE, never as an instruction — a chip that says the opposite of what is
 	# happening is the oldest bug in settings UI.
+	#
+	# The focus arm needs no `said == ""` beside it, unlike the rows below: this is the first control the
+	# category draws, so nothing can have spoken yet and a test for it would be a guard that cannot be
+	# false — the exact shape the rest of this function's history is a catalogue of.
+	var mute_focused: bool = settings_row == 0
 	if _settings_chip(c.position.x + SET_CTRL_DX, y, "MUTED" if Settings.muted else "SOUND ON",
-			{"toggle": "mute"}, not Settings.muted, mouse, 10, Settings.muted):
+			settings_row_payload(CAT_AUDIO, 0), not Settings.muted, mouse, 10, Settings.muted,
+			mute_focused) or mute_focused:
 		said = "silences everything at once; the levels below are kept"
-	for row: Array in AUDIO_ROWS:
+	for i: int in AUDIO_ROWS.size():
+		var row: Array = AUDIO_ROWS[i]
 		y += SET_ROW
 		var id: String = str(row[1])
-		if _settings_slider(c.position.x, y, id, str(row[0]), _audio_level(id), mouse):
+		var focused: bool = settings_row == i + 1
+		if _settings_slider(c.position.x, y, id, str(row[0]), _audio_level(id), mouse, focused):
+			said = str(row[2])
+		elif focused and said == "":
 			said = str(row[2])
 	return said
 
@@ -3923,22 +4003,22 @@ func _settings_audio(c: Rect2, mouse: Vector2) -> String:
 func _settings_feel(c: Rect2, mouse: Vector2) -> String:
 	var said: String = ""
 	var y: float = c.position.y + 14.0
-	for row: Array in FEEL_ROWS:
+	for i: int in FEEL_ROWS.size():
+		var row: Array = FEEL_ROWS[i]
 		var id: String = str(row[1])
 		draw_string(_font, Vector2(c.position.x, y), str(row[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 			UI_TEXT)
 		var text: String = ""
-		var payload: Dictionary = {}
 		var on: bool = false
 		if id == "zoom":
 			text = "%.2fx" % MainView.ZOOM_LEVELS[
 				clampi(Settings.zoom_idx, 0, MainView.ZOOM_LEVELS.size() - 1)]
-			payload = {"cycle": "zoom"}
 		else:
 			on = Settings.screen_shake if id == "shake" else Settings.auto_pickup
 			text = "ON" if on else "OFF"
-			payload = {"toggle": id}
-		if _settings_chip(c.position.x + SET_CTRL_DX, y, text, payload, on, mouse):
+		var focused: bool = settings_row == i
+		if _settings_chip(c.position.x + SET_CTRL_DX, y, text, settings_row_payload(CAT_FEEL, i), on,
+				mouse, 10, false, focused) or (focused and said == ""):
 			said = str(row[2])
 		y += SET_ROW
 	return said
@@ -4001,23 +4081,76 @@ static func action_label(action: StringName) -> String:
 	return String(action)
 
 
+## HOW MANY CONTROLS THE OPEN CATEGORY OFFERS THE KEYBOARD, which is the population `settings_row` is an
+## index into. It was 22 and it was only ever the bindings, because the cursor existed for the binding
+## list alone (`MNU-29a`) and every other control on this page was reachable by mouse only. `MNU-32`'s
+## open half is exactly that gap: the levels, the toggles and RESET KEYS could not be focused at all, so
+## there was nothing for a focus state to be drawn ON.
+##
+## RESET KEYS IS PART OF THE CONTROLS LIST, at its end, rather than a fourth thing with its own key. It is
+## drawn on the detail plate under the two columns, so arriving at it by pressing DOWN off the bottom of
+## the second column is where it already sits on the page.
+func settings_focus_count() -> int:
+	match settings_cat:
+		CAT_CONTROLS: return REMAP_ROWS.size() + 1        # the bindings, then RESET KEYS
+		CAT_FEEL: return FEEL_ROWS.size()
+		_: return AUDIO_ROWS.size() + 1                   # the mute chip, then the levels
+
+
+## WHAT ONE ROW OF A CATEGORY DOES, as the payload the click path already speaks.
+##
+## THE KEYBOARD AND THE MOUSE PRODUCE THE SAME DICTIONARY, deliberately, and this is the only place either
+## of them gets it from: `_settings_audio` / `_settings_feel` / `_settings_controls` register these as the
+## hit payloads, and `settings_focus_payload` returns this for the focused row. `MainView._apply_setting`
+## is therefore one mutation path for both pointers, not two that have to be kept agreeing — the page has
+## already paid once for a page-side copy of a rule drifting from the resolver's (`_binding_clashes`).
+func settings_row_payload(cat: int, i: int) -> Dictionary:
+	match cat:
+		CAT_CONTROLS:
+			if i < 0 or i >= REMAP_ROWS.size():
+				return {"reset": true}
+			return {"bind": String(REMAP_ROWS[i][0])}
+		CAT_FEEL:
+			var f: int = clampi(i, 0, FEEL_ROWS.size() - 1)
+			var fid: String = str(FEEL_ROWS[f][1])
+			return {"cycle": "zoom"} if fid == "zoom" else {"toggle": fid}
+		_:
+			if i <= 0:
+				return {"toggle": "mute"}
+			return {"slider": str(AUDIO_ROWS[clampi(i - 1, 0, AUDIO_ROWS.size() - 1)][1])}
+
+
+## The focused control's payload. `MainView` acts on this and never on the index, so what ENTER does is
+## decided by the same table that decided what a click on the same control does.
+func settings_focus_payload() -> Dictionary:
+	return settings_row_payload(settings_cat, settings_row)
+
+
 ## Move the keyboard cursor. Up/Down step within a column; Left/Right jump a column, which is what the
 ## two-column layout makes them mean. Clamped rather than wrapped: a cursor that leaps from the last row
 ## to the first reads as a lost keypress.
+##
+## IT USED TO REFUSE EVERY CATEGORY BUT CONTROLS, in its first two lines, which is the mechanical form of
+## `MNU-32`'s open half: on AUDIO and FEEL the arrow keys did nothing at all, so the page a player opens
+## when their input is not working had four levels and three toggles that only a mouse could reach.
+##
+## THE COLUMN JUMP IS THE ONE THING THAT STAYS CATEGORY-SHAPED. AUDIO and FEEL are single columns, so
+## there is no column to jump to and the step is 0; `MainView` reads Left/Right on those faces as an
+## ADJUSTMENT to the focused control instead, and only falls back here when the control has nothing to
+## adjust. One rule, and it never has to guess: a slider and a cycle move, everything else steps.
 func move_settings_row(keycode: int) -> void:
-	if settings_cat != CAT_CONTROLS:
-		return
-	var per_col: int = _remap_per_col()
-	var n: int = REMAP_ROWS.size()
+	var step: int = _remap_per_col() if settings_cat == CAT_CONTROLS else 0
 	match keycode:
 		KEY_UP: settings_row -= 1
 		KEY_DOWN: settings_row += 1
-		KEY_LEFT: settings_row -= per_col
-		KEY_RIGHT: settings_row += per_col
-	settings_row = clampi(settings_row, 0, n - 1)
+		KEY_LEFT: settings_row -= step
+		KEY_RIGHT: settings_row += step
+	settings_row = clampi(settings_row, 0, settings_focus_count() - 1)
 
 
-## The action under the keyboard cursor, or &"" when the cursor is not on a binding list.
+## The action under the keyboard cursor, or &"" when the cursor is not on a binding list — which now also
+## covers the last CONTROLS index, RESET KEYS, since that is a control and not a binding. The guard was
+## already written as a RANGE test rather than a category test, so it held the day the list grew a tail.
 func settings_row_action() -> StringName:
 	if settings_cat != CAT_CONTROLS or settings_row < 0 or settings_row >= REMAP_ROWS.size():
 		return &""
@@ -4045,17 +4178,25 @@ func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
 		var chip := Rect2(x + col_w - bw, y - 10.0, bw, 13.0)
 		var lit: bool = chip.has_point(mouse)
 		var cursor: bool = i == settings_row
+		var plate := Rect2(x - 4.0, y - 11.0, col_w + 8.0, 15.0)
 		if lit or capturing or cursor:
 			# The whole row lights, not just the chip — the row is the thing you are choosing, which is
 			# what makes the plate below it read as being ABOUT something.
-			_round_rect(Rect2(x - 4.0, y - 11.0, col_w + 8.0, 15.0), 3.0, Color(0.145, 0.129, 0.082))
+			_round_rect(plate, 3.0, Color(0.145, 0.129, 0.082))
 		# THE KEYBOARD CURSOR IS NOT THE HOVER, and it must not look like it. Hover is a warm fill under
 		# whatever the mouse happens to be over; focus is a claim about where the NEXT keypress will land,
 		# and it persists with no pointer anywhere near it. So focus gets the rail's own gold edge bar —
 		# the mark this UI already uses for "this is the selected one" — and the two can coexist on
 		# different rows without either being ambiguous.
+		#
+		# THE SPINE IS NOW HALF OF IT. It was the whole mark while the binding list was the only thing on
+		# this page a keyboard could reach; now that the levels, the toggles and RESET wear a ring, a row
+		# that wore only a spine would be the one focused control on the page saying it differently. The
+		# ring goes on the row's own plate edge rather than outside it — these rows are drawn on a 15px
+		# pitch with 15px plates, so there is no outside to draw in — and the spine stays, because it is
+		# the counter's mark for a cursor sitting on a row and this is a cursor sitting on a row.
 		if cursor:
-			draw_rect(Rect2(x - 6.0, y - 11.0, 2.0, 15.0), UI_ACCENT)
+			_focus_ring(plate, 0.0, true)
 		# THE MOUSE WINS WHEN IT IS ON A ROW, because it is the more deliberate pointer; the keyboard cursor
 		# speaks when nothing is hovered, so the plate always describes the thing that would act.
 		#
@@ -4086,7 +4227,13 @@ func _settings_controls(g: Dictionary, c: Rect2, mouse: Vector2) -> String:
 		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
 		draw_string(_font, Vector2(chip.position.x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 			Color(0.10, 0.10, 0.12) if (capturing or not clash.is_empty()) else UI_TEXT)
-		_settings_hits.append({"rect": chip, "payload": {"bind": String(action)}})
+		_settings_hits.append({"rect": chip, "payload": settings_row_payload(CAT_CONTROLS, i)})
+	# THE TAIL OF THE LIST IS RESET KEYS, which is drawn on the detail plate below and therefore cannot
+	# describe itself the way a row does — the plate is written before the chip on it is. Said here, where
+	# the rest of the category's sentences are, so a caret parked on it is not sitting over the page's
+	# generic line with no idea what ENTER is about to do to twenty-two bindings.
+	if settings_row >= REMAP_ROWS.size() and said == "":
+		said = "puts every binding back to its default"
 	return said
 
 
@@ -4108,7 +4255,9 @@ func _draw_settings_detail(g: Dictionary, said: String, mouse: Vector2) -> void:
 		y += 13.0
 	if settings_cat == CAT_CONTROLS:
 		var w: float = _font.get_string_size("RESET KEYS", HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 14.0
-		_settings_chip(d.end.x - w, d.end.y - 8.0, "RESET KEYS", {"reset": true}, false, mouse, 9)
+		_settings_chip(d.end.x - w, d.end.y - 8.0, "RESET KEYS",
+			settings_row_payload(CAT_CONTROLS, REMAP_ROWS.size()), false, mouse, 9, false,
+			settings_row >= REMAP_ROWS.size())
 
 
 ## What each category says when your hand is not on anything — the page describing itself rather than
@@ -4138,8 +4287,13 @@ func _wrap(text: String, width: float, size: int) -> Array:
 
 ## One level: label, bar, percentage — all three on the shared grid. Returns whether the mouse is on it,
 ## so the caller can hand its sentence to the detail plate.
+##
+## `focused` is the KEYBOARD's claim on it, and it is a third state beside `hot` and the level itself. The
+## bar already had two hover marks (a lifted frame, a pale cap) and neither of them can say "the next
+## keypress moves THIS level" — hover is wherever the hand happens to be resting and vanishes when it
+## leaves, while focus persists with no pointer on the page at all.
 func _settings_slider(x0: float, y: float, id: String, label: String, value: float,
-		mouse: Vector2) -> bool:
+		mouse: Vector2, focused: bool = false) -> bool:
 	var bar := Rect2(x0 + SET_CTRL_DX, y - 9.0, SET_BAR_W, 10.0)
 	_slider_rects[id] = bar
 	var hot: bool = bar.grow(4.0).has_point(mouse)
@@ -4161,7 +4315,12 @@ func _settings_slider(x0: float, y: float, id: String, label: String, value: flo
 		draw_rect(Rect2(fill.end.x - 2.0, bar.position.y - 2.0, 2.5, bar.size.y + 4.0),
 			GOLD_PALE if hot else Color(0.80, 0.83, 0.89))
 	draw_string(_font, Vector2(x0 + SET_VALUE_DX, y), "%d%%" % int(round(value * 100.0)),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT if hot else UI_TEXT_DIM)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT if (hot or focused) else UI_TEXT_DIM)
+	# Outside the CAP as well as outside the bar. The travelled end stands 2px proud of the frame top and
+	# bottom, so a ring at the default clearance would have crossed it and read as the rendering fault
+	# `MNU-28` took the cap apart to avoid; the extra 2px puts the ring clear of both.
+	if focused:
+		_focus_ring(bar.grow(2.0))
 	_settings_hits.append({"rect": bar.grow(3.0), "payload": {"slider": id}})
 	return hot
 
@@ -4175,8 +4334,15 @@ func _settings_slider(x0: float, y: float, id: String, label: String, value: flo
 ## `not muted` alone would have been wrong the other way: muted would then read as merely unselected, and
 ## silence the player did not intend is worth noticing. Warm-on-dark says suppressed without claiming
 ## chosen.
+##
+## `focused` is a FOURTH state, and it is orthogonal to the other three rather than another value of them.
+## A chip can be ON, hovered and focused at once and has to say all three: `active` fills it gold, `hot`
+## lifts the unfilled fill, `warn` paints it warm-on-dark — every one of them a change to the chip's
+## INTERIOR — and focus rings it from the outside, which is why the gold fill of an engaged toggle cannot
+## swallow it. That separation is the point: if focus and selection drew the same mark, a keyboard user
+## could not tell the toggle they are standing on from the toggle that is switched on.
 func _settings_chip(x: float, y: float, text: String, payload: Dictionary, active: bool,
-		mouse: Vector2, size: int = 10, warn: bool = false) -> bool:
+		mouse: Vector2, size: int = 10, warn: bool = false, focused: bool = false) -> bool:
 	var w: float = _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 12.0
 	var chip := Rect2(x, y - 11.0, w, 15.0)
 	var hot: bool = chip.has_point(mouse)
@@ -4190,14 +4356,22 @@ func _settings_chip(x: float, y: float, text: String, payload: Dictionary, activ
 		draw_rect(chip, Color(0.0, 0.0, 0.0, 0.5), false, 1.0)
 		draw_string(_font, Vector2(x + 6.0, y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
 			Color(0.10, 0.10, 0.12) if active else UI_TEXT)
+	if focused:
+		_focus_ring(chip)
 	_settings_hits.append({"rect": chip, "payload": payload})
 	return hot
 
 
 ## Move to a category. Named like `set_bazaar_tab` and for the same reason: the page owns which face it
 ## is showing, and `main.gd` asks for a change rather than pushing the field every frame.
+##
+## AND THE CURSOR COMES WITH IT. The three faces offer 5, 23 and 3 controls, so an index that was legal on
+## CONTROLS is off the end of both the others — and an out-of-range cursor is not a cosmetic problem here:
+## it is a focus ring drawn on nothing, on the page whose whole job this ticket is. Clamped rather than
+## reset, so switching away and back on a short page leaves you near where you were.
 func set_settings_cat(cat: int) -> void:
 	settings_cat = clampi(cat, 0, CAT_NAMES.size() - 1)
+	settings_row = clampi(settings_row, 0, settings_focus_count() - 1)
 
 
 

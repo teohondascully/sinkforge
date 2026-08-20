@@ -94,6 +94,23 @@ static func toggle_mute() -> bool:
 	return muted
 
 
+## ONE AUDIO LEVEL, BY NAME — the id the settings page draws its rows from (`Hud.AUDIO_ROWS`), resolved
+## once here rather than twice at the two call sites that need it.
+##
+## Named rather than fetched, for the reason `Hud._audio_level` already carried: `Settings` is a class of
+## STATIC vars, and a dynamic `get()` against one is a lookup that fails at runtime rather than at parse
+## time. What is new is that the match lives in ONE place. It used to be the page's private copy, and the
+## keyboard nudge in `MainView` needs the same four names to READ a level before it can move it — so the
+## alternative was a second copy of the table beside the one that writes them (`MainView._set_volume`),
+## which is one rename away from a page that shows `music` while the arrows move `ambience`.
+static func level(id: String) -> float:
+	match id:
+		"master": return master
+		"sound": return sound
+		"ambience": return ambience
+		_: return music
+
+
 ## dB offsets the Sfx layer ADDS to its own baselines at play/frame time — 0 dB at full, ~-60 (gone)
 ## at the bottom of the slider. Lazy application means no player-node bookkeeping here.
 static func sound_db() -> float:
