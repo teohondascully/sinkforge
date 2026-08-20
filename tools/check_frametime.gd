@@ -1,10 +1,10 @@
 extends "res://tools/check_base.gd"
 
-## NOTHING MAY HITCH — and on named hardware, it has to run at 120.
+## NOTHING MAY HITCH â and on named hardware, it has to run at 120.
 ##
 ## THE NAME WAS A LIE FOR THIS LAYER'S WHOLE LIFE. It was registered in the runner as `check_frametime
 ## (120fps)`, it printed "the game does not hold 120fps" when it failed, and it never once compared
-## anything to 8.33ms. What it asserts — and the reasons are below, and they are good ones — is a RATIO:
+## anything to 8.33ms. What it asserts â and the reasons are below, and they are good ones â is a RATIO:
 ## a busy frame's p95 against a quiet frame's median. That ratio is the portable, honest property, and it
 ## is kept exactly as it was. But a ratio cannot tell you the frame rate, so the claim moved to where it
 ## can be true: an absolute 8.33ms budget that runs ONLY when SF_PERF_HOST names the machine (see
@@ -13,18 +13,18 @@ extends "res://tools/check_base.gd"
 ## Every other layer in this suite judged what the game DOES and not one judged how fast it does it, which is
 ## a strange gap for a 2D game whose whole pitch is movement. A swing that measures beautifully and hitches
 ## twice on the way down is not a good swing, and no layer here could tell the difference. (This sentence
-## used to open with a COUNT of those layers. It was written at 49 and read 49 at 66 — a number in prose is
+## used to open with a COUNT of those layers. It was written at 49 and read 49 at 66 â a number in prose is
 ## a claim with no runner, and the suite grows faster than anybody re-reads a docstring.)
 ##
 ## WALL-CLOCK, not `Performance.TIME_PROCESS`. The engine's process timer counts script time and misses the
-## command buffer, the submit and everything the driver does — and on this renderer that is most of a frame.
+## command buffer, the submit and everything the driver does â and on this renderer that is most of a frame.
 ## Ticks around `frame_post_draw` count what a player waits for.
 ##
 ## FOUR PHASES, because the costs are not the same shape and a single average hides the one that matters:
-##   IDLE  — standing still on the surface: the floor cost of drawing the world at all
-##   RUN   — moving, so chunks stream, the veil chases and the speed streaks draw
-##   DIG   — mining, which triggers the fine-terrain REGION rebake; the known hot path (#102)
-##   SWING — on the rope at speed: particles, streaks, the rope, the fastest camera in the game
+##   IDLE  â standing still on the surface: the floor cost of drawing the world at all
+##   RUN   â moving, so chunks stream, the veil chases and the speed streaks draw
+##   DIG   â mining, which triggers the fine-terrain REGION rebake; the known hot path (#102)
+##   SWING â on the rope at speed: particles, streaks, the rope, the fastest camera in the game
 ##
 ## THE BAR IS RELATIVE, and that took a round to get right. Two things make an absolute millisecond budget
 ## unmeasurable here:
@@ -33,24 +33,24 @@ extends "res://tools/check_base.gd"
 ##     the number says nothing. This is why the absolute budget refuses to assert on a paced run.
 ##     MEASURED, and the older claim here was wrong: this file used to say "asking for it off does not
 ##     reliably get it off on macOS", and a boot-time override.cfg fight was planned around that
-##     sentence. On macOS arm64 (M4 Pro, Godot 4.6.2) the VSYNC_DISABLED call in _run() DOES take effect —
+##     sentence. On macOS arm64 (M4 Pro, Godot 4.6.2) the VSYNC_DISABLED call in _run() DOES take effect â
 ##     proven by samples arriving FASTER than the panel can present, which vsync makes impossible. See
 ##     _fastest. Treat the claim as machine-specific and re-derive it from the samples, not from prose.
 ##   * THE MACHINE. A background reindex can put whole SECONDS into a frame that the game had no part in.
 ##     A layer that fails when Spotlight is busy is a layer people learn to ignore.
 ## Both move the quiet frames and the busy frames together, so the RATIO between them survives MUCH of what
 ## the absolute numbers do not: a dig may cost a few times a quiet frame, never twenty times one. That is
-## also the honest statement of the property — "mining must not hitch" — rather than a number copied off a
+## also the honest statement of the property â "mining must not hitch" â rather than a number copied off a
 ## spec sheet. The absolutes are still printed, because when the machine IS quiet they are what you want.
 ##
 ## THAT PARAGRAPH USED TO SAY THE RATIO "SURVIVES" LOAD, FULL STOP, AND IT IS NOT TRUE. Measured: with five
 ## unlocked Godot processes beside it the quiet frame rose 2.4x and the DIG ratio rose from 3.9-4.4x to
-## 4.7-6.7x — through a 6.0x cap — because a longer frame has more wall-clock in which to be descheduled,
+## 4.7-6.7x â through a 6.0x cap â because a longer frame has more wall-clock in which to be descheduled,
 ## so the numerator pays more for contention than the denominator. The ratio is a PARTIAL correction: it
 ## absorbs load for cheap phases and stops absorbing it as a phase gets expensive. A later pass found
 ## this from the opposite end, a sweep failing RUN at 2.1x that passed three times standalone. There is no
-## fix inside the layer — see `_load_caveat`, which records the detector that failed and why its whole
-## family must — so the defence is `tools/with_machine.sh`: anything that boots Godot takes the lock.
+## fix inside the layer â see `_load_caveat`, which records the detector that failed and why its whole
+## family must â so the defence is `tools/with_machine.sh`: anything that boots Godot takes the lock.
 ##
 ## PERCENTILES, not the mean. A hitch is one frame in a hundred and a mean of two hundred cannot see it.
 ## p95 carries the gate rather than p99 or max, because under background load the top one percent belongs
@@ -65,13 +65,13 @@ const SAMPLE: int = 200                ## frames measured per phase (IDLE/RUN/SW
 ## short measurement.
 const DIG_MINES: int = 40
 
-## A quiet frame — the median of the IDLE phase — is the unit everything else is measured in. With vsync on
+## A quiet frame â the median of the IDLE phase â is the unit everything else is measured in. With vsync on
 ## it is the refresh interval; with vsync off it is the game's real floor cost. Either way it is what the
 ## machine can do when the game is asking for nothing.
 ##
 ## HOW MUCH A DIG MAY COST, as a multiple of that quiet frame. Set from measurement with room to spare, and
 ## its job is to stop the hitch coming back: before #S14 a dig cost 13.6x a quiet frame (114ms against 8.4)
-## and the game visibly stalled once a second while mining. It now costs 3.7x. The bar is 6x — comfortably
+## and the game visibly stalled once a second while mining. It now costs 3.7x. The bar is 6x â comfortably
 ## clear of where the code is, nowhere near where it was.
 const DIG_HITCH_RATIO: float = 6.0
 ## Movement must not hitch AT ALL: nothing about running or swinging changes the world, so there is no bake
@@ -81,7 +81,7 @@ const MOVE_HITCH_RATIO: float = 2.0
 ## THE ABSOLUTE BUDGET, and the one place in this project where 120fps is an assertion rather than an
 ## ambition. 120 frames per second is 8.33ms per frame, so every measured phase's p95 must fit inside it.
 ##
-## IT RUNS ONLY WHERE THE NUMBER MEANS SOMETHING. `SF_PERF_HOST` names the machine — set it to whatever
+## IT RUNS ONLY WHERE THE NUMBER MEANS SOMETHING. `SF_PERF_HOST` names the machine â set it to whatever
 ## identifies the box you are calibrating on, e.g. `SF_PERF_HOST=m4max-16in`. Naming it is an assertion by
 ## whoever set it that this is controlled hardware and vsync is genuinely off. On anything else the budget
 ## is not merely noisy, it is meaningless (see VSYNC above: a vsync-pinned run reports the refresh interval
@@ -96,8 +96,8 @@ const FRAME_BUDGET_MS: float = 1000.0 / 120.0
 const VSYNC_PINNED_MS: float = 0.2
 
 ## Fraction of samples sitting on a refresh multiple above which the run LOOKS vsync-paced. Measured, not
-## guessed: forcing VSYNC_ENABLED on this machine drives every phase p95 to ~16.5ms — two refresh intervals,
-## uniform across four phases that otherwise differ by 2x — while a genuine VSYNC_DISABLED run spreads them
+## guessed: forcing VSYNC_ENABLED on this machine drives every phase p95 to ~16.5ms â two refresh intervals,
+## uniform across four phases that otherwise differ by 2x â while a genuine VSYNC_DISABLED run spreads them
 ## 13.6 / 15.6 / 16.4 / 32.6. Clustering is the signal; individual frames are not. A handful of samples DO
 ## come in under the interval even with vsync requested on, which is why "was any frame faster than the
 ## panel" looked decisive and is not.
@@ -129,7 +129,7 @@ func _arm_real_dig() -> void:
 	if picked >= 0:
 		_main._inv_selected = picked
 	else:
-		printerr("    !! every pack slot is placeable (%d) — holding LMB would BUILD, not mine" % slots.size())
+		printerr("    !! every pack slot is placeable (%d) â holding LMB would BUILD, not mine" % slots.size())
 	Controls.deaf = false
 
 
@@ -137,7 +137,7 @@ func _arm_real_dig() -> void:
 ## way to count a break is to look at what the previous aim did, one frame later.
 var _dig_prev_target: Vector2i = Vector2i(-1, -1)
 
-## Per-phase proof that the phase did the work its name claims — filled by _phase, judged by _workload.
+## Per-phase proof that the phase did the work its name claims â filled by _phase, judged by _workload.
 var _work: Dictionary = {}
 
 ## The display's refresh interval in ms, 0 if unreported. A machine constant that contention cannot move,
@@ -147,10 +147,10 @@ var _interval: float = 0.0
 
 func _initialize() -> void:
 	# Exit 42 AND a reason line: the runner requires both before it will call this a skip rather than a
-	# failure. Twelve seconds with a display, one second without — that gap is what made the old quit(0)
+	# failure. Twelve seconds with a display, one second without â that gap is what made the old quit(0)
 	# a lie every time CI ran.
 	if DisplayServer.get_name() == "headless":
-		print("check_frametime: SKIP — no display; the dummy renderer draws nothing, so its frames are free")
+		print("check_frametime: SKIP â no display; the dummy renderer draws nothing, so its frames are free")
 		quit(SKIP)
 		return
 	_run()
@@ -169,21 +169,21 @@ func _run() -> void:
 	# TAKE THE SCENE'S EARS OFF, AFTER A FRAME HAS PASSED.
 	#
 	# This layer opens a REAL WINDOW with live input callbacks, and `main.gd:991` toggles `_paused` from
-	# `_unhandled_input` on Controls.PAUSE — KEY_P or JOY_BUTTON_START. `_paused` is the FIRST gate
+	# `_unhandled_input` on Controls.PAUSE â KEY_P or JOY_BUTTON_START. `_paused` is the FIRST gate
 	# `try_mine` tests, so one stray keystroke, or a joypad that enumerates START, silently pauses the run
 	# and every mine for the rest of it returns false with the world in perfect condition.
 	#
 	# That fits a failure I could not otherwise explain: DIG landed 0 of 40 in a sweep, the body correctly
 	# placed over 44 rows of solid rock, all six cells beneath it solid, and fifteen isolated runs plus a
 	# second full sweep could not reproduce it. It is the only candidate whose intermittency does not depend
-	# on the world — which is exactly what ten byte-identical placements demand.
+	# on the world â which is exactly what ten byte-identical placements demand.
 	#
 	# `capture_moments.gd` learned this the hard way when an E and a P arrived mid-capture and it
 	# photographed the Bazaar modal. It deafens; NO check_* layer did, including this one, and
 	# `check_input_deafness` exists to prove the mechanism works while nothing was using it.
 	#
 	# AFTER a frame, not before: a SceneTree script's `_initialize` runs before the tree is up, so `_ready`
-	# is deferred — and Godot re-arms unhandled-input delivery as part of it. Deafen first and `_ready`
+	# is deferred â and Godot re-arms unhandled-input delivery as part of it. Deafen first and `_ready`
 	# turns the ears back on behind you.
 	Controls.deaf = true
 	_deafen(_main)
@@ -193,7 +193,7 @@ func _run() -> void:
 	player.auto_input = false
 	# FINISH THE BOOT BAKE BEFORE THE CLOCK STARTS. #17 made the fine bake progressive: a fresh scene paints
 	# the visible rect and then fills the rest off-camera at 4ms a frame for about a second. That is real
-	# work the game really does — and it happens once, at boot, and never again. A phase that caught the tail
+	# work the game really does â and it happens once, at boot, and never again. A phase that caught the tail
 	# of it would be reporting the BOOT cost under the name IDLE, and every ratio below divides by IDLE. This
 	# is fixture setup for the same reason _stand_over_rock is: controlling a nuisance variable, not hiding a
 	# cost. Whatever the fill costs belongs in a layer named for it, not in this one's denominator.
@@ -203,14 +203,14 @@ func _run() -> void:
 	var refresh: float = DisplayServer.screen_get_refresh_rate()
 	_interval = (1000.0 / refresh) if refresh > 0.0 else 0.0
 
-	var claim: String = "the hitch ratio only — no absolute budget on unnamed hardware"
+	var claim: String = "the hitch ratio only â no absolute budget on unnamed hardware"
 	if _perf_host != "":
 		claim = "hitch ratio AND the %.2fms budget, on SF_PERF_HOST=%s" % [FRAME_BUDGET_MS, _perf_host]
 	print("== nothing may hitch ==  (%d frames per phase, %s, asserting %s)"
 		% [SAMPLE, DisplayServer.get_name(), claim])
 
 	# IDLE first and ungated by the ratio: it defines the quiet frame the others are judged against. It is
-	# NOT exempt from the absolute — a game that cannot draw a still frame in 8.33ms does not run at 120.
+	# NOT exempt from the absolute â a game that cannot draw a still frame in 8.33ms does not run at 120.
 	var idle: PackedFloat32Array = await _phase(&"idle")
 	var quiet: float = _pct(idle, 0.50)
 	_report("IDLE  standing on the surface", idle)
@@ -225,7 +225,7 @@ func _run() -> void:
 	var ok: bool = true
 	var run_ms: PackedFloat32Array = await _phase(&"run")
 	ok = _gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO) and ok
-	# Stand the body over rock before the clock starts — see _stand_over_rock. Without this the DIG phase
+	# Stand the body over rock before the clock starts â see _stand_over_rock. Without this the DIG phase
 	# inherits wherever RUN happened to stop, which varies by several columns run to run, and lands over a
 	# void about half the time.
 	var seam: int = _stand_over_rock(_main._player)
@@ -250,14 +250,14 @@ func _run() -> void:
 	ok = _absolute(PackedStringArray(["IDLE", "RUN", "DIG", "SWING"]), phases, quiet) and ok
 
 	if not ok:
-		printerr("check_frametime: FAIL — see the phase(s) marked FAIL above")
+		printerr("check_frametime: FAIL â see the phase(s) marked FAIL above")
 		quit(1)
 		return
 	if _perf_host == "":
-		print("check_frametime: PASS — nothing hitches; a dig costs a few quiet frames, not twenty."
+		print("check_frametime: PASS â nothing hitches; a dig costs a few quiet frames, not twenty."
 			+ " Frame RATE is unasserted here (set SF_PERF_HOST on controlled hardware for that)")
 	else:
-		print("check_frametime: PASS — nothing hitches, and every phase fits in %.2fms on %s"
+		print("check_frametime: PASS â nothing hitches, and every phase fits in %.2fms on %s"
 			% [FRAME_BUDGET_MS, _perf_host])
 	quit(0)
 
@@ -267,7 +267,7 @@ func _run() -> void:
 ## Three outcomes, and the middle one is the point: assert it on named hardware; state plainly that it is
 ## unasserted on everything else; and FAIL on named hardware whose frames are being paced by the display,
 ## because a vsync-pinned run reports the refresh interval whether the game has four milliseconds of
-## headroom or none — passing on that measurement would be the same species of lie as counting a skip as a
+## headroom or none â passing on that measurement would be the same species of lie as counting a skip as a
 ## pass.
 ## A MISSED DEADLINE, which is what "120fps" actually MEANS on a vsync-paced display, and the number this
 ## layer should have been reporting all along.
@@ -275,7 +275,7 @@ func _run() -> void:
 ## Under pacing the frame delta is QUANTISED. A frame that fits presents at the refresh interval; a frame
 ## that misses waits for the next one and presents at twice it. There is nothing in between. So "is p95
 ## under 8.33ms" is very nearly unanswerable here: on a paced run p95 IS the interval by construction, and
-## a p95 a hair above it does not mean the game is slow — it means roughly one frame in twenty presented
+## a p95 a hair above it does not mean the game is slow â it means roughly one frame in twenty presented
 ## late. Those are extremely different claims and the old output could not tell them apart.
 ##
 ## HOW OFTEN a deadline is missed is answerable, is what a player actually feels, and cannot be faked by
@@ -284,8 +284,8 @@ func _run() -> void:
 ##
 ## This also exists because the alternative on the table was to assert the budget against
 ## `viewport_get_measured_render_time_cpu`, which reads 0.12-0.16ms on this machine. A gate comparing
-## 0.16ms to 8.33ms cannot fail, and would have been vacuity shape 3 — an unreachable floor passing on
-## noise — installed in the one place this project has been fighting exactly that. The render-CPU number is
+## 0.16ms to 8.33ms cannot fail, and would have been vacuity shape 3 â an unreachable floor passing on
+## noise â installed in the one place this project has been fighting exactly that. The render-CPU number is
 ## real and worth PRINTING; it is not a gate.
 ##
 ## THE CAP IS MEASURED, over EIGHT runs, and the number moved once while measuring it. Written first as 5%
@@ -307,7 +307,7 @@ func _run() -> void:
 ##
 ## AND THEN THE MACHINE MOVED UNDER THE MEASUREMENT, WHICH IS WHY THERE IS NO GATE HERE YET.
 ##
-## Immediately after the eight runs above, three more read IDLE 41%, RUN 37.5%, SWING 50%, DIG 89.7% —
+## Immediately after the eight runs above, three more read IDLE 41%, RUN 37.5%, SWING 50%, DIG 89.7% â
 ## every phase five to ten times worse. That was not the game. `pgrep` found EIGHT Godot processes and a
 ## load average of 7.64: a neighbouring session was running captures without taking the harness lock, so
 ## the eight-run distribution and the three that contradict it were taken on two different computers that
@@ -315,7 +315,7 @@ func _run() -> void:
 ##
 ## The threshold is therefore NOT SET. A cap derived from data whose provenance collapsed mid-derivation
 ## is a number with a story, not a measurement, and the honest state of this is "measured twice, disagreed,
-## needs a verified-quiet box". Setting one anyway — at 25%, which is where the arithmetic was heading —
+## needs a verified-quiet box". Setting one anyway â at 25%, which is where the arithmetic was heading â
 ## would have shipped exactly the thing this file's own header warns about: a threshold that fails for
 ## reasons the game did not cause is a threshold someone deletes within a month.
 ##
@@ -325,8 +325,8 @@ func _run() -> void:
 ##
 ## What survives the contamination anyway, because it is a RATIO between phases measured in the same run
 ## rather than an absolute: DIG misses roughly ten to a hundred times as many deadlines as the phases that
-## do no terrain work, on every run, contended or not. That comparison is the finding — the game holds its
-## frame rate except when it edits terrain — and it is the shape this layer's ratio gates were built around
+## do no terrain work, on every run, contended or not. That comparison is the finding â the game holds its
+## frame rate except when it edits terrain â and it is the shape this layer's ratio gates were built around
 ## in the first place. See the audit notes, Strike 12.
 ##
 ## WHOEVER SETS THIS: take it on a quiet box with the harness lock held and `pgrep Godot` returning one
@@ -345,11 +345,11 @@ func _drop_rate(ms: PackedFloat32Array, interval: float) -> float:
 func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], quiet: float) -> bool:
 	if _perf_host == "":
 		# `SKIP:` at the start of the line is the harness contract for "this layer passed but stood part of
-		# itself down" — see run_harness.sh:43. It matters here more than anywhere: this is the project's
+		# itself down" â see run_harness.sh:43. It matters here more than anywhere: this is the project's
 		# ONLY 120fps assertion, SF_PERF_HOST was unset everywhere for the whole life of the code, and so
 		# the budget had never once run while the summary said ALL PASS. An opt-in assertion is fine; a
 		# SILENT opt-in assertion is decoration. It can no longer pass without saying it did not assert.
-		print("  SKIP: the %.2fms/frame (120fps) budget was NOT asserted — SF_PERF_HOST is unset, so this"
+		print("  SKIP: the %.2fms/frame (120fps) budget was NOT asserted â SF_PERF_HOST is unset, so this"
 			% FRAME_BUDGET_MS
 			+ " is arbitrary hardware and the p95s above are a measurement, not a claim. Set"
 			+ " SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn the budget on.")
@@ -361,42 +361,42 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		var fastest: float = _fastest(phases)
 		var quiet_paced: float = _paced_fraction(phases[0], interval)
 		paced = quiet_paced > PACED_FRACTION
-		print("  absolute: vsync evidence — fastest frame %.2fms against a %.2fms refresh; %.0f%% of QUIET"
+		print("  absolute: vsync evidence â fastest frame %.2fms against a %.2fms refresh; %.0f%% of QUIET"
 			% [fastest, interval, quiet_paced * 100.0]
 			+ " samples land on a refresh multiple."
 			+ (" The quiet frame is %.2fms, ON the interval." % quiet
 				if absf(quiet - interval) < VSYNC_PINNED_MS else ""))
 		if paced:
-			print("  absolute: PACED — the quiet phase is waiting on the panel, so a frame that fits inside"
+			print("  absolute: PACED â the quiet phase is waiting on the panel, so a frame that fits inside"
 				+ " the refresh reports as the refresh and its true cost is invisible. On a 120Hz display"
 				+ " the interval (%.2fms) IS the budget, which makes 'we hit 120fps' and 'we are pinned at" % interval
 				+ " 120fps' the same number. Under-budget phases below therefore STAND DOWN rather than"
 				+ " pass. Over-budget phases still FAIL, and that is sound: pacing only ever makes a frame"
 				+ " report the same or SLOWER, so a phase that exceeded the budget really did exceed it.")
 
-	print("  absolute: SF_PERF_HOST=%s — every phase p95 must fit in %.2fms (120fps); the display refreshes"
+	print("  absolute: SF_PERF_HOST=%s â every phase p95 must fit in %.2fms (120fps); the display refreshes"
 		% [_perf_host, FRAME_BUDGET_MS]
 		+ (" every %.2fms" % interval if interval > 0.0 else " at an unreported rate"))
 	var ok: bool = true
 	for i: int in labels.size():
 		var ms: PackedFloat32Array = phases[i]
 		if ms.is_empty():
-			printerr("      FAIL: %s produced no samples — the budget was not measured" % labels[i])
+			printerr("      FAIL: %s produced no samples â the budget was not measured" % labels[i])
 			ok = false
 			continue
 		var p95: float = _pct(ms, 0.95)
 		# The missed-deadline rate alongside the p95, always, whichever way the budget goes. On a paced run
 		# it is the only one of the two that distinguishes "slow" from "occasionally late", and a reader
-		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing — as happened here twice.
+		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing â as happened here twice.
 		var drops: float = _drop_rate(ms, interval)
-		print("      %s: p95 %.2fms · %.1f%% of frames missed their %.2fms slot (>%.2fms)"
+		print("      %s: p95 %.2fms Â· %.1f%% of frames missed their %.2fms slot (>%.2fms)"
 			% [labels[i], p95, drops * 100.0, interval, interval * DROP_AT])
 		if p95 > FRAME_BUDGET_MS:
-			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget — that phase is under 120fps on %s"
+			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget â that phase is under 120fps on %s"
 				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host]
 				+ (". NOTE: it missed only %.1f%% of its slots, so on a paced display this p95 is consistent"
 					% (drops * 100.0)
-					+ " with a phase that is comfortably fast and occasionally late rather than a slow one —"
+					+ " with a phase that is comfortably fast and occasionally late rather than a slow one â"
 					+ " read the drop rate before acting on this number."
 					if drops <= 0.10 else ""))
 			ok = false
@@ -404,7 +404,7 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
 			# game costing 0.2ms and with one costing 8.3ms, and the harness counts this line, so the run
 			# reports "passed without verifying everything" rather than banking a green nobody earned.
-			print("  SKIP: %s p95 %.2fms is inside the %.2fms budget, but the run is vsync-paced — a frame"
+			print("  SKIP: %s p95 %.2fms is inside the %.2fms budget, but the run is vsync-paced â a frame"
 				% [labels[i], p95, FRAME_BUDGET_MS]
 				+ " that fits inside the refresh reports AS the refresh, so this number cannot tell a fast"
 				+ " phase from a pinned one. Not asserted.")
@@ -417,13 +417,13 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 ##
 ## The pin test used to be `quiet median ~= refresh interval`, and that is a guard that fires exactly when
 ## its target is MET. It cannot separate "vsync is holding us at 120fps" from "we are genuinely rendering
-## at 120fps" — on a 120Hz panel both produce a quiet frame of 8.33ms. The first time anyone set
+## at 120fps" â on a 120Hz panel both produce a quiet frame of 8.33ms. The first time anyone set
 ## SF_PERF_HOST, it refused to assert on a run that was not vsync-paced at all, and this cost an
 ## evening planning an OS-level fight that was never needed.
 ##
 ## What actually separates the two: under vsync the loop blocks on present, so NO frame can come in faster
 ## than the refresh interval. A single sample below it is proof the pacing is ours. The evidence that
-## settled it was already sitting in the output nobody had read this way — an IDLE median of 8.27ms and a
+## settled it was already sitting in the output nobody had read this way â an IDLE median of 8.27ms and a
 ## worst frame of 12.95ms, one below the 8.33ms interval and the other stranded between 8.33 and 16.67
 ## where a vsync-paced frame cannot land.
 ##
@@ -436,15 +436,15 @@ func _fastest(phases: Array[PackedFloat32Array]) -> float:
 	return best
 
 
-## What share of samples land on a multiple of the refresh interval — the actual vsync signature, and the
+## What share of samples land on a multiple of the refresh interval â the actual vsync signature, and the
 ## reason the two simpler tests before it both failed.
 ##
 ## Test one was `quiet median ~= interval`. It fires exactly when the target is MET, and worse, it cannot
 ## fire at all once the game is slower than one refresh: forcing vsync on drove the quiet frame to 8.96ms,
 ## not 8.33, because pacing rounds a too-slow frame UP to the next interval rather than holding it at one.
 ##
-## Test two was `did any frame beat the panel`. That looked decisive — under pacing nothing should present
-## faster than the refresh — and it is not: a VSYNC_ENABLED run still produced a 5.65ms sample. A single
+## Test two was `did any frame beat the panel`. That looked decisive â under pacing nothing should present
+## faster than the refresh â and it is not: a VSYNC_ENABLED run still produced a 5.65ms sample. A single
 ## outlier disables the whole detection, which is the worst property a guard can have.
 ##
 ## What survives both is CLUSTERING. Paced frames pile up on multiples of the interval; unpaced ones spread.
@@ -453,7 +453,7 @@ func _fastest(phases: Array[PackedFloat32Array]) -> float:
 ## Pacing is only visible where the game is FASTER than the panel: a DIG frame at 33ms is not waiting on
 ## anything, so its samples land wherever they like and dilute the signal. Pooled over four phases this
 ## reported 18-39% on a machine the peer's independent profiler measured at 72.5% of STILL frames on a
-## multiple — under the 0.6 threshold, so the pooled version said "not paced" about a run that was.
+## multiple â under the 0.6 threshold, so the pooled version said "not paced" about a run that was.
 func _paced_fraction(ms: PackedFloat32Array, interval: float) -> float:
 	if interval <= 0.0 or ms.is_empty():
 		return 0.0
@@ -471,7 +471,7 @@ func _paced_fraction(ms: PackedFloat32Array, interval: float) -> float:
 ## before/after on the dig path means anything. Left at 0 the phase runs a fixed SAMPLE frames, which is
 ## right for IDLE/RUN/SWING because their work is continuous. DIG's is not: it lands a mine, falls, lands
 ## another, and how many it fits into 200 frames depends on how fast it fell. That put 42-47 mines and a
-## 33-40ms p95 spread on honest runs — wide enough to swallow a real 15% win whole.
+## 33-40ms p95 spread on honest runs â wide enough to swallow a real 15% win whole.
 func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> PackedFloat32Array:
 	var player: Player = _main._player
 	var ms := PackedFloat32Array()
@@ -493,7 +493,7 @@ func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> Packed
 		var now: int = Time.get_ticks_usec()
 		ms.append(float(now - last) / 1000.0)
 		last = now
-		# Evidence that this phase did the work its NAME claims — gathered inside the timed loop because
+		# Evidence that this phase did the work its NAME claims â gathered inside the timed loop because
 		# that is the only place it is true of the frames actually measured. See _workload.
 		moved += player.position.distance_to(prev)
 		prev = player.position
@@ -514,9 +514,9 @@ func _phase(kind: StringName, until_mines: int = 0, cap: int = SAMPLE) -> Packed
 
 
 ## Per-frame input for a phase. Everything here goes through the same fields the keyboard drives, so the
-## body does exactly what a player's body would — no teleporting, no synthetic load.
+## body does exactly what a player's body would â no teleporting, no synthetic load.
 ##
-## Returns whether this frame did the phase's characteristic WORK — currently only meaningful for dig,
+## Returns whether this frame did the phase's characteristic WORK â currently only meaningful for dig,
 ## whose `try_mine` reports success. The return value used to be discarded, which is how a DIG phase that
 ## mined nothing would still have reported a timing distribution under the name DIG.
 func _drive(kind: StringName, player: Player, i: int) -> bool:
@@ -552,9 +552,27 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 			var broke: bool = _dig_prev_target.x >= 0 and not _main.sim.is_solid(_dig_prev_target)
 			var target: Vector2i = _dig_target(player)
 			_dig_prev_target = target
-			var to_px: Transform2D = _main.get_viewport().get_final_transform() \
-				* _main.get_viewport().get_canvas_transform()
-			Input.warp_mouse(to_px * _main._cell_center(target))
+			# POSED, NOT WARPED, AND THE TRANSFORM QUESTION GOES WITH IT. This used to build the full
+			# `get_final_transform() * get_canvas_transform()` chain and move the real OS cursor every frame.
+			# The chain was correct for `Input.warp_mouse` — which takes WINDOW pixels, unlike
+			# `Viewport.warp_mouse`, which takes viewport ones and needs only the half chain. This repository
+			# has had that pair wrong in both directions on different days. Posing a WORLD point needs neither.
+			#
+			# The reason it matters here is not tidiness. `_update_mining` re-reads the pointer every frame, so
+			# a hand on the physical mouse took the aim off `target`, `_workable` failed, and the phase recorded
+			# zero mines while every field of `_report_refusal` read healthy — it prints the INTENDED cell and
+			# never the aim, so it cannot tell "the rock refused" from "the aim was moved".
+			#
+			# NOT claimed: that this explains the historical `DIG landed 0 of 40`. `git log -S warp_mouse` puts
+			# the first warp in this file at c844596 on 2026-08-18, and that red was already written down on
+			# 2026-08-17, when the DIG arm called `try_mine(target)` directly with no cursor in the path. The
+			# mechanism is real and was reachable from the day the warp landed; the old failure is still
+			# unexplained and this comment must not be read as having closed it.
+			#
+			# STILL OPEN: `_arm_real_dig` sets `Controls.deaf = false` for this phase on purpose, so the human's
+			# physical mouse BUTTONS remain live on the same `sf_mine` action the fixture is holding. The seam
+			# does not close that door, and deafening would defeat what the phase exists to measure.
+			Controls.pose_pointer(_main._cell_center(target))
 			Input.action_press(Controls.MINE)
 			if broke:
 				_dig_refusals_running = 0
@@ -578,18 +596,18 @@ func _drive(kind: StringName, player: Player, i: int) -> bool:
 ## over, which is not a stable thing to depend on. Same commit, same machine, measured: an isolated run
 ## landed 46 mines and finished 53 rows deeper; a full-suite run landed ONE and never moved, because RUN
 ## had ended 10px further along and the cell under the feet was already open. The phase then timed 200
-## frames of a body standing still and reported the distribution under the name DIG — and reported it as
+## frames of a body standing still and reported the distribution under the name DIG â and reported it as
 ## 9.36ms p95 against the honest 33.37ms, so the broken fixture looked like a 3.5x performance win.
 ##
 ## Searching downward for real rock is what check_dig_hitch already does, for exactly this reason. Bounded
 ## by DIG_REACH so that a body genuinely standing over a void still fails the workload floor rather than
-## silently teleporting its dig to the bottom of the world — the failure must stay visible.
-## PERSISTENT refusals, not the first one — and the difference is the whole value of the instrument.
+## silently teleporting its dig to the bottom of the world â the failure must stay visible.
+## PERSISTENT refusals, not the first one â and the difference is the whole value of the instrument.
 ##
 ## The first version reported the FIRST refusal and was immediately useless: every healthy run refuses once,
 ## on the frame after a successful mine, when the cell below is the hole you just made and the next solid
 ## rock is further than the reach. Benign, self-correcting, and it would have consumed the one-shot before
-## anything interesting could happen — a diagnostic spent on the normal case is a diagnostic that is not
+## anything interesting could happen â a diagnostic spent on the normal case is a diagnostic that is not
 ## there for the abnormal one.
 ##
 ## The failure this is for is 400 consecutive refusals. So the trigger is a RUN of them: long enough that a
@@ -599,13 +617,13 @@ var _dig_refusals_running: int = 0
 var _dig_refusal_reported: bool = false
 
 
-## WHY DID `try_mine` SAY NO — asked at the first refusal, answered from the three gates it actually has.
+## WHY DID `try_mine` SAY NO â asked at the first refusal, answered from the three gates it actually has.
 ##
 ## This exists because the failure it is for happened ONCE, in a sweep, and could not be reproduced in
 ## fifteen isolated runs, a loaded-box arm, or a second full sweep. A defect at that rate cannot be chased
 ## by re-running; the only affordable move is to make sure the NEXT occurrence arrives with its own answer
-## attached. "DIG landed 0 of 40" plus a dig-site print already eliminated placement — the body stood over
-## 44 rows of solid rock — so what remains is `try_mine` refusing a target it should have taken, and the
+## attached. "DIG landed 0 of 40" plus a dig-site print already eliminated placement â the body stood over
+## 44 rows of solid rock â so what remains is `try_mine` refusing a target it should have taken, and the
 ## three reasons it can are paused, reach/line-of-sight, and no tool for this material.
 ##
 ## Printed rather than asserted. Adding a gate here would guess at the mechanism, and the whole reason this
@@ -620,7 +638,7 @@ func _report_refusal(player: Player, target: Vector2i) -> void:
 	printerr("       can_mine=%s  pack=%s"
 		% [MiningRules.can_mine(mat, _main.sim.inventory), _main.sim.inventory])
 	# EVERY GATE, NAMED SEPARATELY. The previous line said "if solid and can_mine, it was REACH or LINE OF
-	# SIGHT" — a two-way guess that was also incomplete, because `_mineable` has a fourth clause. Each gate
+	# SIGHT" â a two-way guess that was also incomplete, because `_mineable` has a fourth clause. Each gate
 	# is now reported as itself, so the next occurrence arrives with the answer rather than a shortlist.
 	var bit: StringName = BitRules.equipped(_main._selected_item())
 	printerr("       reach=%s  line_of_sight=%s  bit=%s grain_only=%s bites=%s"
@@ -636,8 +654,8 @@ func _report_refusal(player: Player, target: Vector2i) -> void:
 ## `_dig_target` could return a cell the verb is FORBIDDEN to service and `try_mine` refused it every
 ## frame for as long as the body stayed there.
 ##
-## Caught by the refusal reporter on a PASSING run — one refusal at (42, 23) with the body at (42, 19),
-## four cells away — which is the argument for printing a diagnostic on the first failure rather than only
+## Caught by the refusal reporter on a PASSING run â one refusal at (42, 23) with the body at (42, 19),
+## four cells away â which is the argument for printing a diagnostic on the first failure rather than only
 ## when the layer goes red. The run was green; the defect was live; nothing would ever have said so.
 ##
 ## Whether this is THE mechanism behind the one 0-mines sweep is not established and I am not claiming it:
@@ -649,8 +667,8 @@ func _report_refusal(player: Player, target: Vector2i) -> void:
 ## bug with a derivation in front of it.
 const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
 
-## ASK THE VERB, DO NOT MODEL IT. The scan now tests `_main._mineable(c)` — the exact predicate
-## `try_mine` gates on — instead of `is_solid`, which was only ever one of its four clauses.
+## ASK THE VERB, DO NOT MODEL IT. The scan now tests `_main._mineable(c)` â the exact predicate
+## `try_mine` gates on â instead of `is_solid`, which was only ever one of its four clauses.
 ##
 ## Deriving `DIG_REACH` from `REACH_CELLS` fixed the gross case (it was a typed 4 against a 3.2 reach) and
 ## I wrote a docstring claiming the fixture could no longer select a cell the verb was forbidden to service.
@@ -658,10 +676,10 @@ const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
 ## the body's centre to the cell's centre (main.gd:2439); `dy <= DIG_REACH` is a ROW COUNT. They disagree
 ## by up to a cell depending on where in its own cell the body is standing: sitting high in row 19, the
 ## centre of row 22 is ~3.5 cells away and REFUSED, while `dy == 3` waves it through. A row count is not a
-## radius, and rounding the radius down does not turn it into one — it only shrinks how often they differ.
+## radius, and rounding the radius down does not turn it into one â it only shrinks how often they differ.
 ##
 ## And `_mineable` has a fourth clause the proxy never modelled at all: `_bit_bites`, the Wedge grain rule.
-## A grain-only bit facing a misaligned seam refuses that cell PERMANENTLY — the body is not falling, so
+## A grain-only bit facing a misaligned seam refuses that cell PERMANENTLY â the body is not falling, so
 ## nothing self-corrects, and the refusal repeats every frame for as long as the phase runs. That is the
 ## only mechanism I have found whose signature actually matches the one unreproduced failure (400
 ## consecutive refusals, body over 44 rows of solid rock). I am NOT claiming it is that failure's cause:
@@ -669,7 +687,7 @@ const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
 ## one. It is a candidate that the old proxy was structurally incapable of surfacing, which is reason
 ## enough to stop using the proxy.
 ##
-## `DIG_REACH` survives as the SEARCH BOUND — how far down to look — which is the one job a row count is
+## `DIG_REACH` survives as the SEARCH BOUND â how far down to look â which is the one job a row count is
 ## right for. The reach decision itself now belongs to the code that owns it.
 ##
 ## The fallback is deliberately still an unmineable cell rather than the best near-miss. If nothing within
@@ -693,11 +711,11 @@ const COLUMN_SEARCH: int = 12
 ##
 ## `_dig_target` widened the search downward and that was only the DETECTION half. The cause is stated in
 ## its own docstring and was never addressed: the DIG phase measured whatever happened to be under the feet
-## when the previous phase handed over, and RUN's stopping point is not stable — measured across runs on
+## when the previous phase handed over, and RUN's stopping point is not stable â measured across runs on
 ## one machine it varies from 210px to 323px, which is several columns. On roughly half of all runs the
 ## body finished over a void, nothing was within DIG_REACH, and the phase timed a body standing still.
 ##
-## The workload guard added last session catches that and fails the layer, which is correct — and which
+## The workload guard added last session catches that and fails the layer, which is correct â and which
 ## also meant the whole suite went red on a coin flip. A layer that fails half the time is a layer people
 ## learn to ignore, which this file's own header warns about in the paragraph about background load.
 ##
@@ -728,8 +746,8 @@ func _stand_over_rock(player: Player) -> int:
 	player.velocity = Vector2.ZERO
 	# SAY WHERE IT STOOD AND WHAT WAS UNDER IT, every run, not only on failure.
 	#
-	# This fixture fails intermittently — 40 mines and 37 rows deeper on one run, 0 mines and the body
-	# unmoved on the next, same tree — and when it failed there was nothing in the output to tell WHICH
+	# This fixture fails intermittently â 40 mines and 37 rows deeper on one run, 0 mines and the body
+	# unmoved on the next, same tree â and when it failed there was nothing in the output to tell WHICH
 	# assumption broke. "DIG landed 0 of 40" says the phase did no work; it does not say whether the body
 	# was placed somewhere wrong, placed right and then moved, or placed right over rock that was not
 	# there. Three different bugs, one message.
@@ -772,13 +790,13 @@ func _fire_rope() -> void:
 ## guessing a floor before observing the thing has been wrong every time it was tried in this repo. Four
 ## consecutive runs on m4pro-arm64-local, same commit:
 ##
-##   RUN moved       205 · 208 · 208 · 210 px          (spread ~2%)
-##   DIG landed       47 ·  47 ·  42 ·  46 mines/200   (spread ~11%)
-##   SWING anchored  195 · 196 · 200 · 200 frames/200  (spread ~3%)
+##   RUN moved       205 Â· 208 Â· 208 Â· 210 px          (spread ~2%)
+##   DIG landed       47 Â·  47 Â·  42 Â·  46 mines/200   (spread ~11%)
+##   SWING anchored  195 Â· 196 Â· 200 Â· 200 frames/200  (spread ~3%)
 ##
 ## Every floor sits at roughly half the smallest observed value, which is 20-25x the measured run-to-run
 ## spread in each case. That is deliberately loose: this guard's job is to catch a phase that stopped doing
-## its work — a body that cannot move, mines that all fail, a rope that never takes — and NOT to police
+## its work â a body that cannot move, mines that all fail, a rope that never takes â and NOT to police
 ## small changes in how far the fixture happens to travel. A tight floor here would fail on honest fixture
 ## edits and teach everyone to raise it, which is how a guard becomes a formality.
 ## DIG'S FLOOR CHANGED SUBJECT WHEN THE PHASE CHANGED ARM. This is not a floor lowered to buy green -- it
@@ -808,7 +826,7 @@ func _workload() -> bool:
 	var run_moved: float = float(_work.get(&"run", {}).get("moved", 0.0))
 	var dig_mined: int = int(_work.get(&"dig", {}).get("mined", 0))
 	var swing_anchored: int = int(_work.get(&"swing", {}).get("anchored", 0))
-	print("  workload: RUN moved %.0fpx · DIG landed %d mines in %d frames (window) · SWING anchored"
+	print("  workload: RUN moved %.0fpx Â· DIG landed %d mines in %d frames (window) Â· SWING anchored"
 		% [run_moved, dig_mined, int(_work.get(&"dig", {}).get("frames", 0))]
 		+ " %d frames of %d" % [swing_anchored, SAMPLE]
 		+ "   (body ended RUN at %s, DIG at %s, SWING at %s)"
@@ -817,18 +835,18 @@ func _workload() -> bool:
 				_work.get(&"swing", {}).get("at", Vector2i.ZERO)])
 	var ok: bool = true
 	if run_moved < RUN_MIN_PX:
-		printerr("      FAIL: RUN moved the body %.0fpx, under the %.0fpx floor — the phase is timing a"
+		printerr("      FAIL: RUN moved the body %.0fpx, under the %.0fpx floor â the phase is timing a"
 			% [run_moved, RUN_MIN_PX]
 			+ " body that is stuck or standing still, under the name RUN")
 		ok = false
 	if dig_mined < DIG_MIN_MINES:
-		printerr("      FAIL: DIG landed %d mines in its %d-frame window, under the floor of %d — the phase"
+		printerr("      FAIL: DIG landed %d mines in its %d-frame window, under the floor of %d â the phase"
 			% [dig_mined, SAMPLE * 2, DIG_MIN_MINES]
 			+ " was not meaningfully mining, so this distribution is a picture of standing still under the"
 			+ " name DIG")
 		ok = false
 	if swing_anchored < SWING_MIN_ANCHORED:
-		printerr("      FAIL: SWING was anchored for %d of %d frames, under the %d floor — the rope did not"
+		printerr("      FAIL: SWING was anchored for %d of %d frames, under the %d floor â the rope did not"
 			% [swing_anchored, SAMPLE, SWING_MIN_ANCHORED]
 			+ " take the body, so the phase timed a fall rather than a swing")
 		ok = false
@@ -855,7 +873,7 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 			_pct(ms, 0.99), ms[ms.size() - 1]])
 
 
-## WHAT A READER HAS TO CHECK BEFORE BELIEVING A RED RATIO — and the negative result behind it, which is
+## WHAT A READER HAS TO CHECK BEFORE BELIEVING A RED RATIO â and the negative result behind it, which is
 ## the more useful half and is written here because deleted code leaves no trace of what it cost to learn.
 ##
 ## THE HEADER'S CENTRAL CLAIM IS WRONG AND HAS BEEN CORRECTED ABOVE. It said "both move the quiet frames
@@ -874,11 +892,11 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 ##   IDLE p95/p50      1.05 - 1.68x          1.33 - 1.37x     <- also overlaps
 ##   DIG ratio         3.9 - 4.4x            4.7 - 6.7x       <- the failure, cap 6.0x
 ##
-## SUSTAINED LOAD SCALES THE WHOLE DISTRIBUTION UNIFORMLY. The contended runs are not noisier in shape —
-## their p95/p50 is indistinguishable from an idle box's — they are the same distribution multiplied by
+## SUSTAINED LOAD SCALES THE WHOLE DISTRIBUTION UNIFORMLY. The contended runs are not noisier in shape â
+## their p95/p50 is indistinguishable from an idle box's â they are the same distribution multiplied by
 ## 2.4. So nothing INTERNAL to a run separates "this box is loaded" from "this box is slow", and every
 ## detector of that family is dead on arrival, not just the one I wrote. A drift threshold would have had
-## to sit between 1.13 and 1.17 — inside the run-to-run noise of the idle box — which is vacuity shape 3,
+## to sit between 1.13 and 1.17 â inside the run-to-run noise of the idle box â which is vacuity shape 3,
 ## a floor no configuration reliably reaches, and I would have shipped it in the one file that warns about
 ## shape 3 twice, one commit after writing a strike about not doing that. It is deleted rather than tuned.
 ##
@@ -889,7 +907,7 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 ## than the denominator does, and the more expensive the phase the worse the correction holds.
 ##
 ## THE ONLY DEFENCE IS THE PROTOCOL, which is why `tools/with_machine.sh` exists (peer, `0cdb36a`):
-## anything that boots Godot takes the machine lock. This function is what is left over — it cannot stop a
+## anything that boots Godot takes the machine lock. This function is what is left over â it cannot stop a
 ## contended run, so it tells whoever reads the failure how to recognise one.
 func _load_caveat(quiet: float) -> String:
 	if _interval <= 0.0:
@@ -899,11 +917,11 @@ func _load_caveat(quiet: float) -> String:
 		+ " interval. On THIS project's hardware a still frame costs almost exactly one interval on an idle"
 		+ " box and 2.4x that with five unlocked Godot processes beside it, and the same commit's DIG ratio"
 		+ " rose from 3.9-4.4x to 4.7-6.7x purely from the load. A quiet frame well above one interval means"
-		+ " you are reading the machine and not the game — re-run it through tools/with_machine.sh, which"
+		+ " you are reading the machine and not the game â re-run it through tools/with_machine.sh, which"
 		+ " takes the lock, before treating this as a regression")
 
 
-## Report a phase and gate its p95 against the quiet frame. p95, not p99 — see the header: the top one
+## Report a phase and gate its p95 against the quiet frame. p95, not p99 â see the header: the top one
 ## percent belongs to whatever else the machine is doing.
 func _gate(label: String, ms: PackedFloat32Array, quiet: float, ratio: float) -> bool:
 	_report(label, ms)
@@ -912,14 +930,14 @@ func _gate(label: String, ms: PackedFloat32Array, quiet: float, ratio: float) ->
 	var p95: float = _pct(ms, 0.95)
 	var got: float = p95 / maxf(quiet, 0.001)
 	if got > ratio:
-		printerr("      FAIL: p95 is %.1fx a quiet frame (%.2fms vs %.2fms), cap %.1fx — this phase hitches"
+		printerr("      FAIL: p95 is %.1fx a quiet frame (%.2fms vs %.2fms), cap %.1fx â this phase hitches"
 			% [got, p95, quiet, ratio] + _load_caveat(quiet))
 		return false
 	print("      PASS: p95 is %.1fx a quiet frame (cap %.1fx)" % [got, ratio])
 	return true
 
 
-## Clear every input door on every node — `_input`, `_unhandled_input`, `_unhandled_key_input` — plus the
+## Clear every input door on every node â `_input`, `_unhandled_input`, `_unhandled_key_input` â plus the
 ## POLLING path via `Controls.deaf`, which the callback flags do not touch. Recursive rather than naming
 ## MainView, because the HUD and anything added later have doors too and a list of them would rot. Lifted
 ## from `capture_moments.gd`, which is the only tool in the repo that had this right.
