@@ -228,12 +228,35 @@ const DETAIL_LAMP_STEP: float = 8.0 / (DETAIL_ART * 0.5)
 ## RESERVES per blurb line rather than what the face draws — `draw_multiline_string` takes its own pitch from
 ## the font, and the full plate already assumes no more than this by seating the chips 22px under a two-line
 ## blurb. The tail is for what hangs off the last baseline.
+##
+## THE RESERVE IS A FLOOR AND NOT A CAP, which is the half of it that was missing. These two numbers have to
+## stay `const` — `BAZAAR_DETAIL_MIN` is const, `BAZAAR_MIN_H` is built out of it, and `check_pack_layout`
+## asserts a fresh pack LANDS on that floor rather than being caught by it — so they cannot be the font's
+## own measurement. What they can stop being is the last word: `_hold_overflow_h` measures the sentence the
+## plate is about to draw and adds the font's real line height for every line past these two, so a blurb
+## longer than the reserve makes the plate deeper instead of losing its tail. The written 12.0 then only has
+## to dominate the font across the two lines it was written for, and the measurement carries everything
+## after that.
 const DETAIL_BLURB_Y: float = 40.0    ## first blurb baseline, below the plate's top
-const DETAIL_BLURB_LINES: int = 2     ## and what the blurb is allowed to wrap to
+const DETAIL_BLURB_LINES: int = 2     ## the lines the FLOOR pays for — not a limit on what the blurb takes
 const DETAIL_LINE: float = 12.0       ## reserved per blurb line
 const DETAIL_TAIL: float = 8.0        ## last baseline to the bottom of the plate
+const DETAIL_BLURB_SIZE: int = 9      ## and the size it is set at, which is what makes the pitch measurable
+## Where the fact under the blurb sits WHEN THE PLATE IS AT ITS FLOOR, which is the sum the floor is written
+## as. The plates take it off their own bottom edge (`box.end.y - DETAIL_TAIL`) rather than off this, so a
+## plate that grew a line carries the fact down with it instead of printing it through the blurb's last row.
 const DETAIL_FACT_Y: float = DETAIL_BLURB_Y + DETAIL_LINE * DETAIL_BLURB_LINES
 const BAZAAR_DETAIL_MIN: float = DETAIL_FACT_Y + DETAIL_TAIL
+## The horizontal furniture the text column is bought out of: the square's right edge to the first letter,
+## and the last letter to the margin the verb button keeps. Both were repeated literals at the two plates
+## that draw a blurb, which is how the hold plate came to wrap against a 260 that is the sum of nothing.
+const DETAIL_TEXT_GAP: float = 14.0
+const DETAIL_TEXT_RIGHT: float = 24.0
+## The pack plate's verb and its key, named because the column's width is measured off the button and the
+## button is drawn from the same pair. A second copy of the word here would be a width that stops matching
+## the button the day the word changes, and the width is what decides how many lines the sentence takes.
+const HOLD_VERB: String = "HOLD"
+const HOLD_KEY: String = "ENTER"
 const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, named once for its three sites
 ## Head + one row of pack wells + the gap + the detail plate + the foot, ADDED UP rather than written down.
 ## It was a 196 sitting beside that same sentence, which sums to 206, so the floor was ten pixels below the
@@ -1598,7 +1621,9 @@ func _rebuild_minimap() -> void:
 ## of the same number the plate is drawn at and the two cannot overlap or leave a gap between them. The
 ## plate's depth is a property of the SELECTION, but the kinds a selection can have partition by tab
 ## (`bazaar_action`), so it is constant while a tab is open — which is what keeps a cursor move from
-## reflowing the rows the cursor is moving through.
+## reflowing the rows the cursor is moving through. The compact plate's extra depth is bought the same way
+## and for the same reason: `_hold_overflow_h` asks the whole pack how deep its deepest sentence is, not the
+## row the cursor happens to be on, so the plate is sized for the tab and the cursor walks over a still one.
 ##
 ## The shape is a rail, a head, a grid of rows, and a DETAIL PLATE across the bottom. The plate is the whole
 ## argument of #S34: the old layout gave the goods a 16px glyph on a 22px row and then left a third of the
@@ -1670,6 +1695,11 @@ func _bazaar_wanted_h() -> float:
 ## KEYED ON THE SELECTION, not on the tab, because it is the CONTENT that decides. The kinds partition by tab
 ## all the same (`bazaar_action`: PACK yields "hold" or nothing, WORKS "machine" and "rack", BENCH "tech"),
 ## which is what makes the depth constant while a tab is open — see `_bazaar_geometry` on why that matters.
+##
+## AND THE COMPACT DEPTH IS A FLOOR, not the answer. `BAZAAR_DETAIL_MIN` pays for two lines of sentence;
+## `_hold_overflow_h` is what the pack needs BEYOND that, and it is asked of the whole pack rather than of
+## the selected row so that the depth stays constant while the tab is open. A pack whose sentences all fit
+## the reserve adds nothing, which is how a fresh game still lands exactly on `BAZAAR_MIN_H`.
 func _detail_wanted_h() -> float:
 	if sim == null:
 		return BAZAAR_DETAIL
@@ -1677,7 +1707,79 @@ func _detail_wanted_h() -> float:
 		"machine", "rack", "tech":
 			return BAZAAR_DETAIL
 		_:
-			return BAZAAR_DETAIL_MIN
+			return BAZAAR_DETAIL_MIN + _hold_overflow_h()
+
+
+## THE WIDTH THE PACK PLATE'S SENTENCE WRAPS AT, and the one number the height above and the drawing below
+## both take it from. It was `box.size.x - 260.0` at the draw and nothing at all at the measure. 260 is not
+## the sum of anything on this plate: it stopped the column 70px short of the button it was supposed to
+## stop at, and that missing 70px is why the longest sentence in the catalogue needed a third line that
+## `DETAIL_BLURB_LINES` was then cutting off.
+##
+## MEASURED AGAINST THE LARGEST SQUARE THE PLATE MAY DRAW rather than against the square this plate has. The
+## square is read back off the plate's HEIGHT (`_draw_bazaar_detail`), and the height is what this width is
+## being asked for, so a column that narrowed as the plate grew would be an input to its own answer.
+## `DETAIL_ART` is the square's ceiling, so this is the narrowest the column can ever be and the line count
+## it buys is never fewer than the line count that gets drawn.
+##
+## RESERVED FOR THE BUTTON AND NOT FOR THE STATE. `HELD` is a tick and a word where `HOLD` is a pill with a
+## key in it, so sizing the column to whichever form this row carries would rewrap the sentence you are
+## reading as a consequence of pressing the key underneath it.
+func _hold_text_w() -> float:
+	return BAZAAR_SIZE.x - BAZAAR_RAIL - BAZAAR_PAD * 2.0 \
+		- (DETAIL_PAD + DETAIL_ART + DETAIL_TEXT_GAP) \
+		- _verb_button_w(HOLD_VERB, HOLD_KEY) - DETAIL_TEXT_RIGHT
+
+
+## How many lines a sentence takes in a column `w` wide, asked of the font that is going to draw it rather
+## than estimated from a character count. The paragraph's reported height is its line count times its line
+## height, so the division is exact; `roundi` rather than `ceili` because a paragraph coming back a hair
+## over a whole number would otherwise reserve a line nobody needs, and the two-line case is the one the
+## plate's floor is written against.
+func _blurb_lines(text: String, w: float) -> int:
+	var block: float = _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, w,
+		DETAIL_BLURB_SIZE).y
+	return maxi(1, roundi(block / _font.get_height(DETAIL_BLURB_SIZE)))
+
+
+## Measured once per item and kept. The sentences are `const`, the column is derived from constants and the
+## font, and neither the font nor the constants move while the game is running — so there is nothing for
+## this to go stale against, and the alternative is re-shaping every carried sentence on every frame the
+## pack is open.
+var _blurb_lines_memo: Dictionary = {}
+
+
+## HOW MUCH DEEPER THAN ITS FLOOR THE COMPACT PLATE HAS TO BE, for the pack that is open. Zero for a pack
+## whose sentences all fit the two lines `BAZAAR_DETAIL_MIN` pays for, which is every pack the catalogue can
+## make today. The point of it is the day one does not: the plate grows a line instead of eating the end of
+## the sentence. That was a live cut, not a hypothetical — the hold plate handed `DETAIL_BLURB_LINES` to
+## `draw_multiline_string` as a CAP, so a sentence that overran it lost its tail silently and the plate that
+## exists to explain the selected thing stopped mid-explanation.
+##
+## ASKED OF THE WHOLE PACK, NOT OF THE SELECTED ROW. The plate's depth has to be constant while the tab is
+## open — `_bazaar_geometry` carries the reason a cursor may not reflow the rows it is walking through — so
+## this is the deepest thing the tab can put on the plate and moving the cursor cannot change it. An empty
+## pack has nothing to draw and asks for nothing, which is what keeps a fresh game exactly on the floor.
+##
+## AND ONLY PACK CAN ASK. The compact plate is also what a WORKS or BENCH tab with no selection falls back
+## to, and that plate (`_detail_pack`) has no sentence on it at all; sizing it against a pack it is not
+## showing would be reserving depth for text that is on another tab.
+##
+## GROWTH IS IN THE FONT'S OWN LINE HEIGHT while the floor is in the written one, because the floor is
+## `const` and has to stay exact — see `DETAIL_LINE`.
+func _hold_overflow_h() -> float:
+	if bazaar_tab != TAB_PACK:
+		return 0.0
+	var w: float = _hold_text_w()
+	var over: int = 0
+	for slot: Dictionary in sim.inventory_slots():
+		var id: StringName = slot["item"]
+		if not _blurb_lines_memo.has(id):
+			_blurb_lines_memo[id] = _blurb_lines(str(ITEM_PURPOSE.get(id, "—")), w)
+		over = maxi(over, int(_blurb_lines_memo[id]) - DETAIL_BLURB_LINES)
+	# No floor on `over` here: it opens at zero and `maxi` only ever raises it, so a clamp would be a guard
+	# that cannot fire — and this file has been bitten before by conditions written to look careful.
+	return float(over) * _font.get_height(DETAIL_BLURB_SIZE)
 
 
 ## How many wells fit across the content, and how many rows they take. `_tab_pack` calls the first of these
@@ -2590,7 +2692,13 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	# is what is left of the plate's height once its margins are taken — so at the full depth it is the
 	# `DETAIL_ART` that `BAZAAR_DETAIL` is built from and at the compact depth it is whatever fits beside the
 	# text, and neither of them can drift from what `_detail_wanted_h` handed the geometry.
-	var side: float = box.size.y - DETAIL_PAD * 2.0
+	#
+	# CAPPED, because the plate can now be DEEPER than the full 88 as well as shallower: a compact plate
+	# carrying a third line of sentence is taller than the square is meant to be, and letting the square
+	# follow it up would push the text column right, narrow the sentence, and ask for a fourth line — the
+	# height feeding its own input. `DETAIL_ART` is the size the thing is drawn to be wanted at; past that
+	# the extra height belongs to the words that bought it.
+	var side: float = minf(DETAIL_ART, box.size.y - DETAIL_PAD * 2.0)
 	var art := Rect2(box.position + Vector2(DETAIL_PAD, DETAIL_PAD), Vector2(side, side))
 	var act: Dictionary = bazaar_action()
 	var kind: String = str(act.get("kind", ""))
@@ -2668,10 +2776,10 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	else:
 		_draw_thing_icon(id, _detail_glyph(art))
 
-	var tx: float = art.end.x + 14.0
+	var tx: float = art.end.x + DETAIL_TEXT_GAP
 	var reserve: float = _state_plate_w(state) if state != "" \
 		else _verb_button_w(verb, "ENTER" if ready else "")
-	var text_w: float = box.end.x - tx - reserve - 24.0
+	var text_w: float = box.end.x - tx - reserve - DETAIL_TEXT_RIGHT
 	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y), blurb,
 		HORIZONTAL_ALIGNMENT_LEFT, text_w, 9, DETAIL_BLURB_LINES, UI_TEXT_DIM)
@@ -2794,29 +2902,35 @@ func _draw_tech_art(tid: StringName, art: Rect2) -> void:
 func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	_detail_lamp(art, 0.045)
 	_draw_thing_icon(id, _detail_glyph(art))
-	var tx: float = art.end.x + 14.0
+	var tx: float = art.end.x + DETAIL_TEXT_GAP
 	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8,
 		Color(0.949, 0.831, 0.549))
+	# NO LINE CAP, because the plate was sized to hold this. `_hold_overflow_h` measured every sentence in
+	# the pack at `_hold_text_w` and bought the deepest one its lines, so the count this used to be capped
+	# at is now a floor that the height already answered — and a cap here would be cutting a sentence the
+	# panel has already made room for. Same width at both ends for the same reason: a blurb that wrapped at
+	# a different number than the one the height was computed from would run off a plate sized for it.
 	draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y),
-		str(ITEM_PURPOSE.get(id, "—")), HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 260.0, 9,
-		DETAIL_BLURB_LINES, UI_TEXT_DIM)
+		str(ITEM_PURPOSE.get(id, "—")), HORIZONTAL_ALIGNMENT_LEFT, _hold_text_w(),
+		DETAIL_BLURB_SIZE, -1, UI_TEXT_DIM)
 	# THE TALLY SITS WHERE THE BLURB ENDS, not at a baseline of its own. It used to be written 76 down a
 	# plate that was always 88, which is the shop's chip row's depth borrowed by a plate that has no chips —
-	# and this is the plate that no longer has the height to spare. `DETAIL_FACT_Y` is the last line the
-	# blurb can reach, and it is also the sum the compact plate's height is built out of, so the fact cannot
-	# be placed below the plate that was sized to hold it.
+	# and this is the plate that no longer has the height to spare. It is taken off the plate's own bottom
+	# edge rather than off `DETAIL_FACT_Y`: the two are the same pixel while the plate is at its floor, and
+	# they stop being the same pixel the moment a long sentence buys the plate another line, at which point
+	# a fact pinned to the constant would print through the row the blurb had just grown into.
 	var carried: int = int(sim.inventory.get(id, 0))
 	var made: int = int(sim.total_produced.get(id, 0))
-	draw_string(_font, Vector2(tx, box.position.y + DETAIL_FACT_Y),
+	draw_string(_font, Vector2(tx, box.end.y - DETAIL_TAIL),
 		"%d in the pack   ·   %d all told" % [carried, made],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_FAINT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_BLURB_SIZE, UI_TEXT_FAINT)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	if row == held:
 		# HELD is not HOLD greyed out — it is the answer to "which one is in my hand", and the pack screen is
 		# opened to ask it. The state form says that; the dead pill said the pack's one verb had broken.
 		_state_plate(box, "HELD")
 	else:
-		_verb_button(box, "HOLD", "ENTER", true)
+		_verb_button(box, HOLD_VERB, HOLD_KEY, true)
 
 
 ## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
@@ -2824,7 +2938,7 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 func _detail_pack(box: Rect2, art: Rect2) -> void:
 	_detail_lamp(art, 0.035)
 	Visuals.draw_item(self, art.get_center(), _detail_glyph(art).size.x, &"ingot")
-	var tx: float = art.end.x + 14.0
+	var tx: float = art.end.x + DETAIL_TEXT_GAP
 	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, Color(0.949, 0.831, 0.549))
 	var rates: Array[Dictionary] = sim.production_rates()
 	if rates.is_empty():
@@ -2834,11 +2948,13 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 		return
 	draw_string(_font, Vector2(tx, box.position.y + 42.0), "your line is making",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
-	# The rate chips sit ON the compact plate's last line — the same `DETAIL_FACT_Y` the hold plate's tally
-	# uses, so the one plate that has two contents puts them both in the same place, and the row the plate's
+	# The rate chips sit ON the compact plate's last line — the same last line the hold plate's tally uses,
+	# so the one plate that has two contents puts them both in the same place, and the row the plate's
 	# height was built to hold is the row the chips are drawn in rather than one written 50 down beside it.
+	# Off the plate's bottom edge, for the reason `_detail_hold` gives: this plate carries no sentence of
+	# its own, but it shares a height with one that does, and it has to land wherever that height puts it.
 	var cx: float = tx
-	var base: float = box.position.y + DETAIL_FACT_Y
+	var base: float = box.end.y - DETAIL_TAIL
 	for i: int in mini(5, rates.size()):
 		var item: StringName = rates[i]["item"]
 		var label: String = "%.1f/min" % float(rates[i]["rate"])
