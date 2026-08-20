@@ -16,6 +16,16 @@ extends SceneTree
 ## The glyph scale is DERIVED from `SF_MACHINE_PX` and `WorldRenderer.CELL`, never passed in pixels — see the
 ## note in `Bench._draw`, which is the whole reason the first render of this sheet was unreadable.
 ##
+## WHAT THIS SHEET CANNOT BE USED TO JUDGE, above one cell: STROKE WEIGHT. Twenty-one `draw_line` widths in
+## `visuals.gd` are absolute rather than multiplied by `s` — in `_drift` and `_crusher` and `_hopper` as much
+## as in `_drill` and `_generator`. That is not a bug, because `s` never exceeds 1.0 at any call site in the
+## game (the HUD's boxes give 0.65/0.75/0.85, `world_renderer.gd:1360` passes 1.0 and `:2818` clamps to it),
+## so those widths act as a MINIMUM STROKE: relatively thicker as the icon shrinks, which is what keeps a
+## hairline alive at 13 pixels. Above `SF_MACHINE_PX = CELL` this sheet leaves the range the game uses and
+## every one of those strokes renders proportionally THINNER than it ever does in play. Judging "these look
+## spindly" off the 96px sheet would be judging an artefact of the sheet, and the fix it invites — scaling
+## all 21 — would thin the hotbar icons that the floor exists to protect. The tool says so at runtime.
+##
 ##     SF_MACHINE_PX=32 SF_SHEET_SCALE=8    one cell, the play size
 ##     SF_MACHINE_PX=96 SF_SHEET_SCALE=3    the drawing as drawn, for judging detail density
 ##     SF_MACHINE_ACTIVE=0                  the cold/idle palette instead of the running one
@@ -23,6 +33,10 @@ extends SceneTree
 const COLS: int = 6
 const SCALE: int = 8
 const PAD: int = 4
+
+## How many `draw_line` widths in `visuals.gd` are absolute rather than `* s`. Only used to make the
+## above-one-cell warning specific; counted with a scan of every draw_line's fourth argument.
+const UNSCALED_STROKES: int = 21
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the padding is handed to it
@@ -81,6 +95,13 @@ func _initialize() -> void:
 	sheet.save_png(out)
 	print("  %d kinds at %.0f px (%s), x%d -> %s"
 		% [kinds.size(), px, "running" if active else "idle", scale, out])
+	if px > float(WorldRenderer.CELL):
+		# Not a warning about the render, which is correct — a warning about what may be READ off it.
+		print("  NOTE: %.0f px is %.2fx the %d px cell, so glyph scale is %.2f and the game never exceeds"
+			% [px, px / float(WorldRenderer.CELL), WorldRenderer.CELL, px / float(WorldRenderer.CELL)])
+		print("        1.0. The %d absolute stroke widths in visuals.gd render %.2fx thinner here than in"
+			% [UNSCALED_STROKES, px / float(WorldRenderer.CELL)])
+		print("        play. Judge silhouette, colour and density off this sheet; judge stroke weight at 32.")
 	print("  order: %s" % ", ".join(kinds))
 	quit(0)
 
