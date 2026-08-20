@@ -1067,6 +1067,10 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			_item_scanner(canvas, center, size)
 		&"sapling":
 			_item_sapling(canvas, center, size)
+		&"rope":
+			_item_rope(canvas, center, size)
+		&"torch":
+			_item_torch(canvas, center, size)
 		&"wood_pickaxe":
 			_item_pickaxe(canvas, center, size, Color(0.55, 0.40, 0.24), Color(0.74, 0.63, 0.47), 0)
 		&"stone_pickaxe":
@@ -1204,6 +1208,65 @@ static func _item_sealrock(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 ## EARTH — a rounded clod with crumbs off it: loose ground, not masonry.
 ##
+## ROPE and TORCH were the only two items in the catalogue with NO GLYPH AT ALL. Both fell through the
+## match to its default arm, which draws `Rect2(center - size/2, size)` in the item's colour — a bare filled
+## square, no outline, no shape. That is why `check_item_reads` ranked them at **IoU 1.00**: they were not
+## similar shapes, they were the SAME shape, because neither had one. The bare square is the exact thing the
+## carried-ground note above describes as looking like missing art, and it was still here for the climb and
+## the light — two of the most-handled placeables in the game.
+##
+## The two were fixed together because they were one defect, and they are given cues that survive the 16px
+## hotbar slot rather than cues that look good at 4x.
+
+
+## ROPE — a COIL, and it is a RING because nothing else in this catalogue is one. Every other icon here is a
+## solid mass: nuggets, lumps, bars, blocks, a cluster. A shape with a HOLE in it is separated from all of
+## them by a cue that does not depend on vertex detail, and it is also what a coil of rope looks like when it
+## is not in use. The tail is not decoration: a bare annulus reads as a washer or a ring, and the loose end
+## hanging off it is the whole difference between a hoop and a rope.
+##
+## **THE FIRST VERSION OF THIS RING READ AS A MAGNIFYING GLASS, and `check_item_reads` could not have told
+## me.** A thin even stroke with a thin straight tail leaving it at a diagonal is a lens and a handle, and
+## the `scanner` — a prospecting instrument — is two cells away in the same hotbar. The layer was right that
+## the icon was distinct from all 26 others; distinctness is a property of a PAIR, and reading as the wrong
+## object is a property of ONE icon and a person. No pairwise metric can register it, which is why this was
+## found by rendering the set and looking at it rather than by the number going green.
+##
+## What separates cord from a lens is that cord is WOUND. The stroke is thicker than a lens rim would be,
+## six darker wraps cross it at intervals so the ring is visibly made of turns, and the tail leaves
+## TANGENTIALLY at the coil's own stroke width — a handle is thinner than its lens and joins at a right
+## angle, and doing the opposite of both is what buys the read.
+static func _item_rope(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var hemp: Color = item_color(&"rope")
+	var r: float = size * 0.26
+	var w: float = maxf(1.0, size * 0.15)
+	canvas.draw_arc(c, r, 0.0, TAU, 28, hemp, w, true)
+	# The turns. Short bars ACROSS the stroke, not along it: along it they would read as a highlight.
+	for k: int in 6:
+		var a: float = float(k) * TAU / 6.0 + 0.42
+		var d := Vector2(cos(a), sin(a))
+		canvas.draw_line(c + d * (r - w * 0.52), c + d * (r + w * 0.52),
+			hemp.darkened(0.34), maxf(1.0, size * 0.035))
+	# The loose end, at the coil's own thickness and leaving along the tangent.
+	canvas.draw_line(c + Vector2(0.18, 0.19) * size, c + Vector2(0.30, 0.42) * size, hemp.darkened(0.10), w)
+	canvas.draw_line(c + Vector2(0.30, 0.42) * size, c + Vector2(0.40, 0.36) * size,
+		hemp.darkened(0.22), maxf(1.0, size * 0.07))
+
+
+## TORCH — a haft on the DIAGONAL with the flame at its head. The diagonal is the load-bearing choice: the
+## ingot and the plate are horizontal, the bits and the pickaxes are their own axis, and a vertical stick
+## would have been a fifth thing standing upright. It is also how a torch is carried. The flame is a
+## teardrop rather than a disc, because a disc at this size is a fleck, and the flecks already mean ore.
+static func _item_torch(canvas: CanvasItem, c: Vector2, size: float) -> void:
+	var flame: Color = item_color(&"torch")
+	var haft := Color(0.46, 0.33, 0.20)
+	canvas.draw_line(c + Vector2(-0.26, 0.38) * size, c + Vector2(0.04, -0.04) * size,
+		haft, maxf(1.0, size * 0.13))
+	_poly(canvas, c, size, [Vector2(0.04, -0.04), Vector2(0.22, -0.18), Vector2(0.15, -0.44),
+		Vector2(-0.05, -0.20)], flame)
+	canvas.draw_circle(c + Vector2(0.09, -0.21) * size, size * 0.06, Color(1.0, 0.94, 0.70))
+
+
 ## Earth is the one carried material that is already safe on colour (the only warm one in the set, dE 30+
 ## from every other). It is shaped anyway, because if it kept the cube while the rest were given
 ## silhouettes, the cube would come to mean "earth" by elimination — and that is a deduction, not a read.
