@@ -3216,9 +3216,19 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 	# a fact pinned to the constant would print through the row the blurb had just grown into.
 	var carried: int = int(sim.inventory.get(id, 0))
 	var made: int = int(sim.total_produced.get(id, 0))
-	draw_string(_font, Vector2(tx, box.end.y - DETAIL_TAIL),
-		"%d in the pack   ·   %d all told" % [carried, made],
+	var tally: String = "%d in the pack   ·   %d all told" % [carried, made]
+	draw_string(_font, Vector2(tx, box.end.y - DETAIL_TAIL), tally,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_BLURB_SIZE, UI_TEXT_FAINT)
+	# AND THE REST OF THAT LINE, which was the emptiest run of pixels on the counter: two counters at the
+	# left margin, a button at the right, and the whole middle of the plate's bottom shelf holding nothing.
+	# `_detail_demand` fills it with the one live fact the pack screen can answer — see its own note.
+	#
+	# HANDED THE TALLY'S RIGHT EDGE, MEASURED, not a column the two agree about by writing the same number
+	# twice. The tally is the fixed thing on this line (it is the plate's own fact) and the demand is what
+	# gives, so the row's give point is at the demand's left end and the string that decides where that is
+	# is the string that was just drawn.
+	_detail_demand(box, id, tx + _font.get_string_size(tally, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_BLURB_SIZE).x + DETAIL_ROW_GAP)
 	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
 	if row == held:
 		# HELD is not HOLD greyed out — it is the answer to "which one is in my hand", and the pack screen is
@@ -3226,6 +3236,201 @@ func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
 		_state_plate(box, "HELD")
 	else:
 		_verb_button(box, HOLD_VERB, HOLD_KEY, true)
+
+
+## THE ONE WORD ON THE ROW THAT SAYS WHICH WAY THE NUMBERS POINT, named because the row measures it and
+## draws it from the same string. Every other numeral on this counter is a PRICE for the thing named beside
+## it; these are one item's line in somebody else's price, and without the lead-in the row is a rebus.
+const DEMAND_LEAD: String = "wanted by"
+
+
+## WHO ELSE WANTS THIS, AND HOW SHORT YOU STILL ARE FOR THEM — the pack plate's half of the bill.
+##
+## `MNU-12` asks the inspector to expand only for a meaningful choice. The HEIGHT half of that is refused
+## with its evidence written beside the constants: 81 of the full plate's 88 is spoken for, the chips run
+## off the bottom 29px before the old share is reached, and `check_pack_layout` floors the plate at 70
+## independently. What was left is the content, and on PACK the content was the complaint. The plate drew a
+## sentence out of a `const` table and two counters — "24 in the pack · 61 all told" — and then left the
+## right two thirds of its bottom shelf empty beside the one verb this tab has. Neither number is a thing
+## you act on. A lifetime total is a souvenir.
+##
+## THE QUESTION A PACK SCREEN IS ACTUALLY OPENED WITH is whether to keep gathering the stuff, and the
+## counter is the one screen in the game that knows: it holds every price this stack is a line in. So the
+## shelf carries the TRANSPOSE of a WORKS row. A price is indexed by product and answers "what does this
+## machine cost"; standing in your own pack you are asking it the other way round — "what is this stack
+## short for" — and nothing anywhere answered that. `ITEM_PURPOSE`'s own docstring says the resource lines
+## exist so that "resources answer *what wants this*". This is that sentence with the pack's state in it.
+##
+## WHAT COUNTS AS A BUYER is whatever the counter would let you press ENTER on today: the open machines,
+## the open Rack rows, and the next rung of the ladder. They come from `open_machines()`, `open_rack()` and
+## `ResearchRules.next_tech` — the three sources the tabs themselves list from — so this row and those tabs
+## cannot come to disagree about what is buildable. The LOCKED half is deliberately absent, for the reason
+## `_tab_works` gives for hiding it there: a wall of what you cannot have is the thing that rebuild was
+## clearing out, and the future has a home already on the BENCH where it reads as a ladder.
+##
+## THE RUNG'S SAMPLE IS PART OF THE RUNG'S PRICE. Research eats one of its signature material on top of the
+## metal, which is a cost the rung's own `cost` dictionary does not carry and which `_shortfall_note` is
+## otherwise the only place in this file to name. It is folded into the rung's line rather than listed as a
+## second one, because a rung that wants six iron ingots and a seventh to analyze wants seven.
+func _item_demand(id: StringName) -> Array[Dictionary]:
+	var owed: Array[Dictionary] = []
+	var settled: Array[Dictionary] = []
+	if sim == null or id == &"":
+		return owed
+	for i: int in open_machines():
+		_demand_line(id, _craft_id(i), "", craft_options[i]["cost"], owed, settled)
+	for r: int in open_rack():
+		# The same expression `bazaar_action` resolves a Rack row with, so the row you can select and the
+		# row this prices are the same row by construction rather than by two rules that agree today.
+		_demand_line(id, rack_ids[r] if r < rack_ids.size() else &"", "",
+			rack_options[r]["cost"], owed, settled)
+	var next: StringName = ResearchRules.next_tech(sim.research)
+	if next != &"":
+		var rung: Dictionary = ResearchRules.tech(next)
+		var price: Dictionary = (rung.get("cost", {}) as Dictionary).duplicate()
+		var sample: StringName = rung.get("sample", &"")
+		if sample == id:
+			price[id] = int(price.get(id, 0)) + 1
+		# A RUNG IS NAMED AND NOT DRAWN. It has no glyph of its own — that is the whole reason
+		# `_draw_tech_art` exists, and at plate size that function's answer is to show the machines the rung
+		# unlocks. Borrowing one of those down here would put a Drill on the row and mean Automation, so the
+		# ladder's entry wears its word instead. There is at most one of them and it is always last.
+		_demand_line(id, &"", str(rung.get("name", "")), price, owed, settled)
+	# OWED FIRST, SETTLED AFTER — `_cost_order`'s rule, one level up. There it groups the ingredients of one
+	# price; here it groups the prices of one ingredient, and the reason is the same: the only question
+	# anybody brings to a bill is which lines are still open, and the count of open lines is the length of
+	# the first run. What crosses a line here is the same subtraction, `_cost_gap`, and nothing else.
+	owed.append_array(settled)
+	return owed
+
+
+## One buyer's line, or none if this buyer does not name the item. Split out so the three sources above
+## cannot each grow their own copy of the predicate that decides which run a line belongs in.
+func _demand_line(id: StringName, glyph: StringName, word: String, cost: Dictionary,
+		owed: Array[Dictionary], settled: Array[Dictionary]) -> void:
+	var need: int = int(cost.get(id, 0))
+	if need <= 0:
+		return
+	var line: Dictionary = {"glyph": glyph, "word": word, "need": need}
+	if _cost_gap(id, need) > 0:
+		owed.append(line)
+	else:
+		settled.append(line)
+
+
+## THE ROW, right-packed against the space the verb keeps and given whatever the tally leaves it.
+##
+## RESERVED FOR THE BUTTON AND NOT FOR THE STATE, which is `_hold_text_w`'s rule and it is here for the
+## same reason: `HELD` is a tick and a word where `HOLD` is a pill with a key in it, so a row measured
+## against whichever form this slot carries would slide sideways — or drop a line — as a consequence of
+## pressing the key underneath it.
+##
+## AND IT SITS ON THE TALLY'S BASELINE, not on the shelf's floor where the priced plate stands its chips.
+## Text aligns to text, and a card cannot follow it here: a chip's baseline is `DETAIL_CHIP_BASE` down its
+## own top edge, so the card runs `DETAIL_CHIP_H - DETAIL_CHIP_BASE` past whatever line it is set on, and
+## this line is `DETAIL_TAIL` off the bottom of the plate. Seat a card on it and the card's bottom edge
+## lands inside the `DETAIL_PAD` margin every other thing on the plate keeps. So the buyers are drawn the
+## way a WORKS row prices instead — glyph and signed numeral straight onto the plate, no well — which is
+## the form `_cost_glyphs` has used since `MNU-20`'s first half and the form a SETTLED chip already falls
+## back to on the plate above. The elevation that tells the two runs apart there is spent here on the
+## order, which is the cue that costs no pixels.
+##
+## THE INK READS THE SIGN, out of the same `_cost_numeral` the WORKS rows print, so a machine that is two
+## ingots short says `-2` in the list and `-2` here. Nothing new is coloured in: a shortfall is `UI_WARN`
+## as it is everywhere else, and a covered line is drawn in the type ramp's quiet rung rather than in the
+## price surfaces' green — on those surfaces green means "you can pay this" about a price you are standing
+## in front of, and here a covered line means there is nothing to do, which is what this counter draws
+## quiet everywhere. The minus is the cue either way and needs no comparison to read.
+func _detail_demand(box: Rect2, id: StringName, left: float) -> void:
+	var lines: Array[Dictionary] = _item_demand(id)
+	if lines.is_empty():
+		return
+	# THE GLYPH IS THE HEIGHT OF THE LINE IT STANDS IN, asked of the font rather than written as the 12 the
+	# WORKS row happens to use. A mark on a text line that is not the text's own line height is a number
+	# that has to be re-guessed the day the face or the size moves, and this row already has to fit under a
+	# baseline 8px off the bottom of the plate.
+	var glyph: float = _font.get_height(DETAIL_BLURB_SIZE)
+	var lead: float = _font.get_string_size(DEMAND_LEAD, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_NOTE_SIZE).x
+	var right: float = box.end.x - DETAIL_PAD - _verb_button_w(HOLD_VERB, HOLD_KEY) - DETAIL_ROW_GAP
+	var runs: PackedFloat32Array = PackedFloat32Array()
+	var whole: float = 0.0
+	for e: Dictionary in lines:
+		var ew: float = _demand_w(id, e, glyph)
+		runs.append(ew)
+		whole += ew + (DETAIL_ROW_GAP if runs.size() > 1 else 0.0)
+	var budget: float = right - left - lead - DETAIL_ROW_GAP
+	# WHAT DID NOT FIT IS SAID, NOT SWALLOWED. A row that quietly stops after two buyers reads as "two
+	# things want this", which is a stronger claim than the truth and one the reader has no way to doubt.
+	# The reserve is taken at the count's WIDEST — every line dropped — because the marker's width decides
+	# how many lines fit and how many lines fit decides the marker, and an upper bound settles that in one
+	# pass. It can only ever leave a pixel or two of air before the button.
+	var more_w: float = _font.get_string_size("+%d" % lines.size(), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_NOTE_SIZE).x
+	if whole > budget:
+		budget -= more_w + DETAIL_ROW_GAP
+	var shown: int = 0
+	var used: float = 0.0
+	for i: int in runs.size():
+		var step: float = runs[i] + (DETAIL_ROW_GAP if i > 0 else 0.0)
+		if used + step > budget:
+			break
+		used += step
+		shown += 1
+	# THE ROW GIVES AT THE DEMAND, NEVER AT THE TALLY. The tally is this plate's own fact about the thing
+	# under the cursor; the demand is about everything else. A pack whose longest tally leaves no room for
+	# a lead-in and one buyer draws the plate it drew before rather than a lead-in with nothing after it.
+	if shown <= 0:
+		return
+	var cut: int = lines.size() - shown
+	var span: float = lead + DETAIL_ROW_GAP + used + (0.0 if cut <= 0 else DETAIL_ROW_GAP + more_w)
+	var at := Vector2(right - span, box.end.y - DETAIL_TAIL)
+	draw_string(_font, at, DEMAND_LEAD, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE, UI_TEXT_FAINT)
+	at.x += lead + DETAIL_ROW_GAP
+	for i: int in shown:
+		at.x += _demand_mark(at, id, lines[i], glyph) + DETAIL_ROW_GAP
+	if cut > 0:
+		draw_string(_font, at, "+%d" % cut, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE,
+			UI_TEXT_FAINT)
+
+
+## How wide one buyer's line is. Asked before the row is packed AND returned by the drawing below, which
+## calls this rather than adding the same three terms a second time — the width pass and the draw pass on
+## the plate above are two walks of one dictionary and used to each format their own numeral, and that is
+## survivable only for as long as the two spellings cannot differ.
+##
+## THE INNER GAP IS TIGHTER THAN THE OUTER ONE, and the two are the constants that already say so:
+## `DETAIL_CHIP_GAP` holds a buyer to its number, `DETAIL_ROW_GAP` separates one buyer from the next. That
+## is `MNU-20`'s spacing argument — a price and the three parts of a row set at one spacing would be seven
+## equal things in a line — applied to a row whose parts are buyers.
+func _demand_w(id: StringName, e: Dictionary, glyph: float) -> float:
+	var word: String = str(e["word"])
+	var head: float = glyph if word == "" else _font.get_string_size(word,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+	return head + DETAIL_CHIP_GAP + _font.get_string_size(_cost_numeral(id, int(e["need"])),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
+
+
+## One buyer drawn, and the width it took, which is the measured one and not a second sum of the same
+## terms.
+##
+## `at` is the row's BASELINE, and a baseline sits about two thirds down its line box, so the mark is
+## centred a third of a line height ABOVE it and comes out optically level with the digits beside it. Said
+## as a fraction of the line rather than as an offset in pixels, because the line height is asked of the
+## font: pin it to a number and it is a guess again the day the face or the size moves.
+func _demand_mark(at: Vector2, id: StringName, e: Dictionary, glyph: float) -> float:
+	var word: String = str(e["word"])
+	var head: float = glyph
+	if word == "":
+		var mark: StringName = e["glyph"]
+		_draw_thing_icon(mark, Rect2(at.x, at.y - glyph / 3.0 - glyph * 0.5, glyph, glyph))
+	else:
+		head = _font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+		draw_string(_font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE, UI_TEXT_FAINT)
+	var num: String = _cost_numeral(id, int(e["need"]))
+	draw_string(_font, Vector2(at.x + head + DETAIL_CHIP_GAP, at.y), num, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_CHIP_SIZE, UI_WARN if num.begins_with("-") else UI_TEXT_FAINT)
+	return _demand_w(id, e, glyph)
 
 
 ## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what is the
