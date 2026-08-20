@@ -852,12 +852,28 @@ func _check_announce_channel() -> void:
 			% hud._arrival_life)
 
 	# ---- the lesson under the plate ----------------------------------------------------------------
+	#
+	# EVERY WAIT BELOW IS A DRAWN FRAME AND NOT A PHYSICS STEP, WHICH IS THE WHOLE OF THIS SECTION'S FIX.
+	# `Hints` is clocked from `_process`: `main.gd:781` calls `refresh(delta)`, and `main.gd:777` is the
+	# only writer of `_ceremony`. A fixture that advances the game with `physics_frame` is winding a clock
+	# this subject never reads. On a 60fps desktop the two ticks interleave 1:1 and the mistake is
+	# invisible; CI draws this game at 6-9 fps under a software rasteriser
+	# (`.github/workflows/harness.yml:30-33`) while Godot's unoverridden defaults allow eight physics steps
+	# per drawn frame (`physics_ticks_per_second` 60, `max_physics_steps_per_frame` 8 — `project.godot`
+	# sets neither), so a six-await physics loop finished with ZERO `_process` calls behind it. The lesson's
+	# clock reported 7.664 -> 7.664 and `active_alpha()` short-circuited to 0.00.
+	#
+	# THE CLOCK WAS HEALTHY THROUGHOUT, which is what makes this a fixture defect and not a product one:
+	# `SHOW_SECONDS` is 9.0 (`hints.gd:17`) and the layer read 7.664, so 1.336 s had already burned in the
+	# arming loop below — the same kind of loop, just long enough to span a drawn frame by accident.
+	# **A wait that works only because it is long enough to accidentally contain the tick you meant is not
+	# the tick you meant**, and it stops working the moment the box gets slower.
 	var hints: Hints = _main._hints
 	hud._arrival_life = 0.0
 	_main.sim.inventory[&"rope"] = int(_main.sim.inventory.get(&"rope", 0)) + 1
 	var armed: bool = false
 	for _i: int in 30:
-		await physics_frame
+		await RenderingServer.frame_post_draw
 		if hints.active_alpha() > 0.9:
 			armed = true
 			break
@@ -867,26 +883,43 @@ func _check_announce_channel() -> void:
 	var taught: String = hints.active_text()
 	var life_before: float = hints._life
 	for _i: int in 6:
-		await physics_frame
+		await RenderingServer.frame_post_draw
 	_check(hints._life < life_before,
 		"CONTROL: with no ceremony up, the lesson's clock RUNS (%.3f -> %.3f)"
 			% [life_before, hints._life])
 
 	hud.announce("THE CLAYBAND", "10 METRES DOWN", Color(0.7, 0.6, 0.4))
-	await physics_frame                            # one frame for note_ceremony to reach Hints
+	await RenderingServer.frame_post_draw           # one frame for note_ceremony to reach Hints
 	var life_under: float = hints._life
+	# THE SAME SIX FRAMES the control above burned, so the freeze is judged against a run of equal length
+	# rather than against a shorter one that could not have shown the clock moving anyway.
 	for _i: int in 6:
-		await physics_frame
+		await RenderingServer.frame_post_draw
+	# THE PREMISE OF THE FOUR ASSERTIONS BELOW, ASSERTED. On the render clock this window costs real wall
+	# seconds, and the ceremony it is measured under only lives `ARRIVAL_HOLD` = 3.4 of them (`hud.gd:224`,
+	# spent in `hud.gd:353`). Seven drawn frames is under a second at the 8 fps end of the CI range; the
+	# 1.336 s the arming loop burns over a handful of frames says the slowest frame here can cost a third
+	# of a second, which puts this window near 2.3 s — inside 3.4, with less room than anything should rely
+	# on silently. A plate that expired mid-window would fail all four below for a reason that has nothing
+	# to do with the property they are about, so the window reports whether it was valid.
+	_check(hud.announcing(),
+		"CONTROL: the ceremony is still up at the end of the window measured under it (%.3f s of %.1f left)"
+			% [hud._arrival_life, Hud.ARRIVAL_HOLD])
 	_check(hints.active_alpha() == 0.0,
 		"a lesson draws nothing while the ceremony owns the channel (alpha %.2f)" % hints.active_alpha())
 	_check(hints.active_text() == taught,
 		"...and it is HELD rather than dropped: the same lesson is still the active one")
+	# THIS ONE PASSED VACUOUSLY UNTIL THE AWAITS ABOVE MOVED TO THE RENDER CLOCK. It claims the clock is
+	# STOPPED, and it was satisfied by nothing having happened at all — the identical zero `_process` calls
+	# that failed its two neighbours. Nothing about it changed here except that it can now fail: it is a
+	# live test of `hints.gd:212`, whose `not _ceremony` guard wraps `_lingered` and `_life` together, over
+	# six real `_process` ticks. If it goes red, that guard is the thing to read, not this line.
 	_check(is_equal_approx(hints._life, life_under),
 		"...with its clock stopped, not burning down unseen (%.3f -> %.3f)" % [life_under, hints._life])
 
-	hud._arrival_life = 0.0                        # the ceremony ends
-	await physics_frame
-	await physics_frame
+	hud._arrival_life = 0.0                         # the ceremony ends
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
 	_check(hints.active_alpha() > 0.9 and hints.active_text() == taught,
 		"...and the same lesson returns at full opacity once the channel is free (alpha %.2f)"
 			% hints.active_alpha())
@@ -900,15 +933,22 @@ func _check_announce_channel() -> void:
 ##
 ## **61px is three drawn lines at size 11, and it is where the game already is** — measured across all
 ## nineteen lessons after the UI-05 cuts, worst case `rope`/`torch`/`generator` at exactly 61.0. A fourth
-## line is 77px, so this fails the moment any lesson grows one. It was 77 before this strike (`pump`,
-## `chain`, `wrapped`); the number moved because the SUBJECT changed, which is the only direction a
-## threshold is ever allowed to move.
+## line is 77px, so this fails the moment any lesson grows one. It was 77, then 61; it is 52 now. Every
+## move has been DOWNWARD and every one followed the subject: this time the bubble dropped to 8pt over a
+## 176px wrap and the lessons were rewritten to one line each, which took the tallest from 61px to a
+## measured 47px and canvas coverage to 3.92%. A ceiling is lowered by measurement and never raised to
+## buy green — raising it is the change that made the tutorial bigger, wearing a calibration's costume.
 ##
-## **WIDTH IS NOT ASSERTED, DELIBERATELY.** `hint_box` clamps to `HINT_WRAP + 20`, so every lesson at or
-## near the cap reports 250.0 by construction and a `w <= 250` assertion could not fail for any string —
+## **WIDTH IS NOT ASSERTED, DELIBERATELY.** `hint_box` clamps to `HINT_WRAP + 16`, so every lesson at or
+## near the cap reports that number by construction and a width assertion could not fail for any string —
 ## it would be a guard written in a quantity that cannot exceed its own bound. Height is the axis the text
 ## can actually push on.
-const LESSON_MAX_H: float = 61.0
+##
+## This paragraph used to say `HINT_WRAP + 20` and `250.0`, which was 230 + 20: both halves were transcribed
+## as literals when the wrap was 230 and the pad was 20, and neither followed when the bubble was rebuilt at
+## 176 + 16. The reasoning survived the change and the arithmetic did not, which is the failure mode of any
+## number written into prose instead of derived — quote the CONSTANTS, not their product.
+const LESSON_MAX_H: float = 52.0
 
 func _check_lesson_footprint() -> void:
 	var font: Font = ThemeDB.fallback_font

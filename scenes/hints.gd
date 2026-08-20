@@ -33,38 +33,38 @@ const FADE_OUT: float = 0.6
 ## the forge/iron chain (drop-feed in, product falls out — the one verb the chain already taught).
 var _defs: Array[Dictionary] = [
 	{"id": &"rope", "item": &"rope",
-		"text": "ROPE — RMB an open cell above a drop and it unrolls DOWN to you. W/S climbs it, SPACE leaps off."},
+		"text": "ROPE — RMB above a drop. W/S climbs, SPACE leaps off."},
 	{"id": &"torch", "item": &"torch",
-		"text": "TORCH — RMB mounts it on a wall-backed cell (or beside rock). Its light STAYS — claim the dark."},
+		"text": "TORCH — RMB on a wall-backed cell. Its light stays."},
 	{"id": &"scanner", "item": &"scanner",
-		"text": "SCANNER — select it and RMB fires a sonar pulse: every vein in range echoes through the rock."},
+		"text": "SCANNER — RMB pulses. Veins in range echo back."},
 	# UI-05, and this is the ticket's own example. "It grows into a NEW TREE: wood is renewable" is a
 	# SECOND CONCEPT — an economics claim — competing with the one input instruction the bubble exists to
 	# give. It is not deleted; it is moved to `planted`, where it lands on the moment it describes and is
 	# a payoff instead of a promise. *One action, one immediate consequence.*
 	{"id": &"sapling", "item": &"sapling",
-		"text": "SAPLING — RMB plants it on grassy ground."},
+		"text": "SAPLING — RMB plants it on grass."},
 	# Same cut. "Too dense for the Forge" is the immediate consequence of what just entered the pack and
 	# answers the question the player is about to ask. The Blast Furnace is a research path, and a research
 	# path is a plan rather than a consequence — it belongs on the BENCH, which is where the player goes
 	# to make plans.
 	{"id": &"rich_ore", "item": &"rich_ore",
-		"text": "RICH ORE — too dense for the Forge. The BENCH knows what to do with it."},
+		"text": "RICH ORE — too dense for the Forge. Take it to the BENCH."},
 	{"id": &"generator", "item": &"generator",
-		"text": "GENERATOR — place it, then drop COAL on it (Q). It radiates POWER to machines nearby."},
+		"text": "GENERATOR — place it, drop COAL on it. It powers what is near."},
 	{"id": &"conduit", "item": &"conduit",
-		"text": "CONDUIT — RMB lays power tube. Power flows DOWN and SIDEWAYS through it — never up."},
+		"text": "CONDUIT — RMB lays tube. Power flows down and sideways, never up."},
 	{"id": &"hopper", "item": &"hopper",
-		"text": "HOPPER — it banks what falls in and meters it DOWN. It keeps the FIRST item it tastes (R re-tastes)."},
+		"text": "HOPPER — banks what falls in, meters it down. R re-tastes."},
 	{"id": &"lift", "item": &"lift",
-		"text": "LIFT — it hauls goods (and YOU) UP its column. Power multiplies its throughput."},
+		"text": "LIFT — hauls goods and YOU up its column."},
 	{"id": &"splitter", "item": &"splitter",
-		"text": "SPLITTER — it routes falling items DOWN + RIGHT. Aim R at it to cycle the ratio."},
+		"text": "SPLITTER — routes falling items down and right. R cycles the ratio."},
 	{"id": &"h_drill", "item": &"h_drill",
-		"text": "BORER — it bores SIDEWAYS, the way YOU face when placing. Feed it coal; the haul drops down its own column."},
+		"text": "BORER — bores sideways, the way you face. Feed it coal."},
 	{"id": &"descent_engine", "item": &"descent_engine",
-		"text": "DESCENT ENGINE — stand it ON the violet seal, then toss " + str(FactorySim.DESCENT_QUOTA)
-			+ " ingots down its shaft. Gravity feeds the breach."},
+		"text": "DESCENT ENGINE — stand it on the violet seal, then toss " + str(FactorySim.DESCENT_QUOTA)
+			+ " ingots down its shaft."},
 ]
 
 ## STATE-EDGE hints (vs the pack-acquisition ones above): a teaching moment triggered by a body/world
@@ -97,16 +97,13 @@ var _defs: Array[Dictionary] = [
 ##                can see that — it is that the rope is the answer to a drop you are already in.
 var _moments: Array[Dictionary] = [
 	{"id": &"in_water",
-		"text": "AQUIFER — water floods your dig and slows you. A POWERED PUMP drains it; "
-			+ "then mine the rich walls."},
+		"text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"deep_enough",
-		"text": "GRAPPLE — F fires the winch at whatever you're aiming at. W reels you UP it, "
-			+ "SPACE leaps off. The climb back is the swing."},
+		"text": "GRAPPLE — F fires the winch. W reels you up, SPACE leaps off."},
 	{"id": &"pump",
 		# Was four lines. "A shorter line swings faster" is the MECHANISM — true, and a third concept
 		# between the two halves of the input it is explaining. The action and its consequence survive.
-		"text": "PUMP IT — reel W at the BOTTOM of the arc, pay S back out at the top. "
-			+ "In rhythm, the swing winds itself up."},
+		"text": "PUMP IT — reel W at the bottom of the arc, pay S out at the top."},
 	{"id": &"chain",
 		# "You never have to land" is a slogan, and it arrives BEFORE the instruction that earns it.
 		"text": "CHAIN IT — F again in mid-air plants the next line, and the speed you left with "

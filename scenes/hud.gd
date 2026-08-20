@@ -597,12 +597,17 @@ func _draw_flash() -> void:
 ## only a ceiling if something can measure the thing it caps. This is the box `_draw_hint_bubble` actually
 ## draws, extracted so the harness can size every lesson in the game **without reimplementing the layout**
 ## — a second copy of this arithmetic would be a gauge that agrees with itself and not with the screen.
-const HINT_FS: int = 11
-const HINT_WRAP: float = 230.0
+## SIZE IS THE WHOLE COMPLAINT. At 11pt over a 230px wrap this box was 250x52 on a 640x360 canvas —
+## 39% of the width, 14% of the height, set at nearly the objective banner's weight, floating over the
+## body in the middle of the play area. A just-in-time hint is the quietest thing on screen, not the
+## loudest. 8pt over 176 halves the footprint; the lessons were rewritten to one line each in the same
+## pass, because a smaller box around the same paragraph is just a smaller paragraph.
+const HINT_FS: int = 8
+const HINT_WRAP: float = 176.0
 
 static func hint_box(font: Font, text: String) -> Vector2:
 	var ts: Vector2 = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, HINT_WRAP, HINT_FS)
-	return Vector2(minf(ts.x, HINT_WRAP) + 20.0, ts.y + 13.0)
+	return Vector2(minf(ts.x, HINT_WRAP) + 16.0, ts.y + 11.0)
 
 
 func _draw_hint_bubble() -> void:
@@ -613,22 +618,27 @@ func _draw_hint_bubble() -> void:
 	var box: Vector2 = hint_box(_font, hint_text)
 	var w: float = box.x
 	var h: float = box.y
-	var tail := Vector2(clampf(hint_anchor.x, 8.0, CANVAS.x - 8.0), clampf(hint_anchor.y, 60.0, CANVAS.y - 12.0))
+	var tail := Vector2(clampf(hint_anchor.x, 8.0, CANVAS.x - 8.0),
+		clampf(hint_anchor.y, 60.0, HOTBAR_BAND_TOP - 6.0))
 	var origin := Vector2(clampf(tail.x - w * 0.5, 6.0, CANVAS.x - w - 6.0), tail.y - 7.0 - h)
 	if origin.y < 38.0:                       # never under the objective line — flip below the anchor
 		origin.y = tail.y + 7.0
 	var a: float = hint_alpha
 	var rect := Rect2(origin, Vector2(w, h))
-	draw_rect(rect, Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
-	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, a))
-	draw_rect(rect, Color(UI_EDGE.r, UI_EDGE.g, UI_EDGE.b, a), false, 1.0)
+	# ELEVATION, NOT AN OUTLINE. A flat fill inside a 1px border with a full-width bar across the top is
+	# a dialog box, and it reads as one. A soft drop shadow puts the plate ABOVE the world instead of
+	# cut into it, and the accent shrinks to a left edge so the eye lands on the word, not the frame.
+	_round_rect(Rect2(rect.position + Vector2(0.0, 1.5), rect.size), 4.0, Color(0.0, 0.0, 0.0, 0.38 * a))
+	_round_rect(rect, 4.0, Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
+	draw_rect(Rect2(rect.position + Vector2(0.0, 3.0), Vector2(1.5, h - 6.0)),
+		Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.85 * a))
 	var tip_y: float = tail.y if origin.y < tail.y else origin.y - 1.0   # tail reaches toward the body
 	var base_y: float = (origin.y + h) if origin.y < tail.y else origin.y
 	var tx: float = clampf(tail.x, origin.x + 10.0, origin.x + w - 10.0)
-	draw_colored_polygon(PackedVector2Array([Vector2(tx - 5.0, base_y), Vector2(tx + 5.0, base_y),
+	draw_colored_polygon(PackedVector2Array([Vector2(tx - 3.5, base_y), Vector2(tx + 3.5, base_y),
 		Vector2(tx, tip_y)]), Color(UI_BG.r, UI_BG.g, UI_BG.b, UI_BG.a * a))
-	draw_multiline_string(_font, origin + Vector2(10.0, 6.0 + 10.0), hint_text,
-		HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.95, 0.90, 0.72, a))
+	draw_multiline_string(_font, origin + Vector2(8.0, 5.0 + 8.0), hint_text,
+		HORIZONTAL_ALIGNMENT_LEFT, wrap_w, fs, -1, Color(0.92, 0.88, 0.74, a))
 
 
 ## FACTORY ALERTS: a compact left-edge stack of stalled machines, shown ONLY when
