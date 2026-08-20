@@ -2637,12 +2637,16 @@ func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> v
 ## the ink is free to move. It is not moved here, because this change is the one the ticket asked for and
 ## the ink is a separate reading.
 func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
+	# ONE WALK ORDER FOR BOTH PASSES. The sum is the same whichever way the dictionary is read, so the width
+	# pass does not need this — it takes it anyway, because the day the two passes walk the price by two
+	# different rules is the day one of them stops describing the other.
+	var order: Array[StringName] = _cost_order(cost)
 	var w: float = 0.0
-	for item: StringName in cost:
+	for item: StringName in order:
 		w += 12.0 + _font.get_string_size(_cost_numeral(item, int(cost[item])),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
 	var x: float = rr.end.x - 5.0 - w
-	for item: StringName in cost:
+	for item: StringName in order:
 		var label: String = _cost_numeral(item, int(cost[item]))
 		Visuals.draw_item(self, Vector2(x + 6.0, rr.position.y + 10.5), 12.0, item)
 		# The ink reads the SIGN rather than asking the pack a second time. `have < need` written out twice,
@@ -2662,8 +2666,48 @@ func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 ## here — `_works_row` subtracts this function's total from the NAME's budget, so a numeral that measures
 ## narrower than it draws puts the price on top of the word it was widened to protect.
 func _cost_numeral(item: StringName, need: int) -> String:
-	var gap: int = need - int(sim.inventory.get(item, 0))
+	var gap: int = _cost_gap(item, need)
 	return ("-%d" % gap) if gap > 0 else str(need)
+
+
+## THE ONE SUBTRACTION, and the one predicate. What this ingredient is short by: positive while the pack
+## cannot cover the line, zero or below once it can.
+##
+## Everything that tells an outstanding ingredient from a settled one now reads this and nothing else — the
+## order the price is walked in, the card under a detail chip, the sign on both surfaces' numerals and the
+## ink they are drawn in. `have < need` was written out at four addresses before, which is survivable only
+## while the four cannot disagree; they can, and a mark that disagrees with the colour beside it about one
+## ingredient is worse than either cue missing, because each reader only ever sees one of them.
+func _cost_gap(item: StringName, need: int) -> int:
+	return need - int(sim.inventory.get(item, 0))
+
+
+## THE BILL OF MATERIALS ORDER: the lines you still OWE first, the lines the pack already settles after.
+##
+## This is the half of `MNU-20` that was deferred. The numerals were the half that shipped — a deficit
+## prints as a signed `-N` instead of leaving the subtraction to the reader — and fixing a numeral does not
+## make a row of chips a bill. A bill is a list whose outstanding lines are grouped, because the only
+## question anybody brings to a price is which lines are still open. Interleaved, that question is a scan of
+## every ingredient and a comparison per chip; grouped, it is a glance at the front of the price, and the
+## count of open lines is the length of the first run.
+##
+## STABLE INSIDE EACH RUN, so a recipe keeps the order its `.tres` or its rung wrote it in and the only
+## thing that ever moves a chip is that ingredient crossing the line. The crossing is the point and not the
+## price of it: the frame where you pick up the last ingot is the frame the owed run gets shorter, which is
+## the most direct feedback on the panel and the one thing a static row could never say.
+##
+## It sorts the WORKS rows and the detail plate alike, so a machine's price does not rearrange itself
+## between the row you picked it from and the plate that prices it.
+func _cost_order(cost: Dictionary) -> Array[StringName]:
+	var owed: Array[StringName] = []
+	var settled: Array[StringName] = []
+	for item: StringName in cost:
+		if _cost_gap(item, int(cost[item])) > 0:
+			owed.append(item)
+		else:
+			settled.append(item)
+	owed.append_array(settled)
+	return owed
 
 
 ## A machine's sprite or an item's glyph, whichever this id is. Both the pack grid, the works rows and the
@@ -2952,11 +2996,16 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	# is a number that has to be argued anyway.
 	var btn: Rect2 = _verb_button(box, verb, "ENTER" if ready else "", ready)
 	var shelf: Rect2 = _detail_row(box)
+	# THE PRICE AS A BILL: what you still owe first, what the pack already settles after (`_cost_order`), and
+	# the two runs told apart by the card rather than by a gap or a fourth colour (`_detail_chip`). The width
+	# pass and the draw pass below take the same array, so the row cannot pack one arrangement and paint
+	# another — and the row's give point is unchanged, because a settled line is NARROWER than it was.
+	var order: Array[StringName] = _cost_order(cost)
 	var chips_w: float = 0.0
-	for item: StringName in cost:
+	for item: StringName in order:
 		if chips_w > 0.0:
 			chips_w += DETAIL_CHIP_GAP
-		chips_w += _detail_chip_w(int(sim.inventory.get(item, 0)), int(cost[item]))
+		chips_w += _detail_chip_w(item, int(cost[item]))
 	var note_w: float = 0.0 if note == "" \
 		else _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
 	var note_gap: float = 0.0 if note == "" else DETAIL_ROW_GAP
@@ -2969,9 +3018,18 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	# frame; a sentence printed across the picture of the thing you are buying is a broken one.
 	var cx: float = maxf(tx, btn.position.x - DETAIL_ROW_GAP - note_w - note_gap - chips_w)
 	var chip_y: float = shelf.end.y - DETAIL_CHIP_H
-	for item: StringName in cost:
-		cx = _detail_chip(Vector2(cx, chip_y), item, int(cost[item]),
-			int(sim.inventory.get(item, 0))) + DETAIL_CHIP_GAP
+	for item: StringName in order:
+		cx = _detail_chip(Vector2(cx, chip_y), item, int(cost[item])) + DETAIL_CHIP_GAP
+	# LEFT OPEN, AND RECORDED RATHER THAN QUIETLY CREATED. Now that a short chip prints the deficit, the
+	# shortfall branch of this note is the same number a second time, some two hundred pixels along one row —
+	# "-2/3" beside "short 2 Iron Ingot". That is the shape `_detail_hold` stood a note down for, and the
+	# argument for standing this one down too is already written there. It is NOT stood down here, for two
+	# reasons that are about evidence and not about taste. It is `MNU-18`'s shipped treatment — the dead
+	# button saying why — and retiring another ticket's acceptance is not this ticket's to do on its own say
+	# so. And it is the only prose account of the shortfall on the plate, which a reader who is not reading
+	# the glyphs has instead of them; whether the chips cover that reader is a question for `MNU-32`'s
+	# text-only pass, which is a review rather than an edit. The note's OTHER branches — the sample material,
+	# "behind Automation", "at a claimed Bazaar" — say things no chip can and are not in question either way.
 	if note != "":
 		# On the price's own baseline, because the reason and the numbers it is derived from are one
 		# sentence. The verb's label sits a couple of pixels higher, centred in a pill half again as deep;
@@ -3147,42 +3205,112 @@ func _detail_pack(box: Rect2, art: Rect2) -> void:
 ## the drawing, which was survivable while nothing else needed them. The height matters twice over now: it
 ## is what seats the chips on the row's floor beside a button half again their depth.
 ##
-## The `19.0` the text is indented by is NOT this height wearing another hat — it is the glyph well, and the
-## two are equal by coincidence. They are left as separate numbers on purpose; relating them here would be
-## exactly the invented relation this file keeps finding in its own past.
+## `DETAIL_CHIP_WELL` is NOT `DETAIL_CHIP_H` wearing another hat — one is the room the glyph stands in and
+## the other is how deep the card is, and the two are equal by coincidence. They are left as separate
+## numbers on purpose; relating them would be exactly the invented relation this file keeps finding in its
+## own past. The well is named now only because a chip without a card has to know where its numerals start
+## without the card's width to read it off.
 const DETAIL_CHIP_H: float = 19.0
 const DETAIL_CHIP_BASE: float = 13.5  ## chip top → the have/need pair's baseline, which the reason shares
 const DETAIL_CHIP_SIZE: int = 9
+const DETAIL_CHIP_WELL: float = 19.0  ## chip left edge → the numerals: the well the item glyph stands in
 const DETAIL_CHIP_PAD: float = 26.0   ## the glyph well and the right margin, around the have/need pair
+## THE CARD'S RIGHT MARGIN, which is `DETAIL_CHIP_PAD` less the well the numerals start after and therefore
+## not a fifth number that has to be kept in step with the other four by hand. It is DERIVED and not written
+## as a `7.0` for the reason this file has had to learn twice: a literal that must equal the difference
+## between two other literals, with nothing relating them, is wrong the first time either of them moves and
+## nothing anywhere fails when it does.
+##
+## It is named because a SETTLED line has no card, and a margin is a property of the card. Such a line gives
+## this back, which is what makes the covered run sit tighter than the owed one — the grouping paid for out
+## of a number the drawing already contained rather than out of a new gap invented to sit between the runs.
+## A new gap was the first design and it was wrong: `DETAIL_CHIP_GAP` is deliberately tighter than
+## `DETAIL_ROW_GAP` so the price reads as ONE of the row's three parts, and any seam wide enough to group
+## chips inside the price would have been wider than the gap that separates the price from the reason.
+const DETAIL_CHIP_RIM: float = DETAIL_CHIP_PAD - DETAIL_CHIP_WELL
 ## Chip to chip INSIDE the price, deliberately tighter than `DETAIL_ROW_GAP`. A four-ingredient price and
 ## the three parts of the row set at one spacing would be seven equal things in a line; the price has to
 ## read as one of the three.
 const DETAIL_CHIP_GAP: float = 6.0
+## WHAT ONE CHIP'S PAIR SAYS. The denominator is always the PRICE. The numerator is the number you can act
+## on: the DEFICIT while the line is outstanding, the count you HOLD once it is settled.
+##
+## `MNU-20` shipped have/need with the affordability colour on the number you hold, and that survives
+## wherever a held count is still the useful one — on a covered line there is nothing left to close, and
+## what you are carrying is the whole of the answer. On a SHORT line it was the wrong number. "1/3" says
+## where you stand; the only question anybody asks a short line is how far there is to go, and that was a
+## subtraction left to the reader on the one screen they are doing arithmetic on already. "-2/3" answers
+## both at once, in the same width, and the price is not lost — it is still the denominator it always was.
+##
+## NOTHING IS LOST THAT WAS NOT RECOVERABLE THE OTHER WAY ROUND. What you hold is the price less the gap, so
+## the reading this drops is itself one subtraction away; the difference is that it is now the subtraction
+## nobody was doing rather than the one everybody was.
+##
+## And it is the works row's spelling. `_cost_glyphs` has printed a signed deficit per ingredient since
+## `MNU-20`'s first half, so a machine you cannot afford said "-2" in the list and "1/3" on the plate — one
+## fact in two registers, two rows apart, which is how a reader ends up believing the two are about
+## different things. THE SIGN ALSO CARRIES AFFORDABILITY WITHOUT HUE, per that function's own argument: a
+## greyscale reader and a one-ingredient recipe both have nothing to compare a colour against, and a leading
+## minus needs no comparison.
+func _chip_numeral(item: StringName, need: int) -> String:
+	var gap: int = _cost_gap(item, need)
+	# `need - gap` IS what the pack holds, out of the same read the sign came from. Asking the inventory a
+	# second time here would put the numerator and the mark above it on two different states of it.
+	return ("-%d" % gap) if gap > 0 else str(need - gap)
+
+
+## The pair whole, which is the string the width below measures and the two halves below that paint.
+func _chip_label(item: StringName, need: int) -> String:
+	return "%s/%d" % [_chip_numeral(item, need), need]
+
+
 ## Asked before the chip is drawn, and asked BY the chip when it draws itself, so the row cannot pack to one
 ## width and paint at another. It measures the pair WHOLE while `_detail_chip` paints it in two halves, in
 ## two colours — which is what the drawing already did with its own copy of this line.
-func _detail_chip_w(have: int, need: int) -> float:
-	return _font.get_string_size("%d/%d" % [have, need],
+##
+## It takes the ITEM rather than a count now, because what a chip says and how wide its card is both depend
+## on whether the line is settled, and a caller that measured from a count would have to know that rule too.
+##
+## THE ROW GETS NARROWER MORE OFTEN THAN IT GETS WIDER. A settled line drops `DETAIL_CHIP_RIM`; an
+## outstanding one grows by whatever a signed deficit costs over the held count it replaced, which is
+## bounded by the price's own digits — the whole catalogue's largest single ingredient is 12 (`BROAD`'s
+## stone, `AUTOMATION`'s ingots), and no recipe with a two-digit ingredient has more than two of them.
+func _detail_chip_w(item: StringName, need: int) -> float:
+	var w: float = _font.get_string_size(_chip_label(item, need),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x + DETAIL_CHIP_PAD
+	return w if _cost_gap(item, need) > 0 else w - DETAIL_CHIP_RIM
 
 
-## One have/need chip. Green when the pack covers it, red when it does not — the affordability answer given
-## per ingredient rather than as one verdict, so a short shopping list says WHICH thing is short.
-func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
+## ONE LINE OF THE BILL. A line you still OWE gets a card under it; a line the pack already settles does
+## not — and that is the grouping `MNU-20` asked for and did not get. How much of the price is RAISED is how
+## much of it is outstanding, countable at a glance and without reading a numeral at all. Afford everything
+## and the price goes flat, leaving the gold button the only lifted thing on the row; afford nothing and
+## every line of it stands up.
+##
+## SHAPE BEFORE COLOUR, which is the rule `_state_plate` is already built on, and it is why this adds no
+## fourth ink to the three `MNU-06` spent two passes concentrating the screen down to. Both forms were
+## already in the file: the card is the same surface tint every chip wore, and a settled line is drawn in
+## exactly the form the WORKS row prices in — glyph and numeral straight onto the plate, no well.
+##
+## The order the two runs arrive in is `_cost_order`'s, so the raised lines are also the FIRST lines, and
+## the two cues cannot say different things about one ingredient: both read `_cost_gap` and nothing else.
+func _detail_chip(at: Vector2, item: StringName, need: int) -> float:
 	# HAVE OVER NEED, which is what the three comments above this one have always said it was and what the
 	# code did not do. It drew `need/have`, so a fresh save priced the Forge at "3/0" — a fraction with a
 	# zero denominator, in the one screen state nobody had ever photographed — and a finished save priced
 	# it at "3/64", which reads as five percent of the way there while you are carrying twenty-one times
-	# what it asks. The numerator is now the number that MOVES while you play, which is also the one the
-	# affordability colour belongs on.
-	var w: float = _detail_chip_w(have, need)
-	_round_rect(Rect2(at, Vector2(w, DETAIL_CHIP_H)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
+	# what it asks. The numerator is the number you can act on, which is also the one the affordability
+	# colour belongs on.
+	var w: float = _detail_chip_w(item, need)
+	var ok: bool = _cost_gap(item, need) <= 0
+	if not ok:
+		_round_rect(Rect2(at, Vector2(w, DETAIL_CHIP_H)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
 	Visuals.draw_item(self, at + Vector2(11.0, DETAIL_CHIP_H * 0.5), 13.0, item)
-	var ok: bool = have >= need
-	draw_string(_font, at + Vector2(19.0, DETAIL_CHIP_BASE), str(have), HORIZONTAL_ALIGNMENT_LEFT, -1,
+	var head: String = _chip_numeral(item, need)
+	draw_string(_font, at + Vector2(DETAIL_CHIP_WELL, DETAIL_CHIP_BASE), head, HORIZONTAL_ALIGNMENT_LEFT, -1,
 		DETAIL_CHIP_SIZE, Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
-	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
-	draw_string(_font, at + Vector2(19.0 + hw, DETAIL_CHIP_BASE), "/%d" % need,
+	var hw: float = _font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
+	draw_string(_font, at + Vector2(DETAIL_CHIP_WELL + hw, DETAIL_CHIP_BASE), "/%d" % need,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE, UI_TEXT_FAINT)
 	return at.x + w
 
@@ -4270,13 +4398,6 @@ func _can_afford(cost: Dictionary) -> bool:
 		if int(sim.inventory.get(item, 0)) < int(cost[item]):
 			return false
 	return true
-
-
-func _cost_text(cost: Dictionary) -> String:
-	var parts: PackedStringArray = []
-	for item: StringName in cost:
-		parts.append("%d %s" % [int(cost[item]), _item_label(item)])   # "6 Iron Ingot", never a raw id
-	return " ".join(parts)
 
 
 ## The carried pack as a hotbar of slots (icon + count), centred along the bottom. The active slot
