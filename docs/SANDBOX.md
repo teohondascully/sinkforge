@@ -44,6 +44,26 @@ down*, because a lineup deletes exactly the context that question is about. The 
 real world and to the blind-vision pass. If the sandbox ever becomes where things are signed off, it has
 turned into the failure mode above.
 
+> **AND THE ARBITER NAMED IN THAT SENTENCE CANNOT ARBITRATE A LINEUP — 2026-08-20.** This paragraph hands
+> the verdict to "the blind-vision pass", and a later pass has now measured what that pass does when
+> shown two frames side by side. Twelve zero-context judges, sides balanced six and six, zoom forbidden:
+> **12 of 12 called the RIGHT-hand frame the better ground** (p = 0.0005), and 11 of 12 called the LEFT-hand
+> frame the glitch. Split by what was actually on screen, both questions land on a tie. The two questions
+> are one axis answered by POSITION in opposite directions, which is what makes it position rather than
+> taste. An earlier nine-judge four-way ranking was equally empty: mean ranks 2.00 / 2.22 / 2.44 / 3.33
+> against a chance mean of 2.50, SE 0.37.
+>
+> **A contact sheet is a lineup with slots, so this design is the maximally exposed case**, not an
+> incidental one: the whole workflow win in §3 is "N variants in one frame", and every variant is therefore
+> wearing a position. Building the bays and then asking a blind judge which bay wins would produce a
+> confident, reproducible, entirely positional answer.
+>
+> **What survives is the half that works.** The judges' free-text descriptions were content-accurate in all
+> twelve — every one called the speckled frame speckled and the smooth one smooth, whichever side it was on.
+> So the rule for this tool is: **ask a blind judge what it SEES in one bay; never ask it which bay it
+> prefers.** The lineup is for a human eye and for measurement. If the sandbox is built, the sign-off
+> sentence above needs rewriting first, because as written it points the tool at its one broken mode.
+
 ## 3. What to actually build
 
 The valuable artifact is not an environment. It is **one image**.
