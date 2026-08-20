@@ -526,6 +526,12 @@ add "check_plunge (ride it down)"     "res://tools/check_plunge.gd"
 # directions has existed, complete and passing, in no list: not here, not in either CI job, not in any
 # sweep. Nothing reported that, because `check_ci_coverage` audits the layers that ARE registered and a
 # file registered nowhere is outside the population it can see.
+# NOBODY WAS READING A NAMEPLATE. A row of identical machines collapses to one plate carrying a count, and
+# that count was measured over the machines near the BODY rather than the machines in the run — so it moved
+# when you walked and nothing in the world had changed. `check_machine_identity` is the layer that sounds
+# like it covers this and is deliberately the opposite: its subject is whether a silhouette carries
+# identity, and it excludes the label channel on purpose, so it cannot be the layer that reads the label.
+add "check_nameplate_truth (a plate counts its run)" "res://tools/check_nameplate_truth.gd"
 add "check_fixture_pointer (void vs fail)" "res://tools/check_fixture_pointer.gd"
 add "check_aim (honest marker)"       "res://tools/check_aim.gd"
 add "check_impact (a fall costs)"     "res://tools/check_impact.gd"
