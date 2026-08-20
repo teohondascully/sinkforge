@@ -52,6 +52,16 @@ const COOL_MIN: float = 12.0         ## sRGB levels of blue-over-red the water m
 const GRADIENT_MIN: float = 2.5
 const SURFACES_MAX: int = 2          ## bright horizontal edges down one column (one surface, plus slack)
 const EDGE_JUMP: float = 9.0         ## sRGB rise between neighbouring rows that counts as an EDGE
+## How far above and below the body's top edge to hunt for the waterline. Under one cell either way, so it
+## cannot wander into a second surface or into the rock ceiling and call either of them the boundary.
+const SURFACE_LOOK: int = 16
+## Set from a measured pair, not from a guess and not from the passing side alone. With the waterline drawn
+## the boundary rises 10.7, 11.0 and 11.7 levels over three runs; with `open_above` forced to skip, so the
+## meniscus and the line are never drawn on any cell, the same measurement reads 3.9 and 4.0 -- that residual
+## is the fill itself being brighter than the unlit chamber above it, and it is what a body with no surface
+## actually scores. Seven sits near the geometric mean of the two worst cases, 1.5x under the weakest real
+## surface and 1.75x over the strongest null, which is the same shape of headroom `GRADIENT_MIN` carries.
+const SURFACE_RISE_MIN: float = 7.0
 
 func _initialize() -> void:
 	print("== does water read as water ==")
@@ -169,9 +179,16 @@ func _run() -> void:
 			% [fall, GRADIENT_MIN])
 
 	var edges: int = _bright_edges(sub)
-	print("  %d bright horizontal edges down the middle of it" % edges)
+	print("  %d bright INTERIOR edges down the middle of it" % edges)
 	_check(edges <= SURFACES_MAX,
-		"a pool has ONE surface (%d bright edges, cap %d)" % [edges, SURFACES_MAX])
+		"no interior cell draws an edge it does not own (%d interior edges, cap %d)"
+			% [edges, SURFACES_MAX])
+
+	var rise: float = _surface_rise(img, band)
+	print("  the air-to-water boundary rises %.1f sRGB levels" % rise)
+	_check(rise >= SURFACE_RISE_MIN,
+		"the body HAS a surface where it meets the air (%.1f levels, floor %.1f)"
+			% [rise, SURFACE_RISE_MIN])
 
 	main.queue_free()
 	await physics_frame
@@ -260,8 +277,49 @@ func _mean(img: Image, f0: float, f1: float) -> float:
 	return total / maxf(float(n), 1.0)
 
 
-## Bright horizontal edges down the middle of the body: rows whose mean jumps by EDGE_JUMP over the row
-## above. One is the surface. More than that means interior cells are drawing edges they do not own.
+## Bright horizontal edges INSIDE the body: rows whose mean jumps by EDGE_JUMP over the row two above.
+## Every one of them is an interior cell drawing an edge it does not own, which is the defect this was
+## written to catch, and the count is honest about that now. It used to say "one is the surface", and that
+## sentence was wrong in a way that mattered -- see `_surface_rise` below.
+## THE SURFACE ITSELF, which `_bright_edges` is structurally unable to see. That function starts at row 2
+## of the cropped body and asks whether a row is brighter than the one two rows above it, so the only thing
+## it can find is a bright line with body on BOTH sides of it. The real waterline sits on row 0 of that crop
+## -- `_on_screen` derives the region from `POOL_TOP`, the first flooded row -- with air above it, outside
+## the region entirely, and the comparison that would register it runs off the top edge and finds nothing.
+##
+## That left the pair one-sided in the worst available direction. `edges <= SURFACES_MAX` is satisfied by
+## `edges == 0`, and zero is what a body with no waterline at all scores, so a pool that had lost its
+## surface passed a check whose sentence read "a pool has ONE surface". The count was never counting the
+## thing the sentence named. The cap is right and stays; what was missing is that the surface has to EXIST.
+##
+## So look UP instead of down. Sample a strip that begins above the waterline in open air and ends inside
+## the body, and take the largest rise between neighbouring rows anywhere in it. Water under air brightens
+## sharply exactly once, at the boundary, and the size of that step is the thing to assert on.
+##
+## This reads a body under DARK air, which is true by construction here: the fixture is a sealed cistern cut
+## well below the surface, so what sits over the waterline is unlit chamber. A pool open to a lit sky would
+## invert the sign and this would read it as no surface at all. Stated rather than guarded, because there is
+## no such pool in the game to measure and a guard against an unreachable case is decoration.
+func _surface_rise(img: Image, band: Rect2i) -> float:
+	var top: int = maxi(band.position.y - SURFACE_LOOK, 0)
+	var bottom: int = mini(band.position.y + SURFACE_LOOK, img.get_height())
+	if bottom - top < 3:
+		return -1.0
+	var rows := PackedFloat32Array()
+	for y: int in range(top, bottom):
+		var total: float = 0.0
+		var n: int = 0
+		for x: int in range(band.position.x, band.position.x + band.size.x, 2):
+			var c: Color = img.get_pixel(x, y)
+			total += (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) * 255.0
+			n += 1
+		rows.append(total / maxf(float(n), 1.0))
+	var best: float = -1.0
+	for i: int in range(1, rows.size()):
+		best = maxf(best, rows[i] - rows[i - 1])
+	return best
+
+
 func _bright_edges(img: Image) -> int:
 	var rows := PackedFloat32Array()
 	for y: int in img.get_height():
