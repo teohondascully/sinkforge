@@ -699,7 +699,7 @@ func _update_defocus() -> void:
 		# THE SETTINGS PAGE RACKS IT TOO. Whichever modal is up owns the lens; taking the max rather than
 		# adding them means opening one while the other falls does not double the blur.
 		mat.set_shader_parameter("defocus",
-			maxf(_hud._bazaar_ease(), _hud.settings_ease()) * 3.4)
+			maxf(maxf(_hud._bazaar_ease(), _hud.settings_ease()), _hud.plain_modal_ease()) * 3.4)
 
 
 func _process(delta: float) -> void:

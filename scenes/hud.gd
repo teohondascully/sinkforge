@@ -50,7 +50,7 @@ const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → 
 ## What this does NOT do is split the remaining twenty into named roles. Nine constants resolving to the
 ## same gold would document the ambiguity and change nothing a player sees, and the pair a naive split
 ## would separate — the selected row's spine and the button that acts on it — is the one place the doubling
-## CARRIES meaning. That is a design call and it is not this.
+## CARRIES meaning. Splitting it is a separate decision from this one, and it is not this one to make.
 ##
 ## GOLD, AND IT MEANT NINE THINGS. Counted from source rather than from this comment, which used to read
 ## "(FORGED, selected slot, current step)" — three examples standing in for a definition, and the three it
@@ -249,6 +249,10 @@ var _slider_rects: Dictionary = {}         ## slider id -> its bar Rect2 this fr
 var settings_cat: int = CAT_AUDIO          ## which face of the page is open (the rail's selection)
 var _set_h: float = SET_MIN_H              ## eased toward `_settings_wanted_h()`, like the counter
 var _set_t: float = 0.0                    ## the page's own rise, 0..1 — drives the scrim AND the defocus
+## The dashboard and the key list have no rise of their own to borrow, so they share one. Without it they
+## were the two modals of four that left the world sharp behind them, which is the same complaint the
+## settings page was fixed for.
+var _plain_t: float = 0.0
 var settings_row: int = 0                  ## the keyboard cursor on the binding list (`MNU-29a`)
 
 ## Transient toast ("SAVED" / "LOADED" / short notices) — set via flash(), fades out on its own.
@@ -413,6 +417,7 @@ func _process(delta: float) -> void:
 	# while closed for the reason above: a settled frame has to be a settled measurement, or a footprint
 	# is a statement about how many frames elapsed before the shutter.
 	_set_t = clampf(_set_t + (step if settings_open else -step * 2.0), 0.0, 1.0)
+	_plain_t = clampf(_plain_t + (step if (show_dashboard or show_help) else -step * 2.0), 0.0, 1.0)
 	var set_want: float = _settings_wanted_h()
 	if not settings_open or absf(set_want - _set_h) < 0.5:
 		_set_h = set_want
@@ -432,6 +437,14 @@ func _bazaar_ease() -> float:
 ## which is `MNU-07`'s whole complaint.
 func settings_ease() -> float:
 	var u: float = 1.0 - _set_t
+	return 1.0 - u * u * u
+
+
+## The dashboard and the key list, on the same curve as the other two. Public for the same reason: whichever
+## modal is up should rack the world, and picking only the modals that happened to already have a rise is
+## how two of the four ended up reading as stickers on a sharp frame.
+func plain_modal_ease() -> float:
+	var u: float = 1.0 - _plain_t
 	return 1.0 - u * u * u
 
 
@@ -1999,9 +2012,18 @@ func _tab_works(g: Dictionary) -> void:
 	# machines and the tech ladder looks optional.
 	var hidden: int = (craft_options.size() - open_m.size()) + (rack_options.size() - open_r.size())
 	if hidden > 0:
-		var line: String = "%d more wait behind research — press 3 for the BENCH" % hidden
-		draw_string(_font, Vector2(content.position.x + 1.0, content.end.y - 2.0), line,
-			HORIZONTAL_ALIGNMENT_LEFT, content.size.x, 9, Color(0.451, 0.402, 0.280))
+		# The key is a cap and not a word in a sentence. "press 3 for the BENCH" asks the reader to parse an
+		# instruction to find the one glyph that matters; the cap grammar the rail and footer already use
+		# puts it where the eye lands, and the sentence shrinks to what it is actually saying.
+		var dim := Color(0.451, 0.402, 0.280)
+		var y: float = content.end.y - 2.0
+		var head: String = "%d more wait behind research" % hidden
+		draw_string(_font, Vector2(content.position.x + 1.0, y), head,
+			HORIZONTAL_ALIGNMENT_LEFT, content.size.x, 9, dim)
+		var x: float = content.position.x + 1.0 \
+			+ _font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 10.0
+		x += _keycap(Vector2(x, y - 10.0), "3", 8) + 5.0
+		draw_string(_font, Vector2(x, y), "BENCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, dim)
 
 
 ## THE WINDOW'S FIRST ROW. A group shorter than its columns starts at 0 and this is a no-op; a longer one
@@ -2766,7 +2788,7 @@ func _draw_help_overlay() -> void:
 ## THE SETTINGS PAGE — THE COUNTER'S GRAMMAR, ITS OWN STATE.
 ##
 ## `MNU-26` filed one complaint: the settings page "shares none of the panel's grammar". Two prototypes
-## were drawn for it (`tools/mock_settings.gd` a/b) and NEITHER was adopted — see
+## were drawn for it (`tools/mock_settings.gd` a/b) and NEITHER was taken -- see
 ## docs/MENU_MATRIX.md for the ruling and its two facts. The short form:
 ##
 ##   * the reason recorded for making Settings independent was that the counter is a PLACE with a
