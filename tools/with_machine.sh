@@ -169,7 +169,27 @@ lock_claim_write "$_claim"
 CAP="${SF_RUN_CAP:-1800}"
 CAPMARK="$(mktemp "${TMPDIR:-/tmp}/sinkforge-cap.XXXXXX")"
 
-"$GODOT" --path "$ROOT" "$@" &
+# WHERE THE WINDOW LANDS, because the box has an owner and they are using it. Layers that photograph the
+# renderer need a real surface, so they open a real window — which on macOS arrives wherever the OS feels
+# like putting it, frequently on top of whatever the human is doing. `SF_WINDOW_POS=X,Y` parks it.
+#
+# THIS FIXES THE ANNOYANCE AND NOT THE TELEMETRY, and the difference matters. A passive probe measured the
+# pointer moving in 11 of 40 samples with the game window NOT FOCUSED — the game reads the OS pointer
+# through `get_global_mouse_position()` regardless of focus, so a window parked in a corner is still
+# reading the user's hand. Moving the window stops us covering their work; `tools/fixture_pointer.gd` is
+# what stops their work corrupting our numbers. Both are needed and neither substitutes for the other.
+#
+# Deliberately UNSET by default: the right corner depends on a screen layout this script cannot see, and a
+# guessed default that lands a window half off a laptop display would be worse than the status quo.
+# TWO BRANCHES AND NOT AN ARRAY. The first version built `POSARG=()` and expanded `"${POSARG[@]}"`, which
+# on macOS's bash 3.2 under `set -u` is an UNBOUND VARIABLE ERROR when the array is empty -- so every run
+# through this wrapper aborted and returned 1. check_lock caught it immediately ("exit 0 travels through
+# the wrapper unchanged (got 1)"), which is precisely the property it was written to hold.
+if [ -n "${SF_WINDOW_POS:-}" ]; then
+	"$GODOT" --path "$ROOT" --position "$SF_WINDOW_POS" "$@" &
+else
+	"$GODOT" --path "$ROOT" "$@" &
+fi
 _child=$!
 # The child joins the trap: a SIGTERM to the wrapper must not leave an orphaned Godot holding the box after
 # the lock directory it was blocking on has already been removed.
