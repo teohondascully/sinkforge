@@ -986,7 +986,9 @@ func _aiming(main: MainView) -> void:
 	# leave a hole you have just finished digging.
 	var target: Vector2 = main._cell_center(here + Vector2i(AIM_ROOM_W / 2, -AIM_ROOM_H))
 	var vp: Viewport = main.get_viewport()
-	vp.warp_mouse(vp.get_canvas_transform() * target)
+	# POSED, NOT WARPED. `target` is already a world point, so the round trip through the OS cursor bought
+	# nothing and cost everything: a hand on the mouse overrode it and the ghost drew at the hand's angle.
+	Controls.pose_pointer(target)
 	for _i: int in AIM_SETTLE:
 		await physics_frame
 
@@ -1197,7 +1199,15 @@ func _at_the_refusal(main: MainView) -> void:
 		await physics_frame
 	# The pointer, onto the face. HUD_SCALE-independent: the window is 1.5x the render viewport, one cell is
 	# 32 world px, and the camera holds the body at the centre of the frame.
-	Input.warp_mouse(Vector2(960.0 + 2.0 * 32.0 * 1.5, 540.0 - 8.0))
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	var _vp: Viewport = main.get_viewport()
+	var _to_win: Transform2D = _vp.get_final_transform() * _vp.get_canvas_transform()
+	Controls.pose_pointer(_to_win.affine_inverse() * Vector2(960.0 + 2.0 * 32.0 * 1.5, 540.0 - 8.0))
 	for _i2: int in 6:
 		await physics_frame
 	Input.action_press(Controls.MINE)
@@ -1258,7 +1268,23 @@ func _at_the_lode(main: MainView) -> void:
 	main._player.place(Vector2(float(x0 - 5) * 32.0, float(row) * 32.0 - Player.HEIGHT))
 	for _i: int in 30:
 		await physics_frame
-	Input.warp_mouse(Vector2(960.0 + 2.0 * 32.0 * 1.5, 540.0 - 32.0))   # cursor on the half-worked face
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	# THE CELL, NOT THE PIXEL, AND THIS ONE IS MEASURED. Every other site here inverts its original window
+	# pixel so the frame stays byte-comparable with its baseline. That is wrong for this moment, because the
+	# literal it inherited was MARGINAL: `540 - 32` is 21.33 world px above the camera centre, which lands
+	# within a pixel of a cell boundary, so which cell it resolved to depended on WHEN the OS cursor was
+	# read. Inverting it at pose time gave `(37, 46)` where the OS read had given `(37, 45)` — and `(37, 46)`
+	# holds no lode at all (`lode= left=0 frac=0.00` against the baseline's `lode=ore left=160 frac=1.00`).
+	#
+	# **The subject of this photograph is the half-worked face**, staged three cells left and one row up as
+	# state `i = 1`. So the aim is stated as that cell, derived from the same `x0` and `row` the staging
+	# loop uses, and a boundary that used to be decided by cursor-read timing is not a boundary any more.
+	Controls.pose_pointer(main._cell_center(Vector2i(x0 - 3, row - 1)))
 	Input.action_press(Controls.MINE)
 	for _i2: int in 30:
 		await physics_frame
@@ -1286,7 +1312,15 @@ func _at_the_adit(main: MainView) -> void:
 		float(MainView.SURFACE) * 32.0 - Player.HEIGHT))
 	for _i: int in 40:
 		await physics_frame
-	Input.warp_mouse(Vector2(960.0 + 3.0 * 32.0 * 1.5, 540.0 + 2.5 * 32.0 * 1.5))
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	var _vp: Viewport = main.get_viewport()
+	var _to_win: Transform2D = _vp.get_final_transform() * _vp.get_canvas_transform()
+	Controls.pose_pointer(_to_win.affine_inverse() * Vector2(960.0 + 3.0 * 32.0 * 1.5, 540.0 + 2.5 * 32.0 * 1.5))
 	for _i2: int in 8:
 		await physics_frame
 	print("ADIT  lode=%s  left=%d  workable=%s" % [str(sim.lode_at(probe)),
@@ -1354,7 +1388,15 @@ func _at_the_stain(main: MainView) -> void:
 	main._player.place(Vector2(float(x0 - 3) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
 	for _i: int in 60:
 		await physics_frame
-	Input.warp_mouse(Vector2(300.0, 240.0))
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	var _vp: Viewport = main.get_viewport()
+	var _to_win: Transform2D = _vp.get_final_transform() * _vp.get_canvas_transform()
+	Controls.pose_pointer(_to_win.affine_inverse() * Vector2(300.0, 240.0))
 	for _i2: int in 8:
 		await physics_frame
 	var buried: int = 0
@@ -1422,7 +1464,15 @@ func _at_the_chain(main: MainView) -> void:
 	main._player.place(Vector2(float(x0 - 8) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
 	for _i: int in 300:                                        # let it run, so the bores have widened unevenly
 		await physics_frame
-	Input.warp_mouse(Vector2(340.0, 250.0))     # OFF the chain: a name plate would cover the subject
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	var _vp: Viewport = main.get_viewport()
+	var _to_win: Transform2D = _vp.get_final_transform() * _vp.get_canvas_transform()
+	Controls.pose_pointer(_to_win.affine_inverse() * Vector2(340.0, 250.0))     # OFF the chain: a name plate would cover the subject
 	for _i2: int in 8:
 		await physics_frame
 	print("CHAIN  spurs=%d  reach=%d  produced=%d  status=%s" % [
@@ -1466,7 +1516,15 @@ func _at_the_head(main: MainView) -> void:
 	main._player.place(Vector2(float(x0 - 6) * 32.0, float(row + 1) * 32.0 - Player.HEIGHT))
 	for _i: int in 240:                                        # let it run, so there is a haul in the shaft
 		await physics_frame
-	Input.warp_mouse(Vector2(360.0, 260.0))     # OFF the machine: its name plate would cover the subject
+	# POSED, NOT WARPED, AT PROVABLY THE SAME POINT. `Input.warp_mouse` takes WINDOW pixels, so the literal
+	# below is inverted through the engine's own transform rather than re-derived as a cell: that keeps this
+	# frame byte-comparable against its baseline, and it drops three assumptions the literal was carrying
+	# silently — that the window is exactly 1920x1080, that the zoom is exactly 1.00, and that the camera is
+	# centred on the body. A posed WORLD point also survives the zoom cycle that runs after this helper,
+	# which the window pixel did not.
+	var _vp: Viewport = main.get_viewport()
+	var _to_win: Transform2D = _vp.get_final_transform() * _vp.get_canvas_transform()
+	Controls.pose_pointer(_to_win.affine_inverse() * Vector2(360.0, 260.0))     # OFF the machine: its name plate would cover the subject
 	for _i2: int in 8:
 		await physics_frame
 	print("HEAD  status=%s  left=%d  produced=%d" % [
