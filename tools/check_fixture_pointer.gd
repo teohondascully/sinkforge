@@ -60,7 +60,7 @@ func _initialize() -> void:
 		touched._feed(Vector2(772.3, 360.0))
 	_check(touched.contaminated(), "a 132.3 px jump IS contamination — the number that misled me")
 	_check(touched.reason().contains("VOID"),
-		"...and the verdict is VOID, not failed — the distinction the peer lost edits to")
+		"...and the verdict is VOID, not failed — the distinction that cost real edits")
 
 	# --- NON-VACUITY: THE NUMBERS IN THE REASON ARE REAL, NOT DECORATION ---
 	# A reason that always printed the same string would satisfy the two `contains` checks above while
@@ -77,7 +77,7 @@ func _initialize() -> void:
 		"a pointer moving all run counts every move (29 of 30), so travel is not understated")
 
 	# --- THE FIXTURE-SIDE HALF OF INP-01, AS A RATCHET ---
-	# A later pass closed the GAME side: `scenes/` now has zero raw cursor reads outside the seam in
+	# The GAME side is closed: `scenes/` now has zero raw cursor reads outside the seam in
 	# `controls.gd`. The assertion that would actually close the FIXTURE side is "no fixture calls
 	# warp_mouse", and it cannot be written as a flat ban today because ten real calls remain. A guard that
 	# fails on arrival gets disabled, and a guard that quietly asserts nothing is worse -- so this is a
@@ -87,8 +87,8 @@ func _initialize() -> void:
 	# cursor on the user's actual desk. Every one of these is both a measurement that depends on nobody
 	# touching the mouse AND a fixture reaching over to move a working person's pointer. capture_moments
 	# holds seven of the ten and they are the ones that write into `history/`.
-	# Budget, not a ban: these may only ever FALL. The peer migrated check_hud_layout (2), check_frametime
-	# (1) and check_grapple_reads (5) to `Controls.pose_pointer` and those entries are gone rather than
+	# Budget, not a ban: these may only ever FALL. check_hud_layout (2), check_frametime (1) and
+	# check_grapple_reads (5) have moved to `Controls.pose_pointer` and those entries are gone rather than
 	# zeroed, so a reappearance is caught by the unlisted-file rule below. capture_moments keeps seven
 	# because six of them regenerate PNGs that are byte-identical to curated `history/` entries and one
 	# tuned shipped constants -- that is a phased job behind a baseline capture, not a bulk sed.
@@ -126,8 +126,8 @@ func _initialize() -> void:
 		"no fixture gained a new warp_mouse call — it moves the USER'S cursor (%s)"
 			% ("all within budget" if over.is_empty() else ", ".join(over)))
 	# NON-VACUITY, and the first version got this WRONG in a way worth recording: it asserted
-	# `total >= 10`, tying "the scanner works" to "the debt still exists". The peer then paid nine of the
-	# ten sites off within the hour and the assertion would have gone red for the best possible reason.
+	# `total >= 10`, tying "the scanner works" to "the debt still exists". Nine of the ten sites were then
+	# paid off within the hour and the assertion would have gone red for the best possible reason.
 	# **A guard that fails when the problem is FIXED is measuring the problem, not the guard.** So prove
 	# the classifier on synthetic lines instead, which holds whether the debt is ten or zero.
 	_check(_is_warp_line("\tvp.warp_mouse(vp.get_canvas_transform() * world)"),

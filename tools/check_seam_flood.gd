@@ -50,9 +50,9 @@ const SCALE_N: int = 1200
 ## the honest move is to stop asserting a duration in a place where durations cannot be measured. What this
 ## layer is FOR is the byte-identical equivalence below, which is contention-proof and is the whole licence
 ## for having replaced the algorithm. The timing stays as printed information, where a human reading a log
-## can see it and nobody's build depends on it. (The alternative — registering this add_excl — is worse: I
-## argued to the peer that exclusivity is for layers whose ANSWER is a duration, and this layer's answer is
-## a shape. Draining the whole scheduler to protect one informational print would contradict that.)
+## can see it and nobody's build depends on it. (The alternative — registering this add_excl — is worse:
+## the standing rule is that exclusivity is for layers whose ANSWER is a duration, and this layer's answer
+## is a shape. Draining the whole scheduler to protect one informational print would contradict that.)
 
 var _rng := RandomNumberGenerator.new()
 

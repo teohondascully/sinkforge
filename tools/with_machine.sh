@@ -7,14 +7,14 @@
 # Everything after the script name is passed to Godot; `--path <repo>` is supplied.
 #
 # WHY THIS EXISTS, stated plainly because I am the reason. `run_harness.sh` takes this lock and
-# `profile.sh` takes this lock, and I still put eight concurrent Godot processes on a busy box
-# three separate times — because a single layer run, or a capture, is `godot --script ...` typed straight
+# `profile.sh` takes this lock, and I still put eight concurrent Godot processes on this box three
+# separate times — because a single layer run, or a capture, is `godot --script ...` typed straight
 # into a shell, and that path never touched a lock at all. I fixed the profiler and thought the hole was
 # closed; the hole was every OTHER ad-hoc invocation, which is most of them.
 #
 # The rule that survives is about tools and not about people: ANYTHING THAT BOOTS GODOT TAKES THE LOCK.
 # A protocol that depends on remembering to check is not a protocol, and this is the third piece of
-# evidence for that in one session. Run one-off scripts through here.
+# evidence for that in one day. Run one-off scripts through here.
 #
 # Exit 5 = gave up waiting; exit 6 = killed by the wall-clock cap (see CAP below). Otherwise Godot's
 # own exit code is passed through, so `SKIP_CODE=42` and the
@@ -61,8 +61,8 @@ if [ "${SF_REAL_HOME:-0}" != "1" ]; then
 	export SF_ISOLATED_HOME="$SF_HOME"
 fi
 
-# THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine
-# time. `bash tools/with_machine.sh bash tools/run_harness.sh` reads like a runner taking a command; it
+# THESE ARE GODOT ARGUMENTS, NOT A COMMAND, and the difference cost 39 minutes of machine time.
+# `bash tools/with_machine.sh bash tools/run_harness.sh` reads like a runner taking a command; it
 # actually becomes `godot --path <repo> bash tools/run_harness.sh`, which Godot accepts — it ignores the two
 # junk positionals, boots the project, and PLAYS THE GAME until something kills it. No layer runs. Elapsed
 # time and CPU both look perfect, because a game is genuinely running; only the argv shows it.
@@ -86,11 +86,11 @@ fi
 # "waiting for the machine lock (held by pid 65489)" required a `ps` on another terminal to find out what
 # was running and whether it was nearly done. A lock that makes you go and look is a lock that gets
 # overridden. Four lines now: pid, tree, what is running, and when it started — so the message answers the
-# three questions a waiting session actually has.
+# three questions a waiting run actually has.
 #
 # APPEND-ONLY BY DESIGN. Line 1 stays the pid and line 2 stays the tree, because the stale-holder check is
 # `head -1` and both scripts already read those; a lock written by an older copy of either script is
-# missing lines 3 and 4 and the reader falls back rather than failing. Parallel checkouts do not upgrade at the
+# missing lines 3 and 4 and the reader falls back rather than failing. Two checkouts do not upgrade at the
 # same instant.
 lock_claim_write() {
 	printf '%s\n%s\n%s\n%s\n' "$$" "$ROOT" "${1:-?}" "$(date +%s)" > "$LOCK/owner"
@@ -138,7 +138,7 @@ until mkdir "$LOCK" 2>/dev/null; do
 	waited=$((waited + 1))
 done
 # The claim reads better as "running check_walk.gd" than as the whole argv, and the script is the only part
-# of it a waiting session cares about. Falls back to the full arguments when there is no --script, because a
+# of it a waiting run cares about. Falls back to the full arguments when there is no --script, because a
 # claim that cannot name what it is doing should say everything rather than nothing.
 _claim="$*"
 _prev=""
@@ -156,8 +156,8 @@ lock_claim_write "$_claim"
 #
 # Nothing above catches that. The stale-lock sweep clears a holder whose PID is GONE; this holder's PID is
 # very much alive, and a health check calls it healthy because it IS healthy. It is just never going to
-# stop. The next run queued behind it for eight minutes and the only thing that eventually freed
-# the box was a timeout in my terminal client — which is to say, nothing the harness owns.
+# stop. The next run queued behind it for eight minutes and the only thing that eventually freed the
+# box was a timeout in my terminal client — which is to say, nothing the harness owns.
 #
 # The alternative fix was a rule ("scratch scripts get `_initialize()` and a `quit()` on every path"). That
 # only works on the days you remember, and this is the third lock hazard closed here that a rule was

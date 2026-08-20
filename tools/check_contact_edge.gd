@@ -59,10 +59,10 @@ extends "res://tools/check_base.gd"
 ## `_draw_edge_ao` removed: 95%, unchanged. `_sky_form` zeroed: 96%. The tooth removed: 91%. Edge step
 ## median 10.4 against a flat-rock step of 1.5.
 ##
-## MEASURED IN PIXELS BY c2, WITH A BASELINE, WHICH IS THE PART THAT MATTERS. My 7398/0 above mutated the
-## coarse FILL -- a claim about the fill, not about the treatment. c2 mutated `_draw_edge_ao` ALONE and ran
-## it BOTH WAYS, same seed, same standing, same detector, from a gallery fifty rows down so the surface
-## cannot enter frame:
+## MEASURED IN PIXELS, WITH A BASELINE, WHICH IS THE PART THAT MATTERS. My 7398/0 above mutated the
+## coarse FILL -- a claim about the fill, not about the treatment. The measurement that settled it mutated
+## `_draw_edge_ao` ALONE and ran it BOTH WAYS, same seed, same standing, same detector, from a gallery
+## fifty rows down so the surface cannot enter frame:
 ##
 ##                                        unpatched   patched   the treatment
 ##     SURFACE, at the opening, 1.00x           621      4741           +4120
@@ -72,8 +72,8 @@ extends "res://tools/check_base.gd"
 ## 247 is RETRACTED: it was the detector firing on the game's own dark chroma, which it does seven thousand
 ## times whether the pass draws or not. A magenta count without its unpatched column is not a measurement.
 ##
-## In c2's words, and kept in them: **what the layer measures is the rock-versus-back-wall material step, and
-## it does not depend on the contact pass at all -- `_draw_edge_ao` puts zero pixels on screen underground.**
+## Stated plainly: **what the layer measures is the rock-versus-back-wall material step, and it does not
+## depend on the contact pass at all -- `_draw_edge_ao` puts zero pixels on screen underground.**
 ##
 ## THE LAYER IS THEREFORE SOUND AND ITS STATED SUBJECT WAS WRONG, which is why the numbers are trustworthy
 ## and the prose was not.
@@ -186,7 +186,7 @@ const ORIENT_NAME: Array[String] = ["rock TOP (lit lip)", "rock UNDER (ceiling)"
 ##    6a's own pre-registration says a local green over a global red is a finding about boundaries versus
 ##    fields, not a close. That still binds. A green 6b against a red 6a means one specific thing — the
 ##    world is readable at boundaries and unreadable in the field — and whether that suffices for a
-##    first-timer is the naive vision agent's call. This statistic is evidence for that judgement, not the
+##    first-timer is the naive viewer's call. This statistic is evidence for that judgement, not the
 ##    judgement.
 ##
 ## 4. THIS RUNS ON A GENERATED WORLD AND SAYS SO.
@@ -396,7 +396,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	#
 	# `c6f23b8` repaired exactly this in check_rock_reads and check_opening on 2026-08-17 and NEVER REACHED
 	# THIS FILE -- it is absent from `git log -- tools/check_contact_edge.gd`. The 86%/95% reading in
-	# run_harness.sh came from the peer's branch, where it had been applied; main has been running the
+	# run_harness.sh came from a branch where it had been applied; main has been running the
 	# withdrawn lens ever since, and reproduces the withdrawn numbers (51%, steps 1.26-4.49) on demand.
 	#
 	# I THEN CLAIMED THIS EXPLAINED THE MAGENTA NULL, AND IT DOES NOT. Forcing `_draw_edge_ao`'s lip to pure
@@ -517,7 +517,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				# sweeps in every face where the lamp fills the VOID while the rock stays dark. That is the
 				# commonest lit-contact geometry there is, and a big step across it is a statement about the
 				# LAMP'S OWN BOUNDARY, not about how lit rock reads. 6b's claim is about the rock INSIDE the
-				# pool, so the arm takes only faces with light on both sides. (c2 caught this before the
+				# pool, so the arm takes only faces with light on both sides. (Caught before the
 				# first number was quoted anywhere; "either" and "both" are two populations wearing one name.)
 				#
 				# Faces with exactly one side lit now belong to NEITHER arm. They are counted and printed

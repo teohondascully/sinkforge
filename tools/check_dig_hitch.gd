@@ -149,7 +149,7 @@ func _on_frame() -> void:
 		var rect: Rect2i = fine.opening_rect()
 		print("  boot bake: %d of %d fine cells (%.0f%%), rect %s" % [boot, whole,
 			100.0 * float(boot) / float(whole), rect])
-		# THE CONTRACT, NOT A NUMBER NEAR IT. The challenge raised later, and it is right: the previous
+		# THE CONTRACT, NOT A NUMBER NEAR IT. The challenge to the old floor is right: the previous
 		# floor here was `boot > MAX_DIG_CELLS`, picked because 4096 was already in scope, and a regression
 		# that painted one row and stalled would sit above it and pass. What item 17 actually promises is
 		# that THE GROUND AROUND THE BODY is finished before the first frame — so assert exactly that. It is

@@ -13,12 +13,12 @@ extends "res://tools/check_base.gd"
 ## display job honestly reported four passes, and the two reports together said nothing about the gap
 ## between them, because nobody was holding them against each other.
 ##
-## THIS IS A JOIN DEFECT, which is the family named after finding the same shape in the
+## THIS IS A JOIN DEFECT, a family named when the same shape turned up in the
 ## machine-status lamp: a vocabulary defined in one file (`add_gl` in the runner) and consumed in another
 ## (a name list in the workflow), with every existing test reading one file or the other. Look for more of
 ## them anywhere one file enumerates what another file must handle.
 ##
-## SET EQUALITY, NOT CONTAINMENT — also the peer's rule, and the reason this layer can fail. "Every layer
+## SET EQUALITY, NOT CONTAINMENT — the same family's rule, and the reason this layer can fail. "Every layer
 ## the workflow names is real" passes trivially when the workflow names nothing, which is precisely the
 ## bug. So the load-bearing direction is the other one: every layer the RUNNER says needs a surface is
 ## either selected by the display job or explicitly excluded by it, and every exclusion must match a real
@@ -203,8 +203,8 @@ func _yaml_value(flow: String, key: String) -> String:
 ## The distinction is not pedantry and this layer proved it on its own first run. The comment explaining
 ## why `SF_ONLY` was removed necessarily QUOTES the line it replaced, so a bare `flow.contains("SF_ONLY:")`
 ## went red over its own explanation — a scanner that cannot tell a directive from a description, failing
-## on prose about the very defect it was written to catch. The lesson from the same day
-## applies: when a new instrument fires, check the instrument before the code. It was the instrument.
+## on prose about the very defect it was written to catch. The lesson from the same day applies: when a
+## new instrument fires, check the instrument before the code. It was the instrument.
 ## Did someone DECLARE this layer excluded, in the structured form, rather than merely mention it?
 ##
 ## THE FIRST VERSION OF THIS ASKED FOR A COMMENT NAMING THE LAYER, and the mutation still passed. The

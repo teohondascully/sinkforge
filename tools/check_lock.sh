@@ -3,7 +3,7 @@
 #
 #   bash tools/check_lock.sh
 #
-# `with_machine.sh` is the reason parallel runs can share one machine, and until now nothing tested it. That
+# `with_machine.sh` is the reason two runs can share one machine, and until now nothing tested it. That
 # is a bad place for an untested tool, but it is not the reason this file exists. The reason is that one of
 # its paths — GIVE UP — is a run that never happened, and a run that never happened is the single most
 # dangerous thing a test harness can report, because the shape it reports it in is silence. A backgrounded
@@ -57,7 +57,7 @@ check() {  # check <ok:0|1> <label>
 	fi
 }
 
-echo "== the lock is the reason parallel runs can share one machine =="
+echo "== the lock is the reason two runs can share one machine =="
 
 # --- GIVE UP IS NOT SUCCESS ---
 rm -rf "$LOCK"; mkdir -p "$LOCK"
@@ -137,7 +137,7 @@ check $r "...and says NOTHING RAN, on stdout, before taking the lock"
 # None of the four properties above can see that. GIVE UP guards the waiter, not the holder. STALE LOCKS
 # CLEAR reads `kill -0` on the holder's pid and that pid is alive. THE INNER CODE SURVIVES needs an inner
 # code, and there is never going to be one. The holder is healthy; it is simply never going to stop, and
-# the next run queued behind it for eight minutes at 0.6% CPU with 94% of samples in the frame delay.
+# another run queued behind it for eight minutes at 0.6% CPU with 94% of samples in the frame delay.
 runcap() { _c="$1"; shift; SF_LOCK="$LOCK" SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" SF_RUN_CAP="$_c" bash "$WITH" "$@"; }
 
 rm -rf "$LOCK"
@@ -148,7 +148,7 @@ code=$?
 case "$out" in *"CAPPED"*) r=0 ;; *) r=1 ;; esac
 check $r "...and says CAPPED on stdout, for every caller that drops the code"
 [ ! -d "$LOCK" ]; check $? "...and the lock is released, which is the whole point"
-# NON-VACUITY, and the assertion that actually matters to the next session: exiting 6 while leaving the
+# NON-VACUITY, and the assertion that actually matters to the next run: exiting 6 while leaving the
 # process alive would free the lock and keep the box. The stub records its own pid so this can be checked
 # rather than assumed.
 hp="$(cat "$pidf" 2>/dev/null)"

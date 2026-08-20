@@ -166,9 +166,9 @@ func _run() -> void:
 		#
 		# AND THE TRANSIENT IS CAPTURED AND REPORTED RATHER THAN JUST AVOIDED. `a0` is the frame at the
 		# instant the status flips; `a1` is the same state 75 frames later. The gap between them is the
-		# ignition flare, and it is worth a permanent column because I nearly filed it as somebody else's
-		# tonemap bug: the Forge reads 253/255 on `a0` and 142 on `a1`, and I had already told the peer
-		# their post-FX was blowing machines to white before I noticed my own shutter was the cause.
+		# ignition flare, and it is worth a permanent column because I nearly filed it as a bug in the
+		# tonemap: the Forge reads 253/255 on `a0` and 142 on `a1`, and I had already blamed the post-FX
+		# for blowing machines to white before I noticed my own shutter was the cause.
 		# WHAT THE RENDERER BELIEVES, recorded beside what the sim reports. They are two different
 		# predicates: `machine_status` is the sim's vocabulary (ten answers, guarded by
 		# `check_status_reads`), while the casing and glyph are drawn from `_machine_active`, which is a
@@ -381,7 +381,7 @@ func _report(rows: Array[Dictionary]) -> void:
 			continue
 		# SATURATION IS ITS OWN VERDICT, not a low score. A patch pinned near white has no room left to
 		# carry a cue, and reporting that as "this machine has no state cue" would blame the machine for
-		# the tonemap. It is the same finding c1 is bisecting on the surface band, arriving here.
+		# the tonemap. It is the same finding being bisected on the surface band, arriving here.
 		var flare: PackedFloat32Array = r["a0"]
 		var share: float = _clip_share(a1)
 		var flare_share: float = _clip_share(flare)

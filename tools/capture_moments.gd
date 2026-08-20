@@ -2,7 +2,7 @@ extends SceneTree
 
 ## The "Sees" blind-vision instrument's renderer. The 44 `_moment_*.png` are COMMITTED (3c46c8c) — this
 ## header said "not committed; gitignored" until the afternoon they were tracked, and then told readers the
-## opposite of what .gitignore says. Renders canonical game MOMENTS to _moment_<name>.png so a zero-context vision agent can
+## opposite of what .gitignore says. Renders canonical game MOMENTS to _moment_<name>.png so a zero-context viewer can
 ## judge legibility from pixels the way a first-time player would. Run WITHOUT --headless (needs a real
 ## GL context — headless is the dummy renderer and saves blank frames):
 ##   godot --path . --script res://tools/capture_moments.gd -- boot
@@ -759,7 +759,7 @@ func _at_the_counter(main: MainView, which: String) -> void:
 ## `SF_MOMENT_MUTANT=nosapling` withholds the sapling, which is the POSITIVE CONTROL for the guard above:
 ## a shutter check that refuses a bubble-less frame is only worth having if it has been SEEN to refuse one.
 ## It is an environment switch rather than a hand-edit because a mutant's danger is its LIFETIME, not the
-## run's — a commented-out line in a shared tree is live for every other session until it is put back, and
+## run's — a commented-out line in a shared tree is live for every run that follows until it is put back, and
 ## the lock does not cover the minutes spent editing.
 ## UI-08 — THE QUIET FRAME, and it is the only state on this list defined by what is NOT in it.
 ##
@@ -1066,7 +1066,7 @@ func _dig_in(main: MainView) -> void:
 	# THE SHAFT HAS TO ACTUALLY BE SUNK, and until now nothing here checked that it was.
 	#
 	# `dig_down_to` exits on `not sim.is_solid(cell)`, which means BOTH "I finished digging" and, on the
-	# first iteration, "the target was already open" — the two-contracts bug found on a later pass in
+	# first iteration, "the target was already open" — the two-contracts bug in
 	# `PlayAgent` (it is why `check_underground` graded a sunlit surface on seed 99 for its whole life).
 	# A world with a void under the spawn column would return true immediately, and every frame below
 	# would be a photograph of DAYLIGHT filed under `delve`, `room` and `swing`.

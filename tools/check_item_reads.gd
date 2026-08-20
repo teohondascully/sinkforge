@@ -325,9 +325,9 @@ func _check_vocabulary() -> void:
 ##
 ## THE COST OF NOT HAVING THIS, stated because it is the reason it exists: a menu capture built from every
 ## `.tres` on disk showed six white squares, and I read them as a shipped defect — mechanism confirmed in
-## source, screenshot in hand, a message out to a peer who independently confirmed the mechanism — for
-## most of an hour. Every one of the six was an id the game cannot give you. Two people agreeing about a
-## mechanism says nothing about whether the population is real.
+## source, screenshot in hand, then independently confirmed a second time — for most of an hour. Every
+## one of the six was an id the game cannot give you. A mechanism confirmed twice over says nothing about
+## whether the population is real.
 func _check_pack_vocabulary() -> void:
 	var known: Array[StringName] = _items_the_view_knows()
 	var pack: Array[StringName] = _ids_the_pack_can_hold()

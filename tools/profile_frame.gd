@@ -42,7 +42,7 @@ const PROBES: int = 5             ## how many depths to sample
 const REPEATS: int = 12           ## calls per probe, medianed — one call is noise
 
 ## How far below the body to look for real rock. This tool originally aimed each dig blindly at the cell
-## one row down, which is the defect found on a later pass in check_frametime's DIG phase (8d72dae): on
+## one row down, which is the defect found in check_frametime's DIG phase (8d72dae): on
 ## frames where that cell is already open the dig lands on air, the frame costs nothing, and the profile
 ## prices a body standing still. A profiler with that bug is worse than none — it reports its cheapest
 ## numbers exactly when it is measuring the least, so the wrong thing looks fast. Every table below
@@ -340,7 +340,7 @@ func _run() -> void:
 	# WHAT THIS SECTION USED TO CLAIM, AND WHY IT WAS WRONG. It said: a frame that mines NOTHING still costs
 	# ~8.4ms against a budget of 8.33, so the game is at 120fps and no better even standing still, so the dig
 	# path is the smaller half of the problem. That reading was refuted by the drop-rate instrument built
-	# session built afterwards — an idle frame misses its deadline 0-6% of the time, and a digging frame
+	# afterwards — an idle frame misses its deadline 0-6% of the time, and a digging frame
 	# misses 63-68%. The 8.4ms was the PANEL handing us frames at 120Hz, not the game filling them. See the
 	# pacing detection immediately below, which is the part of this file that was right.
 	#

@@ -578,7 +578,7 @@ static func walked_surface(row: int) -> int:
 ## PROGRESSIVE: the visible fine cells are painted now and the rest are owed to `bake_pending`. Left empty
 ## (every existing caller, and both harness layers) the whole grid is painted in one go, exactly as before.
 ## See `bake_pending` for why this is safe and what the world looks like in between.
-## A SILENT DEFAULT IS A FIXTURE-OMISSION AMPLIFIER; AN AUDIBLE ONE IS A DETECTOR. (`c2`'s phrasing.)
+## A SILENT DEFAULT IS A FIXTURE-OMISSION AMPLIFIER; AN AUDIBLE ONE IS A DETECTOR.
 ##
 ## `grammar_at` is an INPUT that does not travel in the `rebake` signature, and `_grammar_of` guards it
 ## with `.is_valid()` — which is the CORRECT guard, the one this repo's catalogue insists on because
@@ -716,7 +716,7 @@ func _fine_rect(view: Rect2) -> Rect2i:
 
 ## PAINT WHAT THE PLAYER CANNOT SEE YET, A SLICE PER FRAME (#17). Returns true while work remains.
 ##
-## The full bake is 262144 fine cells and it is not fast: 1199ms on this machine after the peer's loop
+## The full bake is 262144 fine cells and it is not fast: 1199ms on this machine even after the loop
 ## work, ~4.6us a cell. Every millisecond of it is spent before the first frame, and the profiling that
 ## went looking for the hotspot found there isn't one — the bulk fine-grid handover bought 11%, the eight
 ## noise calls per cell are 16%, and the remaining ~74% is `_paint_fine` itself, a hundred interpreted

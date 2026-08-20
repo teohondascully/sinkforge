@@ -29,7 +29,7 @@ class_name FixturePointer
 ## WHAT THIS IS FOR. A layer whose control was disturbed by a person did not measure a defect; it did not
 ## measure anything. That is a VOID run, and this repo already has the vocabulary — exit 42 / SKIP, and the
 ## rule that giving up is not a pass. Reporting FAIL instead is worse than reporting nothing, because it
-## sends someone to fix a projection that was never broken. It cost real edits.
+## sends someone to fix a projection that was never broken. It has already cost real edits.
 ##
 ##   var eye := FixturePointer.new(get_root())
 ##   ... eye.sample() inside the wait loop, once per frame ...

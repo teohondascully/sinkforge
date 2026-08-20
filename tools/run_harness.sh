@@ -96,7 +96,7 @@
 # are printed ("PASSED WITHOUT VERIFYING EVERYTHING", "this run does not count as a full sweep") and only
 # the words carry it. A caller that reads the integer and not the summary will record a failing run as a
 # COMPLETE failing run, and the day the failure is fixed it will record a green that was never full.
-# Found the hard way on 2026-08-17, when two separate runs reported "exit 0" for sweeps that exited 4 and 1 —
+# Found the hard way on 2026-08-17, when two runs reported "exit 0" for sweeps that exited 4 and 1 —
 # in both cases because the status being read belonged to the `tail`/`grep` at the end of the command, not
 # to the harness. Put the harness LAST, or grep the exit line out of the file, before saying anything.
 set -uo pipefail
@@ -108,7 +108,7 @@ set -uo pipefail
 # hundred lines above its use, and the obvious reading was "the change I just made is broken". The change
 # was fine. The runner had been rewritten underneath it.
 #
-# Parallel work shares this repo and this file is edited from more than one place, so the hazard is not hypothetical and the
+# This file gets edited while sweeps are in flight, so the hazard is not hypothetical and the
 # damage is not the crash — it is a sweep that finishes and gets believed. Checked again at exit; if the
 # bytes moved, the run says so in the summary, loudly, whatever its verdict was.
 SELF_SUM="$(cksum < "$0" 2>/dev/null || echo unknown)"
@@ -127,7 +127,7 @@ cd "$ROOT"
 # Application Support with both set); there is no command-line flag for the user directory; and the
 # project-settings route (`use_custom_user_dir`) would move the SHIPPED GAME's save too, which is the one
 # thing that must not change. HOME works: user:// follows it, per process, with no file on disk for two
-# runs to fight over — which `override.cfg` would have been, and that file is spoken for anyway.
+# concurrent runs to fight over — which `override.cfg` would have been, and that file is spoken for anyway.
 #
 # Keyed on the ROOT PATH, not on a run id: the same checkout wants the same fixtures and a warm shader
 # cache across runs, while a second worktree gets its own namespace and stops colliding with this one.
@@ -316,7 +316,7 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # A rock/air contact IS visible, in all three orientations, at 86% against a 75% floor. The lane began from
 # "the contact carries very nearly no information"; that was an instrument reading its own interior.
 #
-# THAT MECHANICAL BLOCKER EXPIRED AND THE NUMBERS ABOVE ARE WITHDRAWN -- c1, 2026-08-18.
+# THAT MECHANICAL BLOCKER EXPIRED AND THE NUMBERS ABOVE ARE WITHDRAWN -- 2026-08-18.
 #
 # This note said check_contact_edge could not be registered because it reads FineTerrain._side_mutant_cells,
 # from the SF_SIDE_MUTANT patch directive 0031 keeps unmerged. There is nothing left to decouple:
@@ -324,7 +324,7 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 #   grep -n  "_side_mutant_cells" scenes/fine_terrain.gd       -> empty
 # The coupling came off with the patch (3df923c) and directive 0031 still holds. A blocker made of text.
 #
-# THE 86%/95% ABOVE WAS NEVER TRUE OF main. That reading came from the peer's branch, where c6f23b8's
+# THE 86%/95% ABOVE WAS NEVER TRUE OF main. That reading came from a branch where c6f23b8's
 # projection repair had been applied; it never reached this file -- absent from its own git log -- so main
 # was still running `(face - cam) * zoom + image_size * 0.5` and reproduced the WITHDRAWN numbers on demand,
 # 51% with steps 1.26-4.49. Repaired and pooled across three standings in 3b161b6: detectability 95/95/95,
@@ -333,8 +333,8 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # REGISTERED once the rationale was corrected rather than merely noticed. The layer credited
 # TerrainPainter._draw_edge_ao for the contact it measures and that pass does not reach the frame it judges:
 # it draws into the COARSE bake at z=-10 under fine_terrain's alpha 255 at z=-9. Liveness control on the
-# coarse fill -- 7398 magenta pixels at the surface, ZERO underground. c2 then mutated _draw_edge_ao ALONE
-# and ran it both ways, which is the part that matters: surface 621 unpatched against 4741 patched, and
+# coarse fill -- 7398 magenta pixels at the surface, ZERO underground. _draw_edge_ao was then mutated
+# ALONE and run both ways, which is the part that matters: surface 621 unpatched against 4741 patched, and
 # underground 7098 against 7082 -- minus sixteen, i.e. nothing. The pass puts ZERO pixels on screen
 # underground. Knocking it out leaves this layer byte-identical.
 #
@@ -372,8 +372,8 @@ add_gl "check_water_reads (fluid)"     "res://tools/check_water_reads.gd"
 # establish how often anything occurs in a world a player actually digs. It never could, at any reading.
 #
 # Correcting it here because a correction that lives only where it was noticed is compliance rather than a
-# correction — a reader greps the harness, not somebody's tracelog. (c2 made the same catch against their
-# own docs at the same hour, from the other direction.)
+# correction — a reader greps the harness, not somebody's tracelog. (The same catch was made against the
+# docs at the same hour, from the other direction.)
 #
 # Same rule as above — the floor does not move, and the layer joins the suite the day the picture clears it
 # rather than the day the bar is lowered to meet the picture.
@@ -615,7 +615,7 @@ MARKS="$(mktemp -d)"
 # The per-root HOME above ends that class: two worktrees now hold two namespaces and cannot see each
 # other's fixtures at all. What the lock still buys is the thing isolation CANNOT give, and it is the
 # reason not to relax it — a timing layer measures the box, not the directory, so `add_excl` is meaningless
-# if another Godot process is running at the same time. Contention was worth 12% on `check_dig_hitch` and
+# if another run has Godot up at the same time. Contention was worth 12% on `check_dig_hitch` and
 # inverted its verdict. `mkdir` is the atomic primitive: it succeeds for exactly one caller.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 LOCK_WAIT="${SF_LOCK_WAIT:-900}"
@@ -672,7 +672,7 @@ mode="display"; [ "$HAVE_DISPLAY" = "1" ] || mode="NO DISPLAY — the pixel laye
 strictness="skips tolerated"; [ "$STRICT" = "1" ] && strictness="STRICT: any skip fails the run"
 subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_ONLY='${SF_ONLY:-}'"
 # WHICH TREE THIS RAN IN, printed because cwd is an UNMEASURED INPUT to every result this script produces
-# and no result line has ever named it. Parallel work runs in separate git worktrees, and a
+# and no result line has ever named it. This repo is worked through separate git worktrees, and a
 # `cd` that silently resets to the repo root makes a sweep report on somebody else's checkout while looking
 # exactly like a normal green -- that is not hypothetical, it cost a false green on 2026-08-17. `pwd -P`
 # resolves symlinks, and the branch is printed beside it because "which tree" and "which branch" are

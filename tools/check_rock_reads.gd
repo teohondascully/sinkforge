@@ -411,7 +411,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				rock_row.append(float(cy))
 				# THE PARTITION IS DECLARED BEFORE ROCK STOPS BEING ONE THING, which is the whole point of
 				# it existing today rather than the day it matters. This layer draws its solid population at
-				# random from rock and treats it as homogeneous. It already is not: c2's lode pass stains
+				# random from rock and treats it as homogeneous. It already is not: the lode pass stains
 				# 378 buried cells through their host rock. And the 6b fix under consideration — a contact
 				# rim or shadow in the rock's LAST ROW — would deliberately make boundary rock look unlike
 				# interior rock, across EVERY rock/air face in the world rather than 378 cells.
@@ -419,8 +419,8 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				# If that treatment landed while this layer still sampled "rock" as one population, the next
 				# reading would move for two reasons at once and nothing could separate them — and the
 				# failure would be SILENT, because the number would move in the direction we hoped for.
-				# c2 raised this pointed at my own fix; it is the same catch I made on their lode change,
-				# handed back.
+				# The catch cuts both ways: it was made against the lode change first, and it applies just
+				# as well to this fix.
 				#
 				# A 2x2 rather than a precedence order, because a stained boundary cell is genuinely both
 				# and any ranking of the two would be invented. Diagnostic only: the VERDICT stays on the

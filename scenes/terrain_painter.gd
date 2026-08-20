@@ -229,8 +229,8 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ##    and I read the −16 as "zero". I had reported 247 before that, normalised it by open faces, derived a
 ##    monotonic zoom curve and proposed a mechanism for the curve. **A signal measured without its baseline
 ##    is not a small signal, it is an unknown one.**
-## 3. THE HUE RATIO AGAIN, WITH THE BASELINE — still wrong, and this one took a peer's defence of it to
-##    expose. This pass draws at ALPHA (`LIT_RIM` 0.14, `LIT_LIP` 0.30). Forcing the colours to magenta
+## 3. THE HUE RATIO AGAIN, WITH THE BASELINE — still wrong, and this one only came apart when I set out
+##    to defend it. This pass draws at ALPHA (`LIT_RIM` 0.14, `LIT_LIP` 0.30). Forcing the colours to magenta
 ##    does not force the alpha, so a real contribution composites to 14-30% magenta over dark blue-grey
 ##    rock and need never clear a 2:1 ratio. **Absent and present-but-dim are the same reading to it.**
 ## 4. CHANGED BYTES, UNFROZEN. Two consecutive untouched captures differed in **818,528 of 2,073,600

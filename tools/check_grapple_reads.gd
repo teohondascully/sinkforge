@@ -650,7 +650,7 @@ func _check_pointer_seam() -> void:
 ## offsets were 1.0, 97.2, 132.3, 254.9 and 786.7 px rather than one constant number. A wrong transform
 ## gives a constant offset; that spread was a race, and the other racer was a hand.
 ##
-## Measured by the peer with a passive probe that never warps: **11 of 40 samples moved in four seconds,
+## Measured with a passive probe that never warps: **11 of 40 samples moved in four seconds,
 ## largest single jump 21154.6 px, and `focused: false`** — the window did not even have keyboard focus and
 ## was still tracking their pointer.
 ##
@@ -665,7 +665,7 @@ func _check_pointer_seam() -> void:
 ## DEBT, stated so it cannot quietly vanish: nothing here exercises the real
 ## `warp_mouse` -> `get_global_mouse_position` path any more. Disqualifying a cue also blinds the suite to
 ## whatever only that cue could see, so the OS-cursor round-trip needs its own layer that VOIDS rather than
-## FAILS when a human is on the box. Tracked as INP-01; the peer's `tools/fixture_pointer.gd` is the
+## FAILS when a human is on the box. Tracked as INP-01; `tools/fixture_pointer.gd` is the
 ## intended detector.
 ## HOW LONG THE LAMP MAY TAKE TO FOLLOW, and how still counts as settled.
 ##

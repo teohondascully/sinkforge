@@ -47,8 +47,8 @@ extends "res://tools/check_base.gd"
 ## unlocked Godot processes beside it the quiet frame rose 2.4x and the DIG ratio rose from 3.9-4.4x to
 ## 4.7-6.7x — through a 6.0x cap — because a longer frame has more wall-clock in which to be descheduled,
 ## so the numerator pays more for contention than the denominator. The ratio is a PARTIAL correction: it
-## absorbs load for cheap phases and stops absorbing it as a phase gets expensive. A later pass found
-## this from the opposite end, a sweep failing RUN at 2.1x that passed three times standalone. There is no
+## absorbs load for cheap phases and stops absorbing it as a phase gets expensive. It turned up from the
+## opposite end, a sweep failing RUN at 2.1x that passed three times standalone. There is no
 ## fix inside the layer — see `_load_caveat`, which records the detector that failed and why its whole
 ## family must — so the defence is `tools/with_machine.sh`: anything that boots Godot takes the lock.
 ##
@@ -309,7 +309,7 @@ func _run() -> void:
 ##
 ## Immediately after the eight runs above, three more read IDLE 41%, RUN 37.5%, SWING 50%, DIG 89.7% —
 ## every phase five to ten times worse. That was not the game. `pgrep` found EIGHT Godot processes and a
-## load average of 7.64: a neighbouring session was running captures without taking the harness lock, so
+## load average of 7.64: a neighbouring run was taking captures without holding the harness lock, so
 ## the eight-run distribution and the three that contradict it were taken on two different computers that
 ## happen to share a case.
 ##
@@ -387,7 +387,7 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		var p95: float = _pct(ms, 0.95)
 		# The missed-deadline rate alongside the p95, always, whichever way the budget goes. On a paced run
 		# it is the only one of the two that distinguishes "slow" from "occasionally late", and a reader
-		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing — as happened here twice.
+		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing — as has happened twice here.
 		var drops: float = _drop_rate(ms, interval)
 		print("      %s: p95 %.2fms · %.1f%% of frames missed their %.2fms slot (>%.2fms)"
 			% [labels[i], p95, drops * 100.0, interval, interval * DROP_AT])
@@ -418,8 +418,8 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 ## The pin test used to be `quiet median ~= refresh interval`, and that is a guard that fires exactly when
 ## its target is MET. It cannot separate "vsync is holding us at 120fps" from "we are genuinely rendering
 ## at 120fps" — on a 120Hz panel both produce a quiet frame of 8.33ms. The first time anyone set
-## SF_PERF_HOST, it refused to assert on a run that was not vsync-paced at all, and this cost an
-## evening planning an OS-level fight that was never needed.
+## SF_PERF_HOST, it refused to assert on a run that was not vsync-paced at all, and an evening went into
+## planning an OS-level fight that was never needed.
 ##
 ## What actually separates the two: under vsync the loop blocks on present, so NO frame can come in faster
 ## than the refresh interval. A single sample below it is proof the pacing is ours. The evidence that
@@ -452,7 +452,7 @@ func _fastest(phases: Array[PackedFloat32Array]) -> float:
 ## MEASURED ON THE QUIET PHASE ALONE, and pooling every phase was a real defect in the first version.
 ## Pacing is only visible where the game is FASTER than the panel: a DIG frame at 33ms is not waiting on
 ## anything, so its samples land wherever they like and dilute the signal. Pooled over four phases this
-## reported 18-39% on a machine the peer's independent profiler measured at 72.5% of STILL frames on a
+## reported 18-39% on a machine an independent profiler measured at 72.5% of STILL frames on a
 ## multiple — under the 0.6 threshold, so the pooled version said "not paced" about a run that was.
 func _paced_fraction(ms: PackedFloat32Array, interval: float) -> float:
 	if interval <= 0.0 or ms.is_empty():
@@ -727,7 +727,7 @@ const COLUMN_SEARCH: int = 12
 ## one machine it varies from 210px to 323px, which is several columns. On roughly half of all runs the
 ## body finished over a void, nothing was within DIG_REACH, and the phase timed a body standing still.
 ##
-## The workload guard added last session catches that and fails the layer, which is correct — and which
+## The workload guard added since catches that and fails the layer, which is correct — and which
 ## also meant the whole suite went red on a coin flip. A layer that fails half the time is a layer people
 ## learn to ignore, which this file's own header warns about in the paragraph about background load.
 ##
@@ -890,8 +890,8 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 ##
 ## THE HEADER'S CENTRAL CLAIM IS WRONG AND HAS BEEN CORRECTED ABOVE. It said "both move the quiet frames
 ## and the busy frames together, so the RATIO between them survives what the absolute numbers do not". The
-## a later pass hit the counterexample: this layer passed standalone three times (quiet 8.57/8.06/8.01ms,
-## RUN 1.2-1.8x) and FAILED inside a sweep at RUN 2.1x against a 2.0x cap, on a quiet frame of 10.51ms.
+## counterexample: this layer passed standalone three times (quiet 8.57/8.06/8.01ms, RUN 1.2-1.8x) and
+## FAILED inside a sweep at RUN 2.1x against a 2.0x cap, on a quiet frame of 10.51ms.
 ##
 ## I TRIED TO BUILD A DETECTOR FOR IT AND IT DOES NOT WORK. The idea was sound on its face: measure the
 ## quiet frame TWICE, at the start and again at the end from the same fixture, and refuse to render a ratio
@@ -918,7 +918,7 @@ func _report(label: String, ms: PackedFloat32Array) -> void:
 ## A longer frame has more wall-clock in which to be descheduled, so the numerator pays more for contention
 ## than the denominator does, and the more expensive the phase the worse the correction holds.
 ##
-## THE ONLY DEFENCE IS THE PROTOCOL, which is why `tools/with_machine.sh` exists (peer, `0cdb36a`):
+## THE ONLY DEFENCE IS THE PROTOCOL, which is why `tools/with_machine.sh` exists (`0cdb36a`):
 ## anything that boots Godot takes the machine lock. This function is what is left over — it cannot stop a
 ## contended run, so it tells whoever reads the failure how to recognise one.
 func _load_caveat(quiet: float) -> String:

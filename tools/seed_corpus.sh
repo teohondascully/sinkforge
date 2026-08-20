@@ -52,12 +52,12 @@ LAYERS=(
 	check_relief
 	check_room_reads
 	check_underground
-	# ADDED 2026-08-17 on the peer's finding, and it is the exact class this tool exists for: they ran
-	# `check_pacing` across four ad-hoc seeds and it failed two of them on floors that are green in the
-	# harness, because the harness runs ONE seed. A layer whose subject is "the shape of a session" is
-	# seed-sensitive by construction — the session happens in a generated world — and it had never been
-	# pointed at more than one. Whatever the distribution says, it is a finding about the worlds and not a
-	# licence to move a floor; read the warning at the top of this file before touching one.
+	# ADDED 2026-08-17, and it is the exact class this tool exists for: `check_pacing` run across four
+	# ad-hoc seeds failed two of them on floors that are green in the harness, because the harness runs
+	# ONE seed. A layer whose subject is "the shape of a session" is seed-sensitive by construction — the
+	# session happens in a generated world — and it had never been pointed at more than one. Whatever the
+	# distribution says, it is a finding about the worlds and not a licence to move a floor; read the
+	# warning at the top of this file before touching one.
 	check_pacing
 )
 

@@ -6,14 +6,14 @@
 # the profiler's contention, and the profiler times the harness's.
 #
 # This existed as a rule that a person had to remember, and it was broken within the hour by the person who
-# wrote it: I checked the lock, saw another session holding it, said out loud that I was queued behind it,
+# wrote it: I checked the lock, saw another run holding it, said out loud that I was queued behind it,
 # and then ran the profiler twice anyway. A convention only one of the two tools enforces is not a
 # convention.
 #
 # The lock lives in tools/with_machine.sh now, which is the general answer: this script used to carry its
 # own copy of the waiting loop, and a copy is how the hole stayed open. Closing it here left every OTHER
-# ad-hoc `godot --script ...` — single layers, captures — running unlocked, which put eight of my processes
-# on a busy box a second and third time. One implementation, used by everything that boots Godot.
+# ad-hoc `godot --script ...` — single layers, captures — running unlocked, which put eight concurrent
+# processes on the box a second and third time. One implementation, used by everything that boots Godot.
 #
 #   GODOT=/opt/homebrew/bin/godot bash tools/profile.sh
 #

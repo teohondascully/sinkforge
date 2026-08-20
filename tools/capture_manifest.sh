@@ -4,7 +4,7 @@
 #   bash tools/capture_manifest.sh            # rewrite docs/CAPTURE_MANIFEST.md
 #   bash tools/capture_manifest.sh --check    # fail if the tracked manifest is out of date
 #
-# The "Sees" tier hands a zero-context vision agent the tracked `_moment_*.png` and asks what a first-time
+# The "Sees" tier hands a zero-context viewer the tracked `_moment_*.png` and asks what a first-time
 # player would see. Forty-eight undated PNGs cannot answer the one question that decides whether their
 # verdict means anything: WHICH BUILD IS THIS. Tonight 41 of them came from one commit and 7 from another
 # ten hours and one shader later, and nothing about looking at the set said which were which.
@@ -40,7 +40,7 @@
 # the sha of the commit that last wrote each capture, which is the obvious identifier and the wrong one:
 # a sha does not exist until its commit does, so the manifest could not ride in the same commit as the
 # frames; amending to squeeze it in changed the sha and invalidated it again; and then a routine rebase onto
-# a peer's work rewrote the sha a third time and invalidated it once more. An identifier that changes every
+# upstream work rewrote the sha a third time and invalidated it once more. An identifier that changes every
 # time history is tidied is a standing invitation to regenerate a file nobody read.
 #
 # The AUTHOR DATE and the RENDERER SIGNATURE both survive a rebase, and the signature is the better answer
@@ -135,7 +135,7 @@ n=0
 	echo "Every tracked \`_moment_*.png\`, the date it was written, and a signature of the drawing sources as"
 	echo "they stood in the tree that wrote it. **Two frames sharing a RENDERER signature are pictures of the same"
 	echo "renderer**, whatever day they were taken; two frames that differ are not comparable to each other and"
-	echo "a vision agent judging them together is judging two builds."
+	echo "anyone judging them together is judging two builds."
 	echo
 	echo "The RECIPE column is how the frame is produced. \`UNRECORDED\` means the command took an argument"
 	echo "nobody wrote down — an ore-nugget hex, a crop rectangle, a suffix variant's extra state — so the"

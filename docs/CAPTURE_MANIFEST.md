@@ -6,7 +6,7 @@
 Every tracked `_moment_*.png`, the date it was written, and a signature of the drawing sources as
 they stood in the tree that wrote it. **Two frames sharing a RENDERER signature are pictures of the same
 renderer**, whatever day they were taken; two frames that differ are not comparable to each other and
-a vision agent judging them together is judging two builds.
+anyone judging them together is judging two builds.
 
 The RECIPE column is how the frame is produced. `UNRECORDED` means the command took an argument
 nobody wrote down — an ore-nugget hex, a crop rectangle, a suffix variant's extra state — so the

@@ -71,7 +71,7 @@ func _authorities(r: WorldRenderer) -> Array:
 ## neighbour's PAINTED BYTES rather than its solidity", and the grammar terms are the newest paint terms
 ## in `_paint_fine`. They were the only ones it never exercised. (Checked at the time: they read noise
 ## fields and the `_mat_gram` / `_accreted_gram` caches, never a painted byte, so the gap was theoretical.
-## One line makes it permanent.) Found by `c2` auditing every `rebake` call site after `check_texture`
+## One line makes it permanent.) Found by auditing every `rebake` call site after `check_texture`
 ## turned out to have the same omission with a live regression behind it.
 func _bake(fine: FineTerrain, a: Array, bulk: PackedByteArray, view: Rect2) -> void:
 	if not fine.grammar_at.is_valid():

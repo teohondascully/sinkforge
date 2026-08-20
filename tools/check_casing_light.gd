@@ -22,7 +22,7 @@ extends "res://tools/check_base.gd"
 ##
 ## which is bounded below by 0.34 for EVERY colour that exists. No registry entry, no future entry, no
 ## deliberately hostile entry could ever have failed it. That is a floor no configuration can reach — the
-## exact vacuity shape I had argued about a different threshold earlier the same day, and
+## exact vacuity shape I had argued about on a different threshold earlier the same day, and
 ## then built. The margin looked healthy because it was arithmetic, not evidence.
 ##
 ## What can fail — and is the property that actually matters — is each edge separating from the BODY between
