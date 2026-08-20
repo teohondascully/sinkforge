@@ -775,7 +775,7 @@ func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFlo
 		var richness: int = LODE_AMOUNT_BASE \
 			+ int(round(depth_frac * float(LODE_AMOUNT_DEPTH_BONUS) * hmul))
 		_grow_lode(world, rng, Vector2i(cx, cy), size, maxi(1, richness),
-			&"iron" if cy >= l2_top else &"ore", floor_row)
+			&"iron" if cy >= l2_top else &"ore")
 
 
 ## Grow one lode body. Accretion identical to `_grow_vein` and deterministic in the rng sequence, but it
@@ -786,13 +786,20 @@ func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFlo
 ## fight over `amounts`, and water cells because an aquifer cell is already open and flooded. The wall
 ## behind is not checked: the base pass fills one under every rock cell.
 func _grow_lode(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int,
-		richness: int, material: StringName, min_row: int) -> void:
+		richness: int, material: StringName) -> void:
 	var filled: Dictionary = {}
 	var frontier: Array[Vector2i] = [seed_cell]
 	var placed: int = 0
 	while placed < size and not frontier.is_empty():
 		var cell: Vector2i = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
-		if filled.has(cell) or not world.in_bounds(cell) or cell.y < min_row:
+		# THE DEPTH FLOOR IS THIS CELL'S OWN COLUMN, and not the column the body was seeded in. A lode
+		# accretes sideways and the ground it must stay under is not level, so carrying the seed
+		# column's floor across the whole body lets one seeded on high ground creep into a neighbour
+		# whose surface sits lower and break out near it. It read as correct because the two agree
+		# wherever the ground is flat, which is most of the world and all of the spawn pad -- the
+		# disagreement only shows up against a step, and moving where the steps fall exposed it.
+		if filled.has(cell) or not world.in_bounds(cell) \
+				or cell.y < ground_row(cell.x) + LODE_MIN_DEPTH:
 			continue
 		var here: StringName = world.blocks.get(cell, &"")
 		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
