@@ -49,6 +49,40 @@ extends SceneTree
 ## 3.1x, which is the convergence the paragraph above predicts. That second failure is the useful one: it
 ## is what a frame-diff that has stopped discriminating looks like from the inside.
 ##
+## AND THAT IS EXACTLY WHAT CI HAD BEEN READING, on every run this layer has ever had there: control ratios
+## of 0.79, 0.76 and 0.81 against the 4.0 below -- the two arms converged, the convergence the paragraph
+## above says is a frame-diff that sees nothing. The layer posed `_cam_pos` and then waited two drawn
+## frames, and `main.gd:737` lerps that field back toward the body every `_process` at
+## `1.0 - exp(-CAMERA_FOLLOW_SPEED * delta)`, CAMERA_FOLLOW_SPEED = 8.0. At 60 fps a posed 1 px survives
+## two frames as 0.766 px and `snap_to_pixel`'s `round()` returns it to a whole pixel, so on a developer
+## machine the control fired. Under CI's software rasterizer the game draws at 6-9 fps
+## (`.github/workflows/harness.yml:30`), the same pose survives as 0.101 px, `round()` takes it to ZERO,
+## and the camera never moves at all. **The control was not measuring the snap, it was measuring the frame
+## rate**, and the assertion it was too weak to reach is the one the layer is for.
+##
+## SO THE WORLD IS FROZEN FOR THE WHOLE MEASUREMENT -- `Engine.time_scale = 0.0`, the freeze
+## `check_ceremony_reads._shot` and `check_selection_reads` already capture through. It is not comfort. At
+## `delta == 0` the follow's ease multiplier is `1.0 - exp(0)` = 0 -- the property `world_renderer.gd:205`
+## writes down for the lamp -- so the pose cannot be pulled anywhere however many or few frames pass
+## between the write and the shutter. The one nudge in the frame is the one the control asserts on, at any
+## frame rate, which is what a control has to be. The only pose the freeze does NOT protect is a jump past
+## `main.gd:734`'s half-a-viewport teleport threshold, and this layer's largest is one screen pixel.
+##
+## THE FIXTURE ALSO STOPPED TOUCHING THE CAMERA. It used to assign `_camera.global_position` itself, which
+## walked around `main.gd:738` -- the line that actually carries the snap to the framebuffer, and therefore
+## the one line this layer exists to prove reaches it. Frozen, posing `_cam_pos` alone is enough: the
+## game's own `_process` does the snapping and the picture comes from the real path.
+##
+## ONE HALF OF THIS IS PREDICTED, NOT MEASURED HERE, and it is the noise arm. It was over its cap on CI too
+## -- 2.44 to 2.85 % against 2.00 -- for the same defect in a different coat: two drawn frames at 6-9 fps
+## is a third of a second of dust, not a thirtieth. The freeze is the answer to that as well, and
+## `check_ceremony_reads:525` is the evidence it works at all ("unfrozen, two identical captures of this
+## game differ by roughly 40 % of the frame"). But the number THIS layer prints under the freeze on a slow
+## host has not been read yet. If the noise arm still runs hot there, what is left moving is shader-clock
+## or particle work `time_scale` does not reach, or the progressive terrain bake still draining under the
+## shutter -- and that is the thing to go and measure. Not the cap, which stays where four clean runs put
+## it.
+##
 ##   godot --path . --script res://tools/check_snap_frame.gd
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -80,6 +114,9 @@ func _run() -> void:
 		await physics_frame
 	var zoom: float = main._current_zoom()
 
+	# STOP THE WORLD FIRST, so that `base` describes a scene that can no longer drift out from under it and
+	# so that every pose below survives its own two frames at whatever rate this box happens to draw.
+	Engine.time_scale = 0.0
 	# START ON THE GRID. The property is "targets inside one pixel bucket render identically", so the
 	# baseline has to sit at a known place in its bucket -- nudging 0.4px from an arbitrary fractional
 	# position can legitimately cross a rounding boundary, and that would be the snap working, not failing.
@@ -87,6 +124,7 @@ func _run() -> void:
 	main._cam_pos = base
 	var same_r: Array = await _arm(main, base, SUB_PX, zoom)
 	var over_r: Array = await _arm(main, base, FULL_PX, zoom)
+	Engine.time_scale = 1.0
 	var same: int = int(same_r[0])
 	var over: int = int(over_r[0])
 
@@ -111,7 +149,11 @@ func _run() -> void:
 		% [int(same_r[1]), int(over_r[1]), MIN_STRUCTURED])
 	if int(same_r[1]) < MIN_STRUCTURED or int(over_r[1]) < MIN_STRUCTURED:
 		printerr("    ...so the two fractions below are shares of nearly nothing and mean nothing.")
-		_fail += 1
+		# NO SECOND `_fail += 1` HERE, AND THERE WAS ONE. The `_check` directly above has already counted
+		# this failure; incrementing again made the veto print "2 FAILURE(S)" over ONE failed assertion,
+		# and the two extra assertions the branch skips are not failures — they are the ones it exists to
+		# stop from being reported as anything. Measured with the floor forced unreachable: one FAIL line,
+		# "check_snap_frame: 2 FAILURE(S)". A count is not a measurement until it counts the right things.
 		printerr("check_snap_frame: %d FAILURE(S)" % _fail)
 		quit(1)
 		return
@@ -127,9 +169,11 @@ func _run() -> void:
 		printerr("check_snap_frame: %d FAILURE(S)" % _fail)
 	quit(1 if _fail > 0 else 0)
 
-func _shoot(main: MainView, target: Vector2, zoom: float) -> Image:
+## Pose the follow TARGET and photograph what the game does with it. Nothing here assigns the camera: the
+## snap that has to reach the framebuffer is `main.gd:738`'s, and a fixture writing that position itself is
+## a fixture checking its own arithmetic. Only sound with the world stopped — see the docstring.
+func _shoot(main: MainView, target: Vector2) -> Image:
 	main._cam_pos = target
-	main._camera.global_position = MainView.snap_to_pixel(target, zoom)
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	return get_root().get_texture().get_image()
@@ -137,8 +181,8 @@ func _shoot(main: MainView, target: Vector2, zoom: float) -> Image:
 ## One arm: its own baseline, then the same scene with the follow target moved `nudge` screen pixels.
 ## Returns [changed, structured] — both counted over the structured population only.
 func _arm(main: MainView, base: Vector2, nudge: float, zoom: float) -> Array:
-	var a: Image = await _shoot(main, base, zoom)
-	var b: Image = await _shoot(main, base + Vector2(nudge / zoom, 0.0), zoom)
+	var a: Image = await _shoot(main, base)
+	var b: Image = await _shoot(main, base + Vector2(nudge / zoom, 0.0))
 	var y0: int = int(float(a.get_height()) * BAND_TOP)
 	var y1: int = int(float(a.get_height()) * BAND_BOTTOM)
 	var changed: int = 0

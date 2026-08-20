@@ -99,13 +99,42 @@ const TENSION_MARGIN: float = 3.0
 ## check against a screenshot with a ruler rather than a preference about how ropey a rope should look.
 const BOW_FLOOR: float = 0.15
 
+## `_bow_now`'s two ways of FAILING TO MEASURE, as values no real reading can collide with. They used to be
+## `0.0` (a chord too short to have a direction) and `-1.0` (fewer than 40 cord pixels found), and both of
+## them PASS at the call site: on the right-hand side of `bow_slack > bow_taut * 3.0`, `-1.0` becomes -3.0
+## and `0.0` becomes 0.0, so a rope the mask never found reads as a rope that is perfectly taut. A number
+## meaning "I could not look" must never be arithmetic on the same axis as one meaning "I looked".
+const BOW_NO_CHORD: float = -101.0
+const BOW_NO_CORD: float = -102.0
+
+## ...and `_corridor_fill`'s, for the same reason and by the same rule. It used to answer a zero-length
+## throw with `0.0`, which is a legal share and therefore indistinguishable from "the preview drew nothing
+## across a real throw" — and which sailed through the cap that used to stand at the call site. A value
+## meaning "there was nothing to measure" must not be a legal value of the thing being measured.
+const FILL_NO_SPAN: float = -103.0
+
 ## `GR-05` — how much of the throw the preview is allowed to draw.
 ##
-## NO FLOOR IS SET IN THIS COMMIT AND THAT IS THE POINT OF THE COMMIT. Guessing a bound before measuring
-## has been wrong four times in this repository and every one of the guesses looked reasonable. The first
-## run reports; the number it reports is what a bound may later be argued from, once there is a decision
-## about what the preview should be.
-const SPAN_CAP: float = 1.01
+## NO FLOOR IS SET AND THAT IS DELIBERATE. Guessing a bound before measuring has been wrong four times in
+## this repository and every one of the guesses looked reasonable. The run reports; the number it reports
+## is what a bound may later be argued from, once there is a decision about what the preview should be.
+##
+## AND FOR AS LONG AS THAT WAS TRUE THERE WAS ALSO A `_check` HERE, AGAINST `SPAN_CAP = 1.01`, WHICH COULD
+## NOT FAIL. `_corridor_fill` resizes `bins` to `full`, writes only 0 or 1 into each element, sums them and
+## returns `n / full` — so the value is bounded by 1.0 BY CONSTRUCTION and a cap of 1.01 sits above the
+## largest number the expression can produce. Not a loose bound: an unsatisfiable-in-the-other-direction
+## one. Every green "the aim preview inks 0.13 of the distance it is previewing (cap 1.01)" this layer has
+## ever printed was an arithmetic identity wearing an assertion's clothes.
+##
+## **A DEFERRED FLOOR AND A GREEN LIGHT WIRED TO NOTHING LOOK IDENTICAL IN THE LOG**, and only one of them
+## is honest. The decision not to bound `fill` yet is kept exactly as it was; what changes is that the
+## layer now SAYS it has not bounded it, through `_stand_down`, so the runner reports the layer as having
+## passed without verifying everything instead of counting a tautology as a test. That is the same shape
+## this file already chose three times for `GR-04` at :517 — report the measurement, state that the design
+## call is not the harness's to make, assert nothing.
+##
+## No cap is invented here. Inventing one would be worse than the tautology, because it would look
+## calibrated.
 
 ## `GR-06` — the miner must out-read their own telemetry. This one IS asserted, because it is not a matter
 ## of taste: a tool that is easier to see than the person holding it has inverted the frame.
@@ -118,6 +147,10 @@ var _full := Rect2i()
 ## preview's contrast on both backgrounds instead of quoting one and asserting against the other.
 var _rock_gain: float = -1.0
 var _rock_px: int = 0
+## The chord `_bow_now` last measured across, in screen pixels. Carried out of the function so the
+## saturation rejection can quote the mask rim it is describing — `SAG_CAP + 24/span` — rather than naming
+## a cap without the number that produced it.
+var _bow_span: float = 0.0
 
 
 func _initialize() -> void:
@@ -231,10 +264,20 @@ func _run() -> void:
 	var span: float = _corridor_reach(guide, _screen(hand), _screen(target))
 	var fill: float = _corridor_fill(guide, _screen(hand), _screen(target))
 	var stray: int = _outside_corridor(guide, _screen(hand), _screen(target))
-	print("    the preview inks %.2f of the throw and reaches %.0f px of %.0f; %d drawn pixels lie "
-		% [fill, span, reach, stray] + "off the corridor entirely")
-	_check(fill <= SPAN_CAP,
-		"the aim preview inks %.2f of the distance it is previewing (cap %.2f)" % [fill, SPAN_CAP])
+	# THE DEGENERATE CASE IS A FAILURE TO MEASURE AND NOT A SMALL MEASUREMENT. `_corridor_fill` used to
+	# return `0.0` for a zero-length throw, and `0.0 <= 1.01` PASSED — a rig that posed the hand on top of
+	# the target scored a green line on a measurement it never made. Same fault as `_bow_now`'s two
+	# sentinels above, so it is spelled the same way and rejected here rather than averaged in.
+	if is_equal_approx(fill, FILL_NO_SPAN):
+		_check(false, "the rig posed a throw with a LENGTH to measure the preview against — the hand and "
+			+ "the target projected to within a pixel of each other, so there is no throw to ink a share of")
+	else:
+		print("    the preview inks %.2f of the throw and reaches %.0f px of %.0f; %d drawn pixels lie "
+			% [fill, span, reach, stray] + "off the corridor entirely")
+		_stand_down("GR-05's share of the throw the preview inks (measured %.2f)" % fill,
+			"no bound has been decided for it, and the cap that used to stand here was 1.01 over a "
+			+ "quantity `_corridor_fill` bounds at 1.0 by construction — an assertion that could not "
+			+ "fail. The measurement is the deliverable until there is a design call to assert")
 
 	# --- GR-06 / GR-04: does the miner out-read the miner's tool? ---------------------
 	var body: PackedByteArray = _body_mask()
@@ -361,13 +404,50 @@ func _run() -> void:
 		# the next with taut and slack indistinguishable. A single-frame question deserves a single-frame
 		# mask.
 		var bow_taut: float = await _bow_now(p.hand(), hitch, 0.0)
+		var rim_taut: float = _bow_rim()
 		var bow_slack: float = await _bow_now(p.hand(), hitch, 0.55)
-		print("    bow: %.3f of the chord pulled tight, %.3f at 0.55 slack" % [bow_taut, bow_slack])
-		_check(bow_slack >= BOW_FLOOR,
-			"a slack rope HANGS — it departs its own chord by %.3f of it (floor %.2f)"
-				% [bow_slack, BOW_FLOOR])
-		_check(bow_slack > bow_taut * 3.0,
-			"and a taut one does not (%.3f slack against %.3f taut)" % [bow_slack, bow_taut])
+		var rim_slack: float = _bow_rim()
+		print("    bow: %s of the chord pulled tight, %s at 0.55 slack (mask rim %.4f / %.4f, drawn cap %.2f)"
+			% [_bow_str(bow_taut), _bow_str(bow_slack), rim_taut, rim_slack, WorldRenderer.SAG_CAP])
+
+		# THE REJECTION THAT HAD TO EXIST BEFORE EITHER ASSERTION BELOW MEANT ANYTHING.
+		#
+		# `_bow_now` throws away every pixel further than `span * SAG_CAP + 24.0` from the chord, so the
+		# largest number it can return is `SAG_CAP + 24/span` — 0.4621 on this rig's 570px chord. CI read
+		# **0.463 slack against 0.462 taut**. That is not a slack rope beside a taut one, it is the same
+		# mask rim twice, and `world_renderer.gd:3125` settles it: the DRAWN hang is hard-clamped to
+		# `span * SAG_CAP`, so a reading at or above `SAG_CAP` provably did not come off the cord. It came
+		# off whatever else in a lamp-lit rock pocket falls within `ROPE_TOL` of `ROPE_HUE`, and inside a
+		# band 263px either side of the chord there is plenty of it.
+		#
+		# NEITHER ASSERTION COULD SAY SO, and they failed in opposite directions. `bow_slack > bow_taut *
+		# 3.0` asks 1.386 of a quantity whose ceiling is 0.4621 — unsatisfiable arithmetic, reported for
+		# days as a design failure of the rope. `bow_slack >= BOW_FLOOR` was the worse half, because it
+		# PASSED: a green assertion taken off the rim of its own mask, about a rope nobody had measured.
+		# **A statistic pinned to its own ceiling is not a small measurement, it is not a measurement.**
+		#
+		# `BOW_FLOOR`'s note quotes the sag-by-length rope bowing "0.42, its cap" — that is the renderer's
+		# clamp rather than the mask rim, so it may well have been the real cord at full hang. It is still
+		# a reading with no headroom in it, one rounding from the rejection added here, and which of the
+		# two it was is not decidable from source. Flagged, not moved.
+		#
+		# So this is a REJECTION and not a new threshold: no number is chosen here. The bound is
+		# `WorldRenderer.SAG_CAP` read off the renderer at run time, and the layer's answer to a saturated
+		# instrument is to say the instrument saturated — never to publish the rim as if it were a bow.
+		# `BOW_FLOOR` and `TENSION_MARGIN` are untouched; moving a threshold to accommodate a reading that
+		# came off the wrong pixels is how a floor ends up set to the noise it was meant to clear.
+		var taut_read: bool = _bow_measured("taut", bow_taut, rim_taut)
+		var slack_read: bool = _bow_measured("slack", bow_slack, rim_slack)
+		if taut_read and slack_read:
+			_check(bow_slack >= BOW_FLOOR,
+				"a slack rope HANGS — it departs its own chord by %.3f of it (floor %.2f)"
+					% [bow_slack, BOW_FLOOR])
+			_check(bow_slack > bow_taut * 3.0,
+				"and a taut one does not (%.3f slack against %.3f taut)" % [bow_slack, bow_taut])
+		else:
+			_stand_down("GR-03's single-frame bow — both the floor and the taut-against-slack ratio",
+				"neither number came off the cord, and a verdict on the rope drawn from the mask's rim "
+				+ "would be a claim about the instrument wearing the rope's name")
 
 	else:
 		_check(false, "the rig anchors, so the attached states can be judged at all")
@@ -793,7 +873,7 @@ func _corridor_fill(mask: PackedByteArray, from: Vector2, to: Vector2) -> float:
 	var axis: Vector2 = (to - from).normalized()
 	var full: int = int(from.distance_to(to))
 	if full <= 0:
-		return 0.0
+		return FILL_NO_SPAN          # no throw to take a share OF — see the note on the constant
 	var bins := PackedByteArray()
 	bins.resize(full)
 	for i: int in mask.size():
@@ -920,6 +1000,9 @@ func _corridor(a: Vector2, b: Vector2, half: float = CORRIDOR_HALF) -> PackedByt
 ## `ROPE_CORE` and its two derived tones are a specific pale warm fibre, and nothing else in a rock pocket
 ## is within this distance of them. Reported at the 99th percentile of perpendicular offsets rather than
 ## the maximum, because a hang is thousands of pixels wide at its lowest point and a stray mote is twenty.
+##
+## RETURNS `BOW_NO_CHORD` OR `BOW_NO_CORD` WHEN IT COULD NOT LOOK, and neither is a small bow. Put every
+## result through `_bow_measured` before it is allowed to be arithmetic.
 const ROPE_HUE := Color(0.78, 0.70, 0.52)
 const ROPE_TOL: float = 0.20
 
@@ -933,7 +1016,8 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	var axis: Vector2 = (b - a).normalized()
 	var span: float = a.distance_to(b)
 	if span < 1.0:
-		return 0.0
+		return BOW_NO_CHORD
+	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
 	var offs := PackedFloat32Array()
 	for y: int in img.get_height():
@@ -948,10 +1032,51 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 				continue
 			offs.append(off)
 	if offs.size() < 40:
-		return -1.0                          # too little cord found to say anything about its shape
+		return BOW_NO_CORD                   # too little cord found to say anything about its shape
 	var arr: Array = Array(offs)
 	arr.sort()
 	return float(arr[int(float(arr.size() - 1) * 0.99)]) / span
+
+
+## The largest number `_bow_now`'s own mask can ever return, as a share of the chord. It discards every
+## pixel further than `span * SAG_CAP + 24.0` from the chord, so `SAG_CAP + 24/span` is a ceiling built
+## into the instrument and says nothing about a rope. DERIVED, NEVER TYPED — `SAG_CAP` is read off the
+## renderer so this cannot drift away from the clamp it describes.
+func _bow_rim() -> float:
+	return WorldRenderer.SAG_CAP + 24.0 / maxf(_bow_span, 1.0)
+
+
+## A `_bow_now` result for the run log. The sentinels get WORDS, because printing a failure to measure as
+## `-101.000` on a line that reads "bow: ... of the chord" is the same mistake in a smaller font.
+func _bow_str(v: float) -> String:
+	if is_equal_approx(v, BOW_NO_CHORD):
+		return "NO CHORD"
+	if is_equal_approx(v, BOW_NO_CORD):
+		return "NO CORD"
+	return "%.3f" % v
+
+
+## IS A `_bow_now` RESULT A MEASUREMENT? Three ways it is not, and all three used to reach the `GR-03`
+## assertions in `_run` as ordinary floats that happened to satisfy them. Each asserts its own falseness
+## here, so a rope this instrument never found is a red layer with a sentence in it rather than a green
+## layer with a number in it.
+func _bow_measured(which: String, v: float, rim: float) -> bool:
+	if is_equal_approx(v, BOW_NO_CHORD):
+		_check(false, ("the %s rope has a chord to measure a bow across — the hand and the piton "
+			+ "projected to within a pixel of each other, so there is no line to depart from") % which)
+		return false
+	if is_equal_approx(v, BOW_NO_CORD):
+		_check(false, ("the %s rope's cord is FOUND before its shape is judged — fewer than 40 pixels in "
+			+ "the mask sat within ROPE_TOL of ROPE_HUE, which is a mask that missed and not a rope that "
+			+ "is straight") % which)
+		return false
+	if v >= WorldRenderer.SAG_CAP:
+		_check(false, ("the %s reading is a BOW and not a SATURATION of the mask — it reads %.4f with "
+			+ "its own rim at %.4f, and world_renderer.gd:3125 clamps the drawn hang to %.2f of the "
+			+ "chord, so at or above that there is nothing left for it to have measured")
+			% [which, v, rim, WorldRenderer.SAG_CAP])
+		return false
+	return true
 
 
 func _either(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
