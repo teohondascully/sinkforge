@@ -74,8 +74,43 @@ const UI_ACCENT := Color(0.80, 0.66, 0.30)           ## gold accent — selectio
 const GOLD_PALE_LIFT := Color(0.149, 0.171, 0.249, 0.0)
 const GOLD_PALE := Color(UI_ACCENT.r + GOLD_PALE_LIFT.r, UI_ACCENT.g + GOLD_PALE_LIFT.g,
 	UI_ACCENT.b + GOLD_PALE_LIFT.b)
+## THE SAME GOLD SEEN UNDER LESS LIGHT — `GOLD_PALE`'s opposite number, and the gold rung of the type ramp
+## whose grey rungs are `UI_TEXT` / `UI_TEXT_DIM` / `UI_TEXT_FAINT`. Three literals were doing this one job
+## across five sites with nothing in the file relating any of them to the accent they are a darker cut of:
+## `0.451/0.365/0.180` on the pack ledger's heading and the works group titles, `0.451/0.402/0.280` on the
+## "N more wait behind research" line and its BENCH pointer, and `0.58/0.48/0.32` on the detail plate's
+## refusal note. The same shape as the four literals that became `UI_TEXT_FAINT` one layer up.
+##
+## `MNU-32` measured all three against the plates they are printed on: 2.98, 3.35 and 4.37 to one, every
+## one of them under 4.5. Subordinate was the intent at all five sites and they are still plainly
+## subordinate here — this lands at 5.40:1 on `UI_MODAL` against `UI_TEXT_FAINT`'s 5.39 on the same plate,
+## which is the point. It is the third rung, in gold, at the third rung's readability. The `BAZAAR` title
+## beside it is `UI_TEXT` at 12.57, so nothing has been promoted; a heading that measured 2.98 was not
+## subordinate, it was absent.
+##
+## A RUNG IS NOT A MEANING, which is worth stating next to `MNU-06`: that rule is about the gold that says
+## "your input is connected to this", and it stays on the selection, the live verb and the next node. This
+## is a TYPE WEIGHT that happens to be gold, the way `UI_TEXT_FAINT` is a type weight that happens to be
+## grey, and it carries no affordance claim at any of its five sites.
+##
+## THE DROP IS UNIFORM, AND THAT IS THE DERIVATION. Subtracting one value from all three channels leaves
+## every channel DIFFERENCE untouched, so the hue is preserved exactly — 43.2° here and 43.2° on
+## `UI_ACCENT`, where `GOLD_PALE`'s uneven lift moves the hue by 0.9°. It sits at 1.25x the accent's
+## saturation and 0.83 of its value: the accent in shadow, which is what a subordinate heading is.
+const GOLD_DIM_DROP := Color(0.14, 0.14, 0.14, 0.0)
+const GOLD_DIM := Color(UI_ACCENT.r - GOLD_DIM_DROP.r, UI_ACCENT.g - GOLD_DIM_DROP.g,
+	UI_ACCENT.b - GOLD_DIM_DROP.b)
 ## The colour the alert stack has always used for a machine in trouble. Named so that the OTHER place which
 ## reports the same fact can say it the same way, instead of reaching for the accent and inverting it.
+##
+## `MNU-32` sent a third caller here. The counter's cost numerals printed a shortfall in `0.804/0.427/0.376`
+## at two sites — `_cost_glyphs` and `_detail_chip` — and on the SELECTED row's brass plate that literal
+## measured 4.20:1, under the floor. It is the same fact this constant already names, said in a second
+## colour that nothing in the file related to the first; the comment in `_settings_controls` had already
+## written the argument out ("the only other thing in this UI that means 'this will not do what you
+## think'") and then reached for a literal anyway. On brass it is 5.33 now, and 6.33 / 6.02 on the two
+## washes the same numerals land on elsewhere. The green partner is untouched: it clears everywhere it is
+## drawn, and moving a passing colour buys nothing and costs a hue.
 const UI_WARN := Color(0.96, 0.46, 0.30)
 const UI_TEXT := Color(0.80, 0.83, 0.89)
 const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
@@ -92,6 +127,18 @@ const UI_TEXT_DIM := Color(0.54, 0.58, 0.66)
 ##
 ## Named as much as lifted: a literal is invisible to `tools/check_text_contrast.gd`, so the floor can only
 ## be held against something that has somewhere to be held.
+##
+## THREE MORE JOINED IT ON THE SECOND PASS, and the reason they were missed the first time is that they are
+## not on a NAMED plate: `0.40/0.42/0.48` on a locked bench chip (3.38 on the 0.022 wash), `0.40/0.43/0.50`
+## on the settings detail plate's placeholder sentence (3.76 on a 0.22 black well over the modal) and
+## `0.42/0.45/0.53` on the settings page's own `SETTINGS` word (3.95 on the modal). All three sit at hue
+## 222–225° against this constant's 220°, one rung below it in value and nowhere near the floor.
+##
+## THERE IS NO FOURTH RUNG, which is the finding and not an aside. The obvious repair was another step down
+## the ramp — the ramp already carries a unit, `UI_TEXT_DIM` minus this is 0.04 on every channel — but that
+## colour measures 4.70 on the modal, 4.49 on the 0.022 wash and 4.19 on the 0.050 wash. A rung below this
+## one cannot clear 4.5 on the plates these three land on, so the quiet these sites were reaching for does
+## not exist in this palette. They are this rung: 5.15, 5.55 and 5.39 respectively.
 const UI_TEXT_FAINT := Color(0.50, 0.54, 0.62)
 const UI_SLOT := Color(0.11, 0.12, 0.16, 0.95)       ## empty hotbar slot well
 ## The modal plate — the counter and the settings page — which the two of them carried as separate copies
@@ -2387,7 +2434,7 @@ func _pack_ledger(band: Rect2) -> void:
 	var mute: Dictionary = off["mute"]
 	var hb: float = band.position.y + LEDGER_GAP
 	var head: String = "YOUR LINE IS MAKING"
-	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, Color(0.451, 0.365, 0.180))
+	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, GOLD_DIM)
 	var vx: float = band.position.x + 1.0 + _tracked_w(head, 8, 2.0) + 12.0
 	var verdict: String = _ledger_verdict(rates, off)
 	if verdict != "" and band.end.x > vx:
@@ -2490,7 +2537,7 @@ func _tab_works(g: Dictionary) -> void:
 		# The key is a cap and not a word in a sentence. "press 3 for the BENCH" asks the reader to parse an
 		# instruction to find the one glyph that matters; the cap grammar the rail and footer already use
 		# puts it where the eye lands, and the sentence shrinks to what it is actually saying.
-		var dim := Color(0.451, 0.402, 0.280)
+		var dim: Color = GOLD_DIM
 		var y: float = content.end.y - 2.0
 		var head: String = "%d more wait behind research" % hidden
 		draw_string(_font, Vector2(content.position.x + 1.0, y), head,
@@ -2525,7 +2572,7 @@ static func works_window_first(count: int, capacity: int, base: int, cursor: int
 func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int, title: String,
 		opts: Array[Dictionary], open_rows: Array[int], base: int, machines: bool) -> void:
 	var x0: float = content.position.x + float(col0) * (col_w + BAZAAR_GUTTER)
-	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, Color(0.451, 0.365, 0.180))
+	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, GOLD_DIM)
 	if open_rows.is_empty():
 		draw_string(_font, Vector2(x0 + 1.0, content.position.y + 16.0), "(nothing unlocked yet)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
@@ -2649,7 +2696,7 @@ func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 		# three lines apart, is how the mark and the colour start disagreeing about one ingredient — and
 		# disagreeing is worse than either cue missing, because each reader sees only one of them.
 		draw_string(_font, Vector2(x + 13.0, rr.position.y + 14.5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-			Color(0.804, 0.427, 0.376) if label.begins_with("-") else Color(0.482, 0.796, 0.518))
+			UI_WARN if label.begins_with("-") else Color(0.482, 0.796, 0.518))
 		x += 12.0 + _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
 	return w
 
@@ -2708,6 +2755,18 @@ const VERB_PAD: float = 12.0          ## plate edge → ink, both ends
 const VERB_MIN_W: float = 104.0       ## BUY and BUILD keep the width the layout was drawn around
 const VERB_H: float = 24.0
 const VERB_BASE: float = 16.0         ## button top → the verb's baseline. The state form shares the line.
+## THE INK ON A LIVE BUTTON, and the key hint beside it is the SAME ink thinned rather than a second copy
+## of the literal carrying its own alpha — which is what the file held: `Color(0.08, 0.07, 0.04)` and
+## `Color(0.08, 0.07, 0.04, 0.62)`, three lines apart, with nothing relating them.
+##
+## THE ALPHA IS BOUNDED BY THE FLOOR AND NOT BY TASTE, which is the whole reason it moved. `MNU-32`
+## measured the hint at 3.77:1 against the gold it is printed on while the verb above it read 8.30 — the
+## thinning that made the hint subordinate had taken it under 4.5, so the one glyph telling you WHICH KEY
+## RUNS THIS was the least legible thing on the button. At 0.75 it is 5.15:1 and still visibly quieter
+## than the word. 0.70 would have cleared at 4.57, and a floor of 4.5 with a value at 4.57 is a defect
+## waiting for the next palette nudge, so it is not set there.
+const VERB_INK := Color(0.08, 0.07, 0.04)
+const VERB_HINT_A: float = 0.75       ## the hint is the verb's own ink, thinned to the floor and no further
 const DETAIL_ROW_GAP: float = 8.0     ## between the row's three parts: the price, the reason, the verb
 const DETAIL_NOTE_SIZE: int = 8       ## the reason the verb will not run — the smallest type on the plate
 ## THE PLATE'S BOTTOM SHELF, computed once for everything that stands on it.
@@ -2738,11 +2797,10 @@ func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
 	var ty: float = btn.position.y + VERB_BASE
 	if live:
 		_round_rect(btn, 5.0, UI_ACCENT)
-		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
-			Color(0.08, 0.07, 0.04))
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK, VERB_INK)
 		if hint != "":
 			draw_string(_font, Vector2(btn.position.x + VERB_PAD + vw + VERB_GAP, ty), hint,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE, Color(0.08, 0.07, 0.04, 0.62))
+				HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE, Color(VERB_INK, VERB_HINT_A))
 	else:
 		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
 		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
@@ -2978,7 +3036,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		# text aligns to text, and a button's word aligns to its button.
 		var nx: float = maxf(cx - DETAIL_CHIP_GAP + note_gap, btn.position.x - DETAIL_ROW_GAP - note_w)
 		draw_string(_font, Vector2(nx, chip_y + DETAIL_CHIP_BASE), note, HORIZONTAL_ALIGNMENT_LEFT,
-			btn.position.x - DETAIL_ROW_GAP - nx, DETAIL_NOTE_SIZE, Color(0.58, 0.48, 0.32))
+			btn.position.x - DETAIL_ROW_GAP - nx, DETAIL_NOTE_SIZE, GOLD_DIM)
 
 
 ## THE LAMP. Three rings behind the goods is the whole trick, and it is what makes a glyph read as lit
@@ -3180,7 +3238,7 @@ func _detail_chip(at: Vector2, item: StringName, need: int, have: int) -> float:
 	Visuals.draw_item(self, at + Vector2(11.0, DETAIL_CHIP_H * 0.5), 13.0, item)
 	var ok: bool = have >= need
 	draw_string(_font, at + Vector2(19.0, DETAIL_CHIP_BASE), str(have), HORIZONTAL_ALIGNMENT_LEFT, -1,
-		DETAIL_CHIP_SIZE, Color(0.482, 0.796, 0.518) if ok else Color(0.804, 0.427, 0.376))
+		DETAIL_CHIP_SIZE, Color(0.482, 0.796, 0.518) if ok else UI_WARN)
 	var hw: float = _font.get_string_size(str(have), HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
 	draw_string(_font, at + Vector2(19.0 + hw, DETAIL_CHIP_BASE), "/%d" % need,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE, UI_TEXT_FAINT)
@@ -3309,7 +3367,7 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool, fs
 	else:
 		_round_rect(rr, 5.0, Color(1.0, 1.0, 1.0, 0.040 if is_next else 0.022))
 	var name_col: Color = STATE_INK if done \
-		else ((GOLD_PALE if picked else UI_TEXT) if is_next else Color(0.40, 0.42, 0.48))
+		else ((GOLD_PALE if picked else UI_TEXT) if is_next else UI_TEXT_FAINT)
 	var indent: float = _bench_indent(rr.size.x)
 	var room: float = rr.size.x - indent - BENCH_NAME_PAD
 	draw_circle(rr.position + Vector2(_bench_dot_x(rr.size.x), 13.0), BENCH_DOT_R,
@@ -3873,7 +3931,7 @@ func _draw_settings_head(origin: Vector2, g: Dictionary) -> void:
 	# and the category at 2.0:1 — the brightest text on the page was the word that is the same on all
 	# three faces, and the dimmest was the only one that says which face you are looking at. A blind read
 	# called it the most damaging defect on the screen: it fails at telling you what it is.
-	_tracked("SETTINGS", Vector2(x, origin.y + 26.0), 15, 2.8, Color(0.42, 0.45, 0.53))
+	_tracked("SETTINGS", Vector2(x, origin.y + 26.0), 15, 2.8, UI_TEXT_FAINT)
 	_tracked(CAT_NAMES[settings_cat],
 		Vector2(x + _tracked_w("SETTINGS", 15, 2.8) + 16.0, origin.y + 26.0), 15, 2.8, UI_TEXT)
 
@@ -4104,7 +4162,7 @@ func _draw_settings_detail(g: Dictionary, said: String, mouse: Vector2) -> void:
 	var y: float = d.position.y + 20.0
 	for part: String in _wrap(line, d.size.x - 24.0, 10):
 		draw_string(_font, Vector2(d.position.x + 12.0, y), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
-			UI_TEXT if said != "" else Color(0.40, 0.43, 0.50))
+			UI_TEXT if said != "" else UI_TEXT_FAINT)
 		y += 13.0
 	if settings_cat == CAT_CONTROLS:
 		var w: float = _font.get_string_size("RESET KEYS", HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 14.0
