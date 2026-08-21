@@ -1,9 +1,10 @@
 extends "res://tests/test_base.gd"
 
-## Worldgen / terrain suite — the deterministic generators (heightmap + the layered caves / strata /
-## depth-banded ore), the surface silhouette, horizontal + rich-ore richness, the many-seed fuzz sweep,
-## and the dual-grid fine-terrain derivation. Asserts generation is deterministic in (cols, rows, seed)
-## and that the emitted world honours the material registry + two-grid contract.
+## Worldgen and terrain suite: the deterministic generators (heightmap, plus the layered caves,
+## strata and depth-banded ore), the surface silhouette, horizontal and rich-ore richness, the
+## many-seed fuzz sweep, and the dual-grid fine-terrain derivation. Asserts generation is
+## deterministic in (cols, rows, seed) and that the emitted world honours the material registry
+## and the two-grid contract.
 
 
 func _initialize() -> void:
@@ -22,22 +23,22 @@ func _initialize() -> void:
 	_finish("worldgen tests")
 
 
-## THE GROUND STAYS WHERE IT WAS WHEN YOU DIG — the property `FactorySim.surface_row` cannot have and
-## `HeightmapWorldGen.ground_row` exists to provide.
+## The ground stays where it was when you dig. That is the property `FactorySim.surface_row` cannot
+## have and `HeightmapWorldGen.ground_row` exists to provide.
 ##
 ## `surface_row` scans from row 0 for the first solid cell. On a generated, untouched world that IS the
 ## ground, which is why it reads as the surface authority and why consumers kept picking it up. Sink a
 ## shaft and it starts reporting the floor under your own boots, so every `body.y - surface_row(body.x)`
-## in the codebase collapses to about -1 REGARDLESS OF DEPTH. Two shipped consumers computed exactly that:
-## the ambience crossfade (full surface wind, no cave bed and no drips, at the bottom of a hole you dug)
-## and the GRAPPLE hint, which fires at 10 "rows below the local surface that make the climb a real trip"
-## and so could not be reached by climbing down.
+## collapses to about -1 REGARDLESS OF DEPTH. Two consumers computed exactly that: the ambience
+## crossfade, which gave full surface wind and neither cave bed nor drips at the bottom of a hole you
+## dug, and the grapple hint, which fires at Hints.DEPTH_HINT_ROWS (10) rows below the local surface and
+## so could not be reached by climbing down. Both are asserted below, on both authorities.
 ##
-## The depths here are the boundary case ON PURPOSE. A pad column's ground is FLAT_SURFACE_ROW (20) and
-## SURFACE_ROW_MAX is 31, so an eleven-row shaft floors at exactly 31 — still inside the legal ground band.
-## That is the case `FineTerrain.walked_surface` is blind to by construction (it can only reject answers
-## that leave the band, so it catches the forty-row rift and not the shaft you dug this minute), and it is
-## the same eleven rows that put the body one row past the hint threshold. One dig, both claims.
+## The depths here are the boundary case on purpose. A pad column's ground is FLAT_SURFACE_ROW (20) and
+## SURFACE_ROW_MAX is 31, so an eleven-row shaft floors at exactly 31, still inside the legal ground
+## band. That is the case `FineTerrain.walked_surface` is blind to by construction: it can only reject
+## answers that leave the band, so it catches the forty-row rift and not the shaft you dug this minute.
+## The same eleven rows put the body one row past the hint threshold, so one dig makes both claims.
 func _test_ground_survives_digging() -> void:
 	print("- ground survives digging")
 	var sim: FactorySim = FactorySim.new()
@@ -60,7 +61,7 @@ func _test_ground_survives_digging() -> void:
 	_check(body - sim.surface_row(col) < 0,
 		"depth off surface_row reads NEGATIVE eleven rows down — the defect, pinned so it cannot return")
 
-	# The consumer thresholds, both sides. These are the two shipped bugs stated as assertions.
+	# The two consumer thresholds, each read off both authorities so the divergence is the assertion.
 	_check(body - HeightmapWorldGen.ground_row(col) >= Hints.DEPTH_HINT_ROWS, "the GRAPPLE hint can fire")
 	_check(body - sim.surface_row(col) < Hints.DEPTH_HINT_ROWS, "...and off surface_row it never could")
 	_check(clampf(1.0 - float(body - HeightmapWorldGen.ground_row(col)) / 4.0, 0.0, 1.0) == 0.0,
@@ -68,32 +69,30 @@ func _test_ground_survives_digging() -> void:
 	_check(clampf(1.0 - float(body - sim.surface_row(col)) / 4.0, 0.0, 1.0) == 1.0,
 		"...and off surface_row it was at FULL surface wind down there")
 
-	# And why the existing band guard was not already catching this: the shaft floor is legal ground.
+	# And why the band guard cannot catch this on its own: the shaft floor is still legal ground.
 	_check(sim.surface_row(col) <= HeightmapWorldGen.SURFACE_ROW_MAX,
 		"the shaft floor is still inside the legal ground band")
 	_check(FineTerrain.walked_surface(sim.surface_row(col)) != FineTerrain.NO_SURFACE,
 		"walked_surface accepts the shaft floor as ground — it rejects rifts, not shafts")
 
 
-## A GENERATED WORLD CONTAINS USABLE EXTRACTION SITES — and every assertion here runs on a world the
-## GENERATOR built, never on a seeded fixture. That distinction is the entire point of this test.
+## A generated world contains usable extraction sites. Every assertion here runs on a world the
+## GENERATOR built, never on a seeded fixture, and that distinction is the entire point of this test.
 ##
-## The sim has carried a complete lode system for two strikes: `take_lode`, the Drill Head, Spur chaining,
-## the drain fraction, the through-rock stain. None of it could fire on a real world, because the only
-## thing that ever wrote to `sim.lode` outside save/load was the mining branch — the blow that OPENS a
-## vein. Lode was DERIVED from destroying an ore block and never generated. So a fresh world held exactly
-## zero, the Borer and the Drift Rig cut rock with nothing behind it, and "generated deep pockets create
-## usable extraction sites" was false by construction rather than by degree.
+## The lode system (`take_lode`, the Drill Head, Spur chaining, the drain fraction, the through-rock
+## stain) can only fire on a world that actually carries lode. The one thing that writes `sim.lode`
+## outside save/load and outside generation is the mining branch, the blow that OPENS a vein, so if the
+## generator stops seeding lode a fresh world holds exactly zero, the Borer and the Drift Rig cut rock
+## with nothing behind it, and "deep pockets create usable extraction sites" is false by construction
+## rather than by degree.
 ##
-## It stayed invisible because every lode fixture in the suite INJECTS its lode through `world_seeder`.
-## The seeded path was green for months while the generated path did not exist, and no assertion in the
-## project could tell them apart — a controlled lode proves the extraction path GIVEN a lode, which is a
-## different claim and fails differently. Hence the labelling, and hence a green here may never be cited
-## for a seeded fixture nor a seeded green cited for this.
+## Every other lode fixture in the suite INJECTS its lode through `world_seeder`, and a controlled lode
+## proves the extraction path GIVEN a lode, which is a different claim that fails differently. Hence
+## the labelling in the print line, and hence a green here may never be cited for a seeded fixture, nor
+## a seeded green cited for this.
 ##
-## The last four checks are the chain end to end: generator → WorldData → sim → the hand verb. Buried, it
-## is not workable; clear the rock in front of it and it is; work it and it yields its ore. That sequence
-## is the claim, and it is the one nothing in the suite could make before.
+## The last four checks walk the chain end to end: generator, WorldData, sim, the hand verb. Buried, a
+## lode is not workable; clear the rock in front of it and it is; work it and it yields its own ore.
 func _test_generated_lodes() -> void:
 	print("- generated lodes (GENERATED WORLD — not a seeded fixture)")
 	var gen := LayeredWorldGen.new()
@@ -105,13 +104,13 @@ func _test_generated_lodes() -> void:
 	_check(a.lodes == gen.generate(cols, rows, 1337).lodes, "same seed → identical lodes")
 	_check(gen.generate(cols, rows, 99).lodes != a.lodes, "a different seed → different lodes")
 
-	# THAT FLOOR IS WEAK AND I AM NOT PRETENDING OTHERWISE: 20 against an actual 378 would still pass with
-	# the feature all but dead, and a floor I tuned to today's number would be a number I made up rather
-	# than a property. So the load-bearing check is STRUCTURAL instead — the tier split. Lode follows the
-	# division the world already means (ore above the seal, iron below it), and that cannot be satisfied by
-	# accident: it fails if the pass stops running, if the depth banding breaks, or if everything piles into
-	# one band. What density a player should actually MEET is a question for play, not for a constant
-	# guessed here, and guessing it before playing has been wrong every time it has been tried.
+	# The `> 20` floor above is deliberately weak. A real world carries far more than 20 lode cells, so
+	# that floor would still pass with the feature all but dead, and a floor tuned to today's count would
+	# be a made-up number rather than a property. The load-bearing check is STRUCTURAL instead: the tier
+	# split. Lode follows the division the world already means, ore above the seal and iron below it, and
+	# that cannot be satisfied by accident. It fails if the pass stops running, if the depth banding
+	# breaks, or if everything piles into one band. What density a player should actually MEET is a
+	# question for play, not for a constant guessed here.
 	var above: int = 0
 	var below: int = 0
 	var kinds: Dictionary = {}
@@ -127,7 +126,7 @@ func _test_generated_lodes() -> void:
 	_check(kinds.has(&"ore") and kinds.has(&"iron"),
 		"and it carries each tier's own material rather than one everywhere (%s)" % [kinds.keys()])
 
-	# --- the overlap guards, checked over EVERY lode cell rather than a sample ---
+	# --- The overlap guards, checked over EVERY lode cell rather than a sample. ---
 	var on_ore: int = 0
 	var off_host: int = 0
 	var wall_less: int = 0
@@ -156,7 +155,7 @@ func _test_generated_lodes() -> void:
 	_check(flooded == 0, "no lode was seeded inside an aquifer (%d flooded)" % flooded)
 	_check(empty == 0, "every lode carries a positive deposit (%d empty)" % empty)
 
-	# --- generator -> WorldData -> sim -> the hand verb ---
+	# --- The chain: generator, WorldData, sim, the hand verb. ---
 	var sim: FactorySim = FactorySim.new()
 	sim.load_world(a)
 	var in_grid: int = 0
@@ -179,7 +178,7 @@ func _test_generated_lodes() -> void:
 
 
 ## Terrain is authoritative world state: solid cells block placement, mining clears them, and the
-## avatar never touches this (it only reads is_solid). Groundwork for the embodied body (P2·S1a).
+## avatar never writes to it, only reads is_solid.
 func _test_terrain() -> void:
 	print("- terrain")
 	var sim: FactorySim = FactorySim.new()
@@ -196,10 +195,10 @@ func _test_terrain() -> void:
 	_check(not sim.is_solid(Vector2i(-1, 0)), "out-of-bounds is never solid")
 
 
-## The SHARED surface silhouette (sim.surface_row / sim.ramp_dir) the renderer draws and the avatar
-## walks. Locks in: the slope is terrain-topology only, material-independent, ONE tile = a ramp, taller
-## = a wall, and — the bug this whole slice fixes — a placed MACHINE never alters the silhouette (no
-## phantom invisible diagonal). One authority → seen slope == walked slope, by construction.
+## The shared surface silhouette (sim.surface_row and sim.ramp_dir) that the renderer draws and the
+## avatar walks. Four claims: slope is terrain topology only, it is material-independent, exactly one
+## tile of rise is a ramp while taller is a wall, and a placed MACHINE never alters the silhouette, so
+## there is no phantom invisible diagonal. One authority means seen slope equals walked slope.
 func _test_surface_silhouette() -> void:
 	print("- surface silhouette")
 	var sim: FactorySim = FactorySim.new()
@@ -217,11 +216,11 @@ func _test_surface_silhouette() -> void:
 	# Column 6 sits one tile below its left neighbour (col 5) → ramp rising to the LEFT.
 	_check(sim.ramp_dir(6) == -1, "a 1-tile step left reads as a leftward ramp")
 	_check(sim.ramp_dir(3) == 0, "flat ground has no ramp")
-	# Stone slopes exactly like earth — geometry is material-independent (bug #1).
+	# Stone slopes exactly like earth: the geometry is material-independent.
 	_check(sim.surface_row(8) == 8 and sim.ramp_dir(7) == 0,
 		"a 2-tile step is a WALL, not a ramp (only single steps slope)")
-	# THE phantom-ramp killer: drop a machine onto FLAT ground (col 10, both neighbours level); the
-	# silhouette must NOT move — no raised surface, no diagonal — so you bump the box, never glide it (bug #3).
+	# The phantom-ramp guard: drop a machine onto FLAT ground (col 10, both neighbours level) and the
+	# silhouette must not move. No raised surface, no diagonal, so you bump the box instead of gliding it.
 	var proc_def: MachineDef = load("res://src/data/machines/processor.tres")
 	_check(sim.ramp_dir(10) == 0, "flat ground reads flat before any machine")
 	sim.place_machine(proc_def, Vector2i(10, 9))           # a machine standing on the flat row-10 ground
@@ -229,11 +228,11 @@ func _test_surface_silhouette() -> void:
 	_check(sim.ramp_dir(10) == 0, "a placed machine casts NO phantom ramp (it's a box you bump, not a hill)")
 
 
-## EVERY SURFACE IS WALKABLE. The body auto-steps up to 1.3 cells, so a 2-row rise between adjacent
-## columns is a wall it has to jump — and a skyline built out of those is the "walking feels clunky"
+## Every surface is walkable. The body auto-steps up to 1.3 cells, so a 2-row rise between adjacent
+## columns is a wall it has to jump, and a skyline built out of those is the "walking feels clunky"
 ## complaint in its purest form: you press right and the world says no, repeatedly, on ground that looks
-## like a gentle hill. HeightmapWorldGen guarantees this arithmetically (its slope budget is documented at
-## the constants), and this is the assertion that keeps the budget honest: a future amplitude bump that
+## like a gentle hill. HeightmapWorldGen guarantees this arithmetically, with the slope budget documented
+## at its constants, and this is the assertion that keeps the budget honest. A future amplitude bump that
 ## breaks it trips here rather than shipping a hillside nobody can climb.
 ##
 ## Checked across several seeds and both generators, because the surface function is shared and a
@@ -248,18 +247,18 @@ func _test_surface_walkable() -> void:
 			var worst: int = 0
 			var worst_col: int = -1
 			var stray: int = 0
-			# A SINKHOLE is a hole in the ground, so of course the walked surface falls off a cliff at its
-			# lip — that is the feature, not a broken heightmap. What must stay true is that the ground is a
-			# walkable heightmap EVERYWHERE ELSE. Counted as PLACES rather than as column-steps: one mouth
-			# is several rows of irregular throat and so several un-steppable boundaries, and a test that
-			# counted those would be measuring how ragged a hole is instead of how many holes there are.
+			# A sinkhole is a hole in the ground, so the walked surface falls off a cliff at its lip by
+			# design. What must stay true is that the ground is a walkable heightmap EVERYWHERE ELSE.
+			# Mouths are counted as PLACES rather than as column-steps: one mouth is several rows of
+			# irregular throat and so several un-steppable boundaries, and counting those would measure
+			# how ragged a hole is instead of how many holes there are. MOUTH_GAP separates them.
 			var mouths: int = 0
 			var last_cliff: int = -99
-			# The SCARPS are the surface's other marked exception, and they are marked in the generator rather
-			# than in the world, because a scarp is not a carve — it is where the heightmap itself changes
-			# terrace. So they are recognised the same way a route is and counted separately: a face you climb
-			# is not a hole you fall into, and letting them share a budget would mean adding one to the
-			# skyline silently spent a sinkhole.
+			# The scarps are the surface's other marked exception, and they are marked in the generator
+			# rather than in the world, because a scarp is not a carve. It is where the heightmap itself
+			# changes terrace. So they are recognised the same way a route is and counted separately: a
+			# face you climb is not a hole you fall into, and letting them share a budget would mean
+			# adding one to the skyline silently spent a sinkhole.
 			var faces: int = 0
 			var last_face: int = -99
 			for col: int in range(world.cols - 1):
@@ -293,10 +292,9 @@ func _test_surface_walkable() -> void:
 				% [name, seed_v, faces, HeightmapWorldGen.SCARP_COLS.size()])
 
 
-## Topmost GROUND row of a generated column, read from the produced WorldData (so it measures what the
-## world actually is after every pass, not what the height function intended before them). Flora and the
-## bazaar ruin's timber are skipped: a tree trunk is a thing you chop, not a hill you climb, and counting
-## a canopy as terrain reports a four-row "step" at the base of every tree.
+## Materials `_surface_of` skips when it looks for ground. A tree trunk is a thing you chop, not a hill
+## you climb, and counting a canopy as terrain reports a four-row "step" at the base of every tree. The
+## bazaar ruin's timber is skipped for the same reason.
 const _NOT_GROUND: Array[StringName] = [&"wood", &"leaves"]
 
 
@@ -308,6 +306,8 @@ func _route_column(world: WorldData, col: int) -> bool:
 	return false
 
 
+## Topmost ground row of a generated column, read from the produced WorldData, so it measures what the
+## world actually is after every pass rather than what the height function intended before them.
 func _surface_of(world: WorldData, col: int) -> int:
 	for row: int in world.rows:
 		var m: StringName = world.blocks.get(Vector2i(col, row), &"")
@@ -316,8 +316,8 @@ func _surface_of(world: WorldData, col: int) -> int:
 	return world.rows
 
 
-## The world-engine handshake: a generator produces a WorldData deterministically; the sim ingests
-## it; mining carves a block but leaves its wall. Validates the gen↔sim contract independent of viz.
+## The world-engine handshake: a generator produces a WorldData deterministically, the sim ingests it,
+## and mining carves a block but leaves its wall. Validates the gen/sim contract independent of viz.
 func _test_worldgen() -> void:
 	print("- worldgen")
 	var gen: WorldGen = HeightmapWorldGen.new()
@@ -327,19 +327,19 @@ func _test_worldgen() -> void:
 	_check(a.blocks == b.blocks, "same seed → identical blocks (deterministic)")
 	var c: WorldData = gen.generate(72, 40, 99)
 	_check(a.blocks != c.blocks, "a different seed → a different world (ore scatter varies)")
-	# The stone smoke test: earth near the surface, stone deep down (richness via a new material id).
+	# The stone smoke test: earth near the surface, stone deep down, under a distinct material id.
 	var top: int = HeightmapWorldGen.FLAT_SURFACE_ROW
 	_check(a.blocks.get(Vector2i(2, top)) == &"earth", "surface is earth")
 	_check(a.blocks.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone",
 		"deep cells are stone (a new material dropped into generation)")
-	# The background WALL layer (Slice 3): walls behind every sub-surface cell, matching the rock zone.
+	# The background WALL layer: a wall behind every sub-surface cell, matching the rock zone.
 	_check(a.walls.size() > 0 and a.walls == b.walls, "walls generated + deterministic")
 	_check(a.walls.get(Vector2i(2, top)) == &"dirt_wall", "near-surface wall is dirt")
 	_check(a.walls.get(Vector2i(2, top + HeightmapWorldGen.STONE_DEPTH + 2)) == &"stone_wall",
 		"deep wall is stone")
 
 
-	# Ingest + wall persistence (Slice 3): mining clears the block, keeps the wall.
+	# Ingest and wall persistence: mining clears the block and keeps the wall.
 	var sim: FactorySim = FactorySim.new()
 	sim.load_world(a)
 	_check(sim.is_solid(Vector2i(2, top)), "sim ingested the world (surface cell is solid)")
@@ -349,15 +349,15 @@ func _test_worldgen() -> void:
 	_check(sim.wall_at(Vector2i(2, top)) == &"stone_wall", "the background wall survives mining the block")
 
 
-## The RICHER generator: same WorldData contract, deterministic, but now with CAVES (carved cells
-## that keep their wall, only below CAVE_MIN_DEPTH so the base stays solid) and DEPTH-BANDED ore
-## (more ore deep than shallow — the "deeper = richer" pull). Still emits only known material ids, so
-## the renderer is untouched.
+## The richer generator: the same WorldData contract, still deterministic, but now with CAVES (carved
+## cells that keep their wall, only below CAVE_MIN_DEPTH so the base stays solid) and DEPTH-BANDED ore,
+## more of it deep than shallow, which is the "deeper is richer" pull. It still emits only known
+## material ids, so the renderer is untouched.
 func _test_layered_worldgen() -> void:
 	print("- layered worldgen")
 	var gen: WorldGen = LayeredWorldGen.new()
-	# Measure on the REAL world size: solid≫cave is a full-world property, and a truncated 40-row slice is
-	# disproportionately "deep" (its whole band sits in the low-threshold zone) so it over-reads cave.
+	# Measure on the REAL world size: solid ≫ cave is a full-world property, and a truncated 40-row slice
+	# is disproportionately "deep" (its whole band sits in the low-threshold zone), so it over-reads cave.
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
 	var mid: int = rows / 2
@@ -366,8 +366,8 @@ func _test_layered_worldgen() -> void:
 	_check(a.blocks == b.blocks, "same seed → identical blocks (deterministic, caves + veins)")
 	_check(gen.generate(cols, rows, 99).blocks != a.blocks, "a different seed → a different world")
 
-	# CAVES: some sub-surface cells are carved OPEN (block gone) yet still have a wall behind them —
-	# a Terraria carved room. And the near-surface base is untouched (caves only below CAVE_MIN_DEPTH).
+	# Caves: some sub-surface cells are carved OPEN (block gone) yet still have a wall behind them, a
+	# Terraria carved room. And the near-surface base is untouched, since caves start at CAVE_MIN_DEPTH.
 	var carved: int = 0
 	var carved_with_wall: int = 0
 	var route_cells: int = 0
@@ -396,26 +396,26 @@ func _test_layered_worldgen() -> void:
 	_check(carved > 50, "caves carved open cells in the rock (%d)" % carved)
 	_check(carved_with_wall == carved, "every carved cell kept its wall (Terraria room, not void)")
 
-	# THE LID, AND ITS DOORS. The near-surface band stays solid by construction — the open dark is
-	# something you go DOWN to, never something that opens under your feet — with the deliberate exception
-	# of the sinkhole mouths. Applied without exception the rule sealed the ENTIRE underground under an
-	# unbroken lid (tools/check_descent measured the whole connected open space of a world reaching one row
-	# below the surface, with forty rows of chasm in a bottle beneath it), so what is guarded now is the
-	# rule as designed: no UNDIRECTED carve may touch the base, and the doors are few and deliberate.
+	# The lid, and its doors. The near-surface band stays solid by construction, so the open dark is
+	# something you go DOWN to and never something that opens under your feet, with the deliberate
+	# exception of the sinkhole mouths. Applied without that exception the rule seals the ENTIRE
+	# underground under an unbroken lid: tools/check_descent measured a world whose whole connected open
+	# space reached one row below the surface, with forty rows of chasm bottled beneath it. So the rule
+	# guarded here is the designed one: no UNDIRECTED carve may touch the base, and the doors are few.
 	_check(breached_off_route == 0,
 		"no undirected cave breached the near-surface base (%d cells)" % breached_off_route)
 	_check(mouth_cols.size() > 0, "...but the lid does have doors in it (%d columns)" % mouth_cols.size())
 
-	# DIG-YOUR-FACTORY (#107, PROGRESSION §10 / DESIGN_REVIEW F2): the underground must be SOLID-dominant —
-	# you carve your factory INTO ore-rich rock; caves are the rarer opt-in punctuation, NOT the medium you
-	# traverse (follow-the-cave). Guard the identity so a future gen change can't silently drift it back.
+	# Dig-your-factory (docs/PROGRESSION.md §10): the underground must be SOLID-dominant. You carve your
+	# factory INTO ore-rich rock, and caves are the rarer opt-in punctuation, not the medium you traverse.
+	# Guarding the identity here is what stops a future gen change drifting it back to follow-the-cave.
 	#
-	# Measured on UNDIRECTED cave, because that is what the identity is about. A rift cut on purpose to give
-	# the world a vertical dimension, and the throat that connects it to daylight, are the opposite of the
-	# thing this guard defends against while being indistinguishable from it in a raw open-cell count — so
-	# counting them here does not protect the identity, it just makes deliberate structure unaffordable.
-	# The generator marks its own route carves (WorldData.routes); a second, looser ceiling on the TOTAL
-	# still catches a world that has simply become swiss cheese by any means.
+	# Measured on UNDIRECTED cave, because that is what the identity is about. A rift cut on purpose to
+	# give the world a vertical dimension, and the throat that connects it to daylight, are the opposite
+	# of the thing this guard defends against while being indistinguishable from it in a raw open-cell
+	# count, so counting them does not protect the identity, it just makes deliberate structure
+	# unaffordable. The generator marks its own route carves in WorldData.routes, and a second, looser
+	# ceiling on the TOTAL still catches a world that has simply become swiss cheese by any means.
 	var total_below: int = maxi(1, solid_below + carved)
 	var undirected: float = float(carved - route_cells) / float(total_below)
 	var open_frac: float = float(carved) / float(total_below)
@@ -426,7 +426,7 @@ func _test_layered_worldgen() -> void:
 		"...and the underground is solid-dominant all in (%.1f%% open, routes included)"
 		% [open_frac * 100.0])
 
-	# DEPTH-BANDED ORE: count ore in the top half vs the bottom half of the sub-surface column band.
+	# Depth-banded ore: count ore in the top half against the bottom half of the sub-surface band.
 	var ore_shallow: int = 0
 	var ore_deep: int = 0
 	for cell: Vector2i in a.blocks:
@@ -450,7 +450,7 @@ func _test_layered_worldgen() -> void:
 	_check(not sim.is_solid(probe), "a carved cave loads as open (not solid)")
 	_check(sim.wall_at(probe) != &"", "the carved cave still shows its background wall")
 
-	# --- AQUIFERS (L3, slice 3a): deep SEALED water pockets seeded into carved rock. ---
+	# --- Aquifers: deep sealed water pockets seeded into carved rock. ---
 	_check(not a.water.is_empty(), "aquifers seeded some water (%d cells)" % a.water.size())
 	var watered: int = 0
 	var near_surface: int = 0
@@ -463,7 +463,7 @@ func _test_layered_worldgen() -> void:
 		var lvl: int = int(a.water[wc])
 		if lvl < 1 or lvl > FactorySim.WATER_MAX:
 			bad_level += 1
-		# DEEP + BASE-SAFE: every watered cell sits below its column's base-safe band, never near the surface.
+		# Deep and base-safe: every watered cell sits below its column's base-safe band, never near the top.
 		if wc.y < hm.ground_row(wc.x) + LayeredWorldGen.CAVE_MIN_DEPTH:
 			near_surface += 1
 		# NO watered cell is also solid rock (water only lives in the cells the aquifer pass carved open).
@@ -476,9 +476,9 @@ func _test_layered_worldgen() -> void:
 	_check(near_surface == 0, "no aquifer water in the base-safe band (all deep, base stays dry)")
 	_check(bad_level == 0, "every water level is valid (1..WATER_MAX)")
 	_check(in_solid == 0, "no watered cell is solid or in the seal band (water only in carved cells)")
-	# DETERMINISM: same seed → identical water grid (seeded rng only, no time/global random).
+	# Determinism: the same seed yields an identical water grid (seeded rng only, no global random).
 	_check(a.water == b.water, "same seed → identical aquifer water (deterministic)")
-	# INGEST: the sim loads the water and it survives the contract (matches the generated grid).
+	# Ingest: the sim loads the water and it survives the contract, matching the generated grid.
 	_check(sim.total_water() > 0, "load_world ingested the aquifer water (total=%d)" % sim.total_water())
 	var water_match: bool = sim.water.size() == a.water.size()
 	if water_match:
@@ -488,9 +488,9 @@ func _test_layered_worldgen() -> void:
 				break
 	_check(water_match, "sim.water matches the generated world's water grid exactly")
 
-	# --- AQUIFER TREASURE (L3 risk/REWARD): the flood GUARDS a rich vein. Every watered cell adjacent to
-	# solid rock must have &"rich_ore" reachable in its immediate solid surround — so a player who breaches +
-	# drains + mines the drained pocket's walls is rewarded with high-grade ore. Deterministic on seed 1337.
+	# --- Aquifer treasure, the risk-for-reward half: the flood GUARDS a rich vein. Every watered cell
+	# adjacent to solid rock must have &"rich_ore" reachable in its immediate solid surround, so a player
+	# who breaches, drains, and mines the drained pocket's walls is paid in high-grade ore. Seed 1337. ---
 	var rich_neighbours: int = 0            # water cells with rich_ore in a 4-neighbour solid wall
 	var rich_deposits: int = 0             # those rich cells that carry a valid deposit amount
 	var rich_seen: Dictionary = {}
@@ -509,7 +509,7 @@ func _test_layered_worldgen() -> void:
 		% rich_neighbours)
 	_check(rich_deposits > 0 and rich_deposits == rich_seen.size(),
 		"every aquifer-wall rich_ore cell carries a real deposit amount (%d cells, all valid)" % rich_deposits)
-	# The rich ore lines the SOLID rock — it is never a watered/carved cell (grows into rock, not the pocket).
+	# The rich ore lines the SOLID rock and never a watered or carved cell: it grows into rock, not pocket.
 	var rich_in_water: int = 0
 	for rc: Vector2i in rich_seen:
 		if a.water.has(rc):
@@ -517,32 +517,34 @@ func _test_layered_worldgen() -> void:
 	_check(rich_in_water == 0, "aquifer rich_ore is only in solid rock, never in the flooded cells")
 
 
-## WORLDGEN FUZZ (the invariant sweep): generate MANY worlds across a matrix of seeds × sizes and assert
-## the generation invariants hold UNIVERSALLY, not just for _test_layered_worldgen's one happy-path
-## size/seed. The happy path can pass while an edge seed holes the seal, an edge size breaks base-safety,
-## or a stray cell lands OOB / water sits in rock. Each world is checked structurally (pure generation,
-## no ticks) so the whole sweep stays fast. A single failing (seed,size) reports its exact offending numbers.
+## The worldgen fuzz sweep: generate many worlds across a matrix of seeds × sizes and assert the
+## generation invariants hold UNIVERSALLY, not just for _test_layered_worldgen's one happy-path size
+## and seed. The happy path can pass while an edge seed holes the seal, an edge size breaks base-safety,
+## or a stray cell lands out of bounds and water sits in rock. Each world is checked structurally (pure
+## generation, no ticks) so the whole sweep stays fast, and a single failing (seed,size) reports its
+## exact offending numbers.
 ##
 ## Invariants asserted per world:
-##   1. In-bounds     — every blocks/walls/amounts/water key is within (cols,rows).
-##   2. Base-safe     — no carved cave AND no water within CAVE_MIN_DEPTH of the column's surface.
-##   3. Seal intact   — rows SEAL_TOP..+SEAL_ROWS-1 are full-width sealrock (only when the world contains them).
-##   4. No water in rock — no cell is both solid and watered; every water level is in 1..WATER_MAX.
-##   5. Water deep    — every water cell is below the base-safe band (aquifers never near surface).
-##   6. Determinism   — same (seed,size) twice → identical blocks/walls/amounts/water.
-##   7. Load-clean    — load_world ingests without crash; sim.total_water() matches the generated grid
-##                      (sizes are kept ≤ the sim's fixed GRID so nothing is clamped away).
-##   8. Lode legal    — every generated vein is behind host rock, dry, outside the seal, walled, and rich;
-##                      and the plane ingests whole (count, material, positive lode_max).
-##   9. Lode usable   — on every PRODUCTION-size world: a buried vein in each tier, and the chain through
-##                      the real contract — buried → not workable; clear the rock → workable; work it →
-##                      yields its own ore. The arm's own coverage is asserted, not assumed.
+##   1. In-bounds:        every blocks/walls/amounts/water key is within (cols,rows).
+##   2. Base-safe:        no carved cave and no water within CAVE_MIN_DEPTH of the column's surface.
+##   3. Seal intact:      rows SEAL_TOP..+SEAL_ROWS-1 are full-width sealrock, where the world has them.
+##   4. No water in rock: no cell is both solid and watered; every water level is in 1..WATER_MAX.
+##   5. Water deep:       every water cell is below the base-safe band (aquifers never near surface).
+##   6. Determinism:      the same (seed,size) twice yields identical blocks/walls/amounts/water.
+##   7. Load-clean:       load_world ingests without crash and sim.total_water() matches the generated
+##                        grid (sizes stay within the sim's fixed GRID so nothing is clamped away).
+##   8. Lode legal:       every generated vein is behind host rock, dry, outside the seal, walled and
+##                        rich; and the plane ingests whole (count, material, positive lode_max).
+##   9. Lode usable:      on every PRODUCTION-size world, a buried vein in each tier, and the chain
+##                        through the real contract: buried means not workable, clearing the rock makes
+##                        it workable, working it yields its own ore. The arm's own coverage is
+##                        asserted rather than assumed.
 ##
 ## 8 and 9 exist because the lode plane's first evidence was a single seed. `_test_generated_lodes` runs
 ## seed 1337 at one size and proves the design; it cannot speak for the generator across seeds, and the
-## sweep that was built for exactly that did not know the plane existed. Citing the one-seed guard as
-## cross-seed evidence would have been the same error the plane itself was introduced to fix — a sound
-## instrument reporting on a population it was never pointed at.
+## sweep built for exactly that did not know the plane existed. Citing the one-seed guard as cross-seed
+## evidence would repeat the error the plane was introduced to fix: a sound instrument reporting on a
+## population it was never pointed at.
 func _test_worldgen_fuzz() -> void:
 	print("- worldgen fuzz (seeds × sizes)")
 	var gen := LayeredWorldGen.new()
@@ -551,22 +553,23 @@ func _test_worldgen_fuzz() -> void:
 	var hm := HeightmapWorldGen.new()
 
 	var seeds: Array[int] = [0, 1, 7, 42, 1337, 99999, 20260807, 314159, 2, 123456789, 555, 88888]
-	# Sizes: the REAL size plus small/edge dims. All kept ≤ the sim's fixed GRID_COLS×GRID_ROWS so
-	# load_world (which clamps to that fixed grid via in_bounds) ingests every cell — a clean load check.
+	# Sizes: the REAL size plus small and edge dims, all kept within the sim's fixed GRID_COLS×GRID_ROWS
+	# so load_world (which clamps to that grid via in_bounds) ingests every cell, keeping the load check
+	# clean.
 	var sizes: Array[Vector2i] = [
-		Vector2i(FactorySim.GRID_COLS, FactorySim.GRID_ROWS),   # 96×80, the shipping size
+		Vector2i(FactorySim.GRID_COLS, FactorySim.GRID_ROWS),   # 128×128, the shipping size
 		Vector2i(72, 40),                                        # the old happy-path dims
 		Vector2i(48, 40),
 		Vector2i(32, 24),
-		Vector2i(20, 20),                                        # tiny — surface (17..25) crowds the floor
+		Vector2i(20, 20),                                        # tiny: shorter than the 11..31 ground band
 	]
 
 	var seal_lo: int = LayeredWorldGen.SEAL_TOP
 	var seal_hi: int = LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS - 1
 	var worlds: int = 0
 
-	# Accumulated failure counts across the whole sweep — a single _check per invariant reports the FIRST
-	# offending (seed,size)+numbers, so a red is precise instead of a wall of repeats.
+	# First-failure strings accumulated across the whole sweep. One _check per invariant reports the
+	# FIRST offending (seed,size) and its numbers, so a red is precise instead of a wall of repeats.
 	var oob_fail: String = ""
 	var basesafe_fail: String = ""
 	var seal_fail: String = ""
@@ -589,7 +592,7 @@ func _test_worldgen_fuzz() -> void:
 			worlds += 1
 			var tag: String = "(seed=%d, %dx%d)" % [seed, cols, rows]
 
-			# --- 1. IN-BOUNDS: every key of every grid sits inside (cols,rows). ---
+			# --- 1. In-bounds: every key of every grid sits inside (cols,rows). ---
 			if oob_fail == "":
 				for grid: Dictionary in [world.blocks, world.walls, world.amounts, world.water, world.lodes]:
 					for cell: Vector2i in grid:
@@ -599,19 +602,19 @@ func _test_worldgen_fuzz() -> void:
 					if oob_fail != "":
 						break
 
-			# --- 2/5. BASE-SAFE + WATER-DEEP: nothing carved or watered in a column's base-safe band. ---
-			# A carved cave = a cell with a wall but no block, below the surface. It (and any water) must
-			# never sit within CAVE_MIN_DEPTH of the column surface — the spawn base stays solid + dry.
+			# --- 2 and 5. Base-safe and water-deep: nothing carved or watered in the base-safe band. ---
+			# A carved cave is a cell with a wall but no block, below the surface. Neither it nor any water
+			# may sit within CAVE_MIN_DEPTH of the column surface: the spawn base stays solid and dry.
 			if basesafe_fail == "":
 				for col: int in cols:
 					var top: int = hm.ground_row(col)
 					var safe_bottom: int = top + LayeredWorldGen.CAVE_MIN_DEPTH   # first cave-eligible row
 					for row: int in range(top, mini(safe_bottom, rows)):
 						var cell := Vector2i(col, row)
-						# Carved = wall present, block absent (a Terraria room). A never-filled sky cell has
-						# neither, so require the wall to distinguish a carved cave from open air above ground.
-						# ...except a sinkhole throat, which is the one carve allowed to reach daylight and
-						# is the reason the underground is reachable at all (see WorldData.routes).
+						# Carved means wall present, block absent (a Terraria room). A never-filled sky
+						# cell has neither, so requiring the wall is what tells a carved cave from open
+						# air above ground. The exception is a sinkhole throat, the one carve allowed to
+						# reach daylight and the reason the underground is reachable (WorldData.routes).
 						if world.walls.has(cell) and not world.blocks.has(cell) and not world.routes.has(cell):
 							basesafe_fail = "%s carved cave at %s within base-safe band (surface=%d)" \
 								% [tag, str(cell), top]
@@ -623,7 +626,7 @@ func _test_worldgen_fuzz() -> void:
 					if basesafe_fail != "":
 						break
 
-			# --- 3. SEAL INTACT: rows SEAL_TOP..seal_hi are FULL-WIDTH sealrock, only when tall enough. ---
+			# --- 3. Seal intact: rows SEAL_TOP..seal_hi are full-width sealrock, when the world is tall enough. ---
 			if seal_fail == "" and rows > seal_hi:
 				for row: int in range(seal_lo, seal_hi + 1):
 					for col: int in cols:
@@ -634,7 +637,7 @@ func _test_worldgen_fuzz() -> void:
 					if seal_fail != "":
 						break
 
-			# --- 4. NO WATER IN ROCK + valid levels. ---
+			# --- 4. No water in rock, and every level valid. ---
 			for wc: Vector2i in world.water:
 				var lvl: int = int(world.water[wc])
 				if world.blocks.has(wc) and water_rock_fail == "":
@@ -643,7 +646,7 @@ func _test_worldgen_fuzz() -> void:
 				if (lvl < 1 or lvl > FactorySim.WATER_MAX) and water_level_fail == "":
 					water_level_fail = "%s water level %d at %s out of 1..%d" \
 						% [tag, lvl, str(wc), FactorySim.WATER_MAX]
-				# --- 5. WATER DEEP: below the base-safe band AND at/below the deep aquifer band. ---
+				# --- 5. Water deep: below the base-safe band, and at or below AQUIFER_MIN_ROW. ---
 				var wtop: int = hm.ground_row(wc.x)
 				if wc.y < wtop + LayeredWorldGen.CAVE_MIN_DEPTH and water_deep_fail == "":
 					water_deep_fail = "%s water at %s within base-safe band (surface=%d)" % [tag, str(wc), wtop]
@@ -651,10 +654,10 @@ func _test_worldgen_fuzz() -> void:
 					water_deep_fail = "%s water at %s above AQUIFER_MIN_ROW=%d" \
 						% [tag, str(wc), LayeredWorldGen.AQUIFER_MIN_ROW]
 
-			# --- 8. LODE LEGALITY: every generated vein is behind host rock, dry, out of the seal, and rich. ---
-			# The single-seed guard (_test_generated_lodes) proves this for seed 1337 at one size. That is one
-			# world, and the lode plane is generated per-seed like everything else here — so the cross-seed
-			# claim belongs in the population that already sweeps seeds, not beside it.
+			# --- 8. Lode legality: every vein is behind host rock, dry, out of the seal, and rich. ---
+			# The single-seed guard (_test_generated_lodes) proves this for seed 1337 at one size. That is
+			# one world, and the lode plane is generated per-seed like everything else here, so the
+			# cross-seed claim belongs in the population that already sweeps seeds.
 			for lc: Vector2i in world.lodes:
 				var host: StringName = world.blocks.get(lc, &"")
 				if lode_legal_fail == "":
@@ -667,17 +670,17 @@ func _test_worldgen_fuzz() -> void:
 						lode_legal_fail = "%s lode %s is inside the seal band" % [tag, str(lc)]
 					elif not world.walls.has(lc):
 						lode_legal_fail = "%s lode %s has no wall behind it" % [tag, str(lc)]
-				# Richness is the deposit — a lode with none is a vein that pays nothing, which is the
+				# Richness is the deposit. A lode with none is a vein that pays nothing, which is the
 				# generated-world version of the defect this whole plane exists to fix.
 				if int(world.amounts.get(lc, 0)) <= 0 and lode_amount_fail == "":
 					lode_amount_fail = "%s lode %s carries deposit %d" \
 						% [tag, str(lc), int(world.amounts.get(lc, 0))]
 
-			# --- 9. USABLE BURIED LODE IN BOTH TIERS, production-size worlds only. ---
-			# Guarded on `rows > seal_hi` because a 20- or 40-row world has no below-seal band at all, and an
-			# arm that silently skips every world it cannot satisfy is the vacuity this suite keeps finding in
-			# other people's fixtures. `tier_worlds` is asserted against the seed count below, so if the guard
-			# ever stops admitting anything the sweep FAILS instead of quietly proving nothing.
+			# --- 9. A usable buried lode in both tiers, production-size worlds only. ---
+			# Guarded on `rows > seal_hi` because a 20- or 40-row world has no below-seal band at all, and
+			# an arm that silently skips every world it cannot satisfy proves nothing while passing.
+			# `tier_worlds` is asserted against the seed count below, so if the guard ever stops admitting
+			# worlds the sweep FAILS instead of going quietly vacuous.
 			if rows > seal_hi:
 				tier_worlds += 1
 				var l2_top: int = LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS
@@ -696,8 +699,8 @@ func _test_worldgen_fuzz() -> void:
 				elif probe_below.x < 0 and lode_tier_fail == "":
 					lode_tier_fail = "%s no buried lode below the seal" % tag
 				elif lode_tier_fail == "":
-					# The chain, through the real contract: buried → not workable; clear the host rock →
-					# workable; work it → yields its own ore. Both tiers, every seed.
+					# The chain, through the real contract: buried means not workable, clearing the host
+					# rock makes it workable, working it yields its own ore. Both tiers, every seed.
 					var tsim: FactorySim = FactorySim.new()
 					tsim.load_world(world)
 					for probe: Vector2i in [probe_above, probe_below]:
@@ -714,7 +717,7 @@ func _test_worldgen_fuzz() -> void:
 								% [tag, str(probe)]
 							break
 
-			# --- 6. DETERMINISM: regenerating the same (seed,size) yields identical grids. ---
+			# --- 6. Determinism: regenerating the same (seed,size) yields identical grids. ---
 			if determinism_fail == "":
 				var again: WorldData = gen.generate(cols, rows, seed)
 				if world.blocks != again.blocks:
@@ -728,11 +731,11 @@ func _test_worldgen_fuzz() -> void:
 				elif world.lodes != again.lodes:
 					determinism_fail = "%s lodes differ on regen" % tag
 
-			# --- 7. LOAD-CLEAN: ingest through the real contract; total_water matches the grid. ---
+			# --- 7. Load-clean: ingest through the real contract, and total_water matches the grid. ---
 			if load_fail == "" or lode_load_fail == "":
 				var sim: FactorySim = FactorySim.new()
 				sim.load_world(world)
-				# Sizes are ≤ the fixed sim grid, so no cell is clamped away → the water totals must match.
+				# Sizes are within the fixed sim grid, so no cell is clamped away and the totals must match.
 				var grid_total: int = 0
 				for v: Variant in world.water.values():
 					grid_total += int(v)
@@ -748,11 +751,11 @@ func _test_worldgen_fuzz() -> void:
 							load_fail = "%s load invented %s (present=%d produced=%d)" \
 								% [tag, it, _items_present(sim, it), int(sim.total_produced.get(it, 0))]
 							break
-				# LODE INGESTION, through the same contract and NOT gated on the water arm — the two failures
-				# are independent and coupling them would let one mask the other. The plane must arrive whole:
-				# same count, same material per cell, and a positive `lode_max`, which is the denominator the
-				# fleck field thins against. A lode that loads with a zero denominator draws as a stripped vein
-				# on an untouched one — the exact bug `lode_max` was introduced to fix.
+				# Lode ingestion, through the same contract and NOT gated on the water arm: the two
+				# failures are independent, and coupling them would let one mask the other. The plane must
+				# arrive whole: same count, same material per cell, and a positive `lode_max`, which is the
+				# denominator the fleck field thins against. A lode that loads with a zero denominator
+				# draws as a stripped vein on an untouched one.
 				if lode_load_fail == "":
 					if sim.lode.size() != world.lodes.size():
 						lode_load_fail = "%s lode count mismatch: sim=%d grid=%d" \
@@ -794,10 +797,10 @@ func _test_worldgen_fuzz() -> void:
 	_check(lode_load_fail == "",
 		"lode load-clean: the plane ingests whole — count, material and a positive lode_max — %s"
 		% ("OK" if lode_load_fail == "" else lode_load_fail))
-	# NON-VACUITY GUARD ON THE TIER ARM. It is skipped for any world too short to contain the seal band,
-	# which is every size in this matrix except the production one. If that guard ever stops admitting
-	# worlds — a shrunk production size, a moved seal — the arm would pass by testing nothing, so the count
-	# is asserted rather than trusted. This is the assertion I would have omitted a week ago.
+	# The non-vacuity guard on the tier arm. That arm is skipped for any world too short to contain the
+	# seal band, which is every size in this matrix except the production one. If the guard ever stops
+	# admitting worlds, whether from a shrunk production size or a moved seal, the arm would pass by
+	# testing nothing, so the count of admitted worlds is asserted rather than trusted.
 	_check(tier_worlds == seeds.size(),
 		"the both-tier arm actually ran on every production-size world (%d of %d seeds)"
 		% [tier_worlds, seeds.size()])
@@ -806,10 +809,10 @@ func _test_worldgen_fuzz() -> void:
 		% ("OK" if lode_tier_fail == "" else lode_tier_fail))
 
 
-## HORIZONTAL ore pull (the frontier fix): ore richness varies across X at a fixed depth, with the richest
-## bands AWAY from spawn — so the cheapest fresh vein isn't always straight down the spawn column. Asserts
-## the distribution is NOT uniform across x (there exist frontier x-regions statistically richer than the
-## spawn region), AND that the horizontal term is fully deterministic (same seed → identical world).
+## The horizontal ore pull: ore richness varies across X at a fixed depth, with the richest bands AWAY
+## from spawn, so the cheapest fresh vein is not always straight down the spawn column. Asserts the
+## distribution is NOT uniform across x, meaning frontier x-regions exist that are richer than the spawn
+## region, and that the horizontal term is fully deterministic in the seed.
 func _test_horizontal_ore_pull() -> void:
 	print("- horizontal ore pull (frontier richness)")
 	var gen := LayeredWorldGen.new()
@@ -817,14 +820,14 @@ func _test_horizontal_ore_pull() -> void:
 	var rows: int = FactorySim.GRID_ROWS
 	var world: WorldData = gen.generate(cols, rows, 20260807)
 
-	# DETERMINISM: the whole world (blocks + amounts) reproduces bit-for-bit, so the new horizontal field
-	# introduced no time/global-random dependence.
+	# Determinism: the whole world, blocks and amounts alike, reproduces bit for bit, so the horizontal
+	# field carries no time or global-random dependence.
 	var again: WorldData = gen.generate(cols, rows, 20260807)
 	_check(world.blocks == again.blocks, "same seed → identical blocks (horizontal field is deterministic)")
 	_check(world.amounts == again.amounts, "same seed → identical per-cell deposits (deterministic richness)")
 
 	# Sum ore MASS (deposit richness) per column over a FIXED depth band, so any variation is purely
-	# horizontal (depth is held constant across the comparison). Above the seal so all cells are real ore rock.
+	# horizontal with depth held constant. The band stays above the seal so every cell is real ore rock.
 	var band_top: int = 30
 	var band_bot: int = mini(LayeredWorldGen.SEAL_TOP, rows)
 	var col_mass: PackedInt32Array = PackedInt32Array()
@@ -842,21 +845,21 @@ func _test_horizontal_ore_pull() -> void:
 	var right_mass: int = _region_mass(col_mass, cols - 2 * half, cols)          # far-right frontier
 	var frontier_mass: int = maxi(left_mass, right_mass)
 
-	# NOT uniform: at a fixed depth some x-regions carry more ore than the spawn region — the frontier is
-	# meaningfully richer (the "you must leave spawn" pull). Guard against a degenerate all-empty band.
+	# Not uniform: at a fixed depth some x-regions carry more ore than the spawn region, which is the
+	# "you must leave spawn" pull. The first check guards against a degenerate all-empty band.
 	_check(spawn_mass + frontier_mass > 0, "the fixed depth band actually contains ore (spawn=%d, frontier=%d)"
 		% [spawn_mass, frontier_mass])
 	_check(frontier_mass > spawn_mass, "a frontier x-region is richer than spawn at a fixed depth (frontier=%d > spawn=%d)"
 		% [frontier_mass, spawn_mass])
 
-	# And the variation is a real spread, not one lucky cell: the richest window clears the spawn window by a
-	# clear margin (the field's design — bands differ by up to ~2×HORIZONTAL_STRENGTH).
+	# And the variation is a real spread rather than one lucky cell: the richest window must clear the
+	# spawn window by at least 15%. The field spans up to 2×HORIZONTAL_STRENGTH between bands.
 	_check(frontier_mass >= int(round(float(maxi(1, spawn_mass)) * 1.15)),
 		"the frontier richness edge is a meaningful margin, not noise (%.2fx spawn)"
 		% (float(frontier_mass) / float(maxi(1, spawn_mass))))
 
-	# The field respects its own bound (subtlety guarantee): every column multiplier is within
-	# [1-STRENGTH, 1+STRENGTH], so near-spawn ore is thinned but never nuked.
+	# The field respects its own bound, which is the subtlety guarantee: every column multiplier is
+	# within [1-STRENGTH, 1+STRENGTH], so near-spawn ore is thinned but never nuked.
 	var hfield: PackedFloat32Array = gen._horizontal_field(cols, 20260807)
 	var in_bound: bool = true
 	for c: int in cols:
@@ -874,13 +877,13 @@ func _region_mass(col_mass: PackedInt32Array, lo: int, hi: int) -> int:
 	return total
 
 
-## ORE QUALITY: vein seeds landing in/below the deepslate band come up RICH — a distinct
-## material (it READS in-world) whose chunk the Enrichment-gated BLAST FURNACE smelts 1 → 2 ingots.
-## Deeper = richer gains its second axis: deep veins aren't just bigger, they're better.
+## Ore quality: vein seeds landing in or below the deepslate band come up RICH, a distinct material that
+## reads in-world, and whose chunk the Enrichment-gated Blast Furnace smelts one-for-two into ingots.
+## That is the second axis of "deeper is richer": deep veins are not just bigger, they are better.
 func _test_rich_ore() -> void:
 	print("- rich ore + the blast furnace (#48)")
-	# Worldgen: rich veins exist, and only around/below the deepslate band (seeds are band-gated; a
-	# grown blob may crest a few rows above its seed, never further).
+	# Worldgen: rich veins exist, and only around or below the deepslate band. Seeds are band-gated and a
+	# grown blob may crest a few rows above its seed, so the check allows DEEPSLATE_ROW - 8 and no more.
 	var gen := LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 4242)
 	var rich_cells: int = 0
@@ -906,7 +909,7 @@ func _test_rich_ore() -> void:
 	sim.inventory[&"iron_ingot"] = 4; sim.total_produced[&"iron_ingot"] = 4
 	_check(sim.research_tech(&"enrichment"), "Enrichment researches (rich-ore sample + 4 iron ingots)")
 	_check(sim.craft(bf_def), "…and the Blast Furnace crafts (2 plate + 1 gear)")
-	# 1 rich ore → 2 ingots, gravity-fed, conserved (double the plain forge's 2-ore-per-ingot density).
+	# One rich ore makes 2 ingots, gravity-fed and conserved: double the plain forge's per-craft yield.
 	sim.set_solid(Vector2i(6, 6), &"stone")
 	sim.place_machine(bf_def, Vector2i(6, 3))
 	sim.inventory[&"rich_ore"] = int(sim.inventory.get(&"rich_ore", 0)) + 3
@@ -922,16 +925,16 @@ func _test_rich_ore() -> void:
 		_check(present == net, "%s conserved through enrichment (present=%d, net=%d)" % [item, present, net])
 
 
-## FINE TERRAIN (P2 — the dual-grid overhaul). The fine grid is ADDITIVE + DERIVED:
-## it must be (a) deterministic from seed, (b) NEVER change the coarse authority that ALL logistics read,
-## (c) stay in sync when a coarse cell is edited, and (d) rebuild identically after a load. If any of these
-## breaks, the locked hook or the save format is at risk — so this is a guardrail, not a feature test.
+## Fine terrain, the dual-grid overhaul. The fine grid is ADDITIVE and DERIVED, so it must be
+## (a) deterministic from seed, (b) unable to change the coarse authority that all logistics read,
+## (c) in sync when a coarse cell is edited, and (d) identically rebuilt after a load. If any of those
+## breaks, the locked hook or the save format is at risk. This is a guardrail, not a feature test.
 func _test_fine_terrain() -> void:
 	print("[fine terrain]")
 	var gen: WorldGen = LayeredWorldGen.new()
 	var world: WorldData = gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337)
 
-	# (a) DETERMINISM — same seed → identical fine array across two independent loads.
+	# (a) Determinism: the same seed gives an identical fine array across two independent loads.
 	var s1: FactorySim = FactorySim.new()
 	s1.load_world(world)
 	var s2: FactorySim = FactorySim.new()
@@ -939,8 +942,8 @@ func _test_fine_terrain() -> void:
 	_check(s1.fine_w() == FactorySim.GRID_COLS * FactorySim.SUBDIV
 		and s1.fine_h() == FactorySim.GRID_ROWS * FactorySim.SUBDIV, "fine grid is SUBDIV× the coarse grid")
 	_check(_fine_checksum(s1) == _fine_checksum(s2), "same seed → identical fine array (deterministic)")
-	# The fine grid has REAL detail: some fine cells differ from a pure 4× upscale of the coarse grid
-	# (the boundary molding erodes/accretes edges) — proving it's fine DATA, not just a stretched coarse mask.
+	# The fine grid has REAL detail: more than 200 fine cells differ from a pure SUBDIV× upscale of the
+	# coarse grid, because the boundary molding erodes and accretes edges. A stretched mask differs nowhere.
 	var molded: int = 0
 	var solid_fine: int = 0
 	for fy: int in s1.fine_h():
@@ -953,10 +956,10 @@ func _test_fine_terrain() -> void:
 	_check(solid_fine > 0, "the fine grid has solid rock in it (%d cells)" % solid_fine)
 	_check(molded > 200, "fine molding bends the coarse boundary (%d fine cells differ from coarse)" % molded)
 
-	# (b) COARSE UNCHANGED — the coarse solid/material for a fixed seed must be IDENTICAL to what it was
-	# before the fine layer existed. We prove the fine layer is purely additive two ways: the coarse
-	# checksum matches a second independent load, and known interior cells read exactly as the coarse
-	# grid intends (a solid earth cell stays solid earth; a carved cave stays open).
+	# (b) Coarse unchanged: the coarse solid and material grids for a fixed seed must be identical to
+	# what they were before the fine layer existed. Two independent proofs that the fine layer is purely
+	# additive: the coarse checksum matches a second independent load, and known interior cells read
+	# exactly as the coarse grid intends, so a solid earth cell stays solid earth and a cave stays open.
 	_check(_coarse_checksum(s1) == _coarse_checksum(s2), "coarse solid grid identical across loads (fine is additive)")
 	# The world is generated at exactly GRID_COLS×GRID_ROWS, so every block is in bounds → solid == blocks.
 	_check(s1.solid == world.blocks, "coarse solid == the ingested WorldData blocks (unchanged by fine)")
@@ -964,11 +967,11 @@ func _test_fine_terrain() -> void:
 	_check(a_solid.x >= 0 and s1.is_solid(a_solid), "a known coarse-solid cell is still solid")
 	_check(s1.material_at(a_solid) == world.blocks.get(a_solid, &""), "material_at unchanged by the fine layer")
 
-	# (c) SYNC — mining a coarse cell re-molds its 4×4 fine block (+ the boundary band), and the O(local)
-	# incremental sync must produce EXACTLY what a full rebuild would (the load-time path); if these ever
-	# diverge, the fine grid silently rots after digging. We mine a solid cell that has OPEN AIR right below
-	# it (a cavity/cave-edge cell) so the opening actually admits — its block drains toward air — then assert
-	# the block cleared AND that the whole grid equals a full rebuild of the identical coarse state.
+	# (c) Sync: mining a coarse cell re-molds its SUBDIV×SUBDIV fine block and the boundary band around
+	# it, and the O(local) incremental sync must produce exactly what a full rebuild (the load-time path)
+	# would. If the two ever diverge, the fine grid silently rots after digging. The dug cell is chosen
+	# with OPEN AIR right below it so the opening actually admits and its block drains toward air; the
+	# checks are that the block cleared and that the whole grid equals a rebuild of the same coarse state.
 	var dug: Vector2i = _first_solid_over_air(s1)
 	_check(dug.x >= 0, "found a solid cell with open air below to mine")
 	var pre_solid: int = _fine_block_solid(s1, dug)
@@ -984,8 +987,8 @@ func _test_fine_terrain() -> void:
 	rebuilt.rebuild_fine_terrain()
 	_check(_fine_bytes(s1) == _fine_bytes(rebuilt), "incremental dig-sync == a full rebuild (no drift)")
 
-	# (d) LOAD REBUILDS IDENTICAL — a save/restore round-trip through disk must produce the SAME fine
-	# terrain (it is derived, rebuilt by restore, never stored — so it can never desync or bloat the save).
+	# (d) Load rebuilds identical: a save and restore round-trip through disk must produce the same fine
+	# terrain. It is derived, rebuilt by restore and never stored, so it cannot desync or bloat the save.
 	var s3: FactorySim = FactorySim.new()
 	s3.load_world(gen.generate(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, 1337))
 	s3.mine(_first_solid_over_air(s3))             # scar it (a real dig) before saving
@@ -1009,7 +1012,7 @@ func _fine_block_solid(sim: FactorySim, coarse: Vector2i) -> int:
 	return n
 
 
-## A checksum of the fine solid grid — cheap byte fold, enough to catch any divergence.
+## A checksum of the fine solid grid: a cheap byte fold, enough to catch any divergence.
 func _fine_checksum(sim: FactorySim) -> int:
 	var h: int = 1469598103
 	for fy: int in sim.fine_h():
@@ -1028,7 +1031,7 @@ func _fine_bytes(sim: FactorySim) -> PackedByteArray:
 	return out
 
 
-## A checksum of the COARSE solid grid (material ids folded in) — proves the coarse authority is unchanged.
+## A checksum of the COARSE solid grid, material ids folded in, so it proves the coarse authority held.
 func _coarse_checksum(sim: FactorySim) -> int:
 	var keys: Array = sim.solid.keys()
 	keys.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
@@ -1039,7 +1042,7 @@ func _coarse_checksum(sim: FactorySim) -> int:
 	return h
 
 
-## First solid cell scanning down a central column — a known-solid interior probe.
+## First solid cell scanning down a central column: a known-solid interior probe.
 func _first_deep_solid(sim: FactorySim) -> Vector2i:
 	var col: int = FactorySim.GRID_COLS / 2
 	for row: int in range(0, FactorySim.GRID_ROWS):
@@ -1048,8 +1051,8 @@ func _first_deep_solid(sim: FactorySim) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-## First mineable solid cell that sits directly OVER open air (a cavity/cave-edge cell) — mining it
-## genuinely opens the fine block toward air (its bilinear solidness drops), the clean sync case.
+## First mineable solid cell that sits directly OVER open air, at a cavity or cave edge. Mining one of
+## those genuinely opens the fine block toward air, dropping its bilinear solidness: the clean sync case.
 func _first_solid_over_air(sim: FactorySim) -> Vector2i:
 	for row: int in range(0, FactorySim.GRID_ROWS - 1):
 		for col: int in range(0, FactorySim.GRID_COLS):
@@ -1057,6 +1060,6 @@ func _first_solid_over_air(sim: FactorySim) -> Vector2i:
 			if not sim.is_solid(c) or sim.is_solid(c + Vector2i(0, 1)):
 				continue
 			if str(sim.solid[c]) == "sealrock":
-				continue                                          # unmineable — skip
+				continue                                          # sealrock is unmineable, so skip it
 			return c
 	return Vector2i(-1, -1)

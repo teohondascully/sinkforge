@@ -1,9 +1,9 @@
 extends "res://tests/test_base.gd"
 
-## Power + fluids suite — the L2 power field and conduit network (power floods DOWN + lateral, never
-## up), the powered lift and the pump (the paid inverses of gravity and flood), and the discrete-cell
-## water / aquifer layer. Asserts the power field solves in one top-to-bottom sweep and that the
-## flow / drain / lift costs behave deterministically.
+## Power and fluids suite: the L2 power field and conduit network (power floods DOWN and lateral,
+## never up), the powered lift and the pump (the paid inverses of gravity and flood), and the
+## discrete-cell water / aquifer layer. Asserts the power field solves in one top-to-bottom sweep
+## and that the flow, drain and lift costs behave deterministically.
 
 
 func _initialize() -> void:
@@ -16,8 +16,8 @@ func _initialize() -> void:
 	_finish("power/water tests")
 
 
-## POWER: a fueled generator pours power into its aura; out of coal it goes dark; coal
-## is genuinely consumed (conservation). The field is derived — recomputed each tick, never stored.
+## A fueled generator pours power into its aura; out of coal it goes dark; the coal is genuinely
+## consumed, so conservation holds. The field is derived: recomputed each tick, never stored.
 func _test_power_field() -> void:
 	print("- power field + generator")
 	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
@@ -48,9 +48,10 @@ func _test_power_field() -> void:
 	_check(present == net, "coal conserved across burning (present=%d, net=%d)" % [present, net])
 
 
-## CONDUITS: power floods DOWN + LATERAL through tubes, never UP (a U delivers as an L);
-## the place/remove API moves a carried conduit in/out of the layer. Geometry: a generator at (8,4) feeds
-## a down-leg, a lateral bottom, and an up-leg — the up-leg must stay dark even directly above live power.
+## Power floods DOWN and LATERAL through conduit tubes, never UP, so a U delivers as an L; and the
+## place/remove API moves a carried conduit in and out of the layer. Geometry: a generator at (8,4)
+## feeds a down-leg, a lateral bottom, and an up-leg. The up-leg must stay dark even where it sits
+## directly above live power.
 func _test_conduit_network() -> void:
 	print("- conduit network")
 	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
@@ -70,12 +71,12 @@ func _test_conduit_network() -> void:
 	_check(sim.power_at(Vector2i(8, 8)) > 0.0, "power reaches down the conduit, past the generator's aura")
 	_check(sim.power_at(Vector2i(8, 5)) > sim.power_at(Vector2i(8, 11)), "power attenuates down the trunk")
 	_check(sim.power_at(Vector2i(10, 12)) > 0.0, "power carries ACROSS the lateral bottom of the U")
-	# The up-leg tube carries NOTHING upward (a U delivers as an L). The corner's immediate up-neighbour
-	# gets only a faint 1-cell aura bleed (like a generator's), so test from two cells up where even that
-	# is gone — the tube itself never climbs.
+	# The up-leg tube carries NOTHING upward. The corner's immediate up-neighbour gets only a faint
+	# 1-cell bleed, so these read from two cells up and higher, where even the bleed is gone and the
+	# only thing that could deliver power is the tube itself.
 	_check(sim.power_at(Vector2i(10, 9)) == 0.0, "the up-leg carries no power (U delivers as L)")
 	_check(sim.power_at(Vector2i(10, 8)) == 0.0, "no power climbs the up-leg (never flows up)")
-	# place / remove API (carried conduit item ⇄ the layer).
+	# place / remove API: a carried conduit item moves both ways between the pack and the layer.
 	var s2: FactorySim = FactorySim.new()
 	s2.inventory[&"conduit"] = 2
 	s2.total_produced[&"conduit"] = 2      # seed the ledger too, so the conservation assert below is honest
@@ -86,17 +87,17 @@ func _test_conduit_network() -> void:
 	_check(not s2.place_conduit(Vector2i(4, 3)), "cannot run a conduit through solid rock")
 	_check(s2.remove_conduit(Vector2i(3, 3)), "pick the conduit back up")
 	_check(not s2.has_conduit(Vector2i(3, 3)) and int(s2.inventory.get(&"conduit", 0)) == 2, "it returned to the pack")
-	# Symmetric placed-layer accounting: place = consumed, remove = produced, so present == net holds
-	# with conduits mid-placed too (they were the one item that silently skipped the ledger).
+	# Symmetric placed-layer accounting: place counts as consumed, remove as produced, so present == net
+	# holds with conduits mid-placed too. A placed layer that skips the ledger breaks conservation.
 	s2.place_conduit(Vector2i(3, 3))
 	var present_c: int = _items_present(s2, &"conduit")
 	var net_c: int = int(s2.total_produced.get(&"conduit", 0)) - int(s2.total_consumed.get(&"conduit", 0))
 	_check(present_c == net_c, "conduit conserved with one placed (present=%d, net=%d)" % [present_c, net_c])
 
 
-## POWER governs the lift: unpowered it runs at LIFT_THROUGHPUT (proved by _test_lift);
-## with a generator beside it pouring power into its cell, it carries up to LIFT_POWERED_THROUGHPUT — the
-## cost rule (power_throttle) routing the boost. Fighting gravity UP is the canonical "costs power" case.
+## Power governs the lift. Unpowered it runs at LIFT_THROUGHPUT, which _test_lift proves; with a
+## generator beside it pouring power into its cell it carries up to LIFT_POWERED_THROUGHPUT, with
+## power_throttle routing the boost. Fighting gravity upward is the canonical "costs power" case.
 func _test_powered_lift() -> void:
 	print("- powered lift")
 	var lift_def: MachineDef = load("res://src/data/machines/lift.tres")
@@ -123,18 +124,18 @@ func _test_powered_lift() -> void:
 	_check(present == int(sim.total_produced.get(&"ore", 0)), "ore conserved through the powered lift (present=%d)" % present)
 
 
-## THE PUMP — the powered flood-drain (the L3 aquifer answer). It falls on the LOCKED
-## hook: water floods DOWN for free, pumping it back OUT costs power. This is the on-hook PROOF — a POWERED
-## pump drains a flooded pocket substantially, an identical UNPOWERED pump barely touches it. Also asserts
-## the drain is bounded/sane: no water is ever created and no cell goes negative.
+## The pump is the powered flood-drain, and the L3 aquifer's answer. It sits on the locked hook: water
+## floods down for free, and pumping it back out costs power. That is what these checks prove. A powered
+## pump drains a flooded pocket substantially; an identical unpowered pump barely touches it. The drain
+## is also bounded and sane: no water is ever created and no cell goes negative.
 func _test_pump() -> void:
 	print("- pump (powered flood-drain, L3)")
 	var pump_def: MachineDef = load("res://src/data/machines/pump.tres")
 	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
 
 	# Build one flooded, SEALED pocket: a walled 1-wide shaft (x=col) with a floor, brim-full of water.
-	# Returns the sim + the top-of-pocket cell the pump sits in. Sealed so no water escapes — any drop in
-	# total_water is attributable to the pump alone.
+	# Returns the sim plus the top-of-pocket cell the pump sits in. Sealing it is what makes any drop in
+	# total_water attributable to the pump alone.
 	var build_pocket := func(col: int) -> Dictionary:
 		var s: FactorySim = FactorySim.new()
 		for row: int in range(3, 8):
@@ -146,7 +147,7 @@ func _test_pump() -> void:
 			poured += s.add_water(Vector2i(col, row), FactorySim.WATER_MAX)
 		return {"sim": s, "top": Vector2i(col, 3), "poured": poured}
 
-	# --- POWERED: a fueled generator beside the pump pours power into its cell → it drains the pocket. ---
+	# --- Powered: a fueled generator beside the pump pours power into its cell, and it drains. ---
 	var pd: Dictionary = build_pocket.call(6)
 	var sim: FactorySim = pd["sim"]
 	var top: Vector2i = pd["top"]
@@ -162,7 +163,7 @@ func _test_pump() -> void:
 	_check(sim.power_at(top) > 0.0, "power reaches the pump's cell")
 	var before: int = sim.total_water()                       # after warm-up (the pump already drained a little)
 	_check(before > 0, "water still present after warm-up (%d units)" % before)
-	# Tick a while: the powered pump should drain the pocket substantially (aim: nearly dry).
+	# 30 ticks is enough for the powered pump to take the pocket down to a quarter of `before` or less.
 	var negative_seen: bool = false
 	for _i: int in 30:
 		sim.tick()
@@ -174,7 +175,7 @@ func _test_pump() -> void:
 	_check(after <= before / 4, "the powered pump drains the pocket substantially (%d << %d)" % [after, before])
 	_check(not negative_seen, "no cell ever holds a negative water level")
 
-	# --- UNPOWERED: an identical flooded pocket, a pump with NO generator → it does essentially nothing. ---
+	# --- Unpowered: an identical flooded pocket, a pump with NO generator. It must move nothing. ---
 	var upd: Dictionary = build_pocket.call(16)
 	var usim: FactorySim = upd["sim"]
 	var utop: Vector2i = upd["top"]
@@ -187,9 +188,9 @@ func _test_pump() -> void:
 	var uafter: int = usim.total_water()
 	_check(uafter == ubefore, "an UNPOWERED pump drains nothing (%d -> %d) — the on-hook cost rule" % [ubefore, uafter])
 
-	# --- SANITY: the pump never CREATES water — the drained pocket's total only ever fell. ---
+	# --- Sanity: the pump never CREATES water. Both pockets' totals only ever fell. ---
 	_check(after <= before and uafter <= ubefore, "the pump only ever removes water, never adds it")
-	# machine_status mirrors the runner: powered+wet reads working, unpowered reads idle ("no power").
+	# machine_status mirrors the runner: powered and wet reads working, unpowered reads idle.
 	var s3: Dictionary = build_pocket.call(26)
 	var wsim: FactorySim = s3["sim"]
 	var wtop: Vector2i = s3["top"]
@@ -203,9 +204,10 @@ func _test_pump() -> void:
 	_check(wsim.machine_status(wpump) == &"working", "a powered pump over water reads working")
 
 
-## WATER (L3 Aquifer/fluids, first slice) — the discrete-cell integer fluid. Deterministic sim-level:
-## it FALLS on the hook (down for free), SETTLES to a flat top, never enters/coexists with solid rock,
-## conserves total across ticks, and two identical sims flow byte-identically. Sim-only — no render yet.
+## Water is the L3 aquifer's discrete-cell integer fluid. Five deterministic sim-level claims: it FALLS
+## on the hook (down for free), SETTLES to a flat top, never enters or coexists with solid rock,
+## conserves its total across ticks, and two identically-built sims flow byte-identically. Sim only;
+## there is no render layer to test here.
 func _test_water_fluid() -> void:
 	print("- water (L3 fluid primitive)")
 
@@ -216,7 +218,7 @@ func _test_water_fluid() -> void:
 				return false
 		return true
 
-	# --- 1. GRAVITY: pour at the top of a walled open shaft; it all ends at the bottom. ---
+	# --- 1. Gravity: pour at the top of a walled open shaft; it all ends at the bottom. ---
 	# Column x=5, open rows 1..8, capped by a solid floor at row 9; solid walls left/right of the shaft.
 	var g: FactorySim = FactorySim.new()
 	for row: int in range(1, 10):
@@ -233,7 +235,7 @@ func _test_water_fluid() -> void:
 	_check(g.water_at(Vector2i(5, 8)) == 6, "all 6 units settled at the bottom of the shaft")
 	_check(g.total_water() == 6, "gravity run conserved total (6)")
 
-	# --- 2. SETTLE FLAT: pour a blob into a wide walled basin; the surface flattens. ---
+	# --- 2. Settle flat: pour a blob into a wide walled basin; the surface flattens. ---
 	# Basin: solid floor at row 6 across x=1..5, walls at x=0 and x=6, open above.
 	var b: FactorySim = FactorySim.new()
 	for x: int in range(1, 6):
@@ -249,7 +251,7 @@ func _test_water_fluid() -> void:
 		b.tick()
 		_check(no_water_in_solid.call(b), "water never occupies a solid cell (basin run)")
 	_check(b.total_water() == 15, "basin conserved total (15)")
-	# Surface is FLAT: the wettest ROW of the basin has all its wet cells within 1 unit of each other.
+	# Flat means: on the row directly on the floor, at least 4 cells are wet and their levels span 1 unit.
 	var lo: int = 999
 	var hi: int = -999
 	var floor_wet: int = 0
@@ -261,7 +263,7 @@ func _test_water_fluid() -> void:
 			hi = maxi(hi, lvl)
 	_check(floor_wet >= 4 and hi - lo <= 1, "the pool settled to a flat top (wet=%d, spread=%d)" % [floor_wet, hi - lo])
 
-	# --- 3. BLOCKED BY SOLID: placing rock into a watered cell clears that cell's water. ---
+	# --- 3. Blocked by solid: placing rock into a watered cell clears that cell's water. ---
 	var d: FactorySim = FactorySim.new()
 	d.add_water(Vector2i(3, 3), 5)                            # a lone puddle, walled so it can't move
 	for dxy: Vector2i in [Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
@@ -271,7 +273,7 @@ func _test_water_fluid() -> void:
 	d.set_solid(Vector2i(3, 3), &"stone")                     # rock over the watered cell displaces it
 	_check(d.water_at(Vector2i(3, 3)) == 0, "set_solid onto a watered cell clears its water")
 	_check(d.total_water() == before_disp - 5, "total dropped by exactly the displaced cell's level (5)")
-	# The mirror path — placing a carried block into a watered cell also displaces it.
+	# The mirror path: placing a carried block into a watered cell displaces the water too.
 	var d2: FactorySim = FactorySim.new()
 	d2.add_water(Vector2i(2, 2), 4)
 	d2.inventory[&"stone"] = 1; d2.total_produced[&"stone"] = 1
@@ -279,7 +281,7 @@ func _test_water_fluid() -> void:
 	_check(d2.place_block(Vector2i(2, 2), &"stone"), "place_block lands on the watered cell")
 	_check(d2.water_at(Vector2i(2, 2)) == 0, "place_block onto a watered cell displaces its water too")
 
-	# --- 4. CONSERVATION across many ticks with no source/drain. ---
+	# --- 4. Conservation across many ticks with no source or drain. ---
 	var c: FactorySim = FactorySim.new()
 	for row: int in range(1, 12):
 		c.set_solid(Vector2i(2, row), &"stone")
@@ -298,7 +300,7 @@ func _test_water_fluid() -> void:
 	_check(invariant and c.total_water() == total0,
 		"total_water() invariant across 120 ticks (no source/drain, expect %d)" % total0)
 
-	# --- 5. DETERMINISM: two identically-built, identically-poured sims tick to identical water. ---
+	# --- 5. Determinism: two identically-built, identically-poured sims tick to identical water. ---
 	var build_and_pour := func() -> FactorySim:
 		var s: FactorySim = FactorySim.new()
 		for row: int in range(1, 10):

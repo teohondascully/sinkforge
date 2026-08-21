@@ -1,12 +1,13 @@
 extends SceneTree
 
-## Shared base for the Sinkforge headless test suites (tests/test_*.gd). Holds the failure
-## (Extended by PATH — `extends "res://tests/test_base.gd"` — not class_name, so the suites
-## load under a bare `--script` run without depending on the global class cache being current.)
-## counter, the sim fixture, and the assertion + canonicalization helpers every suite uses.
-## Each suite EXTENDS this, runs its _test_* methods from its own _initialize(), then calls
-## _finish() to print the tally and exit. The node-free sim is testable with no scene tree,
-## which is the whole point of the architecture.
+## Shared base for the Sinkforge headless test suites (tests/test_*.gd). Holds the failure counter,
+## the sim fixture, and the assertion + canonicalization helpers every suite uses. Each suite EXTENDS
+## this, runs its _test_* methods from its own _initialize(), then calls _finish() to print the tally
+## and exit. The node-free sim is testable with no scene tree, which is the whole point of the
+## architecture.
+##
+## Suites extend this by PATH (`extends "res://tests/test_base.gd"`) rather than by class_name, so
+## they load under a bare `--script` run without depending on a current global class cache.
 ##
 ## Run a suite: godot --headless --path . --script res://tests/test_<subject>.gd
 ## Exits 0 on all-pass, non-zero on any failure.
@@ -63,9 +64,9 @@ func _dict_sig(d: Dictionary) -> String:
 	return ",".join(parts)
 
 
-## Invariant behind the tree tests (the user's "nothing floats" bug): every foliage cell is ROOTED — its
-## 8-connected foliage component contains a cell resting directly on non-foliage solid ground. Mirrors
-## FactorySim._settle_foliage's rule; false ⇒ a tree is left floating in the air.
+## The invariant behind the tree tests: every foliage cell is rooted, meaning its 8-connected foliage
+## component contains a cell resting directly on non-foliage solid ground. Mirrors the rule in
+## FactorySim._settle_foliage. A false return means a tree was left floating in the air.
 func _no_floating_foliage(sim: FactorySim) -> bool:
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0),
 		Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
@@ -92,10 +93,10 @@ func _no_floating_foliage(sim: FactorySim) -> bool:
 	return true
 
 
-## The WHOLE authoritative state as one canonical string. Built on SaveGame.capture,
-## so the canary and the save format can never drift apart: any field added to the envelope is
-## automatically guarded here, and a field the envelope misses is a field this canary misses — one
-## list, two guards. Dictionary keys are sorted (content-based, insertion-order-proof); machine
+## The whole authoritative state as one canonical string. Built on SaveGame.capture, so the canary
+## and the save format cannot drift apart: any field added to the envelope is automatically guarded
+## here, and a field the envelope misses is a field this canary misses. One list, two guards.
+## Dictionary keys are sorted, making the signature content-based and insertion-order-proof; machine
 ## ARRAY order is kept as-is because tick order is itself authoritative.
 func _state_signature(sim: FactorySim) -> String:
 	return _canon(SaveGame.capture(sim))
