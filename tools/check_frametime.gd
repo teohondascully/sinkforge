@@ -327,7 +327,7 @@ func _run() -> void:
 ## rather than an absolute: DIG misses roughly ten to a hundred times as many deadlines as the phases that
 ## do no terrain work, on every run, contended or not. That comparison is the finding: the game holds its
 ## frame rate except when it edits terrain, and it is the shape this layer's ratio gates were built around
-## in the first place. See the audit notes, Strike 12.
+## in the first place.
 ##
 ## WHOEVER SETS THIS: take it on a quiet box with the harness lock held and `pgrep Godot` returning one
 ## process, over at least eight runs, and write the distribution here. Do not derive it from a suite run.

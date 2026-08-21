@@ -2,8 +2,7 @@
 
 Until this file existed the honest answer to "how do I add a layer?" was *copy the nearest one and hope*,
 and that is how fifty layers came to carry six cosmetically different copies of the same eight-line
-function. This is the short version; the architecture handover §5 is the long one on what makes an assertion
-worth writing.
+function.
 
 ## The shape
 
@@ -71,8 +70,8 @@ which greps for it to report "passed without verifying everything" — not a for
 that can. Before you commit an assertion, break the code and watch it go red. If you cannot make it go
 red, you have not written a test.
 
-The failure modes that have actually bitten this project are catalogued in `the working notes` §12 —
-thirteen of them, every one from a real green that meant nothing. The recurring ones:
+The failure modes that have actually bitten this project all arrived the same way: as a real green that
+meant nothing. The recurring ones:
 
 - **An assertion that cannot fail in the environment it runs in.** Two blank textures compare equal
   headless. This is why pixel layers use `add_gl` and stand down rather than pass.

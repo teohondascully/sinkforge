@@ -26,10 +26,9 @@ extends "res://tools/check_base.gd"
 ## still cannot see a path built from a variable or a format string at runtime. Nothing that reads source
 ## ever will; `save_sentinel.gd` is the half that hashes the real file and does not care how it was named.
 ##
-## Non-vacuity (see the architecture handover §5): a source scan that matches nothing passes trivially, so
-## this asserts the scan found files, found the slot literal where it MUST appear (scenes/main.gd), proved
-## the splice-flattener actually fires on a sample built for it, and found at least one real save-driving
-## layer to hold to property 3.
+## Non-vacuity: a source scan that matches nothing passes trivially, so this asserts the scan found files,
+## found the slot literal where it MUST appear (scenes/main.gd), proved the splice-flattener actually
+## fires on a sample built for it, and found at least one real save-driving layer to hold to property 3.
 ##   godot --headless --path . --script res://tools/check_save_isolation.gd
 
 ## The player's slot. Matched WHOLE: `user://test_sinkforge.save` (test_sim's own isolated round-trip

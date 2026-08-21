@@ -10,11 +10,11 @@ extends "res://tools/check_base.gd"
 ## LESS THAN THEY HAD.** A failed save keeps the previous save. A damaged slot falls back to the backup. A
 ## malformed envelope refuses whole rather than half-restoring a running game. An older save opens.
 ##
-## NON-VACUITY (the architecture handover §5). Every assertion here is preceded by the damage it is asserting
-## against (the file really is truncated, the envelope really is missing a key, the def really is
-## unresolvable), so none of these can pass by never happening. Where an assertion could be satisfied
-## trivially (a "restore refused" that refused because the sim was empty to begin with) the layer first
-## proves the state it is protecting is non-empty and distinctive.
+## NON-VACUITY. Every assertion here is preceded by the damage it is asserting against (the file really is
+## truncated, the envelope really is missing a key, the def really is unresolvable), so none of these can
+## pass by never happening. Where an assertion could be satisfied trivially (a "restore refused" that
+## refused because the sim was empty to begin with) the layer first proves the state it is protecting is
+## non-empty and distinctive.
 ##
 ## Runs entirely on `user://check_save_durability*.save`. No scene, no window: this is the save format
 ## and a bare FactorySim, so it is a couple of seconds.

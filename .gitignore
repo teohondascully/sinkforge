@@ -123,29 +123,8 @@ _diag_*.png
 # walks the FILESYSTEM (DirAccess) rather than git, so it still scans these
 # for mojibake exactly as before, and its CANARY (docs/ARCHITECTURE.md) is
 # untouched.
-docs/notes/
-docs/handover/
-docs/superpowers/
-/docs/WORKING_NOTES.md
-/docs/HANDOVER.md
-/docs/DIRECTOR_BRIEF.md
-/docs/AGENT_PLAY_EVALUATION_PROTOCOL.md
-/AUDIT_REPONSE.md
 
-# Local coordination scratch. Operational state for running work, not project history:
-# it names machine-specific absolute paths and carries no information about the game.
-docs/TASK_QUEUE.md
-tools/task_queue.sh
-tools/test_task_queue.sh
-
-# Working evidence for the release candidate. Spent patch artifacts and a repository
-# audit kept as supporting material rather than as published documentation.
 /.rc-prose-*.patch
-docs/REPO_PORTFOLIO_AUDIT.md
-docs/PRIORITY.md
-docs/FEEL_GAP.md
-docs/MENU_MATRIX.md
-docs/VISUAL_RECOMMENDATIONS_SURFACE.md
 
 # Godot import sidecars for the capture set. The captures now live under docs/media/,
 # which carries a .gdignore, so the engine no longer imports them and the sidecars

@@ -75,10 +75,10 @@ SKIP_CODE=42
 DIR="$(mktemp -d)"
 trap 'rm -rf "$DIR"' EXIT
 
-# RULE 15 (the working notes): anything that boots Godot takes the harness lock. `user://` is keyed on
-# the project NAME, so this sweep shares one save slot and one set of fixtures with any harness run, in any
-# worktree, on this machine. Sixteen minutes of Godot next to somebody's sweep corrupts both, and the
-# corpus is precisely the tool whose output somebody will read as a property of the WORLD.
+# Anything that boots Godot takes the harness lock. `user://` is keyed on the project NAME, so this sweep
+# shares one save slot and one set of fixtures with any harness run, in any worktree, on this machine.
+# Sixteen minutes of Godot next to somebody's sweep corrupts both, and the corpus is precisely the tool
+# whose output somebody will read as a property of the WORLD.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 LOCK_HELD=0
 if [ "${SF_NO_LOCK:-0}" != "1" ]; then

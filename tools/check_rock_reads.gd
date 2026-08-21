@@ -119,8 +119,7 @@ const MIN_SAMPLES: int = 40
 const DARK_CEILING: float = 34.0
 
 ## THE FLOOR: the probability of being right about a random rock/air pair. Set from measurement on this
-## fixture, not from taste; see the audit notes. A coin flip is 0.50 and is the tester's
-## sentence stated as a number.
+## fixture, not from taste. A coin flip is 0.50 and is the tester's sentence stated as a number.
 const READ_FLOOR: float = 0.75
 
 ## PRE-REGISTERED, BEFORE THE NUMBER EXISTS, because the moment to decide which measure closes an item is

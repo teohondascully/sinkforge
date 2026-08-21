@@ -84,11 +84,11 @@ func _run() -> void:
 	# down to the part of the frame the lamp is pointing at". None of that is true of a frame taken in
 	# daylight, and until this check existed nothing noticed the difference.
 	#
-	# The first multi-seed sweep found it (the audit notes, Strike 11). On seed 99 the delve
-	# reached -1 rows because it never started, and the layer judged the surface, in sunlight, against the
-	# underground standard, and reported 23% dead as though the rock had failed. Seven other seeds reached
-	# 14 and scored 0%. The tell was not the verdict but the DENOMINATOR: 74 lit tiles where every other
-	# world had ~12. A frame six times brighter is not the same frame.
+	# The first multi-seed sweep found it. On seed 99 the delve reached -1 rows because it never started,
+	# and the layer judged the surface, in sunlight, against the underground standard, and reported 23%
+	# dead as though the rock had failed. Seven other seeds reached 14 and scored 0%. The tell was not the
+	# verdict but the DENOMINATOR: 74 lit tiles where every other world had ~12. A frame six times brighter
+	# is not the same frame.
 	#
 	# So this fails as a FIXTURE failure, in its own words, and never as a legibility verdict. A layer that
 	# cannot get to the place it judges has not judged it.

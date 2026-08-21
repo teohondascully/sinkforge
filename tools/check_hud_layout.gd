@@ -257,14 +257,14 @@ func _run() -> void:
 
 ## THE BIG MAP IS THE SCREEN, so nothing may be left under it. And nothing may be left HALF under it.
 ##
-## This layer already CAUGHT this, once, and then stopped being able to. A real failing log
-## (`the working notes`) named two collisions against the large map; the banner was fixed by
-## standing it down at `hud.gd:699`, and the second (a 46x44 panel at (297,295), overlap 46x24) was left
-## as an open lead: *"either that panel moved, or it is state-dependent and the current fixture no longer
-## samples it."* It is the second. The panel is `_draw_inventory`'s backing at ONE slot
-## (`hud.gd:2292`: x0 = (640-30)/2 = 305, so Rect2(297, 295, 46, 44)), drawn unconditionally at
-## `hud.gd:263`. It never moved. The matrix asked for `_minimap_mode` **1**, which is the CORNER map
-## (122x122 in the top-right, 142px clear of the bar), so the state that collides was never entered.
+## This layer already CAUGHT this, once, and then stopped being able to. A real failing run named two
+## collisions against the large map; the banner was fixed by standing it down at `hud.gd:699`, and the
+## second (a 46x44 panel at (297,295), overlap 46x24) was left as an open lead: *"either that panel moved,
+## or it is state-dependent and the current fixture no longer samples it."* It is the second. The panel
+## is `_draw_inventory`'s backing at ONE slot (`hud.gd:2292`: x0 = (640-30)/2 = 305, so
+## Rect2(297, 295, 46, 44)), drawn unconditionally at `hud.gd:263`. It never moved. The matrix asked for
+## `_minimap_mode` **1**, which is the CORNER map (122x122 in the top-right, 142px clear of the bar), so
+## the state that collides was never entered.
 ##
 ## THE FIX TO THE FIRST COLLISION IS WHAT HID THE SECOND. Once the banner stood down the sweep went green,
 ## and a green sweep is indistinguishable from a sweep that is no longer looking.

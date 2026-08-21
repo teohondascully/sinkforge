@@ -11,8 +11,8 @@ extends "res://tools/check_base.gd"
 ## THE CORRECTNESS ARGUMENT IS ALREADY STRONG, WHICH IS EXACTLY WHY IT IS TESTED. `_paint_fine` reads only
 ## caches that `rebake` fills completely before any painting begins, and writes only its own four bytes —
 ## so paint ORDER cannot affect the result and any partition of the grid yields the same image, by
-## construction. This project has a catalogue of seventeen guards that were also correct by construction
-## (the working notes §12). The argument justifies the design; it does not excuse the assertion.
+## construction. Correct by construction is what the guards in this project that later turned out to prove
+## nothing all had going for them. The argument justifies the design; it does not excuse the assertion.
 ##
 ## WHAT WOULD BREAK IT, so the assertions have something to be about: a paint term that read a neighbour's
 ## PAINTED BYTES rather than its solidity would become order-dependent overnight, and nothing else in this

@@ -410,7 +410,7 @@ func _settle(col: int) -> bool:
 ## That is not hypothetical. `check_underground` spent its whole life this way on seed 99, which has a void
 ## under the spawn column: it judged a sunlit surface frame against a dead-space standard written for
 ## lamp-lit deep rock, scored 23%, and reported it as the rock failing. Seven other seeds dug their shaft
-## and scored 0%. See the audit notes, Strike 11.
+## and scored 0%.
 ##
 ## The default is unchanged on purpose. Twenty-two call sites use this and most of them mean contract one;
 ## quietly giving all of them a new meaning to fix one caller would be trading a known bug for an unknown
