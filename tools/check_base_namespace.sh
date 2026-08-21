@@ -44,10 +44,31 @@ if [ "$n_base" -lt 5 ]; then
 	exit 1
 fi
 
+# THE POPULATION, COUNTED INDEPENDENTLY OF THE SCAN. `head -1` is how a subclass is recognised below, and
+# it is a per-file, SILENT exclusion: put a `@tool` line or a comment above `extends` and that file leaves
+# the population with nothing said. A floor at zero would not notice, because it only refuses to report
+# when it has lost ALL of the population, and the failure this file exists to catch arrives one layer at a
+# time. `grep -l` over the same two directories does not care what line `extends` is on, so the true count
+# is knowable exactly and the scan can be held to it BY NAME. c1's finding, and it is M5's own lesson --
+# a floor that never binds is a licence with extra syntax -- reappearing in a guard written to apply it.
+#
+# THE PREDICATE IS ANCHORED, AND THE UNANCHORED ONE WAS TRIED FIRST AND WAS WRONG BY ONE. `extends.*
+# check_base\.gd` matches PROSE: `tools/frontier_corpus.gd` extends SceneTree and says so in its docstring
+# -- "it extends `SceneTree` rather than `tools/check_base.gd`" -- so the loose form put a non-subclass in
+# the population and the new floor failed on a clean tree. The two errors are mirrors of each other and
+# both were live in the same guard: `head -1` is too NARROW (misses a real subclass under an annotation),
+# an unanchored grep is too BROAD (finds the class name in a comment). A statement of inheritance starts
+# its line; a mention of it does not.
+population="$(grep -rlE '^[[:space:]]*extends[[:space:]]+"?res://tools/check_base\.gd"?' \
+	"$ROOT/tools" "$ROOT/tests" --include='*.gd' 2>/dev/null | grep -v "^$BASE$" | sort)"
+n_pop=$(printf '%s\n' "$population" | grep -c .)
+
 if [ "$#" -gt 0 ]; then
 	targets="$*"
+	expect=0                                   # an explicit file list is its own population
 else
-	targets="$(find "$ROOT/tools" "$ROOT/tests" -name '*.gd' 2>/dev/null)"
+	targets="$population"
+	expect="$n_pop"
 fi
 
 scanned=0
@@ -76,6 +97,16 @@ if [ "$scanned" -eq 0 ]; then
 	printf '  There are around a hundred in this tree; zero means the search, not the tree.\n' >&2
 	exit 1
 fi
+if [ "$expect" -gt 0 ] && [ "$scanned" -ne "$expect" ]; then
+	printf 'check_base_namespace: FAIL — scanned %d of the %d files that extend check_base.gd.\n' \
+		"$scanned" "$expect" >&2
+	printf '  The rest do not carry `extends` on line 1, so the scan skipped them SILENTLY and their\n' >&2
+	printf '  members were never compared against the base:\n' >&2
+	for f in $population; do
+		head -1 "$f" | grep -q 'check_base\.gd' || printf '    %s\n' "$f" >&2
+	done
+	exit 1
+fi
 
 if [ -n "$bad" ]; then
 	printf 'check_base_namespace: FAIL — a subclass redeclares a member of check_base.gd:%s\n' "$bad" >&2
@@ -84,6 +115,6 @@ if [ -n "$bad" ]; then
 	printf 'Rename the member in the layer, or do not add it to the base.\n' >&2
 	exit 1
 fi
-printf 'check_base_namespace: PASS — %d subclasses, none redeclares any of the %d base members\n' \
-	"$scanned" "$n_base"
+printf 'check_base_namespace: PASS — %d of %d subclasses, none redeclares any of the %d base members\n' \
+	"$scanned" "$n_pop" "$n_base"
 exit 0
