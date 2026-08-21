@@ -346,6 +346,8 @@ func _initialize() -> void:
 		_stand_down("bindings.file-order-control", "the file-order control",
 			"ConfigFile returned the same key order for both writes (%s)" % _say(order_second))
 	else:
+		# Opposite orders, so the case below really does show the order was ignored rather than absent.
+		_asserted("bindings.file-order-control")
 		print("  NOTE: the two fixtures are in opposite key order (%s vs %s)"
 			% [_say(_order_first), _say(order_second)])
 

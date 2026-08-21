@@ -437,7 +437,17 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		_stand_down("ceremony.words-vs-sky-arm", "the words against open sky",
 			"the HUD would not go quiet at the surface, so there was no uninterrupted reference to read "
 			+ "the words against")
+		# AND THE READING ITSELF IS BELOW THIS RETURN, so on this path nothing ever decides about it. Said
+		# out loud because the alternative is silence: `ceremony.words-vs-sky` is registered `always`, and
+		# a run that returns here would have reported it as a debt the layer had quietly stopped owing,
+		# which is the opposite of what happened. A branch cannot announce that it was not taken, so the
+		# branch that DOES run announces it for its sibling.
+		_not_reached("ceremony.words-vs-sky", "the surface arm returned before the reading: the HUD would"
+			+ " not go quiet, so there was nothing to read the words against")
 		return
+
+	# The arm was measurable, which is the only thing its row is conditional on.
+	_asserted("ceremony.words-vs-sky-arm")
 	var cx: int = int(round(_screen(main, Vector2(float(col * CELL) + float(CELL) * 0.5, 0.0)).x))
 	var p2: Image = await _shot()
 	# THE SKY MOVES ON ITS OWN, AND NOTHING IN THIS ARM COULD TELL THAT APART FROM THE PLATE ARRIVING. The

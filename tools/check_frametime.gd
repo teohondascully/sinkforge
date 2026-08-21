@@ -356,7 +356,16 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		_stand_down("frametime.absolute-budget", "the %.2fms/frame (120fps) budget" % FRAME_BUDGET_MS,
 			"SF_PERF_HOST is unset, so this is arbitrary hardware and the p95s above are a measurement,"
 			+ " not a claim. Set SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn it on.")
+		# AND THE OTHER ROW IS NOT STOOD DOWN, IT IS UNREACHABLE, which the registry could not previously
+		# distinguish. `frametime.paced-phase` lives inside the loop below and this return is above it, so
+		# on an unset SF_PERF_HOST nothing ever DECIDES about it -- reporting that as a stand-down would
+		# invent a design decision nobody owes, and reporting it as absent (what happened before) let an
+		# `env` row mean nothing in either direction.
+		_not_reached("frametime.paced-phase", "_absolute() returns above the phase loop while"
+			+ " SF_PERF_HOST is unset, so the paced branch is never evaluated on this machine")
 		return true
+
+	_asserted("frametime.absolute-budget")
 
 	var interval: float = _interval
 	var paced: bool = false
@@ -402,6 +411,10 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 					+ " with a phase that is comfortably fast and occasionally late rather than a slow one —"
 					+ " read the drop rate before acting on this number."
 					if drops <= 0.10 else ""))
+			# ASSERTED AND FAILED IS STILL ASSERTED. The accounting question is whether the property was
+			# put to the test, not whether it survived; a row that only registers on the green path would
+			# report a failing layer as one that never made the claim.
+			_asserted("frametime.paced-phase")
 			ok = false
 		elif paced:
 			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
@@ -412,6 +425,7 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 				"the run is vsync-paced — a frame that fits inside the refresh reports AS the refresh, so"
 				+ " this number cannot tell a fast phase from a pinned one")
 		else:
+			_asserted("frametime.paced-phase")
 			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
 	return ok
 

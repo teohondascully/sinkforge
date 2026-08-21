@@ -271,6 +271,10 @@ func _run() -> void:
 	if is_equal_approx(fill, FILL_NO_SPAN):
 		_check(false, "the rig posed a throw with a LENGTH to measure the preview against — the hand and "
 			+ "the target projected to within a pixel of each other, so there is no throw to ink a share of")
+		# The share is measured below this branch, so on this path the registered row is neither declined
+		# nor made. Said from here, because the branch that would have said it is the one not running.
+		_not_reached("grapple.gr05-preview-share", "the rig posed a zero-length throw, so there was no"
+			+ " share to measure and nothing to decline asserting a bound on")
 	else:
 		print("    the preview inks %.2f of the throw and reaches %.0f px of %.0f; %d drawn pixels lie "
 			% [fill, span, reach, stray] + "off the corridor entirely")
@@ -472,6 +476,9 @@ func _run() -> void:
 		var taut_read: bool = _bow_measured("taut", bow_taut, rim_taut)
 		var slack_read: bool = _bow_measured("slack", bow_slack, rim_slack)
 		if taut_read and slack_read:
+			# Both numbers came off the cord, so the row's condition did not hold and the assertion below
+			# IS the row being made rather than declined.
+			_asserted("grapple.gr03-single-frame-bow")
 			_check(bow_slack >= BOW_FLOOR,
 				"a slack rope HANGS — it departs its own chord by %.3f of it (floor %.2f)"
 					% [bow_slack, BOW_FLOOR])
@@ -484,6 +491,10 @@ func _run() -> void:
 
 	else:
 		_check(false, "the rig anchors, so the attached states can be judged at all")
+		# No anchor means no attached state, so the bow is never read either way — a different thing from
+		# reading it and declining to bound it, and the two used to be the same silence.
+		_not_reached("grapple.gr03-single-frame-bow", "the rig never anchored, so no attached state"
+			+ " existed to read a bow from")
 
 	await _check_against_sky()
 

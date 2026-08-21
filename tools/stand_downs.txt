@@ -32,6 +32,30 @@
 # EVERY POSSIBLE STAND-DOWN IS LISTED, not only the ones seen firing, so that this file is the complete
 # list of assertions this suite may decline to make. Ones marked `env` have conditions that did not hold on
 # the runs it was written from; they are permitted, not verified.
+#
+# AND `env` NO LONGER MEANS "UNCHECKED", which it did for the whole first life of this file. A row could
+# only ever be observed FIRING, so absence meant nothing, so an `env` row could not fail in either
+# direction -- six of these twelve were documentation with a tab in it, inside the file built to stop
+# assertions going missing. Every row is now RESOLVED on every run of its layer, into one of three states:
+#
+#   SKIP:      [id]   the assertion was available and DECLINED       -- a design decision is owed
+#   HELD:      [id]   the assertion was MADE this run                -- the debt is paid here; tighten
+#   UNREACHED: [id]   control flow never arrived at the site         -- intact, this box cannot exercise it
+#
+# The first two are printed by `_stand_down()` and `_asserted()` in `tools/check_base.gd`. THE THIRD IS
+# DERIVED BY THE GATE, from this file and the layer's log, and that placement is the whole trick: a branch
+# that is not taken cannot announce that it was not taken, so a third state emitted at the site would be
+# absence again wearing a new label. `_not_reached()` exists only to let a branch that DOES run attach a
+# reason for a sibling it knows will not be entered.
+#
+#   registered, its layer ran, and NOTHING resolved it    RED. Nobody knows what that branch did.
+#   resolved in code but no row here                      RED, in all three states, not just SKIP.
+#
+# WHAT THIS RETIRES. `iff:` was the previous attempt and it only reaches conditions the GATE can see in
+# summary.txt -- fine for `no-display` and `perf-host`, impossible for a condition only the layer knows,
+# which is most of them. The `iff:` rows are kept because they assert something accounting cannot: WHICH
+# state is required GIVEN the condition. Accounting says every row spoke; `iff:` says what it must have
+# said. Neither subsumes the other.
 
 frametime.absolute-budget	check_frametime	iff:perf-host-unset	The 8.33ms (120fps) budget asserts only when SF_PERF_HOST names the machine, and it is set nowhere. A frame-rate claim on arbitrary hardware is a statement about the box. `env` because setting SF_PERF_HOST makes this one vanish and the paced one below possible.
 frametime.paced-phase	check_frametime	env	A vsync-paced p95 inside the budget cannot tell a fast phase from a pinned one, so it is reported and not banked. Unreachable while SF_PERF_HOST is unset, because _absolute() returns before the loop.

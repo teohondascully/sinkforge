@@ -460,6 +460,8 @@ func _backup_generation() -> void:
 			"a directory at %s did not stop copy_absolute on this platform, so there is no way here to"
 			% (SLOT + SaveGame.BAK_SUFFIX) + " make the copy fail")
 	else:
+		# The forcing function fired, so the guarded assertions below ARE the registered row being made.
+		_asserted("save-durability.failed-backup")
 		_check(not SaveGame.write(SLOT, SaveGame.capture(_world(66))),
 			"a save whose backup copy FAILS is refused, not promoted over an unbacked slot")
 		_check(FileAccess.get_file_as_bytes(SLOT) == guarded,

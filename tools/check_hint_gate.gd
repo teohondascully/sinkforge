@@ -100,10 +100,21 @@ const ALPHA_FRAMES: int = 30          ## ...and to leave alpha 0 once it is on s
 ## ceremony the same way.
 const CEREMONY_CAP: int = 480
 
-## Assertions ATTEMPTED, which the base class does not count. It counts failures, and "0 failures" is the
-## report a layer that asserted nothing also files; the vacuity this repository keeps finding. The tally
-## is printed beside the verdict so an exit code never has to be taken on trust.
-var _asserted: int = 0
+## Assertions ATTEMPTED. `_failures == 0` is the report a layer that asserted nothing also files -- the
+## vacuity this repository keeps finding -- so the tally is printed beside the verdict and an exit code
+## never has to be taken on trust.
+##
+## RENAMED FROM `_asserted` BECAUSE THE BASE CLASS TOOK THAT NAME, and the collision is worth a line. A
+## member added to `tools/check_base.gd` lands in the namespace of all 86 layers that inherit it, and
+## GDScript rejects the SUBCLASS ("the member already exists in parent class") -- so `--check-only` on the
+## edited base file is clean and a layer nobody touched stops loading. The runner then reported it as a
+## PASS, because `godot --script` exits 0 when a script fails to load; only `tools/harness_verdict.sh`
+## caught it, by reading the log rather than the code. Parse-check the SUBCLASSES after touching a base.
+##
+## The base now counts this itself (`_passes` + `_failures`), so this tally is redundant and could go. Left
+## alone deliberately: collapsing it changes what this layer reports, and that is a separate change from
+## unbreaking it.
+var _attempted: int = 0
 
 
 func _initialize() -> void:
@@ -113,14 +124,14 @@ func _initialize() -> void:
 	# set for anything sharing this process, and `pointer_posed()` exists precisely so that "posed and
 	# forgotten" cannot masquerade as a passing hardware test somewhere else.
 	Controls.release_pointer()
-	print("  %d assertions: %d PASS / %d FAIL" % [_asserted, _asserted - _failures, _failures])
+	print("  %d assertions: %d PASS / %d FAIL" % [_attempted, _attempted - _failures, _failures])
 	_verdict("check_hint_gate", "the lesson arrives on plantable ground in reach and on nothing else")
 
 
 ## The base's `_check`, plus the attempt count. Thin on purpose: the pass/fail line, the failure counter and
 ## the exit protocol all stay where they belong, and only the denominator is added.
 func _judge(cond: bool, label: String) -> void:
-	_asserted += 1
+	_attempted += 1
 	_check(cond, label)
 
 

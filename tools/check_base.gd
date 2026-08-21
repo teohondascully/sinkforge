@@ -66,6 +66,44 @@ var _failures: int = 0
 ## are one integer. Counting here is the only place the difference exists.
 var _passes: int = 0
 
+## THE THREE-VALUED ACCOUNTING FOR EVERY REGISTERED STAND-DOWN, and the reason it is three and not two.
+##
+## `tools/stand_downs.txt` lists every assertion this suite is permitted not to make. Until now a row in it
+## could only be OBSERVED FIRING: the gate saw `SKIP: [id]` lines and checked they were registered. Absence
+## meant nothing at all, so a row marked `env` -- permitted but conditional -- COULD NOT FAIL IN EITHER
+## DIRECTION. Six of twelve rows were documentation wearing a registry's clothes. c1's finding.
+##
+## Two-valued accounting does not fix it, because "did not stand down" is ambiguous between two states that
+## want opposite responses:
+##
+##   HELD         the branch ran and the assertion WAS made. The debt is paid; the row should be deleted.
+##   NOT REACHED  control flow never arrived. The row is intact and this environment cannot exercise it.
+##
+## `check_frametime` is the case that forces the distinction: with SF_PERF_HOST unset, `_absolute()` returns
+## before its loop, so `frametime.paced-phase` is neither asserted nor declined -- it is unreachable, and a
+## registry that could only say "absent" reported an unreachable row identically to a paid one. The gate
+## previously guessed between them from a condition it read out of the summary, which worked for the two
+## conditions a summary happens to record and could not be written for the rest.
+##
+## So the layer RESOLVES what it reached and nothing more; the third state is DERIVED by
+## `tools/harness_verdict.sh` as "registered against this layer, and nothing in its log resolved it".
+##
+##   _sd_stood   ids `_stand_down()` declined this run
+##   _sd_held    ids `_asserted()` made this run
+##   _sd_why     optional prose, from a branch that knows why a SIBLING branch will not be entered
+##
+## THE DERIVATION LIVES IN THE GATE BECAUSE THE GATE IS THE ONLY PARTY THAT ALWAYS RUNS, and the obvious
+## alternative was measured before it was rejected. The first version derived it in `_verdict()`, which
+## reads as universal and is not: of the 86 layers inheriting this file, **29 call `_verdict()` and 57
+## print their own line and `quit()` directly** — including `check_frametime`, `check_dig_hitch` and
+## `check_save_durability`, three of the seven layers that own registered rows. The accounting was invisible
+## to all three on its first run, which is how the number came to be counted at all. A hook on a path most
+## of the population does not take is the same defect one level up: an instrument that cannot register its
+## subject. Two dictionaries and a print are what a layer can be trusted to do.
+var _sd_stood: Dictionary = {}
+var _sd_held: Dictionary = {}
+var _sd_why: Dictionary = {}
+
 
 ## Assert, and say so either way. Every layer's output is read by a human at least as often as by the
 ## runner, so the label is a SENTENCE about the property, not a variable name — "the backup holds the older
@@ -197,3 +235,49 @@ func _stand_down(id: String, what: String, why: String) -> void:
 		_failures += 1
 		return
 	print("  SKIP: [%s] %s was NOT asserted — %s" % [id, what, why])
+	_sd_stood[id] = true
+
+
+## THE ASSERTION WAS MADE. Call this on the branch where a registered stand-down did NOT happen, so that
+## the row's absence from the SKIP lines means something.
+##
+## PRINTS ON FIRST CALL ONLY. Several of these sites sit inside loops over phases or drawing sites, and the
+## line is a statement about the RUN rather than about the iteration, so the second one would say nothing
+## the first did not. An id that is both stood down and asserted across a loop still prints both lines,
+## deliberately: "asserted on three phases of four" is a third state and neither line may swallow the other.
+##
+## THIS IS THE HALF THAT IS EASY TO FORGET, and forgetting it is loud rather than quiet. An assert path with
+## no `_asserted()` on it leaves its registered id resolved by nothing, and the gate reports an unresolved
+## id on every run of the layer. A false "unresolved" is a visible wrong claim; the alternative was the
+## silence this mechanism exists to end.
+func _asserted(id: String) -> void:
+	if id.strip_edges().is_empty():
+		printerr("  FAIL: _asserted was called with no id. The gate keys on the id; an unnamed accounting"
+			+ " entry cannot be matched to a row in tools/stand_downs.txt.")
+		_failures += 1
+		return
+	if _sd_held.has(id):
+		return
+	_sd_held[id] = true
+	print("  HELD: [%s] this run asserted it" % id)
+
+
+## CONTROL FLOW NEVER GOT HERE — an OPTIONAL annotation that attaches a REASON to the third state.
+##
+## THE THIRD STATE IS NOT PRODUCED HERE AND MUST NOT BE. A branch that is not taken cannot announce that it
+## was not taken, so "nothing resolved this id" is DERIVED by `tools/harness_verdict.sh`, from the registry
+## and the layer's log, by a party guaranteed to run. This only lets a branch that knows why a SIBLING
+## branch will not be entered say so — the early return standing above the site is the usual caller.
+##
+## Left uncalled, the gate still reports the id as unresolved; it just cannot say why. That is the correct
+## degradation: an explanation is a nicety, and the state itself may never depend on somebody remembering.
+func _not_reached(id: String, why: String) -> void:
+	if id.strip_edges().is_empty():
+		printerr("  FAIL: _not_reached was called with no id, for \"%s\"." % why
+			+ " The gate keys on the id; an unnamed accounting entry cannot be matched to a row.")
+		_failures += 1
+		return
+	if _sd_why.has(id):
+		return
+	_sd_why[id] = why
+	print("  UNREACHED: [%s] nothing here will assert it — %s" % [id, why])

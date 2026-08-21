@@ -264,6 +264,9 @@ func _on_frame() -> void:
 				+ " comparison cannot fail and asserting it would be a lie. Extent and cost below still"
 				+ " assert for real. Run with a window to verify it.")
 		else:
+			# There is a real surface, so the comparison can fail and the row is asserted rather than
+			# declined. This is the branch CI's display job takes and the headless job does not.
+			_asserted("dig-hitch.byte-identity")
 			var want_bytes: int = FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS \
 				* FactorySim.SUBDIV * 4
 			_check(got.size() == want_bytes and want.size() == want_bytes,

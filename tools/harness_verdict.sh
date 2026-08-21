@@ -201,6 +201,16 @@ else
 	sd_ids="$(cat "$LOGDIR"/*.log 2>/dev/null \
 		| sed -nE 's/^[[:space:]]*SKIP:[[:space:]]*\[([^]]+)\].*/\1/p' | sort -u)"
 	sd_count="$(cat "$LOGDIR"/*.log 2>/dev/null | grep -cE '^[[:space:]]*SKIP:')"
+	# THE OTHER TWO RESOLUTIONS. A `SKIP:` line says an assertion was DECLINED, and for the life of this
+	# registry that was the only thing a row could ever say. Absence meant nothing, so an `env` row -- a row
+	# permitted but conditional -- could not fail in either direction and half the file was documentation
+	# with a tab in it. `_asserted()` and `_not_reached()` in tools/check_base.gd close it from the other
+	# side: the layer now says when it MADE the assertion and when it knows a sibling branch will not be
+	# entered, and this gate derives the third state from the two.
+	held_ids="$(cat "$LOGDIR"/*.log 2>/dev/null \
+		| sed -nE 's/^[[:space:]]*HELD:[[:space:]]*\[([^]]+)\].*/\1/p' | sort -u)"
+	unre_ids="$(cat "$LOGDIR"/*.log 2>/dev/null \
+		| sed -nE 's/^[[:space:]]*UNREACHED:[[:space:]]*\[([^]]+)\].*/\1/p' | sort -u)"
 	# WHICH REGISTERED LAYERS ACTUALLY RAN. A layer with no display prints `<name>: SKIP - no display` --
 	# `: SKIP` MID-LINE, which is deliberately not the `^SKIP:` marker, so it contributes no ids. Treating
 	# its absence as "stood down zero" is a missing measurement read as a measured zero, and it would have
@@ -246,8 +256,11 @@ else
 		note "   has flattened them. Nothing was compared."
 		bad=1
 	else
-		# 1. NOTHING UNREGISTERED. This is the direction that matters most: an assertion silently stopped.
-		for _id in $sd_ids; do
+		# 1. NOTHING UNREGISTERED, IN ANY OF THE THREE. This is the direction that matters most: an
+		# assertion silently stopped. It now covers `HELD` and `UNREACHED` too, so an id that appears in
+		# code and in no row of the registry is caught whichever way the code resolves it -- previously a
+		# layer could invent an id and stay clean simply by not standing it down.
+		for _id in $(printf '%s\n%s\n%s\n' "$sd_ids" "$held_ids" "$unre_ids" | grep -v '^$' | sort -u); do
 			printf '%s\n' "$sd_rows" | cut -f1 | grep -qx "$_id" \
 				|| sd_bad="$sd_bad ${_id}(NOT REGISTERED)"
 		done
@@ -264,6 +277,24 @@ else
 			fi
 			_fired=0
 			printf '%s\n' "$sd_ids" | grep -qx "$_id" && _fired=1
+			# 2a. WAS THE ROW ACCOUNTED FOR AT ALL? Declared minus resolved, derived HERE rather than at
+			# the site, because a branch that is not taken cannot announce that it was not taken -- put
+			# the third state at the site and its absence is the original defect wearing a new label.
+			# c1 caught that before it shipped. The gate always runs; a branch may not.
+			#
+			# NOTE THE ONE PLACE THIS COULD NOT LIVE. The first attempt derived it in `_verdict()`, which
+			# reads as the universal exit and is not: 29 of the 86 layers inheriting check_base.gd call
+			# it and 57 print their own line and quit, including three of the seven layers that own rows
+			# here. A hook on a path most of the population does not take is the same defect one level up.
+			_resolved=0
+			for _r in $sd_ids $held_ids $unre_ids; do
+				[ "$_r" = "$_id" ] && { _resolved=1; break; }
+			done
+			if [ "$_resolved" != "1" ]; then
+				sd_bad="$sd_bad ${_id}(UNACCOUNTED: $_layer ran and nothing in its log declined it,"
+				sd_bad="$sd_bad asserted it, or said it was out of reach)"
+				continue
+			fi
 			case "$_kind" in
 				always)
 					[ "$_fired" = "1" ] \
@@ -297,7 +328,17 @@ else
 					# nothing and is the difference between a conditional stand-down quietly becoming
 					# permanent and a human noticing one appear between two runs. It is how the
 					# headless-only `dig-hitch.byte-identity` would have been found months earlier.
-					[ "$_fired" = "1" ] && sd_env="$sd_env $_id" ;;
+					# REPORTED IN WHICHEVER STATE IT LANDED, not only when it fires. The point of
+					# the third state is that an `env` row now says something on every run, so the line
+					# below is how a conditional stand-down quietly becoming permanent -- or quietly
+					# becoming unreachable -- shows up between two sweeps instead of after a season.
+					if [ "$_fired" = "1" ]; then
+						sd_env="$sd_env ${_id}=stood-down"
+					elif printf '%s\n' "$held_ids" | grep -qx "$_id"; then
+						sd_env="$sd_env ${_id}=ASSERTED"
+					else
+						sd_env="$sd_env ${_id}=out-of-reach"
+					fi ;;
 			esac
 		done <<EOF
 $sd_rows
@@ -306,7 +347,8 @@ EOF
 			note "stand-downs: conditions this summary cannot answer, so not checked:$sd_unknown"
 		fi
 		if [ -n "$sd_env" ]; then
-			note "stand-downs: conditional (env) ids that fired -- reported, not asserted:$sd_env"
+			note "stand-downs: conditional (env) rows and how each resolved this run:$sd_env"
+			note "   ASSERTED means the debt is paid on this machine and the row can be deleted."
 		fi
 		if [ -n "$sd_absent" ]; then
 			# NAMED, NEVER SILENT. An exemption nobody prints is a licence: a layer that quietly stopped
@@ -321,7 +363,9 @@ EOF
 			note "   An id not in the registry means something stopped asserting and nobody said so."
 			note "   An 'always' id missing while its layer RAN means the debt was paid and the registry"
 			note "   is stale. An 'iff:' id on the wrong side of its own condition means the condition"
-			note "   moved. None of the three is a pass. tools/stand_downs.txt carries each reason."
+			note "   moved. UNACCOUNTED means the layer ran and said nothing at all about a row the"
+			note "   registry gives it -- add _asserted() to the branch that makes the assertion, or"
+			note "   _not_reached() to the branch that skips past it. None is a pass."
 			bad=1
 		fi
 	fi
