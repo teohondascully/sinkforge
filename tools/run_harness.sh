@@ -548,7 +548,7 @@ add "check_nameplate_truth (a plate counts its run)" "res://tools/check_nameplat
 add "check_fixture_pointer (void vs fail)" "res://tools/check_fixture_pointer.gd"
 add "check_aim (honest marker)"       "res://tools/check_aim.gd"
 add "check_impact (a fall costs)"     "res://tools/check_impact.gd"
-add "play-tests (scripted + friction)" "res://tools/play_tests.gd"
+add "play-tests (scripted pilot + friction)" "res://tools/play_tests.gd"
 
 DECLARED="${#NAMES[@]}"
 
@@ -915,9 +915,36 @@ fi
 # failed arm planted nothing, and disarming on that path would be looking for litter nobody dropped.
 SENTINEL_ARMED=1
 
+# The exclusive layer currently in flight, or -1. Read by the fill loop, which refuses to launch
+# anything at all while it is unreported.
+EXCL_INFLIGHT=-1
+
 while [ "$done_count" -lt "$total" ]; do
 	# Fill free slots.
 	while [ "$launched" -lt "$total" ] && [ "$((launched - done_count))" -lt "$JOBS" ]; do
+		# NOTHING LAUNCHES BESIDE AN EXCLUSIVE LAYER, and until this line existed, everything did.
+		#
+		# The `break` at the bottom of this loop leaves the FILL loop. The outer poll loop then comes
+		# straight back round, re-enters here, and launches the next layer beside the exclusive one that
+		# is still running. So `add_excl` bought a clean START and nothing else: the guard below stops an
+		# exclusive layer beginning while others are in flight, and nothing stopped others beginning while
+		# IT was in flight.
+		#
+		# Measured on a structural reproduction of this loop, with a control in both directions so the
+		# meter is known to be able to read 1 and to read many:
+		#
+		#   unpatched   exclusive layer, JOBS=12   peak concurrent 7      <- should be 1
+		#               exclusive layer, JOBS=1    peak concurrent 1      (the meter can read 1)
+		#               nothing exclusive, JOBS=12 peak concurrent 10     (the meter can read many)
+		#   patched     exclusive layer, JOBS=12   peak concurrent 1
+		#               nothing exclusive, JOBS=12 peak concurrent 10     (no collateral serialisation)
+		#
+		# Row A matching row C rather than row B is the whole finding. This invalidated the premise behind
+		# every layer that measures a duration, and it is why check_grapple_reads kept going red under
+		# JOBS=12 AFTER being made exclusive to stop exactly that.
+		if [ "$EXCL_INFLIGHT" -ge 0 ] && [ "${REPORTED[$EXCL_INFLIGHT]:-0}" != "1" ]; then
+			break
+		fi
 		i="$launched"
 		# An EXCLUSIVE layer gets the machine to itself: wait here until everything in flight has finished,
 		# and once it launches, stop filling slots until it is done. See add_excl for why a timing layer
@@ -952,6 +979,7 @@ while [ "$done_count" -lt "$total" ]; do
 		) &
 		launched=$((launched + 1))
 		if [ "${EXCL[$i]}" = "1" ]; then
+			EXCL_INFLIGHT="$i"
 			break
 		fi
 	done
