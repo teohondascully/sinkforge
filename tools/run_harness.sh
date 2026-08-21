@@ -329,6 +329,27 @@ add "check_trailers (one author, no trailers)" "res://tools/check_trailers.sh"
 # halves have already gone stale separately; see its header.
 add_excl_hl "check_lock (the machine lock's own properties)" "res://tools/check_lock.sh"
 add "check_exit_codes (the table and its reader agree)" "res://tools/check_exit_codes.sh"
+# AND THE AUDIT ABOVE MISSED ONE, WHICH IS THE PART WORTH READING. `check_prose.sh` measures the comment
+# prose in shipped game code and fails on the marks and vocabulary that read as machine-written. It was in
+# no sweep, no CI job and no hook: zero references anywhere outside itself, against a positive control
+# confirming the string appears on this branch at all. It was also RED, on three files that are on
+# `origin/main`, and the count in the worst of them had grown across ten commits (117 to 166 em-dashes in
+# four days) with nothing anywhere saying so.
+#
+# WHY IT COULD STAY MISSING THROUGH AN AUDIT WHOSE QUESTION WAS EXACTLY THIS. `check_ci_coverage` is the
+# layer whose whole job is "every layer runs", and it filtered its population to `.gd`, so a shell gate
+# could not appear in it at all. The guard against this defect was green the whole time, over a population
+# that excluded the file that went missing. Its own header has the right instinct -- a layer is identified
+# by what it INHERITS, not by an allowlist -- and an extension filter is an allowlist wearing a hat. c1's
+# finding, and it is why that population is widened in the same commit as this line.
+#
+# Costs 0.4 seconds, needs no engine and no display, and reads the working tree plus `git ls-files`.
+add "check_prose (the comment register)" "res://tools/check_prose.sh"
+# AND THE ONE WRITTEN TONIGHT, REGISTERED BY THE SAME ARGUMENT RATHER THAN LEFT TO PROVE IT AGAIN.
+# `check_base_namespace.sh` is called from `.githooks/pre-commit`, and `check_trailers` already records why
+# a hook is not enough here: `--no-verify` is routine, and that is exactly the flag that skips it. A gate
+# whose only caller can be skipped by a flag is a gate that will be skipped. Instant, no engine.
+add "check_base_namespace (no layer shadows its base)" "res://tools/check_base_namespace.sh"
 add "check_binding_persistence (a boot may not re-duplicate)" "res://tools/check_binding_persistence.gd"
 add "check_row_identity (one row, one machine)" "res://tools/check_row_identity.gd"
 add "check_encoding (no mojibake)"     "res://tools/check_encoding.gd"

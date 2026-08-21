@@ -42,8 +42,8 @@ is read.
 bash tools/run_harness.sh
 ```
 
-That is the whole suite: 105 layers, each in its own process (a Godot run for all but one, which is a
-shell script), up to the CPU count in parallel. It takes a machine-wide lock first, so a second sweep
+That is the whole suite: 107 layers, each in its own process: a Godot run for the ones written in
+GDScript, a `bash` run for the few written as shell scripts. Up to the CPU count in parallel. It takes a machine-wide lock first, so a second sweep
 queues rather than competing.
 
 Do not pipe it. `tools/run_harness.sh | tail` gives you `tail`'s exit status, and a red layer

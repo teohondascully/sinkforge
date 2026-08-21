@@ -122,8 +122,18 @@ func _initialize() -> void:
 		names.sort()
 		var sources: Dictionary = {}
 		var bases: Dictionary = {}
+		# `.sh` IS IN THE POPULATION, AND LEAVING IT OUT IS HOW THIS LAYER STAYED GREEN OVER A REAL ORPHAN.
+		# The filter used to read `.gd` only, so a SHELL gate could not appear here at all -- and one did
+		# not: `check_prose.sh` was in no sweep, no CI job and no hook, was red on three files that ship,
+		# and had watched the worst of them grow from 117 to 166 em-dashes across ten commits. The layer
+		# whose whole job is "every layer runs" was correct about a population that excluded the file that
+		# went missing. An extension filter is the allowlist the note above rejects, wearing a hat.
+		#
+		# A shell gate has no base class to inherit, so `check_` in the name is all there is to go on for
+		# those. That is genuinely weaker than the inheritance test and is written down rather than hidden:
+		# the `.gd` half still identifies a layer by what it extends, and only the `.sh` half is nominal.
 		for f: String in names:
-			if not f.begins_with("check_") or not f.ends_with(".gd"):
+			if not f.begins_with("check_") or not (f.ends_with(".gd") or f.ends_with(".sh")):
 				continue
 			var src: String = _read("tools/" + f)
 			sources[f] = src
@@ -138,7 +148,16 @@ func _initialize() -> void:
 			var src: String = String(sources[f])
 			if bases.has(f):
 				continue
-			if not src.contains("res://tools/check_base.gd") and not src.contains("extends SceneTree"):
+			# A SHELL GATE HAS NO BASE TO INHERIT, so the inheritance test cannot see one and the extension
+			# filter above was never the thing excluding them: THIS line was. Widening the filter alone
+			# changed nothing, which a mutant proved before it shipped — `check_prose.sh` commented out of
+			# the runner and this layer still PASSED. The predicate for a shell layer is nominal, and that
+			# is weaker than inheritance and is written down rather than hidden: a `tools/check_*.sh` that
+			# is not meant to be a layer will report as an orphan until it is registered or renamed, which
+			# fails loud and in the direction that costs a rename instead of a gate running nowhere.
+			if f.ends_with(".sh"):
+				pass
+			elif not src.contains("res://tools/check_base.gd") and not src.contains("extends SceneTree"):
 				continue
 			layer_files.append(f)
 			if not registered.has("res://tools/" + f):

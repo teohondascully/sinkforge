@@ -1,6 +1,6 @@
 # How this project is verified
 
-Sinkforge is a Godot 4 game with an unusually large test surface: 105 registered check layers across
+Sinkforge is a Godot 4 game with an unusually large test surface: 107 registered check layers across
 34,000 lines of harness (`tools/*.gd`) against 26,000 lines of game code (`src/` and `scenes/`). Both
 figures name their glob deliberately, because the ratio is the claim: counting the harness's shell
 scripts as well, and counting the headless suites in `tests/` as game code, the same measurement reads
@@ -17,7 +17,7 @@ possible into something that can fail.
 
 | verb | count | meaning |
 |---|---|---|
-| `add` | 87 | safe headless; no window, no GPU readback |
+| `add` | 89 | safe headless; no window, no GPU readback |
 | `add_gl` | 14 | needs a real display, because it photographs the frame |
 | `add_excl` | 3 | must run alone on the machine, and needs a display |
 | `add_excl_hl` | 1 | must run alone, but headless: it stages races rather than measuring frames |
