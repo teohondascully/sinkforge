@@ -13,7 +13,7 @@ extends "res://tools/check_base.gd"
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_water_move.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## A cleared, flat test arena: a thick floor plate with open air above it (like check_agility's course),
 ## so the natural terrain can't wall the body and the run is fully deterministic.

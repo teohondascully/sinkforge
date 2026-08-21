@@ -20,7 +20,7 @@ const SCENE: String = "res://scenes/main.tscn"
 const HEIGHTS: Array[int] = [0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 2, 2, 2, 0, 0, 1, 1, 1, 0, 0, 0, 0]
 const START_COL: int = 12
 const BASE_ROW: int = 14
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## Score floor + component caps: headroom over today's MEASURED baseline (deterministic across 3 runs, ZERO
 ## variance: score 95.3, slowness 1.00×, 1 stall, jump-latency 1f) so a real movement regression trips while

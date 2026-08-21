@@ -33,7 +33,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_traverse.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## THE GALLERY: a level corridor with a solid roof, cut into real rock well below the surface.

@@ -8,7 +8,7 @@ extends "res://tools/check_base.gd"
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_climb.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const PIT_COL: int = 6
 const PIT_TOP: int = 8          ## the surface row of the fixture
 const PIT_FLOOR: int = 17       ## solid floor row (pit depth = 9 tiles — far past jump height)

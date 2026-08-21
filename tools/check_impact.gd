@@ -33,7 +33,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_impact.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## The shaft: a clear column with solid rock either side (so the hook has something to bite) and a floor.

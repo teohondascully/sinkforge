@@ -28,7 +28,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_teaching.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## A bubble is shown for Hints.SHOW_SECONDS. Reading prose off a HUD runs about 200 wpm ≈ 5 chars/word,

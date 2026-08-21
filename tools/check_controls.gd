@@ -16,7 +16,7 @@ extends "res://tools/check_base.gd"
 ## a researchable rung standing by must leave that rung alone.
 ## Run: godot --headless --path . --script res://tools/check_controls.gd
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SCENE: String = "res://scenes/main.tscn"
 
 var _main: MainView

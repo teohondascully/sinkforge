@@ -22,7 +22,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_grapple.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## Rig geometry, in cells. A ceiling to hook, a floor to stand on, and a gap in that floor wider than any
 ## jump the body owns.

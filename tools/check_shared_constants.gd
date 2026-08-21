@@ -37,15 +37,29 @@ const EXEMPT: Dictionary = {}
 ## This layer makes three claims and they fail to different things, so a single control would have left
 ## two of them untested while the run looked fully controlled:
 ##
-##   mutant                                      coverage   agreement   opened
-##   scenes/sfx.gd CELL 32 -> 33                 PASS       **FAIL**    PASS
-##   _walk skips tools/ (47 files seen, not 165) **FAIL**   PASS        PASS
+##   mutant                                        coverage   once     agreement   opened
+##   _walk skips tools/ (47 files seen, not 165)   **FAIL**   PASS     PASS        PASS
+##   a second literal, via SF_SHARED_CONST_EXTRA   PASS       **FAIL** PASS        PASS
+##   the OWNER FactorySim.CELL 32 -> 33            PASS       PASS     **FAIL**    PASS
 ##
-## The second row is the one that matters, and it is sharper now than it was. With tools/ skipped the scan
-## finds exactly ONE declaration, the owner, and "every declaration holds 32.0" is then TRUE of a
-## population of one. The agreement check passes VACUOUSLY on a scan that never ran. Coverage is the only
-## thing standing between this layer and a green line that means nothing, and it is provably not the same
-## assertion as the one it protects.
+## Each mutant fires exactly one assertion, which is what makes them a proof rather than three runs of the
+## same test. Two rows deserve reading twice.
+##
+## ROW 1. With tools/ skipped the scan finds exactly ONE declaration, the owner, and "every declaration
+## holds 32.0" is then TRUE of a population of one. The agreement check passes VACUOUSLY on a scan that
+## never ran, and so does the exactly-once check. Coverage is the only thing standing between this layer
+## and a green line that means nothing.
+##
+## ROW 2 IS THE ORIGINAL DEFECT, REPRODUCED. The re-introduced literal holds 32, so it AGREES, so the
+## agreement assertion passes and reports nothing. That is precisely how twenty-four copies accumulated in
+## the first place: every one of them agreed on the day it was written. Only the count sees it. The failure
+## names the sites, because "found 2" sends you grepping and "found 2 -- factory_sim.gd:36, hud.gd:218" is
+## already the fix.
+##
+## ROW 3 answers the objection to consumers aliasing the value at all: a test that imports the constant it
+## checks cannot notice a change to it. True of any single consumer, and the reason the expected value is
+## written HERE. Changing CELL still fails loudly; it now takes one assertion to say so instead of needing
+## twenty-four files to disagree with each other.
 ##
 ## NOT PROVED: the third claim, that every .gd file opened and returned text. Reaching it needs a file
 ## that exists and cannot be read, which I have not staged. It is recorded as unproven rather than assumed
@@ -148,6 +162,16 @@ func _initialize() -> void:
 					% [String(s["path"]).replace("res://", ""), s["line"], s["value"], want])
 
 		print("  %s: %d declaration(s), all must equal %s" % [name, sites.size(), want])
+
+		# THE POINT OF THE LAYER NOW. One literal, and a second one is where the whole defect restarts.
+		# Naming the sites matters: "found 2" sends you grepping, "found 2 -- src/core/factory_sim.gd:36,
+		# scenes/hud.gd:218" is already the fix.
+		var where: Array[String] = []
+		for s: Dictionary in sites:
+			where.append("%s:%d" % [String(s["path"]).replace("res://", ""), s["line"]])
+		_check(sites.size() == 1,
+			"%s is declared exactly once and found %d%s"
+				% [name, sites.size(), "" if sites.size() == 1 else " — at " + ", ".join(where)])
 		_check(wrong.is_empty(),
 			"%s: every declaration holds %s%s"
 				% [name, want, "" if wrong.is_empty() else " — DISAGREE: " + ", ".join(wrong)])

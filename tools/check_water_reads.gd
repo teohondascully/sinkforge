@@ -27,7 +27,7 @@ extends "res://tools/check_base.gd"
 
 const SCENE: String = "res://scenes/main.tscn"
 const DEAD := preload("res://tools/dead_space.gd")
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 const SHOT_SETTLE: int = 90   ## frames for the light/veil layers to repaint after the body is placed
 const POOL_TICKS: int = 600   ## SIM ticks driven directly, so the body is evenly settled on any machine

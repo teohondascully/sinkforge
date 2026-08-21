@@ -14,7 +14,7 @@ extends RefCounted
 ##
 ## Used by tools/play_tests.gd (the driven play-test TYPE).
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 var tree: SceneTree
 var main: MainView

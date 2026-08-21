@@ -26,7 +26,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_aim.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## A hollow box with rock on every side, so a shot in ANY direction has something to find.

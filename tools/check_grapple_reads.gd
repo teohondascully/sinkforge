@@ -46,7 +46,7 @@ extends "res://tools/check_base.gd"
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## The rig: a wide pocket of open sky with a thick ceiling to bite and a floor to stand on. Copied in shape
 ## from `check_grapple`, for the same reason it gives: nothing about this may depend on worldgen.

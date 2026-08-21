@@ -33,7 +33,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_pump.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## THE SWING RIG. A hall wide and deep enough to take a full arc without the body ever touching anything,

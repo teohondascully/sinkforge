@@ -23,7 +23,7 @@ extends "res://tools/check_base.gd"
 ##   CONSERVATION: every cell it takes out of the world arrives somewhere as an item. Matter is never
 ##     deleted, which is the rule the whole spoil design rests on (docs/DRIFT.md §4).
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 var _sim: FactorySim
 var _def: MachineDef

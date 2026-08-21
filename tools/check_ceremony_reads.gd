@@ -64,7 +64,7 @@ extends "res://tools/check_base.gd"
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## A shaft with rock either side, deep enough that the rope crosses the whole plate and continues past it.
 ## The rows BELOW the plate are the drift control: the same rope, the same rock, the same lamp, no plate.

@@ -39,7 +39,7 @@ extends "res://tools/check_base.gd"
 
 const SCENE: String = "res://scenes/main.tscn"
 const AGENT := preload("res://tools/play_agent.gd")
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## How far down both routes are asked to get. Deep enough that the shaft is real work and the hole has

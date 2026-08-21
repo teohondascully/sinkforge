@@ -30,7 +30,7 @@ extends "res://tools/check_base.gd"
 ##   godot --headless --path . --script res://tools/check_wrap.gd
 
 const SCENE: String = "res://scenes/main.tscn"
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 
 ## THE HOOK AND THE LEDGE. A hook planted high, a spur of rock jutting out below and to one side of it, and
