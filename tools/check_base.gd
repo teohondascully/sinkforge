@@ -71,7 +71,7 @@ var _passes: int = 0
 ## `tools/stand_downs.txt` lists every assertion this suite is permitted not to make. Until now a row in it
 ## could only be OBSERVED FIRING: the gate saw `SKIP: [id]` lines and checked they were registered. Absence
 ## meant nothing at all, so a row marked `env` -- permitted but conditional -- COULD NOT FAIL IN EITHER
-## DIRECTION. Six of twelve rows were documentation wearing a registry's clothes. c1's finding.
+## DIRECTION. Six of twelve rows were documentation wearing a registry's clothes. Found in review.
 ##
 ## Two-valued accounting does not fix it, because "did not stand down" is ambiguous between two states that
 ## want opposite responses:

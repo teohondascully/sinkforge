@@ -77,7 +77,7 @@ func _rig(cell: Vector2i, prefill: int) -> FactorySim:
 ## `mine()` breaks blocks; `take_lode` is the hand verb for working an exposed ore face one unit at a time,
 ## and the lode is where ore actually lives: terrain is what you carve, the lode is what you extract. The
 ## first version asserted through `mine()` and `collect_ground()` only, so the cap could have bound on rock
-## and missed ore entirely and this layer would have stayed green. Found by c1 reading the seam against the
+## and missed ore entirely and this layer would have stayed green. Found by reading the seam against the
 ## call sites rather than against the layer.
 ##
 ## THE RULE HERE IS DELIBERATELY NOT THE MINING RULE, and the difference is not an inconsistency.

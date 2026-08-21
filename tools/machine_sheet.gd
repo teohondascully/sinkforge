@@ -63,7 +63,7 @@ class Bench extends Node2D:
 		# the remedy proposed (add a docstring) was the remedy already in place and already failing.
 		#
 		# What actually reaches someone at a CALL SITE is the parameter name, because GDScript has no named
-		# arguments and the call shows a bare `1.0`. c1 made that fix in `c256d6e` by renaming the parameter
+		# arguments and the call shows a bare `1.0`. That fix landed in `c256d6e`, renaming the parameter
 		# `s` -> `cells`. Derived from CELL here rather than written as 20.0, so this tool cannot drift from
 		# the renderer's convention either.
 		Visuals.draw_machine_casing(self, Vector2(pad, pad), px, col, active, true, kind)

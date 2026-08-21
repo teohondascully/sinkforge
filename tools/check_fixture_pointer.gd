@@ -125,7 +125,7 @@ func _initialize() -> void:
 	# harmless leftover: it is SEVEN CALLS OF SLACK on a debt that was already paid, and every one of them
 	# would move a working person's cursor across their desk without turning this layer red. A ratchet that
 	# is not tightened when the debt is paid stops being a bound and becomes a licence.
-	# A SCAN THAT READ NOTHING SCORED CLEAN, and this is c1's finding, in the same function as the fix for
+	# A SCAN THAT READ NOTHING SCORED CLEAN, and this was a review finding, in the same function as the fix for
 	# it: sixty lines down the game-side scan makes an unreadable file an OFFENDER and asserts a concrete
 	# population floor. This one did neither. `DirAccess.open` returning null skipped the entire loop;
 	# `FileAccess.open` returning null `continue`d past the file; `found` stayed empty either way, so `over`

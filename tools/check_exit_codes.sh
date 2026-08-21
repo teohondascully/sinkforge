@@ -114,7 +114,7 @@ fi
 #    FULL-LINE COMMENTS ARE STRIPPED FIRST, and both of these were written without that and could not fail.
 #    Each file EXPLAINS the arrangement in prose above the call -- run_harness.sh:112 opens "BOTH CI AND A
 #    LOCAL RUN ARE NOW GATED AGAINST THAT, by the same file: `tools/harness_verdict.sh`" -- so deleting the
-#    actual invocation and leaving the paragraph left both properties green. Found in review by c1, who ran
+#    actual invocation and leaving the paragraph left both properties green. Found in review, by running
 #    the mutant rather than reasoning about it, and checked the two neighbouring structural greps in the
 #    other direction to bound the claim to exactly these.
 #

@@ -234,7 +234,7 @@ else
 	# shell. IN CI THEY NEED NOT: the harness is one step with its own `env:` block, this gate is a separate
 	# composite-action step, and step-level `env:` does not propagate. A perf job would have produced a run
 	# where the budget correctly did not stand down and a gate insisting it must have -- the diagnosis
-	# exactly backwards. Found by c1, who also noted why M9 could not have caught it: setting the variable
+	# exactly backwards. Found in review, which also established why M9 could not have caught it: setting the variable
 	# locally sets it for the sweep AND the gate at once, so the mutant cannot produce the divergence. A
 	# MUTANT INHERITS THE TOPOLOGY OF THE RUN THAT HOSTS IT, and a fault in the topology is invisible to
 	# every mutant run inside it.
@@ -280,7 +280,7 @@ else
 			# 2a. WAS THE ROW ACCOUNTED FOR AT ALL? Declared minus resolved, derived HERE rather than at
 			# the site, because a branch that is not taken cannot announce that it was not taken -- put
 			# the third state at the site and its absence is the original defect wearing a new label.
-			# c1 caught that before it shipped. The gate always runs; a branch may not.
+			# Caught in review before it shipped. The gate always runs; a branch may not.
 			#
 			# NOTE THE ONE PLACE THIS COULD NOT LIVE. The first attempt derived it in `_verdict()`, which
 			# reads as the universal exit and is not: 29 of the 86 layers inheriting check_base.gd call
@@ -303,7 +303,7 @@ else
 				#    directions: fired without the condition, or absent with it, are both a red. This
 				#    exists because `env` rows CANNOT FAIL -- the presence check skipped them and the
 				#    registration check passes anything listed -- so half the registry was a comment with
-				#    a tab in it, inside the file built to stop assertions going missing. c1's finding.
+				#    a tab in it, inside the file built to stop assertions going missing. Found in review.
 				#
 				#    Only rows whose condition can be STATED get one, and that is the useful part: the
 				#    rows that resist a condition are exactly the rows worth being suspicious of.

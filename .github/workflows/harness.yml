@@ -98,7 +98,7 @@ jobs:
       # it whose cause is a checkout setting. The `authorship` job already sets this and passes there
       # (896 commits, one author, no trailers), so the coverage existed and the sweep's copy of it did
       # not. Fixing it here rather than skipping the layer in this job: a skip re-creates the vacuity
-      # the refusal was written to prevent. Found by c1 in the CI log for bd2b1d7.
+      # the refusal was written to prevent. Found in the CI log for bd2b1d7.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0

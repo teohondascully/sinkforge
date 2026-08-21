@@ -167,7 +167,7 @@ drifted = ref["comma"] > ref_max
 # the per-file ceiling is still computed live off the reference, so the reference may be scrubbed to 0.500
 # (every ceiling drops to 0.550, silently and correctly) and then drift back to 0.700 (every ceiling rises
 # to 0.770) without ever crossing 0.705. That is 0.205 of permanent slack on the bound that sets every
-# other file's, and it is the same object as a warp entry left at 7 against a real count of 0. c1's
+# other file's, and it is the same object as a warp entry left at 7 against a real count of 0. A review
 # finding, on a guard written four hours after I wrote that sentence down.
 #
 # A NUDGE AND NOT A FAILURE, deliberately: a stale anchor is slack, not a breach, and failing a clean tree
@@ -222,14 +222,28 @@ if not paths:
 # would produce hundreds of failures that are all correct usage, and a gate that cries wolf gets disabled.
 #
 # So the wide sweep carries its own much narrower list: only the vocabulary that is wrong ANYWHERE in a
-# repository written by one person. Process words are allowed out here; authorship words are not.
+# repository written by one person.
+#
+# AND THAT LIST LIVES OUTSIDE THIS FILE, which is a publication decision rather than a code one. A
+# banned-word list is a statement about what its author expects to find, so shipping one is shipping that
+# expectation -- and this one had already done its work: every word on it occurs zero times in the tracked
+# tree, so the only remaining instance of each was the line here forbidding it. A rule that is the sole
+# surviving example of what it prohibits is not protecting anything, it is describing its author. Same
+# reason the file already excludes itself from its own scan, carried one step further.
+#
+# One word per line, `#` comments and blanks ignored, matched whole-word and case-insensitively. Point
+# SF_PROSE_WORDS at any file; the default is untracked, so a clean clone has no list and says so rather
+# than reporting a silent pass over an empty one.
+# `__file__` is not this .sh (the python arrives on stdin), so the default is resolved against the tree
+# the layer already runs from. The first draft used `__file__` and silently pointed one directory too
+# high, which the "list present" control caught by naming a path that did not exist.
+WORDS_PATH = os.environ.get("SF_PROSE_WORDS") or os.path.join(os.getcwd(), "tools", "prose_words.txt")
 WIDE_TOKENS = []
-_words = os.environ.get("SF_PROSE_WORDS") or os.path.join(os.getcwd(), "tools", "prose_words.txt")
-if os.path.isfile(_words):
-    for _w in open(_words, encoding="utf-8").read().splitlines():
+if os.path.isfile(WORDS_PATH):
+    for _w in open(WORDS_PATH, encoding="utf-8").read().splitlines():
         _w = _w.split("#", 1)[0].strip()
         if _w:
-            WIDE_TOKENS.append((r"\b%s\b" % _w, _w))
+            WIDE_TOKENS.append((r"(?<![A-Za-z0-9_])" + re.escape(_w) + r"s?(?![A-Za-z0-9_])", _w))
 # TRACKED FILES ONLY, and this is the difference between a gate and a nuisance. The working tree carries
 # coordination documents that are deliberately kept out of the repository through `.git/info/exclude`
 # rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
@@ -239,10 +253,17 @@ WIDE_PATHS = sorted(f for f in _tracked          # the same enumeration as the s
                     if f.startswith(("tools/", ".github/"))
                     or (f.startswith("docs/") and f.endswith(".md"))
                     or f in ("README.md", "CONTRIBUTING.md"))
-# This file spells every literal it hunts for, so it cannot be its own subject. `.gitignore` is excluded
+# The gate is excluded from its own scan: with the word list external it no longer carries the literals,
+# but a file that reports on the list would still match anything the list names. `.gitignore` is excluded
 # for the same reason one line down. Both exclusions are counted and printed below, because an exclusion
 # nobody can see is indistinguishable from a scan that missed.
 WIDE_SKIP = {"tools/check_prose.sh"}
+# A LIST THAT IS NOT THERE IS NOT A CLEAN SWEEP. Without this the wide pass reads every file, matches an
+# empty pattern set, and prints the same line it prints when the tree is genuinely clean.
+if not WIDE_TOKENS:
+    print("check_prose: no wide word list at %s -- the wide sweep read the tree and ASSERTED NOTHING."
+          % WORDS_PATH)
+    print("             Set SF_PROSE_WORDS to a file with one word per line to enable it.")
 wide_fails, wide_read, wide_skipped = [], 0, 0
 for wp in WIDE_PATHS:
     if not os.path.isfile(wp):
@@ -299,9 +320,9 @@ if unreadable:
     for p in unreadable:
         print("  %s" % p)
 
-print("\nwide sweep: %d file(s) read across tools/, .github/, docs/ and the root markdown"
-      % wide_read)
-print("            %d skipped (this file spells every literal it hunts for)" % wide_skipped)
+print("\nwide sweep: %d word(s) tested over %d file(s) across tools/, .github/, docs/ and the root"
+      % (len(WIDE_TOKENS), wide_read))
+print("            markdown, %d skipped (the gate does not scan itself)" % wide_skipped)
 if wide_fails:
     print("\n%d file(s) carry authorship vocabulary outside the game code:" % len(wide_fails))
     for wp, hits in wide_fails:
@@ -316,5 +337,10 @@ if fails or wide_fails or drifted:
             print("  %-42s %s" % (p, "; ".join(bad)))
     sys.exit(1)
 
-print("\ncheck_prose: %d file(s) clean, %d more clean on the wide sweep" % (len(rows), wide_read))
+# WHAT THE WIDE SWEEP ASSERTED, not how many files it opened. With no word list it opens all 151 and
+# tests nothing, and the first version of this line called that "clean" -- a quiet green printed by the
+# gate whose whole job is to stop one.
+print("\ncheck_prose: %d file(s) clean, %s" % (len(rows),
+    "%d more clean on the wide sweep" % wide_read if WIDE_TOKENS
+    else "and the wide sweep ASSERTED NOTHING (no word list; %d file(s) read, 0 words tested)" % wide_read))
 PYEOF

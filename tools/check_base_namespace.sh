@@ -49,7 +49,7 @@ fi
 # the population with nothing said. A floor at zero would not notice, because it only refuses to report
 # when it has lost ALL of the population, and the failure this file exists to catch arrives one layer at a
 # time. `grep -l` over the same two directories does not care what line `extends` is on, so the true count
-# is knowable exactly and the scan can be held to it BY NAME. c1's finding, and it is M5's own lesson --
+# is knowable exactly and the scan can be held to it BY NAME. Found in review, and it is M5's own lesson --
 # a floor that never binds is a licence with extra syntax -- reappearing in a guard written to apply it.
 #
 # THE PREDICATE IS ANCHORED, AND THE UNANCHORED ONE WAS TRIED FIRST AND WAS WRONG BY ONE. `extends.*

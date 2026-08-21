@@ -845,7 +845,7 @@ harness_cleanup() {
 	# line. So a reader searching a retained log dir for NOT A RESULT would find a killed sweep and a
 	# finished one indistinguishable -- exactly the archive gap the exit-code fix exists to close, left open
 	# one level up. Written here rather than in the signal traps themselves so that the annotation and the
-	# integer it explains are produced by the same code path and cannot drift apart. c1's finding.
+	# integer it explains are produced by the same code path and cannot drift apart. Found in review.
 	case "$rc" in
 		130|143)
 			killed="INTERRUPTED (SIGINT)"
