@@ -600,11 +600,15 @@ func _fell_foliage_cell(c: Vector2i) -> void:
 		return
 	solid.erase(c)
 	_dirty_terrain(c)
+	# Through the cap, like every other path that DESTROYS what held the material. This is the cascade — the
+	# rest of a tree coming down after its base was cut — and it is a separate write from `mine`'s own
+	# foliage branch, which is exactly why it was missed: a fixture that fells a lone block never reaches it,
+	# and a full pack was taking a four-block trunk three units past the cap.
 	if mat == &"wood":
-		inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
+		take_into_pack(&"wood", 1, c)
 		total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
 	elif mat == &"leaves" and leaf_drops_sapling(c):
-		inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
+		take_into_pack(&"sapling", 1, c)
 		total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
 	_resettle_pile_above(c)
 
@@ -1152,6 +1156,11 @@ func plant_sapling(cell: Vector2i) -> bool:
 
 ## Take a planted sapling back into the pack, the mirror of plant_sapling. Growth so far is forfeit.
 func remove_sapling(cell: Vector2i) -> bool:
+	# A FULL PACK LEAVES IT PLANTED. Same rule as the lode face and for the same reason: refusing here
+	# destroys nothing — the sapling stays in the ground and keeps growing — so there is no homeless
+	# material needing a floor to land on, and the player loses nothing by being told to come back.
+	if not can_carry(&"sapling", 1):
+		return false
 	if not sapling.has(cell):
 		return false
 	sapling.erase(cell)
@@ -1591,13 +1600,27 @@ func pickup_machine(cell: Vector2i) -> bool:
 	var state: MachineState = grid.get(cell, null)
 	if state == null:
 		return false
+	# THROUGH THE CAP, and this one is the largest single transfer in the game: a hopper is an unbounded
+	# store, so salvaging a loaded one used to hand the player its entire contents in one call regardless of
+	# what they could carry. The machine is leaving the world, so its buffer has nowhere to be except the
+	# pack or the floor — spill, not refuse, on the same rule as mining.
+	#
+	# THE ORDER MATTERS AND THE FIRST VERSION GOT IT WRONG. Spilling while the machine was still in the grid
+	# sent the overflow down its own column, where `_column_landing` found THIS MACHINE and fed the units
+	# straight back into the buffer being emptied — and the `clear()` below then destroyed them. The pack
+	# stayed under the cap and the ore simply ceased to exist, which is the one outcome this whole mechanism
+	# is supposed to make impossible. So the contents are taken out first, the machine is removed, and only
+	# then is anything spilled into a column that no longer has a machine at the top of it.
+	var salvaged: Dictionary = {}
 	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
 		for item: StringName in buffer:
-			inventory[item] = int(inventory.get(item, 0)) + int(buffer[item])
-		buffer.clear()   # salvaged into the pack, and cleared so remove_machine has nothing to destroy
+			salvaged[item] = int(salvaged.get(item, 0)) + int(buffer[item])
+		buffer.clear()   # salvaged out either way, and cleared so remove_machine has nothing to destroy
+	remove_machine(cell)
+	for item: StringName in salvaged:
+		take_into_pack(item, int(salvaged[item]), cell)
 	inventory[state.def.id] = int(inventory.get(state.def.id, 0)) + 1
 	total_produced[state.def.id] = int(total_produced.get(state.def.id, 0)) + 1  # mirrors build's consume
-	remove_machine(cell)
 	return true
 
 

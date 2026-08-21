@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_overflow_is_conserved(cap)
 	_a_full_pack_leaves_its_spill(cap)
 	_the_lode_face_is_the_ore_verb(cap)
+	_the_rest_of_the_yield_paths(cap)
 	_the_other_direction(cap)
 
 	_verdict("check_carry_cap",
@@ -122,6 +123,93 @@ func _the_lode_face_is_the_ore_verb(cap: int) -> void:
 		"CONTROL a pack with room takes the unit from the identical face ('%s')" % String(yielded))
 	_check(int(open_sim.inventory.get(&"ore", 0)) == 1,
 		"...and it is in the pack")
+
+
+## THE OTHER THREE WAYS MATERIAL ENTERS THE PACK, because two were already missed and the reason they were
+## missed is that an unrouted path and a deliberately exempt one look identical in the source.
+##
+## `is_bulk_item` says `wood` and `sapling` are freight and `conduit`, `rope`, `torch` and machine items are
+## not. So a site writing `inventory` inline is only safe if what it writes is exempt — and nothing in the
+## file says which sites were considered and which were simply never visited. These three write BULK:
+##
+##   `_fell_foliage_cell` — the cascade when a cut trunk drops the rest of the tree. Wood and saplings.
+##   `remove_sapling`     — taking a planted sapling back out of the ground.
+##   `pickup_machine`     — salvaging a machine, which hands you its BUFFERED CONTENTS. A hopper sitting on
+##                          forty units of ore empties straight into the pack.
+##
+## THE RULE FOLLOWS THE SAME DISTINCTION `take_lode` established. A path that DESTROYS or REMOVES the thing
+## holding the material has nowhere to put it but the world, so it spills; a path that leaves the thing
+## standing refuses instead. Felling destroys the block and salvage removes the machine, so both spill.
+## `remove_sapling` leaves a growable sapling in the ground if it refuses, so it refuses.
+##
+## `craft_item` is EXEMPT AND THAT IS A DECISION, not an oversight. Crafting spends bulk from the same pack
+## it deposits into and almost always nets downward — ore into an ingot, plates into a gear — so capping the
+## output could refuse a craft that would have made room. A cap that blocks the act of getting lighter is
+## the wrong shape, and the constraint is already applied at every door the material came in through.
+func _the_rest_of_the_yield_paths(cap: int) -> void:
+	# FELLING THE CASCADE, not a lone block. The first version of this arm mined a single wood cell and
+	# passed — because `mine()`'s foliage branch was already routed and `_fell_foliage_cell` was never
+	# reached. The cascade only fires when standing foliage LOSES ITS ROOT, so the fixture has to be a tree:
+	# cut the base and the blocks above come down through a different function with its own inline write.
+	var base := Vector2i(40, 40)
+	var fell := FactorySim.new()
+	fell.solid[base + Vector2i(0, 1)] = &"stone"          # ground for the tree to stand on
+	for up: int in range(0, 4):
+		fell.solid[base - Vector2i(0, up)] = &"wood"      # a four-block trunk
+	fell.inventory[&"stone"] = cap
+	var wood_before: int = int(fell.inventory.get(&"wood", 0))
+	fell.mine(base, true)                                  # cut the base: the rest loses its root
+	var standing: int = 0
+	for up: int in range(0, 4):
+		if fell.solid.has(base - Vector2i(0, up)):
+			standing += 1
+	_check(standing == 0, "fixture: cutting the base brought the whole trunk down (%d left)" % standing)
+	_check(fell.carried_bulk() <= cap,
+		"THE CASCADE does not push a full pack past the cap (%d <= %d)" % [fell.carried_bulk(), cap])
+	_check(int(fell.inventory.get(&"wood", 0)) == wood_before,
+		"...no felled wood entered a pack with no room for it")
+	_check(_on_floor(fell, &"wood") > 0,
+		"...and it is on the floor: a full pack does not destroy a tree it cannot carry (%d there)"
+			% _on_floor(fell, &"wood"))
+
+	# REMOVING A PLANTED SAPLING refuses instead, because refusing leaves a growing sapling in the ground
+	# rather than a hole — nothing is destroyed, so nothing needs a home.
+	var plot := Vector2i(45, 40)
+	var garden := FactorySim.new()
+	garden.sapling[plot] = 0.0
+	garden.inventory[&"stone"] = cap
+	_check(not garden.remove_sapling(plot), "A FULL PACK CANNOT TAKE A PLANTED SAPLING BACK")
+	_check(garden.sapling.has(plot), "...and it is still in the ground, growing, rather than deleted")
+	_check(garden.carried_bulk() <= cap, "...and the pack did not pass the cap")
+	var roomy := FactorySim.new()
+	roomy.sapling[plot] = 0.0
+	_check(roomy.remove_sapling(plot), "CONTROL a pack with room takes the same sapling back")
+
+	# SALVAGE. A hopper sitting on a load of ore hands its whole buffer over when picked up, and the machine
+	# leaves the world, so the contents have nowhere to be but the pack or the floor.
+	var yard := FactorySim.new()
+	var def: MachineDef = load("res://src/data/machines/hopper.tres") as MachineDef
+	_check(def != null, "fixture: a machine def loads for the salvage case")
+	if def == null:
+		return
+	var site := Vector2i(50, 40)
+	yard.solid[site + Vector2i(0, 1)] = &"stone"
+	var state: MachineState = yard.place_machine(def, site)
+	_check(state != null, "fixture: the machine is placed")
+	if state == null:
+		return
+	state.input_buffer[&"ore"] = 40
+	yard.inventory[&"stone"] = cap
+	var ore_before: int = int(yard.inventory.get(&"ore", 0))
+	_check(yard.pickup_machine(site), "fixture: salvage succeeds — the machine is removed either way")
+	_check(yard.carried_bulk() <= cap,
+		"SALVAGING a loaded machine does not push a full pack past the cap (%d <= %d)"
+			% [yard.carried_bulk(), cap])
+	_check(int(yard.inventory.get(&"ore", 0)) == ore_before,
+		"...its buffered ore did not enter a pack with no room")
+	_check(_on_floor(yard, &"ore") > 0,
+		"...it went to the floor instead of being deleted with the machine (%d there)"
+			% _on_floor(yard, &"ore"))
 
 
 ## Every unit of `item` anywhere in the world's piles, so conservation is checked by finding the material
