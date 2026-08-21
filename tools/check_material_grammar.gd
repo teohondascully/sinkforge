@@ -187,7 +187,11 @@ func _run() -> void:
 		"%d of the sampled windows are bright enough for a material to be visible in (floor %d)"
 			% [int(real_r["n_lit"]), MIN_SAMPLES])
 	_check(struct_auc >= READ_FLOOR,
-		"STRUCTURE, colour removed: dirt and stone are tellable apart %.0f%% of the time (floor %.0f%%,"
+		# TWO DECIMALS, because %.0f prints a near miss and its own floor as the SAME NUMBER. This line
+		# read "75% of the time (floor 75%)" against a `>=` comparison, which looks like a broken
+		# assertion rather than a value fractions of a point under the bar, and a reader cannot tell
+		# which from the text. Identical defect to the one already fixed in check_texture.
+		"STRUCTURE, colour removed: dirt and stone are tellable apart %.2f%% of the time (floor %.2f%%,"
 			% [struct_auc * 100.0, READ_FLOOR * 100.0]
 			+ " a coin is 50%) — this is TR-02's actual subject")
 
@@ -246,6 +250,17 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 		sim.place_torch(Vector2i(cx + dx, cy))
 	p.place(main._cell_center(Vector2i(cx, cy)))
 	p.velocity = Vector2.ZERO
+	# POSE THE POINTER, AND POSE IT ON THE BODY, because this layer compares a LEFT half against a RIGHT
+	# half and the head-lamp is aimed. `Controls.pointer_world` falls through to the real
+	# `get_mouse_position()` unless a fixture poses it; `_aim` is built from that, and the lamp's veil cut
+	# rides an offset easing toward `_aim`. So an unposed run lights one side of the seam more than the
+	# other by an amount set by where a hand was left on the desk — a DIRECTIONAL bias on a directional
+	# comparison, not merely noise on it. Nine other fixtures under `tools/` already pose the pointer.
+	#
+	# On the body specifically, because that is the pose that makes the lamp symmetric about the seam. Any
+	# other fixed point would be reproducible and still tilted, which is a quieter version of the same
+	# fault.
+	Controls.pose_pointer(p.position)
 	main._renderer.repaint_world()
 	for _i: int in 40:
 		await physics_frame
