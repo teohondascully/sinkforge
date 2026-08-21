@@ -19,6 +19,20 @@ build/
 .vscode/
 .idea/
 
+# Every other dotted directory at the root is local tooling state, and it is ignored BY SHAPE rather
+# than by name. The rule here used to name one specific tool, which put a vendor's name into a file
+# that ships. Deleting the name closed that and opened something worse: the only surviving rule was in
+# .git/info/exclude, which is local and is NOT part of a clone, so a fresh clone ignored nothing and a
+# single broad `git add` would have committed a working directory full of tool state. Ignoring by shape
+# keeps the protection, names nobody, and covers tooling that does not exist yet.
+#
+# The two dotted directories that must ship are re-included explicitly. Re-inclusion works here because
+# the exclusion applies to the DIRECTORY and is lifted on the same directory; a negation on a path
+# inside an excluded directory would not work, since git does not descend into one.
+/.*/
+!/.github/
+!/.githooks/
+
 # Dev harness — generated screenshots (+ their Godot import sidecars)
 /_capture*.png
 /_capture*.png.import
