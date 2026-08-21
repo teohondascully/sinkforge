@@ -414,10 +414,36 @@ func walk_to_column(col: int, budget: int = 600, on_surface: bool = true) -> boo
 	var ended: Vector2i = main._cell_at(player.position)
 	var arrived: bool = ended.x == col and (not on_surface or _on_surface_of(col))
 	if not arrived:
+		# AND WHAT THE WALKER COULD SEE FROM WHERE IT STOOD, because "could not walk two columns across
+		# flat ground" is not a diagnosis, and that is exactly what corpus seed 20260817 reported. The
+		# ground there is unobstructed: columns 44 to 51 all have surface row 20, no ledge, no gap. So the
+		# terrain does not explain the failure and the walker's VIEW of the terrain is the next question.
+		#
+		# The three cells below are the ones the hop logic branches on. If the body's OWN cell reads
+		# solid, every probe taken relative to it is a row low: `ahead` and `ahead_floor` are then both
+		# inside the ground on any flat surface, the gap-hop branch becomes unreachable, and the wall-hop
+		# branch fires against a wall that is not there. Printing them is how that stops being a story.
+		var d: int = signi(int(col_x - player.position.x))
 		_note("could not walk to column %d (on_surface=%s) in %d frames (stopped at %s, that column's surface is row %d, %s)"
 			% [col, str(on_surface), t, ended, sim.surface_row(col),
 			"still" if still > 150 else "out of budget"])
+		_note("    from there: own cell %s, ahead %s, ahead-floor %s; on_floor=%s, v=(%.1f, %.1f), dir=%d,"
+			% ["SOLID" if sim.is_solid(ended) else "open",
+			"SOLID" if sim.is_solid(ended + Vector2i(d, 0)) else "open",
+			"SOLID" if sim.is_solid(ended + Vector2i(d, 1)) else "open",
+			str(player.on_floor), player.velocity.x, player.velocity.y, d]
+			+ " grapple=%s, ground %d row(s) below" % [str(player.grapple.live()), _drop_below(ended)])
 	return arrived
+
+
+## How far below a cell the first solid ground is, or -1 if the column is open all the way down. A body
+## reported airborne wants this beside it: "in mid-air" over one row of gap and "in mid-air" over a
+## fifty-row shaft are the same two words and completely different situations.
+func _drop_below(cell: Vector2i) -> int:
+	for dy: int in range(1, FactorySim.GRID_ROWS - cell.y):
+		if sim.is_solid(cell + Vector2i(0, dy)):
+			return dy
+	return -1
 
 
 ## How close to the target column the agent stops pushing, and how settled "arrived" means. A stride is
