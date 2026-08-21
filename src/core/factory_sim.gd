@@ -774,7 +774,9 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 		var latent: int = int(deposits.get(cell, DEFAULT_ORE_DEPOSIT))
 		var burst: int = mini(_ore_burst(cell) if keep else 0, latent)
 		if burst > 0:
-			inventory[material] = int(inventory.get(material, 0)) + burst
+			# Through the cap. `total_produced` still counts the whole burst: what will not fit is on the
+			# floor, not discarded, and `collect_ground` does not count production.
+			take_into_pack(material, burst, cell)
 			total_produced[material] = int(total_produced.get(material, 0)) + burst
 		var left: int = latent - burst
 		if left > 0:
@@ -799,10 +801,10 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 		if not keep:
 			pass                                       # pulverised: the tree still falls, the wood is dust
 		elif material == &"wood":
-			inventory[&"wood"] = int(inventory.get(&"wood", 0)) + 1
+			take_into_pack(&"wood", 1, cell)
 			total_produced[&"wood"] = int(total_produced.get(&"wood", 0)) + 1
 		elif material == &"leaves" and leaf_drops_sapling(cell):
-			inventory[&"sapling"] = int(inventory.get(&"sapling", 0)) + 1
+			take_into_pack(&"sapling", 1, cell)
 			total_produced[&"sapling"] = int(total_produced.get(&"sapling", 0)) + 1
 		_resettle_pile_above(cell)
 		_settle_foliage(cell)          # cut the base/trunk → the rest of the tree loses its root and FALLS
@@ -813,7 +815,7 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 	solid.erase(cell)
 	_dirty_terrain(cell)
 	if keep:
-		inventory[material] = int(inventory.get(material, 0)) + 1
+		take_into_pack(material, 1, cell)
 		total_produced[material] = int(total_produced.get(material, 0)) + 1
 	_resettle_pile_above(cell)               # gravity: a pile that rested on this block now falls
 	_settle_foliage(cell)                    # dug the earth under a tree → the whole tree loses its root
@@ -1645,6 +1647,46 @@ func can_carry(item: StringName, n: int) -> bool:
 	if n <= 0 or not is_bulk_item(item):
 		return true
 	return carried_bulk() + n <= PACK_BULK_CAP
+
+
+## THE ONE DOOR INTO THE PACK for anything the cap counts, and the reason the cap did nothing until now.
+## `PACK_BULK_CAP`, `is_bulk_item`, `carried_bulk`, `pack_room` and `can_carry` have all existed and been
+## tested for weeks, and NO live path called any of them: every yield site wrote `inventory[x] =
+## inventory.get(x, 0) + n` inline, twelve of them, so there was no seam to enforce a cap at. That is why
+## the designed pain never reached the player — not a missing rule, a missing place to put it.
+##
+## THE RULE, stated once here rather than at each call site. A full pack does not refuse the swing: the
+## block still breaks, the world still gives up its material, and whatever will not fit FALLS instead of
+## vanishing. Refusing the dig would make a full pack feel like a broken control, and destroying the excess
+## would break the conservation this file argues for everywhere else. Spilling makes the cost a TRIP —
+## which is the pain the cap exists to create — while leaving every unit recoverable.
+##
+## Returns how many units actually entered the pack. Callers that record `total_produced` should keep
+## counting the FULL amount: material on the floor was still extracted from the world, and `collect_ground`
+## does not count production, so nothing is double-counted when it is picked back up.
+func take_into_pack(item: StringName, n: int, spill_at: Vector2i) -> int:
+	if n <= 0:
+		return 0
+	# Gear and machine items are never capped, so they take the whole amount without consulting room.
+	var taken: int = n if not is_bulk_item(item) else mini(n, pack_room())
+	if taken > 0:
+		inventory[item] = int(inventory.get(item, 0)) + taken
+	var rest: int = n - taken
+	if rest > 0:
+		_spill_to_world(spill_at, item, rest)
+	return taken
+
+
+## The overflow half of `take_into_pack`. This is `drop_item`'s tail with the pack half removed: the units
+## never entered the pack, so there is nothing to take out of it, but they land exactly the way dropped
+## items land — down the column, into the first machine below, else a re-collectable floor pile, else the
+## sink. Sharing the landing rather than reimplementing it is what keeps a spilled unit indistinguishable
+## from a dropped one to every consumer downstream.
+func _spill_to_world(cell: Vector2i, item: StringName, n: int) -> void:
+	var dest: Dictionary = _column_landing(cell.x, cell.y)
+	dest["target"][item] = int(dest["target"].get(item, 0)) + n
+	flow_events.append({"item": item, "from": cell, "to": dest["to_cell"], "count": n})
+	last_drop_landing = dest["to_cell"]
 
 
 ## Place a machine in a cell. Returns the new MachineState, or null if out of bounds / occupied /
@@ -2806,9 +2848,26 @@ func collect_ground(cell: Vector2i) -> int:
 	var pile: Dictionary = ground.get(cell, {})
 	if pile.is_empty():
 		return 0
+	# THE CAP APPLIES TO PICKING UP TOO, and leaving it off here would have voided the whole mechanism:
+	# a full pack that spills its overflow onto the floor would scoop the same units straight back on the
+	# next step, so the trip would never happen and the cap would read as a cosmetic delay. What does not
+	# fit STAYS in the pile rather than being lost, so the floor keeps it until there is room.
+	# Keys are collected first because the pile is mutated below and a Dictionary must not be edited while
+	# it is being iterated.
 	var collected: int = 0
-	for item: StringName in pile:
-		inventory[item] = int(inventory.get(item, 0)) + int(pile[item])
-		collected += int(pile[item])
-	ground.erase(cell)
+	var items: Array = pile.keys()
+	for item: StringName in items:
+		var want: int = int(pile[item])
+		var got: int = want if not is_bulk_item(item) else mini(want, pack_room())
+		if got > 0:
+			inventory[item] = int(inventory.get(item, 0)) + got
+			collected += got
+		if got >= want:
+			pile.erase(item)
+		else:
+			pile[item] = want - got
+	if pile.is_empty():
+		ground.erase(cell)
+	else:
+		ground[cell] = pile
 	return collected
