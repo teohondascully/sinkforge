@@ -271,6 +271,19 @@ if os.path.isfile(WORDS_PATH):
             # ships. The whole reason this line changed is that the anchors were producing the silent
             # kind.
             #
+            # MEASURED, so the threshold is evidence and not a claim. Whole tracked tree at the commit
+            # that introduced this, 322 text files of 570 paths:
+            #
+            #     2 short tokens, substring    11773 hit(s) in 222 file(s)   every one a false positive
+            #     2 short tokens, anchored         0
+            #     9 long tokens,  substring        0
+            #
+            # Anchoring exactly where it is needed costs nothing; anchoring everywhere is what hid the
+            # sixth occurrence on the public tree. Note also which error was cheap. The 11773 was caught
+            # in seconds because it is absurd on its face. The anchored zero was clean, plausible and
+            # wrong, and it survived three separately built instruments across two separate attempts. Loud and
+            # wrong is cheap. Quiet and wrong is what ships.
+            #
             # Measured: 0 hits from substring-matching every longer token across the whole tracked tree,
             # and 0 occurrences of the three colliding forms on either tree, so this hardens the gate
             # and moves no verdict today. If a document ever legitimately needs one of them, the fix is
