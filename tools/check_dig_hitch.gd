@@ -259,9 +259,10 @@ func _on_frame() -> void:
 		# was live on main. Measured, not inferred; same commit, same layer: 115 distinct sampled values
 		# and a real FAIL with a window, 1 distinct value and a PASS headless.
 		if DisplayServer.get_name() == "headless":
-			print("  SKIP: byte-identity NOT verified — no rendering surface. The headless driver returns a")
-			print("        blank image, so this comparison cannot fail and asserting it would be a lie.")
-			print("        Extent and cost below still assert for real. Run with a window to verify it.")
+			_stand_down("dig-hitch.byte-identity", "byte-identity of the rebaked region",
+				"there is no rendering surface, and the headless driver returns a blank image, so this"
+				+ " comparison cannot fail and asserting it would be a lie. Extent and cost below still"
+				+ " assert for real. Run with a window to verify it.")
 		else:
 			var want_bytes: int = FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS \
 				* FactorySim.SUBDIV * 4

@@ -456,9 +456,9 @@ func _backup_generation() -> void:
 	if DirAccess.copy_absolute(SLOT, SLOT + SaveGame.BAK_SUFFIX) == OK:
 		# The forcing function did not fire here, so the assertions it guards would pass without ever
 		# exercising a failed copy. Stand them down out loud rather than bank them.
-		print("  SKIP: the failed-backup path was NOT exercised — a directory at %s did not stop"
-			% (SLOT + SaveGame.BAK_SUFFIX))
-		print("        copy_absolute on this platform, so there is no way here to make the copy fail.")
+		_stand_down("save-durability.failed-backup", "the failed-backup path",
+			"a directory at %s did not stop copy_absolute on this platform, so there is no way here to"
+			% (SLOT + SaveGame.BAK_SUFFIX) + " make the copy fail")
 	else:
 		_check(not SaveGame.write(SLOT, SaveGame.capture(_world(66))),
 			"a save whose backup copy FAILS is refused, not promoted over an unbacked slot")

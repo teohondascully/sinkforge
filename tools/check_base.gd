@@ -173,5 +173,27 @@ func _void_layer(layer: String, why: String) -> void:
 
 ## Stand down PART of a layer that otherwise passed. The `SKIP:` prefix is what the runner greps for to
 ## report "passed without verifying everything", so this exists to stop that contract being retyped.
-func _stand_down(what: String, why: String) -> void:
-	print("  SKIP: %s was NOT asserted — %s" % [what, why])
+## `id` IS A STABLE NAME FOR THIS PARTICULAR STAND-DOWN, and it exists because the release gate could not
+## be keyed on anything else. `tools/stand_downs.txt` registers which assertions this suite is permitted not
+## to make; the first version keyed on (layer, count), and a count cannot answer either question that
+## matters. A layer that swaps WHICH of its two it stands down keeps the same count. And a count cannot
+## distinguish "an assertion is now being made" from "a different machine took a different branch" --
+## `check_frametime` returns early on an unset SF_PERF_HOST, so its count is 1 here and something else
+## entirely on a box where the budget is switched on. Both present as 2 -> 1.
+##
+## Format it as `<layer>.<what>`, lowercase, stable across rewordings: the id is the thing the registry
+## holds, so changing it is changing the claim. The reason text may be edited freely.
+##
+## THE BRACKETS ARE THE MACHINE-READABLE PART and the `SKIP:` prefix is deliberately unchanged, because
+## `run_harness.sh` counts stand-downs with `grep -c '^[[:space:]]*SKIP:'` and `harness_verdict.sh` reads
+## the same lines. Moving the marker would silently zero both counts.
+func _stand_down(id: String, what: String, why: String) -> void:
+	# A STAND-DOWN WITHOUT AN ID IS A STAND-DOWN THE GATE CANNOT NAME, so it is refused outright rather than
+	# printed with an empty bracket. Same rule as `_void_layer` requiring a digit in its reason: the layer
+	# does not get to opt out of an assertion without saying which one.
+	if id.strip_edges().is_empty():
+		printerr("  FAIL: _stand_down was called with no id, for \"%s\". The release gate keys on the id;"
+			% what + " an unnamed stand-down cannot be registered, permitted, or noticed when it changes.")
+		_failures += 1
+		return
+	print("  SKIP: [%s] %s was NOT asserted — %s" % [id, what, why])

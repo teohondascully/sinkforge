@@ -274,7 +274,7 @@ func _run() -> void:
 	else:
 		print("    the preview inks %.2f of the throw and reaches %.0f px of %.0f; %d drawn pixels lie "
 			% [fill, span, reach, stray] + "off the corridor entirely")
-		_stand_down("GR-05's share of the throw the preview inks (measured %.2f)" % fill,
+		_stand_down("grapple.gr05-preview-share", "GR-05's share of the throw the preview inks (measured %.2f)" % fill,
 			"no bound has been decided for it, and the cap that used to stand here was 1.01 over a "
 			+ "quantity `_corridor_fill` bounds at 1.0 by construction — an assertion that could not "
 			+ "fail. The measurement is the deliverable until there is a design call to assert")
@@ -478,7 +478,7 @@ func _run() -> void:
 			_check(bow_slack > bow_taut * 3.0,
 				"and a taut one does not (%.3f slack against %.3f taut)" % [bow_slack, bow_taut])
 		else:
-			_stand_down("GR-03's single-frame bow — both the floor and the taut-against-slack ratio",
+			_stand_down("grapple.gr03-single-frame-bow", "GR-03's single-frame bow — both the floor and the taut-against-slack ratio",
 				"neither number came off the cord, and a verdict on the rope drawn from the mask's rim "
 				+ "would be a claim about the instrument wearing the rope's name")
 

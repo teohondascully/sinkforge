@@ -130,14 +130,14 @@ func _initialize() -> void:
 	_consts = script.get_script_constant_map()
 	_calibrate()
 	_measure()
-	_stand_down("the bright-backdrop column", "how much light the world can put through a 0.90 plate is a "
+	_stand_down("contrast.bright-backdrop", "the bright-backdrop column", "how much light the world can put through a 0.90 plate is a "
 		+ "property of the renderer, not of the palette, and this layer's lane is the palette")
 	# NAMED HONESTLY BECAUSE IT IS THE GAP, not because it is tidy. `MNU-32`'s ink pass measured these by
 	# hand and the worst of them was the cost shortfall at 4.20 on the picked row's brass, which is why
 	# that ink is `UI_WARN` now, but the FLOOR on it is not held here, and will not be until the wash
 	# tiles and the brass are constants this layer can name. Ten drawing sites would have to change colour
 	# nothing to get there, so it is a separate decision and not a silent one.
-	_stand_down("the wash tiles and the picked row's brass", "they are literals in the drawing code rather "
+	_stand_down("contrast.wash-and-brass", "the wash tiles and the picked row's brass", "they are literals in the drawing code rather "
 		+ "than named constants, so no row here can reference them — the inks that land on them were "
 		+ "measured by hand for the ticket and cleared, but nothing re-measures them on the next edit")
 	_verdict("check_text_contrast", "every named HUD ink clears %.1f:1 on every named plate it lands on"

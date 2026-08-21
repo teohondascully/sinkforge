@@ -317,7 +317,7 @@ func _run() -> void:
 		% (float(over["rope_de"]) / maxf(float(over["rock_de"]), 0.001)))
 	await _on_the_surface(main, ink)
 
-	_stand_down("how much of the rope an interrupt may take",
+	_stand_down("ceremony.rope-share", "how much of the rope an interrupt may take",
 		"no design decision has been made about what the ceremony owes the world it interrupts; a bound "
 		+ "guessed before that decision has been wrong four times in this repository")
 
@@ -434,7 +434,7 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		await physics_frame
 		quiet += 1
 	if main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01:
-		_stand_down("the words against open sky",
+		_stand_down("ceremony.words-vs-sky-arm", "the words against open sky",
 			"the HUD would not go quiet at the surface, so there was no uninterrupted reference to read "
 			+ "the words against")
 		return
@@ -555,7 +555,7 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		print("  the plate reads %.1fx the drift on the means and %.1fx on the medians"
 			% [float(ink["de"]) / maxf(float(drift["de"]), 0.001),
 				float(ink["med"]) / maxf(float(drift["med"]), 0.001)])
-	_stand_down("how well the words read against open sky",
+	_stand_down("ceremony.words-vs-sky", "how well the words read against open sky",
 		"the arm now carries a drift floor measured inside its own run — same band, same length of "
 		+ "interval, no ceremony — so the reading finally has something in its own units to be a ratio "
 		+ "against; what is still owed is the decision about what that ratio must be, and that needs the "

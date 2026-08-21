@@ -188,72 +188,105 @@ SD_REG="$(dirname "$0")/stand_downs.txt"
 if grep -q 'SUBSET RUN' "$SUM" 2>/dev/null; then
 	note "stand-downs: not checked (SUBSET RUN -- the registry describes a full sweep)"
 elif [ ! -s "$SD_REG" ]; then
-	note "!! the stand-down registry at $SD_REG is missing or empty, so 'exactly these four' was not"
-	note "   checked. That is an unverified run, not a clean one."
+	note "!! the stand-down registry at $SD_REG is missing or empty, so 'exactly these and no others' was"
+	note "   not checked. That is an unverified run, not a clean one."
 	bad=1
 else
-	sd_seen=""; sd_total=0
-	for lg in "$LOGDIR"/*.log; do
-		[ -f "$lg" ] || continue
-		_n="$(grep -cE '^[[:space:]]*SKIP:' "$lg" 2>/dev/null)"
-		[ -n "$_n" ] && [ "$_n" -gt 0 ] 2>/dev/null || continue
-		_slug="$(basename "$lg" .log | sed 's/^[0-9]*-//')"
-		sd_seen="$sd_seen $_slug:$_n"
-		sd_total=$((sd_total + _n))
-	done
-	# THE REGISTRY MUST HAVE PARSED. Its rows are TAB-separated and a file whose tabs became spaces yields
-	# no rows, which agrees with a sweep that stood nothing down -- the empty-set-agrees-with-empty-set
-	# failure this gate exists to refuse one level up.
-	sd_rows="$(awk -F'\t' '!/^#/ && NF > 2 { print $1 "\t" $2 }' "$SD_REG")"
+	# WHAT FIRED, BY ID. `_stand_down()` prints `SKIP: [id] ...`; the bracket is the machine-readable part
+	# and the `SKIP:` prefix is unchanged so the runner's own counter still sees these lines.
+	sd_ids="$(cat "$LOGDIR"/*.log 2>/dev/null \
+		| sed -nE 's/^[[:space:]]*SKIP:[[:space:]]*\[([^]]+)\].*/\1/p' | sort -u)"
+	sd_count="$(cat "$LOGDIR"/*.log 2>/dev/null | grep -cE '^[[:space:]]*SKIP:')"
+	# WHICH REGISTERED LAYERS ACTUALLY RAN. A layer with no display prints `<name>: SKIP - no display` --
+	# `: SKIP` MID-LINE, which is deliberately not the `^SKIP:` marker, so it contributes no ids. Treating
+	# its absence as "stood down zero" is a missing measurement read as a measured zero, and it would have
+	# failed CI's headless job while reporting a debt paid.
+	sd_ran() {
+		_lg="$(ls "$LOGDIR"/*-"$1".log 2>/dev/null | head -1)"
+		[ -n "$_lg" ] || return 1
+		grep -qE "^$1: SKIP" "$_lg" && return 1
+		return 0
+	}
+	sd_rows="$(awk -F'\t' '!/^#/ && NF > 3 { print $1 "\t" $2 "\t" $3 }' "$SD_REG")"
 	sd_nrows="$(printf '%s\n' "$sd_rows" | grep -c .)"
-	sd_have="$(printf '%s' "$sd_seen" | tr ' ' '\n' | grep -v '^$' | sort | tr '\n' ' ')"
-	sd_bad=""
+	sd_bad=""; sd_absent=""; sd_env=""
+	# The conditions an `iff:` row may name. Read from the run rather than from a layer's prose.
+	_nodisplay=0
+	grep -q 'NO DISPLAY' "$SUM" 2>/dev/null && _nodisplay=1
 	if [ "$sd_nrows" -lt 1 ]; then
-		note "!! the stand-down registry parsed to 0 rows -- its rows are TAB-separated and something has"
-		note "   flattened them. Nothing was compared."
+		note "!! the stand-down registry parsed to 0 rows -- its columns are TAB-separated and something"
+		note "   has flattened them. Nothing was compared."
 		bad=1
 	else
-		# EVERY REGISTERED LAYER MUST BE PRESENT AND SATISFY ITS SPEC. `N` is exact; `>=N` is a floor, for
-		# an entry whose count is branched on the ENVIRONMENT rather than on the code. Only one entry needs
-		# it and the reason is written beside it in the registry: `check_frametime` returns early on an
-		# unset SF_PERF_HOST, so its second site is UNREACHABLE on this desk, and the exact count 1 is a
-		# property of this machine's configuration. Registering it exactly would make the release gate go
-		# red the first moment somebody does what that layer's own message instructs -- set SF_PERF_HOST on
-		# a controlled box -- and the registry would report an environment change as a debt paid, whose
-		# recommended response is to tighten the entry, which would bake this desk into the gate. Found by
-		# c1, against a two-sweep stability control of mine that had varied nothing about the confound.
-		while IFS="$(printf '\t')" read -r _slug _spec; do
-			[ -n "$_slug" ] || continue
-			_got="$(printf '%s' "$sd_seen" | tr ' ' '\n' | grep "^${_slug}:" | cut -d: -f2)"
-			_got="${_got:-0}"
-			case "$_spec" in
-				">="*)
-					_min="${_spec#>=}"
-					[ "$_got" -ge "$_min" ] 2>/dev/null \
-						|| sd_bad="$sd_bad ${_slug}(got $_got, want $_spec)" ;;
-				*)
-					[ "$_got" = "$_spec" ] \
-						|| sd_bad="$sd_bad ${_slug}(got $_got, want $_spec)" ;;
+		# 1. NOTHING UNREGISTERED. This is the direction that matters most: an assertion silently stopped.
+		for _id in $sd_ids; do
+			printf '%s\n' "$sd_rows" | cut -f1 | grep -qx "$_id" \
+				|| sd_bad="$sd_bad ${_id}(NOT REGISTERED)"
+		done
+		# 2. EVERY `always` ID WHOSE LAYER RAN MUST BE THERE, so the list is tightened when a debt is paid.
+		# EVERY registered layer is tested for having run, not only the ones carrying an `always` row.
+		# Checking only `always` rows would leave a layer whose entries are all `env` -- check_frametime is
+		# exactly that -- silently exempt, which is the licence the naming exists to prevent: it would stop
+		# running one day and no line anywhere would say so.
+		while IFS="$(printf '\t')" read -r _id _layer _kind; do
+			[ -n "$_id" ] || continue
+			if ! sd_ran "$_layer"; then
+				case " $sd_absent " in *" $_layer "*) ;; *) sd_absent="$sd_absent $_layer" ;; esac
+				continue
+			fi
+			_fired=0
+			printf '%s\n' "$sd_ids" | grep -qx "$_id" && _fired=1
+			case "$_kind" in
+				always)
+					[ "$_fired" = "1" ] \
+						|| sd_bad="$sd_bad ${_id}(REGISTERED always, NOT SEEN and $_layer ran)" ;;
+				# 3. AN `iff:` ROW NAMES THE CONDITION THAT GATES IT, and is then a real assertion in BOTH
+				#    directions: fired without the condition, or absent with it, are both a red. This
+				#    exists because `env` rows CANNOT FAIL -- the presence check skipped them and the
+				#    registration check passes anything listed -- so half the registry was a comment with
+				#    a tab in it, inside the file built to stop assertions going missing. c1's finding.
+				#
+				#    Only rows whose condition can be STATED get one, and that is the useful part: the
+				#    rows that resist a condition are exactly the rows worth being suspicious of.
+				iff:no-display)
+					if [ "$_nodisplay" = "1" ] && [ "$_fired" != "1" ]; then
+						sd_bad="$sd_bad ${_id}(headless and $_layer ran, so it MUST stand down)"
+					elif [ "$_nodisplay" != "1" ] && [ "$_fired" = "1" ]; then
+						sd_bad="$sd_bad ${_id}(fired WITH a display, where it must not)"
+					fi ;;
+				iff:perf-host-unset)
+					if [ -z "${SF_PERF_HOST:-}" ] && [ "$_fired" != "1" ]; then
+						sd_bad="$sd_bad ${_id}(SF_PERF_HOST unset and $_layer ran, so it MUST stand down)"
+					elif [ -n "${SF_PERF_HOST:-}" ] && [ "$_fired" = "1" ]; then
+						sd_bad="$sd_bad ${_id}(fired with SF_PERF_HOST=${SF_PERF_HOST}, where it must not)"
+					fi ;;
+				env)
+					# NOT AN ASSERTION, AND SAID SO OUT LOUD. Reporting every `env` id that fired costs
+					# nothing and is the difference between a conditional stand-down quietly becoming
+					# permanent and a human noticing one appear between two runs. It is how the
+					# headless-only `dig-hitch.byte-identity` would have been found months earlier.
+					[ "$_fired" = "1" ] && sd_env="$sd_env $_id" ;;
 			esac
 		done <<EOF
 $sd_rows
 EOF
-		# AND NOTHING UNREGISTERED MAY STAND ANYTHING DOWN. The loop above cannot see this direction: it
-		# only visits layers the registry already names.
-		for _pair in $sd_seen; do
-			_s="${_pair%%:*}"
-			printf '%s\n' "$sd_rows" | cut -f1 | grep -qx "$_s" \
-				|| sd_bad="$sd_bad ${_pair}(NOT REGISTERED)"
-		done
+		if [ -n "$sd_env" ]; then
+			note "stand-downs: conditional (env) ids that fired -- reported, not asserted:$sd_env"
+		fi
+		if [ -n "$sd_absent" ]; then
+			# NAMED, NEVER SILENT. An exemption nobody prints is a licence: a layer that quietly stopped
+			# running would be excused forever instead of noticed.
+			note "stand-downs: registered layers that did not run in this job, so not checked:$sd_absent"
+		fi
 		if [ -z "$sd_bad" ]; then
-			note "stand-downs: exactly the $sd_nrows registered, $sd_total assertion group(s) in total"
+			note "stand-downs: exactly the registered ones, $(printf '%s\n' "$sd_ids" | grep -c .) id(s),"\
+				"$sd_count line(s) in total"
 		else
-			note "!! THE STAND-DOWNS ARE NOT THE REGISTERED ONES. Both directions are a red: an unlisted"
-			note "   layer stopped asserting something, or a listed one now asserts more and the registry"
-			note "   is stale and must be tightened."
-			note "     mismatched:$sd_bad"
-			note "     this run  : $sd_have"
-			note "   tools/stand_downs.txt is the list, with the reason each one carries no bound."
+			note "!! THE STAND-DOWNS ARE NOT THE REGISTERED ONES:$sd_bad"
+			note "   An id not in the registry means something stopped asserting and nobody said so."
+			note "   An 'always' id missing while its layer RAN means the debt was paid and the registry"
+			note "   is stale. An 'iff:' id on the wrong side of its own condition means the condition"
+			note "   moved. None of the three is a pass. tools/stand_downs.txt carries each reason."
 			bad=1
 		fi
 	fi

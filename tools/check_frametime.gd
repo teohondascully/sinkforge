@@ -349,10 +349,13 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		# ONLY 120fps assertion, SF_PERF_HOST was unset everywhere for the whole life of the code, and so
 		# the budget had never once run while the summary said ALL PASS. An opt-in assertion is fine; a
 		# SILENT opt-in assertion is decoration. It can no longer pass without saying it did not assert.
-		print("  SKIP: the %.2fms/frame (120fps) budget was NOT asserted — SF_PERF_HOST is unset, so this"
-			% FRAME_BUDGET_MS
-			+ " is arbitrary hardware and the p95s above are a measurement, not a claim. Set"
-			+ " SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn the budget on.")
+		# THROUGH THE HELPER, and it used to print this line by hand. The text was identical, so the
+		# runner's `grep -c '^[[:space:]]*SKIP:'` counted it correctly and nothing was ever wrong -- which
+		# is exactly why it survived: the tally rested on two spellings happening to agree. It now carries
+		# an id, which the release gate in `tools/stand_downs.txt` keys on.
+		_stand_down("frametime.absolute-budget", "the %.2fms/frame (120fps) budget" % FRAME_BUDGET_MS,
+			"SF_PERF_HOST is unset, so this is arbitrary hardware and the p95s above are a measurement,"
+			+ " not a claim. Set SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn it on.")
 		return true
 
 	var interval: float = _interval
@@ -404,10 +407,10 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
 			# game costing 0.2ms and with one costing 8.3ms, and the harness counts this line, so the run
 			# reports "passed without verifying everything" rather than banking a green nobody earned.
-			print("  SKIP: %s p95 %.2fms is inside the %.2fms budget, but the run is vsync-paced — a frame"
-				% [labels[i], p95, FRAME_BUDGET_MS]
-				+ " that fits inside the refresh reports AS the refresh, so this number cannot tell a fast"
-				+ " phase from a pinned one. Not asserted.")
+			_stand_down("frametime.paced-phase", "%s p95 %.2fms against the %.2fms budget"
+				% [labels[i], p95, FRAME_BUDGET_MS],
+				"the run is vsync-paced — a frame that fits inside the refresh reports AS the refresh, so"
+				+ " this number cannot tell a fast phase from a pinned one")
 		else:
 			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
 	return ok

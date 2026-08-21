@@ -343,7 +343,7 @@ func _initialize() -> void:
 	# rather than printing the same green either way.
 	var order_second: PackedStringArray = _disk_order()
 	if _say(_order_first) == _say(order_second):
-		_stand_down("the file-order control",
+		_stand_down("bindings.file-order-control", "the file-order control",
 			"ConfigFile returned the same key order for both writes (%s)" % _say(order_second))
 	else:
 		print("  NOTE: the two fixtures are in opposite key order (%s vs %s)"
