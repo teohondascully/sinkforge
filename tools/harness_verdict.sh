@@ -204,22 +204,58 @@ else
 	# THE REGISTRY MUST HAVE PARSED. Its rows are TAB-separated and a file whose tabs became spaces yields
 	# no rows, which agrees with a sweep that stood nothing down -- the empty-set-agrees-with-empty-set
 	# failure this gate exists to refuse one level up.
-	sd_rows="$(awk -F'\t' '!/^#/ && NF > 2 { print $1 ":" $2 }' "$SD_REG" | sort | tr '\n' ' ')"
-	sd_nrows="$(printf '%s' "$sd_rows" | wc -w | tr -d ' ')"
+	sd_rows="$(awk -F'\t' '!/^#/ && NF > 2 { print $1 "\t" $2 }' "$SD_REG")"
+	sd_nrows="$(printf '%s\n' "$sd_rows" | grep -c .)"
 	sd_have="$(printf '%s' "$sd_seen" | tr ' ' '\n' | grep -v '^$' | sort | tr '\n' ' ')"
+	sd_bad=""
 	if [ "$sd_nrows" -lt 1 ]; then
 		note "!! the stand-down registry parsed to 0 rows -- its rows are TAB-separated and something has"
 		note "   flattened them. Nothing was compared."
 		bad=1
-	elif [ "$sd_have" = "$sd_rows" ]; then
-		note "stand-downs: exactly the $sd_nrows registered, $sd_total assertion group(s) in total"
 	else
-		note "!! THE STAND-DOWNS ARE NOT THE REGISTERED ONES. Both directions are a red: an unlisted layer"
-		note "   stopped asserting something, or a listed one now asserts more and the registry is stale."
-		note "     registered: $sd_rows"
-		note "     this run  : $sd_have"
-		note "   tools/stand_downs.txt is the list, with the reason each one carries no bound."
-		bad=1
+		# EVERY REGISTERED LAYER MUST BE PRESENT AND SATISFY ITS SPEC. `N` is exact; `>=N` is a floor, for
+		# an entry whose count is branched on the ENVIRONMENT rather than on the code. Only one entry needs
+		# it and the reason is written beside it in the registry: `check_frametime` returns early on an
+		# unset SF_PERF_HOST, so its second site is UNREACHABLE on this desk, and the exact count 1 is a
+		# property of this machine's configuration. Registering it exactly would make the release gate go
+		# red the first moment somebody does what that layer's own message instructs -- set SF_PERF_HOST on
+		# a controlled box -- and the registry would report an environment change as a debt paid, whose
+		# recommended response is to tighten the entry, which would bake this desk into the gate. Found by
+		# c1, against a two-sweep stability control of mine that had varied nothing about the confound.
+		while IFS="$(printf '\t')" read -r _slug _spec; do
+			[ -n "$_slug" ] || continue
+			_got="$(printf '%s' "$sd_seen" | tr ' ' '\n' | grep "^${_slug}:" | cut -d: -f2)"
+			_got="${_got:-0}"
+			case "$_spec" in
+				">="*)
+					_min="${_spec#>=}"
+					[ "$_got" -ge "$_min" ] 2>/dev/null \
+						|| sd_bad="$sd_bad ${_slug}(got $_got, want $_spec)" ;;
+				*)
+					[ "$_got" = "$_spec" ] \
+						|| sd_bad="$sd_bad ${_slug}(got $_got, want $_spec)" ;;
+			esac
+		done <<EOF
+$sd_rows
+EOF
+		# AND NOTHING UNREGISTERED MAY STAND ANYTHING DOWN. The loop above cannot see this direction: it
+		# only visits layers the registry already names.
+		for _pair in $sd_seen; do
+			_s="${_pair%%:*}"
+			printf '%s\n' "$sd_rows" | cut -f1 | grep -qx "$_s" \
+				|| sd_bad="$sd_bad ${_pair}(NOT REGISTERED)"
+		done
+		if [ -z "$sd_bad" ]; then
+			note "stand-downs: exactly the $sd_nrows registered, $sd_total assertion group(s) in total"
+		else
+			note "!! THE STAND-DOWNS ARE NOT THE REGISTERED ONES. Both directions are a red: an unlisted"
+			note "   layer stopped asserting something, or a listed one now asserts more and the registry"
+			note "   is stale and must be tightened."
+			note "     mismatched:$sd_bad"
+			note "     this run  : $sd_have"
+			note "   tools/stand_downs.txt is the list, with the reason each one carries no bound."
+			bad=1
+		fi
 	fi
 fi
 

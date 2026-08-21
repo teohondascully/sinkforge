@@ -48,7 +48,7 @@
 # convention holding across 105 layers, in a suite where four guards in one week were defeated by text
 # matching. Making `_stand_down()` the only way to produce the line is a separate change and is owed.
 
-check_frametime	1	the 8.33ms (120fps) budget asserts only when SF_PERF_HOST names the machine, and it is set nowhere. A frame-rate claim on arbitrary hardware is a statement about the box. Correct, permanent, and recorded in the layer at :349.
+check_frametime	>=1	the 8.33ms (120fps) budget asserts only when SF_PERF_HOST names the machine, and it is set nowhere. A frame-rate claim on arbitrary hardware is a statement about the box. Correct, permanent, and recorded in the layer at :349.
 check_grapple_reads	1	GR-05's share of the throw the preview inks measures 0.22 and is unasserted. The cap that stood there was 1.01 over a quantity `_corridor_fill` bounds at 1.0 BY CONSTRUCTION -- an assertion that could not fail. Removing it was right; what is owed is a design call, not a guessed bound.
 check_ceremony_reads	2	Two: how the words read against open sky, and how much of the rope an interrupt may take. The arm now carries a drift floor measured inside its own run, so the reading has something in its own units to be a ratio against; the missing piece is the distribution across several runs. The layer's own note: a bound argued from the first one has been wrong four times in this repository.
 check_text_contrast	2	Two. One is a lane boundary -- how much light the world puts through a 0.90 plate belongs to the renderer, not the palette. The other is a REAL gap: the wash tiles and the picked row's brass are literals in the drawing code rather than named constants, so no row here can reference them. Priced by the layer at ten drawing sites.

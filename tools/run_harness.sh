@@ -23,8 +23,12 @@
 # that there is no display, and they stop. They stopped by calling `quit(0)`, so a layer that ran nothing
 # was counted alongside layers that ran everything, and the run printed ALL <n> HARNESS LAYERS PASS with
 # four of them unexecuted. It printed that for as long as CI has been green. The measurement that caught
-# it is the wall-clock: `check_opening` takes 12s with a display and 1s without, and one second is not a
-# test run. So the outcome is now PASS / FAIL / SKIP, the summary reports the three separately, and it
+# it is the wall-clock: `check_opening` runs for SECONDS with a display and returns in about one without,
+# and one second is not a test run. (Re-measured 2026-08-21 on this box, because the figure written here
+# was 12s against a display and the layer now takes 3-4s across two full sweeps -- the argument survives
+# intact and the number had drifted by a factor of three. Note also what the headless second actually is:
+# `check_opening` is an `add_gl` layer, so without a display it SKIPS in ~1s rather than running fast. That
+# is a stronger version of the same point than the sentence originally made.) So the outcome is now PASS / FAIL / SKIP, the summary reports the three separately, and it
 # never again says "ALL" when the count of things that ran is smaller than the count of things there are.
 #
 # HOW A LAYER DECLARES A SKIP — the whole contract, and it is opt-in, so the other layers need no edit:
@@ -310,7 +314,13 @@ add "check_trailers (one author, no trailers)" "res://tools/check_trailers.sh"
 # `check_lock.sh` holds the machine lock to 26 properties and is the reason parallel runs can share this
 # box. It never ran in CI or in a local sweep. It is safe in one and always was: it points `SF_LOCK` at its
 # own temp directory and `GODOT` at a stub, so it touches neither the real lock nor the engine, and it
-# finishes in about five seconds. The thing guarding every run was the thing nothing guarded.
+# finishes in about twenty seconds, measured. The thing guarding every run was the thing nothing guarded.
+#
+# THAT DURATION WAS WRONG HERE FOR HOURS AFTER I CORRECTED IT IN check_lock.sh ITSELF. Its header claimed
+# five seconds -- true at four properties, left alone through twenty-two more -- and I fixed that copy and
+# wrote this one, on the same night and in the same commit series as extracting the lock protocol because
+# it had three hand-maintained copies. A number stated in two places is two claims, and only one of them
+# gets corrected.
 #
 # `check_exit_codes.sh` compares the runner's own exit table against the gate that interprets it. Both
 # halves have already gone stale separately; see its header.
