@@ -32,6 +32,40 @@ const SHARED: Dictionary = {
 ## populated is an exemption list nobody audits.
 const EXEMPT: Dictionary = {}
 
+## NAMES THAT MUST BE DECLARED IN EXACTLY ONE FILE, AND WHICH FILE THAT IS.
+##
+## `SHARED` above asks what a name's VALUE must be, which only works for scalars. This asks a different
+## question that works for anything: how many files DEFINE it, and is that the file it was put in. A table
+## of twenty-two key bindings has no value to compare, and it is exactly the kind of thing that gets
+## copied back into a page "just for now".
+##
+## AN ALIAS IS NOT A DEFINITION. `const REMAP_ROWS: Array[Array] = SettingsPage.REMAP_ROWS` names the
+## symbol locally so the drawing code reads unchanged, and it cannot drift because there is nothing in it
+## to drift. A literal on the right-hand side is a second owner. That distinction is the whole check: it
+## permits the cheap, reversible form of an extraction while refusing the one that re-couples.
+##
+## This is the guard for the HUD extractions. Each one moves a cluster out of `hud.gd` and leaves aliases
+## behind, and the failure mode is not that the move goes wrong on the day. It is that six weeks later a
+## fix lands in the page rather than the module, because the page is where the drawing is and the symbol
+## still resolves there.
+##
+## PROVED BY TWO MUTANTS, and they fire on different assertions, which is the point of there being two:
+##
+##   mutant                                          count      location
+##   a second REMAP_ROWS definition, re-inlined      **FAIL**   not reached
+##   the one definition moved to another file        PASS       **FAIL**
+##
+## The first is the re-coupling this exists to catch. The second is why the location assertion is not
+## redundant with the count: a cluster can be moved out of the page and land somewhere nobody meant, and
+## "there is exactly one of it" is true the whole time. The location check is skipped when the count is
+## already wrong, because two owners have no single place to be.
+const SOLE_OWNER: Dictionary = {
+	"REMAP_ROWS": "res://scenes/settings_page.gd",
+	"AUDIO_ROWS": "res://scenes/settings_page.gd",
+	"FEEL_ROWS": "res://scenes/settings_page.gd",
+	"CAT_NAMES": "res://scenes/settings_page.gd",
+}
+
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.
 ##
 ## This layer makes three claims and they fail to different things, so a single control would have left
@@ -175,6 +209,36 @@ func _initialize() -> void:
 		_check(wrong.is_empty(),
 			"%s: every declaration holds %s%s"
 				% [name, want, "" if wrong.is_empty() else " — DISAGREE: " + ", ".join(wrong)])
+
+	for name: String in SOLE_OWNER:
+		var want_file: String = String(SOLE_OWNER[name])
+		var owners: Array[String] = []
+		var alias_n: int = 0
+		var re2 := RegEx.create_from_string("^\\s*const\\s+%s\\b[^=]*=\\s*(.+?)\\s*$" % name)
+		var alias_re := RegEx.create_from_string("^[A-Z][A-Za-z0-9_]*\\.%s$" % name)
+		for p: String in files:
+			var f2: FileAccess = FileAccess.open(p, FileAccess.READ)
+			if f2 == null:
+				continue
+			var line_no2: int = 0
+			for line: String in f2.get_as_text().split("\n"):
+				line_no2 += 1
+				var m2: RegExMatch = re2.search(line)
+				if m2 == null:
+					continue
+				if alias_re.search(m2.get_string(1)) != null:
+					alias_n += 1                       # names the symbol, owns nothing, cannot drift
+				else:
+					owners.append("%s:%d" % [String(p).replace("res://", ""), line_no2])
+		print("  %s: %d definition(s), %d alias(es), owner must be %s"
+			% [name, owners.size(), alias_n, want_file.replace("res://", "")])
+		_check(owners.size() == 1,
+			"%s is DEFINED in exactly one file and found %d%s"
+				% [name, owners.size(), "" if owners.size() == 1 else " — at " + ", ".join(owners)])
+		if owners.size() == 1:
+			_check(owners[0].begins_with(want_file.replace("res://", "")),
+				"%s is defined in %s and it is in %s"
+					% [name, want_file.replace("res://", ""), owners[0]])
 
 	_check(unreadable.is_empty(),
 		"every .gd file opened and returned text%s"

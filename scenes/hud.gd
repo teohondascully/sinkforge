@@ -3885,36 +3885,14 @@ const SET_CTRL_DX: float = 116.0
 const SET_BAR_W: float = 116.0
 const SET_VALUE_DX: float = 242.0     ## SET_CTRL_DX + SET_BAR_W + 10
 
-const CAT_AUDIO: int = 0
-const CAT_CONTROLS: int = 1
-const CAT_FEEL: int = 2
-const CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL"]
+## The page's shape lives in `SettingsPage`, aliased here so the drawing below reads unchanged and there
+## is still exactly one of each in the tree.
+const CAT_AUDIO: int = SettingsPage.CAT_AUDIO
+const CAT_CONTROLS: int = SettingsPage.CAT_CONTROLS
+const CAT_FEEL: int = SettingsPage.CAT_FEEL
+const CAT_NAMES: Array[String] = SettingsPage.CAT_NAMES
 
-## The bindings, each with the sentence its key does not tell you. A key legend that says what the key
-## is for is a different document from one that says which key it is. The rows that say nothing here are
-## the ones whose label already said it, such as "jump" and "map", and an empty string draws no plate
-## rather than a padded restatement of the label.
-const REMAP_ROWS: Array[Array] = [
-	[Controls.LEFT, "move left", ""], [Controls.RIGHT, "move right", ""],
-	[Controls.UP, "climb up", "ladders, ropes and lift shafts"],
-	[Controls.DOWN, "climb down", ""],
-	[Controls.JUMP, "jump", ""],
-	[Controls.MINE, "mine (hold)", "hold on rock; the pickaxe decides what breaks"],
-	[Controls.GRAPPLE, "grapple",
-		"throw a line at what you are aiming at — it takes your weight, and pays out as you fall"],
-	[Controls.BUILD, "build / place", "puts the held thing where you are aiming"],
-	[Controls.DROP, "drop / feed", "into a machine's mouth if one is there"],
-	[Controls.CRAFT, "pack", "the counter: what you carry, what you can build"],
-	[Controls.RESEARCH, "research / config", ""],
-	[Controls.MAP, "map", "press twice for the whole world"],
-	[Controls.TECH, "tech tree", ""],
-	[Controls.MUTE, "mute sound", ""],
-	[Controls.DASHBOARD, "dashboard", ""], [Controls.HELP, "help", ""],
-	[Controls.PAUSE, "pause", ""],
-	[Controls.SPEED, "game speed", ""], [Controls.ZOOM, "zoom", ""],
-	[Controls.SAVE, "quicksave", ""], [Controls.LOAD, "quickload", ""],
-	[Controls.CLEAR_MARKS, "clear dig plan", ""],
-]
+const REMAP_ROWS: Array[Array] = SettingsPage.REMAP_ROWS
 const REMAP_ROW_H: float = 15.0
 const REMAP_GAP: float = 16.0
 
@@ -3953,22 +3931,11 @@ func _settings_wanted_h() -> float:
 ## than re-deriving it, because a height computed from a second copy of a layout rule is right on the
 ## day it is written and silently wrong the day either copy moves.
 func _remap_per_col() -> int:
-	return int(ceil(float(REMAP_ROWS.size()) * 0.5))
+	return SettingsPage.remap_per_col()
 
 
-## The audio levels and the feel toggles as data, so the drawing is one loop over a table and the detail
-## plate has somewhere to read its sentence from.
-const AUDIO_ROWS: Array[Array] = [
-	["master", "master", "everything, including the ambience bed"],
-	["effects", "sound", "picks, impacts, machines — the things you cause"],
-	["ambience", "ambience", "the layer's own voice: water, wind, the deep hum"],
-	["music", "music", ""],
-]
-const FEEL_ROWS: Array[Array] = [
-	["screen shake", "shake", "impacts and blasts kick the camera"],
-	["zoom", "zoom", "how much of the shaft you can see at once"],
-	["auto-pickup", "auto_pickup", "walk over a dropped thing to take it"],
-]
+const AUDIO_ROWS: Array[Array] = SettingsPage.AUDIO_ROWS
+const FEEL_ROWS: Array[Array] = SettingsPage.FEEL_ROWS
 
 
 func _draw_settings_overlay() -> void:
@@ -4280,10 +4247,7 @@ static func action_label(action: StringName) -> String:
 ## is drawn on the detail plate under the two columns, so arriving at it by pressing Down off the bottom
 ## of the second column is where it already sits on the page.
 func settings_focus_count() -> int:
-	match settings_cat:
-		CAT_CONTROLS: return REMAP_ROWS.size() + 1        # the bindings, then RESET KEYS
-		CAT_FEEL: return FEEL_ROWS.size()
-		_: return AUDIO_ROWS.size() + 1                   # the mute chip, then the levels
+	return SettingsPage.focus_count(settings_cat)
 
 
 ## What one row of a category does, as the payload the click path already speaks.
@@ -4295,19 +4259,7 @@ func settings_focus_count() -> int:
 ## agreeing. The page has already paid once for a page-side copy of a rule drifting from the resolver's,
 ## in `_binding_clashes`.
 func settings_row_payload(cat: int, i: int) -> Dictionary:
-	match cat:
-		CAT_CONTROLS:
-			if i < 0 or i >= REMAP_ROWS.size():
-				return {"reset": true}
-			return {"bind": String(REMAP_ROWS[i][0])}
-		CAT_FEEL:
-			var f: int = clampi(i, 0, FEEL_ROWS.size() - 1)
-			var fid: String = str(FEEL_ROWS[f][1])
-			return {"cycle": "zoom"} if fid == "zoom" else {"toggle": fid}
-		_:
-			if i <= 0:
-				return {"toggle": "mute"}
-			return {"slider": str(AUDIO_ROWS[clampi(i - 1, 0, AUDIO_ROWS.size() - 1)][1])}
+	return SettingsPage.row_payload(cat, i)
 
 
 ## The focused control's payload. `MainView` acts on this and never on the index, so what ENTER does is
@@ -4329,22 +4281,14 @@ func settings_focus_payload() -> Dictionary:
 ## adjustment to the focused control instead, and only falls back here when the control has nothing to
 ## adjust. One rule, and it never has to guess: a slider and a cycle move, everything else steps.
 func move_settings_row(keycode: int) -> void:
-	var step: int = _remap_per_col() if settings_cat == CAT_CONTROLS else 0
-	match keycode:
-		KEY_UP: settings_row -= 1
-		KEY_DOWN: settings_row += 1
-		KEY_LEFT: settings_row -= step
-		KEY_RIGHT: settings_row += step
-	settings_row = clampi(settings_row, 0, settings_focus_count() - 1)
+	settings_row = SettingsPage.next_row(settings_cat, settings_row, keycode)
 
 
 ## The action under the keyboard cursor, or &"" when the cursor is not on a binding list. That now also
 ## covers the last CONTROLS index, RESET KEYS, since that is a control and not a binding. The guard was
 ## already written as a range test rather than a category test, so it held the day the list grew a tail.
 func settings_row_action() -> StringName:
-	if settings_cat != CAT_CONTROLS or settings_row < 0 or settings_row >= REMAP_ROWS.size():
-		return &""
-	return REMAP_ROWS[settings_row][0]
+	return SettingsPage.row_action(settings_cat, settings_row)
 
 
 ## The bindings: two columns of eleven, each row a label and the key that does it. The capture state is
@@ -4557,7 +4501,7 @@ func _settings_chip(x: float, y: float, text: String, payload: Dictionary, activ
 ## focus ring drawn on nothing, on the page whose whole job is saying where the keyboard is. Clamped
 ## rather than reset, so switching away and back on a short page leaves you near where you were.
 func set_settings_cat(cat: int) -> void:
-	settings_cat = clampi(cat, 0, CAT_NAMES.size() - 1)
+	settings_cat = SettingsPage.clamp_cat(cat)
 	settings_row = clampi(settings_row, 0, settings_focus_count() - 1)
 
 
