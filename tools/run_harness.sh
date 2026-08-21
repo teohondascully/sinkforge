@@ -931,6 +931,17 @@ excerpt() {   # excerpt <logfile>
 
 # One line that says exactly what this run is, so a pasted transcript cannot be mistaken for another mode.
 mode="display"; [ "$HAVE_DISPLAY" = "1" ] || mode="NO DISPLAY — the pixel layers will skip"
+# THE PERF-HOST STATE, RECORDED BY THE RUN RATHER THAN INFERRED BY WHOEVER READS IT LATER. `SF_PERF_HOST`
+# decides whether this suite's ONLY 120fps assertion runs at all, and until now the runner printed nothing
+# about it: `tools/harness_verdict.sh` had to read its own shell to find out, which is a different frame
+# from the run it is judging. Locally they agree, because the gate is invoked from this script's EXIT trap
+# in the same shell. IN CI THEY NEED NOT: the harness runs in one step with its own `env:` block and the
+# gate runs as a separate composite-action step, and step-level `env:` does not propagate. A perf job would
+# therefore produce a run where the budget correctly did NOT stand down and a gate that says it must have.
+#
+# It also makes every retained summary.txt interpretable: a frame-budget number in the archive is otherwise
+# silently ambiguous about whether the budget was even switched on.
+perfhost="perf-host=${SF_PERF_HOST:-unset}"
 strictness="skips tolerated"; [ "$STRICT" = "1" ] && strictness="STRICT: any skip fails the run"
 subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_ONLY='${SF_ONLY:-}'"
 # WHICH TREE THIS RAN IN, printed because cwd is an UNMEASURED INPUT to every result this script produces
@@ -939,7 +950,7 @@ subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_
 # exactly like a normal green -- that is not hypothetical, it cost a false green on 2026-08-17. `pwd -P`
 # resolves symlinks, and the branch is printed beside it because "which tree" and "which branch" are
 # different questions and both have been wrong.
-say "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total$subset, $mode, $strictness) =="
+say "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total$subset, $mode, $strictness, $perfhost) =="
 say "   tree: $(pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  head: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
 

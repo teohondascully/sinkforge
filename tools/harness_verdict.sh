@@ -209,10 +209,34 @@ else
 	}
 	sd_rows="$(awk -F'\t' '!/^#/ && NF > 3 { print $1 "\t" $2 "\t" $3 }' "$SD_REG")"
 	sd_nrows="$(printf '%s\n' "$sd_rows" | grep -c .)"
-	sd_bad=""; sd_absent=""; sd_env=""
-	# The conditions an `iff:` row may name. Read from the run rather than from a layer's prose.
+	sd_bad=""; sd_absent=""; sd_env=""; sd_unknown=""
+	# THE CONDITIONS AN `iff:` ROW MAY NAME, AND EVERY ONE OF THEM IS READ FROM THE RUN BEING JUDGED.
+	#
+	# That sentence was here before it was true. `no-display` came from the summary; `perf-host-unset` came
+	# from THIS SHELL'S OWN ENVIRONMENT, which is a different frame, and the comment claiming otherwise sat
+	# directly above both -- the same shape as the guards on this branch that a comment kept green.
+	#
+	# Locally the two frames agree, because the gate runs from `run_harness.sh`'s EXIT trap in the same
+	# shell. IN CI THEY NEED NOT: the harness is one step with its own `env:` block, this gate is a separate
+	# composite-action step, and step-level `env:` does not propagate. A perf job would have produced a run
+	# where the budget correctly did not stand down and a gate insisting it must have -- the diagnosis
+	# exactly backwards. Found by c1, who also noted why M9 could not have caught it: setting the variable
+	# locally sets it for the sweep AND the gate at once, so the mutant cannot produce the divergence. A
+	# MUTANT INHERITS THE TOPOLOGY OF THE RUN THAT HOSTS IT, and a fault in the topology is invisible to
+	# every mutant run inside it.
+	#
+	# The runner now writes `perf-host=<name|unset>` into its header, so both conditions come from `$SUM`.
 	_nodisplay=0
 	grep -q 'NO DISPLAY' "$SUM" 2>/dev/null && _nodisplay=1
+	# ABSENT IS NOT UNSET. A summary with no `perf-host=` token is an OLD one, from before the runner wrote
+	# it, and the honest answer for a row that depends on it is "not checked" rather than a guess in either
+	# direction. Named, never silent, on the same rule as an absent layer.
+	_perfhost=""; _perfknown=0
+	if grep -q 'perf-host=' "$SUM" 2>/dev/null; then
+		_perfknown=1
+		_perfhost="$(sed -n 's/.*perf-host=\([^,)]*\).*/\1/p' "$SUM" | head -1)"
+		[ "$_perfhost" = "unset" ] && _perfhost=""
+	fi
 	if [ "$sd_nrows" -lt 1 ]; then
 		note "!! the stand-down registry parsed to 0 rows -- its columns are TAB-separated and something"
 		note "   has flattened them. Nothing was compared."
@@ -255,10 +279,14 @@ else
 						sd_bad="$sd_bad ${_id}(fired WITH a display, where it must not)"
 					fi ;;
 				iff:perf-host-unset)
-					if [ -z "${SF_PERF_HOST:-}" ] && [ "$_fired" != "1" ]; then
-						sd_bad="$sd_bad ${_id}(SF_PERF_HOST unset and $_layer ran, so it MUST stand down)"
-					elif [ -n "${SF_PERF_HOST:-}" ] && [ "$_fired" = "1" ]; then
-						sd_bad="$sd_bad ${_id}(fired with SF_PERF_HOST=${SF_PERF_HOST}, where it must not)"
+					if [ "$_perfknown" != "1" ]; then
+						sd_unknown="$sd_unknown ${_id}(the summary predates perf-host= and cannot say)"
+					elif [ -z "$_perfhost" ] && [ "$_fired" != "1" ]; then
+						sd_bad="$sd_bad ${_id}(the RUN had SF_PERF_HOST unset and $_layer ran, so it MUST"
+						sd_bad="$sd_bad stand down)"
+					elif [ -n "$_perfhost" ] && [ "$_fired" = "1" ]; then
+						sd_bad="$sd_bad ${_id}(fired on a run with SF_PERF_HOST=${_perfhost}, where it"
+						sd_bad="$sd_bad must not)"
 					fi ;;
 				env)
 					# NOT AN ASSERTION, AND SAID SO OUT LOUD. Reporting every `env` id that fired costs
@@ -270,6 +298,9 @@ else
 		done <<EOF
 $sd_rows
 EOF
+		if [ -n "$sd_unknown" ]; then
+			note "stand-downs: conditions this summary cannot answer, so not checked:$sd_unknown"
+		fi
 		if [ -n "$sd_env" ]; then
 			note "stand-downs: conditional (env) ids that fired -- reported, not asserted:$sd_env"
 		fi
