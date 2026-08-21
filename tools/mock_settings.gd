@@ -387,39 +387,19 @@ func _toggle(c: Control, right_top: Vector2, text: String, on: bool) -> void:
 # --- the counter's own surface tricks, so the mock is made of the same material ------------------------
 
 func _round_rect(c: Control, r: Rect2, rad: float, col: Color) -> void:
-	# StyleBoxFlat, exactly as `Hud._round_rect` does it, and not a hand-decomposed rect-plus-four-circles.
-	# The hand version double-blends wherever the corner discs overlap the middle band, which is invisible
-	# at the plate's 0.985 and produced four bright dots on the corners of a 0.035 detail plate: a mock
-	# arguing for elevation, with a blending artefact on the one surface it was arguing about.
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(int(rad))
-	sb.corner_detail = 8
-	sb.draw(c.get_canvas_item(), r)
+	Visuals.round_rect(c, r, rad, col)
 
 
 func _round_rect_left(c: Control, r: Rect2, rad: float, col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(0)
-	sb.corner_radius_top_left = int(rad)
-	sb.corner_radius_bottom_left = int(rad)
-	sb.corner_detail = 8
-	sb.draw(c.get_canvas_item(), r)
+	Visuals.round_rect_left(c, r, rad, col)
 
 
 func _shadow(c: Control, r: Rect2, steps: int, a: float) -> void:
-	for i: int in steps:
-		var t: float = float(i + 1) / float(steps)
-		_round_rect(c, r.grow(t * 12.0), 8.0 + t * 12.0, Color(0.0, 0.0, 0.0, a * (1.0 - t) * 0.16))
+	Visuals.soft_shadow(c, r, steps, a)
 
 
 func _sheen(c: Control, r: Rect2) -> void:
-	for i: int in 10:
-		var t: float = float(i) / 9.0
-		c.draw_rect(Rect2(r.position.x + 2.0, r.position.y + 2.0 + t * 46.0, r.size.x - 4.0, 5.0),
-			Color(1.0, 0.94, 0.82, 0.020 * (1.0 - t)))
-	c.draw_rect(Rect2(r.position.x + 8.0, r.position.y, r.size.x - 16.0, 1.0), Color(1.0, 1.0, 1.0, 0.075))
+	Visuals.panel_sheen(c, r)
 
 
 func _vignette(c: Control, a: float) -> void:
@@ -431,8 +411,4 @@ func _vignette(c: Control, a: float) -> void:
 
 
 func _tracked(c: Control, text: String, at: Vector2, size: int, track: float, col: Color) -> void:
-	var x: float = at.x
-	for i: int in text.length():
-		var ch: String = text[i]
-		c.draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
-		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+	Visuals.tracked(c, _font, text, at, size, track, col)

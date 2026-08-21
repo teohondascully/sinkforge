@@ -66,6 +66,28 @@ const SOLE_OWNER: Dictionary = {
 	"CAT_NAMES": "res://scenes/settings_page.gd",
 }
 
+
+## THE SAME QUESTION ASKED OF CODE RATHER THAN OF A NAME.
+##
+## `SOLE_OWNER` catches a constant re-declared somewhere it should not be. It cannot catch a ROUTINE
+## re-typed under a different name, which is the form the duplication actually took here: `hud.gd` held
+## two implementations of letter-spaced text, `_tracked` and `_draw_tracked`, identical but for a
+## parameter name, with thirteen and five callers. Both correct, both agreeing, and nothing in the tree
+## comparing them. The day one is fixed and the other is not, some captions print through their titles
+## and some do not.
+##
+## So each entry is a fragment distinctive enough that its presence means the routine is THERE, not
+## merely referenced. The count is of FILES, not occurrences: one file may legitimately use a fragment
+## twice, as `round_rect` and `round_rect_left` both do.
+##
+## Choosing a fragment is the whole skill. Too generic and it fires on innocent code; too specific and a
+## reformat makes it vacuous, which is the worse failure because it goes green. Both below are the load
+## bearing line of their routine, the one you cannot write the routine without.
+const SOLE_IMPL: Dictionary = {
+	"sb.corner_detail = 8": "res://scenes/visuals.gd",
+	"get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT": "res://scenes/visuals.gd",
+}
+
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.
 ##
 ## This layer makes three claims and they fail to different things, so a single control would have left
@@ -239,6 +261,35 @@ func _initialize() -> void:
 			_check(owners[0].begins_with(want_file.replace("res://", "")),
 				"%s is defined in %s and it is in %s"
 					% [name, want_file.replace("res://", ""), owners[0]])
+
+	# THE LAYER MUST NOT SCAN ITSELF. Every fragment below is a string literal in the table above, so an
+	# unfiltered walk finds this file for every entry and the guard reports its own table as duplication.
+	# Skipping by path rather than by cleverness: if the path stops matching, the layer fails loudly on
+	# its own source rather than quietly stopping checking.
+	var self_path: String = ""
+	var own: Script = get_script() as Script
+	if own != null:
+		self_path = own.resource_path
+	for frag: String in SOLE_IMPL:
+		var want2: String = String(SOLE_IMPL[frag])
+		var hits: Array[String] = []
+		for p2: String in files:
+			if p2 == self_path:
+				continue
+			var f3: FileAccess = FileAccess.open(p2, FileAccess.READ)
+			if f3 == null:
+				continue
+			if f3.get_as_text().contains(frag):
+				hits.append(String(p2).replace("res://", ""))
+		var shown: String = frag if frag.length() <= 34 else frag.substr(0, 31) + "..."
+		print("  impl \"%s\": in %d file(s)" % [shown, hits.size()])
+		_check(hits.size() == 1,
+			"the implementation \"%s\" is in exactly one file and found %d%s"
+				% [shown, hits.size(), "" if hits.size() == 1 else " — " + ", ".join(hits)])
+		if hits.size() == 1:
+			_check(hits[0] == want2.replace("res://", ""),
+				"\"%s\" lives in %s and it is in %s"
+					% [shown, want2.replace("res://", ""), hits[0]])
 
 	_check(unreadable.is_empty(),
 		"every .gd file opened and returned text%s"

@@ -452,11 +452,7 @@ func _tracked_w(s: String, size: int, track: float) -> float:
 ## Letter-spaced type. Small caps with air between them is most of what separates a title from a label, and
 ## the HUD already owns this trick for the stratum plates.
 func _tracked(c: Control, text: String, at: Vector2, size: int, track: float, col: Color) -> void:
-	var x: float = at.x
-	for i: int in text.length():
-		var ch: String = text[i]
-		c.draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
-		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+	Visuals.tracked(c, _font, text, at, size, track, col)
 
 
 ## A soft drop shadow, faked with concentric translucent rings. Elevation is what a modern panel uses
@@ -493,22 +489,12 @@ func _well(c: Control, rect: Rect2) -> void:
 ## A REAL rounded rect, via StyleBoxFlat, because composing one from a rect plus four circles double-blends
 ## every corner when the fill is translucent, which is exactly the case a modern surface tint is.
 func _rrect(c: Control, rect: Rect2, r: float, col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(int(r))
-	sb.corner_detail = 8
-	sb.draw(c.get_canvas_item(), rect)
+	Visuals.round_rect(c, rect, r, col)
 
 
 ## Rounded on the left two corners only, for a rail flush against a panel's edge.
 func _rrect_left(c: Control, rect: Rect2, r: float, col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(0)
-	sb.corner_radius_top_left = int(r)
-	sb.corner_radius_bottom_left = int(r)
-	sb.corner_detail = 8
-	sb.draw(c.get_canvas_item(), rect)
+	Visuals.round_rect_left(c, rect, r, col)
 
 
 ## have/need as one chip: the icon, what it costs, and what you are carrying, so "is this affordable" is

@@ -1534,3 +1534,78 @@ static func terrain_dust(material: StringName) -> Color:
 	if material == &"leaves":
 		return Color(0.28, 0.44, 0.22)        # leaf flecks
 	return Color(0.40, 0.30, 0.20)            # earth (default)
+
+
+## ---------------------------------------------------------------------------------------------------
+## PLATE PRIMITIVES: the marks every panel in the game is drawn out of.
+##
+## These lived as private methods on `Hud` and were called from the settings page, the counter, the works
+## list and the bench alike. That is the wrong home for them twice over. It made `hud.gd` the only place
+## a rounded box could be drawn, so every cluster extracted out of that file would have had to carry a
+## reference back to it, and it hid that the file had grown TWO implementations of letter-spaced text
+## which nothing could have noticed diverging.
+##
+## They take the canvas as their first argument, the same shape as `draw_machine_glyph` above, which is
+## one parameter rather than the eleven a caller would need to reach back into the page.
+##
+## `Hud` keeps thin wrappers on its own names so its several dozen call sites read unchanged, and so the
+## `panel_probe` hook that `check_hud_layout` measures overlap through stays where the layer expects it.
+
+
+## A filled box with rounded corners. `corner_detail` 8 because these are small and 8 segments is already
+## past the point where the curve reads as faceted at HUD scale.
+static func round_rect(canvas: CanvasItem, rect: Rect2, r: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(int(r))
+	sb.corner_detail = 8
+	sb.draw(canvas.get_canvas_item(), rect)
+
+
+## Rounded on the left two corners only, for a rail sitting flush against the panel's edge.
+static func round_rect_left(canvas: CanvasItem, rect: Rect2, r: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(0)
+	sb.corner_radius_top_left = int(r)
+	sb.corner_radius_bottom_left = int(r)
+	sb.corner_detail = 8
+	sb.draw(canvas.get_canvas_item(), rect)
+
+
+## Elevation instead of a border. A modern panel does not outline itself, it casts, and concentric
+## translucent rings are the cheap honest version of that. It is what stops a panel reading as printed on
+## the world behind it.
+static func soft_shadow(canvas: CanvasItem, rect: Rect2, spread: int, peak: float) -> void:
+	for i: int in range(spread, 0, -1):
+		var t: float = float(i) / float(spread)
+		canvas.draw_rect(rect.grow(float(i)), Color(0.0, 0.0, 0.0, peak * (1.0 - t) * 0.32))
+
+
+## One hairline of light along the top edge and a slow warm gradient down the plate. Those are the two
+## marks that say which way the lamp is, which is the difference between a surface and a fill.
+static func panel_sheen(canvas: CanvasItem, rect: Rect2) -> void:
+	for i: int in 10:
+		var t: float = float(i) / 9.0
+		canvas.draw_rect(Rect2(rect.position.x + 2.0, rect.position.y + 2.0 + t * 46.0,
+			rect.size.x - 4.0, 5.0), Color(1.0, 0.94, 0.82, 0.020 * (1.0 - t)))
+	canvas.draw_rect(Rect2(rect.position.x + 8.0, rect.position.y, rect.size.x - 16.0, 1.0),
+		Color(1.0, 1.0, 1.0, 0.075))
+
+
+## Letter-spaced type, drawn a character at a time. Small caps with air between them is most of what
+## separates a title from a label.
+static func tracked(canvas: CanvasItem, font: Font, text: String, at: Vector2, size: int,
+		track: float, col: Color) -> void:
+	var x: float = at.x
+	for i: int in text.length():
+		var ch: String = text[i]
+		canvas.draw_string(font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+		x += font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+
+
+## What `tracked` actually occupies: the plain width plus one gap per letter. Measuring tracked type with
+## a bare `get_string_size` is how a caption ends up printed through its own title.
+static func tracked_width(font: Font, text: String, size: int, track: float) -> float:
+	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
+		+ track * float(maxi(text.length() - 1, 0))

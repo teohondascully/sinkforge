@@ -3522,24 +3522,17 @@ func _round_rect(rect: Rect2, r: float, col: Color) -> void:
 	# entirely out of these, so `check_hud_layout`'s "Bazaar open" row recorded the bare screen's four
 	# panels and nothing else, and its headline claim, that the HUD must not print on top of itself, had
 	# never covered the largest overlay in the game.
+	#
+	# THE PROBE STAYS HERE rather than moving with the drawing. It is a property of this page being
+	# measured, not of how a rounded box is drawn, and `check_hud_layout` reaches for it on the Hud.
 	if probing:
 		panel_probe.append(rect)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(int(r))
-	sb.corner_detail = 8
-	sb.draw(get_canvas_item(), rect)
+	Visuals.round_rect(self, rect, r, col)
 
 
 ## Rounded on the left two corners only, for the rail, flush against the panel's edge.
 func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(0)
-	sb.corner_radius_top_left = int(r)
-	sb.corner_radius_bottom_left = int(r)
-	sb.corner_detail = 8
-	sb.draw(get_canvas_item(), rect)
+	Visuals.round_rect_left(self, rect, r, col)
 
 
 ## The focus ring: where the next keypress will land, on any control that can take the keyboard.
@@ -3602,36 +3595,24 @@ func _focus_ring(box: Rect2, grow: float = FOCUS_GROW, spine: bool = false) -> v
 ## translucent rings are the cheap honest version of that, which is what stops the counter reading as
 ## printed on the world behind it.
 func _soft_shadow(rect: Rect2, spread: int, peak: float) -> void:
-	for i: int in range(spread, 0, -1):
-		var t: float = float(i) / float(spread)
-		draw_rect(rect.grow(float(i)), Color(0.0, 0.0, 0.0, peak * (1.0 - t) * 0.32))
+	Visuals.soft_shadow(self, rect, spread, peak)
 
 
 ## One hairline of light along the top edge and a slow warm gradient down the plate. Those are the two
 ## marks that say which way the lamp is, which is the difference between a surface and a fill.
 func _panel_sheen(rect: Rect2) -> void:
-	for i: int in 10:
-		var t: float = float(i) / 9.0
-		draw_rect(Rect2(rect.position.x + 2.0, rect.position.y + 2.0 + t * 46.0, rect.size.x - 4.0, 5.0),
-			Color(1.0, 0.94, 0.82, 0.020 * (1.0 - t)))
-	draw_rect(Rect2(rect.position.x + 8.0, rect.position.y, rect.size.x - 16.0, 1.0),
-		Color(1.0, 1.0, 1.0, 0.075))
+	Visuals.panel_sheen(self, rect)
 
 
 ## Letter-spaced type. Small caps with air between them is most of what separates a title from a label.
 func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
-	var x: float = at.x
-	for i: int in text.length():
-		var ch: String = text[i]
-		draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
-		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
+	Visuals.tracked(self, _font, text, at, size, track, col)
 
 
 ## What `_tracked` actually occupies: the plain width plus one gap per letter. Measuring tracked type
 ## with `get_string_size` is how a caption ends up printed through its own title.
 func _tracked_w(text: String, size: int, track: float) -> float:
-	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
-		+ track * float(maxi(text.length() - 1, 0))
+	return Visuals.tracked_width(_font, text, size, track)
 
 
 ## Darkens the frame's edges so the eye is pushed to the counter. Every modern pause screen does it, and
