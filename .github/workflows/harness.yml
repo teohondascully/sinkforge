@@ -1,5 +1,5 @@
 # CI: run the verification harness (determinism, conservation, movement gauges,
-# agent play-tests, and the pixel layers) on every push to main and every PR.
+# the scripted play-tests, and the pixel layers) on every push to main and every PR.
 #
 # WHY THERE ARE TWO JOBS, AND WHY THAT IS THE WHOLE POINT OF THIS FILE.
 # This used to be one headless job whose name promised the lot. It could not deliver
@@ -46,6 +46,16 @@ concurrency:
   group: harness-${{ github.ref }}
   cancel-in-progress: true
 
+# ONE ENGINE VERSION, WRITTEN ONCE. It used to be typed into both jobs, and two literals that must agree
+# with nothing relating them is the shape this repository keeps paying for: the jobs could drift a patch
+# release apart and every symptom would look like flakiness in whichever layer noticed first. The install
+# steps below also CHECK what they got against this string rather than merely printing it — `--version` was
+# already being run and its output was not read by anything, so a release retagged under the same URL, a
+# truncated download, or a wrong architecture would all have sailed through and been diagnosed as a code
+# change. Bump this one line to move both jobs.
+env:
+  GODOT_VERSION: "4.6.2-stable"
+
 jobs:
   # Every commit must be authored by the repository owner and carry no co-author trailer, per
   # docs/DECISIONS.md. The tracked commit-msg hook covers the ordinary path but is skipped by
@@ -82,16 +92,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install Godot 4.6.2 (headless linux)
+      - name: Install Godot (headless linux)
         run: |
           set -euo pipefail
-          V=4.6.2-stable
+          V="$GODOT_VERSION"
           wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
           unzip -q godot.zip
           BIN="$PWD/Godot_v${V}_linux.x86_64"
           chmod +x "$BIN"
           echo "GODOT=$BIN" >> "$GITHUB_ENV"
-          "$BIN" --version
+          # READ THE VERSION, DO NOT JUST PRINT IT. Godot reports `4.6.2.stable.official.<hash>`; the pin is
+          # `4.6.2-stable`. Compare on the dotted form, and fail here rather than three hundred layer-seconds
+          # later somewhere that looks like a game defect.
+          want="$(printf '%s' "$V" | tr '-' '.')"
+          got="$("$BIN" --version)"
+          echo "pinned: $want   installed: $got"
+          case "$got" in
+            "$want".*) ;;
+            *) echo "!! the engine on this runner is not the pinned one: wanted $want, got $got"; exit 1 ;;
+          esac
 
       # Build .godot/ — including the global class-name cache the harness's
       # `class_name` references resolve through under `--script`.
@@ -110,17 +129,16 @@ jobs:
           SF_LOG_DIR: ${{ runner.temp }}/harness-logs
         run: bash tools/run_harness.sh
 
-      # The result table on the run page, so "what actually ran" is readable without
-      # opening an artifact or scrolling the log.
-      - name: Publish the result table
+      # The result table on the run page, so "what actually ran" is readable without opening an artifact or
+      # scrolling the log — AND a check that the run was a result at all before anyone reads its verdict.
+      # This used to be a bare `cat` of the summary, which publishes a truncated table, a killed run and a
+      # sweep whose every layer died at load in exactly the same shape as a clean one.
+      - name: Publish the result table, and check the run was a result
         if: always()
-        run: |
-          {
-            echo '### harness — headless'
-            echo '```'
-            cat "${{ runner.temp }}/harness-logs/summary.txt" 2>/dev/null || echo 'no summary written'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/harness-verdict
+        with:
+          log-dir: ${{ runner.temp }}/harness-logs
+          label: harness — headless
 
       # Every layer's stdout/stderr, kept. Before this, the runner mktemp'd its log dir
       # and rm -rf'd it on EXIT, so the evidence for a red CI run died with the job and
@@ -153,16 +171,26 @@ jobs:
             xvfb mesa-vulkan-drivers libgl1-mesa-dri \
             libxcursor1 libxinerama1 libxrandr2 libxi6
 
-      - name: Install Godot 4.6.2 (linux)
+      - name: Install Godot (linux)
         run: |
           set -euo pipefail
-          V=4.6.2-stable
+          V="$GODOT_VERSION"
           wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
           unzip -q godot.zip
           BIN="$PWD/Godot_v${V}_linux.x86_64"
           chmod +x "$BIN"
           echo "GODOT=$BIN" >> "$GITHUB_ENV"
-          "$BIN" --version
+          # Same check as the headless job. Repeated rather than factored out, unlike the verdict gate
+          # below: six lines guarding the download directly above them are readable where they stand, and
+          # the constant they compare against is already shared, so the two copies cannot drift apart on the
+          # only value that matters. The gate is a hundred lines of judgment and earns its own file.
+          want="$(printf '%s' "$V" | tr '-' '.')"
+          got="$("$BIN" --version)"
+          echo "pinned: $want   installed: $got"
+          case "$got" in
+            "$want".*) ;;
+            *) echo "!! the engine on this runner is not the pinned one: wanted $want, got $got"; exit 1 ;;
+          esac
 
       - name: Import project
         run: "$GODOT --headless --import"
@@ -203,17 +231,24 @@ jobs:
           SF_STRICT: "1"
           SF_LOG_DIR: ${{ runner.temp }}/harness-logs
           JOBS: "1"
+          # THE PICTURES, FOR THE LAYERS WHOSE WHOLE ARGUMENT IS A PICTURE. These four layers can each dump
+          # the patches and masks they judged, behind a per-layer environment variable, and all four were
+          # unset here — so a pixel layer failing in CI handed back a number and no way to see what it was
+          # looking at, which is the one kind of failure text cannot carry. They write only when the
+          # variable is set, so this costs nothing on a green run beyond the bytes, and the log directory is
+          # already uploaded as the artifact below.
+          SF_CEREMONY_DUMP: ${{ runner.temp }}/harness-logs
+          SF_GREADS_DUMP: ${{ runner.temp }}/harness-logs
+          SF_MIDENT_DUMP: ${{ runner.temp }}/harness-logs
+          SF_MSTATE_DUMP: ${{ runner.temp }}/harness-logs
         run: xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
 
-      - name: Publish the result table
+      - name: Publish the result table, and check the run was a result
         if: always()
-        run: |
-          {
-            echo '### harness — pixel layers (xvfb)'
-            echo '```'
-            cat "${{ runner.temp }}/harness-logs/summary.txt" 2>/dev/null || echo 'no summary written'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/harness-verdict
+        with:
+          log-dir: ${{ runner.temp }}/harness-logs
+          label: harness — pixel layers (xvfb)
 
       - name: Keep the layer logs
         if: always()
