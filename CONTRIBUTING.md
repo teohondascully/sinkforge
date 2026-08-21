@@ -42,7 +42,7 @@ is read.
 bash tools/run_harness.sh
 ```
 
-That is the whole suite: 100 layers, each in its own process (a Godot run for all but one, which is a
+That is the whole suite: 101 layers, each in its own process (a Godot run for all but one, which is a
 shell script), up to the CPU count in parallel. It takes a machine-wide lock first, so a second sweep
 queues rather than competing.
 

@@ -216,6 +216,7 @@ add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
 # Holds the CI workflow against THIS list. It reads both files, which is the only way to see a layer that
 # needs a surface and is selected by no job — two were, and both jobs reported green over them.
 add "check_ci_coverage (every layer runs)" "res://tools/check_ci_coverage.gd"
+add "check_shaders (they still compile)" "res://tools/check_shaders.gd"
 add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "check_save_frontier (envelope)"  "res://tools/check_save_frontier.gd"
 add "sim (core/determinism)"          "res://tests/test_sim.gd"

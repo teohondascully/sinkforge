@@ -188,7 +188,7 @@ and a damaged slot falls back to the backup. The envelope is at version 2 and st
 bash tools/run_harness.sh
 ```
 
-The runner registers 100 layers, one script each, and launches each as its own Godot process, up to
+The runner registers 101 layers, one script each, and launches each as its own Godot process, up to
 the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
 into roughly six kinds:
 
@@ -217,7 +217,7 @@ that has a display, strict mode is on by default, so any skip fails the whole ru
 There are six exit codes in all, and a caller that reads "not zero" as "a test failed" will misdiagnose
 four of them.
 
-100 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
+101 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
 claim.
 
@@ -252,7 +252,7 @@ that is the case.
 | `scenes/` | everything visible: the controller `main.gd`, the renderer, the HUD, the player body, and five shaders. |
 | `assets/sprites/` | the only authored art in the project: 16 miner frames and their Aseprite source. |
 | `tests/` | four headless suites sharing `test_base.gd`, 64 test functions, run with no scene tree. |
-| `tools/` | the harness runner and its 100 layers, the play-tests, the capture and profiling tools, the machine lock. |
+| `tools/` | the harness runner and its 101 layers, the play-tests, the capture and profiling tools, the machine lock. |
 | `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
 | `_moment_*.png` | 52 canonical captures of named moments at the repository root, indexed by `docs/CAPTURE_MANIFEST.md`. Several tools address them by `res://` path. |
