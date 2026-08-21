@@ -600,8 +600,8 @@ func _fell_foliage_cell(c: Vector2i) -> void:
 		return
 	solid.erase(c)
 	_dirty_terrain(c)
-	# Through the cap, like every other path that DESTROYS what held the material. This is the cascade — the
-	# rest of a tree coming down after its base was cut — and it is a separate write from `mine`'s own
+	# Through the cap, like every other path that DESTROYS what held the material. This is the cascade: the
+	# rest of a tree coming down after its base was cut. It is a separate write from `mine`'s own
 	# foliage branch, which is exactly why it was missed: a fixture that fells a lone block never reaches it,
 	# and a full pack was taking a four-block trunk three units past the cap.
 	if mat == &"wood":
@@ -830,7 +830,7 @@ func mine(cell: Vector2i, keep: bool = true) -> StringName:
 ## orthogonal neighbour is something to build off (solid terrain, a machine, or a conduit). A dug room
 ## can be backfilled and a structure extended, but a block cannot go into isolated open sky. A pure
 ## read. The CONTROLLER gates block placement on it rather than place_block, because machines are exempt
-## (a lift is legitimately placed in an open shaft) and worldgen and the harness still place freely.
+## (a lift is legitimately placed in an open shaft) and worldgen and the tests still place freely.
 func block_supported(cell: Vector2i) -> bool:
 	if wall_at(cell) != &"":
 		return true
@@ -1067,7 +1067,7 @@ func total_water() -> int:
 
 ## Packing and seepage (docs/DRIFT.md §4). What was stacked back is not what was always there.
 
-## Is this cell packed fill, the watertight kind? Pure read; the renderer and the harness both use it.
+## Is this cell packed fill, the watertight kind? Pure read; the renderer and the tests both use it.
 func is_packed(cell: Vector2i) -> bool:
 	return fill.get(cell, &"") == FILL_PACKED
 
@@ -1129,8 +1129,8 @@ func leaf_drops_sapling(cell: Vector2i) -> bool:
 ## already), you have to be carrying one, and it must sit ON soil (SAPLING_SOILS).
 ##
 ## These are plant_sapling's own guards, lifted out rather than copied: the representation wants to ask
-## the question BEFORE the click — the aim cursor knows whether the plant is on offer, and the lesson
-## about planting is only an instruction where one could actually go — and a second copy of the rules is
+## the question BEFORE the click. The aim cursor knows whether the plant is on offer, and the lesson
+## about planting is only an instruction where one could actually go. A second copy of the rules is
 ## a second thing to keep in step with this one. The verb below is the only gate; this is what it refuses
 ## on, so an answer of true here and a refusal there cannot happen.
 func can_plant_sapling(cell: Vector2i) -> bool:
@@ -1157,7 +1157,7 @@ func plant_sapling(cell: Vector2i) -> bool:
 ## Take a planted sapling back into the pack, the mirror of plant_sapling. Growth so far is forfeit.
 func remove_sapling(cell: Vector2i) -> bool:
 	# A FULL PACK LEAVES IT PLANTED. Same rule as the lode face and for the same reason: refusing here
-	# destroys nothing — the sapling stays in the ground and keeps growing — so there is no homeless
+	# destroys nothing. The sapling stays in the ground and keeps growing, so there is no homeless
 	# material needing a floor to land on, and the player loses nothing by being told to come back.
 	if not can_carry(&"sapling", 1):
 		return false
@@ -1304,7 +1304,7 @@ func bazaar_center(o: Vector2i) -> Vector2i:
 
 ## Where to place ONE wood block to claim a near-complete bazaar: scans for a frame valid in every
 ## respect EXCEPT a single empty frame cell and returns that cell. Returns (-1,-1) if none is one block
-## from done. Drives the objective pointer and lets a play-test claim the bazaar without hardcoding
+## from done. Drives the objective pointer and lets a scripted play run claim the bazaar without hardcoding
 ## worldgen geometry. Pure read of `solid`.
 func bazaar_completion_cell() -> Vector2i:
 	for y: int in range(0, GRID_ROWS - BAZAAR_H):
@@ -1424,12 +1424,12 @@ func take_lode(cell: Vector2i) -> StringName:
 	var item: StringName = lode[cell]
 	# THE CAP, AND THIS VERB REFUSES WHERE `mine` SPILLS. The difference is not an inconsistency: `mine`
 	# DESTROYS a block, so the material it frees has nowhere to be except the world and refusing the swing
-	# would read as a broken pick. A lode face is not destroyed by being worked — it stays exactly where it
-	# was — so there is no homeless material, and a full pack simply does not take the unit. That also keeps
+	# would read as a broken pick. A lode face is not destroyed by being worked; it stays exactly where it
+	# was. There is no homeless material, and a full pack simply does not take the unit. That also keeps
 	# the vein intact rather than letting a full player drain it onto the floor one click at a time.
 	#
 	# This is the ORE verb. Missed on the first pass, which capped `mine`, `collect_ground` and the foliage
-	# yields and left the one path the lode migration made central writing the pack inline — so the cap bound
+	# yields and left the one path the lode migration made central writing the pack inline. So the cap bound
 	# on rock and not on ore, and the pack could pass the cap by one unit per click.
 	if not can_carry(item, 1):
 		return &""
@@ -1563,7 +1563,7 @@ func research_tech(tech_id: StringName) -> bool:
 ##
 ## DELIBERATELY EXEMPT FROM `PACK_BULK_CAP`, AND THIS LINE EXISTS SO THAT IS LEGIBLE AS A DECISION. Every
 ## other path that adds to the pack goes through `take_into_pack` or asks `can_carry` first; this one writes
-## `inventory` directly, and an unrouted path looks exactly like an exempt one in the source — which is how
+## `inventory` directly, and an unrouted path looks exactly like an exempt one in the source. That is how
 ## four capped paths were missed on the first pass. Crafting SPENDS bulk from the same pack it deposits
 ## into and almost always nets downward: ore into an ingot, plates into a gear. Capping the output could
 ## therefore refuse a craft that would have made room, and a cap that blocks the act of getting lighter is
@@ -1611,11 +1611,11 @@ func pickup_machine(cell: Vector2i) -> bool:
 	# THROUGH THE CAP, and this one is the largest single transfer in the game: a hopper is an unbounded
 	# store, so salvaging a loaded one used to hand the player its entire contents in one call regardless of
 	# what they could carry. The machine is leaving the world, so its buffer has nowhere to be except the
-	# pack or the floor — spill, not refuse, on the same rule as mining.
+	# pack or the floor. It spills rather than refusing, on the same rule as mining.
 	#
 	# THE ORDER MATTERS AND THE FIRST VERSION GOT IT WRONG. Spilling while the machine was still in the grid
 	# sent the overflow down its own column, where `_column_landing` found THIS MACHINE and fed the units
-	# straight back into the buffer being emptied — and the `clear()` below then destroyed them. The pack
+	# straight back into the buffer being emptied, and the `clear()` below then destroyed them. The pack
 	# stayed under the cap and the ore simply ceased to exist, which is the one outcome this whole mechanism
 	# is supposed to make impossible. So the contents are taken out first, the machine is removed, and only
 	# then is anything spilled into a column that no longer has a machine at the top of it.
@@ -1695,13 +1695,13 @@ func can_carry(item: StringName, n: int) -> bool:
 ## `PACK_BULK_CAP`, `is_bulk_item`, `carried_bulk`, `pack_room` and `can_carry` have all existed and been
 ## tested for weeks, and NO live path called any of them: every yield site wrote `inventory[x] =
 ## inventory.get(x, 0) + n` inline, twelve of them, so there was no seam to enforce a cap at. That is why
-## the designed pain never reached the player — not a missing rule, a missing place to put it.
+## the designed pain never reached the player. Not a missing rule; a missing place to put it.
 ##
 ## THE RULE, stated once here rather than at each call site. A full pack does not refuse the swing: the
 ## block still breaks, the world still gives up its material, and whatever will not fit FALLS instead of
 ## vanishing. Refusing the dig would make a full pack feel like a broken control, and destroying the excess
-## would break the conservation this file argues for everywhere else. Spilling makes the cost a TRIP —
-## which is the pain the cap exists to create — while leaving every unit recoverable.
+## would break the conservation this file argues for everywhere else. Spilling makes the cost a TRIP.
+## That is the pain the cap exists to create, and every unit stays recoverable.
 ##
 ## Returns how many units actually entered the pack. Callers that record `total_produced` should keep
 ## counting the FULL amount: material on the floor was still extracted from the world, and `collect_ground`
@@ -1721,7 +1721,7 @@ func take_into_pack(item: StringName, n: int, spill_at: Vector2i) -> int:
 
 ## The overflow half of `take_into_pack`. This is `drop_item`'s tail with the pack half removed: the units
 ## never entered the pack, so there is nothing to take out of it, but they land exactly the way dropped
-## items land — down the column, into the first machine below, else a re-collectable floor pile, else the
+## items land: down the column, into the first machine below, else a re-collectable floor pile, else the
 ## sink. Sharing the landing rather than reimplementing it is what keeps a spilled unit indistinguishable
 ## from a dropped one to every consumer downstream.
 func _spill_to_world(cell: Vector2i, item: StringName, n: int) -> void:
