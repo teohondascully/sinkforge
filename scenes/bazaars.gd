@@ -8,7 +8,7 @@ extends RefCounted
 ## (awning, banners, lantern, a shopkeeper NPC walking in), so it's obvious "a transformation happened".
 ## Pure draw + timers; it never writes the sim. Delete it and production numbers are identical.
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 ## The block-by-block reveal: each frame cell lights up CELL_STAGGER after the previous; a cell's bright
 ## "pop" lasts POP. After the sweep + SETTLE the sign + NPC fade in. Tuned for an unmistakable beat.
 const CELL_STAGGER: float = 0.12

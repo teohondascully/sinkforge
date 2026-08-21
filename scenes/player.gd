@@ -16,7 +16,7 @@ extends Node2D
 ##
 ## Every feel number here is placeholder, measured against intent by tools/measure_player.gd.
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 ## Body AABB, 14x34 px: 0.44 x 1.06 tiles. At the zoomed-out camera the avatar reads as a small nimble
 ## figure in a big granular world. Just over one cell tall, so a body still needs two tiles of
 ## clearance and a one-tall gap is an honest squeeze. Under a cell wide, so a one-wide shaft fits.

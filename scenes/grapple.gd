@@ -31,7 +31,7 @@ extends RefCounted
 ## measures 4.8 rad/s through a wrapped corner against 1.2 without one. The cost is that the anchor is no
 ## longer a chord readable at a glance, which the slack-drawn rope and the aiming ghost offset.
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 
 ## The probe step. The flying hook, the aiming ghost and the line-catch scan all walk a shot in fixed
 ## steps of this size from the origin, which is what lets them agree cell for cell. Advancing by

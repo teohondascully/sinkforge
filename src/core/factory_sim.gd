@@ -23,6 +23,17 @@ const SECONDS_PER_TICK: float = 1.0 / float(TICKS_PER_SECOND)
 ## Sized so a zoomed-out (3x) camera has terrain to scroll through. Provisional.
 const GRID_COLS: int = 128
 const GRID_ROWS: int = 128
+## World pixels per grid cell: the single ruler every file measures the world with.
+##
+## This lives with the grid because it IS the grid's unit, and it is declared here ONCE on purpose.
+## It used to be written out independently in twenty-four files, all agreeing by luck; nothing in the
+## tree could have noticed if one of them stopped. A wrong value here does not crash and does not fail
+## a test, it makes one file measure on a different ruler than its neighbours and the symptom surfaces
+## somewhere else entirely as a few pixels of drift.
+##
+## `check_shared_constants` asserts there is exactly one declaration and that it still reads 32, so
+## re-introducing a local copy fails loudly rather than quietly agreeing.
+const CELL: int = 32
 ## Items/tick a lift carries UP its column with no power. Below this rate a backlog piles at the lift.
 ## A fully-powered lift reaches LIFT_POWERED_THROUGHPUT, scaled by the power reaching its cell;
 ## under-supplied it labours back toward the baseline, which is brownout. The baseline is non-zero so

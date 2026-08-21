@@ -17,7 +17,7 @@ extends Node
 
 const RATE: int = 22050
 const POOL: int = 10
-const CELL: int = 32                          # world px per cell: a sound can ask what it just hit
+const CELL: int = FactorySim.CELL                          # world px per cell: a sound can ask what it just hit
 
 ## The space bus. Every positional voice runs through its one reverb. UI dings and the beds stay dry on
 ## Master: the beds already are the room, and a reverbed interface sound reads as a bug.

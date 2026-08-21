@@ -215,7 +215,7 @@ var minimap_focus: Vector2 = Vector2.ZERO
 var minimap_view: Vector2 = Vector2.ZERO
 var _minimap_tex: ImageTexture
 var _minimap_solid_count: int = -1
-const CELL: float = 32.0
+const CELL: float = FactorySim.CELL
 
 ## On-demand overlays, pushed by MainView each frame. Only the hotbar, the FORGED chip and the current
 ## objective line are permanent; the crafting screen (E), the map (M) and the controls help (H/?) are

@@ -2,20 +2,24 @@ extends "res://tools/check_base.gd"
 
 ## A CONSTANT DEFINED IN MANY PLACES IS A CONSTANT NOTHING RELATES.
 ##
-## `const CELL: int = 32` is declared independently in TWENTY-FOUR files. They all agree today. Nothing
-## in the tree could notice if one stopped agreeing: there is no shared owner, no import, and no assertion
-## anywhere that compares them. The obvious reach is `FactorySim.CELL`, on the reasonable assumption
-## that a grid constant lives with the grid, and it is not there either -- the name exists twenty-four
-## times and belongs to no one.
+## `const CELL: int = 32` was declared independently in TWENTY-FOUR files. They all agreed, by luck.
+## Nothing in the tree could have noticed if one stopped agreeing: there was no shared owner, no import,
+## and no assertion anywhere that compared them. The obvious reach was `FactorySim.CELL`, on the
+## reasonable assumption that a grid constant lives with the grid, and it was not there either. The name
+## existed twenty-four times and belonged to no one.
 ##
 ## This is the runtime-invisible half of the defect class. A wrong value here does not crash and does not
 ## fail a test; it makes one file measure the world on a different ruler than its neighbours, and the
 ## symptom appears somewhere else entirely as a few pixels of drift.
 ##
-## THE GUARD IS DELIBERATELY NOT A REFACTOR. Deriving all twenty-four from one owner is the real fix and
-## it touches twenty-four files, which is not safe while several worktrees hold live work. This layer costs
-## nothing, changes no behaviour, and makes the drift impossible to introduce silently in the meantime.
-## When the tree is quiet, replace the duplicates and delete this.
+## THE OWNER NOW EXISTS: `FactorySim.CELL`, beside GRID_COLS and GRID_ROWS whose unit it is. Consumers
+## alias it (`const CELL: int = FactorySim.CELL`) so call sites stay short while exactly one literal
+## remains in the tree.
+##
+## THIS LAYER IS RETAINED AS A REGRESSION CHECK RATHER THAN DELETED. Its job has inverted: it used to
+## detect drift AMONG duplicates, and now it detects the RE-INTRODUCTION of one. A future file that
+## writes `const CELL: int = 32` of its own is not a compile error and not a test failure anywhere else
+## in the suite; it is a second literal, and a second literal is where the whole defect starts again.
 ##
 ## It reads SOURCE, so every line it prints is a statement about ONE CHECKOUT. It prints which.
 
@@ -33,19 +37,31 @@ const EXEMPT: Dictionary = {}
 ## This layer makes three claims and they fail to different things, so a single control would have left
 ## two of them untested while the run looked fully controlled:
 ##
-##   mutant                                     floor      agreement   opened
-##   scenes/sfx.gd CELL 32 -> 33                PASS       **FAIL**    PASS
-##   _walk skips tools/ (7 sites found, not 24) **FAIL**   PASS        PASS
+##   mutant                                      coverage   agreement   opened
+##   scenes/sfx.gd CELL 32 -> 33                 PASS       **FAIL**    PASS
+##   _walk skips tools/ (47 files seen, not 165) **FAIL**   PASS        PASS
 ##
-## The second row is the one that matters. With seventeen files missed, "every declaration holds 32.0" is
-## still TRUE -- seven were found and all seven agreed -- so the agreement check is vacuously satisfiable
-## by a scan that barely ran. The floor is the only thing standing between this layer and a green line
-## that means nothing, and it is provably not the same assertion as the one it protects.
+## The second row is the one that matters, and it is sharper now than it was. With tools/ skipped the scan
+## finds exactly ONE declaration, the owner, and "every declaration holds 32.0" is then TRUE of a
+## population of one. The agreement check passes VACUOUSLY on a scan that never ran. Coverage is the only
+## thing standing between this layer and a green line that means nothing, and it is provably not the same
+## assertion as the one it protects.
 ##
 ## NOT PROVED: the third claim, that every .gd file opened and returned text. Reaching it needs a file
 ## that exists and cannot be read, which I have not staged. It is recorded as unproven rather than assumed
 ## to work, because an untested assertion is exactly what the other two rows are about.
-const FLOOR: int = 20   ## fewer declarations than this and the scan found nothing, which is not a pass
+## THE COVERAGE CONTROL COUNTS FILES OPENED, NOT DECLARATIONS FOUND.
+##
+## It used to count declarations, with a floor of 20 against the 24 that existed. That conflated two
+## different quantities: "did the scan run" and "how many copies exist". Consolidating the copies is the
+## whole point of this layer, so the old floor would have failed on the success it was built to reach,
+## and the only ways to keep it green were to lower it after every slice or to abandon the refactor.
+##
+## Files scanned is invariant under the refactor and is what the coverage claim was always about. Derived,
+## not chosen: this tree walks 165 .gd files, of which tools/ is 118 and everything else is 47. A floor of
+## 120 is below the real count with 45 files of slack, and above BOTH degenerate scans -- a walk that skips
+## tools/ sees 47, a walk that sees only tools/ sees 118. Either one fails by a wide margin.
+const FILE_FLOOR: int = 120
 
 
 func _frame() -> String:
@@ -96,6 +112,12 @@ func _initialize() -> void:
 				files.append(t)
 		print("  (SF_SHARED_CONST_EXTRA adds %s)" % extra)
 
+	print("  scanned %d .gd file(s)" % files.size())
+	_check(files.size() >= FILE_FLOOR,
+		"the scan opened %d .gd files, at least %d expected — below this the walk missed whole directories,"
+			% [files.size(), FILE_FLOOR]
+			+ " and a scan that barely ran agrees with itself trivially")
+
 	var unreadable: Array[String] = []
 	for name: String in SHARED:
 		var want: float = float(SHARED[name])
@@ -126,9 +148,6 @@ func _initialize() -> void:
 					% [String(s["path"]).replace("res://", ""), s["line"], s["value"], want])
 
 		print("  %s: %d declaration(s), all must equal %s" % [name, sites.size(), want])
-		_check(sites.size() >= FLOOR,
-			"%s: found %d declarations, at least %d expected — fewer means the scan missed files, and a"
-				% [name, sites.size(), FLOOR] + " scan that found nothing agrees with itself trivially")
 		_check(wrong.is_empty(),
 			"%s: every declaration holds %s%s"
 				% [name, want, "" if wrong.is_empty() else " — DISAGREE: " + ", ".join(wrong)])

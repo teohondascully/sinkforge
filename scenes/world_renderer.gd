@@ -16,7 +16,7 @@ extends Node2D
 const SkyPainter := preload("res://scenes/sky_painter.gd")
 const TerrainPainter := preload("res://scenes/terrain_painter.gd")
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const WORLD_SIZE := Vector2(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
 const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air above the surface (the gradient's mid tone)
 ## Parallax ridgeline layers. factor = how world-locked (1 = terrain speed, 0 = pinned to the camera, so

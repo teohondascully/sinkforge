@@ -13,7 +13,7 @@ extends Node2D
 ## place or pick up), and the Lift hauls goods and you upward. Controls: 1-8 select, wheel cycles, Q
 ## drop, E crafting, M map, H help.
 
-const CELL: int = 32
+const CELL: int = FactorySim.CELL
 const REACH_CELLS: float = 3.2     ## how far the body can mine/deposit from its centre
 ## The F5/F9 quicksave slot (SaveGame envelope). A `static var` rather than a const, for the same reason
 ## `Settings.path` is one: anything driving the real save verbs must be able to point them at its own file
