@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Layer 6: the SCRIPTED play-test (a new test TYPE). Instead of poking the sim, a PlayAgent literally
+## Layer 6: the DRIVEN play-test (a distinct test TYPE). Instead of poking the sim, a PlayAgent literally
 ## PLAYS the real game to a GOAL: it walks the real body with real physics and triggers the real reach-
 ## gated verbs (mine / deposit / craft / build / select), looping until the goal is met or a frame
 ## budget runs out. A pass means "a person could actually do this from where they're standing": the
@@ -30,19 +30,39 @@ var _last_trace: Array[String] = []  # the failing try's narration, printed only
 ## per-goal scene boot/teardown is fixed overhead the clock can't touch.) Override with SINKFORGE_PLAY_SCALE.
 const PLAY_TIME_SCALE: float = 2.0
 
+## The harness's SKIP code. A subset run exits with it rather than 0, so that running four goals can never
+## be filed alongside running all of them. See run_harness.sh: 42 buys the SKIP state only together with a
+## line saying why, which `_run` prints.
+const SKIP: int = 42
+
+## Run only the goals whose name contains this, case-insensitively. For working on one rung without paying
+## for the other sixteen, and for sweeping one rung across a seed corpus. DEFAULT EMPTY: unset, everything
+## runs, which is the only thing CI may do. A subset run is announced in the banner and exits SKIP.
+var _only: String = ""
+## Goals `_only` filtered out, by name, so the skip line can list what did not run rather than count it.
+var _skipped: Array[String] = []
+## Goals that did run, so the skip line's denominator is a fact and not a maintained constant.
+var _ran_count: int = 0
+
+
 func _initialize() -> void:
-	print("== Sinkforge scripted play-tests ==")
+	print("== Sinkforge driven play-tests ==")
 	var env: String = OS.get_environment("SINKFORGE_PLAY_SCALE")
 	Engine.time_scale = float(env) if env.is_valid_float() and float(env) > 0.0 else PLAY_TIME_SCALE
-	print("(game clock: %.0fx)" % Engine.time_scale)
+	_only = OS.get_environment("SF_PLAY_ONLY").strip_edges()
+	# WHICH WORLD THIS RAN IN, in the header of every log. These goals walk real generated terrain, so a
+	# result is a statement about a seed and not about the game until the seed is written next to it. The
+	# suite has been reporting pass/fail for a long time without ever saying which world produced it.
+	print("(game clock: %.0fx, world seed %d)" % [Engine.time_scale, MainView.default_seed()])
 	MainView.dev_start = false      # these goals assert exact counts — boot a CLEAN pack, not the dev kit
 	_run()
 
 
 func _run() -> void:
-	# Each goal returns whether it was MET. These run on real-time physics with heuristic navigation, so
-	# a single miss can be timing variance, not a broken game, so _attempt retries once. A genuine breakage
-	# fails BOTH tries; a flake passes on the retry. (Pure-logic guarantees live in the headless suite.)
+	# Each goal returns whether it was MET. These run on real-time physics with heuristic navigation, so a
+	# single miss can be timing variance rather than a broken game, and `_attempt` retries up to TRIES
+	# times. A genuine breakage fails EVERY try; a flake passes on one of the retries. (Pure-logic
+	# guarantees live in the headless suite.)
 	for goal: Array in [
 		["find & dig ore", _goal_find_and_dig_ore],
 		["switch carried items", _goal_switch_items],
@@ -52,6 +72,9 @@ func _run() -> void:
 		["RUNG 1 — reach first automation", _goal_reach_first_automation],
 		["RUNG 2 — breach the seal into L2", _goal_breach_the_seal],
 		["RUNG 3 — the L2 iron chain", _goal_l2_chain],
+		# The crossing RUNG 3 used to make on its way to a build site, now asked for by name. It is a
+		# separate property from the chain and it is measured on ground no fixture has touched.
+		["traversal: cross the open ground to the far site", _goal_cross_to_the_far_site],
 		["RUNG 4 — the Borer ferret loop", _goal_borer],
 		["RUNG 5 — drain the aquifer (L3 flood loop)", _goal_drain_the_aquifer],
 		["RUNG 6 — breach a worldgen aquifer (real descent)", _goal_breach_worldgen_aquifer],
@@ -64,14 +87,30 @@ func _run() -> void:
 		["friction: escape a deep pit (not trapped)", _goal_escape_deep_pit],
 		["friction: cross a jagged tunnel", _goal_cross_jagged_tunnel],
 	]:
-		if not await _attempt(goal[0], goal[1]):
+		var goal_name: String = goal[0]
+		if _only != "" and not goal_name.to_lower().contains(_only.to_lower()):
+			_skipped.append(goal_name)
+			continue
+		_ran_count += 1
+		if not await _attempt(goal_name, goal[1]):
 			_failures += 1
-	if _failures == 0:
-		print("ALL PLAY-GOALS MET")
-		quit(0)
-	else:
+	if _failures > 0:
 		printerr("%d PLAY-GOAL(S) FAILED" % _failures)
 		quit(1)
+		return
+	# A SUBSET RUN IS NOT A SWEEP, AND IT MAY NOT EXIT LIKE ONE. `SF_PLAY_ONLY` is here so one rung can be
+	# worked on, or swept across a seed corpus, without paying for the other sixteen — and the moment such a
+	# thing exists, the next hazard is a green line in a log that ran four goals. So it exits on the
+	# harness's SKIP contract instead of 0: exit 42 plus a line saying why, which the runner reports as SKIP
+	# and strict mode refuses to count as a pass.
+	if not _skipped.is_empty():
+		print("play-tests: SKIP — subset run (SF_PLAY_ONLY=%s): %d of %d goals were not run"
+			% [_only, _skipped.size(), _skipped.size() + _ran_count])
+		printerr("play-tests: THIS WAS NOT A FULL SWEEP. Not run: %s" % ", ".join(_skipped))
+		quit(SKIP)
+		return
+	print("ALL PLAY-GOALS MET")
+	quit(0)
 
 
 ## Run a goal, retrying up to TRIES times if missed (real-time physics flake guard). Fresh scene each
@@ -919,52 +958,81 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 			% [got, water_before, water_after])
 
 
+## RUNG 3's build site, DERIVED FROM THE WORLD'S OWN CONTRACTS rather than picked by eye, because the last
+## column picked by eye is what put this rung on ground the generator is allowed to open a hole in.
+##
+## Two properties are wanted, and the generator already promises both, so the fixture needs to touch
+## nothing to get them:
+##
+##   PAST THE LAST SPAWN FIXTURE. WorldSeeder's rightmost stamp is the drill shaft at MINESHAFT_COL, so
+##     anything beyond it is unclaimed ground and a module placed there lands on rock, not on a fixture.
+##   INSIDE THE SINKHOLE KEEPOUT. `_open_sinkholes` is the only pass that breaks the surface lid, and it
+##     refuses to do so within SINKHOLE_KEEPOUT columns of LayeredWorldGen.SPAWN_COL. Inside that band the
+##     ground is unbroken on EVERY seed; outside it, whether a mouth lands on your approach is luck.
+##
+## Six columns clear of the shaft leaves room to stand, dig and jump out without the shaft mouth in reach.
+const CHAIN_COL: int = MainView.MINESHAFT_COL + 6
+
+
+## Why `col` is not somewhere a mouth can open, or "" if it is fine. The two constants it relates live in
+## two different files and nothing else compares them, so the relationship is asserted at run time rather
+## than believed: move either one and this rung says which, instead of quietly going back to terrain luck.
+func _site_fault(col: int) -> String:
+	if col <= MainView.MINESHAFT_COL:
+		return "col %d is inside the spawn fixture band (the last fixture is the drill shaft at col %d)" \
+			% [col, MainView.MINESHAFT_COL]
+	var reach: int = absi(col - LayeredWorldGen.SPAWN_COL)
+	if reach >= LayeredWorldGen.SINKHOLE_KEEPOUT:
+		return ("col %d is outside the sinkhole keepout (|%d - %d| = %d, keepout %d), so worldgen may open"
+			+ " a mouth on this approach and the rung would be measuring terrain luck") \
+			% [col, col, LayeredWorldGen.SPAWN_COL, reach, LayeredWorldGen.SINKHOLE_KEEPOUT]
+	return ""
+
+
 ## RUNG 3. The L2 IRON CHAIN is playable embodied: with the iron
 ## tier researched and the modules in the pack (bench/craft flows proven headless + in RUNG 1), the
 ## agent DIGS a socket pit, stands the gravity chain in it as Iron Forge over Plate Press, pours raw
 ## iron into the open column above, and must end up holding a PLATE: dig, place, toss, collect, all
 ## through the real reach-gated verbs from where a body can actually stand.
+##
+## THIS RUNG IS ABOUT THE CHAIN, AND THE SITE IS CHOSEN SO THAT IT CAN BE. It used to walk to column 75,
+## and when the generator opened a mouth across that approach the walk was made to succeed by levelling ten
+## columns of ground into a pavement. That is the worst repair on offer: the rung went green because the
+## obstacle had been deleted, and the deleted obstacle was the only one in the suite that a body was gated
+## on crossing. Both halves are now addressed by not needing the pavement — the chain moves onto ground the
+## generator already guarantees (CHAIN_COL), and the crossing became `_goal_cross_to_the_far_site`, which
+## walks the old approach with nothing levelled.
 func _goal_l2_chain() -> bool:
 	var agent: PlayAgent = await _boot()
 	var sim: FactorySim = agent.sim
-	var col: int = 75                                        # clear of every fixture (they end at 71)
+	var col: int = CHAIN_COL
+	var fault: String = _site_fault(col)
+	if fault != "":
+		return await _finish(agent, false, "the build site is not contract ground: %s" % fault)
 	for t: StringName in ResearchRules.ORDER:                # setup hatch: the bench flow is proven elsewhere
 		sim.research[t] = true
 	agent.give(&"iron_forge", 1)
 	agent.give(&"plate_press", 1)
-	agent.give(&"iron", 8)
-
-	# GUARANTEE THE APPROACH, AND THIS IS AN ACCOMMODATION, SO IT SAYS SO OUT LOUD.
-	#
-	# The walk from spawn to column 75 crosses a full-depth chasm at column 71 that worldgen opened when
-	# the shelf bands were scattered. The body falls in on the way and walks along the bottom. It is not a
-	# new failure so much as a newly VISIBLE one: the arrival predicate used to compare columns only, so a
-	# body that fell reported arrival from far below and the dig that followed was aimed at a cell above
-	# its own head.
-	#
-	# Levelling a walkable ledge into the site removes terrain luck from a step that is scenery here. This
-	# rung is named "the L2 iron chain" and exists to prove iron -> forge -> press is playable end to end;
-	# traversal has its own layers and they are better at it. A rung that can also fail on terrain reports
-	# a progression defect when the real finding is a chasm.
-	#
-	# THE COST, STATED: RUNG 3 IS NO LONGER EVIDENCE THAT THE BUILD SITE IS REACHABLE. It never honestly
-	# was, since it passed a long run of sweeps only because that approach happened to be walkable, but
-	# from here nothing in this rung may be read as a claim about traversal. `check_traverse` and
-	# `check_plunge` own that. Picking a nearer column was tried first and is worse: `_standing_ground`
-	# returns 55, which is inside the 40-56 fixture band, so the press lands on top of a fixture.
-	for bx: int in range(col - 9, col + 1):
-		sim.set_solid(Vector2i(bx, MainView.SURFACE + 1), &"earth")
-		for by: int in range(MainView.SURFACE - 1, MainView.SURFACE + 1):
-			sim.set_solid(Vector2i(bx, by), &"")
+	# Ten, not eight: two are spent on the control below, and a treatment left with barely enough to clear
+	# its own assertion is a treatment that reports resource starvation as a broken chain.
+	agent.give(&"iron", 10)
 	if not await agent.walk_to_column(col, 1200):
-		return await _finish(agent, false, "never reached the build site")
+		return await _finish(agent, false, "never reached the build site at col %d" % col)
 	var top: int = sim.surface_row(col)
 	# Guarantee the socket site (the RUNG-4 pattern): the column must be SOLID down through the socket
 	# + its floor; a worldgen cave/tunnel under this col (pure vein-RNG luck, it shifts whenever a
 	# gen pass changes) would drop the body out of reach mid-dig. The dig itself stays the tested verb.
+	#
+	# THE ONLY CELLS THIS RUNG WRITES, AND IT COUNTS THEM SO THE NUMBER IS IN THE LOG. An accommodation
+	# nobody measures is an accommodation nobody can retire, and this one is now three cells on one column
+	# rather than thirty on ten. If `filled` reads 0 across the corpus then the guarantee is dead weight and
+	# can go; if it starts reading above 0, the generator has changed under the site and that is worth
+	# knowing before it turns into a mystery failure.
+	var filled: int = 0
 	for y: int in range(top, top + 3):
 		if not sim.is_solid(Vector2i(col, y)):
 			sim.set_solid(Vector2i(col, y), &"earth")
+			filled += 1
 	# Sink the 2-deep socket exactly like a player does: the proven dig_down_to loop (stay CENTRED
 	# over the column, cut under the feet, fall in, repeat). The old hand-rolled version could stall
 	# with the feet straddling the socket lip: a cell-match stop leaves the body standing on the
@@ -977,12 +1045,16 @@ func _goal_l2_chain() -> bool:
 		return await _finish(agent, false, "could not jump out of the socket")
 	# The chain: press at the socket bottom, forge stacked on it flush with the ground; the open air
 	# above the forge is the feed mouth.
+	var press_cell := Vector2i(col, top + 1)
 	if not await agent.select_item(&"plate_press"):
 		return await _finish(agent, false, "no press in the pack")
-	if not await agent.build_at(Vector2i(col, top + 1)):
+	if not await agent.build_at(press_cell):
 		return await _finish(agent, false,
 			"could not stand the press in the socket at %s (chose col %d, surface row %d, body at %s)"
-				% [str(Vector2i(col, top + 1)), col, top, str(agent.main._cell_at(agent.player.position))])
+				% [str(press_cell), col, top, str(agent.main._cell_at(agent.player.position))])
+	var refusal: String = await _press_refuses_raw_iron(agent, press_cell)
+	if refusal != "":
+		return await _finish(agent, false, refusal)
 	if not await agent.select_item(&"iron_forge"):
 		return await _finish(agent, false, "no iron forge in the pack")
 	if not await agent.build_at(Vector2i(col, top)):
@@ -997,9 +1069,225 @@ func _goal_l2_chain() -> bool:
 	while int(sim.inventory.get(&"plate", 0)) < 1 and t2 < 2400:
 		await agent.step(); t2 += 1
 	var plates: int = int(sim.inventory.get(&"plate", 0))
-	print("  chain: %s  (plates=%d frames=%d)" % [agent.friction(), plates, t2])
+	print("  chain: %s  (col=%d surface row %d, socket cells filled=%d, plates=%d frames=%d)"
+		% [agent.friction(), col, top, filled, plates, t2])
 	return await _finish(agent, plates >= 1,
 		"dug the socket, stood the iron chain, poured iron in the top, walked away holding a plate")
+
+
+## THE CONTROL THAT MAKES RUNG 3 ABOUT THE CHAIN. Returns "" when the press behaves, or the reason it did
+## not. Runs against the press ALONE, before the forge is stacked on it, so nothing the forge does can
+## contaminate the answer.
+##
+## WHY IT HAS TO EXIST. `plates >= 1` cannot see the property the rung is named for. The chain is
+## iron -> forge -> iron_ingot -> press -> plate, and the single thing making the forge load-bearing is
+## that the press does not accept raw iron. Delete that dependency — let the press take iron directly —
+## and the pour still lands in the press, a plate still comes out, and the rung is still green with the
+## forge standing there as scenery. A guard that stays green when the thing it guards is removed is not a
+## guard, and this file had sixteen of them and no way to tell which.
+##
+## THREE QUESTIONS, WEAKEST LAST. The first two are the game's own derivation (`machine_eats` is what the
+## toss verb consults to pick a mouth), so they fail the instant the recipe changes, without waiting on
+## physics. The third is the embodied version: the iron is put INSIDE the press and the press is run, so
+## "no plate" is a statement about a press that had the iron rather than about a throw that missed. That
+## distinction is the whole difference between a control and a coincidence.
+func _press_refuses_raw_iron(agent: PlayAgent, cell: Vector2i) -> String:
+	var sim: FactorySim = agent.sim
+	var press: MachineState = sim.machine_at(cell)
+	if press == null:
+		return "no press registered at %s, so the control has nothing to ask" % str(cell)
+	var recipe: RecipeDef = press.def.recipe
+	if recipe == null:
+		return "the press has no recipe at all, so there is no chain to walk"
+	if sim.machine_eats(press, &"iron"):
+		return ("the press eats RAW IRON, so the forge is not a step in the chain: this rung would reach"
+			+ " its plate with the forge deleted")
+	if not sim.machine_eats(press, &"iron_ingot"):
+		return ("the press does not eat the forge's output (iron_ingot), so nothing connects the two halves"
+			+ " of the chain this rung claims to walk")
+	# The embodied half. `deposit` is deliberately unfiltered — the sim's own docstring says a test rig may
+	# prime any buffer — which is exactly what a control needs: it puts the iron where a working press
+	# would find it, past the toss and past reach, leaving no way to explain a null by a bad delivery.
+	#
+	# WHAT IT ASKS, AND WHY IT IS NOT "IS THE IRON STILL SITTING THERE". That was the first version of this
+	# check and it failed on a healthy press, which is the useful direction for a new instrument to fail in.
+	# `_run_recipe` opens with a documented PASS-THROUGH: anything a machine's recipe does not want is moved
+	# straight to its output and falls on down the column, so a stack sorts a mixed stream and no buffer can
+	# clog. The iron was therefore gone in 180 frames without ever being eaten, and an assertion written
+	# against my assumption rather than against the design called correct behaviour a fault.
+	#
+	# So the question goes to the sim's own conservation ledger instead, which is the thing that actually
+	# means "consumed": `total_consumed` is written in exactly one place, the branch of `_run_recipe` that
+	# spends a recipe's inputs. A press that never increments it for iron has never treated iron as food,
+	# whatever it did with the units afterwards.
+	var offered: int = 2
+	var iron_eaten: int = int(sim.total_consumed.get(&"iron", 0))
+	var plates_made: int = int(sim.total_produced.get(&"plate", 0))
+	if sim.deposit(cell, &"iron", offered) != offered:
+		return "could not put the control iron into the press, so its silence would prove nothing"
+	# Long enough for the press to have finished a cycle twice over if it were going to start one. Derived
+	# from the recipe rather than typed in, so a slower press does not silently turn this into a no-op.
+	var window: int = int(ceil(recipe.time * 60.0 / maxf(Engine.time_scale, 1.0))) * 2
+	for _i: int in window:
+		await agent.step()
+	var ate: int = int(sim.total_consumed.get(&"iron", 0)) - iron_eaten
+	if ate > 0:
+		return ("the press CONSUMED %d raw iron in %d frames: the forge is not a step in the chain, and this"
+			+ " rung would reach its plate with the forge deleted") % [ate, window]
+	var made: int = int(sim.total_produced.get(&"plate", 0)) - plates_made
+	if made > 0:
+		return ("a press fed nothing but raw iron produced %d plate(s) in %d frames: the forge is not in the"
+			+ " chain") % [made, window]
+	var status: StringName = sim.machine_status(press)
+	if status != &"no_input":
+		return ("a press offered %d raw iron reads as '%s' rather than starved, so the game counts that iron"
+			+ " as food") % [offered, str(status)]
+	return ""
+
+
+# --- TRAVERSAL ------------------------------------------------------------------------------------
+
+## The column RUNG 3 used to walk to, kept as this rung's MINIMUM reach. The real destination is the far
+## rim of whichever hole the world actually has (see `_first_hole_east`), but it may never be nearer than
+## this: the rung exists to hold the coverage that moving RUNG 3's build site would otherwise have dropped,
+## so the floor is the old walk and everything past it is a gain.
+const FAR_SITE_COL: int = 75
+
+## WHAT COUNTS AS A HOLE, so that "the body crossed the ground" cannot quietly become "there was nothing to
+## cross". Six rows is past a jump and past the auto-step-up; two columns wide is past a stride. Under both
+## of those the approach is a pavement, and a pavement is what this rung is here to refuse.
+const CROSSING_MIN_DROP: int = 6
+const CROSSING_MIN_SPAN: int = 2
+
+
+## The first real hole east of `from`, as {first column, last column}, or (-1, -1) if the ground runs
+## unbroken all the way. "Real" is CROSSING_MIN_DROP deep and CROSSING_MIN_SPAN wide; a narrower or
+## shallower dip is skipped over and the search continues, so a one-column notch cannot be mistaken for
+## the thing we came to cross.
+##
+## IT SEARCHES RATHER THAN ASSUMING, and the corpus is why. The first version of this rung fixed its
+## destination at column 75 and asked whether there was a hole in between. On five of the eight corpus
+## seeds there was; on the other three the rung reported "nothing to cross", and that reading was wrong.
+## The mouths were there — seed 7 at columns 80-85, seed 512 at 81-82, seed 20260817 at 75-82 — they were
+## simply outside a window somebody had typed in. Three worlds' worth of the exact subject this rung exists
+## for, invisible because the instrument had a fixed frame. WHERE the generator puts a mouth is seed
+## business; THAT it puts them is the contract, so the rung asks the world where its hole is.
+func _first_hole_east(sim: FactorySim, from: int, to: int) -> Vector2i:
+	var c: int = from
+	while c <= to:
+		if sim.surface_row(c) - MainView.SURFACE < CROSSING_MIN_DROP:
+			c += 1
+			continue
+		var last: int = c
+		while last + 1 <= to and sim.surface_row(last + 1) - MainView.SURFACE >= CROSSING_MIN_DROP:
+			last += 1
+		if last - c + 1 >= CROSSING_MIN_SPAN:
+			return Vector2i(c, last)
+		c = last + 1
+	return Vector2i(-1, -1)
+
+
+## How far below the datum a stretch of surface falls at its worst: the depth of the hole, for the log.
+func _deepest_drop(sim: FactorySim, from: int, to: int) -> int:
+	var drop: int = 0
+	for c: int in range(from, to + 1):
+		drop = maxi(drop, sim.surface_row(c) - MainView.SURFACE)
+	return drop
+
+
+## How far past the destination to look for real ground before giving up.
+const FOOTING_SEARCH: int = 8
+
+
+## Where to finish: FAR_SITE_COL if the generator left ground there, else the first column past it that it
+## did. A mouth is a few columns wide and where its far rim falls is seed business, so the finish line has
+## to be able to move — but it moves RIGHTWARD ONLY, away from spawn, so a wider hole can only ever make
+## this rung ask for more. It can never slide the finish line back to the near side of the thing being
+## crossed, which is the one way an adaptive target could quietly delete its own subject.
+func _far_footing(sim: FactorySim, from: int) -> int:
+	for c: int in range(from, mini(from + FOOTING_SEARCH, FactorySim.GRID_COLS - 3)):
+		if sim.surface_row(c) <= HeightmapWorldGen.SURFACE_ROW_MAX:
+			return c
+	return -1
+
+
+## The surface silhouette of a stretch, column by column. Printed rather than summarised: when this rung
+## fails, the shape of the ground is the finding, and a single "could not get there" is not.
+func _surface_profile(sim: FactorySim, from: int, to: int) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for c: int in range(from, to + 1):
+		parts.append(str(sim.surface_row(c)))
+	return "cols %d-%d rows [%s]" % [from, to, " ".join(parts)]
+
+
+## CROSS THE OPEN GROUND, on ground nothing has levelled.
+##
+## THE COVERAGE THIS RUNG IS CARRYING, and why it is worth a rung of its own. RUNG 3 walked from spawn to
+## column 75 to reach a build site. That walk leaves the sinkhole keepout at column 68, and past the
+## keepout is the first place in the world where `_open_sinkholes` may break the surface lid — so, entirely
+## by accident, that walk was the only gated thing in the suite that put a body across a real surface
+## mouth. Nothing else covers it. `check_walk` PLACES the body at each sample column and walks a 90-frame
+## burst, which is a snap hunt and never crosses anything. `check_traverse` carves its own gallery, gates
+## the rope against the legs inside it, and deliberately PRINTS the open-sky run rather than gating it.
+## `check_plunge` rides a mouth DOWNWARD. The horizontal crossing belonged to nobody, so it belongs here.
+##
+## THE FIXTURE MAY NOT TOUCH THE GROUND, and the rung enforces that on itself rather than promising it. It
+## finds the hole in the approach BEFORE walking, and fails if there is not one. That is the guard against
+## the repair that started all of this: levelling the approach makes the walk succeed, and it also makes
+## this assertion fail, so the pavement can no longer be mistaken for a pass. Demonstrated rather than
+## assumed — dropping the old ledge loop back in front of this check flattens columns 66-75 to row 21, the
+## 58-row hole disappears from the profile, and the rung goes red instead of green. It doubles as a worldgen
+## alarm: if a future pass stops breaking the surface lid, this says so rather than going quietly green.
+##
+## The blocks are the file's usual journey hatch (a journey measures traversal, not whether you remembered
+## to bring planks). Everything after that is a player verb: walk, jump, and lay a plank of your own dirt
+## over the hole. `approach` is what does the laying, and it does it through `try_build`.
+func _goal_cross_to_the_far_site() -> bool:
+	var agent: PlayAgent = await _boot()
+	var sim: FactorySim = agent.sim
+	var from_col: int = agent.main._cell_at(agent.player.position).x
+	var east_edge: int = FactorySim.GRID_COLS - 6
+	var hole: Vector2i = _first_hole_east(sim, from_col, east_edge)
+	if hole.x < 0:
+		return await _finish(agent, false,
+			("there is nothing to cross anywhere east of col %d — no run of %d columns is %d rows below the"
+			+ " datum between there and col %d. Either the ground was levelled before the walk, in which"
+			+ " case this rung is measuring a pavement, or worldgen has stopped breaking the surface lid, in"
+			+ " which case the crossing is no longer a property of this world. Profile: %s")
+				% [from_col, CROSSING_MIN_SPAN, CROSSING_MIN_DROP, east_edge,
+				_surface_profile(sim, from_col, east_edge)])
+	var drop: int = _deepest_drop(sim, hole.x, hole.y)
+	# Finish on the far rim, but never nearer than the column RUNG 3 used to walk to, so this rung can only
+	# ever ask for MORE ground than the coverage it inherited, never less.
+	var stand: int = _far_footing(sim, maxi(hole.y + 1, FAR_SITE_COL))
+	if stand < 0:
+		# The parentheses are load-bearing. `%` binds tighter than `+`, so an unbracketed
+		# `"a" + "b" % [x, y]` formats the SECOND fragment alone — a string with no specifiers against two
+		# arguments — and the failure lands on the error path, where nobody is looking.
+		return await _finish(agent, false,
+			("the hole at cols %d-%d has no generated ground within %d columns of its far rim, so there is"
+			+ " nowhere on the other side to stand") % [hole.x, hole.y, FOOTING_SEARCH])
+	print("  crossing: hole at cols %d-%d, %d rows deep; finishing on col %d. %s"
+		% [hole.x, hole.y, drop, stand, _surface_profile(sim, from_col, stand)])
+	agent.give(&"earth", 40)
+	await agent.approach(Vector2i(stand, sim.surface_row(stand)), 3000)
+	# The gate is the two-axis arrival: on that column AND on top of it.
+	var arrived: bool = await agent.walk_to_column(stand, 1200)
+	var at: Vector2i = agent.main._cell_at(agent.player.position)
+	# AND THE ROW IS CHECKED AGAINST THE GENERATOR, NOT AGAINST THE LIVE COLUMN, because the live column is
+	# the one thing that cannot answer this. `surface_row` scans for the first solid cell and keeps no memory
+	# of the original ground, so a column with a hole in it reports the floor of the hole as its surface —
+	# and `walk_to_column`'s own depth test, being written against exactly that number, is satisfied at the
+	# bottom of a mouth. That is fine for its callers, who are asking "am I on this column's ground"; it is
+	# not enough here, where the whole question is whether the body is on the world's surface or inside it.
+	# SURFACE_ROW_MAX is the deepest valley floor the heightmap can produce, so one row under it is the
+	# honest boundary between standing on the ground and standing in a hole.
+	var on_the_world: bool = at.y <= HeightmapWorldGen.SURFACE_ROW_MAX + 1
+	print("  crossing: %s  (hole cols %d-%d %d rows deep, ended at %s, surface band ends row %d)"
+		% [agent.friction(), hole.x, hole.y, drop, str(at), HeightmapWorldGen.SURFACE_ROW_MAX])
+	return await _finish(agent, arrived and on_the_world,
+		"crossed %d columns of unlevelled ground, over a hole %d rows deep at cols %d-%d, and stood on the"
+		% [stand - from_col, drop, hole.x, hole.y] + " surface at col %d" % stand)
 
 
 # --- FRICTION journeys ----------------------------------------------------------------------------

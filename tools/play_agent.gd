@@ -12,7 +12,7 @@ extends RefCounted
 ## with generous frame budgets and a give() hatch to INJECT resources for setup (e.g. top up ingots
 ## before testing crafting) — the user-sanctioned shortcut for "arrange the situation, then play it".
 ##
-## Used by tools/play_tests.gd (the scripted test TYPE).
+## Used by tools/play_tests.gd (the driven play-test TYPE).
 
 const CELL: int = 32
 
@@ -171,6 +171,13 @@ func jump() -> void:
 	await wait(2)
 
 
+## THE PLACEMENTS BELOW GO THROUGH `do_build`, and until they did, `friction()` could not see the single
+## most effortful thing this driver does. `places` is documented as "blocks laid (staircases/pillars to get
+## back up)" — which is exactly and only what this function lays — but it is incremented in `do_build`, and
+## all three sites here called `main.try_build` directly. The crossing rung bridges a 58-row chasm with six
+## blocks and printed `places=0`. `builds` was no better: it counted the ATTEMPT, so a placement the verb
+## refused was reported as a block laid. Both now count the same successes.
+##
 ## Walk toward a cell until it's within reach — and when walking alone fails, BUILD the way there
 ## (Terraria dig-and-build, the behaviour the play-tester expects a smart agent to have): bridge a gap the
 ## body would fall into, and build a stair up a wall / out of a pit. Uses the dirt the agent has dug (every
@@ -200,8 +207,8 @@ func approach(cell: Vector2i, budget: int = 600) -> bool:
 				if sim.is_solid(here + Vector2i(dir * 2, 1)) or sim.is_solid(here + Vector2i(dir * 3, 1)):
 					_do_jump()
 				elif _select_block() and main._can_reach(ahead_floor) and main._placeable(ahead_floor):
-					main.try_build(ahead_floor)
-					builds += 1
+					if do_build(ahead_floor):
+						builds += 1
 			elif not progressing and sim.is_solid(ahead):
 				# A WALL/step ahead we're not getting past.
 				var up: Vector2i = here + Vector2i(dir, -1)     # the cell diagonally up-forward
@@ -211,8 +218,8 @@ func approach(cell: Vector2i, budget: int = 600) -> bool:
 					if main._can_reach(up) and main._placeable(up):
 						_do_jump()                         # taller step → build a stair up-forward and hop on
 						await wait(3)
-						main.try_build(up)
-						builds += 1
+						if do_build(up):
+							builds += 1
 					elif cell.y <= here.y:
 						# Boxed in below the target (a pit whose side is solid ground) → PILLAR straight up:
 						# jump, then drop a block into the cell just vacated under the feet, and land on it.
@@ -220,8 +227,8 @@ func approach(cell: Vector2i, budget: int = 600) -> bool:
 						await wait(5)
 						var under: Vector2i = main._cell_at(player.position) + Vector2i(0, 1)
 						if main._can_reach(under) and main._placeable(under):
-							main.try_build(under)
-							builds += 1
+							if do_build(under):
+								builds += 1
 		if absf(player.position.x - last_x) < 0.3 and player.on_floor:
 			still += 1
 			stuck_frames += 1
