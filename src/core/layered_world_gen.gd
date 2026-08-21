@@ -256,6 +256,8 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	# Dead last, because every lode guard tests the final world, while the seal overwrites blocks wholesale
 	# and the aquifers carve rock away and flood it.
 	_seed_lodes(world, rng, hfield)
+	# AFTER EVEN THAT, and consuming no rng at all, so it cannot move the world it is correcting.
+	_restore_turf(world)
 	return world
 
 
@@ -1013,3 +1015,45 @@ func _stamp_bazaar_ruin(world: WorldData) -> void:
 				world.blocks[c] = &"wood"
 		for ix: int in range(1, w - 1):                       # keep the interior open
 			world.blocks.erase(o + Vector2i(ix, dy))
+
+
+## THE TURF LINE IS SOIL. This restores an invariant the PARENT generator already states in code, and
+## which this class keeps in its SEEDS and loses in its GROWTH.
+##
+## `HeightmapWorldGen.generate` writes &"earth" at every column's `ground_row`, and its own vein pass
+## seeds at `surface[cx] + 1`: the turf row is declared off-limits to ore by the parent, in code rather
+## than in a comment. `_scatter_veins` and `_scatter_coal` honour that in their SEED, `randi_range(top + 1,
+## ...)`, and then hand the body to `_grow_vein`, which appends `Vector2i(0, -1)` to its frontier and
+## accepts any earth/stone/shale/deepslate cell with `min_row` defaulted to 0. A vein seeded one row under
+## the turf of a low column grows UP through the turf of a higher one. `min_row` is the guard for exactly
+## this failure at the OTHER end of the world. Its docstring says a body seeded just under the seal could
+## otherwise climb through rows the seal stamp later re-fills, and nothing passes it at this end.
+##
+## MEASURED ON THIS TREE, eight seeds, 1024 turf cells walked: 24 are not soil, 2.34%, being 18 coal and
+## 6 ore. It is not an invisible worldgen detail. `MaterialDef.has_cap()` is `cap_color.a > 0.0`, and
+## `earth` is the ONLY material in src/data/materials that satisfies it. Fifteen others declare a
+## cap_color of zero alpha, which does not count. So `TerrainPainter._draw_terrain_surface` falls through
+## to `def.base_color.lightened(0.18)` and draws a LIGHTENED ROCK RIM where the grass line should be.
+##
+## THE PER-CELL GUARD BELONGS HERE AND NOT IN `_grow_vein`, which was tried first and is wrong.
+## `tools/check_vein_guard.gd` calls `_grow_vein` directly against a synthetic 24x24 `WorldData` that has
+## no heightmap, so `ground_row` means nothing there and the accretion primitive must stay a primitive.
+## The turf invariant is a property of the GENERATED WORLD, so it is asserted over the generated world.
+##
+## IT DELIBERATELY LEAVES THE SPAWN VEIN ALONE, and that is the point rather than an exemption.
+## `WorldSeeder._seed_starter_vein` puts &"ore" on the turf and `_seed_tutorial_coal` puts coal on it,
+## both AFTER generation, both bootstrap affordances you are meant to see. A broken grass line should mean
+## ore that MEANS something; this removes only the ore that means nothing.
+func _restore_turf(world: WorldData) -> void:
+	for col: int in world.cols:
+		var cell := Vector2i(col, ground_row(col))
+		var here: StringName = world.blocks.get(cell, &"")
+		# Air is a sinkhole or rift MOUTH and is designed; foliage stands on the turf rather than
+		# replacing it, and a canopy leaf can land on a neighbouring column's turf across a scarp.
+		# Written as "anything that is not soil and not one of those two" rather than as a list of ores,
+		# so a material added tomorrow is guarded the day it is added instead of the day someone
+		# remembers this pass.
+		if here == &"" or here == &"earth" or here == &"wood" or here == &"leaves":
+			continue
+		world.blocks[cell] = &"earth"
+		world.amounts.erase(cell)      # or the soil would carry a stale ore deposit into the save
