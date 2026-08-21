@@ -54,7 +54,44 @@ render_mode blend_add;
 // zero-mean texture that darkens as much as it lightens. An additive pass cannot make one at any
 // amplitude. A post-veil mix layer can, and one now exists at z 53 (`_marks`); that is where a back-wall
 // grain belongs, not here.
-uniform float tooth_add : hint_range(0.0, 0.06) = 0.030;   // absolute value added at peak, post-veil
+// Fine rock texture drawn above the darkness veil, in absolute levels. Same texture as rock_grit.
+//
+// rock_grit paints the fine-terrain layer at z=-9 and the veil is a multiply at z=50, so everything the
+// terrain paints is scaled by the factor that made the rock dark in the first place. Outside the lamp the
+// median rock level is 8.7/255: a floor worth two levels through the veil would need twenty levels in lit
+// rock. The limit is layer order, so no amount of amplitude or frequency in rock_grit can reach it. This
+// pass draws the same texture one layer up instead.
+//
+// Being additive it raises rock's mean by about tooth_add/2 where rock is nearly black. That is what puts
+// solid rock above open air in value; without it the two invert, air at 9.0 against rock at 8.5. Air, sky
+// and lit surfaces are untouched, so this is not a global brighten.
+//
+// The mask is solids only. fine_terrain paints the back wall opaque, so an alpha test against 0 is true of
+// the void as well and would texture air as heavily as rock at any amplitude.
+//
+// The back wall deliberately gets no tooth. blend_add is positive only, so texture given to the wall
+// raises its mean and narrows the rock-to-void value step. At a 0.5 wall share the wall's texture rises
+// from 2.02 to 2.30 mean absolute luma delta per pixel against rock's 4.13, and contact-edge detectability
+// falls from 95% to 94%. Dropping the pass costs rock 1.43 levels per pixel and the wall nothing. A
+// back-wall grain has to be zero-mean, which puts it in the post-veil mix layer (_marks, z 53).
+//
+// Amplitude swept against the rock-versus-void reading, two runs per arm, rock and air medians:
+//
+//     0.030  rock 2.99  air 1.88  ->  73% (below floor)      0.060  rock 4.63  air 1.95  ->  84%
+//     0.045  rock 3.78  air 1.93  ->  78%                    0.090  rock 6.44  air 2.00  ->  92%
+//
+// 0.060 rather than the cheaper 0.045 because the deficit it answers is one-sided: voids get read as
+// solid and never the reverse, so the margin wanted is on the rock side.
+//
+// The cost was measured on the frame rather than assumed. Mean absolute horizontal neighbour delta on a
+// surface capture goes 2.507 to 3.378 on dark rock (+35%) and 3.043 to 3.245 on lit pixels (+7%): the
+// daylight half of the original claim survives, and the dark half is what needed the amplitude. Sampled
+// median luminance goes 11.1 to 13.9 against this layer's own 34.0 darkness ceiling, so the region still
+// reads as dark.
+//
+// The hint_range ceiling sits above the shipped value on purpose. A default pinned to the top of its own
+// range documents nothing about how much headroom the effect has.
+uniform float tooth_add : hint_range(0.0, 0.12) = 0.060;   // absolute value added at peak, post-veil
 uniform float mottle_add : hint_range(0.0, 0.03) = 0.006;  // coarser octave so the tooth is not uniform
 uniform float mottle_scale : hint_range(1.0, 16.0) = 5.0;  // world px per mottle sample
 
