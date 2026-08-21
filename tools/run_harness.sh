@@ -1013,7 +1013,24 @@ subset=""; [ "$total" -ne "$DECLARED" ] && subset=" of $DECLARED — SUBSET, SF_
 # resolves symlinks, and the branch is printed beside it because "which tree" and "which branch" are
 # different questions and both have been wrong.
 say "== Sinkforge harness (parallel, JOBS=$JOBS, layers=$total$subset, $mode, $strictness, $perfhost) =="
-say "   tree: $(pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  head: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+# AND WHETHER THE WORKTREE MATCHED THAT HEAD, because `head:` alone cannot say what was tested. The
+# discipline here is sweep-then-commit, so a run's head is routinely the PARENT of the commit whose
+# content it validated -- and three runs recorded the same head while at least one of them was testing
+# the next commit's pending content. Every value in that column is a real commit, so the ambiguity is
+# silent: an archive of nine runs looked like nine distinct trees, then like seven, and is actually
+# unrecoverable from what the header stored.
+#
+# `git diff HEAD | git hash-object --stdin` content-addresses the uncommitted delta without touching the
+# index, a ref or the tree -- unlike `write-tree`, which needs the index staged. Clean runs all print the
+# empty-blob hash, so "clean" is stated in words instead. Untracked files are deliberately excluded: the
+# gates that matter enumerate `git ls-files`, so untracked content is not part of what any of them judge.
+#
+# The pipe is safe under `pipefail` because `hash-object` reads to EOF; the SIGPIPE trap needs an
+# early-exiting consumer, which is what bit check_exit_codes.sh.
+_wt_n="$(git status --porcelain --untracked-files=no 2>/dev/null | wc -l | tr -d ' ')"
+_wt_d="$(git diff HEAD 2>/dev/null | git hash-object --stdin 2>/dev/null | cut -c1-12)"
+if [ "${_wt_n:-0}" -eq 0 ] 2>/dev/null; then _wt="clean"; else _wt="${_wt_n} file(s) modified, delta ${_wt_d:-?}"; fi
+say "   tree: $(pwd -P)  branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  head: $(git rev-parse --short HEAD 2>/dev/null || echo '?')  worktree: ${_wt}"
 
 
 # Take the machine-wide lock before anything touches user://. A run that was killed cannot release its own
