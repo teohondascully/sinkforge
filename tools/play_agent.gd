@@ -238,10 +238,53 @@ func approach(cell: Vector2i, budget: int = 600) -> bool:
 
 ## Select any placeable BLOCK the agent is carrying (dug dirt/stone/wood), so it can bridge/pillar. Returns
 ## whether one got selected. Prefers plentiful dirt/stone over the scarcer wood.
+## What the pack is holding, for a diagnostic note. Sorted so two runs are comparable at a glance.
+func _pack_summary() -> String:
+	var keys: Array = sim.inventory.keys()
+	keys.sort()
+	var parts: PackedStringArray = PackedStringArray()
+	for k: Variant in keys:
+		var n: int = int(sim.inventory[k])
+		if n > 0:
+			parts.append("%s %d" % [str(k), n])
+	return "empty" if parts.is_empty() else ", ".join(parts)
+
+
+## Pick something to pillar with. PREFERENCE FIRST, THEN ANYTHING RATHER THAN NOTHING.
+##
+## This was a bare list of four: earth, stone, deepslate, wood. That list is what a body digs at the
+## SURFACE, and the pilot uses this to climb out of a hole it dug to reach ore, which by definition is not
+## at the surface. On corpus seed 512 it gave up at (45, 26) holding `shale 2, coal 22, ore 6, ingot 4`:
+## twenty-four placeable blocks in the pack and a list that recognised none of them.
+##
+## The pack was at `bulk 36 of 90`, which is worth recording because it rules out the more alarming
+## explanation. `PACK_BULK_CAP` spills what will not fit, so a full pack shedding its earth on the way down
+## would mean the carry cap can strand a body at the bottom of its own shaft. It was not full and nothing
+## spilled. The cap is not implicated.
+##
+## So the fallback below is the actual fix, and the preference list is now only a preference. Anything
+## `is_bulk_item` will serve, most plentiful first, because being stuck at the bottom of a shaft is worse
+## than spending coal on a step. `KEEP` holds back the things the opening still needs; if a material is
+## added tomorrow and nobody updates either list, it lands in the fallback and works, which is the
+## direction a stale list should fail in.
+const PILLAR_PREFERRED: Array[StringName] = [&"earth", &"stone", &"gravel", &"shale", &"deepslate", &"wood"]
+const KEEP: Array[StringName] = [&"ore", &"rich_ore", &"iron", &"ingot", &"iron_ingot", &"plate", &"gear",
+	&"sapling"]
+
 func _select_block() -> bool:
-	for item: StringName in [&"earth", &"stone", &"deepslate", &"wood"]:
+	for item: StringName in PILLAR_PREFERRED:
 		if int(sim.inventory.get(item, 0)) > 0:
 			return select_item(item)
+	var best: StringName = &""
+	var best_n: int = 0
+	for k: Variant in sim.inventory:
+		var item: StringName = k
+		var n: int = int(sim.inventory.get(item, 0))
+		if n > best_n and not KEEP.has(item) and sim.is_bulk_item(item):
+			best = item
+			best_n = n
+	if best != &"":
+		return select_item(best)
 	return false
 
 
@@ -520,7 +563,13 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 			await step(); t += 1
 			continue
 		if not _select_block():
-			_note("climb: out of blocks to pillar with at %s" % bc)
+			# SAY WHAT IS IN THE PACK, because "out of blocks" has two very different causes and the note
+			# could not tell them apart. Either nothing placeable was ever picked up, or the pack filled
+			# with something else and `PACK_BULK_CAP` spilled the placeable material on the way down. The
+			# second would mean the carry cap can strand a body at the bottom of its own shaft, which is a
+			# gameplay consequence of a shipped feature rather than a driver limitation.
+			_note("climb: out of blocks to pillar with at %s (pack: %s, bulk %d of %d)"
+				% [bc, _pack_summary(), sim.carried_bulk(), FactorySim.PACK_BULK_CAP])
 			return false
 		# PILLAR up one cell: jump, and the MOMENT the feet clear the cell we were standing in, drop a block
 		# into it — the body then falls onto that block, one cell higher. This is the fiddly timing a player
