@@ -1,0 +1,54 @@
+# THE ASSERTIONS THIS SUITE IS PERMITTED NOT TO MAKE, AND WHY EACH ONE CANNOT CARRY A BOUND YET.
+#
+# Read by `tools/harness_verdict.sh` on a FULL sweep. One line per layer:
+#
+#     <slug><TAB><expected SKIP: lines><TAB><why no bound can responsibly be set>
+#
+# WHY THIS FILE EXISTS. A full sweep with a display cannot reach exit 0 and never will, because the four
+# stand-downs below are structural rather than temporary. That makes "the full sweep is green" an
+# unreachable gate, and an unreachable gate is met by deleting honest stand-downs or by inventing bounds
+# nobody earned. Both are worse than the sweep is today. The defensible target is the one this file makes
+# checkable: EXIT 4, WITH EXACTLY THESE STAND-DOWNS AND NO OTHERS.
+#
+# IT IS SYMMETRIC, AND THE SECOND HALF IS THE POINT.
+#
+#   a layer stands down and is NOT listed here   RED. Nobody quietly stops asserting something.
+#   a listed layer stands nothing down           RED. The list must be tightened when the debt is paid.
+#
+# The second direction is the warp ratchet's lesson, learned on this branch: that budget sat at seven
+# against a real count of zero, which is not a harmless leftover but seven calls of slack authorised by
+# nothing. A list that is not tightened when the debt is paid stops being a bound and becomes a licence.
+#
+# THE KEY IS THE PAIR (LAYER, COUNT), AND THE FIRST DRAFT OF THIS FILE KEYED ON THE LAYER ALONE. The
+# argument for that was robustness -- `check_frametime` has two `SKIP:` sites and fires one, so an exact
+# number "would go red on a run that stood down LESS". c1 took it apart and was right: a per-layer registry
+# is green when a listed layer goes from 2 stand-downs to 5, and green when a DIFFERENT assertion inside it
+# is the one stood down. **It authorises unlimited stand-downs inside the four layers it names**, which is
+# the licence this file's own paragraph above warns about, written into the file by the person who wrote
+# the warning. It also breaks the symmetry outright: a layer that quietly drops one of its three keeps its
+# name and stays green.
+#
+# The robustness worry was tested rather than argued, on two independent full sweeps:
+#
+#     39341f4   frametime=1  grapple_reads=1  ceremony_reads=2  text_contrast=2
+#     0729de4   frametime=1  grapple_reads=1  ceremony_reads=2  text_contrast=2
+#
+# Identical, while the measurement INSIDE grapple_reads moved (0.22 to 0.26). These are structural
+# conditions -- an unset SF_PERF_HOST, a design decision not yet made -- so the count is deterministic and
+# the flake I was protecting against does not exist. Standing down FEWER is a real change and should be a
+# red: it means an assertion is now being made, and the list must be tightened to say so.
+#
+# WHAT IT STILL DOES NOT KEY ON is the stand-down's own identity, so a layer that swaps WHICH of its two
+# assertions it stands down is invisible here. Closing that needs `_stand_down()` to carry a stable id, and
+# it is owed alongside making `_stand_down()` the only way to produce the line.
+#
+# WHAT THIS INHERITS AND CANNOT FIX. A stand-down is recognised by a line beginning `SKIP:`, matched as
+# text. `check_base.gd` asks layers to call `_stand_down()`, and `check_frametime` prints the line by hand
+# instead; the tally survives because both spellings produce the same text. So this registry rests on a
+# convention holding across 105 layers, in a suite where four guards in one week were defeated by text
+# matching. Making `_stand_down()` the only way to produce the line is a separate change and is owed.
+
+check_frametime	1	the 8.33ms (120fps) budget asserts only when SF_PERF_HOST names the machine, and it is set nowhere. A frame-rate claim on arbitrary hardware is a statement about the box. Correct, permanent, and recorded in the layer at :349.
+check_grapple_reads	1	GR-05's share of the throw the preview inks measures 0.22 and is unasserted. The cap that stood there was 1.01 over a quantity `_corridor_fill` bounds at 1.0 BY CONSTRUCTION -- an assertion that could not fail. Removing it was right; what is owed is a design call, not a guessed bound.
+check_ceremony_reads	2	Two: how the words read against open sky, and how much of the rope an interrupt may take. The arm now carries a drift floor measured inside its own run, so the reading has something in its own units to be a ratio against; the missing piece is the distribution across several runs. The layer's own note: a bound argued from the first one has been wrong four times in this repository.
+check_text_contrast	2	Two. One is a lane boundary -- how much light the world puts through a 0.90 plate belongs to the renderer, not the palette. The other is a REAL gap: the wash tiles and the picked row's brass are literals in the drawing code rather than named constants, so no row here can reference them. Priced by the layer at ten drawing sites.

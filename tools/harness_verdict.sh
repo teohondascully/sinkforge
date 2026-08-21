@@ -170,6 +170,59 @@ if [ "$n_empty" -gt 0 ]; then
 	bad=1
 fi
 
+# --- THE STAND-DOWNS: EXACTLY THESE, AND EXACTLY THIS MANY ------------------------------------------
+#
+# A full sweep with a display CANNOT reach exit 0 and never will: four layers stand assertions down for
+# structural reasons, each naming why a bound cannot responsibly be set. That makes "the full sweep is
+# green" an unreachable gate, and an unreachable gate is met by deleting honest stand-downs or inventing
+# bounds nobody earned. The reachable, checkable target is the one asserted here: EXIT 4, WITH EXACTLY
+# THESE STAND-DOWNS AND NO OTHERS. See tools/stand_downs.txt for the registry and each reason.
+#
+# SYMMETRIC, and the second direction is the one that matters: an unregistered stand-down is a red because
+# nobody may quietly stop asserting something, AND a registered layer standing down fewer is ALSO a red,
+# because a list that is not tightened when the debt is paid stops being a bound and becomes a licence.
+#
+# SUBSET RUNS ARE EXEMPT, and this is a real exemption rather than a convenience: SF_ONLY selects a handful
+# of layers, so the set legitimately will not match and firing here would train people to ignore it.
+SD_REG="$(dirname "$0")/stand_downs.txt"
+if grep -q 'SUBSET RUN' "$SUM" 2>/dev/null; then
+	note "stand-downs: not checked (SUBSET RUN -- the registry describes a full sweep)"
+elif [ ! -s "$SD_REG" ]; then
+	note "!! the stand-down registry at $SD_REG is missing or empty, so 'exactly these four' was not"
+	note "   checked. That is an unverified run, not a clean one."
+	bad=1
+else
+	sd_seen=""; sd_total=0
+	for lg in "$LOGDIR"/*.log; do
+		[ -f "$lg" ] || continue
+		_n="$(grep -cE '^[[:space:]]*SKIP:' "$lg" 2>/dev/null)"
+		[ -n "$_n" ] && [ "$_n" -gt 0 ] 2>/dev/null || continue
+		_slug="$(basename "$lg" .log | sed 's/^[0-9]*-//')"
+		sd_seen="$sd_seen $_slug:$_n"
+		sd_total=$((sd_total + _n))
+	done
+	# THE REGISTRY MUST HAVE PARSED. Its rows are TAB-separated and a file whose tabs became spaces yields
+	# no rows, which agrees with a sweep that stood nothing down -- the empty-set-agrees-with-empty-set
+	# failure this gate exists to refuse one level up.
+	sd_rows="$(awk -F'\t' '!/^#/ && NF > 2 { print $1 ":" $2 }' "$SD_REG" | sort | tr '\n' ' ')"
+	sd_nrows="$(printf '%s' "$sd_rows" | wc -w | tr -d ' ')"
+	sd_have="$(printf '%s' "$sd_seen" | tr ' ' '\n' | grep -v '^$' | sort | tr '\n' ' ')"
+	if [ "$sd_nrows" -lt 1 ]; then
+		note "!! the stand-down registry parsed to 0 rows -- its rows are TAB-separated and something has"
+		note "   flattened them. Nothing was compared."
+		bad=1
+	elif [ "$sd_have" = "$sd_rows" ]; then
+		note "stand-downs: exactly the $sd_nrows registered, $sd_total assertion group(s) in total"
+	else
+		note "!! THE STAND-DOWNS ARE NOT THE REGISTERED ONES. Both directions are a red: an unlisted layer"
+		note "   stopped asserting something, or a listed one now asserts more and the registry is stale."
+		note "     registered: $sd_rows"
+		note "     this run  : $sd_have"
+		note "   tools/stand_downs.txt is the list, with the reason each one carries no bound."
+		bad=1
+	fi
+fi
+
 # ONE GREPPABLE LINE BESIDE THE SENTENCES. `HARNESS_EXIT=` says what the SWEEP concluded; `HARNESS_RESULT=`
 # says whether that conclusion may be quoted at all, and those are different questions that were previously
 # answered by the same integer. Retained log directories are this repository's regression history -- the

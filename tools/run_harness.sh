@@ -663,6 +663,17 @@ pass=0
 fail=0
 skip=0
 partial=0
+# LAYERS AND GROUPS ARE DIFFERENT POPULATIONS, and the summary line called one by the other's name for as
+# long as it has existed. `partial` counts LAYERS that left at least one assertion unmade; the strict
+# branch printed it as "$partial assertion group(s) skipped". On the 105-layer sweep at 0729de4 that read
+# "4 assertion group(s)" over SIX stand-downs in four layers -- check_frametime 1, check_grapple_reads 1,
+# check_ceremony_reads 2, check_text_contrast 2.
+#
+# The per-layer count was already computed and already printed ("2 skipped: ..."), so nothing was hidden
+# from a reader going log by log; it simply never reached the one sentence anybody quotes. A number that is
+# accurate about a population its own label names wrongly is this repository's house defect, and this is it
+# in the runner's own verdict.
+partial_groups=0
 voided=0
 failed_names=()
 skipped_names=()
@@ -1082,6 +1093,7 @@ while [ "$done_count" -lt "$total" ]; do
 					say "$(printf '  [%2d/%2d] %-36s PASS* %3ds  %d skipped: %s' \
 						"$done_count" "$total" "${NAMES[$i]}" "$el" "$nskip" "$part")"
 					partial=$((partial + 1))
+					partial_groups=$((partial_groups + nskip))
 					partial_names+=("${NAMES[$i]}")
 				else
 					say "$(printf '  [%2d/%2d] %-36s PASS  %3ds' "$done_count" "$total" "${NAMES[$i]}" "$el")"
@@ -1162,7 +1174,8 @@ SENTINEL_ARMED=0
 # is named, and the word ALL is reserved for a full list that skipped nothing at any level.
 tally="$pass PASS / $fail FAIL / $skip SKIP of $total"
 [ "$voided" -gt 0 ] && tally="$pass PASS / $fail FAIL / $skip SKIP / $voided VOID of $total"
-[ "$partial" -gt 0 ] && tally="$tally ($partial of those passes stood assertions down)"
+[ "$partial" -gt 0 ] \
+	&& tally="$tally ($partial of those passes stood down $partial_groups assertion group(s))"
 [ "$total" -ne "$DECLARED" ] && tally="$tally selected (of $DECLARED declared — SUBSET RUN)"
 
 if [ "$skip" -gt 0 ]; then
@@ -1192,12 +1205,12 @@ if [ "$((skip + partial))" -gt 0 ] && [ "$STRICT" = "1" ]; then
 	# Fail closed, at BOTH levels. A whole layer that opted out on a machine that could have run it is not a
 	# full sweep; neither is a layer that ran, passed, and quietly left one of its assertions unmade. The
 	# point of strict mode is that neither run is quotable as green.
-	say "$tally — FAIL: $skip layer(s) and $partial assertion group(s) skipped while SF_STRICT is on; this run does not count as a full sweep  (${wall}s)"
+	say "$tally — FAIL: $skip layer(s) did not run and $partial_groups assertion group(s) across $partial layer(s) were stood down while SF_STRICT is on; this run does not count as a full sweep  (${wall}s)"
 	exit 4
 fi
 
 if [ "$((skip + partial))" -gt 0 ]; then
-	say "$tally — $skip layer(s) DID NOT RUN and $partial pass(es) left assertions unmade  (${wall}s wall-clock)"
+	say "$tally — $skip layer(s) DID NOT RUN and $partial pass(es) left $partial_groups assertion group(s) unmade  (${wall}s wall-clock)"
 	exit 0
 fi
 
