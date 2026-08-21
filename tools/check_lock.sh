@@ -131,6 +131,45 @@ check $? "a run that no longer owns the lock leaves it alone on the way out (own
 kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
 rm -rf "$LOCK"
 
+# --- A STALE LOCK IS NOT SWEPT BY A WAITER THAT DECIDED EARLIER ---
+# The seventh property, and the second one that needs two runs. STALE LOCKS CLEAR (above) proves a dead
+# holder does not wedge the box forever. This proves the cure is not worse than the disease.
+#
+# Sweeping is a removal of shared state, and the decision to sweep is not the removal. A waiter reads a
+# dead owner, and by the time it is scheduled again somebody else has cleared the same lock and taken the
+# machine. Its `rm` then lands on a LIVE holder's directory and it walks straight in beside them.
+#
+# In the wild the gap is microseconds, which is why a symmetric staging of this never reproduced: run two
+# waiters at once and they sweep together, harmlessly. It needs one waiter to act LATE. So one is made
+# late here, deliberately, by pausing it inside the sweep -- and then the fix has to be correct by
+# construction rather than by timing, which is the property worth having.
+DELAYED="$TMP/with_machine_delayed.sh"
+awk '{print} /clearing a stale lock: pid/ {print "\t\tsleep \"${SF_TEST_SWEEP_DELAY:-0}\""}' \
+	"$WITH" > "$DELAYED"
+# THE SETUP IS ASSERTED, because if the anchor ever drifts the copy is simply identical to the original,
+# both waiters sweep at once, and this case goes green while testing nothing at all.
+[ "$(grep -c 'SF_TEST_SWEEP_DELAY' "$DELAYED")" -eq 1 ]
+check $? "(setup) the delayed copy carries the sweep pause, so this case is not vacuous"
+
+rm -rf "$LOCK"; mkdir -p "$LOCK"
+# An owner that is certainly dead: start something and reap it.
+sh -c 'exit 0' & dead=$!; wait "$dead" 2>/dev/null
+printf '%s\n%s\n%s\n%s\n' "$dead" "/gone" "a killed run" "0" > "$LOCK/owner"
+log="$TMP/sweeporder"; : > "$log"
+# A sweeps at once and then holds the box for three seconds.
+run /bin/sh -c "echo inA >> '$log'; sleep 3; echo outA >> '$log'" >/dev/null 2>&1 &
+# B makes the same decision and acts on it a second later, by which time the lock is A's.
+SF_LOCK="$LOCK" SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" SF_TEST_SWEEP_DELAY=1 \
+	bash "$DELAYED" /bin/sh -c "echo inB >> '$log'; sleep 1; echo outB >> '$log'" >/dev/null 2>&1 &
+wait
+got="$(tr '\n' ' ' < "$log")"
+case "$got" in "inA outA inB outB "|"inB outB inA outA ") r=0 ;; *) r=1 ;; esac
+check $r "a late sweeper does not clear a lock somebody else now holds (saw: $got)"
+# NON-VACUITY: four stamps means both runs really happened. A waiter that died on startup, or one that
+# gave up at SF_LOCK_WAIT, would leave the ordering trivially intact and prove nothing.
+[ "$(grep -c . "$log")" -eq 4 ]; check $? "...and both runs actually ran (4 stamps)"
+rm -rf "$LOCK" "$LOCK.gc"
+
 # --- ONE AT A TIME ---
 # Two runs race; each stamps the log on the way in and on the way out. If the lock works the stamps are
 # strictly paired: in/out/in/out. An overlap shows up as two INs in a row, which is exactly the eight

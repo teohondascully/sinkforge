@@ -47,6 +47,54 @@ lock_release() {
 		rm -rf "$LOCK"
 	fi
 }
+
+# SWEEPING A STALE LOCK IS A MUTATION OF SHARED STATE, SO IT HAPPENS UNDER ITS OWN MUTEX.
+#
+# The release path above asks whether the directory is still ours. This asks the harder question from the
+# other side: whether it is still THEIRS. Removing a stale lock looks safe because the holder is provably
+# dead, but the proof and the removal are two steps and a waiter can be descheduled between them:
+#
+#   A and B are both waiting. Both read owner = a hard-killed pid. Both call kill -0. Both see it dead.
+#   A removes the directory, takes the lock, writes its own claim, and boots Godot.
+#   B -- which decided a moment earlier and has only now been scheduled -- removes the directory. It is A's.
+#   B takes the lock and boots Godot beside A's.
+#
+# AN ATOMIC RENAME DOES NOT FIX THIS, and it was the first thing tried. `mv` makes exactly one winner among
+# SIMULTANEOUS sweepers, but B here is not simultaneous, it is LATE: its rename succeeds against A's live
+# directory because rename cannot tell whose directory it is. Staged with one waiter delayed, the rename
+# version still put two engines on the box 5 times in 5.
+#
+# What actually closes it is re-deciding at the moment of removal, with nobody else able to remove
+# concurrently. Inside this mutex the reasoning is airtight: to ACQUIRE the lock a process must `mkdir` it,
+# which requires it not to exist; it does exist, right up until we remove it; and we are the only party
+# permitted to remove it. So an owner that reads as dead in here cannot have been replaced by a live one
+# between the read and the `rm`.
+#
+# RESIDUAL, stated rather than hidden. A sweeper killed inside this mutex -- a window of one `sed`, one
+# `kill -0` and one `rm` -- leaves the gc directory behind. The next waiter clears it by the same dead-pid
+# rule, and if THAT races, the worst case is two sweepers and the original window returns. It needs two
+# hard kills landing in two sub-millisecond windows. The old failure needed one kill and no timing at all.
+# Pid REUSE is also still unhandled: `kill -0` on a recycled pid says "alive" for an unrelated process, so
+# a genuinely stale lock can wedge until SF_LOCK_WAIT. That is a liveness fault and it fails loudly.
+lock_steal() {                                  # lock_steal dead|unowned
+	_gc="$LOCK.gc"
+	_gp="$(cat "$_gc/pid" 2>/dev/null)"
+	if [ -n "$_gp" ] && ! kill -0 "$_gp" 2>/dev/null; then
+		rm -rf "$_gc.dead.$$" 2>/dev/null
+		if mv "$_gc" "$_gc.dead.$$" 2>/dev/null; then rm -rf "$_gc.dead.$$"; fi
+	fi
+	if ! mkdir "$_gc" 2>/dev/null; then
+		return 0                                # somebody else is sweeping; loop and re-read
+	fi
+	echo "$$" > "$_gc/pid"
+	_h="$(sed -n 1p "$LOCK/owner" 2>/dev/null)"
+	if [ "${1:-dead}" = "unowned" ]; then
+		if [ -z "$_h" ]; then rm -rf "$LOCK"; fi
+	else
+		if [ -n "$_h" ] && ! kill -0 "$_h" 2>/dev/null; then rm -rf "$LOCK"; fi
+	fi
+	rm -rf "$_gc"
+}
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # How long to wait before giving up, overridable so the GIVE-UP PATH IS TESTABLE. It was not: proving that
 # a timeout exits 5 rather than 0 meant holding the lock for fifteen minutes, so nobody ever proved it, and
@@ -144,7 +192,7 @@ until mkdir "$LOCK" 2>/dev/null; do
 	# than being allowed to wedge every future run.
 	if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
 		echo "  (clearing a stale lock: pid $holder is gone)" >&2
-		rm -rf "$LOCK"
+		lock_steal
 		continue
 	fi
 	if [ "$waited" -ge "$WAIT" ]; then
