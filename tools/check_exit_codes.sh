@@ -111,12 +111,26 @@ fi
 
 # 4. THE GATE IS REACHABLE FROM BOTH CALLERS, because one implementation is the whole reason it moved out
 #    of `.github/`. If either caller stops running it, the rules diverge again the moment one is edited.
-if grep -q 'tools/harness_verdict\.sh' "$RUNNER"; then
+#    FULL-LINE COMMENTS ARE STRIPPED FIRST, and both of these were written without that and could not fail.
+#    Each file EXPLAINS the arrangement in prose above the call -- run_harness.sh:112 opens "BOTH CI AND A
+#    LOCAL RUN ARE NOW GATED AGAINST THAT, by the same file: `tools/harness_verdict.sh`" -- so deleting the
+#    actual invocation and leaving the paragraph left both properties green. Found in review by c1, who ran
+#    the mutant rather than reasoning about it, and checked the two neighbouring structural greps in the
+#    other direction to bound the claim to exactly these.
+#
+#    THE SENTENCE ASSERTING AN INVARIANT WAS KEEPING THE TEST OF THAT INVARIANT GREEN, which is the nastier
+#    of the two directions this repository has now found in one night. The cap library's case was a comment
+#    WARNING AGAINST a bad pattern and matching the search for it; this is a comment CLAIMING a good one,
+#    and that stays true-looking and keeps passing long after it stops being true.
+_calls_gate() {
+	grep -vE '^[[:space:]]*#' "$1" 2>/dev/null | grep -q 'tools/harness_verdict\.sh'
+}
+if _calls_gate "$RUNNER"; then
 	ok "the local runner calls the gate"
 else
 	no "$RUNNER does not call tools/harness_verdict.sh -- local sweeps are ungated again"
 fi
-if grep -q 'tools/harness_verdict\.sh' .github/actions/harness-verdict/action.yml 2>/dev/null; then
+if _calls_gate .github/actions/harness-verdict/action.yml; then
 	ok "the CI action calls the gate"
 else
 	no "the CI action does not call tools/harness_verdict.sh"

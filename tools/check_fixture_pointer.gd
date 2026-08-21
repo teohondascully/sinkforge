@@ -33,6 +33,33 @@ func _is_warp_line(line: String) -> bool:
 	return not t.begins_with("#") and t.contains("warp_mouse(")
 
 
+## And ONE definition of "this line reads the OS pointer", for the same reason. The seam is DESCRIBED in
+## prose in a dozen places across the tree and prose cannot read a cursor.
+func _is_cursor_line(line: String) -> bool:
+	var t: String = line.strip_edges()
+	if t.begins_with("#"):
+		return false
+	return t.contains("get_global_mouse_position(") or t.contains("get_mouse_position(")
+
+
+## Every `.gd` under a directory, recursively. `DirAccess.get_files()` does not descend, and the game side
+## of this scan has to reach `src/core`, `src/data` and `scenes/` alike -- a scanner that silently stops at
+## the top level would report a clean tree it had mostly not opened.
+func _gd_files(root: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(root)
+	if dir == null:
+		return
+	for f: String in dir.get_files():
+		if f.ends_with(".gd"):
+			out.append(root + "/" + f)
+	# `get_directories()`, and the first draft wrote `get_dirs()`, which does not exist. GDScript resolves
+	# that at RUNTIME, so the parse check was clean, the walker never descended, and the scan reported a
+	# clean tree over the 23 top-level scripts it managed to open before the error. The `scanned >= 40`
+	# floor below is the only reason that surfaced as a red instead of a pass.
+	for d: String in dir.get_directories():
+		_gd_files(root + "/" + d, out)
+
+
 func _initialize() -> void:
 	print("== a human at the keyboard is a contaminant, and this is how we notice ==")
 
@@ -144,6 +171,55 @@ func _initialize() -> void:
 	for f: String in found.keys():
 		total += int(found[f])
 	print("    warp_mouse debt: %d calls across %d file(s)" % [total, found.size()])
+
+	# --- AND THE GAME SIDE OF INP-01, OVER THE WHOLE TREE ---
+	# This assertion already existed, in `check_grapple_reads`, over a HARDCODED LIST OF THREE FILES --
+	# main.gd, hud.gd, world_renderer.gd -- and that layer says so in its own header, because a guard whose
+	# claim outruns its population is the failure this repository keeps rediscovering. It was honest about
+	# the limit and the limit was still a hole: a NEW file under `scenes/` or `src/` that read the OS
+	# cursor would be invisible to it, and the list is maintained by hand.
+	#
+	# It also lived in the wrong layer. `check_grapple_reads` is exclusive AND needs a surface, so it runs
+	# in the display job only; this is a text scan that needs neither, and here it runs in both jobs.
+	#
+	# THE MEASURED ANSWER TODAY IS TWO, BOTH INSIDE THE SEAM. `controls.gd` is the one file allowed to touch
+	# the OS pointer -- `pointer_world()` and the raw read beneath it are what everything else goes through,
+	# and `pose_pointer()` is what lets a fixture state a world point without a cursor existing at all.
+	# Named as an exclusion rather than pattern-dodged, on the same rule the warp scan uses above: the only
+	# safe exclusion is one a reader can see is the seam and not a subject.
+	var cursor_files: Array[String] = []
+	_gd_files("res://scenes", cursor_files)
+	_gd_files("res://src", cursor_files)
+	var raw: Array[String] = []
+	var scanned: int = 0
+	for path: String in cursor_files:
+		if path == "res://scenes/controls.gd":
+			continue
+		var cf: FileAccess = FileAccess.open(path, FileAccess.READ)
+		if cf == null:
+			raw.append("%s (unreadable)" % path)
+			continue
+		scanned += 1
+		var ln: int = 0
+		while not cf.eof_reached():
+			ln += 1
+			if _is_cursor_line(cf.get_line()):
+				raw.append("%s:%d" % [path, ln])
+	# A ZERO-RESULT SEARCH IS EVIDENCE ABOUT THE SEARCH until the search is shown to have happened. The
+	# floor is concrete rather than `> 0`: the tree has carried well over forty scripts under these two
+	# directories for a long time, and a collapse below that is a walker that stopped descending, not a
+	# repository that shrank.
+	_check(scanned >= 40,
+		"(setup) the game-side scan opened %d scripts under scenes/ and src/" % scanned)
+	_check(raw.is_empty(),
+		"no shipped script outside the controls.gd seam reads the OS cursor (%s)"
+			% ("clean" if raw.is_empty() else ", ".join(raw)))
+	# NON-VACUITY for the classifier, on synthetic lines, for the same reason the warp one is done this
+	# way: tying "the scanner works" to "the debt still exists" makes the guard go red the day it is fixed.
+	_check(_is_cursor_line("\tvar w := vp.get_mouse_position()"), "...and the scanner recognises a raw read")
+	_check(not _is_cursor_line("## `get_global_mouse_position()` is what this seam replaces"),
+		"...and does NOT count the prose describing the seam")
+	print("    OS-cursor reads outside the seam: %d, across %d scanned script(s)" % [raw.size(), scanned])
 
 	print()
 	if _fails == 0:

@@ -640,36 +640,27 @@ func _stand(col: int, row: int) -> void:
 ## the fixture is not holding the pointer at all. Both are checked here, and both can genuinely fail:
 ## put `get_global_mouse_position()` back into `_update_mining` and this goes red.
 ##
-## ITS POPULATION IS THREE FILES AND THE SENTENCE NOW SAYS SO. An earlier wording claimed "the aim path",
-## which is wider than what it can see: ten `warp_mouse` sites still live under `tools/`, and `controls.gd`
-## itself is excluded by design. A guard whose claim outruns its population is the failure this repository
-## keeps rediscovering, so the fixture-side counterpart (no FIXTURE calls `warp_mouse`) is owed and
-## tracked under INP-01 rather than implied by this one.
-const AIM_SOURCES: Array[String] = [
-	"res://scenes/main.gd",
-	"res://scenes/hud.gd",
-	"res://scenes/world_renderer.gd",
-]
+## THE TEXT SCAN THAT USED TO LIVE HERE HAS MOVED, AND WIDENED, AND THE PARAGRAPH IT REPLACES WAS STALE.
+## It read three hardcoded files -- main.gd, hud.gd, world_renderer.gd -- and said so honestly, on the rule
+## that a guard whose claim outruns its population is the failure this repository keeps rediscovering. The
+## honesty did not close the hole: the list was maintained by hand, so a NEW script under `scenes/` or
+## `src/` that read the OS cursor was invisible to it.
+##
+## It also sat in the wrong layer. This one is exclusive AND needs a surface, so it runs in the display job
+## only, while a text scan needs neither. `check_fixture_pointer` now walks all of `scenes/` and `src/`
+## recursively -- 41 scripts, `controls.gd` named as the seam -- and runs in both jobs.
+##
+## AND THE OTHER TWO CLAIMS IN THAT PARAGRAPH HAD SIMPLY GONE OUT OF DATE. "Ten `warp_mouse` sites still
+## live under `tools/`" is now zero, and "the fixture-side counterpart is owed" describes a ratchet that
+## exists, is tightened to an empty budget, and is therefore already the flat ban the sentence wanted.
+## Both were true when written. Neither was true when read, and nothing was going to notice: prose is the
+## one part of this suite with no assertion behind it.
+##
+## WHAT STAYS HERE IS THE RUNTIME HALF, which no text scan can answer: at this instant, in this running
+## game, is the fixture actually holding the pointer?
 
 
 func _check_pointer_seam() -> void:
-	var offenders: Array[String] = []
-	for path: String in AIM_SOURCES:
-		var f: FileAccess = FileAccess.open(path, FileAccess.READ)
-		if f == null:
-			offenders.append("%s (unreadable)" % path)
-			continue
-		var n: int = 0
-		while not f.eof_reached():
-			n += 1
-			var line: String = f.get_line()
-			if line.strip_edges().begins_with("#"):
-				continue          # the seam is DESCRIBED in prose in several places; prose cannot read a cursor
-			if line.contains("get_global_mouse_position(") or line.contains("get_mouse_position("):
-				offenders.append("%s:%d" % [path, n])
-	_check(offenders.is_empty(),
-		"CONTROL: no aim reader in main/hud/world_renderer goes behind the seam to the OS cursor (%s)"
-			% ("clean" if offenders.is_empty() else ", ".join(offenders)))
 	_check(Controls.pointer_posed(),
 		"CONTROL: the fixture still owns the pointer — a released seam would be measuring a human's hand")
 
