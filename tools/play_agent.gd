@@ -273,8 +273,16 @@ func walk_to_column(col: int, budget: int = 600) -> bool:
 		if here_cell.x == col and player.on_floor:
 			if await _settle(col):
 				return true
-			# Coasted a cell too far. That is a miss, not an arrival — fall back into the loop and walk
+			# Coasted a cell too far. That is a miss, not an arrival, so fall back into the loop and walk
 			# it off, exactly as a player who overshot a doorway would.
+			#
+			# THE INCREMENT IS HERE BECAUSE THE `continue` SKIPS THE ONE AT THE BOTTOM. Without it this
+			# branch spends no budget: a body standing on the target column, on the floor, whose `_settle`
+			# keeps returning false, loops forever without `t` ever moving. It has not hung in practice,
+			# because failing to settle usually means drifting off the column and the next pass takes the
+			# walking branch instead, but "usually leaves the state that traps it" is not a bound. A wait
+			# whose exit condition is computed from state the wait itself produces needs its own counter.
+			t += 1
 			last_x = player.position.x
 			continue
 		var dir: int = signi(int(col_x - player.position.x))
@@ -309,7 +317,16 @@ func walk_to_column(col: int, budget: int = 600) -> bool:
 		if still > 150:
 			break
 	player.input_dir = 0.0
-	return main._cell_at(player.position).x == col
+	# SAY WHY, WHEN IT IS A NO. Every other give-up in this file records a line; this one returned a bare
+	# comparison, so a step that failed only because the body could not walk somewhere produced a trace
+	# with nothing in it. Corpus seed 20260817 fails the opening at `smelt`, and the entire diagnostic
+	# record was "could not perform signposted step 'smelt'", which names the step and not the reason.
+	# Three of that step's four exits were already noted; this was the fourth, one function down.
+	var arrived: bool = main._cell_at(player.position).x == col
+	if not arrived:
+		_note("could not walk to column %d in %d frames (stopped at %s, %s)"
+			% [col, t, main._cell_at(player.position), "still" if still > 150 else "out of budget"])
+	return arrived
 
 
 ## How close to the target column the agent stops pushing, and how settled "arrived" means. A stride is
