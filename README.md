@@ -249,12 +249,22 @@ under xvfb with a software Vulkan driver. No single job runs every layer. `check
 deliberately excluded from CI, because a software rasterizer draws at 6 to 9 fps and its hitch ratios
 then describe the rasterizer.
 
-CI is currently red. The most recent completed run against `main`, on 2026-08-20, failed. The headless
-job came back 77 pass, 0 fail and 15 skipped of the 92 layers declared at that commit; the display job
-selected the 16 layers that need a surface and came back 13 pass, 3 fail, the three being
-`check_grapple_reads`, `check_hud_layout` and `check_snap_frame`. One pass in each job stood assertions
-down rather than making them, which the runner says out loud. This README carries no build badge while
-that is the case.
+CI is red on one layer. In the most recent run against `main`, on 2026-08-21, the authorship job and the
+headless job both passed — the headless job came back 92 pass, 0 fail and 15 skipped of 107, the 15 being
+the layers that need a surface and correctly detect they do not have one. The display job selected those
+16 and came back 15 pass, 1 fail.
+
+The one failure is `check_grapple_reads`, and it is the layer refusing to answer rather than answering
+wrongly. It measures how far a rope departs the straight line between its ends, and it throws away every
+pixel further from that line than the renderer can possibly draw. Under the software rasterizer CI uses,
+both the taut and the slack rope read at that cutoff — 0.4624 and 0.4634 against a rim of 0.4650 — which
+means the number came off the edge of the mask and not off the cord. The layer detects exactly that and
+fails, because a reading taken from the rim of its own mask would be a green assertion about a rope
+nobody measured. The same layer passes on hardware, where the same rope reads 0.053 taut and 0.237 slack.
+
+So this is a measurement that one rendering path cannot deliver, not a defect in the rope. Fixing it means
+making the mask reject non-cord pixels robustly enough for a software rasterizer, which is open work.
+This README carries no build badge while any job is red.
 
 ## Repository map
 
