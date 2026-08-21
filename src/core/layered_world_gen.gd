@@ -1,13 +1,13 @@
 class_name LayeredWorldGen
 extends HeightmapWorldGen
 
-## Adds CAVES (noise pockets, block erased and wall KEPT, only below CAVE_MIN_DEPTH) and DEPTH-BANDED
-## ORE (blob veins, denser and bigger with depth) to HeightmapWorldGen's fill. Emits only existing
-## material ids. Deterministic in (cols, rows, seed): one seeded RNG, one FastNoiseLite.
+## Adds caves (noise pockets: block erased, wall kept, only below CAVE_MIN_DEPTH) and depth-banded ore
+## (blob veins, denser and bigger with depth) to HeightmapWorldGen's fill. Emits only existing material
+## ids. Deterministic in (cols, rows, seed): one seeded RNG, one FastNoiseLite.
 
-## Counted features ("N per column") were tuned against an 80-row world and are scaled against
-## DENSITY_ROWS; per-CELL rolls (cave noise, spires, rubble) scale with area already.
-const DENSITY_ROWS: int = 80         ## the world height every *_PER_COL figure below was tuned against
+## Counted features ("N per column") are calibrated to an 80-row world, then scaled against DENSITY_ROWS.
+## Per-cell rolls (cave noise, spires, rubble) already scale with area.
+const DENSITY_ROWS: int = 80         ## world height the *_PER_COL figures below are calibrated to
 
 
 func _density_count(world: WorldData, per_col: float) -> int:
@@ -15,48 +15,48 @@ func _density_count(world: WorldData, per_col: float) -> int:
 
 
 # --- caves ---
-## Caves never breach this many tiles below a column's surface (keeps the spawn base safe/solid).
+## Caves never breach this many tiles below a column's surface, which keeps the spawn base solid.
 const CAVE_MIN_DEPTH: int = 6
 ## Noise scale: smaller means larger, smoother pockets. ~0.10 gives room-sized caverns.
 const CAVE_FREQ: float = 0.11
-## Carve where noise exceeds this, easing toward CAVE_THRESHOLD_DEEP with depth. RAISED (#107): the old
-## 0.40/0.12 opened ~31% of the underground into air; these keep it near 15%. PROGRESSION 10 /
-## DESIGN_REVIEW F2.
+## Carve where noise exceeds this, easing toward CAVE_THRESHOLD_DEEP with depth. These hold open space
+## near 15% of the underground. The earlier 0.40/0.12 pair opened about 31% of it into air, which is
+## most of the rock gone before a pick ever touches it.
 const CAVE_THRESHOLD_TOP: float = 0.47
 const CAVE_THRESHOLD_DEEP: float = 0.31
-## X is compressed by this factor before sampling, so caverns come out wide and flat (#93).
+## X is compressed by this factor before sampling, so caverns come out wide and flat.
 const CAVE_XSTRETCH: float = 2.1
 ## Carve threshold eased this much just under a strata shelf and hardened just above one, so roofs hang
 ## from the hard bands and floors rest on them.
 const CAVE_SHELF_BIAS: float = 0.10
 
-# --- strata (horizontal rock banding, #93) ---
-## Rows per band. Every few bands is a HARD SHELF (shale) that resists caving.
+# --- strata (horizontal rock banding) ---
+## Rows per band. Every few bands is a hard shelf of shale that resists caving.
 const STRATA_BAND_H: int = 4
-## 1-in-N bands is a hard shelf. Deterministic per band index (a seeded hash), so the layering is stable.
+## One band in every N is a hard shelf; a hash of the band-group index fixes which, so layering is stable.
 ##
-## TWO WAS TRIED AND MEASURED, AND IT IS NOT THE ANSWER. Scattering the shelves fixed a real defect — they
-## used to land in bands 0 to 7, a contiguous 32-row slab across the whole shallow world with nothing below
-## it — but it also took the shallow count from eight shelves to six, and the frontier richness margin fell
-## from 3.05x spawn to 1.13x, under the 1.15x floor that separates a margin from noise.
+## Do not lower this to 2. Scattering the shelves fixed a real defect: they used to land in bands 0 to 7,
+## a contiguous 32-row slab across the whole shallow world with nothing below it. But scattering also took
+## the shallow count from eight shelves to six, and the frontier richness margin fell from 3.05x spawn to
+## 1.13x, under the 1.15x floor that separates a margin from noise.
 ##
-## Density looked like the obvious lever and is not. At 2 the arithmetic gives nine shelves spread from row
-## 4 to row 71, more than the old eight and reaching full depth, and richness recovers to 1.51x — but three
-## `surface_row` assertions about a shaft floor staying inside the legal ground band go red, and they pass
-## at 3. Measured in both directions against the same fixture, so the attribution is a control rather than
-## a coincidence: one failure is traded for three.
+## Density looks like the obvious lever and is not. At 2 the arithmetic gives nine shelves spread from row
+## 4 to row 71, more than the old eight and reaching full depth, and richness recovers to 1.51x. But three
+## `surface_row` assertions about a shaft floor staying inside the legal ground band fail there, and pass
+## at 3. Both directions were checked against the same fixture, so the attribution is controlled rather
+## than coincidental: at 2 the trade is one failure for three.
 ##
 ## The two legibility gauges barely move either way (rock-versus-air 72% to 73%, paint roughness 6.5% to
-## 6.6%), which is the other half of the result — they are a RENDERING property and not a density one, so
+## 6.6%), which is the other half of the result: they are a rendering property and not a density one, so
 ## no value of this constant was ever going to settle them.
 const STRATA_SHELF_EVERY: int = 3
 ## Added to the carve threshold inside a shelf band, so it survives as a continuous ledge.
 const STRATA_SHELF_RESIST: float = 0.34
-## Below this ABSOLUTE row the strata banding stops (deepslate/seal/Stonereach own the deep look already).
+## Absolute row below which strata banding stops. Deepslate, the seal and Stonereach own the deep look.
 const STRATA_MAX_ROW: int = DEEPSLATE_ROW
 
-# --- big caverns (a few large cohesive chambers, #93) ---
-## Chamber count is this x columns: wide flat-floored ellipses the tunnel worms thread. LOWERED (#107).
+# --- big caverns (a few large cohesive chambers) ---
+## Chamber count is this times columns: wide, flat-floored ellipses that the tunnel worms thread.
 const CAVERN_PER_COL: float = 0.035
 ## Chamber half-extents (cells). Wide and shallow gives a flat floor rather than a ball.
 const CAVERN_RX_MIN: int = 6
@@ -65,151 +65,151 @@ const CAVERN_RY_MIN: int = 3
 const CAVERN_RY_MAX: int = 5
 
 # --- tunnels (winding caverns that connect the noise pockets into an explorable system) ---
-## Worm count ≈ this × columns. Trimmed (#107) to connect the noise pockets without a tunnel maze.
+## Worm count is about this times columns: enough to link the noise pockets without a tunnel maze.
 const TUNNEL_PER_COL: float = 0.07
 const TUNNEL_MIN_LEN: int = 18
 const TUNNEL_MAX_LEN: int = 46
 ## Carve radius around the worm path (1 → ~3-wide walkable caverns).
 const TUNNEL_RADIUS: int = 1
 
-## --- VERTICAL STRUCTURE (#S5) -------------------------------------------------------------------------
-## A RIFT is a narrow chasm falling THROUGH the layer stack, wandering as it goes. Budgeted against the
-## dig-your-factory guard in tests/test_worldgen.gd, which caps open space at a quarter of everything
-## below the surface; the first cut of these numbers reached 26.5% and tripped it. Re-cut for the
-## 128-row world as rarer and longer at the same budget.
-const RIFT_PER_COL: float = 0.018        ## ~4 rifts on this world — landmarks, not a feature grid
-const RIFT_MIN_LEN: int = 34             ## rows; short of this it reads as a hole rather than a chasm
+## --- vertical structure -------------------------------------------------------------------------------
+## A rift is a narrow chasm falling through the layer stack, wandering as it goes. These numbers are
+## budgeted against the dig-your-factory guard in tests/test_worldgen.gd, which caps open space at a
+## quarter of everything below the surface. On the 128-row world that budget buys rifts that are rare
+## and long, rather than frequent and short.
+const RIFT_PER_COL: float = 0.018        ## about 4 rifts per world: landmarks rather than a feature grid
+const RIFT_MIN_LEN: int = 34             ## rows; below this it reads as a hole rather than a chasm
 const RIFT_MAX_LEN: int = 80
-const RIFT_HALF_W_MIN: float = 0.8       ## half-width in cells at the narrowest — a squeeze
-const RIFT_HALF_W_MAX: float = 2.1       ## ...and at the widest — a rift PINCHES and OPENS as it falls
-const RIFT_WANDER: float = 0.34          ## cells of horizontal drift per row (kept low: a rift is a fall line)
+const RIFT_HALF_W_MIN: float = 0.8       ## half-width in cells at its narrowest (a squeeze)
+const RIFT_HALF_W_MAX: float = 2.1       ## and at its widest; a rift pinches and opens as it falls
+const RIFT_WANDER: float = 0.34          ## cells of horizontal drift per row (low because a rift is a fall line)
 ## A rift pays: ore in its wall upgrades to rich ore, plain rock sometimes becomes ore.
 const RIFT_SPAWN_KEEPOUT: int = 10       ## columns either side of spawn no rift may start in
 const RIFT_WALL_ORE_CHANCE: float = 0.11 ## plain rock in a rift wall that becomes ore
 const RIFT_WALL_RICH_CHANCE: float = 0.55## ore already in a rift wall that upgrades to rich ore
 
-## Shelves jutting into open space from a cavern's sides. Placed on the OPEN side of a solid wall.
+## Shelves jutting into open space from a cavern's sides, placed on the open side of a solid wall.
 const LEDGE_PER_COL: float = 0.22
 const LEDGE_LEN_MIN: int = 2
 const LEDGE_LEN_MAX: int = 4
-const LEDGE_HEADROOM: int = 2            ## cells of clear air a shelf needs above it, or it is just fill
+const LEDGE_HEADROOM: int = 2            ## cells of clear air a shelf needs above it or it is just fill
 
-## Stalactites down from ceilings, stalagmites up from floors, one cell wide and tapering. Floor teeth
-## are shorter: taller ones blocked the route down in two scripted play-test rungs.
+## Stalactites hang from ceilings, stalagmites rise from floors, one cell wide and tapering. Floor
+## teeth stay short, because taller ones block the route down.
 const SPIRE_CHANCE: float = 0.075        ## per eligible ceiling cell
-const SPIRE_FLOOR_BIAS: float = 0.34     ## × that chance for a floor cell — teeth belong on the roof
-const SPIRE_HANG_MIN: int = 2            ## stalactite, growing DOWN from a ceiling
+const SPIRE_FLOOR_BIAS: float = 0.34     ## multiplies that chance for a floor cell; teeth belong on the roof
+const SPIRE_HANG_MIN: int = 2            ## stalactite growing down from a ceiling
 const SPIRE_HANG_MAX: int = 5
-const SPIRE_RISE_MIN: int = 1            ## stalagmite, growing UP from a floor — steppable by construction
+const SPIRE_RISE_MIN: int = 1            ## stalagmite growing up from a floor; steppable by construction
 const SPIRE_RISE_MAX: int = 2
 
-## RUBBLE: single loose blocks resting on cave floors.
+## Single loose blocks resting on cave floors.
 const RUBBLE_CHANCE: float = 0.060
 
 # --- ore ---
-## Vein-seed attempts are this x columns, each kept by a depth-weighted roll. Nudged up (#107), but
-## kept near 20% of solid rock.
+## Vein-seed attempts are this times columns, each kept by a depth-weighted roll. Sized to hold ore
+## near 20% of solid rock.
 const ORE_ATTEMPTS_PER_COL: float = 1.0
-## A vein seed at the very bottom is accepted this often; at the surface, ~0. Linear in depth.
+## Acceptance for a vein seed at the very bottom. Linear in depth, and near zero at the surface.
 const ORE_CHANCE_DEEP: float = 0.85
 
-## Acceptance floor. Without it tools/check_richness measured TOPSOIL at 1.2 encounters per hundred
-## rows. At depth_frac 1 the floor drops out of the expression, so deep acceptance is unchanged.
+## Acceptance floor for the shallow band, without which topsoil runs almost dry. At depth_frac 1 the
+## floor drops out of the expression, and deep acceptance is unchanged.
 const ORE_SHALLOW_FLOOR: float = 0.34
 const COAL_SHALLOW_FLOOR: float = 0.42
-## Vein BODY size (cells in the accretion blob), from this at the surface toward +BONUS at depth.
+## Vein body size in cells of the accretion blob, from this at the surface toward +BONUS at depth.
 const ORE_SIZE_MIN: int = 8
 const ORE_SIZE_DEPTH_BONUS: int = 44
-## COAL veins, the drill's FUEL. Same cavity model as ore, slightly more common and shallower-reaching.
+## Coal veins are the drill's fuel. Same cavity model as ore, but commoner and shallower-reaching.
 const COAL_ATTEMPTS_PER_COL: float = 0.8
 const COAL_CHANCE_DEEP: float = 0.95
 const COAL_SIZE_MIN: int = 6
 const COAL_SIZE_DEPTH_BONUS: int = 30
-const COAL_AMOUNT_BASE: int = 30         # modest PER-CELL (the drill bores cell by cell); big BODIES give the
-const COAL_AMOUNT_DEPTH_BONUS: int = 170 # long-lasting TOTAL (hundreds shallow → thousands deep per body)
-## Per-CELL ore deposit, kept MODEST: the Drill drains a cell then sinks to the next. Lasting supply
-## is the multi-cell BODY (ORE_SIZE_*): cells x per-cell, hundreds shallow and thousands deep.
+const COAL_AMOUNT_BASE: int = 30         # modest per cell because the drill bores cell by cell; the large
+const COAL_AMOUNT_DEPTH_BONUS: int = 170 # bodies carry the total: hundreds shallow and thousands deep
+## Per-cell ore deposit, kept modest: the Drill drains a cell, then sinks to the next. Lasting supply
+## comes from the multi-cell body (ORE_SIZE_*), cells times per-cell deposit.
 const ORE_AMOUNT_BASE: int = 30
 const ORE_AMOUNT_DEPTH_BONUS: int = 170
-## Vein seeds in or below the deepslate band roll this often into RICH ORE (#48), which the Blast
-## Furnace smelts 1 -> 2 ingots and which carries more per-cell deposit.
+## Vein seeds in or below the deepslate band roll this often into rich ore. The Blast Furnace smelts
+## one rich ore into two ingots, and the cell carries a larger deposit.
 const RICH_CHANCE: float = 0.45
 const RICH_AMOUNT_MULT: float = 1.5
 
-# --- HORIZONTAL richness (the FRONTIER pull) ---
-## A deterministic per-column multiplier centred on 1.0 that varies ore across X at a fixed depth, so
-## richer zones fan out AWAY from spawn: a low-frequency FastNoiseLite band mixed with a
-## distance-from-spawn ramp. Multiplies into vein ACCEPTANCE, blob SIZE and per-cell RICHNESS, clamped
-## to [1 - HORIZONTAL_STRENGTH, 1 + HORIZONTAL_STRENGTH] and stacked on the depth term. STRENGTH 0.0
-## restores the depth-only world, FREQ sets band width, FRONTIER_BIAS tilts between distance and pure
-## noise (1.0 = all distance). Seeded off the world seed plus an offset, uncorrelated with the caves.
+# --- horizontal richness (the frontier pull) ---
+## A deterministic per-column multiplier, centred on 1.0, that varies ore across X at a fixed depth so
+## richer zones fan out away from spawn: a low-frequency FastNoiseLite band mixed with a
+## distance-from-spawn ramp. It multiplies into vein acceptance, blob size and per-cell richness and
+## stacks on the depth term; construction bounds it to [1 - HORIZONTAL_STRENGTH, 1 + HORIZONTAL_STRENGTH].
+## STRENGTH 0.0 restores the depth-only world, FREQ sets band width, FRONTIER_BIAS tilts between distance
+## and pure noise (1.0 is all distance). Seeded off the world seed plus an offset, uncorrelated with the caves.
 const HORIZONTAL_STRENGTH: float = 0.55
 const HORIZONTAL_FREQ: float = 0.045
 const FRONTIER_BIAS: float = 0.5
-## Column the distance ramp measures from. Near it the ramp contributes ~0, the map edges ~+1.
+## Column the distance ramp measures from. It contributes about 0 nearby, about +1 at the map edges.
 const SPAWN_COL: int = (FLAT_START + FLAT_END) / 2
 
 
-## Below this ABSOLUTE row a third band turns to deepslate. Earth to stone happens in the base.
+## Absolute row below which a third band turns to deepslate. Earth to stone happens in the base.
 const DEEPSLATE_ROW: int = 76
 
-## THE SEAL, the L1->L2 gate (docs/PROGRESSION.md 2/9): an UNBROKEN full-width band of unmineable
-## sealrock, stamped LAST so no cave, tunnel or vein can hole it. Rows DEEPSLATE_ROW..SEAL_TOP-1 stay
-## a mineable deepslate SHELF where deepslate is sampled for Descent research. Below is STONEREACH
-## (L2), reachable only by feeding a Descent Engine its throughput quota.
+## The seal is the L1 to L2 gate (docs/PROGRESSION.md 2/9): an unbroken, full-width band of unmineable
+## sealrock, stamped after every carving pass, so that no cave, tunnel or vein can hole it. Rows
+## DEEPSLATE_ROW..SEAL_TOP-1 stay a mineable deepslate shelf, where deepslate is sampled for Descent
+## research. Below it lies Stonereach (L2), reachable only by feeding a Descent Engine its quota.
 const SEAL_TOP: int = 84
 const SEAL_ROWS: int = 2
 
-## IRON, L2's signature material and the analyze-sample for the next tier, seeded ONLY below the seal.
+## Iron, L2's signature material and the analyze-sample for the next tier, is seeded below the seal.
 const IRON_ATTEMPTS_PER_COL: float = 0.5
 const IRON_SIZE_MIN: int = 10
 const IRON_SIZE_DEPTH_BONUS: int = 30
 const IRON_AMOUNT: int = 220
 
-# --- LODES: ore in the WALL plane rather than the terrain ---
+# --- lodes: ore in the wall plane rather than the terrain ---
 ## Terrain is the carved plane, the lode the extracted one (`docs/LODE.md`). Every pass above stamps ore
-## as a SOLID BLOCK; these bodies go into the background plane behind rock that stays solid, for the Head,
-## the Spur, the Borer and the Drift Rig to draw from. ADDITIVE: the cutover that converts the ore blocks
-## and deletes the solid-ore path is `docs/LODE_PLAN.md` phase 3, so every richness assertion above keeps
-## its meaning. `WorldRenderer` already stains a buried lode through rock and draws an exposed one off
-## `sim.lode`; that the stain code RUNS here holds, whether it is VISIBLE in play is unverified
-## (`LODE_PLAN.md` 5).
+## as a solid block. These bodies instead go into the background plane, behind rock that stays solid, for
+## the Head, the Spur, the Borer and the Drift Rig to draw from. The pass is additive, so every richness
+## assertion above keeps its meaning; the cutover that converts the ore blocks, and deletes the solid-ore
+## path, is `docs/LODE_PLAN.md` phase 3. `WorldRenderer` stains a buried lode through rock and draws an
+## exposed one off `sim.lode`. That the stain code runs here holds; whether it is legible in play is
+## untested (`LODE_PLAN.md` 5).
 const LODE_ATTEMPTS_PER_COL: float = 0.35
 const LODE_SIZE_MIN: int = 6
 const LODE_SIZE_DEPTH_BONUS: int = 12
 const LODE_AMOUNT_BASE: int = 40
 const LODE_AMOUNT_DEPTH_BONUS: int = 170
-## Lode keepout below a column's generated ground, so it follows the relief rather than cutting flat.
+## Lode keepout below a column's generated ground, so bodies follow the relief, not a flat cut.
 const LODE_MIN_DEPTH: int = 14
 
 # --- aquifers (the L3 water pockets a dig breaks into) ---
-## Sealed pressurised water pockets carved into SOLID rock (block erased, wall KEPT) and filled to
-## WATER_MAX, so digging in releases them. Never within CAVE_MIN_DEPTH of a column's surface, centre
-## at or below AQUIFER_MIN_ROW, never spliced into the cave/tunnel system. Stamped LAST, after the
-## seal; a blob cell landing in the seal band or any non-solid cell is skipped.
-const AQUIFER_PER_COL: float = 0.045       # pocket count ≈ this × cols (a handful, like the big caverns)
-const AQUIFER_MIN_ROW: int = DEEPSLATE_ROW + 2   # centres live in/below the deep deepslate + Stonereach band
+## Sealed, pressurised water pockets carved into solid rock (block erased, wall kept) and filled to
+## WATER_MAX, so that digging in releases them. A pocket never comes within CAVE_MIN_DEPTH of a column's
+## surface, always centres at or below AQUIFER_MIN_ROW, and is never spliced into the cave or tunnel
+## system. Stamped after the seal; a blob cell in the seal band, or in any non-solid cell, is skipped.
+const AQUIFER_PER_COL: float = 0.045       # pocket count is about this times cols (a handful of them)
+const AQUIFER_MIN_ROW: int = DEEPSLATE_ROW + 2   # centres live in or below the deepslate and Stonereach band
 const AQUIFER_RX_MIN: int = 2
 const AQUIFER_RX_MAX: int = 4
 const AQUIFER_RY_MIN: int = 2
 const AQUIFER_RY_MAX: int = 3
 
-# --- aquifer TREASURE (L3 risk/REWARD): the flood GUARDS a rich vein ---
-## A modest &"rich_ore" vein in the SOLID rock lining each pocket, so draining and mining the walls
-## pays out. Seeded from a solid RIM cell, so _grow_vein bores INTO the surrounding rock.
+# --- aquifer treasure (the L3 risk and reward): the flood guards a rich vein ---
+## A modest &"rich_ore" vein in the solid rock lining each pocket, so that draining and mining the walls
+## pays out. Seeded from a solid rim cell, so that _grow_vein bores into the surrounding rock.
 const AQUIFER_ORE_SIZE_MIN: int = 5
 const AQUIFER_ORE_SIZE_MAX: int = 9
-## Per-cell deposit: the deep-band ore baseline (ORE_AMOUNT_BASE + full-depth bonus) x the rich multiplier.
+## Per-cell deposit: the deep-band ore baseline (ORE_AMOUNT_BASE plus full-depth bonus) times the multiplier.
 const AQUIFER_ORE_RICHNESS: int = int((ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS) * RICH_AMOUNT_MULT)
 
 # --- surface trees (the wood source the bazaar is gathered for) ---
-## Plant chance per eligible column, and minimum columns between trunks so canopies read as separate trees.
+## Plant chance per eligible column, and minimum columns between trunks, so canopies read as separate.
 const TREE_CHANCE: float = 0.20
 const TREE_GAP: int = 3
 
-## The abandoned Bazaar RUIN: a wood frame that activates when its one missing block is placed. Sits at
-## the LEFT endpoint of the centred plateau (cols 40-43) with the missing post bottom-RIGHT, so it is
-## claimed from the SPAWN side (col 44) and completing it never walls the body off from the shaft.
+## The abandoned Bazaar ruin: a wood frame that activates when its one missing block is placed. It sits
+## at the left endpoint of the centred plateau (cols 40-43), with the missing post at bottom right, so it
+## is claimed from the spawn side (col 44), and completing it never walls the body off from the shaft.
 const RUIN_X: int = 40
 
 
@@ -220,51 +220,51 @@ func generate(cols: int, rows: int, seed: int) -> WorldData:
 	rng.seed = seed
 	# Per-column horizontal richness multiplier, built once and reused by ore and coal.
 	var hfield: PackedFloat32Array = _horizontal_field(cols, seed)
-	_band_strata(world)          # STRATA: stack hard shelf bands (shale) through the mid rock (#93)
+	_band_strata(world)          # stack hard shelf bands of shale through the mid rock
 	_band_deepslate(world)
-	_carve_caves(world, seed)    # anisotropic + shelf-aware → wide flat caverns, overhangs, ledges (#93)
-	_carve_big_caverns(world, rng)   # a few large cohesive chambers the tunnels thread together (#93)
+	_carve_caves(world, seed)    # anisotropic and shelf-aware: wide flat caverns with overhangs
+	_carve_big_caverns(world, rng)   # a few large cohesive chambers that the tunnels thread together
 	_carve_tunnels(world, rng)
 	_scatter_veins(world, rng, hfield)
 	_scatter_coal(world, rng, hfield)
 	_scatter_iron(world, rng)
-	# THE VERTICAL PASSES (#S5) run AFTER the ore, load-bearing both ways: a rift cut through finished rock
-	# slices veins so its walls show ore, and the horizontal richness field is computed on unperturbed rock.
+	# The vertical passes run after the ore, and the order is load-bearing both ways: a rift cut through
+	# finished rock slices veins, so its walls show ore, and the richness field sees unperturbed rock.
 	var rift_cells: Array[Vector2i] = _carve_rifts(world, rng)
-	_mineralize(world, rng, rift_cells)                # RIFTS: vertical space — and the reason to go to one
-	_open_sinkholes(world, rng, rift_cells)            # ...and the reason it is not sealed under a lid
-	_stud_ledges(world, rng)     # then put rock BACK: shelves, spires and rubble, so open space has form
+	_mineralize(world, rng, rift_cells)                # vertical space and the reason to visit it
+	_open_sinkholes(world, rng, rift_cells)            # and the reason it is not sealed under a lid
+	_stud_ledges(world, rng)     # then put rock back so that open space has form
 	_stud_spires(world, rng)
 	_scatter_rubble(world, rng)
-	# LAST pass over the rock, judging what every earlier pass left behind: no column may run dry.
+	# Last pass over the rock, judging what the earlier ones left behind: no column may run dry.
 	_seed_droughts(world, rng)
 	_plant_trees(world, rng)
 	_stamp_bazaar_ruin(world)
-	_stamp_seal(world)          # LAST solid pass: the gate band overwrites everything, so nothing can hole it
-	_seed_aquifers(world, rng)  # AFTER the seal — carves + fills water into solid rock; no later pass touches it
-	# DEAD LAST: every lode guard tests the FINAL world, and the seal overwrites blocks wholesale while the
-	# aquifers carve rock away and flood it.
+	_stamp_seal(world)          # last solid pass: the gate band overwrites everything so nothing can hole it
+	_seed_aquifers(world, rng)  # after the seal; carves and floods solid rock and no later pass touches it
+	# Dead last, because every lode guard tests the final world, while the seal overwrites blocks wholesale
+	# and the aquifers carve rock away and flood it.
 	_seed_lodes(world, rng, hfield)
 	return world
 
 
 ## Per-column richness multiplier (see HORIZONTAL_STRENGTH). Deterministic in (cols, seed): a seeded
-## low-frequency noise band mixed with a distance ramp, normalised to [0,1], mapped into [1-S, 1+S].
+## low-frequency noise band mixed with a distance ramp, then mapped from [0,1] into [1-S, 1+S].
 func _horizontal_field(cols: int, seed: int) -> PackedFloat32Array:
 	var noise := FastNoiseLite.new()
-	noise.seed = seed + 91_331               # offset so the richness band doesn't correlate with the caves
+	noise.seed = seed + 91_331               # offset so the richness band does not track the caves
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.frequency = HORIZONTAL_FREQ
-	# Farthest any column sits from spawn, normalising the distance ramp so an edge column reaches ~1.
+	# Farthest any column sits from spawn, normalising the ramp so an edge column reaches about 1.
 	var max_dist: float = float(maxi(1, maxi(SPAWN_COL, cols - 1 - SPAWN_COL)))
 	var field := PackedFloat32Array()
 	field.resize(cols)
 	for col: int in cols:
-		# (a) organic noise band in [0,1]; (b) distance-from-spawn ramp in [0,1] (0 at spawn, 1 at the edge).
+		# An organic noise band in [0,1] and a distance-from-spawn ramp in [0,1] (0 at spawn, 1 at the edge).
 		var band: float = (noise.get_noise_2d(float(col), 0.0) + 1.0) * 0.5
 		var ramp: float = float(abs(col - SPAWN_COL)) / max_dist
 		var mix: float = lerpf(band, ramp, FRONTIER_BIAS)   # tilt toward the frontier ramp per FRONTIER_BIAS
-		# Map the [0,1] mix onto a symmetric multiplier around 1.0, bounded by STRENGTH (keeps it subtle).
+		# Map the [0,1] mix onto a multiplier symmetric about 1.0, bounded by STRENGTH.
 		field[col] = 1.0 + (mix * 2.0 - 1.0) * HORIZONTAL_STRENGTH
 	return field
 
@@ -282,10 +282,10 @@ func _band_deepslate(world: WorldData) -> void:
 ## Is the band containing `row` a hard shelf band? Deterministic and seed-independent, so shelves stack
 ## at the same depths in every world. False outside the strata zone (surface fill to STRATA_MAX_ROW).
 ##
-## Exactly one band in every STRATA_SHELF_EVERY is a shelf by arithmetic, and the hash chooses WHICH one
-## inside each group rather than whether a shelf happens at all. Both bounds are tight and attained: at
-## most 2 shelf bands touch, and at most 2 * (STRATA_SHELF_EVERY - 1) bands separate two of them. On the
-## shipping constants that is 6 shelf bands of 19, at rows 0-3, 16-19, 28-31, 36-39, 52-55 and 64-67.
+## Arithmetic makes exactly one band in every STRATA_SHELF_EVERY a shelf; the hash chooses which one
+## inside each group, never whether a shelf happens at all. Both bounds are tight and attained: at most
+## 2 shelf bands touch, and at most 2 * (STRATA_SHELF_EVERY - 1) bands separate two of them. On the
+## shipping constants that gives 6 of 19, at rows 0-3, 16-19, 28-31, 36-39, 52-55 and 64-67.
 func _is_shelf_band(row: int) -> bool:
 	if row >= STRATA_MAX_ROW:
 		return false
@@ -293,14 +293,14 @@ func _is_shelf_band(row: int) -> bool:
 	return band % STRATA_SHELF_EVERY == _band_hash(band / STRATA_SHELF_EVERY) % STRATA_SHELF_EVERY
 
 
-## Scatter a band-group index. The fold-back is the whole function: multiply, xor down, multiply, xor
-## down. A bare `(i * K) >> s` reads a multiplicative step off bits the index still occupies, which
+## Scatter a band-group index: multiply, xor down, multiply, xor down. The fold-back is the whole
+## function. A bare `(i * K) >> s` reads a multiplicative step off bits the index still occupies, so it
 ## yields an arithmetic progression rather than a scatter, and every modulus taken off it is another view
-## of that one progression. The previous form here reduced exactly to `(band / 8) % 3`, which put every
-## shelf in rows 0..31 and left rows 32..75 with no strata at all.
+## of that one progression. Without the folds this reduces exactly to `(band / 8) % 3`, which puts every
+## shelf in rows 0..31, and leaves rows 32..75 with no strata at all.
 ##
-## Kept local rather than shared with the equivalent mixer in scenes/sky_painter.gd: that one is on the
-## representation side of the seam, and src/ does not depend on scenes/.
+## Kept local rather than shared with the equivalent mixer in scenes/sky_painter.gd, which sits on the
+## representation side of the seam; src/ does not depend on scenes/.
 static func _band_hash(group: int) -> int:
 	var h: int = (((group & 0xFFFF) + 1) * 2654435761) & 0xFFFFFFFF
 	h = (h ^ (h >> 15)) & 0xFFFFFFFF
@@ -308,25 +308,25 @@ static func _band_hash(group: int) -> int:
 	return h >> 16
 
 
-## Turn the HARD SHELF bands into &"shale", a cave-resistant rock, in BOTH grids. Runs BEFORE veins and
-## caves and only converts solid earth/stone, so it never fills a cave or overwrites ore.
+## Turn the hard shelf bands into cave-resistant &"shale" in both grids. Runs before veins and caves,
+## and converts only solid earth or stone, so it never fills a cave or overwrites ore.
 func _band_strata(world: WorldData) -> void:
 	for cell: Vector2i in world.blocks:
 		if cell.y >= STRATA_MAX_ROW:
 			continue
 		if not _is_shelf_band(cell.y):
 			continue
-		# Only band the STONE zone: the earth surface layer is left alone so strata start below ground.
+		# Only band the stone zone: the earth surface layer is left alone, so strata start below ground.
 		if world.blocks[cell] == &"stone":
 			world.blocks[cell] = &"shale"
 			if world.walls.get(cell, &"") == &"stone_wall":
 				world.walls[cell] = &"shale_wall"
 
 
-## Carve caves with seeded noise. A cell opens (block erased, WALL kept) when noise clears the
-## depth-eased, strata-adjusted threshold, and never inside the base-safe band. Anisotropic and
-## strata-aware (#93): X is compressed by CAVE_XSTRETCH; hard shelf bands add STRATA_SHELF_RESIST and
-## survive as ledges; an asymmetric shelf bias undercuts a band and pools cave below it.
+## Carve caves with seeded noise. A cell opens (block erased, wall kept) when noise clears the
+## depth-eased, strata-adjusted threshold, and never inside the base-safe band. X is compressed by
+## CAVE_XSTRETCH; hard shelf bands add STRATA_SHELF_RESIST and survive as ledges; an asymmetric shelf
+## bias undercuts a band, and pools cave below it.
 func _carve_caves(world: WorldData, seed: int) -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = seed
@@ -341,24 +341,24 @@ func _carve_caves(world: WorldData, seed: int) -> void:
 				continue
 			var depth_frac: float = float(row - cave_start) / float(maxi(1, world.rows - cave_start))
 			var threshold: float = lerpf(CAVE_THRESHOLD_TOP, CAVE_THRESHOLD_DEEP, depth_frac)
-			# STRATA resistance: a hard shelf band is much harder to open (survives as a ledge/bridge).
+			# Strata resistance: a hard shelf band is much harder to open, and survives as a ledge.
 			if _is_shelf_band(row):
 				threshold += STRATA_SHELF_RESIST
-			# OVERHANG bias: easier just under a shelf (undercut → overhang), harder just above one (roof pools).
+			# Overhang bias: easier just under a shelf (undercut), harder just above one (roof pools).
 			elif _is_shelf_band(row - 1):
 				threshold -= CAVE_SHELF_BIAS
 			elif _is_shelf_band(row + 1):
 				threshold += CAVE_SHELF_BIAS
-			# Anisotropy: compress X so features span more columns than rows → wide, flat caverns.
+			# Anisotropy: compress X so features span more columns than rows, giving wide flat caverns.
 			if noise.get_noise_2d(float(col) / CAVE_XSTRETCH, float(row)) > threshold:
 				world.blocks.erase(cell)        # open air; the wall behind it stays (carved room)
 
 
-## Large cohesive chambers deep in the rock (#93): wide ellipses vertically squashed, with a solid floor
-## shelf below the centre. Wall kept, never breaches the base-safe band, only opens solid rock.
+## Large cohesive chambers deep in the rock: wide ellipses, vertically squashed, with a solid floor
+## shelf below the centre. The wall is kept, only solid rock opens, the base-safe band never breached.
 func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var count: int = maxi(2, _density_count(world, CAVERN_PER_COL))
-	# Chambers live in the deep-but-above-seal band, so they read as halls on Stonereach's approach.
+	# Chambers live in the deep band above the seal, so they read as halls on Stonereach's approach.
 	var lo_row: int = DEEPSLATE_ROW - 18
 	var hi_row: int = SEAL_TOP - 3
 	if hi_row <= lo_row:
@@ -368,7 +368,7 @@ func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var cy: int = rng.randi_range(lo_row, hi_row)
 		var rx: int = rng.randi_range(CAVERN_RX_MIN, CAVERN_RX_MAX)
 		var ry: int = rng.randi_range(CAVERN_RY_MIN, CAVERN_RY_MAX)
-		# Keep the bottom ~third of the ellipse SOLID, giving a flat floor shelf to stand on.
+		# Keep the bottom third of the ellipse solid, giving a flat floor shelf to stand on.
 		var floor_cut: int = maxi(1, ry - 1)
 		for dy: int in range(-ry, ry + 1):
 			for dx: int in range(-rx, rx + 1):
@@ -387,8 +387,8 @@ func _carve_big_caverns(world: WorldData, rng: RandomNumberGenerator) -> void:
 					world.blocks.erase(cell)                  # open; wall kept (carved room)
 
 
-## Worms random-walk through the rock with a horizontal bias, threading the isolated noise pockets
-## into one connected system. Each keeps its wall and never rises into the base-safe band.
+## Worms random-walk through the rock with a horizontal bias, threading the isolated noise pockets into
+## one connected system. Each keeps its wall, and never rises into the base-safe band.
 func _carve_tunnels(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var worms: int = maxi(3, _density_count(world, TUNNEL_PER_COL))
 	for _w: int in worms:
@@ -408,7 +408,7 @@ func _carve_tunnels(world: WorldData, rng: RandomNumberGenerator) -> void:
 				break
 
 
-## Carve a disc of OPEN air (block erased, wall kept), refusing any cell in a column's base-safe band.
+## Carve a disc of open air (block erased, wall kept), refusing any cell in a base-safe band.
 func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 	for dy: int in range(-radius, radius + 1):
 		for dx: int in range(-radius, radius + 1):
@@ -423,14 +423,14 @@ func _carve_disc(world: WorldData, center: Vector2i, radius: int) -> void:
 				world.blocks.erase(cell)
 
 
-## A chasm walks DOWN from a start row, wandering slightly, its half-width breathing so it pinches and
-## opens. Wall kept; refuses the base-safe band, so a rift can never open a chimney into the tutorial.
+## A chasm walks down from a start row, wandering slightly, its half-width breathing so that it pinches
+## and opens. The wall is kept and the base-safe band refused, so no rift opens a chimney into spawn.
 func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2i]:
 	var carved: Array[Vector2i] = []
 	var count: int = maxi(2, _density_count(world, RIFT_PER_COL))
 	for _r: int in count:
 		var x: float = float(rng.randi_range(5, world.cols - 6))
-		# Push a rift that rolled too near spawn out to whichever side it was already leaning toward.
+		# Push a rift that rolled too near spawn out to whichever side it already leans toward.
 		if absf(x - float(SPAWN_COL)) < float(RIFT_SPAWN_KEEPOUT):
 			var away: float = 1.0 if x >= float(SPAWN_COL) else -1.0
 			x = clampf(float(SPAWN_COL) + away * float(RIFT_SPAWN_KEEPOUT), 5.0, float(world.cols - 6))
@@ -443,7 +443,7 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 			var row: int = top + i
 			if row >= world.rows - 2:
 				break
-			# Width breathes on a sine so the chasm reads as carved by something that varied, not extruded.
+			# Width breathes on a sine, so the chasm reads as carved rather than extruded.
 			var t: float = 0.5 + 0.5 * sin(phase + float(i) * pinch)
 			var half: float = lerpf(RIFT_HALF_W_MIN, RIFT_HALF_W_MAX, t)
 			var lo: int = int(floor(x - half))
@@ -455,7 +455,7 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 				if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
 				world.blocks.erase(cell)
-				world.routes[cell] = true          # deliberate vertical structure, not undirected cave
+				world.routes[cell] = true          # deliberate vertical structure and not undirected cave
 				carved.append(cell)
 			x += drift
 			drift = clampf(drift + rng.randf_range(-0.10, 0.10), -RIFT_WANDER, RIFT_WANDER)
@@ -464,24 +464,24 @@ func _carve_rifts(world: WorldData, rng: RandomNumberGenerator) -> Array[Vector2
 	return carved
 
 
-## SINKHOLES: the mouths that make the vertical structure reachable. Every carve elsewhere refuses the
+## The mouths that make the vertical structure reachable. Every carve elsewhere refuses the
 ## CAVE_MIN_DEPTH rows under a column's surface, which also seals the underground under an unbroken lid:
-## tools/check_descent measured the whole connected open space reaching ONE row below the surface, with
-## forty rows of chasm at column 24 in a sealed bottle. Cut UP from the top of a rift, flared toward the
-## surface. Columns are ranked by the FALL underneath, the tallest unbroken open run below the rift
-## ceiling; taking the leftmost rift column past the keepout instead opened a mouth over the tapering END
-## of a chasm, and tools/check_plunge measured the body dropping twelve rows onto a shelf.
-const SINKHOLE_COUNT: int = 3            ## mouths in a world — landmarks, and rare enough to stay landmarks
-const SINKHOLE_MOUTH_HALF: float = 3.0   ## half-width where it meets the sky: wide enough to see from away
-const SINKHOLE_THROAT_HALF: float = 1.1  ## ...and where it joins the rift below
-const SINKHOLE_FLARE: float = 2.2        ## >1 keeps the throat narrow and opens the cone late (a collapse)
+## without this pass the connected open space reaches one row below the surface, and a forty-row chasm
+## can sit in a sealed bottle. Each mouth is cut up from the top of a rift, flared toward the surface.
+## Columns are ranked by the fall underneath, meaning the tallest unbroken open run below the rift
+## ceiling. Ranking by leftmost rift column instead opens a mouth over the tapering end of a chasm, and
+## drops the body about twelve rows onto a shelf.
+const SINKHOLE_COUNT: int = 3            ## mouths in a world: rare enough to stay landmarks
+const SINKHOLE_MOUTH_HALF: float = 3.0   ## half-width where it meets the sky, wide enough to see from afar
+const SINKHOLE_THROAT_HALF: float = 1.1  ## and where it joins the rift below
+const SINKHOLE_FLARE: float = 2.2        ## above 1 keeps the throat narrow and opens the cone late (a collapse)
 const SINKHOLE_KEEPOUT: int = 20         ## columns either side of spawn that stay sealed (the tutorial's ground)
-const SINKHOLE_SPACING: int = 15         ## columns between mouths, so no two read as one broken region
-const SINKHOLE_WANDER: float = 0.22      ## cells of drift per row — a throat, not a drainpipe
-const SINKHOLE_MIN_DROP: int = 14        ## rows of fall under a mouth, below which it is a pit not a route
+const SINKHOLE_SPACING: int = 15         ## columns between mouths so that no two read as one broken region
+const SINKHOLE_WANDER: float = 0.22      ## cells of drift per row: a throat rather than a drainpipe
+const SINKHOLE_MIN_DROP: int = 14        ## rows of fall under a mouth, below which it is a pit and not a route
 
 func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: Array[Vector2i]) -> void:
-	# The highest open cell in each column the rifts carved: the ceiling that must be broken through.
+	# The highest open cell in each column the rifts carved: the ceiling to break through.
 	var tops: Dictionary = {}
 	for c: Vector2i in rift_cells:
 		if not tops.has(c.x) or c.y < int(tops[c.x]):
@@ -489,7 +489,7 @@ func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: A
 	var cols: Array = tops.keys()
 	cols.sort()
 
-	# Rank by the fall underneath, deepest first, ties to the leftmost column so the pick stays deterministic.
+	# Rank by the fall underneath, deepest first. Ties go leftmost so the pick stays deterministic.
 	var ranked: Array[Vector2i] = []
 	for col: Variant in cols:
 		var cx: int = col
@@ -513,7 +513,7 @@ func _open_sinkholes(world: WorldData, rng: RandomNumberGenerator, rift_cells: A
 		_cut_throat(world, rng, cand.x, int(tops[cand.x]))
 
 
-## How far a body stepping in here would FALL: the unbroken open run below the rift's ceiling.
+## How far a body stepping in here would fall: the unbroken open run below the rift's ceiling.
 func _drop_below(world: WorldData, col: int, ceiling: int) -> int:
 	var run: int = 0
 	for row: int in range(ceiling, world.rows):
@@ -536,10 +536,10 @@ func _cut_throat(world: WorldData, rng: RandomNumberGenerator, col: int, rift_to
 		for c: int in range(int(floor(x - half)), int(ceil(x + half)) + 1):
 			var cell := Vector2i(c, row)
 			if world.in_bounds(cell):
-				world.blocks.erase(cell)                # deliberately past CAVE_MIN_DEPTH: this IS the mouth
+				world.blocks.erase(cell)                # deliberately past CAVE_MIN_DEPTH because this is the mouth
 				world.routes[cell] = true
-		# THE FALL LINE stays plumb: a cone drifting off the column the drop is under puts the mouth in one
-		# place and the fall in another. The source column is opened at every row regardless.
+		# The fall line stays plumb. A cone drifting off the column the drop is under would put the mouth
+		# in one place, and the fall in another, so the source column is opened at every row regardless.
 		var plumb := Vector2i(col, row)
 		if world.in_bounds(plumb):
 			world.blocks.erase(plumb)
@@ -548,8 +548,8 @@ func _cut_throat(world: WorldData, rng: RandomNumberGenerator, col: int, rift_to
 		drift = clampf(drift + rng.randf_range(-0.08, 0.08), -SINKHOLE_WANDER, SINKHOLE_WANDER)
 
 
-## Enrich the solid rock touching the rift's carved cells. Runs on the carve's own cell list rather than
-## rescanning, so it can only touch rift walls and never a cave that happens to sit beside one.
+## Enrich the solid rock touching the rift's carved cells. Runs on the carve's own cell list, instead of
+## rescanning, so it can only touch rift walls, never a cave that happens to sit beside one.
 func _mineralize(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vector2i]) -> void:
 	var rich: int = int(round(float(ORE_AMOUNT_BASE + ORE_AMOUNT_DEPTH_BONUS) * RICH_AMOUNT_MULT))
 	var touched: Dictionary = {}
@@ -561,7 +561,7 @@ func _mineralize(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vec
 			touched[cell] = true
 			var here: StringName = world.blocks.get(cell, &"")
 			if here == &"ore":
-				# RICH ore stays a DEEP find: at twenty rows it would let a player skip the tier gate sideways.
+				# Rich ore stays a deep find: at twenty rows, it would let a player skip the tier gate sideways.
 				if cell.y >= DEEPSLATE_ROW and rng.randf() < RIFT_WALL_RICH_CHANCE:
 					world.blocks[cell] = &"rich_ore"
 					world.amounts[cell] = rich
@@ -572,7 +572,7 @@ func _mineralize(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vec
 
 
 ## Where an open cell sits against a solid side wall with air above, grow a short tongue of rock into
-## the space. Sampled from a snapshot of the open set, so a ledge cannot seed another.
+## the space. Sampled from a snapshot of the open set so that a ledge cannot seed another.
 func _stud_ledges(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var sites: Array[Vector2i] = _open_cells(world)
 	var wanted: int = _density_count(world, LEDGE_PER_COL)
@@ -582,7 +582,7 @@ func _stud_ledges(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var c: Vector2i = sites[rng.randi_range(0, sites.size() - 1)]
 		var dir: int = 0
 		if world.blocks.has(c + Vector2i(-1, 0)):
-			dir = 1                                   # wall on the left → the shelf grows right
+			dir = 1                                   # wall on the left so the shelf grows right
 		elif world.blocks.has(c + Vector2i(1, 0)):
 			dir = -1
 		if dir == 0:
@@ -611,7 +611,7 @@ func _stud_spires(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var up: bool = world.blocks.has(c + Vector2i(0, 1))
 		if down == up:
 			continue                                  # a 1-cell gap between two solids grows nothing
-		var hang: bool = down                         # solid above → this tooth hangs from a ceiling
+		var hang: bool = down                         # solid above, so this tooth hangs from a ceiling
 		if rng.randf() > SPIRE_CHANCE * (1.0 if hang else SPIRE_FLOOR_BIAS):
 			continue
 		var step: int = 1 if hang else -1
@@ -625,19 +625,19 @@ func _stud_spires(world: WorldData, rng: RandomNumberGenerator) -> void:
 			world.blocks[cell] = mat
 
 
-## RUBBLE: a single loose block resting on a cave floor.
+## A single loose block resting on a cave floor.
 func _scatter_rubble(world: WorldData, rng: RandomNumberGenerator) -> void:
 	for c: Vector2i in _open_cells(world):
 		if not world.blocks.has(c + Vector2i(0, 1)):
 			continue                                  # must be resting on something
 		if world.blocks.has(c + Vector2i(0, -1)):
-			continue                                  # ...with air above it, or it is just fill
+			continue                                  # and with air above it or it is just fill
 		if rng.randf() > RUBBLE_CHANCE:
 			continue
 		world.blocks[c] = _structural_rock(world.blocks.get(c + Vector2i(0, 1), &"stone"))
 
 
-## The material a structural block is built from. Ore, coal and iron are REWARDS, so structure is plain rock.
+## The material a structural block is built from. Ore, coal and iron are rewards, so structure is rock.
 const _REWARD_ROCK: Array[StringName] = [&"ore", &"rich_ore", &"coal", &"iron"]
 
 
@@ -645,8 +645,8 @@ func _structural_rock(source: StringName) -> StringName:
 	return &"stone" if source == &"" or _REWARD_ROCK.has(source) else source
 
 
-## Every underground cell currently OPEN, in a deterministic scan order. Scans the grid rather than
-## tracking carves, so it sees the union of every earlier pass and the studding passes stay byte-identical.
+## Every underground cell currently open, in a deterministic scan order. Scans the grid instead of
+## tracking carves, so it sees the union of every earlier pass, and the studding passes stay stable.
 func _open_cells(world: WorldData) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for col: int in world.cols:
@@ -663,12 +663,12 @@ static func _banded(depth_frac: float, floor_frac: float) -> float:
 	return floor_frac + (1.0 - floor_frac) * clampf(depth_frac, 0.0, 1.0)
 
 
-## THE DROUGHT PASS. Flooring the depth ramp raises the AVERAGE, but a world can measure 7.5 encounters
-## per hundred rows and still contain a shaft running thirty-five rows of identical rock. Wherever the
-## rock has gone quiet for too long this plants a make-up vein, or a VUG, a cavity whose approach raises
-## the pick's hollow ring. Reads the world it is writing, so fixing one column also fixes its neighbours.
-const DROUGHT_LIMIT: int = 18            ## rows of unbroken plain rock before the generator owes you something
-const DROUGHT_VUG_CHANCE: float = 0.28   ## ...and how often what it owes you is a cavity rather than a vein
+## The drought pass. Flooring the depth ramp raises the average, but a world can average 7.5 encounters
+## per hundred rows and still hold a shaft running thirty-five rows of identical rock. Wherever the rock
+## has gone quiet for too long this plants a make-up vein, or a vug, a cavity whose approach raises the
+## pick's hollow ring. It reads the world it writes, so fixing one column also fixes its neighbours.
+const DROUGHT_LIMIT: int = 18            ## rows of unbroken plain rock before the generator owes something
+const DROUGHT_VUG_CHANCE: float = 0.28   ## how often what it owes is a cavity rather than a vein
 const DROUGHT_VEIN_SIZE: int = 5
 const DROUGHT_COAL_BIAS: float = 0.38    ## share of planted veins that are coal rather than ore
 const PLAIN_ROCK: Array[StringName] = [&"earth", &"stone", &"shale", &"deepslate"]
@@ -684,8 +684,8 @@ func _seed_droughts(world: WorldData, rng: RandomNumberGenerator) -> void:
 			run += 1
 			if run < DROUGHT_LIMIT:
 				continue
-			# Plant back INTO the run just walked, so the break lands in the middle of the quiet rather than
-			# at the moment it was noticed.
+			# Plant back into the run just walked, so the break lands in the middle of the quiet, rather
+			# than at the moment it was noticed.
 			var at := Vector2i(col, row - rng.randi_range(3, DROUGHT_LIMIT - 4))
 			if rng.randf() < DROUGHT_VUG_CHANCE:
 				_carve_disc(world, at, 1)
@@ -700,13 +700,13 @@ func _seed_droughts(world: WorldData, rng: RandomNumberGenerator) -> void:
 			run = row - at.y
 
 
-## Is this cell plain rock, i.e. solid and made of nothing worth stopping for?
+## Is this cell plain rock, meaning solid and made of nothing worth stopping for?
 func _is_plain(world: WorldData, cell: Vector2i) -> bool:
 	return world.blocks.has(cell) and world.blocks[cell] in PLAIN_ROCK
 
 
-## Depth-banded ore: many seed attempts, each kept by a depth-weighted roll, grown into a blob whose
-## size also scales with depth. Only replaces SOLID rock, though a vein can end up exposed in a cave wall.
+## Depth-banded ore: many seed attempts, each kept by a depth-weighted roll, grown into a blob whose size
+## also scales with depth. Only solid rock is replaced, though a vein can end up exposed in a cave wall.
 func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
 	var attempts: int = _density_count(world, ORE_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
@@ -719,10 +719,10 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 		# A rich x-band lifts acceptance, size and deposit; a lean band drops them.
 		var hmul: float = hfield[cx]
 		if rng.randf() > _banded(depth_frac, ORE_SHALLOW_FLOOR) * ORE_CHANCE_DEEP * hmul:
-			continue                            # rejected — shallow seeds still mostly die here (the band)
+			continue                            # rejected; shallow seeds still mostly die here
 		var size: int = ORE_SIZE_MIN + int(round(depth_frac * float(ORE_SIZE_DEPTH_BONUS) * hmul))
 		var richness: int = ORE_AMOUNT_BASE + int(round(depth_frac * float(ORE_AMOUNT_DEPTH_BONUS) * hmul))
-		# A vein seeded in or below the deepslate band may come up RICH, smelting 1 -> 2 ingots.
+		# A vein seeded in or below the deepslate band may come up rich, smelting into two ingots.
 		var material: StringName = &"ore"
 		if cy >= DEEPSLATE_ROW and rng.randf() < RICH_CHANCE:
 			material = &"rich_ore"
@@ -730,7 +730,7 @@ func _scatter_veins(world: WorldData, rng: RandomNumberGenerator, hfield: Packed
 		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, material)
 
 
-## Depth-banded COAL. Same cavity machinery as ore veins with its own commonness, size and richness.
+## Depth-banded coal. Same cavity machinery as ore veins, with its own commonness, size and richness.
 func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
 	var attempts: int = _density_count(world, COAL_ATTEMPTS_PER_COL)
 	for _i: int in attempts:
@@ -740,7 +740,7 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedF
 			continue
 		var cy: int = rng.randi_range(top + 1, world.rows - 1)
 		var depth_frac: float = float(cy - top) / float(maxi(1, world.rows - top))
-		var hmul: float = hfield[cx]            # same frontier pull as ore (coal fans out too)
+		var hmul: float = hfield[cx]            # same frontier pull as ore, so coal fans out too
 		if rng.randf() > _banded(depth_frac, COAL_SHALLOW_FLOOR) * COAL_CHANCE_DEEP * hmul:
 			continue
 		var size: int = COAL_SIZE_MIN + int(round(depth_frac * float(COAL_SIZE_DEPTH_BONUS) * hmul))
@@ -748,10 +748,10 @@ func _scatter_coal(world: WorldData, rng: RandomNumberGenerator, hfield: PackedF
 		_grow_vein(world, rng, Vector2i(cx, cy), size, richness, &"coal")
 
 
-## Grow one vein as a compact ACCRETION BLOB rather than a thin random walk: repeatedly fill a random
-## frontier cell and add its rock neighbours. Every converted cell carries the vein's depth-scaled
-## `richness`, its finite per-cell deposit. `min_row` floors the blob: a body seeded just under the seal
-## could otherwise climb through rows the seal stamp later re-fills and leave its crest ABOVE them.
+## Grow one vein as a compact accretion blob, rather than a thin random walk: repeatedly fill a random
+## frontier cell, and add its rock neighbours. Every converted cell carries the vein's depth-scaled
+## `richness`, its finite per-cell deposit. `min_row` floors the blob, since a body seeded just under the
+## seal could otherwise climb through rows the seal stamp later refills.
 func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int, richness: int, material: StringName = &"ore", min_row: int = 0) -> void:
 	var filled: Dictionary = {}
 	var frontier: Array[Vector2i] = [seed_cell]
@@ -762,7 +762,7 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 			continue
 		var here: StringName = world.blocks.get(cell, &"")
 		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
-			continue                                # only replace SOLID rock (never fill a carved cave)
+			continue                                # only replace solid rock and never fill a carved cave
 		world.blocks[cell] = material
 		world.amounts[cell] = richness
 		filled[cell] = true
@@ -771,10 +771,10 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 			frontier.append(cell + d)
 
 
-## LODE BODIES: the accretion machinery of the veins above, writing to the BACKGROUND plane and leaving
-## the host rock in place. Material follows the tier the depth means: ore above the seal, iron below.
-## Runs DEAD LAST in `generate`, after the seal and the aquifers, because every guard below tests the
-## final world and those passes overwrite blocks and flood rock.
+## Lode bodies use the accretion machinery of the veins above, but write to the background plane and
+## leave the host rock in place. Material follows the tier the depth implies: ore above the seal, iron
+## below. Runs dead last in `generate`, after the seal and the aquifers, because every guard below tests
+## the final world, while those passes overwrite blocks and flood rock.
 func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFloat32Array) -> void:
 	var l2_top: int = SEAL_TOP + SEAL_ROWS
 	for _i: int in _density_count(world, LODE_ATTEMPTS_PER_COL):
@@ -783,7 +783,7 @@ func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFlo
 		if floor_row >= world.rows - 1:
 			continue
 		var cy: int = rng.randi_range(floor_row, world.rows - 1)
-		# Depth sets size and richness; the horizontal field tilts the fat ones AWAY from spawn.
+		# Depth sets size and richness; the horizontal field tilts the fat ones away from spawn.
 		var depth_frac: float = float(cy) / float(maxi(1, world.rows - 1))
 		var hmul: float = hfield[cx] if cx < hfield.size() else 1.0
 		var size: int = LODE_SIZE_MIN + int(round(depth_frac * float(LODE_SIZE_DEPTH_BONUS)))
@@ -793,13 +793,13 @@ func _seed_lodes(world: WorldData, rng: RandomNumberGenerator, hfield: PackedFlo
 			&"iron" if cy >= l2_top else &"ore")
 
 
-## Grow one lode body. Accretion identical to `_grow_vein` and deterministic in the rng sequence, but it
-## writes `world.lodes` and NEVER `world.blocks`. A cell is refused unless it is plain
-## earth/stone/deepslate/shale: sealrock would be unreachable, foliage and bazaar structure are not rock,
-## and a carved-open cell would leave ore hanging in a cave. Ore-like cells are refused because mining an
-## ore block writes a lode into that cell (`factory_sim.gd`), already-lode cells because two bodies would
+## Grow one lode body. Accretion is identical to `_grow_vein`, and deterministic in the rng sequence, but
+## it writes `world.lodes`, never `world.blocks`. A cell is refused unless it is plain earth, stone,
+## deepslate or shale: sealrock would be unreachable, foliage and bazaar structure are not rock, and a
+## carved-open cell would leave ore hanging in a cave. Ore-like cells are refused because mining an ore
+## block writes a lode into that cell (`factory_sim.gd`), already-lode cells because two bodies would
 ## fight over `amounts`, and water cells because an aquifer cell is already open and flooded. The wall
-## behind is not checked: the base pass fills one under every rock cell.
+## behind is not checked, since the base pass fills one under every rock cell.
 func _grow_lode(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2i, size: int,
 		richness: int, material: StringName) -> void:
 	var filled: Dictionary = {}
@@ -807,29 +807,29 @@ func _grow_lode(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
 	var placed: int = 0
 	while placed < size and not frontier.is_empty():
 		var cell: Vector2i = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
-		# THE DEPTH FLOOR IS THIS CELL'S OWN COLUMN, and not the column the body was seeded in. A lode
+		# The depth floor is this cell's own column, not the column the body was seeded in. A lode
 		# accretes sideways and the ground it must stay under is not level, so carrying the seed
 		# column's floor across the whole body lets one seeded on high ground creep into a neighbour
-		# whose surface sits lower and break out near it. It read as correct because the two agree
-		# wherever the ground is flat, which is most of the world and all of the spawn pad -- the
-		# disagreement only shows up against a step, and moving where the steps fall exposed it.
+		# whose surface sits lower and break out near it. The two agree wherever the ground is flat,
+		# which is most of the world and all of the spawn pad, so the disagreement only shows up
+		# against a step.
 		if filled.has(cell) or not world.in_bounds(cell) \
 				or cell.y < ground_row(cell.x) + LODE_MIN_DEPTH:
 			continue
 		var here: StringName = world.blocks.get(cell, &"")
 		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
-			continue                                # host rock only — never ore-like, sealrock, wood, air
+			continue                                # host rock only: never ore-like or sealrock or wood or air
 		if world.lodes.has(cell) or world.water.has(cell):
-			continue                                # one vein per cell, and never inside an aquifer
+			continue                                # one vein per cell and never inside an aquifer
 		world.lodes[cell] = material
-		world.amounts[cell] = richness              # a lode's richness IS its deposit; the sim reads both
+		world.amounts[cell] = richness              # a lode's richness is its deposit and the sim reads both
 		filled[cell] = true
 		placed += 1
 		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			frontier.append(cell + d)
 
 
-## IRON bodies, seeded ONLY below the seal, with depth within L2 setting size and richness.
+## Iron bodies, seeded only below the seal, with depth within L2 setting size and richness.
 func _scatter_iron(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var l2_top: int = SEAL_TOP + SEAL_ROWS
 	if l2_top >= world.rows - 1:
@@ -843,8 +843,8 @@ func _scatter_iron(world: WorldData, rng: RandomNumberGenerator) -> void:
 		_grow_vein(world, rng, Vector2i(cx, cy), size, IRON_AMOUNT, &"iron", l2_top)
 
 
-## Stamp THE SEAL: an unbroken full-width sealrock band (rows SEAL_TOP..+SEAL_ROWS-1) filling even
-## carved cells. Backed by deepslate wall so the breach shaft reads as carved rock rather than void.
+## Stamp the seal: an unbroken, full-width sealrock band (rows SEAL_TOP..+SEAL_ROWS-1) that fills even
+## carved cells. Backed by deepslate wall, so the breach shaft reads as carved rock rather than void.
 func _stamp_seal(world: WorldData) -> void:
 	for row: int in range(SEAL_TOP, mini(SEAL_TOP + SEAL_ROWS, world.rows)):
 		for col: int in world.cols:
@@ -855,9 +855,9 @@ func _stamp_seal(world: WorldData) -> void:
 				world.walls[cell] = &"deepslate_wall"
 
 
-## Small SEALED water pockets carved deep into solid rock and filled to WATER_MAX. Runs LAST, after the
-## seal, so no later solid pass overwrites the water. Each is an ellipse whose CENTRE sits at or below
-## AQUIFER_MIN_ROW; it only ERASES SOLID rock, keeping the wall, and refuses the column's base-safe band,
+## Small sealed water pockets carved deep into solid rock, filled to WATER_MAX. Runs after the seal, so
+## that no later solid pass overwrites the water. Each is an ellipse whose centre sits at or below
+## AQUIFER_MIN_ROW. It erases only solid rock, keeping the wall, and refuses the column's base-safe band,
 ## the seal band and already-open air, so it stays sealed on all sides.
 func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var count: int = maxi(2, _density_count(world, AQUIFER_PER_COL))
@@ -873,7 +873,7 @@ func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 		var cy: int = rng.randi_range(lo_row, hi_row)
 		var rx: int = rng.randi_range(AQUIFER_RX_MIN, AQUIFER_RX_MAX)
 		var ry: int = rng.randi_range(AQUIFER_RY_MIN, AQUIFER_RY_MAX)
-		var carved: Array[Vector2i] = []            # the cells THIS pocket flooded — its rim is our vein seed
+		var carved: Array[Vector2i] = []            # the cells this pocket flooded; its rim seeds the vein
 		for dy: int in range(-ry, ry + 1):
 			for dx: int in range(-rx, rx + 1):
 				var ex: float = float(dx) / float(rx)
@@ -883,31 +883,31 @@ func _seed_aquifers(world: WorldData, rng: RandomNumberGenerator) -> void:
 				var cell := Vector2i(cx + dx, cy + dy)
 				if not world.in_bounds(cell):
 					continue
-				# BASE-SAFE: never within CAVE_MIN_DEPTH of the column's surface (base stays dry).
+				# Base-safe: never within CAVE_MIN_DEPTH of the column's surface, so the base stays dry.
 				if cell.y < ground_row(cell.x) + CAVE_MIN_DEPTH:
 					continue
-				# Never in the seal band (the seal is inviolate solid) and never above the deep aquifer band.
+				# Never in the seal band, which is inviolate solid, and never above the deep aquifer band.
 				if cell.y < AQUIFER_MIN_ROW or (cell.y >= seal_lo and cell.y <= seal_hi):
 					continue
-				# Only carve SOLID rock, keeping the wall. Skipping already-open air is what keeps the pocket
-				# sealed by rock rather than spliced into the cave/tunnel system.
+				# Only carve solid rock, keeping the wall. Skipping already-open air is what keeps the pocket
+				# sealed by rock, rather than spliced into the cave and tunnel system.
 				if not world.blocks.has(cell):
 					continue
 				world.blocks.erase(cell)                  # open the cell (wall kept behind it)
-				world.amounts.erase(cell)                 # a vein cell we flooded keeps no deposit
+				world.amounts.erase(cell)                 # a flooded vein cell keeps no deposit
 				world.water[cell] = FactorySim.WATER_MAX  # fill the carved cell (guaranteed not solid now)
 				carved.append(cell)
-		# REWARD: line the drained pocket's walls with a rich vein (only grows into the solid rim rock).
+		# Line the drained pocket's walls with a rich vein, which grows only into the solid rim rock.
 		_seed_aquifer_treasure(world, rng, carved)
 
 
-## Grow the aquifer's reward vein in the SOLID rock lining the pocket, seeded from a rim cell so
-## _grow_vein bores INTO the surrounding rock and can never fill what the pocket carved. min_row
+## Grow the aquifer's reward vein in the solid rock lining the pocket, seeded from a rim cell, so that
+## _grow_vein bores into the surrounding rock and can never fill what the pocket carved. A min_row of
 ## SEAL_TOP+SEAL_ROWS floors it at the top of Stonereach. Empty `carved` means no vein.
 func _seed_aquifer_treasure(world: WorldData, rng: RandomNumberGenerator, carved: Array[Vector2i]) -> void:
 	if carved.is_empty():
 		return
-	# The SOLID rim: cells adjacent to a flooded cell that are still rock _grow_vein accepts.
+	# The solid rim: cells adjacent to a flooded cell that are still rock _grow_vein accepts.
 	var rim: Array[Vector2i] = []
 	var seen: Dictionary = {}
 	for wc: Vector2i in carved:
@@ -920,39 +920,39 @@ func _seed_aquifer_treasure(world: WorldData, rng: RandomNumberGenerator, carved
 			if here == &"earth" or here == &"stone" or here == &"deepslate" or here == &"shale":
 				rim.append(nb)
 	if rim.is_empty():
-		return                                         # pocket fully rimmed by seal/other water/air — no vein
+		return                                         # pocket fully rimmed by seal, water or air: no vein
 	var seed_cell: Vector2i = rim[rng.randi_range(0, rim.size() - 1)]
 	var size: int = rng.randi_range(AQUIFER_ORE_SIZE_MIN, AQUIFER_ORE_SIZE_MAX)
 	_grow_vein(world, rng, seed_cell, size, AQUIFER_ORE_RICHNESS, &"rich_ore", SEAL_TOP + SEAL_ROWS)
 
 
-## Sparse surface trees, the source of WOOD: a 1-wide &"wood" trunk under a 3-wide rounded &"leaves"
-## canopy, stamped in the AIR above a column's ground cell, clear of the centred flat plateau. Foliage is
-## excluded from the walkable silhouette (FactorySim.surface_row), so trees do not ramp.
+## Sparse surface trees, the source of wood: a 1-wide &"wood" trunk under a 3-wide rounded &"leaves"
+## canopy, stamped in the air above a column's ground cell, clear of the centred flat plateau. Foliage
+## is excluded from the walkable silhouette (FactorySim.surface_row), so trees do not ramp.
 func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 	var last: int = -99
-	# Keep the spawn-to-bazaar band clear: a tree just past the 3-tall frame would be the nearest tree but
-	# unreachable behind the wall. The tutorial tree left of spawn is the early wood source.
+	# Keep the spawn-to-bazaar band clear. A tree just past the 3-tall frame would be the nearest tree,
+	# yet unreachable behind the wall. The tutorial tree left of spawn is the early wood source.
 	var start: int = maxi(FLAT_END + 2, RUIN_X + FactorySim.BAZAAR_W + 3)
 	for col: int in range(start, world.cols):
 		if col - last < TREE_GAP or rng.randf() > TREE_CHANCE:
 			continue
 		var ground: int = ground_row(col)
 		if not world.blocks.has(Vector2i(col, ground)):
-			continue                                   # column has no solid surface here (cave mouth) — skip
+			continue                                   # column has no solid surface here (a cave mouth)
 		var trunk: int = rng.randi_range(2, 3)
 		if ground - trunk - 2 < 0:
-			continue                                   # not enough sky above for trunk + canopy
+			continue                                   # not enough sky above for trunk and canopy
 		var blocked: bool = false
 		for h: int in range(1, trunk + 1):
 			if world.blocks.has(Vector2i(col, ground - h)):
-				blocked = true                         # a hill cell already occupies the trunk space — skip
+				blocked = true                         # a hill cell already occupies the trunk space
 				break
 		if blocked:
 			continue
 		for h: int in range(1, trunk + 1):
 			world.blocks[Vector2i(col, ground - h)] = &"wood"
-		# Rounded canopy: a 3-wide band beside/above the trunk top, with a single leaf crowning it.
+		# Rounded canopy: a 3-wide band beside and above the trunk top, with a single leaf crowning it.
 		var ttr: int = ground - trunk                  # row of the topmost trunk cell
 		var canopy: Array[Vector2i] = [
 			Vector2i(col, ttr - 1), Vector2i(col, ttr - 2),
@@ -965,37 +965,37 @@ func _plant_trees(world: WorldData, rng: RandomNumberGenerator) -> void:
 		last = col
 
 
-## Stamp the bazaar ruin (see RUIN_X): flatten its footprint to FLAT_SURFACE_ROW, then lay the wood frame
-## MINUS the bottom-right post. On completion FactorySim.find_bazaars detects it.
+## Stamp the bazaar ruin (see RUIN_X): flatten its footprint to FLAT_SURFACE_ROW, then lay the wood
+## frame minus the bottom-right post. On completion FactorySim.find_bazaars detects it.
 func _stamp_bazaar_ruin(world: WorldData) -> void:
 	var ground: int = FLAT_SURFACE_ROW
 	var w: int = FactorySim.BAZAAR_W
 	var h: int = FactorySim.BAZAAR_H
-	# Skip the ruin on any world too small for its fixed-column footprint (cols 40-43); it wrote unguarded
-	# at fixed columns and went OOB on narrow worlds.
+	# Skip the ruin on any world too small for its fixed-column footprint (cols 40-43), which would
+	# otherwise write out of bounds.
 	if ground - h < 0 or not world.in_bounds(Vector2i(RUIN_X + w - 1, ground + 3)):
 		return
 	for cx: int in range(RUIN_X, RUIN_X + w):                  # flatten + clear the footprint
 		for ry: int in range(0, ground):
 			world.blocks.erase(Vector2i(cx, ry))              # remove any bump / tree above the ground line
-			world.walls.erase(Vector2i(cx, ry))              # ...and its back-wall, so the cleared area is open
-			                                                 # SKY (no floating dirt wall above the flattened ruin)
+			world.walls.erase(Vector2i(cx, ry))              # and its back-wall so the cleared area is open
+			                                                 # sky, with no floating dirt wall above the flattened ruin
 		for ry: int in range(ground, ground + 4):
 			var fc := Vector2i(cx, ry)
 			var existing: StringName = world.blocks.get(fc, &"")
-			# Solid ground to build on, and CLEAR any buried tree stump (wood or leaves under a cleared
-			# canopy), so a finished bazaar never connects to orphan wood that could flood-fell it.
+			# Solid ground to build on. Clears any buried tree stump (wood or leaves under a cleared
+			# canopy) so a finished bazaar never connects to orphan wood that could flood-fell it.
 			if existing == &"" or existing == &"wood" or existing == &"leaves":
 				world.blocks[fc] = &"earth"
 				world.walls[fc] = &"dirt_wall"
 	var o := Vector2i(RUIN_X, ground - h)                     # frame top-left
-	var missing := o + Vector2i(w - 1, h - 1)                 # bottom-RIGHT post — the gap faces spawn (which is
-	                                                          # RIGHT of the ruin), so the player walks up from the
-	                                                          # hand-work side to place the finishing block, and ends
+	var missing := o + Vector2i(w - 1, h - 1)                 # bottom-right post; the gap faces spawn (which is
+	                                                          # right of the ruin) so the player walks up from the
+	                                                          # hand-work side to place the finishing block and ends
 	                                                          # up on the shaft side (never walled off by the frame)
 	for dx: int in w:
 		world.blocks[o + Vector2i(dx, 0)] = &"wood"           # top beam
-	for dy: int in range(1, h):                               # posts (both sides), minus the gap
+	for dy: int in range(1, h):                               # posts on both sides, minus the gap
 		for px: int in [0, w - 1]:
 			var c := o + Vector2i(px, dy)
 			if c != missing:

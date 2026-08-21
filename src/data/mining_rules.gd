@@ -1,14 +1,14 @@
 class_name MiningRules
 extends RefCounted
 
-## The MANUAL-MINING rules: how hard each material is to break by hand, and which TOOL is needed to break
+## The manual-mining rules: how hard each material is to break by hand, and which tool is needed to break
 ## it at all. Plain static data, so the controller's hold loop, the verb gate in try_mine and the headless
 ## tests read one source of truth. can_mine() is the gate, mine_seconds() the duration. Provisional and
 ## eye-tuned; promote tools to ToolDef resources and hardness onto MaterialDef past wood.
 
-## Material id -> the tool CLASS required to break it. Absent = hand-mineable. Rock, ore and foliage all
-## want the pick; the axe class was deleted 2026-07-17, because tool gates read the whole PACK rather than
-## a wielded item, so it added no verb.
+## Material id -> the tool class required to break it. Absent means hand-mineable. Rock, ore and foliage
+## all want the pick. The axe class is gone: tool gates read the whole pack rather than a wielded item,
+## so it added no verb.
 const REQUIRED_TOOL: Dictionary = {
 	&"stone": &"pick",
 	&"ore": &"pick",
@@ -21,26 +21,26 @@ const REQUIRED_TOOL: Dictionary = {
 	&"leaves": &"pick",
 }
 
-## Material id -> the minimum tool TIER of its required class; absent defaults to 1. The DEPTH GATE:
-## deepslate (rows >= DEEPSLATE_ROW) needs a tier-2 pick, so the starter wood pick bounces off it.
+## Material id -> the minimum tool tier of its required class; absent defaults to 1. This is the depth
+## gate: deepslate (rows >= DEEPSLATE_ROW) needs a tier-2 pick, so the starter wood pick bounces off it.
 const REQUIRED_TIER: Dictionary = {
 	&"deepslate": 2,
-	&"iron": 2,          # L2's ore lives in the deepslate zone — the same pick works both
-	&"rich_ore": 2,      # the high-grade veins live in/below the deepslate band (#48) — same honest gate
-	&"sealrock": 99,     # THE SEAL is un-hand-mineable by ANY pick, forever: the L1→L2 gate is a
-	                     # THROUGHPUT wall: only a fed Descent Engine breaches it (docs/PROGRESSION.md 2)
+	&"iron": 2,          # L2's ore lives in the deepslate zone and one pick works both
+	&"rich_ore": 2,      # the high-grade veins live in or below the deepslate band under the same gate
+	&"sealrock": 99,     # the seal is un-hand-mineable by any pick, forever: the L1→L2 gate is a
+	                     # throughput wall, and only a fed Descent Engine breaches it (docs/PROGRESSION.md 2)
 }
 
 ## Material id -> base SECONDS to break with a tier-1 tool or by hand. Eye-tuned.
-## THE ACHE LIVES DEEP (#B1). The SHALLOW band was retuned down hard: the grind that sells automation was
-## landing in the first sixty seconds, before any payoff (4 ore = six seconds of holding). The DEEP numbers
-## did not move, so deepslate went from ~2x surface rock to ~3x.
+## The ache lives deep. The shallow band is tuned down hard, because the grind that sells automation was
+## landing in the first sixty seconds, before any payoff (4 ore is six seconds of holding). The deep numbers
+## are untouched, so deepslate moved from about 2x surface rock to about 3x.
 const HARDNESS: Dictionary = {
 	&"earth": 0.28,
 	&"stone": 0.85,
 	&"ore": 0.90,
 	&"coal": 0.90,
-	&"deepslate": 2.80,      # the deep band is UNTOUCHED — this is where the drill-hunger belongs
+	&"deepslate": 2.80,      # the deep band is where the drill-hunger belongs
 	&"iron": 3.0,
 	&"rich_ore": 2.4,
 	&"wood": 0.50,
@@ -48,22 +48,22 @@ const HARDNESS: Dictionary = {
 }
 const DEFAULT_HARDNESS: float = 0.50
 
-## Tool item id -> {class, tier, speed}. Speed scales the break rate (2.0 = twice as fast); TIER gates which
-## materials the tool may break at all (see REQUIRED_TIER). Starter kit is the wood tools at tier 1; the
-## Stone Pickaxe at tier 2 is the first depth-unlocking upgrade.
+## Tool item id -> {class, tier, speed}. Speed scales the break rate (2.0 is twice as fast) and tier gates
+## which materials the tool may break at all (see REQUIRED_TIER). The starter kit is the wood tools at tier
+## 1; the Stone Pickaxe at tier 2 is the first depth-unlocking upgrade.
 ##
-## THE SPEED AXIS IS DELETED (#S32, `docs/BITS.md` 2). Every pick cuts at 1.0 and the ladder means only WHAT
-## MAY BE BITTEN. The old values were 1.0 / 1.7 / 2.6 (deepslate 1.65s -> 1.08s). The BITS (`BitRules`)
-## replace that relief: a Broad or Lance clears old rock four and five cells at a time.
+## The speed axis is deleted (`docs/BITS.md` 2). Every pick cuts at 1.0 and the ladder decides only what may
+## be bitten. The old values were 1.0 / 1.7 / 2.6 (deepslate 1.65s to 1.08s). The bits (`BitRules`) replace
+## that relief: a Broad or a Lance clears old rock four and five cells at a time.
 const TOOLS: Dictionary = {
 	&"wood_pickaxe": {&"class": &"pick", &"tier": 1, &"speed": 1.0},
 	&"stone_pickaxe": {&"class": &"pick", &"tier": 2, &"speed": 1.0},
 	&"iron_pickaxe": {&"class": &"pick", &"tier": 3, &"speed": 1.0},
-	# The wood_axe entry stays ONLY so a pre-#38 save carrying one still renders; it is no longer seeded,
+	# The wood_axe entry stays only so an older save carrying one still renders. It is no longer seeded,
 	# required by any material, or craftable.
 	&"wood_axe": {&"class": &"axe", &"tier": 1, &"speed": 1.0},
-	# The SCANNER is equipment, not a breaker: its own class so it never enters a pick/axe speed query, speed 0,
-	# no material requires it. Listed so is_tool_item treats it as gear rather than a machine input.
+	# The scanner is equipment rather than a breaker: its own class so it never enters a pick or axe speed
+	# query, speed 0, and no material requires it. Listed so is_tool_item treats it as gear, not machine input.
 	&"scanner": {&"class": &"scanner", &"tier": 1, &"speed": 0.0},
 }
 
@@ -73,11 +73,11 @@ const TOOLS: Dictionary = {
 const TOOL_RECIPES: Dictionary = {
 	&"stone_pickaxe": {&"stone": 8, &"wood": 3},
 	# The tier-3 pick is priced in the L2 chain's own product: iron ingots need the Iron Forge, which needs
-	# Ironworks research, which needs the breach, so the MATERIALS gate it and no research lock is set. L3's
+	# Ironworks research, which needs the breach, so the materials gate it and no research lock is set. L3's
 	# rock band will gate on tier 3; nothing below L2 bounces a stone pick.
 	&"iron_pickaxe": {&"iron_ingot": 6, &"wood": 3},
-	# The sonar: cheap in materials, gated by PROSPECTING research instead. craft_item refuses it until the
-	# tech is in; ResearchRules.locking_tech drives the gate.
+	# The sonar: cheap in materials, gated by Prospecting research instead. craft_item refuses it until the
+	# tech is in, and ResearchRules.locking_tech drives the gate.
 	&"scanner": {&"ingot": 2, &"coal": 1},
 }
 
@@ -90,14 +90,14 @@ static func required_tool(material: StringName) -> StringName:
 	return REQUIRED_TOOL.get(material, &"")
 
 
-## Minimum tool TIER of the required class. 0 for a hand-mineable material, else REQUIRED_TIER, default 1.
+## Minimum tool tier of the required class. 0 for a hand-mineable material, else REQUIRED_TIER, default 1.
 static func required_tier(material: StringName) -> int:
 	if required_tool(material) == &"":
 		return 0
 	return int(REQUIRED_TIER.get(material, 1))
 
 
-## Highest TIER among owned tools of `tool_class`, or 0 if the pack holds none. Compared against required_tier.
+## Highest tier among owned tools of `tool_class`, or 0 if the pack holds none. Compared against required_tier.
 static func best_tier(tool_class: StringName, inventory: Dictionary) -> int:
 	var best: int = 0
 	for tid: StringName in TOOLS:
@@ -121,7 +121,7 @@ static func tool_name(id: StringName) -> String:
 
 
 ## The lowest-tier tool of the required class that can bite this rock, or &"" when hand-mineable. A refusal
-## must NAME the rung (`docs/BITS.md` 5) from the same table the gate reads. Deterministic: TOOLS is iterated
+## must name the rung (`docs/BITS.md` 5) from the same table the gate reads. Deterministic: TOOLS is iterated
 ## in declaration order and the lowest sufficient tier wins.
 static func drive_for(material: StringName) -> StringName:
 	var cls: StringName = required_tool(material)
@@ -144,7 +144,7 @@ static func hardness(material: StringName) -> float:
 	return float(HARDNESS.get(material, DEFAULT_HARDNESS))
 
 
-## Is this item equipment (a pick/axe) rather than a resource? Named is_tool_ITEM to avoid colliding with
+## Is this item equipment (a pick or axe) rather than a resource? Named is_tool_item to avoid colliding with
 ## the built-in Script.is_tool().
 static func is_tool_item(item: StringName) -> bool:
 	return TOOLS.has(item) or BitRules.is_bit(item)
@@ -161,7 +161,7 @@ static func best_speed(tool_class: StringName, inventory: Dictionary) -> float:
 
 
 ## Can the pack break this material at all? Hand-mineable materials always; class-gated ones require a
-## matching tool OF SUFFICIENT TIER. The gate try_mine enforces.
+## matching tool of sufficient tier. The gate try_mine enforces.
 static func can_mine(material: StringName, inventory: Dictionary) -> bool:
 	var cls: StringName = required_tool(material)
 	if cls == &"":
@@ -169,14 +169,14 @@ static func can_mine(material: StringName, inventory: Dictionary) -> bool:
 	return best_tier(cls, inventory) >= required_tier(material)
 
 
-## Seconds of HOLDING to break this material with the pack's best matching tool, INF when the tool is
+## Seconds of holding to break this material with the pack's best matching tool, INF when the tool is
 ## missing. Hand-mineable materials use the baseline speed of 1.0.
 static func mine_seconds(material: StringName, inventory: Dictionary) -> float:
 	var cls: StringName = required_tool(material)
 	if cls == &"":
 		return hardness(material)
 	if not can_mine(material, inventory):
-		return INF                                # lacking the tool OR the required tier → it won't yield
+		return INF                                # lacking the tool or the required tier, so it will not yield
 	var spd: float = best_speed(cls, inventory)
 	if spd <= 0.0:
 		return INF

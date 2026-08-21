@@ -11,7 +11,7 @@ extends Node2D
 ## the sim.
 
 ## Draw-domain painter modules. Each is stateless: it paints onto a CanvasItem this renderer hands it and
-## reads renderer state as `r.x`. Preloaded by PATH rather than class_name so headless drivers resolve them
+## reads renderer state as `r.x`. Preloaded by path rather than class_name so headless drivers resolve them
 ## without a refreshed global-class cache.
 const SkyPainter := preload("res://scenes/sky_painter.gd")
 const TerrainPainter := preload("res://scenes/terrain_painter.gd")
@@ -22,7 +22,7 @@ const SKY_COLOR := Color(0.09, 0.11, 0.16)         ## open air above the surface
 ## Parallax ridgeline layers. factor = how world-locked (1 = terrain speed, 0 = pinned to the camera, so
 ## smaller reads further away); drop = px below the horizon band the ridge crests sit; amp = crest height.
 ## Far hills are lighter for atmospheric haze, near hills darker: a far range darker than the sky behind it
-## is the opposite of what distance does, and high contrast reads as NEAR.
+## is the opposite of what distance does, and high contrast reads as near.
 ##
 ## Three ranges and not two. With two the backdrop collapsed into cardboard on sky, with no middle distance.
 ## The farthest range now sits almost in the sky's own value, and SkyPainter's aerial-perspective lerp falls
@@ -62,13 +62,13 @@ const SKY_REACH: int = 12                           ## tiles of open air sunligh
 ## into the first several feet of earth, and cutting to pitch one tile down turns the bottom of the opening
 ## frame into a void that reads as the end of the world.
 ##
-## Sixteen and not seven, and the constraint is 8-bit rather than artistic. The veil MULTIPLIES, which
+## Sixteen and not seven, and the constraint is 8-bit rather than artistic. The veil multiplies, which
 ## preserves relative contrast perfectly, but a deep multiplier leaves the whole rock a few dozen 8-bit
 ## levels to live in while its own texture spans about two of them, so paint that measurably reads as rock
 ## at full light quantizes into a stain. At seven tiles the bottom 45% of the opening frame printed as one
 ## smooth brown gradient with four or five levels in it and no visible rock at all.
 ##
-## Sixteen is the honest depth because daylight soaks into SOIL, not into rock: the band under the grass
+## Sixteen is the honest depth because daylight soaks into soil, not into rock: the band under the grass
 ## reads as dirt with stones in it and a visible bottom edge, and the dark begins at rock depth. The deep is
 ## not touched by this at all.
 const SKY_FADE: int = 16
@@ -77,11 +77,11 @@ const SKY_FADE: int = 16
 ## own light" holds and lit rock pops out of the gloom. 0.87 left rock invisible; 0.74 lost structure in the
 ## murk.
 const AMBIENT_DARK: float = 0.66
-## The colour of full gloom, as a MULTIPLIER rather than a wash. Skylight-only ambient is cool and dim, so
+## The colour of full gloom, as a multiplier rather than a wash. Skylight-only ambient is cool and dim, so
 ## the deep darkens and cools in one operation. Because it multiplies, a cell keeps its own hue and its own
 ## relative contrast for free: dark brown topsoil stays brown, dark grey stone stays grey, and the bedding,
 ## fissures and carved edges painted into the rock survive as structure rather than being averaged under a
-## haze. Raising these values lifts the whole deep; the RATIO between the channels is what makes shadow read
+## haze. Raising these values lifts the whole deep; the ratio between the channels is what makes shadow read
 ## cool.
 ##
 ## At (0.24, 0.28, 0.38) the deep printed unlit dirt at rgb(6,10,24) and unlit stone at rgb(8,14,31): a 4:1
@@ -89,22 +89,22 @@ const AMBIENT_DARK: float = 0.66
 ## apart. Barely cool and appreciably brighter keeps the material read while the deep still plainly needs a
 ## lamp.
 const AMBIENT_LIGHT := Color(0.34, 0.35, 0.42)
-## How much of the deep ambient an unlit EMPTY cell keeps. Applies below the scatter band only, so the
+## How much of the deep ambient an unlit empty cell keeps. Applies below the scatter band only, so the
 ## surface and the daylight soak are untouched.
 ##
 ## `check_rock_reads` sampled 140 solid cells against 55 air cells outside every light source and asked how
 ## often you would be right telling them apart from pixels: 56%, against a coin flip of 50%. The medians say
 ## something sharper than "no contrast": unlit air read 12.0 and unlit rock read 9.4, so the void was
-## BRIGHTER than the rock. An inverted cue rather than a missing one, and inverted against the lamp too,
+## brighter than the rock. An inverted cue rather than a missing one, and inverted against the lamp too,
 ## where bright means solid-and-lit.
 ##
 ## The mechanism is `_open_blur`, and it is not a bug. That term means "how much light can reach in here",
-## which is right near the surface, where openness IS how skylight arrives. Carried into the deep it keeps
+## which is right near the surface, where openness is how skylight arrives. Carried into the deep it keeps
 ## paying out light that has no source: an air pocket forty rows down is maximally open, so it took the full
 ## ambient while the rock beside it took the openness of rock. Down here there is nothing overhead to be
 ## open to.
 ##
-## A floor on the VOID rather than a lift on the rock, because raising global brightness is how this was got
+## A floor on the void rather than a lift on the rock, because raising global brightness is how this was got
 ## wrong before: an earlier blue fog did exactly that and had to be pulled. Rock's ambient is untouched at
 ## AMBIENT_LIGHT and keeps every value and every grain it had; the whole change is subtractive on cells that
 ## hold nothing, so carved space is the darkest thing in frame until you light it.
@@ -119,13 +119,13 @@ const VOID_FLOOR: float = 0.35
 ## environment per frame is a renderer whose output depends on when you asked.
 static var BARE_MACHINES: bool = OS.get_environment("SF_MACHINE_BARE") == "1"
 ## `SF_MACHINE_SILHOUETTE=1`: the casing and nothing else, with no glyph, light pool or label. The question
-## is whether the machine's BODY carries its identity, and every other channel answers a different one. The
+## is whether the machine's body carries its identity, and every other channel answers a different one. The
 ## glyph especially is a decal on the front, so leaving it in would let `check_machine_identity` pass on
 ## twenty identical boxes wearing twenty different icons.
 static var SILHOUETTE_ONLY: bool = OS.get_environment("SF_MACHINE_SILHOUETTE") == "1"
 ## One colour for all of them. Leaving each machine its registry hue and masking "material" as "far enough
 ## from bare rock" could not register its subject: the Descent Engine's shadowed foot lands within 3 levels
-## of the rock behind it, so a DARK machine measured as a SMALLER machine, and twenty bodies scored a mean
+## of the rock behind it, so a dark machine measured as a smaller machine, and twenty bodies scored a mean
 ## pair difference of 0.201 that was twenty paint jobs on one rectangle. Painted identically, any difference
 ## left in the patch is geometry.
 const SILHOUETTE_GREY := Color(0.75, 0.75, 0.77)
@@ -139,7 +139,7 @@ const IDLE_GLOW: float = 0.12
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)          ## the miner's warm head-lamp: a saturated amber core, so
                                                    ## the pool reads warm-gold rather than as a white wash
 ## The lamp's ease rate, named so a fixture can derive its own settle budget instead of hard-coding a frame
-## count. The recurrence collapses to `e_N = e0 * exp(-LAMP_EASE * T)`: decay depends only on elapsed GAME
+## count. The recurrence collapses to `e_N = e0 * exp(-LAMP_EASE * T)`: decay depends only on elapsed game
 ## time, not on how it is chopped into frames.
 const LAMP_EASE: float = 9.0
 const LAMP_RADIUS: float = CELL * 5.6               ## the additive bloom halo, drawn by _paint_lights
@@ -153,7 +153,7 @@ func lamp_head() -> Vector2:
 	return player.position + Vector2(0.0, -Player.HEIGHT * 0.30)
 
 
-## What `_lamp_offset` is easing toward. This is an OFFSET, a vector relative to the head, not a world
+## What `_lamp_offset` is easing toward. This is an offset, a vector relative to the head, not a world
 ## point: every render site spends it as `head + _lamp_offset` (`_veil_cut` twice, `_draw_glow` twice), so
 ## reading it as a position is wrong by the whole head vector, and the error looks like a small lighting
 ## drift.
@@ -175,13 +175,13 @@ func lamp_pos() -> Vector2:
 	return lamp_head() + _lamp_offset
 
 
-## How far the lamp still has to travel. A fixture waiting for the light to settle must assert THIS rather
+## How far the lamp still has to travel. A fixture waiting for the light to settle must assert this rather
 ## than watch `_lamp_offset` stop changing between frames. Under `Engine.time_scale = 0` the ease multiplier
 ## is `1.0 - exp(0)` = 0, so the offset cannot move at all, a derivative test reads perfectly still on every
-## frame, and the layer photographs a lamp pickled mid-slide. A residual reports the truth in that state.
+## frame, and a settle check photographs a lamp pickled mid-slide. A residual reports the truth in that state.
 ##
 ## Two limits on what a small residual means:
-## * It only means "settled" for a body AT REST. The target is head-relative and recomputed from the live
+## * It only means "settled" for a body at rest. The target is head-relative and recomputed from the live
 ##   position, so a walking, falling or swinging body carries a permanent residual floor, and a settle loop
 ##   run during a spawn fall will spend its whole budget and prove nothing.
 ## * It is not monotone across the `CELL * 0.9` branch. The two branches do not meet: at the threshold the
@@ -246,7 +246,7 @@ const CRUMBLE_MAX: int = 48
 # Pushed by MainView each frame (the bits the renderer can't derive from the sim alone).
 var _aim: Vector2i = Vector2i(-99, -99)
 var _aim_in_reach: bool = false
-## Will the carried DRIVE bite the aimed rock at all? False = the wall is over your tier, and the cursor has
+## Will the carried drive bite the aimed rock at all? False = the wall is over your tier, and the cursor has
 ## to say so before the swing (`docs/BITS.md` §5) rather than after a click that did nothing.
 var _aim_bites: bool = true
 var _aim_placeable: bool = false
@@ -254,7 +254,7 @@ var _lamp_offset: Vector2 = Vector2.ZERO   ## eased head->beam-pool offset (the 
 var lamp_color: Color = LAMP_COLOR         ## the picked lamp tint, set from the title screen
 var _ghost_def: MachineDef = null
 var _ghost_material: StringName = &""                ## a building material selected for block placement
-var _guide_targets: Array[Dictionary] = []           ## current objective's WHERE-cells (pushed by MainView)
+var _guide_targets: Array[Dictionary] = []           ## current objective's where-cells (pushed by MainView)
 var _mine_cell: Vector2i = Vector2i(-999, -999)       ## block being charge-mined (cracks drawn on it; pushed by MainView)
 var _mine_frac: float = 0.0                           ## 0..1 break-charge of that block: the felt-friction read
 var _dig_marks: Dictionary = {}                       ## the dig plan (live ref from MainView), hatched overlay
@@ -282,26 +282,26 @@ var _chunk_rows: int = 0
 ## Coarse terrain bake. The chunk painters above draw the static coarse terrain over the whole 16,384-cell
 ## world; measured on a mature base that was ~72% of the frame's draw calls, ~11,882 of them. They are
 ## static per terrain change, so the chunk canvases live inside a world-sized SubViewport with a transparent
-## background and its render target is drawn as ONE textured quad at z -10: pixel-identical by construction,
+## background and its render target is drawn as one textured quad at z -10: pixel-identical by construction,
 ## since it is the same draw code, and ~11k fewer draw calls. The viewport re-renders only when a chunk was
 ## dirtied, via render_target_update_mode UPDATE_ONCE; between changes the GPU replays the single quad.
 var _terrain_viewport: SubViewport                    ## world-in-pixels canvas the chunk painters render into
-var _terrain_layer: LightLayer                        ## the ONE quad in the main tree that draws the bake (z -10)
+var _terrain_layer: LightLayer                        ## the one quad in the main tree that draws the bake (z -10)
 ## The incremental bake. The viewport is the whole world, 4096x4096 px, and every chunk painter lives inside
 ## it, so nothing is ever culled: re-rendering it replayed every chunk over sixteen megapixels and cost
 ## ~100ms, once per dig, which was two thirds of a measured 114ms mining hitch (tools/check_frametime). The
-## target is now RETAINED and a dig re-renders only the chunks that changed; the rest keep the pixels they
+## target is now retained and a dig re-renders only the chunks that changed; the rest keep the pixels they
 ## already had. `_eraser` blanks those chunks' rects first, because blending cannot remove coverage.
 var _eraser: LightLayer                               ## z -11 inside the viewport: clears a dirty chunk's rect
 var _erase_rects: Array[Rect2] = []                   ## world rects to blank on the next viewport render
 var _back: LightLayer      ## the parallax backdrop (sky gradient + ridgelines + clouds), z -20
 ## Fine terrain molding: the coarse 32px terrain fill re-rendered as an organic 8px-grain field baked to one
-## texture (scenes/fine_terrain.gd) and drawn OVER the chunk terrain, which keeps drawing walls and the
+## texture (scenes/fine_terrain.gd) and drawn over the chunk terrain, which keeps drawing walls and the
 ## surface cap, so the blocky cell edges become curved. Rebuilt only on terrain change (_fine_dirty), never
 ## per frame: the same repaint-on-change discipline as the veil.
 var _fine: FineTerrain
 var _fine_layer: LightLayer
-var _fine_dirty: bool = true                     ## FULL rebake pending (initial paint / load): the slow lane
+var _fine_dirty: bool = true                     ## Full rebake pending (initial paint / load): the slow lane
 ## The per-dig fast lane: a dig accumulates the coarse bounding box of this frame's changed cells so the
 ## fine baker patches only that region instead of re-processing the whole 512 x 512 fine grid.
 var _fine_region_pending: bool = false
@@ -318,14 +318,14 @@ var _veil_img: Image
 var _veil_tex: ImageTexture
 var _veil_base: PackedByteArray
 var _veil_scratch: PackedByteArray   ## persistent per-frame veil buffer: base memcpy'd in, holes cut
-var _veil_dirty: bool = true                     ## a FULL veil rebake (daylight moved / world loaded)
+var _veil_dirty: bool = true                     ## a full veil rebake (daylight moved / world loaded)
 ## A dig dirties only the columns it touched. Tracked separately from _veil_dirty so the cheap case stays
 ## cheap and the global case, the daylight clock, still gets the whole world.
 var _veil_cols_dirty: bool = false
 var _veil_col_min: int = 0
 var _veil_col_max: int = 0
 ## Crystal seams: the flood is cached across frames and shared by _update_veil and _paint_lights, which
-## both need the identical seam list. It only changes when ore EXPOSURE changes (terrain dug or placed near
+## both need the identical seam list. It only changes when ore exposure changes (terrain dug or placed near
 ## ore) or when the culling view-rect moves (a seam pans on or off screen), so it is recomputed on either
 ## signal and otherwise replayed. Invalidated in the terrain-dirty block below.
 var _crystal_seams_cache: Array[Dictionary] = []
@@ -373,8 +373,8 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_chunk_cols = ceili(float(FactorySim.GRID_COLS) / float(CHUNK))
 	_chunk_rows = ceili(float(FactorySim.GRID_ROWS) / float(CHUNK))
 	# The chunk painters render into a world-sized SubViewport: a flat 4096x4096 canvas with no camera, so a
-	# chunk's world-space draw lands 1:1 at pixel coords, and a TRANSPARENT background so the sky above
-	# ground stays see-through and the backdrop shows. update_mode DISABLED means it never re-renders on its
+	# chunk's world-space draw lands 1:1 at pixel coords, and a transparent background so the sky above
+	# ground stays see-through and the backdrop shows. update_mode disabled means it never re-renders on its
 	# own; it is flipped to UPDATE_ONCE only when a chunk is dirtied, below, which preserves the fast lane.
 	_terrain_viewport = SubViewport.new()
 	_terrain_viewport.size = Vector2i(FactorySim.GRID_COLS * CELL, FactorySim.GRID_ROWS * CELL)
@@ -382,7 +382,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_terrain_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_terrain_viewport.disable_3d = true
 	# Its own world, so the colour grade cannot reach it. The WorldEnvironment's adjustment pass runs as a
-	# viewport post-process, and this viewport RETAINS its render target between updates (CLEAR_MODE_NEVER on
+	# viewport post-process, and this viewport retains its render target between updates (CLEAR_MODE_NEVER on
 	# the partial-bake path; that retention is what makes a dig cost one chunk instead of the whole world).
 	# Inheriting the grade meant saturation 1.18 was re-applied to the same stored pixels on every bake, so
 	# the terrain compounded 1.18^n: grass measured (87,130,47) at boot and (42,255,0) after a play arc, and
@@ -398,7 +398,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 			chunk.setup(-10, _paint_terrain_chunk.bind(rect))  # painter(ci, rect) draws only this block
 			_terrain_viewport.add_child(chunk)                        # renders into the bake viewport, not the main tree
 			_chunks.append(chunk)
-	# The eraser sits BELOW the chunk painters inside the same viewport, so on a partial re-render each
+	# The eraser sits below the chunk painters inside the same viewport, so on a partial re-render each
 	# dirty chunk's rect is blanked before that chunk repaints into it.
 	_eraser = LightLayer.new()
 	_eraser.setup(-11, _paint_erase)
@@ -434,7 +434,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_fine_layer.material = grit
 	add_child(_fine_layer)
 	_bake_fine_terrain()
-	# Two world-space canvases ABOVE this renderer's draw: the skylight/darkness veil, then the light pools.
+	# Two world-space canvases above this renderer's draw: the skylight/darkness veil, then the light pools.
 	_glow_tex = _make_glow_texture()
 	_dark = LightLayer.new()
 	_dark.setup(50, _paint_darkness, CanvasItemMaterial.BLEND_MODE_MUL)
@@ -449,7 +449,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	_lights.setup(51, _paint_lights, CanvasItemMaterial.BLEND_MODE_ADD)
 	add_child(_lights)
 	# ...and the tooth again, above the veil, because below it there is no tooth at all. rock_grit paints
-	# into the terrain layer at z -9 and `_dark` MULTIPLIES at z 50, so its additive floor, the one meant to
+	# into the terrain layer at z -9 and `_dark` multiplies at z 50, so its additive floor, the one meant to
 	# keep something in rock the veil has taken most of the way down, is scaled by the very factor that made
 	# the rock dark. See scenes/rock_tooth.gdshader; measured by check_rock_reads.
 	_tooth = LightLayer.new()
@@ -483,7 +483,7 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 		chunk.queue_redraw()  # initial full paint (once); thereafter only dirtied chunks repaint
 	_bake_terrain_full()   # the initial coarse terrain: every chunk, and the target cleared under it
 	sim.terrain_dirty.clear()  # drop any dirt from world-seeding; the initial paint covers it
-	_dark.queue_redraw()  # the veil's ONE draw command (the stretched lightmap); content updates via the texture
+	_dark.queue_redraw()  # the veil's one draw command (the stretched lightmap); content updates via the texture
 
 
 ## Full-world repaint, for when the terrain changed wholesale under the retained caches, such as loading a
@@ -610,7 +610,7 @@ func _process(delta: float) -> void:
 		_bake_terrain_chunks(dirty)
 		sim.terrain_dirty.clear()
 		_leaf_cache_dirty = true   # a felled tree stops shedding leaves
-		_crystal_seams_valid = false   # a dig or place near ore changes which cells are EXPOSED: reflood seams
+		_crystal_seams_valid = false   # a dig or place near ore changes which cells are exposed: reflood seams
 		# The mold follows the dug shape, but patch only the changed region's fine cells rather than the whole
 		# grid: the per-dig freeze was the full fine rebake this used to trigger.
 		_fine_region_pending = true
@@ -627,7 +627,7 @@ func _process(delta: float) -> void:
 			_veil_col_max = rmax.x
 		_veil_cols_dirty = true
 	if _fine_dirty:
-		_bake_fine_terrain()          # FULL rebake (initial / load): the slow lane
+		_bake_fine_terrain()          # Full rebake (initial / load): the slow lane
 	elif _fine_region_pending:
 		_bake_fine_region(_fine_dirty_min, _fine_dirty_max)   # the per-dig fast lane
 		_fine_region_pending = false
@@ -642,7 +642,7 @@ func _process(delta: float) -> void:
 
 ## Full bake: every chunk, onto a freshly cleared target. Used for the initial paint and for a wholesale
 ## change such as loading a save, where nothing on the target can be trusted. CLEAR_MODE_ONCE rather than
-## ALWAYS, because the target is retained from here on and clearing it again would undo every partial bake
+## always, because the target is retained from here on and clearing it again would undo every partial bake
 ## below.
 func _bake_terrain_full() -> void:
 	for chunk: LightLayer in _chunks:
@@ -693,7 +693,7 @@ func _chunk_index(cell: Vector2i) -> int:
 	return (cell.y / CHUNK) * _chunk_cols + (cell.x / CHUNK)
 
 
-# --- draw sequence (WORLD space; the Camera2D provides the view transform) ----
+# --- draw sequence (world space; the Camera2D provides the view transform) ----
 
 func _draw() -> void:
 	_zoom = get_canvas_transform().get_scale().x   # once per frame; every zoom gate below reads this
@@ -705,13 +705,13 @@ func _draw() -> void:
 	_draw_seams()     # the rock's grain: the planes a blow can follow
 	_draw_drop_paths()
 	_draw_lode()      # ore in the back wall: the vein you cleared the rock off, and how much is left
-	_draw_seal_pulse(_view_world_rect())  # the unbreakable band's slow violet breath. It is a wash ON rock,
+	_draw_seal_pulse(_view_world_rect())  # the unbreakable band's slow violet breath. It is a wash on rock,
 	                                      # so it belongs under the veil with the rock it is painted on. The
 	                                      # ore flares used to be drawn here and are not any more: they are a
 	                                      # light, and _paint_lights draws them above the veil.
-	_draw_updrafts()  # rising shimmer in each lift's shaft, so the column reads as lifting UP
+	_draw_updrafts()  # rising shimmer in each lift's shaft, so the column reads as lifting up
 	_draw_conduits()  # power tubes (copper, with a channel that glows by the live power level)
-	_draw_power_pulses()  # bright beads flowing DOWN the live network: energy visibly moving
+	_draw_power_pulses()  # bright beads flowing down the live network: energy visibly moving
 	_draw_ropes()     # placed climb-ropes hanging down their shafts (behind machines and the body)
 	_draw_torches()   # mounted torches guttering on the walls: placed light, claimed territory
 	_draw_saplings()  # planted sprouts growing on the sim's tick
@@ -739,7 +739,7 @@ func _draw() -> void:
 	_draw_grapple()        # the live line and its hook, over the world and under the HUD
 	_draw_aim()
 	if payouts != null:
-		payouts.draw(self)  # "+N" gain ticks LAST: the reward should never be buried by the world
+		payouts.draw(self)  # "+N" gain ticks last: the reward should never be buried by the world
 
 
 ## The sonar: an expanding wavefront ring from the body and, as it passes each vein's true distance, an
@@ -816,11 +816,10 @@ func _draw_dig_marks(canvas: CanvasItem) -> void:
 		var cell: Vector2i = key
 		if not view.has_point(Vector2(cell) * float(CELL)):
 			continue
-		# The same corners the cursor puts on the thing it is over, at a thinner stroke. A marked cell IS a
+		# The same corners the cursor puts on the thing it is over, at a thinner stroke. A marked cell is a
 		# thing the pick will act on, only later and not now, and the difference between now and later is
-		# worth a stroke width rather than a whole second shape. The loop that used to live here cut its
-		# corners at its own arm length and its own inset, which is how two copies of one mark stop being
-		# one mark.
+		# worth a stroke width rather than a whole second shape. `_cell_corners` cuts both, so the two can
+		# never drift into two marks.
 		canvas.draw_rect(_mark_wash(cell), fill)
 		_cell_corners(canvas, _mark_rect(cell), edge, 1.5)
 
@@ -891,10 +890,10 @@ func _draw_surface_life() -> void:
 	var cyc: int = int(_anim_time / CYCLE)
 	var ct: float = fmod(_anim_time, CYCLE)
 	if ct < CROSS_T and daylight() > 0.5:
-		# `Seams.grain` rather than a bare `cyc * 2654435761`: that constant is ODD, so its low bit is the
-		# low bit of `cyc` untouched, and `bh % 2` was EXACTLY `cyc % 2` — verified over 100,000 cycles. The
-		# bird reversed direction on every single crossing, a metronome rather than a choice, and altitude
-		# marched in steps of +23 for the same reason. Two salts so heading and height are independent.
+		# `Seams.grain` rather than a bare `cyc * 2654435761`: that constant is odd, so its low bit is the
+		# low bit of `cyc` untouched, and `bh % 2` was exactly `cyc % 2` over 100,000 verified cycles. The
+		# bird reversed direction on every single crossing, which is a metronome rather than a choice, and
+		# altitude marched in steps of +23 for the same reason. Two salts keep heading and height apart.
 		var bh_dir: int = Seams.grain(Vector2i(cyc, 11))
 		var bh_alt: int = Seams.grain(Vector2i(cyc, 22))
 		var frac: float = ct / CROSS_T
@@ -911,7 +910,7 @@ func _draw_surface_life() -> void:
 
 ## Crystal/ore glow: the cool accent light. Coloured light reads as a feature when it is big and cohesive
 ## and as confetti when it is scattered dots, so instead of glowing isolated cells this clusters nearby
-## exposed ore into a few cohesive SEAMS: flood-connect adjacent exposed vein cells, then emit one glow per
+## exposed ore into a few cohesive seams: flood-connect adjacent exposed vein cells, then emit one glow per
 ## cluster (centroid plus a radius that grows with the cluster's extent). Both _update_veil, which cuts a
 ## cool hole, and _paint_lights, which lays the pool, call this, so reveal and glow never disagree.
 const CRYSTAL_COLOR := Color(0.34, 0.86, 1.0)          ## saturated cyan-teal: the cool pole against the warm lamp
@@ -931,7 +930,7 @@ func _exposed_ore_cells() -> Array[Vector2i]:
 		var md: MaterialDef = _material(sim.material_at(c))
 		if not md.has_nuggets() or not md.glitters:  # coal has nuggets but does not glitter: it is fuel
 			continue
-		# Only EXPOSED ore glows. A crystal seam catches light where it meets a carved cavity, so at least one
+		# Only exposed ore glows. A crystal seam catches light where it meets a carved cavity, so at least one
 		# orthogonal neighbour must be open air, which confines the accent to carved edges.
 		if sim.is_solid(c + Vector2i(0, -1)) and sim.is_solid(c + Vector2i(0, 1)) \
 				and sim.is_solid(c + Vector2i(-1, 0)) and sim.is_solid(c + Vector2i(1, 0)):
@@ -940,7 +939,7 @@ func _exposed_ore_cells() -> Array[Vector2i]:
 	return out
 
 
-## Cluster the exposed-ore cells into cohesive SEAMS. Greedy flood: pop a cell, absorb every still-unclaimed
+## Cluster the exposed-ore cells into cohesive seams. Greedy flood: pop a cell, absorb every still-unclaimed
 ## cell within CLUSTER_LINK of it via a growing frontier, and emit the group as one glow
 ## {pos = centroid, radius = base + extent}. Deterministic, since it iterates a sorted cell list. Clusters
 ## smaller than CRYSTAL_MIN_CELLS are dropped as noise.
@@ -962,7 +961,7 @@ func _crystal_seams() -> Array[Dictionary]:
 ## exposed ore, on the frame where n is largest, because digging is what exposes ore. Each pop now looks only
 ## in the buckets its own neighbourhood can reach.
 ##
-## The absorption ORDER must be preserved. This is a greedy flood, so the order cells are absorbed in decides
+## The absorption order must be preserved. This is a greedy flood, so the order cells are absorbed in decides
 ## which seam a cell between two seams lands in, and therefore the centroids and radii that get drawn. The
 ## linear scan walked a globally sorted list, so for a given frontier cell it absorbed matching cells in
 ## sorted order; the gathered candidates are re-sorted here to reproduce that. Without the sort this is still
@@ -1034,7 +1033,7 @@ func _cluster_seams(from_cells: Array[Vector2i]) -> Array[Dictionary]:
 ## frame, once in _update_veil and once in _paint_lights. It only changes when ore exposure changes (a dig or
 ## place near ore clears _crystal_seams_valid) or when the culling view-rect pans and a seam scrolls on or
 ## off screen. Recompute on either signal, otherwise replay the cached list, so the veil cut and the light
-## pool read the IDENTICAL seams and it floods once per frame rather than twice. _crystal_seams() itself
+## pool read the identical seams and it floods once per frame rather than twice. _crystal_seams() itself
 ## stays the pure compute, so the profiler can measure it in isolation.
 func _crystal_seams_cached() -> Array[Dictionary]:
 	var view: Rect2 = _view_world_rect()
@@ -1045,7 +1044,7 @@ func _crystal_seams_cached() -> Array[Dictionary]:
 	return _crystal_seams_cache
 
 
-## The glow colour for an ore seam, derived from the seam's OWN material so the accent light agrees with the
+## The glow colour for an ore seam, derived from the seam's own material so the accent light agrees with the
 ## flecks in the rock rather than putting a cyan glow on orange ore. Takes the first cell's material
 ## `nugget_color` and pushes it toward saturation, because a light source reads as a purer hue than the
 ## embedded speck. A material with no nuggets falls back to CRYSTAL_COLOR.
@@ -1067,13 +1066,13 @@ func _seam_glow_color(cells: Array) -> Color:
 ## it has to hold up to being looked at for a long time. This is not the glint, which is a rare twinkle that
 ## says something is over there and still fires on top of this.
 ##
-## It thins as it drains. `deposits` is the number the player plans around, and a 250-unit cell and a 4-unit
-## cell were pixel identical, which broke the Drift Rig's own capture (`docs/DRIFT.md`): the rig chewed one
-## cell forever and the photograph had to seed thin seams by hand to show a cycle. The fleck set is
-## deterministic per cell and the draw takes a PREFIX of it, so flecks disappear one by one as the vein is
-## worked rather than reshuffling, and a half-worked vein looks like the same vein, half worked.
+## It thins as it drains. `deposits` is the number the player plans around, and a 250-unit cell used to be
+## pixel-identical to a 4-unit one, so a rig chewing a fat vein showed no progress at all (`docs/DRIFT.md`).
+## The fleck set is deterministic per cell and the draw takes a prefix of it, so flecks disappear one by one
+## as the vein is worked rather than reshuffling, and a half-worked vein looks like the same vein, half
+## worked.
 ##
-## Only EXPOSED lode draws here. Ore still behind rock is the stain's job (`docs/LODE.md` §10, phase 4).
+## Only exposed lode draws here. Ore still behind rock is the stain's job (`docs/LODE.md` §10).
 func _draw_lode() -> void:
 	if sim.lode.is_empty():
 		return
@@ -1119,7 +1118,7 @@ const GRAIN_SHADE: float = 0.36                      ## ...and the one it is not
 ##
 ## A circle with a bright core reads as a bubble, and six of them per cell reads as foam. A grain is a facet
 ## instead: a small quad seated in its own shadow, split into a lit half and a shaded half. The two-tone
-## split is what does the work, because it makes the grain a SHAPE catching light rather than a dot emitting
+## split is what does the work, because it makes the grain a shape catching light rather than a dot emitting
 ## it, which is `docs/LODE.md` §11's rule ("ore does not glow, it answers your lamp") applied at the level of
 ## one fleck. The veil overhead still dims the whole field where no lamp reaches it.
 func _draw_grain(p: Vector2, r: float, spin: float, nug: Color) -> void:
@@ -1135,29 +1134,47 @@ func _draw_grain(p: Vector2, r: float, spin: float, nug: Color) -> void:
 	draw_colored_polygon(PackedVector2Array([q[1], q[2], p]), body.darkened(GRAIN_SHADE))
 
 
-## Knockout seam, default true; only measurement code sets it false. A cosmetic cue that cannot be switched
-## off cannot be measured by SUBTRACTION, and subtraction is the one instrument whose answer does not depend
-## on how the subject happens to be distributed on screen. The alternative, splitting exposed ore into
-## clustered and lone and comparing them, had six cells in it, because `_cluster_seams` absorbs ~87% of
-## exposed ore; three of its nine runs divided 0 by 0 and printed a confident zero.
+## Knockout switch for the glint, default true; only measurement code sets it false. A cosmetic cue that
+## cannot be switched off cannot be measured by subtraction, and subtraction is the one instrument whose
+## answer does not depend on how the subject happens to be distributed on screen. The alternative, splitting
+## exposed ore into clustered and lone and comparing them, had six cells in it, because `_cluster_seams`
+## absorbs ~87% of exposed ore; three of its nine runs divided 0 by 0 and printed a confident zero.
 var draw_glints: bool = true
 
 
-## The glint has to be drawn ABOVE the veil, which is the same layer-order trap as rock_grit.
+## The glint has to be drawn above the veil, which is the same layer-order trap as rock_grit.
 ##
-## Drawn from WorldRenderer._draw at z 0, every flare was scaled by `_dark`, the LightLayer at z 50 with
-## BLEND_MODE_MUL, which is the factor that makes rock dark. `glint_dark` below raises the flare's alpha as
-## the surround darkens, so the compensation and the attenuation were the same number and cancelled.
+## Drawn from `_draw` at z 0, every flare was scaled by `_dark`, the LightLayer at z 50 with BLEND_MODE_MUL
+## that makes rock dark. `glint_dark` below raises the flare's alpha as the surround darkens, so the
+## compensation and the attenuation were the same number and cancelled.
 ##
-## Measured by knockout: suppressing the flares entirely changed which ore cells reach the frame's brightest
+## Knockout confirms it. Suppressing the flares entirely changed which ore cells reach the frame's brightest
 ## 1% by nothing (9 of 13, 12 of 20, 20 of 30 discovered, identical cell for cell with the cue on and off)
-## and moved ore's share of that band by -10.5%, -0.35% and +0.6%. The +0.6% is the tell that the instrument
-## is a per-frame quantile: deleting pixels lowers the bar and lets others in. Every ore cell that did reach
-## the bright band got there on the seam light pool, which `_paint_lights` draws at z 51, above the veil.
+## and moved ore's share of that band by -10.5%, -0.35% and +0.6%. The +0.6% is the tell that a per-frame
+## quantile measures its own threshold: deleting pixels lowers the bar and lets others in. Every ore cell
+## that did reach the bright band got there on the seam light pool, which `_paint_lights` draws at z 51,
+## above the veil.
 ##
 ## So this is called from `_paint_lights`, additive and post-veil, on the same canvas as the pools it was
-## losing to. `glint_dark` is kept and now does what it describes: a surface vein in daylight stays quiet and
-## a vein in the deep flares at full strength, with nothing downstream to take it back.
+## losing to. `glint_dark` is kept and now does what it describes: a surface vein in daylight stays quiet
+## and a vein in the deep flares at full strength, with nothing downstream to take it back.
+##
+## What is left wrong with the glint is its colour rather than its loudness, and that is left alone on
+## purpose. It arrives at rgb 255,255,~237 in both underground frames, which is white, and it cannot arrive
+## as anything else: `ore.nugget_color` is (0.78, 0.81, 0.85) at HSV saturation 0.082, and the
+## `.lightened(0.65)` below takes that to 0.026, six levels of chroma against 26 for iron and 52 for
+## rich_ore, before the additive composite, the palette grade and the WorldEnvironment glow finish clipping
+## R and G. The brightest mineral mark in the game therefore says bright rather than ore, while the grains
+## that do carry the ore's hue (`_draw_lode`, 159 levels of chroma in daylight) sit at 234 up top and at
+## 82-89 under the veil. `glint_dark` compounds it by design, driving the flare to full strength exactly
+## where the rock is darkest, which is exactly where the ore being marked cannot be seen. Every repair for
+## it (a smaller `lightened`, a ceiling held under UI white, or removing the overdraw where the two lines
+## and the circle stack additively at the star's centre) changes how loud and what colour a deliberate
+## discovery cue is, so it is a look decision rather than a tuning one.
+##
+## The per-cell phase hash below is not a linear-sequence-as-hash site: its `% 997` outputs have 13, 14 and
+## 28 distinct gaps over a 16-cell horizontal run, a 16-cell vertical face and a 6x6 patch, so there is no
+## three-distance lattice, unlike the star and cloud fields.
 func _draw_glint_flares(view: Rect2, canvas: CanvasItem) -> void:
 	const PERIOD: float = 3.4
 	const FLARE_LEN: float = 0.5
@@ -1169,7 +1186,7 @@ func _draw_glint_flares(view: Rect2, canvas: CanvasItem) -> void:
 		var def: MaterialDef = _material(sim.material_at(c))
 		if not def.has_nuggets() or not def.glitters:  # coal reads as dark clusters, not glinting gems
 			continue
-		# Only EXPOSED ore glints: a fleck catches the light at a dug face, not buried in solid rock. Ore
+		# Only exposed ore glints: a fleck catches the light at a dug face, not buried in solid rock. Ore
 		# twinkling everywhere, including cells sealed inside stone, reads as a floating starfield; gating to
 		# exposed faces clusters the sparkle onto the vein that has been dug into. Discovery from across a
 		# dark cavern is carried by the cohesive crystal-seam glows instead.
@@ -1224,7 +1241,7 @@ func _draw_seal_pulse(view: Rect2) -> void:
 				Color(0.42, 0.22, 0.66, 0.05 + 0.09 * breath))
 
 
-## Painter for ONE terrain chunk, bound to its cell `rect`: background walls, terrain cells and the smoothed
+## Painter for one terrain chunk, bound to its cell `rect`: background walls, terrain cells and the smoothed
 ## surface, but only for cells inside this chunk. A CanvasItem is not clipped to `rect` (the surface wedge
 ## may reach one cell above it), so cross-boundary detail draws fine; `rect` only bounds which cells this
 ## chunk is responsible for. The world border is drawn by the dynamic _draw, as one thin outline.
@@ -1233,7 +1250,7 @@ func _paint_terrain_chunk(ci: CanvasItem, rect: Rect2i) -> void:
 	TerrainPainter.paint(self, ci, rect)   # solid cells in this chunk, ending with the surface cap for its columns
 
 
-## Draw the baked coarse terrain (the SubViewport render-target) as ONE quad at z -10: the ~11,882-draw chunk
+## Draw the baked coarse terrain (the SubViewport render-target) as one quad at z -10: the ~11,882-draw chunk
 ## pass collapsed to a single textured rect. World rect 1:1, NEAREST filter so it snaps crisply with the
 ## pixel-snap camera. The render-target holds the chunk painters' exact output, since it is the same draw
 ## code, so this is pixel-identical to a per-chunk pass; it only re-renders on a terrain change.
@@ -1245,7 +1262,7 @@ func _paint_terrain_bake(layer: LightLayer) -> void:
 
 
 ## Draw the placed power conduits. Each tube is a copper segment with stubs to whatever it couples to
-## (adjacent conduits, the generator feeding it, a machine drawing from it) and an inner CHANNEL that glows
+## (adjacent conduits, the generator feeding it, a machine drawing from it) and an inner channel that glows
 ## from dim to gold by the live power it carries, so a powered trunk reads as a bright line pouring down the
 ## shaft and a dead tube reads dark. The power level is a derived field; this pass is read-only.
 func _draw_conduits() -> void:
@@ -1297,7 +1314,7 @@ func _draw_power_pulses() -> void:
 		if lvl < 0.08:                                # dead or near-dead tube: no flow to show
 			continue
 		var center: Vector2 = Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
-		# Flow links leaving THIS node: down, if coupled to a conduit or a consumer machine, plus downhill
+		# Flow links leaving this node: down, if coupled to a conduit or a consumer machine, plus downhill
 		# laterals toward an equal-or-lower conduit, with ties going right. Never up: that would deny the hook.
 		var links: Array[Vector2i] = []
 		var below: Vector2i = c + Vector2i(0, 1)
@@ -1403,7 +1420,7 @@ const ZONE_TINTS: Array[Dictionary] = [
 ]
 
 
-## Ease `col` toward every zone tint whose band `row` has entered. Applied to terrain AND walls, so the whole
+## Ease `col` toward every zone tint whose band `row` has entered. Applied to terrain and walls, so the whole
 ## stratum shifts together; machines and items stay untinted, because the artificial keeps its own colour.
 func _zone_tinted(col: Color, row: int) -> Color:
 	for z: Dictionary in ZONE_TINTS:
@@ -1423,22 +1440,22 @@ func _cell_fill_color(c: Vector2i, def: MaterialDef) -> Color:
 	return FineTerrain.apply_tone(_cell_base_color(c, def), _cell_tone(c))
 
 
-## The cell's colour BEFORE any tone: the material's base darkened with depth and zone-tinted. Split out for
+## The cell's colour before any tone: the material's base darkened with depth and zone-tinted. Split out for
 ## the fine bake, which needs the base and the tone separately so it can reconstruct the tone field between
 ## coarse samples instead of inheriting one flat value per 32px cell. The coarse pass puts the two straight
 ## back together above, so its output is unchanged.
 func _cell_base_color(c: Vector2i, def: MaterialDef) -> Color:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
-	# depth_darken is OUTWEIGHED by the zone tints applied after it, and cannot be tuned out of that.
+	# depth_darken is outweighed by the zone tints applied after it, and cannot be tuned out of that.
 	# _zone_tinted lerps toward four mid-bright targets, so it both lightens the deep and attenuates
-	# whatever this line did by (1 - strength). Measured authored luma from row 24 to row 88 RISES in
+	# whatever this line did by (1 - strength). Measured authored luma from row 24 to row 88 rises in
 	# every material that spans bands: coal +39.8, deepslate +33.7, ore +19.8, stone +12.2. Deleting
 	# depth_darken makes those slopes steeper, not flatter (+41.1, +36.2, +22.6, +16.1), and applying it
 	# after the tints instead only reaches flat for stone. The lever for a darker deep is ZONE_TINTS,
 	# which is a palette decision rather than a tuning one. What makes the deep read dark in the shipped
 	# image is the shadow veil, a separate multiply layer that never touches these bytes.
 	var base: Color = def.base_color.darkened(depth * def.depth_darken)
-	# The stain (`docs/LODE.md` §10 phase 4). Rock with a vein behind it is mineralised rock and should look
+	# The stain (`docs/LODE.md` §10). Rock with a vein behind it is mineralised rock and should look
 	# it; otherwise, once ore stops being a block, the world is uniform stone and the only way to find
 	# anything is to dig at random.
 	#
@@ -1453,7 +1470,7 @@ func _cell_base_color(c: Vector2i, def: MaterialDef) -> Color:
 	return _zone_tinted(base, c.y)
 
 
-## Carry rock `amount` of the way toward the metal in it, in HUE only: the host keeps the say over how lit it
+## Carry rock `amount` of the way toward the metal in it, in hue only: the host keeps the say over how lit it
 ## is. Shared by the buried stain and the exposed face so the two cannot drift apart, since an opened vein
 ## has to be the same vein, more so.
 func _stain(host: Color, vein: MaterialDef, amount: float) -> Color:
@@ -1475,11 +1492,11 @@ func _stain(host: Color, vein: MaterialDef, amount: float) -> Color:
 ## That boost is also why quantising these two to the coarse grid was costly, and why the fine bake
 ## reconstructs them: the term the game amplifies most was the term drawing the grid.
 ##
-## Both are applied RELATIVE to the cell's own colour (see FineTerrain.apply_tone), then tinted. Absolute
+## Both are applied relative to the cell's own colour (see FineTerrain.apply_tone), then tinted. Absolute
 ## band targets looked right against brown topsoil and died below it: a dark clay target sits almost exactly
 ## on deep stone's own colour, so half the bedding became a no-op in the place that needed it most.
 ## Lightening and darkening the cell always swings, whatever the cell happens to be; the tint then rides on
-## top for the hue that makes a band read as a different DEPOSIT rather than as shading.
+## top for the hue that makes a band read as a different deposit rather than as shading.
 func _cell_tone(c: Vector2i) -> Vector2:
 	var depth: float = clampf(float(c.y) / float(FactorySim.GRID_ROWS), 0.0, 1.0)
 	var boost: float = 1.0 + depth * 2.2
@@ -1490,14 +1507,14 @@ func _cell_tone(c: Vector2i) -> Vector2:
 ## flat colour, but it drifts in cloudy isotropic patches, which reads as noise on a slab rather than as a
 ## slab made of something.
 ##
-## Bands run HORIZONTALLY, the direction you cut across as you sink, at three incommensurable frequencies, so
+## Bands run horizontally, the direction you cut across as you sink, at three incommensurable frequencies, so
 ## fine laminations and thick beds overlap and the pattern never visibly repeats down a shaft. They are
 ## warped slowly along x so a layer dips and rises like real bedding instead of ruling a straight line across
 ## the world. Light bands go sandy and dark bands go to cool clay: a hue move rather than a value one,
 ## because value alone would only re-shade the same brown.
 ##
 ## Deterministic and RNG-free, and it feeds the fine-terrain bake through the same callable, so a dug face
-## exposes the same layer the coarse cell was showing. The two band COLOURS live on FineTerrain with
+## exposes the same layer the coarse cell was showing. The two band colours live on FineTerrain with
 ## `apply_tone`, which is the single authority for what a tone means to a pixel: the coarse pass and the fine
 ## pass have to agree, so only one of them may own it.
 const STRATA_AMOUNT: float = 0.17              ## how far a band pulls toward its colour
@@ -1546,52 +1563,50 @@ func _cell_speckles(c: Vector2i, n: int) -> Array[Vector2]:
 	return out
 
 
-## UI DRAWN INTO WORLD SPACE IS NOT WHITE. WHITE IS FOR IMPACT AND FOR PHYSICAL EVENTS.
+## Interface drawn into world space is not white. White is reserved for impact and for physical events.
 ##
-## No such rule existed, and without one every mark drifted to the top of the value range, because the top
-## of the range is always the cheapest way to make one more thing read. A rock shattering under the pick
-## (`_draw_mine_cracks`, 0.92/0.94/1.00), a sonar return arriving (`_draw_scan`, a 1.0 core), a targeting
-## ring parked on the objective cell for the whole step and the cursor box all spoke in the same voice, and
-## the two that were events had nothing left to shout with.
+## Without that rule every mark drifts to the top of the value range, because the top of the range is the
+## cheapest way to make one more thing read. A rock shattering under the pick (`_draw_mine_cracks`,
+## 0.92/0.94/1.00), a sonar return arriving (`_draw_scan`, a 1.0 core), a targeting ring parked on the
+## objective cell for a whole step and the cursor box all spoke in the same voice, and the two that were
+## events had nothing left to shout with.
 ##
 ## Pure white is the brightest mark this screen can make and there is exactly one of it, so it is spent on
-## the rarest thing: something that has just HAPPENED, at the moment it happens. Chrome is what the player
-## looks THROUGH rather than AT, and it has no moment: the cursor, the build ghost's border, guidance.
-## Chrome is allowed to be bright. It is not allowed to be white.
+## the rarest thing: something that has just happened, at the moment it happens. Chrome is what the player
+## looks through rather than at, and it has no moment: the cursor, the build ghost's border, guidance. It
+## is allowed to be bright, and it is not allowed to be white.
 ##
-## One constant and not a palette, because the sites that take it differ only in alpha and each already
-## carries an alpha that was settled in place, some of them under the veil and some above it. Moving hue and
-## leaving every alpha exactly as it was keeps this one change rather than two.
+## One constant rather than a palette, because the sites that take it differ only in alpha and each already
+## carries an alpha settled in place, some under the veil and some above it. Moving hue and leaving every
+## alpha alone keeps this one change rather than two.
 const CHROME := Color(0.78, 0.83, 0.92)
 
 
-## AN ARROW IS MATTER MOVING. A CHEVRON IS ATTENTION. NOTHING ELSE POINTS.
+## An arrow is matter moving. A chevron is attention. Nothing else points.
 ##
-## Four unrelated grammars had grown into the same handful of shapes, and every one of them read as "go
-## this way". A solid wedge on a machine's edge meant goods cross here. A solid wedge of the same size,
-## bobbing three cells up in the air on a line, meant your objective is down there. A stem with an open
-## head under the Drill's preview meant ore pours out into that cell, and the identical stem said the same
-## thing under the Borer and under each of the Drift Rig's two drop columns, in three separate copies of
-## the same six lines. Three of the four were describing a flow. The fourth was not, and it was the one
-## carrying the whole of the game's guidance.
+## Four unrelated grammars had grown into the same handful of shapes, and every one read as "go this way":
+## a solid wedge on a machine's edge for goods crossing there, the same wedge bobbing three cells up in the
+## air on a line for the objective below it, and a stem with an open head for ore pouring out under the
+## Drill, the Borer and each of the Drift Rig's two drop columns. Three of the four described a flow; the
+## fourth did not, and it was the one carrying the whole of the game's guidance.
 ##
-## An ARROW says matter moves along the way it points. It is a solid head, with a stem when the goods
+## An arrow says matter moves along the way it points. It is a solid head, with a stem when the goods
 ## travel a distance to get there and without one when they only cross a boundary, and it is always drawn
 ## in contact with the path it describes: on the casing edge the goods pass through, in the cell they land
 ## in. `_matter_wedge` draws that head for every one of them, so a machine's spout and a drop column's
-## arrowhead are not two similar marks that have to be kept in step, they are one mark called twice.
+## arrowhead are one mark called twice rather than two similar marks kept in step.
 ##
-## A CHEVRON says look here. It is an open stroke, it has no stem of its own, and it is the only mark in
+## A chevron says look here. It is an open stroke, it has no stem of its own, and it is the only mark in
 ## the file that floats free of the thing it means. Guidance owns it and nothing else may draw one. Its
 ## tether is dotted rather than drawn for the same reason the head opened up: a solid line running from a
-## head down onto a cell is a stem, and a stem would make the mark an arrow pouring something INTO that
+## head down onto a cell is a stem, and a stem would make the mark an arrow pouring something into that
 ## rock, which is the drop column's sentence and the one thing guidance must not be caught saying.
 ##
 ## The rule reaches as far as the marks this file lays over the world and no further. `Visuals._lift`
 ## marches open chevrons up the Lift's body to mean goods rise through it, which is matter wearing the
-## attention shape. That one sits inside the casing and is part of the picture of what the machine IS,
-## rather than a note laid on top of the world, so it is a boundary case and not a collision. It is still
-## the first place to look if the two ever start reading as each other.
+## attention shape. That one sits inside the casing and is part of the picture of what the machine is
+## rather than a note laid on top of the world, so it is a boundary case rather than a collision, and the
+## first place to look if the two ever start reading as each other.
 ##
 ## Half-width and rise of the one chevron there is, in pixels. Kept here rather than at the draw site
 ## because it is the shape the rule names, and because a second chevron appearing anywhere with its own
@@ -1599,55 +1614,44 @@ const CHROME := Color(0.78, 0.83, 0.92)
 const GUIDE_CHEVRON := Vector2(9.0, 10.0)
 
 
-## A SQUARE IS WHERE YOU POINT. CORNERS ARE WHAT YOU WOULD ACT ON. A DASH IS A PLAN. A BAR IS A NO.
+## A square is where you point. Corners are what you would act on. A dash is a plan. A bar is a refusal.
 ##
-## Five marks were answering the same two questions — what is the cursor on, and may I act on it — and no
-## two of them were cut from the same parts. A chrome square at the cell's full width over rock. The same
-## square inset by a pixel and half a pixel heavier under a build ghost. Corner brackets at one arm length
-## on the thing under the cursor, and corner brackets at another arm length and another inset on a cell
-## painted for the pick. An outline breathing green around the cell guidance wants the next machine on. A
-## red square with an X drawn corner to corner over rock too hard to bite. Five, for two questions, and
-## every one of them has to be learned on its own.
+## Four shapes for two questions: what is the cursor on, and may I act on it. Five marks used to answer
+## them and no two were cut from the same parts, and two of them were not cut differently at all. Over an
+## empty cell the build ghost's border said yes in chrome and no in red at the same size and weight, so the
+## difference between a press that lands and a press that does nothing was a hue, which is no difference to
+## a player who cannot use hue.
 ##
-## The worst of it was where two answers were NOT cut differently. Over an empty cell the build ghost's
-## border said yes in chrome and no in red at the same size and the same weight, so the difference between
-## a press that lands and a press that does nothing was a hue — which is no difference at all to a player
-## who cannot use hue, and that is the one place in the file where telling two marks apart costs a press.
-##
-## Four shapes now, and each answers a different question.
-##
-## A SQUARE is the cursor and says only HERE. One inset, one weight, chrome, and it neither breathes nor
+## A square is the cursor and says only "here". One inset, one weight, chrome, and it neither breathes nor
 ## grows: it is on screen every frame of the game, and a mark that never leaves cannot be the mark that
 ## means now.
 ##
-## CORNERS say this is the thing your next press acts on. They breathe, they grow, and they carry the
-## thing's OWN colour, so they name what is under the cursor as well as where it is — which is the half of
+## Corners say this is the thing your next press acts on. They breathe, they grow, and they carry the
+## thing's own colour, so they name what is under the cursor as well as where it is. That is the half of
 ## the sentence a neutral reticle could never say, and the reason this is the mark the active action keeps.
 ## `_cell_corners` cuts them for the hovered thing and for the painted dig plan alike, the plan wearing a
 ## thinner stroke of the same shape rather than a second shape to learn.
 ##
-## A DASH is a plan: something happens to this cell later, by your hand or by a machine's. It was already
-## the build previews' shape and it is now the placement objective's too, which used to breathe an outline
-## around its cell — the one gesture corners own.
+## A dash is a plan: something happens to this cell later, by your hand or by a machine's. It is the build
+## previews' shape and the placement objective's.
 ##
-## A BAR is a refusal, struck ACROSS the cell it refuses, in the one red both refusals now share. This is
-## the part of the vocabulary that has to survive being glanced at rather than read, which is why the
-## answer is a shape and not only a colour.
+## A bar is a refusal, struck across the cell it refuses, in the one red both refusals share. This part of
+## the vocabulary has to survive being glanced at rather than read, which is why the answer is a shape and
+## not only a colour.
 ##
-## NOTHING THAT ALIGNS TO A CELL IS ROUND. The world keeps two rings and neither of them is a cell mark.
-## The hook's endpoint (`_draw_aim_ghost`) is put where the hook would touch and is not snapped to the
-## grid, so it reads as a contact point rather than as a square's worth of rock — which is exactly what
-## says it belongs to a different verb than the one the cursor is holding. The sonar's returns and the map
-## pin's beacon expand, and a growing ring is an arrival rather than a place. The need bubble over a
-## stalled machine was a third, and the worst of them — a thin circle with a bolt struck through it,
-## hanging in the dark over a machine too unlit to see, which is a prohibition sign in every language on
-## earth. It keeps its shape and gets a stem down onto the roof it speaks for, because a mark touching the
-## thing it is about is a label, and only a mark floating free of everything can be read as a sign.
+## Nothing that aligns to a cell is round. The world keeps two rings and neither is a cell mark. The hook's
+## endpoint (`_draw_aim_ghost`) sits where the hook would touch and is not snapped to the grid, so it reads
+## as a contact point rather than as a square's worth of rock, which is what says it belongs to a different
+## verb than the one the cursor is holding. The sonar's returns and the map pin's beacon expand, and a
+## growing ring is an arrival rather than a place. The need bubble over a stalled machine gets a stem down
+## onto the roof it speaks for: floating free in the dark it is a thin circle with a bolt struck through
+## it, which is a prohibition sign in every language on earth, while a mark touching the thing it is about
+## reads as a label.
 ##
 ## Where the rule stops: `Visuals.draw_status_mark` cuts a small cross for a machine wired to nothing, and
-## a cross on a machine is close to the bar this file now spends on refusal. That one is a lamp glyph
-## inside the casing rather than a note laid over the world, so it is a boundary case in the same way
-## `Visuals._lift`'s chevrons are, and it is the first place to look if the two start reading as each other.
+## a cross on a machine is close to the bar this file spends on refusal. That one is a lamp glyph inside
+## the casing rather than a note laid over the world, so it is a boundary case in the same way
+## `Visuals._lift`'s chevrons are, and the first place to look if the two start reading as each other.
 ##
 ## Inset from the cell edge that every mark here is drawn at, in pixels. One number rather than one per
 ## site, so a cell wearing two of them shows no seam between them.
@@ -1670,7 +1674,7 @@ const MARK_FILL: float = MARK_INSET + MARK_W * 0.5
 ## you are doing right now and is allowed to interrupt. Each site keeps the alpha it had already settled
 ## on, so only the hue moves.
 ##
-## The red-amber the build previews warn in is deliberately NOT this. A warning says the machine you are
+## The red-amber the build previews warn in is deliberately not this. A warning says the machine you are
 ## about to place will sit there with nowhere to drain; a refusal says the press will not happen at all.
 ## One of them stops you and the other does not, and they should not arrive in the same colour.
 const REFUSE := Color(0.95, 0.45, 0.40)
@@ -1680,11 +1684,11 @@ const REFUSE := Color(0.95, 0.45, 0.40)
 ## machine; mode "act" is a chevron bobbing in the air above the target with a tether down to it, over
 ## a faint wash on the cell itself (dig this, feed this forge). Cosmetic.
 ##
-## ONE RING GRAMMAR, AND IT BELONGS TO THE ACTIVE ACTION. "act" used to draw a near-white reticle over a
+## one ring grammar, and it belongs to the active action. "act" used to draw a near-white reticle over a
 ## dark backing ring here, so the objective and the cursor were both breathing a shape around a cell, on
 ## the same 4.0 rad/s clock, in two colour languages, at once. The cursor's ring is the one that survives
 ## (`_draw_interact_pulse`): it appears only where the next action would land, it is drawn in the colour of
-## the thing being acted on so it says WHAT as well as where, and it leaves when you look elsewhere. An
+## the thing being acted on so it says what as well as where, and it leaves when you look elsewhere. An
 ## objective is a destination rather than an action, it sits on screen for the length of a whole step, and
 ## a mark that never goes away cannot be the mark that means now. So guidance points from above instead and
 ## stays out of the ring language entirely.
@@ -1696,7 +1700,7 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 			continue
 		var center: Vector2 = _cell_center(cell)
 		if String(t.get("mode", "act")) == "ghost":
-			# A dashed cell, not a breathing one. An outline that GROWS around a cell is what the cursor
+			# A dashed cell, not a breathing one. An outline that grows around a cell is what the cursor
 			# does when it lands on something you can act on, and a placement objective is not that: it is
 			# a plan, which is the shape the build previews already wear and which this cell is about to
 			# become one of. It still breathes in value, so it reads as live without borrowing the gesture.
@@ -1713,12 +1717,12 @@ func _draw_guide_targets(canvas: CanvasItem) -> void:
 		# under a chrome one, so it punches through both the bright lamp and the bright day sky; that is
 		# what the filled wedge's dark backing polygon used to do and it is the property worth keeping.
 		var lift: float = float(CELL) * (2.9 + 0.35 * pulse)
-		# `lift` is where the mark hangs, and the chevron's point sits on it directly. The filled wedge that
-		# used to be here carried a second offset below `tip` for its apex, which was bookkeeping for
-		# building a triangle around a point rather than anything the mark meant. It goes with the triangle.
+		# `lift` is where the mark hangs, and the chevron's point sits on it directly, with no second offset
+		# for an apex: that was bookkeeping for building a triangle around a point rather than anything the
+		# mark meant.
 		var tip := center + Vector2(0.0, -lift)
 		# The tether is ticked, not drawn. A solid line from a head down onto a cell is a stem, and a stem
-		# is what makes an arrow: the mark would then be saying something POURS into that rock, which is
+		# is what makes an arrow: the mark would then be saying something pours into that rock, which is
 		# the drop column's sentence. Ticks with gaps in them read as a leader line instead, and the tick
 		# pattern is the one `_draw_dashed_rect` already uses on the build previews.
 		_dotted_line(canvas, tip + Vector2(0.0, 3.0), center + Vector2(0.0, -float(CELL) * 0.5),
@@ -1769,15 +1773,15 @@ func _mark_wash(cell: Vector2i) -> Rect2:
 	return _mark_rect(cell).grow(MARK_INSET - MARK_FILL)
 
 
-## THE CURSOR SQUARE: the cell you are pointing at, and nothing beyond that. Three sites used to cut their
-## own — over rock at the cell's full width, under a build ghost inset by a pixel and half a pixel heavier,
-## over refused rock inset by a pixel — so the cursor changed size and weight as it crossed from stone into
-## air. One mark in three colours now.
+## The cursor square: the cell you are pointing at, and nothing beyond that. Three sites used to cut their
+## own version. Over rock it was the cell's full width; under a build ghost it was inset by a pixel and half
+## a pixel heavier; over refused rock it was inset by a pixel. The cursor therefore changed size and weight
+## as it crossed from stone into air. One mark in three colours now.
 func _cell_square(cell: Vector2i, col: Color) -> void:
 	draw_rect(_mark_rect(cell), col, false, MARK_W)
 
 
-## CORNERS: four L-brackets hugging `rect` with their arms turned inward. The hovered thing wears them
+## corners: four L-brackets hugging `rect` with their arms turned inward. The hovered thing wears them
 ## solid and the painted dig plan wears them thin, which is the whole of the difference between the two
 ## sites that used to keep a corner loop each, at two arm lengths and two insets.
 ##
@@ -1793,12 +1797,12 @@ func _cell_corners(canvas: CanvasItem, rect: Rect2, col: Color, width: float) ->
 		canvas.draw_line(c, c + Vector2(0.0, arm * d.y), col, width)
 
 
-## A REFUSAL: the cursor square in the refusal red with a bar struck across it. Both of the game's hard NOs
-## come through here — rock over the carried drive's tier, and a cell with no room for the machine in hand
-## — because they were the pair that differed in hue and in nothing else, and a refusal is exactly the
+## A refusal: the cursor square in the refusal red with a bar struck across it. Both of the game's hard
+## refusals come through here: rock over the carried drive's tier and a cell with no room for the machine
+## in hand. They were the pair that differed in hue and in nothing else, and a refusal is exactly the
 ## answer that must not depend on telling two reds apart.
 ##
-## One bar where there used to be a crossed pair: two strokes were never saying more than one, and a cross
+## One bar where there used to be a crossed pair. Two strokes were never saying more than one, and a cross
 ## is the mark a machine's lamp wears for a wire that leads nowhere. It starts half a corner arm in from
 ## the mark's corners, which is where the cross it replaces started and is far enough in that a cell could
 ## wear corners and a bar at once without them touching. `alpha` is whatever the calling site had already
@@ -1812,11 +1816,11 @@ func _cell_refusal(cell: Vector2i, alpha: float) -> void:
 
 
 ## An interactable outline pulse: a breathing coloured outline plus solid corner brackets around the hovered
-## thing, in the thing's OWN colour, so a drill pulses steel and an ore vein pulses ore. Drawn rather than
+## thing, in the thing's own colour, so a drill pulses steel and an ore vein pulses ore. Drawn rather than
 ## shadered because machines and terrain here are procedural canvas paint, so there is no texture a shader
 ## outline could sample.
 ##
-## THIS is the mark the active action keeps: an outline that grows around a cell means the next press lands
+## this is the mark the active action keeps: an outline that grows around a cell means the next press lands
 ## there. Nothing else may grow one, which is why the objective marker gave up first its reticle and then
 ## its breathing outline (see `_draw_guide_targets`). The colour is not decoration either, it is the second
 ## half of the sentence, naming what is under the cursor without any text; that is the part a neutral
@@ -1836,7 +1840,7 @@ func _draw_aim() -> void:
 	if not sim.in_bounds(_aim):
 		return
 	if sim.is_solid(_aim):
-		# Rock over the carried drive's tier: the cursor goes cold and barred BEFORE you press
+		# Rock over the carried drive's tier: the cursor goes cold and barred before you press
 		# (`docs/BITS.md` §5). A binary gate is only honest if you can see it coming; finding out by clicking
 		# and watching nothing happen reads as a broken game rather than as a locked door.
 		if _aim_in_reach and not _aim_bites:
@@ -1873,7 +1877,7 @@ func _draw_aim() -> void:
 		if _ghost_def.behavior == &"h_drill" and _aim_placeable:
 			_draw_h_drill_preview()  # the gallery it will chew, and where the haul drains (or does not)
 		if _ghost_def.behavior == &"drift" and _aim_placeable:
-			_draw_drift_preview()    # the 2-high gallery and BOTH drop columns, each lit for its own drain
+			_draw_drift_preview()    # the 2-high gallery and both drop columns, each lit for its own drain
 	elif _ghost_material != &"":
 		# Block-placement preview: a translucent material-tinted fill.
 		var bg: Color = _material(_ghost_material).base_color
@@ -1881,8 +1885,8 @@ func _draw_aim() -> void:
 		draw_rect(_mark_wash(_aim), bg)
 	else:
 		return  # the active hotbar item is not placeable, so there is nothing to ghost
-	# The same cursor square as over rock, over a cell you may fill — chrome rather than the near-white it
-	# was, for the same reason the cursor moved: a preview is not an event. A cell you may NOT fill is
+	# The same cursor square as over rock, over a cell you may fill. Chrome rather than the near-white it
+	# was, for the same reason the cursor moved: a preview is not an event. A cell you may not fill is
 	# barred, where it used to be a second red square differing from the placeable one only in hue. The two
 	# answers to "can this go here" are now two shapes, and the refusal is the same mark rock over your
 	# tier wears, since it is the same sentence about a different obstacle.
@@ -1905,7 +1909,7 @@ func _draw_drill_preview() -> void:
 	var flow := Color(1.0, 0.80, 0.30, 0.95)              # warm gold: the ore is there and it will flow
 	var warn := Color(0.98, 0.45, 0.38, 0.95)             # red-amber: no drain below
 	var tint: Color = warn if blocked else flow
-	# Tint each cell the drill will bore by ITS OWN material, so a mixed column (ore stacked on coal) reads
+	# Tint each cell the drill will bore by its own material, so a mixed column (ore stacked on coal) reads
 	# as mixed: the drill bores straight down through both and pours a mixed stream, and that is visible
 	# before committing rather than as one uniform gold.
 	for oc: Variant in ore_cells:
@@ -1923,7 +1927,7 @@ func _draw_drill_preview() -> void:
 		_out_arrow(drop, tint)
 
 
-## Holding the Borer previews its GALLERY: tint every solid cell it can chew along the builder's facing,
+## Holding the Borer previews its gallery: tint every solid cell it can chew along the builder's facing,
 ## since it bores the way the player is looking, plus a dashed box around the run and a down out-arrow under
 ## its own cell. Gold when a drain exists below, red-amber when it would sit sealed on rock and pool.
 ## Mirrors _draw_drill_preview's language sideways.
@@ -1952,14 +1956,14 @@ func _draw_h_drill_preview() -> void:
 	var box := Rect2(Vector2(float(lo * CELL) + 1.0, float(_aim.y * CELL) + 1.0),
 		Vector2(float((hi - lo + 1) * CELL) - 2.0, float(CELL) - 2.0))
 	_draw_dashed_rect(self, box, tint, 6.0, MARK_W)
-	# The out-arrow under the borer's OWN cell: the on-hook rule made visible before you commit.
+	# The out-arrow under the borer's own cell: the on-hook rule made visible before you commit.
 	_out_arrow(below, tint)
 
 
 ## Holding the Drift Rig previews the two things that make it a different machine from the Borer: the gallery
-## is TWO CELLS HIGH, and the haul leaves by TWO COLUMNS, pay straight down and spoil down the column behind.
+## is two cells high, and the haul leaves by two columns, pay straight down and spoil down the column behind.
 ## `docs/DRIFT.md` §6 names two drop columns as the geometry most likely to go wrong, so both arrows are
-## drawn and each is lit for its OWN drain: gold where a column has somewhere to fall, red-amber where that
+## drawn and each is lit for its own drain: gold where a column has somewhere to fall, red-amber where that
 ## stream would pool the moment it started.
 func _draw_drift_preview() -> void:
 	var facing: int = player.facing if player != null else 1
@@ -1981,7 +1985,7 @@ func _draw_drift_preview() -> void:
 		if sim.is_solid(hi):
 			cells.append(hi)
 	for c: Vector2i in cells:
-		# Tinted by CLASS, not by material: this machine's promise is that it separates the two, so the
+		# Tinted by class, not by material: this machine's promise is that it separates the two, so the
 		# preview shows which half of that wall is ore and which half is rock.
 		var pay: bool = sim.drift_is_pay(sim.material_at(c))
 		var col: Color = Color(1.0, 0.82, 0.34, 0.26) if pay else Color(0.62, 0.66, 0.70, 0.18)
@@ -2038,15 +2042,14 @@ func _draw_rope_preview() -> void:
 	draw_line(bot + Vector2(-5.0, 0.0), bot + Vector2(5.0, 0.0), ghost, 2.2)   # the floor it reaches
 
 
-## A DROP-COLUMN ARROW: goods leave the machine above and fall into `cell`. A stem down the middle of the
+## A drop-column arrow: goods leave the machine above and fall into `cell`. A stem down the middle of the
 ## column ending in `_matter_wedge`, which is the same head a machine's spout wears, because it is the same
 ## claim about the same goods one cell further along.
 ##
-## One function for what used to be three copies of the same six lines, one under the Drill's preview, one
-## under the Borer's and one under each of the Drift Rig's two columns. The three had already drifted: the
-## Drill's named its head size `6.0` in a local, the Borer's and the Rig's wrote the same `6.0` twice each
-## as bare literals. Three copies of a shape are three chances for it to stop being one shape, which is the
-## failure the rule above exists to prevent and which had already half happened here.
+## One function for four call sites: the Drill's preview, the Borer's, and each of the Drift Rig's two
+## columns. As three hand-rolled copies they had already drifted, the Drill naming its head size `6.0` in a
+## local while the other two wrote the same `6.0` twice each as bare literals. Three copies of a shape are
+## three chances for it to stop being one shape.
 ##
 ## Returns the tip, so a caller that hangs something off the end of the arrow does not need its own copy of
 ## how long the arrow is.
@@ -2061,13 +2064,13 @@ func _out_arrow(cell: Vector2i, tint: Color) -> Vector2:
 	return tip
 
 
-## A PLAN: the perimeter walked clockwise, laying `dash`-length ticks every other `dash`. Every site that
-## says something will happen to these cells later draws one — what a Drill will bore, the gallery a Borer
+## A plan: the perimeter walked clockwise, laying `dash`-length ticks every other `dash`. Every site that
+## says something will happen to these cells later draws one: what a Drill will bore, the gallery a Borer
 ## will chew, both of a Drift Rig's columns, and the cell guidance wants the next machine on.
 ##
 ## Drawn to a passed canvas, like `_dotted_line` and `_chevron`, because guidance's copy lives on the marks
-## layer above the veil while the build previews go on `self`. One weight for all of them: two of the four
-## used to be half a pixel heavier than the others for no reason either could state.
+## layer above the veil while the build previews go on `self`. One weight for all four, where two of them
+## used to be half a pixel heavier than the others.
 func _draw_dashed_rect(canvas: CanvasItem, rect: Rect2, color: Color, dash: float, width: float) -> void:
 	var corners: Array[Vector2] = [
 		rect.position,
@@ -2087,7 +2090,7 @@ func _draw_dashed_rect(canvas: CanvasItem, rect: Rect2, color: Color, dash: floa
 			t += dash * 2.0
 
 
-## The parallax backdrop: what the sky IS when nothing backs a cell. A vertical gradient breathing between
+## The parallax backdrop: what the sky is when nothing backs a cell. A vertical gradient breathing between
 ## day and night palettes on the day clock, a sun or moon riding its arc, stars fading in after dusk,
 ## ridgeline silhouettes sliding at sub-terrain speed, the Sinkforge crown, and a few slow clouds. Fully
 ## deterministic per frame from the camera and the cosmetic clock. Kept as a method so it stays the far
@@ -2097,18 +2100,18 @@ func _paint_backdrop(ci: CanvasItem) -> void:
 	SkyPainter.paint(self, ci)
 
 
-## The background WALL layer (sim.wall): a dug-out cell reveals the carved-room backing behind it. Cells with
-## NO wall stay transparent, so the parallax backdrop at z -20 shows through, which is what makes open sky
+## The background wall layer (sim.wall): a dug-out cell reveals the carved-room backing behind it. Cells with
+## no wall stay transparent, so the parallax backdrop at z -20 shows through, which is what makes open sky
 ## read as sky.
 ##
 ## The second plane is the depth cue that matters. A tunnel rendered as a flat rectangle at roughly four
 ## percent grey does not read as dark, it reads as empty, and no amount of work on the foreground plane fixes
 ## it. The wall used to be darkened twice, once in its own paint and again by the shadow veil, so the veil
 ## compounded a value that had already been crushed. Darkness belongs to the veil alone; the wall's paint
-## describes the MATERIAL, a rock face textured like the rock in front of it but flatter and cooler, so the
+## describes the material, a rock face textured like the rock in front of it but flatter and cooler, so the
 ## two planes separate by hue as well as by value.
 ##
-## The recess comes from solid rock CASTING onto the wall behind it. Every edge where this wall meets solid
+## The recess comes from solid rock casting onto the wall behind it. Every edge where this wall meets solid
 ## takes a soft inward shadow, deepest under a ceiling, because the world's key light comes from above. That
 ## cast is what turns a hole into a room, and it costs four neighbour lookups in a pass that only runs on a
 ## dig.
@@ -2143,7 +2146,7 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
 			var top_here: int = band[cx - rect.position.x]
-			# Tested for by NAME rather than left to the distance check. NO_SURFACE is -1, and `absi(0 - -1)`
+			# Tested for by name rather than left to the distance check. NO_SURFACE is -1, and `absi(0 - -1)`
 			# is 1, which is not greater than 1, so row zero of a hole column would fall through and draw. It
 			# is sky up there and `sim.wall` would reject it a line later, so the defect is invisible; a
 			# sentinel that survives on a downstream accident is what this guards against.
@@ -2170,13 +2173,13 @@ func _draw_background(ci: CanvasItem, rect: Rect2i) -> void:
 ##
 ## `Seams` gives every rock cell a bedding plane, a joint, a diagonal or nothing, and a blow that follows one
 ## calves the whole run, so the grain has to be readable before the swing or the mechanic is a slot machine.
-## Drawing every plane in the world all the time answers that badly: `Seams.at` keys bedding to the ROW and
-## joints to the COLUMN, so one plane spans the entire world; each cell lays its stroke on its own EDGE, so a
+## Drawing every plane in the world all the time answers that badly: `Seams.at` keys bedding to the row and
+## joints to the column, so one plane spans the entire world; each cell lays its stroke on its own edge, so a
 ## run of them is a ruled line lying exactly on a cell boundary. At Seams.RATE_HORIZONTAL 0.18 and
 ## RATE_VERTICAL 0.12 that is 18% of rows and 12% of columns ruled on the grid in ink, which reads as graph
 ## paper: a renderer drawing its own storage layout.
 ##
-## So the ambient pass does not exist and the CURSOR answers instead. Hovering a cell lights the plane
+## So the ambient pass does not exist and the cursor answers instead. Hovering a cell lights the plane
 ## through it and the run it would shear, which is more information than an ambient hairline carried, at the
 ## moment it is worth having, and it costs the rest of the screen nothing. The stroke itself is a shadow with
 ## a lit lip rather than a drawn line, and it wanders off the cell line, because a parting that ran straight
@@ -2192,7 +2195,7 @@ func _draw_seams() -> void:
 		_stroke_seam(c, Seams.at(c, sim.world_seed), s, SEAM_AIM_DARK, SEAM_AIM_LIP, 2.2)
 
 
-## A smooth +/-1 wander along a plane, sampled per cell INDEX so neighbouring cells share an endpoint exactly
+## A smooth +/-1 wander along a plane, sampled per cell index so neighbouring cells share an endpoint exactly
 ## and the polyline is continuous. Two sines rather than a hash, because a hash steps at every cell and a
 ## plane has to bend rather than jump.
 func _seam_wander(i: int, salt: float) -> float:
@@ -2230,7 +2233,7 @@ func _stroke_seam(c: Vector2i, seam: int, s: float, dark: Color, lip: Color, w: 
 
 ## The cells the aimed cell's plane runs through, within one blow's reach along it. Walked with
 ## `MainView._calve`'s own gates (contiguous, same seam, still solid) so what lights up is what would
-## actually shear rather than a decoration that resembles it. The heading gate is deliberately NOT applied:
+## actually shear rather than a decoration that resembles it. The heading gate is deliberately not applied:
 ## this says which way the rock parts, which is what you need in order to choose a heading at all.
 func _aim_run() -> Dictionary:
 	var out: Dictionary = {}
@@ -2323,7 +2326,7 @@ func _draw_ground() -> void:
 
 
 ## The render of sim.water. Each watered cell holds an integer level 1..WATER_MAX and draws a translucent
-## blue fill whose height is level/WATER_MAX of the cell, anchored at the cell's BOTTOM, so a partially-full
+## blue fill whose height is level/WATER_MAX of the cell, anchored at the cell's bottom, so a partially-full
 ## cell reads a low water line and a settled pool reads a flat surface across its top. Translucent enough
 ## that the terrain and back wall behind show through. Read each frame, never cached, because water flows
 ## every tick and the sim is authoritative; this pass never writes it. Drawn in the main world pass, below
@@ -2339,10 +2342,10 @@ const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so
 const WATER_SHEEN := Color(0.32, 0.66, 0.98)          ## cool blue tint for the wet-sheen pool
 const WATER_SHEEN_BASE: float = 0.07                  ## floor intensity for a barely-wet cell
 const WATER_SHEEN_LEVEL: float = 0.11                 ## added intensity at a brim-full cell (scales by level)
-const WATER_SHEEN_RADIUS: float = 2.4                 ## cells; wide enough that neighbouring pools MERGE
+const WATER_SHEEN_RADIUS: float = 2.4                 ## cells; wide enough that neighbouring pools merge
 const WATER_SHEEN_SPREAD: float = 0.42                ## ...and dimmer each, so the total stays a whisper
 ## The surface y (top of the water) a cell would draw for a given integer level, anchored at the cell
-## BOTTOM. Higher level means a higher surface and so a SMALLER y; level 0 is the cell floor.
+## bottom. Higher level means a higher surface and so a smaller y; level 0 is the cell floor.
 func _water_surface_y(cell: Vector2i, level: int) -> float:
 	var frac: float = clampf(float(level) / float(FactorySim.WATER_MAX), 0.0, 1.0)
 	return float(cell.y) * float(CELL) + float(CELL) * (1.0 - frac)
@@ -2389,7 +2392,7 @@ func _spawn_water_drips(delta: float) -> void:
 		var surf_y: float = _water_surface_y(c, level)
 		particles.water_drip(Vector2(base.x + cell_f * 0.5, surf_y + 2.0))
 		spawned += 1
-		# A small splash where the pour LANDS: scan down the open column to the first blocker, rock or a
+		# A small splash where the pour lands: scan down the open column to the first blocker, rock or a
 		# full-water surface. Only if it is close and on-screen, so this never chases a bottomless shaft or
 		# splashes off-view. Half the drips, so it stays subtle.
 		if randf() < 0.5:
@@ -2417,33 +2420,58 @@ func _spawn_water_drips(delta: float) -> void:
 ##     soft meniscus under it, and slow caustic bands drift through the body. All cosmetic, all off the
 ##     free-running clock, none of it near the sim.
 ##
-## Deep water is deeply BLUE rather than dark. At (0.05, 0.16, 0.34) the body tended toward black as it
+## Deep water is deeply blue rather than dark. At (0.05, 0.16, 0.34) the body tended toward black as it
 ## deepened, which loses the cue that says water and not hole: measured against the rock it sits in, the
 ## colour separation fell to 10 levels, most of that in the top few cells. Dropping red and green further
 ## while holding blue up deepens it and reads more like water.
 const WATER_DEEP := Color(0.03, 0.13, 0.46)           ## the colour the body tends toward with depth
 const WATER_DEPTH_CELLS: float = 7.0                  ## cells down over which the gradient runs out
-## Deliberately short of opaque. Depth is carried by COLOUR, toward WATER_DEEP, rather than by density,
+## Deliberately short of opaque. Depth is carried by colour, toward WATER_DEEP, rather than by density,
 ## because the rock behind a pool is where a body of water gets most of its visible structure: shut it out
 ## and the interior is a flat field again, just a darker one. At 0.80 the body measured 60% featureless by
 ## the shared dead-space standard, and the rock showing through is what fixes that, not more caustics.
 const WATER_ALPHA_DEEP: float = 0.66                  ## ...and the density it reaches there
 const WATER_RIPPLE_AMP: float = 1.5                   ## px the waterline travels
-const WATER_RIPPLE_LEN: float = 46.0                  ## px between ripple crests
+## Authored at 46px and drawn at 105px, knowingly. The waterline is displaced at the two corners of each
+## cell, so it is sampled every CELL px exactly as the caustics are, and 46px is under the two-cell floor:
+## it advances 0.696 cycles per sample and folds to 0.304, which puts the drawn crests 105px apart.
+##
+## The second caustic below has the same problem for a different reason. A caustic is a flat fill with no
+## sub-cell resolution available at any price. This is vertex geometry, and one extra sample on the top
+## edge would put the sampling at 16px and make 46.0 mean what it says, but that touches the surface
+## polygon, the bright line and the meniscus, all of which have to agree about where the water is. Raising
+## this to 96px instead would make the number honest and the water worse, since a 1.5px swell every 96px
+## is close to no ripple at all.
+const WATER_RIPPLE_LEN: float = 46.0                  ## px between ripple crests; drawn at 105, see above
 const WATER_RIPPLE_SPEED: float = 1.7                 ## crests per second
 const WATER_MENISCUS: float = 3.0                     ## px of soft edge hung under the bright line
 const WATER_CAUSTIC_LEN: float = 78.0                 ## px between caustic bands
 const WATER_CAUSTIC_SPEED: float = 0.55
 const WATER_CAUSTIC: float = 0.15                     ## how much a band lifts the fill
-## A second, finer set crossing the first the other way. One band pattern is a stripe; two at different
-## scales drifting in opposite directions interfere, and interference is what light on moving water looks
-## like.
+## A second set crossing the first the other way. One band pattern is a stripe; two at different scales
+## drifting in opposite directions interfere, and interference is what light on moving water looks like.
+##
+## It is the finer of the two on paper only. Caustics are evaluated once per cell and the fill is flat
+## across it, so this is a sampled signal whose shortest representable period is two cells, meaning 64px.
+## The authored 29.0 is under that by a factor of two: along y the argument advances 1.103 cycles per
+## sample and folds to 0.103, and along x the 0.7 coefficient puts the period at 41.4px, which folds to
+## 0.233. The band written as 29px and 41px is drawn at 309px and 141px. Not as noise, because
+## undersampling a single sinusoid destroys its frequency and not its structure, but as a coarse moire
+## slower and wider than the 78px primary it is meant to detail, crawling the wrong way at a speed
+## unrelated to WATER_CAUSTIC_SPEED2.
+##
+## The primary is legal on the same test: 78px is 0.410 cycles per sample and its 0.6 y coefficient makes
+## 130px, both comfortably under the limit. A period this one could be read at is any multiple of CELL of
+## two or more, and three samples per cycle rather than the bare two Nyquist allows is the first that
+## reads as a band instead of a checker, which puts it at 96px. Moving it would also change how much
+## visible texture WATER_CAUSTIC2 lifts, and that is a look decision wanting eyes on moving water rather
+## than arithmetic on a constant.
 const WATER_CAUSTIC_LEN2: float = 29.0
 const WATER_CAUSTIC_SPEED2: float = -0.9
 const WATER_CAUSTIC2: float = 0.09
 
 
-## How far INSIDE the body this cell sits: 0 at the surface, growing downward, capped where the gradient has
+## How far inside the body this cell sits: 0 at the surface, growing downward, capped where the gradient has
 ## run out anyway, so a deep aquifer costs no more to draw than a puddle.
 func _water_depth(c: Vector2i) -> float:
 	var d: int = 0
@@ -2457,11 +2485,11 @@ func _water_depth(c: Vector2i) -> float:
 ## What the player built, and whether it holds. Two tells over one pass, because they are two halves of one
 ## fact (`docs/DRIFT.md` §4):
 ##
-##   PACKED fill draws as aggregate: a compacted stipple with a hairline seam around the cell. The molded
+##   packed fill draws as aggregate: a compacted stipple with a hairline seam around the cell. The molded
 ##     terrain layer blends a one-cell material into its neighbours, which is what makes rock read as rock
 ##     rather than as tiles, and is wrong for a wall whose whole value is being a different material from
-##     the rock beside it. So packing is drawn ON TOP, as construction rather than as strata.
-##   LOOSE fill WEEPS when water leans on it: a bead runs down the dry face and fades, phased per cell so a
+##     the rock beside it. So packing is drawn on top, as construction rather than as strata.
+##   loose fill weeps when water leans on it: a bead runs down the dry face and fades, phased per cell so a
 ##     wall reads as a weeping surface rather than as one blinking light. Without it water appears on the
 ##     dry side out of nowhere and the player never learns which wall is the leak.
 ##
@@ -2489,7 +2517,7 @@ func _draw_fill_tells() -> void:
 			if sim.water_at(wet) < FactorySim.SEEP_PRESSURE or sim.is_solid(dry):
 				continue
 			var face := base + Vector2(cell_f, cell_f) * 0.5 + Vector2(pair[1] as Vector2i) * cell_f * 0.44
-			# The face goes WET first, a cool sheen down the dry side, which is what is noticeable from across
+			# The face goes wet first, a cool sheen down the dry side, which is what is noticeable from across
 			# a gallery; the beads then run down it.
 			draw_line(face + Vector2(0.0, -cell_f * 0.46), face + Vector2(0.0, cell_f * 0.46),
 				Color(0.55, 0.78, 0.94, 0.26), 3.0)
@@ -2533,7 +2561,7 @@ func _draw_water() -> void:
 		var base := Vector2(c) * cell_f
 		if not view.has_point(base):
 			continue
-		# Fill anchored at the BOTTOM, filling upward from the floor. The top edge is smoothed: each side of
+		# Fill anchored at the bottom, filling upward from the floor. The top edge is smoothed: each side of
 		# the surface is the average of this cell's surface y and the horizontal neighbour's surface y, so a
 		# level pool draws a near-flat top and a level step tapers into a ramp instead of a hard stair. A side
 		# with no water neighbour keeps this cell's own height, so pool edges stay crisp.
@@ -2554,7 +2582,7 @@ func _draw_water() -> void:
 		# THE WATERLINE IS SAMPLED AT THE CELL MIDPOINT AS WELL AS ITS EDGES, AND WITHOUT THAT THE RIPPLE
 		# CONSTANT IS A LIE. The top edge used to carry two vertices per cell, both on cell boundaries, so
 		# the drawn line was a polyline through points 32px apart no matter what `WATER_RIPPLE_LEN` said.
-		# A 46px crest spacing sampled every 32px is below Nyquist — which needs period >= 2x spacing — and
+		# A 46px crest spacing sampled every 32px is below Nyquist, which needs period >= 2x spacing, and
 		# a sinusoid under Nyquist does not turn into noise, it FOLDS to a lower frequency: 32/46 is 0.696
 		# cycles per sample, folding to 0.304, so the ripple actually drew crests every 105px. Not a subtle
 		# error and not a tuning matter: the water was rippling at better than twice the wavelength anyone
@@ -2569,7 +2597,7 @@ func _draw_water() -> void:
 		var mid_top: float = mid_y
 		if not open_above:
 			# An interior cell is full. Its own level is a bookkeeping number about how much water lives here,
-			# not a height: the water above is resting ON it, so there is no air in this cell to draw.
+			# not a height: the water above is resting on it, so there is no air in this cell to draw.
 			# Honouring the level everywhere terraced a settling body into horizontal slabs with gaps of rock
 			# showing between them, which is what a large pool looks like for the several seconds the sim takes
 			# to even out, and what an unevenly-fed aquifer looks like permanently.
@@ -2610,7 +2638,7 @@ func _draw_water() -> void:
 		# waterline is a drawn stroke sitting on a fill; with it, the fill appears to end in a surface.
 		var men := Color(WATER_SURFACE.r, WATER_SURFACE.g, WATER_SURFACE.b, 0.22)
 		# Both of these hang off the SAME three points as the fill. A band that resampled the surface on its
-		# own would drift off the fill it is supposed to cap — a bright line floating above its own water
+		# own would drift off the fill it is supposed to cap: a bright line floating above its own water
 		# reads as a rendering fault and would look worse than the aliasing this fixes.
 		draw_colored_polygon(PackedVector2Array([
 			tl, tm, tr, Vector2(tr.x, right_y + WATER_MENISCUS), Vector2(tm.x, mid_top + WATER_MENISCUS),
@@ -2641,7 +2669,7 @@ func _machine_active(machine: MachineState) -> bool:
 const WORK_ANIM_FPS: float = 4.0
 
 
-## The sprite for a machine's CURRENT state, or null for the code-drawn casing and glyph. Fallback chain per
+## The sprite for a machine's current state, or null for the code-drawn casing and glyph. Fallback chain per
 ## frame: working with work_0 and work_1 present cycles them; working with only work_0 alternates it with
 ## idle, giving a 2-frame chug from one extra PNG; idle, or no work frames, gives the static machine_<id>.
 ## Partial sets degrade gracefully, so frames can land one at a time.
@@ -2684,7 +2712,7 @@ func _draw_crumble() -> void:
 		var pos: Vector2 = cr["pos"]
 		var col: Color = cr["col"]
 		var t: float = clampf(float(cr["age"]) / CRUMBLE_DUR, 0.0, 1.0)
-		if t < 0.28:                                     # the break FLASH: a quick warm burst inset from the
+		if t < 0.28:                                     # the break flash: a quick warm burst inset from the
 			var fi: float = float(CELL) * (0.16 + t)     # cell edges (a pop, not a lit tile), swelling out
 			draw_rect(Rect2(pos + Vector2(fi, fi), Vector2(float(CELL) - fi * 2.0, float(CELL) - fi * 2.0)),
 				Color(1.0, 0.92, 0.72, (0.28 - t) * 1.1))
@@ -2700,31 +2728,31 @@ func _draw_crumble() -> void:
 					Color(0.03, 0.03, 0.05, (1.0 - t) * 0.5), false, 1.0)          # dark rim for definition
 
 
-## The zoom at or above which per-machine TEXT decorations (name label, held badge, need bubble) are legible
-## enough to draw for EVERY on-screen machine. MainView.ZOOM_LEVELS is [1.00, 0.70, 0.50, 0.33] and the
+## The zoom at or above which per-machine text decorations (name label, held badge, need bubble) are legible
+## enough to draw for every on-screen machine. MainView.ZOOM_LEVELS is [1.00, 0.70, 0.50, 0.33] and the
 ## default is 1.00, so this threshold sits between the 0.70 inspect level and the 0.50 and 0.33 levels below
 ## it. At those two, only the hovered or aimed machine shows its text and the rest stay clean glyphs, so a
 ## big base is not a wall of unreadable tiny labels. The zoom here is the canvas transform's scale, which
 ## equals the camera zoom.
 const TEXT_ZOOM: float = 0.65
 
-## The zoom at or above which a machine's FINE casing detail (rivets, vent slots, the recessed faceplate) is
+## The zoom at or above which a machine's fine casing detail (rivets, vent slots, the recessed faceplate) is
 ## resolvable enough to be worth drawing. Same reasoning as TEXT_ZOOM and a different threshold, because a
 ## rivet stops being a rivet before a label stops being a label: at 0.50x a 32px cell covers 16 screen
 ## pixels, and a 1.4px rivet in it is under a pixel of grey. What carries the machines when small is the
 ## shading and the silhouette, which the cheap tier draws unconditionally.
 const DETAIL_ZOOM: float = 0.62
 
-## The canvas scale for THIS frame, read once in `_draw` rather than once per machine.
+## The canvas scale for this frame, read once in `_draw` rather than once per machine.
 ## `get_canvas_transform` is a server round-trip and the machine loop called it twice per machine; a third
 ## call for the detail gate would land on the pass that already owns the frame budget.
 var _zoom: float = 1.0
 
 
-## Should this machine's TEXT decorations draw? Yes when zoomed in enough to read them, or when it is the
+## Should this machine's text decorations draw? Yes when zoomed in enough to read them, or when it is the
 ## machine the player is aiming at, so pointing at any box reads its label and status even zoomed out.
 ##
-## This is a LEGIBILITY test and only that: it answers "would 8px type survive at this scale", which is a
+## This is a legibility test and only that: it answers "would 8px type survive at this scale", which is a
 ## necessary condition for drawing a plate and not a sufficient one. It still gates the held-count badge and
 ## the stalled need bubble, both of which are per-machine state that the player wants wherever the machine
 ## is. The nameplate wants something stricter and asks `_label_visible` instead.
@@ -2744,7 +2772,7 @@ func _text_visible(cell: Vector2i) -> bool:
 const LABEL_NEAR_CELLS: float = MainView.REACH_CELLS * 2.0
 
 
-## Should this machine draw its NAMEPLATE? Aimed at, or standing near it.
+## Should this machine draw its nameplate? Aimed at, or standing near it.
 ##
 ## The plate used to ride `_text_visible` alone, which made it a pure zoom gate, and the zoom that gate
 ## permitted was every zoom the game ships at except the two most distant: `TEXT_ZOOM` is 0.65 and
@@ -2754,9 +2782,9 @@ const LABEL_NEAR_CELLS: float = MainView.REACH_CELLS * 2.0
 ## question, which it cannot: whether 8px type resolves says nothing about whether this box's name is worth
 ## the player's attention right now.
 ##
-## Relevance is proximity or intent. The zoom term is kept, as an AND rather than an OR, because it is still
+## Relevance is proximity or intent. The zoom term is kept, as an `and` rather than an `or`, because it is still
 ## true and still necessary: at 0.33x the plate is a few pixels tall and unreadable however close you stand.
-## The aim exemption stays an OR and stays first, because pointing at a thing IS the question being asked,
+## The aim exemption stays an `or` and stays first, because pointing at a thing is the question being asked,
 ## and it is the one case where a plate too small to read is still better than no answer.
 func _label_visible(cell: Vector2i) -> bool:
 	if cell == _aim:
@@ -2767,10 +2795,10 @@ func _label_visible(cell: Vector2i) -> bool:
 
 
 ## Is this machine bolted to the wall rather than standing in the cell? True for a Head, meaning a drill
-## standing ON a lode and boring into the back wall rather than down through rock, and for every Spur. Both
+## standing on a lode and boring into the back wall rather than down through rock, and for every Spur. Both
 ## are frames hung on a face, neither may hide the vein it is eating, and both therefore skip the opaque
 ## casing and the contact shadow every other machine gets. One machine has two mounts while the bridge
-## lasts (`docs/LODE_PLAN.md` §3); after the phase-3 cutover there is only the Head.
+## lasts (`docs/LODE_PLAN.md` §3); once that bridge is retired there is only the Head.
 func _is_head(machine: MachineState) -> bool:
 	return machine.def.behavior == &"spur" \
 		or (machine.def.behavior == &"drill" and sim.lode.has(machine.cell))
@@ -2788,8 +2816,8 @@ func _draw_machine(machine: MachineState) -> void:
 	var pos: Vector2 = Vector2(machine.cell) * float(CELL)
 	var recipe: RecipeDef = machine.def.recipe
 	var center: Vector2 = pos + Vector2(CELL, CELL) * 0.5
-	# Everything drawn ON a machine (glyph, badge, progress bar, ports, status lamp) is positioned against
-	# the FACE, not the cell. Against the cell is correct only while every machine fills its cell; with
+	# Everything drawn on a machine (glyph, badge, progress bar, ports, status lamp) is positioned against
+	# the face, not the cell. Against the cell is correct only while every machine fills its cell; with
 	# per-machine profiles the Forge's input port hung in the air above its chimney and the Ore Vent's
 	# progress bar ran across the rock beside its foot. `machine_face` is where the body actually is, and
 	# `check_casing_light` asserts the decoration stays on one of the body's own parts.
@@ -2797,7 +2825,7 @@ func _draw_machine(machine: MachineState) -> void:
 	var face := Rect2(pos + face_u.position * float(CELL), face_u.size * float(CELL))
 	if _is_head(machine):
 		# A Head is bolted to the wall, so it gets no contact shadow at its feet: it is not standing on
-		# anything. Instead it casts a shadow onto the plane BEHIND it, offset down-right, which is the
+		# anything. Instead it casts a shadow onto the plane behind it, offset down-right, which is the
 		# cheapest way to say that this object is in front of that surface.
 		draw_rect(Rect2(pos + Vector2(3.0, 3.0), Vector2(CELL - 4.0, CELL - 4.0)),
 			Color(0.0, 0.0, 0.0, 0.34))
@@ -2826,7 +2854,7 @@ func _draw_machine(machine: MachineState) -> void:
 		# A Head is a frame, not a fill (`docs/LODE.md` §5). Every other machine gets an opaque casing filling
 		# its cell, which is right for a box that processes things and wrong for one bolted onto the thing it
 		# is eating: it would hide the vein completely, and the vein is the only reason the machine is there.
-		# So the casing is dropped and the glyph's own rails carry the body, and the flecks thin THROUGH the
+		# So the casing is dropped and the glyph's own rails carry the body, and the flecks thin through the
 		# machine, which makes the Head a gauge without adding a gauge.
 		Visuals.draw_machine_glyph(self, center,
 			"spur" if machine.def.behavior == &"spur" else "collar", 1.0, active, clock, false,
@@ -2891,7 +2919,7 @@ func _draw_machine(machine: MachineState) -> void:
 
 
 ## The one-shot assemble overlay for a just-placed machine: a settling flash that fades, a bright scan line
-## sweeping up the casing so the frame prints upward, and corner brackets snapping inward to lock the frame.
+## running up the casing so the frame prints upward, and corner brackets snapping inward to lock the frame.
 ## All overlay, so it never hides the terrain. `t` runs 0 to 1.
 func _draw_construct(pos: Vector2, t: float) -> void:
 	var c: float = float(CELL)
@@ -2948,7 +2976,7 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 	draw_circle(lamp_c, 4.2 * k, Color(0.03, 0.03, 0.05, 0.9))
 	Visuals.draw_status_mark(self, lamp_c, r, look["mark"], lamp)
 	# Nothing to raise an alarm about: running, resting or finished. `fix` is the sim's word for what the
-	# player would have to DO, so "none" is exactly the set that needs no floating anything, and a status
+	# player would have to do, so "none" is exactly the set that needs no floating anything, and a status
 	# added later inherits the right behaviour from its table entry rather than from a list of names here.
 	if StringName(look["fix"]) == &"none" or status == &"spent":
 		return
@@ -2956,12 +2984,12 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 		# The bubble is gone at this zoom, and a stall is the one thing that must still reach the player.
 		# Zoomed out, the need bubble is dropped as unreadable clutter and the machine falls back on a
 		# coloured dot roughly a pixel across. So the alarm moves to the only scale that survives out here,
-		# the whole cell, and to the one channel that needs no resolution at all: MOTION. A stalled machine
+		# the whole cell, and to the one channel that needs no resolution at all: motion. A stalled machine
 		# breathes a ring around itself and a working one does nothing, because "no alarm" has to stay the
 		# quiet state or a mature base becomes a light show.
 		#
-		# This branch is deliberately taken BEFORE the guidance check below. It is the only alarm a machine has
-		# left out here, and it is not the thing that check exists to stop: it sits ON the cell instead of
+		# This branch is deliberately taken before the guidance check below. It is the only alarm a machine has
+		# left out here, and it is not the thing that check exists to stop: it sits on the cell instead of
 		# floating in the column above it, so it does not stack under the chevron the way the bubble does.
 		#
 		# It is also the one other breathing outline in the file, which is a real tension with the cursor
@@ -2972,7 +3000,7 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 		draw_rect(Rect2(face.position - Vector2(1.5, 1.5), face.size + Vector2(3.0, 3.0)),
 			Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 2.0)
 		return
-	# ONE FLOATING MARK PER CELL. If guidance is already pointing at this machine there is a chevron bobbing
+	# One floating mark per cell. If guidance is already pointing at this machine there is a chevron bobbing
 	# in the air above it on a tether down onto its roof, and the bubble hangs in that same column, bobbing on
 	# its own clock, saying a version of the same sentence: this box is the one you have to deal with. Reaching
 	# this line at all means the machine is stalled and the step is still open, which is nearly always the same
@@ -2988,7 +3016,7 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 	var bob: float = sin(_anim_time * 3.0) * 1.5
 	var bc: Vector2 = Vector2(face.get_center().x, face.position.y - 24.0 + bob)
 	var br: float = 9.0                       # the bubble's radius, named once because the stem hangs off it
-	# A STEM DOWN ONTO THE ROOF, because this bubble is the only mark in the file that floated free of the
+	# A stem down onto the roof, because this bubble is the only mark in the file that floated free of the
 	# thing it meant, and guidance's chevron is supposed to be the only one that does. In a lit room the
 	# machine underneath carried the attachment on its own. In an unlit one it does not: what is left on
 	# screen is a thin ring with a bolt struck through it, hanging in rock, and a ring with a diagonal
@@ -3007,8 +3035,8 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 
 	# The bubble holds up what the player would go and do about it, which for two statuses is an item to
 	# fetch and for three is a job to perform. Drawing items only meant the jam, dead-power and unwired states
-	# floated an ORE icon over all three, telling the player to feed a machine that was not hungry. Silencing
-	# them was true but quiet: the lamp names the KIND of problem and the bubble is where the specific one
+	# floated an ore icon over all three, telling the player to feed a machine that was not hungry. Silencing
+	# them was true but quiet: the lamp names the kind of problem and the bubble is where the specific one
 	# belongs. Each job now has its own glyph and the bubble speaks for all five, with none of them borrowing
 	# another's answer.
 	if not bool(look["feeds"]):
@@ -3035,7 +3063,7 @@ func _draw_machine_status(machine: MachineState, face: Rect2, show_bubble: bool 
 const LABEL_FS: int = 8
 const LABEL_H: float = 11.0
 ## How many rows of plates may stack above a machine before the rest are dropped. Two and not more: the third
-## row would start colliding with the machine one cell UP, which trades a text collision for a worse one.
+## row would start colliding with the machine one cell up, which trades a text collision for a worse one.
 ## Run-collapsing below makes deep stacks rare enough that two is generous.
 const LABEL_SHELVES: int = 2
 const LABEL_SHELF_H: float = 12.0
@@ -3057,26 +3085,26 @@ var _label_plan: Dictionary = {}
 ## than the collapse: `_label_visible` wants the body near, and a body cannot be near both.
 ##
 ## What is left is then shelf-packed left to right, dropping to a second row when a plate would land on the
-## one before it. The aimed machine is packed FIRST, so that pointing at something always names it: that is
+## one before it. The aimed machine is packed first, so that pointing at something always names it: that is
 ## the promise `_label_visible` makes when it exempts the aimed cell from the zoom gate, and a packer that
 ## silently dropped that plate would break it.
 ##
 ## The plan and the draw must ask the same question or the packer reserves shelf space for plates that never
-## appear, and a plate that IS drawn gets pushed to a second row to clear a gap. So both call
+## appear, and a plate that is drawn gets pushed to a second row to clear a gap. So both call
 ## `_label_visible` and neither has its own copy of the rule.
 func _plan_machine_labels(mview: Rect2) -> void:
 	_label_plan.clear()
-	# HOW MANY MACHINES ARE THERE IS NOT HOW MANY YOU ARE STANDING NEAR. The run used to be counted over a
-	# `named` that had already been filtered by `mview` and `_label_visible`, and `_label_visible` is a radius
-	# around the PLAYER — so the number printed on the plate was a statement about where the body happened to
-	# be. Three generators in a row read GENERATOR ×2 from one step too far back, with the third machine
-	# drawn, lit and plainly on screen next to the plate undercounting it, and walking two cells changed the
-	# number while nothing in the world changed. A run straddling that radius came out worse than wrong: the
-	# middle machine dropping out of `named` broke the westward test, so one run of three published two
-	# separate plates, each reading GENERATOR, neither carrying a count.
+	# How many machines there are is not how many you are standing near. The run used to be counted over a
+	# `named` already filtered by `mview` and `_label_visible`, and `_label_visible` is a radius around the
+	# player, so the number printed on the plate was a statement about where the body happened to be. Three
+	# generators in a row read GENERATOR ×2 from one step too far back, with the third machine drawn, lit
+	# and plainly on screen next to the plate undercounting it; walking two cells changed the number while
+	# nothing in the world changed. A run straddling that radius came out worse than wrong: the middle
+	# machine dropping out of `named` broke the westward test, so one run of three published two separate
+	# plates, each reading GENERATOR and neither carrying a count.
 	#
 	# So the run is measured over every named machine in the factory, which is the thing the count claims to
-	# be about, and visibility decides only where a plate is DRAWN. Those were always two questions and one
+	# be about, and visibility decides only where a plate is drawn. Those were always two questions and one
 	# test was answering both.
 	var named: Dictionary = {}
 	var shown: Dictionary = {}
@@ -3097,7 +3125,7 @@ func _plan_machine_labels(mview: Rect2) -> void:
 			n += 1
 		# The plate hangs over the part of the run you can actually see. Centring it over the whole run would
 		# push it off the edge for a row that leaves the view, and a run with nothing visible in it wants no
-		# plate at all — which is the one thing the old visibility filter was getting right.
+		# plate at all. That is the one thing the earlier visibility filter was getting right.
 		var lo: int = -1
 		var hi: int = -1
 		for k: int in n:
@@ -3156,7 +3184,7 @@ func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 	# The mouth sits on the machine; the spout sits on the cell. Goods fall in from above and land on the
 	# body, so the input wedge belongs on the face's top edge, over the chimney's shoulder for a Forge rather
 	# than floating where the chimney is not. Output makes the opposite claim: it says which neighbouring
-	# CELL the goods leave into, and every profile in the set keeps a flat foot at the cell line for that
+	# cell the goods leave into, and every profile in the set keeps a flat foot at the cell line for that
 	# reason. Both stay on the face's centre column so they read as one throughput line.
 	var mid: float = face.get_center().x
 	if recipe != null and not recipe.inputs.is_empty():
@@ -3167,11 +3195,14 @@ func _draw_machine_io(machine: MachineState, pos: Vector2, face: Rect2) -> void:
 		out_col = _item_ink(recipe.outputs.keys()[0])
 	match machine.def.behavior:
 		&"lift":
-			_matter_wedge(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts UP
+			_matter_wedge(Vector2(mid, face.position.y), Vector2(0, -1), Color(0.5, 1.0, 0.92))   # spouts up
 		&"splitter":
 			_matter_wedge(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # down
 			_matter_wedge(Vector2(pos.x + c, face.get_center().y), Vector2(1, 0), out_col)        # + right
 		_:
+			# The Borer belongs in this default arm and is not an oversight: it bores sideways, but
+			# `_destinations_h_drill` returns the cell below and nothing else, so one downward spout is the
+			# whole of its routing. A machine that works sideways does not thereby ship sideways.
 			_matter_wedge(Vector2(mid, pos.y + c), Vector2(0, 1), out_col)                        # spouts down
 
 
@@ -3183,7 +3214,7 @@ const WEDGE_HALF: float = 4.5
 const WEDGE_JUT: float = WEDGE_HALF + 2.5
 
 
-## THE MATTER WEDGE, the one solid head in this file, and the whole of the arrow half of the vocabulary
+## The matter wedge, the one solid head in this file, and the whole of the arrow half of the vocabulary
 ## above. `_draw_machine_io` sets it on a casing edge to say goods cross here; `_out_arrow` sets it on the
 ## end of a stem to say goods fall to there. Both are the same sentence about the same kind of thing, so
 ## they are one call and not two shapes to keep in step.
@@ -3211,7 +3242,7 @@ func _buffer_total(buffer: Dictionary) -> int:
 	return n
 
 
-## THE INK A MARK WEARS WHEN IT SPEAKS FOR AN ITEM, which is the item's own colour unless it has none.
+## The ink a mark wears when it speaks for an item, which is the item's own colour unless it has none.
 ##
 ## `Visuals.item_color` answers `Color.WHITE` for an item it has no table entry for, and white is the one
 ## colour a mark drawn into the world may not be: it belongs to things that have just happened (see CHROME
@@ -3239,7 +3270,7 @@ func _bulk_item(buffer: Dictionary) -> StringName:
 	return best
 
 
-## HOW FULL THE BELLY IS, ON THE MACHINE, so a base says where it is backing up without a number stamped
+## How full the belly is, on the machine, so a base says where it is backing up without a number stamped
 ## on every box.
 ##
 ## A held-count badge answers the question the player is actually asking, which is "is this one jamming?",
@@ -3247,7 +3278,7 @@ func _bulk_item(buffer: Dictionary) -> StringName:
 ## can say it directly: the contents show through the body and rise as the machine fills, and the well
 ## reaches the top at the same instant `machine_status` turns and the lamp beside it goes red.
 ##
-## THREE BEHAVIOURS AND NOT ALL OF THEM, and the boundary is the sim's rather than a taste call. These are
+## Three behaviours and not all of them, and the boundary is the sim's rather than a taste call. These are
 ## the only machines whose buffer the sim caps, so they are the only ones where a fraction exists to draw
 ## at all. A Forge holding two ore is not two percent of anything, and a well over it would be an invented
 ## denominator dressed as a measurement.
@@ -3273,7 +3304,7 @@ func _draw_load_gauge(machine: MachineState, face: Rect2) -> void:
 		&"drift":
 			# Two wells, because the rig jams its two hauls independently and the sim has a separate status
 			# for each (`blocked_pay`, `blocked_spoil`). Spoil is the one with a side: it drops down the
-			# column BEHIND the rig, so its well takes the half of the body facing that way and pay takes
+			# column behind the rig, so its well takes the half of the body facing that way and pay takes
 			# what is left. Pay falls down the rig's own column and has no side of its own, so putting it
 			# opposite the spoil is what makes the pair readable rather than a claim about where it goes.
 			# `_held` does not count `spoil_buffer` at all, so until now the spoil half of a Drift Rig had
@@ -3290,11 +3321,11 @@ func _draw_load_gauge(machine: MachineState, face: Rect2) -> void:
 
 ## The well has to clear the casing's own lit edge on both sides, or the level paints over the one trick
 ## that sells a flat square as hardware. Read off `Visuals.CASING_INSET` rather than eyeballed or copied,
-## so a retuned casing cannot quietly leave the glass sitting on top of it -- the two move together or
+## so a retuned casing cannot quietly leave the glass sitting on top of it; the two move together or
 ## neither does.
 const WELL_INSET: float = Visuals.CASING_INSET * 2.0
 
-## How much of the body the contents tint. Low, because this is a level seen THROUGH a casing and not a
+## How much of the body the contents tint. Low, because this is a level seen through a casing and not a
 ## panel painted on one: the glyph, the rivets and the lit edge all have to survive it.
 const WELL_ALPHA: float = 0.34
 
@@ -3331,7 +3362,7 @@ func _cell_center(cell: Vector2i) -> Vector2:
 
 ## View culling: the on-screen world-space rectangle, grown by `margin_cells` so partially-on-screen content
 ## and its glow, labels or shadows that reach past its cell are not clipped at the edge. The per-frame draw
-## passes test `if not view.has_point(Vector2(cell) * CELL): continue` BEFORE emitting any draw call for an
+## passes test `if not view.has_point(Vector2(cell) * CELL): continue` before emitting any draw call for an
 ## element, so every pass reads the identical rect. Off-screen draws are not visible, so skipping them is
 ## pixel-identical on screen. `margin_cells` should be 2-3 or more for passes whose visual overspills its
 ## cell: machines have glow, badges and I/O ports, and a lamp-lit item glow reaches further still.
@@ -3358,7 +3389,7 @@ func _paint_fine_terrain(layer: LightLayer) -> void:
 ## visible rect is already correct in the first bake, so nothing the player is looking at waits for this.
 const FINE_FILL_BUDGET_US: int = 4000
 
-## The opening view is the ground around the BODY, and deliberately not the camera rect.
+## The opening view is the ground around the body, and deliberately not the camera rect.
 ##
 ## `setup()` runs from main's `_ready` before the renderer is added to the tree, so `get_canvas_transform`
 ## and `get_viewport_rect` fail there: first loudly, with two engine errors, then quietly, by returning an
@@ -3388,7 +3419,7 @@ func _bake_fine_terrain() -> void:
 	if _fine == null:
 		return
 	# The material's texture grammar, beside its colour. Set here rather than passed through `rebake`,
-	# because the region path and five harness fixtures call that signature too; see `grammar_at`.
+	# because the region path and several other callers use that signature too; see `grammar_at`.
 	_fine.grammar_at = func(c: Vector2i) -> int: return _material(sim.material_at(c)).grammar
 	_fine.rebake(
 		func(c: Vector2i) -> bool: return sim.is_solid(c),
@@ -3427,7 +3458,7 @@ func _bake_fine_region(cmin: Vector2i, cmax: Vector2i) -> void:
 ## pass paints, so an eroded fine cell shows exactly the wall it would if hand-dug. Falls back to a dark
 ## dirt tone for a cell with no wall entry, which is unlikely on solid terrain.
 ##
-## It carries the same bedding as the foreground rock, because it IS the same ground seen a plane back: a
+## It carries the same bedding as the foreground rock, because it is the same ground seen a plane back: a
 ## tunnel cut through a sandy layer should show that layer behind it. Then it recedes, pushed down in value
 ## and drifted toward cool, which are the two moves distance makes. It does not darken itself for being
 ## underground; that is the veil's job, and doing it here as well counted the same shadow twice.
@@ -3439,7 +3470,7 @@ const WALL_NONE := Color(0.06, 0.055, 0.05)   ## a cell with no wall entry (unli
 ## into.
 const LODE_STAIN: float = 0.42
 const LODE_STAIN_LIFT: float = 1.05
-## ...and how far rock STILL COVERING a vein carries, plus how much it DARKENS.
+## ...and how far rock still covering a vein carries, plus how much it darkens.
 ##
 ## The buried tell gets a value channel and the open face does not, and the asymmetry is deliberate. Holding
 ## value is right at an open face: both a face and the rock beside it are things you look at, and a carved
@@ -3467,26 +3498,26 @@ func _wall_fill_color(c: Vector2i) -> Color:
 	return FineTerrain.apply_wall_tone(_wall_base_color(c), _wall_strata(c))
 
 
-## The wall's colour BEFORE any bedding or recess. Split out for the fine bake, which reconstructs the
+## The wall's colour before any bedding or recess. Split out for the fine bake, which reconstructs the
 ## bedding between coarse samples rather than inheriting one flat value per 32px cell. The coarse pass puts
 ## the two straight back together above, so its output is unchanged.
 func _wall_base_color(c: Vector2i) -> Color:
-	# A lode IS wall (`docs/LODE.md`). Ore in the background plane paints as the background plane, so it
+	# A lode is wall (`docs/LODE.md`). Ore in the background plane paints as the background plane, so it
 	# inherits the molding, the bedding, the recess shadow and the veil that every other wall gets, for free,
 	# and cannot read as a decal stuck on top of the rock. Drawing the lode as its own translucent wash in
 	# the dynamic pass looked like a poster in one version and like smoke in the next. Routing it through the
-	# wall's own colour authority states the thesis literally: the vein is what the wall is MADE OF here.
+	# wall's own colour authority states the thesis literally: the vein is what the wall is made of here.
 	if sim.lode.has(c):
 		# Mineralised, not just ore-coloured. An ore block's matrix is within a hair of stone's, since ore
 		# reads as ore because of its pale flecks rather than its rock, so painting the wall the ore's base
-		# colour is literally correct and completely invisible. A real vein face is STAINED by what is in it,
+		# colour is literally correct and completely invisible. A real vein face is stained by what is in it,
 		# so the wall here is the rock carried LODE_STAIN (0.42) of the way toward the metal. That derives per
 		# material rather than being picked: coal stains the wall dark, iron rusty, ore pale.
 		#
-		# It stains in HUE and not in VALUE. Lerping the raw colour brightened the wall by 62%, because ore's
-		# nugget is pale (v 0.85) against its matrix (v 0.34), so a carved adit came out LIGHTER than the solid
+		# It stains in hue and not in value. Lerping the raw colour brightened the wall by 62%, because ore's
+		# nugget is pale (v 0.85) against its matrix (v 0.34), so a carved adit came out lighter than the solid
 		# rock around it and read as more rock rather than as a hole with a face at the back of it.
-		# `docs/LODE.md` §11 names the rule that breaks: brightness carries ATTENTION, density carries
+		# `docs/LODE.md` §11 names the rule that breaks: brightness carries attention, density carries
 		# richness. So the mix sets what the wall is made of and the host rock keeps the say over how lit it
 		# is; the metal earns its brightness one grain at a time, in `_draw_lode`.
 		var vein: MaterialDef = _material(sim.lode[c])
@@ -3497,7 +3528,7 @@ func _wall_base_color(c: Vector2i) -> Color:
 	return _zone_tinted(_material(sim.wall[c]).base_color, c.y)
 
 
-## The wall's bedding: the same beds as the foreground rock, only quieter, because it IS the same ground
+## The wall's bedding: the same beds as the foreground rock, only quieter, because it is the same ground
 ## seen a plane back and a tunnel cut through a sandy layer should show that layer behind it.
 func _wall_strata(c: Vector2i) -> float:
 	return _cell_tone(c).y * FineTerrain.WALL_STRATA_QUIET
@@ -3561,7 +3592,7 @@ const ROPE_SEGMENTS: int = 14
 ## of luma in its own corridor, and the side-by-side is two straight lines. 0.55 x 26px is a 14px bow across
 ## a 500px span, under 3%, which is a wobble rather than a hang.
 ##
-## A rope's sag is a fact about its LENGTH, not a constant. For a chord `d`, the parabolic approximation
+## A rope's sag is a fact about its length, not a constant. For a chord `d`, the parabolic approximation
 ## gives extra length ~ (8/3)(h^2/d), so h = d * sqrt(3s / (8(1-s))) where `s` is the slack fraction the
 ## winch already computes. At 10% slack that is a fifth of the span; at half slack it is six tenths of it.
 ## Capped, because past a point the loop leaves the screen and stops being information, and floored at a
@@ -3584,12 +3615,12 @@ const ROPE_SHADE := Color(0.20, 0.16, 0.12)
 ## target: the pick has its aim box, the builder its ghost.
 ##
 ## Drawn quietly: a thin dotted lead and a small ring, nothing that competes with the ore glint or the crack
-## overlay. Drawn ONLY when the line is stowed, because once you are on the rope the attention belongs on
+## overlay. Drawn only when the line is stowed, because once you are on the rope the attention belongs on
 ## the arc and a second line racing the cursor across the rock is noise.
 ##
-## The lead is a STUB rather than a line. Drawn hand to target at even spacing, `check_grapple_reads`
+## The lead is a stub rather than a line. Drawn hand to target at even spacing, `check_grapple_reads`
 ## measured the preview inking 0.96 of the throw, which is a dimension line: how a CAD package indicates a
-## distance and how a debug build draws a raycast. What the preview is FOR is the endpoint, and that
+## distance and how a debug build draws a raycast. What the preview is for is the endpoint, and that
 ## information is entirely in the ring; the lead only has to say which throw the ring belongs to, which
 ## takes a stub off the hand rather than a tether. The trace is unchanged, so acquisition is exactly as
 ## reliable as before.
@@ -3605,7 +3636,7 @@ const AIM_MISS := Color(0.62, 0.64, 0.70, 0.16)   ## nothing in range: the lead 
 ## highest-contrast edge in the frame. Measured on the surface with the guidance quiet and the shot aimed
 ## over open sky, the preview added 207 levels of local gradient at its brightest tenth, against the miner's
 ## own silhouette step of 87, and nearly all of it was this ring. AIM_SHADE_W is what was pulled in; the ring
-## is a distinctive SHAPE and does not need a wide black halo to be found. Acquisition is untouched, since
+## is a distinctive shape and does not need a wide black halo to be found. Acquisition is untouched, since
 ## the trace, the ring's position and its radius are all unchanged.
 const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)
 const AIM_SHADE_W: float = 3.0
@@ -3615,7 +3646,7 @@ const AIM_SHADE_W: float = 3.0
 ## `check_grapple_reads` isolates the preview by differencing two otherwise identical frames. Getting the
 ## reference frame by parking the cursor on the miner's own hand also swings the head-lamp, because the lamp
 ## is aimed: five and a half cells of light moved between the two captures and the difference mask ate it.
-## Excluding a lamp-sized disc then blinds the layer to the near field, which is the only place the
+## Excluding a lamp-sized disc then blinds the check to the near field, which is the only place the
 ## shortened lead lives, and it measured 0.04 of the throw inked while seeing the endpoint ring alone.
 ##
 ## With this flag the reference frame has the cursor in exactly the same place and the lamp in exactly the
@@ -3631,7 +3662,7 @@ func _draw_aim_ghost() -> void:
 	var to: Vector2 = shot["at"]
 	var hit: bool = shot["hit"]
 	# A dotted lead rather than a solid one, because a solid line reads as a rope that is already there. It
-	# runs a fraction of the way rather than all of it: the stub says WHICH throw, the ring says where it
+	# runs a fraction of the way rather than all of it: the stub says which throw, the ring says where it
 	# lands, and nothing in between needs drawing.
 	var full: float = from.distance_to(to)
 	var stub: float = minf(full * AIM_STUB, AIM_STUB_MAX) / maxf(full, 1.0)
@@ -3647,8 +3678,8 @@ func _draw_aim_ghost() -> void:
 			(AIM_LEAD if hit else AIM_MISS) * Color(1, 1, 1, fade), 1.0)
 	if hit:
 		# One ring, and nothing inside it. The dot that used to sit at the centre marked the point the ring
-		# already marks, and a ring with a mark in the middle of it is a selection reticle — which the
-		# cursor's own square is being, on the same rock, a few pixels away, every time the throw lands
+		# already marks, and a ring with a mark in the middle of it is a selection reticle. That is what the
+		# cursor's own square is being, on the same rock a few pixels away, every time the throw lands
 		# somewhere you could also swing at. Position, radius and backing stroke are all untouched, so the
 		# endpoint is exactly as findable as it was; there is simply one mark on it rather than two.
 		draw_arc(to, AIM_RING, 0.0, TAU, 16, AIM_SHADE, AIM_SHADE_W)
@@ -3672,7 +3703,7 @@ func _draw_grapple() -> void:
 			_draw_cord(at, pivot, 0.0)
 			at = pivot
 		_draw_cord(from, at, rope_sag(from.distance_to(at), g.slack(from)))
-		# The piton belongs at the HOOK and nowhere else, pointed back down the first span of line.
+		# The piton belongs at the hook and nowhere else, pointed back down the first span of line.
 		_draw_hook(g.pivots[0] if not g.pivots.is_empty() else from, g.anchor, 0.0)
 	if g.throwing():
 		_draw_rope(from, g.tip, 0.0)
@@ -3684,7 +3715,7 @@ func _draw_rope(from: Vector2, to: Vector2, sag: float) -> void:
 	_draw_hook(from, to, sag)
 
 
-## Just the cord, with no hook. Split out because a wrapped line is several spans and only ONE of them ends
+## Just the cord, with no hook. Split out because a wrapped line is several spans and only one of them ends
 ## at the hook; drawing the whole polyline with _draw_rope sprouts a piton at every corner it caught on.
 func _draw_cord(from: Vector2, to: Vector2, sag: float) -> void:
 	var pts := PackedVector2Array()
@@ -3704,7 +3735,7 @@ func _draw_cord(from: Vector2, to: Vector2, sag: float) -> void:
 		if i % 2 == 0:
 			draw_line(pts[i], pts[i].lerp(pts[i + 1], 0.55), ROPE_CORE.lightened(0.35), 1.0)
 
-## The hook: a wedge biting INTO the rock, oriented along the line's last segment so it always looks planted.
+## The hook: a wedge biting into the rock, oriented along the line's last segment so it always looks planted.
 func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
 	var pts := PackedVector2Array()
 	for i: int in ROPE_SEGMENTS + 1:
@@ -3721,18 +3752,18 @@ func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
 	draw_line(head - dir * 8.0 + side * 3.0, head - dir * 2.0, Color(0.92, 0.86, 0.70), 1.0)
 
 
-## Bake the veil's BASE, which is the skylight/ambient model: daylight floods down each column's open air,
+## Bake the veil's base, which is the skylight/ambient model: daylight floods down each column's open air,
 ## attenuating past SURFACE_LINE, is blocked by the first solid rock, scatters SKY_FADE tiles under the
 ## exposed surface, and everything deeper sits in full ambient, with the night floor applied above ground.
 ## Runs only when terrain or the quantized daylight changes.
 ##
-## Shadow MULTIPLIES. Carrying a shadow colour in RGB and a darkness in A and alpha-blending it over the
+## Shadow multiplies. Carrying a shadow colour in RGB and a darkness in A and alpha-blending it over the
 ## world is what fog does, not what shadow does: at the deep's ambient opacity only about a third of a cell's
 ## own colour survived to the eye, and the other two thirds were a smooth blurred wash painted on top. Since
 ## the texture is one texel per cell stretched across the world, that wash was a soft cloud with no
 ## relationship to the rock underneath, and it averaged away the bedding, fissures, grain and carved edges.
 ##
-## As a multiply, a texel is a LIGHT LEVEL: white leaves the world untouched, AMBIENT_LIGHT is the cool
+## As a multiply, a texel is a light level: white leaves the world untouched, AMBIENT_LIGHT is the cool
 ## near-dark of the deep, and everything between is a dimmer. Multiplication is proportional, so relative
 ## contrast survives it exactly, so rock a fifth brighter than its neighbour stays a fifth brighter at any
 ## light level, and detail dims instead of dissolving. It also deletes work: an alpha-blend needs each
@@ -3740,13 +3771,13 @@ func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
 ## preserves hue for free. So there is no per-cell shadow-colour bake, no dirty flag for it and no per-dig
 ## patch pass, and a dig never touches this texture's colours.
 ##
-## Mass occludes. A veil light level that is a pure function of ROW gives every cell at a given depth the
+## Mass occludes. A veil light level that is a pure function of row gives every cell at a given depth the
 ## same light, whether it is open air or the middle of a hundred tonnes of rock, so a 13x7 chamber cut into
 ## the deep printed at luma 0.148 against 0.127 for the surrounding stone: a 16% difference no eye reads as
-## SPACE, and every other depth cue in the renderer was fighting it.
+## space, and every other depth cue in the renderer was fighting it.
 ##
 ## Light does not travel through stone. Openness is measured as a field, 1 in air and 0 in rock, and smoothed
-## with a separable box blur, so light bleeds a couple of cells INTO the mass from any opening instead of
+## with a separable box blur, so light bleeds a couple of cells into the mass from any opening instead of
 ## stopping at a hard line. Solid cells are then dimmed by how buried they are: a rock face on the edge of a
 ## chamber keeps nearly all its light, and rock with nothing but rock around it loses MASS_SHADE of it. Open
 ## cells are never touched, since the veil's own row-based level already describes them, and the lamp cuts
@@ -3757,12 +3788,12 @@ func _draw_hook(from: Vector2, to: Vector2, sag: float) -> void:
 ## change. check_dig_hitch holds.
 ## Why 0.55 and not 0.46. Deep buried mass sits at openness ~0 with `key` ~0, because it has rock above and
 ## below it so the vertical gradient is flat, which puts it at exactly `1 - MASS_SHADE` while an open cell
-## sits at 1.0. The open-versus-buried contrast is therefore capped at `1/(1 - MASS_SHADE)` BY CONSTRUCTION,
-## and the KEY cannot raise it, because the KEY brightens up-facing FACES, which is a different cell from
+## sits at 1.0. The open-versus-buried contrast is therefore capped at `1/(1 - MASS_SHADE)` by construction,
+## and the key cannot raise it, because the key brightens up-facing faces, which is a different cell from
 ## the one this ratio is about. At 0.46 that cap is 1.85x, and `check_room_reads` demands 2.0x: a floor above
 ## the model's structural maximum, unreachable by construction.
 ##
-## It passed anyway because it sampled ONE cell, and that cell's material tone rode along with the lighting:
+## It passed anyway because it sampled one cell, and that cell's material tone rode along with the lighting:
 ## a dark-toned stone read 39 where the lighting alone predicts 46, and 86/39 = 2.21x looked like headroom.
 ## Taking the median over the buried block, which is what the light actually does to the mass with the
 ## per-material tone lottery averaged out, reports 1.87x, and 86 x 0.54 = 46.4 confirms it is the model and
@@ -3777,10 +3808,10 @@ const KEY_STRENGTH: float = 0.30     ## brightening of a fully up-facing mass (a
 const KEY_GAIN: float = 3.0          ## how fast the vertical openness gradient saturates the key
 var _open_field: PackedFloat32Array = PackedFloat32Array()
 var _open_blur: PackedFloat32Array = PackedFloat32Array()
-## Raw solidity, kept SEPARATE and persistent. The vertical blur below writes its result back into
+## Raw solidity, kept separate and persistent. The vertical blur below writes its result back into
 ## `_open_field`, destroying the raw values it was built from. That is harmless when every column is rebuilt
 ## every time and fatal once a bake covers only a band, because the horizontal blur of a band column reads
-## raw solidity from columns OUTSIDE it, and those columns are unchanged and cached.
+## raw solidity from columns outside it, and those columns are unchanged and cached.
 var _open_raw: PackedFloat32Array = PackedFloat32Array()
 
 
@@ -3789,7 +3820,7 @@ var _open_raw: PackedFloat32Array = PackedFloat32Array()
 ## whole 16,384-cell field never needs rebuilding for it. Rebuilding it all measured 13ms per dig, the
 ## second-largest piece of a mining hitch after the terrain bake itself.
 ##
-## The daylight clock genuinely IS global: every row's sky level moves at once. That path passes the whole
+## The daylight clock genuinely is global: every row's sky level moves at once. That path passes the whole
 ## world and pays the full cost, a few times a day rather than a few times a second.
 func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) -> void:
 	var cols: int = FactorySim.GRID_COLS
@@ -3799,7 +3830,7 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 		dug_from = 0
 		dug_to = cols - 1
 	var band: Vector2i = _bake_openness(cols, rows, dug_from, dug_to)
-	# Above its column's surface the light level depends on the ROW alone, so table it once per bake rather
+	# Above its column's surface the light level depends on the row alone, so table it once per bake rather
 	# than calling a function per cell, which is the bake's dominant cost over 16,384 cells.
 	var sky_rgb: PackedInt32Array = PackedInt32Array()
 	sky_rgb.resize(rows * 3)
@@ -3811,6 +3842,9 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 		sky_rgb[row * 3] = int(c.r * 255.0)
 		sky_rgb[row * 3 + 1] = int(c.g * 255.0)
 		sky_rgb[row * 3 + 2] = int(c.b * 255.0)
+	# The deep's own ambient, and the value the scatter band under the turf line lerps toward, so the soak
+	# follows the deep it is fading into. The void floor below derives from it, so rock and void keep one
+	# ratio between them.
 	var amb: Color = _light_level(AMBIENT_DARK)
 	var amb_r: int = int(amb.r * 255.0)
 	var amb_g: int = int(amb.g * 255.0)
@@ -3845,11 +3879,11 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 			elif _is_true_void(Vector2i(col, row)):
 				# Unlit nothing is absence, and absence is the darkest thing down here. See VOID_FLOOR.
 				#
-				# The predicate needs `and not wall`, because a cell with nothing in it is TWO different
+				# The predicate needs `and not wall`, because a cell with nothing in it is two different
 				# objects. A natural void was never filled and has no backing; a carved room is space someone
 				# opened, and the wall behind it is a surface that survived the digging. Flooring both to
-				# near-black made a chamber read 0.79x DARKER than the buried mass around it and turned
-				# check_room_reads red, correctly, because that layer's whole claim is that carved space
+				# near-black made a chamber read 0.79x darker than the buried mass around it and turned
+				# check_room_reads red, correctly, because that check's whole claim is that carved space
 				# announces itself as carved.
 				#
 				# It is the distinction the renderer draws everywhere else: `_draw_background` paints walled
@@ -3857,7 +3891,7 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 				r = void_r
 				g = void_g
 				b = void_b
-			# Clamped, because the key term can push a strongly up-facing cell ABOVE its row's own light level
+			# Clamped, because the key term can push a strongly up-facing cell above its row's own light level
 			# and a byte does not say so: it wraps, and a lit ledge prints as a dark one.
 			var lit: float = _open_blur[row * cols + col]
 			_veil_base[i] = mini(255, int(float(r) * lit))
@@ -3872,9 +3906,9 @@ func _bake_veil_base(dug_from: int = 0, dug_to: int = FactorySim.GRID_COLS - 1) 
 ## under a flat surface drops straight to buried-dark and the ground reads as a painted band rather than as
 ## earth you are looking into the top of.
 ##
-## `dug_from`..`dug_to` are the columns whose SOLIDITY changed. Everything downstream of them changes over a
+## `dug_from`..`dug_to` are the columns whose solidity changed. Everything downstream of them changes over a
 ## wider band, because the horizontal blur reaches MASS_REACH either side, so this widens the range itself
-## and RETURNS the band it actually refreshed, which is the band the caller must re-compose.
+## and returns the band it actually refreshed, which is the band the caller must re-compose.
 func _bake_openness(cols: int, rows: int, dug_from: int, dug_to: int) -> Vector2i:
 	var n: int = cols * rows
 	if _open_field.size() != n:
@@ -3903,13 +3937,13 @@ func _bake_openness(cols: int, rows: int, dug_from: int, dug_to: int) -> Vector2
 				acc += _open_blur[clampi(row + d, 0, rows - 1) * cols + col]
 			_open_field[row * cols + col] = acc / span
 	# Open cells keep their full row-based light; solid ones are dimmed by how buried they are. The blurred
-	# openness is already 0..1, and a cell touching air lands high enough in it that a rock FACE, which is
+	# openness is already 0..1, and a cell touching air lands high enough in it that a rock face, which is
 	# what you look at when you look at a wall, barely dims at all.
 	#
-	# Then the KEY. How buried a cell is says how much light reaches it and nothing about which way its mass
+	# Then the key. How buried a cell is says how much light reaches it and nothing about which way its mass
 	# faces, so a floor and a ceiling at the same burial depth come out at the same brightness and a cavern
-	# reads as a dark patch rather than as a space with a lit floor and a shadowed roof. The VERTICAL
-	# GRADIENT of the openness field is that missing information: positive where the air is above (an
+	# reads as a dark patch rather than as a space with a lit floor and a shadowed roof. The vertical
+	# gradient of the openness field is that missing information: positive where the air is above (an
 	# up-facing surface) and negative where the air is below (an overhang), and already smooth because the
 	# field was blurred, so it shades as a gradient rather than banding. Light in a mine comes down, so
 	# up-facing mass gains and down-facing mass loses.
@@ -3930,16 +3964,16 @@ func _bake_openness(cols: int, rows: int, dug_from: int, dug_to: int) -> Vector2
 ## Is there genuinely nothing here? The predicate VOID_FLOOR needs, written here in the renderer's own terms
 ## rather than borrowed from another subsystem.
 ##
-## `not is_solid` looks like "this cell is empty" and is not: it is COLLISION's question, and it means "a
+## `not is_solid` looks like "this cell is empty" and is not: it is collision's question, and it means "a
 ## body may pass through here". Three different things pass that test and only one of them is nothing.
 ##
-##   a CARVED ROOM has a wall behind it: space someone opened, with backing that survived the digging.
+##   a carved room has a wall behind it: space someone opened, with backing that survived the digging.
 ##     Flooring it makes a chamber read 0.79x darker than the mass it was cut from (check_room_reads).
-##   a FLOODED CELL has water in it: a surface with a colour and a depth ramp of its own. Flooring it puts
-##     the floor of a pool 23.4 levels LIGHTER than its surface, inverting the depth cue (check_water_reads).
-##   a TRUE VOID is the only one that is absence, and the only one that should go black.
+##   a flooded cell has water in it: a surface with a colour and a depth ramp of its own. Flooring it puts
+##     the floor of a pool 23.4 levels lighter than its surface, inverting the depth cue (check_water_reads).
+##   a true void is the only one that is absence, and the only one that should go black.
 ##
-## A predicate borrowed from another subsystem carries THAT subsystem's question.
+## A predicate borrowed from another subsystem carries that subsystem's question.
 func _is_true_void(c: Vector2i) -> bool:
 	return not sim.is_solid(c) and not sim.wall.has(c) and not sim.water.has(c)
 
@@ -3948,7 +3982,7 @@ func _light_level(darkness: float) -> Color:
 	return Color.WHITE.lerp(AMBIENT_LIGHT, clampf(darkness / AMBIENT_DARK, 0.0, 1.0))
 
 
-## A source's own colour mapped to the colour its light REVEALS rock in. A lamp is amber but still bright,
+## A source's own colour mapped to the colour its light reveals rock in. A lamp is amber but still bright,
 ## so a full-strength pool must reach near-white or it would darken the channels its tint is weakest in: a
 ## saturated teal lift would print a teal-and-black hole instead of lighting the rock. LIGHT_TINT is how
 ## much of the source's hue survives that lift, which is enough to read as amber or teal at a glance and
@@ -3958,7 +3992,7 @@ const LIGHT_TINT: float = 0.28
 const TORCH_LIGHT := Color(1.0, 0.72, 0.34)   ## a wall torch burns hotter and oranger than the head-lamp
 const SEAM_LIGHT := Color(0.46, 0.86, 1.0)    ## exposed-ore seams answer in cold cyan
 
-## Pool radii in CELLS for every veil source that gets view-culled. They are named here rather than written
+## Pool radii in cells for every veil source that gets view-culled. They are named here rather than written
 ## at the call site because the cull margin below must be at least the largest of them: a source outside the
 ## margin is skipped entirely, so any pool that reaches further than the margin is clipped where it crosses
 ## the screen edge, and the clip pops in and out as the camera scrolls.
@@ -3967,8 +4001,26 @@ const TORCH_CORE_R: float = 4.4      ## the hot core at the flame
 const MACHINE_GLOW_R: float = 2.8
 const CONDUIT_GLOW_R: float = 1.8
 const MOTE_GLOW_R: float = 1.4
-## Derived, never written by hand: widen any pool above and the margin follows it. A hand-set margin was 6.0
-## against a 7.6-cell torch, which clipped the outer glow of every torch within 1.6 cells of the view edge.
+## Derived, never written by hand: widen any pool above and the margin follows it. A hand-set margin of 6.0
+## against a 7.6-cell torch clipped the outer glow of every torch within 1.6 cells of the view edge.
+##
+## One veil source is missing from this max and cannot join it as things stand: the crystal seam pool.
+## `_crystal_seams` sizes each seam `CELL * 2.2 + extent * 0.55` where `extent` is the cluster's diagonal
+## span, so in cells the pool is `2.2 + 0.55 * span`, and nothing bounds it. A seam spanning ten cells
+## already reaches 7.7 and clears the margin every other source is held under; twenty-five cells, which is
+## what a drift gallery run along a vein produces, reaches 16. `CRYSTAL_MAX` caps how many seams glow and
+## `CRYSTAL_MIN_CELLS` caps how small one may be; neither caps how large.
+##
+## It is worse than the torch case that prompted the derivation above, because `_exposed_ore_cells` culls
+## its input cells at `_view_world_rect()`, a one-cell margin, so a seam is dropped entirely while its pool
+## could still reach sixteen cells into frame. Since the cull drops cells rather than seams, a vein
+## straddling the view edge also loses its outside cells, which shrinks `extent` and so shrinks the radius:
+## the size of the glow is partly a fact about where the camera is.
+##
+## Not fixed here, because every repair for it moves pixels (capping the radius, widening the collection
+## margin, or clustering in world space instead of view space) and that wants a look pass rather than a
+## constant edited blind. Written down at the constant it violates so the rule and its one exception are
+## read together.
 const VEIL_CULL_MARGIN: float = maxf(maxf(TORCH_GLOW_R, MACHINE_GLOW_R),
 	maxf(CONDUIT_GLOW_R, MOTE_GLOW_R))
 
@@ -3977,7 +4029,7 @@ func _light_tint(source: Color) -> Color:
 	return Color.WHITE.lerp(source, LIGHT_TINT)
 
 
-## Per frame: copy the baked base and let every live light CUT its pool out of the darkness. The cuts are
+## Per frame: copy the baked base and let every live light cut its pool out of the darkness. The cuts are
 ## multiplicative, so each source scales the remaining veil and stacked lights deepen the opening without
 ## over-subtracting. Where light falls the world shows its true colours through the hole, and the additive
 ## pools then lay their warmth on top. Falling items cut too, so a gravity pour visibly opens the dark.
@@ -3989,11 +4041,11 @@ func _update_veil() -> void:
 	elif _veil_cols_dirty:
 		_veil_cols_dirty = false
 		_bake_veil_base(maxi(_veil_col_min, 0), mini(_veil_col_max, FactorySim.GRID_COLS - 1))
-	# Persistent scratch: the working buffer is a MEMBER, refilled from the freshly-baked base each frame.
+	# Persistent scratch: the working buffer is a member, refilled from the freshly-baked base each frame.
 	# `.duplicate()` is a native memcpy, ~0.4us at this size, and is not the veil's cost; the real cost is the
 	# per-source cutting below plus the texture upload. Cutting into the member directly means nothing leaks
 	# a fresh local per frame. The base is re-copied whole each frame, so a light that scrolls off-screen and
-	# back leaves no stale hole: only THIS frame's on-screen cuts appear over a fully-dark base.
+	# back leaves no stale hole: only this frame's on-screen cuts appear over a fully-dark base.
 	_veil_scratch = _veil_base.duplicate()
 	var bytes: PackedByteArray = _veil_scratch   # alias for brevity; mutating it is the intended per-frame write
 	# Off-screen cut cull: the veil texture covers the whole world but only the on-screen portion is ever
@@ -4003,8 +4055,8 @@ func _update_veil() -> void:
 	# radius, so no source is ever dropped while it can still reach the screen. The player lamp and the seams
 	# are on-screen by nature and are not culled.
 	var cull: Rect2 = _view_world_rect(VEIL_CULL_MARGIN)
-	# Light cuts HARD to reveal rock: the pools open a bright core that falls off tight, so lit rock pops out
-	# of the gloom, and each cut carries its SOURCE's colour, so what the lamp uncovers is warm stone rather
+	# Light cuts hard to reveal rock: the pools open a bright core that falls off tight, so lit rock pops out
+	# of the gloom, and each cut carries its source's colour, so what the lamp uncovers is warm stone rather
 	# than grey stone with an amber sticker over it.
 	if player != null:
 		var head: Vector2 = lamp_head()
@@ -4016,7 +4068,7 @@ func _update_veil() -> void:
 		#
 		# "Bring your own light" survives the wider reveal: the pool still falls off hard, the deep outside it
 		# is still genuinely dark, and torches and machines still buy territory that stays lit when you leave.
-		# What changes is that the lamp shows the ROOM you are standing in rather than the arm's length in
+		# What changes is that the lamp shows the room you are standing in rather than the arm's length in
 		# front of you. The throat and body pools widen with it so the beam keeps its shape.
 		_veil_cut(bytes, head + _lamp_offset, 9.0, 0.99, lamp_lit)         # aimed beam: wide reveal, open core
 		_veil_cut(bytes, head + _lamp_offset * 0.45, 5.0, 0.8, lamp_lit)   # the beam throat
@@ -4038,7 +4090,7 @@ func _update_veil() -> void:
 	for cell: Variant in sim.torch:
 		var tpos: Vector2 = _cell_center(cell as Vector2i)
 		if cull.has_point(tpos):
-			# Two cuts, the same shape as the head-lamp: a wide soft glow that makes the ROOM habitable and a
+			# Two cuts, the same shape as the head-lamp: a wide soft glow that makes the room habitable and a
 			# hot core at the flame. One quadratic pool alone put a 2-cell bright disc on the wall and left the
 			# rest of a hung chamber black, which is not what a torch in a room looks like.
 			_veil_cut(bytes, tpos, TORCH_GLOW_R, 0.52, _light_tint(TORCH_LIGHT))
@@ -4050,9 +4102,10 @@ func _update_veil() -> void:
 		var lvl: float = _conduit_level(cell as Vector2i)
 		if lvl > 0.04:
 			_veil_cut(bytes, cpos, CONDUIT_GLOW_R, lvl * 0.7)
-	# Crystal/ore seam glow: a few cohesive seams of clustered exposed ore each cut ONE larger cool hole in
+	# Crystal/ore seam glow: a few cohesive seams of clustered exposed ore each cut one larger cool hole in
 	# the gloom, so the vein's rock is revealed around it, and _paint_lights lays the saturated pool on top.
-	# Seams are already view-culled, since _exposed_ore_cells builds only from cells inside _view_world_rect.
+	# Seams are view-culled by their cells, at a one-cell margin, which is not the same as culling them by
+	# their pool; see VEIL_CULL_MARGIN, where the arithmetic is.
 	for seam: Dictionary in _crystal_seams_cached():
 		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
 		_veil_cut(bytes, seam["pos"], float(seam["radius"]) / float(CELL), 0.62 + 0.26 * breath,
@@ -4065,12 +4118,12 @@ func _update_veil() -> void:
 	_veil_tex.update(_veil_img)
 
 
-## Open the veil in a radial falloff around a world position; `radius` is in CELLS. The falloff is textured:
+## Open the veil in a radial falloff around a world position; `radius` is in cells. The falloff is textured:
 ## a cheap per-cell value nudge breaks the pool's outer half so the light reveals rock grain as it fades
 ## rather than ending in a clean gaussian blob. The core stays smooth, because the nudge scales up with
 ## distance, so the bright centre is unbroken.
 ##
-## Light has a COLOUR. `tint` is the colour of the source's light, and the cut lifts each channel toward
+## Light has a colour. `tint` is the colour of the source's light, and the cut lifts each channel toward
 ## `255 * tint` rather than toward flat white, so lamp-lit rock comes out amber and lift-lit rock comes out
 ## teal through the multiply, each carrying its own material hue underneath. This is the job the additive
 ## pass used to do by painting over the rock, which is why the additive pass could drop to a fraction of its
@@ -4101,14 +4154,14 @@ func _veil_cut(bytes: PackedByteArray, world: Vector2, radius: float, strength: 
 			var window: float = (1.0 - f) * clampf(f * 2.2, 0.0, 1.0)
 			var g: float = (sin(float(col) * 1.7 + float(row) * 2.3) * 0.62 \
 				+ sin(float(col) * 4.1 - float(row) * 3.7) * 0.38) * 0.13 * window
-			# A cut RAISES the light level toward the tint rather than lowering an opacity: the same pool and
+			# A cut raises the light level toward the tint rather than lowering an opacity: the same pool and
 			# the same falloff, expressed in the multiply model. Sources stack by each lifting whatever the
 			# previous one left, so overlapping pools brighten toward full light and can never overshoot it.
 			var lift: float = clampf(strength * f * f + g * strength, 0.0, 1.0)  # noisy soft-edged pool
 			var idx: int = (row * cols + col) * 4
 			for k: int in 3:
 				var v: float = float(bytes[idx + k])
-				if target[k] > v:                        # a light only ever ADDS light to a channel
+				if target[k] > v:                        # a light only ever adds light to a channel
 					bytes[idx + k] = int(v + (target[k] - v) * lift)
 
 
@@ -4131,7 +4184,7 @@ func _skylight_alpha(row: int, surf: int) -> float:
 ## alpha, which is the shader's strength mask, is full at the machine top and fades to nothing about 2 cells
 ## up. The shader displaces whatever the screen already shows there, so the plume warps terrain, walls, items
 ## and the machine's own smoke alike. Recipe-runners have behavior &"", so the hot check keys on the glyph
-## KIND instead, and only forge-style machines shimmer rather than every module.
+## kind instead, and only forge-style machines shimmer rather than every module.
 func _paint_heat_haze(layer: LightLayer) -> void:
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
@@ -4153,8 +4206,8 @@ func _paint_heat_haze(layer: LightLayer) -> void:
 ## The machine light pool's radius in cells, and the distance at which two of those pools are one light.
 ##
 ## Distinct from MACHINE_GLOW_R, which is the same lamp's hole in the darkness veil, and the two are free to
-## differ because they compose differently: the veil cuts are MULTIPLICATIVE, so overlapping holes deepen an
-## opening and can never over-subtract, while these pools are ADDITIVE and overlapping ones sum.
+## differ because they compose differently: the veil cuts are multiplicative, so overlapping holes deepen an
+## opening and can never over-subtract, while these pools are additive and overlapping ones sum.
 ##
 ## The link distance is derived from the radius rather than picked. Two pools whose centres sit closer than
 ## one radius overlap across their hot cores, which is exactly the sum that clips, so a pair that close is
@@ -4163,45 +4216,41 @@ const MACHINE_POOL_R: float = 2.6
 const MACHINE_POOL_LINK: int = ceili(MACHINE_POOL_R)
 
 
-## One cohesive pool per run of neighbouring same-coloured emitters, plus each machine's own hot core — and
-## why a row of burners used to be a slab.
+## One cohesive pool per run of neighbouring same-coloured emitters, plus each machine's own hot core. This
+## is also why a row of burners used to read as a slab.
 ##
 ## The light layer blends additive, so N overlapping pools sum to N times one pool's intensity and clip
-## against the framebuffer. Three generators in a row printed a featureless orange block with their own fuel
-## counters and status lamps drawn at z 0 underneath it and destroyed by it: on the drift capture 99.3% of
-## the pixels across the three casings clipped at 255 in some channel, and every counter and lamp rect on
-## all three machines was clipped edge to edge. A pool exists to say that a machine is working and it was
-## erasing what the machine had to say.
+## against the framebuffer. Three generators in a row printed a featureless orange block with their own
+## fuel counters and status lamps drawn at z 0 underneath it and destroyed by it: 99.3% of the pixels
+## across the three casings clipped at 255 in some channel, and every counter and lamp rect on all three
+## was clipped edge to edge. A pool exists to say a machine is working, and it was erasing what the machine
+## had to say.
 ##
-## The ore seam pass below already answers this for clustered ore, and this is the same treatment. Flood the
-## emitters into groups, lay ONE pool per group, and keep the per-machine pip, so a run of burners reads as
-## three machines inside one light rather than as one wide lamp. The radius is not a taste number either:
-## the group's pool is a single machine's radius plus half the group's diagonal extent, which is the size at
-## which the outermost member still keeps a full single-machine radius of light around it. A lone machine is
-## a group of one whose extent is zero, so its pool is the identical draw call it always was, arithmetically
-## and not approximately: photographed beside the run, the Drift Rig's casing clipped 15.36% to 15.50% over
-## three runs of the unchanged build and 15.26% to 15.31% over three of four runs of this one, with the
-## fourth at 16.30%.
+## The ore seam pass below already answers this for clustered ore, and this is the same treatment. Flood
+## the emitters into groups, lay one pool per group, and keep the per-machine pip, so a run of burners
+## reads as three machines inside one light rather than as one wide lamp. The radius is derived: a single
+## machine's radius plus half the group's diagonal extent, which is the size at which the outermost member
+## still keeps a full single-machine radius of light around it. A lone machine is a group of one whose
+## extent is zero, so its pool is arithmetically the identical draw call it always was. Photographed beside
+## the run, the Drift Rig's casing clipped 15.36% to 15.50% over three runs of the unchanged build and
+## 15.26% to 15.31% over three of four runs of this one, with the fourth at 16.30%.
 ##
-## This fixes the stacking and not the burner's own tuning, and knockout separates the two. Suppress the two
-## neighbours' pools on that same capture and the surviving generator, now alone, still clips 96.4% of its
-## own counter and 87.7% of its own status lamp: one pool of (1.0, 0.62, 0.20) at a pulse near 0.9 lays some
-## 211 levels of red over a casing that is already electric gold in a torch-lit gallery. It is the BASE that
-## decides, not the pool alone — check_machine_state stages one machine in a dark room whose empty mean luma
-## is 17, and there the same generator's working frame clips 4%. So the outer machines of a run come back,
-## each casing 98.8% clipped and now 45.4% and 35.4%, while the one nearest the centroid, which by
-## construction receives exactly one machine's worth of pool and no more, stays where a lone burner standing
-## in its own light has always been.
+## This fixes the stacking rather than the burner's own tuning, and knockout separates the two. Suppress
+## the two neighbours' pools on that same capture and the surviving generator, now alone, still clips 96.4%
+## of its own counter and 87.7% of its own status lamp: one pool of (1.0, 0.62, 0.20) at a pulse near 0.9
+## lays some 211 levels of red over a casing already electric gold in a torch-lit gallery. It is the base
+## that decides rather than the pool alone. check_machine_state stages one machine in a dark room whose
+## empty mean luma is 17, and there the same generator's working frame clips 4%. So the outer machines of a
+## run come back at 45.4% and 35.4% clipped against 98.8% before, while the one nearest the centroid, which
+## by construction receives exactly one machine's worth of pool, stays where a lone burner always was.
 ##
-## Grouped by POOL COLOUR rather than by machine kind, because the colour is what a merge would destroy: two
-## modules with different casings paint different pools and have to stay apart, while two emitters painting
-## the same hue on the same rock lose nothing by sharing one. Colour is the finer key of the two wherever
-## they differ, and no casing colour in MACHINE_STYLE coincides with the furnace, generator or lift pool
-## literals, so this never merges across kinds.
-##
-## The idle gate joins that key for the same reason. An idled pool and a working pool are different lights
-## even in one colour, and pooling them would publish a working machine's state over the stopped machine
-## beside it, which is the exact read IDLE_GLOW exists to make.
+## Grouped by pool colour rather than by machine kind, because the colour is what a merge would destroy:
+## two modules with different casings paint different pools and have to stay apart, while two emitters
+## painting the same hue on the same rock lose nothing by sharing one. No casing colour in MACHINE_STYLE
+## coincides with the furnace, generator or lift pool literals, so this never merges across kinds. The idle
+## gate joins that key for the same reason: an idled pool and a working pool are different lights even in
+## one colour, and pooling them would publish a working machine's state over the stopped machine beside it,
+## which is the exact read IDLE_GLOW exists to make.
 func _paint_machine_pools(layer: LightLayer) -> void:
 	if SILHOUETTE_ONLY:
 		return          # a body's shape is not its glow; see SILHOUETTE_ONLY
@@ -4211,12 +4260,12 @@ func _paint_machine_pools(layer: LightLayer) -> void:
 	var at_cell: Dictionary = {}
 	for machine: MachineState in sim.machines:
 		var kind: String = Visuals.machine_kind(machine.def)
-		# Each machine's pool blazes in its OWN colour out of the black: a hot orange forge, an amber burner,
+		# Each machine's pool blazes in its own colour out of the black: a hot orange forge, an amber burner,
 		# a cyan-teal lift.
 		var col: Color = Color(1.0, 0.46, 0.16)            # furnace ember (hot saturated orange)
 		var pulse: float = 0.7 + 0.12 * sin(_anim_time * 3.0 + float(machine.cell.x))  # a sign of life
 		# A cold or idle machine barely glows: it blazes only while it is doing its job, so light means
-		# working. The gate applies to EVERY machine, not just the furnace.
+		# working. The gate applies to every machine, not just the furnace.
 		#
 		# Gating only `kind == "furnace"` left a stopped drill, hopper, splitter, crusher, borer, press, mill
 		# and pump each lighting the rock around them exactly as brightly as a running one, so the hardware
@@ -4235,7 +4284,7 @@ func _paint_machine_pools(layer: LightLayer) -> void:
 		if kind == "generator":
 			col = Color(1.0, 0.62, 0.20)                   # warm coal-burner glow
 			# Breathes while fueled and goes dark when it runs dry: the "is it making power?" read. This
-			# REPLACES pulse rather than scaling it, so the idle multiplier above never reached a burner at
+			# replaces pulse rather than scaling it, so the idle multiplier above never reached a burner at
 			# all, and the flag has to follow the number rather than the test that set it.
 			pulse = (0.85 + 0.22 * sin(_anim_time * 6.5)) if machine.fuel > 0 else 0.0
 			idled = false
@@ -4244,7 +4293,7 @@ func _paint_machine_pools(layer: LightLayer) -> void:
 			pulse = (0.55 + 0.5 * machine.power_factor) * (0.85 + 0.15 * sin(_anim_time * 3.0))
 			idled = false                                  # replaced, exactly as the burner's is
 		elif kind != "furnace":
-			# Each machine's pool takes its OWN casing colour, so a drill, hopper and splitter read as distinct
+			# Each machine's pool takes its own casing colour, so a drill, hopper and splitter read as distinct
 			# devices in the dark instead of as a field of identical cyan blobs.
 			col = Visuals.machine_color(machine.def)
 		if pulse <= 0.0:
@@ -4303,7 +4352,7 @@ func _paint_machine_pools(layer: LightLayer) -> void:
 	# The cores last, one per burning machine, on top of whatever pool covers them. A fire's centre is
 	# near-white rather than saturated, so the forge ember and the coal burner each get a small hot-white pip
 	# and the pool reads like flame rather than as a flat coloured disc. These are what keep a run of three
-	# from reading as one wide lamp, so they stay per-machine and at each machine's OWN pulse; the layer is
+	# from reading as one wide lamp, so they stay per-machine and at each machine's own pulse; the layer is
 	# additive, where draw order carries no meaning, so lifting them out of the pool loop changes nothing but
 	# the shape of this function.
 	for e: Dictionary in lit:
@@ -4333,8 +4382,8 @@ func _paint_lights(layer: LightLayer) -> void:
 	if player != null:
 		# A faint flicker so the lamp reads as a live flame rather than a static disc.
 		#
-		# Light reveals, it does not paint. The lamp does two jobs: it CUTS a wide hole in the darkness veil
-		# (see _update_veil, 9 cells at 0.99 strength, which is what actually makes rock visible) and it ADDS
+		# Light reveals, it does not paint. The lamp does two jobs: it cuts a wide hole in the darkness veil
+		# (see _update_veil, 9 cells at 0.99 strength, which is what actually makes rock visible) and it adds
 		# an amber pool on top. An additive term strong enough to swamp the reveal repaints the rock the veil
 		# just uncovered: three overlapping pools summed past 1.0, tripped the glow threshold and blew the
 		# centre of the frame to a white smear.
@@ -4344,7 +4393,7 @@ func _paint_lights(layer: LightLayer) -> void:
 		# washing the pool's centre to a structureless cream; at 0.17 the carved rock inside the pool survives
 		# and the lamp still plainly reads as a lamp.
 		var flick: float = 0.17 + 0.030 * sin(_anim_time * 11.0) + 0.020 * sin(_anim_time * 27.0)
-		# Scale the lamp by how DARK the miner's spot actually is: a full blaze in the deep where it IS the
+		# Scale the lamp by how dark the miner's spot actually is: a full blaze in the deep where it is the
 		# light, and a dim glow in daylight. At spawn the full-strength lamp washed out both the avatar and
 		# the starter ore it sits on, so every warm thing read as a lamp.
 		var pcell := Vector2i(int(floor(player.position.x / float(CELL))), int(floor(player.position.y / float(CELL))))
@@ -4370,7 +4419,7 @@ func _paint_lights(layer: LightLayer) -> void:
 		_draw_glow(layer, tpool, float(CELL) * 3.0, Color(1.0, 0.60, 0.24), gutter)
 		# White-hot flame core: the guttering torch flame has a bright near-white centre.
 		layer.draw_circle(tpool, 1.6 + 0.8 * gutter, Color(1.0, 0.93, 0.78, 0.8 * gutter))
-	# Powered conduits EMIT light, so a live trunk pours a column of warm glow down the dark shaft. The
+	# Powered conduits emit light, so a live trunk pours a column of warm glow down the dark shaft. The
 	# in-world tube is drawn under the veil, so this is what makes its power read from across the room.
 	for cell: Variant in sim.conduit:
 		var lvl: float = _conduit_level(cell)
@@ -4378,18 +4427,18 @@ func _paint_lights(layer: LightLayer) -> void:
 			_draw_glow(layer, _cell_center(cell), float(CELL) * (0.9 + 0.7 * lvl), Color(1.0, 0.78, 0.36), lvl * 0.7)
 	# Ore seam glow: one cohesive glow per clustered exposed vein, sized to the seam's extent, plus a hot core
 	# pip on each exposed cell, so the seam reads as discrete nuggets inside one glow. The glow takes the
-	# seam's OWN material colour, `nugget_color` pushed toward saturation, rather than a hardcoded cyan, so ore
+	# seam's own material colour, `nugget_color` pushed toward saturation, rather than a hardcoded cyan, so ore
 	# glows warm orange, rich_ore gold and iron cold steel, and the light agrees with the flecks in the rock.
 	# On a mixed seam the first cell's material governs.
 	#
-	# The accent is deliberately tight and dim. A wide soft radial halo of ANY colour impersonates a light
+	# The accent is deliberately tight and dim. A wide soft radial halo of any colour impersonates a light
 	# source, and first-time players read it as a lamp or a lava blob rather than as rock. Ore reads by its
 	# tinted cell body and chunky nuggets, drawn under the veil; what is left here is a tight dim accent plus
 	# bright nugget pips, so an exposed vein shimmers in the dark without pretending to be a lamp.
 	for seam: Dictionary in _crystal_seams_cached():
 		var breath: float = 0.55 + 0.45 * sin(_anim_time * 1.4 + float(seam["pos"].x) * 0.02)
 		var seam_glow: Color = _seam_glow_color(seam["cells"])
-		# Gate the discovery glow by how DARK the vein sits, as the lamp is gated: a vein in daylight reads as
+		# Gate the discovery glow by how dark the vein sits, as the lamp is gated: a vein in daylight reads as
 		# pure rock, since a glow of any strength there impersonates a lamp, while a vein in the deep dark
 		# still shimmers and stays findable across a cavern.
 		var sc := Vector2i(int(seam["pos"].x / float(CELL)), int(seam["pos"].y / float(CELL)))
@@ -4407,7 +4456,7 @@ func _paint_lights(layer: LightLayer) -> void:
 	# is painted into the light layer every frame.
 	var mote_view: Rect2 = _view_world_rect(2.0)
 	for m: Dictionary in falling.motes():
-		# Dropped and falling items glow, but a dropped STACK overlaps many motes into one blown-out disc, so
+		# Dropped and falling items glow, but a dropped stack overlaps many motes into one blown-out disc, so
 		# each mote is dimmer and tighter and a stream reads warm without clipping.
 		if not mote_view.has_point(m["pos"]):
 			continue
@@ -4417,7 +4466,7 @@ func _paint_lights(layer: LightLayer) -> void:
 	# plus a level-scaled term, well under a torch, crystal seam or lamp, so lit and shallow water looks
 	# essentially unchanged and it never reads as a light source or as lava. View-culled like the passes above.
 	#
-	# Drawn on the body's SKIN rather than cell by cell. A glow of radius 1.15 cells at every cell centre puts
+	# Drawn on the body's skin rather than cell by cell. A glow of radius 1.15 cells at every cell centre puts
 	# one disc per cell in a square grid, and adjacent discs touch without merging, so a wide aquifer comes out
 	# as visible polka dots. Only the cells at the top or the sides of the body glow, over a radius wide enough
 	# that neighbours blend, which is cheaper on a deep pool and closer to what dim water does: the light
@@ -4458,7 +4507,7 @@ func _paint_godrays(layer: LightLayer) -> void:
 		return
 	for col: int in range(FactorySim.GRID_COLS):
 		var surf: int = sim.surface_row(col)
-		# The beam mouth is the SHALLOWER neighbouring surface, because light pours past that edge. min and
+		# The beam mouth is the shallower neighbouring surface, because light pours past that edge. min and
 		# not max, so a 2-wide shaft still beams: its partner column is deep, and the outer rim is the edge.
 		var mouth: int = mini(sim.surface_row(maxi(col - 1, 0)),
 			sim.surface_row(mini(col + 1, FactorySim.GRID_COLS - 1)))
@@ -4486,7 +4535,7 @@ func _paint_godrays(layer: LightLayer) -> void:
 			var cols := PackedColorArray([
 				Color(RAY, a), Color(RAY, a), Color(RAY, a_end), Color(RAY, a_end)])
 			layer.draw_polygon(pts, cols)
-		# A soft landing pool where the beam MEETS the floor while still lit.
+		# A soft landing pool where the beam meets the floor while still lit.
 		if end_row == surf and floor_light > 0.06:
 			_draw_glow(layer, Vector2(x + cell_f * 0.5, float(surf) * cell_f),
 				cell_f * 1.6, RAY, 0.18 * floor_light * shimmer * dl)
