@@ -162,7 +162,13 @@ n=0
 	echo "|---|---|---|---|"
 	while IFS= read -r f; do
 		stem="${f##*/_moment_}"; stem="${stem%.png}"
-		sha="$(git log --follow -1 --format=%H -- "$f")"
+		# FOLLOW THE RENAME, AND SKIP THE RENAME ITSELF. `--follow` alone is not enough here: with `-1`
+		# git stops at the most recent commit touching the path, and after a move that commit IS the
+		# rename. Written that way first, it re-dated all 52 rows to the move and gave frames shot
+		# weeks apart a single renderer signature, which is the archival record this table exists to
+		# keep. `--diff-filter=AM` keeps the add and any real content edit and drops pure renames.
+		# Caught by diffing the regenerated table against the pre-move one rather than by reading it.
+		sha="$(git log --follow --diff-filter=AM -1 --format=%H -- "$f")"
 		printf '| `%s` | %s | `%s` | `%s` |\n' \
 			"$stem" "$(git log -1 --format=%ad --date=format:'%Y-%m-%d %H:%M' "$sha")" \
 			"$(sig_for_commit "$sha")" "$(recipe_for "$stem")"
@@ -177,7 +183,7 @@ n=0
 	echo "## Cohorts"
 	echo
 	git ls-files 'docs/media/moments/_moment_*.png' | while IFS= read -r f; do
-		sha="$(git log --follow -1 --format=%H -- "$f")"; sig_for_commit "$sha"
+		sha="$(git log --follow --diff-filter=AM -1 --format=%H -- "$f")"; sig_for_commit "$sha"
 	done | sort | uniq -c | sort -rn | while read -r count sig; do
 		echo "- \`$sig\` — $count frames"
 	done
