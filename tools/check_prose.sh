@@ -314,6 +314,8 @@ if not WIDE_TOKENS:
 else:
     print("  HELD: [prose.wide-word-list] this run asserted it (%d word(s))" % len(WIDE_TOKENS))
 wide_fails, wide_read, wide_skipped = [], 0, 0
+wide_emdash, wide_emdash_files = 0, 0
+_emdash_gated = set(paths)   # the population the categorical em-dash rule already covers
 wide_binary, wide_absent, wide_unreadable = 0, 0, []
 for wp in WIDE_PATHS:
     if wp in WIDE_SKIP:
@@ -345,6 +347,22 @@ for wp in WIDE_PATHS:
         wide_binary += 1
         continue
     wide_read += 1
+    # EM-DASH CENSUS, COUNTED HERE AND FAILING NOTHING. The em-dash rule twelve screens down is
+    # categorical -- this file's own header says "the character is the tell" -- and its population is
+    # `scenes/` and `src/` COMMENT BODIES, which is 314 of the 1902 em-dashes in origin/main's tracked
+    # text. The other 1588 are in tools/, docs/, tests/ and the root, where nothing has ever counted
+    # them, so a clean run has always been able to read as "this tree has no em-dashes" while carrying
+    # 84% of them one directory across.
+    #
+    # It reports and does not fail, deliberately. Turning it into a gate would go red on 1772 lines
+    # tonight, which is a backlog decision and not a repair, and a gate that arrives already red gets
+    # switched off. What it removes is the INVISIBILITY, which is the half that was never anyone's
+    # decision. Counted on the read the wide sweep already did, so it costs nothing.
+    if wp not in _emdash_gated:
+        _n_em = wsrc.count(EMDASH)
+        if _n_em:
+            wide_emdash += _n_em
+            wide_emdash_files += 1
     hits = []
     for pat, name in WIDE_TOKENS:
         # CASE-INSENSITIVE, like the narrow sweep twelve lines down and unlike the first version of
@@ -401,6 +419,13 @@ print("\nwide sweep: %d word(s) tested over %d text file(s) -- every tracked fil
 print("            %d binary, %d excluded by name, %d tracked-but-absent,"
       % (wide_binary, wide_skipped, wide_absent))
 print("            %d unreadable" % len(wide_unreadable))
+if wide_emdash:
+    print("\n   note: %d em-dash(es) in %d tracked file(s) OUTSIDE the categorical rule's population"
+          % (wide_emdash, wide_emdash_files))
+    print("         (that rule reads scenes/ and src/ comment bodies only). Counted, not gated: this")
+    print("         is a backlog, and a report of 0 em-dashes above is a statement about %d file(s),"
+          % len(paths))
+    print("         not about the tree.")
 # THE POPULATION HAS TO ADD UP. Every path out of the loop above increments exactly one counter, so if
 # these do not sum to the population then a file left through a path nobody counts -- which is precisely
 # the bug this block replaced, and precisely the thing that makes a small sweep read as a clean one.
