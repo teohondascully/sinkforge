@@ -90,6 +90,10 @@ case "$rc" in
 	    bad=1 ;;
 	7)  meaning="a previous run of THIS gate rejected that sweep; the table below is the rejected one"
 	    bad=1 ;;
+	130) meaning="INTERRUPTED (SIGINT) partway through -- a partial sweep, not a verdict"
+	    bad=1 ;;
+	143) meaning="TERMINATED (SIGTERM) partway through: a job timeout, an OOM, or a kill. Not a verdict"
+	    bad=1 ;;
 	"") meaning="UNKNOWN — no exit line" ;;
 	# AN UNRECOGNISED CODE IS A RED, NOT A FOOTNOTE. This branch printed its warning and then fell through
 	# to a clean exit while it was being written — the guard against codes nobody documented was passing

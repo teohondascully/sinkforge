@@ -104,6 +104,9 @@
 #   7  NOT A RESULT: the sweep finished and tools/harness_verdict.sh refused to let its verdict be quoted,
 #      because a declared layer never reported, a layer log is the wreckage of a load failure, or the gate
 #      read no logs at all. This is not "a test failed" and must never be recorded as one. Re-run it.
+# 130  interrupted (SIGINT/Ctrl-C) partway through. NOT a verdict: whatever the table shows is a partial
+#      sweep. Recorded because the alternative was recording it as 0.
+# 143  terminated (SIGTERM) partway through. Same, and the one a CI job timeout or an `OOM` produces.
 #  43  VOID: a layer ran and could not measure its subject. NOT a failure and NOT a skip — the sample
 #      was spoiled by something outside the code, so the correct response is to run it again. Deliberately
 #      the same integer the layers use for it, so the value cannot drift between the two halves.
@@ -830,7 +833,8 @@ harness_cleanup() {
 	# themselves teaches people to skip reading it.
 	VERDICT_RC=0
 	case "$rc" in
-		0|1|4|43)
+		0|1|4|43)   # and NOT 130/143: a killed run is self-describing, and the gate's exit-7 override
+		            # would replace the signal's own status with a vaguer one.
 			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/harness_verdict.sh" ]; then
 				printf '\n'
 				bash "$ROOT/tools/harness_verdict.sh" "$DIR" "harness (local sweep)" \
@@ -873,6 +877,21 @@ harness_cleanup() {
 	fi
 }
 trap harness_cleanup EXIT
+# A KILLED RUN MUST NOT RECORD A CLEAN EXIT, and it did. `harness_cleanup` takes `$?` on its first line,
+# which is the right way to capture a normal exit and is 0 when the shell is cut down by a signal while
+# `wait`ing -- so a sweep killed at layer 30 wrote `HARNESS_EXIT=0` into its own summary. Observed, by
+# SIGTERMing a real sweep: the table showed one armed sentinel, no layer rows, and a clean exit line.
+#
+# The verdict gate caught the CONSEQUENCE (no layer rows -> HARNESS_RESULT=no), so nothing quoted it as a
+# pass, but the recorded number was still false and the archive is read by grep. These two traps make the
+# status say what happened. They must EXIT rather than merely record: a trap on INT or TERM that returns
+# resumes the script, which would turn Ctrl-C into "the sweep carries on without you".
+#
+# NOTE FOR ANYONE EXTENDING THIS: `exit` inside the EXIT trap does NOT survive a signal death -- bash
+# re-raises and the observed status was 143 regardless of the trap's own `exit 7`. That is why the gate is
+# not consulted for these codes below; the code already says precisely what happened.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Every verdict goes to the terminal AND to summary.txt in the log dir, so the uploaded artifact carries
 # the result table and not just a pile of logs to correlate by hand. Truncated, not appended: SF_LOG_DIR
