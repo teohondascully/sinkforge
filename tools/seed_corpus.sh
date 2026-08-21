@@ -81,86 +81,21 @@ trap 'rm -rf "$DIR"' EXIT
 # whose output somebody will read as a property of the WORLD.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 
-# RELEASE ONLY A LOCK WE STILL OWN, and the distinction is not pedantry: it is the difference between one
-# run on this box and two. `LOCK_HELD=1` records that we acquired the lock ONCE. It does not record that we
-# still hold it, and those come apart on a path the stale sweep above creates deliberately.
-#
-#   A is killed hard, so its EXIT trap never runs and its lock directory stays.
-#   B waits, sees A's pid is gone, clears the lock as stale and takes it. The directory is now B's.
-#   A's trap finally fires -- a slow SIGTERM, a reaped subshell -- and deletes the directory. It is B's.
-#   C finds no lock, takes it, and boots Godot NEXT TO B's still-running Godot.
-#
-# Nothing downstream can see that. Both runs look healthy, both report exit 0, and every duration either
-# one measured is a measurement of the other one as well. It is silent, and it corrupts results rather
-# than failing them, which is the worst pair of properties a fault can have.
-#
-# The owner file already carries the holder's pid on line 1 and always has. Releasing means checking it.
-# The residual race is narrow and deliberately left: the stale sweep can still clear a lock between another
-# holder's check and its `rm`. Closing that needs an atomic compare-and-delete the filesystem does not
-# offer; what is closed here is the cascade, where ONE hard kill makes every subsequent honest release
-# delete a stranger's lock.
-lock_release() {
-	if [ "$(sed -n 1p "$LOCK/owner" 2>/dev/null)" = "$$" ]; then
-		rm -rf "$LOCK"
-	fi
-}
+# The lock protocol lives in one file. See tools/lock_lib.sh for why: it was three hand-maintained copies,
+# two safety defects had to be fixed in each of them by hand, and they had already diverged.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lock_lib.sh"
 
-# SWEEPING A STALE LOCK IS A MUTATION OF SHARED STATE, SO IT HAPPENS UNDER ITS OWN MUTEX.
-#
-# The release path above asks whether the directory is still ours. This asks the harder question from the
-# other side: whether it is still THEIRS. Removing a stale lock looks safe because the holder is provably
-# dead, but the proof and the removal are two steps and a waiter can be descheduled between them:
-#
-#   A and B are both waiting. Both read owner = a hard-killed pid. Both call kill -0. Both see it dead.
-#   A removes the directory, takes the lock, writes its own claim, and boots Godot.
-#   B -- which decided a moment earlier and has only now been scheduled -- removes the directory. It is A's.
-#   B takes the lock and boots Godot beside A's.
-#
-# AN ATOMIC RENAME DOES NOT FIX THIS, and it was the first thing tried. `mv` makes exactly one winner among
-# SIMULTANEOUS sweepers, but B here is not simultaneous, it is LATE: its rename succeeds against A's live
-# directory because rename cannot tell whose directory it is. Staged with one waiter delayed, the rename
-# version still put two engines on the box 5 times in 5.
-#
-# What actually closes it is re-deciding at the moment of removal, with nobody else able to remove
-# concurrently. Inside this mutex the reasoning is airtight: to ACQUIRE the lock a process must `mkdir` it,
-# which requires it not to exist; it does exist, right up until we remove it; and we are the only party
-# permitted to remove it. So an owner that reads as dead in here cannot have been replaced by a live one
-# between the read and the `rm`.
-#
-# RESIDUAL, stated rather than hidden. A sweeper killed inside this mutex -- a window of one `sed`, one
-# `kill -0` and one `rm` -- leaves the gc directory behind. The next waiter clears it by the same dead-pid
-# rule, and if THAT races, the worst case is two sweepers and the original window returns. It needs two
-# hard kills landing in two sub-millisecond windows. The old failure needed one kill and no timing at all.
-# Pid REUSE is also still unhandled: `kill -0` on a recycled pid says "alive" for an unrelated process, so
-# a genuinely stale lock can wedge until SF_LOCK_WAIT. That is a liveness fault and it fails loudly.
-lock_steal() {                                  # lock_steal dead|unowned
-	_gc="$LOCK.gc"
-	_gp="$(cat "$_gc/pid" 2>/dev/null)"
-	if [ -n "$_gp" ] && ! kill -0 "$_gp" 2>/dev/null; then
-		rm -rf "$_gc.dead.$$" 2>/dev/null
-		if mv "$_gc" "$_gc.dead.$$" 2>/dev/null; then rm -rf "$_gc.dead.$$"; fi
-	fi
-	if ! mkdir "$_gc" 2>/dev/null; then
-		return 0                                # somebody else is sweeping; loop and re-read
-	fi
-	echo "$$" > "$_gc/pid"
-	_h="$(sed -n 1p "$LOCK/owner" 2>/dev/null)"
-	if [ "${1:-dead}" = "unowned" ]; then
-		if [ -z "$_h" ]; then rm -rf "$LOCK"; fi
-	else
-		if [ -n "$_h" ] && ! kill -0 "$_h" 2>/dev/null; then rm -rf "$LOCK"; fi
-	fi
-	rm -rf "$_gc"
-}
+
 if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 	waited=0
 	while :; do
 		if mkdir "$LOCK" 2>/dev/null; then
-			printf '%s\n%s\n' "$$" "$PWD" >"$LOCK/owner"; break
+			lock_claim_write "the seed corpus sweep"; break
 		fi
 		holder="$(head -1 "$LOCK/owner" 2>/dev/null || true)"
 		if [ -n "${holder:-}" ] && ! kill -0 "$holder" 2>/dev/null; then
-			echo "  (clearing a stale harness lock: pid $holder is gone)"; lock_steal; continue
+			if lock_steal; then echo "  (cleared a stale harness lock: pid $holder was gone)"; fi
+			continue
 		fi
 		if [ "$waited" -ge "${SF_LOCK_WAIT:-900}" ]; then
 			echo "!! another run has held $LOCK for ${waited}s (pid ${holder:-unknown}) — refusing to sweep"

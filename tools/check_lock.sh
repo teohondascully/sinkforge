@@ -144,7 +144,11 @@ rm -rf "$LOCK"
 # late here, deliberately, by pausing it inside the sweep -- and then the fix has to be correct by
 # construction rather than by timing, which is the property worth having.
 DELAYED="$TMP/with_machine_delayed.sh"
-awk '{print} /clearing a stale lock: pid/ {print "\t\tsleep \"${SF_TEST_SWEEP_DELAY:-0}\""}' \
+# The pause goes between the caller DECIDING the holder is dead and the sweep ACTING on it, which is the
+# gap the defect lives in. The copy also needs the protocol library beside it, because the wrapper sources
+# that relative to its own location.
+cp "$ROOT/tools/lock_lib.sh" "$TMP/lock_lib.sh"
+awk '{print} /kill -0 "\$holder"/ {print "\t\tsleep \"${SF_TEST_SWEEP_DELAY:-0}\""}' \
 	"$WITH" > "$DELAYED"
 # THE SETUP IS ASSERTED, because if the anchor ever drifts the copy is simply identical to the original,
 # both waiters sweep at once, and this case goes green while testing nothing at all.
@@ -239,6 +243,39 @@ rm -rf "$LOCK"
 runcap 0 /bin/sh -c "sleep 2; exit 42" >/dev/null 2>&1
 code=$?
 [ "$code" -eq 42 ]; check $? "SF_RUN_CAP=0 disables the cap and the inner code still survives (got $code)"
+
+# --- THE PROTOCOL HAS ONE COPY ---
+# The eighth property, and it is structural rather than behavioural: it does not test what the lock DOES,
+# it tests that there is only one thing doing it.
+#
+# Every property above drives `with_machine.sh`. `run_harness.sh` and `seed_corpus.sh` take the same lock
+# and share none of the wrapper's command-line contract, so pointing this file at them would establish that
+# they can be invoked rather than that their locking is sound. For a long time the answer to "are the other
+# two correct?" was that they held byte-identical copies — which is a snapshot, not an invariant, and the
+# only thing keeping them equal was somebody remembering. Two safety defects were fixed by hand in three
+# files each; the third hand-fix is where copies diverge. They already had: `seed_corpus.sh` wrote a
+# two-line owner file where the others wrote four, so the waiter was told a run was in progress and never
+# told what it was.
+#
+# So the protocol lives in `tools/lock_lib.sh` and this asserts that it still lives ONLY there. A future
+# copy-paste is caught here rather than by the next person to lose a measurement to two engines.
+lib_users=0
+lib_dupes=""
+for f in tools/with_machine.sh tools/run_harness.sh tools/seed_corpus.sh; do
+	grep -q 'lock_lib\.sh' "$ROOT/$f" && lib_users=$((lib_users + 1))
+	for fn in lock_claim_write lock_claim lock_release lock_steal; do
+		grep -qE "^${fn}\(\)" "$ROOT/$f" && lib_dupes="$lib_dupes $f:$fn"
+	done
+done
+[ "$lib_users" -eq 3 ]; check $? "all three lock takers source the shared protocol ($lib_users of 3)"
+[ -z "$lib_dupes" ]; check $? "and none of them redefines it locally${lib_dupes:+ —$lib_dupes}"
+# NON-VACUITY: the assertions above are satisfied by a repository where those files do not exist, and by a
+# grep that silently matched nothing. The library must actually be there and actually define the protocol.
+lib_defs=0
+for fn in lock_claim_write lock_claim lock_release lock_steal; do
+	grep -qE "^${fn}\(\)" "$ROOT/tools/lock_lib.sh" && lib_defs=$((lib_defs + 1))
+done
+[ "$lib_defs" -eq 4 ]; check $? "...and the shared protocol defines all four entry points ($lib_defs of 4)"
 
 echo
 if [ "$fails" -eq 0 ]; then
