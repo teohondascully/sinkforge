@@ -1560,6 +1560,14 @@ func research_tech(tech_id: StringName) -> bool:
 ## satisfies present == produced − consumed at all times and conservation can be asserted on anything.
 ## The output, a machine id or a tool id, lives in the same pack as ore and ingots. One path for both
 ## machines (craft) and tools (MiningRules.TOOL_RECIPES), so the Bazaar screen crafts them identically.
+##
+## DELIBERATELY EXEMPT FROM `PACK_BULK_CAP`, AND THIS LINE EXISTS SO THAT IS LEGIBLE AS A DECISION. Every
+## other path that adds to the pack goes through `take_into_pack` or asks `can_carry` first; this one writes
+## `inventory` directly, and an unrouted path looks exactly like an exempt one in the source — which is how
+## four capped paths were missed on the first pass. Crafting SPENDS bulk from the same pack it deposits
+## into and almost always nets downward: ore into an ingot, plates into a gear. Capping the output could
+## therefore refuse a craft that would have made room, and a cap that blocks the act of getting lighter is
+## the wrong shape. The constraint has already been applied at every door the ingredients came in through.
 func craft_item(output: StringName, cost: Dictionary, count: int = 1) -> bool:
 	if cost.is_empty() or count <= 0:
 		return false
