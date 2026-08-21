@@ -15,11 +15,9 @@ build/
 *.exe
 *.pck
 
-# IDE
+# IDE and local tool state
 .vscode/
 .idea/
-
-# Local agent state (Assistant Code scheduler locks, etc.)
 .assistant/
 
 # Dev harness — generated screenshots (+ their Godot import sidecars)
