@@ -48,7 +48,7 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `lode` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- lode` |
 | `map` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- map` |
 | `mouth` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- mouth` |
-| `pack` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- pack` |
+| `pack` | 2026-08-20 18:32 | `b87bae9a44` | `capture_moments.gd -- pack` |
 | `pack_fresh` | 2026-08-18 03:12 | `8ba28b06f4` | `capture_moments.gd -- pack_fresh` |
 | `pack_full` | 2026-08-18 04:33 | `47992d44ab` | `capture_moments.gd -- pack_full` |
 | `plunge` | 2026-08-17 14:03 | `4ad3509248` | `capture_moments.gd -- plunge` |
@@ -70,10 +70,11 @@ A recipe invented to fill that column would be worse than a blank one, because i
 
 ## Cohorts
 
-- `4ad3509248` — 38 frames
+- `4ad3509248` — 37 frames
 - `47992d44ab` — 8 frames
 - `8ba28b06f4` — 4 frames
 - `03bd8f57df` — 2 frames
+- `b87bae9a44` — 1 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
 permitted and described rather than forbidden: re-shooting is not available for every frame, so
