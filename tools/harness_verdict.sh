@@ -13,15 +13,37 @@
 # load failure. It fails the job on any of those even when the harness itself was green, because a green
 # over layers that did not execute is the one outcome this whole harness exists to make impossible.
 #
-# Usage: verdict.sh <log-dir> <label>
+# THIS LIVES UNDER `tools/` AND NOT UNDER `.github/`, AND THAT IS THE POINT. It began as a CI-only script,
+# which left the one gate against a green over layers that never ran unreachable from the command line, so
+# `tools/run_harness.sh` carried a comment saying, accurately, "CI is gated against that; a local run is
+# not." The reader most exposed to that green is whoever is running the sweep by hand to decide whether to
+# commit, and they were the only one it did not protect. Both callers now run THIS file:
+#
+#   .github/actions/harness-verdict/action.yml   after each CI job
+#   tools/run_harness.sh                          from its EXIT trap, before the log directory is removed
+#
+# Usage: harness_verdict.sh <log-dir> <label> [notes-file]
+#
+# `notes-file`, when given, receives the plain verdict lines: no markdown, no second copy of the table. The
+# local runner points it at the sweep's own summary.txt, so a RETAINED log directory carries the answer to
+# "was this a result" beside the result itself, for the later reader who has nothing but the directory.
 set -uo pipefail
 LOGDIR="${1:?log-dir}"
 LABEL="${2:-harness}"
+NOTES="${3:-}"
 SUM="$LOGDIR/summary.txt"
 bad=0
 OUT="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
-note() { printf '%s\n' "$*"; printf '%s\n' "$*" >>"$OUT"; }
+## Every verdict line goes to the terminal, to the CI step summary, and to the notes file when there is one.
+## The trailing `return 0` is not decoration: under `set -e` in a caller, a `note` whose final command is a
+## failed append would take the gate down mid-verdict and report nothing.
+note() {
+	printf '%s\n' "$*"
+	printf '%s\n' "$*" >>"$OUT"
+	[ -n "$NOTES" ] && printf '%s\n' "$*" >>"$NOTES" 2>/dev/null
+	return 0
+}
 
 {
 	printf '### %s\n\n' "$LABEL"
@@ -57,6 +79,17 @@ case "$rc" in
 	3)  meaning="THE PRODUCTION SAVE SLOT WAS TOUCHED — layer results are moot" ;;
 	4)  meaning="something was SKIPPED under SF_STRICT: this was NOT a full sweep" ;;
 	5)  meaning="another harness run holds the machine lock; nothing ran" ;;
+	# THESE THREE WERE MISSING, AND THE FALLTHROUGH BELOW SAID SOMETHING FALSE ABOUT THEM. It printed
+	# "run_harness.sh's own table does not list 43" for a code that table has listed since the day VOID
+	# shipped. The guard against undocumented codes was itself the thing out of date, and it reported its
+	# own staleness as a defect in the runner: an instrument blaming its subject for its own blind spot.
+	6)  meaning="KILLED BY THE WALL-CLOCK CAP (tools/with_machine.sh): a truncated sweep, not a verdict"
+	    bad=1 ;;
+	43) meaning="VOID: a layer ran and could not measure its subject. Neither a pass nor a failure, because"
+	    meaning="$meaning the sample was spoiled from outside the code. RE-RUN IT."
+	    bad=1 ;;
+	7)  meaning="a previous run of THIS gate rejected that sweep; the table below is the rejected one"
+	    bad=1 ;;
 	"") meaning="UNKNOWN — no exit line" ;;
 	# AN UNRECOGNISED CODE IS A RED, NOT A FOOTNOTE. This branch printed its warning and then fell through
 	# to a clean exit while it was being written — the guard against codes nobody documented was passing
@@ -103,6 +136,28 @@ for lg in "$LOGDIR"/*.log; do
 done
 note "layer logs: $n_logs   engine-level load failures: $n_died   silent: $n_empty"
 
+# ZERO LOGS IS NOT ZERO PROBLEMS, and until this branch existed it scored as zero problems. `n_died` and
+# `n_empty` are both 0 over an empty set, neither branch below fires, and the gate printed "every layer log
+# carries the output of a layer that executed" -- vacuously true of no logs, and phrased as a positive
+# verification. A gate written to catch 103 layers reporting PASS without running was issuing its own
+# all-clear when it had read nothing at all.
+#
+# NOT LIVE WHEN IT WAS FOUND, AND THE REACHABILITY IS WORTH STATING RATHER THAN INFLATING. `SUM` is inside
+# `LOGDIR`, so a missing or misdirected directory dies at the `[ ! -s "$SUM" ]` check above, before the log
+# loop; and in CI `SF_LOG_DIR` and the action's `log-dir` are the same expression in the same file. What is
+# real is the coupling: the `*.log` glob agrees with `run_harness.sh`'s log naming by CONVENTION, in a
+# different file, with nothing relating them. Change the extension or push per-layer logs into a
+# subdirectory and `summary.txt` stays exactly where it is, so every check above still passes while this
+# loop reads an empty set.
+#
+# It is fixed here rather than later because this file is now also the LOCAL gate, and the precondition
+# that kept it latent -- one log path, written once -- is precisely what does not hold on a workstation
+# with worktrees, `SF_LOG_DIR` overrides and retained directories from older naming schemes.
+if [ "$n_logs" -eq 0 ]; then
+	note "!! NO LAYER LOGS WERE READ. Whatever the table says, this gate verified nothing: the checks"
+	note "   below for load failures and silent layers were run over an empty set and passed by default."
+	bad=1
+fi
 if [ "$n_died" -gt 0 ]; then
 	note "!! THESE LAYERS DID NOT RUN — the engine could not load them. Their exit codes describe a BUILD"
 	note "   failure, not a property failure, and are neither a pass nor a test result:"
@@ -115,11 +170,18 @@ if [ "$n_empty" -gt 0 ]; then
 	bad=1
 fi
 
+# ONE GREPPABLE LINE BESIDE THE SENTENCES. `HARNESS_EXIT=` says what the SWEEP concluded; `HARNESS_RESULT=`
+# says whether that conclusion may be quoted at all, and those are different questions that were previously
+# answered by the same integer. Retained log directories are this repository's regression history -- the
+# archive gets grepped to answer "was it already red at that commit" -- and a history whose rows cannot say
+# "this row is not evidence" is one that will eventually have every row read as though it were.
 if [ "$bad" = "0" ]; then
+	note "HARNESS_RESULT=yes"
 	note "this run is a RESULT: the runner finished, every declared layer reported, and every layer log"
 	note "carries the output of a layer that executed. The verdict above may be quoted."
 else
 	note ""
+	note "HARNESS_RESULT=no"
 	note "THIS RUN IS NOT A RESULT. Do not read the harness's verdict as pass or fail — re-run it."
 fi
 printf '```\n' >>"$OUT"

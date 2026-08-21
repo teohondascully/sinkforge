@@ -82,9 +82,14 @@
 #   SF_LOCK_WAIT=900   seconds to wait for a run already in flight before giving up (exit 5)
 #   SF_NO_LOCK=1       run anyway, concurrently, and own the consequences
 #
-# EXIT CODES, because there are SEVEN now and a caller that treats "not 0" as "a test failed" will
-# misdiagnose six of them. The count said five for long enough to outlive two additions, which is the
-# small version of the same fault this list exists to prevent.
+# EXIT CODES. A caller that treats "not 0" as "a test failed" will misdiagnose most of this list.
+#
+# NO COUNT IS GIVEN HERE, ON PURPOSE. This line used to open "because there are FIVE now", which outlived
+# two additions before anyone noticed, and then said SEVEN over a list of eight. A tally beside a list is a
+# second copy of the list maintained by hand, and it is the copy nobody re-reads. What the count was for --
+# noticing when the table and the code that interprets it drift apart -- is now done by
+# `tools/check_exit_codes.sh`, which derives both lists and compares them, and fails if either parses to
+# fewer entries than the table has carried since VOID landed.
 #   0  everything that ran passed, and anything skipped is named in the summary
 #   1  a layer failed
 #   2  could not start — the sentinel would not arm, or SF_ONLY matched nothing
@@ -92,6 +97,9 @@
 #   4  something was skipped while SF_STRICT was on: not a full sweep
 #   5  another harness run holds the lock
 #   6  a run was killed by the wall-clock cap (see tools/with_machine.sh)
+#   7  NOT A RESULT: the sweep finished and tools/harness_verdict.sh refused to let its verdict be quoted,
+#      because a declared layer never reported, a layer log is the wreckage of a load failure, or the gate
+#      read no logs at all. This is not "a test failed" and must never be recorded as one. Re-run it.
 #  43  VOID: a layer ran and could not measure its subject. NOT a failure and NOT a skip — the sample
 #      was spoiled by something outside the code, so the correct response is to run it again. Deliberately
 #      the same integer the layers use for it, so the value cannot drift between the two halves.
@@ -99,7 +107,13 @@
 # 0 IS THE MOST DANGEROUS OF THESE AND IT IS NOT LISTED AS SUCH ABOVE, so it is said here: `godot --script`
 # exits 0 when the script cannot be parsed AND when the script does not exist. On a fresh clone with no
 # import step, every layer dies at load and this runner would print ALL 103 HARNESS LAYERS PASS over 103
-# layers that never ran. CI is gated against that by .github/actions/harness-verdict; a local run is not.
+# layers that never ran.
+#
+# BOTH CI AND A LOCAL RUN ARE NOW GATED AGAINST THAT, by the same file: `tools/harness_verdict.sh`, called
+# from this script's EXIT trap and from .github/actions/harness-verdict. For most of the time the hazard
+# above was documented, only CI was protected, and the sentence recording that fact sat here unchanged --
+# a known way for this runner to lie, written down in the runner, addressed everywhere except where a human
+# would meet it. A local sweep that cannot be quoted now exits 7 and says so.
 #
 # THEY ARE ORDERED BY SEVERITY AND THAT MEANS 1 MASKS 4. A run that both fails a layer AND stands an
 # assertion group down exits 1, so the exit code alone cannot say the run was also incomplete — the words
@@ -229,6 +243,18 @@ add_gl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(0); }
 # noticing the same sentence describes one run of itself. A 120fps gate read off the inflated column would
 # fail a game that met it — and, worse, could not be trusted when it eventually passed.
 add_excl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(1); EXCL+=(1); }
+# EXCLUSIVE WITHOUT A SURFACE, and the two properties really are independent even though the three layers
+# above happen to want both. `add_excl` sets GLFLAG=1 because everything that had needed to run alone so
+# far measured frame time, and frame time needs a renderer. `check_lock` needs neither a renderer nor an
+# engine -- it points GODOT at a stub -- but it stages RACES, with a deliberate one-second stagger, and a
+# race staged on a loaded box is a race that quietly fails to stage. That direction is worse than a flake:
+# the properties would pass, over a condition that never occurred.
+#
+# Registering it through `add_excl` would have been the easy move and would have marked a headless-safe
+# layer as needing a display, which is a lie told to `check_ci_coverage` -- it reads GLFLAG from these very
+# function bodies to decide which jobs must select which layers, so the layer would have run in one job
+# instead of both and the coverage check would have agreed it was fine.
+add_excl_hl() { NAMES+=("$1"); SCRIPTS+=("$2"); GLFLAG+=(0); EXCL+=(1); }
 add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
 # Holds the CI workflow against THIS list. It reads both files, which is the only way to see a layer that
 # needs a surface and is selected by no job — two were, and both jobs reported green over them.
@@ -278,6 +304,18 @@ add "check_binding_conflict (one key, one job)" "res://tools/check_binding_confl
 # than the commit, and no flag skips the suite." It was in no sweep, so no flag needed to skip it. Found by
 # running it by hand, where it went red on a second author identity sitting one merge from main.
 add "check_trailers (one author, no trailers)" "res://tools/check_trailers.sh"
+# TWO MORE GATES THAT RAN IN NO SWEEP, found by the same question that found `check_trailers`: which of
+# these files is only ever executed by a human who remembers it exists?
+#
+# `check_lock.sh` holds the machine lock to 26 properties and is the reason parallel runs can share this
+# box. It never ran in CI or in a local sweep. It is safe in one and always was: it points `SF_LOCK` at its
+# own temp directory and `GODOT` at a stub, so it touches neither the real lock nor the engine, and it
+# finishes in about five seconds. The thing guarding every run was the thing nothing guarded.
+#
+# `check_exit_codes.sh` compares the runner's own exit table against the gate that interprets it. Both
+# halves have already gone stale separately; see its header.
+add_excl_hl "check_lock (the machine lock's own properties)" "res://tools/check_lock.sh"
+add "check_exit_codes (the table and its reader agree)" "res://tools/check_exit_codes.sh"
 add "check_binding_persistence (a boot may not re-duplicate)" "res://tools/check_binding_persistence.gd"
 add "check_row_identity (one row, one machine)" "res://tools/check_row_identity.gd"
 add "check_encoding (no mojibake)"     "res://tools/check_encoding.gd"
@@ -709,6 +747,31 @@ harness_cleanup() {
 	if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ]; then
 		printf 'HARNESS_EXIT=%s\n' "$rc" >>"$DIR/summary.txt" 2>/dev/null || true
 	fi
+	# WAS THIS A RUN AT ALL? Everything above reports what the sweep CONCLUDED. This asks the prior
+	# question, and until now only CI was allowed to ask it: `godot --script` exits 0 when a script is
+	# missing or unparseable, so on a fresh clone this runner would print ALL LAYERS PASS over layers that
+	# never loaded. The gate lived under `.github/`, which meant the person running the sweep by hand to
+	# decide whether to commit was the one reader it could not reach.
+	#
+	# It is the same file CI runs, not a port of it, for the reason the machine lock was collapsed into
+	# `tools/lock_lib.sh` on the same night: a rule with two copies is a rule that will be true in one
+	# place. `local` and CI must reject the same runs, and the only way to keep that is one implementation.
+	#
+	# ONLY WHERE A SWEEP WAS ATTEMPTED. Codes 2, 3, 5 and 6 describe a runner that never got to layers, and
+	# the gate would correctly observe that no layers reported and add a second, louder complaint about a
+	# condition the runner has already named precisely. A gate that fires on runs that already explained
+	# themselves teaches people to skip reading it.
+	VERDICT_RC=0
+	case "$rc" in
+		0|1|4|43)
+			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/harness_verdict.sh" ]; then
+				printf '\n'
+				bash "$ROOT/tools/harness_verdict.sh" "$DIR" "harness (local sweep)" \
+					"$DIR/summary.txt"
+				VERDICT_RC=$?
+			fi
+			;;
+	esac
 	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed
 	# further down. A run that never reached `verify` (Ctrl-C, a crash, an early exit on any of the codes
 	# above) has still left a marker at the player's REAL save path, and leaving it there is the one piece
@@ -721,10 +784,26 @@ harness_cleanup() {
 	fi
 	lock_release
 	rm -rf "$MARKS"
-	if [ "$KEEP_LOGS" = "1" ] || [ "$rc" != "0" ] || [ "$((fail + skip + partial))" -gt 0 ]; then
+	# A REJECTED RUN KEEPS ITS LOGS, and the first draft of this deleted them. The gate's whole complaint is
+	# that the logs do not support the verdict, so removing them destroys the only evidence for the one
+	# outcome where somebody has to go and look.
+	if [ "$KEEP_LOGS" = "1" ] || [ "$rc" != "0" ] || [ "$VERDICT_RC" != "0" ] \
+			|| [ "$((fail + skip + partial))" -gt 0 ]; then
 		printf '\nper-layer logs: %s\n' "$DIR"
 	else
 		rm -rf "$DIR"
+	fi
+	# THE OVERRIDE GOES LAST, AFTER THE SENTINEL IS HOME AND THE LOCK IS RELEASED. Exiting from an EXIT trap
+	# skips whatever follows it in the trap, and what follows here is the disarm that takes the marker back
+	# off the player's real save path plus the lock release that frees the box. An early `exit 7` would have
+	# turned "this run cannot be quoted" into "this run left litter in the save slot and wedged the
+	# machine", which is a strictly worse outcome than the one being reported.
+	#
+	# 3 IS NOT OVERRIDDEN. A touched production save slot is news about the player's data; the gate's news is
+	# only that the layer verdict is unquotable, which code 3 already says in stronger terms.
+	if [ "$VERDICT_RC" != "0" ] && [ "$rc" != "3" ]; then
+		echo "!! exiting 7: the sweep above is NOT A RESULT (its own verdict was ${rc})."
+		exit 7
 	fi
 }
 trap harness_cleanup EXIT

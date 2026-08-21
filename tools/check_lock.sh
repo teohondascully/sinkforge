@@ -10,8 +10,17 @@
 # call came back "completed (exit code 0)" after waiting fifteen minutes and never booting Godot, and the
 # only thing standing between that and a false green was a human reading the log text.
 #
-# Needs no Godot and no display: a stub stands in for the engine so the exit codes can be chosen here. Runs
-# in about five seconds.
+# Needs no Godot and no display: a stub stands in for the engine so the exit codes can be chosen here.
+#
+# RUNS IN ABOUT TWENTY SECONDS, measured, and this line said five for a long while -- true when it had four
+# properties, left alone through twenty-two more. A duration in a comment is a measurement with no date on
+# it, so it is quoted here as measured rather than as a design intent.
+#
+# REGISTERED AS A HARNESS LAYER, and for most of its life it was not: it held the machine lock to 26
+# properties and ran only when a human remembered it existed. That is the same defect `check_trailers`
+# had, found by the same question -- which of these files is only ever executed on purpose? It runs
+# through `add_excl_hl`, alone but without a surface, because the races it stages need a quiet box: a
+# stagger that fails to stage does not go red, it passes over a condition that never happened.
 #
 #   GIVE UP IS NOT SUCCESS.  A lock that never frees ends the run with 5 and says so in words, on stdout,
 #                            where a log skim will find it even if the exit code has been thrown away.

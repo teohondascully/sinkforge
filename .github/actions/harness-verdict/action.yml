@@ -4,6 +4,13 @@
 # by identical rules, and two copies of a rule are the thing this repository keeps finding stale. The
 # display job's layer selection was a hand-kept list that went out of date and left two layers running in
 # no job at all; that is the same shape one level up.
+#
+# THIS ACTION HOLDS NO LOGIC. The rule lives at `tools/harness_verdict.sh`, because it must judge a LOCAL
+# sweep by exactly the rules it judges a CI sweep by, and a rule that lives under `.github/` is reachable
+# only from CI. It used to, and the consequence was written down and left standing for a while: `godot
+# --script` exits 0 when the script is missing or unparseable, so a fresh clone printed ALL LAYERS PASS
+# over layers that never ran, and only the CI copy would catch it. The person most likely to be lied to by
+# that is whoever is running the sweep by hand to decide whether to commit.
 name: harness verdict
 description: Publish the harness summary table and fail if the run was not a real result.
 
@@ -19,4 +26,4 @@ runs:
   using: composite
   steps:
     - shell: bash
-      run: bash "${{ github.action_path }}/verdict.sh" "${{ inputs.log-dir }}" "${{ inputs.label }}"
+      run: bash "${{ github.workspace }}/tools/harness_verdict.sh" "${{ inputs.log-dir }}" "${{ inputs.label }}"
