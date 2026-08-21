@@ -69,7 +69,7 @@ echo "check_prose: a file named here may be absent or already correct on another
 echo
 
 python3 - "$REF_FILE" "$COMMA_SLACK" <<'PYEOF'
-import os, re, sys, glob
+import os, re, sys, glob, subprocess
 
 ref_path, slack = sys.argv[1], float(sys.argv[2])
 EMDASH = "—"
@@ -155,6 +155,64 @@ print()
 paths = sorted(set(glob.glob("scenes/**/*.gd", recursive=True)
                  + glob.glob("scenes/**/*.gdshader", recursive=True)
                  + glob.glob("src/**/*.gd", recursive=True)))
+
+# THE SECOND SWEEP, AND THE REASON IT IS SEPARATE.
+#
+# Everything above this line looks at `scenes/` and `src/` only, and for eight months that was the whole
+# scan. So `tools/`, `.github/`, `docs/` and the two root markdown files were never read by this tool at
+# all -- which is how a registered layer name reached the public run summary carrying the vocabulary this
+# file exists to keep out of the repository. An instrument with a glob that excludes most of the tree is
+# not a strict instrument, it is a quiet one.
+#
+# It cannot simply be the same scan with a wider glob, and that is the interesting part. The token list
+# above forbids `harness`, which is correct for game code -- the simulation should not know it is being
+# tested -- and absurd for `tools/`, where the harness is the subject. Applying one list to both surfaces
+# would produce hundreds of failures that are all correct usage, and a gate that cries wolf gets disabled.
+#
+# So the wide sweep carries its own much narrower list: only the vocabulary that is wrong ANYWHERE in a
+# repository written by one person. Process words are allowed out here; authorship words are not.
+WIDE_TOKENS = []
+_words = os.environ.get("SF_PROSE_WORDS") or os.path.join(os.getcwd(), "tools", "prose_words.txt")
+if os.path.isfile(_words):
+    for _w in open(_words, encoding="utf-8").read().splitlines():
+        _w = _w.split("#", 1)[0].strip()
+        if _w:
+            WIDE_TOKENS.append((r"\b%s\b" % _w, _w))
+# TRACKED FILES ONLY, and this is the difference between a gate and a nuisance. The working tree carries
+# coordination documents that are deliberately kept out of the repository through `.git/info/exclude`
+# rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
+# authorship vocabulary is SUPPOSED to live, and scanning them would fail this gate permanently on files
+# no clone will ever see. What ships is what `git ls-files` says ships.
+_tracked = subprocess.run(["git", "ls-files", "-z"], capture_output=True, text=True, check=True)
+_tracked = set(_tracked.stdout.split("\0")) - {""}
+WIDE_PATHS = sorted(f for f in _tracked
+                    if f.startswith(("tools/", ".github/"))
+                    or (f.startswith("docs/") and f.endswith(".md"))
+                    or f in ("README.md", "CONTRIBUTING.md"))
+# This file spells every literal it hunts for, so it cannot be its own subject. `.gitignore` is excluded
+# for the same reason one line down. Both exclusions are counted and printed below, because an exclusion
+# nobody can see is indistinguishable from a scan that missed.
+WIDE_SKIP = {"tools/check_prose.sh"}
+wide_fails, wide_read, wide_skipped = [], 0, 0
+for wp in WIDE_PATHS:
+    if not os.path.isfile(wp):
+        continue
+    if wp in WIDE_SKIP:
+        wide_skipped += 1
+        continue
+    try:
+        wsrc = open(wp, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue          # binary or unreadable: not prose, and not silently counted as clean either
+    wide_read += 1
+    hits = []
+    for pat, name in WIDE_TOKENS:
+        k = len(re.findall(pat, wsrc))
+        if k:
+            hits.append("%dx %s" % (k, name))
+    if hits:
+        wide_fails.append((wp, hits))
+
 ref_abs = os.path.abspath(ref_path)
 
 fails, rows, unreadable = [], [], []
@@ -191,11 +249,20 @@ if unreadable:
     for p in unreadable:
         print("  %s" % p)
 
-if fails:
-    print("\n%d file(s) failed:" % len(fails))
-    for p, bad in fails:
-        print("  %-42s %s" % (p, "; ".join(bad)))
+print("\nwide sweep: %d file(s) read across tools/, .github/, docs/ and the root markdown"
+      % wide_read)
+print("            %d skipped (this file spells every literal it hunts for)" % wide_skipped)
+if wide_fails:
+    print("\n%d file(s) carry authorship vocabulary outside the game code:" % len(wide_fails))
+    for wp, hits in wide_fails:
+        print("  %-42s %s" % (wp, "; ".join(hits)))
+
+if fails or wide_fails:
+    if fails:
+        print("\n%d file(s) failed:" % len(fails))
+        for p, bad in fails:
+            print("  %-42s %s" % (p, "; ".join(bad)))
     sys.exit(1)
 
-print("\ncheck_prose: %d file(s) clean" % len(rows))
+print("\ncheck_prose: %d file(s) clean, %d more clean on the wide sweep" % (len(rows), wide_read))
 PYEOF

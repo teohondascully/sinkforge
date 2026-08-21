@@ -54,7 +54,7 @@ const REQUIRED_KEYS: Array[String] = [
 ## Both defaults are the failure this project keeps finding: AN ERROR PATH THAT RETURNS THE PASSING VALUE.
 ## A key went missing and the restore SUCCEEDED, so the player loads a world that is subtly not theirs,
 ## plays on, saves, and the original identity is gone with nothing having reported anything. Refusing is
-## the strictly safer branch — a refused load leaves the file on disk, where a later build can still read it.
+## the strictly safer branch. A refused load leaves the file on disk, where a later build can still read it.
 ##
 ## Checked AFTER `_migrate`, not before, because supplying a field an older envelope predates is exactly
 ## what a migration branch is for: v1 has no `seep_tick` and the v1→v2 branch fills it in, so a v1 save
@@ -163,7 +163,7 @@ static func _stage(data: Dictionary) -> Dictionary:
 	# THE CHAIN HAS TO ARRIVE. `_valid_envelope` bounds the version to [OLDEST_READABLE, VERSION]; it does
 	# not say a branch exists to carry an old one forward. Bump VERSION to 3 without writing the v2→v3
 	# branch and every v2 save on disk migrates to itself, then loads under v3 semantics with no branch
-	# having run — silently, because the version gate already said yes. Refuse instead: unreachable today
+	# having run, silently, because the version gate already said yes. Refuse instead: unreachable today
 	# (v1→v2 is the whole chain), and it is the next bump this is written for.
 	if int(env.get("version", -1)) != VERSION:
 		last_invalid = "migration stopped at version %s — no branch carries it to %d" \

@@ -18,7 +18,6 @@ build/
 # IDE and local tool state
 .vscode/
 .idea/
-.assistant/
 
 # Dev harness — generated screenshots (+ their Godot import sidecars)
 /_capture*.png

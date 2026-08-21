@@ -58,7 +58,7 @@ const STRATA_BAND_H: int = 4
 ## The legibility gauges quoted alongside it (rock-versus-air 72% to 73%) are withdrawn too, and for a
 ## different reason: that layer was reading the real mouse pointer, and its run-to-run spread was 4.24
 ## points, so a one-point difference was never a measurement. The conclusion it was offered for still
-## holds, and now holds more firmly than the evidence did — a difference inside the instrument's own noise
+## holds, and now holds more firmly than the evidence did. A difference inside the instrument's own noise
 ## is not evidence that this constant moves legibility.
 const STRATA_SHELF_EVERY: int = 3
 ## Added to the carve threshold inside a shelf band, so it survives as a continuous ledge.
