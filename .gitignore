@@ -130,3 +130,9 @@ docs/superpowers/
 /docs/DIRECTOR_BRIEF.md
 /docs/AGENT_PLAY_EVALUATION_PROTOCOL.md
 /AUDIT_REPONSE.md
+
+# Local coordination scratch. Operational state for running work, not project history:
+# it names machine-specific absolute paths and carries no information about the game.
+docs/TASK_QUEUE.md
+tools/task_queue.sh
+tools/test_task_queue.sh
