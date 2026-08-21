@@ -163,6 +163,24 @@ ceiling = ref["comma"] * slack
 print("reference  %-34s %5d comment lines  %.3f commas/line" % (ref_path, ref["comment_lines"], ref["comma"]))
 print("ceiling    %.3f commas/line  (reference x %.2f, anchor ratchet %.3f)" % (ceiling, slack, ref_max))
 drifted = ref["comma"] > ref_max
+# AND THE RATCHET DOES NOT TIGHTEN, WHICH IS THE DEFECT IT WAS MODELLED ON. The anchor is a constant and
+# the per-file ceiling is still computed live off the reference, so the reference may be scrubbed to 0.500
+# (every ceiling drops to 0.550, silently and correctly) and then drift back to 0.700 (every ceiling rises
+# to 0.770) without ever crossing 0.705. That is 0.205 of permanent slack on the bound that sets every
+# other file's, and it is the same object as a warp entry left at 7 against a real count of 0. c1's
+# finding, on a guard written four hours after I wrote that sentence down.
+#
+# A NUDGE AND NOT A FAILURE, deliberately: a stale anchor is slack, not a breach, and failing a clean tree
+# because somebody improved the reference is how a gate gets switched off. The line says the number and
+# what to do with it, which is all a ratchet can honestly ask for.
+stale = (not drifted) and (ref_max - ref["comma"]) > 0.02
+if stale:
+    print()
+    print("   note: the anchor is stale. %s measures %.3f against a recorded maximum of %.3f, so every"
+          % (ref_path, ref["comma"], ref_max))
+    print("         file is being judged %.3f looser than the reference currently earns. Tighten"
+          % ((ref_max - ref["comma"]) * slack))
+    print("         REF_COMMA_MAX toward the measured value; it is slack, not a breach, so this is a note.")
 if drifted:
     print()
     print("!! THE ANCHOR HAS DRIFTED UP: %s is at %.3f commas/line against a recorded maximum of %.3f,"
