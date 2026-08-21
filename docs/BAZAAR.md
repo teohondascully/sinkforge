@@ -1,6 +1,6 @@
 # THE BAZAAR — one counter, three tabs
 
-> **Status: SHIPPED** as #S33 (2026-08-16), with one deviation from the text below. Chosen with the user
+> **Status: SHIPPED** as #S33 (2026-08-16), with one deviation from the text below. Chosen
 > over two alternatives (walk-between-physical-stations; a hybrid of both).
 >
 > **Deviation:** rows are **22px, not 24** — 24 gave nine rows per column, and the twenty rows §2 promises

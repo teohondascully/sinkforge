@@ -27,7 +27,7 @@
 > the tier words live there ("too hard — the Stone Pickaxe (tier 2) bites it") and the skid's one line is
 > reserved for the GRAIN refusal, which no other panel explains. Two panels saying one sentence is noise.
 >
-> **Original spec follows** (2026-08-16). Opened at the user's request, merging two ideas that turned out
+> **Original spec follows** (2026-08-16). Merging two ideas that turned out
 > to be one design seen from either end: picks-as-shapes, and rock you can read. Provisional and reversible;
 > the numbers are placeholders that want play, not a spec. **This deliberately overturns a documented
 > decision** — see §6.
@@ -132,8 +132,8 @@ PROGRESSION §10 states the Tools axis is **soft-gated** — *"you can mine the 
 punishingly slow it isn't worth it"* — and that a new tier **"retroactively trivialises old rock
 (retroactive-relief dopamine)."**
 
-Both change, on the user's call (2026-08-16: *"maybe we shouldn't have pickaxes be super slow, just not
-strong enough for the next layer"*):
+Both change (2026-08-16: *"maybe pickaxes shouldn't be super slow, just not strong enough for the next
+layer"*):
 
 - **Soft-gating is dropped for hard bite/no-bite.** In practice this documents what the code already does
   and removes the speed multiplier that was pretending to be the gate.

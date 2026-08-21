@@ -1,6 +1,9 @@
 # Sinkforge — Technical Architecture
 
-> The technical source of truth. Every system, its responsibility, its public API, and its relationships. Update this whenever a new system is built or refactored.
+> The technical source of truth. The load-bearing systems get a section each — responsibility, public API,
+> relationships — and the **Module index** near the bottom lists every remaining script in `src/` and
+> `scenes/` with one line on what it is for, so that nothing in the tree is absent from this file without
+> being absent on purpose. Update this whenever a system is built or refactored.
 
 ## Core Principle: Data-Driven Everything
 
@@ -51,9 +54,10 @@ and every production count is identical.**
   `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
   (PROVISIONAL edge). A **lift** (`behavior == &"lift"`) routes UP (`_column_rise`)
   rate-limited by `LIFT_THROUGHPUT`; a **drill** (`behavior == &"drill"`) draws from the WORLD, not a
-  buffer — `_run_drill` bores the first ore cell within `DRILL_REACH` straight below, drains its
-  finite `deposits` pool (`_drain_deposit`, shared with hand-`mine`), and spits ore down its column
-  like an ordinary machine.
+  buffer — `_run_drill` takes the cell `drill_target()` picks out of the column straight below it,
+  drains that cell's finite `deposits` pool, and spits ore down its column like an ordinary machine.
+  There is no reach constant on the vertical drill: `drill_target()` scans the whole column. The
+  horizontal sibling does have one, `H_DRILL_RANGE`.
 - **THE BEHAVIOR REGISTRY (`_BEHAVIORS`):** the ONE sim-side table wiring a `behavior` tag into the
   tick — per-tag `run` / `status` / `dests` hook method-names (dispatched via `call()`; names, not
   bound Callables, so a RefCounted sim never self-references) plus semantic flags (`updraft`,
@@ -84,7 +88,8 @@ and every production count is identical.**
 - **Water — the fluid layer (L3 Aquifer):** `water` (cell→integer level `1..WATER_MAX`)
   is authoritative world state beside `solid`/`wall`/`conduit`/`rope`/`torch`/`deposits`. Discrete-cell,
   integer-only (deliberately NOT per-pixel falling-sand — fits the discrete-cell hook). API
-  `water_at`/`add_water`/`remove_water`/`total_water`. `_flow_water()` runs each tick (after `_flow`): a
+  `water_at`/`add_water`/`remove_water`/`total_water`. `WaterFlow.step()` (`src/core/water_flow.gd`, called
+  from `FactorySim` each tick after `_flow`) is a
   deterministic snapshot-based two-rule step — DOWN (gravity, the hook) then LATERAL even-fill settle —
   that only MOVES water, so `total_water` is invariant (conserved). `add_water`/`remove_water` are the
   explicit accounted source/drain; `set_solid`/`place_block` DISPLACE (erase) a cell's water. The **Pump**
@@ -174,7 +179,9 @@ and every production count is identical.**
   `output_buffer`, `progress`, and a reference to its shared `MachineDef` (flyweight).
 
 ### Data Resources — the content schema (flyweight)
-- **Location:** `src/data/` (`MachineDef`, `RecipeDef`; `.tres` instances in `machines/`, `recipes/`)
+- **Location:** `src/data/` — `MachineDef`, `RecipeDef` and `MaterialDef`, with the `.tres` instances in
+  `src/data/machines/`, `src/data/recipes/` and `src/data/materials/`. The static rule tables
+  (`bit_rules.gd`, `mining_rules.gd`, `research_rules.gd`, `seams.gd`) sit beside them.
 - **Responsibility:** Shared definitions consumed by the generic sim. A machine = a named
   recipe-runner; a source = a recipe with no inputs; a thin `behavior: StringName` tag
   (default empty) lets non-recipe machines branch in the sim without a type-enum. PROVISIONAL machine
@@ -272,13 +279,13 @@ production state — delete them and the numbers are unchanged):
   so they never drift), item glyphs/colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
   layer (state + spawn-from-`flow_events` + advance + draw + light-motes). **`LightLayer`**
   (`scenes/light_layer.gd`) — a thin canvas giving each lighting pass its own blend mode.
-- **Input (embodied, Factorio-style):** ←→/AD move, **Space jump**, **W/↑ + S/↓ climb** a rope (grab +
-  ride; release hangs; Space jumps off — handled by `Player`); **LMB mine**
-  the aimed solid cell (reach-limited); **mouse-wheel** picks the active hotbar slot; **1/2 craft**
-  a machine item (Processor/Splitter) from carried ingots; **RMB** places the selected hotbar
-  machine item on an in-reach open cell (consumes it) or picks one of your machines back up
-  (returns it + salvages its buffers); **E** deposits the selected resource into an in-reach
-  machine; **P** pause. You also **auto-collect** product piles by walking over them. The cursor is
+- **Input (embodied, Factorio-style):** the bindings themselves are not listed here, because they moved
+  and this list did not. `scenes/controls.gd` is the source of truth — it holds every default, keyboard
+  and gamepad, and registers them into Godot's `InputMap` at runtime, which is why `project.godot` has no
+  `[input]` section at all. `README.md` carries the reader-facing table. Architecturally what matters is
+  the shape: `Player` owns movement and rope-riding; every verb that changes the world goes through a
+  reach-gated method on `MainView` and nowhere else; and you **auto-collect** product piles by walking
+  over them. The cursor is
   context-sensitive (`WorldRenderer._draw_aim`): a solid cell shows a MINE box; an open in-reach cell
   shows a BUILD ghost of the selected machine item (green = placeable) — only when a machine is
   selected. The Ore Vent is excluded from crafting so you stay the ore source by hand. **The economy
@@ -288,14 +295,64 @@ production state — delete them and the numbers are unchanged):
 
 ### Dev harness (Track B)
 - **Location:** `tests/test_*.gd` (headless sim/worldgen/power/stress suites sharing `test_base.gd`),
-  `tools/check_*.gd` + `tools/play_tests.gd` (embodied movement + agent play-tests).
+  `tools/check_*.gd` + `tools/play_tests.gd` (embodied movement + scripted-pilot play-tests).
   Run everything with `bash tools/run_harness.sh`.
 
 ---
 
+## Module index
+
+The systems above are the ones whose design needs explaining. These are the rest of the tree: every other
+script under `src/` and `scenes/`, so that this file can be checked against `ls` rather than trusted.
+
+### `src/` — no engine dependency beyond `RefCounted`
+
+| Module | What it is |
+| --- | --- |
+| `src/core/power_flow.gd` | the per-tick power propagation: clears and refills the sim's `power` field from the fuelled generators outward |
+| `src/core/water_flow.gd` | the per-tick fluid algorithm, stateless over the sim's `water` and `solid` grids. `WaterFlow.step()` is the water section above |
+| `src/core/fine_terrain.gd` | the deterministic fine-grid build of the dual-grid terrain, filling the sim's `_fine_solid` byte grid |
+| `src/core/flora.gd` | the per-tick flora pass: planted saplings age into trees |
+| `src/data/mining_rules.gd` | how hard each material is to break by hand, and which tool can break it |
+| `src/data/bit_rules.gd` | picks that differ in shape rather than in speed. Design: `docs/BITS.md` |
+| `src/data/seams.gd` | the grain of the rock: a seam direction per cell, and what striking along it calves off |
+
+### `scenes/` — representation only; reads the sim, never writes to it
+
+| Module | What it is |
+| --- | --- |
+| `scenes/player.gd` | the embodied avatar. A representation entity that reads the sim's world and owns movement |
+| `scenes/grapple.gd` | the piton and winch line: the traversal verb for getting back up |
+| `scenes/controls.gd` | the single source of truth for keybindings, keyboard and gamepad, registered into `InputMap` at runtime |
+| `scenes/terrain_painter.gd` | the coarse-terrain draw pipeline: per-cell fill, grain, ore crystals, the autotile silhouette |
+| `scenes/fine_terrain.gd` | the fine terrain bake, rendering the sim's terrain as molded rock at an 8px sub-cell resolution |
+| `scenes/sky_painter.gd` | the parallax celestial backdrop: gradient, stars, sun and moon, clouds |
+| `scenes/strata.gd` | the descent named: rows grouped into coloured depth bands, and the accessors over that table |
+| `scenes/world_seeder.gd` | builds the tutorial world state onto a freshly generated sim, including the hand-placed spawn fixtures |
+| `scenes/hover_info.gd` | assembles the dictionary the HUD's info panel renders for the cell under the cursor |
+| `scenes/hints.gd` | just-in-time teaching: a bubble the first time an item with a non-obvious use reaches the pack |
+| `scenes/payouts.gd` | the "+3 ore" tick that rises off a broken block, so the reward reads at the point of impact |
+| `scenes/particles.gd` | the cosmetic particle layer, driven by bursts `MainView` emits on world verbs |
+| `scenes/bazaars.gd` | a representation-only view of the Bazaar structures the sim detects |
+| `scenes/art.gd` | a drop-in sprite loader: a texture for a logical key when its PNG exists, and nothing otherwise |
+| `scenes/sfx.gd` | procedural audio. Every sound is synthesised at boot rather than loaded |
+| `scenes/score.gd` | the music, as a pure function of depth. No track list and no cue system |
+
+Shaders live beside them: `post_fx.gdshader` (described under Drawing in `README.md`), plus
+`erase.gdshader`, `heat_haze.gdshader`, `rock_grit.gdshader` and `rock_tooth.gdshader`.
+
+---
+
 ## Data Schema Reference
+The three schema classes are `src/data/recipe_def.gd`, `src/data/machine_def.gd` and
+`src/data/material_def.gd`; the `.tres` files under `src/data/recipes/`, `src/data/machines/` and
+`src/data/materials/` are instances of them.
+
 - **`RecipeDef`** — `id: StringName`, `inputs: Dictionary` (item id→count), `outputs: Dictionary`, `time: float`.
-- **`MachineDef`** — `id: StringName`, `display_name: String`, `recipe: RecipeDef`, `behavior: StringName` (empty = recipe-runner, `&"splitter"` = router).
+- **`MachineDef`** — `id: StringName`, `display_name: String`, `recipe: RecipeDef`, `behavior: StringName`
+  (empty = plain recipe-runner; otherwise a tag, of which `FactorySim._BEHAVIORS` is the authoritative
+  list), `craft_cost: Dictionary` (item id→count, what the bench charges) and `craft_count: int` (how many
+  the craft yields).
 - Items are referenced by `StringName` id (e.g. `&"ore"`, `&"ingot"`); no `ItemDef` yet (added when needed).
 
 ## Scene Tree Overview

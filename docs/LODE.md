@@ -44,7 +44,7 @@
 > fixture measures on. So the cave is SEALED and visible anyway, because this game draws the ground it has not
 > dug. Getting in costs one swing at the roof, which is the whole of this document in one blow.
 >
-> **Original spec (2026-08-16).** Opened by the user's question — *"is having ores that you put drills under
+> **Original spec (2026-08-16).** Opened by one question — *"is having ores that you put drills under
 > still valuable? it's odd that you can mine an ore and it disappears, but you can drill an ore and it might
 > have 400 deposit."* It is odd, and chasing it down found a real contradiction at the centre of the loop
 > rather than a balance wart. Provisional and reversible; numbers are placeholders that want play.
@@ -247,7 +247,7 @@ Three strikes, each provable on its own and each leaving the game playable:
 
 ## 11. How ore should read under light
 
-> Raised by the user while phase 1 was landing: *"I want the lighting to make ores feel special but not so
+> Raised while phase 1 was landing: *"I want the lighting to make ores feel special but not so
 > much so that it's hard to play the game from distractions and overstimulation."* This is phase 4 material
 > — it belongs with the stain — but the principle is written down here because it decides how the stain is
 > built, not the other way round.
@@ -268,7 +268,7 @@ That is also just true of metal in rock. It has no light in it. It catches yours
 and gates on `_skylight_alpha` — *daylight*, so that a surface vein does not sparkle at noon. It therefore has
 no idea where your lamp is or where your torches are. Every exposed ore cell on screen twinkles on its own
 schedule, forever, which is exactly the **"ore reads as a floating starfield"** finding already recorded
-against the game. The user's worry is not hypothetical; it is the current behaviour.
+against the game. The worry above is not hypothetical; it is the current behaviour.
 
 ### The five parts
 

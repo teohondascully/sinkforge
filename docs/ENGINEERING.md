@@ -1,8 +1,11 @@
 # How this project is verified
 
 Sinkforge is a Godot 4 game with an unusually large test surface: 103 registered check layers across
-34,000 lines of harness against 26,000 lines of game code. That ratio is deliberate, and this document
-explains the reasoning, because the harness is the part of the repository most worth reading.
+34,000 lines of harness (`tools/*.gd`) against 26,000 lines of game code (`src/` and `scenes/`). Both
+figures name their glob deliberately, because the ratio is the claim: counting the harness's shell
+scripts as well, and counting the headless suites in `tests/` as game code, the same measurement reads
+roughly 36,500 against 30,300. That ratio is deliberate either way, and this document explains the
+reasoning, because the harness is the part of the repository most worth reading.
 
 A game is hard to test for an ordinary reason: most of what makes it good is a picture on a screen and a
 feeling in the hand, and neither is a return value. The layers here exist to turn as much of that as
@@ -47,8 +50,10 @@ own mechanism can produce the symptom it watches for will produce it.
 ## A number written in prose is a test with no runner
 
 Documentation drifts silently. `tools/check_doc_counts.gd` asserts that every layer count printed in
-`README.md` and `CONTRIBUTING.md` equals the count the runner actually registers. It was written after the
-same number went stale twice within an hour of being correct.
+`README.md`, `CONTRIBUTING.md` and this file equals the count the runner actually registers. It was
+written after the same number went stale twice within an hour of being correct. This document is inside
+its own guard rather than outside it: the per-verb table above is exactly the kind of number that rots in
+a table cell, because a table cell is not a sentence anyone rereads.
 
 The same rule applies in reverse: where a count would rot, the repository prefers to record the command
 that derives it instead of the answer.
@@ -84,10 +89,14 @@ without a display at all.
 ## Running it
 
 ```
-bash tools/run_harness.sh                 # everything
-bash tools/run_harness.sh --headless      # only the layers that need no display
+bash tools/run_harness.sh                    # everything
+SF_HEADLESS=1 bash tools/run_harness.sh      # force the no-display path, as CI's headless job does
 bash tools/with_machine.sh --headless --check-only --script res://scenes/main.gd
 ```
+
+The runner is configured by environment variables and parses no command-line arguments at all, so a
+`--headless` flag would be accepted in silence and ignored. `CONTRIBUTING.md` has the full list of
+switches.
 
 Exit codes and the parse-check trap are documented in `CONTRIBUTING.md`. The short version of the trap:
 `--check-only` prints the parse error and then exits `0` anyway, so read the output rather than the

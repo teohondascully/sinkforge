@@ -1,5 +1,10 @@
 # P1: guidance quietness, after-frames
 
+> **HISTORICAL RECORD — do not update, do not regenerate.** A fixed account of one finished piece of
+> work: the frames here are the "after" half of a before/after pair, and their value is that they stopped
+> changing. For the game as it is now, start at `README.md`. The "before" half, and the provenance for
+> both, is `docs/media/baseline/README.md`.
+
 Paired with `../baseline/`, which is immutable. These are the same moments, the same seed (1337) and the
 same capture path, taken after each P1 strike.
 

@@ -1,5 +1,12 @@
 # P0: the visual-triage baseline
 
+> **HISTORICAL RECORD — do not update, do not regenerate.** This page and the frames beside it describe
+> the game as it stood at commit `4e0444c` on 2026-08-17, and they are deliberately frozen there: they
+> are the "before" that the presentation work is measured against, and a before that moves with the work
+> is not a before. Several defects described below have since been fixed, and each says so where it is
+> described. For the game as it is now, start at `README.md`. The matching "after" frames are in
+> `docs/media/p1/`.
+
 The baseline for the visual-triage program. It is the gate on every phase below it, and its job is to
 make "it looks better now" a claim someone can check.
 

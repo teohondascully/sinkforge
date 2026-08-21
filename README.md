@@ -47,9 +47,9 @@ with a remaining unit count, drawn into the wall bake rather than pasted over it
 the face with the same button you dig with. A blow opens a vein instead of ending it, and what the
 burst did not take stays in the cell to keep working. Three things work a lode. A Drill standing on
 one drains it in place, and the code calls that a Head; a Spur chains off a Head to widen the set of
-cells it reaches; a Drift Rig cuts rock and sorts pay from spoil into two drop columns. There is no
-separate Head definition under `src/data/machines/`, only `spur.tres` and `drift_rig.tres`: the Head
-is the Drill, standing somewhere that matters.
+cells it reaches; a Drift Rig cuts rock and sorts pay from spoil into two drop columns. Of those three,
+only two have a definition under `src/data/machines/` — `spur.tres` and `drift_rig.tres`. There is no
+`head.tres`, because the Head is the Drill, standing somewhere that matters.
 
 The migration is unfinished. The generator seeds lodes into the wall plane, and a hand-placed spawn
 fixture in `scenes/world_seeder.gd` opens a starter pocket with a visible face, so the first one is
@@ -99,15 +99,19 @@ invocation takes, and how to run one test layer instead of all of them.
 | `R` | configure the machine under the cursor |
 | `X` | clear the painted dig plan |
 | `M` | map |
-| `T` | tech tree |
+| `T` | the tech tree, which is the counter's bench tab |
 | `G` | production dashboard |
 | `Z` | cycle zoom |
-| `.` | cycle the game clock, 1x through 8x |
+| `.` | step the game clock: 1x, 2x, 4x, 8x |
 | `N` | mute |
 | `P` | pause |
 | `F5` / `F9` | save / load |
 | `H` or `/` | key help |
 | `Esc` | close the open screen, or open settings |
+
+With the counter open the same inputs mean something else: the arrow keys move its cursor, the mouse
+wheel and `1`-`3` change tab, and `Enter` is what commits — buying at the bazaar, and researching a tech
+at the bench. Researching has no other binding, so `Enter` is the one row above that is easy to miss.
 
 Mining, building and feeding are gated on reach, at 3.2 cells from the body's centre, and on a clear
 line of sight to the target cell.
@@ -260,17 +264,54 @@ that is the case.
 
 ## Documents
 
-| File | What it is for |
-| --- | --- |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to run the game and the tests, the house conventions, how to add a harness layer |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | every system, its responsibility, its public API, and what depends on it |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the decision record: what was decided, why, and where in the repository to check it |
-| [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | how the project is verified: the three execution classes, why an assertion that cannot fail is a defect, and what the capture manifest is for |
-| [`docs/HARNESS_LAYERS.md`](docs/HARNESS_LAYERS.md) | the shape of a test layer and the failure modes this suite has actually hit |
-| [`docs/GDD.md`](docs/GDD.md) | the design document — what the game is trying to be |
-| [`docs/PROGRESSION.md`](docs/PROGRESSION.md) | the depth ladder: gates, research, and what each layer is for |
-| [`docs/LODE.md`](docs/LODE.md) | ore in the wall plane: the design, and `docs/LODE_PLAN.md` for the migration |
-| [`docs/MATERIAL_SPINE.md`](docs/MATERIAL_SPINE.md) | the shipped economy, read off the data files rather than off intent |
+Every document in the repository, grouped by what you would open it for. A design document's own first
+paragraph carries its status; the third column here is a summary of it, so that nothing on this list has
+to be read before you know whether it describes the game as it is or as it is meant to become.
+
+**Start here, then go sideways.** `README.md` says what the game is and how to run it, `CONTRIBUTING.md`
+is how to work on it, `docs/ARCHITECTURE.md` is where the code lives, and `docs/DECISIONS.md` is why any
+of it is the way it is.
+
+### Working on the project
+
+| File | What it is for | Status |
+| --- | --- | --- |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to run the game and the tests, the house conventions, how to add a harness layer | current |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the load-bearing systems in depth — responsibility, public API, what depends on them — then a module index covering the rest of the tree | current |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the decision record: what was decided, why, and where in the repository to check it | current |
+| [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | how the project is verified: the three execution classes, why an assertion that cannot fail is a defect, and what the capture manifest is for | current |
+| [`docs/HARNESS_LAYERS.md`](docs/HARNESS_LAYERS.md) | the shape of a test layer and the failure modes this suite has actually hit | current |
+
+### What the game is meant to be
+
+| File | What it is for | Status |
+| --- | --- | --- |
+| [`docs/GDD.md`](docs/GDD.md) | the design document — what the game is trying to be | design, v0.2 |
+| [`docs/PROGRESSION.md`](docs/PROGRESSION.md) | the depth ladder: gates, research, and what each layer is for | rungs 1–2 built, the rest design |
+| [`docs/MATERIAL_SPINE.md`](docs/MATERIAL_SPINE.md) | the shipped economy, read off the data files rather than off intent | current, and deliberately not aspirational |
+
+### One feature at a time
+
+Each of these specifies a single system and records, at the top, which parts of itself have actually
+landed and which are still only written down.
+
+| File | What it is for | Status |
+| --- | --- | --- |
+| [`docs/BAZAAR.md`](docs/BAZAAR.md) | the research and crafting counter: one panel, three tabs | shipped, with the deviations recorded in it |
+| [`docs/BITS.md`](docs/BITS.md) | picks that differ in shape, and rock that has a grain | mostly shipped; the Rack and drives-as-research are still spec |
+| [`docs/DRIFT.md`](docs/DRIFT.md) | the Drift Rig and spoil: horizontal extraction, vertical logistics | §3 and §4 shipped; the deeper packing payoffs are spec |
+| [`docs/LODE.md`](docs/LODE.md) | ore in the background wall plane, and why mining stopped being a trap | phases 1–2a shipped, 2b–4 spec |
+| [`docs/LODE_PLAN.md`](docs/LODE_PLAN.md) | the migration behind `LODE.md`: blast radius, order of work, and how to get back | in flight |
+| [`docs/SANDBOX.md`](docs/SANDBOX.md) | a proposed contact-sheet fixture for judging materials side by side | **proposed, not built** — nothing in it exists yet |
+
+### Presentation, and the captured record
+
+| File | What it is for | Status |
+| --- | --- | --- |
+| [`docs/VISUAL_TRIAGE.md`](docs/VISUAL_TRIAGE.md) | the evidence ledger behind the presentation work: screenshot complaints turned into falsifiable workstreams | current |
+| [`docs/CAPTURE_MANIFEST.md`](docs/CAPTURE_MANIFEST.md) | every canonical capture, its date, and the renderer signature of the build that took it | generated; do not edit by hand |
+| [`docs/media/baseline/README.md`](docs/media/baseline/README.md) | the immutable "before" frames for the presentation work, and what was read off them | **historical** — a fixed record of the build at `4e0444c` |
+| [`docs/media/p1/README.md`](docs/media/p1/README.md) | the matching "after" frames for the first presentation pass | **historical** — paired with `docs/media/baseline/` above |
 
 ## Status
 

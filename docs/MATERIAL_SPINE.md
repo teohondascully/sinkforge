@@ -101,7 +101,8 @@ here, in the routing verbs, and not in more recipes.** Six recipes arranged by t
 puzzle no matter how many more recipes get added.
 
 **F6 — the tree is 11 rungs and roughly 15 minutes of validated play.** `docs/PROGRESSION.md` concedes
-the agent-validated arc is about that long. The 40-hour figure elsewhere in the docs is not supported by
+the arc the scripted pilot can reach is about that long. The 40-hour figure elsewhere in the docs is not
+supported by
 anything in this table.
 
 ## 6. What this means for the canon question

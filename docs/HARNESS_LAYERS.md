@@ -80,7 +80,7 @@ meant nothing. The recurring ones:
 - **A floor no configuration can reach**, quietly passing on noise.
 - **A fixture that never reached its subject.** `check_underground` judged a sunlit surface frame against
   a standard written for lamp-lit deep rock, because its dig silently never started. **Prove the premise
-  before the verdict** — assert the agent got where it was sent, assert the phase did the work its name
+  before the verdict** — assert the fixture got where it was sent, assert the phase did the work its name
   claims.
 - **A hand-written list of the ways something can happen.** It is a snapshot with an expiry date and
   nothing prints the date. Derive the list from the source of truth and assert you covered all of it.

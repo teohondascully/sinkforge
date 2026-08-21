@@ -57,8 +57,15 @@ disappears. Run it unpiped, or read the exit line out of the log directory it na
 | `SF_HEADLESS=1` | force the no-display path. This is what CI runs, and it is not the same run. |
 | `SF_STRICT=1` / `0` | make any skip fail the run, or tolerate skips. Defaults to strict wherever there is a display. |
 | `JOBS=1` | serialize. Useful when a failure might be contention rather than the code. |
+| `SF_GL_ONLY=1` | run only the layers that need a real display. This plus `SF_NOT` is exactly what CI's second job does. |
+| `SF_NOT='regex'` | drop the layers whose names match. CI excludes `check_frametime` this way. |
 | `SF_LOG_DIR=/path` | keep every layer's output there. Without it the directory is still printed, and kept unless the run was perfectly clean. |
 | `GODOT=/path/to/Godot` | point at a different engine binary. |
+
+The runner takes no command-line arguments. Every switch is an environment variable, so a flag such as
+`--headless` is accepted in silence and ignored rather than refused. Five more variables exist for
+narrower jobs — `SF_LOCK_WAIT`, `SF_NO_LOCK`, `SF_LOCK`, `SF_REAL_HOME` and `SF_HOME` — and the runner's
+own header comment is their reference.
 
 ### Exit codes
 

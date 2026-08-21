@@ -1,11 +1,14 @@
 # THE SANDBOX — a contact sheet, not a second game
 
-> **Status: NOTE FOR LATER (2026-08-16).** Raised by the user: *"I wonder if it's worth it to create an
-> almost sandbox testing environment so that you can test isolated features like lighting, materials, tools
-> etc in a specialized mini sandbox world... ie for ores you could have a sandbox environment with like every
-> ore side by side."* With an invitation to push back. This is the push-back and the counter-proposal:
-> **yes, and it is worth building — but as a thin parameterised layer over `tools/capture_moments.gd`,
-> never as a separate world.** Not scheduled; picked up when a tuning task next justifies it.
+> **Status: PROPOSED, NOT BUILT (2026-08-16).** Nothing described here exists yet. `tools/sandbox.gd`,
+> named in §3, is the thing this document argues for rather than a file in the tree, and every path
+> under it is prospective.
+>
+> The question: is it worth standing up an almost-sandbox testing environment, so that isolated
+> features — lighting, materials, tools — can be looked at in a specialised mini world, with (say)
+> every ore side by side? The answer below is **yes, and it is worth building — but as a thin
+> parameterised layer over `tools/capture_moments.gd`, never as a separate world.** Not scheduled;
+> picked up when a tuning task next justifies it.
 
 ## 1. The honest case FOR it, from today
 
@@ -41,34 +44,34 @@ So the rule that keeps this honest:
 Second push-back: **the sandbox judges A-vs-B; it never judges "good".** A lineup answers *is this fleck
 count more legible than that one* — it cannot answer *does a vein read in a real dark tunnel forty metres
 down*, because a lineup deletes exactly the context that question is about. The verdict still belongs to the
-real world and to the blind-vision pass. If the sandbox ever becomes where things are signed off, it has
-turned into the failure mode above.
+real world and to the blind pixel review described in `docs/DECISIONS.md`. If the sandbox ever becomes
+where things are signed off, it has turned into the failure mode above.
 
-> **AND THE ARBITER NAMED IN THAT SENTENCE CANNOT ARBITRATE A LINEUP — 2026-08-20.** This paragraph hands
-> the verdict to "the blind-vision pass", and a later pass has now measured what that pass does when
-> shown two frames side by side. Twelve zero-context judges, sides balanced six and six, zoom forbidden:
-> **12 of 12 called the RIGHT-hand frame the better ground** (p = 0.0005), and 11 of 12 called the LEFT-hand
-> frame the glitch. Split by what was actually on screen, both questions land on a tie. The two questions
-> are one axis answered by POSITION in opposite directions, which is what makes it position rather than
-> taste. An earlier nine-judge four-way ranking was equally empty: mean ranks 2.00 / 2.22 / 2.44 / 3.33
-> against a chance mean of 2.50, SE 0.37.
+> **AND THE ARBITER NAMED IN THAT SENTENCE CANNOT ARBITRATE A LINEUP — 2026-08-20.** The paragraph above
+> hands the verdict to the blind pixel review, and that review has now been measured on the specific task
+> of comparing two frames side by side. Twelve independent blind readings, sides balanced six and six,
+> zoom forbidden: **12 of 12 called the RIGHT-hand frame the better ground** (p = 0.0005), and 11 of 12
+> called the LEFT-hand frame the glitch. Split by what was actually on screen instead of by side, both
+> questions land on a tie. The two questions are one axis answered by POSITION in opposite directions,
+> which is what makes it position rather than taste. An earlier nine-reading four-way ranking was equally
+> empty: mean ranks 2.00 / 2.22 / 2.44 / 3.33 against a chance mean of 2.50, SE 0.37.
 >
 > **A contact sheet is a lineup with slots, so this design is the maximally exposed case**, not an
 > incidental one: the whole workflow win in §3 is "N variants in one frame", and every variant is therefore
-> wearing a position. Building the bays and then asking a blind judge which bay wins would produce a
+> wearing a position. Building the bays and then asking a blind reader which bay wins would produce a
 > confident, reproducible, entirely positional answer.
 >
-> **What survives is the half that works.** The judges' free-text descriptions were content-accurate in all
-> twelve — every one called the speckled frame speckled and the smooth one smooth, whichever side it was on.
-> So the rule for this tool is: **ask a blind judge what it SEES in one bay; never ask it which bay it
-> prefers.** The lineup is for a human eye and for measurement. If the sandbox is built, the sign-off
-> sentence above needs rewriting first, because as written it points the tool at its one broken mode.
+> **What survives is the half that works.** The free-text descriptions were content-accurate in all twelve
+> — every one called the speckled frame speckled and the smooth one smooth, whichever side it was on. So
+> the rule for this tool is: **ask a blind reader what it SEES in one bay; never ask which bay is better.**
+> The lineup is for a trained eye and for measurement. If the sandbox is built, the sign-off sentence above
+> needs rewriting first, because as written it points the tool at its one broken mode.
 
 ## 3. What to actually build
 
 The valuable artifact is not an environment. It is **one image**.
 
-**`tools/sandbox.gd` — a parameterised fixture + contact sheet.**
+**`tools/sandbox.gd` (proposed; no such file exists yet) — a parameterised fixture + contact sheet.**
 
 - **Bays.** A row of identical carved bays in the real scene, one per subject, each with a label rendered
   into the shot. `--subjects=ore,rich_ore,iron,coal` gives four bays, one per material.
@@ -86,8 +89,8 @@ share `capture_moments.gd`'s boot and shutter so there is exactly one way a scre
 ## 4. What it is NOT for
 
 - **Not a harness layer.** It renders and saves; it asserts nothing. The `check_*` layers keep owning truth.
-- **Not a play space.** No agent drives it. `play_tests` owns whether the game can be played.
-- **Not a sign-off venue.** See §2. It proposes; `history/` and the blind-vision pass dispose.
+- **Not a play space.** Nothing drives it. `tools/play_tests.gd` owns whether the game can be played.
+- **Not a sign-off venue.** See §2. It proposes; `history/` and the blind pixel review dispose.
 
 ## 5. First job when it exists
 

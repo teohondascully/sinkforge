@@ -13,12 +13,12 @@
 > `% FactorySim.DESCENT_QUOTA`, which is exactly the discipline DECISIONS calls "a comment that states a
 > number is a test with no runner". The doc had no such excuse, so it now names the constants instead.*
 
-> **Status: DESIGNED (2026-06-28), via a guided brainstorm with the user. Not yet built.** This is the
+> **Status: DESIGNED (2026-06-28). Not yet built.** This is the
 > progression backbone the whole game hangs on — the resolution of the long-open "what is the Sinkforge /
 > tech graph / endgame" questions (GDD Open Questions; DECISIONS same date). It UNBLOCKS the crafter
 > modules and ore quality (both were waiting on a recipe graph). Two sub-systems are deliberately still
 > open and get their own brainstorm before they're built: **combat feel** and **power mechanics** (below).
-> Everything here is provisional/reversible per our working model — names, counts, and per-layer twists can
+> Everything here is provisional and reversible by design — names, counts, and per-layer twists can
 > change; the SHAPE is what's locked.
 
 ## 1. Destination — "Forge & ignite the Sinkforge"
@@ -111,10 +111,10 @@ IS, and how you fight it, is the combat sub-brainstorm — §7.*
 
 - **Combat feel** (load-bearing for bosses + frontier defense): how the body fights, and how the factory
   fights — melee/ranged/tools-as-weapons for the body; turrets/traps/automated defenses for the frontier;
-  what a boss-siege actually plays like. Its own session before L2's guardian or the frontier threat ships.
+  what a boss-siege actually plays like. Its own design pass, before L2's guardian or the frontier threat ships.
 - **Power mechanics** (the L2 twist, the first buildable tier): how power is generated and distributed —
   does it flow DOWN with gravity (on-hook) or via a placed network? burner→steam→…? how it governs the lift
-  and drills. A focused mini-brainstorm when we build L2.
+  and drills. A focused design pass, taken before L2 is built.
 - **Narrative stakes** (deferred, non-blocking): *why* you must reach the Sinkforge — escape home, reignite
   it, stop it, answer a call. Better discovered than forced; the abandoned-bazaar "someone came before"
   thread + the painted prologue seed it.
@@ -125,7 +125,7 @@ A cold open of **hand-painted, semi-realistic sequential panels** telling the Si
 hard-cutting to present day; the protagonist crosses a **portal** and a **stylization transition** resolves
 the realistic world *into* our 2D pixel underworld; the final beat tilts the camera down the shaft — the
 way is **down**. This **diegetically justifies the pixel art** (it's the nature of the place you crossed
-into, not a budget aesthetic — answering the user's old "2011 vs 2026 look" worry), plants the mission
+into, not a budget aesthetic — answering the standing "2011 vs 2026 look" worry), plants the mission
 wordlessly, and threads into the spawn ruin (others crossed before you).
 
 ## 9. First build slice (proposed)
@@ -139,7 +139,7 @@ follow-up slice — the logistics gate (throughput wall) is playable without it.
 
 ## 10. The addiction model — how the 80% stays fun for 40 hours
 
-> Added 2026-08-08 (design synthesis, guided one-axis-at-a-time with the user; DECISIONS same date). §1-9
+> Added 2026-08-08 (design synthesis, worked one axis at a time; DECISIONS same date). §1-9
 > answer *what the campaign IS*; this section answers *why the moment-to-moment loop keeps you playing* —
 > the part that actually retains, and the part a beautiful campaign spine can't rescue if it's missing.
 
@@ -148,7 +148,8 @@ follow-up slice — the logistics gate (throughput wall) is playable without it.
   (a charge-meter you stare at demoralizes; it makes the 39 hours feel like waiting). The discharge is a
   climax you ASSEMBLE in the final act, not a number that ticks up all game. **Corollary — validate the
   loop FIRST:** prove ~2 hours of real, human, moment-to-moment fun *before* building campaign structure.
-  Only ~15 min (RUNG 1–4, agent-validated) exists today. Content is cheap once the loop is proven; a gorgeous
+  Only ~15 min (RUNG 1–4, as far as the scripted pilot in `tools/play_tests.gd` reaches) exists today.
+  Content is cheap once the loop is proven; a gorgeous
   campaign bolted onto an unfun loop is wasted work. This is why #96/#97 (grow-world / build-L3) sit BEHIND
   a real 2-hour human playtest, not ahead of it.
 
@@ -167,7 +168,7 @@ follow-up slice — the logistics gate (throughput wall) is playable without it.
   inputs. Pull one, the others must follow.
 
 - **Anti-restart: a persistent CHASSIS + slotted MODULES.** A new layer must **never feel like starting
-  over** (the user's explicit fear — restart-feel demoralizes and makes people quit). Resolution: tools
+  over** (the standing fear behind this whole section — restart-feel demoralizes and makes people quit). Resolution: tools
   **harden monotonically** (a tier, once earned, is never lost — the carry-forward), and specialization to a
   layer's twist is **swappable MODULES** (sealed / heat-shielded / gravity-anchored) you keep forever and
   re-slot per frontier. This does harden-AND-specialize, **additive-never-substitutive**. The **shrine-camps
