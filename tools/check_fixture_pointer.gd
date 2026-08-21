@@ -125,34 +125,60 @@ func _initialize() -> void:
 	# harmless leftover: it is SEVEN CALLS OF SLACK on a debt that was already paid, and every one of them
 	# would move a working person's cursor across their desk without turning this layer red. A ratchet that
 	# is not tightened when the debt is paid stops being a bound and becomes a licence.
+	# A SCAN THAT READ NOTHING SCORED CLEAN, and this is c1's finding, in the same function as the fix for
+	# it: sixty lines down the game-side scan makes an unreadable file an OFFENDER and asserts a concrete
+	# population floor. This one did neither. `DirAccess.open` returning null skipped the entire loop;
+	# `FileAccess.open` returning null `continue`d past the file; `found` stayed empty either way, so `over`
+	# was empty and the budget assertion PASSED over zero files. The layer printed "0 calls across 0 file(s)"
+	# and reported success.
+	#
+	# WHAT MADE IT INVISIBLE IS WORTH MORE THAN THE FIX. The three assertions beneath it are controls on the
+	# PREDICATE -- they prove `_is_warp_line` recognises a real call, and refuses a comment about one, and
+	# refuses a doc comment. All three genuinely run and genuinely pass. **A control on the predicate is not
+	# a control on the population.** Together they answer "does my detector work" and nothing at all
+	# answered "did my detector look at anything". An assertion counter cannot see the difference: the layer
+	# reports several real assertions either way.
 	var budget: Dictionary = {}
 	var found: Dictionary = {}
+	var opened: int = 0
+	var unreadable: Array[String] = []
 	var dir := DirAccess.open("res://tools")
-	if dir != null:
+	if dir == null:
+		unreadable.append("res://tools (the directory itself would not open)")
+	else:
 		for f: String in dir.get_files():
-			if not f.ends_with(".gd") or f.begins_with("_scratch_"):
-				continue
-			# THE SCANNER CANNOT SCAN ITSELF. This file has to contain the literal token in order to look
-			# for it, so an unguarded sweep counts its own search string as a call, finds it over a budget
-			# of zero, and fails on arrival. Named explicitly rather than pattern-dodged, because the only
-			# safe exclusion is one a reader can see is the detector and not a subject.
-			if f == "check_fixture_pointer.gd":
-				continue
-			var txt: FileAccess = FileAccess.open("res://tools/" + f, FileAccess.READ)
-			if txt == null:
-				continue
-			var n: int = 0
-			while not txt.eof_reached():
-				var line: String = txt.get_line()
-				if _is_warp_line(line):
-					n += 1
-			if n > 0:
-				found[f] = n
+				if not f.ends_with(".gd") or f.begins_with("_scratch_"):
+					continue
+				# THE SCANNER CANNOT SCAN ITSELF. This file has to contain the literal token in order to look
+				# for it, so an unguarded sweep counts its own search string as a call, finds it over a budget
+				# of zero, and fails on arrival. Named explicitly rather than pattern-dodged, because the only
+				# safe exclusion is one a reader can see is the detector and not a subject.
+				if f == "check_fixture_pointer.gd":
+					continue
+				var txt: FileAccess = FileAccess.open("res://tools/" + f, FileAccess.READ)
+				if txt == null:
+					unreadable.append(f)
+					continue
+				opened += 1
+				var n: int = 0
+				while not txt.eof_reached():
+					var line: String = txt.get_line()
+					if _is_warp_line(line):
+						n += 1
+				if n > 0:
+					found[f] = n
 	var over: Array[String] = []
 	for f: String in found.keys():
 		var allowed: int = int(budget.get(f, 0))
 		if int(found[f]) > allowed:
 			over.append("%s has %d (budget %d)" % [f, found[f], allowed])
+	# THE POPULATION, ASSERTED RATHER THAN PRINTED. The floor is concrete for the same reason the game-side
+	# one is: `tools/` has carried well over sixty `.gd` fixtures for a long time, so a collapse below that
+	# is a scan that failed, not a directory that emptied.
+	_check(opened >= 60, "(setup) the warp scan opened %d fixture scripts under tools/" % opened)
+	_check(unreadable.is_empty(),
+		"(setup) every fixture under tools/ could be read (%s)"
+			% ("all readable" if unreadable.is_empty() else "COULD NOT READ: " + ", ".join(unreadable)))
 	_check(over.is_empty(),
 		"no fixture gained a new warp_mouse call — it moves the USER'S cursor (%s)"
 			% ("all within budget" if over.is_empty() else ", ".join(over)))

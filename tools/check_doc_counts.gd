@@ -46,11 +46,11 @@ const CLAIMS: Array[String] = [
 ## The per-verb counts, which the total cannot cover. `docs/ENGINEERING.md` prints a table of the three
 ## execution classes, and a table cell is exactly where a number goes stale unnoticed: it is not in a
 ## sentence anyone rereads. Each pattern must capture its number in group 1, keyed by the verb it claims.
-const VERB_CLAIMS: Dictionary = {
-	"add": "\\| `add` \\| ([0-9]+) \\|",
-	"add_gl": "\\| `add_gl` \\| ([0-9]+) \\|",
-	"add_excl": "\\| `add_excl` \\| ([0-9]+) \\|",
-}
+## THE PATTERN IS DERIVED PER VERB, for the same reason the verbs are: this was a hand-kept dictionary of
+## three, so a fourth execution class could be added to the runner and documented nowhere, and the layer
+## whose name is "docs match the runner" would agree that they did.
+func _verb_pattern(verb: String) -> String:
+	return "\\| `%s` \\| ([0-9]+) \\|" % verb
 
 ## Below this the scan is not reading the documents, whatever it reports about them.
 const MIN_CLAIMS: int = 3
@@ -77,16 +77,24 @@ func _initialize() -> void:
 					"%s says %d where the runner registers %d (\"%s\")"
 					% [doc.get_file(), claimed, registered, m.get_string(0)])
 
-	for verb: String in VERB_CLAIMS:
+	# AND EVERY VERB THE RUNNER DEFINES MUST HAVE A ROW. Checking only the rows that exist lets a new
+	# execution class be undocumented and still green -- the table would be internally consistent and
+	# silently incomplete, which is exactly how `add_excl_hl` arrived. A verb with no row is a red here.
+	var verbs: Array[String] = _verbs()
+	_check(verbs.size() >= 3, "derived the registration verbs from the runner: %s" % ", ".join(verbs))
+	for verb: String in verbs:
 		var want: int = _count_registrations(verb)
 		var re := RegEx.new()
-		re.compile(VERB_CLAIMS[verb])
+		re.compile(_verb_pattern(verb))
+		var rows: int = 0
 		for doc: String in DOCS:
 			for m: RegExMatch in re.search_all(_read(doc)):
 				found += 1
+				rows += 1
 				_check(int(m.get_string(1)) == want,
 					"%s says %s layers use `%s` where the runner registers %d"
 					% [doc.get_file(), m.get_string(1), verb, want])
+		_check(rows > 0, "`%s` (%d layers) has a row in the execution-class table" % [verb, want])
 
 	_check(found >= MIN_CLAIMS,
 		"the scan actually found the layer-count claims (%d found, at least %d expected)"
@@ -95,17 +103,47 @@ func _initialize() -> void:
 		% [found, DOCS.size(), registered])
 
 
-## The three registration verbs, each requiring a trailing SPACE. Without it this matches `add() {`, which
-## is the definition of the verb rather than a use of it, and inflates the count by exactly three.
+## THE VERBS ARE DERIVED FROM THE RUNNER, and this function used to name three of them. `add_excl_hl` was
+## added for a layer that must run alone but needs no display, and this file could not see it: the total
+## read 104 where the runner declared 105, and the missing one was invisible rather than wrong. A guard
+## against stale counts, holding its own stale count of the things it counts.
+##
+## The rule is the one `check_ci_coverage` already uses on the same file, deliberately: a registration verb
+## is any function that appends to NAMES. Adding a fifth requires no edit here.
+##
+## EACH USE REQUIRES A TRAILING SPACE, without which this matches `add() {` -- the DEFINITION of the verb
+## rather than a use of it -- and inflates the total by exactly the number of verbs. It also has to be a
+## prefix match on the verb plus a space rather than on the verb alone, or `add ` would count `add_gl ` and
+## `add_excl ` would count `add_excl_hl `.
+func _verbs() -> Array[String]:
+	var out: Array[String] = []
+	for line: String in _read(RUNNER).split("\n"):
+		var t: String = line.strip_edges()
+		if not t.contains("NAMES+=("):
+			continue
+		var paren: int = t.find("() {")
+		if paren > 0 and not out.has(t.substr(0, paren)):
+			out.append(t.substr(0, paren))
+	return out
+
+
 func _count_registrations(verb: String = "") -> int:
 	var text: String = _read(RUNNER)
+	# NOT A TERNARY. `[verb] if ... else _verbs()` assigns an untyped `Array` to an `Array[String]` and
+	# throws at RUNTIME, which --check-only does not see. The function then returned 0 for every verb, and
+	# the "has a row in the table" assertion PASSED over those zeroes -- a row exists whether the count
+	# beside it is 3 or garbage. Only the count comparison caught it.
+	var verbs: Array[String] = []
+	if verb.is_empty():
+		verbs = _verbs()
+	else:
+		verbs.append(verb)
 	var n: int = 0
 	for line: String in text.split("\n"):
-		if verb.is_empty():
-			if line.begins_with("add ") or line.begins_with("add_gl ") or line.begins_with("add_excl "):
+		for v: String in verbs:
+			if line.begins_with(v + " "):
 				n += 1
-		elif line.begins_with(verb + " "):
-			n += 1
+				break
 	return n
 
 

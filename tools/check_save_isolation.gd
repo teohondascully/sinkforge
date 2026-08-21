@@ -226,13 +226,29 @@ func _initialize() -> void:
 	# under the parallel sweep, where planting a file at the production slot would race everything).
 	var runner: String = FileAccess.get_file_as_string(RUNNER)
 	_check(runner.length() > 1000, "tools/run_harness.sh read (%d chars)" % runner.length())
-	_check(runner.contains("save_sentinel.gd -- arm"), "the runner ARMS the save sentinel before the sweep")
-	_check(runner.contains("save_sentinel.gd -- verify"), "the runner VERIFIES the save sentinel after the sweep")
+	# THE VERB IS NO LONGER ADJACENT TO THE SCRIPT NAME, and this guard went red the day that changed --
+	# correctly, and for a reason worth recording. It matched the literal `save_sentinel.gd -- arm`, which
+	# was one of three bare `"$GODOT" --headless ... | grep` invocations. Those had no wall-clock cap, in
+	# the one part of the suite whose failure costs a person their save file, so they were collapsed into a
+	# `sentinel()` helper that passes the verb as `"$1"` and watches the process. The literal went with
+	# them.
+	#
+	# THAT IS A STRUCTURAL GUARD TRACKING A LITERAL THAT MOVED, and the direction it failed in is the whole
+	# point: it went RED on a change that made the runner safer, which is annoying and honest. The same
+	# shape resolved the other way -- greps that kept matching PROSE after the code moved -- accounted for
+	# four guards on this branch that could not fail at all.
+	#
+	# So it now checks the helper AND the three call sites, which is a stronger claim than the old one: the
+	# old form could be satisfied by three invocations that were never reached.
+	_check(runner.contains("res://tools/save_sentinel.gd -- \"$1\""),
+		"the runner drives the save sentinel through one capped helper, not a bare engine call")
+	_check(runner.contains("sentinel arm"), "the runner ARMS the save sentinel before the sweep")
+	_check(runner.contains("sentinel verify"), "the runner VERIFIES the save sentinel after the sweep")
 	# …and takes the plant back on the ABORT path too. `verify` only runs when the sweep reaches the end;
 	# a run killed at any point before that leaves a marker sitting at the player's real save path, which
 	# is the exact species of litter this whole instrument exists to argue nobody drops. An arm with no
 	# verify protects nothing; an arm with no disarm is a promise kept only when nothing goes wrong.
-	_check(runner.contains("save_sentinel.gd -- disarm"),
+	_check(runner.contains("sentinel disarm"),
 		"…and DISARMS it from the cleanup trap, so an aborted run does not leave a marker behind")
 	_check(runner.contains("trap harness_cleanup EXIT"),
 		"…with that cleanup actually installed as an EXIT trap, not merely defined")
