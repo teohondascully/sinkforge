@@ -191,9 +191,17 @@ func _run() -> void:
 		# read "75% of the time (floor 75%)" against a `>=` comparison, which looks like a broken
 		# assertion rather than a value fractions of a point under the bar, and a reader cannot tell
 		# which from the text. Identical defect to the one already fixed in check_texture.
-		"STRUCTURE, colour removed: dirt and stone are tellable apart %.2f%% of the time (floor %.2f%%,"
-			% [struct_auc * 100.0, READ_FLOOR * 100.0]
-			+ " a coin is 50%) — this is TR-02's actual subject")
+		# AND THE SAMPLE SIZE, because the two decimals above are not the whole story. Five same-build
+		# repeats on one box read 77.14, 77.14, 77.14, 72.86 and 80.00 — every one an exact multiple of
+		# 1/n_lit, so the statistic is quantised at about 1.4 points here and 75.00% IS NOT A REACHABLE
+		# VALUE: the readings either side of the floor are 74.29 and 75.71. The bound is really "53 of
+		# 70". A reader who cannot see `n` cannot know that, and cannot tell a miss of one window from a
+		# real shortfall. The spread across those repeats is FIVE windows against a margin of ONE, which
+		# is the layer's actual problem and is not fixed by anything on this line.
+		"STRUCTURE, colour removed: dirt and stone are tellable apart %.2f%% of the time over %d lit"
+			% [struct_auc * 100.0, int(real_r["n_lit"])]
+			+ " windows (floor %.2f%%, a coin is 50%%) — this is TR-02's actual subject"
+			% (READ_FLOOR * 100.0))
 
 	print("  BASELINE: with one grammar for both materials, structure reads %.0f%% in the lit band;"
 		% (_best(flat, usable) * 100.0)
