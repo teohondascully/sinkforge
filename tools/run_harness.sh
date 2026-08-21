@@ -578,6 +578,11 @@ if [ -n "${SF_ONLY:-}" ] || [ "${SF_GL_ONLY:-0}" = "1" ] || [ -n "${SF_NOT:-}" ]
 	if [ "${#NAMES[@]}" -eq 0 ]; then
 		echo "!! the filter (SF_ONLY='${SF_ONLY:-}' SF_GL_ONLY='${SF_GL_ONLY:-0}' SF_NOT='${SF_NOT:-}')" \
 			"matched none of the $DECLARED layers — refusing to report a run of nothing"
+		# THIS EXIT IS UPSTREAM OF `trap harness_cleanup EXIT`, so it prints its own line. Found by testing
+		# the fix at two exit codes instead of one: HARNESS_EXIT appeared for a passing subset and was
+		# missing here, which is the case a caller most needs it for, because a filter that matched nothing
+		# is the failure most likely to be mistaken for a clean run.
+		printf 'HARNESS_EXIT=2\n'
 		exit 2
 	fi
 fi
@@ -661,6 +666,22 @@ harness_cleanup() {
 		echo "   version and part from another. WHATEVER THIS RUN REPORTED, IT IS NOT A RESULT. Re-run it."
 		[ -n "${DIR:-}" ] && [ -w "${DIR:-}/summary.txt" ] \
 			&& echo "!! THE RUNNER WAS EDITED MID-RUN — this is not a result, re-run it" >>"$DIR/summary.txt"
+	fi
+	# THE EXIT CODE, AS A LINE, BEFORE THE LOG DIRECTORY GOES. The comment at the top of this file tells a
+	# caller not to trust `$?` after a pipe and to "grep the exit line out of the file" instead. There was
+	# no such line. The advice named a workaround that did not exist, which is worse than no advice, because
+	# a reader who follows it finds nothing and concludes the run said nothing.
+	#
+	# The underlying trap turned up on the same night in three different shapes: `$?` read after a
+	# `tail`, after a `head`, and after an appended `echo` that was meant to CAPTURE the code and reported
+	# its own instead. All three are the same bug and all three are already described eight hundred lines
+	# above. Documentation did not stop it; a line in the output can, because the failure mode is reading
+	# the wrong process's status and this belongs to no other process.
+	#
+	# `rc` is the real status: `harness_cleanup` takes `$?` on its first line, before anything here runs.
+	printf 'HARNESS_EXIT=%s\n' "$rc"
+	if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ]; then
+		printf 'HARNESS_EXIT=%s\n' "$rc" >>"$DIR/summary.txt" 2>/dev/null || true
 	fi
 	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed
 	# further down. A run that never reached `verify` (Ctrl-C, a crash, an early exit on any of the codes
