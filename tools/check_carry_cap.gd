@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_full_pack_still_swings(cap)
 	_overflow_is_conserved(cap)
 	_a_full_pack_leaves_its_spill(cap)
+	_the_lode_face_is_the_ore_verb(cap)
 	_the_other_direction(cap)
 
 	_verdict("check_carry_cap",
@@ -68,6 +69,59 @@ func _rig(cell: Vector2i, prefill: int) -> FactorySim:
 		# through `mine` would make the setup depend on the behaviour being measured.
 		sim.inventory[&"stone"] = prefill
 	return sim
+
+
+## THE LODE FACE, WHICH THE FIRST VERSION OF THIS LAYER DID NOT COVER AND SHOULD HAVE.
+##
+## `mine()` breaks blocks; `take_lode` is the hand verb for working an exposed ore face one unit at a time,
+## and the lode is where ore actually lives — terrain is what you carve, the lode is what you extract. The
+## first version asserted through `mine()` and `collect_ground()` only, so the cap could have bound on rock
+## and missed ore entirely and this layer would have stayed green. Found by c1 reading the seam against the
+## call sites rather than against the layer.
+##
+## THE RULE HERE IS DELIBERATELY NOT THE MINING RULE, and the difference is not an inconsistency.
+## `mine()` DESTROYS a block, so the material it frees has nowhere to be but the world, and refusing the
+## swing would make a full pack read as a broken pick. `take_lode` takes one unit off a face that stays
+## exactly where it was: nothing is destroyed, so there is no homeless material, and the honest answer to
+## "you cannot carry this" is that you do not take it. Refusing also keeps the vein intact instead of
+## letting a full player drain it onto the floor and down the column one click at a time.
+##
+## So: a full pack takes nothing, the deposit is untouched, and NOTHING is spilled. All three, because
+## "returned empty" and "took it anyway" and "spilled it" are three different behaviours and only one is
+## right.
+func _the_lode_face_is_the_ore_verb(cap: int) -> void:
+	var cell := Vector2i(30, 40)
+	var sim := FactorySim.new()
+	# An exposed workable face: a lode with no solid over it and units left in the deposit.
+	sim.lode[cell] = &"ore"
+	sim.deposits[cell] = 5
+	sim.inventory[&"stone"] = cap
+	_check(sim.lode_workable(cell), "fixture: the lode face is exposed and workable")
+	_check(sim.carried_bulk() == cap, "fixture: and the pack is at the cap")
+
+	var deposit_before: int = int(sim.deposits.get(cell, 0))
+	var bulk_before: int = sim.carried_bulk()
+	var got: StringName = sim.take_lode(cell)
+
+	_check(got == &"",
+		"A FULL PACK TAKES NOTHING FROM THE FACE (returned '%s')" % String(got))
+	_check(sim.carried_bulk() == bulk_before,
+		"...the pack did not grow (%d -> %d)" % [bulk_before, sim.carried_bulk()])
+	_check(int(sim.deposits.get(cell, 0)) == deposit_before,
+		"...the vein is intact, not drained onto the floor (%d -> %d)"
+			% [deposit_before, int(sim.deposits.get(cell, 0))])
+	_check(_on_floor(sim, &"ore") == 0,
+		"...and nothing was spilled: a face that keeps its ore has none to spill")
+
+	# CONTROL, the direction that catches a verb jammed shut: with room, the same call yields.
+	var open_sim := FactorySim.new()
+	open_sim.lode[cell] = &"ore"
+	open_sim.deposits[cell] = 5
+	var yielded: StringName = open_sim.take_lode(cell)
+	_check(yielded == &"ore",
+		"CONTROL a pack with room takes the unit from the identical face ('%s')" % String(yielded))
+	_check(int(open_sim.inventory.get(&"ore", 0)) == 1,
+		"...and it is in the pack")
 
 
 ## Every unit of `item` anywhere in the world's piles, so conservation is checked by finding the material

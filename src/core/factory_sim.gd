@@ -1413,6 +1413,17 @@ func take_lode(cell: Vector2i) -> StringName:
 	if not lode_workable(cell):
 		return &""
 	var item: StringName = lode[cell]
+	# THE CAP, AND THIS VERB REFUSES WHERE `mine` SPILLS. The difference is not an inconsistency: `mine`
+	# DESTROYS a block, so the material it frees has nowhere to be except the world and refusing the swing
+	# would read as a broken pick. A lode face is not destroyed by being worked — it stays exactly where it
+	# was — so there is no homeless material, and a full pack simply does not take the unit. That also keeps
+	# the vein intact rather than letting a full player drain it onto the floor one click at a time.
+	#
+	# This is the ORE verb. Missed on the first pass, which capped `mine`, `collect_ground` and the foliage
+	# yields and left the one path the lode migration made central writing the pack inline — so the cap bound
+	# on rock and not on ore, and the pack could pass the cap by one unit per click.
+	if not can_carry(item, 1):
+		return &""
 	var left: int = int(deposits.get(cell, 0)) - 1
 	inventory[item] = int(inventory.get(item, 0)) + 1
 	total_produced[item] = int(total_produced.get(item, 0)) + 1
