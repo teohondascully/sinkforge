@@ -37,6 +37,13 @@
 # should be commented, and inventing one here would freeze a number nobody measured. It prints sorted
 # worst-first so a reader can see the outliers without the script pretending to know where the line is.
 #
+# A FILE THE EXTRACTOR CANNOT READ IS A FAILURE, NOT A PASS. The first version of this globbed
+# `.gdshader` alongside `.gd`, found no `#` comments in them because shaders comment with `//`, recorded
+# zero comment lines, and skipped them as having nothing to check. Five shader files were invisible to a
+# tool named for finding exactly what one of them carried. So a globbed file that yields no comments is
+# now reported by name: either it is genuinely uncommented, which is worth knowing, or the extractor does
+# not understand its syntax, which is worth knowing more.
+#
 # THE FRAME. Every number here is a statement about one checkout. The tool prints the branch and SHA it
 # read, because a source-reading instrument whose output does not name its ref invites its findings to be
 # quoted as properties of the project.
@@ -69,11 +76,22 @@ EMDASH = "—"
 
 # Comment-only text. A "#" inside a string literal is code, so trailing comments are found by scanning
 # the line and tracking quote state rather than by splitting on the first "#".
-def comment_text(src):
+def comment_text(src, shader=False):
     out = []
+    block = False
     for line in src.split("\n"):
         s = line.lstrip()
-        if s.startswith("#"):
+        if shader:
+            if block:
+                out.append(s)
+                if "*/" in line:
+                    block = False
+                continue
+            if s.startswith("/*"):
+                out.append(s)
+                block = "*/" not in s
+                continue
+        if s.startswith("#") or (shader and s.startswith("//")):
             out.append(s)
             continue
         q, i, n = None, 0, len(line)
@@ -90,12 +108,15 @@ def comment_text(src):
             elif c == "#":
                 out.append(line[i:].strip())
                 break
+            elif shader and c == "/" and i + 1 < n and line[i + 1] == "/":
+                out.append(line[i:].strip())
+                break
             i += 1
     return out
 
 def metrics(path):
     src = open(path, encoding="utf-8").read()
-    cl = comment_text(src)
+    cl = comment_text(src, shader=path.endswith(".gdshader"))
     body = "\n".join(cl)
     n = max(len(cl), 1)
     total = max(src.count("\n"), 1)
@@ -120,6 +141,9 @@ TOKENS = [
     (r"\bpeer\b",                                       "peer"),
     (r"\bthe user\b",                                   "the user"),
     (r"TRIED AND REVERTED",                             "TRIED AND REVERTED"),
+    (r"\bRAISED\s+[0-9.]+\s*->\s*[0-9.]+",              "a RAISED x -> y note"),
+    (r"\bblind judge\b",                                 "blind judge"),
+    (r"^\s*(?:#|//)\s*MEASURED\b",                       "a MEASURED banner"),
 ]
 
 ref = metrics(ref_path)
@@ -133,10 +157,11 @@ paths = sorted(set(glob.glob("scenes/**/*.gd", recursive=True)
                  + glob.glob("src/**/*.gd", recursive=True)))
 ref_abs = os.path.abspath(ref_path)
 
-fails, rows = [], []
+fails, rows, unreadable = [], [], []
 for p in paths:
     m = metrics(p)
     if m["comment_lines"] == 0:
+        unreadable.append(p)
         continue
     bad = []
     is_ref = os.path.abspath(p) == ref_abs
@@ -159,6 +184,12 @@ print("%-42s %6s %6s %6s  %s" % ("FILE", "#CMNT", "TOTAL", "COMMA", "SHARE"))
 for share, p, cl, tot, comma, bad in sorted(rows, reverse=True)[:14]:
     print("%-42s %6d %6d %6.3f  %4.0f%%%s" % (p, cl, tot, comma, share * 100, "  <-- fails" if bad else ""))
 print("\n(comment share is reported, never asserted: no defensible bound exists for it)")
+
+if unreadable:
+    print("\n%d globbed file(s) yielded NO comments; either genuinely bare or the extractor" % len(unreadable))
+    print("does not understand their syntax. Both are worth a look:")
+    for p in unreadable:
+        print("  %s" % p)
 
 if fails:
     print("\n%d file(s) failed:" % len(fails))
