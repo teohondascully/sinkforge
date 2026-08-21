@@ -613,7 +613,6 @@ const HELPER_TAGS: Dictionary = {
 	# internal: helpers, not screens
 	"_draw": &"internal",
 	"_draw_scrim": &"internal",
-	"_draw_tracked": &"internal",
 	"_draw_thing_icon": &"internal",
 	"_draw_tech_art": &"internal",
 	"_draw_tech_chip": &"internal",
@@ -971,9 +970,9 @@ func _draw_arrival() -> void:
 	var t: float = _arrival_life / ARRIVAL_HOLD
 	var a: float = clampf(minf((1.0 - t) * 6.0, t * 2.4), 0.0, 1.0)     # fast in, slow out
 	var y: float = CANVAS.y * 0.26 - (1.0 - t) * 5.0
-	var w: float = _tracked_width(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
+	var w: float = _tracked_w(_arrival_text, ARRIVAL_SIZE, ARRIVAL_TRACK)
 	var half: float = w * 0.5 + 12.0
-	var kw: float = _tracked_width(_arrival_kicker, 9, 2.6) if _arrival_kicker != "" else 0.0
+	var kw: float = _tracked_w(_arrival_kicker, 9, 2.6) if _arrival_kicker != "" else 0.0
 	var core_half: float = maxf(w, kw) * 0.5 + SCRIM_PAD
 	# The ceremony is furniture while it is up, so a layout check has to be able to see it. It draws no
 	# `_panel()`, deliberately, so `panel_probe` was blind to it. It is registered as the solid core only
@@ -986,13 +985,13 @@ func _draw_arrival() -> void:
 	# The shadow carries the contrast the veil used to. It is drawn under every glyph rather than under
 	# the whole plate so it costs the world a pixel around each letter instead of a 420x50 field.
 	if _arrival_kicker != "":
-		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0) + SCRIM_INK_OFF, 9, 2.6,
+		_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0) + SCRIM_INK_OFF, 9, 2.6,
 			Color(SCRIM_INK, SCRIM_INK_A * a))
-		_draw_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
+		_tracked(_arrival_kicker, Vector2(CANVAS.x * 0.5 - kw * 0.5, y - 15.0), 9, 2.6,
 			Color(_arrival_color, 0.80 * a))
-	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y) + SCRIM_INK_OFF, ARRIVAL_SIZE,
+	_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y) + SCRIM_INK_OFF, ARRIVAL_SIZE,
 		ARRIVAL_TRACK, Color(SCRIM_INK, SCRIM_INK_A * a))
-	_draw_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y), ARRIVAL_SIZE, ARRIVAL_TRACK,
+	_tracked(_arrival_text, Vector2(CANVAS.x * 0.5 - w * 0.5, y), ARRIVAL_SIZE, ARRIVAL_TRACK,
 		Color(_arrival_color, a))
 	# Two hairlines the width of the words: a frame that says "plate" without drawing a panel.
 	for ry: float in [y - 25.0, y + 7.0]:
@@ -1050,19 +1049,6 @@ func _scrim_c(weight: float, a: float) -> Color:
 
 ## Letter-tracked text. `draw_string` has no tracking, and tracking is the whole difference between
 ## small type that reads as a label and small type that reads as a caption.
-func _draw_tracked(text: String, at: Vector2, size: int, track: float, color: Color) -> void:
-	var x: float = at.x
-	for i: int in text.length():
-		var ch: String = text[i]
-		draw_string(_font, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
-		x += _font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + track
-
-
-func _tracked_width(text: String, size: int, track: float) -> float:
-	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
-		+ track * float(maxi(0, text.length() - 1))
-
-
 ## The fast-forward chip, top-left: a small "▶▶ Nx" tag shown only while the game clock is sped up, so a
 ## visibly racing world has an on-screen cause. Hidden at 1x to keep the default screen calm.
 func _draw_fastforward() -> void:

@@ -1042,7 +1042,7 @@ func _check_helper_registry() -> void:
 	var plate_top: float = Hud.CANVAS.y * 0.26 - Hud.SCRIM_ABOVE
 	var plate_bot: float = Hud.CANVAS.y * 0.26 + Hud.SCRIM_BELOW
 	# THE PLATE IS CENTRED AND ITS WIDTH IS ITS TEXT, so the box is built from the WIDEST BAND NAME THE
-	# GAME CAN ANNOUNCE, measured with the HUD's own `_tracked_width` at the HUD's own constants. The first
+	# GAME CAN ANNOUNCE, measured with the HUD's own `_tracked_w` at the HUD's own constants. The first
 	# version of this used "nearly the whole centre column" as a generous bound (600px wide) and failed a
 	# chip sitting at x 10..114, in a column the plate cannot reach at any text length. **A bound invented
 	# to be safe is not conservative, it is wrong in a direction that feels responsible**, and it condemns
@@ -1050,7 +1050,7 @@ func _check_helper_registry() -> void:
 	var widest: float = 0.0
 	var widest_name: String = ""
 	for b: Dictionary in Strata.BANDS:
-		var w: float = hud._tracked_width(String(b["name"]), Hud.ARRIVAL_SIZE, Hud.ARRIVAL_TRACK)
+		var w: float = hud._tracked_w(String(b["name"]), Hud.ARRIVAL_SIZE, Hud.ARRIVAL_TRACK)
 		if w > widest:
 			widest = w
 			widest_name = String(b["name"])
