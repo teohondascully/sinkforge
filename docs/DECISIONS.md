@@ -6,7 +6,7 @@ rather than inventing evidence.
 
 It is cited by name from `project.godot`, which calls it the rationale for a compile-error tripwire, and
 from `README.md`, `.gitignore`, `.githooks/commit-msg`, `tools/check_trailers.sh`,
-`tools/capture_moments.gd`, `docs/ARCHITECTURE.md`, `docs/PRIORITY.md` and
+`tools/capture_moments.gd`, `docs/ARCHITECTURE.md` and
 `.github/workflows/harness.yml`.
 
 ## Status taxonomy
@@ -312,9 +312,6 @@ to read in motion.
 Menus have to read as current. Elevation rather than borders. Defocus the world behind a modal. A detail
 plate for the selected thing. Costs as glyphs. Never a wall of locked rows; the future belongs on the
 research screen.
-
-*Attested: `docs/PRIORITY.md`; `docs/FEEL_GAP.md`; `docs/MENU_MATRIX.md`;
-`docs/VISUAL_RECOMMENDATIONS_SURFACE.md`.*
 
 ### 2026-08-16: default zoom 0.70× to 1.00× (LOCKED, with its derivation)
 

@@ -82,7 +82,7 @@ func _run() -> void:
 	# anything absent from it to `Visuals.draw_item`, whose default arm fills a flat rect with
 	# `item_color` — last line `return Color.WHITE`. A machine that reaches the pack without a craft path
 	# therefore draws as a blank white square, which is a failure mode this project has already shipped
-	# once (docs/FEEL_GAP.md, the carried terrain blocks).
+	# once (the carried terrain blocks).
 	#
 	# It is not reachable today, and the reason is worth writing down because it is NOT the one I first
 	# gave: it is not that nothing crafts these defs, it is that nothing PLACES them. `world_seeder`

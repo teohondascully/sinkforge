@@ -35,11 +35,12 @@ _zoom_*.png
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
 
-# COUNT THEM WITH `git ls-files '_moment_*.png' | wc -l`, NOT WITH `ls`. There are 51 _moment_*.png on
-# disk and 48 of them are tracked; the other three are the water diagnostics ignored below. The figure
-# in this comment said 44 for a long time, which was the tracked 41 plus those three — a directory
-# listing written down as a count of the record.
-# THE VISUAL RECORD — history/ (the curated archive) and the 48 canonical _moment_*.png captures — is
+# COUNT THEM WITH `git ls-files 'docs/media/moments/_moment_*.png' | wc -l`, NOT WITH `ls`, and do not
+# write the answer down here. Three different numbers for this one set were once carried in three files
+# at once, all of them stale, because a count in a comment is a test with no runner. The captures live
+# under docs/media/, which carries a .gdignore, so the engine does not import them and they need no
+# .import sidecars.
+# THE VISUAL RECORD — history/ (the curated archive) and the canonical capture set — is
 # COMMITTED, at the user's instruction on 2026-08-17. Both sat here ignored before, history/ under a note
 # reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
 # (docs/DECISIONS.md, "Never destroy anything the user made") forbids DESTROYING them, and it exists
@@ -136,3 +137,18 @@ docs/superpowers/
 docs/TASK_QUEUE.md
 tools/task_queue.sh
 tools/test_task_queue.sh
+
+# Working evidence for the release candidate. Spent patch artifacts and a repository
+# audit kept as supporting material rather than as published documentation.
+/.rc-prose-*.patch
+docs/REPO_PORTFOLIO_AUDIT.md
+docs/PRIORITY.md
+docs/FEEL_GAP.md
+docs/MENU_MATRIX.md
+docs/VISUAL_RECOMMENDATIONS_SURFACE.md
+
+# Godot import sidecars for the capture set. The captures now live under docs/media/,
+# which carries a .gdignore, so the engine no longer imports them and the sidecars
+# describe nothing. Regenerated automatically if a capture is ever moved back.
+/_moment_*.png.import
+/_crop_*.png.import

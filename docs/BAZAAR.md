@@ -9,8 +9,8 @@
 > stocked with the four bits.
 >
 > **Its LOOK was reworked as #S34** — this document specs the counter's *shape* (one panel, three tabs, no
-> scrolling, same everywhere), and that shape is what shipped and what stays. The surface on top of it is in
-> `docs/FEEL_GAP.md` STRIKE 34, along with two changes that revise §3 and §7 below:
+> scrolling, same everywhere), and that shape is what shipped and what stays. The rework also made two
+> changes that revise §3 and §7 below:
 >
 > * **WORKS lists only what you can BUILD.** §3 said the Rack shows locked rows naming the tech that
 >   unlocks them. In play that was thirteen greyed rows out of sixteen — decision paralysis in the place you

@@ -33,7 +33,7 @@ const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight → 
 ## Gold never labels and never counts. It marks only what the player's input is connected to: the
 ## selection, the verb that acts on it, the next available research node, an engaged control. The nine
 ## sites where the accent was pure information now draw in text colours, and the call sites are
-## enumerated in `docs/MENU_MATRIX.md`.
+## all in this file, and the roles that kept the accent are walked through below.
 ##
 ## A machine's stalled count belongs in `UI_WARN`, not here.
 ##
@@ -3842,7 +3842,7 @@ func _draw_help_overlay() -> void:
 ## counter binds the digit row and the mouse wheel to tab selection. A binding capture cannot live
 ## inside a tab strip. The other reason once recorded, that the counter is a place with a precondition,
 ## is not true: `E` sets `_inventory_open` with no proximity check, and `_near_bazaar()` gates exactly
-## one field. The ruling is in docs/MENU_MATRIX.md.
+## one field.
 ##
 ## The grid. The old page put slider bars at x0+62 and chips at x0+92: two control columns in one stack,
 ## 30px apart. There is now one label x, one control x and one value x.

@@ -349,7 +349,7 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 	await RenderingServer.frame_post_draw    # the veil/light layers repaint a frame behind a camera move
 	# WHERE THE FRAME IS WRITTEN, and the whole reason this override exists.
 	#
-	# The default is the repo root, where the 44 canonical `_moment_*.png` live and where every consumer
+	# The default is `docs/media/moments/`, where the canonical `_moment_*.png` live and where every consumer
 	# looks. `SF_MOMENT_DIR` moves ONLY the destination: the same script, the same scene, the same settle,
 	# the same moment helper, the same shutter. That is the point. A baseline archived by a second,
 	# convenient capture path is not a baseline of this one. The divergence between two capture paths is
@@ -362,7 +362,7 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 	# root, because the fallback would quietly overwrite a canonical capture with a baseline, which is
 	# precisely the outcome the redirect exists to make impossible. `mkdir -p` that only warns is the same
 	# defect as a guard that cannot be false: the error path arrives at the dangerous state anyway.
-	var out_dir: String = "res://"
+	var out_dir: String = "res://docs/media/moments/"
 	var redirect: String = OS.get_environment("SF_MOMENT_DIR")
 	if redirect != "":
 		out_dir = redirect if redirect.ends_with("/") else redirect + "/"

@@ -161,13 +161,13 @@ n=0
 	echo "| capture | date | renderer | recipe |"
 	echo "|---|---|---|---|"
 	while IFS= read -r f; do
-		stem="${f#_moment_}"; stem="${stem%.png}"
-		sha="$(git log -1 --format=%H -- "$f")"
+		stem="${f##*/_moment_}"; stem="${stem%.png}"
+		sha="$(git log --follow -1 --format=%H -- "$f")"
 		printf '| `%s` | %s | `%s` | `%s` |\n' \
 			"$stem" "$(git log -1 --format=%ad --date=format:'%Y-%m-%d %H:%M' "$sha")" \
 			"$(sig_for_commit "$sha")" "$(recipe_for "$stem")"
 		n=$((n + 1))
-	done < <(git ls-files '_moment_*.png')
+	done < <(git ls-files 'docs/media/moments/_moment_*.png')
 } > "$TMP/manifest.md"
 
 # The summary is appended after the table so the counts are of what was actually written, not of what was
@@ -176,8 +176,8 @@ n=0
 	echo
 	echo "## Cohorts"
 	echo
-	git ls-files '_moment_*.png' | while IFS= read -r f; do
-		sha="$(git log -1 --format=%H -- "$f")"; sig_for_commit "$sha"
+	git ls-files 'docs/media/moments/_moment_*.png' | while IFS= read -r f; do
+		sha="$(git log --follow -1 --format=%H -- "$f")"; sig_for_commit "$sha"
 	done | sort | uniq -c | sort -rn | while read -r count sig; do
 		echo "- \`$sig\` — $count frames"
 	done

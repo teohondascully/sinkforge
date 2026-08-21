@@ -70,8 +70,8 @@ extends "res://tools/check_base.gd"
 ## port would report a clean population and be clean because the instrument cannot register the writes**,
 ## which is the thing this layer exists to catch, arriving as this layer. The sim version needs a different
 ## extractor (subscripts) and a different population rule (the tick's transitive closure, not its body).
-## Filed as a ticket in `docs/PRIORITY.md`; if that ticket is not there, the paragraph above is the
-## ticket.
+## No such layer exists yet; the paragraph above is the specification for the one that should, kept here
+## because there is nowhere else a reader would find it.
 ##
 ## ONE RULE HERE IS LOAD-BEARING FOR A REASON NOBODY REASONED TO. `_assigned_pair` rejects `+=`, which was
 ## written because a compound assignment is a read-modify-write of a field the fixture never established.

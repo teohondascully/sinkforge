@@ -1,7 +1,7 @@
 # P0: the visual-triage baseline
 
-The baseline for the visual-triage program (`docs/PRIORITY.md`, head of Tier 3). It is the gate on every
-phase below it, and its job is to make "it looks better now" a claim someone can check.
+The baseline for the visual-triage program. It is the gate on every phase below it, and its job is to
+make "it looks better now" a claim someone can check.
 
 Captured 2026-08-17.
 

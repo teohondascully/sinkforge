@@ -190,9 +190,7 @@ show through as competing scenery.
 
 **Priority placement.** A menu-overhaul parent under T2.1, immediately after V1's tutorial quietness. It
 may run in parallel with T3.1 because it is a contained UI pass, but it begins with a visual language and
-information-architecture prototype rather than a piecemeal reskin. The `MNU-*` queue is in
-`docs/VISUAL_RECOMMENDATIONS_SURFACE.md`, and the findings from building its capture register are in
-`docs/MENU_MATRIX.md`.
+information-architecture prototype rather than a piecemeal reskin.
 
 ## Candidate backlog, grouped under roots
 
@@ -200,7 +198,7 @@ Observations to preserve, not twenty independent implementation tickets.
 
 | Symptom | Root | Severity | First investigation |
 |---|---|---:|---|
-| Multi-line tutorial panel over the body, occluding the thing it teaches (`UI-01`, still open) *(listed as "screen-centred" until 2026-08-20 — withdrawn: the anchor is a world position, the miner's head in the audited frame (`scenes/main.gd:826-841`), and the draw only clamps it on-canvas (`scenes/hud.gd:700-701`). Status lives on the ticket in `docs/VISUAL_RECOMMENDATIONS_SURFACE.md`.)* | V1 | Frame-breaking | Measure duration and coverage; replace one lesson with a contextual first-use cue |
+| Multi-line tutorial panel over the body, occluding the thing it teaches (`UI-01`, still open) *(listed as "screen-centred" until 2026-08-20 — withdrawn: the anchor is a world position, the miner's head in the audited frame (`scenes/main.gd:826-841`), and the draw only clamps it on-canvas (`scenes/hud.gd:700-701`).)* | V1 | Frame-breaking | Measure duration and coverage; replace one lesson with a contextual first-use cue |
 | Multiple arrows, rings and labels in one surface frame | V1 | Frame-breaking | Inventory simultaneous helper states and assign priority tiers |
 | `FORGE` labels and pointers read as duplicated UI | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
 | Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
@@ -269,7 +267,6 @@ Add one parent priority entry at a time, after consulting this ledger:
 3. add one T3 terrain-material-grammar parent item covering V2 and V3;
 4. add one T3 grapple-visual-language parent item alongside T3.10.
 
-`docs/PRIORITY.md` remains the small decision queue and milestone map. This file and
-`docs/VISUAL_RECOMMENDATIONS_SURFACE.md` are the evidence-rich granular queue. Many independent tickets
-may run in parallel out of a selected workstream, but only one milestone-level parent occupies the active
-priority table at a time.
+This file is the evidence-rich granular queue, kept separate from the small decision queue and milestone
+map. Many independent tickets may run in parallel out of a selected workstream, but only one
+milestone-level parent occupies the active priority table at a time.

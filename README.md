@@ -9,7 +9,7 @@ Gravity carries a machine's output downward for free. Moving anything back up, i
 costs power. Production lines therefore grow vertically, while the tunnels around them sprawl in any
 direction.
 
-![The first automated line running at the surface](_moment_line.png)
+![The first automated line running at the surface](docs/media/moments/_moment_line.png)
 
 ## What it is
 
@@ -37,7 +37,7 @@ Deepslate down to the world floor, and need a pump before they are worth enterin
 
 There is no reset and no prestige mechanic. The world is permanent and grows downward.
 
-![A drill and five spurs working a seam, 27 metres down](_moment_chain.png)
+![A drill and five spurs working a seam, 27 metres down](docs/media/moments/_moment_chain.png)
 
 ### Terrain is what you carve; the lode is what you extract
 
@@ -57,7 +57,7 @@ guaranteed rather than left to the seed. Ore *blocks* still exist alongside all 
 plane, and converting them is the next phase. `docs/LODE.md` is the design and `docs/LODE_PLAN.md` is
 the migration, including what breaks.
 
-![An ore lode showing in the back wall of a torch-lit gallery](_moment_lode.png)
+![An ore lode showing in the back wall of a torch-lit gallery](docs/media/moments/_moment_lode.png)
 
 ## Running from source
 
@@ -255,7 +255,7 @@ that is the case.
 | `tools/` | the harness runner and its 103 layers, the play-tests, the capture and profiling tools, the machine lock. |
 | `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
-| `_moment_*.png` | 52 canonical captures of named moments at the repository root, indexed by `docs/CAPTURE_MANIFEST.md`. Several tools address them by `res://` path. |
+| `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |
 | `.githooks/` | the tracked `commit-msg` and `pre-commit` hooks. Activate them once per clone; `CONTRIBUTING.md` says how. |
 
 ## Documents
@@ -270,7 +270,6 @@ that is the case.
 | [`docs/PROGRESSION.md`](docs/PROGRESSION.md) | the depth ladder: gates, research, and what each layer is for |
 | [`docs/LODE.md`](docs/LODE.md) | ore in the wall plane: the design, and `docs/LODE_PLAN.md` for the migration |
 | [`docs/MATERIAL_SPINE.md`](docs/MATERIAL_SPINE.md) | the shipped economy, read off the data files rather than off intent |
-| [`docs/PRIORITY.md`](docs/PRIORITY.md) | the working roadmap: one ordered list, with the reasoning for every item that was demoted or reversed |
 
 ## Status
 

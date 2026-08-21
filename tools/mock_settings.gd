@@ -9,7 +9,7 @@ extends SceneTree
 ##   godot --path . --script res://tools/mock_settings.gd -- b     the brief's compact utility page
 ##
 ## WHY THIS SCREEN AND NOT THE COUNTER. `tools/mock_bazaar.gd` put three proposals over a real frame and the
-## Bazaar in the game today came out of that round (docs/FEEL_GAP.md §the counter). Settings never went through
+## Bazaar in the game today came out of that round. Settings never went through
 ## it. The seven-rung menu matrix photographs the consequence: the two screens are the same game's two
 ## modals and they share nothing.
 ##

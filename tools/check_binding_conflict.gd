@@ -5,8 +5,8 @@ extends "res://tools/check_base.gd"
 ## without rendering, so the whole contract checks in milliseconds.
 ##   godot --headless --path . --script res://tools/check_binding_conflict.gd
 ##
-## WHY THIS FILE REPLACED A LONGER ONE. An earlier 371-line draft of this layer was written, cited in
-## `docs/MENU_MATRIX.md` as MNU-29a's "knockout-proven" evidence, and never registered: `git ls-files`
+## WHY THIS FILE REPLACED A LONGER ONE. An earlier 371-line draft of this layer was written, counted as
+## the "knockout-proven" evidence that the defect was closed, and never registered: `git ls-files`
 ## returned nothing for it and `run_harness.sh` never named it, so **it had never run once.** Reviewed, its
 ## centrepiece "no duplicate exists" assertion compared `Settings.binding_label`, which is `events[0]`,
 ## which is exactly the predicate the defect hides behind. Its knockout could only fire in the half of the
