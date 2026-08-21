@@ -352,6 +352,25 @@ add "check_prose (the comment register)" "res://tools/check_prose.sh"
 # a hook is not enough here: `--no-verify` is routine, and that is exactly the flag that skips it. A gate
 # whose only caller can be skipped by a flag is a gate that will be skipped. Instant, no engine.
 add "check_base_namespace (no layer shadows its base)" "res://tools/check_base_namespace.sh"
+
+# RE-DERIVED FROM A DIVERGENT LINE, 2026-08-21. Two of four static guards taken off a branch that had not
+# seen this runner in 66 commits. Merging that branch whole would have DELETED `check_prose`,
+# `check_exit_codes`, `check_lock` and `check_base_namespace`, all four of which postdate it -- which is why
+# the layers came across one at a time and its runner did not come across at all.
+#
+# The two that landed each gate a defect class this tree has hit and had no standing guard for, and each
+# carries its own control: `check_shared_constants` fails if its scan finds too few declarations, because a
+# scan that found nothing agrees with itself trivially, and `check_hash_mixing` ships fourteen controls
+# proving its judge fires both ways.
+#
+# The other two did not land and are recorded rather than dropped. `check_vacuous_assertions` reported two
+# findings here and BOTH were false: it reads a call to a helper whose empty-input path returns a passing
+# value, but cannot see the size guard and `quit(1)` standing above every such call site, so it flagged two
+# correct layers. A gate that cannot be trusted about its own hits cannot be registered, because the house
+# rule is that a red is never quieted. `check_mining_registry` failed four assertions describing material
+# data this tree does not have; that is a data divergence and belongs to the material comparison, not here.
+add "check_shared_constants (one value, many owners)" "res://tools/check_shared_constants.gd"
+add "check_hash_mixing (no lattices)"  "res://tools/check_hash_mixing.gd"
 add "check_binding_persistence (a boot may not re-duplicate)" "res://tools/check_binding_persistence.gd"
 add "check_row_identity (one row, one machine)" "res://tools/check_row_identity.gd"
 add "check_encoding (no mojibake)"     "res://tools/check_encoding.gd"
