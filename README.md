@@ -192,6 +192,15 @@ and a damaged slot falls back to the backup. The envelope is at version 2 and st
 bash tools/run_harness.sh
 ```
 
+On a clone that has just been made, the sweep comes back one short, and it is not a defect in the
+game. `check_trailers` asserts that this clone's `core.hooksPath` resolves to the tracked hooks in
+`.githooks/`, and that setting does not survive a `git clone` because nothing carries it: it is a
+property of your copy, not of the repository. Until you run the line the failure itself prints,
+`git config core.hooksPath .githooks`, the layer is correctly telling you the tracked hooks are not
+wired to anything. Run it once and that layer passes. Build machines set `CI`, where the layer stands
+that one assertion down and says so, because nothing commits from a build machine and the wiring
+would prove nothing there.
+
 The runner registers 107 layers, one script each, and launches each as its own Godot process, up to
 the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
 into roughly six kinds:
