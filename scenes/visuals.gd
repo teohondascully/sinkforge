@@ -1,55 +1,55 @@
 class_name Visuals
 extends RefCounted
 
-## Shared VISUAL VOCABULARY — the one place that maps game data to its on-screen look, so the world
+## Shared VISUAL VOCABULARY: the one place that maps game data to its on-screen look, so the world
 ## renderer and the HUD never drift apart (they used to each re-draw the same machine glyphs + item
 ## colours by hand). Pure presentation helpers: a machine's KIND/COLOUR, its silhouette GLYPH drawn on
-## any canvas at any scale, and an item's COLOUR. No state, no sim writes — static functions only.
+## any canvas at any scale, and an item's COLOUR. No state, no sim writes, and static functions only.
 
 # --- machines ----------------------------------------------------------------
 
-## THE MACHINE STYLE REGISTRY — the representation-side twin of FactorySim._BEHAVIORS: the ONE
+## THE MACHINE STYLE REGISTRY, the representation-side twin of FactorySim._BEHAVIORS: the ONE
 ## table wiring a behavior tag to its LOOK (glyph kind + casing colour), replacing two parallel
 ## if-ladders that had to be extended in lock-step. A def with no entry falls back on its recipe:
 ## a no-input source reads as a furnace, anything else as a gear (the generic runner). Adding a
 ## machine = one entry here (+ a drawer in draw_machine_glyph if its kind is genuinely new).
 const MACHINE_STYLE: Dictionary = {
-	&"drill": {"kind": "drill", "color": Color(0.72, 0.56, 0.30)},        # steel-amber — ore-extraction tech
-	&"lift": {"kind": "lift", "color": Color(0.26, 0.66, 0.62)},          # teal — anti-gravity tech
+	&"drill": {"kind": "drill", "color": Color(0.72, 0.56, 0.30)},        # steel-amber, ore-extraction tech
+	&"lift": {"kind": "lift", "color": Color(0.26, 0.66, 0.62)},          # teal, anti-gravity tech
 	&"splitter": {"kind": "fork", "color": Color(0.58, 0.42, 0.78)},
-	&"generator": {"kind": "generator", "color": Color(0.80, 0.66, 0.26)},# electric gold — burns fuel → power
-	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper — the power-tube material
-	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal — a storage bin
-	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan — the placeable climb
-	&"torch": {"kind": "torch", "color": Color(0.86, 0.60, 0.26)},        # flame amber — placeable light
-	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze — the gate-breacher
-	# The L2 crafter modules: recipe-runners wearing their OWN faces — the behavior
+	&"generator": {"kind": "generator", "color": Color(0.80, 0.66, 0.26)},# electric gold: burns fuel → power
+	&"conduit": {"kind": "conduit", "color": Color(0.66, 0.47, 0.30)},    # copper, the power-tube material
+	&"hopper": {"kind": "hopper", "color": Color(0.40, 0.44, 0.52)},      # cool gunmetal: a storage bin
+	&"rope": {"kind": "rope", "color": Color(0.62, 0.50, 0.32)},          # hemp tan, the placeable climb
+	&"torch": {"kind": "torch", "color": Color(0.86, 0.60, 0.26)},        # flame amber, placeable light
+	&"descent": {"kind": "descent", "color": Color(0.38, 0.26, 0.44)},   # seal-purple bronze: the gate-breacher
+	# The L2 crafter modules: recipe-runners wearing their OWN faces, and the behavior
 	# tags have no _BEHAVIORS entry (they fall through to the recipe runner), they exist so each module
 	# visibly announces its one product (per-item legibility, the modules' whole point).
-	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace — smelts iron
-	&"blast_furnace": {"kind": "furnace", "color": Color(0.82, 0.60, 0.28)}, # white-gold heat — 1 rich ore → 2 ingots (#48)
-	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey — presses plates
-	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze — mills gears
-	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel — the sideways Borer
-	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue — the powered flood-drain (L3)
-	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal — powered, heavy
-	&"crush": {"kind": "crush", "color": Color(0.38, 0.33, 0.30)},        # crusher iron — spoil in, gravel out
-	&"spur": {"kind": "spur", "color": Color(0.66, 0.53, 0.32)},          # the Head's own amber — it IS the Head
+	&"iron_forge": {"kind": "furnace", "color": Color(0.40, 0.48, 0.62)}, # steel-blue furnace, smelts iron
+	&"blast_furnace": {"kind": "furnace", "color": Color(0.82, 0.60, 0.28)}, # white-gold heat: 1 rich ore → 2 ingots (#48)
+	&"plate_press": {"kind": "press", "color": Color(0.52, 0.57, 0.68)},  # slab-grey, presses plates
+	&"gear_mill": {"kind": "gear", "color": Color(0.72, 0.56, 0.26)},     # bronze, mills gears
+	&"h_drill": {"kind": "h_drill", "color": Color(0.56, 0.46, 0.32)},    # earth-steel: the sideways Borer
+	&"pump": {"kind": "pump", "color": Color(0.30, 0.52, 0.68)},          # water-blue, the powered flood-drain (L3)
+	&"drift": {"kind": "drift", "color": Color(0.29, 0.36, 0.38)},        # dark gunmetal-teal: powered, heavy
+	&"crush": {"kind": "crush", "color": Color(0.38, 0.33, 0.30)},        # crusher iron: spoil in, gravel out
+	&"spur": {"kind": "spur", "color": Color(0.66, 0.53, 0.32)},          # the Head's own amber; it IS the Head
 	# THE ORE VENT IS NOT A FURNACE, and until this entry existed it was drawn as one. `machine_kind` treats
 	# "a recipe with empty inputs" as a furnace, which is true of the base Forge and false of every SOURCE --
 	# a vent takes nothing in because it draws ore out of the ground, not because it smelts. It shipped with
 	# the Forge's sooty casing and a fire glyph. Cosmetic tag only: `&"ore_vent"` has no `_BEHAVIORS` entry,
 	# so the sim still falls through to the recipe runner exactly as it did with no behavior at all.
-	&"ore_vent": {"kind": "vent", "color": Color(0.24, 0.27, 0.31)},      # cold basalt — a hole in dark rock
+	&"ore_vent": {"kind": "vent", "color": Color(0.24, 0.27, 0.31)},      # cold basalt, a hole in dark rock
 }
 
 
-## THE STATUS VOCABULARY — what each of `FactorySim.machine_status`'s answers looks like on the machine.
+## THE STATUS VOCABULARY: what each of `FactorySim.machine_status`'s answers looks like on the machine.
 ##
 ## THIS EXISTS BECAUSE THE RENDERER ONLY KNEW HALF OF THEM. The sim returns ten statuses; the status lamp
 ## matched on five and let the rest fall through to the grey "idle" default. So a drill whose ore had no
 ## drain below it, a rig with a jammed spoil column, an unpowered crusher and a Spur wired to nothing all
-## displayed the one colour that means "nothing is wrong here" — and then fell through to the need bubble,
+## displayed the one colour that means "nothing is wrong here", and then fell through to the need bubble,
 ## which defaults to ore, and told you to feed ore to a machine whose actual problem was that it had no
 ## power. A silent wrong state is worse than a missing one: it sends you to fix something that isn't broken.
 ##
@@ -61,9 +61,9 @@ const MACHINE_STYLE: Dictionary = {
 ##          detail is the first thing a four-pixel mark loses.
 ##   fix    what the player would have to DO about it. This is the field with a rule attached: two statuses
 ##          calling for different fixes must never share a mark, or the lamp sends you to the wrong job.
-##          Two statuses calling for the SAME fix are welcome to share one — `no_fuel` and `no_input` are
+##          Two statuses calling for the SAME fix are welcome to share one; `no_fuel` and `no_input` are
 ##          both "put something in", and which something is what the need bubble is for.
-##   feeds  whether the floating need bubble — which can only draw an ITEM — is capable of telling the
+##   feeds  whether the floating need bubble, which can only draw an ITEM, is capable of telling the
 ##          truth about this status. False for power, jams and wiring, where it would have to invent one.
 ##
 ## The three `blocked*` states deliberately look identical: the lamp's job is to name the KIND of problem,
@@ -84,20 +84,20 @@ const STATUS_LOOK: Dictionary = {
 
 ## The look of a status, falling back on idle's neutral bar for anything the table has not heard of. The
 ## fallback is a safety net and not a licence: `check_status_reads` walks the sim's own source and fails if
-## any status it can return is missing here, so a new one is caught at the harness rather than in play.
+## any status it can return is missing here, so a new one is caught by the tests rather than in play.
 static func status_look(status: StringName) -> Dictionary:
 	return STATUS_LOOK.get(status, STATUS_LOOK[&"idle"])
 
 
-## Draw a status lamp's MARK — the geometry half of the redundant coding, centred at `c` with radius `r`.
+## Draw a status lamp's MARK, the geometry half of the redundant coding, centred at `c` with radius `r`.
 ##
-##   ● disc    a full disc — complete and running
+##   ● disc    a full disc: complete and running
 ##   ▬ bar     a bar at rest
 ##   ○ ring    hollow, because the machine is fine and the vein is empty
 ##   ▲ feed    pointing UP, at the need bubble it is asking for
-##   ◆ power   a diamond — the power motif, and the one mark that is neither round nor square
+##   ◆ power   a diamond: the power motif, and the one mark that is neither round nor square
 ##   ■ clear   a hard stop: something behind this machine is jammed
-##   ✕ link    a cross — placed, but joined to nothing
+##   ✕ link    a cross: placed, but joined to nothing
 static func draw_status_mark(canvas: CanvasItem, c: Vector2, r: float, mark: StringName,
 		col: Color) -> void:
 	match mark:
@@ -122,22 +122,22 @@ static func draw_status_mark(canvas: CanvasItem, c: Vector2, r: float, mark: Str
 			canvas.draw_circle(c, r, col)
 
 
-## THE NEED BUBBLE'S OTHER VOCABULARY — what to draw when the answer is not an item.
+## THE NEED BUBBLE'S OTHER VOCABULARY: what to draw when the answer is not an item.
 ##
 ## The bubble floats above a stalled machine holding up WHAT IT NEEDS, and it could only ever draw an item
 ## glyph. That is fine for the two statuses whose answer is a thing you carry, and useless for the three
 ## whose answer is a job: no power, a jammed column, a Spur wired to nothing. Those used to reach the bubble
-## anyway and float an ORE icon over all of them, which is why they now stop at the lamp — correct, and
+## anyway and float an ORE icon over all of them, which is why they now stop at the lamp. Correct, and
 ## quieter than they should be, because the lamp names the KIND of problem and the bubble is where the
 ## specific one belongs.
 ##
 ## So the three jobs get glyphs. They are deliberately not items: an item glyph says "fetch me this" and
 ## these say "go do this", and the difference has to survive being 11px across.
 ##
-##   power   a bolt — the same motif as the lamp's diamond and the conduit's channel
+##   power   a bolt: the same motif as the lamp's diamond and the conduit's channel
 ##   clear   a chevron driving DOWN into a bar: the drain is dug below the machine, which is where a jam is
 ##           always cleared from. It points at the answer's location, not just at its existence.
-##   link    two links with a gap between them — the one shape that means "connected" when it is closed
+##   link    two links with a gap between them, the one shape that means "connected" when it is closed
 static func draw_fix_glyph(canvas: CanvasItem, c: Vector2, size: float, fix: StringName,
 		col: Color) -> void:
 	var u: float = size * 0.5
@@ -165,8 +165,8 @@ static func draw_fix_glyph(canvas: CanvasItem, c: Vector2, size: float, fix: Str
 static func machine_kind(def: MachineDef) -> String:
 	if MACHINE_STYLE.has(def.behavior):
 		return (MACHINE_STYLE[def.behavior] as Dictionary)["kind"]
-	# The base Forge (processor) SMELTS ore→ingot — it's a furnace with fire, not a generic cool runner.
-	# (Classing it "gear" made it glow cold cyan and spill over the starter ore — the blind-playtest bug.)
+	# The base Forge (processor) SMELTS ore→ingot. It is a furnace with fire, not a generic cool runner.
+	# (Classing it "gear" made it glow cold cyan and spill over the starter ore: the bug a blind run found.)
 	if def.id == &"processor" or (def.recipe != null and def.recipe.inputs.is_empty()):
 		return "furnace"
 	return "gear"
@@ -178,16 +178,16 @@ static func machine_color(def: MachineDef) -> Color:
 		return (MACHINE_STYLE[def.behavior] as Dictionary)["color"]
 	var recipe: RecipeDef = def.recipe
 	if def.id == &"processor" or (recipe != null and recipe.inputs.is_empty()):
-		return Color(0.28, 0.23, 0.20)   # dark sooty IRON — a furnace is a dark machine; the heat is in the
+		return Color(0.28, 0.23, 0.20)   # dark sooty IRON: a furnace is a dark machine; the heat is in the
 		#                                  glowing MOUTH (see _furnace), lit only while smelting. The old
-		#                                  ember-orange body out-shouted the avatar + ore (blind-playtest).
-	return Color(0.30, 0.55, 0.75)       # steel-blue — the generic processor
+		#                                  ember-orange body out-shouted the avatar + ore (found by a blind run).
+	return Color(0.30, 0.55, 0.75)       # steel-blue, the generic processor
 
 
-## THE CASING — the body a machine is built out of, as opposed to the glyph painted on its front.
+## THE CASING: the body a machine is built out of, as opposed to the glyph painted on its front.
 ##
 ## COMPREHENSIVE_AUDIT §194 says the machines read as UI rather than hardware, and the casing is the whole
-## reason. It was a flat `draw_rect` of one colour, a dark 1.5px border, and four black dots for bolts —
+## reason. It was a flat `draw_rect` of one colour, a dark 1.5px border, and four black dots for bolts,
 ## which is, exactly and not approximately, how you draw a BUTTON. Every machine in the game was the same
 ## 30x30 flat square in a different hue with an icon on it. Hue and icon are how a toolbar distinguishes its
 ## entries; they are not how a world distinguishes its objects.
@@ -205,49 +205,49 @@ static func machine_color(def: MachineDef) -> Color:
 ##   PLINTH.         A darker band across the foot, so the machine is BOLTED DOWN to the floor rather than
 ##                   pasted onto it. Paired with the contact shadow the renderer already drew.
 ##
-## WHY THE DETAIL TIER EXISTS. Rivets, vents and a recessed faceplate are what actually sell sheet metal —
+## WHY THE DETAIL TIER EXISTS. Rivets, vents and a recessed faceplate are what actually sell sheet metal,
 ## and at the locked 0.50x play zoom a 32px cell is 16 screen pixels, where a 1px rivet is half a pixel of
 ## grey mush and a vent slot is nothing at all. Detail below the pixel grid is not subtle, it is a cost with
 ## no image attached. So the fine work draws only when it is resolvable, and the cheap tier carries the
 ## whole load at play zoom, which is right on both counts: shading and silhouette are what read when small,
 ## and they are also the part that fits in the frame budget on a mature base.
-## COLD IRON — how far an idle machine falls away from its working colour. `PC-05`: *"give installed
+## COLD IRON: how far an idle machine falls away from its working colour. `PC-05`: *"give installed
 ## machines a visible active/idle distinction"*, guarded by *"causality survives labels hidden and
 ## grayscale."*
 ##
-## **THE DISTINCTION IS SUBTRACTED FROM IDLE RATHER THAN ADDED TO WORKING, and that direction is the whole
-## design.** The obvious move is to brighten a running machine — and this file already records that A/B
+## THE DISTINCTION IS SUBTRACTED FROM IDLE RATHER THAN ADDED TO WORKING, and that direction is the whole
+## design. The obvious move is to brighten a running machine, and this file already records that A/B
 ## being decisive against it: a broad pale wash lifted the body's mid-value until it met the glyph painted
 ## on top of it, and the Drift Rig's white rails stopped separating from their own casing. *"Legibility
 ## outranks the look, and the glyph is the part that has to be read."* Taking value AWAY from the idle
-## state leaves the working state — the one a player spends their time looking at, and the one every
-## glyph in the vocabulary was drawn against — **byte-identical**.
+## state leaves the working state (the one a player spends their time looking at, and the one every
+## glyph in the vocabulary was drawn against) byte-identical.
 ##
 ## MEASURED, NOT CHOSEN BY EYE. `check_machine_state` photographs each machine working and stopped with
 ## its label, badge and status lamp suppressed, converts to Rec.709 luma, and separates the state
 ## difference from what the animation contributes on its own. Before this, the Drill's state difference
-## was 14.4 levels against a 7.6-level motion baseline — **a still frame of a running drill and a stopped
-## one were the same picture with the gear at a different angle.**
+## was 14.4 levels against a 7.6-level motion baseline. A still frame of a running drill and a stopped
+## one were the same picture with the gear at a different angle.
 const COLD_DARKEN: float = 0.22       ## how much value an idle casing gives up
 const COLD_DESAT: float = 0.18        ## ...and how far it drifts toward grey, so it reads cold not shadowed
 
-## THE PROFILE — the shape a machine's body actually occupies inside its cell.
+## THE PROFILE: the shape a machine's body actually occupies inside its cell.
 ##
 ## `PC-01`: *"make the machine silhouette carry more identity than its label."* The header above already
-## quotes the audit finding — *"the same 30x30 flat square in a different hue with an icon on it"* — and the
+## quotes the audit finding, *"the same 30x30 flat square in a different hue with an icon on it"*, and the
 ## lighting model that answered it made the square read as an OBJECT without making it read as a PARTICULAR
 ## object. Measured with the glyphs off, the light pools off and every body painted one grey
 ## (`check_machine_identity`), 171 of 190 machine pairs occupied the same cell pixels to within 3%. The only
 ## machine with its own outline was the Spur, and only because a Head deliberately draws no casing at all.
 ##
 ## SO THE BODIES ARE BUILT FROM RECTANGLES AND NOT FROM A POLYGON, and that is a decision about pixels
-## rather than about convenience. The play zoom is 0.50x, so a 32px cell is **16 screen pixels**: a
+## rather than about convenience. The play zoom is 0.50x, so a 32px cell is 16 screen pixels: a
 ## diagonal is four grey steps, a curve is a smudge, and both cost their legibility to antialiasing before
 ## they cost it to distance. Stacked rectangles of decreasing width ARE how pixel art draws a dome, a
 ## funnel and a ziggurat, and every seam between two of them lands on the pixel grid.
 ##
 ## Each entry is in UNIT SPACE (0..1 across the cell, y down) so the profiles survive any cell size, and
-## every one of them keeps a FLAT FOOT at y=1.0 — the plinth and the contact shadow are what bolt a machine
+## every one of them keeps a FLAT FOOT at y=1.0, because the plinth and the contact shadow are what bolt a machine
 ## to the floor, and a body that floats loses more than a silhouette gains.
 ##
 ## A kind with no entry keeps the full square. That is the honest default for the placeables (torch, rope,
@@ -256,23 +256,23 @@ const COLD_DESAT: float = 0.18        ## ...and how far it drifts toward grey, s
 ##
 ## That version measured better and looked worse, which is the whole reason this comment is long. Splitting
 ## each machine into two and three sub-bodies took `check_machine_identity`'s mean pair difference from
-## 0.093 to 0.352 — a real, large, correctly-measured gain — and the side-by-side capture at play zoom was
-## unambiguous in the other direction: the machines read as **broken**, not as different. Each part carried
+## 0.093 to 0.352, a real and correctly-measured gain, and the side-by-side capture at play zoom was
+## unambiguous in the other direction: the machines read as broken, not as different. Each part carried
 ## its own bevel and its own outline, so a 32px cell filled with internal seams; the glyph shrank to fit the
 ## largest surviving part and clipped; and the solid block of registry colour that made a machine read as
-## ONE object at 16 screen pixels was gone. **The gauge went green while the subject got worse**, which is
+## ONE object at 16 screen pixels was gone. The gauge went green while the subject got worse, which is
 ## the exact failure this repository has spent the day cataloguing, arriving through a door I built myself.
 ##
-## So the body is one rectangle — full width, from the crown line to the foot — and identity lives in the
+## So the body is one rectangle (full width, from the crown line to the foot) and identity lives in the
 ## TOP BAND, which is the only part of a machine's outline that has sky behind it. A chimney, a pair of
 ## gantry posts, three crusher teeth, a hopper's flange: each is one small addition against the background
 ## rather than a subtraction from the mass. The glyph keeps its size and sits on solid metal.
 ##
 ## Rectangles, not polygons, and that is a decision about pixels rather than convenience. Play zoom is
-## 0.50x, so a 32px cell is **16 screen pixels**: a diagonal is four grey steps and a curve is a smudge.
+## 0.50x, so a 32px cell is 16 screen pixels: a diagonal is four grey steps and a curve is a smudge.
 ## Stacked rectangles of decreasing width ARE how pixel art draws a dome, and every seam lands on the grid.
 ##
-## Unit space (0..1 across the cell, y down). Every profile keeps a FLAT FOOT at y=1.0 — the plinth and the
+## Unit space (0..1 across the cell, y down). Every profile keeps a FLAT FOOT at y=1.0: the plinth and the
 ## contact shadow are what bolt a machine to the floor, and a body that floats loses more than it gains.
 ## A kind with no entry keeps the full square, which is the honest default for the placeables (torch, rope,
 ## conduit) whose in-world drawing is not this function at all.
@@ -285,13 +285,13 @@ const MACHINE_PROFILE: Dictionary = {
 	# A GENERATOR IS A DRUM: a domed cap, which at this size is one rectangle narrower than the body.
 	# Wide and LOW, deliberately: a tall centred cap put it 0.038 from the Descent Engine's stepped one.
 	"generator": [BODY, Rect2(0.14, 0.09, 0.72, 0.13)],
-	# A DRILL IS SLUNG BETWEEN TWO MOUNTS. Two short posts with a gap — the machine hangs in its frame.
+	# A DRILL IS SLUNG BETWEEN TWO MOUNTS. Two short posts with a gap, so the machine hangs in its frame.
 	"drill": [BODY, Rect2(0.06, 0.02, 0.24, 0.20), Rect2(0.70, 0.02, 0.24, 0.20)],
 	# THE BORER IS THE DRILL TURNED SIDEWAYS and its crown says so: one mount, hard against the left.
 	"h_drill": [BODY, Rect2(0.02, 0.02, 0.34, 0.20)],
 	# A HOPPER IS A MOUTH. A full-width flange overhanging the body: goods land ON this.
 	"hopper": [BODY, Rect2(0.0, 0.0, 1.0, 0.14)],
-	# A LIFT IS A GANTRY — two tall posts, taller and thinner than the drill's mounts, open between them.
+	# A LIFT IS A GANTRY: two tall posts, taller and thinner than the drill's mounts, open between them.
 	"lift": [BODY, Rect2(0.08, 0.0, 0.18, 0.22), Rect2(0.74, 0.0, 0.18, 0.22)],
 	# A SPLITTER TAKES ONE INLET. A single central stack over a body that fans out below it.
 	"fork": [BODY, Rect2(0.36, 0.0, 0.28, 0.22)],
@@ -306,14 +306,14 @@ const MACHINE_PROFILE: Dictionary = {
 	# A PUMP HAS A SPOUT, and it leaves to one side.
 	"pump": [BODY, Rect2(0.62, 0.06, 0.34, 0.16)],
 	# THE DRIFT RIG IS A FRAME, NOT A LID. Its crown was one full-width canopy and measured 0.028 from the
-	# Hopper's flange — two machines that do nothing alike wearing the same outline. Two brackets with the
+	# Hopper's flange, two machines that do nothing alike wearing the same outline. Two brackets with the
 	# sky between them reads as a rig and cannot be confused with a mouth.
 	"drift": [BODY, Rect2(0.0, 0.02, 0.32, 0.16), Rect2(0.68, 0.02, 0.32, 0.16)],
-	# THE DESCENT ENGINE IS AN ALTAR — the one machine in the game that is a GATE. A stepped cap, narrower
+	# THE DESCENT ENGINE IS AN ALTAR, the one machine in the game that is a GATE. A stepped cap, narrower
 	# than the generator's dome and taller, so the two are not the same object at a glance.
 	"descent": [BODY, Rect2(0.34, 0.0, 0.32, 0.22), Rect2(0.14, 0.12, 0.72, 0.10)],
 	# THE THREE PLACEABLES. `draw_machine_casing` is not how a rope, a torch or a conduit is drawn in the
-	# world — each has its own draw — but `place_machine` accepts their defs, the ghost preview reaches
+	# world (each has its own draw) but `place_machine` accepts their defs, the ghost preview reaches
 	# them, and with no entry here all three were the same full square and scored 0.003 from each other.
 	# A default that is wrong for three of twenty registry entries is a default worth overriding.
 	"rope": [Rect2(0.38, 0.0, 0.24, 1.0)],
@@ -325,23 +325,23 @@ const FULL_PROFILE: Array = [Rect2(0.0, 0.0, 1.0, 1.0)]
 ## WHERE THE GLYPH, THE BADGE, THE BAR AND THE PORTS BELONG once the body no longer fills the cell.
 ##
 ## Everything that used to be positioned against the CELL is now positioned against the FACE, and the
-## reason is a picture: with the profiles in and nothing else changed, the Forge's input port — an orange
-## wedge marking where ore drops in — hung in the empty air above the chimney, and the Ore Vent's progress
-## bar ran across rock beside its foot. **A cue anchored to a rectangle the machine no longer occupies is a
-## cue pointing at nothing**, and it is the exact cost of carving a silhouette out of a full square.
+## reason is a picture: with the profiles in and nothing else changed, the Forge's input port, an orange
+## wedge marking where ore drops in, hung in the empty air above the chimney, and the Ore Vent's progress
+## bar ran across rock beside its foot. A cue anchored to a rectangle the machine no longer occupies is a
+## cue pointing at nothing, and it is the exact cost of carving a silhouette out of a full square.
 ##
 ## The default is the largest part by area, which is right for eleven of the thirteen. `lift` is the
 ## exception the default gets wrong: its two gantry posts are each fractionally larger than the base beam
 ## they stand on, so the glyph would ride up one leg. `check_casing_light` asserts every face here is
 ## contained in one of its kind's own parts, so this table cannot drift away from the profile above it.
 ## Empty on purpose, and kept because the moment a profile stops being "one body plus a crown" the default
-## stops being right. The default is the largest part by area, which for every entry above is `BODY` — so
+## stops being right. The default is the largest part by area, which for every entry above is `BODY`, so
 ## the glyph, the badge, the bar and the ports all sit on the same solid rectangle they always sat on,
 ## three pixels lower than the cell's centre and never on a crown.
 const MACHINE_FACE: Dictionary = {}
 
 
-## The body rectangles for a kind, in unit space. Never empty — an unknown kind is a full square, which is
+## The body rectangles for a kind, in unit space. Never empty: an unknown kind is a full square, which is
 ## what every machine was before this existed.
 static func machine_profile(kind: String) -> Array:
 	return MACHINE_PROFILE.get(kind, FULL_PROFILE)
@@ -393,13 +393,13 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 		# --- the light: A THIN CATCH AND A DEEP SHADOW, not a wash --------------------
 		# The first version of this lit the top THIRD with a broad pale wash, and the A/B was decisive
 		# against it: the body's mid-value climbed until it met the glyph painted on top of it, and the
-		# Drift Rig's white rails stopped separating from their own casing. Under a torch — where the world
-		# light is already multiplying everything — it read as a blown-out cream tile, which is a worse UI
+		# Drift Rig's white rails stopped separating from their own casing. Under a torch, where the world
+		# light is already multiplying everything, it read as a blown-out cream tile, which is a worse UI
 		# tile than the flat one it replaced. LEGIBILITY OUTRANKS THE LOOK, and the glyph has to be read.
 		#
 		# So the light is where light actually is on a 32px object: a couple of pixels catching it along
 		# the top, and a real shadow across the foot. The body keeps its registry colour in the middle,
-		# which is the value every glyph in the vocabulary was drawn against. Per PART, now — a stepped
+		# which is the value every glyph in the vocabulary was drawn against. Per PART, now: a stepped
 		# dome whose steps are unlit is a stack of flat cards, and the step edges are the whole shape.
 		canvas.draw_rect(Rect2(body.position, Vector2(body.size.x, minf(3.0, body.size.y))),
 			Color(1.0, 0.98, 0.92, 0.07))
@@ -426,8 +426,8 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 			continue
 		# --- the tier that only exists when you can see it ----------------------------
 		# A RECESSED FACEPLATE: the glyph sits in a panel sunk into the body, which is why it reads as
-		# stamped into the machine instead of stickered onto it. The bevel runs the OTHER WAY here — dark
-		# on top, light on the bottom — because that inversion is the only thing that distinguishes a hole
+		# stamped into the machine instead of stickered onto it. The bevel runs the OTHER WAY here, dark
+		# on top and light on the bottom, because that inversion is the only thing that distinguishes a hole
 		# from a bump.
 		#
 		# The plate also does legibility work, and it is the reason the number here is 0.26 and not the
@@ -452,7 +452,7 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 				body.position.y + body.size.y - 6.0, 2.0, 3.0), Color(0.0, 0.0, 0.02, 0.42))
 
 		# RIVETS: a dark seat with a lit crown offset up-left, toward the same sun the bevel assumes. A
-		# rivet drawn as a single black dot — which is what shipped — is a hole, not a fastener.
+		# rivet drawn as a single black dot (which is what shipped) is a hole, not a fastener.
 		if body.size.x >= 10.0 and body.size.y >= 10.0:
 			for corner: Vector2 in [Vector2(3.0, 3.0), Vector2(body.size.x - 3.0, 3.0),
 					Vector2(3.0, body.size.y - 3.0), Vector2(body.size.x - 3.0, body.size.y - 3.0)]:
@@ -465,7 +465,7 @@ static func draw_machine_casing(canvas: CanvasItem, pos: Vector2, cell_px: float
 
 
 ## An idle casing: value gone and the hue pulled toward grey. Both, because darkening alone reads as a
-## machine standing in shadow — which is a fact about the lighting, not about the machine — while
+## machine standing in shadow, which is a fact about the lighting rather than about the machine, while
 ## desaturation alone reads as a different material. Together they read as switched off.
 static func _cold_iron(c: Color) -> Color:
 	var grey: float = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
@@ -473,7 +473,7 @@ static func _cold_iron(c: Color) -> Color:
 
 
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,
-## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation — a gear
+## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation: a gear
 ## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.
 ## `flip` mirrors DIRECTIONAL glyphs (the Borer bores left when its machine faces -1); others ignore it.
 static func draw_machine_glyph(canvas: CanvasItem, center: Vector2, kind: String, s: float,
@@ -529,13 +529,13 @@ static func _furnace(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 		canvas.draw_circle(ember, 3.4 * s * (0.85 + 0.25 * p), Color(1.0, 0.55, 0.18).lightened(0.18 * p))
 		canvas.draw_circle(ember, 1.7 * s * (0.85 + 0.25 * p), Color(1.0, 0.90, 0.55))
 	else:
-		# COLD: a dead dark coal bed in the mouth — no glow, so an UNLIT forge reads as an off machine
+		# COLD: a dead dark coal bed in the mouth. No glow, so an UNLIT forge reads as an off machine
 		# (light = working). The idle spawn forges no longer out-shout the avatar + ore.
 		canvas.draw_circle(ember, 2.8 * s, Color(0.30, 0.15, 0.11))
 		canvas.draw_circle(ember, 1.3 * s, Color(0.40, 0.21, 0.15))
 
 
-## Gear (processor): a cogged dark disc with a bright hub. ROTATES while running — the "machine is on" read.
+## Gear (processor): a cogged dark disc with a bright hub. ROTATES while running, which is the "machine is on" read.
 static func _gear(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var gear := Color(0.10, 0.13, 0.18)
 	var spin: float = t * 2.6 if active else 0.0
@@ -547,7 +547,7 @@ static func _gear(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 	canvas.draw_circle(c, 2.6 * s, hub.lightened(0.25) if active else hub)
 
 
-## Lift: stacked UP-chevrons. They MARCH upward while carrying — the goods-go-up read.
+## Lift: stacked UP-chevrons. They MARCH upward while carrying: the goods-go-up read.
 static func _lift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var up := Color(0.85, 1.0, 0.95)
 	var rise: float = (fmod(t * 9.0, 7.0) if active else 0.0) * s
@@ -560,7 +560,7 @@ static func _lift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 
 
 ## Drill: a boxy housing over a downward-pointing bit with helical flutes. The bit BOBS down and the
-## flutes MARCH while boring — the "it's chewing into the rock below" read (mirrors what _run_drill does).
+## flutes MARCH while boring, the "it's chewing into the rock below" read (mirrors what _run_drill does).
 ## Ore Vent (an ore SOURCE): a fissure in rock with a lintel over it, and ore rising out of the dark on the
 ## draught while it is producing. Deliberately NOT a fire and NOT a bit -- the two things it kept being
 ## mistaken for. A furnace's light comes from inside its mouth and stays there; a vent's mouth is unlit and
@@ -617,31 +617,31 @@ static func _drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 			canvas.draw_line(Vector2(c.x - 3.0 * s, fy), Vector2(c.x + 3.0 * s, fy - 1.4 * s), edge, 1.0)
 
 
-## THE COLLAR — a Drill Head bolted to the rock, boring INTO THE BACKGROUND (`docs/LODE.md` §5).
+## THE COLLAR: a Drill Head bolted to the rock, boring INTO THE BACKGROUND (`docs/LODE.md` §5).
 ##
 ## This machine works along an axis the game does not have. Sinkforge is a side view: X and Y are the whole
-## world, and a Head bores along Z, into the screen. The old drill glyph — a motor block with a tapering bit
-## pointing DOWN and flutes marching downward — said "I bore downward through solid rock" as clearly as a
+## world, and a Head bores along Z, into the screen. The old drill glyph (a motor block with a tapering bit
+## pointing DOWN and flutes marching downward) said "I bore downward through solid rock" as clearly as a
 ## glyph can, and once ore moved to the background plane that became a lie the player would believe.
 ##
 ## Four cues, all flat, none of them a perspective axis borrowed from a different game:
 ##   FORESHORTENING.  A bit pointing at you is a CIRCLE, not a shaft. The bore reads as a dark socket with a
-##                    lit rim — the universal "hole going away from you".
+##                    lit rim, the universal "hole going away from you".
 ##   SCALE, NOT BOB.  The judder pulses the socket's SIZE. Things moving toward the viewer grow; things
 ##                    moving along the plane slide. Swapping translation for scale is the whole axis flip.
-##   RADIAL SPOIL.    Dust leaves the hole in every direction rather than falling one way — it is coming OUT
+##   RADIAL SPOIL.    Dust leaves the hole in every direction rather than falling one way. It is coming OUT
 ##                    at you, which only makes sense if the hole faces you.
 ##   A FRAME, NOT A FILL. Rails and a bracket, open in the middle, so the vein it is eating shows straight
-##                    through the machine. A machine that sits on a resource must never hide it — and since
+##                    through the machine. A machine that sits on a resource must never hide it, and since
 ##                    the fleck field thins as the deposit drains, the Head becomes a gauge for free.
 ##
 ## And the socket WIDENS as the vein goes (`fill` 1 → 0), so the machine and the flecks tell the same story
 ## from opposite ends: the metal thins out while the hole eats outward.
-## THE SPUR — the Collar's smaller sibling, and drawn to say so.
+## THE SPUR: the Collar's smaller sibling, and drawn to say so.
 ##
 ## It reads as the same machine wearing less of it: the same amber frame, the same dark bore, the same
 ## inverted value relationship that lets a frame survive being seen against dark rock. What it does NOT have
-## is a chute, and that absence is the whole sentence — a Spur's haul does not leave here, it leaves at the
+## is a chute, and that absence is the whole sentence. A Spur's haul does not leave here, it leaves at the
 ## Head. What it has instead is a LINK ARM reaching out of one side toward whatever it is chained to, so a
 ## line of them reads as one machine with several mouths rather than as several machines that happen to be
 ## adjacent. Unlinked, the arm reaches into nothing and the bore goes cold, which is what being unlinked is.
@@ -679,7 +679,7 @@ static func _collar(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 	# THE FRAME CARRIES ITS OWN CONTRAST. Every other machine draws near-black steel on top of an opaque
 	# machine-coloured casing, and the casing is what makes the dark glyph read. Dropping the casing to show
 	# the vein through it (which is the whole point) also dropped that contrast, and the first cut of this
-	# vanished into dark rock entirely — only the bore ring survived. So the value relationship inverts: the
+	# vanished into dark rock entirely; only the bore ring survived. So the value relationship inverts: the
 	# frame is the LIGHT part now, and the bore is the dark one.
 	var steel := Color(0.66, 0.53, 0.32)
 	var edge := Color(0.90, 0.80, 0.56)
@@ -712,7 +712,7 @@ static func _collar(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 		shade, 1.4 * s)                                        # the open mouth of the chute, in shadow
 	if not active:
 		return
-	# Spoil, thrown OUT of the hole in every direction — the cue that the hole faces the viewer.
+	# Spoil, thrown OUT of the hole in every direction, the cue that the hole faces the viewer.
 	for k: int in 5:
 		var ang: float = float(k) * TAU / 5.0 + t * 0.7
 		var phase: float = fmod(t * 1.9 + float(k) * 0.2, 1.0)
@@ -721,7 +721,7 @@ static func _collar(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 			Color(0.72, 0.66, 0.56, 0.55 * (1.0 - phase)))
 
 
-## The Borer (horizontal drill): the vertical drill's cousin turned on its side — a motor block with a
+## The Borer (horizontal drill): the vertical drill's cousin turned on its side: a motor block with a
 ## tapering bit pointing along its FACING (flip mirrors it), flutes scrolling forward + a judder while
 ## it chews, and a little coal-fire dot for its self-feeding bunker.
 static func _h_drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, flip: bool) -> void:
@@ -746,9 +746,9 @@ static func _h_drill(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 	canvas.draw_circle(c + Vector2(-4.5 * s * f, 4.0 * s), 1.6 * s, Color(1.0, 0.55, 0.18, 0.4 + 0.5 * fire))
 
 
-## THE DRIFT RIG: a squat powered gallery machine. It reads as the Borer's bigger sibling on purpose — same
-## facing, same forward judder — but with the two things that make it a different machine drawn where you can
-## see them: a TWO-HIGH cutting head (the walkable gallery it leaves) and a SORTER — two chutes under the
+## THE DRIFT RIG: a squat powered gallery machine. It reads as the Borer's bigger sibling on purpose (same
+## facing, same forward judder) but with the two things that make it a different machine drawn where you can
+## see them: a TWO-HIGH cutting head (the walkable gallery it leaves) and a SORTER, two chutes under the
 ## body, one pointing down for pay and one pointing back for spoil, with a divider between them. Its power is
 ## an arc across the head rather than a fire, because it eats a network and not a coal box.
 static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float, flip: bool) -> void:
@@ -759,11 +759,11 @@ static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 	var spoil := Color(0.60, 0.60, 0.62)    # ...and the rock chute wears ROCK's. That IS the machine.
 	var bob: float = (sin(t * 11.0) * 1.2 if active else 0.0) * s
 	# The body: one dark block with its mass to the rear, so the bright bar at the face has something to
-	# read against. At 32 world pixels a machine gets two shapes and a colour — no more.
+	# read against. At 32 world pixels a machine gets two shapes and a colour. No more.
 	var bx: float = (c.x - 10.0 * s) if f > 0.0 else (c.x - 2.0 * s)
 	canvas.draw_rect(Rect2(bx, c.y - 8.0 * s, 12.0 * s, 17.0 * s), steel)
 	# THE CUTTER BAR: ONE bright bar spanning the full height of the face, with four teeth biting forward
-	# off it. Two small drums read as a single arrow at world scale — the full-height bar is the only way
+	# off it. Two small drums read as a single arrow at world scale; the full-height bar is the only way
 	# "it cuts two cells high" survives to 32 pixels, and the teeth are what make it a cutter not a mast.
 	var bar: float = c.x + (5.0 * s + bob) * f
 	canvas.draw_line(Vector2(bar, c.y - 11.0 * s), Vector2(bar, c.y + 10.0 * s), edge, 3.2 * s)
@@ -775,7 +775,7 @@ static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 		canvas.draw_colored_polygon(PackedVector2Array([
 			Vector2(bar, ty - 1.8 * s), Vector2(bar, ty + 1.8 * s),
 			Vector2(bar + 4.2 * s * f, ty)]), edge)
-	# THE SORTER: two chutes under the belly, each in the colour of what falls out of it — pay straight
+	# THE SORTER: two chutes under the belly, each in the colour of what falls out of it: pay straight
 	# down its own column, spoil back down the one behind. They are the machine's whole reason to exist,
 	# so they are drawn as material, not as plumbing.
 	var pay_x: float = c.x - 2.0 * s * f
@@ -783,7 +783,7 @@ static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 	canvas.draw_line(Vector2(pay_x, c.y + 6.0 * s), Vector2(pay_x, c.y + 12.0 * s), pay, 3.0 * s)
 	canvas.draw_line(Vector2(spoil_x, c.y + 6.0 * s), Vector2(spoil_x - 3.5 * s * f, c.y + 12.0 * s),
 		spoil, 3.0 * s)
-	# The power tell: an arc across the roof of the body — bright while it cuts, a dim filament while it
+	# The power tell: an arc across the roof of the body, bright while it cuts, a dim filament while it
 	# waits on the network. It eats a network, not a coal box, so it never shows fire.
 	var arc: float = (0.6 + 0.4 * sin(t * 19.0)) if active else 0.20
 	var spark := Color(0.62, 0.88, 1.0, 0.30 + 0.65 * arc)
@@ -793,7 +793,7 @@ static func _drift(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 ## THE CRUSHER (docs/DRIFT.md §4): two counter-rotating toothed ROLLERS with rock going in the top and
 ## gravel coming out the bottom. The read has to be "this eats what falls into it and something smaller
 ## comes out", so the rollers turn OPPOSITE ways while it works and the spill below is drawn in gravel's
-## own colour — the same trick the Drift Rig's chutes use, and for the same reason.
+## own colour, the same trick the Drift Rig's chutes use, and for the same reason.
 static func _crusher(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var steel := Color(0.11, 0.12, 0.13)
 	var edge := Color(0.74, 0.76, 0.78)
@@ -823,16 +823,16 @@ static func _crusher(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 
 ## Generator (coal burner → power): a steel housing with a coal-fire at its base that BREATHES while
 ## fueled, and a bright lightning bolt that flares when it's pouring power. The fire + bolt go dim/still
-## when it runs dry — the "is it making power?" read (mirrors _run_generator's fuel state).
+## when it runs dry: the "is it making power?" read (mirrors _run_generator's fuel state).
 static func _generator(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var steel := Color(0.15, 0.16, 0.20)
 	canvas.draw_rect(Rect2(c.x - 7.0 * s, c.y - 7.5 * s, 14.0 * s, 15.0 * s), steel)
-	# Coal fire glowing in the firebox at the base — breathes while burning.
+	# Coal fire glowing in the firebox at the base, breathing while it burns.
 	var p: float = (0.72 + 0.28 * sin(t * 7.0)) if active else 0.32
 	var fire := c + Vector2(0.0, 5.0 * s)
 	canvas.draw_circle(fire, 4.2 * s * (0.8 + 0.3 * p), Color(1.0, 0.5, 0.15, 0.55 + 0.4 * p))
 	canvas.draw_circle(fire, 2.0 * s, Color(1.0, 0.85, 0.45, 0.6 + 0.4 * p))
-	# Lightning bolt up top — the power output, bright when active.
+	# Lightning bolt up top: the power output, bright when active.
 	var bolt := Color(1.0, 0.92, 0.45).lightened(0.2 * p) if active else Color(0.55, 0.52, 0.34)
 	var w: float = 2.2 if active else 1.6
 	var pts := PackedVector2Array([
@@ -843,7 +843,7 @@ static func _generator(canvas: CanvasItem, c: Vector2, s: float, active: bool, t
 
 
 ## Conduit (power tube): a copper pipe with end couplings + an inner channel that GLOWS and a spark that
-## travels DOWN it while power flows (active) — the "power pours down this tube" read. Used for the hotbar
+## travels DOWN it while power flows (active), the "power pours down this tube" read. Used for the hotbar
 ## icon; the in-world tube is drawn by WorldRenderer (it knows orientation + the live power level).
 static func _conduit(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var copper := Color(0.46, 0.32, 0.20)
@@ -859,11 +859,11 @@ static func _conduit(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 
 ## Hopper (storage bin): an inverted funnel mouth over a bin that holds a MOUND of stockpiled goods, with a
 ## chute at the base metering a bit DOWN while feeding (active). The mound + the falling nub read "it banks
-## what pours in and trickles it out" — the chest of the gravity factory.
+## what pours in and trickles it out": the chest of the gravity factory.
 static func _hopper(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var steel := Color(0.30, 0.34, 0.42)
 	var lip := Color(0.52, 0.57, 0.66)
-	# Funnel mouth (wide top tapering in) — the catch.
+	# Funnel mouth (wide top tapering in), the catch.
 	canvas.draw_colored_polygon(PackedVector2Array([
 		c + Vector2(-8.0 * s, -8.0 * s), c + Vector2(8.0 * s, -8.0 * s),
 		c + Vector2(4.5 * s, -2.0 * s), c + Vector2(-4.5 * s, -2.0 * s)]), steel)
@@ -882,7 +882,7 @@ static func _hopper(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: f
 
 
 ## Descent Engine (the L1→L2 gate-breacher): a heavy cross-braced housing over a massive down-RAM that
-## POUNDS while it's eating goods — the "it's hammering the seal open" read. A pale progress core glows
+## POUNDS while it's eating goods, which is the "it's hammering the seal open" read. A pale progress core glows
 ## in the housing as the quota fills (the view scales it via the machine's fed fraction elsewhere; the
 ## glyph itself just breathes).
 static func _descent(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
@@ -901,7 +901,7 @@ static func _descent(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: 
 	canvas.draw_circle(c + Vector2(0.0, -5.5 * s), 2.0 * s, Color(0.85, 0.70, 1.0, core))  # the quota core
 
 
-## Pump (the powered flood-drain, L3): a steel housing with a curved down-SPOUT drawing water UP and OUT —
+## Pump (the powered flood-drain, L3): a steel housing with a curved down-SPOUT drawing water UP and OUT:
 ## a rising water column inside the body + a bright droplet climbing the spout while it's draining (active),
 ## and a piston knob up top that bobs on the clock. The "it sucks the flood out, on power" read; still + dim
 ## when unpowered (nothing to pump / no power).
@@ -910,7 +910,7 @@ static func _pump(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 	var water := Color(0.34, 0.62, 0.86)
 	# Housing.
 	canvas.draw_rect(Rect2(c.x - 6.0 * s, c.y - 6.0 * s, 12.0 * s, 13.0 * s), steel)
-	# The intake water column drawn up inside the body — rises while pumping.
+	# The intake water column drawn up inside the body, rising while pumping.
 	var rise: float = (0.55 + 0.35 * (0.5 + 0.5 * sin(t * 6.0))) if active else 0.4
 	var col_h: float = 9.0 * s * rise
 	canvas.draw_rect(Rect2(c.x - 3.0 * s, c.y + 6.0 * s - col_h, 6.0 * s, col_h),
@@ -918,7 +918,7 @@ static func _pump(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 	# The curved out-spout arcing over the right lip.
 	canvas.draw_line(c + Vector2(0.0, -3.0 * s), c + Vector2(7.5 * s, -3.0 * s), steel.lightened(0.2), 2.6 * s)
 	canvas.draw_line(c + Vector2(7.5 * s, -3.0 * s), c + Vector2(7.5 * s, 1.0 * s), steel.lightened(0.2), 2.6 * s)
-	# The piston knob up top — bobs while working.
+	# The piston knob up top, bobbing while it works.
 	var bob: float = (sin(t * 8.0) * 1.2 if active else 0.0) * s
 	canvas.draw_rect(Rect2(c.x - 1.4 * s, c.y - 9.0 * s + bob, 2.8 * s, 3.5 * s), steel.lightened(0.25))
 	# A droplet climbing the spout + spilling out while draining.
@@ -929,7 +929,7 @@ static func _pump(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: flo
 		canvas.draw_circle(c + Vector2(7.5 * s, spill), 1.3 * s, water)
 
 
-## Rope (the placeable climb): a hanging line with rung KNOTS + a coiled spare at the top — reads as
+## Rope (the placeable climb): a hanging line with rung KNOTS + a coiled spare at the top, which reads as
 ## "this unrolls down a shaft". Static (a rope doesn't animate); the in-world hang is drawn by
 ## WorldRenderer per cell, this glyph is the hotbar/craft-panel icon.
 static func _rope(canvas: CanvasItem, c: Vector2, s: float) -> void:
@@ -942,7 +942,7 @@ static func _rope(canvas: CanvasItem, c: Vector2, s: float) -> void:
 
 
 ## Press (the plate press): a heavy frame over a piston RAM that strokes down onto a glowing slab
-## while working — the "it stamps plates" read (mirrors what its recipe does).
+## while working: the "it stamps plates" read (mirrors what its recipe does).
 static func _press(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var frame := Color(0.13, 0.15, 0.20)
 	canvas.draw_rect(Rect2(c.x - 7.5 * s, c.y - 9.0 * s, 15.0 * s, 3.0 * s), frame)     # the head beam
@@ -956,7 +956,7 @@ static func _press(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 	canvas.draw_rect(Rect2(c.x - 5.5 * s, c.y + 5.2 * s, 11.0 * s, 1.8 * s), slab)      # the worked sheet
 
 
-## Torch (placeable light): a leaning stick with a live FLAME that gutters on the clock — the in-world
+## Torch (placeable light): a leaning stick with a live FLAME that gutters on the clock, the in-world
 ## mount and the hotbar icon share it. `active` full flame; still icons burn steady + small.
 static func _torch(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: float) -> void:
 	var stick := Color(0.46, 0.32, 0.18)
@@ -970,7 +970,7 @@ static func _torch(canvas: CanvasItem, c: Vector2, s: float, active: bool, t: fl
 	canvas.draw_circle(tip, 1.3 * s, Color(0.16, 0.10, 0.06))                        # the charred wrap
 
 
-## Fork (splitter): a stem that splits DOWN and to the RIGHT — mirrors its 50/50 routing.
+## Fork (splitter): a stem that splits DOWN and to the RIGHT, mirroring its 50/50 routing.
 static func _fork(canvas: CanvasItem, c: Vector2, s: float) -> void:
 	var fork := Color(0.93, 0.88, 1.0)
 	canvas.draw_line(c + Vector2(0.0, -6.5 * s), c, fork, 2.0)
@@ -989,35 +989,35 @@ static func item_color(item: StringName) -> Color:
 	if item == &"wood":
 		return Color(0.55, 0.38, 0.22)
 	if item == &"coal":
-		return Color(0.24, 0.25, 0.29)        # dark slate-black — the generator's fuel
+		return Color(0.24, 0.25, 0.29)        # dark slate-black, the generator's fuel
 	if item == &"wood_pickaxe":
-		return Color(0.62, 0.46, 0.30)        # starter tools — a wood-handle brown
+		return Color(0.62, 0.46, 0.30)        # starter tools: a wood-handle brown
 	if item == &"wood_axe":
 		return Color(0.70, 0.52, 0.32)
 	if item == &"stone_pickaxe":
-		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade — cold stone-grey (unlocks deepslate)
+		return Color(0.56, 0.60, 0.66)        # the tier-2 upgrade, cold stone-grey (unlocks deepslate)
 	if item == &"iron_pickaxe":
-		return Color(0.78, 0.82, 0.92)        # the tier-3 upgrade — bright steel (the L2 chain's edge)
+		return Color(0.78, 0.82, 0.92)        # the tier-3 upgrade: bright steel (the L2 chain's edge)
 	if item == &"rope":
-		return Color(0.78, 0.66, 0.44)        # hemp — the placeable climb
+		return Color(0.78, 0.66, 0.44)        # hemp, the placeable climb
 	if item == &"torch":
-		return Color(1.0, 0.76, 0.36)         # flame amber — placeable light
+		return Color(1.0, 0.76, 0.36)         # flame amber: placeable light
 	if item == &"scanner":
-		return Color(0.45, 0.85, 0.95)        # sonar cyan — the prospecting handheld
+		return Color(0.45, 0.85, 0.95)        # sonar cyan: the prospecting handheld
 	if item == &"sapling":
-		return Color(0.44, 0.66, 0.30)        # young leaf-green — the renewable-wood seed (#38)
+		return Color(0.44, 0.66, 0.30)        # young leaf-green, the renewable-wood seed (#38)
 	if item == &"rich_ore":
-		return Color(1.0, 0.86, 0.46)         # white-gold — the high-grade vein's chunk (#48)
+		return Color(1.0, 0.86, 0.46)         # white-gold: the high-grade vein's chunk (#48)
 	if item == &"iron":
-		return Color(0.72, 0.76, 0.85)        # pale steel — L2's signature ore
+		return Color(0.72, 0.76, 0.85)        # pale steel, L2's signature ore
 	if item == &"iron_ingot":
-		return Color(0.80, 0.84, 0.92)        # refined steel bar — the L2 chain's base good
+		return Color(0.80, 0.84, 0.92)        # refined steel bar, the L2 chain's base good
 	if item == &"plate":
-		return Color(0.66, 0.71, 0.80)        # rolled sheet — the press's product
+		return Color(0.66, 0.71, 0.80)        # rolled sheet: the press's product
 	if item == &"gear":
-		return Color(0.82, 0.68, 0.34)        # bronze-toothed cog — the mill's product
+		return Color(0.82, 0.68, 0.34)        # bronze-toothed cog, the mill's product
 	# THE CARRIED GROUND. Terraria-style dig-and-carry means the pack routinely fills with the plain
-	# terrain you cut — and those had no entry here, so every one of them fell through to WHITE and
+	# terrain you cut, and those had no entry here, so every one of them fell through to WHITE and
 	# drew as a blank square. Three identical white blanks in the hotbar is the single most illegible
 	# thing on the screen; it looks like missing art, which is exactly what it was.
 	if item == &"earth":
@@ -1031,7 +1031,7 @@ static func item_color(item: StringName) -> Color:
 	if item == &"sealrock":
 		return Color(0.30, 0.26, 0.34)
 	if item == &"gravel":
-		return Color(0.40, 0.42, 0.45)       # crushed rock — cooler and flatter than the stone it came from
+		return Color(0.40, 0.42, 0.45)       # crushed rock, cooler and flatter than the stone it came from
 	return Color.WHITE
 
 
@@ -1097,14 +1097,14 @@ static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: St
 			canvas.draw_rect(Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size)), item_color(item))
 
 
-## A CUTTING BIT — and its SILHOUETTE IS ITS CUT, which is the entire design of `BitRules` made visible.
+## A CUTTING BIT, and its SILHOUETTE IS ITS CUT, which is the entire design of `BitRules` made visible.
 ## The bits differ in shape rather than in speed, so four identical steel lumps with four different names
 ## would throw away the one thing the icons could have said. A Broad is a wide blunt head, a Sinker is a
 ## downward spike, a Lance is a long horizontal point, a Wedge is a splitting triangle: you can tell what a
 ## bit does to rock by looking at what it is, before you have read a single price.
 ##
 ## All four share the same brass socket so they read as a SET of interchangeable heads for one drive, rather
-## than as four unrelated tools — which is also the progression thesis (chassis plus modules) drawn.
+## than as four unrelated tools, which is also the progression thesis (chassis plus modules) drawn.
 static func _item_bit(canvas: CanvasItem, c: Vector2, size: float, kind: StringName) -> void:
 	var u: float = size * 0.5
 	var steel := Color(0.72, 0.76, 0.84)
@@ -1134,13 +1134,13 @@ static func _item_bit(canvas: CanvasItem, c: Vector2, size: float, kind: StringN
 			canvas.draw_line(c + Vector2(0.0, -u * 0.88), c + Vector2(-u * 0.50, u * 0.10), edge, 1.5)
 
 
-## THE CARRIED GROUND, and each one's SILHOUETTE IS WHAT IT DOES — the same argument _item_bit makes for
+## THE CARRIED GROUND, and each one's SILHOUETTE IS WHAT IT DOES, the same argument _item_bit makes for
 ## cutting heads, applied to the stock you dig, carry and backfill with.
 ##
 ## All six of these used to share this one cube and differ only by tint, and four of those tints sit within
 ## dE 8 of a neighbour in CIELab, which at hotbar size is a coin-flip. Gravel was worse than that: it had no
 ## entry at all and fell through to a flat coloured square. That is the material the whole Drift Rig
-## contract turns on — a gallery backfilled with the stone you dug out of it is a SIEVE, and the same
+## contract turns on: a gallery backfilled with the stone you dug out of it is a SIEVE, and the same
 ## gallery packed with crushed gravel is a BULKHEAD (FactorySim, `## gravel packs`). Deciding whether your
 ## gallery floods was a matter of telling two grey squares apart.
 ##
@@ -1154,7 +1154,7 @@ static func _item_block(canvas: CanvasItem, c: Vector2, size: float, col: Color)
 		canvas.draw_rect(Rect2(c + g * size, Vector2(size * 0.10, size * 0.10)), col.darkened(0.22))
 
 
-## GRAVEL — a heap of loose pebbles, and pointedly NOT a block. It is aggregate: the one material that
+## GRAVEL: a heap of loose pebbles, and pointedly NOT a block. It is aggregate: the one material that
 ## PACKS, and the one you reach for when a gallery has to hold water back. Its outline is lumpy where every
 ## other carried material's is straight, so it separates from stone by shape at any size, which is the only
 ## thing that survives being 40px wide in a hotbar.
@@ -1168,7 +1168,7 @@ static func _item_gravel(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_circle(pc - Vector2(size * 0.028, size * 0.034), r * 0.46, col.lightened(0.26))
 
 
-## SHALE — fissile rock, so it reads as a STACK OF THIN PLATES. That is also exactly what it does when you
+## SHALE is fissile rock, so it reads as a STACK OF THIN PLATES. That is also exactly what it does when you
 ## hit it in the world: it splits along its partings rather than crumbling.
 static func _item_shale(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var col: Color = item_color(&"shale")
@@ -1181,7 +1181,7 @@ static func _item_shale(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_rect(Rect2(plate.position, Vector2(plate.size.x, size * 0.030)), col.lightened(0.28))
 
 
-## DEEPSLATE — a tall faceted shard. It is harder than stone and breaks to an edge instead of a rubble, so
+## DEEPSLATE: a tall faceted shard. It is harder than stone and breaks to an edge instead of a rubble, so
 ## the silhouette says "this came from further down" before the colour has to carry it.
 static func _item_deepslate(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var col: Color = item_color(&"deepslate")
@@ -1192,8 +1192,8 @@ static func _item_deepslate(canvas: CanvasItem, c: Vector2, size: float) -> void
 		c + Vector2(0.04, 0.08) * size, c + Vector2(-0.16, -0.02) * size]), col.lightened(0.30))
 
 
-## SEALROCK — this one KEEPS the block, because it genuinely is one: it is what the Seal is built of, the
-## floor of a layer. It is marked instead, with a bright parting across the face — the line the descent has
+## SEALROCK keeps the block, because it genuinely is one: it is what the Seal is built of, the
+## floor of a layer. It is marked instead, with a bright parting across the face, the line the descent has
 ## to break. Shape says "block"; the seam says "not ordinary".
 static func _item_sealrock(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var col: Color = item_color(&"sealrock")
@@ -1206,35 +1206,35 @@ static func _item_sealrock(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		Color(seam.r, seam.g, seam.b, 0.48), maxf(1.0, size * 0.030))
 
 
-## EARTH — a rounded clod with crumbs off it: loose ground, not masonry.
+## EARTH: a rounded clod with crumbs off it: loose ground, not masonry.
 ##
 ## ROPE and TORCH were the only two items in the catalogue with NO GLYPH AT ALL. Both fell through the
-## match to its default arm, which draws `Rect2(center - size/2, size)` in the item's colour — a bare filled
-## square, no outline, no shape. That is why `check_item_reads` ranked them at **IoU 1.00**: they were not
+## match to its default arm, which draws `Rect2(center - size/2, size)` in the item's colour, a bare filled
+## square, no outline, no shape. That is why `check_item_reads` ranked them at IoU 1.00: they were not
 ## similar shapes, they were the SAME shape, because neither had one. The bare square is the exact thing the
 ## carried-ground note above describes as looking like missing art, and it was still here for the climb and
-## the light — two of the most-handled placeables in the game.
+## the light, two of the most-handled placeables in the game.
 ##
 ## The two were fixed together because they were one defect, and they are given cues that survive the 16px
 ## hotbar slot rather than cues that look good at 4x.
 
 
-## ROPE — a COIL, and it is a RING because nothing else in this catalogue is one. Every other icon here is a
+## ROPE is a COIL, and it is a RING because nothing else in this catalogue is one. Every other icon here is a
 ## solid mass: nuggets, lumps, bars, blocks, a cluster. A shape with a HOLE in it is separated from all of
 ## them by a cue that does not depend on vertex detail, and it is also what a coil of rope looks like when it
 ## is not in use. The tail is not decoration: a bare annulus reads as a washer or a ring, and the loose end
 ## hanging off it is the whole difference between a hoop and a rope.
 ##
-## **THE FIRST VERSION OF THIS RING READ AS A MAGNIFYING GLASS, and `check_item_reads` could not have told
-## me.** A thin even stroke with a thin straight tail leaving it at a diagonal is a lens and a handle, and
-## the `scanner` — a prospecting instrument — is two cells away in the same hotbar. The layer was right that
+## THE FIRST VERSION OF THIS RING READ AS A MAGNIFYING GLASS, and `check_item_reads` could not have told
+## me. A thin even stroke with a thin straight tail leaving it at a diagonal is a lens and a handle, and
+## the `scanner` (a prospecting instrument) is two cells away in the same hotbar. The layer was right that
 ## the icon was distinct from all 26 others; distinctness is a property of a PAIR, and reading as the wrong
 ## object is a property of ONE icon and a person. No pairwise metric can register it, which is why this was
 ## found by rendering the set and looking at it rather than by the number going green.
 ##
 ## What separates cord from a lens is that cord is WOUND. The stroke is thicker than a lens rim would be,
 ## six darker wraps cross it at intervals so the ring is visibly made of turns, and the tail leaves
-## TANGENTIALLY at the coil's own stroke width — a handle is thinner than its lens and joins at a right
+## TANGENTIALLY at the coil's own stroke width, because a handle is thinner than its lens and joins at a right
 ## angle, and doing the opposite of both is what buys the read.
 static func _item_rope(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var hemp: Color = item_color(&"rope")
@@ -1253,7 +1253,7 @@ static func _item_rope(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		hemp.darkened(0.22), maxf(1.0, size * 0.07))
 
 
-## TORCH — a haft on the DIAGONAL with the flame at its head. The diagonal is the load-bearing choice: the
+## TORCH: a haft on the DIAGONAL with the flame at its head. The diagonal is the load-bearing choice: the
 ## ingot and the plate are horizontal, the bits and the pickaxes are their own axis, and a vertical stick
 ## would have been a fifth thing standing upright. It is also how a torch is carried. The flame is a
 ## teardrop rather than a disc, because a disc at this size is a fleck, and the flecks already mean ore.
@@ -1269,7 +1269,7 @@ static func _item_torch(canvas: CanvasItem, c: Vector2, size: float) -> void:
 
 ## Earth is the one carried material that is already safe on colour (the only warm one in the set, dE 30+
 ## from every other). It is shaped anyway, because if it kept the cube while the rest were given
-## silhouettes, the cube would come to mean "earth" by elimination — and that is a deduction, not a read.
+## silhouettes, the cube would come to mean "earth" by elimination, and that is a deduction, not a read.
 static func _item_clod(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var col: Color = item_color(&"earth")
 	_poly(canvas, c, size, [Vector2(-0.36, 0.04), Vector2(-0.24, -0.28), Vector2(0.10, -0.36),
@@ -1279,10 +1279,10 @@ static func _item_clod(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_circle(c + crumb * size, size * 0.045, col.darkened(0.18))
 
 
-## RICH ORE (#48) — a nugget the ore has CRYSTALLISED out of, spurs breaking the outline.
+## RICH ORE (#48): a nugget the ore has CRYSTALLISED out of, spurs breaking the outline.
 ##
 ## This used to be "the same rough nugget, crowded with brighter flecks: quality READS." It did not read.
-## check_item_reads measured ore against rich_ore at IoU 1.00 and dE 4.4 — the identical silhouette in an
+## check_item_reads measured ore against rich_ore at IoU 1.00 and dE 4.4, the identical silhouette in an
 ## indistinguishable colour, because both used this exact polygon and the flecks are interior detail that
 ## a hotbar cell throws away. Rich ore is the only quality axis in the game (1 rich → 2 ingots against
 ## ore's 2 → 1, a fourfold difference), so it is worth a shape of its own: the same body, with crystal
@@ -1299,7 +1299,7 @@ static func _item_rich_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.97, 0.80))
 
 
-## SAPLING (#38) — a sprout in a root ball: two young leaves on a stem, the seed of a new tree.
+## SAPLING (#38): a sprout in a root ball: two young leaves on a stem, the seed of a new tree.
 static func _item_sapling(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var stem := Color(0.48, 0.36, 0.22)
 	var leaf := Color(0.44, 0.66, 0.30)
@@ -1319,7 +1319,7 @@ static func _poly(canvas: CanvasItem, c: Vector2, size: float, frac: Array, fill
 	canvas.draw_polyline(pts + PackedVector2Array([pts[0]]), fill.darkened(0.45), maxf(1.0, size * 0.03), true)
 
 
-## ORE — a rough rock nugget with bright amber ore flecks embedded (reads as "metal IN rock").
+## ORE is a rough rock nugget with bright amber ore flecks embedded (reads as "metal IN rock").
 static func _item_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	_poly(canvas, c, size, [Vector2(-0.34, -0.06), Vector2(-0.10, -0.34), Vector2(0.28, -0.24),
 		Vector2(0.36, 0.14), Vector2(0.06, 0.34), Vector2(-0.30, 0.22)], Color(0.44, 0.46, 0.52))
@@ -1328,7 +1328,7 @@ static func _item_ore(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(1.0, 0.82, 0.5))
 
 
-## IRON INGOT — the ingot-bar silhouette in cold refined steel (visibly kin to the copper ingot,
+## IRON INGOT: the ingot-bar silhouette in cold refined steel (visibly kin to the copper ingot,
 ## visibly the L2 metal).
 static func _item_iron_ingot(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var steel := Color(0.74, 0.79, 0.88)
@@ -1338,7 +1338,7 @@ static func _item_iron_ingot(canvas: CanvasItem, c: Vector2, size: float) -> voi
 		Vector2(-0.20, -0.06)], steel.lightened(0.25))   # lit top face
 
 
-## PLATE — a rolled steel sheet lying at a slight skew, a lit edge on top (reads flat + manufactured).
+## PLATE: a rolled steel sheet lying at a slight skew, a lit edge on top (reads flat + manufactured).
 static func _item_plate(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var sheet := Color(0.62, 0.67, 0.77)
 	_poly(canvas, c, size, [Vector2(-0.38, -0.10), Vector2(0.30, -0.24), Vector2(0.38, 0.10),
@@ -1347,8 +1347,8 @@ static func _item_plate(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		sheet.lightened(0.30), maxf(1.0, size * 0.05))
 
 
-## GEAR — a toothed cog with a punched hub (the mill's product; also the generic-machine motif).
-## The SCANNER: a dark handheld with a cyan screen, a stub antenna, and sonar arcs —
+## GEAR: a toothed cog with a punched hub (the mill's product; also the generic-machine motif).
+## The SCANNER: a dark handheld with a cyan screen, a stub antenna, and sonar arcs. It
 ## reads as "a device that listens" at hotbar size.
 static func _item_scanner(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var s: float = size * 0.5
@@ -1377,49 +1377,49 @@ static func _item_gear(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	canvas.draw_circle(c, size * 0.10, Color(0.16, 0.13, 0.08))   # the punched hub
 
 
-## IRON — the ore nugget silhouette in cold deepslate tones with pale steel flecks (L2's new find —
-## visibly kin to ore, visibly NOT copper).
+## IRON: the ore nugget silhouette in cold deepslate tones with pale steel flecks (L2's new find,
+## visibly kin to ore and visibly NOT copper).
 ##
-## **AND IT WAS DESIGNED AGAINST THE WRONG NEIGHBOUR.** "Visibly NOT copper" is the comparison the line
+## AND IT WAS DESIGNED AGAINST THE WRONG NEIGHBOUR. "Visibly NOT copper" is the comparison the line
 ## above was written for and it succeeds at it. The comparison nobody made was against the rock it is
 ## named after: measured on the drawn icons, `deepslate/iron` was the closest colour pair in the whole
-## catalogue at **dE 1.0**, which is at or below a just-noticeable difference, with silhouettes overlapping
+## catalogue at dE 1.0, which is at or below a just-noticeable difference, with silhouettes overlapping
 ## 0.72. Both are carried, so both can sit in the hotbar at once. `check_item_reads` was green and
-## correctly so — it asserts on outline AND tint together, and this pair clears the shape half.
+## correctly so: it asserts on outline AND tint together, and this pair clears the shape half.
 ##
-## **AND IT CANNOT BE FIXED BY MOVING A COLOUR, WHICH I FOUND BY TRYING.** This icon is `_item_ore`'s
-## polygon and `_item_ore`'s fleck POSITIONS, byte for byte — the two are the same nugget separated by one
+## AND IT CANNOT BE FIXED BY MOVING A COLOUR, WHICH I FOUND BY TRYING. This icon is `_item_ore`'s
+## polygon and `_item_ore`'s fleck POSITIONS, byte for byte. The two are the same nugget separated by one
 ## parameter, the matrix value: ore's body is 0.44/0.46/0.52 and iron's is 0.30/0.33/0.42. That single
 ## number carries two separations in opposite directions. Dark enough to be told from ore, and it is
 ## deepslate. Light enough to be told from deepslate, and it is ore.
 ##
-## Measured, not reasoned. Enlarging the flecks to four at r=0.085 — the docstring's own promise, since
-## three dots at r=0.06 were a tenth of the covered pixels and the metal was rounding error — cleared
+## Measured, not reasoned. Enlarging the flecks to four at r=0.085 (the docstring's own promise, since
+## three dots at r=0.06 were a tenth of the covered pixels and the metal was rounding error) cleared
 ## `deepslate/iron` out of the closest six entirely (dE 1.0 → `shale/iron` 3.8) and immediately reddened
-## `check_item_reads` with **`ore/iron` at IoU 1.00, dE 9.5**: the exact conjunction the layer asserts on.
+## `check_item_reads` with `ore/iron` at IoU 1.00, dE 9.5: the exact conjunction the layer asserts on.
 ## Reverted. The guard did its job and the trade is real.
 ##
-## **So T3.4's fix is a SILHOUETTE and not a tint.** Iron sharing ore's outline is what forces value to do
+## So T3.4's fix is a SILHOUETTE and not a tint. Iron sharing ore's outline is what forces value to do
 ## both jobs; give it its own shape and the value is free to leave deepslate. That is a spend the ticket
 ## says to authorise only after re-verification, and this is the re-verification.
 ##
-## **THE SHAPE IS A CLUSTER, and it is chosen for what the CATALOGUE does not already contain.** Every other
-## rock glyph here is one convex lump — ore's nugget, coal's faceted lump, deepslate's shard — so a shape
+## THE SHAPE IS A CLUSTER, and it is chosen for what the CATALOGUE does not already contain. Every other
+## rock glyph here is one convex lump: ore's nugget, coal's faceted lump, deepslate's shard. So a shape
 ## that is two lumps is separated from all of them by a cue that survives being 16px tall, where vertex
 ## detail does not. The two are placed on a DIAGONAL, which is the part doing the work: it leaves the
 ## upper-right and lower-left corners empty, so the union is concave and its footprint no longer fills the
 ## square the way a single blob does. IoU against `_item_ore` falls out of that emptiness rather than out of
 ## the outline, which is why it is a diagonal rather than a snowman.
 ##
-## **AND ONLY NOW DOES THE VALUE MOVE**, to the steel band its own `item_color` has always promised. This is
+## AND ONLY NOW DOES THE VALUE MOVE, to the steel band its own `item_color` has always promised. This is
 ## the second half of the same fix and it is not independent of the first: the reverted attempt above moved
 ## iron's tint while it still wore ore's outline, and `ore/iron` went to IoU 1.00 / dE 9.5 because the tint
 ## was the only separation left. With the outline separated the tint is free, so it goes where the identity
-## already lives — `item_color(&"iron")` is pale steel 0.72/0.76/0.85, and the drawn icon was a dark blue-grey
+## already lives: `item_color(&"iron")` is pale steel 0.72/0.76/0.85, and the drawn icon was a dark blue-grey
 ## that matched deepslate instead of matching iron. The host stays a rock rather than becoming the metal:
 ## light enough to leave deepslate's band outright, cool enough not to read as ore's neutral grey.
 ##
-## **NOT YET MEASURED — this awaits a `check_item_reads` run and must not be read as verified.** The layer is
+## NOT YET MEASURED. This awaits a `check_item_reads` run and must not be read as verified. The layer is
 ## `add_gl` and the machine was held elsewhere when this was written. Both halves of this change are exactly
 ## the kind the file has already recorded being wrong about once, and the numbers above came from the
 ## instrument rather than from reasoning about constants, which is the only reason they are trustworthy.
@@ -1431,13 +1431,13 @@ static func _item_iron(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		Vector2(0.28, 0.36), Vector2(0.02, 0.32)], host)
 	_poly(canvas, c, size, [Vector2(-0.42, -0.12), Vector2(-0.18, -0.36), Vector2(0.06, -0.28),
 		Vector2(0.10, 0.02), Vector2(-0.14, 0.20), Vector2(-0.40, 0.10)], host.lightened(0.06))
-	# Flecks sit on BOTH lumps — metal spread across the cluster, not a lit lump beside a bare one.
+	# Flecks sit on BOTH lumps: metal spread across the cluster, not a lit lump beside a bare one.
 	for f: Vector2 in [Vector2(-0.20, -0.10), Vector2(-0.06, 0.06), Vector2(0.22, 0.16)]:
 		canvas.draw_circle(c + f * size, size * 0.06, Color(0.78, 0.82, 0.92))
 		canvas.draw_circle(c + f * size - Vector2(size * 0.02, size * 0.02), size * 0.025, Color(0.95, 0.97, 1.0))
 
 
-## INGOT — a trapezoidal cast metal bar with a bright top face (the classic ingot silhouette).
+## INGOT: a trapezoidal cast metal bar with a bright top face (the classic ingot silhouette).
 static func _item_ingot(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var gold := Color(0.93, 0.78, 0.36)
 	_poly(canvas, c, size, [Vector2(-0.26, -0.16), Vector2(0.26, -0.16), Vector2(0.40, 0.18),
@@ -1446,7 +1446,7 @@ static func _item_ingot(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		Vector2(-0.20, -0.06)], gold.lightened(0.28))   # lit top face
 
 
-## COAL — a dark faceted lump with a cool sheen highlight (distinct from the rounded ore nugget).
+## COAL: a dark faceted lump with a cool sheen highlight (distinct from the rounded ore nugget).
 static func _item_coal(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	_poly(canvas, c, size, [Vector2(-0.30, -0.10), Vector2(-0.06, -0.32), Vector2(0.30, -0.18),
 		Vector2(0.34, 0.16), Vector2(0.02, 0.34), Vector2(-0.32, 0.16)], Color(0.20, 0.21, 0.25))
@@ -1454,7 +1454,7 @@ static func _item_coal(canvas: CanvasItem, c: Vector2, size: float) -> void:
 		Color(0.34, 0.36, 0.42))   # a lit facet
 
 
-## WOOD — a short LOG: a brown bar capped by round ends, with concentric end-grain rings on the left face.
+## WOOD is a short LOG: a brown bar capped by round ends, with concentric end-grain rings on the left face.
 static func _item_wood(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	var bark := Color(0.52, 0.36, 0.20)
 	canvas.draw_rect(Rect2(c - Vector2(size * 0.30, size * 0.16), Vector2(size * 0.60, size * 0.32)), bark)
@@ -1464,12 +1464,12 @@ static func _item_wood(canvas: CanvasItem, c: Vector2, size: float) -> void:
 	canvas.draw_circle(c - Vector2(size * 0.30, 0.0), size * 0.035, bark.darkened(0.30))
 
 
-## PICKAXE — a wood handle with a curved double-pointed head at the top (points sweeping down-and-out).
+## PICKAXE: a wood handle with a curved double-pointed head at the top (points sweeping down-and-out).
 ## `handle`/`head` colours let one drawer serve the wood pick and the grey stone pick.
 ## `tier` shapes the HEAD, and it has to, because the three pickaxes were one silhouette in three tints and
-## two of those tints are dE 8.6 apart — check_item_reads found stone/iron at IoU 1.00. A tool tier is not
+## two of those tints are dE 8.6 apart, and check_item_reads found stone/iron at IoU 1.00. A tool tier is not
 ## decoration: the iron head is what lets you into deepslate, and "which pick am I holding" was being
-## answered by a grey that is a coin-flip at hotbar size. So the head grows with the tier — a wooden pick is
+## answered by a grey that is a coin-flip at hotbar size. So the head grows with the tier: a wooden pick is
 ## barely more than a wedge lashed on, stone is broad and blunt, iron is long and swept and comes to points
 ## that rise above the shoulder.
 static func _item_pickaxe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, head: Color,
@@ -1478,20 +1478,20 @@ static func _item_pickaxe(canvas: CanvasItem, c: Vector2, size: float, handle: C
 		handle, maxf(1.5, size * 0.12))                              # the shaft
 	var pts: Array
 	match tier:
-		0:                                                           # WOOD — a short blunt head
+		0:                                                           # WOOD, a short blunt head
 			pts = [Vector2(-0.30, -0.02), Vector2(-0.12, -0.26), Vector2(0.12, -0.26),
 				Vector2(0.30, -0.02), Vector2(0.10, -0.14), Vector2(-0.10, -0.14)]
-		2:                                                           # IRON — long, swept, pointed
+		2:                                                           # IRON: long, swept, pointed
 			pts = [Vector2(-0.52, -0.20), Vector2(-0.22, -0.36), Vector2(0.22, -0.36),
 				Vector2(0.52, -0.20), Vector2(0.38, -0.04), Vector2(0.12, -0.20),
 				Vector2(-0.12, -0.20), Vector2(-0.38, -0.04)]
-		_:                                                           # STONE — broad and chunky
+		_:                                                           # STONE, broad and chunky
 			pts = [Vector2(-0.44, -0.04), Vector2(-0.16, -0.30), Vector2(0.16, -0.30),
 				Vector2(0.44, -0.04), Vector2(0.12, -0.16), Vector2(-0.12, -0.16)]
 	_poly(canvas, c, size, pts, head)
 
 
-## AXE — a wood handle with a fanned blade on the upper right + a bright cutting edge.
+## AXE: a wood handle with a fanned blade on the upper right + a bright cutting edge.
 static func _item_axe(canvas: CanvasItem, c: Vector2, size: float, handle: Color, blade: Color) -> void:
 	canvas.draw_line(c + Vector2(size * 0.06, size * 0.42), c + Vector2(-0.10 * size, -0.34 * size),
 		handle, maxf(1.5, size * 0.12))                              # the shaft
@@ -1501,7 +1501,7 @@ static func _item_axe(canvas: CanvasItem, c: Vector2, size: float, handle: Color
 		blade.lightened(0.4), maxf(1.0, size * 0.04))              # honed cutting edge
 
 
-## Debris/dust colour for a mined terrain material (juice particles) — roughly its rock tone.
+## Debris/dust colour for a mined terrain material (juice particles), roughly its rock tone.
 static func terrain_dust(material: StringName) -> Color:
 	if material == &"stone":
 		return Color(0.34, 0.37, 0.44)

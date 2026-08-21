@@ -2,10 +2,10 @@ class_name Bazaars
 extends RefCounted
 
 ## REPRESENTATION-ONLY view of the Bazaar structures the sim detects. The sim has no
-## bazaar STATE — "active" is derived from the world (a valid wood frame == active, FactorySim.find_bazaars).
+## bazaar STATE. "active" is derived from the world (a valid wood frame == active, FactorySim.find_bazaars).
 ## This layer remembers which frames we've already seen so it can fire a one-shot, block-by-block COSMETIC
-## TRANSFORMATION the instant a frame completes — plain wood visibly becoming a decorated market stall
-## (awning, banners, lantern, a shopkeeper NPC walking in) — so it's obvious "a transformation happened".
+## TRANSFORMATION the instant a frame completes: plain wood visibly becoming a decorated market stall
+## (awning, banners, lantern, a shopkeeper NPC walking in), so it's obvious "a transformation happened".
 ## Pure draw + timers; it never writes the sim. Delete it and production numbers are identical.
 
 const CELL: int = 32
@@ -21,11 +21,11 @@ const RUIN_WEAR: float = 1.0
 
 var _time: float = 0.0
 var _seen: Dictionary = {}                 ## origin (Vector2i) -> activation _time (when the frame completed)
-var _ruins: Array[Dictionary] = []         ## {origin, gap} — frames one block short (FactorySim.find_bazaar_ruins)
+var _ruins: Array[Dictionary] = []         ## {origin, gap} for frames one block short (FactorySim.find_bazaar_ruins)
 
 
 ## Advance + reconcile against the sim's currently-valid frames. Returns the origins that BECAME active
-## this update (so the controller can fire particles / shake — the juice that sells the transform).
+## this update (so the controller can fire particles / shake: the juice that sells the transform).
 func update(sim: FactorySim, dt: float) -> Array[Vector2i]:
 	_time += dt
 	var current: Dictionary = {}
@@ -50,7 +50,7 @@ func center_of(origin: Vector2i) -> Vector2:
 
 
 func draw(canvas: CanvasItem) -> void:
-	for r: Dictionary in _ruins:            # the unfinished ones first — a live stall may sit on top of one
+	for r: Dictionary in _ruins:            # the unfinished ones first, because a live stall may sit on top of one
 		_draw_ruin(canvas, r["origin"], r["gap"])
 	for o: Vector2i in _seen:
 		_draw_bazaar(canvas, o, _time - float(_seen[o]))
@@ -73,7 +73,7 @@ func _draw_bazaar(canvas: CanvasItem, origin: Vector2i, age: float) -> void:
 	var full: float = float(cells.size()) * CELL_STAGGER + POP
 	var prog: float = clampf(age / full, 0.0, 1.0)
 	var base := Vector2(origin.x * CELL, origin.y * CELL)
-	# Warm hearth glow behind the stall, swelling as it forms — "this place is alive/inviting".
+	# Warm hearth glow behind the stall, swelling as it forms. "This place is alive/inviting".
 	var glow_c := base + Vector2(FactorySim.BAZAAR_W * CELL * 0.5, FactorySim.BAZAAR_H * CELL * 0.5)
 	canvas.draw_circle(glow_c, float(FactorySim.BAZAAR_W * CELL) * 0.7,
 			Color(1.0, 0.82, 0.5, 0.10 * prog))
@@ -81,7 +81,7 @@ func _draw_bazaar(canvas: CanvasItem, origin: Vector2i, age: float) -> void:
 	for i: int in cells.size():
 		var rt: float = age - float(i) * CELL_STAGGER
 		if rt < 0.0:
-			continue                                       # not revealed yet — the bare wood block shows
+			continue                                       # not revealed yet; the bare wood block shows
 		var cell: Vector2i = origin + (cells[i]["rel"] as Vector2i)
 		var p := Vector2(cell.x * CELL, cell.y * CELL)
 		_draw_decor(canvas, p, String(cells[i]["kind"]), cell.x, cell.y == origin.y + 1)
@@ -114,7 +114,7 @@ func _draw_decor(canvas: CanvasItem, p: Vector2, kind: String, col: int, upper: 
 		cloth.a = left
 		canvas.draw_rect(Rect2(p + Vector2(0.0, 2.0), Vector2(CELL, CELL * 0.62)), cloth)
 		canvas.draw_rect(Rect2(p, Vector2(CELL, 3.0)), cloth.darkened(0.25))         # valance rail
-		# Scalloped fringe hanging off the bottom of the awning — the first thing to rot off a dead canopy,
+		# Scalloped fringe hanging off the bottom of the awning, the first thing to rot off a dead canopy,
 		# so its ABSENCE is most of what makes the ruin read as abandoned rather than merely dim.
 		if wear < 0.5:
 			for s: int in 2:
@@ -142,13 +142,13 @@ func _draw_decor(canvas: CanvasItem, p: Vector2, kind: String, col: int, upper: 
 # --- the ruin: a stall that is one block short, and the block-shaped hole saying so ------------------
 
 ## An unfinished frame, drawn in the finished stall's own vocabulary at full wear, plus a marked-out slot
-## where the missing block goes. Before this, a near-complete frame drew NOTHING — so the ruin the world
+## where the missing block goes. Before this, a near-complete frame drew NOTHING, so the ruin the world
 ## stamps beside spawn, which exists to teach "build a Bazaar", was four loose wood blocks on flat ground.
 func _draw_ruin(canvas: CanvasItem, origin: Vector2i, gap: Vector2i) -> void:
 	for spec: Dictionary in _frame_cells():
 		var cell: Vector2i = origin + (spec["rel"] as Vector2i)
 		if cell == gap:
-			continue                                    # nothing to dress — that is the hole
+			continue                                    # nothing to dress: that is the hole
 		_draw_decor(canvas, Vector2(cell.x * CELL, cell.y * CELL), String(spec["kind"]),
 				cell.x, cell.y == origin.y + 1, RUIN_WEAR)
 	_draw_gap(canvas, gap)
@@ -165,7 +165,7 @@ func _draw_gap(canvas: CanvasItem, gap: Vector2i) -> void:
 	var ink := Color(1.0, 0.86, 0.55, 0.40 + 0.45 * pulse)
 	for i: int in 7:
 		if i % 2 == 1:
-			continue                                    # every other run left out — that is the dash
+			continue                                    # every other run is left out, and that is the dash
 		var t: float = float(i) * seg
 		canvas.draw_line(p + Vector2(t, 0.0), p + Vector2(t + seg, 0.0), ink, 2.0)
 		canvas.draw_line(p + Vector2(t, CELL), p + Vector2(t + seg, CELL), ink, 2.0)
@@ -183,7 +183,7 @@ func _draw_sign(canvas: CanvasItem, base: Vector2, a: float) -> void:
 	canvas.draw_circle(c + Vector2(0.0, 5.5), 2.6, Color(0.95, 0.8, 0.45, a))       # a gold mark
 
 
-## The shopkeeper NPC standing in the interior — a robed figure, distinct from the miner silhouette.
+## The shopkeeper NPC standing in the interior: a robed figure, distinct from the miner silhouette.
 func _draw_keeper(canvas: CanvasItem, base: Vector2, a: float) -> void:
 	var feet := base + Vector2(FactorySim.BAZAAR_W * CELL * 0.5, FactorySim.BAZAAR_H * CELL - 2.0)
 	var robe := Color(0.52, 0.38, 0.62, a)                                          # plum merchant robe

@@ -8,17 +8,17 @@ render_mode blend_add;
 // specifically "so rock that the veil has taken most of the way down still has something in it"), is
 // scaled by exactly the factor that made the rock dark. Outside the lamp the sampled median is
 // 8.7/255, so to land 2 levels through that veil the floor would have to be 20 levels in lit rock.
-// The mechanism cannot reach its own stated purpose from below the multiply. That is not a tuning
-// failure, it is a layer-order one, and it is why raising GRAIN_AMP, adding an additive companion, and
-// raising the noise frequency all came to nothing (58% -> 55% -> 59%, against a 75% floor).
+// The mechanism cannot reach its own stated purpose from below the multiply. The failure is one of
+// layer order rather than tuning. That is why raising GRAIN_AMP came to nothing; so did an additive
+// companion and so did a higher noise frequency (58% -> 55% -> 59%, against a 75% floor).
 //
 // So this draws the same fine texture again, above the veil, and adds tooth in absolute levels. Being
 // additive and post-veil, what it writes is what arrives.
 //
-// It masks on VOID_ALPHA, which is the other half of the same story: fine_terrain paints the back wall
-// opaque, so rock_grit's `step(0.004, COLOR.a)`, under a comment reading "air gets none of this", was
-// true of the void as well. Before that was fixed, air carried more tooth than rock (grain 2.06 vs
-// 1.83). Texturing both equally cannot separate them, at any amplitude.
+// It masks on VOID_ALPHA, the other half of the same story. fine_terrain paints the back wall opaque.
+// So rock_grit's `step(0.004, COLOR.a)` was true of the void as well, under a comment reading "air
+// gets none of this". Before that was fixed air carried more tooth than rock (grain 2.06 vs 1.83).
+// Texturing both equally cannot separate them at any amplitude.
 //
 // Positive only, because an additive pass cannot subtract. The consequence is honest and small: rock
 // gains about `tooth_add/2` of mean brightness where it is nearly black, which also puts solid rock
@@ -28,12 +28,12 @@ render_mode blend_add;
 
 // The back wall deliberately gets no share of this tooth, and giving it one was measured and rejected.
 //
-// The mask below is `step(0.998, src.a)`, solids only, and the note above explains why: before it, air
-// carried more tooth than rock. That was right about the void and questionable about the back wall, which
-// is not void but the earth you did not dig, one plane behind the face. And the wall is measurably flat:
+// The mask below is `step(0.998, src.a)` and takes solids only. The note above explains why: before it
+// air carried more tooth than rock. That was right about the void and questionable about the back wall.
+// The wall is not void but the earth you did not dig one plane behind the face. And it is measurably flat:
 // inside the lamp at 22 rows, local texture (mean |luma delta| to the neighbouring pixel) is 4.13 on rock
-// against 2.02 on the wall, at medians of 31.5 and 18.8. The hole is not dark, it is smooth, and similar
-// value with no structure is exactly what a cut-out looks like. So the complaint about it is real, and
+// against 2.02 on the wall, at medians of 31.5 and 18.8. The hole is not dark but smooth. Similar
+// value with no structure is exactly what a cut-out looks like. So the complaint about it is real and
 // the word "black" points the wrong way. Dropping this pass costs the rock 1.43 levels/px and the wall
 // nothing, so this one mask is two thirds of the gap.
 //
