@@ -69,8 +69,16 @@ void fragment() {
 	float vig = 1.0 - smoothstep(vignette_inner, vignette_outer, d);
 	col *= mix(1.0 - vignette_strength, 1.0, vig);
 
-	// Animated film grain: a faint per-pixel flicker, re-seeded over time.
-	float g = hash(uv * vec2(1280.0, 720.0) + fract(TIME * time_scale * 0.04) * 137.0);
+	// Animated film grain: a faint per-pixel flicker, re-seeded over time. The hash is fed screen
+	// coordinates in pixels, which is what 1.0 / SCREEN_PIXEL_SIZE is. This was a literal
+	// vec2(1280.0, 720.0), copied from window/size/viewport_width and _height, and the copy was wrong
+	// twice over: nothing kept it in step with the project setting, and the setting was the wrong one to
+	// read anyway, because window/stretch/mode is canvas_items and the framebuffer this pass runs over is
+	// therefore the window rather than the viewport. The literal named a surface the shader is never
+	// handed. No visual change is expected at any resolution, since the hash decorrelates at either step
+	// size; what changes is that the number is now read off the surface instead of duplicated from a
+	// setting. heat_haze.gdshader already reads the surface the same way.
+	float g = hash(uv / SCREEN_PIXEL_SIZE + fract(TIME * time_scale * 0.04) * 137.0);
 	col += (g - 0.5) * grain_amount;
 
 	COLOR = vec4(col, 1.0);
