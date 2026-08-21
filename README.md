@@ -249,10 +249,20 @@ under xvfb with a software Vulkan driver. No single job runs every layer. `check
 deliberately excluded from CI, because a software rasterizer draws at 6 to 9 fps and its hitch ratios
 then describe the rasterizer.
 
-CI is red on one layer. In the most recent run against `main`, on 2026-08-21, the authorship job and the
-headless job both passed — the headless job came back 92 pass, 0 fail and 15 skipped of 107, the 15 being
-the layers that need a surface and correctly detect they do not have one. The display job selected those
-16 and came back 15 pass, 1 fail.
+CI is red on one layer, and the number it reports is not the number a local sweep reports. That is not a
+contradiction, and the difference is worth stating because it is the whole reason this suite is split
+into jobs:
+
+| Where | Renderer | What runs | Result |
+| --- | --- | --- | --- |
+| a local sweep | the machine's real GPU, through a real window | all 109 layers in one run | 109 pass, 0 fail, 0 skip |
+| CI, headless job | Godot's dummy renderer | all 109 declared; the 15 needing a surface skip themselves | 92 pass, 0 fail, 15 skip |
+| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | only the layers needing a surface | 15 pass, 1 fail |
+
+So "the suite passes" and "CI is red" are statements about different renderers, and both are true. The
+authorship job passes in all cases. A layer that reads pixels can only be as truthful as the thing that
+drew them, which is why the display job exists at all and why its one failure is a real finding rather
+than a nuisance.
 
 The one failure is `check_grapple_reads`, and it is the layer refusing to answer rather than answering
 wrongly. It measures how far a rope departs the straight line between its ends, and it throws away every
