@@ -40,6 +40,29 @@ if [ "$ae" != "$want" ] || [ "$ce" != "$want" ]; then
 	exit 1
 fi
 
+# BASE-CLASS NAMESPACE GATE, and it sits ABOVE the mojibake block on purpose: that block opens with
+# `[ -z "$files" ] && exit 0`, and an early return taken for an unrelated reason silently skips every
+# guard after it. The comment at the top of this file says so about the identity gate; this is the same
+# rule applied a second time rather than relearned a second time.
+#
+# It costs nothing (pure text, no engine) and it catches a failure that is invisible where you would look
+# for it: a member added to `tools/check_base.gd` breaks a SUBCLASS, so `--check-only` on the file you
+# edited is clean, and `godot --script` exits 0 on a load failure so the runner scores the broken layer as
+# a PASS. One of those cost a 275-second sweep to find.
+#
+# Runs on any staged `.gd`, in either direction -- the new member can be in the base or in the layer.
+if git diff --cached --name-only --diff-filter=ACM -- '*.gd' | grep -q .; then
+	if [ -x tools/check_base_namespace.sh ] || [ -r tools/check_base_namespace.sh ]; then
+		if ! sh tools/check_base_namespace.sh >/dev/null 2>/tmp/sf_ns.$$; then
+			printf 'COMMIT REFUSED: base-class namespace collision.\n' >&2
+			cat /tmp/sf_ns.$$ >&2
+			rm -f /tmp/sf_ns.$$
+			exit 1
+		fi
+		rm -f /tmp/sf_ns.$$
+	fi
+fi
+
 # MOJIBAKE GATE. `perl -0777 -i -pe` and friends treat a file's bytes as Latin-1: feed one a UTF-8
 # source with an em dash in it and every `—` comes back as `Ã¢ÂÂ`, silently, while the tool prints
 # only "Wide character in print" to stderr. That happened here across five files and 925 characters,
@@ -54,15 +77,24 @@ files=$(git diff --cached --name-only --diff-filter=ACM -- '*.gd' '*.md' '*.sh' 
 bad=""
 for f in $files; do
 	[ -f "$f" ] || continue
+	# A FILE THAT WILL NOT DECODE IS NOT A FILE WITH NOTHING WRONG. This printed 0 on any exception and 0
+	# is the passing value, so the one input most likely to be mojibake -- a file that is no longer valid
+	# UTF-8 -- was the input this gate waved through. `-1` is used as the "could not read" signal because
+	# the count itself can never be negative, and the branch below refuses on it explicitly rather than
+	# letting it fall into the numeric comparison.
 	n=$(python3 -c "
 import sys
 try:
     s = open('$f', encoding='utf-8').read()
 except Exception:
-    print(0); sys.exit()
+    print(-1); sys.exit()
 print(sum(1 for c in s if 0x80 <= ord(c) <= 0x9f))
 " 2>/dev/null)
-	[ "${n:-0}" -gt 0 ] && bad="$bad\n  $f ($n control characters)"
+	if [ "${n:-x}" = "x" ] || [ "${n:-x}" = "-1" ]; then
+		bad="$bad\n  $f (COULD NOT BE READ AS UTF-8 — which is what this gate is looking for)"
+	elif [ "$n" -gt 0 ]; then
+		bad="$bad\n  $f ($n control characters)"
+	fi
 done
 if [ -n "$bad" ]; then
 	printf 'COMMIT REFUSED: mojibake (U+0080-U+009F) in staged files:%b\n' "$bad" >&2
