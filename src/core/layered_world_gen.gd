@@ -36,19 +36,30 @@ const STRATA_BAND_H: int = 4
 ## One band in every N is a hard shelf; a hash of the band-group index fixes which, so layering is stable.
 ##
 ## Do not lower this to 2. Scattering the shelves fixed a real defect: they used to land in bands 0 to 7,
-## a contiguous 32-row slab across the whole shallow world with nothing below it. But scattering also took
-## the shallow count from eight shelves to six, and the frontier richness margin fell from 3.05x spawn to
-## 1.13x, under the 1.15x floor that separates a margin from noise.
+## a contiguous 32-row slab across the whole shallow world with nothing below it. The reason to keep it at
+## 3 is that three `surface_row` assertions about a shaft floor staying inside the legal ground band fail
+## at 2 and pass at 3. Both directions were checked against the same fixture, so the attribution is
+## controlled rather than coincidental.
 ##
-## Density looks like the obvious lever and is not. At 2 the arithmetic gives nine shelves spread from row
-## 4 to row 71, more than the old eight and reaching full depth, and richness recovers to 1.51x. But three
-## `surface_row` assertions about a shaft floor staying inside the legal ground band fail there, and pass
-## at 3. Both directions were checked against the same fixture, so the attribution is controlled rather
-## than coincidental: at 2 the trade is one failure for three.
+## THE RICHNESS ARGUMENT THAT USED TO STAND HERE IS WITHDRAWN. It read: scattering took the frontier
+## richness margin from 3.05x spawn to 1.13x, "under the 1.15x floor that separates a margin from noise",
+## and lowering this constant to 2 recovered it to 1.51x. Every one of those numbers came from a statistic
+## that could not measure the property. It summed TOTAL ore over two windows with unequal amounts of rock
+## left in them, on a window the horizontal field itself rates as neutral, pricing base-layer ore at 1
+## where the game pays 250. Measured as richness per solid cell at the edge the field actually favours,
+## the corrected world clears the same floor on twelve seeds out of twelve, worst case 1.246x. Scattering
+## did not cost the frontier anything; the ruler was wrong. See `tests/test_worldgen.gd`.
 ##
-## The two legibility gauges barely move either way (rock-versus-air 72% to 73%, paint roughness 6.5% to
-## 6.6%), which is the other half of the result: they are a rendering property and not a density one, so
-## no value of this constant was ever going to settle them.
+## The phrase "the 1.15x floor that separates a margin from noise" was the worst of it, and is the reason
+## the whole paragraph is quoted rather than deleted: 1.15 is an inline literal in a test, written when the
+## observed value was 6.3x, and this comment had promoted it to a design constraint inside the generator by
+## restating it. A number does not become a requirement by being cited.
+##
+## The legibility gauges quoted alongside it (rock-versus-air 72% to 73%) are withdrawn too, and for a
+## different reason: that layer was reading the real mouse pointer, and its run-to-run spread was 4.24
+## points, so a one-point difference was never a measurement. The conclusion it was offered for still
+## holds, and now holds more firmly than the evidence did — a difference inside the instrument's own noise
+## is not evidence that this constant moves legibility.
 const STRATA_SHELF_EVERY: int = 3
 ## Added to the carve threshold inside a shelf band, so it survives as a continuous ledge.
 const STRATA_SHELF_RESIST: float = 0.34

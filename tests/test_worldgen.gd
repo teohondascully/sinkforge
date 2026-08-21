@@ -809,54 +809,116 @@ func _test_worldgen_fuzz() -> void:
 		% ("OK" if lode_tier_fail == "" else lode_tier_fail))
 
 
-## The horizontal ore pull: ore richness varies across X at a fixed depth, with the richest bands AWAY
-## from spawn, so the cheapest fresh vein is not always straight down the spawn column. Asserts the
-## distribution is NOT uniform across x, meaning frontier x-regions exist that are richer than the spawn
-## region, and that the horizontal term is fully deterministic in the seed.
+## THE FRONTIER IS WHERE THE FIELD IS STRONGEST, AND RICHNESS IS ORE PER UNIT OF ROCK.
+##
+## Both halves of that sentence are corrections, and between them they are why this test read 1.13x while
+## the world it was measuring delivers between 1.25x and 4.27x.
+##
+## WHAT IT USED TO DO. Total ore mass in a 16-column window at each map edge, `max()` of the two, over the
+## same total at spawn, on one hardcoded seed. Four things wrong with that, in rising order of severity:
+##
+##   `max()` PICKS A WINDOW THAT IS NOT A FRONTIER. Spawn sits at column 48 of 128, so the two edges are
+##   48 and 79 columns away and the field normalises by the larger. Measured across twelve seeds, the left
+##   window's mean multiplier is 1.02 -- the NEUTRAL value -- while the right window's is 1.23. The left
+##   edge is not a frontier under the field's own definition, and taking the larger TOTAL of the two
+##   quietly selects it whenever it happens to hold more ore.
+##
+##   A TOTAL IS NOT A RICHNESS. Rifts and sinkholes carve rock away, and both have keepouts that exclude
+##   the spawn window (RIFT_SPAWN_KEEPOUT covers columns 38-58, SINKHOLE_KEEPOUT covers 28-67). Carved
+##   cells hold no ore, so carving depresses the frontier's numerator while protecting spawn's. The
+##   comparison is between two windows with different amounts of rock in them, scored as though they had
+##   the same.
+##
+##   ORE WITH NO `amounts` ENTRY WAS PRICED AT 1. `HeightmapWorldGen` writes base veins without an entry,
+##   and the documented contract is that an absent entry reads as `FactorySim.DEFAULT_ORE_DEPOSIT`. Around
+##   76 cells worth ~19,000 units were scoring as ~76.
+##
+##   ONE SEED, AND NOT THE SHIPPING ONE. 20260807, where the game ships 1337.
+##
+## THE FAILING SEED IS THE COROLLARY, NOT A COINCIDENCE. On 20260807 the right window carries the highest
+## field value in the whole corpus (1.29) and has lost HALF ITS ROCK to carving: 358 solid cells against
+## spawn's 704. Its density is 1.25x spawn and its total is not, so `max()` selected the left window
+## instead -- at multiplier 0.99, the neutral point -- and 21806/19288 gives exactly the 1.13x reported.
+## The design was working and the instrument could not see it.
+##
+## WHAT IT DOES NOW. The frontier is chosen by asking the field which edge it favours, richness is ore
+## mass per solid cell, ore is priced the way the game prices it, and the whole thing runs over a
+## twelve-seed corpus instead of one draw.
+##
+## THE FLOOR IS UNCHANGED AT 1.15. It was never earned -- it is an inline literal, written when the
+## observed value was 6.3x, with no arithmetic relating it to anything -- but this is not the commit to
+## re-derive it in, and moving a bar while also changing what it measures would make both unreviewable.
+## Corrected, the corpus clears it 12 of 12 with a worst case of 1.246.
+##
+## AND THE CORRECTION IS NOT SELF-SERVING, which is the part worth checking. Pricing ore properly makes
+## the worst seed WORSE, 1.259 down to 1.246, and it was adopted anyway because 250 is what the game pays.
+## The old total is still computed and printed on every seed, unasserted: a cue that gets disqualified
+## also stops being able to warn you, so it stays visible.
+const FRONTIER_SEEDS: Array[int] = [1337, 0, 1, 7, 42, 99999, 20260807, 314159, 2, 123456789, 555, 88888]
+const FRONTIER_FLOOR: float = 1.15
+const FRONTIER_BAND_TOP: int = 30
+const FRONTIER_HALF: int = 8
+
+
 func _test_horizontal_ore_pull() -> void:
 	print("- horizontal ore pull (frontier richness)")
 	var gen := LayeredWorldGen.new()
 	var cols: int = FactorySim.GRID_COLS
 	var rows: int = FactorySim.GRID_ROWS
-	var world: WorldData = gen.generate(cols, rows, 20260807)
+	var band_bot: int = mini(LayeredWorldGen.SEAL_TOP, rows)
 
-	# Determinism: the whole world, blocks and amounts alike, reproduces bit for bit, so the horizontal
-	# field carries no time or global-random dependence.
+	# Determinism, on the seed this test has always used: the whole world, blocks and amounts alike,
+	# reproduces bit for bit, so the horizontal field carries no time or global-random dependence.
+	var world: WorldData = gen.generate(cols, rows, 20260807)
 	var again: WorldData = gen.generate(cols, rows, 20260807)
 	_check(world.blocks == again.blocks, "same seed → identical blocks (horizontal field is deterministic)")
 	_check(world.amounts == again.amounts, "same seed → identical per-cell deposits (deterministic richness)")
 
-	# Sum ore MASS (deposit richness) per column over a FIXED depth band, so any variation is purely
-	# horizontal with depth held constant. The band stays above the seal so every cell is real ore rock.
-	var band_top: int = 30
-	var band_bot: int = mini(LayeredWorldGen.SEAL_TOP, rows)
-	var col_mass: PackedInt32Array = PackedInt32Array()
-	col_mass.resize(cols)
-	for cell: Vector2i in world.blocks:
-		var m: StringName = world.blocks[cell]
-		if (m == &"ore" or m == &"rich_ore" or m == &"coal") and cell.y >= band_top and cell.y < band_bot:
-			col_mass[cell.x] += int(world.amounts.get(cell, 1))
+	var worst: float = 1.0e9
+	var worst_seed: int = 0
+	var richer: int = 0
+	var with_ore: int = 0
+	for s: int in FRONTIER_SEEDS:
+		var w: WorldData = gen.generate(cols, rows, s)
+		var hf: PackedFloat32Array = gen._horizontal_field(cols, s)
+		# ASK THE FIELD WHICH EDGE IS THE FRONTIER rather than asserting it, so this keeps meaning the
+		# same thing if SPAWN_COL or the world width ever move.
+		var lo: int = 0
+		var hi: int = 2 * FRONTIER_HALF
+		if _mean_field(hf, cols - 2 * FRONTIER_HALF, cols) > _mean_field(hf, 0, 2 * FRONTIER_HALF):
+			lo = cols - 2 * FRONTIER_HALF
+			hi = cols
+		var sp: Dictionary = _band_ore(w, LayeredWorldGen.SPAWN_COL - FRONTIER_HALF,
+			LayeredWorldGen.SPAWN_COL + FRONTIER_HALF, band_bot)
+		var fr: Dictionary = _band_ore(w, lo, hi, band_bot)
+		var ratio: float = float(fr["density"]) / maxf(0.001, float(sp["density"]))
+		if int(sp["mass"]) + int(fr["mass"]) > 0:
+			with_ore += 1
+		if float(fr["density"]) > float(sp["density"]):
+			richer += 1
+		if ratio < worst:
+			worst = ratio
+			worst_seed = s
+		# THE RETIRED QUANTITY, REPRODUCED EXACTLY, printed and never asserted. A cue that gets
+		# disqualified also stops being able to warn you, so it stays visible -- but only if it is
+		# genuinely the old cue. The first version of this line took the max of the FIELD-SELECTED
+		# frontier and spawn, which is a different statistic wearing the old one's label: it printed
+		# 1.00x on seed 20260807 where the assertion being replaced printed 1.13x. It has to be
+		# max(LEFT, RIGHT) over spawn, at unit pricing, or it is not the number anybody is comparing to.
+		var west: Dictionary = _band_ore(w, 0, 2 * FRONTIER_HALF, band_bot)
+		var east: Dictionary = _band_ore(w, cols - 2 * FRONTIER_HALF, cols, band_bot)
+		var old_total: float = float(maxi(int(west["unit_mass"]), int(east["unit_mass"]))) \
+			/ float(maxi(1, int(sp["unit_mass"])))
+		print("    seed %-10d frontier %3d-%-3d  %6.1f vs %6.1f = %.2fx   rock %d/%d   (old total %.2fx)"
+			% [s, lo, hi - 1, fr["density"], sp["density"], ratio, fr["rock"], sp["rock"], old_total])
 
-	# Region masses: a spawn-centred window vs the two frontier edges (away from spawn on either side).
-	var spawn: int = LayeredWorldGen.SPAWN_COL
-	var half: int = 8
-	var spawn_mass: int = _region_mass(col_mass, spawn - half, spawn + half)
-	var left_mass: int = _region_mass(col_mass, 0, 2 * half)                     # far-left frontier
-	var right_mass: int = _region_mass(col_mass, cols - 2 * half, cols)          # far-right frontier
-	var frontier_mass: int = maxi(left_mass, right_mass)
-
-	# Not uniform: at a fixed depth some x-regions carry more ore than the spawn region, which is the
-	# "you must leave spawn" pull. The first check guards against a degenerate all-empty band.
-	_check(spawn_mass + frontier_mass > 0, "the fixed depth band actually contains ore (spawn=%d, frontier=%d)"
-		% [spawn_mass, frontier_mass])
-	_check(frontier_mass > spawn_mass, "a frontier x-region is richer than spawn at a fixed depth (frontier=%d > spawn=%d)"
-		% [frontier_mass, spawn_mass])
-
-	# And the variation is a real spread rather than one lucky cell: the richest window must clear the
-	# spawn window by at least 15%. The field spans up to 2×HORIZONTAL_STRENGTH between bands.
-	_check(frontier_mass >= int(round(float(maxi(1, spawn_mass)) * 1.15)),
-		"the frontier richness edge is a meaningful margin, not noise (%.2fx spawn)"
-		% (float(frontier_mass) / float(maxi(1, spawn_mass))))
+	_check(with_ore == FRONTIER_SEEDS.size(),
+		"every seed puts ore in the measured band (%d of %d)" % [with_ore, FRONTIER_SEEDS.size()])
+	_check(richer == FRONTIER_SEEDS.size(),
+		"the frontier is richer than spawn on every seed (%d of %d)" % [richer, FRONTIER_SEEDS.size()])
+	_check(worst >= FRONTIER_FLOOR,
+		"the frontier richness edge is a meaningful margin on every seed — worst %.3fx on seed %d (floor %.2fx)"
+			% [worst, worst_seed, FRONTIER_FLOOR])
 
 	# The field respects its own bound, which is the subtlety guarantee: every column multiplier is
 	# within [1-STRENGTH, 1+STRENGTH], so near-spawn ore is thinned but never nuked.
@@ -869,12 +931,38 @@ func _test_horizontal_ore_pull() -> void:
 	_check(in_bound, "the horizontal multiplier stays bounded by HORIZONTAL_STRENGTH (subtle, never nukes spawn)")
 
 
-## Sum a slice [lo, hi) of a per-column mass array, clamped to bounds. (test helper)
-func _region_mass(col_mass: PackedInt32Array, lo: int, hi: int) -> int:
-	var total: int = 0
-	for c: int in range(maxi(0, lo), mini(col_mass.size(), hi)):
-		total += col_mass[c]
-	return total
+## Mean horizontal multiplier over a column slice. What the field ASKS for, as distinct from what the
+## world delivers once carving and the field-blind ore passes have had their say.
+func _mean_field(hf: PackedFloat32Array, lo: int, hi: int) -> float:
+	var total: float = 0.0
+	for x: int in range(maxi(0, lo), mini(hf.size(), hi)):
+		total += hf[x]
+	return total / float(maxi(1, hi - lo))
+
+
+## Ore mass and solid-cell count for one window of the fixed depth band, plus the density that is the
+## ratio of the two. `rock` is the denominator the old version never divided by; without it two windows
+## with very different amounts of rock left in them get compared as though they were the same sample.
+##
+## `unit_mass` is the retired quantity, kept only so the old number stays printable: it prices an ore cell
+## with no `amounts` entry at 1, which is what the previous assertion did, where `mass` prices it at
+## DEFAULT_ORE_DEPOSIT the way every consumer in the game does.
+func _band_ore(w: WorldData, lo: int, hi: int, bot: int) -> Dictionary:
+	var mass: int = 0
+	var unit_mass: int = 0
+	var rock: int = 0
+	for x: int in range(maxi(0, lo), mini(w.cols, hi)):
+		for y: int in range(FRONTIER_BAND_TOP, bot):
+			var c := Vector2i(x, y)
+			if not w.blocks.has(c):
+				continue                        # carved away: counts against the rock denominator
+			rock += 1
+			var m: StringName = w.blocks[c]
+			if m == &"ore" or m == &"rich_ore" or m == &"coal":
+				mass += int(w.amounts.get(c, FactorySim.DEFAULT_ORE_DEPOSIT))
+				unit_mass += int(w.amounts.get(c, 1))
+	return {"mass": mass, "unit_mass": unit_mass, "rock": rock,
+		"density": float(mass) / float(maxi(1, rock))}
 
 
 ## Ore quality: vein seeds landing in or below the deepslate band come up RICH, a distinct material that
