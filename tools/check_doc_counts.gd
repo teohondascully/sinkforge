@@ -26,7 +26,7 @@ extends "res://tools/check_base.gd"
 ##     bash tools/with_machine.sh --headless --script res://tools/check_doc_counts.gd
 
 const RUNNER: String = "res://tools/run_harness.sh"
-const DOCS: Array[String] = ["res://README.md", "res://CONTRIBUTING.md"]
+const DOCS: Array[String] = ["res://README.md", "res://CONTRIBUTING.md", "res://docs/ENGINEERING.md"]
 
 ## Phrases that state the registered-layer count. Each pattern must capture the number in group 1. Kept as
 ## patterns rather than as one loose `[0-9]+ layers` because this file also says "17 layers" about the
@@ -40,7 +40,17 @@ const CLAIMS: Array[String] = [
 	# nothing, `found` would quietly drop from 4 to 3, and MIN_CLAIMS of 3 would still pass. A blind scan
 	# reporting a clean tree is the exact shape this layer exists to catch, so it must not have it.
 	"([0-9]+) is a count of registered layers",
+	"([0-9]+) registered check layers",
 ]
+
+## The per-verb counts, which the total cannot cover. `docs/ENGINEERING.md` prints a table of the three
+## execution classes, and a table cell is exactly where a number goes stale unnoticed: it is not in a
+## sentence anyone rereads. Each pattern must capture its number in group 1, keyed by the verb it claims.
+const VERB_CLAIMS: Dictionary = {
+	"add": "\\| `add` \\| ([0-9]+) \\|",
+	"add_gl": "\\| `add_gl` \\| ([0-9]+) \\|",
+	"add_excl": "\\| `add_excl` \\| ([0-9]+) \\|",
+}
 
 ## Below this the scan is not reading the documents, whatever it reports about them.
 const MIN_CLAIMS: int = 3
@@ -67,6 +77,17 @@ func _initialize() -> void:
 					"%s says %d where the runner registers %d (\"%s\")"
 					% [doc.get_file(), claimed, registered, m.get_string(0)])
 
+	for verb: String in VERB_CLAIMS:
+		var want: int = _count_registrations(verb)
+		var re := RegEx.new()
+		re.compile(VERB_CLAIMS[verb])
+		for doc: String in DOCS:
+			for m: RegExMatch in re.search_all(_read(doc)):
+				found += 1
+				_check(int(m.get_string(1)) == want,
+					"%s says %s layers use `%s` where the runner registers %d"
+					% [doc.get_file(), m.get_string(1), verb, want])
+
 	_check(found >= MIN_CLAIMS,
 		"the scan actually found the layer-count claims (%d found, at least %d expected)"
 		% [found, MIN_CLAIMS])
@@ -76,11 +97,14 @@ func _initialize() -> void:
 
 ## The three registration verbs, each requiring a trailing SPACE. Without it this matches `add() {`, which
 ## is the definition of the verb rather than a use of it, and inflates the count by exactly three.
-func _count_registrations() -> int:
+func _count_registrations(verb: String = "") -> int:
 	var text: String = _read(RUNNER)
 	var n: int = 0
 	for line: String in text.split("\n"):
-		if line.begins_with("add ") or line.begins_with("add_gl ") or line.begins_with("add_excl "):
+		if verb.is_empty():
+			if line.begins_with("add ") or line.begins_with("add_gl ") or line.begins_with("add_excl "):
+				n += 1
+		elif line.begins_with(verb + " "):
 			n += 1
 	return n
 

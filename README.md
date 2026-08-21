@@ -265,6 +265,7 @@ that is the case.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to run the game and the tests, the house conventions, how to add a harness layer |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | every system, its responsibility, its public API, and what depends on it |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | the decision record: what was decided, why, and where in the repository to check it |
+| [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | how the project is verified: the three execution classes, why an assertion that cannot fail is a defect, and what the capture manifest is for |
 | [`docs/HARNESS_LAYERS.md`](docs/HARNESS_LAYERS.md) | the shape of a test layer and the failure modes this suite has actually hit |
 | [`docs/GDD.md`](docs/GDD.md) | the design document — what the game is trying to be |
 | [`docs/PROGRESSION.md`](docs/PROGRESSION.md) | the depth ladder: gates, research, and what each layer is for |
