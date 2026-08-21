@@ -174,8 +174,16 @@ for layer in "${LAYERS[@]}"; do
 		# rows)", "(drought 19)". Pull the parenthesised groups that contain a digit off the PASS/FAIL lines
 		# and put one seed per line. Deliberately dumb: any layer that prints its numbers the normal way
 		# shows up here without the corpus knowing anything about that layer.
-		nums=$(grep -hE "^[[:space:]]*(PASS|FAIL)" "$log" 2>/dev/null \
-			| grep -oE '\([^)]*[0-9][^)]*\)' | head -4 | tr '\n' ' ')
+		allnums=$(grep -hE "^[[:space:]]*(PASS|FAIL)" "$log" 2>/dev/null \
+			| grep -oE '\([^)]*[0-9][^)]*\)')
+		if [ -z "$allnums" ]; then
+			nums=""
+		else
+			ngroups=$(printf '%s\n' "$allnums" | grep -c .)
+			nums=$(printf '%s\n' "$allnums" | head -4 | tr '\n' ' ')
+			# A cap that drops evidence without saying so reads as "that was all of it". It was not.
+			[ "$ngroups" -gt 4 ] && nums="$nums(+$((ngroups - 4)) more, see the log) "
+		fi
 		if [ -n "$nums" ]; then
 			[ "$shown" = 0 ] && { echo; echo "--- $layer"; shown=1; }
 			printf '  seed %-10s %s\n' "$s" "$nums"
@@ -227,8 +235,21 @@ if [ "$seed_blind" -gt 0 ]; then
 	echo "$seed_blind LAYER(S) ARE SEED-BLIND — see the flags above. Their columns are not coverage."
 	echo
 fi
-echo "$total_fail RED CELL(S) — the generator is seed-fragile at these points:"
-for c in "${FAILED_CELLS[@]}"; do echo "  $c"; done
+# A red cell says THIS LAYER failed on THIS SEED. It does not say the generator did it. The layer and the
+# play driver are both inside the measurement, and the first time this ran, two of the five red cells were a
+# driver that could not finish the opening rather than a world that was badly shaped.
+echo "$total_fail RED CELL(S) — this layer failed on this seed:"
+for c in "${FAILED_CELLS[@]}"; do
+	echo "  $c"
+	_layer="${c%% @ seed *}"; _seed="${c##* }"
+	# THE ASSERTION TEXT, not a digit-filtered sample of it. The numbers block above only pulls
+	# parenthesised groups CONTAINING A DIGIT, so an assertion whose parenthetical is words was invisible
+	# there — and on the first corpus run that was the single most important line in the whole sweep:
+	# "FAIL: the session is playable at all (the opening reached first automation)" fired on two seeds and
+	# never reached the summary, which showed only the dead-air and density numbers that are downstream of
+	# it. A summary that cannot print a failure is worse than no summary, because it looks like one.
+	grep -hE "^[[:space:]]*FAIL" "$DIR/$_layer.$_seed.log" 2>/dev/null | sed -E 's/^[[:space:]]*/      /'
+done
 echo
 echo "Logs for failing cells: ${TMPDIR:-/tmp}/seed_corpus.<layer>.<seed>.log"
 echo "This is a FINDING. Do not lower a floor to clear it."
