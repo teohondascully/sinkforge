@@ -268,10 +268,25 @@ code=$?
 #
 # So the protocol lives in `tools/lock_lib.sh` and this asserts that it still lives ONLY there. A future
 # copy-paste is caught here rather than by the next person to lose a measurement to two engines.
+## DOES THIS FILE ACTUALLY SOURCE THAT LIBRARY, as opposed to mentioning it?
+##
+## Both of these properties were written as `grep -q 'lock_lib\.sh' "$file"` and neither could fail. Every
+## caller carries a COMMENT above its source line -- "The lock protocol lives in one file. See
+## tools/lock_lib.sh for why" -- so the grep matched the explanation whether or not the `.` line beneath it
+## survived. Deleting the source line outright left the property green.
+##
+## It went unnoticed because the pair was watched red on the WRONG HALF: a local `lock_release` appended to
+## `seed_corpus.sh` turns the DUPES assertion red and leaves the SOURCES one untouched, so a red was
+## observed, from the neighbouring property, and the pair was recorded as watched. Two assertions on one
+## line of output is one assertion as far as evidence goes.
+_srcs() {
+	grep -qE "^[[:space:]]*(\.|source)[[:space:]].*$2\.sh" "$1"
+}
+
 lib_users=0
 lib_dupes=""
 for f in tools/with_machine.sh tools/run_harness.sh tools/seed_corpus.sh; do
-	grep -q 'lock_lib\.sh' "$ROOT/$f" && lib_users=$((lib_users + 1))
+	_srcs "$ROOT/$f" lock_lib && lib_users=$((lib_users + 1))
 	for fn in lock_claim_write lock_claim lock_release lock_steal; do
 		grep -qE "^${fn}\(\)" "$ROOT/$f" && lib_dupes="$lib_dupes $f:$fn"
 	done
@@ -285,6 +300,50 @@ for fn in lock_claim_write lock_claim lock_release lock_steal; do
 	grep -qE "^${fn}\(\)" "$ROOT/tools/lock_lib.sh" && lib_defs=$((lib_defs + 1))
 done
 [ "$lib_defs" -eq 4 ]; check $? "...and the shared protocol defines all four entry points ($lib_defs of 4)"
+
+# --- AND THE SAME THREE PROPERTIES FOR THE WALL-CLOCK CAP ---
+# The cap left `with_machine.sh` for `tools/cap_lib.sh` when `run_harness.sh` needed it for its three
+# `save_sentinel.gd` calls and could not have it: this script's first act is to take the lock the runner is
+# already holding, so a bound that only exists inside the lock-TAKER is unavailable to the lock-HOLDER.
+#
+# Guarded structurally on the day it was extracted rather than after it diverges, because the lock's own
+# extraction is the argument. Three copies of that protocol were reviewed as "identical today, merely
+# unverified" -- and `lock_claim_write` had ALREADY diverged, writing a two-line owner file in one of the
+# three, so waiters behind a corpus sweep were told a run was in progress and never told what it was. The
+# review was accurate about the two functions it diffed and was quoted as being about the protocol.
+cap_users=0
+cap_dupes=""
+for f in tools/with_machine.sh tools/run_harness.sh; do
+	_srcs "$ROOT/$f" cap_lib && cap_users=$((cap_users + 1))
+	for fn in cap_watch cap_done; do
+		grep -qE "^${fn}\(\)" "$ROOT/$f" && cap_dupes="$cap_dupes $f:$fn"
+	done
+done
+[ "$cap_users" -eq 2 ]; check $? "both cap users source the shared watchdog ($cap_users of 2)"
+[ -z "$cap_dupes" ]; check $? "and neither redefines it locally${cap_dupes:+ -$cap_dupes}"
+cap_defs=0
+for fn in cap_watch cap_done; do
+	grep -qE "^${fn}\(\)" "$ROOT/tools/cap_lib.sh" && cap_defs=$((cap_defs + 1))
+done
+[ "$cap_defs" -eq 2 ]; check $? "...and the shared watchdog defines both entry points ($cap_defs of 2)"
+
+# THE WATCHDOG MUST NOT SLEEP THE WHOLE CAP, which is the one implementation detail worth asserting rather
+# than trusting, because the obvious version CAUSED the failure the cap prevents: killing the subshell
+# leaves its `sleep`, which is a separate process, which inherits the caller's stdout and holds the pipe
+# for the remainder of the cap. A fast successful run then returned nothing for CAP seconds. Measured at
+# exactly 20s under SF_RUN_CAP=20 and 5s under SF_RUN_CAP=5, with a child that exited immediately.
+# COMMENTS ARE STRIPPED FIRST, and the first version of this did not do that and failed on a correct file.
+# `cap_lib.sh` explains the hazard by NAMING the bad pattern -- "the obvious version, `sleep "$CAP"` in a
+# subshell, CAUSED the failure the cap exists to prevent" -- and a grep for the bad pattern found the
+# sentence warning against it. The guard was reading the prose about its subject as its subject.
+if sed 's/#.*//' "$ROOT/tools/cap_lib.sh" | grep -qE 'sleep +"?\$(_cw_secs|\{_cw_secs\}|CAP)'; then
+	false
+else
+	true
+fi
+check $? "the watchdog polls rather than sleeping the whole cap (no orphan holding stdout)"
+grep -q '>/dev/null &' "$ROOT/tools/cap_lib.sh"
+check $? "...and the watchdog subshell never holds the caller's stdout at all"
 
 echo
 if [ "$fails" -eq 0 ]; then

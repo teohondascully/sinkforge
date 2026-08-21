@@ -710,6 +710,52 @@ LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 # The lock protocol lives in one file. See tools/lock_lib.sh for why: it was three hand-maintained copies,
 # two safety defects had to be fixed in each of them by hand, and they had already diverged.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lock_lib.sh"
+# And the wall-clock cap, for the same reason. See tools/cap_lib.sh.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cap_lib.sh"
+
+# THE SAVE SENTINEL, THROUGH A BOUND. Three calls -- arm, verify, disarm -- and every one of them used to
+# be a bare `"$GODOT" --headless ... | grep`, with no cap of any kind, in the one part of this suite whose
+# failure costs a person their save file rather than a red square.
+#
+# TWO OF THE THREE RUN WHILE THE MACHINE LOCK IS HELD, so a hang there does not merely stall this run: it
+# wedges the box for every run queued behind it, and it does so while looking completely healthy. This
+# repository has already watched a Godot process idle for thirty-nine minutes at 0.6% CPU while its caller
+# was told the command completed, and separately has a standing note about `godot` stalling at 0% forever
+# after the banner when the OS keyring is wedged -- which is precisely a boot that never reaches `quit()`.
+#
+# GENEROUS, because the job is to turn "forever" into "bounded" and not to police a legitimate boot. Arm
+# and verify take a few seconds; five minutes is two orders of magnitude of headroom.
+SENTINEL_CAP="${SF_SENTINEL_CAP:-300}"
+
+## sentinel <verb> -- run save_sentinel.gd, echo its own lines, and return 0 only if it really reported.
+##
+## The original was `if ! "$GODOT" ... | grep -E '^save_sentinel:'`, whose meaning under `pipefail` is "the
+## engine exited 0 AND printed at least one sentinel line". That conjunction is deliberate and is preserved
+## exactly: an engine that exits 0 having printed nothing is the load-failure case, and a sentinel that
+## prints nothing has not told us whether the player's save is intact. Output goes to a file rather than a
+## pipe because the process has to be BACKGROUNDED to be watched, and a backgrounded pipeline gives us the
+## pid of the wrong end of it.
+sentinel() {
+	_sv_out="$(mktemp "${TMPDIR:-/tmp}/sinkforge-sentinel.XXXXXX")"
+	"$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- "$1" "$SENTINEL" \
+		>"$_sv_out" 2>&1 &
+	_sv_pid=$!
+	cap_watch "$_sv_pid" "$SENTINEL_CAP" "save_sentinel $1"
+	wait "$_sv_pid"
+	_sv_st=$?
+	cap_done
+	grep -E '^save_sentinel:' "$_sv_out"
+	_sv_grep=$?
+	rm -f "$_sv_out"
+	# A CAPPED SENTINEL IS NOT A FAILED SENTINEL AND MUST NOT BE READ AS ONE. It is a sentinel that never
+	# answered, which is the state every caller here is least equipped to handle silently, so it says so.
+	if [ "$CAP_HIT" = "1" ]; then
+		echo "  !! save_sentinel $1 was KILLED by the ${SENTINEL_CAP}s cap -- it never answered."
+		echo "     This is not a verdict about the save slot. Nothing here knows its state."
+		return 1
+	fi
+	[ "$_sv_st" = "0" ] && [ "$_sv_grep" = "0" ]
+}
 
 
 LOCK_WAIT="${SF_LOCK_WAIT:-900}"
@@ -779,8 +825,7 @@ harness_cleanup() {
 	# exits 0 on every path and removes only bytes still identical to what it planted, so a slot something
 	# else wrote during the run survives as evidence instead of being tidied away.
 	if [ "$SENTINEL_ARMED" = "1" ]; then
-		"$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- disarm "$SENTINEL" 2>&1 \
-			| grep -E '^save_sentinel:' || true
+		sentinel disarm || true
 	fi
 	lock_release
 	rm -rf "$MARKS"
@@ -918,7 +963,7 @@ fi
 # Arm the save sentinel BEFORE any layer launches. A failure here is fatal: running unguarded is exactly
 # the situation that cost a developer their save.
 SENTINEL="$DIR/save_sentinel.state"
-if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- arm "$SENTINEL" 2>&1 | grep -E '^save_sentinel:'; then
+if ! sentinel arm; then
 	echo "  !! could not arm the save sentinel — refusing to run the harness unguarded"
 	exit 2
 fi
@@ -1101,7 +1146,7 @@ echo
 # is still an accusation about a neighbour and not about a layer. Check for a second `run_harness.sh`
 # before believing this one. (The same neighbour also makes check_frametime hitch, since it measures
 # milliseconds while a dozen other Godot processes fight it for the GPU.)
-if ! "$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- verify "$SENTINEL" 2>&1 | grep -E '^save_sentinel:'; then
+if ! sentinel verify; then
 	echo
 	echo "!! THE HARNESS TOUCHED THE PRODUCTION SAVE SLOT. Layer results ($pass pass / $fail fail) are moot."
 	exit 3

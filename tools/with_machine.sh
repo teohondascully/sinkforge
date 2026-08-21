@@ -27,6 +27,8 @@ LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
 # The lock protocol lives in one file. See tools/lock_lib.sh for why: it was three hand-maintained copies,
 # two safety defects had to be fixed in each of them by hand, and they had already diverged.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lock_lib.sh"
+# And the wall-clock cap, for the same reason. See tools/cap_lib.sh.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cap_lib.sh"
 
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -149,7 +151,6 @@ lock_claim_write "$_claim"
 # long a fixture may legitimately take, so the default would not have interrupted any real run in this
 # repo's history. `SF_RUN_CAP=0` disables it for a run that genuinely needs longer.
 CAP="${SF_RUN_CAP:-1800}"
-CAPMARK="$(mktemp "${TMPDIR:-/tmp}/sinkforge-cap.XXXXXX")"
 
 # WHERE THE WINDOW LANDS, because the box has an owner and they are using it. Layers that photograph the
 # renderer need a real surface, so they open a real window — which on macOS arrives wherever the OS feels
@@ -175,62 +176,24 @@ fi
 _child=$!
 # The child joins the trap: a SIGTERM to the wrapper must not leave an orphaned Godot holding the box after
 # the lock directory it was blocking on has already been removed.
-trap 'lock_release; kill "$_child" 2>/dev/null; rm -f "$CAPMARK"' EXIT INT TERM
+trap 'lock_release; kill "$_child" 2>/dev/null; [ -n "${CAP_MARK:-}" ] && rm -f "$CAP_MARK"' EXIT INT TERM
 
-_dog=""
-if [ "$CAP" -gt 0 ]; then
-	# POLLED IN ONE-SECOND STEPS, AND NOT `sleep "$CAP"`, because the obvious version of this watchdog
-	# caused the exact failure the cap exists to prevent. `kill "$_dog"` below kills the SUBSHELL; the
-	# `sleep` it is blocked in is a separate process, so it survives, gets reparented to init, and runs
-	# out the rest of the cap. That orphan inherited the wrapper's stdout, which means it held the write
-	# end of the caller's pipe: `bash tools/with_machine.sh ... | tail` printed nothing and returned
-	# nothing for CAP seconds AFTER Godot had already exited 0. A clean, fast, SUCCESSFUL run was
-	# indistinguishable from a hang, and at the default cap it looked like a thirty-minute one.
-	#
-	# It cost four abandoned runs, each retry restarting the work and leaving another orphan behind;
-	# seven were alive on the box when this was finally read. Measured rather than reasoned: with a
-	# child that exits immediately, `SF_RUN_CAP=20` made the piped call take twenty seconds and
-	# `SF_RUN_CAP=5` five, which is the cap dialling the hang it was supposed to bound.
-	#
-	# So the watchdog now ENDS ITSELF the moment the child is gone instead of waiting to be killed, and
-	# the longest-lived orphan it can leave is one second. `>/dev/null` is the belt to that braces: this
-	# subshell never holds the caller's stdout at all, whatever it happens to be blocked in.
-	(
-		_left="$CAP"
-		while [ "$_left" -gt 0 ]; do
-			kill -0 "$_child" 2>/dev/null || exit 0
-			sleep 1
-			_left=$((_left - 1))
-		done
-		if kill -0 "$_child" 2>/dev/null; then
-			# Mark BEFORE killing, so the status below can tell a cap from a fixture that chose to die on
-			# a signal. Without the mark both arrive as 143 and the cap would be invisible in the log.
-			printf 'capped\n' > "$CAPMARK"
-			echo "with_machine: CAP REACHED after ${CAP}s — killing $_claim (pid $_child)" >&2
-			echo "with_machine: it was still alive but may not have been WORKING; a fixture that errors" >&2
-			echo "with_machine: before its quit() idles here forever. Check for _init vs _initialize." >&2
-			kill -TERM "$_child" 2>/dev/null
-			sleep 5
-			kill -KILL "$_child" 2>/dev/null
-		fi
-	) >/dev/null &
-	_dog=$!
-fi
+# THE WATCHDOG NOW LIVES IN `tools/cap_lib.sh`, and the long account of why it polls in one-second steps
+# instead of sleeping the whole cap went with it. It moved because `run_harness.sh` needs the same bound on
+# its three `save_sentinel.gd` calls and cannot get it here: this script takes the machine lock, and the
+# runner is already holding it when it arms. A bound that only exists inside the lock-taker is a bound that
+# the lock-holder cannot use.
+cap_watch "$_child" "$CAP" "$_claim"
 
 wait "$_child"
 status=$?
-if [ -n "$_dog" ]; then
-	kill "$_dog" 2>/dev/null
-	wait "$_dog" 2>/dev/null
-fi
+cap_done
 
-if [ -s "$CAPMARK" ]; then
-	rm -f "$CAPMARK"
+if [ "$CAP_HIT" = "1" ]; then
 	# LOUD, on stdout as well as stderr, and for the same reason exit 5 is: a capped run is a run that did
 	# not finish, and the failure mode is not a misread exit code but that nothing downstream ever looks.
 	echo "with_machine: KILLED BY THE ${CAP}s CAP — this is not a pass (exit 6)" >&2
 	echo "with_machine: CAPPED — the run did not finish. Not a pass."
 	exit 6
 fi
-rm -f "$CAPMARK"
 exit "$status"
