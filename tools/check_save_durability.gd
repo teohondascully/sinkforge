@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_backup_recovery()
 	_transactional_restore()
 	_version_migration()
+	_no_defaults()
 	_phase_equivalence()
 	_seed_ownership()
 	_backup_generation()
@@ -221,6 +222,85 @@ func _version_migration() -> void:
 	_check(not SaveGame.restore(untouched, future),
 		"a save from a NEWER build is refused (v%d) — forward compatibility is not free" % [SaveGame.VERSION + 1])
 	_check(untouched.solid.is_empty(), "…without touching the sim")
+
+	# EVERY READABLE VERSION HAS A BRANCH THAT ARRIVES. `_valid_envelope` bounds the version to
+	# [OLDEST_READABLE, VERSION]; it does not say a migration exists to carry an old one the rest of the
+	# way. Bump VERSION to 3 without writing the v2→v3 branch and `_migrate` returns every v2 save
+	# unchanged — the gate already said yes, so it loads under v3 semantics with no branch having run and
+	# nothing red. The loop is driven by the two constants rather than by a list written here, so the day
+	# the next bump lands without its branch this is what says so, and it says which version stalled.
+	_check(SaveGame.VERSION > SaveGame.OLDEST_READABLE,
+		"there is an older version for the chain to carry at all (v%d..v%d) — the loop is not vacuous"
+			% [SaveGame.OLDEST_READABLE, SaveGame.VERSION])
+	var unmigrated: Array[String] = []
+	for v: int in range(SaveGame.OLDEST_READABLE, SaveGame.VERSION + 1):
+		var old: Dictionary = SaveGame.capture(_world(v))
+		old["version"] = v
+		var landed: int = int(SaveGame._migrate(old).get("version", -1))
+		if landed != SaveGame.VERSION:
+			unmigrated.append("v%d stops at v%d" % [v, landed])
+	_check(unmigrated.is_empty(), "every readable version migrates all the way to v%d%s"
+		% [SaveGame.VERSION, "" if unmigrated.is_empty() else " — " + ", ".join(unmigrated)])
+
+
+## 4b. A FIELD WHOSE ABSENCE WOULD CHANGE THE FUTURE IS REFUSED, NOT DEFAULTED.
+##
+## `world_seed` used to default to 0 and `seep_tick` to 0, and neither is a truthful reading of "absent".
+## Seed 0 does not say "this world had no seed", it says "this world was seeded 0" — and `_commit` then
+## re-molds the fine terrain from a number the world was never built with, which is invisible until the
+## rock comes back subtly different. Phase 0 does not say "this world had no phase", it says "the next weep
+## lands now", which `_phase_equivalence`'s control proves is a different future.
+##
+## Both were the failure this project keeps finding: THE ERROR PATH RETURNED THE PASSING VALUE. A key went
+## missing and the restore SUCCEEDED, so the player opens a world that is quietly not theirs, plays it, and
+## saves over the only record of which world it was. A refusal is strictly the safer branch — the file
+## stays on disk, where a later build can still read it.
+func _no_defaults() -> void:
+	print("== no silent defaults ==")
+	_check(SaveGame.NO_DEFAULT_KEYS.size() >= 2,
+		"there are fields declared un-defaultable (%s) — the loop below is not vacuous"
+			% ", ".join(SaveGame.NO_DEFAULT_KEYS))
+	for key: String in SaveGame.NO_DEFAULT_KEYS:
+		var live: FactorySim = _world(101)
+		var mark: Array = [live.solid.size(), live.world_seed, live._seep_tick,
+			int(live.inventory.get(&"ore", 0))]
+		var holed: Dictionary = SaveGame.capture(_world(202))
+		holed.erase(key)
+		_check(not SaveGame.restore(live, holed),
+			"an envelope with no \"%s\" is REFUSED rather than defaulted" % key)
+		_check(SaveGame.last_invalid.contains(key),
+			"…and names the field it refused on (%s)" % SaveGame.last_invalid)
+		_check([live.solid.size(), live.world_seed, live._seep_tick,
+			int(live.inventory.get(&"ore", 0))] == mark,
+			"…leaving the running game exactly as it was")
+
+	# THE CONTROL, and the reason this is a LIST rather than a blanket rule. A field whose absence HAS a
+	# truthful empty reading must still default, or every older save stops opening. A capture from before
+	# the lode and the water existed genuinely had neither, and `{}` says exactly that.
+	var pre_lode: Dictionary = SaveGame.capture(_world(303))
+	pre_lode.erase("lode")
+	pre_lode.erase("lode_max")
+	pre_lode.erase("water")
+	var older := FactorySim.new()
+	_check(SaveGame.restore(older, pre_lode),
+		"…while a save from before the lode and the water existed still opens")
+	_check(older.lode.is_empty() and older.water.is_empty(),
+		"…holding neither of them, which is the truth about that world")
+
+	# THE CASE THAT EXISTS ON SOMEBODY'S DISK: a v1 envelope written before `world_seed` was captured at
+	# all (it entered `capture` without a version bump, so the version gate cannot tell those apart from
+	# any other v1). There is no honest migration — a seed cannot be invented — so it is refused by name
+	# rather than loaded into a world that molds differently and then saved over.
+	var ancient: Dictionary = SaveGame.capture(_world(404))
+	ancient["version"] = 1
+	ancient.erase("seep_tick")      # a v1 save predates the phase: the v1→v2 branch supplies this one
+	ancient.erase("world_seed")     # …and predates the seed, which nothing can supply
+	var target := FactorySim.new()
+	_check(not SaveGame.restore(target, ancient),
+		"a v1 save from before the seed was captured is refused, not molded from seed 0")
+	_check(SaveGame.last_invalid.contains("world_seed"),
+		"…naming the seed as the reason (%s)" % SaveGame.last_invalid)
+	_check(target.solid.is_empty(), "…without touching the sim")
 
 
 ## 5. THE SAME FILE PRODUCES THE SAME FUTURE, WHICHEVER WAY YOU GOT TO IT.

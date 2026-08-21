@@ -46,8 +46,12 @@ const SELF: String = "res://tools/check_save_isolation.gd"
 const SENTINEL: String = "res://tools/save_sentinel.gd"
 
 const SCAN_DIRS: Array[String] = ["res://tools", "res://tests"]
+
+## Counted rather than assumed: an exclusion nobody can see is indistinguishable from a scan that missed.
+var _scratch_skipped: int = 0
 const MAIN_SRC: String = "res://scenes/main.gd"
 const RUNNER: String = "res://tools/run_harness.sh"
+const SAVE_SRC: String = "res://src/core/save_game.gd"
 
 ## Source with adjacent string-literal splicing collapsed, so the scan reads what a program will actually
 ## SPELL rather than how the file happens to be laid out. `"user://" + "sinkforge.save"` is a path to the
@@ -68,6 +72,22 @@ static func _flatten(src: String) -> String:
 ## RECURSIVE on purpose. This read `get_files()` alone, so the day anybody filed layers under `tools/perf/`
 ## the gate would have gone on passing while seeing none of them. A safety gate that quietly stops covering
 ## new code is worse than no gate at all, because the runner's header keeps promising it.
+## SCRATCH COPIES ARE EXCLUDED, AND THE COUNT IS PRINTED, because a silent exclusion is how a sample
+## becomes a different sample. `tools/_scratch_*.gd` is this repository's convention for a throwaway probe;
+## `.gitignore:92` ignores the whole glob, so none of them exist in a clean clone or in CI, and none of them
+## is registered in `tools/run_harness.sh` — grep it, the count is zero — so none can ever run in a sweep.
+##
+## They break this layer for a reason that is real and harmless: a scratch probe is usually a COPY of the
+## layer it is investigating, so it necessarily names that layer's slot. Two files, one slot, no possible
+## collision, because only one of them is a layer. Left unexcluded, anybody's local experiment reddens the
+## suite for everybody, which teaches people to stop trusting it.
+##
+## The narrow risk this accepts: a scratch file that writes a REAL slot would no longer be caught here. That
+## is bounded by the same facts — it cannot be scheduled, and the production slot is guarded separately by
+## the sentinel, which is the instrument that actually stands between a fixture and the player's save.
+const SCRATCH_PREFIX: String = "_scratch_"
+
+
 func _sources(dir: String) -> Dictionary:
 	var out: Dictionary = {}
 	var d: DirAccess = DirAccess.open(dir)
@@ -76,10 +96,26 @@ func _sources(dir: String) -> Dictionary:
 	for name: String in d.get_files():
 		if not name.ends_with(".gd"):
 			continue
+		if name.begins_with(SCRATCH_PREFIX):
+			_scratch_skipped += 1
+			continue
 		var path: String = dir + "/" + name
 		out[path] = _flatten(FileAccess.get_file_as_string(path))
 	for sub: String in d.get_directories():
 		out.merge(_sources(dir + "/" + sub))
+	return out
+
+
+## Every `user://….save` path literal in one (already flattened) source, de-duplicated. A fixture naming
+## its own slot twice is one fixture, not two. Deliberately narrow — a real path, no `*`, no spaces — so
+## the prose in a docstring cannot be read as a slot somebody writes to.
+func _slots(src: String) -> Array[String]:
+	var out: Array[String] = []
+	var re: RegEx = RegEx.create_from_string("\"(user://[A-Za-z0-9_%./-]+\\.save)\"")
+	for m: RegExMatch in re.search_all(src):
+		var s: String = m.get_string(1)
+		if not out.has(s):
+			out.append(s)
 	return out
 
 
@@ -106,16 +142,38 @@ func _initialize() -> void:
 	var offenders: Array[String] = []
 	var touchers: Array[String] = []
 	var unguarded: Array[String] = []
+	var unread: Array[String] = []
+	var slots: Dictionary = {}          # "user://x.save" → the files that name it
 	for dir: String in SCAN_DIRS:
 		var srcs: Dictionary = _sources(dir)
+		# A DIRECTORY THIS COULD NOT READ IS NOT A DIRECTORY WITH NOTHING WRONG IN IT. `_sources` answers
+		# `{}` both for "opened, found nothing" and for "could not open, or is not there any more", and an
+		# empty map contributes no offenders, which scores as clean. The total floor below cannot catch it
+		# either: `res://tools` alone holds 115 .gd files against `res://tests`'s 5, so tests/ could be
+		# renamed tomorrow and this gate would keep passing at 115 while covering none of it. Directories
+		# moving is live work in this repo, which is what makes the quiet version of that unacceptable.
+		_check(not srcs.is_empty(), "%s opened and yielded .gd files (%d)" % [dir, srcs.size()])
 		for path_v: Variant in srcs.keys():
 			var path: String = String(path_v)
 			if path == SELF or path == SENTINEL:
 				continue
 			var src: String = srcs[path_v]
 			scanned += 1
+			# …and the same failure one level down. `get_file_as_string` answers "" for a file it could not
+			# read, "" contains no slot literal, and the file scores clean while still counting toward the
+			# floor: the file it could not READ arrives as the file with nothing WRONG in it. A .gd with no
+			# bytes is the tell, not the norm.
+			if src.is_empty():
+				unread.append(path)
+				continue
 			if src.contains(SLOT):
 				offenders.append(path)
+			for slot: String in _slots(src):
+				if not slots.has(slot):
+					var first: Array[String] = []
+					slots[slot] = first
+				var owners_so_far: Array[String] = slots[slot]
+				owners_so_far.append(path)
 			# Anything that can REACH the slot (by naming the static, or by driving the controller's
 			# save verbs, which read it) has to redirect it first. Deliberately broader than "boots
 			# main.tscn": `DirAccess.remove_absolute(MainView.save_path)` in a fixture that never boots
@@ -128,6 +186,10 @@ func _initialize() -> void:
 					unguarded.append(path)
 
 	_check(scanned >= 40, "the scan actually read the harness (%d .gd files)" % scanned)
+	_check(unread.is_empty(), "every scanned file gave up its source%s"
+		% ("" if unread.is_empty() else " — read as empty: " + ", ".join(unread)))
+	print("  %d scratch cop(ies) excluded (tools/_scratch_*.gd — gitignored, and registered nowhere)"
+		% _scratch_skipped)
 	_check(offenders.is_empty(), "no fixture names the production slot%s"
 		% ("" if offenders.is_empty() else " — " + ", ".join(offenders)))
 	_check(not touchers.is_empty(),
@@ -135,6 +197,27 @@ func _initialize() -> void:
 			% ", ".join(touchers))
 	_check(unguarded.is_empty(), "every save-reaching layer overrides MainView.save_path%s"
 		% ("" if unguarded.is_empty() else " — " + ", ".join(unguarded)))
+
+	# --- 3b. AND NO TWO FIXTURES SHARE ONE SLOT -------------------------------------------------
+	# Everything above holds the fixtures to not naming the PLAYER's slot. Nothing held them to not naming
+	# EACH OTHER's, and the sweep runs JOBS layers at once inside a single `user://` — Godot keys it on the
+	# project NAME, so the isolated home is one namespace for the whole run. Two layers on one save file do
+	# not collide loudly; they sweep each other's `.tmp`, read each other's `.bak`, and each reports on
+	# whichever one lost the race. Intermittent, and a property of the schedule rather than of the code.
+	var shared: Array[String] = []
+	for slot_v: Variant in slots.keys():
+		var owners: Array[String] = slots[slot_v]
+		if owners.size() > 1:
+			shared.append("%s ← %s" % [String(slot_v), ", ".join(owners)])
+	# NON-VACUITY IN BOTH DIRECTIONS. "No duplicates" over an empty set is free, so the extractor has to
+	# have found real slots; and the extractor itself has to be shown to extract, on a sample built for it,
+	# or a regex that quietly stops matching would buy a permanent green.
+	_check(slots.size() >= 5, "the scan found %d distinct isolated save slots to compare" % slots.size())
+	var sample: Array[String] = _slots("a = \"user://one.save\"\nb = \"user://two.save\"\nc = \"user://one.save\"")
+	_check(sample.size() == 2 and sample.has("user://one.save") and sample.has("user://two.save"),
+		"the slot extractor really extracts, and de-duplicates within a file (%s)" % ", ".join(sample))
+	_check(shared.is_empty(), "no two fixtures write the same isolated slot%s"
+		% ("" if shared.is_empty() else " — " + "; ".join(shared)))
 
 	# --- 4. the sentinel's exemption is paid for ------------------------------------------------
 	# save_sentinel.gd is skipped above. That is only defensible while it is doing the job it was
@@ -186,6 +269,39 @@ func _initialize() -> void:
 				as_layer.append(t)
 	_check(as_layer.is_empty(), "the sentinel is a runner instrument, not a harness layer%s"
 		% ("" if as_layer.is_empty() else " — registered by: " + "; ".join(as_layer)))
+
+	# --- 5. …and the sentinel refuses on the SAME terms the game's writer does -------------------
+	# The exemption above is for a file that WRITES the production slot: `arm` plants a marker there when it
+	# finds none. That is correct while `user://` is scratch and is the very damage this layer is about
+	# everywhere else, so the sentinel carries its own copy of `SaveGame._fixture_may_not_write`'s rule —
+	# it must, being the runner's first Godot call, where delegating would turn an un-imported checkout's
+	# parse error into "could not arm the sentinel".
+	#
+	# Two copies of one rule drift. So the marker names are DERIVED from the game's copy rather than spelled
+	# here: rename the variable in save_game.gd and this goes red asking the sentinel to be taught, instead
+	# of the sentinel going on reading an environment variable that nothing sets any more — which is the
+	# silent version, and would leave it planting at the real slot again.
+	var game_src: String = FileAccess.get_file_as_string(SAVE_SRC)
+	var sentinel_src: String = FileAccess.get_file_as_string(SENTINEL)
+	_check(game_src.length() > 1000 and sentinel_src.length() > 1000,
+		"save_game.gd (%d chars) and save_sentinel.gd (%d chars) both read"
+			% [game_src.length(), sentinel_src.length()])
+	var env_re: RegEx = RegEx.create_from_string("OS\\.get_environment\\(\"(SF_[A-Z_]+)\"\\)")
+	var markers: Array[String] = []
+	for m: RegExMatch in env_re.search_all(game_src):
+		var n: String = m.get_string(1)
+		if not markers.has(n):
+			markers.append(n)
+	_check(markers.size() >= 2, "the game's own write refusal keys on %d environment markers (%s)"
+		% [markers.size(), ", ".join(markers)])
+	var untaught: Array[String] = []
+	for marker: String in markers:
+		if not sentinel_src.contains(marker):
+			untaught.append(marker)
+	_check(untaught.is_empty(), "the sentinel consults every marker that refusal does%s"
+		% ("" if untaught.is_empty() else " — never read by save_sentinel.gd: " + ", ".join(untaught)))
+	_check(sentinel_src.contains("func _unguarded()"),
+		"…through a named refusal of its own, not by hoping the runner always wraps it")
 
 	if _failures == 0:
 		print("check_save_isolation: PASS")

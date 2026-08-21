@@ -41,6 +41,26 @@ const REQUIRED_KEYS: Array[String] = [
 	"produced", "consumed", "conduit", "rope", "torch", "research", "machines",
 ]
 
+## FIELDS WHOSE ABSENCE CHANGES THE FUTURE, AND WHICH THEREFORE MAY NOT BE DEFAULTED.
+##
+## "Additive, so default it" is right for a field whose absence has a TRUTHFUL empty reading: a save from
+## before the lode existed genuinely had no lode, and `{}` says exactly that. It is wrong for a field whose
+## default is a DIFFERENT SPECIFIC VALUE dressed up as a missing one. `world_seed` defaulting to 0 does not
+## say "this world had no seed"; it says "this world was seeded 0", and `_commit` then re-molds the fine
+## terrain from a number the world was never built with. `seep_tick` defaulting to 0 does not say "this
+## world had no phase"; it says "the next weep lands at phase 0", which `check_save_durability`'s phase
+## control proves is a different future.
+##
+## Both defaults are the failure this project keeps finding: AN ERROR PATH THAT RETURNS THE PASSING VALUE.
+## A key went missing and the restore SUCCEEDED, so the player loads a world that is subtly not theirs,
+## plays on, saves, and the original identity is gone with nothing having reported anything. Refusing is
+## the strictly safer branch — a refused load leaves the file on disk, where a later build can still read it.
+##
+## Checked AFTER `_migrate`, not before, because supplying a field an older envelope predates is exactly
+## what a migration branch is for: v1 has no `seep_tick` and the v1→v2 branch fills it in, so a v1 save
+## still opens. What cannot pass is arriving at the current version still missing one.
+const NO_DEFAULT_KEYS: Array[String] = ["world_seed", "seep_tick"]
+
 ## What the last `read()` found. NONE is a new player, CORRUPT is lost work, RECOVERED is work the backup
 ## saved; the caller needs the distinction.
 enum Read { NONE, OK, RECOVERED, CORRUPT }
@@ -140,6 +160,23 @@ static func _stage(data: Dictionary) -> Dictionary:
 		return {}
 	var env: Dictionary = _migrate(data)
 
+	# THE CHAIN HAS TO ARRIVE. `_valid_envelope` bounds the version to [OLDEST_READABLE, VERSION]; it does
+	# not say a branch exists to carry an old one forward. Bump VERSION to 3 without writing the v2→v3
+	# branch and every v2 save on disk migrates to itself, then loads under v3 semantics with no branch
+	# having run — silently, because the version gate already said yes. Refuse instead: unreachable today
+	# (v1→v2 is the whole chain), and it is the next bump this is written for.
+	if int(env.get("version", -1)) != VERSION:
+		last_invalid = "migration stopped at version %s — no branch carries it to %d" \
+			% [str(env.get("version", "?")), VERSION]
+		return {}
+
+	# A migration that did not reach the current version has not done its job, and neither has one that
+	# left a no-default field behind. Both are refusals rather than defaults; see NO_DEFAULT_KEYS.
+	for key: String in NO_DEFAULT_KEYS:
+		if not env.has(key):
+			last_invalid = "missing key: %s (no default: its absence would change the world's future)" % key
+			return {}
+
 	# Resolve every machine def before anything else (a save from a different data set is refused whole).
 	var rebuilt: Array[MachineState] = []
 	for md: Variant in (env.get("machines", []) as Array):
@@ -169,7 +206,7 @@ static func _stage(data: Dictionary) -> Dictionary:
 		rebuilt.append(m)
 
 	return {
-		"world_seed": int(env.get("world_seed", 0)),   # additive: absent in the oldest saves → 0 (default)
+		"world_seed": int(env["world_seed"]),   # NO_DEFAULT_KEYS: gated above, so this may index directly
 		"solid": (env["solid"] as Dictionary).duplicate(),
 		"wall": (env["wall"] as Dictionary).duplicate(),
 		"deposits": (env["deposits"] as Dictionary).duplicate(),
@@ -187,7 +224,7 @@ static func _stage(data: Dictionary) -> Dictionary:
 		"fill": (env.get("fill", {}) as Dictionary).duplicate(),     # additive: an older save has no packing
 		"research": (env["research"] as Dictionary).duplicate(),
 		"sapling": (env.get("sapling", {}) as Dictionary).duplicate(),   # additive: absent in older saves
-		"seep_tick": int(env.get("seep_tick", 0)),
+		"seep_tick": int(env["seep_tick"]),     # NO_DEFAULT_KEYS: likewise
 		"machines": rebuilt,
 	}
 

@@ -7,9 +7,12 @@ extends SceneTree
 ## so it cannot see a path assembled at runtime, a stray `DirAccess.remove_absolute` on a globalized
 ## path, or a crash mid-write. This is the empirical half: arm before the sweep, verify after.
 ##
-##   godot --headless --path . --script res://tools/save_sentinel.gd -- arm    <statefile>
-##   godot --headless --path . --script res://tools/save_sentinel.gd -- verify <statefile>
-##   godot --headless --path . --script res://tools/save_sentinel.gd -- disarm <statefile>
+## THROUGH A WRAPPER, ALWAYS — the invocation printed here used to be a bare `godot`, and a bare `godot`
+## has the player's own `HOME`, which makes `arm` plant its marker at their real save. See `_unguarded()`.
+##
+##   bash tools/with_machine.sh --headless --script res://tools/save_sentinel.gd -- arm    <statefile>
+##   bash tools/with_machine.sh --headless --script res://tools/save_sentinel.gd -- verify <statefile>
+##   bash tools/with_machine.sh --headless --script res://tools/save_sentinel.gd -- disarm <statefile>
 ##
 ## When a real save is present it is READ ONLY: hashed, never rewritten, never moved. When none is
 ## present a sentinel is planted so the empty case is still covered, and `verify` removes what `arm`
@@ -67,6 +70,38 @@ static func _plant() -> String:
 const NO_WITNESS: String = "-"
 
 
+## IS `user://` THE PLAYER'S OWN DIRECTORY RIGHT NOW?
+##
+## THIS INSTRUMENT'S OWN MECHANISM IS A WRITE TO THE SLOT IT PROTECTS, which is fine under the two wrapper
+## scripts — they move `HOME`, so `user://` is a scratch directory — and is the exact damage this file
+## exists to argue nobody does, anywhere else. The usage block at the top of this file prints a BARE
+## `godot --headless --path . --script res://tools/save_sentinel.gd -- arm <statefile>`, and run that way
+## on a machine with no save present, `arm` plants marker bytes at the player's real `sinkforge.save`.
+##
+## Those bytes are not inert. `SaveGame.read` cannot decode them while `FileAccess.file_exists` is true, so
+## the next launch takes the `Read.CORRUPT` branch and the game says "save DAMAGED — not loaded" to
+## somebody who has never saved in their life. That is the precise sentence `last_read` was built to make
+## impossible, produced by the guard that watches for it — the same shape as a lock whose stale sweep is
+## what puts two engines on the box.
+##
+## So the same POSITIVE MARKER the game's own writer keys on is required here, for the same stated reason:
+## absence of proof of isolation is the refusal condition, because a guard that must RECOGNISE the
+## dangerous state is wrong for every state nobody thought of. `SaveGame._fixture_may_not_write` asks this
+## question too, and is deliberately NOT called: this is the runner's first Godot invocation, so a parse
+## error anywhere in the game's own classes would arrive as "could not arm the sentinel", which is a
+## misleading diagnosis for a checkout nobody has imported yet. Two copies of one rule drift, so
+## `check_save_isolation` derives the marker names from `save_game.gd` and holds this file to reading them.
+##
+## The `--script` term of the game's rule is omitted because it is constant-true here: there is no way to
+## reach this file except through `--script`.
+func _unguarded() -> bool:
+	if not OS.get_environment("SF_ISOLATED_HOME").is_empty():
+		return false
+	if OS.get_environment("SF_REAL_HOME") == "1":
+		return false
+	return true
+
+
 func _production_digest() -> String:
 	var path: String = OS.get_environment("SF_PRODUCTION_SLOT")
 	if path.is_empty():
@@ -85,6 +120,17 @@ func _initialize() -> void:
 	var mode: String = argv[0]
 	var statefile: String = argv[1]
 	var real: String = ProjectSettings.globalize_path(SLOT)
+
+	# Every mode below either writes the slot or removes from it, so none of them may run against a real
+	# `user://`. See `_unguarded()`. `disarm` is handled inside its own branch, because it is a trap
+	# handler and its contract is that it never fails.
+	if mode != "disarm" and _unguarded():
+		printerr("save_sentinel: REFUSING to %s — nothing declared an isolated home (SF_ISOLATED_HOME is " % mode
+			+ "unset), so user:// is the PLAYER'S directory and %s is their save. This instrument " % real
+			+ "plants a marker at that path when it finds it empty; a marker left there reads to the game "
+			+ "as a DAMAGED save. Run it through tools/run_harness.sh or tools/with_machine.sh.")
+		quit(1)
+		return
 
 	if mode == "arm":
 		# "Is there a real save here?" is NOT the same question as "does the file exist". A marker left
@@ -109,6 +155,23 @@ func _initialize() -> void:
 		var digest: String = FileAccess.get_sha256(SLOT)
 		var witness: String = _production_digest()
 		var out: FileAccess = FileAccess.open(statefile, FileAccess.WRITE)
+		# A FIXTURE THAT DIES BEFORE ITS `quit()` DOES NOT FAIL — IT HANGS. Every other `FileAccess.open` in
+		# this file is null-checked and this one was not, so a state file that cannot be opened (a log dir
+		# already swept, a full disk) reached `out.store_line` on a null instance, which aborts this
+		# function before any `quit()`. The SceneTree then comes up and idles, and because `run_harness.sh`
+		# reads this call through a pipe, the sweep waits on it forever holding the machine lock. It is the
+		# runner's FIRST Godot call, so nothing has started that any watchdog is timing.
+		#
+		# The rollback matters as much as the check. We may already have planted; quitting without taking
+		# that back would leave a marker at the slot with no state file for `disarm` to recognise it by.
+		if out == null:
+			if planted and not existing:
+				DirAccess.remove_absolute(SLOT)
+			printerr("save_sentinel: cannot write the armed state to %s (err %d) — refusing to run "
+				% [statefile, FileAccess.get_open_error()]
+				+ "unguarded%s" % (" (the marker just planted has been taken back)" if planted and not existing else ""))
+			quit(1)
+			return
 		out.store_line("planted" if planted else "real")
 		out.store_line(digest)
 		out.store_line(witness)
@@ -177,6 +240,13 @@ func _initialize() -> void:
 	# DISARM NEVER FAILS. It is a shell trap handler's last act, and cleanup that can abort the trap is how
 	# one problem becomes two. Every path here exits 0; the loudest it gets is a line on stderr.
 	if mode == "disarm":
+		# Unguarded, this would be reaching into the player's own directory to remove a file, and nothing
+		# this run did put anything there — `arm` refused above. Says so and exits 0, per the contract.
+		if _unguarded():
+			printerr("save_sentinel: not disarming — nothing declared an isolated home, so user:// is the "
+				+ "player's directory and this run planted nothing in it.")
+			quit(0)
+			return
 		if not FileAccess.file_exists(statefile):
 			quit(0)                     # never armed, or the log dir is already gone. Nothing to take back.
 			return
