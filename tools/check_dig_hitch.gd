@@ -3,27 +3,27 @@ extends "res://tools/check_base.gd"
 ## Harness layer: THE DIG-HITCH FRICTION GAUGE (#103, the mining micro-freeze guard).
 ##
 ## The reported bug: every hand-dig micro-froze the frame because the fine-terrain baker
-## (scenes/fine_terrain.gd) re-processed the WHOLE ~120k-cell fine grid on EVERY terrain change — a
-## Callable + ~9 noise samples per cell — even though a single dig only changes one 32px cell. This gauge
+## (scenes/fine_terrain.gd) re-processed the WHOLE ~120k-cell fine grid on EVERY terrain change (a
+## Callable + ~9 noise samples per cell), even though a single dig only changes one 32px cell. This gauge
 ## makes that friction EXECUTABLE so it can never silently come back:
 ##
-##   FRICTION  — after a single dig the renderer's fine rebake must touch <= MAX_DIG_CELLS fine cells (the
+##   FRICTION : after a single dig the renderer's fine rebake must touch <= MAX_DIG_CELLS fine cells (the
 ##               dirty-chunk fast lane), not the whole grid. Before #102 this reads the full grid → FAIL.
-##   CORRECT   — the dirty-chunk region bake must be BYTE-IDENTICAL to a full rebake of the same post-dig
+##   CORRECT  : the dirty-chunk region bake must be BYTE-IDENTICAL to a full rebake of the same post-dig
 ##               world (guards the dilation margin: too small a margin would leave stale AO/moss seams).
-##   COST      — the region bake must actually be CHEAP IN TIME, not merely small in extent.
+##   COST     : the region bake must actually be CHEAP IN TIME, not merely small in extent.
 ##
 ## That last one was missing for a long time and its absence is worth writing down. This layer is
 ## registered as "check_dig_hitch (friction)" and every assertion in it counted CELLS. Extent is a proxy
 ## for cost, and it is a proxy that breaks exactly where it matters: the tile-texture work adds ~2 extra
 ## noise samples per solid fine cell, which makes every bake more expensive while touching precisely the
-## same number of cells. The measured original defect — DIG p95 33.8ms → 19.8ms — could have walked back
+## same number of cells. The measured original defect (DIG p95 33.8ms → 19.8ms) could have walked back
 ## in and this gauge would have printed PASS the whole way.
 ##
 ## An ABSOLUTE millisecond budget is not the answer on arbitrary hardware; it flakes, and someone deletes
 ## it. So the always-on assertion is a RATIO measured twice on the same machine in the same process: bake
 ## the full grid, bake one region, and compare their per-cell costs. A region bake is allowed to be dearer
-## per cell (fixed setup amortised over few cells, worse cache locality) but not wildly so — that is what
+## per cell (fixed setup amortised over few cells, worse cache locality) but not wildly so; that is what
 ## "the fast lane is genuinely a fast lane" means in time rather than in cell count. The per-cell µs of
 ## both is always PRINTED, so drift is visible to a human even when the ratio holds, and an absolute
 ## budget can be switched on for one named machine via SF_PERF_HOST.
@@ -34,13 +34,13 @@ extends "res://tools/check_base.gd"
 const SCENE: String = "res://scenes/main.tscn"
 const FINE_SEED: int = 1337                 ## must match WorldRenderer's FineTerrain.new(..., 1337)
 ## A single 32px dig dilated by REGION_MARGIN(6) is a ~16×16 fine patch (256 cells). Allow generous slack
-## for a dig that dirties a small cluster, but far below the ~120k full grid — the freeze is unmistakable.
+## for a dig that dirties a small cluster, but far below the ~120k full grid; the freeze is unmistakable.
 const MAX_DIG_CELLS: int = 4096
-## Each bake is timed BEST-OF-N. The minimum is the right statistic here: we are asking "what does this work
+## Each bake is timed BEST-OF-N. The minimum is the right statistic here: the question is "what does this work
 ## cost", and every sample is that cost plus some amount of scheduler noise ≥ 0. Taking the min subtracts as
-## much of the noise as the samples let us, which is what keeps a ratio gate usable on a loaded CI box.
+## much of the noise as the samples allow, which is what keeps a ratio gate usable on a loaded CI box.
 const TIME_SAMPLES: int = 3
-## THE PORTABLE COST GATE — per-cell, not total. A region bake's cost PER FINE CELL may exceed a full
+## THE PORTABLE COST GATE: per-cell, not total. A region bake's cost PER FINE CELL may exceed a full
 ## bake's per-cell cost, but only by this factor. Per-cell is the right normalisation: it does not care how
 ## many cells the dig happened to dirty, so changing REGION_MARGIN or SYNC_BAND does not silently re-tune
 ## the gate the way a raw total-time ratio would.
@@ -60,14 +60,14 @@ const TIME_SAMPLES: int = 3
 ## Why the ratio exceeds 1.0 at all, and why the gate is not tighter: both paths end with the SAME fixed
 ## full-image set_data + texture upload of the whole 512x512 image. Call it U. Then
 ##   region per-cell = U/576 + p        full per-cell = U/262144 + p ~= p
-## and from the measured pair, U/576 ~= 1.4 us so U ~= 0.8 ms — about a fifth of the region bake. The
+## and from the measured pair, U/576 ~= 1.4 us so U ~= 0.8 ms, about a fifth of the region bake. The
 ## consequence worth knowing: the ratio RISES as the dirty region SHRINKS, because U is spread over fewer
 ## cells. If a future change halved the region to ~288 cells the ratio would climb to ~1.5 with no
 ## regression at all. The gate is set at 3.0 to survive that, which still catches a doubling of the region
 ## path's real per-cell work.
 ##
-## PROVED NON-VACUOUS, not assumed to be. Injecting the exact bug class this gate exists for — a full-grid
-## _tone refresh inside rebake_region, which does hidden 262144-cell work while last_baked_cells stays 576 —
+## PROVED NON-VACUOUS, not assumed to be. Injecting the exact bug class this gate exists for (a full-grid
+## _tone refresh inside rebake_region, which does hidden 262144-cell work while last_baked_cells stays 576)
 ## moved the region bake 4.73 -> 13.19 ms and the ratio 1.19 -> 3.385, and the layer went RED. Every OTHER
 ## assertion here stayed green through that injection: the cell-count gate still saw 576 cells and the
 ## byte-identity check still matched, because the output was correct, only ruinously expensive. That is the
@@ -75,7 +75,7 @@ const TIME_SAMPLES: int = 3
 ## and that is the honest limit of a ratio with this much headroom.
 ##
 ## WHAT THIS GATE CANNOT SEE, stated plainly so nobody trusts it further than it goes: a change that makes
-## EVERY bake more expensive — more noise samples per solid cell, say — moves both numbers together and the
+## EVERY bake more expensive (more noise samples per solid cell, say) moves both numbers together and the
 ## ratio does not budge. That is why the absolute us/cell is printed on every run, and why SF_DIG_BUDGET_MS
 ## exists below for anyone who has characterised a specific machine.
 const MAX_PERCELL_RATIO: float = 3.0
@@ -94,7 +94,7 @@ var _main: MainView
 var _frames: int = 0
 var _dig_cell: Vector2i
 ## THE DIG SITES. Each entry is the set of coarse cells mined in ONE frame, so the last entry exercises a
-## MULTI-CELL dirty range (cmin != cmax) — the generalisation where the stale-ring bug actually lived and
+## MULTI-CELL dirty range (cmin != cmax), the generalisation where the stale-ring bug actually lived and
 ## which a single-cell test cannot reach. Sites are spread far apart in x on purpose: each dig's rebake
 ## window is only ~5 coarse cells wide, so no dig can accidentally repaint (and thus repair) another's
 ## staleness before the comparison at the end.
@@ -110,7 +110,7 @@ func _initialize() -> void:
 
 
 ## The first SOLID cell in `col` at or below `surface_row(col) + drop`, searching down. Returns the
-## starting cell unchanged if the column is hollow all the way — the caller asserts solidity, so a hollow
+## starting cell unchanged if the column is hollow all the way; the caller asserts solidity, so a hollow
 ## column fails loudly rather than silently digging air.
 func _rock(sim: FactorySim, col: int, drop: int) -> Vector2i:
 	var start: int = sim.surface_row(col) + drop
@@ -142,7 +142,7 @@ func _on_frame() -> void:
 		var whole: int = FactorySim.GRID_COLS * FactorySim.SUBDIV * FactorySim.GRID_ROWS * FactorySim.SUBDIV
 		# `opening_baked_cells`, NOT `last_baked_cells`. The first version of this assertion read the latter
 		# and reported 1024 cells: by frame 10 the off-screen fill had already overwritten it with the size
-		# of its most recent 4ms slice. It failed, which is the only reason the wrong number was ever seen —
+		# of its most recent 4ms slice. It failed, which is the only reason the wrong number was ever seen:
 		# had the range happened to fit, this layer would have been asserting on a fill slice under the name
 		# "the boot bake" for as long as anyone cared to read it.
 		var boot: int = fine.opening_baked_cells
@@ -152,7 +152,7 @@ func _on_frame() -> void:
 		# THE CONTRACT, NOT A NUMBER NEAR IT. The challenge to the old floor is right: the previous
 		# floor here was `boot > MAX_DIG_CELLS`, picked because 4096 was already in scope, and a regression
 		# that painted one row and stalled would sit above it and pass. What item 17 actually promises is
-		# that THE GROUND AROUND THE BODY is finished before the first frame — so assert exactly that. It is
+		# that THE GROUND AROUND THE BODY is finished before the first frame, so assert exactly that. It is
 		# also the assertion that fails on the defect this change really had: an opening rect built from a
 		# camera that had not yet moved onto the player, clipped to the world corner, containing nothing
 		# anyone was looking at.
@@ -163,9 +163,9 @@ func _on_frame() -> void:
 
 		# ITEM 17'S OWN WORST CASE, BEFORE IT IS DRAINED AWAY. The change trades a boot freeze for a
 		# possible mid-play stutter: a dig landing while off-screen fill is still outstanding. Everything
-		# below this block drains the fill first — necessarily, because a not-yet-filled cell is transparent
+		# below this block drains the fill first (necessarily, because a not-yet-filled cell is transparent
 		# in the region-baked image and painted in the reference, which this layer would report as a stale
-		# ring — and that drain arranges for the one new risk never to be measured. So measure it here.
+		# ring), and that drain arranges for the one new risk never to be measured. So measure it here.
 		var owed: int = fine.pending_rows()
 		var probe: Vector2i = _rock(sim, maxi(FactorySim.GRID_COLS / 3, 4), 6)
 		_check(sim.is_solid(probe), "the pending-fill probe site %s is solid rock" % probe)
@@ -178,15 +178,15 @@ func _on_frame() -> void:
 			"...and the dig did not drag the outstanding fill along with it (%d rows before, %d after)"
 			% [owed, fine.pending_rows()])
 		# NOT ASSERTED HERE, and written down so green is not misread as coverage: that the renderer never
-		# runs a dig bake and a fill slice in the SAME frame. It cannot — `_process` reaches the fill through
-		# an `elif` after the dig branch — but that is a structural argument about a file this layer does not
+		# runs a dig bake and a fill slice in the SAME frame. It cannot (`_process` reaches the fill through
+		# an `elif` after the dig branch), but that is a structural argument about a file this layer does not
 		# read, not a measurement. The bounded thing above is the region bake's own extent.
 
 		# EVERY ASSERTION BELOW NEEDS A WHOLE GRID, for the transparent-vs-painted reason given above.
 		_check(fine.finish_pending() > 0 and fine.pending_rows() == 0,
 			"finish_pending drained the outstanding fill and left the grid whole")
 		# Pick dig sites at several depths and columns. The first is a deep interior solid cell, so mining it
-		# dirties exactly one cell (no tree-fell / ore-collapse / surface shift) — the cleanest single-dig
+		# dirties exactly one cell (no tree-fell / ore-collapse / surface shift), the cleanest single-dig
 		# friction measurement, and the one the cost gate is timed against.
 		var mid: int = FactorySim.GRID_COLS / 2
 		_dig_cell = Vector2i(mid, sim.surface_row(mid) + 10)
@@ -227,12 +227,12 @@ func _on_frame() -> void:
 				% [_max_dig_cells_seen, MAX_DIG_CELLS])
 
 		# CORRECTNESS: a full rebake of the SAME post-dig world must be byte-identical to the region bakes the
-		# renderer has accumulated — reuse the renderer's exact palette/wall/surface authorities so only the
+		# renderer has accumulated; reuse the renderer's exact palette/wall/surface authorities so only the
 		# bake PATH differs, not the inputs. One reference bake covers every site: a region bake that left
 		# stale solidity behind has no later chance to repair it, because the sites do not overlap.
 		var r: WorldRenderer = _main._renderer
 		var ref := FineTerrain.new(FactorySim.GRID_COLS, FactorySim.GRID_ROWS, FINE_SEED)
-		# THE TEXTURE GRAMMAR IS AN INPUT, and it does not travel in the `rebake` signature — it is a
+		# THE TEXTURE GRAMMAR IS AN INPUT, and it does not travel in the `rebake` signature: it is a
 		# property, so a caller that forgets it gets Clastic everywhere and no error. Without this line the
 		# reference bakes one grammar for the whole world while the renderer bakes real ones, and the
 		# byte-identity check below reds on a CONFIGURATION difference while claiming a PATH difference.
@@ -252,11 +252,11 @@ func _on_frame() -> void:
 		# BEFORE trusting `got == want`, establish that the comparison COULD have failed.
 		#
 		# This assertion spent its whole life vacuous and nobody could tell. Under --headless the dummy
-		# rendering driver never uploads texture data, so get_image() hands back a BLANK surface — full
+		# rendering driver never uploads texture data, so get_image() hands back a BLANK surface: full
 		# size, one repeated value. Two blank surfaces are byte-identical, so the check passed. And
 		# --headless was the only way the harness ever ran this layer, because it was registered with `add`
 		# rather than `add_gl`. The result: the guard reported PASS while the very bug it exists to catch
-		# was live on main. Measured, not inferred — same commit, same layer: 115 distinct sampled values
+		# was live on main. Measured, not inferred; same commit, same layer: 115 distinct sampled values
 		# and a real FAIL with a window, 1 distinct value and a PASS headless.
 		if DisplayServer.get_name() == "headless":
 			print("  SKIP: byte-identity NOT verified — no rendering surface. The headless driver returns a")
@@ -287,7 +287,7 @@ func _on_frame() -> void:
 			quit(1)
 
 
-## THE COST GATE. `ref` has already been fully baked once by the caller, so its caches are sized and warm —
+## THE COST GATE. `ref` has already been fully baked once by the caller, so its caches are sized and warm,
 ## which is the state the game is actually in when it bakes. Time a full bake and a region bake back to back
 ## on that same warm object: same machine, same process, same data, same moment. Only the PATH differs, so
 ## the ratio between them is a property of the code and not of the hardware it ran on.
@@ -305,7 +305,7 @@ func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
 		full_us = mini(full_us, Time.get_ticks_usec() - t0)
 		full_cells = ref.last_baked_cells
 
-	# THE SAME FULL BAKE WITH THE FINE GRID HANDED OVER WHOLE — the boot/load path the game actually takes.
+	# THE SAME FULL BAKE WITH THE FINE GRID HANDED OVER WHOLE: the boot/load path the game actually takes.
 	# The loop above times the Callable path, which is what check_texture uses (it bakes a synthetic world
 	# with no sim behind it) and what this file measured for its whole life. Timing only that was how a
 	# 262144-dispatch loop stayed the dominant cost of every boot without ever appearing in a number.
@@ -344,12 +344,12 @@ func _cost(r: WorldRenderer, ref: FineTerrain) -> void:
 		% [ratio, MAX_PERCELL_RATIO, TIME_SAMPLES, float(region_us) / float(maxi(full_us, 1))])
 
 	# BOTH SIDES OF THE RATIO HAVE TO HAVE HAPPENED. `full_cells > region_cells` is satisfied by
-	# `region_cells == 0`, and a region bake that painted nothing also costs almost no time — so `region_pc`
+	# `region_cells == 0`, and a region bake that painted nothing also costs almost no time, so `region_pc`
 	# (which divides by `maxi(region_cells, 1)`) comes out near zero, `ratio` comes out near zero, and the
 	# claim "the fast lane is fast in TIME" passes on a lane that did no work at all. That is the strongest
 	# possible pass for the emptiest possible measurement, and the `maxi(…, 1)` divide-guard is what converts
 	# the impossible case into a flattering one instead of a loud one.
-	# NON-VACUITY — an empty region bake costs no time, so the ratio flatters it.
+	# NON-VACUITY: an empty region bake costs no time, so the ratio flatters it.
 	_check(region_cells > 0 and full_cells > region_cells,
 		"the timed pair really is full-grid vs region, and the region baked something (%d vs %d cells)"
 			% [full_cells, region_cells])

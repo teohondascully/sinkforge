@@ -4,30 +4,30 @@ extends "res://tools/check_base.gd"
 ##
 ## check_descent proved the GEOMETRY of a second route exists: the sinkholes let open space reach sixty
 ## rows under the sky, from mouths you can find. Geometry is necessary and it is not sufficient. A route
-## that nobody would take is scenery, and a route that everybody would take is not a choice either — it is
+## that nobody would take is scenery, and a route that everybody would take is not a choice either: it is
 ## the new chore with a better view. The thing worth measuring is the SHAPE OF THE TRADE.
 ##
 ## So both routes are PLAYED, from the same surface, to the same depth, in the same world:
 ##
-##   THE SHAFT   — stand over a column and sink it by hand. The old descent. Slow, safe, entirely yours:
+##   THE SHAFT  : stand over a column and sink it by hand. The old descent. Slow, safe, entirely yours:
 ##                 every cell you pass through is a cell you made, so nothing about it can surprise you.
-##   THE PLUNGE  — walk to a sinkhole mouth and go down the hole a body did not make. Fast, committed,
+##   THE PLUNGE : walk to a sinkhole mouth and go down the hole a body did not make. Fast, committed,
 ##                 the world's. You arrive where the hole goes, at the speed the hole chooses.
 ##
 ## Three numbers come out, and each one is a different way for the design to be wrong:
 ##
-##   THE SPEEDUP   — plunge frames vs shaft frames. Under about 2× the hole is not worth walking to and
+##   THE SPEEDUP  : plunge frames vs shaft frames. Under about 2× the hole is not worth walking to and
 ##                   the second route is scenery. This has a floor.
-##   THE COST      — blocks broken on each route. The shaft's number is its price. The plunge's number must
+##   THE COST     : blocks broken on each route. The shaft's number is its price. The plunge's number must
 ##                   be ZERO, or it is not a second route, it is the first route with a head start.
-##   THE ROPE      — the plunge is ridden TWICE, once on legs alone and once with the grapple, and the gap
+##   THE ROPE     : the plunge is ridden TWICE, once on legs alone and once with the grapple, and the gap
 ##                   between them is the tool's reason to exist stated as a number. check_grapple proves the
 ##                   rope works on a rig built to suit it; this proves it matters in terrain nobody designed.
 ##                   The gap is measured on the way BACK, and that is the second thing this layer has been
 ##                   wrong about. It first asked the rope to reach DEEPER, which no tool in this world can:
 ##                   a sinkhole throat is cut as a plumb fall line on purpose, and nothing beats gravity at
 ##                   going down. That assertion only ever passed because the mouth it happened to pick had a
-##                   ledge the legs hung up on — it was gating on a defect in the route, not a virtue of the
+##                   ledge the legs hung up on; it was gating on a defect in the route, not a virtue of the
 ##                   tool, and it went green again the moment the terraces landed and the ranking chose a
 ##                   cleaner hole. Falling in is free either way. A hole a body cannot LEAVE is a trap, and
 ##                   the rope is the difference between a trap and a route.
@@ -54,7 +54,7 @@ const PURCHASE_REACH: int = 5      ## cells sideways the sample shot is aimed
 
 ## The hole must not be SLOWER than the pickaxe. This was written as 2.0 before the route had ever been
 ## played, on the assumption that falling obviously beats digging; the first honest run said 0.3, and the
-## three things wrong with it were all real — mouths opening over the thin end of a chasm, a winch that
+## three things wrong with it were all real: mouths opening over the thin end of a chasm, a winch that
 ## could not haul from standing, and a reel geared slower than the legs it was supposed to replace. Fixing
 ## those took it to 1.1. Parity is the line that actually matters: below it the free route is a novelty
 ## nobody takes, and at parity-plus-zero-cost it is a genuine choice, which is the whole point of cutting
@@ -63,8 +63,8 @@ const SPEEDUP_FLOOR: float = 1.0   ## ...faster than the pickaxe (measured 1.1)
 const PURCHASE_FLOOR: float = 0.50 ## ...and the rope must bite on at least this share of the way down
 ## Rows the rope must regain over legs on the way back. Set at MOST OF THE DEPTH rather than at some token
 ## margin, because "the rope gains a few rows" and "the rope gets you home" are different claims and only
-## the second one justifies the hole. Measured 54 against 0 — the line does not merely escape the shaft, it
-## carries on up the terrain above it — so this floor has room, and it would still catch a winch that only
+## the second one justifies the hole. Measured 54 against 0 (the line does not merely escape the shaft, it
+## carries on up the terrain above it), so this floor has room, and it would still catch a winch that only
 ## managed to lift a body off the floor of the trap it is in.
 const ROPE_EDGE: int = 20
 const LEGS_BACK_CAP: int = 3         ## rows legs alone may scramble back — past this it is not a trap
@@ -72,7 +72,7 @@ const CLIMB_BUDGET: int = 900        ## frames to get home, generous and identic
 const CLIMB_OVER: float = 1.6        ## cells sideways the climbing throw reaches for the shaft wall
 const CLIMB_UP: float = 5.0          ## ...and cells up, so each line is a real gain of height
 
-## THE ROPE HOP — how a stuck body gets over the lip that stopped it. Fire up and across toward the way
+## THE ROPE HOP: how a stuck body gets over the lip that stopped it. Fire up and across toward the way
 ## down, reel in, lean, let go. One motion, and it is the same one a player makes.
 const STUCK_FRAMES: int = 14       ## frames without gaining a row before the body reaches for the wall
 const HOP_OVER: int = 5            ## cells across the hop aims
@@ -117,22 +117,22 @@ func _run() -> void:
 	var purchase: float = float(roped["bit"]) / maxf(float(roped["shots"]), 1.0)
 	_check(roped["rows"] >= TARGET_ROWS,
 		"the hole GOES somewhere (%d rows, asked for %d)" % [roped["rows"], TARGET_ROWS])
-	# THIS USED TO ASSERT `roped["mines"] == 0`, and `_ride` never presses mine — its own docstring says
+	# THIS USED TO ASSERT `roped["mines"] == 0`, and `_ride` never presses mine; its own docstring says
 	# "Nothing is mined and nothing is placed". So the number was zero because of how the fixture was
 	# written, not because of anything the game does, and the sentence it was standing behind ("going down
 	# costs no digging") was already fully carried by the rows assertion above: the body got TARGET_ROWS
-	# down without ever mining. The real claim is about the ROCK — you fall through the hole the generator
+	# down without ever mining. The real claim is about the ROCK: you fall through the hole the generator
 	# cut, and it is still there afterwards, which is what makes it a route rather than a thing you carve.
 	_check(bool(roped["untouched"]) and int(roped["rock"]) > 1000,
 		"...and the %d cells of rock around it are untouched by the trip — the hole was already there"
 			% int(roped["rock"]))
 	# BOTH JOURNEYS HAVE TO HAVE HAPPENED before their frame counts may be divided by one another. A shaft
-	# that stalls does not stop early — it spends its whole 6000-frame budget going nowhere and then returns
+	# that stalls does not stop early; it spends its whole 6000-frame budget going nowhere and then returns
 	# those frames as its cost, so the ratio reads as a spectacular ~21x win for the hole. The worse mining
 	# gets, the better this layer says the plunge is, and it reports the number in the tone of a pass. The
 	# stall does print, but to stderr, out of the assertion record and into a place a green run never shows.
 	# So the SLOWER route must arrive before its frame count is allowed to flatter the faster one.
-	# NON-VACUITY — the shaft must ARRIVE before its frame count may divide anything.
+	# NON-VACUITY: the shaft must ARRIVE before its frame count may divide anything.
 	_check(bool(shaft["ok"]),
 		"the shaft got all the way down too, so the two frame counts are of the same journey (%d rows)"
 			% shaft["rows"])
@@ -145,7 +145,7 @@ func _run() -> void:
 	# REGAINED against a cap, and a body that never went down the hole regains nothing and passes it with
 	# room to spare. A run that stalled six rows in would report the trap working perfectly when what it
 	# actually measured is a body that was never in the trap. The cap only means something below the lip.
-	# NON-VACUITY — the body must have gone DOWN before 'it cannot climb out' says anything.
+	# NON-VACUITY: the body must have gone DOWN before 'it cannot climb out' says anything.
 	_check(int(legs["rows"]) >= TARGET_ROWS,
 		"the legs-only ride went down that same hole first (%d rows, asked for %d)"
 			% [legs["rows"], TARGET_ROWS])
@@ -158,7 +158,7 @@ func _run() -> void:
 
 
 ## THE PLUNGE. Find the mouth nearest the spawn, walk the real body to its lip, step off, and go down the
-## hole under gravity — firing at the wall every so often to find out whether the rope has anything to
+## hole under gravity, firing at the wall every so often to find out whether the rope has anything to
 ## hold. Nothing is mined and nothing is placed; if the body ends up somewhere it cannot leave, that is a
 ## true report about the route.
 func _ride(with_rope: bool) -> Dictionary:
@@ -187,7 +187,7 @@ func _ride(with_rope: bool) -> Dictionary:
 
 	var start_row: int = main._cell_at(p.position).y
 	# THE ROCK AS IT WAS, before a single frame of the descent. `agent.mines` counts mine calls the DRIVER
-	# made, and this driver never makes any — so an assertion on it says something about the fixture and
+	# made, and this driver never makes any, so an assertion on it says something about the fixture and
 	# nothing about the world. This says something about the world: whatever happened on the way down and
 	# back, the terrain is the terrain the generator laid.
 	var rock_before: Dictionary = sim.solid.duplicate()
@@ -219,14 +219,14 @@ func _ride(with_rope: bool) -> Dictionary:
 		if deepest - start_row >= TARGET_ROWS:
 			break
 		# Can the rope find rock from here? Sample from where the body actually is, mid-descent, then let go
-		# immediately — this is asking whether purchase EXISTS, not riding it.
+		# immediately: this is asking whether purchase EXISTS, not riding it.
 		#
 		# AND THE SAMPLE HAS TO PUT THE BODY BACK, which is the third thing this layer has been wrong about
 		# and by far the worst, because it made the instrument the thing being measured. A FRESH plant takes
 		# up slack: Grapple.advance sets `length = distance * SLACK_TAKEUP` (0.90), and the distance
 		# constraint then projects the body onto that shorter circle in the same physics step. The shot here
 		# is aimed five cells sideways, so the projection is essentially horizontal and the body is snapped
-		# about a tenth of the reach TOWARD THE ANCHOR — measured at ten point seven pixels, from x=2552.9
+		# about a tenth of the reach TOWARD THE ANCHOR, measured at ten point seven pixels, from x=2552.9
 		# back to x=2563.6 against an anchor at 2663 on a line of 100.
 		#
 		# Ten pixels is not a rounding error at this scale. The body is fourteen pixels wide in a thirty-two
@@ -234,7 +234,7 @@ func _ride(with_rope: bool) -> Dictionary:
 		# PURCHASE_EVERY frames whether the body needs it or not. On the shelf at (80,46) the legs-only ride
 		# was walking left toward a twenty-row drop in column 79, it needed about seven frames of walking to
 		# get its box clear of the ledge in column 80, and the probe reset it to the same tenth of a pixel
-		# every eight. Six hundred frames of that, reported as "27 rows, asked for 34" — a number that was
+		# every eight. Six hundred frames of that, reported as "27 rows, asked for 34", a number that was
 		# about this fixture's sampling cadence and not about the hole at all.
 		#
 		# The frames were already billed to the instrument (`probed`), which is the same decision made once
@@ -288,7 +288,7 @@ func _ride(with_rope: bool) -> Dictionary:
 ##
 ## This layer used to assert the rope reached DEEPER than legs, and that was never a property this world
 ## could have. A sinkhole throat is cut as a plumb fall line on purpose (LayeredWorldGen._cut_throat), and
-## nothing beats gravity at going down — the only reason the assertion ever passed is that the mouth it
+## nothing beats gravity at going down; the only reason the assertion ever passed is that the mouth it
 ## happened to pick had a ledge the legs got stuck on, so it was gating on a defect in the route rather than
 ## on a virtue of the tool. Both runs also stop at TARGET_ROWS, so the number was saturated at the ceiling
 ## for both and could not have shown a gap even in principle.
@@ -296,7 +296,7 @@ func _ride(with_rope: bool) -> Dictionary:
 ## What the rope is for on a plunge is the RETURN. Falling in is free either way; a hole you cannot get out
 ## of is a trap, and the difference between a trap and a route is the tool in your hands. So: stand the body
 ## at the bottom of the hole it just rode down and give it the same budget to get home, once with legs and
-## once with a line. Legs may jump, scramble and take any opening the shaft offers — nothing is withheld.
+## once with a line. Legs may jump, scramble and take any opening the shaft offers; nothing is withheld.
 func _climb(main: MainView, p: Player, sim: FactorySim, with_rope: bool) -> int:
 	var bottom: int = main._cell_at(p.position).y
 	var best: int = bottom
@@ -318,14 +318,14 @@ func _climb(main: MainView, p: Player, sim: FactorySim, with_rope: bool) -> int:
 			elif p.grapple.state == Grapple.State.ANCHORED:
 				p.input_climb = 1.0                          # winch, and keep winching until it is spent
 				# Wound in, or level with the hook: this line has given what it has. Let go and throw the
-				# next one from higher up — that hand-over-hand is what climbing a shaft on a rope IS.
+				# next one from higher up; that hand-over-hand is what climbing a shaft on a rope IS.
 				if p.grapple.length <= Grapple.MIN_LENGTH + 1.0 \
 						or p.position.y <= p.grapple.anchor.y + CELL * 0.5:
 					p.grapple.cut()
 					p.input_climb = 0.0
 					p.request_jump()                         # kick off the wall into the next throw
 		# Legs, both runs: lean toward whatever opening there is and jump at every chance. On the roped run
-		# this costs nothing and keeps the comparison fair — the rope is measured as an ADDITION to the body,
+		# this costs nothing and keeps the comparison fair: the rope is measured as an ADDITION to the body,
 		# not as a replacement for it.
 		p.input_dir = -side
 		if p.on_floor and f % 12 == 0:
@@ -338,7 +338,7 @@ func _climb(main: MainView, p: Player, sim: FactorySim, with_rope: bool) -> int:
 	return bottom - best
 
 
-## Which way the nearest wall is — the side a hook has something to bite. Ties go to the way the shaft is
+## Which way the nearest wall is: the side a hook has something to bite. Ties go to the way the shaft is
 ## closed, so a body in open air still throws at rock rather than into the void.
 func _wall_dir(sim: FactorySim, at: Vector2i) -> float:
 	for d: int in range(1, 5):
@@ -350,7 +350,7 @@ func _wall_dir(sim: FactorySim, at: Vector2i) -> float:
 
 
 ## THE HOP. The body is on a shelf with a wall between it and the way down. Fire up and across, reel in,
-## lean into the swing, let go over the far side. Returns the frames it cost — a hop that finds no rock
+## lean into the swing, let go over the far side. Returns the frames it cost; a hop that finds no rock
 ## costs only the flight, which is the honest price of reaching for a wall that is not there.
 func _rope_hop(main: MainView, p: Player, sim: FactorySim, dir: float) -> int:
 	var spent: int = 0
@@ -370,8 +370,8 @@ func _rope_hop(main: MainView, p: Player, sim: FactorySim, dir: float) -> int:
 		spent += 1
 		# Let go once level with the anchor: the body is over the lip it was stuck behind, and everything the
 		# winch and the lean built up carries it across. Waiting to pass the anchor in X sounds tidier and
-		# never fires — a winch pulls you ALONG the line, so the body arrives under the hook, not beyond it.
-		# Let go the moment the way is OPEN — the hop exists to clear one lip, and riding the winch past
+		# never fires: a winch pulls you ALONG the line, so the body arrives under the hook, not beyond it.
+		# Let go the moment the way is OPEN: the hop exists to clear one lip, and riding the winch past
 		# that point is pure cost. Falling back on "wound all the way in" only when the terrain read never
 		# comes good, so a hop can still end.
 		var cell: Vector2i = main._cell_at(p.position)
@@ -415,8 +415,8 @@ func _dig() -> Dictionary:
 
 
 ## WHICH WAY IS DOWN FROM HERE. Look at the columns within reach and find the one whose open air drops
-## furthest below the body, then lean that way. This is the read a player makes at a glance — the hole is
-## darker and taller on the side it continues — expressed as the only thing the body can do about it.
+## furthest below the body, then lean that way. This is the read a player makes at a glance (the hole is
+## darker and taller on the side it continues), expressed as the only thing the body can do about it.
 const DRAIN_LOOK: int = 5          ## columns either side the read covers
 const DRAIN_DEPTH: int = 24        ## rows down each column is probed
 
@@ -426,7 +426,7 @@ const DRAIN_DEPTH: int = 24        ## rows down each column is probed
 ## still have NO PART OF ITSELF over a neighbour. Nine pixels, today.
 ##
 ## THIS IS THE DEFECT THIS CONSTANT EXISTS FOR, written down because the shape of it is not obvious from
-## the code that had it. The old read returned `signf(best - at.x)` — cell index against cell index — so
+## the code that had it. The old read returned `signf(best - at.x)` (cell index against cell index), so
 ## the instant the body's CENTRE crossed into the chosen column the steering went to zero and the body was
 ## told it had arrived. It had not. `at.x` is floor(x / 32) and the body is fourteen wide, so a body whose
 ## centre is one pixel inside column 71 still has six pixels of itself hanging over column 70, and if
@@ -444,7 +444,7 @@ const DRAIN_DEPTH: int = 24        ## rows down each column is probed
 ## 12.2 < 18 holds with the worst case, so there is no oscillation to add hysteresis against.
 ##
 ## WHAT WOULD MAKE THIS WRONG: a body as wide as a cell (the band goes to zero and there is no position
-## from which the body is clear of both neighbours — but such a body also cannot fit down a one-wide dug
+## from which the body is clear of both neighbours, but such a body also cannot fit down a one-wide dug
 ## shaft, so the game would have bigger news); or a top speed raised past sqrt(2 * FRICTION * 2 * BAND) =
 ## 281 px/s, at which point releasing at one edge coasts out the other and this becomes the oscillation it
 ## was written to prevent. Both are readable off Player, so if that file moves, re-run this arithmetic.
@@ -463,8 +463,8 @@ func _drain_dir(sim: FactorySim, at: Vector2i, x: float) -> float:
 			best_run = run
 			best = c
 	# Steer at the MIDDLE of the chosen column, in pixels, not at its index. Nothing changes when the pick
-	# is a neighbouring column — its centre is at least sixteen pixels away, so the sign is what it always
-	# was — and everything changes when the pick is the column the body is already in, which used to be the
+	# is a neighbouring column (its centre is at least sixteen pixels away, so the sign is what it always
+	# was), and everything changes when the pick is the column the body is already in, which used to be the
 	# one case the driver could not act on.
 	var want: float = float(best) * float(CELL) + float(CELL) * 0.5
 	if absf(want - x) <= DRAIN_DEADBAND:
@@ -484,7 +484,7 @@ func _open_run(sim: FactorySim, col: int, from_row: int) -> int:
 	return run
 
 
-## The deepest row the standable open space reaches from a cell, four-connected — "if the body walked
+## The deepest row the standable open space reaches from a cell, four-connected: "if the body walked
 ## every corridor it can get to from here without digging, how far down does that get it?"
 func _reach_from(sim: FactorySim, start: Vector2i) -> int:
 	var seen := {start: true}

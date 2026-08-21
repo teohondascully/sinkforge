@@ -1,6 +1,6 @@
 extends "res://tools/check_base.gd"
 
-## Harness layer: A SAVE YOU CANNOT LOSE. `check_saveload` proves the happy path — save, damage, load,
+## Harness layer: A SAVE YOU CANNOT LOSE. `check_saveload` proves the happy path: save, damage, load,
 ## everything came back. This layer proves the UNHAPPY ones, which is where saves actually die: the disk
 ## fills, the process is killed mid-write, the file is truncated, the envelope is from an older build, the
 ## world was loaded from one seed and then re-saved under another. None of those were covered by anything,
@@ -11,12 +11,12 @@ extends "res://tools/check_base.gd"
 ## malformed envelope refuses whole rather than half-restoring a running game. An older save opens.
 ##
 ## NON-VACUITY (the architecture handover §5). Every assertion here is preceded by the damage it is asserting
-## against — the file really is truncated, the envelope really is missing a key, the def really is
-## unresolvable — so none of these can pass by never happening. Where an assertion could be satisfied
+## against (the file really is truncated, the envelope really is missing a key, the def really is
+## unresolvable), so none of these can pass by never happening. Where an assertion could be satisfied
 ## trivially (a "restore refused" that refused because the sim was empty to begin with) the layer first
 ## proves the state it is protecting is non-empty and distinctive.
 ##
-## Runs entirely on `user://check_save_durability*.save`. No scene, no window — this is the save format
+## Runs entirely on `user://check_save_durability*.save`. No scene, no window: this is the save format
 ## and a bare FactorySim, so it is a couple of seconds.
 ##   godot --headless --path . --script res://tools/check_save_durability.gd
 
@@ -33,7 +33,7 @@ func _sweep() -> void:
 ## It is also deliberately a world where TIME DOES SOMETHING: a flooded shaft over a column of LOOSE
 ## backfill, which is the one configuration that weeps (docs/DRIFT.md §4). Without that, every "the two
 ## futures agree" assertion below would be comparing two worlds in which nothing was ever going to
-## happen — true, and worth nothing.
+## happen: true, and worth nothing.
 func _world(mark: int) -> FactorySim:
 	var sim := FactorySim.new()
 	for col: int in range(8, 14):
@@ -45,7 +45,7 @@ func _world(mark: int) -> FactorySim:
 		sim.solid.erase(Vector2i(10, row3))          # …and the dry gallery under it
 	sim.add_water(Vector2i(10, 24), FactorySim.WATER_MAX)
 	sim.add_water(Vector2i(10, 25), FactorySim.WATER_MAX)
-	# THE ONE CELL BETWEEN THEM is your own backfill, packed loose — the exact configuration that weeps:
+	# THE ONE CELL BETWEEN THEM is your own backfill, packed loose, the exact configuration that weeps:
 	# a wet cell above, your fill, open space below. Packed gravel here would hold and nothing would move.
 	sim.set_solid(Vector2i(10, 26), &"earth")
 	sim.fill[Vector2i(10, 26)] = FactorySim.FILL_LOOSE
@@ -109,7 +109,7 @@ func _atomic_write() -> void:
 
 	# A VARIANT THAT LANDS SHORT. Write something that is not an envelope and prove `write` catches it on
 	# the readback instead of promoting it over the good save. This is the guard against the readback
-	# being decorative — remove the `_valid_envelope` check in `write` and this assertion goes red.
+	# being decorative: remove the `_valid_envelope` check in `write` and this assertion goes red.
 	_check(not SaveGame.write(SLOT, {"version": 2, "junk": true}),
 		"an envelope that fails its own readback validation is NOT promoted")
 	_check(FileAccess.get_file_as_bytes(SLOT) == before,
@@ -126,7 +126,7 @@ func _backup_recovery() -> void:
 	_check(SaveGame.write(SLOT, SaveGame.capture(_world(22))), "…then a newer one, demoting it to backup")
 
 	# TRUNCATION is the realistic corruption: a process killed mid-write, a disk that filled. Half a
-	# binary Variant decodes to null, which the old reader returned as {} — indistinguishable from "this
+	# binary Variant decodes to null, which the old reader returned as {}, indistinguishable from "this
 	# player has never saved", which is exactly the sentence you must not show somebody who just lost an
 	# hour.
 	var whole: PackedByteArray = FileAccess.get_file_as_bytes(SLOT)
@@ -139,7 +139,7 @@ func _backup_recovery() -> void:
 	_check(int(got.get("world_seed", -1)) == 11, "a truncated slot RECOVERS the previous save from backup")
 	_check(SaveGame.last_read == SaveGame.Read.RECOVERED, "…and reports it as a recovery, not as a clean load")
 
-	# BOTH GONE is the one case where the answer really is "you have no save" — and it must still not be
+	# BOTH GONE is the one case where the answer really is "you have no save", and it must still not be
 	# confused with a player who never had one.
 	DirAccess.remove_absolute(SLOT + SaveGame.BAK_SUFFIX)
 	_check(SaveGame.read(SLOT).is_empty(), "with the backup gone too, the damaged slot yields nothing")
@@ -159,7 +159,7 @@ func _transactional_restore() -> void:
 	_check(fingerprint[0] > 0 and fingerprint[1] > 0, "the live sim has real state to protect %s" % [fingerprint])
 
 	# A save from another data set: the terrain would restore fine, the machine def does not exist. The
-	# old code caught this one — it resolved defs first — so it is here to stay caught.
+	# old code caught this one (it resolved defs first), so it is here to stay caught.
 	var alien: Dictionary = SaveGame.capture(_world(55))
 	alien["machines"] = [{"def": "no_such_machine", "cell": Vector2i(5, 30), "in": {}, "out": {},
 		"spoil": {}, "progress": 0.0, "route_toggle": 0, "fuel": 0, "power_factor": 0.0, "fed": 0}]
@@ -183,7 +183,7 @@ func _transactional_restore() -> void:
 			live.water.size(), live.deposits.size()] == fingerprint
 		_check(refused and intact, "an envelope missing \"%s\" is refused WHOLE — nothing was written" % key)
 		# …and refused by the PRESENCE gate specifically. Both the presence loop and the type loop under
-		# it reject a missing key, so the assertion above passes with the presence loop deleted — which
+		# it reject a missing key, so the assertion above passes with the presence loop deleted, which
 		# makes it blind to the thing that loop is actually for. It is what refuses CLEANLY: without it
 		# the type loop indexes `data[key]` on a key that is not there, and Godot answers with an engine
 		# error per miss (measured 2026-08-17: 2 error lines became 16). Naming the reason is what lets a
@@ -225,7 +225,7 @@ func _version_migration() -> void:
 
 ## 5. THE SAME FILE PRODUCES THE SAME FUTURE, WHICHEVER WAY YOU GOT TO IT.
 ## Same-process F9 restores into a sim that has been running; a fresh process restores into a brand new
-## one. If any phase counter survives the first path and not the second, one file has two futures — and
+## one. If any phase counter survives the first path and not the second, one file has two futures, and
 ## the whole determinism argument this project rests on stops being true at the exact moment a player
 ## reloads. `_seep_tick` is authoritative and is SAVED; the rate/accumulator readouts are derived and are
 ## RESET. Either policy is defensible; leaving them wherever the last game happened to stop is not.
@@ -269,7 +269,7 @@ func _phase_equivalence() -> void:
 
 	# AND THE CONTROL, which is what makes persisting the phase a fact rather than a preference: two sims
 	# holding the same world at DIFFERENT points in the seep cycle must diverge. If this passes trivially
-	# — if phase never mattered — then everything above is ceremony and should be deleted rather than
+	# (if phase never mattered) then everything above is ceremony and should be deleted rather than
 	# believed.
 	var phase_a: FactorySim = _world(7)
 	var phase_b: FactorySim = _world(7)
@@ -316,17 +316,17 @@ func _seed_ownership() -> void:
 
 ## 7. THE BACKUP GENERATION IS NOT SPENT TWICE.
 ## Section 2 proves a damaged slot recovers from the backup. This proves the recovery SURVIVES THE NEXT
-## SAVE — which is where it used to die, one save later and out of sight of every test.
+## SAVE, which is where it used to die, one save later and out of sight of every test.
 ##
 ## `write` copied the primary to `.bak` on the sole condition that the primary EXISTED. So the first save
 ## after a recovery copied the wreckage that had just been recovered *from* over the only intact
-## generation left. The player was warned "recovered", played on, saved once — and was then a single
+## generation left. The player was warned "recovered", played on, saved once, and was then a single
 ## corruption away from nothing at all, with no sign that the net under them had been cut. Nothing here
 ## fails loudly; the damage is entirely in what is no longer there.
 ##
 ## The second half is the opposite direction of the same three lines: `copy_absolute` returns an Error and
 ## it was discarded, so a backup that could NOT be written was followed by a rename that could, replacing
-## the save with nothing behind it — while `write`'s own docstring promised any failure leaves the
+## the save with nothing behind it, while `write`'s own docstring promised any failure leaves the
 ## existing save exactly as it was. Both were found by an external audit and both were release-blocking.
 func _backup_generation() -> void:
 	print("== the backup generation ==")
@@ -347,7 +347,7 @@ func _backup_generation() -> void:
 		and SaveGame.last_read == SaveGame.Read.RECOVERED,
 		"…and the player is now running on a RECOVERED save, with that damage still on disk")
 
-	# THE SAVE THAT USED TO EAT THE NET. Everything about it succeeds — the new game lands in the slot —
+	# THE SAVE THAT USED TO EAT THE NET. Everything about it succeeds (the new game lands in the slot),
 	# and the only question is what it did to the generation standing behind it.
 	_check(SaveGame.write(SLOT, SaveGame.capture(_world(33))), "they save again, and the new save writes")
 	_check(int(SaveGame.read(SLOT).get("world_seed", -1)) == 33, "…and the slot holds it")
@@ -366,7 +366,7 @@ func _backup_generation() -> void:
 
 	# A BACKUP THAT CANNOT BE WRITTEN ABORTS THE PROMOTION. Occupying the backup path with a DIRECTORY is
 	# the cleanest honest forcing function: the copy cannot open its destination, while the rename of the
-	# temp file over the primary is entirely unaffected — which is precisely the shape that used to leave
+	# temp file over the primary is entirely unaffected, which is precisely the shape that used to leave
 	# a fresh save sitting on top of no backup at all.
 	_sweep()
 	_check(SaveGame.write(SLOT, SaveGame.capture(_world(55))), "a save exists to be protected")

@@ -3,7 +3,7 @@ extends "res://tools/check_base.gd"
 ## WHERE ROCK MEETS AIR, THE MEETING ITSELF HAS TO BE VISIBLE.
 ##
 ## 6b, and it exists because 6a was retired on a contradiction rather than on a number. `check_rock_reads`
-## asks whether a PATCH of unlit pixels is rock or air — a field question, answered by value. That question
+## asks whether a PATCH of unlit pixels is rock or air: a field question, answered by value. That question
 ## cannot be answered by any single constant, because air is legitimately two things: `check_room_reads`
 ## requires a carved room to read BRIGHTER than the mass it was cut from, and a natural void has to read as
 ## absence. Two layers assert opposite things about the same cells and no constant satisfies both.
@@ -20,12 +20,12 @@ extends "res://tools/check_base.gd"
 ##   POLARITY       across the faces that ARE edges, is the rock side reliably the same side?
 ##                  (having found an edge: "which side of it is wall?")
 ##
-## A frame can pass one and fail the other, and the fixes differ — detectability wants contrast at the
+## A frame can pass one and fail the other, and the fixes differ: detectability wants contrast at the
 ## contact, polarity wants that contrast to point consistently. Reporting one number would average a
 ## legible frame with an illegible one and call it middling.
 ##
 ## MEASURED IDENTICALLY OR NOT AT ALL. The boundary and interior populations are sampled with the SAME
-## geometry — two patches straddling a shared cell face, the same offset either side — so the only thing
+## geometry (two patches straddling a shared cell face, the same offset either side), so the only thing
 ## that differs between them is the ground truth. A comparison in which the two arms are measured
 ## differently is not a comparison, it is two measurements with a subtraction sign between them.
 ##
@@ -35,7 +35,7 @@ extends "res://tools/check_base.gd"
 ##
 ##   godot --path . --script res://tools/check_contact_edge.gd     (NO --headless: it judges pixels)
 
-## WHAT THIS LAYER CREDITS FOR THE CONTACT IS NOT WHAT DRAWS IT — measured 2026-08-18, and it supersedes
+## WHAT THIS LAYER CREDITS FOR THE CONTACT IS NOT WHAT DRAWS IT; measured 2026-08-18, and it supersedes
 ## every mention of `_draw_edge_ao` below.
 ##
 ## This file is written as though `TerrainPainter._draw_edge_ao` is the treatment under test: a warm lit lip
@@ -55,7 +55,7 @@ extends "res://tools/check_base.gd"
 ##
 ## WHAT THE STEP ACTUALLY IS, then: the rock-versus-back-wall MATERIAL difference, plus whatever
 ## `fine_terrain` itself draws at a face (`rim`, `rim_warm`, `_sky_form`, the "carved-edge AO" and "form
-## sink" its own comment names). Measured against three independent knockouts, the subject is robust —
+## sink" its own comment names). Measured against three independent knockouts, the subject is robust.
 ## `_draw_edge_ao` removed: 95%, unchanged. `_sky_form` zeroed: 96%. The tooth removed: 91%. Edge step
 ## median 10.4 against a flat-rock step of 1.5.
 ##
@@ -92,9 +92,9 @@ const SETTLE: int = 60
 ## that survived were incidental geometry elsewhere in frame, not the subject.
 ##
 ## What is NOT being changed to fix that, because the temptation runs the other way and this is the exact
-## move I have spent the day refusing: `MIN_SAMPLES` stays 40, `SURFACE_CLEAR` stays 20, `DARK_CEILING`
+## move that has been refused all day: `MIN_SAMPLES` stays 40, `SURFACE_CLEAR` stays 20, `DARK_CEILING`
 ## stays 34, `READ_FLOOR` stays 0.75. No floor moves. The delve goes deeper so that the chamber lands BELOW
-## the exclusion line rather than above it — the same class of fix as check_fastforward's runway needing to
+## the exclusion line rather than above it; the same class of fix as check_fastforward's runway needing to
 ## be machine-free and inside the surface band. A fixture that is not standing where the effect is cannot be
 ## repaired by lowering the bar for what counts as having found it.
 ##
@@ -106,11 +106,11 @@ const SETTLE: int = 60
 ## than anyone asserting it. The old "65x39 at zoom 1.0" was the broken projection below measuring itself:
 ## 65 columns falls out of ~29.5px per cell, which is what the hand-rolled arithmetic believed.
 ##
-## I THEN GOT IT WRONG A SECOND TIME IN THIS COMMENT, and it is left recorded because the error is the
-## interesting part. Replacing 65x39 I wrote "26x15", derived from 48 world units x 1.5 composite = 72px
+## IT THEN WENT WRONG A SECOND TIME IN THIS COMMENT, and it is left recorded because the error is the
+## interesting part. In place of 65x39 it said "26x15", derived from 48 world units x 1.5 composite = 72px
 ## and 1920/72 -- reasoning from constants instead of reading the number the fixture prints. The composite
 ## does not multiply out that way at this camera; the engine transform reports 48.0px per cell and the view
-## is 45 wide. Both wrong figures came from computing a measurement I could have run.
+## is 45 wide. Both wrong figures came from computing a measurement that could have been run.
 ##
 ## A 41-WIDE CHAMBER THEREFORE FITS, and the single-viewpoint shortfall was never about the room being too
 ## wide. With the lens repaired, one standing found 33 rock|air faces against a floor of 40 and correctly
@@ -122,7 +122,7 @@ const SETTLE: int = 60
 ## would give, because pooling de-excludes as well as adds.
 ##
 ## CONSEQUENCE, STATED RATHER THAN BURIED: 6b no longer judges the identical frame 6a does. It judges the
-## same KIND of place — deep unlit rock against carved void — at a depth where the filter both layers share
+## same KIND of place (deep unlit rock against carved void) at a depth where the filter both layers share
 ## actually admits it. Comparing the two numbers is still meaningful; claiming they are one frame is not.
 const DELVE_ROWS: int = 30
 const ROOM_W: int = 41
@@ -148,7 +148,7 @@ const MIN_SAMPLES: int = 40
 const READ_FLOOR: float = 0.75
 
 ## Sampling geometry at a face. Each patch sits FACE_OFFSET of a cell to its own side of the shared face,
-## with a radius of PATCH_FRAC — so a patch spans 0.10..0.46 of a cell from the face and cannot reach
+## with a radius of PATCH_FRAC, so a patch spans 0.10..0.46 of a cell from the face and cannot reach
 ## across it. A patch that straddled the boundary would contain the edge itself and both arms would measure
 ## the same pixels.
 const FACE_OFFSET: float = 0.28
@@ -157,7 +157,7 @@ const MIN_PATCH: int = 1
 
 ## Distances from the face, in world px, at which the luminance profile is taken. Negative is INTO THE AIR,
 ## positive is INTO THE ROCK. Dense in the first six pixels because that is the entire span
-## `_draw_edge_ao` paints into — 3 steps x 2px of strip, plus the lit lip in step 0.
+## `_draw_edge_ao` paints into: 3 steps x 2px of strip, plus the lit lip in step 0.
 const PROFILE_PX: Array[float] = [-9.0, -5.0, -2.0, 1.0, 3.0, 5.0, 7.0, 9.0, 13.0, 17.0]
 
 ## Face orientations, because the treatment under test is directional by design.
@@ -169,7 +169,7 @@ const ORIENT_NAME: Array[String] = ["rock TOP (lit lip)", "rock UNDER (ceiling)"
 ## PRE-REGISTERED, BEFORE ANY NUMBER EXISTS. All four of these were written down before the layer was first
 ## run, because every one of them is a place where a later choice could be made to flatter a result.
 ##
-## 1. THE NON-EDGE POPULATION IS ROCK INTERIOR ONLY — rock|rock faces, never air|air.
+## 1. THE NON-EDGE POPULATION IS ROCK INTERIOR ONLY: rock|rock faces, never air|air.
 ##    Air is close to featureless, so air|air faces produce near-zero steps, and including them would pad
 ##    the non-edge arm with easy cases and inflate detectability. Rock interior is the CONFUSABLE case: it
 ##    is where a false edge would come from, and it is what the tester's eye actually has to reject.
@@ -184,8 +184,8 @@ const ORIENT_NAME: Array[String] = ["rock TOP (lit lip)", "rock UNDER (ceiling)"
 ##
 ## 3. A GREEN HERE DOES NOT CLOSE 6a, AND DOES NOT BY ITSELF CLOSE T3.1.
 ##    6a's own pre-registration says a local green over a global red is a finding about boundaries versus
-##    fields, not a close. That still binds. A green 6b against a red 6a means one specific thing — the
-##    world is readable at boundaries and unreadable in the field — and whether that suffices for a
+##    fields, not a close. That still binds. A green 6b against a red 6a means one specific thing: the
+##    world is readable at boundaries and unreadable in the field, and whether that suffices for a
 ##    first-timer is the naive viewer's call. This statistic is evidence for that judgement, not the
 ##    judgement.
 ##
@@ -253,7 +253,7 @@ func _run() -> void:
 		"the skip breakdown accounts for every skipped face")
 
 	# NON-VACUITY FIRST. Both statistics below are ratios over pairs, and a ratio over a handful of faces is
-	# not a small result, it is no result — and it flatters.
+	# not a small result, it is no result, and it flatters.
 	_check(edge_step.size() >= MIN_SAMPLES,
 		"%d rock|air faces were found to judge (floor %d)" % [edge_step.size(), MIN_SAMPLES])
 	_check(flat_step.size() >= MIN_SAMPLES,
@@ -306,13 +306,13 @@ func _run() -> void:
 		var u: Array[float] = lo[ORIENT_UNDER]
 		var w: Array[float] = lo[ORIENT_SIDE]
 		# EACH BUCKET CARRIES ITS OWN FLOOR, and a bucket under it prints no median at all. Measured, not
-		# assumed: across five runs TOP (n=41) held 43.7-44.6 and SIDE (n=42) held 28.7-29.5 — both stable
-		# inside one level — while UNDER (n=12) swung 26.8-42.8, landing either below SIDE or level with
+		# assumed: across five runs TOP (n=41) held 43.7-44.6 and SIDE (n=42) held 28.7-29.5 (both stable
+		# inside one level) while UNDER (n=12) swung 26.8-42.8, landing either below SIDE or level with
 		# TOP depending on which faces the sample caught. At that size the median moves a whole rank when
 		# one face enters, so the number is not a weak result, it is a coin. Widening VIEWPOINTS to seven
 		# standings did not help: UNDER stayed at n=12, which says down-facing rock inside a lamp is rare
 		# in this world rather than merely unsampled. Printing "UNDER 41.2" beside two solid numbers would
-		# read as the third leg of an ordering, and someone (me) would quote it.
+		# read as the third leg of an ordering, and someone would quote it.
 		print("    lit ROCK by face orientation — TOP %s, SIDE %s, UNDER %s"
 			% [_orient_cell(t), _orient_cell(w), _orient_cell(u)])
 		if t.size() >= ORIENT_MIN and w.size() >= ORIENT_MIN:
@@ -322,7 +322,7 @@ func _run() -> void:
 				+ " — the ordering claim is TOP vs SIDE only, and the third leg is an open question.")
 
 	# THE PROFILE ACROSS THE FACE. Negative is into the air, positive into the rock. It was sized against
-	# `_draw_edge_ao` painting "the first 6px of a 32px cell" — both halves of which are false. The cell is
+	# `_draw_edge_ao` painting "the first 6px of a 32px cell", both halves of which are false. The cell is
 	# 48px captured, not 32 (the broken lens's figure), and that pass does not reach this frame at all. The
 	# profile survives the correction because what it actually does is show WHERE the step lives, which is
 	# worth printing whatever draws it: a flat profile means the verdict above is about where this layer
@@ -355,7 +355,7 @@ func _run() -> void:
 
 	# THE STAINED ARM, REPORTED SEPARATELY AND NEVER FOLDED IN. Pre-registered above. If these two disagree
 	# it means ore tell is carrying legibility that plain rock does not have, which is a finding about what
-	# is doing the work — and a fix aimed at the pooled number would be aimed at the wrong half.
+	# is doing the work, and a fix aimed at the pooled number would be aimed at the wrong half.
 	print("  polarity by host: %d plain-rock edges at %.0f%%, %d lode-stained edges at %.0f%%"
 		% [signed_plain.size(), _consistency(signed_plain) * 100.0,
 			signed_stained.size(), _consistency(signed_stained) * 100.0])
@@ -399,18 +399,18 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	# run_harness.sh came from a branch where it had been applied; main has been running the
 	# withdrawn lens ever since, and reproduces the withdrawn numbers (51%, steps 1.26-4.49) on demand.
 	#
-	# I THEN CLAIMED THIS EXPLAINED THE MAGENTA NULL, AND IT DOES NOT. Forcing `_draw_edge_ao`'s lip to pure
-	# magenta once changed NOTHING here, and I wrote that off as the broken lens looking past the face it
-	# painted. Then I knocked the whole pass out under the REPAIRED lens and the output was byte-identical
+	# THIS WAS THEN CLAIMED TO EXPLAIN THE MAGENTA NULL, AND IT DOES NOT. Forcing `_draw_edge_ao`'s lip to pure
+	# magenta once changed NOTHING here, and that was written off as the broken lens looking past the face it
+	# painted. Then the whole pass was knocked out under the REPAIRED lens and the output was byte-identical
 	# -- so the lens was never the reason. See the header: the coarse pass this layer credits is invisible
-	# underground, measured at zero. Two independent faults stacked, and I attributed both to the one I had
+	# underground, measured at zero. Two independent faults stacked, and both were attributed to the one
 	# just fixed, which is the more seductive error because the fix was real.
 	var to_px: Transform2D = main.get_viewport().get_final_transform() \
 		* main.get_viewport().get_canvas_transform()
 	var cell_px: float = to_px.basis_xform(Vector2(float(WorldRenderer.CELL), 0.0)).length()
 	var patch: int = maxi(MIN_PATCH, int(cell_px * PATCH_FRAC))
 	# WORLD UNITS, because it is subtracted in world space and transformed afterwards. It was
-	# `cell_px * FACE_OFFSET`, which is CELL * zoom * FACE_OFFSET — a SCREEN-space length applied before the
+	# `cell_px * FACE_OFFSET`, which is CELL * zoom * FACE_OFFSET: a SCREEN-space length applied before the
 	# `* zoom`, so the real offset was CELL * FACE_OFFSET * zoom². Harmless at the zoom 1.0 every reading so
 	# far was taken at, and silently wrong at any other, which is the kind of latent defect that surfaces as
 	# an unexplained drift the day someone changes a camera default.
@@ -422,7 +422,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	if scratch.size() != want_bytes or base.size() != want_bytes:
 		# FALL TO THE FAILING SIDE, same as 6a. Without these buffers every cell tests as unlit, the sample
 		# silently becomes "the whole frame including the lamp pool", and the layer reports on a different
-		# question than the one it is named for — while looking GREENER, because a lit edge reads.
+		# question than the one it is named for, while looking GREENER, because a lit edge reads.
 		printerr("check_contact_edge: FAIL — the veil buffers are %d/%d bytes, expected %d; the lit/unlit"
 			% [scratch.size(), base.size(), want_bytes]
 			+ " split cannot be computed and every cell would count as dark")
@@ -442,7 +442,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 		prof_or.append(per)
 		signed_or.append([] as Array[float])
 		step_or.append([] as Array[float])
-	## THE LAMP ARM — same measurement, the population this layer used to discard. Diagnostic only.
+	## THE LAMP ARM: same measurement, the population this layer used to discard. Diagnostic only.
 	var lit_edge_step: Array[float] = []
 	var lit_flat_step: Array[float] = []
 	var lit_edge_signed: Array[float] = []
@@ -472,7 +472,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 	c0 = Vector2i(maxi(c0.x, 0), maxi(c0.y, 0))
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
-	# Absolute, not per-column — `surface_row` has no memory of the original terrain, so on a dug column it
+	# Absolute, not per-column: `surface_row` has no memory of the original terrain, so on a dug column it
 	# reports the bottom of the player's own shaft and would exclude exactly the carved space under test.
 	# This is the bug that made 6a's fixture drift run to run; the same trap applies here verbatim.
 	var floor_row: int = WorldRenderer.SURFACE_LINE + SURFACE_CLEAR
@@ -493,7 +493,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				if b.x > c1.x or b.y > c1.y:
 					continue
 				# DE-DUPLICATED HERE AND NOWHERE EARLIER, so a face rejected as LIT from one standing stays
-				# eligible from the next — which is the entire point of moving the camera.
+				# eligible from the next, which is the entire point of moving the camera.
 				var fkey: String = "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
 				# The two arms dedupe SEPARATELY. Sharing one set would let a face measured while lit
 				# block its own unlit measurement from the next standing, quietly shrinking the population
@@ -506,14 +506,14 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				# THE LAMP ARM (diagnostic, 2026-08-18). This used to `continue`, and that exclusion is why
 				# this layer could not answer the ticket it is filed under: 6b's complaint is *"inside the
 				# LIT POOL the rock has no edges"*, from a blind tester describing the rock INSIDE the lamp
-				# as a soft mottled gradient, and every lit face was being thrown away — 667 of them from a
+				# as a soft mottled gradient, and every lit face was being thrown away: 667 of them from a
 				# single standing. The layer measured the dark outside the complaint and passed.
 				#
 				# Lit faces are now measured into their own arms and PRINTED. Nothing is asserted on them:
 				# this file's own rule is that a floor invented before the measurement is the error it has
 				# already made once, and nobody has looked at this population yet.
 				# BOTH SIDES, NOT EITHER, and the difference is the whole population. The unlit arm skips a
-				# face when EITHER cell is lit, and the naive complement of that is "either is lit" — which
+				# face when EITHER cell is lit, and the naive complement of that is "either is lit", which
 				# sweeps in every face where the lamp fills the VOID while the rock stays dark. That is the
 				# commonest lit-contact geometry there is, and a big step across it is a statement about the
 				# LAMP'S OWN BOUNDARY, not about how lit rock reads. 6b's claim is about the rock INSIDE the
@@ -564,15 +564,15 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				# THE PROFILE ACROSS THE FACE, sampled at single pixels rather than in a patch, because the
 				# thing it is looking for is only a few pixels wide and a patch would average it away.
 				#
-				# This exists because `TerrainPainter._draw_edge_ao` ALREADY draws a contact treatment — a
-				# lit lip on sky-facing tops, a rim on side walls, three 2px AO steps and concave scoops —
+				# This exists because `TerrainPainter._draw_edge_ao` ALREADY draws a contact treatment (a
+				# lit lip on sky-facing tops, a rim on side walls, three 2px AO steps and concave scoops)
 				# and all of it lives in the first 6px of a 32px cell. The two-patch measure above centres
 				# 9px from the face with a 5px radius, so it samples 4..14px and can capture at most the
 				# outer sliver of a 6px treatment. Before "the contact carries no information" can be a
 				# claim about the WORLD, it has to survive the possibility that it is a claim about where
 				# this instrument happened to look.
 				# ORIENTATION IS NOT A NUISANCE HERE, IT IS THE SUBJECT. `_draw_edge_ao` is a KEY LIGHT from
-				# above, not uniform occlusion — its own comment says so: "occlusion alone can't make a
+				# above, not uniform occlusion; its own comment says so: "occlusion alone can't make a
 				# form". A sky-facing face gets a warm LIT lip (alpha 0.30), an underside falls into the
 				# darkest thing in the world (0.46), and side walls take a dim rim then a mid AO (0.14 /
 				# 0.26). So the rock side is deliberately BRIGHTER at a top face and DARKER at a ceiling.
@@ -580,8 +580,8 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 				# Pooling those into one median cancels them against each other, and pooling them into one
 				# polarity statistic is worse than that: it tests "is the rock side always the same side",
 				# a rule this renderer never claimed and deliberately breaks. **A perfectly executed key
-				# light scores ~50% on a pooled polarity measure by construction.** That is my statistic
-				# encoding an assumption its subject does not share — the same error as every population
+				# light scores ~50% on a pooled polarity measure by construction.** That is the statistic
+				# encoding an assumption its subject does not share, the same error as every population
 				# mistake in this project, one level up, in the verdict rather than the sample.
 				var orient: int = ORIENT_SIDE
 				if d.y == 1:
@@ -611,8 +611,8 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 						# words were "a soft mottled gradient — FOG, NOT CARVED MASS", which is a complaint
 						# about FORM rather than about edges: a contact can be perfectly crisp while the
 						# solid behind it still reads as vapour. Fog has no orientation; a carved mass lit
-						# from above does. The renderer claims a key light — sky-facing tops catch a warm
-						# lip, undersides fall into the darkest thing in the world, walls sit between — so
+						# from above does. The renderer claims a key light (sky-facing tops catch a warm
+						# lip, undersides fall into the darkest thing in the world, walls sit between), so
 						# if that reaches the lit pool the ROCK-side luma must ORDER by face orientation,
 						# TOP > SIDE > UNDER. If the three medians sit on top of each other, the lit rock is
 						# being shaded uniformly and "fog" is the right word for it.
@@ -649,7 +649,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary, seen_lit: Dictionary)
 ## concatenate, the per-index Array[Array] profiles (profile, prof_or, signed_or, step_or) concatenate
 ## INSIDE each index, and the exclusion counters add. A generic "append if Array" would flatten the nested
 ## ones into a single bucket and silently destroy the per-orientation split that this layer's whole
-## argument rests on — the key light makes TOP and UNDER point opposite ways, and merging them is the
+## argument rests on: the key light makes TOP and UNDER point opposite ways, and merging them is the
 ## error the layer already documents at the verdict level.
 func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
 	if src.is_empty():
@@ -683,7 +683,7 @@ func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
 	return dst
 
 
-## A cell the veil never brightened — scratch bytes still equal base bytes, so no source reached it. Any
+## A cell the veil never brightened: scratch bytes still equal base bytes, so no source reached it. Any
 ## light source added later appears in the buffer and is excluded automatically, where a hand-kept radius
 ## list would have to be remembered.
 ## A median, or an honest refusal to give one. Under the floor the count is all that gets printed.
@@ -714,7 +714,7 @@ func _patch_luma(img: Image, cx: int, cy: int, r: int) -> float:
 	return sum / float(n) if n > 0 else 0.0
 
 
-## HOW OFTEN A REAL EDGE OUTSTEPS AN INTERIOR — the same Mann-Whitney statistic 6a uses, folded for the
+## HOW OFTEN A REAL EDGE OUTSTEPS AN INTERIOR: the same Mann-Whitney statistic 6a uses, folded for the
 ## same reason: a frame where interiors consistently outstep real edges is perverse but readable once
 ## learned, and it is the OVERLAP that cannot be read at all.
 func _readability(a: Array[float], b: Array[float]) -> float:
@@ -731,7 +731,7 @@ func _readability(a: Array[float], b: Array[float]) -> float:
 	return maxf(auc, 1.0 - auc)
 
 
-## HOW OFTEN THE ROCK SIDE IS THE SAME SIDE — polarity as the player would learn it.
+## HOW OFTEN THE ROCK SIDE IS THE SAME SIDE: polarity as the player would learn it.
 ##
 ## Not an AUC: polarity is not about two populations, it is about whether ONE population has a consistent
 ## sign. A player who notices "the wall side is the darker one" is right exactly as often as that rule
@@ -756,7 +756,7 @@ func _consistency(signed: Array[float]) -> float:
 	return maxf(pos, neg) / float(signed.size())
 
 
-## Which way the majority leans, for the report only — never for the verdict, which is direction-blind.
+## Which way the majority leans, for the report only; never for the verdict, which is direction-blind.
 func _lean(signed: Array[float]) -> float:
 	var sum: float = 0.0
 	for v: float in signed:
@@ -782,7 +782,7 @@ func _median(a: Array[float]) -> float:
 	return s[s.size() / 2]
 
 
-## The shaft and the work chamber, cut by the real agent through the real verbs — lifted from
+## The shaft and the work chamber, cut by the real agent through the real verbs; lifted from
 ## check_rock_reads so the two layers judge the same frame. Returns rows below the PRE-DIG surface.
 func _delve(main: MainView) -> int:
 	var agent: PlayAgent = AGENT.new(self, main)
@@ -791,9 +791,9 @@ func _delve(main: MainView) -> int:
 	var from_surface: int = main.sim.surface_row(here.x)
 	var target := Vector2i(here.x, from_surface + DELVE_ROWS)
 	# THE DELVE REPORTS ITS OWN INPUTS, every run. A 30-row delve came back having moved nowhere and with
-	# no note from the agent, which meant `dig_down_to` had returned true on its FIRST iteration — it only
+	# no note from the agent, which meant `dig_down_to` had returned true on its FIRST iteration; it only
 	# does that when the target cell is already open. "reached -1" cannot distinguish "the digger failed"
-	# from "the target was a hole in the ground before we started", and those want opposite fixes.
+	# from "the target was a hole in the ground before the dig", and those want opposite fixes.
 	var solid_at_start: bool = main.sim.is_solid(target)   # sampled BEFORE the dig, or it is always false
 	var body_at_start: int = here.y
 	var ok: bool = await agent.dig_down_to(target, 2400, true)

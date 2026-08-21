@@ -4,7 +4,7 @@ extends "res://tools/check_base.gd"
 ##
 ## `capture_moments` set `main._hud.can_craft = true` and shuttered sixty settle frames later.
 ## `main.gd:793` re-derives that field from `_near_bazaar()` on every `_process`. The write was gone long
-## before the picture, and ten menu captures — the whole baseline a redesign was to be judged against —
+## before the picture, and ten menu captures (the whole baseline a redesign was to be judged against)
 ## photographed the counter as seen by somebody standing nowhere near it. The Bazaar's gold verb button was
 ## not in the archive at all, so the first frame ever taken of it live turned out to read `BUILDENTER`.
 ##
@@ -13,19 +13,19 @@ extends "res://tools/check_base.gd"
 ## plausible, and a written analysis gets built on top of it.
 ##
 ## The moment-level guard for that specific field lives in `capture_moments._contamination`, where it
-## belongs — it reads `can_craft` at the shutter and refuses the write. This layer is the OTHER half: it
+## belongs: it reads `can_craft` at the shutter and refuses the write. This layer is the OTHER half: it
 ## asks whether the class is anywhere else, and it asks statically so that a fixture nobody is running
 ## tonight is still covered.
 ##
 ## HOW THE POPULATION IS DERIVED, which is the only interesting decision here. Not from a list of fields
-## somebody thought of — that is the failure mode `_contamination` had, whose `EXPECT` table could not even
+## somebody thought of; that is the failure mode `_contamination` had, whose `EXPECT` table could not even
 ## SPELL `can_craft` because its vocabulary was properties on `main`. It is read out of the game: every
 ## `<receiver>.<field> = ...` and every bare `<field> = ...` statement lexically inside a `_process` or
 ## `_physics_process` body under `scenes/` and `src/`. Add a new per-frame push and this layer's population
 ## grows by itself.
 ##
 ## THE BARE FORM WAS MISSING FOR AS LONG AS THIS FILE EXISTED, and it is the commoner of the two: a
-## `_process` writing its own state needs no receiver, so `_assigned_pair` — which requires one — could not
+## `_process` writing its own state needs no receiver, so `_assigned_pair` (which requires one) could not
 ## see it. `main.gd:737` recomputes `_cam_pos` and was invisible; `_camera.global_position`, derived from it
 ## on the NEXT line, was caught and then exempted on a reason that only holds at 60 fps. The layer was
 ## looking straight at the defect and keying on the line beneath it, which is this layer's own subject
@@ -33,12 +33,12 @@ extends "res://tools/check_base.gd"
 ##
 ## WHAT IT CANNOT SEE, stated because a static scan invites being trusted past its reach:
 ##   - mutation through a method (`hud.set_thing(x)`), or through a shared Array/Dictionary reference
-##   - a field on a local declared inside the body, or a bare write to the function's own parameter — both
+##   - a field on a local declared inside the body, or a bare write to the function's own parameter; both
 ##     excluded on purpose, see `locals` below
-##   - a field pushed from a timer, a signal handler, or `_ready` (`hud.objectives` is one — assigned once,
+##   - a field pushed from a timer, a signal handler, or `_ready` (`hud.objectives` is one: assigned once,
 ##     by reference, so a fixture that reassigns it decouples rather than loses)
-##   - a receiver named differently in the two files. The match is on the PAIR — the identifier immediately
-##     left of the field, with a leading underscore stripped — so `main._hud.can_craft` in a fixture meets
+##   - a receiver named differently in the two files. The match is on the PAIR (the identifier immediately
+##     left of the field, with a leading underscore stripped), so `main._hud.can_craft` in a fixture meets
 ##     `_hud.can_craft` in the game, and `check_pack_layout`'s bare `hud` meets it too, while
 ##     `_player.position` never collides with `_motes.position`. A fixture that reaches the same object
 ##     through a differently-NAMED handle is outside this layer's reach. The bare form keys on the FILE's
@@ -53,13 +53,13 @@ extends "res://tools/check_base.gd"
 ## `rmin` inside `world_renderer._process` colliding with any `.x` anywhere. A layer written to catch
 ## "the population is not the claim" whose own population was every field with a common name. Kept in the
 ## comment rather than the history because the shape is the lesson.
-## It sees exactly two shapes, and the one it could not see is the one that bit us twice.
+## It sees exactly two shapes, and the one it could not see is the one that has bitten twice.
 ##
 ## AND THE SIM HALF HAS THE SAME SHAPE, WHICH THIS EXTRACTOR CANNOT SEE. Measured rather than assumed,
-## and recorded here because "we checked and it is not there" and "nobody looked" are two states a
+## and recorded here because "it was checked and it is not there" and "nobody looked" are two states a
 ## reader cannot tell apart from a green layer. Fixtures pose **13 distinct sim fields across ~129 sites**
 ## (`inventory[]` 37, `deposits[]` 21, `total_produced[]` 15, `torch[]` 12, `lode[]` 12, `research[]` 11,
-## and the tail). `FactorySim.tick()` assigns exactly ONE field in its own body — `_seep_tick += 1` — and
+## and the tail). `FactorySim.tick()` assigns exactly ONE field in its own body (`_seep_tick += 1`) and
 ## fans the rest out through `PowerFlow.compute(self)`, `WaterFlow.step(self)` and `Flora.grow(self)`,
 ## static helpers in other files taking the sim as a parameter, which between them write six sim fields.
 ## **Every one of those six is a subscript write**, `sim.water[c] = …`.
@@ -67,28 +67,28 @@ extends "res://tools/check_base.gd"
 ## Both of this file's rules exclude that subject by construction: `_assigned_pair` returns "" on any left
 ## side containing `[`, correct for node fields and fatal in a container-shaped state; and a lexical body
 ## scan finds 1 of 7 because the tick's per-frame work is a fan-out while `_process`'s is not. **A direct
-## port would report a clean population and be clean because the instrument cannot register the writes** —
+## port would report a clean population and be clean because the instrument cannot register the writes**,
 ## which is the thing this layer exists to catch, arriving as this layer. The sim version needs a different
 ## extractor (subscripts) and a different population rule (the tick's transitive closure, not its body).
 ## Filed as a ticket in `docs/PRIORITY.md`; if that ticket is not there, the paragraph above is the
 ## ticket.
 ##
-## ONE RULE HERE IS LOAD-BEARING FOR A REASON I DID NOT REASON TO. `_assigned_pair` rejects `+=`, which I
-## wrote because a compound assignment is a read-modify-write of a field the fixture never established.
+## ONE RULE HERE IS LOAD-BEARING FOR A REASON NOBODY REASONED TO. `_assigned_pair` rejects `+=`, which was
+## written because a compound assignment is a read-modify-write of a field the fixture never established.
 ## The better reading, and the one to keep: **`=` DESTROYS a pose, `+=` PRESERVES it as an offset.**
 ## `check_save_durability` poses `phase_b._seep_tick = phase_a._seep_tick + SEEP_INTERVAL / 2`, then
-## advances both sims and asserts they diverge — under a naive port that is a textbook offence, and it is
+## advances both sims and asserts they diverge; under a naive port that is a textbook offence, and it is
 ## in fact one of the better fixtures in the tree, because the pose IS the subject. Both halves are written
 ## down because a reviewer needs the rule and the next person to port this needs the reason.
 ##
 ##   godot --headless --path . --script res://tools/check_posed_fields.gd
 
 ## Writes that are known-safe, each with the reason, because a bare allow-list is a place to hide a bug.
-## Keyed "<tool file>:<field>". A layer whose exemption stops being true does not go green quietly — the
+## Keyed "<tool file>:<field>". A layer whose exemption stops being true does not go green quietly: the
 ## reason is written next to it so the next reader can check it rather than inherit it.
 const EXEMPT: Dictionary = {
 	# THE NEXT FOUR ARE ONE ARGUMENT, and it is the one thing that distinguishes them from `can_craft`.
-	# Each writes the value the recompute ITSELF produces when nothing is happening — `_arrival_life = 0.0`
+	# Each writes the value the recompute ITSELF produces when nothing is happening: `_arrival_life = 0.0`
 	# against hud.gd:353's `maxf(0.0, _arrival_life - delta)`, `_hover_latch = Vector2i(-9999, -9999)`
 	# against main.gd:794's own else-branch. A pose the recompute converges to cannot be destroyed by it;
 	# `can_craft = true` was destroyed because `_near_bazaar()` said false and the picture agreed with the
@@ -135,7 +135,7 @@ const EXEMPT: Dictionary = {
 ## EXEMPT excuses one fixture's write because of that fixture's situation, this excuses it because the
 ## statement that would destroy the pose is behind an `if` the fixture itself opened.
 ##
-## All three below are player.gd:241-246, the three lines under `if auto_input:` — the switch player.gd:143
+## All three below are player.gd:241-246, the three lines under `if auto_input:`, the switch player.gd:143
 ## documents as the harness's own door in ("the harness sets it false and drives input_dir / request_jump()
 ## directly"). Without this the bare-field rule reported 70 offences across 13 fixtures, every one of them
 ## a fixture using the entry point the game built for it.
@@ -143,7 +143,7 @@ const EXEMPT: Dictionary = {
 ## AND IT IS VERIFIED PER FIXTURE RATHER THAN ASSERTED ONCE. A tool is only excused if it assigns the named
 ## switch itself, matched on the FIELD name because the handle differs everywhere (`p`, `pl`, `_player`,
 ## `main._player`) and the pair key cannot travel. A fixture that pokes `input_dir` without throwing
-## `auto_input` is still an offence, which is the whole point — a blanket entry here would be the
+## `auto_input` is still an offence, which is the whole point; a blanket entry here would be the
 ## allow-list failure this layer's own header warns about.
 const GUARDED: Dictionary = {
 	"player.input_dir": "auto_input",
@@ -182,17 +182,17 @@ func _initialize() -> void:
 
 ## EVERY REJECTION IN `_assigned_pair`, one line each, with the verdict it is supposed to return. The
 ## control above proves the extractor FIRES; this proves the twelve places it declines are the twelve it
-## means to decline, which nothing checked — the whole corpus above lands in none of them, so a rule could
+## means to decline, which nothing checked: the whole corpus above lands in none of them, so a rule could
 ## have been deleted or inverted and every green here would have held.
 ##
 ## Rows are `[line, expected pair]`, and the last TWO are acceptances on purpose: without them the table
 ## passes on a function that returns "" unconditionally, and the second of them is what shows the `(`
-## rejection is about the LEFT side only — `_near_bazaar()` on the right is the real game line.
+## rejection is about the LEFT side only: `_near_bazaar()` on the right is the real game line.
 ##
 ## THE BARE ROW IS THE ONE TO READ TWICE. `_cam_pos = target` is still a rejection HERE, and that is not
 ## the old behaviour surviving: the bare form moved to `_assigned_own`, which only `_scan_per_frame` calls,
 ## because `_scan_writes` reads whole tool files where a bare name is almost always the fixture's own local.
-## The verdict that changed is asserted where it changed — `ctl.has(&"control._own_made_up")` in
+## The verdict that changed is asserted where it changed: `ctl.has(&"control._own_made_up")` in
 ## `_initialize`, which is the same line inside a per-frame body being ACCEPTED.
 ##
 ## Every row carries a `"` so that `_scan_writes`, which reads this file like any other tool, throws the
@@ -290,7 +290,7 @@ func _initialize() -> void:
 		+ "posed state, and this is the false positive the first run produced")
 	# THE BARE HALF, which is the half that was blind. `_own_made_up` has no receiver at all and is keyed
 	# under the file's own name; the two negatives beside it are the two ways a bare name can be something
-	# other than a field — a `var` declared in the body, and a parameter of the function itself.
+	# other than a field: a `var` declared in the body, and a parameter of the function itself.
 	_check(ctl.has(&"control._own_made_up"),
 		"CONTROL: the extractor finds a field the body assigns on ITSELF, with no receiver to key on")
 	_check(not ctl.has(&"control.loose_local") and not ctl.has(&"control.delta"),
@@ -300,10 +300,10 @@ func _initialize() -> void:
 	var caught: Array = _scan_writes(CONTROL_TOOL, ctl)
 	# Five writes in the control tool, two of which must be caught. `_hud.made_up_field` is the receiver-form
 	# offence; `_hud.not_per_frame` shares the receiver and `_player.made_up_field` shares the FIELD, and
-	# neither may be caught — which is the whole reason this layer keys on the pair, and the bug the first
+	# neither may be caught, which is the whole reason this layer keys on the pair, and the bug the first
 	# version had. `control._own_made_up` is the bare-form offence, matched because the fixture's handle
 	# happens to be named for the file; `elsewhere._own_made_up` is the same field through a handle that is
-	# not, and it is deliberately MISSED — that is this layer's oldest limitation, and the bare rule inherits
+	# not, and it is deliberately MISSED; that is this layer's oldest limitation, and the bare rule inherits
 	# it rather than escaping it. It is a control so that the limitation is visible rather than only prose.
 	_check(caught.size() == 2 and str(caught[0][0]) == "hud.made_up_field"
 			and str(caught[1][0]) == "control._own_made_up",
@@ -327,20 +327,20 @@ func _initialize() -> void:
 
 ## Every `<recv>.<field> = ...` AND every bare `<field> = ...` lexically inside a `_process`/
 ## `_physics_process` body. Godot has no reflection for "what does this function assign", so this is a line
-## scan — and the body is bounded the way GDScript bounds it, by the next line at zero indentation that
+## scan, and the body is bounded the way GDScript bounds it, by the next line at zero indentation that
 ## opens a declaration.
 ##
 ## THE BARE FORM IS THE COMMON ONE AND IT WAS THE INVISIBLE ONE, which is not a coincidence: it is what a
 ## `_process` does to its OWN state, and its own state is most of what a `_process` writes. `_assigned_pair`
 ## needs a receiver, so `main.gd:737`'s `_cam_pos = _cam_pos.lerp(...)` was outside the population while
-## `_camera.global_position` one line BELOW it was inside — caught, and then exempted on a reason that only
+## `_camera.global_position` one line BELOW it was inside: caught, and then exempted on a reason that only
 ## held at 60 fps. The layer looked at the defect and saw the line under it. Turning the rule on took the
 ## population from 20 fields to 50.
 ##
 ## A BARE NAME HAS NO RECEIVER, SO THE FILE IS THE RECEIVER: `_cam_pos` in `main.gd` is keyed
 ## `main._cam_pos`, which is what a fixture holding the scene in a variable called `main` or `_main` writes.
 ## That is the same normalisation the receiver form already uses (`main._hud`, `_hud` and `hud` all collapse
-## to `hud`), and it inherits the same limitation — a fixture reaching `world_renderer.gd`'s own fields
+## to `hud`), and it inherits the same limitation: a fixture reaching `world_renderer.gd`'s own fields
 ## through a handle called `_renderer` is out of reach, and there is a control for that in `_initialize`.
 ## It holds for `main.gd`, `hud.gd` and `player.gd`, which are the three objects fixtures actually pose.
 func _scan_per_frame(src: String, label: String, out: Dictionary) -> void:
@@ -350,7 +350,7 @@ func _scan_per_frame(src: String, label: String, out: Dictionary) -> void:
 	# LOCALS DECLARED INSIDE THE BODY ARE NOT POSED STATE. `world_renderer._process` builds a local `rmin`
 	# and assigns `rmin.x`; `profile_frame` happens to use locals of the same name, and without this the
 	# layer reported it as a fixture posing a field the game recomputes. A local is not a field of a live
-	# object — nothing can overwrite it between a fixture's write and a shutter, because it does not
+	# object; nothing can overwrite it between a fixture's write and a shutter, because it does not
 	# survive the call.
 	# ...and under the bare rule the function's own PARAMETERS join them, for the same reason and with more
 	# at stake: `delta = 0.0` is a bare assignment to a name that is not a field at all, and keyed by file
@@ -413,7 +413,7 @@ func _params_of(func_line: String) -> Array[String]:
 
 ## Which FIELD names a tool assigns anywhere in itself, receiver ignored. Read by the `GUARDED` check,
 ## which has to ask "did this fixture throw `auto_input`" of a file that spells the handle `p`, `pl`,
-## `_player` or `main._player` depending on who wrote it — so the pair key cannot answer and the field can.
+## `_player` or `main._player` depending on who wrote it, so the pair key cannot answer and the field can.
 func _switches_thrown(src: String) -> Dictionary:
 	var out: Dictionary = {}
 	for ln: String in src.split("\n"):
@@ -438,7 +438,7 @@ func _scan_writes(src: String, fields: Dictionary) -> Array:
 ## STATEMENT rather than about what it writes to, which is why both extractors below start here: a line
 ## that is empty once its comment is cut; a line carrying a string, which matters because this file's own
 ## prose and `capture_moments`' four-paragraph explanation both contain the offending line as TEXT; a line
-## with no assignment on it; and a comparison or compound assignment — `+=` is a read-modify-write of a
+## with no assignment on it; and a comparison or compound assignment: `+=` is a read-modify-write of a
 ## field the fixture did not establish, and is not this class.
 func _assign_lhs(raw: String) -> String:
 	var ln: String = raw
@@ -458,7 +458,7 @@ func _assign_lhs(raw: String) -> String:
 ## `receiver.field` for a `something.receiver.field = value` statement, or "". The receiver is the
 ## identifier immediately left of the field with any leading underscore stripped, so the game's `_hud` and a
 ## fixture's `main._hud` and `hud` all normalise to `hud`. Rejects typed declarations, calls and subscripts
-## on the left, and a bare name — that last one is not a gap, it is `_assigned_own`'s subject, and it stays
+## on the left, and a bare name; that last one is not a gap, it is `_assigned_own`'s subject, and it stays
 ## a rejection HERE because `_scan_writes` reads whole tool files where a bare name is nearly always a local
 ## of the fixture's own.
 func _assigned_pair(raw: String) -> String:
@@ -476,7 +476,7 @@ func _assigned_pair(raw: String) -> String:
 	return "%s.%s" % [recv, field]
 
 
-## The bare `field = value` form — a body writing its OWN state, with no receiver to key on. Same statement
+## The bare `field = value` form: a body writing its OWN state, with no receiver to key on. Same statement
 ## rules as the pair form and the same rejections on the left; the difference is that a dot DISQUALIFIES
 ## here instead of being required. The caller supplies the receiver, and only `_scan_per_frame` may call
 ## this: outside a per-frame body a bare name is a local, and `locals` is what tells the two apart.
@@ -497,7 +497,7 @@ func _read(path: String) -> String:
 ## THE REPOSITORY'S OWN STATEMENT ABOUT WHAT IS PART OF IT. This layer was failing the entire sweep on
 ## `tools/_scratch_clock_tick.gd`, which `.gitignore` excludes by the glob `tools/_scratch_*.gd`: untracked
 ## scratch work, not shipping, and not what a claim about this codebase is about. The detector was right
-## about the file — that fixture does write a field the game recomputes — but the POPULATION was wrong, and
+## about the file (that fixture does write a field the game recomputes) but the POPULATION was wrong, and
 ## a verdict on the codebase that depends on whatever scratch work happens to be lying around is not a
 ## verdict on the codebase. That is this layer's own subject, one level up.
 ##

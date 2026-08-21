@@ -11,8 +11,8 @@ extends "res://tools/check_base.gd"
 ##
 ## **CONTRAST RATIO IS NOT COMPUTED FROM THE LUMA THIS REPOSITORY ALREADY USES, AND THAT IS THE WHOLE
 ## REASON THIS FILE EXISTS RATHER THAN A LINE ADDED TO AN EXISTING LAYER.** The measurement sites here
-## weigh gamma-encoded sRGB components directly, in two different conventions — Rec.709 `(0.2126, 0.7152,
-## 0.0722)` and Rec.601 `(0.299, 0.587, 0.114)` — and either of them dropped into `(L1 + 0.05) / (L2 +
+## weigh gamma-encoded sRGB components directly, in two different conventions (Rec.709 `(0.2126, 0.7152,
+## 0.0722)` and Rec.601 `(0.299, 0.587, 0.114)`), and either of them dropped into `(L1 + 0.05) / (L2 +
 ## 0.05)` produces a number with the right units and the wrong value. Relative luminance LINEARISES each
 ## channel first:
 ##
@@ -32,7 +32,7 @@ extends "res://tools/check_base.gd"
 ## grey `#767676` on white is the canonical borderline case: it is the darkest neutral that clears 4.5:1,
 ## and it comes out at 4.54 linearised and 2.05 gamma-encoded. A layer that measured contrast with the
 ## wrong luminance would pass every assertion below and be wrong by a factor of two, and no arrangement of
-## our own colours can catch that — only a number nobody here chose can.
+## the palette's own colours can catch that: only a number nobody here chose can.
 ##
 ## THE COLOURS ARE READ OUT OF `scenes/hud.gd`, not sampled off a frame. Sampling would drag in the lighting
 ## veil, the vignette, the panel sheen and glyph antialiasing, and antialiased edges are most of the pixels
@@ -46,7 +46,7 @@ extends "res://tools/check_base.gd"
 ## length, because a layer called "text contrast" that measured thirteen pairs would otherwise be read as a
 ## sweep of the HUD: the title screen and the tooltip draw their type in inline literals; the wash tiles
 ## (`Color(1, 1, 1, 0.022…0.062)` over the modal) and the picked row's brass are plates this layer cannot
-## name, because they are literals in the drawing code and not constants — SEE THE STAND-DOWN BELOW, since
+## name, because they are literals in the drawing code and not constants; SEE THE STAND-DOWN BELOW, since
 ## that is where the remaining exposure sits; `RAIL_ON_FILL` carries a glyph and no text; the disabled verb
 ## button is deliberately quiet and is exempt under every readability standard that has an opinion about
 ## disabled controls; and text drawn at a fading alpha (`hint_a` on the objective hint) is measured at full
@@ -54,7 +54,7 @@ extends "res://tools/check_base.gd"
 ## `draw_string` calls exist in that file. Thirteen pairs is what is asserted.
 ##
 ## `UI_ACCENT` ENTERS AS A PLATE AND NOT AS AN INK, which is `MNU-06` holding rather than bending: gold was
-## moved off every site where it was labelling anything, so it is still not a text ink — but the live verb
+## moved off every site where it was labelling anything, so it is still not a text ink, but the live verb
 ## button is a slab of it with dark type on top, and that is a plate carrying text like any other.
 ##
 ## THE FOUR ROWS ADDED BY `MNU-32`'s ink pass are `GOLD_DIM` and `GOLD_PALE` on the modal, and `VERB_INK`
@@ -63,38 +63,38 @@ extends "res://tools/check_base.gd"
 ## against. The thinned row is the one that had actually failed, at 3.77 against a floor of 4.5.
 ##
 ## `GOLD_DIM`'s ROW IS DOWN TO ONE CALL SITE, and the row is kept rather than dropped. `MNU-06`'s closing
-## pass moved the three headings it was lifted for onto `UI_TEXT_DIM` — a gold rung of a type ramp turned
-## out to be an affordance claim at a lower volume — and their figures are now carried by the row that
+## pass moved the three headings it was lifted for onto `UI_TEXT_DIM` (a gold rung of a type ramp turned
+## out to be an affordance claim at a lower volume), and their figures are now carried by the row that
 ## already asserted that ink on this plate. What is left is the detail plate's refusal note, which sits on
 ## a wash this layer cannot name (see the stand-down), so the modal under it is the nearest ground a row
 ## can hold. The site list is written out per row precisely so a shrinking one is visible here instead of
 ## being a number that keeps measuring green over an empty population.
 ##
 ## THE PLATE IS COMPOSITED, because every one of the four carries alpha and a translucent plate is not a
-## colour — it is a colour plus a window onto whatever is behind it. The ground is black: that is the value
+## colour: it is a colour plus a window onto whatever is behind it. The ground is black: that is the value
 ## the palette was authored against ("the HUD is still perfectly readable against its own near-black
 ## panels"), and it is the only ground `scenes/hud.gd` can be held responsible for. A brighter world behind
 ## the window can only close the gap, so the over-white figure is printed beside every row as the bracket
-## on how much it can cost. It is not asserted, and the stand-down below says so — the one row it would
+## on how much it can cost. It is not asserted, and the stand-down below says so: the one row it would
 ## take under the floor is the hotbar's keybind digit at 4.11, the hotbar being the only furniture here
 ## thin enough and low enough for a lamp to sit behind it.
 ##
-## MEASURED BEFORE THE FLOOR WAS SET. The palette's named inks — `UI_TEXT`, `UI_TEXT_DIM`, `UI_ACCENT`,
-## `UI_WARN` — came in between 4.57 and 13.13 across every named plate, the lowest of them being
+## MEASURED BEFORE THE FLOOR WAS SET. The palette's named inks (`UI_TEXT`, `UI_TEXT_DIM`, `UI_ACCENT`,
+## `UI_WARN`) came in between 4.57 and 13.13 across every named plate, the lowest of them being
 ## `UI_TEXT_DIM` under the worst backdrop a translucent panel can have. The floor is 4.5, which is not
 ## invented for this layer: it is the level the palette's own dimmest named role already cleared without
 ## help. Four bounds guessed in advance have been wrong in this repository; this one is a ratchet on a
 ## decision the design had already made, which is the only kind of bound worth writing down here.
 ##
 ## WHAT IT CAUGHT, at 2.0 to 4.0 against the same plates: four separate literals doing one job, eight sites,
-## no name between them — the counter's tab name at title size (2.04), both key legends (2.90 and 3.13),
+## no name between them: the counter's tab name at title size (2.04), both key legends (2.90 and 3.13),
 ## both rails' unlit labels (3.27), the detail plate's tally line, the cost chip's shortfall, and the
 ## hotbar's keybind digit (3.96). They are `UI_TEXT_FAINT` now, and the third tier of the type ramp is a
 ## constant this layer can hold a floor against instead of a literal it cannot see.
 ##
 ## PROVED RED BY KNOCKOUT, TWICE, BECAUSE THERE ARE TWO THINGS HERE THAT COULD BE VACUOUS. The subject
-## first: `UI_TEXT_FAINT` was set to `Color(0.14, 0.15, 0.19)` — a value change and not a hue change, so
-## the fault is contrast and nothing else — and the three rows carrying it went to 1.12, 1.25 and 1.31
+## first: `UI_TEXT_FAINT` was set to `Color(0.14, 0.15, 0.19)` (a value change and not a hue change, so
+## the fault is contrast and nothing else), and the three rows carrying it went to 1.12, 1.25 and 1.31
 ## against a floor of 4.5, while the six rows that do not carry it printed the same figures they print
 ## green. Then the instrument: `_linear` was replaced by the identity, which is exactly the mistake this
 ## header is about, and the calibration went to 2.05 and failed before any of the palette was reached.
@@ -134,7 +134,7 @@ func _initialize() -> void:
 		+ "property of the renderer, not of the palette, and this layer's lane is the palette")
 	# NAMED HONESTLY BECAUSE IT IS THE GAP, not because it is tidy. `MNU-32`'s ink pass measured these by
 	# hand and the worst of them was the cost shortfall at 4.20 on the picked row's brass, which is why
-	# that ink is `UI_WARN` now — but the FLOOR on it is not held here, and will not be until the wash
+	# that ink is `UI_WARN` now, but the FLOOR on it is not held here, and will not be until the wash
 	# tiles and the brass are constants this layer can name. Ten drawing sites would have to change colour
 	# nothing to get there, so it is a separate decision and not a silent one.
 	_stand_down("the wash tiles and the picked row's brass", "they are literals in the drawing code rather "
@@ -157,8 +157,8 @@ func _calibrate() -> void:
 			% [grey, REF_RATIO] + "repository's gamma-encoded luma, which would read 2.05 here")
 
 
-## The nine pairs, and every call site that draws one. The colours come out of the file; only the PAIRING —
-## which ink lands on which plate — is written here, because that is a fact about the drawing code and not
+## The nine pairs, and every call site that draws one. The colours come out of the file; only the PAIRING (
+## which ink lands on which plate) is written here, because that is a fact about the drawing code and not
 ## a value that can drift out from under a copy.
 func _measure() -> void:
 	var pairs: Array[Dictionary] = [
@@ -192,8 +192,8 @@ func _measure() -> void:
 	_check(translucent > 0, "at least one plate is translucent, so the compositing path is exercised "
 		+ "rather than being carried untested (%d of %d rows)" % [translucent, pairs.size()])
 	# THE THINNED ROW IS THE ONE THAT WAS BROKEN, so its path is asserted rather than assumed. A row that
-	# quietly lost its `ink_a` would be measured at full strength — which is exactly the reading that hid
-	# the verb hint's 3.77 for as long as it did — and would still print nine honest-looking figures.
+	# quietly lost its `ink_a` would be measured at full strength (which is exactly the reading that hid
+	# the verb hint's 3.77 for as long as it did), and would still print nine honest-looking figures.
 	var thinned: int = 0
 	for p: Dictionary in pairs:
 		if p.has("ink_a"):

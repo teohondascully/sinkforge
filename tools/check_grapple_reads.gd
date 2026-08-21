@@ -2,7 +2,7 @@ extends "res://tools/check_base.gd"
 
 ## DOES THE GRAPPLE LOOK LIKE A TOOL, OR LIKE THE GEOMETRY SOMEBODY DEBUGGED IT WITH?
 ##
-## `check_grapple` already scores the four properties the FUN is made of — it bites, it swings, it lifts,
+## `check_grapple` already scores the four properties the FUN is made of: it bites, it swings, it lifts,
 ## it crosses. Every one of them is a fact about the body's velocity, and not one of them would change by a
 ## single number if the rope were drawn as a magenta line with an arrow on it. `GR-01`–`GR-07` are the
 ## other half, and they are a different instrument:
@@ -10,7 +10,7 @@ extends "res://tools/check_base.gd"
 ##   `GR-01`  the persistent dashed guide reads as construction geometry, not as a tool
 ##   `GR-02`  aim and attachment are visually conflated
 ##   `GR-03`  tension has no visible state in a still frame
-##   `GR-04`  the guide rivals the miner's silhouette against calm sky — REPRODUCES, and it is the endpoint
+##   `GR-04`  the guide rivals the miner's silhouette against calm sky. REPRODUCES, and it is the endpoint
 ##            MARK rather than the lead: the same preview adds ~15 levels of edge on dark rock and its ring
 ##            alone carries ~208 against open sky. Reported, never asserted: how loud an aim mark should be
 ##            is a design call, and the two numbers a floor would compare are not the same quantity.
@@ -19,24 +19,24 @@ extends "res://tools/check_base.gd"
 ##   `GR-07`  judge it in motion, not only in screenshots
 ##
 ## **THE FIRST JOB IS NOT TO FIX THESE, IT IS TO FIND OUT WHICH ARE STILL TRUE.** `UI-01` in this same
-## programme turned out to be aimed at a property the code does not have — its bubble is anchored to the
-## body, not the screen — and the complaint survived while the diagnosis did not. Two of these read the
+## programme turned out to be aimed at a property the code does not have (its bubble is anchored to the
+## body, not the screen), and the complaint survived while the diagnosis did not. Two of these read the
 ## same way on inspection: `_draw_aim_ghost` returns early while `grapple.live()`, so aim and rope are
 ## never on screen together (`GR-02`), and `_draw_cord` bows the line by its slack, so tension is already
 ## form rather than UI (`GR-03`). Both were MEASURED here rather than argued, and the measurement split
 ## them. `GR-02` was already satisfied. `GR-03` was not: the bow was a flat 26 pixels regardless of how much
 ## line was out, and measured as a share of its own chord a rope at 0.55 slack departed it by **0.013**
 ## against a bar-taut **0.012**. Those are the same picture. The ticket was right, and the code read as
-## though it disagreed — which is the most expensive kind of wrong comment there is.
+## though it disagreed, which is the most expensive kind of wrong comment there is.
 ##
 ## HOW THE GUIDE IS ISOLATED, and this comment described the opposite of the code for one commit, which is
 ## the failure the paragraph above is about. The first version parked the cursor ON the miner's own hand
-## for the reference frame, so no test switch was needed — and that also swings the HEAD-LAMP, which is
+## for the reference frame, so no test switch was needed. And that also swings the HEAD-LAMP, which is
 ## aimed. Five and a half cells of light moved between the two captures and the difference mask ate it;
 ## excluding a lamp-sized disc to compensate then blinded the layer to the near field, the only place a
 ## shortened lead lives, and it measured 0.04 of the throw inked while seeing the endpoint ring alone.
 ##
-## So there IS a switch — `WorldRenderer.AIM_GHOST_OFF` — and the reference frame has the cursor in exactly
+## So there IS a switch (`WorldRenderer.AIM_GHOST_OFF`), and the reference frame has the cursor in exactly
 ## the same place, the lamp in exactly the same position, and the body in exactly the same pose. The
 ## difference is the preview and nothing else.
 ##
@@ -49,7 +49,7 @@ const SETTLE: int = 40
 const CELL: int = 32
 
 ## The rig: a wide pocket of open sky with a thick ceiling to bite and a floor to stand on. Copied in shape
-## from `check_grapple`, for the same reason it gives — nothing about this may depend on worldgen.
+## from `check_grapple`, for the same reason it gives: nothing about this may depend on worldgen.
 const RIG_LEFT: int = 14
 const RIG_RIGHT: int = 46
 ## The ceiling is TEN cells above the floor and the target eight across, because `Grapple.MAX_RANGE` is
@@ -70,8 +70,8 @@ const HAND_RADIUS: float = 14.0       ## excluded from the guide mask — the co
 ## still-frame noise floor, printed every run.
 const DRAW_LEVEL: float = 10.0
 
-## Frames between the two reference captures. Long enough to contain the slow animations — the marker bob,
-## the glint twinkle — because a control that samples faster than the thing it is controlling for is blind
+## Frames between the two reference captures. Long enough to contain the slow animations (the marker bob,
+## the glint twinkle), because a control that samples faster than the thing it is controlling for is blind
 ## to exactly the parts of the frame that will contaminate the measurement.
 const QUIET_GAP: int = 30
 ## HOW MANY periods the self-motion controls sample before believing a number. Three runs of an unchanged
@@ -85,16 +85,16 @@ const PHASE_SAMPLES: int = 3
 ## line cannot be mistaken for the tool.
 const CORRIDOR_HALF: float = 44.0
 
-## `GR-03` — how many times the rope's own animation the tension difference must clear. 3.0 was copied from
+## `GR-03`: how many times the rope's own animation the tension difference must clear. 3.0 was copied from
 ## `check_machine_state` before anything here had been measured, which is the habit this repository keeps
 ## catching itself in. It stays at 3.0 only because the measurement has since walked far past it, and the
 ## number now has both its sides: the sag-by-length rope and the flat-26px rope it replaced, on this same
 ## instrument, in the same rig.
 const TENSION_MARGIN: float = 3.0
 
-## `GR-03` — how far a slack line must hang below its own chord to read as hanging, as a share of that
+## `GR-03`: how far a slack line must hang below its own chord to read as hanging, as a share of that
 ## chord. Set from the two ropes measured on this instrument in this rig: the flat-26px rope bows **0.03**
-## of its chord at 0.55 slack — a 14px deviation over 500px, which is a wobble — and the sag-by-length rope
+## of its chord at 0.55 slack (a 14px deviation over 500px, which is a wobble), and the sag-by-length rope
 ## bows **0.42**, its cap. 0.15 sits between them with room on both sides, and it is a number a person can
 ## check against a screenshot with a ruler rather than a preference about how ropey a rope should look.
 const BOW_FLOOR: float = 0.15
@@ -103,17 +103,17 @@ const BOW_FLOOR: float = 0.15
 ## `0.0` (a chord too short to have a direction) and `-1.0` (fewer than 40 cord pixels found), and both of
 ## them PASS at the call site: on the right-hand side of `bow_slack > bow_taut * 3.0`, `-1.0` becomes -3.0
 ## and `0.0` becomes 0.0, so a rope the mask never found reads as a rope that is perfectly taut. A number
-## meaning "I could not look" must never be arithmetic on the same axis as one meaning "I looked".
+## meaning "could not look" must never be arithmetic on the same axis as one meaning "looked".
 const BOW_NO_CHORD: float = -101.0
 const BOW_NO_CORD: float = -102.0
 
 ## ...and `_corridor_fill`'s, for the same reason and by the same rule. It used to answer a zero-length
 ## throw with `0.0`, which is a legal share and therefore indistinguishable from "the preview drew nothing
-## across a real throw" — and which sailed through the cap that used to stand at the call site. A value
+## across a real throw", and which sailed through the cap that used to stand at the call site. A value
 ## meaning "there was nothing to measure" must not be a legal value of the thing being measured.
 const FILL_NO_SPAN: float = -103.0
 
-## `GR-05` — how much of the throw the preview is allowed to draw.
+## `GR-05`: how much of the throw the preview is allowed to draw.
 ##
 ## NO FLOOR IS SET AND THAT IS DELIBERATE. Guessing a bound before measuring has been wrong four times in
 ## this repository and every one of the guesses looked reasonable. The run reports; the number it reports
@@ -121,7 +121,7 @@ const FILL_NO_SPAN: float = -103.0
 ##
 ## AND FOR AS LONG AS THAT WAS TRUE THERE WAS ALSO A `_check` HERE, AGAINST `SPAN_CAP = 1.01`, WHICH COULD
 ## NOT FAIL. `_corridor_fill` resizes `bins` to `full`, writes only 0 or 1 into each element, sums them and
-## returns `n / full` — so the value is bounded by 1.0 BY CONSTRUCTION and a cap of 1.01 sits above the
+## returns `n / full`. So the value is bounded by 1.0 BY CONSTRUCTION and a cap of 1.01 sits above the
 ## largest number the expression can produce. Not a loose bound: an unsatisfiable-in-the-other-direction
 ## one. Every green "the aim preview inks 0.13 of the distance it is previewing (cap 1.01)" this layer has
 ## ever printed was an arithmetic identity wearing an assertion's clothes.
@@ -130,13 +130,13 @@ const FILL_NO_SPAN: float = -103.0
 ## is honest. The decision not to bound `fill` yet is kept exactly as it was; what changes is that the
 ## layer now SAYS it has not bounded it, through `_stand_down`, so the runner reports the layer as having
 ## passed without verifying everything instead of counting a tautology as a test. That is the same shape
-## this file already chose three times for `GR-04` at :517 — report the measurement, state that the design
+## this file already chose three times for `GR-04` at :517: report the measurement, state that the design
 ## call is not the harness's to make, assert nothing.
 ##
 ## No cap is invented here. Inventing one would be worse than the tautology, because it would look
 ## calibrated.
 
-## `GR-06` — the miner must out-read their own telemetry. This one IS asserted, because it is not a matter
+## `GR-06`: the miner must out-read their own telemetry. This one IS asserted, because it is not a matter
 ## of taste: a tool that is easier to see than the person holding it has inverted the frame.
 const BODY_MARGIN: float = 1.15
 
@@ -148,7 +148,7 @@ var _full := Rect2i()
 var _rock_gain: float = -1.0
 var _rock_px: int = 0
 ## The chord `_bow_now` last measured across, in screen pixels. Carried out of the function so the
-## saturation rejection can quote the mask rim it is describing — `SAG_CAP + 24/span` — rather than naming
+## saturation rejection can quote the mask rim it is describing (`SAG_CAP + 24/span`) rather than naming
 ## a cap without the number that produced it.
 var _bow_span: float = 0.0
 
@@ -186,7 +186,7 @@ func _run() -> void:
 
 	# THE BACKGROUND, TWICE, and the second one is the noise floor. A threshold quoted without the noise it
 	# has to clear is a preference wearing a number. THE CURSOR IS ON THE TARGET FOR BOTH CAPTURES and the
-	# preview is switched off for the reference instead — see `WorldRenderer.AIM_GHOST_OFF`. Parking the
+	# preview is switched off for the reference instead; see `WorldRenderer.AIM_GHOST_OFF`. Parking the
 	# cursor elsewhere also swings the aimed head-lamp, and excluding a lamp-sized disc to compensate
 	# blinded the measurement to the near field, which is the only place a shortened lead exists.
 	WorldRenderer.AIM_GHOST_OFF = true
@@ -196,7 +196,7 @@ func _run() -> void:
 	# reference captures back to back. Anything that animates SLOWLY therefore looked perfectly still to the
 	# control and perfectly new to the measurement: the Forge's off-screen marker bobs, and ore glints
 	# twinkle over about a second, so the guide mask acquired a bobbing triangle 450px away and a pair of
-	# glints 1030px away in the opposite corner — which is where "the preview reaches 1.82 of its own throw"
+	# glints 1030px away in the opposite corner, which is where "the preview reaches 1.82 of its own throw"
 	# came from. **A noise floor sampled over a shorter interval than the signal is not a noise floor.**
 	# SAMPLED OVER A PERIOD, NOT ONCE. Taking a single pair samples the animation at whatever PHASE the run
 	# happened to reach: measured across three runs of an unchanged build this control read 5.04%, 6.10% and
@@ -204,7 +204,7 @@ func _run() -> void:
 	# not by the picture. **A statistic on a duty-cycled cue needs a full period.** The head-lamp flickers on
 	# two sine terms, ore glints turn over about a second, dust falls.
 	#
-	# The FLOOR IS UNCHANGED at 0.06 — this replaces one random draw with the MEDIAN of several draws of the
+	# The FLOOR IS UNCHANGED at 0.06: this replaces one random draw with the MEDIAN of several draws of the
 	# same quantity, which is the estimator the repository already settled on for thresholded fractions after
 	# an identical fraction swung 25% to 84% between identical runs. Mean and spread are printed beside it so
 	# a future reader can see what one sample would have been worth.
@@ -216,7 +216,7 @@ func _run() -> void:
 	var noise: float = 0.0
 	var moving: PackedByteArray = PackedByteArray()
 	# CONSECUTIVE PAIRS. The first version compared every sample against the SAME `bg`, so the four draws
-	# spanned 30, 60, 90 and 120 frames — four different intervals of a growing quantity, not four draws of
+	# spanned 30, 60, 90 and 120 frames: four different intervals of a growing quantity, not four draws of
 	# one. Their median is then biased upward and moves with CHURN_SAMPLES, which is precisely the property
 	# a median is chosen to avoid. The numbers that fix produced were quoted in a commit message as
 	# "the median of several draws of the same quantity"; they were not, and they are re-derived below.
@@ -237,11 +237,11 @@ func _run() -> void:
 		spread += "%.2f%% " % (v * 100.0)
 	print("    churn samples over %d periods: %s(median %.2f%%)" % [CHURN_SAMPLES, spread, churn * 100.0])
 	# NOTHING IN THIS GAME HOLDS STILL, and the first version of this control demanded that it did. Two
-	# consecutive captures of an untouched frame differ by 163 levels at their worst pixel — the head-lamp
+	# consecutive captures of an untouched frame differ by 163 levels at their worst pixel: the head-lamp
 	# flickers on two sine terms by design, ore glints, dust falls. **A worst-pixel noise floor is a
 	# statement about the liveliest pixel in the frame, not about the frame**, and holding a threshold above
 	# it would mean measuring nothing. So the moving pixels are IDENTIFIED and excluded instead, and what is
-	# asserted is that they are a small minority — if most of the frame is in motion the exclusion has
+	# asserted is that they are a small minority; if most of the frame is in motion the exclusion has
 	# stopped being an exclusion.
 	print("    still-frame churn: %.2f%% of pixels move on their own (worst pixel %.1f levels)"
 		% [churn * 100.0, noise])
@@ -265,7 +265,7 @@ func _run() -> void:
 	var fill: float = _corridor_fill(guide, _screen(hand), _screen(target))
 	var stray: int = _outside_corridor(guide, _screen(hand), _screen(target))
 	# THE DEGENERATE CASE IS A FAILURE TO MEASURE AND NOT A SMALL MEASUREMENT. `_corridor_fill` used to
-	# return `0.0` for a zero-length throw, and `0.0 <= 1.01` PASSED — a rig that posed the hand on top of
+	# return `0.0` for a zero-length throw, and `0.0 <= 1.01` PASSED; a rig that posed the hand on top of
 	# the target scored a green line on a measurement it never made. Same fault as `_bow_now`'s two
 	# sentinels above, so it is spelled the same way and rejected here rather than averaged in.
 	if is_equal_approx(fill, FILL_NO_SPAN):
@@ -304,7 +304,7 @@ func _run() -> void:
 		_dump("anchored")
 		var rope: PackedByteArray = _mask(roped, bg, hand, moving)
 		_dump_mask("rope", rope)
-		# The two live in the same corridor by construction — same hand, same target. If they were the same
+		# The two live in the same corridor by construction: same hand, same target. If they were the same
 		# picture the difference between their masks would be nothing, and `GR-02`'s complaint would stand.
 		print("    aim vs anchored: %.3f of the corridor is drawn by one and not the other"
 			% _shape_diff(guide, rope))
@@ -314,12 +314,12 @@ func _run() -> void:
 
 		# --- GR-03: does tension have a still-frame form? -----------------------------
 		# SLACK against TAUT, and the phase baseline in between, because a rope with a wind animation on it
-		# would otherwise score its own clock as a tension cue — the mistake `check_machine_state` made
+		# would otherwise score its own clock as a tension cue; the mistake `check_machine_state` made
 		# and had to unmake.
 		# THE BODY HAS TO BE HELD UP BY SOMETHING THAT IS NOT THE ROPE, and the two versions before this one
 		# were not. Hanging, the miner swings and settles between captures, so the "clock" baseline was
 		# body motion: it measured 15.6 levels against a 13.5-level tension signal and reported that a
-		# slack rope looks like a taut one. Paying out line while hanging is worse still — the body simply
+		# slack rope looks like a taut one. Paying out line while hanging is worse still: the body simply
 		# falls to the new length. Standing on the floor with the anchor overhead, the pose is stable at any
 		# payout, which is also the situation a player is in whenever they are not mid-swing.
 		p.grapple.length = Grapple.MAX_RANGE
@@ -340,7 +340,7 @@ func _run() -> void:
 		# of what moves on its own across the window is removed from BOTH counts, so what is left of the
 		# baseline is the rope's own animation and what is left of the signal is the hang.
 		# THE BASELINE IS A MEDIAN OF SEVERAL DRAWS, not one. Across three runs of an unchanged build the
-		# SIGNAL was 4702, 4703 and 4711 px — stable to a fifth of a percent — while this baseline drew 1017,
+		# SIGNAL was 4702, 4703 and 4711 px (stable to a fifth of a percent) while this baseline drew 1017,
 		# 332 and 2701. **The flake was never in the rope; it was in the control**, and at 2701 the baseline
 		# ate a margin the signal had always cleared. One draw from a periodic process is not an estimate of it.
 		# `TENSION_MARGIN` is untouched at 3.0; only the estimator changed.
@@ -355,9 +355,9 @@ func _run() -> void:
 		# contain the hang also filled it with unchanged rock, so the same pair of ropes scored 9.96 in a
 		# narrow lane and 3.07 in a wide one. **A mean over an area is a statement about the area.** What
 		# the ticket asks is how much of the picture tension changes, which is a count of the pixels the two
-		# states disagree about — a number the lane's size cannot move.
+		# states disagree about, a number the lane's size cannot move.
 		# THE LANE HAS TO BE WIDE ENOUGH TO CONTAIN THE THING IT IS MEASURING, and the first version sized it
-		# to `CORRIDOR_HALF` — 44px, chosen for the aim preview, which is straight. A slack rope hangs up to
+		# to `CORRIDOR_HALF`: 44px, chosen for the aim preview, which is straight. A slack rope hangs up to
 		# `SAG_CAP` of its own chord below it, so the whole hang fell outside the lane and the measurement
 		# went DOWN, 9.96 to 8.07, at the exact moment the picture became unmistakable. **An instrument
 		# scoped to the old behaviour reads an improvement as a regression.**
@@ -390,7 +390,7 @@ func _run() -> void:
 
 		# AND NOW THE NUMBER THE TICKET ACTUALLY ASKS FOR, which is not that one.
 		#
-		# `GR-03`'s evidence is *"no visible physical state distinction IN STILL FRAME"* — a claim about one
+		# `GR-03`'s evidence is *"no visible physical state distinction IN STILL FRAME"*, a claim about one
 		# picture, not about two. The count above compares two captures, and it answered YES for the flat
 		# 26px rope as loudly as for the hanging one (3537 px against 4540): displacing a line by more than
 		# its own width changes a similar number of pixels whether the displacement is 14px or 200. **A
@@ -399,7 +399,7 @@ func _run() -> void:
 		#
 		# What a person reads in one frame is BOW: how far the cord departs from the straight chord between
 		# its ends, as a share of that chord. THE CORD IS FOUND BY ITS OWN COLOUR, not by differencing
-		# against a rope-free capture — that version cut the line to get its reference, and cutting also
+		# against a rope-free capture; that version cut the line to get its reference, and cutting also
 		# changes the miner's pose and the key prompt, so the same rope measured 0.24 on one run and 0.31 on
 		# the next with taut and slack indistinguishable. A single-frame question deserves a single-frame
 		# mask.
@@ -410,7 +410,7 @@ func _run() -> void:
 		# WHAT THE RENDERER SAYS IT DREW, beside what the mask read, because until this line existed the
 		# two had never been put next to each other and a constant was standing in for the prediction.
 		#
-		# `rope_sag` returns a hang in PIXELS OF Y — `_draw_cord` applies it as `p.y += sin(t * PI) * sag`,
+		# `rope_sag` returns a hang in PIXELS OF Y; `_draw_cord` applies it as `p.y += sin(t * PI) * sag`,
 		# so the maximum is vertical. `_bow_now` measures the PERPENDICULAR departure from the chord
 		# (`|d.cross(axis)|`). On a diagonal those are not the same quantity: a vertical drop of `h` across
 		# a chord at angle theta departs it by `h * cos(theta)`. This shot is deliberately a long diagonal,
@@ -435,7 +435,7 @@ func _run() -> void:
 		# reading at or above `SAG_CAP`, and that is only a saturation test while a legitimate reading
 		# cannot get there. It cannot here because the chord is diagonal, which costs the vertical hang a
 		# `cos(theta)`. Flatten the shot and the honest reading climbs toward 0.42 until the guard starts
-		# rejecting real ropes — the exact inversion this layer was suspected of and does not have. So the
+		# rejecting real ropes; the exact inversion this layer was suspected of and does not have. So the
 		# geometry that makes the threshold valid is checked beside the reading it protects.
 		_check(pred < WorldRenderer.SAG_CAP,
 			("the posed shot leaves the saturation guard room to be a saturation guard — the renderer's "
@@ -446,7 +446,7 @@ func _run() -> void:
 		# THE REJECTION THAT HAD TO EXIST BEFORE EITHER ASSERTION BELOW MEANT ANYTHING.
 		#
 		# `_bow_now` throws away every pixel further than `span * SAG_CAP + 24.0` from the chord, so the
-		# largest number it can return is `SAG_CAP + 24/span` — 0.4621 on this rig's 570px chord. CI read
+		# largest number it can return is `SAG_CAP + 24/span`, 0.4621 on this rig's 570px chord. CI read
 		# **0.463 slack against 0.462 taut**. That is not a slack rope beside a taut one, it is the same
 		# mask rim twice, and `world_renderer.gd:3125` settles it: the DRAWN hang is hard-clamped to
 		# `span * SAG_CAP`, so a reading at or above `SAG_CAP` provably did not come off the cord. It came
@@ -454,19 +454,19 @@ func _run() -> void:
 		# band 263px either side of the chord there is plenty of it.
 		#
 		# NEITHER ASSERTION COULD SAY SO, and they failed in opposite directions. `bow_slack > bow_taut *
-		# 3.0` asks 1.386 of a quantity whose ceiling is 0.4621 — unsatisfiable arithmetic, reported for
+		# 3.0` asks 1.386 of a quantity whose ceiling is 0.4621: unsatisfiable arithmetic, reported for
 		# days as a design failure of the rope. `bow_slack >= BOW_FLOOR` was the worse half, because it
 		# PASSED: a green assertion taken off the rim of its own mask, about a rope nobody had measured.
 		# **A statistic pinned to its own ceiling is not a small measurement, it is not a measurement.**
 		#
-		# `BOW_FLOOR`'s note quotes the sag-by-length rope bowing "0.42, its cap" — that is the renderer's
+		# `BOW_FLOOR`'s note quotes the sag-by-length rope bowing "0.42, its cap"; that is the renderer's
 		# clamp rather than the mask rim, so it may well have been the real cord at full hang. It is still
 		# a reading with no headroom in it, one rounding from the rejection added here, and which of the
 		# two it was is not decidable from source. Flagged, not moved.
 		#
 		# So this is a REJECTION and not a new threshold: no number is chosen here. The bound is
 		# `WorldRenderer.SAG_CAP` read off the renderer at run time, and the layer's answer to a saturated
-		# instrument is to say the instrument saturated — never to publish the rim as if it were a bow.
+		# instrument is to say the instrument saturated, never to publish the rim as if it were a bow.
 		# `BOW_FLOOR` and `TENSION_MARGIN` are untouched; moving a threshold to accommodate a reading that
 		# came off the wrong pixels is how a floor ends up set to the noise it was meant to clear.
 		var taut_read: bool = _bow_measured("taut", bow_taut, rim_taut)
@@ -491,16 +491,16 @@ func _run() -> void:
 	await physics_frame
 
 
-## `GR-04` — *"reduce rope contrast against calm sky until it is needed"*, evidence *"the guide rivals the
+## `GR-04`: *"reduce rope contrast against calm sky until it is needed"*, evidence *"the guide rivals the
 ## miner silhouette against blue sky."*
 ##
 ## EVERYTHING ABOVE THIS RUNS IN A ROCK POCKET, which is the half of the constraint that reads *"cable
-## remains readable against dark underground"* — and it is the easy half. A pale warm line on near-black
+## remains readable against dark underground"*, and it is the easy half. A pale warm line on near-black
 ## rock has contrast to spare. The claim being made here is the opposite one, on a background that is
 ## bright, flat and uniform, where a dark miner and a pale rope are competing on different signs.
 ##
 ## The miner is left standing on real surface ground rather than in a built rig, because the ticket is
-## about the surface as it ships and a rig would be me choosing the sky.
+## about the surface as it ships and a rig would mean choosing the sky.
 func _check_against_sky() -> void:
 	var p: Player = _main._player
 	var sim: FactorySim = _main.sim
@@ -515,7 +515,7 @@ func _check_against_sky() -> void:
 
 	# ONE BLOCK ALONE IN THE SKY, and the first version of this did not build one. It aimed at empty air nine
 	# cells across and twelve up, the trace stopped on the nearest tree trunk, and the ring landed a cell
-	# from the miner's head against foliage — so a measurement labelled "against calm sky" was taken against
+	# from the miner's head against foliage. So a measurement labelled "against calm sky" was taken against
 	# a tree. The ticket is about a mark on an open background, so the rig makes one: everything cleared for
 	# five cells around, a single solid cell in the middle of it, sky behind and on every side.
 	var perch := Vector2i(col + 8, row - 9)
@@ -529,7 +529,7 @@ func _check_against_sky() -> void:
 	var target: Vector2 = _main._cell_center(perch)
 	# THE REFERENCE IS TAKEN ON BOTH SIDES OF THE MEASUREMENT, and on the surface that is not fussiness.
 	# **Clouds drift.** A reference captured thirty frames before the shot has clouds thirty frames out of
-	# position, so every cloud edge in the frame reads as something the preview drew — the first version of
+	# position, so every cloud edge in the frame reads as something the preview drew; the first version of
 	# this scored the preview at 202 levels against the miner's 87 and its mask image was cloud outlines and
 	# the serifs of the word "ore". Sandwiching the shot means anything a cloud touched on either side of it
 	# is excluded, and the nearer reference is four frames away rather than thirty.
@@ -571,13 +571,13 @@ func _check_against_sky() -> void:
 	_check(_count(guide) > 60,
 		"CONTROL: the preview drew something against the sky at all (%d pixels)" % _count(guide))
 	# REPORTED, NOT ASSERTED, AND THAT IS `GR-04`'s OWN SHAPE. Its approach line is *"state-based alpha and
-	# endpoint emphasis"* — how loud an aim mark should be is a design call, and the two candidate floors
+	# endpoint emphasis"*: how loud an aim mark should be is a design call, and the two candidate floors
 	# here are not comparable quantities: the miner's number is the step between an opaque body and what is
 	# behind it, while the ring's is the contrast it carries WITHIN itself, a dark backing stroke against a
 	# pale mark. Asserting one against the other would be the ruler-mismatch this repository keeps finding.
 	#
-	# What IS asserted is the constraint the ticket states in the other direction — *"cable remains readable
-	# against dark underground"* — because that one compares a thing to itself in the place it must work.
+	# What IS asserted is the constraint the ticket states in the other direction: *"cable remains readable
+	# against dark underground"*, because that one compares a thing to itself in the place it must work.
 	print("    GR-04 REPRODUCES: on dark rock the whole preview adds %.0f levels of edge over %d pixels; "
 		% [_rock_gain, _rock_px] + "on open sky the endpoint mark alone carries %.0f over %d, against a "
 		% [guide_edge, _count(guide)] + "miner whose own silhouette step is %.0f. How loud an aim mark "
@@ -586,11 +586,11 @@ func _check_against_sky() -> void:
 
 ## WAIT UNTIL THE GUIDANCE HAS FINISHED TALKING, and the layer needed this twice for two different
 ## reasons. Teleporting into the underground rig crosses a stratum boundary, so the ARRIVAL PLATE is
-## mid-animation over half the frame — two captures of the "still" rig differed by 248 levels and the guide
+## mid-animation over half the frame; two captures of the "still" rig differed by 248 levels and the guide
 ## mask swallowed 119156 pixels of fading serif type. Teleporting to the surface lands the body in the air,
 ## which fires the CHAIN IT lesson: a high-contrast plate the width of the frame, appearing between the
 ## reference capture and the shot, with its edge straight through the throw corridor. That is where "the
-## preview reads 194 levels against the miner's 88" came from — a number that would have confirmed `GR-04`
+## preview reads 194 levels against the miner's 88" came from, a number that would have confirmed `GR-04`
 ## on the strength of a tutorial bubble.
 ##
 ## **A layer that photographs a transient is measuring the transient**, three times over now.
@@ -629,7 +629,7 @@ func _stand(col: int, row: int) -> void:
 
 ## WHAT REPLACED THREE CONTROLS THE SEAM MADE TAUTOLOGICAL.
 ##
-## The retired three read `_aim_lands_on().distance_to(target) < 3.0` — and once the pointer is POSED
+## The retired three read `_aim_lands_on().distance_to(target) < 3.0`, and once the pointer is POSED
 ## rather than warped, `_aim_lands_on()` returns the posed value itself. All three would have reported
 ## 0.0 px forever, including in a build where the aim path had been broken outright. **They are not
 ## dropped for being inconvenient; they are dropped because they could no longer fail**, and an assertion
@@ -637,13 +637,13 @@ func _stand(col: int, row: int) -> void:
 ##
 ## What they were actually guarding was "the pose reached the game". With a seam there are exactly two
 ## ways that stops being true: a reader in the aim path goes behind the seam's back to the OS cursor, or
-## the fixture is not holding the pointer at all. Both are checked here, and both can genuinely fail —
+## the fixture is not holding the pointer at all. Both are checked here, and both can genuinely fail:
 ## put `get_global_mouse_position()` back into `_update_mining` and this goes red.
 ##
 ## ITS POPULATION IS THREE FILES AND THE SENTENCE NOW SAYS SO. An earlier wording claimed "the aim path",
 ## which is wider than what it can see: ten `warp_mouse` sites still live under `tools/`, and `controls.gd`
 ## itself is excluded by design. A guard whose claim outruns its population is the failure this repository
-## keeps rediscovering, so the fixture-side counterpart — no FIXTURE calls `warp_mouse` — is owed and
+## keeps rediscovering, so the fixture-side counterpart (no FIXTURE calls `warp_mouse`) is owed and
 ## tracked under INP-01 rather than implied by this one.
 const AIM_SOURCES: Array[String] = [
 	"res://scenes/main.gd",
@@ -679,17 +679,17 @@ func _check_pointer_seam() -> void:
 ## This used to call `vp.warp_mouse(vp.get_canvas_transform() * world)` and then wait for the readback to
 ## agree. The transform pair was right and the wait was not the problem either. **The problem was that
 ## `warp_mouse` moves the REAL cursor on the REAL desk, and a person was using this machine.** Their hand
-## moved it back, so the readback disagreed by however far they had travelled — which is why the pooled
+## moved it back, so the readback disagreed by however far they had travelled, which is why the pooled
 ## offsets were 1.0, 97.2, 132.3, 254.9 and 786.7 px rather than one constant number. A wrong transform
 ## gives a constant offset; that spread was a race, and the other racer was a hand.
 ##
 ## Measured with a passive probe that never warps: **11 of 40 samples moved in four seconds,
-## largest single jump 21154.6 px, and `focused: false`** — the window did not even have keyboard focus and
+## largest single jump 21154.6 px, and `focused: false`**: the window did not even have keyboard focus and
 ## was still tracking their pointer.
 ##
 ## So the layer stops asking the windowing system for anything. `Controls.pose_pointer` states the world
 ## point directly and every reader in the game resolves to it, which makes this measurement independent of
-## who else is using the box — and stops us yanking their pointer across the screen while they work.
+## who else is using the box, and no longer yanks their pointer across the screen while they work.
 ##
 ## The settle loop is gone with it, and not because it was wrong: a posed world point needs no round-trip
 ## and, unlike a posed SCREEN pixel, does not change meaning while the camera is still moving. That was the
@@ -713,7 +713,7 @@ func _check_pointer_seam() -> void:
 ## actually still moving, and reads it from the renderer rather than assuming a frame count.
 const LAMP_SETTLE_MAX: int = 240
 ## A RESIDUAL epsilon, not a step epsilon. The first version bounded the frame-to-frame STEP, which is
-## `residual * (1 - exp(-LAMP_EASE/60))` = residual * 0.1393 — so 0.05 as a step was really ~0.359 px of
+## `residual * (1 - exp(-LAMP_EASE/60))` = residual * 0.1393, so 0.05 as a step was really ~0.359 px of
 ## residual. Kept at 0.05 as a residual deliberately: it is ~7x tighter, the body is at rest here, and the
 ## measured settle still lands inside the budget with room (0.03 px, held 6).
 const LAMP_SETTLE_EPS: float = 0.05
@@ -726,7 +726,7 @@ func _look_at(world: Vector2) -> void:
 	# `_lamp_offset` stopped CHANGING, which is a different question with the same answer most of the time
 	# and the opposite answer exactly when it matters: under `Engine.time_scale = 0` the ease multiplier is
 	# `1.0 - exp(0)` = 0, the offset cannot move, and a derivative test reads PERFECTLY STILL on every frame
-	# while the lamp sits pickled mid-slide. This layer never freezes, so that version was not wrong here —
+	# while the lamp sits pickled mid-slide. This layer never freezes, so that version was not wrong here,
 	# but it was one hoist away from being wrong in `check_ceremony_reads`, which does.
 	#
 	# It also awaited `physics_frame` while `_lamp_offset` is written in `_process`. More than one physics
@@ -749,16 +749,16 @@ func _look_at(world: Vector2) -> void:
 	_check(held >= LAMP_SETTLE_HOLD,
 		"the head-lamp settled before the shutter (%.2f px residual after %d frames, held %d)"
 			% [residual, LAMP_SETTLE_MAX, held])
-	# Not a wait for the pose — that is immediate now — but for the frame that DRAWS through it, since
+	# Not a wait for the pose (that is immediate now) but for the frame that DRAWS through it, since
 	# every assertion downstream reads pixels rather than state.
 	# READS THE CONSUMED VALUE, NOT THE SEAM. This check was written against `Controls.pointer_world`, which
-	# under a pose returns the posed point itself — so it compared `world` with `world` and could only ever
+	# under a pose returns the posed point itself, so it compared `world` with `world` and could only ever
 	# be 0.0. That is the identical defect as the three assertions this file retired for being unable to
 	# fail, committed a hundred lines below the paragraph explaining why that is unacceptable, with a
 	# docstring claiming it "still has a channel to fail through". It did not.
 	#
 	# `_main._aim` is what `_update_mining` DERIVED from the pointer and what the renderer actually draws
-	# and lights from, so it diverges the moment the aim path breaks — which is the thing worth knowing.
+	# and lights from, so it diverges the moment the aim path breaks, which is the thing worth knowing.
 	# It is a CELL, so the tolerance is in cells and the posed point is converted the same way the game
 	# converts it.
 	var want: Vector2i = _main._cell_at(world)
@@ -769,12 +769,12 @@ func _look_at(world: Vector2) -> void:
 
 
 ## How far the game's DERIVED aim cell may sit from the cell under the posed point. Not zero, because
-## `_effective_aim` legitimately snaps to the nearest reachable solid when the raw cell is out of reach —
+## `_effective_aim` legitimately snaps to the nearest reachable solid when the raw cell is out of reach,
 ## so this bounds "the pose reached the game" without asserting that no snapping occurred.
 const AIM_SETTLE_CELLS: float = 2.0
 
 
-## Where the RENDERER thinks the cursor is, in world space — the exact expression `_draw_aim_ghost` calls,
+## Where the RENDERER thinks the cursor is, in world space: the exact expression `_draw_aim_ghost` calls,
 ## so a seam that resolved differently for the fixture than for the game would show up here.
 func _aim_lands_on() -> Vector2:
 	return Controls.pointer_world(_main._renderer)
@@ -799,7 +799,7 @@ func _hook(target: Vector2i) -> bool:
 ## The first version moved the body instead, on the reasoning that `slack()` is a pure function of the
 ## hand's distance from the hitch and a fixture should therefore drive the hand. That is true and it was
 ## still wrong: **the camera follows the body**, so the two captures were of two different parts of the
-## world and the 19 levels between them were mostly rock. The side-by-side made it obvious in a second — one
+## world and the 19 levels between them were mostly rock. The side-by-side made it obvious in a second: one
 ## frame is a miner over a floor, the other is a miner under a ceiling.
 ##
 ## `length` is the winch's payout and the player pays it out with a key, so setting it is driving a real
@@ -868,7 +868,7 @@ func _screen_scale() -> float:
 	return _screen(Vector2(100.0, 0.0)).distance_to(_screen(Vector2.ZERO)) / 100.0
 
 
-## HOW FAR ALONG THE THROW THE PREVIEW DRAWS — measured IN THE CORRIDOR between the hand and the target,
+## HOW FAR ALONG THE THROW THE PREVIEW DRAWS: measured IN THE CORRIDOR between the hand and the target,
 ## and the two versions before this one measured the whole frame instead.
 ##
 ## The frame is full of things that appear and vanish on their own: ore glints twinkle, dust falls, the
@@ -879,7 +879,7 @@ func _screen_scale() -> float:
 ## which is a projection, not a radius. Off-corridor marks are counted and reported rather than silently
 ## dropped, because a preview that sprayed the frame would otherwise read as a tidy short one.
 ##
-## HOW FAR FROM THE HAND THE PREVIEW REACHES — the farthest drawn pixel, not the diagonal of a bounding box
+## HOW FAR FROM THE HAND THE PREVIEW REACHES: the farthest drawn pixel, not the diagonal of a bounding box
 ## and not a pixel count. A count cannot say it: eleven dots strung the whole way and eleven bunched at the
 ## hand cover the same area. A bounding box cannot either, because a single stray mark anywhere in the
 ## frame stretches it, which is exactly what the first version measured (3.11 of a throw, from a reticle in
@@ -897,7 +897,7 @@ func _corridor_reach(mask: PackedByteArray, from: Vector2, to: Vector2) -> float
 	return far
 
 
-## HOW MUCH OF THE THROW HAS INK ON IT — the share of one-pixel bands along the axis that contain any
+## HOW MUCH OF THE THROW HAS INK ON IT: the share of one-pixel bands along the axis that contain any
 ## drawn pixel at all. **`reach` was the wrong number and it took a change that plainly worked to show it:**
 ## shortening the lead from a full tether to a quarter-length stub moved `reach` by nothing, because the
 ## endpoint ring is at the far end of the throw and always will be. The ring is the payload; the lead is
@@ -939,11 +939,11 @@ func _outside_corridor(mask: PackedByteArray, from: Vector2, to: Vector2) -> int
 
 ## HOW HARD A THING'S EDGES HIT, at the 90th percentile rather than the peak. A single antialiased pixel
 ## somewhere on the rope should not decide whether the rope out-shouts the miner, and a mean should not
-## either — most of a body's pixels are its flat interior, which has no edge in it at all.
+## either: most of a body's pixels are its flat interior, which has no edge in it at all.
 ## THE GRADIENT THE PREVIEW ADDS, not the gradient that happens to be under it.
 ##
-## `_edge_p90` reads the local step at every masked pixel, which is correct for the MINER — an opaque body
-## whose silhouette step is entirely its own — and wrong for a thin translucent line, because the step it
+## `_edge_p90` reads the local step at every masked pixel, which is correct for the MINER (an opaque body
+## whose silhouette step is entirely its own) and wrong for a thin translucent line, because the step it
 ## reports belongs to whatever the line was drawn across. Underground that is flat dark rock and the
 ## distinction never showed. On the surface it is clouds and a lesson plate, and the preview measured
 ## **202 levels** against the miner's 87 while its own mask image was cloud outlines and the serifs of the
@@ -1073,7 +1073,7 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 
 ## The largest number `_bow_now`'s own mask can ever return, as a share of the chord. It discards every
 ## pixel further than `span * SAG_CAP + 24.0` from the chord, so `SAG_CAP + 24/span` is a ceiling built
-## into the instrument and says nothing about a rope. DERIVED, NEVER TYPED — `SAG_CAP` is read off the
+## into the instrument and says nothing about a rope. DERIVED, NEVER TYPED: `SAG_CAP` is read off the
 ## renderer so this cannot drift away from the clamp it describes.
 func _bow_rim() -> float:
 	return WorldRenderer.SAG_CAP + 24.0 / maxf(_bow_span, 1.0)
@@ -1107,12 +1107,12 @@ func _bow_measured(which: String, v: float, rim: float) -> bool:
 	# the change. The argument for moving it: `rope_sag` clamps at the posed slack (0.55 solves to
 	# 0.6770 against a `SAG_CAP` of 0.42, and every slack above 0.3199 pins), so the drawn hang IS the
 	# cap, and a 99th-percentile reading over a cord with thickness should therefore land at or just
-	# above `SAG_CAP` whenever the mask works — making this guard fire on success.
+	# above `SAG_CAP` whenever the mask works, making this guard fire on success.
 	#
 	# IT NEGLECTS THE UNITS. `rope_sag` returns a hang in pixels of Y: `_draw_cord` applies it as
 	# `p.y += sin(t * PI) * sag`, so the maximum is VERTICAL. `_bow_now` measures the PERPENDICULAR
 	# departure from the chord, `|d.cross(axis)|`. A vertical drop of `h` across a chord at angle theta
-	# departs that chord by `h * cos(theta)`, and this shot is deliberately a long diagonal — measured
+	# departs that chord by `h * cos(theta)`, and this shot is deliberately a long diagonal, measured
 	# at 49.3 degrees, where the cap's 0.42 of vertical is **0.2736 of the chord**, printed above.
 	#
 	# So a real rope here cannot read much past 0.28, the observed 0.4634 was nowhere near the arc and

@@ -5,7 +5,7 @@ extends "res://tools/check_base.gd"
 ## Until this layer existed, one cell was both terrain and resource, and the two verbs that acted on it
 ## disagreed by two orders of magnitude: a drill took 250 units out of an ore cell, and a pick took a 3-6
 ## burst and then `deposits.erase(cell)`d the rest out of existence. Swinging at ore was the single most
-## destructive act in the game and NOTHING said so — no tell, no refusal, no number on screen. A player who
+## destructive act in the game and NOTHING said so: no tell, no refusal, no number on screen. A player who
 ## cleared a room to build in it could annihilate a four-hundred-unit vein in six swings and never learn it.
 ##
 ## Worse, it contradicted the kit: `docs/BITS.md` shipped a bit set whose premise is that you clear rock
@@ -13,12 +13,12 @@ extends "res://tools/check_base.gd"
 ##
 ## `docs/LODE.md`: terrain is what you CARVE, the lode is what you EXTRACT, and they stop being the same
 ## object. This layer holds the half of that which can be true before the generator moves (phase 1 of
-## `docs/LODE_PLAN.md` §4) — the mechanic, the conservation, and the trap being gone.
+## `docs/LODE_PLAN.md` §4): the mechanic, the conservation, and the trap being gone.
 ##
 ##   THE TRAP IS GONE.      Clear rock over a seeded vein with every bit in the set; the deposit total is
 ##                          unchanged. This one case is the whole reason the migration exists.
 ##   THE BLOW OPENS IT.     Hand-mining an ore block takes its burst OUT of the vein and leaves the rest
-##                          exposed and workable — not a hole where a vein used to be.
+##                          exposed and workable, not a hole where a vein used to be.
 ##   ONE POOL, TWO HANDS.   Hand-work and the drill draw down the same number, and every unit either takes
 ##                          is realised as production exactly once. Conservation is not renegotiated here.
 ##   IT IS FINITE.          A worked-out lode is gone: it stops reading as a vein and stops drawing as one.
@@ -68,7 +68,7 @@ func _run() -> void:
 
 
 ## A sealed working with the body standing in it and a wall of `mat` in reach, each cell seeded to `each`.
-## Returns the cell directly right of the body — the face every case swings at.
+## Returns the cell directly right of the body: the face every case swings at.
 func _working(mat: StringName, each: int, span: int = 3) -> Vector2i:
 	var home: Vector2i = _main._cell_at(_main._player.position)
 	for dx: int in range(-5, 7):
@@ -97,7 +97,7 @@ func _working(mat: StringName, each: int, span: int = 3) -> Vector2i:
 
 ## THE TRAP IS GONE. The headline case, and the one the whole migration is for: clear the rock over a
 ## seeded vein with every bit in the set and the vein is still worth exactly what it was worth. Driven
-## through `try_mine` — the real verb, with the real bit equipped — rather than through `sim.mine`, because
+## through `try_mine` (the real verb, with the real bit equipped) rather than through `sim.mine`, because
 ## it is the BIT's extra reach (shape and calving) that makes this frightening: one Lance blow takes a
 ## column, and every cell it takes used to be a vein deleted.
 func _the_trap_is_gone() -> void:
@@ -139,7 +139,7 @@ func _the_trap_is_gone() -> void:
 
 
 ## THE BLOW OPENS IT. A hand-mined ore block leaves a workable face, and the burst it paid comes OUT of
-## the vein rather than out of nowhere — so the number on the wall is the number you can still get.
+## the vein rather than out of nowhere, so the number on the wall is the number you can still get.
 func _the_blow_opens_it() -> void:
 	var face: Vector2i = _working(&"ore", 60, 1)
 	var before: int = _sim.ore_deposit_at(face)
@@ -174,7 +174,7 @@ func _one_pool_two_hands() -> void:
 		"…and realised as production exactly once, so the ledger still balances")
 
 
-## IT IS FINITE. A vein worked dry is spent, and everything that reads it has to agree — otherwise the wall
+## IT IS FINITE. A vein worked dry is spent, and everything that reads it has to agree; otherwise the wall
 ## keeps glittering at a player who cannot get anything out of it, which is the worst kind of lie a tell
 ## can tell.
 func _it_is_finite() -> void:
@@ -193,7 +193,7 @@ func _it_is_finite() -> void:
 
 
 ## COVERING IS NOT KILLING. The lode is background; a block in front of it is a block in front of it. This
-## matters because the whole point is that construction and resource stopped being the same object — if
+## matters because the whole point is that construction and resource stopped being the same object: if
 ## backfilling a gallery destroyed the vein behind it, they would still be the same object.
 func _covering_is_not_killing() -> void:
 	var face: Vector2i = _working(&"ore", 40, 1)
@@ -209,7 +209,7 @@ func _covering_is_not_killing() -> void:
 
 
 ## THE LADDER STILL HOLDS (#S37). A lode over your drive refuses, and it refuses through the SAME two
-## predicates the crossed cursor and the skid are drawn from — so ore inherits every tell rock has without
+## predicates the crossed cursor and the skid are drawn from, so ore inherits every tell rock has without
 ## one line of new tell code. What must NOT happen is the bit gating it: bits shape holes, and working a
 ## face cuts no hole (`docs/LODE_PLAN.md` §8.3).
 func _the_ladder_still_holds() -> void:
@@ -264,7 +264,7 @@ func _opened_a_lode(face: Vector2i) -> bool:
 
 ## THE STARTER ADIT. Once ore lives behind rock, the opening has a hole in it: a first-time player has
 ## nothing to aim at, because every vein in the world is buried and the stain that will telegraph them is
-## phase 4. The adit is the answer — a face you can see from the surface, with the rock already off it.
+## phase 4. The adit is the answer: a face you can see from the surface, with the rock already off it.
 ##
 ## Three things have to be true, and the third is the one that bites: the vein has to be VISIBLE without
 ## digging, it has to CONTINUE past what you were given, and the cut has to be a place you can walk out of.
@@ -289,7 +289,7 @@ func _the_adit_is_there() -> void:
 	_check(not sim.lode.has(Vector2i(mouth, top)) and not sim.lode.has(Vector2i(mouth, top + 1)),
 		"…and the break-in end is bare, so the vein is a reason to go deeper rather than a thing you land on")
 	# THE SURFACE IS WHOLE. The pocket is sealed, and this is the assertion that earns its keep: the first two
-	# versions of this cut opened onto the sky, and the plateau's surface is not spare ground — it is the
+	# versions of this cut opened onto the sky, and the plateau's surface is not spare ground: it is the
 	# corridor the opening walks AND the runway `measure_player` and `check_fastforward` measure motion on.
 	# A hole in it took four playthrough layers down at once, twice, in two different columns.
 	var roof_whole: bool = true
@@ -299,7 +299,7 @@ func _the_adit_is_there() -> void:
 	_check(roof_whole,
 		"the ground OVER the pocket is unbroken — you can walk across it without knowing it is there")
 	# YOU CAN WALK IT. The property the first cut broke and nothing caught: it stepped down one row per column
-	# without keeping the row above open, so the body — 34px against a 32px cell, always two rows — met solid
+	# without keeping the row above open, so the body (34px against a 32px cell, always two rows) met solid
 	# rock with its HEAD at every step. The sim was content because the floor cells were clear. So this asserts
 	# the corridor the way the body meets it: contiguous, two rows minimum, and OVERLAPPING by the body's own
 	# height where one column hands over to the next.
@@ -348,7 +348,7 @@ func _the_adit_is_there() -> void:
 	_check(int(sim.deposits.get(Vector2i(room, top + 4), 0))
 			> int(sim.deposits.get(Vector2i(room, top + 3), 0)),
 		"…and it gets richer as it goes, so following it is worth the digging")
-	# And the free part is a taste, not a supply — the pressure to dig has to survive the gift.
+	# And the free part is a taste, not a supply: the pressure to dig has to survive the gift.
 	var given: int = 0
 	for c3: Vector2i in open_face:
 		given += int(sim.deposits.get(c3, 0))
@@ -364,7 +364,7 @@ func _vein_total() -> int:
 	return t
 
 
-## Every unit of ore that ended up in the pack instead (a burst is not a loss — it is a withdrawal).
+## Every unit of ore that ended up in the pack instead (a burst is not a loss; it is a withdrawal).
 func _pocketed() -> int:
 	return int(_sim.inventory.get(&"ore", 0))
 
@@ -379,14 +379,14 @@ func _reset_pack() -> void:
 ## to dig at random. That is the DESIGN ARGUMENT for building the stain; it is not something this layer
 ## measures, and the distinction matters because the prose here used to claim the second.
 ##
-## WHAT THIS LAYER ACTUALLY TESTS — a COLORIMETRIC RULE, and nothing wider. It calls `_stain()` directly and
+## WHAT THIS LAYER ACTUALLY TESTS: a COLORIMETRIC RULE, and nothing wider. It calls `_stain()` directly and
 ## compares HSV components of the returned Color: the buried tell is a hue/saturation move that holds most
 ## of the host's value, an open face never darkens, and a face stains further than a buried vein (so
 ## clearing rock still changes what you see). Those assertions are correct about what they cover.
 ##
 ## WHAT IT DOES NOT TEST, DESPITE WHAT THIS DOCSTRING ONCE SAID: that the tell "is real enough to see", or
 ## that a player can read a buried vein at all. Nothing here renders, captures, samples a screen, or
-## involves a person — a delta in colour space is not a delta a person notices, and no assertion below can
+## involves a person: a delta in colour space is not a delta a person notices, and no assertion below can
 ## become evidence about perception no matter how it is worded. Player readability is UNVERIFIED and sits
 ## behind the unmet capture gate in `docs/LODE_PLAN.md` §5: a diagnostic frame that sets and RECORDS the
 ## tutorial/objective HUD state so the vein is unoccluded.
@@ -425,7 +425,7 @@ func _the_rock_tells_on_itself() -> void:
 	# WHAT CLEARING THE ROCK ACTUALLY BUYS YOU. This started as a comparison of the two stains and the
 	# comparison was the wrong test: covered rock now DARKENS and an open face does not, so they are not two
 	# volumes of one signal, they are two different signals. The real answer is that only an exposed face
-	# carries metal — the grain field of `_draw_lode`, which is also exactly the state the hand and the Head
+	# carries metal: the grain field of `_draw_lode`, which is also exactly the state the hand and the Head
 	# can work. Buried, you get a discolouration and a decision; exposed, you get the vein.
 	var open_cell := Vector2i(7, 58)
 	_sim.set_solid(open_cell, &"")

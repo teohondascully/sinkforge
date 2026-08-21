@@ -1,12 +1,12 @@
 extends "res://tools/check_base.gd"
 
-## Harness layer — THE GRAPPLE, scored. The grapple exists to make vertical space fun instead of tedious,
+## Harness layer: THE GRAPPLE, scored. The grapple exists to make vertical space fun instead of tedious,
 ## and "fun" is not a thing a harness can read. What a harness CAN read is the four properties the fun is
 ## made of, so each is turned into a number with a floor under it:
 ##
 ##   1. IT BITES.       A shot at rock plants within a few frames; a shot at open sky runs out of line and
 ##                      stows instead of hanging in the air forever.
-##   2. IT SWINGS.      From a dead hang, pumping the arc gets the body moving FASTER than its legs can —
+##   2. IT SWINGS.      From a dead hang, pumping the arc gets the body moving FASTER than its legs can,
 ##                      because the constraint only removes the outward half of velocity, so the tangential
 ##                      half accumulates. If a change ever makes the rope bleed tangential speed, this is
 ##                      the number that drops, and a swing that is slower than walking is a swing nobody
@@ -14,7 +14,7 @@ extends "res://tools/check_base.gd"
 ##   3. IT LIFTS.       Reeling in raises the body against gravity. This is the answer to the trip back up,
 ##                      and it is the single most load-bearing claim the tool makes.
 ##   4. IT CROSSES.     A chasm too wide to jump is crossed by swinging it. This is the whole verb, end to
-##                      end, driven through the real body and the real constraint — the play-test, not a
+##                      end, driven through the real body and the real constraint: the play-test, not a
 ##                      unit test of the maths.
 ##
 ## Every rig here is built the way check_agility builds its course: carve a pocket of open sky out of the
@@ -42,7 +42,7 @@ const SWING_SPEED_FLOOR: float = 1.15  ## × RUN_SPEED the pumped arc must beat,
 const REEL_LIFT_FLOOR: float = 3.0     ## cells the body must gain in 90 frames of holding UP on the line
 ## Fraction of release speed still on the body half a second later, flying free. This is the one that
 ## guards the POINT of the tool: the controller's normal job is to hold you at RUN_SPEED, and for a while
-## it did exactly that to a released swing — 420px/s bled back to a walk inside a sixth of a second, which
+## it did exactly that to a released swing: 420px/s bled back to a walk inside a sixth of a second, which
 ## makes every swing a very pretty way of arriving at walking pace. Speed you cannot keep is not a reward.
 const MOMENTUM_KEEP_FLOOR: float = 0.72
 
@@ -103,8 +103,8 @@ func _build_rig(sim: FactorySim) -> void:
 
 
 ## Fire and WAIT for the bite. The flight is a real projectile at a real speed, so how long it takes
-## depends on how far away the rock is — a fixed frame budget silently turns "the shot is still in the
-## air" into "the rig failed to anchor", which is how the first run of this file lied to me.
+## depends on how far away the rock is; a fixed frame budget silently turns "the shot is still in the
+## air" into "the rig failed to anchor", which is how the first run of this file lied.
 func _hook(main: MainView, target: Vector2i, budget: int = 90) -> bool:
 	var p: Player = main._player
 	p.grapple.fire(p.hand(), main._cell_center(target))
@@ -128,7 +128,7 @@ func _stand(main: MainView, col: int, row: int) -> void:
 		await physics_frame
 
 
-## 1. IT BITES — a shot straight up at the ceiling plants, and plants fast.
+## 1. IT BITES: a shot straight up at the ceiling plants, and plants fast.
 func _check_bite(main: MainView) -> void:
 	await _stand(main, RIG_LEFT + 4, FLOOR_ROW - 2)
 	var p: Player = main._player
@@ -149,7 +149,7 @@ func _check_bite(main: MainView) -> void:
 func _check_miss(main: MainView) -> void:
 	var p: Player = main._player
 	await _stand(main, RIG_LEFT + 4, FLOOR_ROW - 2)
-	# Fire along the open corridor between floor and ceiling — nothing to hit inside MAX_RANGE.
+	# Fire along the open corridor between floor and ceiling: nothing to hit inside MAX_RANGE.
 	p.grapple.fire(p.hand(), p.hand() + Vector2(1.0, -0.02))
 	var frames: int = 0
 	while p.grapple.live() and frames < 240:
@@ -158,10 +158,10 @@ func _check_miss(main: MainView) -> void:
 	_check(not p.grapple.live(), "a shot that hits nothing runs out of line and stows")
 
 
-## 3. IT SWINGS — hang from the ceiling, pump the arc, and beat walking speed.
+## 3. IT SWINGS: hang from the ceiling, pump the arc, and beat walking speed.
 func _check_swing(main: MainView) -> float:
 	# Stand on SOLID ground at the chasm's left lip and hook the ceiling out over the void, so the body
-	# has a real drop to swing into. (Standing mid-chasm just falls — there is no floor there.)
+	# has a real drop to swing into. (Standing mid-chasm just falls; there is no floor there.)
 	await _stand(main, GAP_LEFT - 1, FLOOR_ROW - 2)
 	var p: Player = main._player
 	if not await _hook(main, Vector2i(GAP_LEFT + 3, CEIL_ROW)):
@@ -176,7 +176,7 @@ func _check_swing(main: MainView) -> float:
 		p.input_dir = dir
 		await physics_frame
 		var vx: float = p.velocity.x
-		# Flip the pump at each apex — where horizontal travel reverses — which is how a swing is driven.
+		# Flip the pump at each apex (where horizontal travel reverses), which is how a swing is driven.
 		if signf(p.position.x - prev_x) != 0.0 and signf(p.position.x - prev_x) != signf(dir):
 			dir = -dir
 		prev_x = p.position.x
@@ -187,7 +187,7 @@ func _check_swing(main: MainView) -> float:
 	return best / Player.RUN_SPEED
 
 
-## 4. IT LIFTS — hang on the line and hold UP; the body must climb.
+## 4. IT LIFTS: hang on the line and hold UP; the body must climb.
 func _check_reel(main: MainView) -> float:
 	await _stand(main, RIG_LEFT + 6, FLOOR_ROW - 2)
 	var p: Player = main._player
@@ -205,7 +205,7 @@ func _check_reel(main: MainView) -> float:
 	return gained
 
 
-## 5. IT CROSSES — the whole verb, end to end, played the way a player plays it: run at the lip, hook the
+## 5. IT CROSSES, the whole verb, end to end, played the way a player plays it: run at the lip, hook the
 ## ceiling out over the void, ride the arc, and LET GO on the far side. The release is the point. A test
 ## that clung to the rope and reeled itself in was testing a winch, not a swing, and it never got across.
 func _check_chasm(main: MainView) -> bool:
@@ -218,7 +218,7 @@ func _check_chasm(main: MainView) -> bool:
 	var released: bool = false
 	for _i: int in 300:
 		await physics_frame
-		# Let go when the body is OVER the far lip — which is what a player does, and which is later than
+		# Let go when the body is OVER the far lip, which is what a player does, and which is later than
 		# the low point of the arc. Releasing at the anchor's column gives you the most speed and the least
 		# height, and drops you straight into the hole you were trying to clear.
 		if not released and p.grapple.taut and p.position.x > float(GAP_RIGHT) * CELL:
@@ -236,13 +236,13 @@ func _check_chasm(main: MainView) -> bool:
 	return landed.x >= GAP_RIGHT and p.on_floor
 
 
-## 6. IT KEEPS — the controller property the swing depends on, tested at its own level. A pendulum is at
+## 6. IT KEEPS: the controller property the swing depends on, tested at its own level. A pendulum is at
 ## its fastest exactly where it is lowest, so there is no point on an arc that is both fast and high, and
 ## a test that demanded both never fired at all. What actually needs guarding is simpler than the rig
 ## makes it look: a body moving faster than it can run, with nobody touching the controls, must still be
 ## moving faster than it can run a moment later. Launch it in open air and watch.
 ##
-## Without this property the whole tool is decorative — the controller's normal job is to hold you AT
+## Without this property the whole tool is decorative: the controller's normal job is to hold you AT
 ## RUN_SPEED, and for a while it did exactly that to a released swing: 420px/s bled to a walk inside a
 ## sixth of a second. Speed you cannot keep is not a reward. (The end-to-end proof that it reaches the
 ## body lives in the chasm test above, which lands three cells further with this than without it.)

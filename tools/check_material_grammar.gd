@@ -10,7 +10,7 @@ extends "res://tools/check_base.gd"
 ## (0.355, 0.350, 0.335), so ANY separability test that can see colour scores near-perfect and closes
 ## TR-02 while the thing the ticket is about goes untouched. A hue difference is not a material grammar;
 ## a player told "the brown one is dirt" has learned a colour key, not read a material. So the verdict
-## here is computed on STRUCTURE ONLY, and the colour cues are kept — as a CONTROL that must stay high,
+## here is computed on STRUCTURE ONLY, and the colour cues are kept, as a CONTROL that must stay high,
 ## because if colour separability collapses too then the rig is broken rather than the grammar being good.
 ##
 ## AND THE SECOND TRAP, which is the same one in the other direction. The fine layer applies grain
@@ -26,7 +26,7 @@ extends "res://tools/check_base.gd"
 ## a second time with THE SAME MATERIAL ON BOTH SIDES. If the null rig separates, the instrument is
 ## reading position or lighting rather than material, and every number in the treatment run is void.
 ##
-## Deliberately NOT registered while TR-02 is open — `check_rock_reads` was held out the same way through
+## Deliberately NOT registered while TR-02 is open; `check_rock_reads` was held out the same way through
 ## 6a. A layer that is red on arrival is not a gate, it is a ticket with a runner attached.
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -41,20 +41,20 @@ const SETTLE: int = 70
 const DEPTHS: Array[int] = [22, 26, 30]
 const HALF_W: int = 20         ## corridor half-width in cells
 ## SHALLOW ON PURPOSE. Torch light reaches a few cells into rock, so a slab ten rows deep puts most of its
-## windows where nothing is visible — the first lit rig lit 12 of 48. The sampled band is now the rock a
+## windows where nothing is visible: the first lit rig lit 12 of 48. The sampled band is now the rock a
 ## torch actually reaches, which is also the only rock a player ever sees the material of.
 const HALF_H: int = 8          ## slab half-height in cells
 const STRIDE: int = 2          ## cells between window centres — windows overlap less than they tile
 const GAP: int = 3             ## columns either side of the seam left unsampled (contacts are not interiors)
 const CORRIDOR: int = 1        ## rows carved out either side of centre
 ## THE RIG HAS TO BE LIT, and the first version was not. With only the player's lamp, 7 of 48 windows were
-## bright enough to see a material in — and the NULL rig duly "separated" at 83% on six of them, which is
+## bright enough to see a material in, and the NULL rig duly "separated" at 83% on six of them, which is
 ## five windows out of six and is noise wearing a percentage. TR-02 is answered where a player can see, so
 ## the corridor carries a line of torches and the lit band becomes the population rather than a remainder.
 const TORCH_EVERY: int = 2     ## columns between torches along the corridor
 
 ## THE WINDOW HAS TO BE THE SIZE OF THE THING IT IS LOOKING FOR, and the first version of this layer was
-## not. It sampled 0.30 of a cell — 15 screen pixels — while `fine_terrain.gd` says in its own constants
+## not. It sampled 0.30 of a cell (15 screen pixels) while `fine_terrain.gd` says in its own constants
 ## that a grain feature spans ABOUT ELEVEN FINE CELLS. SUBDIV is 4, so a fine cell is 12 screen px and a
 ## feature is ~132; the patch covered 1.25 fine cells. A window that small cannot see a texture at all,
 ## only the inside of one of its pixels, and it duly reported that a 2.9x difference in grain amplitude
@@ -65,29 +65,29 @@ const TORCH_EVERY: int = 2     ## columns between torches along the corridor
 ## wide enough to average that in would dilute the material's own signal with the world's.
 ## THE WINDOW IS WIDE AND SHALLOW BECAUSE THE VISIBLE REGION IS. Torchlight reaches about two cells into
 ## a rock face, so the only rock whose material a player ever sees is a thin skin behind whatever they
-## have just dug — while a grain feature spans ~11 fine cells, which is 2.75 coarse cells. **The texture's
+## have just dug, while a grain feature spans ~11 fine cells, which is 2.75 coarse cells. **The texture's
 ## features are larger than the band in which they can be seen**, and that is a finding about the grammar's
 ## scale rather than about the rig: a square window big enough to contain a feature necessarily reaches
 ## into rock nobody can see, which is how the first lit band ended up at 11 of 32 windows.
 ##
-## So the window is 4 cells across and 2 deep — wide enough horizontally to contain a feature, shallow
+## So the window is 4 cells across and 2 deep: wide enough horizontally to contain a feature, shallow
 ## enough vertically to stay inside the lit skin. Matching the sampling shape to the shape of the region
 ## the question is about, rather than to the shape of the thing being measured.
 const WIN_W: float = 4.0       ## window width in coarse cells — spans a grain feature
 const WIN_H: float = 2.0       ## window height in coarse cells — stays inside the torch-lit skin
 const MIN_SAMPLES: int = 30    ## a ratio over a handful of windows is not a small result, it is no result
 ## Every Nth pixel, both axes. The window is 193px across and the finest thing in it is a 12px fine cell,
-## so a 3px lattice is still four samples per fine cell — nowhere near the structure being measured. The
+## so a 3px lattice is still four samples per fine cell, nowhere near the structure being measured. The
 ## first version walked every pixel with `get_pixel`, three separate times per window, which came to ~32
 ## million calls and took the layer past a ten-minute wall. One fused pass over `get_data()` bytes at
 ## stride 3 is the same four numbers about 30x faster.
 const STEP: int = 3
 ## A WINDOW IS "LIT" WHEN A PLAYER COULD ACTUALLY SEE IT. The first version of this layer sampled the
-## whole slab and reported 64% separability on rock whose mean luma is 10/255 — a 4x crop of it is
+## whole slab and reported 64% separability on rock whose mean luma is 10/255; a 4x crop of it is
 ## visually BLACK. That number is real and it is about nothing: no variation language reads at 4%
 ## brightness, at any amplitude, so a texture statistic taken there cannot answer TR-02's completion
 ## criterion ("an independent reviewer names each material"). The lit band is where the claim lives; the
-## dark band is reported beside it because "we cannot tell them apart out here" is itself the finding, and
+## dark band is reported beside it because "they cannot be told apart out here" is itself the finding, and
 ## it is a BRIGHTNESS finding rather than a texture one.
 const LIT_FLOOR: float = 22.0  ## mean window luma above which rock is actually visible
 const READ_FLOOR: float = 0.75 ## the same bar check_rock_reads holds rock/void to
@@ -115,18 +115,18 @@ func _run() -> void:
 	var null_r: Dictionary = await _measure(main, &"earth", &"earth", "NULL   earth | earth", true)
 	var real_r: Dictionary = await _measure(main, &"earth", &"stone", "TREAT  earth | stone", true)
 
-	# THE SAME MEASUREMENT WITH THE TOOTH PASS OFF, and it is not a curiosity — it is the mechanism
+	# THE SAME MEASUREMENT WITH THE TOOTH PASS OFF, and it is not a curiosity: it is the mechanism
 	# question. `rock_tooth.gdshader` adds texture ABOVE the darkness veil in ABSOLUTE levels, because 6a
 	# established that anything the fine layer writes underground is multiplied by the veil down to
 	# nothing. That fix worked and it is why rock reads against void at all. But the tooth is ISOTROPIC and
-	# material-blind by construction — it masks on alpha and adds the same hash to every solid cell in the
+	# material-blind by construction: it masks on alpha and adds the same hash to every solid cell in the
 	# world. So underground it is plausibly the dominant surface texture, in which case a material grammar
 	# written into the fine layer is being crushed by the veil AND overpainted by the fix for the veil.
 	# If structure separation jumps with the tooth off, that is the answer, and it means the grammar has to
 	# reach the frame the way the tooth does rather than the way the fine layer does.
-	# THE PAIRED BASELINE, and without it the headline is a category error. The 57% I recorded before the
+	# THE PAIRED BASELINE, and without it the headline is a category error. The 57% recorded before the
 	# grammar existed was a POOLED number, and pairing alone lifts a cue several points by removing the
-	# lighting spread — so quoting today's paired figure against that pooled one would credit the grammar
+	# lighting spread, so quoting today's paired figure against that pooled one would credit the grammar
 	# with the statistic's improvement. This arm is the same two materials with the SAME language: stone's
 	# MaterialDef is flattened to Clastic, so the slabs still differ in colour and no longer differ in
 	# grammar. Whatever separates here is what separated before any of this work.
@@ -145,14 +145,14 @@ func _run() -> void:
 
 	# A CUE IS DISQUALIFIED BY ITS OWN NULL, per cue rather than in aggregate. The null rig holds the SAME
 	# material on both sides, so any separation it shows is the instrument reading position, lighting or
-	# geometry — and a cue that separates identical rock cannot be trusted to be reading material when the
+	# geometry, and a cue that separates identical rock cannot be trusted to be reading material when the
 	# rock differs. Pooled over three placements the two structure cues come apart sharply: GRAIN reads 51%
 	# on the null, ANISO reads 73%. So ANISO is not a material cue in this rig and is excluded from the
-	# verdict by rule rather than by my picking the number I liked. It is still printed, because "we tried
-	# to read direction and could not" is a finding about the seams, not an absence of one.
+	# verdict by rule rather than by picking a preferred number. It is still printed, because "the attempt
+	# to read direction failed" is a finding about the seams, not an absence of one.
 	#
 	# ANISO's failure is also informative rather than merely inconvenient: the treatment's own anisotropy
-	# reads 50-51%, so the per-grammar seam DIRECTION — bedded running flat, massive running steep — is not
+	# reads 50-51%, so the per-grammar seam DIRECTION (bedded running flat, massive running steep) is not
 	# reaching the frame at all. The seams are drawn multiplicatively, which is the constraint written at
 	# the head of fine_terrain.gd, and direction is the half of the grammar that constraint costs most.
 	var cues: Array[String] = ["grain", "aniso"]
@@ -236,7 +236,7 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 	for dy: int in range(-HALF_H, HALF_H + 1):
 		for dx: int in range(-HALF_W, HALF_W + 1):
 			sim.set_solid(Vector2i(cx + dx, cy + dy), left if dx < 0 else right)
-	# Carve the corridor so the slab faces are seen, lit and rimmed — symmetric, so both sides get the
+	# Carve the corridor so the slab faces are seen, lit and rimmed; symmetric, so both sides get the
 	# same geometry and therefore the same AO and rim.
 	for dy: int in range(-CORRIDOR, CORRIDOR + 1):
 		for dx: int in range(-HALF_W, HALF_W + 1):
@@ -271,11 +271,11 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 	# MIRRORED SAMPLING. Every cell is taken with its mirror twin at the same |dx| and the same dy, so the
 	# two populations are matched on distance from the lamp and on depth. An unmatched sample would let a
 	# lighting gradient masquerade as a material difference, which is precisely what the null rig would
-	# then fail to catch — the null and the mirroring guard the same hole from two sides.
+	# then fail to catch: the null and the mirroring guard the same hole from two sides.
 	var half_x: int = int(ceil(WIN_W * 0.5))
 	var half_y: int = int(ceil(WIN_H * 0.5))
 	for dy: int in range(-HALF_H, HALF_H + 1, STRIDE):
-		# The corridor, its rim band, AND a window radius clear of both — a window centred one cell from
+		# The corridor, its rim band, AND a window radius clear of both: a window centred one cell from
 		# the corridor still reaches into it, and carved-edge AO is not a material property.
 		if absi(dy) <= CORRIDOR + half_y:
 			continue
@@ -307,7 +307,7 @@ func _report(out: Dictionary, label: String) -> Dictionary:
 
 	# PAIRED, NOT POOLED, and the first version threw the whole point of the rig away. Every window is
 	# sampled with its MIRROR TWIN at the same |dx| and the same dy, so the two are matched on distance
-	# from the lamp and on depth — and then the pooled Mann-Whitney compared two unordered bags and let
+	# from the lamp and on depth, and then the pooled Mann-Whitney compared two unordered bags and let
 	# all that matching evaporate. Lighting varies far more across the slab than material does, so the
 	# within-material spread it re-introduced was swamping the between-material difference the rig was
 	# built to isolate. A paired comparison asks the only question the design supports: for THIS pair of
@@ -359,7 +359,7 @@ func _take(out: Dictionary, side: String, d: PackedByteArray, w: int, x: int, y:
 	var m: Dictionary = _window(d, w, x, y, rx, ry)
 	(out[side + "_value"] as Array[float]).append(float(m["mean"]))
 	(out[side + "_chroma"] as Array[float]).append(float(m["chroma"]))
-	# COEFFICIENT OF VARIATION, not standard deviation — see the header. Multiplicative grain makes raw
+	# COEFFICIENT OF VARIATION, not standard deviation; see the header. Multiplicative grain makes raw
 	# std track brightness, so a raw-std "grain" cue would be the VALUE cue with a different label.
 	(out[side + "_grain"] as Array[float]).append(float(m["std"]) / maxf(float(m["mean"]), 1.0))
 	(out[side + "_aniso"] as Array[float]).append(float(m["aniso"]))
@@ -399,7 +399,7 @@ func _window(d: PackedByteArray, w: int, cx: int, cy: int, rx: int, ry: int) -> 
 
 
 ## The matched-pair statistic: over mirrored windows, how often the two sides differ in the SAME direction.
-## Folded for the same reason the pooled version is — which way round the cue runs is not something a
+## Folded for the same reason the pooled version is: which way round the cue runs is not something a
 ## player has to be told, only that the two materials are not the same picture.
 func _paired(a: Array[float], b: Array[float]) -> float:
 	if a.is_empty():
@@ -414,7 +414,7 @@ func _paired(a: Array[float], b: Array[float]) -> float:
 	return maxf(f, 1.0 - f)
 
 
-## The best surviving cue's lit-band reading — used for the baseline arm so it is scored on exactly the
+## The best surviving cue's lit-band reading, used for the baseline arm so it is scored on exactly the
 ## cues the treatment is scored on.
 func _best(d: Dictionary, cues: Array[String]) -> float:
 	var out: float = 0.0
@@ -430,7 +430,7 @@ func _pick(v: Array[float], idx: Array[int]) -> Array[float]:
 	return out
 
 
-## Mann-Whitney, folded — the same statistic and the same reasoning as check_rock_reads: distribution-free
+## Mann-Whitney, folded; the same statistic and the same reasoning as check_rock_reads: distribution-free
 ## because a bimodal population (bedding against fissure) should not be punished for its shape, and folded
 ## because which way round the cue runs is not something a player needs to be told.
 func _readability(a: Array[float], b: Array[float]) -> float:

@@ -9,7 +9,7 @@ extends "res://tools/check_base.gd"
 ## interrupts may share the screen at once. It is a thorough instrument and it cannot see this at all.
 ##
 ## **T2.1's last open line is "stop zone ceremony colliding with map, rope and action."** The map half is
-## covered — `_draw_arrival` registers its solid core and two layout states raise the plate with the
+## covered: `_draw_arrival` registers its solid core and two layout states raise the plate with the
 ## minimap up. The rope half is not, and the reason is structural rather than an oversight: **every rope in
 ## this game is drawn in WORLD space** by `world_renderer.gd` (`_draw_ropes` for the placed ladders,
 ## `_draw_cord` for the grapple line). There is no `_draw_rope` in `scenes/hud.gd` and no rope rectangle in
@@ -18,10 +18,10 @@ extends "res://tools/check_base.gd"
 ##
 ## **Not a missing state. A missing plane.** This layer is that plane.
 ##
-## AND THE PLATE CANNOT BE MOVED OUT OF THE WAY — derivable before any capture. The camera centres the
+## AND THE PLATE CANNOT BE MOVED OUT OF THE WAY, derivable before any capture. The camera centres the
 ## body, so the miner sits at canvas (320, 180); the plate is centred too and spans canvas y 61.6..111.6,
 ## the 4.3rd to the 7.4th cell above the body, in the body's own column. Its core reaches ~114 canvas px
-## either side of centre and `SCRIM_FEATHER` adds 96 more — a ~420 px footprint on a 640 px canvas. There
+## either side of centre and `SCRIM_FEATHER` adds 96 more: a ~420 px footprint on a 640 px canvas. There
 ## is nowhere to put it that is not over the miner. Placement is not a treatment here, so the layer does
 ## not measure position; it measures how much of the rope survives.
 ##
@@ -47,17 +47,17 @@ extends "res://tools/check_base.gd"
 ## nothing. Assertion 2 in particular: standing the body in the rig crosses a stratum boundary and the game
 ## announces on its own, so the first "no ceremony" capture came back reading `25 METRES DOWN / SHALE
 ## REACH`. Both arms were ceremonies, the diff was two plates cancelling, and the probe reported a ratio of
-## 1.0 — which was the truth, read as an instrument failure.
+## 1.0, which was the truth, read as an instrument failure.
 ##
 ## ---
 ##
 ## THE MECHANISM, printed every run because it is more useful than the headline number. The scrim is
-## `Color(0.02, 0.025, 0.04)` at alpha 0.28 — a multiply in all but name. (This line said 0.80 for as long as
+## `Color(0.02, 0.025, 0.04)` at alpha 0.28, a multiply in all but name. (This line said 0.80 for as long as
 ## the file has existed; `ffeb1c8` dropped it to 0.28 twenty-eight minutes after the line was written, and
 ## the docstring further down has known the real number all along. The file contradicted itself.) Underground the rock behind it
 ## sits at a luma near ten, so eighty percent of it is nearly nothing: the scrim is almost invisible over
 ## the mass of the frame. The rope is HEMP at 0.76/0.63/0.42. **A multiplicative veil takes 80% from the
-## bright thin things and almost nothing from the dark mass** — it erases the rope, the cord and the glints
+## bright thin things and almost nothing from the dark mass**: it erases the rope, the cord and the glints
 ## while leaving intact exactly the background it was drawn to suppress. So the layer reports what the
 ## ceremony did to the ROPE beside what it did to the ROCK behind the rope, in the same rows. If those two
 ## numbers ever converge, the veil has started doing its job.
@@ -78,12 +78,12 @@ const FLOOR_ROW: int = 45
 const STAND_ROW: int = 44
 
 ## `_arrival_life` where `_draw_arrival`'s alpha has been pinned at 1.0 for a while. The plate is at full
-## opacity for life in 1.42..2.83 — fast in, slow out — so the middle of that window is the honest place to
+## opacity for life in 1.42..2.83 (fast in, slow out), so the middle of that window is the honest place to
 ## photograph it, and the value is printed so a run that missed the window is visible rather than silent.
 const PLATEAU: float = 2.20
 const QUIET_MAX: int = 600
 ## A COLUMN FAR ENOUGH FROM SPAWN that the surface there is ordinary ground rather than the opening scene's
-## dug pit — the same reason `check_grapple_reads` picks 96. The first version stood the body at the rig's
+## dug pit; the same reason `check_grapple_reads` picks 96. The first version stood the body at the rig's
 ## own column and the arm stood down half the time: near spawn the game is still TEACHING, so a lesson
 ## bubble is up, and the plate suppresses it, so the two captures differ by a surface that is not the
 ## subject. Waiting longer is the wrong fix; the arm needs somewhere the teaching is finished.
@@ -91,7 +91,7 @@ const SURFACE_COL: int = 96
 const SURFACE_QUIET_MAX: int = 1500
 ## HOW WIDE THE SEARCH FOR THE FIBRE IS, and the first version searched five image px either side, which
 ## is wide enough to catch something else. The control band's dE distribution came back with a mean of 4.6
-## and a 95th percentile of 34.5 — a tail that heavy in a band where nothing is over the rope is not drift,
+## and a 95th percentile of 34.5; a tail that heavy in a band where nothing is over the rope is not drift,
 ## it is the tracer locking onto a different object. It is: the shaft is full of ORE GLINTS, they twinkle
 ## on their own clock, and `_rope_x` takes the brightest pixel in its window.
 ##
@@ -104,12 +104,12 @@ const MIN_ROWS: int = 100          ## rope rows a band must contain before its f
 
 ## THERE IS NO "FRACTION OF THE ROPE OCCLUDED" FIGURE HERE, AND TWO ATTEMPTS AT ONE ARE WHY.
 ##
-## The first counted rows past a flat 3.0 dE — underneath the control band's own mean drift of 4.7, so it
+## The first counted rows past a flat 3.0 dE, underneath the control band's own mean drift of 4.7, so it
 ## counted the world moving as the ceremony arriving and reported 86-89%.
 ##
 ## The second set the threshold from the data: the 95th percentile of the dE on rope rows BELOW the plate,
 ## measured that run. That is the right idea and it is still not a statistic. **Two runs of the identical
-## build put the threshold at 34.4 and at 4.4** — an eightfold swing, because a p95 over 151 samples is the
+## build put the threshold at 34.4 and at 4.4**: an eightfold swing, because a p95 over 151 samples is the
 ## 143rd value and one twinkling row moves it. The headline moved with it, 25% against 84%, for a subject
 ## that had not changed at all.
 ##
@@ -119,13 +119,13 @@ const MIN_ROWS: int = 100          ## rope rows a band must contain before its f
 
 ## The drift the two captures may accumulate between them. Measured at 4.5 dE across 151 control rows over
 ## the ~220 frames the plate needs to reach plateau; the bound is set well above that because it is a
-## VOIDING check rather than a quality one — it fires when the world moved enough to swamp the subject, not
+## VOIDING check rather than a quality one: it fires when the world moved enough to swamp the subject, not
 ## when the world moved.
 const DRIFT_CAP: float = 12.0
 
 ## How much louder the ceremony must be than the drift, in a patch of the plate AWAY from the rope. Away,
 ## because a positive control that reads the rope's own column would fail the day the ceremony is fixed to
-## clear the rope — a control must survive the treatment it exists to make measurable.
+## clear the rope; a control must survive the treatment it exists to make measurable.
 const DREW_RATIO: float = 4.0
 
 var _skipped: bool = false
@@ -154,11 +154,11 @@ func _run() -> void:
 	get_root().add_child(main)
 	# THE HUMAN AT THE KEYBOARD IS NOT PART OF THE EXPERIMENT, and until now this layer never said so. It
 	# posed nothing and deafened nothing, so for the whole run the aim tracked the operator's physical
-	# mouse — and `world_renderer` eases the head-lamp toward the aim, which in this rig (a hand-built dark
+	# mouse, and `world_renderer` eases the head-lamp toward the aim, which in this rig (a hand-built dark
 	# shaft, no torches, no machines) is the ONLY light on the band being measured. A hand moving during
 	# the run swings a 9-cell reveal and a 5.6-cell bloom across the control band.
 	#
-	# It is not the cause of the failure this fixes — the rock channel, which is what illumination moves,
+	# It is not the cause of the failure this fixes: the rock channel, which is what illumination moves,
 	# read 0.7 against a calibrated 0.9 on the failing run, so the light demonstrably did NOT move that
 	# time. It is closed because it is a live hole that would eventually produce a red nobody could
 	# reproduce, and because leaving it open means the next surprising number here has two explanations.
@@ -180,7 +180,7 @@ func _run() -> void:
 
 	# THE REFERENCE FRAME MUST BE UNINTERRUPTED. Two `critical` surfaces fire on their own here: the game's
 	# arrival plate, because standing the body in the rig crosses a band, and the ROPE lesson bubble. The
-	# bubble matters more than its faintness suggests — `_rope_x` takes the brightest pixel in the column,
+	# bubble matters more than its faintness suggests: `_rope_x` takes the brightest pixel in the column,
 	# so a ghost letter lying on the rope BECOMES the rope and every reading afterwards is of the wrong
 	# pixel.
 	var quiet: int = 0
@@ -210,7 +210,7 @@ func _run() -> void:
 		% [waited, main._hud._arrival_life])
 	# NO SECOND INTERRUPT MAY ARRIVE BETWEEN THE CAPTURES, and the knockout run is what found this. With the
 	# ceremony removed but the same interval held, the CONTROL band came back at 73.6 dE against the 4.0 it
-	# reads normally — because a lesson bubble fires in that band about seventy frames after the HUD goes
+	# reads normally, because a lesson bubble fires in that band about seventy frames after the HUD goes
 	# quiet, and `_draw_hint_bubble` YIELDS TO THE PLATE. So the control band is quiet in a real run partly
 	# because the ceremony is suppressing the other `critical` surface that would otherwise be sitting in
 	# it. That is correct behaviour and it makes the control conditional on the treatment, which is worth
@@ -224,7 +224,7 @@ func _run() -> void:
 		p.save_png(dump + "/ceremony_reference.png")
 		q.save_png(dump + "/ceremony_plate.png")
 
-	# WHERE THE PLATE LANDS, derived — and the derivation checked rather than assumed. `CANVAS` is 640x360;
+	# WHERE THE PLATE LANDS, derived, and the derivation checked rather than assumed. `CANVAS` is 640x360;
 	# the body, which the camera centres, photographs at half the frame height. One canvas px is therefore
 	# `_h / 360` image px, and the plate runs `CANVAS.y * 0.26` minus `SCRIM_ABOVE` through plus
 	# `SCRIM_BELOW`.
@@ -244,11 +244,11 @@ func _run() -> void:
 		"the rope was found in both bands (%d across the plate, %d below it)"
 			% [over["rows"], under["rows"]])
 
-	# THE CEREMONY DREW — read in a patch of the plate's core to the LEFT of the rope, so this control
+	# THE CEREMONY DREW: read in a patch of the plate's core to the LEFT of the rope, so this control
 	# still fires the day the plate is changed to clear the rope's own column.
 	# CANVAS px, converted once. The first version wrote 320 and 150 meaning canvas offsets and then
 	# multiplied them by the canvas scale as well, which put the "inside the plate" patch at image column
-	# zero — the far left edge of the frame, outside the plate entirely. It read 0.0049 against 0.0058 and
+	# zero: the far left edge of the frame, outside the plate entirely. It read 0.0049 against 0.0058 and
 	# reported that the ceremony had not drawn, in a frame where the ceremony is plainly legible. A control
 	# aimed at the wrong place fails in the direction that looks like a finding.
 	var patch_l: int = cx - int(80.0 * scale)     # inside the words, left of the rope's column
@@ -262,36 +262,36 @@ func _run() -> void:
 	#
 	#     rope median 1.3   rope MEAN 18.6   rock mean 0.7      (calibration: 1.3 / 4.5 / 0.9)
 	#
-	# The median is its calibration value to the decimal, and the rock channel — which is what illumination
-	# moves — did not move either. **A mean fourteen times its own median is a handful of rows, not a band
+	# The median is its calibration value to the decimal, and the rock channel (which is what illumination
+	# moves) did not move either. **A mean fourteen times its own median is a handful of rows, not a band
 	# that moved.** That is exactly the distinction `_band`'s own comment says only the median can make,
 	# written directly above an assertion that used the mean. The layer was fooled in the way it documented.
 	#
 	# This is NOT a loosened threshold. `DRIFT_CAP` is unchanged at 12.0, and the quantity it now bounds is
 	# the one the check was always about: "did the world move enough to swamp the subject". A band that
 	# really moves lifts every row, so the median rises and this fires. The knockout that justified the
-	# check in the first place — a lesson bubble at 73.6 dE across the whole band — lifts every row too.
+	# check in the first place (a lesson bubble at 73.6 dE across the whole band) lifts every row too.
 	_check(float(under["med"]) < DRIFT_CAP,
 		"the band below the plate stayed still enough to serve as a control (median %.1f dE, cap %.1f; mean %.1f over %d rows)"
 			% [under["med"], DRIFT_CAP, under["rope_de"], under["rows"]])
-	# THE LOUD ROWS ARE REPORTED AND NOT ASSERTED, because I do not know what they are yet and a ceiling I
-	# cannot derive is a number that measures my guess. Measured: 19 and 20 of 151 rows over two runs, while
+	# THE LOUD ROWS ARE REPORTED AND NOT ASSERTED, because what they are is not yet known and a ceiling
+	# nobody can derive is a number that measures a guess. Measured: 19 and 20 of 151 rows over two runs, while
 	# the median sits at the noise floor.
 	#
 	# REJECTED HYPOTHESIS, recorded so it is not proposed again: that `_rope_x`'s brightest-pixel search is
 	# picking ore glints, which `7aff097` moved above the darkness veil after `ROPE_HALF = 2` was sized to
-	# exclude them. It is a good story and it is wrong here — `_rig` sets every cell in the region to
+	# exclude them. It is a good story and it is wrong here: `_rig` sets every cell in the region to
 	# `&"stone"`, so there is no ore in this world at all and no glint can be in this band.
 	#
 	# The live candidate is the rope's own sway. `_rope_x` picks a column in frame `p` and the comparison
 	# reads that same column in `q`; the rope oscillates ~0.8 world px, so on any row where it crossed a
 	# pixel boundary between the two captures the sample goes from rope to backing and scores a full
 	# separation. That would lift a MINORITY of rows and leave the rest at the floor, which is the shape
-	# observed — but I have not tested it, so it stays a candidate and not a finding.
+	# observed, but it has not been tested, so it stays a candidate and not a finding.
 	print("    loud rows in the control band: %d of %d over DRIFT_CAP (mechanism UNDETERMINED, see above)"
 		% [under["loud"], under["rows"]])
 
-	# WHAT THE SCRIM IS FOR, measured, because the obvious treatment for everything above is to weaken it —
+	# WHAT THE SCRIM IS FOR, measured, because the obvious treatment for everything above is to weaken it,
 	# and weakening the sole guarantor of a property without an instrument on that property is how a
 	# disqualified cue takes a defect with it. The words are the pixels the ceremony ADDS light to; their
 	# ground is everything else inside the same strip. If a later commit shrinks the veil, this number says
@@ -324,7 +324,7 @@ func _run() -> void:
 
 ## One band: how much of the rope the ceremony takes, how much it takes from the rock behind the rope, and
 ## how much separation the rope had there to begin with. The fibre's position is traced out of the
-## REFERENCE frame, where nothing is over it — traced out of the ceremony frame the brightest pixel in the
+## REFERENCE frame, where nothing is over it; traced out of the ceremony frame the brightest pixel in the
 ## rope's column is a letter, and the plate would score as improving the rope's read.
 func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 	var rows: int = 0
@@ -407,7 +407,7 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 ##
 ## The plate's field veil dropped from alpha 0.80 to 0.28 and the words took their contrast locally
 ## instead, from a near-black shadow a pixel behind each glyph. That trade was measured **underground**,
-## where the background is rock at a luma near ten — the case where the veil was doing least. **The surface
+## where the background is rock at a luma near ten, the case where the veil was doing least. **The surface
 ## is the case where it was doing most**, and a treatment validated only where the thing it replaced was
 ## useless has not been validated at all.
 ##
@@ -416,7 +416,7 @@ func _band(p: Image, q: Image, cx: int, y0: int, y1: int) -> Dictionary:
 ##
 ## AND IT NOW READS AGAINST A DRIFT FLOOR TAKEN IN ITS OWN RUN. Everything this arm reports is a difference
 ## between two photographs of a background that moves whether or not the ceremony fires, so it takes a
-## third frame — a second reference, one plate-wait after the first, with nothing announced — and runs the
+## third frame (a second reference, one plate-wait after the first, with nothing announced) and runs the
 ## same comparison over the same band on that untreated pair. The plate's number is reported against it.
 ## The block inside says why the control is temporal rather than spatial, how the two intervals are
 ## matched, and what about them is not.
@@ -441,24 +441,24 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	var cx: int = int(round(_screen(main, Vector2(float(col * CELL) + float(CELL) * 0.5, 0.0)).x))
 	var p2: Image = await _shot()
 	# THE SKY MOVES ON ITS OWN, AND NOTHING IN THIS ARM COULD TELL THAT APART FROM THE PLATE ARRIVING. The
-	# underground standing has a spatial control — the band below the plate, same rope, same rock, same
-	# lamp, no plate — and that band reading 1.3 median against the plate band's 21.2 is the whole reason
+	# underground standing has a spatial control (the band below the plate, same rope, same rock, same
+	# lamp, no plate), and that band reading 1.3 median against the plate band's 21.2 is the whole reason
 	# the deep arm's number is a measurement rather than a difference. Up here there is nowhere to put one,
 	# and it is worth writing down that this was worked out rather than skipped: the plate's core reaches
 	# ~114 canvas px either side of centre and `SCRIM_FEATHER` adds 96 more, some 420 px of a 640 px canvas,
-	# and vertically the words sit at canvas y 61.6..111.6 — so a band far enough ABOVE to clear the feather
+	# and vertically the words sit at canvas y 61.6..111.6, so a band far enough ABOVE to clear the feather
 	# is off the top of the frame, and one far enough BELOW is ground rather than sky. The control cannot be
 	# placed in space here. It is placed in time instead.
 	#
 	# Two references with no announcement between them: `p2` at the moment the HUD went quiet, `p3` one
-	# plate-wait later. `_ink` then runs over the identical band on that untreated pair — same statistic,
-	# same pixels, same animation-phase separation, same run, same code path — and that is the floor the
+	# plate-wait later. `_ink` then runs over the identical band on that untreated pair (same statistic,
+	# same pixels, same animation-phase separation, same run, same code path), and that is the floor the
 	# plate's reading has to beat, in the plate's own units. The plate is measured against `p3` and not
 	# `p2`, for two reasons: it keeps the treated interval exactly one plate-wait long, which is the
 	# interval this arm has always used and the one its old numbers were taken over, and it makes the
 	# control's second frame the treatment's first, so the two intervals abut with no gap between them.
 	#
-	# HOW THE INTERVALS ARE MATCHED, AND WHAT IS LEFT UNMATCHED. The plate wait is data-dependent — it spins
+	# HOW THE INTERVALS ARE MATCHED, AND WHAT IS LEFT UNMATCHED. The plate wait is data-dependent: it spins
 	# until `_arrival_life` has fallen from `Hud.ARRIVAL_HOLD` to `PLATEAU`, and `_process` takes a
 	# real-time delta off that clock each rendered frame, so the wait is that many SECONDS of wall time
 	# however many frames it costs. The control cannot watch the same clock, because starting it would mean
@@ -476,9 +476,9 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	# none of them is anywhere near a plate-wait long: five clouds drift at 4 to 7 px/s on phases chosen to
 	# be incommensurate, the bird crosses on `CYCLE = 47.0` and is only on screen for `CROSS_T = 16.0` of
 	# that and only by day, and the whole sky breathes on `DAY_SECONDS = 480.0`. So this measures ONE PHASE
-	# of each, not their envelope — and the bird is a duty-cycled cue, which is the exact shape that has
-	# already produced a wrong statistic in this repository by being sampled over less than a period. I am
-	# not going to invent a period to divide by. The answer is repeats at different phases, pooled, which is
+	# of each, not their envelope, and the bird is a duty-cycled cue, which is the exact shape that has
+	# already produced a wrong statistic in this repository by being sampled over less than a period. No
+	# period is going to be invented to divide by. The answer is repeats at different phases, pooled, which is
 	# the same thing the surface reading itself needs before anything may be asserted about it.
 	var drift_frames: int = ceili((Hud.ARRIVAL_HOLD - PLATEAU) * float(Engine.physics_ticks_per_second))
 	for _i: int in drift_frames:
@@ -489,7 +489,7 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	# put that control band at 73.6 dE. The same hazard is here and it is worse in one specific way: the
 	# plate SUPPRESSES the bubble across the treated interval (`_draw_hint_bubble` yields to it) and nothing
 	# suppresses it across the control interval, so a bubble can only ever inflate the FLOOR and never the
-	# reading above it — which is the direction that makes the ratio look worse than the truth rather than
+	# reading above it, which is the direction that makes the ratio look worse than the truth rather than
 	# better, but is still a void and not a result. The arrival life goes beside it because the other way to
 	# ruin this pair is for the GAME to announce something into the control window, which is exactly how the
 	# deep arm's first reference frame came back reading `25 METRES DOWN`. Both are sampled at the end of
@@ -520,7 +520,7 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	_check(int(ink["px"]) >= 400,
 		"the words were found against open sky too (%d ink pixels at row %d)" % [ink["px"], row])
 	# WHAT THIS ARM COULD NOT SAY, AND WHAT THE LINE UNDER IT CHANGES. Three samples either side of a
-	# treatment came back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4 — bimodal in BOTH configurations, ranges
+	# treatment came back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4: bimodal in BOTH configurations, ranges
 	# overlapping completely, and the highest of all six readings on the treated side. The background is a
 	# live sky over vegetation at a surface row the rig does not pin, and it swings ~25% run to run, so the
 	# number this arm printed was the plate arriving PLUS the sky moving with no way to separate them, and
@@ -528,8 +528,8 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	#
 	# The drift line is the missing half of that: the same statistic over the same band on a pair of frames
 	# the ceremony never touched, so the sky's own contribution is measured in the run rather than argued
-	# about afterwards. It does not turn the reading into a claim — the ratio has to be watched across
-	# several runs before anyone can say what it may demand — but it is the difference between a number
+	# about afterwards. It does not turn the reading into a claim (the ratio has to be watched across
+	# several runs before anyone can say what it may demand), but it is the difference between a number
 	# with a floor under it and a number floating on its own.
 	#
 	# THE PX COUNT IN THE DRIFT LINE IS THE ONE TO READ FIRST, and it is new evidence about an assertion
@@ -565,7 +565,7 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 ## HOW WELL THE CEREMONY'S OWN TYPE READS, row by row, inside the strip the words occupy.
 ##
 ## Ink is separated from ground by what the ceremony DID rather than by colour: the words add light, the
-## veil takes it away, so `luma(with) - luma(without)` splits them without a palette assumption — which
+## veil takes it away, so `luma(with) - luma(without)` splits them without a palette assumption, which
 ## matters because a colour classifier keyed on the arrival tint would go blind under the very veil being
 ## measured, and because the tint changes per stratum.
 func _ink(p: Image, q: Image, cx: int, y0: int, y1: int, half: int) -> Dictionary:
@@ -612,7 +612,7 @@ func _ink(p: Image, q: Image, cx: int, y0: int, y1: int, half: int) -> Dictionar
 	return {"px": px, "de": acc / maxf(float(rows), 1.0), "rows": rows, "med": med}
 
 
-## Mean per-channel change across a rectangle — the positive control's statistic. Deliberately NOT a
+## Mean per-channel change across a rectangle: the positive control's statistic. Deliberately NOT a
 ## thresholded count: the scrim is multiplicative over rock at a luma near ten, so it moves a great many
 ## pixels a very short distance, and a count with a threshold on it is blind to exactly that.
 func _patch(p: Image, q: Image, x0: int, x1: int, y0: int, y1: int) -> float:

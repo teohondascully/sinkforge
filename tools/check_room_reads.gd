@@ -1,11 +1,11 @@
 extends "res://tools/check_base.gd"
 
-## DOES A DUG ROOM READ AS A ROOM? — the lighting law behind the game's oldest complaint, pinned.
+## DOES A DUG ROOM READ AS A ROOM? The lighting law behind the game's oldest complaint, pinned.
 ##
 ## The renderer had every depth cue you would want (a recessed back-wall plane, cast shadows on it,
 ## carved edges, a hue shift between the planes) sitting on top of a veil that gave BURIED ROCK AND OPEN
 ## SPACE THE SAME LIGHT, because the light level was a pure function of row. Measured on a 13x7 chamber
-## with two torches in it, the back wall printed at luma 0.142 against 0.117 for the surrounding stone —
+## with two torches in it, the back wall printed at luma 0.142 against 0.117 for the surrounding stone:
 ## a 1.2x separation, which no eye reads as space. Every cue above it was arguing with the lighting.
 ##
 ## MASS_SHADE fixed it upstream: light does not travel through stone, so a cell buried in rock is dimmer
@@ -14,9 +14,9 @@ extends "res://tools/check_base.gd"
 ##
 ## Asserted here, straight off the baked veil rather than off a screenshot:
 ##   1. an open chamber is decisively brighter than the mass around it (the whole point)
-##   2. rock at the chamber's EDGE keeps most of its light — a face you are looking at is not a void
+##   2. rock at the chamber's EDGE keeps most of its light: a face you are looking at is not a void
 ##   3. it is a GRADIENT, not a cliff: brightness falls monotonically from the opening into the mass
-##   4. open cells are never dimmed — the deep's own ambient still describes them, unchanged
+##   4. open cells are never dimmed: the deep's own ambient still describes them, unchanged
 ##   5. the surface still reads: ground under open sky is far brighter than ground a few rows down
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -29,7 +29,7 @@ const ROOM_H: int = 7
 ## THIS COMMENT USED TO SAY THE KEY RAISED THAT CEILING AND THAT THE PAIR MEASURED 2.21x. Both were wrong,
 ## and the floor sat ABOVE the model's structural maximum of 1.85x for as long as it has existed. It went
 ## green regardless because the reading sampled a single cell, so the material's own tone rode along with
-## the lighting — a dark stone read 39 where lighting alone predicts 46. The median (below) removes the
+## the lighting: a dark stone read 39 where lighting alone predicts 46. The median (below) removes the
 ## tone lottery and reported the truth: 1.87x, against a floor of 2.0. MASS_SHADE moved 0.46 → 0.55 in
 ## response, because the floor was right about what the game needs and the renderer was not delivering it.
 ## Now 2.26x measured against a 2.22x construction cap.
@@ -69,11 +69,11 @@ func _on_frame() -> void:
 ## A column where this fixture actually means something, searched outward from the middle so the shipping
 ## seed keeps the site it has always used when that site is valid. Requirements, all of them things the
 ## readings below silently depended on before:
-##   - the whole chamber block is SOLID, so we carve a room out of mass rather than widening a cave;
+##   - the whole chamber block is SOLID, so the room is carved out of mass rather than widening a cave;
 ##   - the column under it stays solid past the deepest sample (the face, the gradient walk, the mass ref),
 ##     so "buried mass" is buried mass;
 ##   - the comparison shaft 20 columns over is solid too, so its open cells are open for the same reason.
-## Returns -1 when no such column exists — which is a finding to report, not a thing to paper over.
+## Returns -1 when no such column exists, which is a finding to report, not a thing to paper over.
 ## Searches DEPTH as well as column. The layer's requirement is "deep enough that no skylight reaches it";
 ## row 44 was one fixture's way of spelling that, not part of the property, and pinning it threw away three
 ## corpus seeds that simply had their solid mass at another depth. Depth is searched from CY_MIN downward
@@ -97,22 +97,22 @@ func _mass_site(sim: FactorySim, cy_start: int) -> Vector2i:
 
 ## Is a chamber at (cx, cy) genuinely buried, with solid mass under it and under its comparison shaft?
 ##
-## "Buried" is not this layer's opinion — it is WorldRenderer.MASS_REACH's. Light bleeds MASS_REACH cells
+## "Buried" is not this layer's opinion; it is WorldRenderer.MASS_REACH's. Light bleeds MASS_REACH cells
 ## into the mass, so a sample with any pre-existing void within that radius is only partly shaded and reads
 ## far brighter than buried rock. The arithmetic is checkable rather than asserted: a fully-buried cell
-## keeps MASS_SHADE (0.46) of open light, and on seed 1337 the mass reference reads 41 against an open 86
-## — 0.48, a buried cell. On a seed where the reference sits beside a cave it read 67, 0.78, and the layer
+## keeps MASS_SHADE (0.46) of open light, and on seed 1337 the mass reference reads 41 against an open 86,
+## 0.48, a buried cell. On a seed where the reference sits beside a cave it read 67, 0.78, and the layer
 ## blamed the LIGHTING for correctly brightening rock next to a void. So the sampled column is required to
 ## be solid out to MASS_REACH either side, and MASS_REACH past the deepest sample.
 ##
-## Note this deliberately does NOT require distance from the chamber we are about to carve: the chamber's
+## Note this deliberately does NOT require distance from the chamber about to be carved: the chamber's
 ## own influence on the cells beneath it is the signal every reading here exists to measure.
 func _buried(sim: FactorySim, cx: int, cy: int, deepest: int) -> bool:
 	var reach: int = WorldRenderer.MASS_REACH
-	# Every cell this layer SAMPLES, plus the radius light bleeds through, must be solid rock before we
+	# Every cell this layer SAMPLES, plus the radius light bleeds through, must be solid rock before the
 	# carve. That is the whole precondition and it is deliberately no wider: demanding the full 13x7 block
 	# be pre-solid as well rejected entire worlds (two corpus seeds had no such column anywhere), and "no
-	# site" is not evidence about lighting — it is just a fixture that asked for too much.
+	# site" is not evidence about lighting; it is just a fixture that asked for too much.
 	for y: int in range(cy, deepest + reach + 1):
 		for dx: int in range(-reach, reach + 1):
 			if not sim.is_solid(Vector2i(cx + dx, y)):
@@ -141,7 +141,7 @@ func _run() -> void:
 	var sim: FactorySim = _main.sim
 	var r: WorldRenderer = _main._renderer
 	# Cut a chamber deep enough that no skylight reaches it, in a column with plenty of rock either side,
-	# then re-bake. sim.mine (not try_mine) — reach is a gameplay rule and this is a lighting fixture.
+	# then re-bake. sim.mine (not try_mine): reach is a gameplay rule and this is a lighting fixture.
 	var cy: int = 44
 	# THE FIXTURE HAS PRECONDITIONS AND THEY MUST BE CHECKED, NOT ASSUMED. Every reading below compares an
 	# open cell against BURIED MASS in the column under the chamber. This layer used to carve at the middle
@@ -165,7 +165,7 @@ func _run() -> void:
 	var mass_cell: Vector2i = Vector2i(cx, cy + ROOM_H + 6)
 	var one: float = _light(r, cx, mass_cell.y)
 	# MEASURE THE MASS, NOT ONE TEXEL OF IT. Sampling a single cell made this reading a draw from the
-	# per-cell tone noise: across a seed corpus the same material at the same row read 39, 44 and 46 — a
+	# per-cell tone noise: across a seed corpus the same material at the same row read 39, 44 and 46; a
 	# ~9% spread with the 2.0 floor sitting inside it, so the verdict depended on which cell the fixture
 	# happened to land on. The median over the 5x5 block the site search already PROVED is buried is the
 	# same claim ("how dark is buried mass") with the noise taken out; it is not a weaker one, and the
@@ -182,7 +182,7 @@ func _run() -> void:
 		"the chamber's own rock face keeps %.0f%% of the open light" % [face / room * 100.0])
 
 	# 3. A GRADIENT, NOT A CLIFF. Walking the same column down from the floor into the mass, light must
-	#    fall every step and never jump back up — a hard edge would print as a painted black band.
+	#    fall every step and never jump back up: a hard edge would print as a painted black band.
 	var prev: float = face
 	var monotone: bool = true
 	var steps: Array[String] = []
@@ -196,8 +196,8 @@ func _run() -> void:
 	_check(prev < face, "...and is genuinely darker %d cells in (%.0f -> %.0f)"
 		% [MASS_STEPS, face, prev])
 
-	# 4. OPEN CELLS ARE UNTOUCHED. Two open cells at the same row — one in the chamber, one in a shaft
-	#    dug beside it — must read identically: openness only ever dims ROCK.
+	# 4. OPEN CELLS ARE UNTOUCHED. Two open cells at the same row (one in the chamber, one in a shaft
+	#    dug beside it) must read identically: openness only ever dims ROCK.
 	for dy: int in range(ROOM_H):
 		sim.mine(Vector2i(cx + 20, cy + dy))
 	r._bake_veil_base()
@@ -214,6 +214,6 @@ func _run() -> void:
 		% [top, under])
 
 
-## The baked veil's red channel at a cell — the light level the multiply layer will apply there.
+## The baked veil's red channel at a cell: the light level the multiply layer will apply there.
 func _light(r: WorldRenderer, col: int, row: int) -> float:
 	return float(r._veil_base[(row * FactorySim.GRID_COLS + col) * 4])

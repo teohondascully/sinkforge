@@ -3,7 +3,7 @@ extends "res://tools/check_base.gd"
 ## DOES WATER READ AS WATER, OR AS A BLUE RECTANGLE?
 ##
 ## The played descent now drops a body sixty-four metres into an aquifer chamber, which made the aquifer
-## something a player LOOKS at rather than something they wade through — and looked at, it was the most
+## something a player LOOKS at rather than something they wade through, and looked at, it was the most
 ## programmer-art thing on screen: a uniform translucent slab with a hard bright stripe along the top and,
 ## because the waterline was drawn for every cell rather than only the exposed ones, more stripes stacked
 ## inside it. It read as a stack of UI panels. This is the layer that keeps it honest.
@@ -39,14 +39,14 @@ const POOL_TOP: int = 46
 const POOL_BOTTOM: int = 54
 const HEAD: int = 6                  ## rows of air left above the water, so the surface is visible
 ## The seal, and it is deliberately thick. It is not only keeping the cistern from draining into whatever
-## the generator left next door — its LEFT face is the reference this layer compares the water against, and
+## the generator left next door; its LEFT face is the reference this layer compares the water against, and
 ## that reference has to be rock beyond argument. The first version sampled a strip a few rows under the
 ## pool floor and got the world's own natural aquifer, then reported the water as barely distinguishable
 ## from "rock" that was in fact more water.
 const WALL: int = 3
 
 const COOL_MIN: float = 12.0         ## sRGB levels of blue-over-red the water must beat the rock by
-## sRGB levels of blue-over-red the SURFACE must beat the FLOOR by — the body tends toward WATER_DEEP with
+## sRGB levels of blue-over-red the SURFACE must beat the FLOOR by: the body tends toward WATER_DEEP with
 ## depth, which is denser and darker, so its blue-over-red separation shrinks. Measured 4.3-5.2 over three
 ## runs on the fixture cistern; the floor keeps roughly 1.7x headroom under the worst of those.
 const GRADIENT_MIN: float = 2.5
@@ -94,10 +94,10 @@ func _run() -> void:
 	main._player.place(Vector2(float((POOL_LEFT + POOL_RIGHT) / 2) * CELL,
 		float(POOL_TOP - 3) * CELL))
 	# SETTLE THE SIM, NOT THE CLOCK. This waited SHOT_SETTLE rendered frames and assumed the pool would be
-	# even by then — but the scene advances the sim by real delta with a CAPPED backlog, so how far a body
+	# even by then, but the scene advances the sim by real delta with a CAPPED backlog, so how far a body
 	# settles in ninety frames depends on how busy the machine is. Under parallel harness load each frame
 	# carries more sim time and the pool levelled; run alone on an idle machine it was still terracing, the
-	# depth tint had nothing to read, and the gradient assertion failed at 0.1 of a floor of 2.5 — a layer
+	# depth tint had nothing to read, and the gradient assertion failed at 0.1 of a floor of 2.5: a layer
 	# that passed or failed on CPU contention rather than on anything about the game. Ticking the sim
 	# directly makes the fixture deterministic, which is the only way this measurement means anything.
 	for _t: int in POOL_TICKS:
@@ -126,19 +126,19 @@ func _run() -> void:
 
 	# Crop to the body before judging anything. The shared judge takes row bounds and reads the FULL WIDTH
 	# of them, which over a chamber twenty cells wide in a frame sixty cells wide means most of what it
-	# grades is the dark rock either side and whatever HUD is floating over it — the first run of this
+	# grades is the dark rock either side and whatever HUD is floating over it; the first run of this
 	# reported the deadest tile at an x the cistern does not even reach.
 	var sub: Image = img.get_region(band)
 	sub.save_png("res://_diag_water_body.png")
 	# The dead-space fraction is REPORTED, not gated, and that is a deliberate reversal. Running the shared
 	# judge here was the obvious move and it was the wrong standard: "dead" was defined for ROCK, which is
 	# supposed to have tooth, and it grades this body 60% featureless. But water is the one thing in the
-	# frame that is meant to be smooth — the only way to satisfy a terrain standard would be to put grain on
+	# frame that is meant to be smooth: the only way to satisfy a terrain standard would be to put grain on
 	# water, which looks worse and is the opposite of the goal. (The number is also flattered or punished by
 	# whatever the rig's rock happens to be: a sealed box of uniform stone has nothing to show through.)
 	#
 	# The property a FLUID actually has to have is that you can see it is there. So the gate is contrast
-	# against the rock it sits in, measured where it matters — cool against warm — and the dead fraction
+	# against the rock it sits in, measured where it matters (cool against warm), and the dead fraction
 	# stays printed underneath as context for anyone reading a regression.
 	var j: Dictionary = DEAD.judge(sub, 0, sub.get_height())
 	DEAD.report(j)
@@ -164,7 +164,7 @@ func _run() -> void:
 		sub.get_width(), int(float(sub.get_height()) * 0.27))))
 	# DEPTH IS GRADED ON THE AXIS THE DESIGN PUTS IT ON. This assertion used to measure LUMINANCE and demand
 	# the floor of the body be 2.5 sRGB levels darker than its top. The renderer says in as many words that
-	# it does not work that way — "Depth is carried by COLOUR — toward WATER_DEEP — rather than by density" —
+	# it does not work that way: "Depth is carried by COLOUR, toward WATER_DEEP, rather than by density",
 	# and underground the shadow veil multiplies the whole body down until a luminance difference of tens of
 	# levels in the source palette survives as 0.6 on screen. So the check demanded a real property through a
 	# channel that could not carry it, and had failed every time it genuinely ran since it was written; it
@@ -214,7 +214,7 @@ func _flood(sim: FactorySim) -> void:
 			sim.add_water(Vector2i(x, y), FactorySim.WATER_MAX)
 
 
-## The screen rectangle the flooded cells project to, trimmed to the frame — the region every judgement
+## The screen rectangle the flooded cells project to, trimmed to the frame: the region every judgement
 ## below runs over. Derived from the camera rather than assumed, so a zoom change cannot quietly point
 ## this layer at the wrong pixels and keep passing.
 func _on_screen(main: MainView, img: Image) -> Rect2i:
@@ -233,7 +233,7 @@ func _on_screen(main: MainView, img: Image) -> Rect2i:
 	return r.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
 
 
-## The cistern's own sealed WALL — rock by construction, at the same depth and under the same light as the
+## The cistern's own sealed WALL: rock by construction, at the same depth and under the same light as the
 ## water beside it, which is what makes it a fair thing to compare against.
 func _rock_below(main: MainView, img: Image) -> Rect2i:
 	# get_final_transform() * get_canvas_transform(), not the canvas transform alone. The canvas transform
@@ -251,7 +251,7 @@ func _rock_below(main: MainView, img: Image) -> Rect2i:
 	return r.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
 
 
-## Mean sRGB (r, g, b) of a region — the channel split is the point, so this cannot collapse to luma.
+## Mean sRGB (r, g, b) of a region; the channel split is the point, so this cannot collapse to luma.
 func _cool(img: Image) -> Vector3:
 	var total := Vector3.ZERO
 	var n: int = 0

@@ -5,7 +5,7 @@ extends "res://tools/check_base.gd"
 ## check_voice asks whether two sounds can be told apart and refuses to let any pair sit on top of another.
 ## Nothing asked the same question of the icons, and the answer was no in a place that costs a gallery:
 ## earth, stone, shale, deepslate and sealrock all rendered through ONE cube differing only by tint, four of
-## those tints sit within dE 8 of a neighbour in CIELab, and gravel had no glyph at all — it fell through
+## those tints sit within dE 8 of a neighbour in CIELab, and gravel had no glyph at all: it fell through
 ## draw_item's default branch to a flat coloured square.
 ##
 ## That last one is not cosmetic. Gravel is the only material that PACKS: a gallery backfilled with the
@@ -15,7 +15,7 @@ extends "res://tools/check_base.gd"
 ## So this RENDERS every item's icon the way the hotbar does and compares them as a player's eye would:
 ##
 ##   SHAPE.   The alpha silhouette, compared by intersection-over-union. Two icons with IoU above SAME_SHAPE
-##            occupy the same outline — whatever is drawn inside them, they read as the same object at
+##            occupy the same outline; whatever is drawn inside them, they read as the same object at
 ##            hotbar size.
 ##   COLOUR.  The mean colour over the covered pixels, in CIELab. Below SAME_TINT is a difference a person
 ##            will not reliably call at 40px against a moving background.
@@ -24,7 +24,7 @@ extends "res://tools/check_base.gd"
 ## outline if their colours separate, and may share a colour if their outlines separate. What is forbidden
 ## is sharing both. A pair that does is not "similar", it is the same icon with two names.
 ##
-## NEEDS A REAL WINDOW — it renders. Registered with add_gl, and it skips rather than lies if it finds no
+## NEEDS A REAL WINDOW: it renders. Registered with add_gl, and it skips rather than lies if it finds no
 ## rendering device, because an all-blank comparison would pass this test perfectly.
 ##
 ##   godot --path . --script res://tools/check_item_reads.gd
@@ -35,7 +35,7 @@ extends "res://tools/check_base.gd"
 ##
 ## THIS LIST IS HAND-MAINTAINED, WHICH IS A LIABILITY, and `_check_vocabulary` below is what keeps it from
 ## becoming one. An item added to the game and not added here is never rendered by this layer and never
-## compared against anything — so it can wear another item's exact icon and the suite stays green, which is
+## compared against anything, so it can wear another item's exact icon and the suite stays green, which is
 ## the failure mode this layer was written to end. A list that has to be remembered protects nothing.
 const ITEMS: Array[StringName] = [
 	&"earth", &"stone", &"gravel", &"shale", &"deepslate", &"sealrock",
@@ -50,11 +50,11 @@ const CANVAS: int = 64          ## px per icon render
 ## said otherwise. It read "roughly a hotbar cell". It is roughly FOUR of them. Every `Visuals.draw_item`
 ## call site in `scenes/`: **13.0** through most of the HUD (carried-count chips, pack rows, detail chips,
 ## the legend), **12.0** at `hud.gd:2785`, **9.0** for an item lying in the world
-## (`world_renderer.gd:2321`), and the detail plate at 40 or a well's own height — the only large ones.
+## (`world_renderer.gd:2321`), and the detail plate at 40 or a well's own height; the only large ones.
 ##
 ## **So a cue that exists at 48 and dies at 13 is invisible to every number below.** That is not
 ## hypothetical: a glyph detail at `size * 0.035` is 1.7px here and 0.46px in the hotbar. The general form,
-## which is worth more than this instance — **a spatial metric should take its window from the transform
+## which is worth more than this instance: **a spatial metric should take its window from the transform
 ## rather than from a number**; the terrain layers already do (`check_rock_reads:442` derives its patch from
 ## the live viewport basis). Icons have no transform to read, because the size is chosen by each caller, so
 ## the honest substitute is to make the size ASKABLE and to say what the callers use.
@@ -82,7 +82,7 @@ var _canvas: int = CANVAS
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the geometry is handed to it
-## rather than read from CANVAS/ICON directly — which would not compile.
+## rather than read from CANVAS/ICON directly, which would not compile.
 class Glyph extends Node2D:
 	var item: StringName
 	var at: Vector2
@@ -101,8 +101,8 @@ func _initialize() -> void:
 		print("  NOTE: rendering at %.0f px, not the default %.0f (SF_ICON_PX)" % [_icon_px, ICON])
 	await _run()
 	# quit() sets the exit code and leaves at the end of the frame, so a SECOND quit overwrites the first.
-	# Without this guard the skip below returned 0, and the runner reads the exact code — so a layer that
-	# announced "I did not run" in its own output was counted as a PASS, which is the precise defect the
+	# Without this guard the skip below returned 0, and the runner reads the exact code, so a layer that
+	# announced "did not run" in its own output was counted as a PASS, which is the precise defect the
 	# three-state runner exists to prevent. Caught by expecting 42 and getting 0.
 	if _skipped:
 		return
@@ -120,8 +120,8 @@ func _run() -> void:
 	_check_vocabulary()
 	_check_pack_vocabulary()
 	if DisplayServer.get_name() == "headless":
-		# AND IF IT FAILED, THIS IS A FAILURE AND NOT A SKIP. Reporting 42 here would hand the runner "I did
-		# not run" while holding a real failure in _failures — a broken build filed under "not attempted",
+		# AND IF IT FAILED, THIS IS A FAILURE AND NOT A SKIP. Reporting 42 here would hand the runner "did
+		# not run" while holding a real failure in _failures: a broken build filed under "not attempted",
 		# which is the precise defect the three-state protocol exists to prevent. The honest report is: the
 		# pixel half could not run, and the half that could run failed.
 		if _failures > 0:
@@ -166,11 +166,11 @@ func _run() -> void:
 				clashes.append("%s/%s (IoU %.2f, dE %.1f)" % [a, b, iou, de])
 	print("  %d items, %d pairs; the most alike outlines are %s at IoU %.2f"
 		% [ITEMS.size(), ITEMS.size() * (ITEMS.size() - 1) / 2, worst_pair, worst_iou])
-	# AND THE SAME RANKING BY SHAPE, FOR THE REASON THE TINT RANKING BELOW ALREADY GIVES — read symmetrically.
+	# AND THE SAME RANKING BY SHAPE, FOR THE REASON THE TINT RANKING BELOW ALREADY GIVES: read symmetrically.
 	# The line above reports ONE outline pair, chosen by `iou > worst_iou`, which is a STRICT comparison: when
 	# several pairs sit at the same worst value the first one found keeps the slot and the rest are never
 	# printed. That is not hypothetical. `stone/sealrock`, `ingot/iron_ingot` and `ore/iron` were ALL at IoU
-	# 1.00 — three pairs drawn from one polygon apiece — and this line could only ever name one of them.
+	# 1.00 (three pairs drawn from one polygon apiece), and this line could only ever name one of them.
 	# `ore/iron` is the one it did not name, and it is the pair T3.4 was about: iron was `_item_ore`'s polygon
 	# byte for byte, so its matrix value had to separate it from ore AND from deepslate at once, and it lost
 	# against deepslate at dE 1.0. **The suite ranked six colours and one shape, so the shape half of the
@@ -193,7 +193,7 @@ func _run() -> void:
 	# was answering a narrower question: it prints the worst OUTLINE and then asserts on the CONJUNCTION of
 	# outline and tint. A pair that is separated by shape and nearly identical in colour is invisible in
 	# both of those numbers, and at a 16px hotbar slot against a dark moving background it is exactly what
-	# the ticket is describing. Six lines, no new assertion — the ranking is the evidence the ticket asked
+	# the ticket is describing. Six lines, no new assertion: the ranking is the evidence the ticket asked
 	# for, and turning it into a floor would be inventing a threshold nobody has looked at a screen to set.
 	var by_tint: Array[Dictionary] = []
 	for i: int in ITEMS.size():
@@ -213,9 +213,9 @@ func _run() -> void:
 		"no pair shares BOTH an outline and a colour (%d pair(s) do)" % clashes.size())
 
 	# --- the carried ground specifically: it is what this layer was written for ---
-	# NOT "these six no longer share a silhouette" — that would be the wrong claim and it would fail on a
+	# NOT "these six no longer share a silhouette": that would be the wrong claim and it would fail on a
 	# pair that is working as designed. sealrock KEEPS the cube, deliberately: it is a block, and its colour
-	# already separates it from stone by dE 24. What must hold is the narrower, true thing — where COLOUR
+	# already separates it from stone by dE 24. What must hold is the narrower, true thing: where COLOUR
 	# cannot tell two carried materials apart, SHAPE has to, because tint is the half that dies first at
 	# hotbar size against a dark moving background.
 	var ground: Array[StringName] = [&"earth", &"stone", &"gravel", &"shale", &"deepslate", &"sealrock"]
@@ -249,7 +249,7 @@ func _run() -> void:
 
 
 
-## THE SAME COMPARISON AT THE SIZE THE PLAYER ACTUALLY SEES — REPORTED, NEVER ASSERTED.
+## THE SAME COMPARISON AT THE SIZE THE PLAYER ACTUALLY SEES: REPORTED, NEVER ASSERTED.
 ##
 ## Everything above runs at `ICON` = 48. The HUD asks for 13. That gap is not a rounding difference: detail
 ## which separates two glyphs at 48 can be gone at 13, so a margin measured up there is not a margin the
@@ -258,8 +258,8 @@ func _run() -> void:
 ## same pair (`gravel`/`iron_pickaxe` at dE 1.5, absent from the top six at 48).
 ##
 ## It reports rather than asserts, deliberately. Turning this into a second floor would be inventing a
-## threshold at a size nobody has reviewed a screen at, and the disjunction this layer is built on — share an
-## outline OR a colour, never both — was calibrated at 48. What it DOES do is make a hotbar-size collision
+## threshold at a size nobody has reviewed a screen at, and the disjunction this layer is built on (share an
+## outline OR a colour, never both) was calibrated at 48. What it DOES do is make a hotbar-size collision
 ## impossible to miss: a pair sharing both axes down here prints as a WOULD-CLASH, which is the evidence a
 ## floor would need before anyone argues for one.
 func _report_at_hotbar_size() -> void:
@@ -318,7 +318,7 @@ func _render(item: StringName) -> Image:
 	return img
 
 
-## Fraction of the canvas the icon covers — the silhouette, as a number.
+## Fraction of the canvas the icon covers: the silhouette, as a number.
 func _coverage(img: Image) -> float:
 	var n: int = 0
 	for y: int in img.get_height():
@@ -343,7 +343,7 @@ func _iou(a: Image, b: Image) -> float:
 	return float(inter) / float(maxi(uni, 1))
 
 
-## Mean colour over the covered pixels only — the background must not dilute the reading.
+## Mean colour over the covered pixels only: the background must not dilute the reading.
 func _mean_lab(img: Image) -> Vector3:
 	var r: float = 0.0
 	var g: float = 0.0
@@ -368,8 +368,8 @@ func _mean_lab(img: Image) -> Vector3:
 ## `Visuals.item_color` is an if-ladder ending in `return Color.WHITE`, and its own comment records the day
 ## that fallback shipped: the carried ground had no entries, so earth, stone and shale all drew as blank
 ## white squares in the hotbar and it looked like missing art, because it was. The ladder was fixed. The
-## thing that let it happen — a vocabulary defined by whoever last edited a function, checked against a list
-## somebody has to remember to update — was not.
+## thing that let it happen (a vocabulary defined by whoever last edited a function, checked against a list
+## somebody has to remember to update) was not.
 ##
 ## So the list above is held to `visuals.gd` by reading it. Give an item a look and this goes red until the
 ## item is also being compared against every other icon, which is the right dependency: drawing something
@@ -379,11 +379,11 @@ func _mean_lab(img: Image) -> Vector3:
 ## `item_color` alone and reported the four bits as stale, on the reasoning that an item compared here ought
 ## to have a colour. It does not: `_item_bit` hardcodes its own steel, edge and brass and never calls
 ## `item_color`, so the bits are drawn deliberately and specifically while having no entry in the ladder at
-## all. The premise was mine and it was wrong — an item_color entry is one way the view knows an item, not
+## all. That premise was simply wrong: an item_color entry is one way the view knows an item, not
 ## the only way. The vocabulary is the UNION of the two places a look can be declared.
 ##
 ## THE CHECK IS SET EQUALITY, NOT CONTAINMENT, and that is deliberate. Containment in either direction alone
-## can be satisfied by a scanner that silently matches nothing — the cleanest vacuous pass there is, and one
+## can be satisfied by a scanner that silently matches nothing; the cleanest vacuous pass there is, and one
 ## this project has already been bitten by. Requiring both directions means a broken regex produces
 ## twenty-five items "the view does not know" and fails instantly rather than passing on an empty set.
 func _check_vocabulary() -> void:
@@ -411,7 +411,7 @@ func _check_vocabulary() -> void:
 ##
 ## `_check_vocabulary` above closes the drift between the hand-kept ITEMS list and what visuals.gd draws,
 ## in both directions, with a non-vacuity floor. It is a good guard and it cannot see the failure it most
-## needs to. Its universe is `_items_the_view_knows()`, read out of visuals.gd — so an id the GAME can put
+## needs to. Its universe is `_items_the_view_knows()`, read out of visuals.gd, so an id the GAME can put
 ## in a pack and the VIEW has never heard of is absent from BOTH sides of the comparison, and passes by
 ## construction. The list agrees with the code; nobody asked whether either agrees with the game.
 ##
@@ -423,7 +423,7 @@ func _check_vocabulary() -> void:
 ##
 ##   materials   every `.tres` whose `layer` is not `&"wall"` (the wall plane is dug THROUGH, never
 ##               carried) minus `leaves`, which `FactorySim.mine`'s foliage branch turns into a SAPLING
-##               or into nothing — the leaf block itself is never pocketed.
+##               or into nothing; the leaf block itself is never pocketed.
 ##   recipes     every input and every output of every recipe on disk.
 ##   tools       `MainView.CRAFT_TOOLS`, plus the pickaxe you start holding and the sapling you plant.
 ##
@@ -432,8 +432,8 @@ func _check_vocabulary() -> void:
 ## this population to machines would be asserting someone else's contract through the wrong instrument.
 ##
 ## THE COST OF NOT HAVING THIS, stated because it is the reason it exists: a menu capture built from every
-## `.tres` on disk showed six white squares, and I read them as a shipped defect — mechanism confirmed in
-## source, screenshot in hand, then independently confirmed a second time — for most of an hour. Every
+## `.tres` on disk showed six white squares, and they read as a shipped defect (mechanism confirmed in
+## source, screenshot in hand, then independently confirmed a second time) for most of an hour. Every
 ## one of the six was an id the game cannot give you. A mechanism confirmed twice over says nothing about
 ## whether the population is real.
 func _check_pack_vocabulary() -> void:
@@ -463,7 +463,7 @@ func _check_pack_vocabulary() -> void:
 
 
 ## The ids `FactorySim.inventory` can hold, derived from the data the way the pack is filled. See the
-## header above `_check_pack_vocabulary` for why each exclusion is there — every one of them is a state
+## header above `_check_pack_vocabulary` for why each exclusion is there: every one of them is a state
 ## the game cannot reach, and reaching it in a fixture manufactures defects rather than finding them.
 func _ids_the_pack_can_hold() -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -473,7 +473,7 @@ func _ids_the_pack_can_hold() -> Array[StringName]:
 			if not f.ends_with(".tres"):
 				continue
 			var mat: MaterialDef = load("res://src/data/materials/%s" % f) as MaterialDef
-			# sealrock is `REQUIRED_TIER: 99` — un-hand-mineable by any pick, forever, because the L1->L2
+			# sealrock is `REQUIRED_TIER: 99`, un-hand-mineable by any pick, forever, because the L1->L2
 			# gate is a throughput wall and only a fed Descent Engine breaches it. `mine()` would pocket it
 			# if it were ever reached; it never is.
 			if mat == null or mat.layer == &"wall" or mat.id == &"leaves" or mat.id == &"sealrock":
@@ -500,7 +500,7 @@ func _ids_the_pack_can_hold() -> Array[StringName]:
 
 ## Every item `visuals.gd` declares a look for: a branch in the `item_color` ladder, or a `match` arm in
 ## `draw_item`'s glyph dispatch. There is no runtime way to ask a function which values it treats specially,
-## and a hand-kept mirror of either would be one more list to drift — the exact problem this is here to
+## and a hand-kept mirror of either would be one more list to drift: the exact problem this is here to
 ## solve.
 func _items_the_view_knows() -> Array[StringName]:
 	var f: FileAccess = FileAccess.open("res://scenes/visuals.gd", FileAccess.READ)

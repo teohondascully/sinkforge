@@ -7,13 +7,13 @@ extends "res://tools/check_base.gd"
 ## different rules:
 ##
 ##   `_craft_id(i)`  returns `craft_ids[i]` when the row is in range, and otherwise falls back to
-##                   `machine_icons.keys()[i]` — a defensive path from before MainView supplied craft_ids.
+##                   `machine_icons.keys()[i]`: a defensive path from before MainView supplied craft_ids.
 ##   `_unlocked()`   walks `craft_options.size()` rows reading `ids[i] if i < ids.size() else &""`, and
 ##                   decides each row's locked-ness from whatever that read produced.
 ##
 ## The counter resolves a row's IDENTITY through the first and its LOCKED-NESS through the second. Past the
-## end of `craft_ids` they answer differently on purpose — one falls back to a real machine id, the other
-## reads the empty name — and `ResearchRules.locking_tech(&"")` is `&""`, which means "freely craftable".
+## end of `craft_ids` they answer differently on purpose (one falls back to a real machine id, the other
+## reads the empty name), and `ResearchRules.locking_tech(&"")` is `&""`, which means "freely craftable".
 ## So a short `craft_ids` does not produce an error or a blank row. It produces a row that draws as a
 ## machine you have not researched, over a filter that decided it was yours because it was looking at
 ## nothing. There is no visible symptom at the moment of the mistake.
@@ -21,13 +21,13 @@ extends "res://tools/check_base.gd"
 ## WHY THERE IS NOTHING TO FIX AND STILL SOMETHING TO GUARD. main.gd builds `craft_opts`, `craft_ids` and
 ## `machine_icons` in ONE loop over `_craftable`, so the three come out the same length and the fallback
 ## never fires. That is a property of one loop in one function, held up by nothing but the fact that
-## nobody has yet had a reason to append to one of those lists without the others — a filtered subset, a
+## nobody has yet had a reason to append to one of those lists without the others: a filtered subset, a
 ## second source of rows, a tools/machines split of the kind `rack_ids` already is. The `LOCKED` branch in
 ## `_draw_bazaar_detail` is unreachable today by exactly this coincidence, which is why it is commented as
 ## kept rather than deleted. This layer is what turns the coincidence into a checked invariant.
 ##
 ## WHAT IS ASSERTED, AND WHY IT IS NOT THE LENGTH CHECK. `craft_ids.size() >= craft_options.size()` is the
-## REASON the two agree today; row-by-row agreement is the PROPERTY. They are not the same statement — a
+## REASON the two agree today; row-by-row agreement is the PROPERTY. They are not the same statement: a
 ## future build could legitimately resolve rows some other way and keep the property while losing the
 ## reason, and a build could also keep the lengths equal while the two lists hold different machines in
 ## the same slot. So §2 probes the property directly and §3 records the reason underneath it.
@@ -53,8 +53,8 @@ extends "res://tools/check_base.gd"
 ##
 ## WHAT WOULD HAVE TO BE TRUE FOR THIS LAYER TO GO RED, stated once so a future reader can weigh a green:
 ## a row whose identity and whose locked-ness are decided from different machines. In practice that means
-## `craft_ids` and `craft_options` diverging in main.gd — a filtered list, an early return, an append to
-## one of the three structures and not the others — or `_craft_id` and `_unlocked` being changed apart.
+## `craft_ids` and `craft_options` diverging in main.gd (a filtered list, an early return, an append to
+## one of the three structures and not the others), or `_craft_id` and `_unlocked` being changed apart.
 ## Nothing else in the tree can move these numbers.
 ##
 ## WHAT THIS DOES NOT COVER. The RACK half (`rack_ids` / `rack_options`) resolves through the same
@@ -74,7 +74,7 @@ var _frames: int = 0
 
 ## The row set, read ONCE off the booted HUD. `_rows` is the count `_unlocked` walks; `_ids[i]` is the
 ## machine `_craft_id` puts in row i; `_locks[i]` is that machine's gating tech through the shipped rule.
-## Cached because `_craft_id` does not read the research state — posing a state cannot change these — and
+## Cached because `_craft_id` does not read the research state (posing a state cannot change these), and
 ## caching them makes it explicit that every expectation below descends from the RESOLVER's answer rather
 ## than from a list written out in this file.
 var _rows: int = 0
@@ -118,7 +118,7 @@ func _pose_research(granted: Dictionary) -> void:
 		live[tid] = true
 
 
-## The rows the counter should open if `granted` were the whole of what is researched — worked out from
+## The rows the counter should open if `granted` were the whole of what is researched, worked out from
 ## `_craft_id`'s ids, through the same `ResearchRules.locking_tech` the filter consults. One half of the
 ## comparison; `open_machines()` is the other.
 func _expected_open(granted: Dictionary) -> Array[int]:
@@ -186,7 +186,7 @@ func _run() -> void:
 	# Nothing below this section means anything without it. Every id here comes off a HUD that MainView
 	# built during its own `_ready`; the layer sets no field on it. The guards go red if the scene did not
 	# finish booting, if the counter has no rows, if the resolver handed back the empty name, or if two
-	# rows resolve to one machine — each of which would let the agreement in §2 hold over nothing.
+	# rows resolve to one machine, each of which would let the agreement in §2 hold over nothing.
 	_check(_hud != null, "MainView built a HUD and it is the one the game draws")
 	if _hud == null:
 		_verdict("check_row_identity")
@@ -244,8 +244,8 @@ func _run() -> void:
 
 	# --- 2. THE PROPERTY: ROW BY ROW, UNDER EVERY STATE THAT SEPARATES THE ROWS ----------------
 	# One tech at a time, so a locked row is open in exactly one probe and shut in the rest. A build whose
-	# two lists have drifted opens rows it should not — `_unlocked` reads `&""` past the end of
-	# `craft_ids` and `locking_tech(&"")` is "freely craftable" — and the probe names the row and the
+	# two lists have drifted opens rows it should not (`_unlocked` reads `&""` past the end of
+	# `craft_ids` and `locking_tech(&"")` is "freely craftable"), and the probe names the row and the
 	# machine `_craft_id` says is standing in it.
 	var techs: Array[StringName] = []
 	for i: int in _rows:
@@ -263,7 +263,7 @@ func _run() -> void:
 	_probe("the whole tree", everything)
 
 	# THE PROBES ACTUALLY FILTERED. A row the filter opened in every single probe was never gated by
-	# anything it read, whatever `_craft_id` says about it — which is the exact state a short `craft_ids`
+	# anything it read, whatever `_craft_id` says about it, which is the exact state a short `craft_ids`
 	# produces, and it would otherwise sail through every comparison above as an agreement.
 	var never_shut: PackedStringArray = []
 	var never_open: PackedStringArray = []
@@ -305,7 +305,7 @@ func _run() -> void:
 	# Everything above is a green printed by `_disagreements` returning empty, and a comparator that
 	# always returns empty prints the identical run. So it is handed a WRONG expectation, on the same
 	# state, in the same run: one row flipped out of the set it belongs in. It has to report exactly that
-	# row, and it has to name it — a comparator that noticed but could not say which row would leave a
+	# row, and it has to name it: a comparator that noticed but could not say which row would leave a
 	# future reader with a red they cannot act on.
 	#
 	# The wrong answer is built from the FILTER'S OWN output rather than from `_expected_open`, so this
@@ -327,7 +327,7 @@ func _run() -> void:
 		"AND IT REJECTS A WRONG ANSWER: withholding row %d from the expectation is reported, and only that row (%s)"
 			% [dropped, _say(caught)])
 
-	# Put the world back the way the boot left it — the tree runs at least one more frame after `quit()`.
+	# Put the world back the way the boot left it; the tree runs at least one more frame after `quit()`.
 	_pose_research(_boot_research)
 	var restored: bool = _hud.sim.research.size() == _boot_research.size()
 	for tid: StringName in _boot_research:

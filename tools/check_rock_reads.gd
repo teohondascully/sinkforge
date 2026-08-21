@@ -5,14 +5,14 @@ extends "res://tools/check_base.gd"
 ## The blind tester's words, and the only complaint in the audit they asked to record loudly: *"I cannot
 ## reliably tell solid rock from empty air, and I want to say that loudly."* Nine harness layers judge the
 ## underground and every one of them passes on the frame that produced that sentence, because all nine ask
-## whether the picture has CONTENT — dead space, contrast, texture, richness. Content is not the property
+## whether the picture has CONTENT: dead space, contrast, texture, richness. Content is not the property
 ## that failed. Two regions can both be full of detail and still be the same two regions to a player. What
 ## failed is SEPARABILITY: whether the pixel you are looking at tells you which of the two things it is.
 ##
 ## So this layer asks the tester's question in the tester's form. Sample the frame at cells the sim KNOWS
 ## are solid and at cells the sim KNOWS are air, and measure how often you would be right if you had to
-## guess from the pixels alone. That number has a name — it is the probability that a randomly drawn rock
-## sample reads differently from a randomly drawn air sample, the Mann-Whitney statistic — and it lands on
+## guess from the pixels alone. That number has a name (it is the probability that a randomly drawn rock
+## sample reads differently from a randomly drawn air sample, the Mann-Whitney statistic), and it lands on
 ## exactly the scale the complaint is phrased in. 0.50 is a coin flip, which is "I cannot reliably tell".
 ##
 ## THE ORACLE IS INDEPENDENT, which is the whole reason this can fail. The ground truth comes from
@@ -21,7 +21,7 @@ extends "res://tools/check_base.gd"
 ## with itself forever.
 ##
 ## TWO CUES, because a player has two. The audit's prescription for 6a is an ambient floor that keeps unlit
-## *rock* grainy while unlit *air* stays black — that is a texture cue, not only a brightness cue, and a
+## *rock* grainy while unlit *air* stays black; that is a texture cue, not only a brightness cue, and a
 ## gauge that measured brightness alone would call a correct fix a failure. So both are measured: the mean
 ## luminance of a cell's patch (VALUE) and the spread within it (GRAIN). A player can read the rock if
 ## EITHER works, so the verdict takes the better of the two and the report prints both, because which one
@@ -35,7 +35,7 @@ const SETTLE: int = 60
 
 ## The same shaft-and-chamber the dead-space layer cuts, and for the same reason: it is the only fixture
 ## that puts a large carved VOID and the solid rock around it in one frame, underground, at a depth past
-## the daylight soak. Kept in step with check_underground deliberately — if the two layers judged different
+## the daylight soak. Kept in step with check_underground deliberately: if the two layers judged different
 ## places, a fix that satisfied one could quietly ruin the other's subject.
 # 30, not 16, and this is a FIXTURE-REACH change rather than a threshold change: every floor in this file
 # (MIN_SAMPLES 40, READ_FLOOR 0.75, DARK_CEILING 34.0) is untouched, and MIN_DELVE moves UP, which is
@@ -66,7 +66,7 @@ const VIEWPOINTS: Array[int] = [0, -12, 12]  ## column offsets from the delve co
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
 
-## WHAT "OUTSIDE THE LAMP" MEANS HERE — and it is not a distance.
+## WHAT "OUTSIDE THE LAMP" MEANS HERE, and it is not a distance.
 ##
 ## The complaint is specifically about the rock the lamp does NOT reach. Inside the pool everyone agrees it
 ## reads fine, and including lit cells would drown the failure in the region that already works.
@@ -79,13 +79,13 @@ const HUD_BOTTOM: float = 0.20
 ## So ask the veil instead of guessing at it. `_veil_scratch` is the per-frame lighting buffer with every
 ## source's hole already cut into it, and `_veil_base` is that same buffer before any source touched it. A
 ## cut only ever RAISES a channel. So a cell whose scratch bytes still equal its base bytes was reached by
-## no light at all — not the lamp, not a torch, not a machine, not a crystal, not a seam. That is
+## no light at all: not the lamp, not a torch, not a machine, not a crystal, not a seam. That is
 ## provable-zero rather than far-enough, and it cannot drift: a light source added tomorrow appears in the
 ## buffer and is excluded automatically, where a hand-kept radius list would have to be remembered.
 ##
 ## It also covers the bloom sprite the veil knows nothing about, by arithmetic: the halo reaches 5.6 cells
 ## from the head, the beam centre sits 1.9 cells from the head, so the furthest a bloom-touched cell can be
-## from the beam centre is 7.5 — inside the 9.0 cut. Every cell the bloom brightens is already veil-lit.
+## from the beam centre is 7.5, inside the 9.0 cut. Every cell the bloom brightens is already veil-lit.
 ##
 ## Still geometric in spirit, never photometric: nothing here excludes a cell for being BRIGHT. Doing that
 ## would define the dark region in terms of the quantity under test, throw out every sample that made rock
@@ -93,7 +93,7 @@ const HUD_BOTTOM: float = 0.20
 ## alike.
 
 ## Cells this close to their column's surface are thrown out. Above the surface is sky, and sky against rock
-## separates trivially and for a reason that has nothing to do with the complaint — a layer that sampled it
+## separates trivially and for a reason that has nothing to do with the complaint; a layer that sampled it
 ## would report near-perfect legibility on the exact frame the tester could not read. Below the surface the
 ## renderer runs a scatter band that fades daylight out over SKY_FADE rows, so the top of the deep is a
 ## gradient rather than the flat ambient this is written about. Both are excluded and the count of what was
@@ -107,7 +107,7 @@ const PATCH_FRAC: float = 0.30
 const MIN_PATCH: int = 2
 
 ## NON-VACUITY FLOORS. The statistic below is a ratio over pairs drawn from two populations, so it is
-## defined — and flattering — for populations of one. Eleven rock samples against three air samples can
+## defined (and flattering) for populations of one. Eleven rock samples against three air samples can
 ## report a perfect 1.00 and mean nothing. These are the sizes at which the number starts being about the
 ## frame rather than about the sample.
 const MIN_SAMPLES: int = 40
@@ -115,10 +115,10 @@ const MIN_SAMPLES: int = 40
 ## The premise: this is supposed to be the DARK part of the frame. If the sampled cells are not dark then
 ## whatever is being measured, it is not the thing the tester complained about, and the verdict below does
 ## not apply to it. Stated as an assertion rather than an assumption because check_underground's seed-99
-## failure was exactly this shape — a layer that reached the wrong place and judged it confidently.
+## failure was exactly this shape: a layer that reached the wrong place and judged it confidently.
 const DARK_CEILING: float = 34.0
 
-## THE FLOOR — the probability of being right about a random rock/air pair. Set from measurement on this
+## THE FLOOR: the probability of being right about a random rock/air pair. Set from measurement on this
 ## fixture, not from taste; see the audit notes. A coin flip is 0.50 and is the tester's
 ## sentence stated as a number.
 const READ_FLOOR: float = 0.75
@@ -127,16 +127,16 @@ const READ_FLOOR: float = 0.75
 ## the moment before you can see which one flatters you.
 ##
 ## A local adjacent-pair measure is coming: for every rock cell that TOUCHES an air cell, is the rock the
-## brighter of the two? That is a better model of the tester's actual task — at the lamp's edge, is that
-## wall or hole — than the global statistic below, which pools every rock cell in frame against every air
+## brighter of the two? That is a better model of the tester's actual task (at the lamp's edge, is that
+## wall or hole) than the global statistic below, which pools every rock cell in frame against every air
 ## cell and so answers "could you identify an isolated patch".
 ##
 ## **6a CLOSES ON THE GLOBAL MEASURE.** If the local one comes up green while the global stays red, that is
 ## NOT a close; it is a finding that boundaries read while fields do not, and the item stays open. The
 ## global measure is the one that was red when the blind tester wrote the sentence this layer exists to
-## restate, and swapping to a second measure after seeing a result I did not like would be threshold
-## shopping with a methodology alibi. Written down here so that later-me has to delete a paragraph to
-## cheat, rather than merely change his mind.
+## restate, and swapping to a second measure after seeing an unwelcome result would be threshold
+## shopping with a methodology alibi. Written down here so that a later pass must delete a paragraph to
+## cheat, rather than merely change its mind.
 
 
 func _initialize() -> void:
@@ -228,8 +228,8 @@ func _run() -> void:
 		% ["VALUE" if v_auc >= g_auc else "GRAIN", best * 100.0, READ_FLOOR * 100.0])
 
 	# THE SHAPE OF EACH POPULATION, NOT JUST ITS CENTRE. A median gap and a separability can move in
-	# opposite directions — this fixture did exactly that, gap 2.6 -> 4.2 while discriminability went
-	# 56% -> 53% — and a median cannot show why. Two candidate mechanisms both predict it and they want
+	# opposite directions (this fixture did exactly that, gap 2.6 -> 4.2 while discriminability went
+	# 56% -> 53%), and a median cannot show why. Two candidate mechanisms both predict it and they want
 	# different fixes, so print the spread and let the distribution choose between them:
 	#   heterogeneous rock  -> wide rock spread, narrow air spread, heavy overlap at the shoulders
 	#   bimodal air         -> air's own quartiles far apart, a population with two homes
@@ -274,7 +274,7 @@ func _run() -> void:
 
 
 ## Walk every cell whose screen box lands on the judged slab, keep the ones that are deep and unlit, and
-## record what the frame put there. Returns the two populations twice over — once by value, once by grain —
+## record what the frame put there. Returns the two populations twice over (once by value, once by grain)
 ## plus the tally of what was excluded and why.
 func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	var w: int = img.get_width()
@@ -303,7 +303,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	if scratch.size() != want_bytes or base.size() != want_bytes:
 		# FALL TO THE FAILING SIDE. Without these buffers every cell would test as unlit, the sample would
 		# silently become "the whole frame including the lamp pool", and the layer would report on a
-		# different question than the one it is named for — while looking greener, because lit rock reads.
+		# different question than the one it is named for, while looking greener, because lit rock reads.
 		printerr("check_rock_reads: FAIL — the veil buffers are %d/%d bytes, expected %d; the lit/unlit"
 			% [scratch.size(), base.size(), want_bytes]
 			+ " split cannot be computed and every cell would count as dark")
@@ -370,7 +370,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 	c1 = Vector2i(mini(c1.x, FactorySim.GRID_COLS - 1), mini(c1.y, FactorySim.GRID_ROWS - 1))
 
 	# ABSOLUTE, NOT PER-COLUMN, and the difference is a sim bug rather than a preference.
-	# `surface_row(col)` returns the first solid cell scanning from row 0 — it has no memory of the
+	# `surface_row(col)` returns the first solid cell scanning from row 0; it has no memory of the
 	# original terrain, so a column the player has dug reports the row BELOW the shaft as its surface.
 	# The old filter was `cy <= surface_row(col) + SURFACE_CLEAR`, which on every dug column excluded a
 	# twenty-row band starting at the bottom of the shaft: exactly the carved space this layer is supposed
@@ -412,13 +412,13 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 				# THE PARTITION IS DECLARED BEFORE ROCK STOPS BEING ONE THING, which is the whole point of
 				# it existing today rather than the day it matters. This layer draws its solid population at
 				# random from rock and treats it as homogeneous. It already is not: the lode pass stains
-				# 378 buried cells through their host rock. And the 6b fix under consideration — a contact
-				# rim or shadow in the rock's LAST ROW — would deliberately make boundary rock look unlike
+				# 378 buried cells through their host rock. And the 6b fix under consideration (a contact
+				# rim or shadow in the rock's LAST ROW) would deliberately make boundary rock look unlike
 				# interior rock, across EVERY rock/air face in the world rather than 378 cells.
 				#
 				# If that treatment landed while this layer still sampled "rock" as one population, the next
-				# reading would move for two reasons at once and nothing could separate them — and the
-				# failure would be SILENT, because the number would move in the direction we hoped for.
+				# reading would move for two reasons at once and nothing could separate them, and the
+				# failure would be SILENT, because the number would move in the hoped-for direction.
 				# The catch cuts both ways: it was made against the lode change first, and it applies just
 				# as well to this fix.
 				#
@@ -443,7 +443,7 @@ func _sample(main: MainView, img: Image, seen: Dictionary) -> Dictionary:
 			elif main.sim.water_at(c) > 0:
 				# THE THIRD THING, and finding it is why the air population was bimodal. `is_solid` is
 				# `solid.has(cell)` and water lives in a SEPARATE dictionary, so a flooded cell is
-				# not-solid and was being counted as air — while drawing as water, which is bright on
+				# not-solid and was being counted as air, while drawing as water, which is bright on
 				# purpose. Air's quartiles sat at 0.7 and 11.2 around a median of 3.7: two homes, one of
 				# them the void and the other a fluid the layer had never heard of.
 				#
@@ -481,7 +481,7 @@ func _merge(dst: Dictionary, src: Dictionary) -> Dictionary:
 ## the axis this layer's rock population is about to split along.
 ##
 ## Water is not air for this purpose. A rock face onto a flooded cell is a rock/water contact, which is
-## check_water_reads' subject and looks nothing like a rock/void one — counting it here would put a third
+## check_water_reads' subject and looks nothing like a rock/void one; counting it here would put a third
 ## kind of cell into the "boundary" arm and reintroduce, inside the fix, exactly the heterogeneity the fix
 ## exists to expose. (6a already learned this once: flooded cells counted as air gave the air population
 ## two homes.)
@@ -495,7 +495,7 @@ func _touches_air(sim: FactorySim, c: Vector2i) -> bool:
 	return false
 
 
-## Mean luminance and standard deviation over a square patch — x is VALUE, y is GRAIN.
+## Mean luminance and standard deviation over a square patch: x is VALUE, y is GRAIN.
 ## HOW DIRECTIONAL THE TEXTURE IS, in [-1, 1]. Mean absolute VERTICAL neighbour difference against mean
 ## absolute HORIZONTAL, normalised by their sum. Horizontal bedding changes value as you move UP or DOWN
 ## across the bands and barely as you move along them, so it reads POSITIVE; isotropic mottling reads ~0.
@@ -556,13 +556,13 @@ func _patch_stats(img: Image, cx: int, cy: int, r: int) -> Vector2:
 ##
 ## The Mann-Whitney statistic: the share of all rock-air pairs in which the rock sample sits above the air
 ## one, ties counted as half a success because a tie is exactly the case where the pixel told you nothing.
-## Distribution-free on purpose — it asks whether the two populations are in different places, not whether
+## Distribution-free on purpose: it asks whether the two populations are in different places, not whether
 ## either has a shape, so a bimodal rock population (bedding against fissure) is not punished for it.
 ##
 ## FOLDED, because the player does not need to know which way round it goes. A frame where unlit air is
 ## consistently *brighter* than unlit rock is perfectly readable once you have looked at it for a second;
 ## it is the frame where the two overlap that cannot be read at all. So 0.20 and 0.80 are the same
-## legibility and both fold to 0.80, and only 0.50 — no information in either direction — is the floor of
+## legibility and both fold to 0.80, and only 0.50 (no information in either direction) is the floor of
 ## the scale.
 func _readability(a: Array[float], b: Array[float]) -> float:
 	if a.is_empty() or b.is_empty():
@@ -599,7 +599,7 @@ func _median(a: Array[float]) -> float:
 	return s[s.size() / 2]
 
 
-## The shaft and the work chamber, cut by the real agent through the real verbs — lifted from
+## The shaft and the work chamber, cut by the real agent through the real verbs; lifted from
 ## check_underground so the two layers judge the same place. Returns rows below the PRE-DIG surface.
 func _delve(main: MainView) -> int:
 	var agent: PlayAgent = AGENT.new(self, main)

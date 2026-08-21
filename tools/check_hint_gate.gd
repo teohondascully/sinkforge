@@ -3,7 +3,7 @@ extends "res://tools/check_base.gd"
 ## DOES THE SAPLING LESSON ACTUALLY WAIT FOR GROUND THAT WOULD TAKE A SAPLING?
 ##
 ## `UI-02` gave one lesson a relevance gate. *"RMB plants it on grass"* is an INSTRUCTION, and an
-## instruction with nowhere to point is just words on the screen — it used to arrive on the pickup wherever
+## instruction with nowhere to point is just words on the screen; it used to arrive on the pickup wherever
 ## the player happened to be standing and run its nine seconds out over a rock face. So the bubble now
 ## waits in the queue until `main.gd` pokes `note_relevant(SAPLING_GATE, ...)` true, which happens only
 ## while the cursor is on a cell `can_plant_sapling` accepts and the body can reach it.
@@ -14,7 +14,7 @@ extends "res://tools/check_base.gd"
 ## every acquisition assertion over there keeps passing, because the latch is written at FIRE time and
 ## `check_teaching` reads the latch, not the screen. **The two failure modes of a gate are invisible to
 ## every layer that only asks whether the lesson exists.** So this one asks the other question, and it has
-## to ask it in BOTH directions inside one run — a layer that only proves the bubble arrives is satisfied by
+## to ask it in BOTH directions inside one run: a layer that only proves the bubble arrives is satisfied by
 ## a gate that is not there at all, and a layer that only proves it is held is satisfied by a gate that
 ## never opens. Either half alone is a green light over the bug it was written for.
 ##
@@ -24,7 +24,7 @@ extends "res://tools/check_base.gd"
 ##   HELD, WRONG GROUND    cursor in reach, on an open cell whose floor is STONE. `can_plant_sapling`
 ##                         refuses; the bubble must stay in the queue. This is the rock face from the
 ##                         ticket, and it is the one the old build got wrong.
-##   HELD, OUT OF REACH    cursor on a cell that WOULD take a seed — `can_plant_sapling` says yes — parked
+##   HELD, OUT OF REACH    cursor on a cell that WOULD take a seed (`can_plant_sapling` says yes) parked
 ##                         far enough out that `_can_reach` says no. The reach term is `main.gd`'s own
 ##                         addition ("the sim owns no avatar") and no sim-level test can see it.
 ##   HELD, EMPTY PACK      cursor on the good cell, in reach, with the seed taken back out of the pack.
@@ -32,12 +32,12 @@ extends "res://tools/check_base.gd"
 ##   SHOWN                 cursor on the good cell, in reach, seed in the pack. The bubble arrives.
 ##
 ## Each negative satisfies the other two conjuncts, so a phase that holds tells you WHICH term did the
-## refusing rather than merely that something did — a control that travels inside the measurement instead
+## refusing rather than merely that something did: a control that travels inside the measurement instead
 ## of beside it.
 ##
 ## AND THEN THE FIFTH, which is the design decision `hints.gd` argues for at length and which a naive
 ## repair of either failure mode would break: the gate gates ARRIVAL, not DISPLAY. Once the bubble is up,
-## walking the cursor back off the soil must not take it away — *"the cursor moves every frame of normal
+## walking the cursor back off the soil must not take it away: *"the cursor moves every frame of normal
 ## play, so the bubble would strobe as the aim crossed the edge of the soil, and a lesson explaining where
 ## to point cannot flicker every time you point somewhere."* A layer that proved only the first four would
 ## be perfectly happy with a build that suppressed the display on the same flag.
@@ -45,7 +45,7 @@ extends "res://tools/check_base.gd"
 ## EVERYTHING IS DRIVEN THROUGH THE REAL PATH. The cursor is posed with `Controls.pose_pointer`, which is
 ## the seam the game already reads its aim through, so `_process` re-derives `_aim` from it and `main.gd`
 ## computes the gate from the same `can_plant_sapling` the click obeys. **The one field this layer never
-## writes is `Hints._relevant`** — it is the subject, and it is also recomputed every `_process`, so a
+## writes is `Hints._relevant`**: it is the subject, and it is also recomputed every `_process`, so a
 ## fixture that assigned it would have posed nothing and photographed a note left for a frame that was
 ## never read (`check_posed_fields` is the standing guard for that class). The pack, the queue and the
 ## ground are set up directly; the gate is only ever read.
@@ -54,7 +54,7 @@ extends "res://tools/check_base.gd"
 ## a layer building its own fixture must stay out of `tools/seed_corpus.sh`, because its columns come out
 ## identical on every seed and the corpus would count that as coverage it does not have. The shelf here is
 ## carved rather than found precisely so that "the gate opened" cannot depend on what the terrain happened
-## to put under the cursor — the subject is a boolean in a controller, not a landscape.
+## to put under the cursor: the subject is a boolean in a controller, not a landscape.
 ##
 ##   godot --headless --path . --script res://tools/check_hint_gate.gd
 
@@ -62,14 +62,14 @@ const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40                ## physics frames for the body to fall onto the shelf and stop
 
 ## THE SITE IS BUILT, NOT FOUND, and it is built OFF the spawn plateau on purpose. Columns 39-58 are the
-## tutorial cluster — bazaar, forge, starter vein, tree, coal, mineshaft — and three of those put a machine
+## tutorial cluster (bazaar, forge, starter vein, tree, coal, mineshaft) and three of those put a machine
 ## or a trunk in cells this layer needs open. A fixture that quietly lands on the forge would fail its own
 ## preconditions with a message about saplings.
 const SITE_COL: int = HeightmapWorldGen.BASE_PAD_END + 6
 ## How far out the out-of-reach cell sits. `_can_reach` is 3.2 cells, so 10 is not merely over the line: it
 ## is past TWICE the reach, which is the number that matters. Inside 2x, `_effective_aim`'s fallback can
 ## find a solid cell that is within reach of the body AND within a reach-radius of the cursor, and would
-## snap the aim onto it — the phase would still hold, but it would be holding because the aim moved to a
+## snap the aim onto it; the phase would still hold, but it would be holding because the aim moved to a
 ## solid block rather than because the reach term refused. That is the wrong reason with the right result,
 ## which is the shape this repository keeps finding. Asserted below rather than trusted.
 const FAR_DX: int = 10
@@ -80,7 +80,7 @@ const CHAMBER_UP: int = 10            ## rows of headroom carved above the shelf
 const RELIEF_SLACK: int = 3
 
 ## How long a lesson is watched NOT arriving. Promotion happens inside a single `Hints.refresh`, so one
-## frame would technically do — this is a window wide enough that a human reading the log believes it.
+## frame would technically do; this is a window wide enough that a human reading the log believes it.
 const HOLD_FRAMES: int = 24
 ## ...and how long it is given to arrive once the situation turns up. Twelve, for `check_teaching`'s
 ## reason: the gate is poked in `_process` and this layer drives `process_frame`, so a hint asserted on the
@@ -92,7 +92,7 @@ const ALPHA_FRAMES: int = 30          ## ...and to leave alpha 0 once it is on s
 ## it does. A negative phase measured under the ceremony would pass without the gate existing at all.
 ##
 ## COUNTED IN PHYSICS FRAMES, AND THAT IS NOT A DETAIL. The plate's life is 3.4 SECONDS, decayed by delta,
-## and every other wait in this layer counts PROCESS frames — which is right for them, because promotion
+## and every other wait in this layer counts PROCESS frames, which is right for them, because promotion
 ## happens once per `refresh` and the question is how many chances it got. It is wrong here: headless Godot
 ## runs the process loop as fast as the box will go, so a few hundred process frames can be a fraction of a
 ## second and the cap would expire with the plate still up. Physics ticks at a fixed 60 Hz, so this cap is
@@ -101,7 +101,7 @@ const ALPHA_FRAMES: int = 30          ## ...and to leave alpha 0 once it is on s
 const CEREMONY_CAP: int = 480
 
 ## Assertions ATTEMPTED, which the base class does not count. It counts failures, and "0 failures" is the
-## report a layer that asserted nothing also files — the vacuity this repository keeps finding. The tally
+## report a layer that asserted nothing also files; the vacuity this repository keeps finding. The tally
 ## is printed beside the verdict so an exit code never has to be taken on trust.
 var _asserted: int = 0
 
@@ -110,8 +110,8 @@ func _initialize() -> void:
 	print("== the sapling lesson waits for ground that would take a sapling ==")
 	await _run()
 	# Hand the pointer back whatever happened above. A layer that poses and forgets leaves `Controls._posed`
-	# set for anything sharing this process, and `pointer_posed()` exists precisely so that "I posed it and
-	# forgot" cannot masquerade as a passing hardware test somewhere else.
+	# set for anything sharing this process, and `pointer_posed()` exists precisely so that "posed and
+	# forgotten" cannot masquerade as a passing hardware test somewhere else.
 	Controls.release_pointer()
 	print("  %d assertions: %d PASS / %d FAIL" % [_asserted, _asserted - _failures, _failures])
 	_verdict("check_hint_gate", "the lesson arrives on plantable ground in reach and on nothing else")
@@ -146,7 +146,7 @@ func _run() -> void:
 	# --- the gate exists in the DEFINITIONS, before anything is driven ---------------------------------
 
 	# `_gate_of` is built once in `Hints._init` from the `when` keys. If the `when` were dropped from the
-	# def, `_ready_to_show` would return true for everything and all four phases below would still run —
+	# def, `_ready_to_show` would return true for everything and all four phases below would still run:
 	# three of them would fail, but they would fail with a story about the cursor. This says it plainly and
 	# says it first.
 	var gated: int = 0
@@ -190,8 +190,8 @@ func _run() -> void:
 	# MINED WITH `keep = false`, AND THAT ARGUMENT IS NOT TIDINESS. `mine()` defaults to pocketing what it
 	# breaks, and `factory_sim.gd` is explicit that felled leaves hide a sapling: *"a share of leaves hide a
 	# sapling, deterministic per cell with no RNG"*. A carve that runs through a worldgen tree would
-	# therefore drop a SAPLING into the pack — the exact item whose acquisition edge fires the exact lesson
-	# under test — and it would do it before the fixture had established that the pack was empty. The
+	# therefore drop a SAPLING into the pack (the exact item whose acquisition edge fires the exact lesson
+	# under test), and it would do it before the fixture had established that the pack was empty. The
 	# fixture would be firing the subject at itself.
 	for col: int in range(span_left, span_right + 1):
 		for row: int in range(floor_row - CHAMBER_UP, floor_row):
@@ -227,8 +227,8 @@ func _run() -> void:
 	# WHAT THE OPENING ALREADY TAUGHT IS CLEARED, NOT LEFT TO CHANCE. Promotion only happens while nothing
 	# is on screen (`Hints.refresh`: `if _active == "" and not _queue.is_empty()`), so one leftover bubble
 	# from the boot holds the channel for nine seconds and every HELD phase below would pass without the
-	# gate doing anything at all. The `_done` latches survive — a lesson already taught cannot re-queue, and
-	# that is exactly the quiet this fixture wants — while the sapling's own latch is dropped so its
+	# gate doing anything at all. The `_done` latches survive (a lesson already taught cannot re-queue, and
+	# that is exactly the quiet this fixture wants) while the sapling's own latch is dropped so its
 	# acquisition edge can fire for real.
 	hints._queue.clear()
 	hints._active = &""
@@ -249,7 +249,7 @@ func _run() -> void:
 	await process_frame
 
 	# THE CEREMONY HAS TO BE OFF THE CHANNEL BEFORE ANY OF THIS MEANS ANYTHING. A lesson held by the arrival
-	# plate is indistinguishable, from outside, from a lesson held by the gate — and the plate is up at boot
+	# plate is indistinguishable, from outside, from a lesson held by the gate, and the plate is up at boot
 	# for several seconds by design. Waited out through the game's own flag rather than a frame count.
 	var waited: int = 0
 	while hints._ceremony and waited < CEREMONY_CAP:
@@ -261,9 +261,9 @@ func _run() -> void:
 		"CONTROL: nothing else is holding the announce channel — a lesson held by the arrival plate would "
 			+ "look exactly like a lesson held by the gate")
 	# WHY THIS NAMES THE OTHER OUTCOME RATHER THAN JUST COUNTING THE QUEUE. An empty queue has two causes
-	# that want opposite repairs: the lesson never fired (a fixture fault — no seed edge, wrong latch), or
+	# that want opposite repairs: the lesson never fired (a fixture fault: no seed edge, wrong latch), or
 	# it fired and went STRAIGHT to the screen because the gate did not hold it. The second is the exact
-	# defect this layer exists to catch, and under a gate stuck open it is what actually happens — the
+	# defect this layer exists to catch, and under a gate stuck open it is what actually happens; the
 	# mutation run proved it, and the first version of this message read "has FIRED and is waiting in the
 	# queue (0 queued)" for it, which points a reader at the acquisition edge instead of at the gate. A
 	# failure message that names the wrong half of its own disjunction sends the next person to the wrong
@@ -286,7 +286,7 @@ func _run() -> void:
 		return
 
 	# THE THREE CELLS SIDE BY SIDE, printed before anything is judged. Each negative below satisfies both
-	# terms the others refuse on, and that is the whole design of this layer — a reader has to be able to
+	# terms the others refuse on, and that is the whole design of this layer: a reader has to be able to
 	# see it rather than take it from the assertion labels.
 	var probes: Array[Array] = [[good, "good"], [stone, "stone floor"], [far, "far earth"]]
 	for probe: Array in probes:
@@ -349,7 +349,7 @@ func _run() -> void:
 		"...and what is on screen is the sapling's own text, not another lesson wearing its slot")
 	_judge(hints.active_gate() == Hints.SAPLING_GATE,
 		"...and it reports the gate it waited on, so the bubble can be pointed at the cell that opened it")
-	# Not a legibility claim — `active_alpha` is a fade envelope and one frame of it is a very small number.
+	# Not a legibility claim: `active_alpha` is a fade envelope and one frame of it is a very small number.
 	# What this asks is whether anything is CLAMPING it to zero: the envelope returns a flat 0.0 under a
 	# ceremony or a body moving too fast to read, so a lesson that is promoted and drawn at nothing is a
 	# lesson the player never got. Reported with the two suppressors beside it so a failure says which.
@@ -359,7 +359,7 @@ func _run() -> void:
 
 	# --- AND IT DOES NOT STROBE -----------------------------------------------------------------------
 
-	# The gate gates ARRIVAL. `hints.gd` argues the alternative down explicitly — suppressing the DISPLAY on
+	# The gate gates ARRIVAL. `hints.gd` argues the alternative down explicitly: suppressing the DISPLAY on
 	# the same flag would make the bubble flicker every time the aim crossed the edge of the soil, and a
 	# lesson explaining where to point cannot flicker every time you point somewhere. It is also the repair
 	# somebody reaching for "make the gate stricter" would write, so it is worth a standing assertion.
@@ -382,12 +382,12 @@ func _run() -> void:
 
 ## --- helpers ----------------------------------------------------------------------------------------
 
-## IS THE GATE LIVE THIS FRAME? Read, never written — `_relevant` is the subject and the controller
+## IS THE GATE LIVE THIS FRAME? Read, never written: `_relevant` is the subject and the controller
 ## rewrites it every `_process`, so a fixture that assigned it would be posing a recomputed field and
 ## proving nothing.
 ##
 ## The `bool()` is not decoration. `Dictionary.get` hands back a Variant, and in GDScript a Variant that
-## happens to hold an Array, a Dictionary or a Callable compares `!= null` as TRUE — this repository has
+## happens to hold an Array, a Dictionary or a Callable compares `!= null` as TRUE; this repository has
 ## shipped three guards that could never be false for exactly that reason, one of them an unbounded leak.
 ## Converting once, here, means every call site is asking a bool a bool's question.
 func _gate_open(hints: Hints) -> bool:
@@ -398,7 +398,7 @@ func _gate_open(hints: Hints) -> bool:
 ##
 ## THE FAILURE PATH IS THE WHOLE POINT OF THIS FUNCTION. "The bubble did not appear" is satisfied perfectly
 ## by a hint that was never queued, by a hint system that has been emptied, and by a lesson that latched
-## and was consumed two phases ago — three states in which this layer is measuring nothing and would print
+## and was consumed two phases ago: three states in which this layer is measuring nothing and would print
 ## green. So the queue membership is re-checked every frame rather than once, and losing it fails.
 func _held_off(hints: Hints, id: StringName, frames: int) -> bool:
 	for i: int in frames:
@@ -433,8 +433,8 @@ func _await_shown(hints: Hints, id: StringName, frames: int) -> bool:
 
 
 ## ...and then for it to clear FADE_IN. Separate from `_await_shown` because "promoted" and "drawn" are
-## different claims and `active_alpha` can be zero for reasons — a ceremony, a body moving too fast to read
-## — that have nothing to do with the gate. Both are reported at the call site.
+## different claims and `active_alpha` can be zero for reasons (a ceremony, a body moving too fast to read)
+## that have nothing to do with the gate. Both are reported at the call site.
 func _await_visible(hints: Hints, frames: int) -> bool:
 	for _i: int in frames:
 		if hints.active_alpha() > 0.0:
@@ -443,7 +443,7 @@ func _await_visible(hints: Hints, frames: int) -> bool:
 	return hints.active_alpha() > 0.0
 
 
-## The first lesson that names no gate — the comparison that keeps the HELD phases from being satisfied by
+## The first lesson that names no gate: the comparison that keeps the HELD phases from being satisfied by
 ## a `_ready_to_show` stuck shut. Returns &"" when there is none, and the caller fails on that rather than
 ## skipping it: "every lesson is gated" is itself the state in which this layer stops being able to see.
 func _ungated_id(hints: Hints) -> StringName:
@@ -455,7 +455,7 @@ func _ungated_id(hints: Hints) -> StringName:
 
 
 ## The text a def carries, for comparing against what is on screen. Empty when the id is unknown, which the
-## caller must treat as a failure — an empty expectation compared against an empty screen is a match.
+## caller must treat as a failure: an empty expectation compared against an empty screen is a match.
 func _def_text(hints: Hints, id: StringName) -> String:
 	for def: Dictionary in hints._defs:
 		if def["id"] == id:

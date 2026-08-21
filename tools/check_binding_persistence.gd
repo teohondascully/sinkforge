@@ -1,28 +1,28 @@
 extends "res://tools/check_base.gd"
 
-## Harness layer: A SETTINGS FILE MAY NOT REINSTATE A DUPLICATE BINDING ON EVERY BOOT. Headless, no scene
-## — `Settings` and `Controls` are pure statics over ConfigFile and InputMap, so the whole contract checks
+## Harness layer: A SETTINGS FILE MAY NOT REINSTATE A DUPLICATE BINDING ON EVERY BOOT. Headless, no scene:
+## `Settings` and `Controls` are pure statics over ConfigFile and InputMap, so the whole contract checks
 ## in milliseconds against the REAL load path.
 ##   godot --headless --path . --script res://tools/check_binding_persistence.gd
 ##
 ## WHAT IT GUARDS. `rebind` guards the door: since MNU-29a it cannot create a duplicate, because it takes
 ## the colliding event off whoever held it. Nothing counted what was already in the room. `load_settings`
 ## read the `bindings` section off disk and handed it straight to `apply_bindings` with no conflict check
-## anywhere on that path, so a config written by the PRE-FIX build — or hand-edited, or carried over from
-## another machine — put its duplicate back on every launch, and both actions fired on every press. The
+## anywhere on that path, so a config written by the PRE-FIX build (or hand-edited, or carried over from
+## another machine) put its duplicate back on every launch, and both actions fired on every press. The
 ## CONTROLS page would draw the clash if the player opened it, which makes the defect visible rather than
 ## silent; nothing anywhere resolved it.
 ##
 ## THE FIXTURE IS A FILE, NOT A DICTIONARY, and that distinction is the whole reason this layer exists.
 ## Asserting against a hand-built `Settings.bindings` would demonstrate the RESOLVER and say nothing about
-## whether a config on disk can reach it. `_pose` writes the bytes with a bare `ConfigFile` — bypassing
-## `save_settings`, and therefore bypassing the door — and every case then goes through
+## whether a config on disk can reach it. `_pose` writes the bytes with a bare `ConfigFile` (bypassing
+## `save_settings`, and therefore bypassing the door), and every case then goes through
 ## `Settings.load_settings()` exactly as a boot does. The mechanism was confirmed by reading the code; this
 ## is what makes it a REACHABLE fact.
 ##
 ## EVERY CASE POSES ITS DEFECT AND THEN PROVES THE POSE, before loading anything. A fixture that quietly
 ## failed to write the duplicate prints the identical green to a build that repairs one, and this repo has
-## been bitten by that exact shape more than once — §1 asserts the file is complete, that it really does
+## been bitten by that exact shape more than once: §1 asserts the file is complete, that it really does
 ## imply two actions on one key, and that the collision sits where the defect lives.
 ##
 ## §1 IS ON A NON-FIRST EVENT ON PURPOSE. The original fix's own demonstration (`jump` -> `W`) passed only
@@ -39,7 +39,7 @@ extends "res://tools/check_base.gd"
 ## * `check_binding_conflict`'s §5 says in prose that it PINS the load path's old permissiveness. It does
 ##   not, and never did: it poses its duplicate by calling `Settings._apply_action` directly and never
 ##   calls `load_settings`, so it pins the behaviour of the applier and is untouched by the reconciliation
-##   this layer asserts. Its green is unchanged and unweakened — but the sentence in its docstring about
+##   this layer asserts. Its green is unchanged and unweakened, but the sentence in its docstring about
 ##   the load path is now stale, and only a human editing that file can fix it.
 
 const TEST_PATH: String = "user://binding_persistence_check.cfg"
@@ -66,7 +66,7 @@ func _pose(overrides: Dictionary) -> void:
 	cfg.save(TEST_PATH)
 
 
-## The order the `bindings` keys come back from the file in — the basis a resolver must NOT use.
+## The order the `bindings` keys come back from the file in: the basis a resolver must NOT use.
 func _disk_order() -> PackedStringArray:
 	var cfg := ConfigFile.new()
 	if cfg.load(TEST_PATH) != OK or not cfg.has_section("bindings"):
@@ -75,7 +75,7 @@ func _disk_order() -> PackedStringArray:
 
 
 ## What the FILE says every action is bound to: its override where the file carries one, the shipped
-## default where it does not — which is precisely the state `load_settings` is about to apply.
+## default where it does not, which is precisely the state `load_settings` is about to apply.
 ##
 ## The failed-load path returns an EMPTY map, which is the value that fails `_disk_is_whole` rather than
 ## the value that makes a duplicate assertion look satisfied. Every case calls that guard first.
@@ -109,7 +109,7 @@ func _disk_caps() -> Dictionary:
 	return out
 
 
-## action -> every cap the LIVE InputMap gives it, read through `Settings.event_labels` — the same
+## action -> every cap the LIVE InputMap gives it, read through `Settings.event_labels`: the same
 ## accessor `Hud._binding_clashes` and `rebind` compare, at the same per-event grain.
 func _live_caps() -> Dictionary:
 	var out: Dictionary = {}
@@ -156,7 +156,7 @@ func _live(action: StringName) -> PackedStringArray:
 
 
 ## One outcome list from the reconciliation report, as names. A mistyped `kind` would come back empty, so
-## every list is asserted both ways somewhere in this file — §3 requires all three empty, §1/§4/§5 each
+## every list is asserted both ways somewhere in this file: §3 requires all three empty, §1/§4/§5 each
 ## require one of them to name an action.
 func _report(kind: String) -> PackedStringArray:
 	var out: PackedStringArray = []
@@ -279,7 +279,7 @@ func _initialize() -> void:
 
 	# --- 4. AN ACTION MAY NOT BOOT DEAD: the free default comes back ---------------------------
 	# Both actions are overridden, so tier 1 of the precedence rule cannot separate them and the tie breaks
-	# on `Controls.defaults()` order — `sf_left` is first in that table, so it keeps J. The dashboard is
+	# on `Controls.defaults()` order: `sf_left` is first in that table, so it keeps J. The dashboard is
 	# left with nothing, and gets back its own default key, which nobody is holding.
 	Settings.reset_bindings()
 	_pose({Controls.LEFT: [{"key": KEY_J}], Controls.DASHBOARD: [{"key": KEY_J}]})
@@ -306,8 +306,8 @@ func _initialize() -> void:
 
 	# --- 5. ...AND WHEN NOTHING IS FREE, THE DUPLICATE STANDS, ON PURPOSE ----------------------
 	# `sf_research` has exactly one default event, R, and the config hands R to move-left. There is nothing
-	# to give it back. The decision is that it keeps firing on R — a duplicate the CONTROLS page can show
-	# beats a verb with no key at all — and the decision has to be VISIBLE, because a live map holding a
+	# to give it back. The decision is that it keeps firing on R (a duplicate the CONTROLS page can show
+	# beats a verb with no key at all), and the decision has to be VISIBLE, because a live map holding a
 	# duplicate looks identical whether the pass weighed it or never ran.
 	Settings.reset_bindings()
 	_pose({Controls.LEFT: [{"key": KEY_R}]})
@@ -339,7 +339,7 @@ func _initialize() -> void:
 	_pose({Controls.DASHBOARD: [{"key": KEY_J}], Controls.LEFT: [{"key": KEY_J}]})
 	_disk_is_whole("posed collision, keys reversed")
 	# The control on this case is the fixture itself: if `ConfigFile` handed both writes back in the SAME
-	# order, the run cannot show that the order was ignored — only that the outcome held — and it says so
+	# order, the run cannot show that the order was ignored (only that the outcome held), and it says so
 	# rather than printing the same green either way.
 	var order_second: PackedStringArray = _disk_order()
 	if _say(_order_first) == _say(order_second):

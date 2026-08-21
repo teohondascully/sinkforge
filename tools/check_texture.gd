@@ -1,12 +1,12 @@
 extends SceneTree
 
-## NO TEXTURE FIELD MAY BE WHITE NOISE — the Nyquist guard.
+## NO TEXTURE FIELD MAY BE WHITE NOISE: the Nyquist guard.
 ##
 ## Every procedural texture in this game is a FastNoiseLite field sampled on an INTEGER grid: one sample
 ## per fine cell, one per coarse cell. A noise field only produces the smooth, clumped, structured values
 ## it is drawn for while its period is comfortably longer than that sample spacing. Push the frequency to
 ## 1.0 and the period is one sample; neighbouring cells become statistically independent and the field
-## stops being texture and becomes STATIC — visually a checkerboard, and worse, a checkerboard that
+## stops being texture and becomes STATIC: visually a checkerboard, and worse, a checkerboard that
 ## averages away every other detail layered on top of it.
 ##
 ## This was not hypothetical. Two fields shipped over the Nyquist limit at once: the fine terrain's
@@ -20,7 +20,7 @@ extends SceneTree
 ## coordinates and the lag-1 Pearson correlation of the sequence is measured. A field with structure
 ## correlates strongly with its own neighbour. White noise does not.
 ##
-## PART TWO — AND THE PAINT IS WHAT YOU ACTUALLY SEE.
+## PART TWO: AND THE PAINT IS WHAT YOU ACTUALLY SEE.
 ##
 ## Passing part one is necessary and nowhere near sufficient, which cost a whole round to learn. Every
 ## input field can clear the floor and the painted rock still print as confetti, for three reasons the
@@ -29,7 +29,7 @@ extends SceneTree
 ##      checkerboard; the same field at a tenth the amplitude is grain. Correlation is scale-free and
 ##      says nothing about how loud the term is.
 ##   2. THRESHOLDS. `if stone > THRESH` turns a smooth field into a binary mask, and a mask is far less
-##      correlated than the field it came from — a 0.5-correlated field can threshold into scattered
+##      correlated than the field it came from: a 0.5-correlated field can threshold into scattered
 ##      single cells.
 ##   3. STACKING. Six independent terms each individually quiet sum into one loud one.
 ## So the second half of this file bakes the REAL FineTerrain over a REAL generated world and measures
@@ -37,7 +37,7 @@ extends SceneTree
 ## and a flat base makes every number below attributable to the texture passes alone.
 ##
 ## The unit that matters here is a FINE CELL: one texel, 8 world px, and at the game's zoom about twelve
-## SCREEN pixels. Anything that changes value cell to cell is not fine detail at that size — it is a
+## SCREEN pixels. Anything that changes value cell to cell is not fine detail at that size: it is a
 ## twelve-pixel checker, which is exactly what "blocky" means when a player says it.
 
 ## Below this, consecutive samples are effectively independent. It corresponds to roughly three samples
@@ -51,17 +51,17 @@ const SAMPLES: int = 4096
 ## i.e. a clump you can see the shape of rather than a value that changes every square.
 const PAINT_LAG1_FLOOR: float = 0.55
 
-## ROUGHNESS — the mean second difference |L[i-1] - 2L[i] + L[i+1]| as a fraction of mean luminance.
+## ROUGHNESS: the mean second difference |L[i-1] - 2L[i] + L[i+1]| as a fraction of mean luminance.
 ##
 ## The obvious metric, a plain neighbour step, is wrong here and measuring it proved why: a smooth
 ## shading gradient across a rock face steps between neighbours exactly as much as a checkerboard does,
-## so a step ceiling punishes FORM — the thing the terrain most needs — while a checkerboard hides under
+## so a step ceiling punishes FORM (the thing the terrain most needs) while a checkerboard hides under
 ## it. The second difference vanishes on any straight ramp and peaks on alternation, which is precisely
 ## the distinction the eye makes between "this surface is curving" and "these are two different tiles".
 ##
 ## The ceiling is calibrated, not derived. The rock printed 12.7% across a face and 17.9% down one, which
 ## is unmistakably a grid of tiles at any magnification; the retune that made it read as rock lands at
-## 5.9% and 5.6%. 6.5% is that, plus enough room to move a constant without tripping — this number's job
+## 5.9% and 5.6%. 6.5% is that, plus enough room to move a constant without tripping; this number's job
 ## is to stop the slide back, not to name a target. (For scale: a term alternating +/-A every cell
 ## contributes 4A, so the whole budget is about a 1.6% per-cell wobble.)
 const PAINT_ROUGH_CEIL: float = 0.065
@@ -81,7 +81,7 @@ func _initialize() -> void:
 	sim.rebuild_fine_terrain()          # builds the molding noise fields lazily
 
 	# name -> [noise, x_step, y_step]. The step is how far the real paint loop moves per sample, which is
-	# the thing that actually matters — a field sampled at x*0.38 is being asked for a far lower spatial
+	# the thing that actually matters: a field sampled at x*0.38 is being asked for a far lower spatial
 	# frequency than the same field sampled at x*1.0, and only the AS-SAMPLED rate can be judged.
 	var fields: Array = [
 		["fine.grain (octave 1)", fine._grain, FineTerrain.GRAIN_XSTRETCH, 0.0],
@@ -118,8 +118,8 @@ func _initialize() -> void:
 		quit(1)
 
 
-## Bake the real fine terrain over a real world and measure the PIXELS. Only deep interior cells count —
-## a cell whose eight fine neighbours are all solid — because the carved-edge passes (AO, rim, moss,
+## Bake the real fine terrain over a real world and measure the PIXELS. Only deep interior cells count (
+## a cell whose eight fine neighbours are all solid) because the carved-edge passes (AO, rim, moss,
 ## back-rock) are SUPPOSED to swing hard at a boundary; that is form, not noise. What must be quiet is
 ## the middle of a rock face, which is most of what is on screen and all of what reads as "flat and
 ## blocky" when it isn't.
@@ -134,7 +134,7 @@ func _check_paint() -> int:
 	# THE GRAMMARS HAVE TO BE WIRED OR THIS LAYER MEASURES A WORLD IT FLATTENED ITSELF.
 	#
 	# `FineTerrain.grammar_at` is an INPUT that does not travel in the `rebake` signature (its own
-	# docstring says so). Omitting it here does not disable the grammars — it bakes every material as
+	# docstring says so). Omitting it here does not disable the grammars; it bakes every material as
 	# GRAM_CLASTIC, which is a world that has never shipped. Measured both ways on the same bake, same
 	# seed, same population:
 	#
@@ -211,7 +211,7 @@ func _deep(sim: FactorySim, fx: int, fy: int) -> bool:
 
 ## Lag-1 Pearson correlation and mean relative roughness along one axis, over runs of THREE consecutive
 ## deep-interior cells (the triple is what the second difference needs, and requiring all three interior
-## keeps carved edges — which are supposed to be sharp — out of the statistic). Returns [r, rough, n].
+## keeps carved edges, which are supposed to be sharp, out of the statistic). Returns [r, rough, n].
 func _profile(lum: PackedFloat32Array, interior: PackedByteArray, step: int) -> Array:
 	var n: int = 0
 	var sa: float = 0.0

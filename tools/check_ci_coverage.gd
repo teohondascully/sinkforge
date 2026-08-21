@@ -8,7 +8,7 @@ extends "res://tools/check_base.gd"
 ##     SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
 ##
 ## accurate on the day it was typed. `add_gl` then grew to six. `check_item_reads` and `check_hud_layout`
-## skip in the headless job — correctly, they need a window — and this job never selected them, so they
+## skip in the headless job (correctly, they need a window) and this job never selected them, so they
 ## ran in NO CI JOB AT ALL. Nothing printed that. The headless job honestly reported them as SKIP and the
 ## display job honestly reported four passes, and the two reports together said nothing about the gap
 ## between them, because nobody was holding them against each other.
@@ -18,13 +18,13 @@ extends "res://tools/check_base.gd"
 ## (a name list in the workflow), with every existing test reading one file or the other. Look for more of
 ## them anywhere one file enumerates what another file must handle.
 ##
-## SET EQUALITY, NOT CONTAINMENT — the same family's rule, and the reason this layer can fail. "Every layer
+## SET EQUALITY, NOT CONTAINMENT: the same family's rule, and the reason this layer can fail. "Every layer
 ## the workflow names is real" passes trivially when the workflow names nothing, which is precisely the
 ## bug. So the load-bearing direction is the other one: every layer the RUNNER says needs a surface is
 ## either selected by the display job or explicitly excluded by it, and every exclusion must match a real
 ## layer, so a typo in `SF_NOT` cannot quietly excuse nothing while looking deliberate.
 ##
-## NON-VACUITY. The scan can fail to find anything — a renamed verb, a reformatted workflow — and a scan
+## NON-VACUITY. The scan can fail to find anything (a renamed verb, a reformatted workflow), and a scan
 ## that matches nothing satisfies every forward check. So the counts are asserted before the sets are
 ## compared: the runner must yield a plausible number of layers, must yield at least one that needs a
 ## surface, and the workflow must yield both a selection and an exclusion.
@@ -47,7 +47,7 @@ func _initialize() -> void:
 		return
 
 	# THE REGISTRATION VERBS, DERIVED. Spelling them out here would make this layer carry its own copy of
-	# the very list whose staleness it exists to catch — the same mistake one level up. A verb is any
+	# the very list whose staleness it exists to catch: the same mistake one level up. A verb is any
 	# function in the runner that appends to NAMES.
 	var verbs: Array[String] = []
 	for line: String in runner.split("\n"):
@@ -59,7 +59,7 @@ func _initialize() -> void:
 			verbs.append(t.substr(0, paren))
 	_check(verbs.size() >= 3, "derived the registration verbs from the runner: %s" % ", ".join(verbs))
 
-	# Which layers each verb registered, and which of them set GLFLAG=1 — "this needs a real surface".
+	# Which layers each verb registered, and which of them set GLFLAG=1: "this needs a real surface".
 	var needs_surface: Array[String] = []
 	var all_layers: Array[String] = []
 	var registered: Dictionary = {}
@@ -97,18 +97,18 @@ func _initialize() -> void:
 
 	# AND THE OTHER DIRECTION, which this file did not have and paid for. Everything above reasons about the
 	# layers the runner REGISTERS, so a finished layer that nothing registers is not in the population at
-	# all — it is not covered badly, it is invisible. `check_fixture_pointer.gd` sat that way: complete,
+	# all: it is not covered badly, it is invisible. `check_fixture_pointer.gd` sat that way: complete,
 	# thirteen passing assertions, guarding the mechanism that decides whether a contaminated run counts,
 	# and executed by nothing on any branch. The audit and the orphan passed each other exactly, and the
 	# audit is the one that should have noticed.
 	#
 	# Judged against the paths the registration LINES carry, not against the runner's text. The first
 	# version of this asked whether the file mentioned the path anywhere, which a commented-out registration
-	# satisfies — the knockout that was supposed to prove this assertion fires passed instead, because the
+	# satisfies: the knockout that was supposed to prove this assertion fires passed instead, because the
 	# `#` in front of the line it had just disabled changed nothing about the search.
 	#
 	# A LAYER IS IDENTIFIED BY WHAT IT INHERITS, NOT BY AN ALLOWLIST. `check_base.gd` is not a layer and is
-	# correctly registered nowhere, and the cheap way to say so would be to name it as an exception — but an
+	# correctly registered nowhere, and the cheap way to say so would be to name it as an exception, but an
 	# exception list is the thing that grows quietly until the guard is a formality, and this file already
 	# exists because a hand-kept list went stale. Extending the harness base is what makes a file a layer, so
 	# that is the test, and `check_base.gd` falls out of it for the right reason rather than by name.
@@ -167,12 +167,12 @@ func _initialize() -> void:
 	var not_re: String = _yaml_value(flow, "SF_NOT")
 	_check(not not_re.is_empty(), "the display job states its exclusions in SF_NOT rather than by omission")
 	var excluded: Array[String] = []
-	# `create_from_string` ALWAYS returns an object — a pattern that fails to compile comes back non-null
+	# `create_from_string` ALWAYS returns an object: a pattern that fails to compile comes back non-null
 	# with `is_valid()` false, and its `search` then matches nothing. Measured against 4.6.2 rather than
 	# assumed: `RegEx.create_from_string("check_(unclosed")` gives `!= null -> true`, `is_valid() -> false`.
 	# So `_check(re != null, ...)` could not fail, and it was standing in front of the exact input it was
 	# supposed to be validating. A broken SF_NOT would have been caught one assertion further down, by
-	# `excluded.size() > 0` — but by the wrong line, saying the wrong thing.
+	# `excluded.size() > 0`, but by the wrong line, saying the wrong thing.
 	var re: RegEx = RegEx.create_from_string(not_re)
 	_check(re.is_valid(), "SF_NOT ('%s') compiles as a pattern at all" % not_re)
 	# AND THE CLAIM THIS USED TO MAKE IS STILL NOT PROVEN BY THAT. Godot's RegEx is PCRE2; the runner
@@ -198,9 +198,9 @@ func _initialize() -> void:
 		"...and it does not exclude every surface layer (%d of %d) — that would be the display job doing"
 		% [excluded.size(), needs_surface.size()] + " nothing while reporting green")
 
-	# AN EXCLUSION HAS TO COST SOMETHING, and this assertion exists because the first mutation I tried
+	# AN EXCLUSION HAS TO COST SOMETHING, and this assertion exists because the first mutation tried
 	# against this layer PASSED. Adding `check_hud_layout` to SF_NOT removed a layer from every CI job and
-	# the layer reported it, correctly, as an exclusion on the record — its contract was only that nothing
+	# the layer reported it, correctly, as an exclusion on the record: its contract was only that nothing
 	# runs nowhere WITHOUT being named. But "named" is a low bar, and the way the original defect returns is
 	# not someone deleting a name, it is the exclusion list growing one flaky layer at a time until the
 	# display job is a formality again. So each excluded layer must be ARGUED FOR in the workflow's own
@@ -225,7 +225,7 @@ func _initialize() -> void:
 		+ " equality, not containment")
 
 	# And the headless job must stay unfiltered, or the layers that DON'T need a surface lose their cover
-	# the same way. `SF_HEADLESS` is not a filter — it forces the no-display path — so it is not counted.
+	# the same way. `SF_HEADLESS` is not a filter (it forces the no-display path), so it is not counted.
 	_check(not flow.contains("SF_GL_ONLY: \"0\""),
 		"nothing turns the display job's selection off while leaving it looking enabled")
 
@@ -235,7 +235,7 @@ func _initialize() -> void:
 
 
 ## Does this registration verb mark its layers as needing a surface? Read from the verb's own body rather
-## than from a list here — `add_excl` sets GLFLAG=1 too, and a layer that measures TIME needs a real
+## than from a list here: `add_excl` sets GLFLAG=1 too, and a layer that measures TIME needs a real
 ## renderer for the same reason a layer that measures pixels does.
 func _verb_sets_gl(runner: String, verb: String) -> bool:
 	for line: String in runner.split("\n"):
@@ -245,7 +245,7 @@ func _verb_sets_gl(runner: String, verb: String) -> bool:
 	return false
 
 
-## The first double-quoted run in a line — a layer's display name, as the runner stores it.
+## The first double-quoted run in a line: a layer's display name, as the runner stores it.
 func _first_quoted(line: String) -> String:
 	var a: int = line.find("\"")
 	if a < 0:
@@ -271,14 +271,14 @@ func _yaml_value(flow: String, key: String) -> String:
 ##
 ## The distinction is not pedantry and this layer proved it on its own first run. The comment explaining
 ## why `SF_ONLY` was removed necessarily QUOTES the line it replaced, so a bare `flow.contains("SF_ONLY:")`
-## went red over its own explanation — a scanner that cannot tell a directive from a description, failing
+## went red over its own explanation: a scanner that cannot tell a directive from a description, failing
 ## on prose about the very defect it was written to catch. The lesson from the same day applies: when a
 ## new instrument fires, check the instrument before the code. It was the instrument.
 ## Did someone DECLARE this layer excluded, in the structured form, rather than merely mention it?
 ##
 ## THE FIRST VERSION OF THIS ASKED FOR A COMMENT NAMING THE LAYER, and the mutation still passed. The
 ## workflow's own explanation of the original defect says "`check_item_reads` and `check_hud_layout` ran in
-## NEITHER job" — so the prose written to describe the bug satisfied the guard against the bug, for exactly
+## NEITHER job", so the prose written to describe the bug satisfied the guard against the bug, for exactly
 ## the two layers involved. That is twice in one file that free text fooled a scanner (the other was
 ## `SF_ONLY:` inside a comment), which is the argument for a MARKER rather than a keyword search: a
 ## declaration nobody writes by accident and no amount of surrounding explanation can imitate.

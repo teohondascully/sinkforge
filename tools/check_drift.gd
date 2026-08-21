@@ -5,22 +5,22 @@ extends "res://tools/check_base.gd"
 ## `docs/DRIFT.md` §7 names the properties the Drift Rig must hold, and the reason they are worth a whole
 ## harness layer is that this is the first machine in the game with TWO outputs that mean different things.
 ## Every other multi-output machine (the splitter) deals its stream round-robin; if the rig ever fell back
-## to that path it would still look like it was working — items would still fall, both columns would still
-## fill — and the one thing you bought it for, the sort, would be silently gone. That failure is invisible
+## to that path it would still look like it was working (items would still fall, both columns would still
+## fill), and the one thing you bought it for, the sort, would be silently gone. That failure is invisible
 ## by eye and obvious to an assertion, which is exactly the kind this file is for.
 ##
-##   THE SORT — pay lands in one column, spoil in the other, with ZERO cross-contamination. Checked from
+##   THE SORT: pay lands in one column, spoil in the other, with ZERO cross-contamination. Checked from
 ##     both ends: no ore in the spoil column, no rock in the pay column.
-##   THE ON-HOOK RULE — neither stream ever moves sideways. This is the GDD's whole division of labour and
+##   THE ON-HOOK RULE: neither stream ever moves sideways. This is the GDD's whole division of labour and
 ##     the property that must never regress: everything the rig produces is found either straight below the
 ##     rig or straight below the cell behind it, and nowhere else in the world.
-##   TWO INDEPENDENT JAMS — a column with no drain pools that stream ALONE, and the status names which one.
+##   TWO INDEPENDENT JAMS: a column with no drain pools that stream ALONE, and the status names which one.
 ##     One shared "blocked" would be a lie on a machine whose two drains are dug in different places.
-##   POWER, NOT COAL — unpowered it does nothing at all, and it never consumes a lump of coal to run. The
+##   POWER, NOT COAL: unpowered it does nothing at all, and it never consumes a lump of coal to run. The
 ##     rig is what makes a power network necessary; if it quietly ran on fuel that argument evaporates.
-##   IT CUTS TWO HIGH — the gallery it leaves is walkable, which is the difference between a drift and a
+##   IT CUTS TWO HIGH: the gallery it leaves is walkable, which is the difference between a drift and a
 ##     bore-hole, and the only reason the machine is called what it is called.
-##   CONSERVATION — every cell it takes out of the world arrives somewhere as an item. Matter is never
+##   CONSERVATION: every cell it takes out of the world arrives somewhere as an item. Matter is never
 ##     deleted, which is the rule the whole spoil design rests on (docs/DRIFT.md §4).
 
 const CELL: int = 32
@@ -48,7 +48,7 @@ func _initialize() -> void:
 		printerr("check_drift: FAIL — %d failure(s)" % _failures)
 		quit(1)
 
-## A world with a rig at `at` facing +1, a mixed wall in front of it, and — unless `drains` says otherwise —
+## A world with a rig at `at` facing +1, a mixed wall in front of it, and (unless `drains` says otherwise)
 ## an open shaft under both of its columns so the haul has somewhere to go.
 ## `wall_mix` true = alternating ore and stone two cells high, so both streams have work every step;
 ## false = plain stone, for the checks that want cells to CLEAR fast (an ore cell drains unit by unit, so a
@@ -80,7 +80,7 @@ func _rig(at: Vector2i, wall: int, drain_pay: bool, drain_spoil: bool, powered: 
 	return m
 
 
-## ONE generator beside the rig — the aura case, which is deliberately not enough for full speed (auras take
+## ONE generator beside the rig: the aura case, which is deliberately not enough for full speed (auras take
 ## the max and never sum, so the most a machine standing beside a generator ever reads is 4.0 of the rig's
 ## 6.0). The rig labours at two-thirds. That is the design, and building the fixture states it.
 func _power(at: Vector2i) -> void:
@@ -91,7 +91,7 @@ func _power(at: Vector2i) -> void:
 
 
 ## Ticks driven ONE AT A TIME. `advance()` caps how much backlog it will chew in a single call, so handing
-## it twenty seconds at once silently runs a fraction of them — which reads as "the machine does nothing".
+## it twenty seconds at once silently runs a fraction of them, which reads as "the machine does nothing".
 func _advance(seconds: float) -> void:
 	for _i: int in int(seconds / FactorySim.SECONDS_PER_TICK):
 		_sim.tick()
@@ -122,7 +122,7 @@ func _the_sort() -> void:
 	_check(m.def.behavior == &"drift", "…and it is the rig doing it, not a splitter downstream")
 
 
-## THE ON-HOOK RULE. Not "it usually falls down" — nothing it produced may exist in ANY other column of the
+## THE ON-HOOK RULE. Not "it usually falls down": nothing it produced may exist in ANY other column of the
 ## world, which is the only way to state "never moves sideways" as an assertion.
 func _the_hook() -> void:
 	var at := Vector2i(40, 40)
@@ -190,7 +190,7 @@ func _power_not_coal() -> void:
 	_check(_sim.machine_status(m) == &"no_power", "…and says so — 'no power', in its own word")
 	_check(int(_sim.total_consumed.get(&"coal", 0)) == 0, "…and it never burned a lump of coal to try")
 
-	# Powered, it runs — same fixture, one difference, so the check is about power and nothing else.
+	# Powered, it runs: same fixture, one difference, so the check is about power and nothing else.
 	var m2: MachineState = _rig(at, 8, true, true, true)
 	var before2: int = _sim.solid.size()
 	_advance(20.0)
@@ -214,7 +214,7 @@ func _power_not_coal() -> void:
 	_check(m3.power_factor >= 1.0, "a real conduit trunk runs the rig at FULL speed — the demand is meetable")
 
 
-## IT CUTS TWO HIGH — and only two. A rig that quietly cut one row is a Borer with a new name; one that cut
+## IT CUTS TWO HIGH, and only two. A rig that quietly cut one row is a Borer with a new name; one that cut
 ## three would eat the gallery's ceiling out from over your head.
 func _two_high() -> void:
 	var at := Vector2i(40, 40)

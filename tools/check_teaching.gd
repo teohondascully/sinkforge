@@ -4,17 +4,17 @@ extends "res://tools/check_base.gd"
 ##
 ## The winch has quietly grown three techniques. You can chain a throw instead of landing, so an arc need
 ## never end (tools/check_traverse measures the rope crossing a gallery half again as fast as a full
-## stride — but only for a player who knows that). The line bends around corners and whips you round them
+## stride, but only for a player who knows that). The line bends around corners and whips you round them
 ## (tools/check_wrap measures four times the turn rate). And it will catch a fall you are already
 ## committed to. None of the three was mentioned anywhere in the game, which means the measured depth was
 ## real and unreachable: a build can be strictly better and play strictly worse.
 ##
 ## None of them can be taught up front, either. "The rope bends around corners" is noise to someone who
-## has never swung one. They are situational lessons, so they are triggered by the situation — and that
+## has never swung one. They are situational lessons, so they are triggered by the situation, and that
 ## is the thing a harness can actually judge. Four properties:
 ##
-##   IT FIRES WHEN IT'S TRUE.   Drive a real body into each situation — a release at speed in mid-air, a
-##                              line caught on a spur, a drop that takes your footing — and the matching
+##   IT FIRES WHEN IT'S TRUE.   Drive a real body into each situation (a release at speed in mid-air, a
+##                              line caught on a spur, a drop that takes your footing), and the matching
 ##                              bubble must appear. A hint whose condition never occurs in play is not a
 ##                              lesson, it is a comment in a shipped file.
 ##   IT FIRES ONCE.             Repeat the situation and it must stay silent. A tip that re-teaches every
@@ -32,7 +32,7 @@ const CELL: int = 32
 const SETTLE: int = 30
 
 ## A bubble is shown for Hints.SHOW_SECONDS. Reading prose off a HUD runs about 200 wpm ≈ 5 chars/word,
-## so ~17 chars/second — and a hint wants to be read TWICE (once to notice, once to understand). That
+## so ~17 chars/second, and a hint wants to be read TWICE (once to notice, once to understand). That
 ## puts the ceiling at a little over 150 characters for a 9-second bubble.
 const TEXT_MAX: int = 150
 
@@ -41,7 +41,7 @@ const TEXT_MAX: int = 150
 const PROSE_LETTERS: Array[String] = ["A", "I"]
 
 ## THE HOOK AND THE LEDGE, borrowed from tools/check_wrap: a hook planted high, a spur jutting out below
-## and to one side, and a body starting beyond the spur's tip and above its level — so the swing, not the
+## and to one side, and a body starting beyond the spur's tip and above its level, so the swing, not the
 ## plant, drives the line onto the corner.
 const HOOK_COL: int = 36
 const HOOK_ROW: int = 26
@@ -74,14 +74,14 @@ func _initialize() -> void:
 ## A SLOT OF THIS LAYER'S OWN, SET BEFORE THE SCENE EXISTS.
 ##
 ## `_judge_persistence` drives the real F5/F9 verbs, and `MainView.save_path` defaults to the game's
-## canonical slot — so the first version of that test **rewrote the slot `save_sentinel` had just planted a
+## canonical slot, so the first version of that test **rewrote the slot `save_sentinel` had just planted a
 ## canary in**, and the harness correctly declared the whole run moot. It was the isolated `user://` and
 ## never the player's real save, but the rule is not "do not destroy player data", it is "no layer writes
 ## the save slot", and the sentinel exists precisely so that a layer which starts writing saves cannot do
 ## it quietly. **The guard caught a new writer on its first run**, which is the only useful moment to catch
 ## one.
 ##
-## Static and read at call time, so it must be set before anything can read it, and cleaned up after —
+## Static and read at call time, so it must be set before anything can read it, and cleaned up after:
 ## a layer that tidies only the file it first thought of leaves litter for the next run to trip over.
 const TEST_SLOT: String = "user://check_teaching.save"
 
@@ -109,19 +109,19 @@ func _run() -> void:
 ##
 ## THIS IS A FIX FOR A CI-ONLY RED, AND THE RACE IS STRUCTURAL RATHER THAN UNLUCKY. The hints are noted in
 ## MainView._process (main.gd:1205, via :749). This layer drives the body with `await physics_frame`, and
-## the drop loop below breaks on the very frame `on_floor and worst > 0.0` first holds — then asserted the
+## the drop loop below breaks on the very frame `on_floor and worst > 0.0` first holds, then asserted the
 ## hint on the next line. A GDScript coroutine resumes synchronously when the signal fires, so at that
 ## point ZERO process frames have necessarily run since the landing, and whether the hint has been noted
-## depends entirely on whether `on_floor` happened to lag `stagger` by a frame. It did on both our boxes.
-## It did not on CI, and the layer failed there while passing everywhere we looked.
+## depends entirely on whether `on_floor` happened to lag `stagger` by a frame. It did on both dev boxes.
+## It did not on CI, and the layer failed there while passing everywhere else it was tried.
 ##
 ## Waiting is safe rather than lenient because the window is real: stagger is set to STAGGER_MAX = 0.26s and
 ## decays by delta per physics frame, so there are ~15 frames in which _process can legitimately observe it.
-## Twelve is inside that and nowhere near it — a hint that has not latched in twelve process frames has not
+## Twelve is inside that and nowhere near it: a hint that has not latched in twelve process frames has not
 ## latched, and still fails.
 ##
 ## All three hint assertions go through here, not just the one that turned red. `chain` breaks out of its
-## loop after two physics frames and `wrapped` after a full one, which are the same bug with more slack —
+## loop after two physics frames and `wrapped` after a full one, which are the same bug with more slack:
 ## the kind that waits for a slower machine. Fixing the instance and leaving the class is how this comes
 ## back next month as somebody else's afternoon.
 const HINT_SETTLE: int = 12
@@ -213,7 +213,7 @@ func _judge_texts(hints: Hints) -> void:
 	# NON-VACUITY. Every one of the four assertions above counts a fault among the hints that EXIST, and all
 	# four are satisfied perfectly by a game that teaches nothing at all: no duplicate ids, no dead keys, no
 	# overlong bubbles and no blank text, over an empty table. The population is `hints._defs` +
-	# `hints._moments`, which is to say it is defined by the thing under test — so every hint that goes
+	# `hints._moments`, which is to say it is defined by the thing under test, so every hint that goes
 	# missing removes a chance to fail, and the layer gets quieter as the teaching gets worse.
 	#
 	# Both tables are floored SEPARATELY. A single combined floor is satisfied by the larger one surviving
@@ -221,7 +221,7 @@ func _judge_texts(hints: Hints) -> void:
 	# world does something to you. Losing either is losing half the teaching.
 	#
 	# The numbers are deliberately under today's counts (12 and 6). Their job is to catch a table that
-	# vanished or halved, not to police the count — pruning a hint is a design decision and should not have
+	# vanished or halved, not to police the count: pruning a hint is a design decision and should not have
 	# to argue with a test.
 	_check(hints._defs.size() >= 8,
 		"%d pickup hints exist to be judged" % hints._defs.size())
@@ -294,7 +294,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 	_check(await _latched(hints, &"wrapped"),
 		"the first time the line BENDS, the game says what just happened")
 
-	# THE CHAIN. Let go while airborne and moving — the frame a second throw would have paid off.
+	# THE CHAIN. Let go while airborne and moving: the frame a second throw would have paid off.
 	var released: float = 0.0
 	for _i: int in SWING_FRAMES:
 		p.input_dir = 1.0
@@ -351,24 +351,24 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 			% [hints._done.size(), hints._queue.size()])
 
 
-## THE SAPLING'S SECOND HALF — the one lesson whose situation is a PLAYER ACTION rather than a physics
+## THE SAPLING'S SECOND HALF: the one lesson whose situation is a PLAYER ACTION rather than a physics
 ## state, and therefore the one this layer's rope drills could never have reached.
 ##
 ## `UI-05` moved *"it grows into a NEW TREE: wood is renewable"* off the pickup bubble, where it was a
-## second concept competing with the instruction, and onto the first sapling that actually roots — where
+## second concept competing with the instruction, and onto the first sapling that actually roots, where
 ## it is a payoff rather than a promise. **That move is only honest if the payoff fires.** This layer's own
 ## standard: *"a hint whose condition never occurs in play is not a lesson, it is a comment in a shipped
 ## file"*, and a lesson relocated onto a condition nobody drives is exactly that, with the added insult
 ## that the text it replaced is gone.
 ##
-## Driven through `try_build`, the real verb, with a real selection — not `sim.plant_sapling`, which would
+## Driven through `try_build`, the real verb, with a real selection, not `sim.plant_sapling`, which would
 ## bypass the poke in `main.gd` that is the actual thing under test and pass while it was missing.
 func _judge_sapling(main: MainView, hints: Hints) -> void:
 	var sim: FactorySim = main.sim
 	var soil := Vector2i(BODY_COL, HALL_BOTTOM)          # inside the carved hall, on its stone floor
 	sim.set_solid(soil + Vector2i(0, 1), &"earth")       # SAPLING_SOILS is [&"earth"] — give it ground
 	# ESTABLISH "YOU DO NOT HAVE ONE" BEFORE TESTING THE FIRST ONE, and this setup is itself a finding.
-	# `Hints._init` snapshots the pack, deliberately — whatever you are already holding at construction is
+	# `Hints._init` snapshots the pack, deliberately: whatever you are already holding at construction is
 	# not a fresh acquisition. This layer boots with `dev_start` at its default, and THE DEV KIT ALREADY
 	# CONTAINS A SAPLING, so `_had[&"sapling"]` is true from frame zero and the pickup lesson can never
 	# fire in this fixture. Measured, not assumed: the first version of this check failed with
@@ -408,18 +408,18 @@ func _judge_sapling(main: MainView, hints: Hints) -> void:
 	_check(hints._done.size() == taught, "...and it is never said twice")
 
 
-## UI-04 — "IT FIRES ONCE" HAD A PERIOD, AND THE PERIOD WAS ONE PROCESS.
+## UI-04: "IT FIRES ONCE" HAD A PERIOD, AND THE PERIOD WAS ONE PROCESS.
 ##
 ## This layer already holds the game to *"none of it is ever said twice"* and the game passed, because both
 ## the assertion and the play session live inside a single boot. `Hints._done` was never written to disk,
-## so **every state-edge lesson re-taught itself in full on every launch** — the grapple, the wrap, the
+## so **every state-edge lesson re-taught itself in full on every launch**: the grapple, the wrap, the
 ## chain, the hard landing, the aquifer. That is the same failure the layer's own docstring names (*"a tip
 ## that re-teaches every swing is the reason players learn to ignore tips"*) at a period long enough that
 ## nothing inside one process could see it.
 ##
 ## Driven through `_save_game` and `_load_game`, the real F5/F9 verbs, against a FRESH `Hints` standing in
 ## for a new launch. Testing `restore_taught` directly would prove the function works and prove nothing
-## about the two lines in `main.gd` that call it — which is where a wrong key name lives.
+## about the two lines in `main.gd` that call it, which is where a wrong key name lives.
 func _judge_persistence(main: MainView, hints: Hints) -> void:
 	var taught: Array[String] = hints.taught_ids()
 	_check(taught.size() >= 5,

@@ -1,9 +1,9 @@
 extends "res://tools/check_base.gd"
 
-## Harness layer — THE BAZAAR panel is ONE SHAPE, always on-screen, and never needs to scroll.
+## Harness layer: THE BAZAAR panel is ONE SHAPE, always on-screen, and never needs to scroll.
 ##
 ## The property changed with #S33 and it changed to a stronger one. It used to be "the growing craft list
-## scrolls correctly inside its viewport, and the research bench stays reachable below it" — a guard on a
+## scrolls correctly inside its viewport, and the research bench stays reachable below it", a guard on a
 ## workaround. `docs/BAZAAR.md` deletes the workaround: two columns of 24px rows hold twenty rows in the
 ## space eight stacked ones used to need, and if a list ever outgrows that the answer is a third column,
 ## not a scrollbar. So what is asserted now is that the overflow never happens, which is what the scrollbar
@@ -11,8 +11,8 @@ extends "res://tools/check_base.gd"
 ##
 ## The other half is fix #4, and it is worth stating as an assertion because it was the most annoying of the
 ## six: the panel is the SAME SIZE AND POSITION whether or not you are standing at a claimed Bazaar. It used
-## to change shape — away from the stall the recipe rows and the whole research section vanished and you got
-## a hint line — so you could not plan a build from the bottom of a shaft, which is the one place you want
+## to change shape (away from the stall the recipe rows and the whole research section vanished and you got
+## a hint line), so you could not plan a build from the bottom of a shaft, which is the one place you want
 ## to. Now only the VERBS are gated; the layout is a constant.
 ##
 ## Also guards the MINIMAP frame, which is the same class of bug one element over: a HUD rect that derives
@@ -26,12 +26,12 @@ func _craft_options(n: int) -> Array[Dictionary]:
 	return out
 
 
-## The first field of the panel's shape that moved, named — "" if nothing did, and NOTHING_MEASURED if there
+## The first field of the panel's shape that moved, named: "" if nothing did, and NOTHING_MEASURED if there
 ## was nothing to compare. Every entry `_bazaar_geometry` returns is compared, so a field ADDED to that
 ## dictionary later is covered the day it lands rather than the day somebody remembers to come back here.
 ##
 ## THE TWO EMPTY ANSWERS ARE DIFFERENT STRINGS, and that is the whole design of this function. A version
-## that returned "" for both would say "nothing moved" about a shape it never looked at — the un-measurable
+## that returned "" for both would say "nothing moved" about a shape it never looked at: the un-measurable
 ## case handed back as the passing verdict, which is the `dead_space.gd` defect exactly. That one was
 ## survivable only because callers guarded it, and it went wrong the moment a second caller appeared and
 ## did not: three callers, two remembered, one did not, and nobody ever decided that. A caller-side guard
@@ -77,14 +77,14 @@ func _initialize() -> void:
 
 	# --- THE COUNTER FITS AT A CONTROLLED SIZE. This used to say "THE REAL LISTS ... at the largest it can
 	# currently be", and 10 and 7 are neither. Measured on the shipping scene: 19 craftable machines, all 19
-	# open once the tech tree is finished, plus 7 on the Rack — so this stand-in is HALF the machine list, and every
+	# open once the tech tree is finished, plus 7 on the Rack, so this stand-in is HALF the machine list, and every
 	# assertion below about columns and windows was being made against a population smaller than the one it
 	# named. That is the measurement-boundary error, not a rounding one: the numbers are right about what
 	# they measured and the sentence was about something else.
 	#
 	# The synthetic case is KEPT, because a fixed size is what makes the geometry assertions readable, and
 	# 10+7 sits exactly on the 3-column boundary where a regression would show first. What it is NOT is a
-	# statement about the shipping catalogue — `_real_catalogue()` at the bottom of this file is. ---
+	# statement about the shipping catalogue; `_real_catalogue()` at the bottom of this file is. ---
 	hud.craft_options = _craft_options(10)
 	hud.rack_options = _craft_options(7)
 	_assert_fits(hud, canvas, "real")
@@ -95,7 +95,7 @@ func _initialize() -> void:
 		% [per_column, cols, per_column * cols])
 	# Twenty is the number `docs/BAZAAR.md` promises, and the number that makes the scrollbar unnecessary.
 	# #S34 moved it from two columns of ten to three of seven when the detail plate took the bottom of the
-	# panel — the promise is the ROW COUNT, not the column count, and this is the assertion that says so.
+	# panel; the promise is the ROW COUNT, not the column count, and this is the assertion that says so.
 	_check(per_column * cols >= 20, "the counter holds twenty rows without scrolling")
 	# ...and each GROUP gets whole columns of its own, because the left list is what you build and the right
 	# is what you buy. A group that spilled into its neighbour's column would make a row's meaning depend on
@@ -103,7 +103,7 @@ func _initialize() -> void:
 	var lay: Dictionary = hud.works_columns(per_column)
 	print("  MACHINES takes %d column(s), THE RACK %d — of %d" % [int(lay["machines"]), int(lay["rack"]), cols])
 	# ASKED OF THE DEMAND, NOT OF THE ANSWER. This read `lay["total"] <= cols`, and `works_columns` ends with
-	# `if m + r > BAZAAR_COLS: … m = BAZAAR_COLS - r` — it CLAMPS its own total on purpose, so the number
+	# `if m + r > BAZAAR_COLS: … m = BAZAAR_COLS - r`; it CLAMPS its own total on purpose, so the number
 	# being tested had just been forced into range by the function under test. It could not fail however far
 	# the two lists overflowed. `hud.gd`'s comment beside that clamp says "check_pack_layout asserts the
 	# squeeze is not happening today", and that was exactly the sentence this file was not saying: the clamp
@@ -112,7 +112,7 @@ func _initialize() -> void:
 	# it, and require that the squeeze never fires.
 	# The `maxi(1, …)` floors mean two EMPTY lists still ask for 1+1, so this alone would pass on a counter
 	# with nothing on it. It is not left resting on that: the per-tab census below asserts TAB_WORKS has rows
-	# at the stall, and TAB_WORKS is these two lists end to end — so emptiness fails there, loudly, and this
+	# at the stall, and TAB_WORKS is these two lists end to end, so emptiness fails there, loudly, and this
 	# assertion is free to be about the squeeze. Stated because the coupling is real but not local.
 	var want_machines: int = maxi(1, ceili(float(hud.open_machines().size()) / float(per_column)))
 	var want_rack: int = maxi(1, ceili(float(hud.open_rack().size()) / float(per_column)))
@@ -135,7 +135,7 @@ func _initialize() -> void:
 		"the detail plate is inside the panel and tall enough to matter (%.0fpx)" % detail.size.y)
 
 	# --- SAME SHAPE EVERYWHERE (fix #4). Away from a Bazaar only the VERBS are gated. ---
-	# Two fields of the shape were compared — `origin` and `h` — which is the panel's OUTLINE. The content
+	# Two fields of the shape were compared (`origin` and `h`), which is the panel's OUTLINE. The content
 	# rect, the detail plate and the row geometry could all move underneath an outline that stayed put, and
 	# the content rect is exactly where the vanishing recipe rows lived. And the row count was asked on the
 	# ONE tab that happened to be selected, while the old panel lost a different part of itself on each. So:
@@ -147,11 +147,11 @@ func _initialize() -> void:
 		stall_rows[tab] = hud.bazaar_row_count()
 		# The guard that makes the comparison below mean anything: a tab that is EMPTY at the stall would
 		# keep its nothing down a shaft and report a pass for having lost none of it.
-		# NON-VACUITY — a tab with no rows at the stall would lose none down a shaft.
+		# NON-VACUITY: a tab with no rows at the stall would lose none down a shaft.
 		_check(int(stall_rows[tab]) > 0,
 			"at the stall, tab %d has rows it could lose (%d)" % [tab, int(stall_rows[tab])])
 	# BOTH GEOMETRIES ARE READ ON THE SAME TAB, pinned here rather than inherited. `_bazaar_geometry` does
-	# not consult `bazaar_tab` today, so the census loop above cannot disturb it — but the whole point of
+	# not consult `bazaar_tab` today, so the census loop above cannot disturb it, but the whole point of
 	# `_shape_diff` is that it covers fields nobody has added yet, and the day one of them varies by tab this
 	# comparison would read two different tabs and report the difference as `can_craft`'s doing. One line to
 	# make the only variable between the two readings the one under test.
@@ -162,7 +162,7 @@ func _initialize() -> void:
 	hud.set_bazaar_tab(Hud.TAB_WORKS)
 	var in_a_shaft: Dictionary = hud._bazaar_geometry()
 	_assert_fits(hud, canvas, "no-bazaar")
-	# NON-VACUITY — a statement about the FIXTURE, not the feature. It no longer props up `_shape_diff`
+	# NON-VACUITY: a statement about the FIXTURE, not the feature. It no longer props up `_shape_diff`
 	# (that ambiguity is sealed inside the helper now); it asserts the panel reports a shape worth comparing.
 	_check(at_stall.size() >= 6, "the geometry has fields to compare at all (%d)" % at_stall.size())
 	var moved: String = _shape_diff(at_stall, in_a_shaft)
@@ -171,7 +171,7 @@ func _initialize() -> void:
 	# THIS ASSERTION USED TO READ `bazaar_row_count() >= 0`. A row count is an integer count; it is never
 	# negative; the check could not fail, and it was the only thing standing behind the claim its own
 	# label made. The property that sentence is actually about is that the list does not SHRINK when the
-	# verbs gate — away from a Bazaar you still READ everything it would sell you, you just cannot buy it
+	# verbs gate: away from a Bazaar you still READ everything it would sell you, you just cannot buy it
 	# here, which is what makes the screen the same screen in both places.
 	for tab: int in tabs:
 		hud.set_bazaar_tab(tab)
@@ -195,7 +195,7 @@ func _initialize() -> void:
 		hud.bazaar_move(0, -1)
 	_check(hud.bazaar_row == 0, "the cursor clamps at the top")
 	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "…which is a machine row")
-	# LEFT/RIGHT jumps a whole COLUMN — the motion your eye makes. Two of them clears the machine list's two
+	# LEFT/RIGHT jumps a whole COLUMN: the motion your eye makes. Two of them clears the machine list's two
 	# columns and lands in the Rack, which is the counter-to-Rack hop stated in the honest units.
 	hud.bazaar_move(1, 0)
 	_check(str(hud.bazaar_action().get("kind", "")) == "machine", "right jumps a column, still in MACHINES")
@@ -209,7 +209,7 @@ func _initialize() -> void:
 	_check(str(hud.bazaar_action().get("kind", "")) == "tech", "…and Enter acts on a tech")
 	hud.set_bazaar_tab(Hud.TAB_PACK)
 	# PACK's verb is HOLD (#S34): the one tab that had a cursor and nothing to do with it. Equipping is
-	# stateless, so "hold this" is the same act as pressing the slot's hotbar digit — reachable from the
+	# stateless, so "hold this" is the same act as pressing the slot's hotbar digit; reachable from the
 	# screen you are looking at rather than only from a row of numbers hidden behind the panel.
 	_check(hud.bazaar_row_count() == sim.inventory_slots().size(), "PACK offers every carried slot to the cursor")
 	_check(str(hud.bazaar_action().get("kind", "")) == "hold", "…and Enter holds the one under the cursor")
@@ -279,7 +279,7 @@ func _initialize() -> void:
 ## THE SHIPPING CATALOGUE, IN THE TWO RESEARCH STATES THAT ARE DIFFERENT SHAPES.
 ##
 ## Everything above runs on a stand-in of 10 machines and 7 Rack rows. The real one is bigger, and the
-## interesting thing about it only appears at the far end of the tech tree — which no fixture in this suite
+## interesting thing about it only appears at the far end of the tech tree, which no fixture in this suite
 ## has ever stood in. `check_pack_layout` researched exactly one locked tech and erased it four lines later.
 ##
 ##   FRESH      machines= 4 rack= 6   ask 1+1 = 2 of 3   no squeeze
@@ -287,7 +287,7 @@ func _initialize() -> void:
 ##
 ## So `hud.gd`'s "this branch never fires" was a universal produced by a fixture that visits one state, and
 ## it fires for every player who finishes the tree. BOTH properties are held here, keyed on research
-## completeness, rather than the unsqueezed one being weakened to accommodate the squeezed one — "it never
+## completeness, rather than the unsqueezed one being weakened to accommodate the squeezed one: "it never
 ## squeezes" and "it squeezes when the tree is done" are different claims and the layer should say which
 ## one it is standing on.
 ##
@@ -313,14 +313,14 @@ func _real_catalogue() -> void:
 		"the shipping catalogue is %d machines and %d Rack rows, so there are lists to judge"
 			% [hud.craft_options.size(), hud.rack_options.size()])
 
-	# FRESH — the state the ticket's "never fires" claim is actually true in.
+	# FRESH: the state the ticket's "never fires" claim is actually true in.
 	var fm: int = hud.open_machines().size()
 	var fr: int = hud.open_rack().size()
 	_check(_want(fm, per_col) + _want(fr, per_col) <= cols,
 		"fresh: both lists fit UNSQUEEZED (%d machines + %d rack ask %d of %d columns)"
 			% [fm, fr, _want(fm, per_col) + _want(fr, per_col), cols])
 
-	# FULL TECH — the state nothing has ever visited.
+	# FULL TECH: the state nothing has ever visited.
 	for tid: StringName in ResearchRules.ORDER:
 		main.sim.research[tid] = true
 	var tm: int = hud.open_machines().size()
@@ -363,7 +363,7 @@ func _walk_window(count: int, capacity: int, base: int, lost: Array[String], tag
 ##
 ## The panel used to draw `BAZAAR_SIZE` whatever the tab held, so a fresh game's one-item PACK covered the
 ## same 91.8% of the canvas as a finished game's nineteen-machine WORKS list. `_bazaar_wanted_h` ended that
-## and nothing anywhere held it — the only reader outside the class was a scratch probe — so a counter put
+## and nothing anywhere held it (the only reader outside the class was a scratch probe), so a counter put
 ## back on a fixed height would have passed every layer in this suite, this one included.
 ##
 ## ORDERED, NOT PINNED TO A NUMBER. `wanted == 206` would pin today's arithmetic, and it would go red the
@@ -373,7 +373,7 @@ func _walk_window(count: int, capacity: int, base: int, lost: Array[String], tag
 ##
 ## AND THOSE ENDS ARE ASSERTED AS EQUALITIES ON PURPOSE. `_bazaar_wanted_h` finishes in a `clampf` between
 ## `BAZAAR_MIN_H` and `BAZAAR_SIZE.y`, so `wanted >= BAZAAR_MIN_H` and `wanted <= BAZAAR_SIZE.y` are
-## properties of that clamp and hold whatever the tabs contain — the same shape as the column total this
+## properties of that clamp and hold whatever the tabs contain; the same shape as the column total this
 ## file used to read back out of `works_columns` after `works_columns` had clamped it, and no more able to
 ## fail. The equalities can fail. A fresh pack is one row of wells and `BAZAAR_MIN_H` is written as that row
 ## plus the fixed furniture, so the floor is where PACK's sum LANDS and not where it is caught; BENCH's
@@ -381,7 +381,7 @@ func _walk_window(count: int, capacity: int, base: int, lost: Array[String], tag
 ## short enough to fit inside the ceiling would say so here rather than quietly stop being clamped.
 ##
 ## MEASURED ON `_bazaar_wanted_h`, NOT ON THE PANEL'S DRAWN HEIGHT. `_bazaar_geometry` reports `_bazaar_h`,
-## which `_process` eases toward the want and which starts at `BAZAAR_SIZE.y` — in a scene where nobody has
+## which `_process` eases toward the want and which starts at `BAZAAR_SIZE.y`; in a scene where nobody has
 ## opened the counter that field is still sitting on its default, so all three readings would come back as
 ## the full panel and the comparison would be between two copies of one constant.
 ##
@@ -408,7 +408,7 @@ func _adaptive_panel(main: MainView, hud: Hud) -> void:
 	var stocked_h: float = _asks_for(hud, Hud.TAB_PACK)
 	print("  the counter asks for %.0f fresh (%d slots), %.0f stocked (%d), %.0f on BENCH — of %.0f..%.0f"
 		% [fresh_h, fresh_slots, stocked_h, stocked_slots, bench_h, Hud.BAZAAR_MIN_H, Hud.BAZAAR_SIZE.y])
-	# NON-VACUITY — a statement about the FIXTURE. If the scoop moved nothing the two PACK readings would be
+	# NON-VACUITY: a statement about the FIXTURE. If the scoop moved nothing the two PACK readings would be
 	# one reading taken twice, and the strict inequality below would be reporting that the pack never
 	# changed as if it were reporting that the panel never grew. It also fixes the attribution of a red:
 	# a pile too small to reach a second row of wells fails HERE, by name, and not as the ordering.

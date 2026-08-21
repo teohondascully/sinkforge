@@ -2,7 +2,7 @@ extends "res://tools/check_base.gd"
 
 ## CAN YOU TELL A WORKING MACHINE FROM A STOPPED ONE WITHOUT READING ANYTHING?
 ##
-## `PC-05` — *"give installed machines a visible active/idle distinction"* — with the evidence line
+## `PC-05`: *"give installed machines a visible active/idle distinction"*, with the evidence line
 ## *"labels/pointers carry state because hardware does not"* and a guard that is unusually precise about
 ## how to check it: **causality survives labels hidden and grayscale.**
 ##
@@ -10,27 +10,27 @@ extends "res://tools/check_base.gd"
 ## each:
 ##
 ##   the STATUS LAMP        is not the hardware. It is a rimmed dot in the corner of the cell, and its own
-##                          comment says it "mirrors Factorio's entity status light" — UI about the
+##                          comment says it "mirrors Factorio's entity status light", UI about the
 ##                          machine, which is the thing the ticket is complaining about. Hidden here.
 ##   the WARM TOP BEVEL     is one pixel, and it is a HUE shift: `col.lightened(0.34)` against that lerped
 ##                          30% toward warm. In grayscale those two are nearly the same value.
 ##   the GLYPH ANIMATION    is motion, and **a still frame has no motion.** A screenshot, a marketing shot,
-##                          a capture in this repository's own evidence directories — none of them contain
+##                          a capture in this repository's own evidence directories: none of them contain
 ##                          a spinning gear, only a gear at some angle.
 ##
 ## SO THE MEASUREMENT HAS TO SEPARATE STATE FROM PHASE, or it will score the animation as the cue and
 ## report a pass on a frame where nothing distinguishes the two machines at all. Three captures, not two:
 ##
-##   D_motion = | A(t1) - A(t2) |     the SAME state, two animation phases — what a still frame can gain
+##   D_motion = | A(t1) - A(t2) |     the SAME state, two animation phases: what a still frame can gain
 ##                                     purely by being taken at a different moment
 ##   D_state  = | A(t1) - I(t1) |     different states
 ##
 ## **A state cue is only real if `D_state` clears `D_motion` by a margin.** If they are comparable, the
-## thing being measured is the clock, not the machine — and a gauge that cannot tell those apart would
+## thing being measured is the clock, not the machine, and a gauge that cannot tell those apart would
 ## have called the animation a success and closed the ticket.
 ##
 ## Everything is measured on LUMA (Rec.709) inside the machine's own cell, projected through
-## `get_final_transform() * get_canvas_transform()` — the full chain. The half-chain is a known defect in
+## `get_final_transform() * get_canvas_transform()`: the full chain. The half-chain is a known defect in
 ## this repository: `check_opening` located its horizon 24px high for want of the `get_final_transform()`
 ## half, judged the wrong band and under-reported for as long as it existed.
 ##
@@ -39,12 +39,12 @@ extends "res://tools/check_base.gd"
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
 const STEADY_FRAMES: int = 75         ## frames a state is given to reach its steady LIGHT before the
-                                      ## shutter — status says "running", not "finished changing"
+                                      ## shutter; status says "running", not "finished changing"
 const PHASE_FRAMES: int = 22          ## frames between the two same-state captures — a visibly different
                                       ## point in every machine animation in the vocabulary
 ## THE FAMILY, not one machine. `PC-05` asks for *"one physical state cue for forge/drill family"*, and a
 ## layer that measured only the Forge would have answered a question about one machine and reported it as
-## an answer about the family — which is the measurement-boundary error this project keeps finding, in the
+## an answer about the family, which is the measurement-boundary error this project keeps finding, in the
 ## direction where the population is SMALLER than the claim.
 ##
 ## Each is placed on the chamber floor with whatever its own run-gate wants underneath it, then driven by
@@ -66,7 +66,7 @@ const SUBJECTS: Array[Dictionary] = [
 ## alone**, so the only thing that differs between two subjects' numbers is the subject.
 const STAGE := Vector2i(46, 26)       ## the one cell every subject is measured in
 ## SATURATION IS MEASURED AS A SHARE OF PIXELS AT THE CEILING, NOT AS A MEAN. A mean can sit at 150 while
-## the machine's whole lit face is pinned at 255 and its shading, rivets and glyph are gone — the dark
+## the machine's whole lit face is pinned at 255 and its shading, rivets and glyph are gone: the dark
 ## surround pulls the average back down and the average reports comfort. What matters is how much of the
 ## subject has stopped carrying information.
 const CLIP_LEVEL: float = 250.0       ## luma at or above this is, for our purposes, white
@@ -95,7 +95,7 @@ func _run() -> void:
 			+ "difference between two blank frames is zero, which this layer would read as a failure")
 		return
 	# SET RATHER THAN REQUIRED. The first version skipped unless `SF_MACHINE_BARE=1` was in the
-	# environment, which makes the layer's own precondition somebody else's job — and under `SF_STRICT` a
+	# environment, which makes the layer's own precondition somebody else's job, and under `SF_STRICT` a
 	# skip is a failure, so a layer that can arrange its own condition and instead demands one from the
 	# runner is just a layer that does not run. The env var stays for driving `capture_moments` by hand.
 	WorldRenderer.BARE_MACHINES = true
@@ -157,7 +157,7 @@ func _run() -> void:
 		#
 		# It captured the instant `machine_status` first said `working` and the instant it first said
 		# anything else. The Forge's ember ramps up and fades out over many frames, so those two shots
-		# caught it mid-ramp and mid-fade — and the numbers moved enormously between two runs of the same
+		# caught it mid-ramp and mid-fade, and the numbers moved enormously between two runs of the same
 		# code: stopped luma 248.8 then 48.8, `D_motion` 0.71 then 139.49. **A gauge whose answer changes
 		# by 200 levels between identical runs is measuring the shutter, not the subject.**
 		#
@@ -166,9 +166,9 @@ func _run() -> void:
 		#
 		# AND THE TRANSIENT IS CAPTURED AND REPORTED RATHER THAN JUST AVOIDED. `a0` is the frame at the
 		# instant the status flips; `a1` is the same state 75 frames later. The gap between them is the
-		# ignition flare, and it is worth a permanent column because I nearly filed it as a bug in the
-		# tonemap: the Forge reads 253/255 on `a0` and 142 on `a1`, and I had already blamed the post-FX
-		# for blowing machines to white before I noticed my own shutter was the cause.
+		# ignition flare, and it is worth a permanent column because it was nearly filed as a bug in the
+		# tonemap: the Forge reads 253/255 on `a0` and 142 on `a1`, and the post-FX had already taken the
+		# blame for blowing machines to white before the shutter here turned out to be the cause.
 		# WHAT THE RENDERER BELIEVES, recorded beside what the sim reports. They are two different
 		# predicates: `machine_status` is the sim's vocabulary (ten answers, guarded by
 		# `check_status_reads`), while the casing and glyph are drawn from `_machine_active`, which is a
@@ -179,8 +179,8 @@ func _run() -> void:
 		var a0: PackedFloat32Array = await _luma_patch()
 		for _i: int in STEADY_FRAMES:
 			await physics_frame
-		# SAMPLED WITH `a1`, AND THE FIRST VERSION SAMPLED IT WITH `a0` — the same shutter error as the
-		# ignition flare, made twice, because I fixed it for the pixels and not for the predicate beside
+		# SAMPLED WITH `a1`, AND THE FIRST VERSION SAMPLED IT WITH `a0`: the same shutter error as the
+		# ignition flare, made twice, because it was fixed for the pixels and not for the predicate beside
 		# them. The Generator reported `OFF` at the working state on every run: `_status_generator` calls a
 		# machine working the moment it HOLDS coal, while `_machine_active` asks whether it is BURNING
 		# (`fuel > 0`), and the tick that converts one into the other had not run yet at the flip. Both
@@ -251,7 +251,7 @@ func _settle_until(sim: FactorySim, m: MachineState, want: StringName) -> bool:
 	return false
 
 
-## Any not-working status will do for the stopped shot — WHICH one differs per machine (`no_input`,
+## Any not-working status will do for the stopped shot; WHICH one differs per machine (`no_input`,
 ## `no_fuel`, `no_power`, `spent`) and pinning a specific one here would be this fixture deciding what a
 ## machine's idle looks like instead of asking it.
 func _settle_until_not(sim: FactorySim, m: MachineState, avoid: StringName) -> bool:
@@ -262,12 +262,12 @@ func _settle_until_not(sim: FactorySim, m: MachineState, avoid: StringName) -> b
 	return false
 
 
-## The machine's cell, in screen pixels, as LUMA. THE FULL TRANSFORM CHAIN — `get_final_transform()` maps
+## The machine's cell, in screen pixels, as LUMA. THE FULL TRANSFORM CHAIN: `get_final_transform()` maps
 ## the render viewport onto the window and `get_canvas_transform()` maps the world into the viewport;
 ## using only the second is the defect that put `check_opening`'s horizon 24px high for its whole life.
 ## THE PATCH RECTANGLE IS COMPUTED ONCE AND REUSED, and the first version did not do that. Recomputing it
 ## per capture let the camera's easing move the cell a fraction of a pixel between shots, the rect rounded
-## to a different size, and `_mean_abs` returned its "these are not comparable" sentinel — which the layer
+## to a different size, and `_mean_abs` returned its "these are not comparable" sentinel, which the layer
 ## then printed as `D_motion = -1.00`, a difference of MINUS ONE LEVEL. **A sentinel that flows into an
 ## arithmetic comparison stops being a sentinel and becomes a very good score:** `-1.00` sailed through
 ## `d_state > d_motion * 2` and that assertion PASSED on a run where the motion baseline did not exist.
@@ -285,7 +285,7 @@ func _lock_patch(cell: Vector2i) -> Rect2i:
 
 
 ## `SF_MSTATE_DUMP=<dir>` writes each patch as a PNG. **Numbers say a difference is small; only the image
-## says WHY**, and this layer has already cost two wrong theories that a glance would have settled — the
+## says WHY**, and this layer has already cost two wrong theories that a glance would have settled: the
 ## ignition flare read as a tonemap bug, and a casing treatment that measured as no change.
 func _dump(tag: String) -> void:
 	var dir: String = OS.get_environment("SF_MSTATE_DUMP")
@@ -344,7 +344,7 @@ func _mean(a: PackedFloat32Array) -> float:
 ## THE FLOOR IS NOT SET HERE YET, AND THAT IS DELIBERATE FOR THIS COMMIT. The first run reports; the number
 ## it reports is what a floor may later be set from. Guessing a floor before measuring has been wrong four
 ## times running in this project, and every one of those guesses looked reasonable at the time.
-## HOW MANY TIMES THE MOTION BASELINE THE STATE DIFFERENCE MUST CLEAR — and this number was 2.0 until the
+## HOW MANY TIMES THE MOTION BASELINE THE STATE DIFFERENCE MUST CLEAR, and this number was 2.0 until the
 ## measurement showed 2.0 was a coin toss.
 ##
 ## At 2.0 the Drill measured ratios of 1.68, 1.94, 2.01, 1.41, 2.04 and 2.43 across six runs of identical
@@ -352,7 +352,7 @@ func _mean(a: PackedFloat32Array) -> float:
 ## inside its own noise is not a threshold, and a green from one is the least trustworthy kind there is.
 ##
 ## 3.0 is chosen from a measured GAP rather than from taste, and the gap has both sides stated. After the
-## idle-pool gate, three runs give Forge ~16x, Drill ~10x, Generator ~4.4x — the tightest passing subject
+## idle-pool gate, three runs give Forge ~16x, Drill ~10x, Generator ~4.4x; the tightest passing subject
 ## has 45% headroom. Before the gate the Drill sat at ~1.9x. **Any threshold in (2.5, 4.0) separates those
 ## two populations stably**; 3.0 is the middle of that band and would have failed the old Drill on every
 ## one of the six runs, including the ones where 2.0 passed it.
@@ -393,7 +393,7 @@ func _report(rows: Array[Dictionary]) -> void:
 		var told: String = "%s->%s" % ["on" if r["live_work"] else "OFF",
 			"ON" if r["live_stop"] else "off"]
 		# TWO PREDICATES FOR ONE QUESTION, AND NOTHING IN THE REPOSITORY MADE THEM AGREE. The sim answers
-		# with `machine_status` — ten words, guarded by check_status_reads — and the renderer draws from
+		# with `machine_status` (ten words, guarded by check_status_reads) and the renderer draws from
 		# `_machine_active`, a three-arm match whose default arm (`_held > 0 or progress > 0`) is a GUESS
 		# about every behaviour added after it was written. A new machine kind that the sim calls working
 		# and the default arm calls idle would ship dark and nothing would notice. It is asserted here, at
@@ -411,7 +411,7 @@ func _report(rows: Array[Dictionary]) -> void:
 				flare_share * 100.0, share * 100.0, told, "reads" if ok else "DOES NOT READ"])
 	if not lagged.is_empty():
 		# REPORTED, NOT FAILED. A one-tick lag between "holds coal" and "is burning it" is 50ms of a
-		# generator drawn cold, which no eye resolves — but it is exactly the shape a real desync would
+		# generator drawn cold, which no eye resolves, but it is exactly the shape a real desync would
 		# take, so it is printed every run rather than smoothed away.
 		print("    settling lag (not a failure): " + ", ".join(lagged))
 	_check(disagrees.is_empty(),

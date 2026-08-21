@@ -3,7 +3,7 @@ extends SceneTree
 ## THE ROCK MUST NOT BETRAY ITS GRID.
 ##
 ## The terrain is stored one material per 32px coarse cell and REPAINTED at an 8px fine grain, and every
-## texture pass in `scenes/fine_terrain.gd` — grain, patches, embedded stones, cracks, hue, AO, form — is
+## texture pass in `scenes/fine_terrain.gd` (grain, patches, embedded stones, cracks, hue, AO, form) is
 ## sampled per FINE cell and measured by `check_texture`. All of it, however, is painted ON TOP OF a base
 ## colour that comes from the COARSE cell: `_cell_fill_color(c, def)`, one Color for all SUBDIV² children.
 ##
@@ -12,7 +12,7 @@ extends SceneTree
 ## seams at every tile edge (which just rebuilds the grid)". Evaluated once per coarse cell, that is
 ## exactly what they become: a smooth field sampled and held constant across 4x4 fine cells is a MOSAIC,
 ## and its every step lands on a coarse boundary. Worse, both are multiplied by `1.0 + depth * 2.2`, so
-## the mosaic gets up to 3.2x LOUDER with depth — loudest precisely where the game is played.
+## the mosaic gets up to 3.2x LOUDER with depth, loudest precisely where the game is played.
 ##
 ## check_texture cannot see this. It bakes the real FineTerrain but substitutes a FLAT GREY for the
 ## material palette, deliberately, so its numbers are attributable to the texture passes alone. That makes
@@ -21,21 +21,21 @@ extends SceneTree
 ##
 ## THE MEASUREMENT. In the baked fine image, walk every pair of horizontally adjacent fine cells and sort
 ## each pair into two buckets:
-##   SEAM — the pair straddles a coarse-cell boundary (fx+1 is a multiple of SUBDIV)
-##   BODY — the pair sits inside one coarse cell
+##   SEAM: the pair straddles a coarse-cell boundary (fx+1 is a multiple of SUBDIV)
+##   BODY: the pair sits inside one coarse cell
 ## Compare the mean |Δluma| of the two buckets. In rock that reads as rock, they are the same: a texture
 ## field does not know where the grid is. In rock that reads as a tilemap, SEAM is a multiple of BODY.
 ## Then do the same down the columns. The ratio is the whole test.
 ##
 ## WHAT IS EXCLUDED, and why each exclusion is necessary rather than convenient:
-##   * pairs where either cell is not solid, or has ANY air among its 8 neighbours — edge cells carry AO,
+##   * pairs where either cell is not solid, or has ANY air among its 8 neighbours: edge cells carry AO,
 ##     rim, moss and form terms that step legitimately, and a face is where they all land at once.
-##   * pairs whose two COARSE parents hold different materials — dirt meeting stone SHOULD step hard.
+##   * pairs whose two COARSE parents hold different materials: dirt meeting stone SHOULD step hard.
 ##     That is geology, not tiling, and a test that punished it would be asking for mush.
 ##   * everything above SOIL_CLEAR, where the soil profile keys bands to each column's own surface row
 ##     and therefore steps per COLUMN by design.
 ## What remains is one continuous material, away from every face: the case where a step can only come from
-## the grid. Measured headless off the real bake, so it is exact — no camera, no zoom, no resampling.
+## the grid. Measured headless off the real bake, so it is exact: no camera, no zoom, no resampling.
 
 const SCENE := "res://scenes/main.tscn"
 const SETTLE_FRAMES: int = 8            ## frames to let the initial full bake land before reading pixels
@@ -45,12 +45,12 @@ const SETTLE_FRAMES: int = 8            ## frames to let the initial full bake l
 const SOIL_CLEAR: int = 120
 
 ## How much harder a pair may step ACROSS a coarse boundary than inside one. 1.0 would demand the grid be
-## perfectly invisible, which no honest bake achieves — the base colour is genuinely constant per cell for
+## perfectly invisible, which no honest bake achieves: the base colour is genuinely constant per cell for
 ## everything the coarse pass owns. The bar is set at a ratio the eye does not resolve as a line: a seam
 ## may be a fifth louder than the body's own grain, not a multiple of it.
 const MAX_SEAM_RATIO: float = 1.20
 
-## Refuse to pass on a thin sample — an empty world would otherwise score perfectly.
+## Refuse to pass on a thin sample: an empty world would otherwise score perfectly.
 const MIN_PAIRS: int = 20000
 ## The BACK WALL (#S13) gets the same question asked of it, with its own floor: wall cells only exist where
 ## the world is already open (caves at worldgen, everything you dig after), so there are honestly fewer of
@@ -77,7 +77,7 @@ func _process(_delta: float) -> bool:
 func _judge() -> void:
 	var r: WorldRenderer = _main._renderer
 	var fine: FineTerrain = r._fine
-	# #17 made the boot bake progressive, so at SETTLE_FRAMES part of the grid is still transparent — and
+	# #17 made the boot bake progressive, so at SETTLE_FRAMES part of the grid is still transparent, and
 	# every sweep below SKIPS transparent cells, so an unfinished grid does not read as a grid problem, it
 	# reads as too few pairs to say anything. It failed exactly that way. This layer judges the molded rock,
 	# not boot pacing; give it a whole one. See FineTerrain.finish_pending.
@@ -99,7 +99,7 @@ func _judge() -> void:
 		MIN_PAIRS) and ok
 	ok = _report("down a face (top-bottom)", _sweep(r, fine, data, solid, fcols, frows, sub, false, false),
 		MIN_PAIRS) and ok
-	# THE BACK WALL. Until #S13 this layer could not see it at all — it samples only cells with all nine
+	# THE BACK WALL. Until #S13 this layer could not see it at all: it samples only cells with all nine
 	# fine neighbours solid, and a wall cell is air by definition. The wall was therefore the one large
 	# thing on screen with no instrument on it, and it was a flat fill per 32px cell the whole time.
 	print("  -- the wall behind what you have dug --")
@@ -192,8 +192,8 @@ func _deep_interior(solid: PackedByteArray, fcols: int, frows: int, fx: int, fy:
 
 
 ## A back-wall cell far enough from any rock that no cast shadow reaches it: painted (alpha 255), not
-## solid, its coarse parent not solid either — which excludes the eroded back-ROCK branch, a different
-## paint — and the same true of all eight neighbours.
+## solid, its coarse parent not solid either (which excludes the eroded back-ROCK branch, a different
+## paint), and the same true of all eight neighbours.
 func _wall_interior(fine: FineTerrain, data: PackedByteArray, solid: PackedByteArray, fcols: int,
 		frows: int, sub: int, fx: int, fy: int) -> bool:
 	for dy: int in [-1, 0, 1]:
@@ -204,7 +204,7 @@ func _wall_interior(fine: FineTerrain, data: PackedByteArray, solid: PackedByteA
 				return false
 			if solid[y * fcols + x] == 1:
 				return false
-			# A WALL CELL IS NOW NAMED, NOT INFERRED. This read `!= 255`, which meant "opaque" — true of
+			# A WALL CELL IS NOW NAMED, NOT INFERRED. This read `!= 255`, which meant "opaque": true of
 			# solid rock as well, so it leaned on the two neighbouring tests to exclude rock and would have
 			# been silently wrong if either changed. `FineTerrain` now stamps air-with-something-behind-it
 			# with VOID_ALPHA so the tooth pass can mask on it (rock_grit spent its life texturing the void
@@ -225,7 +225,7 @@ func _same_wall(r: WorldRenderer, sub: int, ax: int, ay: int, bx: int, by: int) 
 	return r.sim.wall.get(a, &"") == r.sim.wall.get(b, &"")
 
 
-## Two fine cells share a material when their COARSE parents do — a real material boundary is allowed to
+## Two fine cells share a material when their COARSE parents do: a real material boundary is allowed to
 ## step as hard as it likes.
 func _same_material(r: WorldRenderer, sub: int, ax: int, ay: int, bx: int, by: int) -> bool:
 	var a: Vector2i = Vector2i(ax / sub, ay / sub)

@@ -2,7 +2,7 @@ extends "res://tools/check_base.gd"
 
 ## CAN YOU TELL TWO MACHINES APART WITH THE ICONS OFF?
 ##
-## `PC-01` — *"make the machine silhouette carry more identity than its label"* — with the evidence line
+## `PC-01`: *"make the machine silhouette carry more identity than its label"*, with the evidence line
 ## *"Forge hardware is tiny and generic relative to its text badge"* and the constraint *"name may remain
 ## available on inspect."* The constraint is the whole ticket: the name is allowed to exist, it is just not
 ## allowed to be **how you know what the thing is.**
@@ -10,8 +10,8 @@ extends "res://tools/check_base.gd"
 ## THE AUDIT ALREADY SAID THIS AND HALF OF IT WAS DONE. `Visuals.draw_machine_casing`'s own header quotes
 ## COMPREHENSIVE_AUDIT §194 and answers it exactly: *"Every machine in the game was the same 30x30 flat
 ## square in a different hue with an icon on it. Hue and icon are how a toolbar distinguishes its entries;
-## they are not how a world distinguishes its objects."* What followed was a **lighting** model — top
-## catch, bevel, plinth, rivets — and it is good, and it is not the sentence it was written under. Every
+## they are not how a world distinguishes its objects."* What followed was a **lighting** model (top
+## catch, bevel, plinth, rivets), and it is good, and it is not the sentence it was written under. Every
 ## machine is still the same square. The diagnosis was accepted and the silhouette half was never built.
 ##
 ## SO THE MEASUREMENT IS A SHAPE MEASUREMENT AND NOTHING ELSE, and each exclusion is one of the answers
@@ -23,18 +23,18 @@ extends "res://tools/check_base.gd"
 ##   the LIGHT POOL   is a glow, not a body. `check_machine_state` already owns that channel and proved it
 ##                    carries STATE; letting it carry identity here would double-count one cue for two
 ##                    tickets. Off.
-##   the CASING HUE   is PAINTED OUT — every body drawn in one grey — and the first version of this layer
+##   the CASING HUE   is PAINTED OUT (every body drawn in one grey), and the first version of this layer
 ##                    did not do that, on the reasoning quoted above: that an occupancy mask is already
 ##                    blind to colour. It is not, because occupancy is decided by a threshold and a
 ##                    threshold is a brightness. The Descent Engine's shadowed foot sits within 3 levels
 ##                    of the rock behind it, so a DARK machine measured as a SMALLER machine, and twenty
-##                    identical rectangles scored a mean pair difference of 0.201 — which the layer would
+##                    identical rectangles scored a mean pair difference of 0.201, which the layer would
 ##                    have reported as twenty distinguishable shapes. **The instrument could not register
-##                    its subject, in the same session I catalogued that as the dominant failure here.**
+##                    its subject, in the same session that catalogued it as the dominant failure here.**
 ##
 ## THE UNIT IS THE SHARE OF THE CELL WHERE ONE MACHINE HAS MATERIAL AND THE OTHER DOES NOT: a symmetric
 ## difference of masks over the patch area. It answers the question a player's eye answers at 16 screen
-## pixels — *is that the same box?* — and it cannot be satisfied by any amount of surface treatment,
+## pixels (*is that the same box?*) and it cannot be satisfied by any amount of surface treatment,
 ## which is the property that makes it the right gauge for this ticket rather than a luma comparison.
 ##
 ##   godot --path . --script res://tools/check_machine_identity.gd
@@ -47,7 +47,7 @@ const SETTLE: int = 40
 const SHOW_FRAMES: int = 12           ## frames a newly placed machine gets before the shutter
 
 ## THE WHOLE REGISTRY, DISCOVERED RATHER THAN LISTED. A hand-written subject list in a layer about "do the
-## machines look alike" would go stale the first time somebody adds a machine — and the machine most
+## machines look alike" would go stale the first time somebody adds a machine, and the machine most
 ## likely to be a copy of an existing one is the one added last. Read from disk every run.
 const MACHINE_DIR: String = "res://src/data/machines"
 
@@ -62,18 +62,18 @@ const ROOM_BOTTOM: int = 28
 ## HOW FAR FROM BARE ROCK A PIXEL HAS TO BE BEFORE IT COUNTS AS MATERIAL. Not guessed: the empty stage is
 ## captured twice and the largest difference between those two captures is printed every run as the noise
 ## floor. This sits far above it, and far below the ~100-level step between rock and any casing in the
-## registry — there is nothing in between for it to be sensitive to.
-## 12 rather than 25, because the casing's hard outline — the one pixel that IS the silhouette edge —
+## registry: there is nothing in between for it to be sensitive to.
+## 12 rather than 25, because the casing's hard outline (the one pixel that IS the silhouette edge)
 ## composites to about 15 levels over rock, and a threshold that drops the outline is a threshold that
 ## cannot see the boundary it is measuring.
 const MASK_LEVEL: float = 12.0
 
 ## HOW MUCH OF THE CELL TWO MACHINES MUST DISAGREE ABOUT.
 ##
-## Set from measurement AFTER the silhouette work, never before it — guessing a floor before playing the
+## Set from measurement AFTER the silhouette work, never before it: guessing a floor before playing the
 ## thing has been wrong four times running in this repository. The first run of this layer reported 0.000
 ## for all 190 pairs, which is not a number a floor can be derived from; it is the ticket.
-## 0.025 — a floor set from the measurement, and only after the work, with both sides of the gap stated.
+## 0.025: a floor set from the measurement, and only after the work, with both sides of the gap stated.
 ## Before any silhouette existed the whole registry scored 0.000. After it, the tightest pair of DIFFERENT
 ## kinds is 0.036 (Descent Engine / Splitter) and the next three are 0.041, 0.047 and 0.049, so 0.025
 ## leaves the tightest passing pair 44% of headroom and fails every pair the old code produced.
@@ -142,17 +142,17 @@ func _run() -> void:
 	var noisy_share: float = float(noisy) / float(maxi(bare.size(), 1))
 	print("    empty stage: mean luma %.1f, largest still-frame difference %.1f levels, %d of %d pixels (%.4f of the cell) clear the mask threshold"
 		% [_mean(bare), floor_noise, noisy, bare.size(), noisy_share])
-	# THE CONTROL IS IN MASK UNITS, NOT IN LEVELS, and it was not always — that cost a red sweep.
+	# THE CONTROL IS IN MASK UNITS, NOT IN LEVELS, and it was not always; that cost a red sweep.
 	#
 	# It used to assert `_max_abs(bare, bare2) < MASK_LEVEL * 0.75`: the LARGEST difference between two
 	# captures of an unchanging cell, against three quarters of the threshold. A max over a thousand pixels
 	# is the statistic most sensitive to a single one, so it is a noisy estimator of exactly the thing it
-	# estimates — it read 3.9 the night the threshold was set and 10.7 four runs later with nothing changed,
+	# estimates: it read 3.9 the night the threshold was set and 10.7 four runs later with nothing changed,
 	# and the second reading failed a layer whose subject had not moved. The stage is not perfectly still
 	# either: the body's lamp pulses a few cells away, so a handful of pixels genuinely swing ten levels.
 	#
 	# The claim that matters is not "no pixel ever wobbles". It is "wobble cannot be mistaken for a machine",
-	# and that is answerable in the units the layer actually judges in — the share of the cell a mask covers,
+	# and that is answerable in the units the layer actually judges in: the share of the cell a mask covers,
 	# against the share two machines must differ by. A max in levels was never comparable to SHAPE_FLOOR;
 	# this is. The level figure stays PRINTED, because it is the diagnostic that says whether the stage has
 	# started moving, and it should not be the thing that fails.
@@ -262,7 +262,7 @@ func _report(subjects: Array[Dictionary]) -> void:
 		% [pairs, total / maxf(float(pairs), 1.0), worst, worst_pair, best, best_pair])
 	# THE TIGHT END IS THE ONLY END WITH INFORMATION IN IT. A mean over 190 pairs is dominated by the
 	# machines that were never in question, and the floor this layer will eventually hold has to be argued
-	# from the pairs nearest to it — including the ones that are alike ON PURPOSE, which a single number
+	# from the pairs nearest to it, including the ones that are alike ON PURPOSE, which a single number
 	# cannot tell apart from the ones that are alike by neglect.
 	ranked.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
 	print("    the ten most alike:")
@@ -349,7 +349,7 @@ func _luma_patch() -> PackedFloat32Array:
 ## survive.
 ## How many pixels of an unchanging cell move further than `level` between two captures. The population is
 ## pixels and the answer is a count, so it can be turned into a share of the cell and compared with the
-## floor the shape assertion uses — which a maximum in luma levels never could be.
+## floor the shape assertion uses, which a maximum in luma levels never could be.
 func _count_over(a: PackedFloat32Array, b: PackedFloat32Array, level: float) -> int:
 	var n: int = 0
 	for i: int in mini(a.size(), b.size()):
