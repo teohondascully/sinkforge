@@ -23,6 +23,30 @@
 set -uo pipefail
 GODOT="${GODOT:-godot}"
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
+
+# RELEASE ONLY A LOCK WE STILL OWN, and the distinction is not pedantry: it is the difference between one
+# run on this box and two. `LOCK_HELD=1` records that we acquired the lock ONCE. It does not record that we
+# still hold it, and those come apart on a path the stale sweep above creates deliberately.
+#
+#   A is killed hard, so its EXIT trap never runs and its lock directory stays.
+#   B waits, sees A's pid is gone, clears the lock as stale and takes it. The directory is now B's.
+#   A's trap finally fires -- a slow SIGTERM, a reaped subshell -- and deletes the directory. It is B's.
+#   C finds no lock, takes it, and boots Godot NEXT TO B's still-running Godot.
+#
+# Nothing downstream can see that. Both runs look healthy, both report exit 0, and every duration either
+# one measured is a measurement of the other one as well. It is silent, and it corrupts results rather
+# than failing them, which is the worst pair of properties a fault can have.
+#
+# The owner file already carries the holder's pid on line 1 and always has. Releasing means checking it.
+# The residual race is narrow and deliberately left: the stale sweep can still clear a lock between another
+# holder's check and its `rm`. Closing that needs an atomic compare-and-delete the filesystem does not
+# offer; what is closed here is the cascade, where ONE hard kill makes every subsequent honest release
+# delete a stranger's lock.
+lock_release() {
+	if [ "$(sed -n 1p "$LOCK/owner" 2>/dev/null)" = "$$" ]; then
+		rm -rf "$LOCK"
+	fi
+}
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # How long to wait before giving up, overridable so the GIVE-UP PATH IS TESTABLE. It was not: proving that
 # a timeout exits 5 rather than 0 meant holding the lock for fifteen minutes, so nobody ever proved it, and
@@ -193,7 +217,7 @@ fi
 _child=$!
 # The child joins the trap: a SIGTERM to the wrapper must not leave an orphaned Godot holding the box after
 # the lock directory it was blocking on has already been removed.
-trap 'rm -rf "$LOCK"; kill "$_child" 2>/dev/null; rm -f "$CAPMARK"' EXIT INT TERM
+trap 'lock_release; kill "$_child" 2>/dev/null; rm -f "$CAPMARK"' EXIT INT TERM
 
 _dog=""
 if [ "$CAP" -gt 0 ]; then

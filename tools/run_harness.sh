@@ -649,8 +649,31 @@ MARKS="$(mktemp -d)"
 # if another run has Godot up at the same time. Contention was worth 12% on `check_dig_hitch` and
 # inverted its verdict. `mkdir` is the atomic primitive: it succeeds for exactly one caller.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
+
+# RELEASE ONLY A LOCK WE STILL OWN, and the distinction is not pedantry: it is the difference between one
+# run on this box and two. `LOCK_HELD=1` records that we acquired the lock ONCE. It does not record that we
+# still hold it, and those come apart on a path the stale sweep above creates deliberately.
+#
+#   A is killed hard, so its EXIT trap never runs and its lock directory stays.
+#   B waits, sees A's pid is gone, clears the lock as stale and takes it. The directory is now B's.
+#   A's trap finally fires -- a slow SIGTERM, a reaped subshell -- and deletes the directory. It is B's.
+#   C finds no lock, takes it, and boots Godot NEXT TO B's still-running Godot.
+#
+# Nothing downstream can see that. Both runs look healthy, both report exit 0, and every duration either
+# one measured is a measurement of the other one as well. It is silent, and it corrupts results rather
+# than failing them, which is the worst pair of properties a fault can have.
+#
+# The owner file already carries the holder's pid on line 1 and always has. Releasing means checking it.
+# The residual race is narrow and deliberately left: the stale sweep can still clear a lock between another
+# holder's check and its `rm`. Closing that needs an atomic compare-and-delete the filesystem does not
+# offer; what is closed here is the cascade, where ONE hard kill makes every subsequent honest release
+# delete a stranger's lock.
+lock_release() {
+	if [ "$(sed -n 1p "$LOCK/owner" 2>/dev/null)" = "$$" ]; then
+		rm -rf "$LOCK"
+	fi
+}
 LOCK_WAIT="${SF_LOCK_WAIT:-900}"
-LOCK_HELD=0
 
 # Declared HERE, above the trap, not where they are first used. `set -u` is on, so an exit taken between
 # installing the trap and arming the sentinel would run a cleanup handler that dies on an unset variable —
@@ -695,7 +718,7 @@ harness_cleanup() {
 		"$GODOT" --headless --path . --script res://tools/save_sentinel.gd -- disarm "$SENTINEL" 2>&1 \
 			| grep -E '^save_sentinel:' || true
 	fi
-	[ "$LOCK_HELD" = "1" ] && rm -rf "$LOCK"
+	lock_release
 	rm -rf "$MARKS"
 	if [ "$KEEP_LOGS" = "1" ] || [ "$rc" != "0" ] || [ "$((fail + skip + partial))" -gt 0 ]; then
 		printf '\nper-layer logs: %s\n' "$DIR"
@@ -805,7 +828,6 @@ if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 	while true; do
 		if mkdir "$LOCK" 2>/dev/null; then
 			lock_claim_write "the harness ($total layers, JOBS=$JOBS)"
-			LOCK_HELD=1
 			break
 		fi
 		holder="$(head -1 "$LOCK/owner" 2>/dev/null || true)"

@@ -80,12 +80,35 @@ trap 'rm -rf "$DIR"' EXIT
 # Sixteen minutes of Godot next to somebody's sweep corrupts both, and the corpus is precisely the tool
 # whose output somebody will read as a property of the WORLD.
 LOCK="${SF_LOCK:-${TMPDIR:-/tmp}/sinkforge-harness.lock}"
-LOCK_HELD=0
+
+# RELEASE ONLY A LOCK WE STILL OWN, and the distinction is not pedantry: it is the difference between one
+# run on this box and two. `LOCK_HELD=1` records that we acquired the lock ONCE. It does not record that we
+# still hold it, and those come apart on a path the stale sweep above creates deliberately.
+#
+#   A is killed hard, so its EXIT trap never runs and its lock directory stays.
+#   B waits, sees A's pid is gone, clears the lock as stale and takes it. The directory is now B's.
+#   A's trap finally fires -- a slow SIGTERM, a reaped subshell -- and deletes the directory. It is B's.
+#   C finds no lock, takes it, and boots Godot NEXT TO B's still-running Godot.
+#
+# Nothing downstream can see that. Both runs look healthy, both report exit 0, and every duration either
+# one measured is a measurement of the other one as well. It is silent, and it corrupts results rather
+# than failing them, which is the worst pair of properties a fault can have.
+#
+# The owner file already carries the holder's pid on line 1 and always has. Releasing means checking it.
+# The residual race is narrow and deliberately left: the stale sweep can still clear a lock between another
+# holder's check and its `rm`. Closing that needs an atomic compare-and-delete the filesystem does not
+# offer; what is closed here is the cascade, where ONE hard kill makes every subsequent honest release
+# delete a stranger's lock.
+lock_release() {
+	if [ "$(sed -n 1p "$LOCK/owner" 2>/dev/null)" = "$$" ]; then
+		rm -rf "$LOCK"
+	fi
+}
 if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 	waited=0
 	while :; do
 		if mkdir "$LOCK" 2>/dev/null; then
-			printf '%s\n%s\n' "$$" "$PWD" >"$LOCK/owner"; LOCK_HELD=1; break
+			printf '%s\n%s\n' "$$" "$PWD" >"$LOCK/owner"; break
 		fi
 		holder="$(head -1 "$LOCK/owner" 2>/dev/null || true)"
 		if [ -n "${holder:-}" ] && ! kill -0 "$holder" 2>/dev/null; then
@@ -99,7 +122,7 @@ if [ "${SF_NO_LOCK:-0}" != "1" ]; then
 		[ $((waited % 30)) -eq 0 ] && echo "  waiting for the harness lock (held by pid ${holder:-?}) ..."
 		sleep 2; waited=$((waited + 2))
 	done
-	trap 'rm -rf "$DIR"; [ "$LOCK_HELD" = "1" ] && rm -rf "$LOCK"' EXIT
+	trap 'rm -rf "$DIR"; lock_release' EXIT
 fi
 
 if [ -n "${SF_CORPUS_ONLY:-}" ]; then

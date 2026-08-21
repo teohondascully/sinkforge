@@ -96,6 +96,41 @@ rm -rf "$LOCK"
 run /bin/sh -c 'exit 1' >/dev/null 2>&1
 [ ! -d "$LOCK" ]; check $? "the lock is released even when the run inside it failed"
 
+# --- RELEASE ONLY WHAT YOU STILL OWN ---
+# The sixth property, and the five above are all blind to it, because every one of them runs a single
+# holder. This one needs two, and it is the failure that turns a serialised box back into a parallel one.
+#
+# `LOCK_HELD=1` used to be the whole release condition. It records that a run ACQUIRED the lock once; it
+# does not record that the run still holds it, and the stale sweep pulls those apart on purpose:
+#
+#   A is killed hard, so its trap never runs and its lock directory outlives it.
+#   B waits, sees A's pid is gone, clears the lock as stale, and takes it. The directory is B's now.
+#   A's trap fires late -- a slow SIGTERM, a reaped subshell -- and deletes the directory. It is B's.
+#   C finds no lock, takes it, and boots Godot alongside B's still-running Godot.
+#
+# ONE hard kill is enough to make every honest release after it delete a stranger's lock. Worse, nothing
+# reports it: both runs exit 0, both look healthy, and the only trace is that every duration either of
+# them measured was measured next to the other. Silent, and corrupting rather than failing.
+#
+# Staged directly: start a run, retitle the lock under it to a different LIVE pid, and see whether it
+# takes something that is not its own on the way out. The paired case above ("released even when the run
+# inside it failed") is what stops this being satisfied by a wrapper that never releases anything.
+rm -rf "$LOCK"
+started="$TMP/started"; : > "$started"
+run /bin/sh -c "echo up > '$started'; sleep 3" >/dev/null 2>&1 &
+a=$!
+waited=0
+while [ ! -s "$started" ] && [ "$waited" -lt 40 ]; do sleep 0.25; waited=$((waited + 1)); done
+[ -s "$started" ]; check $? "(setup) the holder started and took the lock"
+# A different owner, and a LIVE one: a dead pid would be cleared by the stale sweep and prove nothing.
+sleep 30 >/dev/null 2>&1 & other=$!
+printf '%s\n%s\n%s\n%s\n' "$other" "/elsewhere" "another run" "0" > "$LOCK/owner"
+wait "$a"
+[ -d "$LOCK" ] && [ "$(sed -n 1p "$LOCK/owner" 2>/dev/null)" = "$other" ]
+check $? "a run that no longer owns the lock leaves it alone on the way out (owner $other)"
+kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
+rm -rf "$LOCK"
+
 # --- ONE AT A TIME ---
 # Two runs race; each stamps the log on the way in and on the way out. If the lock works the stamps are
 # strictly paired: in/out/in/out. An overlap shows up as two INs in a row, which is exactly the eight
