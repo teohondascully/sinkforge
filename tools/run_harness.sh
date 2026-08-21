@@ -817,6 +817,28 @@ harness_cleanup() {
 	if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ]; then
 		printf 'HARNESS_EXIT=%s\n' "$rc" >>"$DIR/summary.txt" 2>/dev/null || true
 	fi
+	# AND SAY IT IN WORDS, for the same reason the integer is written at all: the archive is grepped by
+	# people as well as by scripts, and `143` only reads as a death to somebody who already knows it is one.
+	# A killed run is the single case where nothing else writes the sentence, because the verdict gate is
+	# deliberately not consulted for these codes (see the case below), and `HARNESS_RESULT=` is the gate's
+	# line. So a reader searching a retained log dir for NOT A RESULT would find a killed sweep and a
+	# finished one indistinguishable -- exactly the archive gap the exit-code fix exists to close, left open
+	# one level up. Written here rather than in the signal traps themselves so that the annotation and the
+	# integer it explains are produced by the same code path and cannot drift apart. c1's finding.
+	case "$rc" in
+		130|143)
+			killed="INTERRUPTED (SIGINT)"
+			[ "$rc" = 143 ] && killed="TERMINATED (SIGTERM)"
+			echo "!! $killed partway through. WHATEVER THIS RUN REPORTED, IT IS NOT A RESULT. Re-run it."
+			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ]; then
+				{
+					printf '\n!! %s partway through -- the layer table above is a PARTIAL sweep.\n' "$killed"
+					printf 'HARNESS_RESULT=no\n'
+					printf 'THIS RUN IS NOT A RESULT. Do not read the harness verdict as pass or fail.\n'
+				} >>"$DIR/summary.txt" 2>/dev/null || true
+			fi
+			;;
+	esac
 	# WAS THIS A RUN AT ALL? Everything above reports what the sweep CONCLUDED. This asks the prior
 	# question, and until now only CI was allowed to ask it: `godot --script` exits 0 when a script is
 	# missing or unparseable, so on a fresh clone this runner would print ALL LAYERS PASS over layers that
