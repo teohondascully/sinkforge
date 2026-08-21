@@ -186,13 +186,22 @@ func _run() -> void:
 
 	var share: float = float(worst) / float(total)
 	var density: float = float(_events.size()) * 1000.0 / float(total)
-	print("  longest silence %d frames = %.0f%% of the session  (%s)" % [worst, share * 100.0, worst_at])
-	print("  density %.1f events / 1000 frames" % density)
+	print("  longest silence %d frames = %.2f%% of the session  (%s)" % [worst, share * 100.0, worst_at])
+	print("  density %.2f events / 1000 frames" % density)
 
+	# THE ASSERTION LINE CARRIES ITS OWN ARITHMETIC, at a resolution that can support the comparison it is
+	# printing. At `%.0f` the corpus run on seed 7 read `no stretch of the session is dead air (20%, cap
+	# 20%)` and FAILED — a line that says the value equals the bound and then refuses it, so a reader
+	# cannot tell a miss of one frame from a miss of forty, and cannot tell either from a defect in the
+	# comparison. The counts are here for the same reason: a share is a claim about a session of a given
+	# length, and `worst` and `total` let the number be recomputed instead of trusted. It is the only line
+	# that leaves this layer when it runs under `tools/seed_corpus.sh`.
 	_check(share <= QUIET_SHARE_CAP,
-		"no stretch of the session is dead air (%.0f%%, cap %.0f%%)" % [share * 100.0, QUIET_SHARE_CAP * 100.0])
+		"no stretch of the session is dead air (%.2f%% = %d of %d frames, cap %.2f%%)"
+			% [share * 100.0, worst, total, QUIET_SHARE_CAP * 100.0])
 	_check(density >= DENSITY_FLOOR,
-		"...and it is not thin either (%.1f events/1000f, floor %.1f)" % [density, DENSITY_FLOOR])
+		"...and it is not thin either (%.2f = %d events in %d frames, floor %.2f)"
+			% [density, _events.size(), total, DENSITY_FLOOR])
 
 	main.queue_free()
 	await physics_frame
