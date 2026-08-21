@@ -61,6 +61,7 @@ const MIN_CLAIMS: int = 3
 func _initialize() -> void:
 	var registered: int = _count_registrations()
 	_check(registered > 0, "read the registration list out of run_harness.sh (%d layers)" % registered)
+	_check_registry_population(registered)
 
 	var found: int = 0
 	for doc: String in DOCS:
@@ -156,3 +157,76 @@ func _read(path: String) -> String:
 	var s: String = f.get_as_text()
 	f.close()
 	return s
+
+
+## THE COUNT MUST BE A POPULATION, NOT AN AGGREGATE.
+##
+## Everything above compares a number in a document against a number from the runner. Both can be wrong
+## together, and a total is exactly the shape that hides it: two registrations of one script read as two
+## layers, and a registration whose script was deleted reads as one. The docs would then agree with an
+## inflated figure and every assertion here would pass, which is the failure this suite keeps meeting --
+## a green taken over a population nobody enumerated.
+##
+## The occasion was a merge comparison. Two runners on two lines of history both registered exactly 107,
+## and the SETS DIFFERED BY FOUR IN EACH DIRECTION. The equal totals were the most misleading thing in the
+## comparison, because they invited the conclusion that the registries matched. A count is not a set, and
+## it must not be the only thing asserted about one.
+##
+## Three properties, each of which the total is blind to:
+##
+##   1. the paths are DISTINCT. A duplicate inflates the count without adding a layer.
+##   2. every path EXISTS. A dangling registration inflates the count without running anything.
+##   3. the distinct-and-existing set is the SAME SIZE as the count. This is the one that makes the other
+##      two more than a pair of spot checks, and it is what fired when a duplicate was planted: "109
+##      distinct existing scripts, one per registration (110 counted)".
+##
+## A FOURTH AND A FIFTH WERE WRITTEN AND REMOVED, and the reason is worth more than the assertions were.
+## They asserted that every registration line yields a path, and that this scan and `_count_registrations`
+## agree on the total. Both are unreachable. `run_harness.sh` runs under `set -u` and `add()` dereferences
+## `$2`, so a registration line with no path kills the runner at line 237 with an unbound variable before
+## any layer starts. No sweep can reach this file in that state, so neither assertion could ever be false,
+## and a control planting such a line produced no failure here -- it produced no run at all.
+##
+## They were written in the same hour this suite REJECTED an imported layer for reporting assertions that
+## cannot fail. Keeping them would have shipped the defect that layer was rejected for describing. The
+## test is not whether an assertion is reasonable; it is whether a planted defect makes it red.
+func _check_registry_population(registered: int) -> void:
+	var text: String = _read(RUNNER)
+	var verbs: Array[String] = _verbs()
+	var re: RegEx = RegEx.new()
+	re.compile("\"(res://[^\"]+)\"")
+	var paths: Array[String] = []
+	for line: String in text.split("\n"):
+		var is_reg: bool = false
+		for v: String in verbs:
+			if line.begins_with(v + " "):
+				is_reg = true
+				break
+		if not is_reg:
+			continue
+		var m: RegExMatch = re.search(line)
+		if m != null:
+			paths.append(m.get_string(1).replace("res://", ""))
+
+	var seen: Dictionary = {}
+	var dupes: Array[String] = []
+	for pth: String in paths:
+		if seen.has(pth):
+			if not dupes.has(pth):
+				dupes.append(pth)
+		seen[pth] = true
+	_check(dupes.is_empty(),
+		"no script is registered twice (%d duplicate path(s): %s)" % [dupes.size(), ", ".join(dupes)])
+
+	var missing: Array[String] = []
+	for pth: String in paths:
+		if not FileAccess.file_exists("res://" + pth):
+			missing.append(pth)
+	_check(missing.is_empty(),
+		"every registered script exists on disk (%d missing: %s)" % [missing.size(), ", ".join(missing)])
+
+	# The control. Without it the three assertions above are satisfied by an empty `paths`, which is the
+	# same trivial agreement `check_shared_constants` guards its own scan against.
+	_check(seen.size() == registered,
+		"the registry resolves to %d distinct existing scripts, one per registration (%d counted)"
+			% [seen.size(), registered])
