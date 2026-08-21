@@ -170,6 +170,22 @@ func _run() -> void:
 	var seen: Dictionary = {}
 	var s: Dictionary = {}
 	var home: Vector2 = main._player.position
+
+	# THE POINTER IS POSED, AND UNTIL NOW IT WAS NOT. `Controls.pointer_world` falls through to the real
+	# `get_mouse_position()` unless a fixture poses it. `main._aim` is built from that, and the head-lamp's
+	# veil cut rides `head + _lamp_offset`, which eases toward `_aim`. So the boundary of the region this
+	# layer calls "outside the lamp" — the exclusion its entire population depends on — was being set by
+	# where the person at this desk had left their hand. Ten other fixtures under `tools/` already pose the
+	# pointer; this one read the room's lighting through an uncontrolled input and never said so.
+	#
+	# `check_fixture_pointer` does not catch this. It bans a fixture that MOVES the real cursor, which is a
+	# different fault: this one never touched the cursor, it just believed it.
+	#
+	# Posed at the body, so the lamp pool sits over the cells this layer already throws out as lit. Posing
+	# it anywhere else would move the exclusion rather than fix it, and could quietly enlarge the judged
+	# population, which is the one thing a stability fix must not do.
+	Controls.pose_pointer(home)
+
 	for off: int in VIEWPOINTS:
 		main._player.position = home + Vector2(float(off * WorldRenderer.CELL), 0.0)
 		main._player.velocity = Vector2.ZERO
