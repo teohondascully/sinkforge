@@ -60,7 +60,14 @@ func _initialize() -> void:
 	print("== the fast flood draws the same picture as the obvious one ==")
 	_run()
 	if _failures == 0:
-		print("check_seam_flood: PASS — spatial hash and quadratic scan agree, and the hash is faster")
+		# THE VERDICT MAY NOT CLAIM MORE THAN THE ASSERTIONS DO. This line used to end "and the hash is
+		# faster", which nothing in this layer tests: `fast_ms`, `slow_ms` and `speedup` are computed, printed
+		# and never asserted, deliberately, because a duration assertion in an `add` layer measures the box
+		# and this one is not `add_excl`. The body already says so in as many words. The VERDICT said it
+		# anyway, and the verdict is the line a reader takes away, so the layer would have announced the hash
+		# was faster with the hash ten times slower.
+		print("check_seam_flood: PASS — spatial hash and quadratic scan draw the same picture "
+			+ "(the speedup is printed below, not asserted)")
 		quit(0)
 	else:
 		printerr("check_seam_flood: FAIL (%d)" % _failures)
