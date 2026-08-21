@@ -243,7 +243,42 @@ if os.path.isfile(WORDS_PATH):
     for _w in open(WORDS_PATH, encoding="utf-8").read().splitlines():
         _w = _w.split("#", 1)[0].strip()
         if _w:
-            WIDE_TOKENS.append((r"(?<![A-Za-z0-9_])" + re.escape(_w) + r"s?(?![A-Za-z0-9_])", _w))
+            # ANCHORING IS WHAT HID ONE, so it is now applied only where it is needed. A whole-word
+            # matcher cannot see a listed word written inside a REGEX LITERAL: in `\b<listed-word>`
+            # the character before it is the `b` of `\b`, which is a word character, so the
+            # lookbehind rejects it. The public tree carries exactly that, in a token list, inside the
+            # gate that hunts these words -- found by a peer scanning without anchors and missed by
+            # three separately built scans that all had them. The precision was the blind spot.
+            #
+            # Short tokens still need both anchors, because they occur inside ordinary English: the
+            # two-letter one matches "remains", "available", "again". Longer ones are matched as plain
+            # substrings, which is strictly more sensitive and cannot be evaded by any prefix.
+            #
+            # THE LENGTH RULE IS A PROXY AND IT HAS A KNOWN EXCEPTION, named here rather than left for
+            # whoever next writes the word in a document. The first draft of this comment claimed that
+            # longer vendor names do not occur inside ordinary words. That is false at nine letters:
+            # prefixing one of the tokens with `phil` or `mis`, or suffixing it with `al`, gives three
+            # ordinary English adjectives. A peer found it by testing the invariant instead of reading
+            # it. Written as prefixes rather than spelled out because spelling them turns this comment
+            # into three hits -- which is the collision demonstrating itself, and the reason the
+            # placeholder convention above exists.
+            #
+            # It stays a substring anyway, and the honest statement of the trade is not "no collisions"
+            # but this: a short token collides so often that anchoring is the only way it is usable at
+            # all, while a long one collides rarely and LOUDLY. The list already makes that trade
+            # explicitly for the two-letter entry, whose note says a loud wrong answer is what it is
+            # buying. A false positive here reds the gate and gets read; a false negative is silent and
+            # ships. The whole reason this line changed is that the anchors were producing the silent
+            # kind.
+            #
+            # Measured: 0 hits from substring-matching every longer token across the whole tracked tree,
+            # and 0 occurrences of the three colliding forms on either tree, so this hardens the gate
+            # and moves no verdict today. If a document ever legitimately needs one of them, the fix is
+            # a word-specific exception with the reason beside it, never a return to blanket anchoring.
+            if len(_w) <= 3:
+                WIDE_TOKENS.append((r"(?<![A-Za-z0-9_])" + re.escape(_w) + r"s?(?![A-Za-z0-9_])", _w))
+            else:
+                WIDE_TOKENS.append((re.escape(_w), _w))
 # TRACKED FILES ONLY, and this is the difference between a gate and a nuisance. The working tree carries
 # coordination documents that are deliberately kept out of the repository through `.git/info/exclude`
 # rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
