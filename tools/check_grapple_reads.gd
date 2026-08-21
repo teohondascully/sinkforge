@@ -153,6 +153,46 @@ var _rock_px: int = 0
 var _bow_span: float = 0.0
 
 
+## OPEN: THE CORD MASK ADMITS ANYTHING ROPE-COLOURED, AND THAT IS WHY THIS LAYER IS RED ON CI.
+##
+## `_bow_now` selects cord by hue alone, inside a corridor that is `span * SAG_CAP + 24.0` wide because it
+## has to admit a fully hung rope. Anything else drawn in that warm grey and lying inside the corridor is
+## taken as cord, and since the reading is a 99th percentile of OFFSET, whatever sits furthest from the
+## chord decides it. The layer then correctly refuses to publish a verdict, and reports saturation. That
+## report is honest but names the wrong subject: the ROPE did not saturate, the mask did.
+##
+## A LOCAL, DETERMINISTIC REPRODUCTION EXISTS, which is worth more than the CI red because it can be run
+## on demand. Centre the objective line in `hud.gd::_draw_objective_line` — `gx = rect.position.x +
+## (w - tw) * 0.5` instead of `rect.position.x + pad` — and about 250px of warm-grey text moves into the
+## corridor:
+##
+##     leftpinned objective (shipped)   bow 0.054 taut / 0.237 slack   3 of 3   healthy
+##     centred objective                bow 0.462 taut / 0.463 slack   4 of 4   at the rim 0.4650
+##
+## Still-frame churn was 0.10% throughout, so it is not machine contention, and the glyph-divisor refactor
+## that landed in the same hour was ruled out separately at 0.053/0.237 over three runs. That HUD fix is a
+## real one and is held behind this defect rather than dropped.
+##
+## TWO REPAIRS WERE BUILT AND BOTH FAILED ON MEASUREMENT. Recording them so the third does not repeat one:
+##
+##   1. FLOOD FILL FROM THE ANCHORS. "The cord is what the hand holds" is the right sentence and the wrong
+##      test, because attachment is not visible: the miner is drawn over the hand end and the piton over
+##      the other, so a taut cord had 370 rope-coloured pixels in the corridor and 3 within reach of an
+##      anchor. Slack measured 0.208; taut returned NO CORD.
+##   2. LONGEST CONNECTED RUN ALONG THE CHORD. Extent is the right discriminator — a cord spans the chord
+##      and a word does not — but the cord is not connected at this tolerance. Lighting, the veil and the
+##      depth fade move the drawn colour along its length, so inside ROPE_TOL it breaks into dashes: the
+##      longest runs spanned 0.16 and 0.09 of the chord, and both ropes returned NO CORD.
+##
+## What both attempts established: the rope is present as roughly 370-470 matching pixels distributed
+## along the whole chord, and it is neither anchored-visible nor contiguous. So the next attempt should
+## bin by `along` and use the fact that the cord occupies nearly EVERY bin while text occupies few,
+## rather than any property of a single connected component. Hiding the HUD for the shutter is the cheap
+## alternative and is not sufficient on its own: CI saturates with the shipped left-pinned objective, so
+## something other than this text is also inside the corridor there, most likely rock the software
+## rasterizer renders closer to ROPE_HUE than hardware does.
+
+
 func _initialize() -> void:
 	print("== the grapple, as a picture rather than as a velocity ==")
 	await _run()
