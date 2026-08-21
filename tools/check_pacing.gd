@@ -133,6 +133,21 @@ func _run() -> void:
 	print("    %s" % _shape(total))
 	print("           ^ one column per %.0f frames; | = the game said something" % (float(total) / float(BAR)))
 
+	# WHY IT FAILED, WHEN IT FAILS. `PlayAgent` records a diagnostic line at every point it gives up
+	# ("could not reach %s to mine it", "ran out of budget digging to %s (stuck near %s)", "climb: STALLED
+	# at %s ... (trapped)") and `arc_driver.play` adds the step it was on. All of it lands in `agent.trace`
+	# and, until now, nothing printed it. So a failed opening reported that it had failed and threw away the
+	# only record of WHICH of the nine steps failed and where the body was standing at the time.
+	#
+	# That cost a night. Two of eight corpus seeds fail this assertion, and the diagnosis had to be rebuilt
+	# from an event list that does not contain the failure, which sent me to worldgen with a ruler for
+	# something the agent had already written down. Printed only on failure: a passing run's trace is noise.
+	if not arc_ok:
+		print("  the opening did NOT reach automation. What the pilot recorded on the way:")
+		if agent.trace.is_empty():
+			print("    (nothing — the agent gave up without recording a reason, which is its own defect)")
+		for line: String in agent.trace:
+			print("    %s" % line)
 	_check(arc_ok, "the session is playable at all (the opening reached first automation)")
 	# VETO, before any ratio is computed. A share and a density are statements about a session of a given
 	# SHAPE; if act two did not happen, they are true statements about a different session than the one this

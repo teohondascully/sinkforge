@@ -86,7 +86,13 @@ func _step_mine(agent: PlayAgent) -> bool:
 ## Step 2 — toss surface ore into the bootstrap forge, let it smelt, stand by the pocket to reach-collect 2
 ## ingots.
 func _step_smelt(agent: PlayAgent) -> bool:
+	# EVERY GIVE-UP SAYS WHY. Corpus seed 20260817 failed this step and the only thing recorded anywhere
+	# was "could not perform signposted step 'smelt'", which names the step and not the reason. Of the
+	# four ways out of this function only `walk_to_column` was writing a note, so a failure here was a
+	# fact with no cause attached and no way to tell the three remaining branches apart.
 	if not await agent.select_item(&"ore"):
+		agent._note("smelt: no ore in the pack to select (carrying %d)"
+			% int(agent.sim.inventory.get(&"ore", 0)))
 		return false
 	var bf: Vector2i = MainView.MINESHAFT_FORGE_CELL
 	if not await agent.walk_to_column(bf.x - 1):
@@ -99,7 +105,11 @@ func _step_smelt(agent: PlayAgent) -> bool:
 		guard += 1
 		await agent.approach(collect)
 		await agent.wait(20)
-	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
+	var got: int = int(agent.sim.inventory.get(&"ingot", 0))
+	if got < 2:
+		agent._note("smelt: the forge gave up %d ingot(s) of 2 in %d tries (ore left in pack: %d)"
+			% [got, guard, int(agent.sim.inventory.get(&"ore", 0))])
+	return got >= 2
 
 
 ## Step 3 — chop one trunk block of the nearest tree for wood (enough to claim the bazaar).
@@ -248,6 +258,21 @@ func _nearest_ore_not_shaft(agent: PlayAgent) -> Vector2i:
 	for cell: Variant in agent.sim.solid:
 		var c: Vector2i = cell
 		if agent.sim.solid[c] != &"ore" or c.x == MainView.MINESHAFT_COL:
+			continue
+		# AND NOT THE FORGE COLUMN, for the same reason the shaft is excluded: this returns a target for
+		# `dig_down_to`, which sinks a COLUMN, and the bootstrap forge sits in the middle of this one at
+		# `MINESHAFT_FORGE_CELL` = (46, 20). Ore below it cannot be reached by digging down from the
+		# surface, because the machine is in the way and a machine is not a block you can mine through.
+		#
+		# On corpus seed 512 the nearest ore during the research step was (46, 29), nine rows under the
+		# forge. The agent walked to (46, 19), stood on its own forge, and dug at it until the budget ran
+		# out, four times, which is the `guard < 4` in `_step_research`. That is 9632 frames, 92% of the
+		# session, and it is the whole of why two of eight seeds never reach first automation.
+		#
+		# The search had no idea. It is a pure distance scan over `sim.solid` with one column excluded,
+		# so "nearest" meant nearest in a straight line and never asked whether the digger could get
+		# there. This makes the second exclusion explicit rather than teaching the scan about geometry.
+		if c.x == MainView.MINESHAFT_FORGE_CELL.x:
 			continue
 		var d: float = agent.main._cell_center(c).distance_to(agent.player.position)
 		if d < best_d:
