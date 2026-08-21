@@ -113,8 +113,10 @@
 #
 # 0 IS THE MOST DANGEROUS OF THESE AND IT IS NOT LISTED AS SUCH ABOVE, so it is said here: `godot --script`
 # exits 0 when the script cannot be parsed AND when the script does not exist. On a fresh clone with no
-# import step, every layer dies at load and this runner would print ALL 103 HARNESS LAYERS PASS over 103
-# layers that never ran.
+# import step, every layer dies at load and this runner would print its all-pass line over the entire
+# registered suite, every layer of which never ran. Said without a total on purpose: the count is derived
+# from the registration verbs a few lines down, and a number written here would rot the next time a layer
+# lands while the hazard it describes stayed exactly the same size.
 #
 # BOTH CI AND A LOCAL RUN ARE NOW GATED AGAINST THAT, by the same file: `tools/harness_verdict.sh`, called
 # from this script's EXIT trap and from .github/actions/harness-verdict. For most of the time the hazard

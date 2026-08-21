@@ -20,9 +20,11 @@ extends "res://tools/check_base.gd"
 ## THE PREDICATE IS COMPARISONS, NOT ASSERTION HELPERS, AND THAT IS THE WHOLE DESIGN.
 ##
 ## The obvious version looks for the claim in a `_verdict()` note and the evidence in a `_check()` call.
-## Both halves are wrong here, and measurably: **30 of 98 layers call `_verdict()`** and **88 of 98 call
-## `_check()`**, so a detector written that way is blind to two thirds of the tree on one axis and a tenth
-## on the other. The one real instance reaches the terminal through a bare `print`, and a layer that
+## Both halves are wrong here, and measurably: **under a third of the layers this gate scans call
+## `_verdict()`** and **about nine in ten call `_check()`**, so a detector written that way is blind to
+## roughly two thirds of the tree on one axis and a tenth on the other. Proportions rather than a pair of
+## totals: the totals move with every layer added, the argument does not, and a stale pair in a comment
+## about stale detectors is the joke writing itself. The one real instance reaches the terminal through a bare `print`, and a layer that
 ## enforces its floor with `if r >= LAG1_FLOOR:` rather than `_check(r >= LAG1_FLOOR)` would be reported
 ## as unguarded. Both mistakes were made while building this and both scored as coverage.
 ##
