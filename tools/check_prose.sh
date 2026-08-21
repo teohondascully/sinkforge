@@ -256,9 +256,17 @@ if os.path.isfile(WORDS_PATH):
 # which sees comment BODIES and not string literals, and whose token list carries none of the eight
 # vendor words. Measured, with a control leg, by planting three lines in scenes/player.gd:
 #
-#     # scripted probe comment.        exit 1   caught      <- control: file is in population, gate is live
-#     # Assistant wrote this helper.     exit 0   MISSED
-#     print("scripted probe")          exit 0   MISSED
+#     # <listed-word> probe.          exit 1   caught      <- control: file is in population, gate is live
+#     # <vendor-name> wrote this.      exit 0   MISSED
+#     print("<listed-word> probe")     exit 0   MISSED
+#
+# The words are written as placeholders on purpose, and the reason is a defect this file committed twice
+# tonight. THIS FILE IS TRACKED AND IT EXCLUDES ITSELF FROM ITS OWN SCAN, which is correct -- it would
+# match its own literals -- and which makes it the one shipped file no gate reads. Spelling the evidence
+# out here put five occurrences of the vocabulary into the only place nothing would ever catch them:
+# 0 on origin/main, 2 after the case-fold repair, 5 after the population repair, every one added by the
+# commits whose subject was removing exactly this. Self-exclusion is necessary and it is also an
+# unmonitored surface; write about the words here, never in them.
 #
 # The two misses are the hole; the control is what makes them mean blindness rather than a broken probe.
 # Note which one nearly shipped: the instance that started this was a print() banner, the highest-value
@@ -269,13 +277,25 @@ if os.path.isfile(WORDS_PATH):
 # argued for. Measured before the change: 0 hits across the 58 text files it adds, so this hardens the
 # gate and moves no verdict.
 WIDE_PATHS = sorted(_tracked)
-# The gate is excluded from its own scan: with the word list external it no longer carries the literals,
-# but a file that reports on the list would still match anything the list names. The comment here used
-# to claim `.gitignore` was excluded too -- it never was, in this set or any other; the old population
-# simply never reached it. It is in scope now and measures clean, and an ignore file that ever names a
-# vendor is a real finding rather than a nuisance. Exclusions are counted and printed below, because an
-# exclusion nobody can see is indistinguishable from a scan that missed.
-WIDE_SKIP = {"tools/check_prose.sh"}
+# AND NOTHING IS EXCLUDED, WHICH IS A CHANGE. This set held `tools/check_prose.sh` for as long as this
+# file spelled the words it hunts for: a file reporting on the list matches anything the list names, so
+# it had to be exempt. That exemption made it the one tracked, shipped file no gate read -- and the
+# comments above then filled it, 0 occurrences on origin/main to 5, added by the very commits removing
+# the vocabulary elsewhere. The self-exclusion was correct and the surface it created was not.
+#
+# Rewriting those comments to placeholders took this file to 0, which removes the reason for the
+# exemption, so the exemption goes. Named on both axes rather than called an improvement: better on
+# coverage, because the last unscanned tracked file is now scanned; worse on freedom of expression in
+# this one file, because writing about a listed word here now fails the gate and the author must reach
+# for `<listed-word>`. That is the trade, and it is the right way round -- the alternative is a blind
+# spot precisely where someone is thinking hardest about the vocabulary.
+#
+# The set and its counter stay so the mechanism exists and prints; an exclusion nobody can see is
+# indistinguishable from a scan that missed, and so is an empty one nobody mentions.
+#
+# (The comment here also used to claim `.gitignore` was excluded. It never was, in this set or any
+# other; the old population simply never reached it. It is in scope now and measures clean.)
+WIDE_SKIP = set()
 # A LIST THAT IS NOT THERE IS NOT A CLEAN SWEEP, AND SAYING SO IN PROSE IS NOT ENOUGH. The first version
 # of this printed a warning and then exited 0 with no marker, so the runner scored the layer a plain PASS,
 # byte-indistinguishable from a run that tested every word -- and since the list is deliberately untracked,
@@ -329,10 +349,10 @@ for wp in WIDE_PATHS:
     for pat, name in WIDE_TOKENS:
         # CASE-INSENSITIVE, like the narrow sweep twelve lines down and unlike the first version of
         # this line. The word list's own header promised whole-word AND case-insensitive matching while
-        # the code did neither half of the second part, so `SCRIPTED` passed a gate that stopped
-        # `scripted`. origin/main carries exactly that: play_tests.gd:3 spells it capitalised in a
-        # docstring and play_tests.gd:34 spells it lowercase in a print, and only the second was
-        # reachable. A rule documented one way and implemented another is the quieter half of a guard
+        # the code did neither half of the second part, so the CAPITALISED spelling of a listed word
+        # passed a gate that stopped its lowercase form. origin/main carries exactly that pair in one
+        # file: a docstring spells it capitalised, a print() twelve lines later spells it lowercase, and
+        # only the second was reachable. A rule documented one way and implemented another is the quieter half of a guard
         # that cannot be false.
         k = len(re.findall(pat, wsrc, re.IGNORECASE))
         if k:
@@ -378,7 +398,7 @@ if unreadable:
 
 print("\nwide sweep: %d word(s) tested over %d text file(s) -- every tracked file in the repository"
       % (len(WIDE_TOKENS), wide_read))
-print("            %d binary, %d self-skipped (the gate does not scan itself), %d tracked-but-absent,"
+print("            %d binary, %d excluded by name, %d tracked-but-absent,"
       % (wide_binary, wide_skipped, wide_absent))
 print("            %d unreadable" % len(wide_unreadable))
 # THE POPULATION HAS TO ADD UP. Every path out of the loop above increments exactly one counter, so if
