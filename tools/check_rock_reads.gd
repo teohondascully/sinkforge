@@ -263,7 +263,10 @@ func _run() -> void:
 		+ " same depths; far apart means they are not the same picture)")
 
 	_check(best >= READ_FLOOR,
-		"a player can tell rock from air out in the dark — %.0f%% on the better of the two cues (floor %.0f%%)"
+		# TWO DECIMALS ON THE FAILURE, because %.0f prints a near miss and its own floor as the same
+		# number. "75% on the better of the two cues (floor 75%)" reads as a broken assertion rather
+		# than as a value four thousandths under the bar, and a reader cannot tell which from the line.
+		"a player can tell rock from air out in the dark — %.2f%% on the better of the two cues (floor %.2f%%)"
 			% [best * 100.0, READ_FLOOR * 100.0])
 
 	main.queue_free()

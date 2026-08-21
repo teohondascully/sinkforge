@@ -194,7 +194,10 @@ func _check_paint() -> int:
 			print("  PASS: paint %-14s lag-1 %.2f, roughness %.1f%%  (%d samples)"
 				% [axis[0], r, rough * 100.0, n])
 		else:
-			printerr("  FAIL: paint %-14s lag-1 %.2f (floor %.2f), roughness %.1f%% (ceil %.1f%%)"
+			# TWO DECIMALS ON THE FAILING LINE. At %.1f a roughness a few ten-thousandths over the
+			# ceiling prints as equal to it, so the line reads "6.5% (ceil 6.5%)" and looks like the
+			# assertion is wrong rather than the paint. The passing line above can stay coarse.
+			printerr("  FAIL: paint %-14s lag-1 %.2f (floor %.2f), roughness %.2f%% (ceil %.2f%%)"
 				% [axis[0], r, PAINT_LAG1_FLOOR, rough * 100.0, PAINT_ROUGH_CEIL * 100.0])
 			fails += 1
 	return fails
