@@ -258,12 +258,23 @@ WIDE_PATHS = sorted(f for f in _tracked          # the same enumeration as the s
 # for the same reason one line down. Both exclusions are counted and printed below, because an exclusion
 # nobody can see is indistinguishable from a scan that missed.
 WIDE_SKIP = {"tools/check_prose.sh"}
-# A LIST THAT IS NOT THERE IS NOT A CLEAN SWEEP. Without this the wide pass reads every file, matches an
-# empty pattern set, and prints the same line it prints when the tree is genuinely clean.
+# A LIST THAT IS NOT THERE IS NOT A CLEAN SWEEP, AND SAYING SO IN PROSE IS NOT ENOUGH. The first version
+# of this printed a warning and then exited 0 with no marker, so the runner scored the layer a plain PASS,
+# byte-indistinguishable from a run that tested every word -- and since the list is deliberately untracked,
+# that is the PERMANENT state in CI, which is the one environment where the tree becomes public. A gate
+# that stands an assertion down silently, forever, in exactly the place it matters, is the quiet green
+# this repository is built around catching, one level up from the leg it was written to fix.
+#
+# So it declares itself through the registry instead: `SKIP: [id]` when the sweep is declined, `HELD: [id]`
+# when it ran. tools/stand_downs.txt carries the row and tools/harness_verdict.sh resolves it, so the
+# verdict reads PASS* and names which assertion did not happen. Same three-valued accounting a check_base
+# layer gets, spelled out by hand because this layer is a shell script and has no base class.
 if not WIDE_TOKENS:
-    print("check_prose: no wide word list at %s -- the wide sweep read the tree and ASSERTED NOTHING."
+    print("  SKIP: [prose.wide-word-list] no wide word list at %s, so no authorship vocabulary was"
           % WORDS_PATH)
-    print("             Set SF_PROSE_WORDS to a file with one word per line to enable it.")
+    print("        tested. Point SF_PROSE_WORDS at a file with one word per line to enable it.")
+else:
+    print("  HELD: [prose.wide-word-list] this run asserted it (%d word(s))" % len(WIDE_TOKENS))
 wide_fails, wide_read, wide_skipped = [], 0, 0
 for wp in WIDE_PATHS:
     if not os.path.isfile(wp):

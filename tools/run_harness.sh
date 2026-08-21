@@ -340,8 +340,8 @@ add "check_exit_codes (the table and its reader agree)" "res://tools/check_exit_
 # layer whose whole job is "every layer runs", and it filtered its population to `.gd`, so a shell gate
 # could not appear in it at all. The guard against this defect was green the whole time, over a population
 # that excluded the file that went missing. Its own header has the right instinct -- a layer is identified
-# by what it INHERITS, not by an allowlist -- and an extension filter is an allowlist wearing a hat. c1's
-# finding, and it is why that population is widened in the same commit as this line.
+# by what it INHERITS, not by an allowlist -- and an extension filter is an allowlist wearing a hat. Found
+# in review, and it is why that population is widened in the same commit as this line.
 #
 # Costs 0.4 seconds, needs no engine and no display, and reads the working tree plus `git ls-files`.
 add "check_prose (the comment register)" "res://tools/check_prose.sh"
