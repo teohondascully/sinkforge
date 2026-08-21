@@ -122,8 +122,17 @@ fi
 #    of the two directions this repository has now found in one night. The cap library's case was a comment
 #    WARNING AGAINST a bad pattern and matching the search for it; this is a comment CLAIMING a good one,
 #    and that stays true-looking and keeps passing long after it stops being true.
+#    IT IS ONE PROCESS ON PURPOSE, and the pipe it replaces was a live flake rather than a tidiness
+#    point. `producer | grep -q` under `pipefail` reports the pipeline as FAILED when the match is
+#    found EARLY: `grep -q` exits at the first hit, the upstream `grep -v` is still writing, it takes
+#    SIGPIPE and exits 141, and `pipefail` promotes 141 over the consumer's 0. The layer then prints
+#    "does not call the gate" precisely BECAUSE the call is there. Measured at 1 in 400 quiet and
+#    2 in 400 under 12 spinners on the 22KB runner, 400 in 400 on a 300KB control whose match is on
+#    line 1, upstream 141 and downstream 0 in every failing trial. It cost a red in one full sweep.
+#    The CI action never showed it: 491 bytes fits the pipe buffer, so its producer finishes first.
+#    An unreadable file still fails, which is the direction this property needs: awk exits 2.
 _calls_gate() {
-	grep -vE '^[[:space:]]*#' "$1" 2>/dev/null | grep -q 'tools/harness_verdict\.sh'
+	awk '/^[[:space:]]*#/ { next } /tools\/harness_verdict\.sh/ { hit = 1 } END { exit hit ? 0 : 1 }' "$1"
 }
 if _calls_gate "$RUNNER"; then
 	ok "the local runner calls the gate"
