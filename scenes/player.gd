@@ -506,7 +506,24 @@ func _resolve_axis(horizontal: bool) -> void:
 			if horizontal:
 				var ov_x: float = minf(rect.end.x, cell_rect.end.x) - maxf(rect.position.x, cell_rect.position.x)
 				var ov_y: float = minf(rect.end.y, cell_rect.end.y) - maxf(rect.position.y, cell_rect.position.y)
-				if ov_x > ov_y:
+				# THE LEDGE EXEMPTION ONLY APPLIES BELOW, and until it said so this test was
+				# direction-blind. Its intent is "the body is clipping the top of a block UNDER it, so
+				# let the vertical pass land it instead of blocking the walk". The identical condition
+				# fires when the body is clipping the BOTTOM of a block above it, and nothing in the
+				# branch compared the cell to the body: a two-way classifier, ledge or wall, in a world
+				# that also contains ceilings.
+				#
+				# WHAT IT COST. HEIGHT is just over CELL, so a resting body's head pokes exactly
+				# HEIGHT - CELL = 2px into the row above its own, on every walking frame (the horizontal
+				# resolve runs before the vertical integration, on feet the last vertical pass snapped to
+				# a row boundary). The test therefore reduced to "did this frame carry the body more than
+				# 2px in", and at walking speed it does about half the time. Measured on a one-row tunnel
+				# over 16 approaches differing ONLY in sub-cell start phase: 8 of 16 crossed at full
+				# stride, 3 of 16 at RUN_SPEED, same map, same body, same input. The note on HEIGHT above
+				# says a one-tall gap is an honest squeeze; it was a coin flip instead, and no fixture
+				# could see it, because a fixture draws the same phase on every run. Comparing the cell
+				# to the body makes it 16 of 16 refused in both legs. Guarded by check_stepup.
+				if ov_x > ov_y and cell_rect.get_center().y > rect.get_center().y:
 					continue          # shallower in Y → a ledge to step/land onto, not a wall to block
 				# A wall in the path. Before blocking, try to step up onto it: the auto-step the heightmap
 				# cannot give, identical for a dug pit's edge, a cave ledge and a placed machine, none of

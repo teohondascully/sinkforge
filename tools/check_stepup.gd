@@ -18,6 +18,19 @@ var _y0: float = 0.0
 var _prev_y: float = 0.0
 var _max_rise: float = 0.0  ## largest single-frame UPWARD jump during the climb (teleport detector)
 
+## A ONE-ROW OPENING IS A WALL, over FOUR sub-cell start phases rather than one. The body is HEIGHT 34
+## in a CELL of 32, so a resting head pokes exactly 2px into the row above and the horizontal resolve
+## used to read that graze as a ledge, letting the body through whenever a frame carried it more than
+## 2px into the mouth. Whether it does is decided by where in the cell the approach happens to start,
+## so a SINGLE approach is a coin flip that a fixture would draw the same way on every run and call a
+## property of the world. Four phases is a guard the defect cannot pass by luck: unrepaired, the same
+## four cross between one and three times.
+const SQUEEZE_COL: int = 14                      ## the tunnel mouth
+const SQUEEZE_OFFSETS: Array[float] = [0.0, 8.0, 16.0, 24.0]
+var _sq_i: int = 0
+var _sq_built: bool = false
+var _sq_through: Array[String] = []
+
 
 func _initialize() -> void:
 	Engine.max_fps = 60
@@ -96,8 +109,46 @@ func _phys() -> void:
 			elif _t >= 4.0:
 				_check(false, "could not jump the 2-tile wall (x=%.0f)" % _player.position.x)
 				_phase = 3
-		3:
+		3:  # A ONE-ROW OPENING REFUSES THE BODY, from every start phase.
+			if _sq_i >= SQUEEZE_OFFSETS.size():
+				_check(_sq_through.is_empty(),
+					"a one-row opening refused the body from all %d start phases%s"
+					% [SQUEEZE_OFFSETS.size(), "" if _sq_through.is_empty()
+						else " (SQUEEZED THROUGH at " + ", ".join(_sq_through) + ")"])
+				_phase = 4
+				return
+			if not _sq_built:
+				_build_squeeze(SQUEEZE_OFFSETS[_sq_i])
+				_sq_built = true
+				return
+			_player.input_dir = 1.0
+			_t += 1.0 / 60.0
+			if _player.position.x > float((SQUEEZE_COL + 3) * 32):
+				_sq_through.append("+%.0fpx" % SQUEEZE_OFFSETS[_sq_i])
+				_sq_i += 1; _sq_built = false
+			elif _t >= 2.5:
+				_sq_i += 1; _sq_built = false
+		4:
 			if _failures == 0:
 				print("STEP-UP OK"); quit(0)
 			else:
 				printerr("%d STEP-UP CHECK(S) FAILED" % _failures); quit(1)
+
+
+## A flat floor with a ONE-ROW tunnel: floor at row 12, ceiling at row 10, so row 11 is the only opening
+## and the body is 2px too tall for it. The run-up is four cells, enough to reach RUN_SPEED and not
+## enough to build a stride, which is the speed a player crosses ordinary ground at. `off` shifts the
+## start inside its cell, which is the only thing that varies between the four approaches.
+func _build_squeeze(off: float) -> void:
+	var sim: FactorySim = _main.sim
+	for x: int in range(2, 21):
+		for y: int in range(2, 16):
+			sim.set_solid(Vector2i(x, y), &"")
+		sim.set_solid(Vector2i(x, 12), &"earth")        # the floor
+	for x: int in range(SQUEEZE_COL, 21):
+		sim.set_solid(Vector2i(x, 10), &"earth")        # the ceiling, two rows above it
+	_player.position = Vector2(float((SQUEEZE_COL - 4) * 32) + off,
+			float(12 * 32) - Player.HEIGHT * 0.5)
+	_player.velocity = Vector2.ZERO
+	_player.input_dir = 0.0
+	_t = 0.0
