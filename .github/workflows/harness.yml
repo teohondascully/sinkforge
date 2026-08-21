@@ -90,7 +90,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # FULL HISTORY, BECAUSE THIS JOB RUNS `check_trailers` AS LAYER 28 AND A SHALLOW CLONE
+      # MAKES THAT A PERMANENT RED FROM CONFIGURATION RATHER THAN FROM CODE. The layer refuses to
+      # report a verdict on a history it cannot see -- "shallow clone; the history was not scanned" --
+      # which is exactly right and is why it cannot be left alone: it is the guard on the no-trailer
+      # rule, a locked project constraint, and the Actions tab has been carrying a standing failure on
+      # it whose cause is a checkout setting. The `authorship` job already sets this and passes there
+      # (896 commits, one author, no trailers), so the coverage existed and the sweep's copy of it did
+      # not. Fixing it here rather than skipping the layer in this job: a skip re-creates the vacuity
+      # the refusal was written to prevent. Found by c1 in the CI log for bd2b1d7.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install Godot (headless linux)
         run: |
