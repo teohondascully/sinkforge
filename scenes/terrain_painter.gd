@@ -1,34 +1,27 @@
 extends RefCounted
 
-## THE TERRAIN PAINTER — the coarse-terrain draw pipeline (per-cell fill/grain/ore-crystals, the autotile
-## silhouette chamfers + concave fillets, carved-edge ambient occlusion, and the walkable surface cap/ramp
-## pass), extracted from WorldRenderer so the renderer isn't carrying ~300 lines of terrain drawing.
-## Stateless: it paints onto the baked terrain CanvasItem the renderer hands it, reads terrain from r.sim,
-## and pulls each cell's APPEARANCE (colour/grain/speckles/material) from the renderer's shared helpers
-## (r._cell_fill_color / r._material / r._cell_speckles — those stay on WorldRenderer because walls,
-## fine-terrain and the minimap share them). Bake-time code (drawn once per dirty chunk into the terrain
-## SubViewport, not per frame), so the r.x reach-backs are amortized. Deterministic; purely cosmetic.
+## The coarse-terrain draw pipeline: per-cell fill, grain and ore crystals, the autotile silhouette
+## chamfers and concave fillets, carved-edge ambient occlusion, and the walkable surface cap/ramp pass.
+## Stateless. It paints onto the terrain CanvasItem the renderer hands it, reads terrain from r.sim, and
+## takes each cell's appearance from the renderer's shared helpers (r._cell_fill_color / r._material /
+## r._cell_speckles), which live there because walls, fine terrain and the minimap share them. Bake-time
+## code: drawn once per dirty chunk into the terrain SubViewport, not per frame. Deterministic, cosmetic.
 
-## THE KEY LIGHT (#A1) — the carved-edge pass's four face weights, in one place because they only mean
-## anything relative to each other. Light comes from straight ABOVE (the same direction the veil's
-## skylight floods), so a sky-facing top catches a warm lit lip while an underside falls into the
-## deepest shadow in the frame and walls sit between. The SPREAD between these numbers is what gives a
-## block a top and a bottom; flattening them back toward each other returns the sticker look.
-const LIT_RIM: float = 0.14      ## the dimmer highlight a VERTICAL face catches from the same key light
+## The carved-edge pass's four face weights, kept together because they only mean anything relative to
+## each other. Light comes from straight above, the direction the veil's skylight floods, so a sky-facing
+## top catches a warm lit lip, an underside falls into the deepest shadow in the frame, and walls sit
+## between. The spread between these numbers is what gives a block a top and a bottom.
+const LIT_RIM: float = 0.14      ## the dimmer highlight a vertical face catches from the same key light
 const LIT_LIP: float = 0.30      ## warm highlight alpha on the very edge of a sky-facing face
 const AO_TOP: float = 0.07       ## whisper of dark under that lip, just enough to give it thickness
-const AO_SIDE: float = 0.26      ## walls — the mid tone
-const AO_UNDER: float = 0.46     ## overhangs/ceilings — nothing in the world is darker
+const AO_SIDE: float = 0.26      ## walls, the mid tone
+const AO_UNDER: float = 0.46     ## overhangs and ceilings, the darkest tone in the world
 
-## THE CORNER RADIUS, named once because three passes have to agree on it and none of them could see the
-## other two. `_draw_cell_silhouette` cuts this much off every convex corner; `_draw_edge_ao` insets its
-## face strips by exactly the same amount, and that one is a HARD requirement rather than a preference,
-## because an inset smaller than the cut leaves an AO sliver floating in the air over the 45 degree face
+## The corner radius, named once because three passes have to agree on it. `_draw_cell_silhouette` cuts
+## this much off every convex corner. `_draw_edge_ao` must inset its face strips by exactly the same
+## amount: an inset smaller than the cut leaves an AO sliver floating in the air over the 45 degree face,
 ## and an inset larger than it leaves the corner unshaded. `_draw_inner_fillets` rounds concave junctions
-## to the same radius so that convex and concave corners read as one edge vocabulary.
-##
-## All three were separate 7.0 literals, related by a comment on one of them reading "keep in lockstep",
-## which is a note and not a mechanism.
+## to the same radius, so convex and concave corners read as one edge vocabulary.
 const CHAMFER: float = 7.0
 
 ## The carved-edge strip stack on a foreground face: how many strips, and how thick each one is. The
@@ -41,12 +34,11 @@ const AO_DEPTH: float = AO_STEPS * AO_STRIP
 
 ## Draw the solid cells in `rect`, then the concave fillets + the surface cap/ramp pass for its columns.
 static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
-	# #S15: only the surface band survives the fine layer, so the rest is skipped — but ROW BY ROW, in the
-	# original order. A cell's chamfers bleed past its own rect and composite against whatever was drawn
-	# before them, so the visit order is part of the picture: walking the columns instead moved 75 pixels of
-	# the frame where restricting the rows moved none. The saving is in the cells skipped, not the order.
-	# `surface_row` SCANS a column from the sky down, so it is hoisted out of the inner loop — eight calls
-	# per chunk rather than sixty-four.
+	# Only the surface band survives the fine layer, so the rest is skipped, but row by row in the original
+	# order: a cell's chamfers bleed past its own rect and composite against whatever was drawn before them,
+	# so visit order is part of the picture. Walking the columns instead moved 75 pixels of the frame;
+	# restricting the rows moved none. `surface_row` scans a column from the sky down, so it is hoisted out
+	# of the inner loop.
 	var band: PackedInt32Array = PackedInt32Array()
 	band.resize(rect.size.x)
 	for i: int in rect.size.x:
@@ -60,15 +52,15 @@ static func paint(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 			if not r.sim.solid.has(c):
 				continue
 			_draw_terrain_cell(r, ci, c)
-	_draw_inner_fillets(r, ci, rect)   # concave junctions rounded into the open cells (autotile #9)
+	_draw_inner_fillets(r, ci, rect)   # concave junctions rounded into the open cells
 	_draw_terrain_surface(r, ci, rect)
 
 
-## The concave half of the autotile: wherever an OPEN cell's corner meets two solid
-## orthogonal faces (a floor meeting a wall, a ceiling meeting a pillar), a quarter-round shoulder of
-## the supporting rock's own colour fills that corner — carved junctions read as worn rock, not Lego
-## seams. Bottom corners take the FLOOR cell's colour, top corners the CEILING's. Runs per chunk after
-## the cells; the surface cap/ramp pass paints after (over) it, so the walked line stays authoritative.
+## The concave half of the autotile: wherever an open cell's corner meets two solid orthogonal faces, a
+## quarter-round shoulder of the supporting rock's colour fills that corner, so a carved junction reads
+## as worn rock instead of a right-angled seam. Bottom corners take the floor cell's colour, top corners
+## the ceiling's. Runs per chunk after the cells, and the surface cap/ramp pass then paints over it, so
+## the walked line stays authoritative.
 static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 	const R: float = CHAMFER
 	var s: float = float(WorldRenderer.CELL)
@@ -83,8 +75,8 @@ static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) 
 	for cy: int in range(rect.position.y, rect.position.y + rect.size.y):
 		for cx: int in range(rect.position.x, rect.position.x + rect.size.x):
 			var c := Vector2i(cx, cy)
-			# #S15: an open cell with a wall behind it is painted by the fine layer, so its fillet would
-			# never be seen. Only open AIR — a hillside, the sky side of an arch — still shows one.
+			# An open cell with a wall behind it is painted by the fine layer, so its fillet would never be
+			# seen. Only open air, a hillside or the sky side of an arch, still shows one.
 			if r.sim.wall.has(c):
 				continue
 			if r.sim.solid.has(c) or not r.sim.in_bounds(c):
@@ -104,12 +96,12 @@ static func _draw_inner_fillets(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) 
 
 
 ## One solid terrain cell: fill, grain, ore nuggets, and carved-edge AO. Split out of the cell loop so the
-## chunked painter can draw just its block's cells (was `for cell in sim.solid` over the whole world).
+## chunked painter can draw just its block's cells.
 static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) -> void:
 		var pos := Vector2(c) * float(WorldRenderer.CELL)
 		var def: MaterialDef = r._material(r.sim.solid[c])
-		# Sprite-ready: if a tile PNG exists for this material, draw it and skip the procedural fill
-		# (still draw the surface cap/ramp pass below).
+		# If a tile PNG exists for this material, draw it and skip the procedural fill. The surface
+		# cap/ramp pass below still runs.
 		var tile: Texture2D = Art.tex("tile_" + String(def.id))
 		if tile != null:
 			ci.draw_texture_rect(tile, Rect2(pos, Vector2(WorldRenderer.CELL, WorldRenderer.CELL)), false)
@@ -117,30 +109,27 @@ static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) ->
 		var col: Color = r._cell_fill_color(c, def)
 		_draw_cell_silhouette(r, ci, c, pos, col)
 		if def.grain:
-			# Rock grain — a darker pit + a lighter clod + a mid chip, deterministic per cell, so the
-			# surface reads as textured rock rather than a colour swatch.
+			# Rock grain: a darker pit, a lighter clod, a mid chip, deterministic per cell, so the surface
+			# reads as textured rock rather than a colour swatch.
 			var sp: Array[Vector2] = r._cell_speckles(c, 3)
 			ci.draw_rect(Rect2(pos + sp[0] - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), col.darkened(0.26))
 			ci.draw_rect(Rect2(pos + sp[1] - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), col.lightened(0.12))
 			ci.draw_rect(Rect2(pos + sp[2] - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), col.darkened(0.14))
 			_draw_fissure(ci, c, pos, col)
-		if def.has_nuggets():  # embedded specks so a vein reads as ore IN rock, not an orange block
-			# Speck DENSITY tracks the remaining deposit: a rich body sparkles thickly, a
-			# nearly-drained one thins to a fleck — so a chunk's "set amount" READS, and a drill eating it
-			# bottom-up visibly fades. (Cells with no pool entry = amount 1 = today's sparse look.)
-			# BLIND-PLAYTEST FIX: a vein must read as MINERAL-IN-ROCK, not warm blobs. The instrument kept
-			# calling round warm flecks "embers/coals" (fire) — so the specks are now ANGULAR, dark-SOCKETED
-			# CRYSTALS (a rough faceted chip seated in a rock socket, a lit upper facet), the Terraria/Minecraft
-			# ore language. Kept below the glow HDR threshold so daylight ore does NOT bloom like an ember;
-			# the crystals glow only via the dark-gated seam pass underground.
+		if def.has_nuggets():  # embedded specks so a vein reads as ore in rock, not an orange block
+			# Speck density tracks the remaining deposit, so a drill eating a vein bottom-up visibly fades. A
+			# cell with no pool entry counts as amount 1.
+			# The specks are angular crystals seated in a dark socket. Round warm flecks read as embers rather
+			# than as mineral. The colours stay below the glow HDR threshold so daylight ore does not bloom;
+			# underground the dark-gated seam pass lights them.
 			var richness: int = int(r.sim.deposits.get(c, 1))
 			var nug_n: int = clampi(def.nugget_count + richness - 1, maxi(def.nugget_count, 4), def.nugget_count + 6)
 			var socket: Color = def.nugget_color.darkened(0.55)     # dark rock socket seats the crystal
-			var facet: Color = def.nugget_color.lightened(0.22)     # a hard mineral facet catching light (dim — no bloom)
+			var facet: Color = def.nugget_color.lightened(0.22)     # a hard mineral facet catching light, dim, no bloom
 			for nug: Vector2 in r._cell_speckles(c, nug_n):
 				var p: Vector2 = pos + nug
 				const R: float = 3.2
-				# An IRREGULAR faceted chip (asymmetric quad = rough crystal, not a soft gem/blob).
+				# An irregular faceted chip. A symmetric quad reads as a soft gem instead of rough crystal.
 				var v0: Vector2 = p + Vector2(0.0, -R)
 				var v1: Vector2 = p + Vector2(R * 0.72, -R * 0.12)
 				var v2: Vector2 = p + Vector2(R * 0.16, R)
@@ -152,19 +141,18 @@ static func _draw_terrain_cell(r: WorldRenderer, ci: CanvasItem, c: Vector2i) ->
 		_draw_edge_ao(r, ci, c, pos)  # carved depth: ambient occlusion on faces that border open air
 
 
-## The cell's body FILL, autotiled: instead of a flat square, the silhouette CHAMFERS
-## every convex corner — a 45° cut wherever two adjacent faces are both open — so free edges read as
-## weathered earth, a lone block reads as a boulder, and cave mouths lose the Lego. The 45° echoes the
-## ramp language (one diagonal vocabulary everywhere). The cut is skipped on the top corners of the
-## column's walkable surface cell: the cap/ramp pass owns that edge, and the seen line must stay
-## exactly the walked line. Sprite tiles (tile_<id>.png) bypass this — art brings its own edges.
+## The cell's body fill, autotiled: the silhouette chamfers every convex corner, a 45° cut wherever two
+## adjacent faces are both open, so free edges read as weathered earth and a lone block as a boulder.
+## The angle is 45° to match the ramp geometry, so the world has one diagonal vocabulary throughout. The
+## cut is skipped on the top corners of the column's walkable surface cell, where the cap/ramp pass owns
+## the edge and the line drawn has to be the line walked. Sprite tiles (tile_<id>.png) bypass this.
 static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
 	const R: float = CHAMFER
 	var open_u: bool = not r.sim.is_solid(c + Vector2i(0, -1))
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
 	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
-	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y     # the walk line — the cap/ramp pass owns it
+	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y     # the walked line: the cap/ramp pass owns it
 	var s: float = float(WorldRenderer.CELL)
 	var pts := PackedVector2Array()
 	if open_u and open_l and not keep_top:               # top-left
@@ -186,66 +174,34 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 	ci.draw_colored_polygon(pts, col)
 
 
-## Ambient-occlusion crevice shadow on each cell face that borders OPEN air — a few inset strips of
-## fading dark, so dug tunnels and exposed dirt faces look CARVED (recessed), not like flat stickers.
-## CORNER-AWARE: each strip INSETS where the silhouette chamfered that corner (no AO
-## sliver floating over the 45° cut), and where a face DEAD-ENDS into an overhang (perpendicular
-## neighbour solid but the diagonal past it solid too — a concave inside corner) a nested SCOOP patch
-## darkens the junction end, so carved pockets read scooped from the rock, not taped together. Both
-## cells at a junction patch their own face, so the scoop is symmetric with zero cross-cell drawing.
+## Ambient-occlusion crevice shadow on every cell face that borders open air: inset strips of fading dark
+## so dug tunnels and exposed dirt faces read as carved rather than as flat stickers. Each strip insets
+## where the silhouette chamfered that corner. Where a face dead-ends into an overhang (perpendicular
+## neighbour solid and the diagonal past it solid too) a nested scoop darkens the junction end. Both cells
+## at a junction patch their own face; the scoop is symmetric and neither draws outside its own box.
 ##
-## MEASURED 2026-08-18, BECAUSE NONE OF THE ABOVE REACHES A PLAYER UNDERGROUND. This pass draws on the
-## COARSE layer at z=-10. `FineTerrain` draws its mold at z=-9 and writes alpha 255 over every solid cell
-## (`fine_terrain.gd:822`), so the only place a coarse pixel can survive is where the mold — which is
-## organic and does not fill a cell to its square boundary — has eroded away from the edge. That is exactly
-## the band these strips are drawn in, which is why the question needed measuring rather than deducing.
+## What the pass is worth depends on depth. It draws on the coarse layer at z=-10. `FineTerrain` draws its
+## mold at z=-9 and writes alpha 255 over every solid cell (`fine_terrain.gd:822`), so a coarse pixel can
+## survive only where the mold has eroded back from the cell edge. The mold is organic and does not fill a
+## cell to its square boundary, and that eroded band is exactly where these strips sit.
 ##
-## THE MEASUREMENT THAT FINALLY FITS THE QUESTION, after two that did not. The world is FROZEN
-## (`Engine.time_scale = 0`), the mold is allowed to finish baking (`pending_rows() == 0`), and the same
-## process captures the frame with this function drawing and with it skipped, counting pixels that differ
-## AT ALL — any channel, more than one 8-bit step. No classifier, no threshold, no dependence on how dark
-## the contribution is: half a level still moves a byte. Three runs, and every signal is printed beside a
-## same-vs-same capture of the untouched scene, because a difference count without its own noise floor is
-## the exact mistake this docstring made twice:
+## Method: a frozen world (`Engine.time_scale = 0`) with the mold baked out to `pending_rows() == 0`. One
+## process captures the frame with this function drawing and with it skipped, then counts every pixel that
+## moves by more than one 8-bit step in any channel. Three runs, each beside a same-vs-same capture of the
+## untouched scene:
 ##
-##                              floor   drawn-vs-skipped
-##   SURFACE, at the opening      24 /  72 /  21     4427 / 4531 / 4559
-##   UNDERGROUND, 50 rows down    15 /  38 /   9       48 /   43 /    9
+##                              floor            drawn-vs-skipped
+##   surface, at the opening    24 / 72 / 21     4427 / 4531 / 4559
+##   underground, 50 rows down  15 / 38 /  9       48 /   43 /    9
 ##
-## **At the surface the pass paints about 4,500 pixels — sixty to two hundred times its own noise floor.**
-## **Underground the signal is the floor.** Paired, the excess is +33 / +5 / 0 out of 2,073,600, and two of
-## three runs show nothing at all. So the pass contributes less than about forty pixels down there, which
-## is 0.002% of the frame, and the honest form of that is *not separable from noise* rather than *zero*.
+## At the surface the pass paints roughly 4500 px: sixty to two hundred times its own noise floor. Fifty
+## rows down the signal is the floor. Paired, the excess is +33 / +5 / 0 out of 2073600 px and two of the
+## three runs show nothing at all, which bounds the contribution under about forty pixels or 0.002% of the
+## frame. That is not separable from noise rather than zero. The pass stays for the surface work.
 ##
-## Not deleted, because four and a half thousand pixels in the first view anybody ever sees is real work.
-##
-## FOUR DETECTORS DIED GETTING HERE AND EACH ONE FAILED DIFFERENTLY, which is the useful part.
-##
-## 1. ABSOLUTE CHANNEL LEVELS (`r > 0.30 and b > 0.30`). The veil multiplies every channel down to a luma of
-##    eight to eleven underground, so the detector went blind at exactly the depths under study — its
-##    sensitivity varying with the variable being studied.
-## 2. A HUE RATIO (`min(r,b) > 2g`), which a uniform darkening cannot break. It fired on the world instead:
-##    7098 hits with the patch and 7082 without, so the underground reading was the game's own dark chroma
-##    and I read the −16 as "zero". I had reported 247 before that, normalised it by open faces, derived a
-##    monotonic zoom curve and proposed a mechanism for the curve. **A signal measured without its baseline
-##    is not a small signal, it is an unknown one.**
-## 3. THE HUE RATIO AGAIN, WITH THE BASELINE — still wrong, and this one only came apart when I set out
-##    to defend it. This pass draws at ALPHA (`LIT_RIM` 0.14, `LIT_LIP` 0.30). Forcing the colours to magenta
-##    does not force the alpha, so a real contribution composites to 14-30% magenta over dark blue-grey
-##    rock and need never clear a 2:1 ratio. **Absent and present-but-dim are the same reading to it.**
-## 4. CHANGED BYTES, UNFROZEN. Two consecutive untouched captures differed in **818,528 of 2,073,600
-##    pixels** — 40% of the frame from animation phase alone. A floor forty thousand times the underground
-##    subject.
-##
-## Only the fifth — changed bytes with the world stopped — has a floor smaller than what it measures.
-##
-## What survives, and it is the useful half: whatever makes rock read as carved at depth, it is NOT this
-## function, whose own docstring above promised precisely that. It is `FineTerrain`'s own rim, rim_warm and
-## form sink. Any comment or layer rationale crediting this pass with the contact reading underground is
-## describing something the player cannot see there.
-##
-## Caveats: one seed, one gallery shape, one standing per row, and a pixel count is a statement about area
-## rather than about noticeability.
+## Consequence for anyone reading this file: whatever makes rock read as carved at depth is not this
+## function, despite what the paragraph above promises. It is `FineTerrain`'s rim, rim_warm and form sink.
+## Caveats: one seed and one gallery shape. A pixel count states area rather than noticeability.
 static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2) -> void:
 	const STEPS: int = AO_STEPS
 	const CH: float = CHAMFER                          # the silhouette's cut, so the strips inset off it
@@ -253,20 +209,14 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 	var open_d: bool = not r.sim.is_solid(c + Vector2i(0, 1))
 	var open_l: bool = not r.sim.is_solid(c + Vector2i(-1, 0))
 	var open_r: bool = not r.sim.is_solid(c + Vector2i(1, 0))
-	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y   # top corners uncut there — the cap pass owns them
+	var keep_top: bool = FineTerrain.walked_surface(r.sim.surface_row(c.x)) == c.y   # top corners uncut there: the cap pass owns them
 	var cs: float = float(WorldRenderer.CELL)
-	# THE KEY LIGHT (#A1). This pass used to darken all four faces by the same amount, which is
-	# ambient occlusion without a light — and occlusion alone can't make a form. Every block got an
-	# even dark border and read as a sticker with a drawn outline, which is most of what "flat" and
-	# "two-dimensional" meant. Light now comes from ABOVE, matching the skylight model the veil already
-	# bakes (daylight floods DOWN each column), so the three exposed faces do three different jobs:
-	# a sky-facing top catches a warm LIT lip, an underside falls into deep shadow, and the walls sit
-	# between. Same cheap strips, same bake, but the rock finally has a top and a bottom.
+	# The key light comes from above, matching the skylight the veil bakes down each column, so the three
+	# exposed faces do three jobs: a warm lit lip on top, deep shadow underneath, walls between. Darkening
+	# all four equally is occlusion without a light, and it reads as a drawn outline around every block.
 	var top_lip := Color(1.0, 0.95, 0.84, LIT_LIP)
-	# A side face catches a RIM, not a lip. Light from above grazes a vertical wall instead of striking
-	# it, so the wall gets a thin dim highlight where it meets open air — but it must get SOMETHING. A
-	# room dug into rock is read almost entirely from its silhouette, and a silhouette with lit tops and
-	# unlit sides reads as a terrace seen from above, not as a chamber seen from the side (#S3).
+	# A side face catches a rim, not a lip: light from above grazes a vertical wall rather than striking
+	# it. It still has to catch something, or a dug room reads as a terrace from above, not a chamber.
 	var side_rim := Color(1.0, 0.94, 0.86, LIT_RIM)
 	for i: int in STEPS:
 		var fade: float = 1.0 - float(i) / float(STEPS)
@@ -275,8 +225,7 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 		if open_u:
 			var x0: float = CH if (open_l and not keep_top) else 0.0
 			var x1: float = cs - (CH if (open_r and not keep_top) else 0.0)
-			# The very edge catches the sun; below it only a whisper of dark, enough to give the lip
-			# thickness without re-flattening the face we just lit.
+			# The edge catches the sun; below it a whisper of dark gives the lip its thickness.
 			var col: Color = top_lip if i == 0 else Color(0.0, 0.0, 0.0, AO_TOP * fade)
 			ci.draw_rect(Rect2(pos.x + x0, pos.y + o, x1 - x0, s), col)
 		if open_d:
@@ -294,9 +243,8 @@ static func _draw_edge_ao(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Ve
 			var y1: float = cs - (CH if open_d else 0.0)
 			ci.draw_rect(Rect2(pos.x + cs - o - s, pos.y + y0, s, y1 - y0),
 				side_rim if i == 0 else Color(0.0, 0.0, 0.0, AO_SIDE * fade))
-	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops)
-	# AND the diagonal past it is solid too (an overhang roofs the junction). Each scoop: two nested
-	# rects hugging that end of the face, stacking extra dark onto the strips already there.
+	# The concave scoops. A face's end is concave when its continuation cell is solid (the face stops) and
+	# the diagonal past it is solid too (an overhang roofs the junction). Two nested rects per scoop.
 	var solid_ul: bool = r.sim.is_solid(c + Vector2i(-1, -1))
 	var solid_ur: bool = r.sim.is_solid(c + Vector2i(1, -1))
 	var solid_dl: bool = r.sim.is_solid(c + Vector2i(-1, 1))
@@ -337,24 +285,22 @@ static func _ao_scoop(ci: CanvasItem, corner: Vector2, along: Vector2, near_edge
 		ci.draw_rect(rc, Color(0.0, 0.0, 0.0, 0.14))
 
 
-## Smooth the blocky surface, reading the sim's shared silhouette authority (sim.surface_row /
-## sim.ramp_dir) so the diagonal we DRAW is exactly the one the avatar WALKS. The ramp GEOMETRY is
-## universal (every material slopes); only the EDGE PAINT is material-specific (grass cap vs stone lip).
+## Smooth the blocky surface from the sim's silhouette authority (sim.surface_row / sim.ramp_dir), so the
+## diagonal drawn is exactly the one the avatar walks. Every material slopes, so the ramp geometry is
+## universal; only the edge paint is material-specific, a grass cap versus a stone lip.
 static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i) -> void:
 	for col: int in range(rect.position.x, rect.position.x + rect.size.x):
 		if col >= FactorySim.GRID_COLS:
 			break
-		# THE PASS THAT DRAWS THE GRASS, and the one that put a turf cap eight hundred pixels underground.
 		# `surface_row` returns the first solid cell scanning down, so on a dug column it names the rock at
-		# the bottom of the player's own shaft — and this pass then caps it, chamfers it and ramps it as if
-		# it were the hillside. `walked_surface` rejects any row below the band the generator can produce.
-		# The existing GRID_ROWS test already meant "this column has no surface"; NO_SURFACE is the same
-		# statement about a column that has ground, but not up here.
+		# the bottom of the player's shaft, which this pass would otherwise cap and ramp like a hillside.
+		# `walked_surface` rejects any row below the band the generator can produce: NO_SURFACE means the
+		# column has ground but not up here, where the GRID_ROWS test means it has none at all.
 		var row: int = FineTerrain.walked_surface(r.sim.surface_row(col))
 		if row == FineTerrain.NO_SURFACE or row >= FactorySim.GRID_ROWS:
 			continue  # empty column, or a hole floor that is not the walked line
-		# Only THIS chunk's rows own the cap. (The wedge reaches one cell up into the chunk above, which is
-		# harmless — chunks aren't clipped — and that neighbour is dirtied on a dig so stale caps clear.)
+		# Only this chunk's rows own the cap. The wedge reaches one cell up into the chunk above, which is
+		# harmless (chunks are not clipped) and that neighbour is dirtied on a dig, so stale caps clear.
 		if row < rect.position.y or row >= rect.position.y + rect.size.y:
 			continue
 		var cell := Vector2i(col, row)
@@ -366,11 +312,10 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		if dir == 0:
 			_draw_flat_cap(ci, px, py, edge, col)
 			continue
-		# A 45° ramp wedge over the air corner. It's the SAME earth mass as the cell below, so it fills with
-		# the cell's own body colour (not flat base_color) and carries a CONCAVE scoop: a per-vertex gradient
-		# lights the top cap edge and pools shadow at the inner base corner, so the slope reads as a rounded,
-		# carved earth shoulder instead of a flat triangular sticker. The WALKED hypotenuse (cap edge) stays
-		# exactly on the 45° line the sim authority defines — only shading is added, never the geometry.
+		# A 45° ramp wedge over the air corner, the same earth mass as the cell below, so it fills with the
+		# cell's own body colour rather than flat base_color and carries a per-vertex gradient: cap edge lit,
+		# shadow pooled at the inner base corner, so the slope reads as a rounded carved shoulder rather than
+		# a flat triangle. Shading only; the hypotenuse stays on the 45° line the sim defines.
 		var body: Color = r._cell_fill_color(cell, def)
 		var foot := Vector2(px, py) if dir == 1 else Vector2(px + WorldRenderer.CELL, py)         # the low (flat-side) corner
 		var outer := Vector2(px + WorldRenderer.CELL, py) if dir == 1 else Vector2(px, py)        # bottom corner under the peak
@@ -384,9 +329,8 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		var mid := (foot + outer) * 0.5
 		ci.draw_polygon(PackedVector2Array([foot, mid, outer]),
 			PackedColorArray([Color(0,0,0,0.14), Color(0,0,0,0.05), Color(0,0,0,0.14)]))
-		# A couple of grain speckles so the wedge carries the same rock texture as the body (not a smooth face).
-		# The wedge occupies the CELL-box ABOVE the cell top (py-CELL..py); speckles are placed there and kept
-		# only if they fall under the diagonal (inside the triangle), so no fleck floats out over open air.
+		# Grain speckles so the wedge carries the body's rock texture. The wedge occupies the cell box above
+		# the cell top (py-CELL..py), so a speckle is kept only if it falls under the diagonal.
 		if def.grain:
 			var wedge_top := Vector2(px, py - WorldRenderer.CELL)
 			for sp: Vector2 in r._cell_speckles(cell, 2):
@@ -397,17 +341,13 @@ static func _draw_terrain_surface(r: WorldRenderer, ci: CanvasItem, rect: Rect2i
 		ci.draw_line(foot, peak, edge, 3.0)
 
 
-## THE WALL FACE (#S3) — everything that makes a back-wall cell read as a rock surface a plane behind
-## the play space, rather than as a hole punched in the world.
-##
-## Two jobs. First TEXTURE: the same grain and fracture vocabulary as the foreground rock, at reduced
-## contrast, because it is the same ground seen from further away — a wall with no texture at all is
-## indistinguishable from a void no matter what colour it is. Second, and far more important, the CAST:
-## every edge where this cell meets solid rock takes an inward shadow from it. Under a ceiling it is
-## deepest, beside a wall it is moderate, and above a floor it is light — because the world's key light
-## comes from above (#A1), so a floor stays open to the sky while an overhang does not. That directional
-## cast is the whole illusion: it is what a real recess does, and once it is there the eye stops reading
-## a rectangle and starts reading a room.
+## Everything that makes a back-wall cell read as a rock plane behind the play space rather than a hole
+## punched in the world. Texture first: the foreground rock's grain and fracture vocabulary at reduced
+## contrast, because a wall with no texture is indistinguishable from a void whatever colour it is. Then
+## the cast: every edge where this cell meets solid rock takes an inward shadow, deepest under a ceiling,
+## moderate beside a wall, light above a floor, because the key light comes from above and a floor stays
+## open to the sky while an overhang does not. The directional cast is what makes the recess read as a
+## room: it is what a real recess does to the light in it.
 ##
 ## Called from WorldRenderer._draw_background, so it runs on the chunk bake (a dig), never per frame.
 static func paint_wall_face(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
@@ -437,15 +377,10 @@ static func paint_wall_face(r: WorldRenderer, ci: CanvasItem, c: Vector2i, pos: 
 				Color(0.0, 0.0, 0.0, WorldRenderer.WALL_AO_SIDE * fade))
 
 
-## FISSURES — a sparse fracture running through the rock, so a MASS of solid cells has structure of its
-## own. Speckles alone give a cell surface texture, but they are point noise: a wall of them is a field
-## of static, which is a large part of why a solid body of rock underground read as fog rather than as
-## stone. A fracture is a LINE, and a line is the one thing an eye reads as structure at a glance.
-##
-## Roughly one cell in five gets one, and it runs shallowly across the cell — along the bedding, since
-## rock splits along its layers — with a lighter highlight under it so the crack has an edge that
-## catches the same overhead key light as everything else. Deterministic per cell like the speckles, so
-## the same rock always carries the same crack and a rebaked chunk is identical.
+## A sparse fracture through the rock, so a mass of solid cells has structure of its own. Speckles alone
+## are point noise and a wall of them reads as static; a line is what an eye reads as structure. Roughly
+## one cell in five gets one, running shallowly along the bedding, with a lighter highlight under it so
+## the crack catches the overhead key light. Deterministic per cell, so a rebaked chunk is identical.
 static func _draw_fissure(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color) -> void:
 	var h: int = _fringe_hash(c.x * 31 + c.y, c.y)
 	if h % 5 != 0:
@@ -461,21 +396,15 @@ static func _draw_fissure(ci: CanvasItem, c: Vector2i, pos: Vector2, col: Color)
 	ci.draw_line(a, b, col.darkened(0.42), 1.0)
 
 
-## THE FLAT CAP, RAGGED (#A5). A flat surface cell used to take one uniform 4px bar of cap colour, and a
-## run of flat columns therefore drew a single ruled line the full width of the world — the loudest
-## remaining piece of "blocky", and the thing that made the ground read as a cardboard cut-out laid over
-## the sky. Nothing here moves the WALKED line: the sim's surface row is still exactly `py`, and the
-## avatar walks it. Only the paint is broken up, in three ways that each attack a different straight
-## edge:
-##   * the cap's THICKNESS varies per 8px slice, so the grass/earth boundary underneath stops being a
-##     rule and starts being an interface;
-##   * ROOTS finger a few px further down out of some slices, so that interface interlocks rather than
-##     butting;
-##   * TUFTS overhang a few px into the air above the line, which is what actually kills the razor.
-##     They are cosmetic overhang into a neighbouring chunk's box, which the chunk bake tolerates (the
-##     fillet pass already reaches a full cell up).
-## Deterministic per column — the same column always grows the same fringe, so nothing shimmers when a
-## chunk rebakes after a dig.
+## A flat surface cell takes a ragged cap rather than one uniform bar of cap colour, because a run of
+## flat columns otherwise draws a single ruled line the full width of the world. Nothing here moves the
+## walked line, which is still exactly `py`; only the paint is broken up, three ways:
+##   * cap thickness varies per 8px slice, so the grass/earth boundary is an interface, not a rule;
+##   * roots finger a few px further down out of some slices, so that interface interlocks;
+##   * tufts overhang a few px into the air above the line, which is what kills the razor edge. They
+##     overhang into the neighbouring chunk's box, which the chunk bake tolerates because chunks are
+##     not clipped and the fillet pass already reaches a full cell up.
+## Deterministic per column, so nothing shimmers when a chunk rebakes after a dig.
 static func _draw_flat_cap(ci: CanvasItem, px: float, py: float, edge: Color, col: int) -> void:
 	const SLICES: int = 4
 	var sw: float = float(WorldRenderer.CELL) / float(SLICES)
@@ -492,7 +421,7 @@ static func _draw_flat_cap(ci: CanvasItem, px: float, py: float, edge: Color, co
 			ci.draw_rect(Rect2(tx, py - 2.0 - float((h >> 12) % 3), 2.0, 4.0), edge)
 
 
-## A stable scramble of (column, slice) — the fringe's only source of variation. Same shape as
+## A stable scramble of (column, slice), the fringe's only source of variation. Same shape as
 ## _cell_speckles' hash and equally RNG-free, so a rebaked chunk is byte-identical to the first bake.
 static func _fringe_hash(col: int, slice: int) -> int:
 	var h: int = (col * 374761393) ^ (slice * 668265263)
@@ -500,9 +429,9 @@ static func _fringe_hash(col: int, slice: int) -> int:
 	return (h ^ (h >> 16)) & 0x7fffffff
 
 
-## True when a local point (0..CELL within the wedge's upper box) falls UNDER the 45° diagonal — i.e. inside
-## the filled ramp triangle. Keeps grain speckles on the earth and off the open-air side. Mirrors the two
-## ramp orientations: rising-right fills where x+y ≥ CELL; rising-left where y ≥ x.
+## True when a local point (0..CELL within the wedge's upper box) falls under the 45° diagonal, inside the
+## ramp triangle, which keeps grain speckles off the open-air side. Rising-right fills where x+y ≥ CELL,
+## rising-left where y ≥ x.
 static func _in_ramp(local: Vector2, dir: int) -> bool:
 	if dir == 1:
 		return local.x + local.y >= float(WorldRenderer.CELL)

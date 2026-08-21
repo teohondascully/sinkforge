@@ -25,15 +25,14 @@ var fuel: int = 0
 var power_factor: float = 1.0
 ## Units consumed, written by two runners and meaning something different in each. `_run_descent` counts
 ## refined goods eaten toward the breach quota (DESCENT_QUOTA). `_run_drill` counts ore pulled, which
-## `_status_drill` reads to tell a spent Borer from a starved one. Do not split the field without
-## checking both.
+## `_status_drill` reads to tell a spent Borer from a starved one. Check both before splitting it.
 var fed: int = 0
 ## Directional machines only: which way it works, plus or minus 1. Set once at placement from the
 ## builder's facing (a discrete call, so determinism holds). 1 when unused.
 var facing: int = 1
 ## Configurable machines only: mode index cycled by the R-configure verb. 0 = default behaviour.
 var mode: int = 0
-## Drift Rig only: the SPOIL half of its haul, falling down the column BEHIND the rig while
+## Drift Rig only: the spoil half of its haul, falling down the column behind the rig while
 ## `output_buffer` holds the pay half for the column under it. Each jams independently (DRIFT.md §3).
 var spoil_buffer: Dictionary = {}
 ## Hopper only: the one item id banked here. Auto-latches on the first item banked; everything else

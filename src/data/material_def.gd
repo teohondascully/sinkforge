@@ -17,7 +17,7 @@ extends Resource
 @export var base_color: Color = Color(0.30, 0.22, 0.16)
 ## Dirt-grain speckle on/off (deterministic per-cell texture so it isn't a flat fill).
 @export var grain: bool = true
-## Texture GRAMMAR, distinct from colour (TR-02 / TR-04). `grain` is only on/off, so every grained material ran
+## Texture grammar, distinct from colour. `grain` is only on or off, so every grained material would run
 ## one identical noise at a different hue. This picks the fine baker's noise language:
 ##   Clastic: soil, gravel, clay. Granular noise and rounded clumps, barely any seams.
 ##   Bedded:  shale and other layered rock. Features stretched horizontally into flat laminae.

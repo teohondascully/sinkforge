@@ -1,17 +1,17 @@
 class_name SaveGame
 extends RefCounted
 
-## SAVE / LOAD. A save is a straight capture of the sim's authoritative state into one versioned
+## Save and load. A save is a straight capture of the sim's authoritative state into one versioned
 ## Dictionary, written with Godot's binary Variant serializer (Vector2i keys and StringNames round-trip
 ## natively, no JSON key-mangling). Machines serialize as def id plus runtime fields; defs are flyweight
-## .tres reloaded by the id/filename convention. DERIVED and transient state (grid, power, flow_events,
-## terrain_dirty, the rate ring buffer, the tick accumulator) is NOT saved and rebuilds on the next tick.
+## .tres reloaded by the id/filename convention. Derived and transient state (grid, power, flow_events,
+## terrain_dirty, the rate ring buffer, the tick accumulator) is not saved and rebuilds on the next tick.
 ## Determinism is the verifier: capture, restore, tick both N times, compare signatures
-## (tests/_test_save_load). Restore mutates a sim IN PLACE so live references stay valid; the caller
+## (tests/_test_save_load). Restore mutates a sim in place so live references stay valid; the caller
 ## repaints (WorldRenderer.repaint_world).
 ##
-## DURABILITY (v2). Opening the real path for WRITE truncates the previous save to zero the instant
-## `FileAccess.open(path, WRITE)` returns, so a write instead encodes to `.tmp`, closes it, READS IT BACK
+## Durability (v2). Opening the real path for writing truncates the previous save to zero the instant
+## `FileAccess.open(path, WRITE)` returns, so a write instead encodes to `.tmp`, closes it, reads it back
 ## and proves it decodes to a real envelope, copies the current good save aside to `.bak`, then renames
 ## `.tmp` over the slot. That order leaves the slot holding a complete, readable game at every point:
 ##
@@ -23,9 +23,9 @@ extends RefCounted
 ## Reading mirrors it: a slot that is missing, truncated or malformed falls back to `.bak`, and
 ## `last_read` says which happened, so the UI can distinguish no save from a damaged one.
 ##
-## RESTORE IS TRANSACTIONAL. Every field is validated and duplicated into a staging dictionary first and
+## Restore is transactional. Every field is validated and duplicated into a staging dictionary first, and
 ## the live sim is untouched until the whole envelope is known good. Unguarded `data["x"]` indexing into
-## the live sim left a running game with new terrain and old inventory whenever a key was missing.
+## the live sim would leave a running game with new terrain and old inventory whenever a key went missing.
 
 const VERSION: int = 2
 ## The oldest envelope `_migrate` can carry forward. v1 saves (no `seep_tick`) still load.
@@ -35,7 +35,7 @@ const DEF_DIR: String = "res://src/data/machines/"
 const TMP_SUFFIX: String = ".tmp"
 const BAK_SUFFIX: String = ".bak"
 
-## The keys the restore path REQUIRES. Everything else is additive: absent in an older save, defaulted.
+## The keys the restore path requires. Everything else is additive: absent in an older save, defaulted.
 const REQUIRED_KEYS: Array[String] = [
 	"version", "solid", "wall", "deposits", "inventory", "ground", "sink",
 	"produced", "consumed", "conduit", "rope", "torch", "research", "machines",
@@ -62,7 +62,7 @@ static func capture(sim: FactorySim) -> Dictionary:
 		})
 	return {
 		"version": VERSION,
-		"world_seed": sim.world_seed,   # the fine terrain derives from this — restore rebuilds it (not stored)
+		"world_seed": sim.world_seed,   # the fine terrain derives from this; restore rebuilds it
 		"solid": sim.solid.duplicate(),
 		"wall": sim.wall.duplicate(),
 		"deposits": sim.deposits.duplicate(),
@@ -80,20 +80,20 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"fill": sim.fill.duplicate(),
 		"research": sim.research.duplicate(),
 		"sapling": sim.sapling.duplicate(),
-		# THE SEEP PHASE (v2). Loose backfill weeps every SEEP_INTERVAL ticks, so the phase decides which tick
-		# the next weep lands on. Omitting it made an in-process F9 resume mid-cycle and a fresh process at zero.
+		# The seep phase (v2). Loose backfill weeps every SEEP_INTERVAL ticks, so the phase decides which tick
+		# the next weep lands on. Omit it and a reload resumes mid-cycle while a fresh process starts at zero.
 		"seep_tick": sim._seep_tick,
 		"machines": machines,
 	}
 
 
-## Why the last envelope was refused. The PRESENCE loop below refuses nothing the TYPE loop would not, and
-## the per-key ablation in `check_save_durability` passes either way; without it the type loop reaches
-## `data[key2]` on an absent key and Godot logs an engine error per miss, taking a holed save from 2 error
-## lines to 16.
+## Why the last envelope was refused. The presence loop below refuses nothing the type loop would not and
+## the per-key ablation in `check_save_durability` passes either way, but without it the type loop reaches
+## `data[key2]` on an absent key and Godot logs an engine error per miss, taking a holed save from two
+## error lines to sixteen.
 static var last_invalid: String = ""
 
-## Cheap structural gate run on anything off disk BEFORE it goes near the sim: a truncated file decodes
+## Cheap structural gate run on anything off disk before it goes near the sim: a truncated file decodes
 ## to null and a foreign file lacks these keys, and both must be told from a good save without crashing.
 static func _valid_envelope(data: Dictionary) -> bool:
 	last_invalid = ""
@@ -133,14 +133,14 @@ static func _migrate(data: Dictionary) -> Dictionary:
 	return out
 
 
-## Validate and DUPLICATE the whole envelope into a ready-to-assign staging dictionary, or {} if anything
+## Validate and duplicate the whole envelope into a ready-to-assign staging dictionary, or {} if anything
 ## is wrong, having touched nothing. The half of `restore` that is allowed to fail.
 static func _stage(data: Dictionary) -> Dictionary:
 	if not _valid_envelope(data):
 		return {}
 	var env: Dictionary = _migrate(data)
 
-	# Resolve every machine def BEFORE anything else (a save from a different data set is refused whole).
+	# Resolve every machine def before anything else (a save from a different data set is refused whole).
 	var rebuilt: Array[MachineState] = []
 	for md: Variant in (env.get("machines", []) as Array):
 		if not (md is Dictionary):
@@ -218,7 +218,7 @@ static func _commit(sim: FactorySim, s: Dictionary) -> void:
 	sim.grid.clear()
 	for m: MachineState in rebuilt:
 		sim.grid[m.cell] = m
-	# AUTHORITATIVE PHASE (v2), restored: the next weep's timing is part of the world's future.
+	# Authoritative phase (v2), restored: the next weep's timing is part of the world's future.
 	sim._seep_tick = s["seep_tick"]
 	# Transient and derived resets: the next tick rebuilds power, the view drains fresh channels, the bazaar
 	# cache rescans.
@@ -226,21 +226,21 @@ static func _commit(sim: FactorySim, s: Dictionary) -> void:
 	sim.flow_events.clear()
 	sim.terrain_dirty.clear()
 	sim._bazaars_dirty = true
-	# One-shot view channels. `last_drop_landing` used to survive a load, granting pickup grace at a cell from
-	# the previous session.
+	# One-shot view channels. Left alone, `last_drop_landing` survives a load and grants pickup grace at a
+	# cell from the previous session.
 	sim.last_drop_landing = Vector2i(-1, -1)
-	# DERIVED PHASE, reset EXPLICITLY: these three used to survive an in-process F9 while a fresh process
-	# started them at zero, so the same file gave a different sub-tick offset and rate readout per route in.
+	# Derived phase, reset explicitly. Left alone these three survive an in-process reload while a fresh
+	# process starts them at zero, so one file gives a different sub-tick offset and rate readout per route.
 	sim._tick_accumulator = 0.0
 	sim._rate_tick = 0
 	sim._rate_samples.clear()
-	# The FINE TERRAIN grid is DERIVED and not saved: rebuilt from the restored coarse terrain plus the seed,
-	# so a loaded game molds identically to when it was saved.
+	# The fine terrain grid is derived and not saved. It is rebuilt from the restored coarse terrain plus
+	# the seed, so a loaded game molds identically to when it was saved.
 	sim.rebuild_fine_terrain()
 
 
 ## Load a capture back into `sim`, in place. Refuses an unknown version, a malformed envelope, or a machine
-## whose def no longer exists, leaving the sim UNTOUCHED. Returns whether the restore happened.
+## whose def no longer exists, leaving the sim untouched. Returns whether the restore happened.
 static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	var staged: Dictionary = _stage(data)
 	if staged.is_empty():
@@ -249,24 +249,22 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	return true
 
 
-## Write an envelope to disk, keeping the previous GOOD save as `<path>.bak`. On ANY failure the existing
+## Write an envelope to disk, keeping the previous good save as `<path>.bak`. On any failure the existing
 ## save is left exactly as it was: every early return removes the temp file.
 ##
-## "Atomic" here is REPLACEMENT VISIBILITY only: a reader sees the whole old save or the whole new one
+## "Atomic" here means replacement visibility only. A reader sees the whole old save or the whole new one,
 ## because the bytes are staged in a temp file and the slot is swapped with one rename. Nothing fsyncs, so
 ## it is not a power-loss durability claim; the backup generation covers that case.
 ##
-## COST: the existing save is decoded once per write to decide whether it may become the backup, on top of
+## Cost: the existing save is decoded once per write to decide whether it may become the backup, on top of
 ## the readback below. Saves are user- or interval-triggered and the envelope is small.
 ##
-## A FIXTURE MAY NOT WRITE `user://` UNLESS SOMEBODY DECLARED THE SANDBOX. Isolation lives in the two
-## wrappers, so a bare `godot --script res://tests/...` inherits the real HOME and writes into the player's
-## Godot directory: `test_fine_terrain.save` from `tests/test_worldgen.gd:994` sits in
-## `~/Library/Application Support/Godot/app_userdata/Sinkforge/` at 847K, unwitnessed because
-## `save_sentinel` watches `sinkforge.save` and that is not it. Keyed on a POSITIVE marker exported by both
-## wrappers rather than on recognising the dangerous state: absence of proof of isolation is the refusal
-## condition. `SF_REAL_HOME=1` is honoured, being the declaration itself. `--script` is the fixture tell:
-## the game proper never has it.
+## A fixture may not write `user://` unless something has declared a sandbox. Isolation lives in the two
+## wrapper scripts, so a bare `godot --script res://tests/...` inherits the real HOME and writes into the
+## player's own Godot data directory, where nothing watches for it. The check keys on a positive marker
+## exported by both wrappers rather than on recognising the dangerous state: absence of proof of isolation
+## is the refusal condition. `SF_REAL_HOME=1` is honoured, being that declaration itself, and `--script`
+## is the fixture tell, since the game proper never carries it.
 static func _fixture_may_not_write(path: String) -> bool:
 	if not path.begins_with("user://"):
 		return false
@@ -290,25 +288,24 @@ static func write(path: String, data: Dictionary) -> bool:
 			% [tmp, FileAccess.get_open_error()])
 		return false
 	f.store_var(data)
-	# CLOSE BEFORE READING BACK: Godot flushes on free, and the readback would otherwise race the writer.
+	# Close before reading back: Godot flushes on free, and the readback would otherwise race the writer.
 	f.close()
 
-	# PROVE IT LANDED. A disk that filled mid-write leaves a truncated file `get_var` returns null for; a
-	# Variant that failed to encode leaves something that is not an envelope. Either way the temp is discarded.
+	# Prove it landed. A disk that filled mid-write leaves a truncated file `get_var` returns null for, and
+	# a Variant that failed to encode leaves something that is not an envelope. Either way the temp goes.
 	if not _valid_envelope(_read_file(tmp)):
 		push_warning("save: %s did not read back as a valid envelope — the existing save is untouched" % tmp)
 		DirAccess.remove_absolute(tmp)
 		return false
 
-	# LAST KNOWN GOOD. Copied, not renamed, so the slot stays occupied throughout and a crash between these
-	# lines still finds a complete game at the real path. Two conditions, opposite failure directions of the
-	# same three lines, both flagged release-blocking by an external audit:
+	# Last known good, copied rather than renamed, so the slot stays occupied throughout and a crash between
+	# these lines still finds a complete game at the real path. Two conditions guard opposite failure
+	# directions of the same three lines:
 	#
-	# 1. ONLY A VALID PRIMARY MAY BECOME THE BACKUP. The copy used to require only that the file existed.
-	#    `read()` recovers FROM the backup when the primary is damaged, so the next save copied that damaged
-	#    primary over the good backup, destroying the last recovery generation.
-	# 2. A FAILED COPY MUST ABORT THE WRITE. `copy_absolute()` returns an Error and it was discarded; a failed
-	#    copy followed by a successful rename replaced the save with no valid backup behind it.
+	# 1. Only a valid primary may become the backup. `read()` recovers from the backup when the primary is
+	#    damaged, so copying a damaged primary across would destroy the last recovery generation.
+	# 2. A failed copy must abort the write. `copy_absolute()` returns an Error; discarding it lets a failed
+	#    copy followed by a successful rename replace the save with no valid backup behind it.
 	if FileAccess.file_exists(path):
 		if _valid_envelope(_read_file(path)):
 			var backed: int = DirAccess.copy_absolute(path, path + BAK_SUFFIX)
@@ -355,7 +352,7 @@ static func read(path: String) -> Dictionary:
 			% [path, path + BAK_SUFFIX])
 		last_read = Read.RECOVERED
 		return backup
-	# A file that exists but will not decode is a CORRUPT save, not an absent one, and only one of those may
+	# A file that exists but will not decode is a corrupt save, not an absent one, and only one of those may
 	# be shown to somebody who definitely had a save yesterday.
 	last_read = Read.CORRUPT if (FileAccess.file_exists(path) or FileAccess.file_exists(path + BAK_SUFFIX)) \
 		else Read.NONE

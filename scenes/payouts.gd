@@ -1,19 +1,14 @@
 class_name Payouts
 extends RefCounted
 
-## The PAYOUT layer (juice — #B2): the little "+3 ore" tick that rises off a block you just broke.
+## The payout layer: the "+3 ore" tick that rises off a block you just broke, so the reward reads at the
+## point of impact rather than only in a hotbar counter at the edge of the screen.
 ##
-## Why it exists: breaking rock already had dust, debris, shake and a thump — everything that says the
-## BLOW landed — but nothing that says you got PAID. The gain went straight into a hotbar number in the
-## corner of the screen, far from where you were looking, so the first minute of the game read as
-## effort without reward. This puts the reward at the point of impact, in the item's own colour.
+## Ticks merge. A second gain of the same item near a still-young tick bumps that tick's count instead
+## of stacking a second label, so a fast dig streak counts up (+1, +2, +3) instead of spamming the frame.
 ##
-## Ticks MERGE: a second gain of the same item near a still-young tick bumps its count instead of
-## stacking a second label, so fast digging counts UP (+1 → +2 → +3) rather than spamming the frame —
-## the ramp is the satisfying part.
-##
-## Pure representation, exactly like [Particles]: MainView emits, WorldRenderer draws, the sim never
-## sees it. Capped so it can't unbound.
+## Pure representation, like [Particles]: MainView emits, WorldRenderer draws, the sim never sees it.
+## Capped so it cannot grow without bound.
 
 const MAX: int = 12
 const LIFE: float = 0.90            ## seconds a tick lives
@@ -27,8 +22,8 @@ const PIP_R: float = 3.6            ## radius of the item-coloured diamond ahead
 var _t: Array[Dictionary] = []
 
 
-## Bank a gain of `count` × `item` at `pos` (world px) — merging into a recent nearby tick of the same
-## item when there is one, so a fast dig streak reads as one climbing number.
+## Bank a gain of `count` × `item` at `pos` (world px), merging into a recent nearby tick of the same
+## item when there is one.
 func gain(pos: Vector2, item: StringName, count: int = 1) -> void:
 	if count <= 0:
 		return
@@ -57,10 +52,10 @@ func size() -> int:
 
 
 ## Draw each tick as a `◆ +N` plate in the item's own colour, rising and fading. The dark drop-shadow
-## keeps it legible over bright ore and dark rock alike; the rise eases OUT (fast off the block, then
-## drifting) so the pop lands at the moment of the break, and the fade waits for the back half so the
-## number is fully solid while you are still looking at it. The pip is drawn here rather than through
-## Visuals.draw_item because a textured glyph can't be faded per-call.
+## keeps it legible over bright ore and dark rock alike. The rise eases out so the pop lands at the
+## moment of the break, and the fade waits for the back half so the number is solid while it is being
+## read. The pip is drawn here rather than through Visuals.draw_item because a textured glyph cannot be
+## faded per-call.
 func draw(canvas: CanvasItem) -> void:
 	var font: Font = ThemeDB.fallback_font
 	for q: Dictionary in _t:

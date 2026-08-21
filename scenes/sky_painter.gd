@@ -1,18 +1,15 @@
 extends RefCounted
 
-## THE SKY / BACKDROP PAINTER — the parallax celestial backdrop (sky gradient, stars, sun/moon, clouds,
-## the Sinkforge crown, and the ridgeline silhouettes), extracted from WorldRenderer so the renderer isn't
-## carrying ~170 lines of pure sky drawing. Stateless: it paints onto the backdrop CanvasItem the renderer
-## hands it and reads the renderer's cosmetic clock + day/night phase; all the tuning constants stay as
-## WorldRenderer consts (RIDGES / SINKFORGE_* / SURFACE_LINE). WorldRenderer._paint_backdrop is now a
-## one-line delegator so the LightLayer draw-callback wiring is untouched. Purely cosmetic — never the sim.
+## The parallax celestial backdrop: sky gradient, stars, sun and moon, clouds, the Sinkforge crown and
+## the ridgeline silhouettes. Stateless; it paints onto the backdrop CanvasItem the renderer hands it and
+## reads the renderer's cosmetic clock and day/night phase. Tuning constants live as WorldRenderer consts
+## (RIDGES, SINKFORGE_*, SURFACE_LINE). Cosmetic only, never the sim.
 
-## The two colours the star field is made of, and neither one is new paint. star_cold is the night zenith
-## Color(0.045, 0.06, 0.105) that paint() lays down below, kept at its own hue 225.0 and saturation 0.571
-## and carried up to full value. star_warm is the dusk ember Color(0.62, 0.42, 0.34) that blushes the
-## horizon, kept at its hue 17.1 and saturation 0.452, with its value solved so that the two tints land on
-## the same Rec.709 luma, 145.8 of 255. The warm minority therefore differs from the cold field in hue and
-## in nothing else, and neither tint is ever the brighter speck. See _stars for why the field moved at all.
+## The two star tints, both taken from the sky paint() lays down below. STAR_COLD is the night zenith
+## Color(0.045, 0.06, 0.105) held at its own hue 225.0 and saturation 0.571 and carried up to full value.
+## STAR_WARM is the dusk ember Color(0.62, 0.42, 0.34) that blushes the horizon, held at hue 17.1 and
+## saturation 0.452 with its value solved so both tints land on the same Rec.709 luma of 145.8 in 255.
+## The warm minority differs from the cold in hue alone. Neither tint is ever the brighter speck.
 const STAR_COLD := Color(0.429, 0.571, 1.0)
 const STAR_WARM := Color(0.776, 0.526, 0.426)
 
@@ -24,8 +21,8 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	var cam: Vector2 = view.get_center()
 	var horizon: float = float(WorldRenderer.SURFACE_LINE) * float(WorldRenderer.CELL)
 	var dl: float = r.daylight()
-	# Sky palette: the original moody night, eased toward a subdued day blue (overcast-underworld, not
-	# beach postcard) by the daylight level. Dusk/dawn pass through a brief warm blush at the horizon.
+	# Sky palette: a moody night eased toward a subdued day blue (overcast underworld, not beach
+	# postcard) by the daylight level. Dusk and dawn pass through a brief warm blush at the horizon.
 	var top_c: Color = Color(0.045, 0.06, 0.105).lerp(Color(0.21, 0.32, 0.50), dl)
 	var hor_c: Color = Color(0.125, 0.135, 0.185).lerp(Color(0.46, 0.55, 0.66), dl)
 	var blush: float = clampf(1.0 - absf(dl - 0.5) * 2.0, 0.0, 1.0)     # peaks mid-transition
@@ -38,11 +35,11 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 	if view.end.y > horizon:
 		ci.draw_rect(Rect2(Vector2(view.position.x, horizon),
 			Vector2(view.size.x, view.end.y - horizon)), hor_c)
-	# Stars, once the daylight has died back far enough for any of them to carry. The field's own voice, and
-	# why it is not the interface's, is written out over _stars.
+	# Stars, once the daylight has died back far enough for any of them to carry. Palette rationale for the
+	# field is over _stars.
 	if dl < 0.85:
 		_stars(r, ci, view, cam, grad_top, horizon, dl)
-	# SUN / MOON: each rides a low arc across the view during its half of the cycle, pinned to the
+	# Sun and moon: each rides a low arc across the view during its half of the cycle, pinned to the
 	# camera like any celestial thing. The sun is a warm bloom; the moon a small pale disc.
 	var p: float = r.day_phase()
 	var arc: float = (p + 0.05) / 0.60 if p < 0.55 else (p - 0.55) / 0.45   # 0..1 across its transit
@@ -58,26 +55,17 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 			ci.draw_circle(body, 18.0, Color(0.80, 0.85, 0.95, 0.12))
 			ci.draw_circle(body, 10.0, Color(0.88, 0.91, 0.97, 0.85))
 			ci.draw_circle(body + Vector2(3.5, -2.5), 8.0, top_c.lerp(Color(0.82, 0.86, 0.94), 0.25))  # the shadowed limb
-	# Clouds: soft three-lobe blobs drifting with the wind, barely lighter than the sky. Each wraps
-	# through the visible span on its own phase so the cover never visibly loops. Lit by the daylight.
+	# Clouds: soft lozenges drifting with the wind, barely lighter than the sky. Each wraps through the
+	# visible span on its own phase so the cover never visibly loops. Lit by the daylight.
 	var span: float = view.size.x + 500.0
 	for i: int in 5:
-		# Fixed for the same reason as the stars, after I first stood this site down on the argument that
-		# five samples cannot show a lattice. That argument was WRONG, and the refutation is short enough
-		# to print: sorted, the old values ran 0.000, 0.044, 0.283, 0.522, 0.761, whose four gaps are
-		# 0.044, 0.239, 0.239, 0.239 — THREE IDENTICAL GAPS to six decimals, which is the three-distance
-		# theorem showing itself at n=5, not a scatter. Reasoning about the sample size in the abstract
-		# stood down a site the test in hand would have caught. Compute the gaps; do not estimate whether
-		# it is worth computing them.
-		#
-		# It also mattered more here than one axis, because `h` is a single scalar driving six properties:
-		# parallax, x, y, alpha, drift rate and radius. One lattice was replicated across all of them —
-		# sorted, `22.0 + h * 24.0` gave radii 22.0, 23.1, 28.8, 34.5, 40.3, stepping 5.736 three times
-		# running. Now four distinct gaps.
-		#
-		# Not claimed: that any of this was VISIBLE. At alpha 0.05 to 0.13 behind a horizon it may never
-		# have read, and that was never measured either way. A correct mixer costs nothing, so the site is
-		# fixed on the defect rather than on an improvement nobody has demonstrated.
+		# `h` is one scalar driving six properties: parallax, x, y, alpha, drift rate and radius. It has to
+		# scatter. `(i * K) % 1000` is linear and does not. Sorted, its five values ran
+		# 0.000 / 0.044 / 0.283 / 0.522 / 0.761, whose four gaps are 0.044 / 0.239 / 0.239 / 0.239. Three
+		# identical gaps to six decimals is the three-distance theorem at n=5 rather than a scatter, and
+		# the one lattice was replicated through every property it drove: `22.0 + h * 24.0` gave radii
+		# 22.0 / 23.1 / 28.8 / 34.5 / 40.3, stepping 5.736 three times running. Through Seams.grain the
+		# radii have four distinct gaps.
 		var h: float = float(Seams.grain(Vector2i(i, 505)) % 1000) / 1000.0
 		var p2: float = 0.10 + h * 0.06                                 # nearly pinned = far away
 		var cx: float = view.position.x - 250.0 + fposmod(
@@ -86,26 +74,26 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 		var cc: Color = Color(0.42, 0.47, 0.58, 0.05 + h * 0.02) \
 			.lerp(Color(0.78, 0.82, 0.88, 0.10 + h * 0.03), dl)
 		var rad: float = 22.0 + h * 24.0
-		# A WIDE, FLAT lozenge (one smooth ellipse + a smaller upper puff for form) so it reads as a
-		# drifting cloud. The old round 3-circle puff read to blind testers as a bokeh orb / lens-flare /
-		# bug; overlapping translucent circles also scallop and build alpha hotspots. Flat-fill polygons
-		# keep the alpha even, so it's a soft continuous cloud, denser only where the two puffs cross.
+		# A wide flat lozenge (one smooth ellipse plus a smaller upper puff for form) reads as a drifting
+		# cloud. A round three-circle puff reads instead as a bokeh orb or a lens flare, and overlapping
+		# translucent circles scallop their edges and build alpha hotspots. Flat-fill polygons keep the
+		# alpha even, so the cover stays continuous and is denser only where the two puffs cross.
 		_cloud_puff(ci, Vector2(cx, cy), rad * 2.1, rad * 0.52, cc)
 		_cloud_puff(ci, Vector2(cx - rad * 0.35, cy - rad * 0.30), rad * 1.15, rad * 0.5, cc)
-	# THE SINKFORGE CROWN sits between the sky and the hills — drawn before the ridges so the near hill
-	# occludes its base, grounding the colossus rising from behind the landscape.
+	# The Sinkforge crown sits between the sky and the hills, drawn before the ridges so the near hill
+	# occludes its base and grounds the colossus rising from behind the landscape.
 	_sinkforge(r, ci, view, cam, horizon, dl, hor_c)
-	# Ridgelines: far-to-near silhouettes. Sampled in FEATURE space (x shifted by the camera's
-	# unparallaxed remainder) so crests slide slower than the terrain — the whole depth illusion.
-	# By day they haze toward the sky (aerial perspective); by night they sink back to silhouette.
+	# Ridgelines: far-to-near silhouettes. Sampled in feature space, with x shifted by the camera's
+	# unparallaxed remainder, so crests slide slower than the terrain. That is the whole depth illusion.
+	# By day they haze toward the sky (aerial perspective), by night they sink back to silhouette.
 	for ridge: Dictionary in WorldRenderer.RIDGES:
 		var f: float = float(ridge["factor"])
 		var amp: float = float(ridge["amp"])
 		var freq: float = float(ridge["freq"])
 		var base_y: float = horizon - float(ridge["drop"]) + cam.y * (1.0 - f) * 0.30
-		# Deep underground the camera drags base_y BELOW the polygon's fixed bottom edge — the crest
-		# line would dip under the floor line (a self-intersecting polygon, triangulation fails).
-		# Clamp the crests above the floor: invisible either way (walls cover the backdrop down there).
+		# Deep underground the camera drags base_y below the polygon's fixed bottom edge, which dips the
+		# crest line under the floor line into a self-intersecting polygon that fails to triangulate.
+		# Clamping the crests above the floor is invisible either way, since walls cover it down there.
 		var floor_y: float = horizon + 320.0
 		var pts := PackedVector2Array()
 		var x: float = view.position.x
@@ -117,44 +105,37 @@ static func paint(r: WorldRenderer, ci: CanvasItem) -> void:
 			x += 24.0
 		pts.append(Vector2(view.end.x + 24.0, floor_y))
 		pts.append(Vector2(view.position.x, floor_y))
-		# AERIAL PERSPECTIVE (#A2). The old falloff topped out near a third of the way to the sky, which
-		# is far too little air for a range on the horizon — every ridge stayed a hard dark cut-out and
-		# the backdrop had no depth to read. The curve is now both stronger and much steeper in the
-		# parallax factor, so the farthest range nearly dissolves into the sky while the nearest stays a
-		# silhouette. Steepness is the point: an even haze across all three would only make one flat
-		# plane paler, where a gradient across them is the depth itself.
+		# Aerial perspective. A falloff topping out a third of the way to the sky is too little air for a
+		# range on the horizon, and leaves every ridge a hard dark cut-out. This curve is stronger and much
+		# steeper in the parallax factor, so the farthest range nearly dissolves into the sky while the
+		# nearest stays a silhouette. The steepness carries the depth: an even haze across all three would
+		# only make one flat plane paler.
 		ci.draw_colored_polygon(pts, (ridge["color"] as Color).lerp(hor_c, dl * maxf(0.88 - f * 1.5, 0.0)))
 
 
-## The star field: a hashed scatter in near-pinned sky space, fading in as the daylight dies, each speck
-## shimmering on its own phase. Stateless like the rest of this file, the ore-glint trick pointed at the sky.
+## The star field: a hashed scatter in near-pinned sky space. It fades in as the daylight dies and each
+## speck shimmers on its own phase.
 ##
-## The sky is not chrome and it is not an event, so it cannot borrow either voice. world_renderer.gd's
-## CHROME block spends white on something that has just happened and gives everything the player looks
-## through rather than at a bright non-white blue-grey; scenery is the third thing, and it had no voice of
-## its own. These 42 specks drew at Color(0.85, 0.88, 0.95), which over the night zenith at peak twinkle
-## composites to Rec.709 luma 165.6 of 255, hue 222.6, saturation 0.124. The aim cursor composites to
-## 181.3 at hue 219.0 and saturation 0.160, the guide chevron to 198.9. Three and a half degrees of hue
-## apart, 0.036 of saturation apart, and a peak sixteen luma steps under the dimmest permanent mark on the
-## screen: scenery wearing the interface's colour. It blinked, too. The old twinkle ran alpha 0.072 to
-## 0.720 and carried the speck from luma 30.4 to 165.6, an 82 percent modulation that reads as a mark
-## flashing rather than as air moving.
+## Scenery must not wear the interface's colour. At Color(0.85, 0.88, 0.95) these 42 specks composited
+## over the night zenith at peak twinkle to Rec.709 luma 165.6 of 255 at hue 222.6 and saturation 0.124.
+## The aim cursor sits at 181.3 / hue 219.0 / saturation 0.160 and the guide chevron at 198.9. That is
+## three and a half degrees of hue and 0.036 of saturation off the marker stack, with a peak sixteen luma
+## steps under the dimmest permanent mark on screen. The old twinkle compounded it: alpha ran 0.072 to
+## 0.720 and carried a speck from luma 30.4 to 165.6. An 82 percent modulation reads as a mark flashing
+## rather than as air moving.
 ##
-## The tints are now two colours this file already paints the sky with, so the field is made of sky instead
-## of made of palette. Peak composite lands at 109.3, which is 72.0 below the cursor, a wider gap than the
-## 42.2 separating the ghost border at 200.8 from the sonar core at 243.0. The sky is the outermost tier
-## rather than one more step inside the marker stack. Presence at rest barely moves, because the trough
-## comes up as the peak comes down: the mean over a twinkle cycle goes 98.0 to 83.0, a 15 percent drop
-## against the peak's 34, at the same 42 specks and the same radii. Five of the 42 take the warm tint on
-## salt 606.
+## On STAR_COLD/STAR_WARM the peak composites to 109.3. That is 72.0 below the cursor, a wider gap than
+## the 42.2 separating the ghost border at 200.8 from the sonar core at 243.0, so the sky sits outside the
+## marker stack instead of one step inside it. Presence at rest barely moves, because the trough comes up
+## as the peak comes down: the mean over a twinkle cycle goes 98.0 to 83.0, a 15 percent drop against the
+## peak's 34, at the same 42 specks and the same radii. Five of the 42 take the warm tint on salt 606.
 ##
-## Density and contrast then answer to what the interface is doing. A guide chevron rides CELL * 3.25 above
-## the cell it names, with a tether back down to it, and a held build ghost puts a chrome box on the aim
-## cell; worked near the surface, both stand inside this field. Each clears a disc the size of that lift,
-## so specks fade to nothing across the marker and the cell it points at, and are untouched everywhere
-## else. One radius covers both marks, sized on the taller rig, since the ghost is only up in the sky while
-## you are placing something there and that is the moment the sky should be quietest of all. With no marker
-## in the sky none of this fires and the field is exactly what it was.
+## Density then answers to what the interface is doing. A guide chevron rides CELL * 3.25 above the cell
+## it names and tethers back down to it, and a held build ghost puts a chrome box on the aim cell. Worked
+## near the surface, both stand inside this field. Each clears a disc the size of that lift, so specks
+## fade to nothing across the marker and the cell it points at and are untouched everywhere else. One
+## radius covers both marks, sized on the taller rig. With no marker in the sky none of this fires and the
+## field is exactly what it was.
 static func _stars(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vector2,
 		grad_top: float, horizon: float, dl: float) -> void:
 	var cell_px: float = float(WorldRenderer.CELL)
@@ -167,11 +148,11 @@ static func _stars(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vector2,
 		marks.append(Vector2(r._aim) * cell_px + half)
 	var star_a: float = (1.0 - dl) * 0.9
 	for i: int in 42:
-		# A bare `i * 2654435761` is a LINEAR sequence, not a hash, and it showed: across these 42 stars
-		# the sorted x values had only THREE distinct gaps between them (76, 241, 317 — a three-distance
-		# lattice), y had five, all under 24px inside a 380px band, and the radii cycled 0,1,2,0,1,2 with
-		# the index. That is a comb of evenly spaced dots with marching sizes, not a sky. One salt per
-		# axis so position, twinkle, size and tint are independent; x alone goes to 38 distinct gaps.
+		# `i * 2654435761` is a linear sequence rather than a hash. Across these 42 stars the sorted x
+		# values had three distinct gaps (76 / 241 / 317, a three-distance lattice); y had five, all under
+		# 24px inside a 380px band; and the radii cycled 0-1-2-0-1-2 with the index. That is a comb of
+		# evenly spaced dots with marching sizes, not a sky. One salt per axis keeps position, twinkle,
+		# size and tint independent, and x alone goes to 38 distinct gaps.
 		var sx: float = view.position.x + fposmod(
 			float(Seams.grain(Vector2i(i, 101)) % 4093) + cam.x * 0.04, view.size.x)
 		var sy: float = grad_top - 60.0 + float(Seams.grain(Vector2i(i, 202)) % 380)
@@ -189,7 +170,8 @@ static func _stars(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vector2,
 			Color(tint.r, tint.g, tint.b, star_a * tw * quiet * 0.8))
 
 
-## A soft filled ellipse (flat alpha — no scalloped edge, no overlap hotspot) — one lobe of a cloud lozenge.
+## One lobe of a cloud lozenge: a filled ellipse at flat alpha, so it has no scalloped edge and no
+## hotspot where lobes overlap.
 static func _cloud_puff(ci: CanvasItem, c: Vector2, rx: float, ry: float, col: Color) -> void:
 	var poly := PackedVector2Array()
 	const N: int = 16
@@ -211,14 +193,14 @@ static func _sinkforge(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vecto
 	var base_y: float = horizon + 30.0 + cam.y * (1.0 - f) * 0.30  # base seam just under the horizon
 	if cx < view.position.x - 360.0 * s or cx > view.end.x + 360.0 * s:
 		return
-	# Silhouette: darker + more present than the ridges (a solid mass), hazed by daylight. It sits at a
-	# parallax factor between the far and mid ranges, so once those gained real aerial perspective (#A2)
-	# its old near-unhazed black stopped reading as distance and started reading as a sticker pasted on
-	# the sky. It takes less haze than an equidistant hill would — it is the landmark, and it should stay
-	# the most present thing on the horizon — but it now stands in the same air as everything around it.
+	# Silhouette: a solid mass, so darker and more present than the ridges, but still hazed by daylight.
+	# Its parallax factor sits between the far and mid ranges, and beside ridges carrying real aerial
+	# perspective a near-unhazed black stops reading as distance and starts reading as a sticker pasted on
+	# the sky. It takes less haze than an equidistant hill would, since it is the landmark and should stay
+	# the most present thing on the horizon, but it stands in the same air as everything around it.
 	var sil: Color = Color(0.050, 0.058, 0.098).lerp(hor_c, dl * 0.44)
 	var pyl_top: float = base_y - 250.0 * s
-	# CHAINS: titanic catenaries hanging from the pylon shoulders (upper spans read above the hills).
+	# Chains: titanic catenaries hanging from the pylon shoulders, the upper spans read above the hills.
 	for k: int in 2:
 		var off: float = (float(k) * 2.0 - 1.0) * 40.0 * s
 		var top := Vector2(cx + off, pyl_top + 20.0 * s)
@@ -228,25 +210,25 @@ static func _sinkforge(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vecto
 			chpts.append(Vector2(top.x + off * 0.5 * t,
 				top.y + t * (base_y + 40.0 * s - top.y) + sin(t * PI) * 22.0 * s))
 		ci.draw_polyline(chpts, sil.darkened(0.12), 5.0 * s)
-	# BASE mesa: a broad dark industrial footing on the horizon (mostly behind the near ridge).
+	# Base mesa: a broad dark industrial footing on the horizon, mostly behind the near ridge.
 	var bw: float = 150.0 * s
 	var bh: float = 70.0 * s
 	ci.draw_colored_polygon(PackedVector2Array([
 		Vector2(cx - bw, base_y), Vector2(cx + bw, base_y),
 		Vector2(cx + bw * 0.72, base_y - bh), Vector2(cx - bw * 0.72, base_y - bh)]), sil)
-	# Leaning BUTTRESS pillars flanking the tower (dead, off-vertical = ancient).
+	# Leaning buttress pillars flanking the tower. Dead and off-vertical is what reads as ancient.
 	for dir: int in [-1, 1]:
 		var px: float = cx + float(dir) * 96.0 * s
 		ci.draw_colored_polygon(PackedVector2Array([
 			Vector2(px - 14.0 * s, base_y - bh + 6.0 * s), Vector2(px + 14.0 * s, base_y - bh + 6.0 * s),
 			Vector2(px + float(dir) * 22.0 * s + 8.0 * s, base_y - 150.0 * s),
 			Vector2(px + float(dir) * 22.0 * s - 8.0 * s, base_y - 150.0 * s)]), sil.darkened(0.10))
-	# Central PYLON rising to the cog.
+	# The central pylon rising to the cog.
 	var pw: float = 40.0 * s
 	ci.draw_colored_polygon(PackedVector2Array([
 		Vector2(cx - pw, base_y - bh + 4.0 * s), Vector2(cx + pw, base_y - bh + 4.0 * s),
 		Vector2(cx + pw * 0.6, pyl_top), Vector2(cx - pw * 0.6, pyl_top)]), sil)
-	# The broken COG-RING crowning the pylon (the machine motif, ruined: an arc + teeth missing).
+	# The broken cog-ring crowning the pylon: the machine motif, ruined, with an arc and teeth missing.
 	var ring_c := Vector2(cx, pyl_top - 30.0 * s)
 	var rr: float = 78.0 * s
 	var gap0: float = 2.15      # the broken arc (radians): ring + teeth absent here
@@ -263,8 +245,8 @@ static func _sinkforge(r: WorldRenderer, ci: CanvasItem, view: Rect2, cam: Vecto
 	for i: int in 4:
 		var a: float = float(i) / 4.0 * TAU + 0.4
 		ci.draw_line(ring_c, ring_c + Vector2(cos(a), sin(a)) * (rr - 6.0 * s), sil, 7.0 * s)
-	# The EMBER HEART: a faint deep-red glow breathing in the cog hub — the machine is dormant, not dead.
-	# Kept subtle so it reads as a buried pulse, not a second sun (the loud "watch it thrum" is a later slice).
+	# The ember heart: a faint deep-red glow breathing in the cog hub, so the machine reads as dormant
+	# rather than dead. Kept subtle enough to be a buried pulse rather than a second sun.
 	var pulse: float = 0.5 + 0.5 * sin(r._anim_time * 0.55)
 	for gi: int in 3:
 		var gr: float = (13.0 + float(gi) * 15.0) * s

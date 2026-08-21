@@ -1,10 +1,10 @@
 extends RefCounted
 
-## The deterministic fine-grid BUILD of the dual-grid terrain. Stateless; fills the sim's `_fine_solid` byte
+## The deterministic fine-grid build of the dual-grid terrain. Stateless; fills the sim's `_fine_solid` byte
 ## array from the coarse `solid` grid plus seeded fine worldgen. Deterministic in (world_seed, coords) only,
 ## no time and no RNG, so two loads mold identically. Never saved; it derives from `solid` plus the seed.
 
-## Rebuild the ENTIRE fine terrain array, after load_world and save-restore since the fine grid is not saved.
+## Rebuild the entire fine terrain array, after load_world and save-restore, since it is never saved.
 ## O(fine cells); incremental edits use sync_block.
 static func rebuild(sim: FactorySim) -> void:
 	_ensure_noise(sim)
@@ -17,16 +17,15 @@ static func rebuild(sim: FactorySim) -> void:
 			sim._fine_solid[fy * fw + fx] = 1 if _cell_solid(sim, fx, fy) else 0
 
 
-## Coarse cells of margin an edit re-molds AROUND the edited cell. `_cell_solid` reads a cell's eight coarse
+## Coarse cells of margin an edit re-molds around the edited cell. `_cell_solid` reads a cell's eight coarse
 ## neighbours to decide whether it is on a boundary, so changing one coarse cell changes the molded shape of
-## the whole ring touching it, not just its own SUBDIV^2 block.
-##
-## THIS NUMBER IS A CONTRACT: anything caching the fine grid must refresh at least this wide after an edit or
-## it keeps stale solidity. The renderer's per-dig fast lane (scenes/fine_terrain.gd rebake_region) reads it;
-## a narrower hardcoded window diverged from a full bake by a 16-texel smear.
+## the whole ring touching it, not just its own SUBDIV^2 block. The number is a contract: anything caching
+## the fine grid must refresh at least this wide after an edit, or it keeps stale solidity. The renderer's
+## per-dig fast lane (scenes/fine_terrain.gd rebake_region) reads it, and a narrower hardcoded window
+## diverges from a full bake by a 16-texel smear.
 const SYNC_BAND: int = 1
 
-## Re-mold ONE coarse cell's SUBDIV x SUBDIV fine block plus SYNC_BAND cells around it, since edge molding
+## Re-mold one coarse cell's SUBDIV x SUBDIV fine block plus SYNC_BAND cells around it, since edge molding
 ## reads the coarse neighbours. O(local): (SUBDIV*(1 + 2*SYNC_BAND))^2 fine cells per edit, 144 at today's
 ## constants. The incremental path used on mine/place/bore/fell.
 static func sync_block(sim: FactorySim, coarse: Vector2i) -> void:
@@ -46,9 +45,9 @@ static func sync_block(sim: FactorySim, coarse: Vector2i) -> void:
 			sim._fine_solid[fy * fw + fx] = 1 if _cell_solid(sim, fx, fy) else 0
 
 
-## Decide whether one fine cell is solid: the FINE WORLDGEN, deterministic in (world_seed, fx, fy). Base
+## Decide whether one fine cell is solid: the fine worldgen, deterministic in (world_seed, fx, fy). Base
 ## solidity is the parent coarse cell's, and in the interior (all coarse neighbours agree) it stays as-is, so
-## the gravity hook's terrain is never punched. Only at a solid/air BOUNDARY does detail apply: a bilinear
+## the gravity hook's terrain is never punched. Only at a solid/air boundary does detail apply: a bilinear
 ## ramp of coarse solidity perturbed by edge noise, then grit, then thresholded. Coarse stays the authority.
 static func _cell_solid(sim: FactorySim, fx: int, fy: int) -> bool:
 	var pcx: int = fx / FactorySim.SUBDIV
@@ -62,16 +61,16 @@ static func _cell_solid(sim: FactorySim, fx: int, fy: int) -> bool:
 			boundary = true
 			break
 	if not boundary:
-		return parent    # deep interior / deep air — untouched, the base stays solid by construction
+		return parent    # deep interior or deep air: molding is skipped and the base stands
 	# Bilinear solidness at the fine cell centre (coarse-cell units) → a smooth 0..1 ramp across the edge.
 	var wx: float = (float(fx) + 0.5) / float(FactorySim.SUBDIV)
 	var wy: float = (float(fy) + 0.5) / float(FactorySim.SUBDIV)
 	var solidness: float = _bilinear(sim, wx, wy)
-	# EDGE noise bends the boundary (organic erosion/accretion); a slight net-erode opens cave mouths.
+	# Edge noise bends the boundary (organic erosion and accretion); a slight net-erode opens cave mouths.
 	var band: float = 1.0 - absf(solidness - 0.5) * 2.0     # full swing at the 0.5 edge, 0 deep in either
 	var edge: float = sim._fine_edge.get_noise_2d(float(fx), float(fy)) * FactorySim.FINE_EDGE_AMP - FactorySim.FINE_EROSION_BIAS
 	solidness = clampf(solidness + edge * band, 0.0, 1.0)
-	# GRIT: high-frequency noise adds bite near a face and fades inward, so exposed rock gets pits and
+	# Grit: high-frequency noise adds bite near a face and fades inward, so exposed rock gets pits and
 	# nubs while deep rock stays whole.
 	var grit: float = sim._fine_grit.get_noise_2d(float(fx), float(fy)) * FactorySim.FINE_GRIT_BITE * band
 	solidness = clampf(solidness + grit, 0.0, 1.0)
@@ -100,9 +99,9 @@ static func _ensure_noise(sim: FactorySim) -> void:
 	if sim._fine_edge != null and sim._fine_seed_built == sim.world_seed:
 		return
 	sim._fine_seed_built = sim.world_seed
-	# SINGLE OCTAVE on both fields. FastNoiseLite defaults to 5-octave FBM and each octave doubles the frequency,
-	# so a field resolving on the fine grid still ships octaves that do not. An aliased octave in a SHAPE field
-	# flips the boundary in and out per cell, printing a rock lip as a one-pixel dither.
+	# Single octave on both fields. FastNoiseLite defaults to 5-octave FBM and each octave doubles the
+	# frequency, so a field resolving on the fine grid still ships octaves that do not. An aliased octave in
+	# a shape field flips the boundary in and out per cell, printing a rock lip as a one-pixel dither.
 	sim._fine_edge = FastNoiseLite.new()
 	sim._fine_edge.seed = sim.world_seed ^ 0x1f83d9ab
 	sim._fine_edge.noise_type = FastNoiseLite.TYPE_SIMPLEX

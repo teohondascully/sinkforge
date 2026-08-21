@@ -1,17 +1,18 @@
 class_name Particles
 extends RefCounted
 
-## Cosmetic particle layer (juice — audit #6). Pure representation: MainView emits bursts on world-verbs
-## (dig / place / collect) and on the body's landing/footsteps; WorldRenderer draws them. Never touches
-## the sim (uses randf — fine, it's cosmetic, not the deterministic tick). Capped so it can't unbound.
+## Cosmetic particle layer. MainView emits bursts on world verbs and on the body's landing and
+## footsteps; WorldRenderer draws them. It never touches the sim, so randf() is safe here: these are
+## outside the deterministic tick. Capped so it cannot grow without bound.
 
 const MAX: int = 240
 
-# Each particle: pos, vel, life, max_life, color, size, grav.
+# Each particle carries pos/vel/life/max_life/color/size/grav.
 var _p: Array[Dictionary] = []
 
 
-## Spawn `count` particles at `pos` flung within a cone/spread, each fading + falling under `grav`.
+## Spawn `count` particles at `pos` (world px) flung within a cone of half-width `spread` radians,
+## each fading and falling under `grav`.
 func burst(pos: Vector2, count: int, color: Color, speed: float, spread: float, size: float,
 		life: float, grav: float = 220.0, up_bias: float = 0.0) -> void:
 	for _i: int in count:
@@ -28,16 +29,15 @@ func burst(pos: Vector2, count: int, color: Color, speed: float, spread: float, 
 		})
 
 
-# --- named emitters (so call sites read intent) ---
+# --- named emitters, so call sites read as intent ---
 
-## A puff of material-coloured dust (digging, landing, footsteps) — flung low + sideways, settling.
+## A puff of material-coloured dust for digging, landing and footsteps. Flung low and sideways.
 func dust(pos: Vector2, color: Color, amount: int = 8) -> void:
 	burst(pos, amount, color, 90.0, PI * 0.55, 3.0, 0.42, 260.0)
 
 
-## THE DRAUGHT (#S11) — a thin, slow drift of dust pulled ALONG a direction, for a face with a void behind
-## it. Nearly weightless and long-lived, so it hangs in the lamp pool and reads as moving air rather than
-## as debris; the tell has to be visible to a player with the sound off, and a cave breathes.
+## The draught: a thin slow drift of dust along `dir`, marking a face with a void behind it. Nearly
+## weightless and long-lived, so it hangs in the lamp pool as moving air. The silent half of the cue.
 func draught(pos: Vector2, color: Color, dir: Vector2, amount: int = 2) -> void:
 	for _i: int in amount:
 		if _p.size() >= MAX:
@@ -50,31 +50,30 @@ func draught(pos: Vector2, color: Color, dir: Vector2, amount: int = 2) -> void:
 		})
 
 
-## A bright outward spark spray (placing a machine) — fast, short, little gravity.
+## A bright outward spark spray for placing a machine: fast and short, with little gravity.
 func spark(pos: Vector2, color: Color) -> void:
 	burst(pos, 12, color, 150.0, PI, 2.4, 0.30, 60.0, PI * 0.5)
 
 
-## A small upward pop (collecting a pile) — rises + fades.
+## A small upward pop for collecting a pile.
 func pop(pos: Vector2, color: Color) -> void:
 	burst(pos, 6, color, 70.0, 0.5, 2.6, 0.45, -40.0)
 
 
-## A tight chip off a struck rock face (the per-blow mining tick): a few quick flecks
-## flung along `dir_ang` (radians — usually back toward the digger). Smaller than a break.
+## A tight chip off a struck rock face, once per blow: a few quick flecks flung along `dir_ang` in
+## radians, usually back toward the digger. Smaller than a break.
 func chip(pos: Vector2, color: Color, dir_ang: float) -> void:
 	burst(pos, 3, color, 110.0, 0.7, 2.2, 0.28, 260.0, -PI * 0.5 - dir_ang)
 
 
-## Break DEBRIS kicked out of a shattered block along `dir_ang` — chunkier + faster than dust, the
-## "that blow landed" payoff layered over the settling dust puff.
+## Debris kicked out of a shattered block along `dir_ang`. Chunkier and faster than dust, and layered
+## over the settling dust puff rather than replacing it.
 func debris(pos: Vector2, color: Color, dir_ang: float) -> void:
 	burst(pos, 7, color, 150.0, 0.5, 2.8, 0.38, 300.0, -PI * 0.5 - dir_ang)
 
 
-## A single cool-blue DRIP shed off pouring water (L3): one tiny droplet nudged mostly DOWN with a hair
-## of sideways drift, falling under strong gravity, short-lived. Called sparsely per pouring cell (the
-## renderer rate-limits + view-culls) so a waterfall shimmers with the odd drop, not a firehose.
+## A single droplet shed off pouring water: mostly down with a hair of sideways drift, short-lived
+## under strong gravity. The renderer rate-limits and view-culls the calls, so a waterfall shimmers.
 func water_drip(pos: Vector2) -> void:
 	if _p.size() >= MAX:
 		return
@@ -87,8 +86,8 @@ func water_drip(pos: Vector2) -> void:
 	})
 
 
-## A tiny cool-blue SPLASH where falling water lands — a few flecks kicked UP + outward, quick, so a
-## pour reads as hitting the surface below, not vanishing. Smaller/cooler than a mining break.
+## A splash where falling water lands: a few flecks kicked up and outward, so a pour reads as hitting
+## the surface below rather than vanishing into it.
 func water_splash(pos: Vector2) -> void:
 	burst(pos, 4, Color(0.62, 0.82, 0.98), 60.0, PI * 0.6, 1.8, 0.26, 340.0, PI * 0.5)
 

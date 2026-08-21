@@ -1,10 +1,10 @@
 class_name Art
 extends RefCounted
 
-## Drop-in sprite loader. Returns a Texture2D for a logical key if its PNG exists
-## under assets/sprites/, else null so the caller falls back to its code-drawn primitive. Caches lookups
-## (including misses) so a missing file is probed once. This is the seam that lets the user add art
-## incrementally without touching draw code: no PNG → today's primitives; PNG present → their art.
+## Drop-in sprite loader. Returns a Texture2D for a logical key if its PNG exists under
+## assets/sprites/, else null so the caller falls back to its code-drawn primitive. Lookups are cached
+## including misses, so a missing file is probed once and art can land one sprite at a time without
+## touching draw code.
 
 const DIR: String = "res://assets/sprites/"
 
@@ -21,6 +21,6 @@ static func tex(key: String) -> Texture2D:
 	return t
 
 
-## True if any sprite art exists at all (lets a renderer keep its pure-primitive path until art lands).
+## True if any sprite art exists at all, so a renderer can keep its pure-primitive path until it does.
 static func has_any() -> bool:
 	return tex("miner") != null or tex("machine_processor") != null

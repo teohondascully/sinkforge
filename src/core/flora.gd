@@ -1,11 +1,10 @@
 extends RefCounted
 
-## Per-tick flora sweep: ages planted saplings into trees. Stateless, operating on the sim's
-## `sapling` layer and terrain grids; FactorySim owns the state, the SAPLING_* constants and the
-## public API. Deterministic (cell-hash trunk heights, no RNG) and conservation-safe: an uprooted
-## seed is ledgered back into play.
+## Per-tick flora pass: ages planted saplings into trees. Stateless, operating on the sim's `sapling`
+## layer and terrain grids; FactorySim owns the state, the SAPLING_* constants and the public API.
+## Deterministic (cell-hash trunk heights, no RNG) and conservation-safe: an uprooted seed is ledgered.
 
-## The growth sweep. Every sapling ages one tick. One built over is destroyed; one whose soil
+## The growth pass. Every sapling ages one tick. One built over is destroyed; one whose soil
 ## vanished drops as a ground item. At SAPLING_GROW_TICKS it sprouts a tree into cells still open.
 static func grow(sim: FactorySim) -> void:
 	if sim.sapling.is_empty():
@@ -16,9 +15,9 @@ static func grow(sim: FactorySim) -> void:
 	for cv: Variant in sim.sapling:
 		var c: Vector2i = cv
 		if sim.solid.has(c) or sim.grid.has(c):
-			dead.append(c)                              # built over — crushed
+			dead.append(c)                              # built over and crushed
 		elif not FactorySim.SAPLING_SOILS.has(sim.solid.get(c + Vector2i(0, 1), &"")):
-			uprooted.append(c)                          # soil mined out — the seed drops free
+			uprooted.append(c)                          # soil mined out and the seed drops free
 		else:
 			sim.sapling[c] = int(sim.sapling[c]) + 1
 			if int(sim.sapling[c]) >= FactorySim.SAPLING_GROW_TICKS:

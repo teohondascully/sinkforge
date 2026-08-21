@@ -1,15 +1,13 @@
 class_name LightLayer
 extends Node2D
 
-## A thin REPRESENTATION-layer canvas that paints one lighting pass for MainView in world space. It
-## exists only so each pass gets its OWN blend mode (you can't switch blend mid-_draw on one CanvasItem):
-## terrain passes are ordinary MIX, the DARKNESS pass MULTIPLIES (shadow scales the light already there,
-## which is what shadow physically does — see WorldRenderer's veil notes), and the LIGHT pass is ADD
-## (warm pools punching back through). MainView owns all the light MATH; this just provides the canvas +
-## blend + redraw. Pure visuals — delete it and the sim numbers are identical.
+## One lighting pass for MainView, painted in world space. It exists so that each pass can carry its own
+## blend mode, which a single CanvasItem cannot switch mid-_draw: terrain passes are MIX, the darkness
+## pass multiplies, so shadow scales the light already there, and the light pass is ADD. MainView owns all
+## the light math; this owns only the canvas, the blend and the redraw. Pure representation.
 
-## MainView sets this to its painter (`_paint_darkness` / `_paint_lights`); we hand it back this canvas
-## so its draw_* calls land on US (they're only valid on the CanvasItem currently in its _draw pass).
+## MainView's painter (`_paint_darkness` or `_paint_lights`), handed this canvas back when it runs:
+## draw_* calls are only valid on the CanvasItem currently inside its own _draw pass.
 var painter: Callable
 
 

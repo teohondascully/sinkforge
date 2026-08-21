@@ -2,10 +2,9 @@ extends RefCounted
 
 ## Per-tick power propagation: clears and refills the sim's `power` field from the fueled generators and the
 ## conduit network. Stateless. Derived and recomputed from scratch each tick, so it cannot desync from
-## placement or fuel. Deterministic: top-to-bottom sweep, fixed L->R then R->L tie-break.
+## placement or fuel. Deterministic: top-to-bottom pass, fixed L->R then R->L tie-break.
 
-## Rebuild the power field: every FUELED generator stamps its innate aura, then power floods further through
-## the conduit network (down and lateral, never up).
+## Rebuild the power field: every fueled generator stamps its aura, then power floods the conduit network.
 static func compute(sim: FactorySim) -> void:
 	sim.power.clear()
 	for machine: MachineState in sim.machines:
@@ -15,8 +14,8 @@ static func compute(sim: FactorySim) -> void:
 		_flow_through_conduits(sim)
 
 
-## Stamp a generator's innate aura: an attenuating diamond (manhattan radius POWER_AURA) around `origin`,
-## fading to 0 at the rim. Overlapping auras take the MAX, never the sum.
+## Stamp a generator's innate aura: an attenuating diamond (manhattan radius POWER_AURA) around `origin`
+## that fades to 0 at the rim. Overlapping auras take the maximum rather than the sum.
 static func _emit_aura(sim: FactorySim, origin: Vector2i, amount: float) -> void:
 	for dy: int in range(-FactorySim.POWER_AURA, FactorySim.POWER_AURA + 1):
 		for dx: int in range(-FactorySim.POWER_AURA, FactorySim.POWER_AURA + 1):
@@ -30,15 +29,15 @@ static func _emit_aura(sim: FactorySim, origin: Vector2i, amount: float) -> void
 			sim.power[cell] = maxf(float(sim.power.get(cell, 0.0)), v)
 
 
-## Flood power through the conduit network in ONE top-to-bottom sweep. Power flows DOWN and LATERAL, never up,
-## so the network is acyclic by row and needs no iterative solver. Per row: VERTICAL inflow is the SUM of the
-## feeders above clamped to CONDUIT_CAPACITY, which also bounds branch amplification; HORIZONTAL spread is a
-## lossy MAX delivery both ways along the row, where the L->R then R->L order is the tie-break that stops two
-## adjacent tubes forming a same-row loop. Each conduit cell then writes into the field and BLEEDS to its
-## neighbours so adjacent machines draw.
+## Flood power through the conduit network in one top-to-bottom pass. Power flows down and laterally but
+## never up, so the network is acyclic by row and needs no iterative solver. Per row the vertical inflow is
+## the sum of the feeders above clamped to CONDUIT_CAPACITY, which also bounds branch amplification, while
+## horizontal spread is a lossy maximum delivered both ways along the row, where the L->R then R->L order
+## is the tie-break that stops two adjacent tubes forming a same-row loop. Each conduit cell then writes
+## into the field and bleeds to its neighbours so adjacent machines draw.
 static func _flow_through_conduits(sim: FactorySim) -> void:
 	var carried: Dictionary = {}                       # conduit cell -> power it carries this tick
-	# Touch only ACTUAL conduit cells, grouped by row, so a sparse network costs O(conduits), not O(grid).
+	# Touch only actual conduit cells, grouped by row, so a sparse network costs O(conduits), not O(grid).
 	var by_row: Dictionary = {}                         # y -> Array[int] of conduit x's in that row
 	for cell: Variant in sim.conduit:
 		var c: Vector2i = cell
@@ -56,7 +55,7 @@ static func _flow_through_conduits(sim: FactorySim) -> void:
 			for dx: int in [-1, 0, 1]:
 				vin += _power_out_of(sim, Vector2i(x + dx, y - 1), carried) * FactorySim.CONDUIT_V_KEEP
 			carried[Vector2i(x, y)] = minf(vin, FactorySim.CONDUIT_CAPACITY)
-		# (2) horizontal spread within the row: L→R then R→L lossy MAX (the same-row tie-break), only
+		# (2) horizontal spread within the row: L→R then R→L lossy maximum (the same-row tie-break), only
 		# transferring between conduits that are actually adjacent in this row.
 		for i: int in range(1, xs.size()):
 			if xs[i] == xs[i - 1] + 1:
@@ -70,7 +69,7 @@ static func _flow_through_conduits(sim: FactorySim) -> void:
 	for cell: Vector2i in carried:
 		var v: float = float(carried[cell])
 		if v <= 0.0:
-			continue          # a tube carrying NO power adds no field entry — else consumers that read
+			continue          # a tube carrying no power adds no field entry, or consumers that read
 			                  # power.keys() as "lit" (minimap frontier-reach) wash an unpowered run powered
 		sim.power[cell] = maxf(float(sim.power.get(cell, 0.0)), v)
 		for nb: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
@@ -79,8 +78,8 @@ static func _flow_through_conduits(sim: FactorySim) -> void:
 				sim.power[n] = maxf(float(sim.power.get(n, 0.0)), v * FactorySim.CONDUIT_BLEED)
 
 
-## Power a cell feeds DOWN into the conduit below it: a fueled generator pours its full output, a conduit passes
-## what it carries, anything else nothing. Read during the top-down sweep, so a conduit feeder's `carried` is final.
+## Power a cell feeds down into the conduit below it: a fueled generator pours its full output, a conduit
+## passes what it carries, anything else nothing. Read during the top-down pass, so a feeder is final.
 static func _power_out_of(sim: FactorySim, cell: Vector2i, carried: Dictionary) -> float:
 	if sim.conduit.has(cell):
 		return float(carried.get(cell, 0.0))

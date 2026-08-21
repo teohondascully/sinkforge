@@ -1,214 +1,174 @@
 class_name Player
 extends Node2D
 
-## The embodied avatar — P2·S1a. PURELY a representation-layer entity: it reads the sim's world
-## (is_solid / machine_at) for collision but NEVER enters the deterministic tick and never writes
-## production state. Delete it and the factory numbers are identical. Movement is a small custom
-## platformer controller with per-axis move-then-resolve AABB collision against the sim's solid cells,
-## the machines, and the world walls/floor (safe from tunnelling at these speeds vs 32px cells; would
-## need substep clamping only under severe frame drops) — plain GDScript so the feel is fully ours to
-## tune (custom-now, not TileMap).
+## The embodied avatar, purely a representation-layer entity: it reads the sim's world (is_solid,
+## machine_at) for collision but never enters the deterministic tick and never writes production
+## state. Delete it and the factory numbers are identical. Movement is a small custom platformer
+## controller with per-axis move-then-resolve AABB collision against the sim's solid cells, the
+## machines and the world bounds. Plain GDScript rather than a TileMap, so the feel is tunable.
 ##
-## FLOOR AUTHORITY (the 2026-06 movement-rebuild fix). The heightmap slope-follow (surface_row/ramp_dir)
-## glides smooth 45° ramps but only knows a 1-D per-column surface — it can't see cave floors, dug pits,
-## or machines, so it used to FIGHT the AABB and trap you in a 1-pit. Now it acts ONLY on a genuine
-## rendered ramp (ramp_dir≠0); EVERYWHERE ELSE the AABB is the sole authority via two mirror moves in the
-## resolve: auto STEP-UP a ≤1-tile rise (climb out of a pit, over a machine, up a cave ledge) and
-## floor-SNAP a ≤1-tile descent (hug stairs/slopes without launching). Guarded by tools/check_step.gd.
+## Floor authority. The heightmap slope-follow (surface_row / ramp_dir) glides smooth 45° ramps but
+## knows only a 1-D per-column surface: it cannot see cave floors, dug pits or machines, and left to
+## itself it fights the AABB and traps the body in a one-cell pit. So it acts only on a genuine
+## rendered ramp. Everywhere else the AABB is the sole authority, through two mirror moves in the
+## resolve: auto step-up over a rise of one tile or less, and floor-snap down a descent of the same.
+## Guarded by tools/check_step.gd.
 ##
-## DESIGN-OPEN: every number here (speed, gravity, jump, size) is placeholder feel, measured vs
-## intended by the harness (tools/measure_player.gd) and tuned by taste.
+## Every feel number here is placeholder, measured against intent by tools/measure_player.gd.
 
 const CELL: int = 32
-## Body AABB. SCALE spike (Noita-feel): shrunk 20×44 → 14×34 so the avatar reads as a small nimble figure
-## in a big granular world once the camera is zoomed out (the thing we're judging by eye). Still JUST over
-## one cell tall (34 > 32), so the "needs TWO tiles of clearance; a 1-tall gap is an honest squeeze" rule
-## HOLDS — collision semantics + the step/agility harnesses are unchanged. WIDTH stays under a cell so it
-## still fits down a 1-wide dug shaft. Proportions preserved (0.65 the old, ~0.44×1.06 tiles).
+## Body AABB, 14x34 px: 0.44 x 1.06 tiles. At the zoomed-out camera the avatar reads as a small nimble
+## figure in a big granular world. Just over one cell tall, so a body still needs two tiles of
+## clearance and a one-tall gap is an honest squeeze. Under a cell wide, so a one-wide shaft fits.
 const WIDTH: float = 14.0
 const HEIGHT: float = 34.0
 
-## --- feel constants (placeholder; harness measures these vs intent) ---
 const RUN_SPEED: float = 150.0       ## px/s horizontal top speed
-const ACCEL: float = 1700.0          ## px/s^2 toward top speed (~0.09s) — quick, but not instant (less stiff)
+const ACCEL: float = 1700.0          ## px/s^2 toward top speed (about 0.09s): quick, but not instant
 const FRICTION: float = 2200.0       ## px/s^2 rubbed off when no input (snappy stop)
 const GRAVITY: float = 900.0         ## px/s^2
-## Jump apex ~= v^2/(2g) ~= 74px — comfortably clears a TWO-tile (64px) wall. It was -330 (apex 60px),
-## which made a 2-block ledge a 4px-short bounce-off — the reported "stalling on a 2-high jump". A ≥3-tile
-## wall stays honest (jump can't beat it; that's what ropes/digging are for).
+## Jump apex is v^2/(2g) = about 74px, which comfortably clears a two-tile (64px) wall. At -330 it was
+## 60px and bounced off a two-block ledge by four pixels. Three tiles or more stays an honest wall.
 const JUMP_VELOCITY: float = -365.0
-## VARIABLE JUMP: while RISING with Space released, gravity is multiplied by this —
-## a tap gives a short hop (~1/2 tile), a held press the full 2-tile arc. Feel-standard platformer
-## control; never touches falls (velocity.y >= 0) or rope climbs. Harness drivers that don't model
-## the key default jump_held=true, so every measured/scripted jump stays the FULL arc.
+## While rising with the jump key released, gravity is multiplied by this: a tap gives a short hop of
+## about half a tile and a held press the full two-tile arc. It never touches falls (velocity.y >= 0)
+## or rope climbs. Drivers that do not model the key default to jump_held = true.
 const JUMP_CUT_GRAVITY: float = 2.1
 const MAX_FALL: float = 560.0        ## px/s terminal
 const COYOTE_TIME: float = 0.08      ## s of grace to still jump after leaving an edge
 const JUMP_BUFFER: float = 0.10      ## s a jump press is remembered before landing (forgiving)
-## THE STRIDE (#S9) — the body builds momentum, the same idea the dig rhythm already runs on.
+## The stride. RUN_SPEED is tuned for mining: close quarters and one cell at a time, stopping exactly
+## where intended. That is the wrong speed for crossing a hundred and twenty-eight columns of world.
+## Raising the constant fixes the traverse and ruins the mining, so top speed is a state instead.
 ##
-## RUN_SPEED is tuned for MINING: close quarters, one cell at a time, stop exactly where you meant to.
-## It is the wrong speed for crossing a hundred and twenty-eight columns of world, and the world grew
-## sixty percent taller without the legs getting any longer, so every traverse became a commute. Raising
-## the constant would fix the commute and ruin the mining, which is why it stayed wrong.
-##
-## So it stops being a constant and becomes a state. Hold one direction on the ground and, after
-## STRIDE_DELAY of unbroken travel, the miner settles into a run that tops out STRIDE_GAIN faster. Turn,
-## stop, hit a wall, wade into water or land hard and it is gone. Everything SHORT — a step to line up a
-## dig, a hop onto a ledge, the whole first second of any movement — happens at exactly the speed it
-## always did, so the mining feel is untouched and the measured top speed still reads 150.
-##
-## Deliberately not free, and deliberately not a toggle: the delay is long enough that you cannot flick
-## into it, a hard landing costs half of it, and it SURVIVES leaving the ground — so running a line of
-## broken terrain without breaking the run is a thing a player gets better at. The grapple stays king by
-## a wide margin (a pumped arc measures 2.8x RUN_SPEED against a full stride's 1.55x); this is the floor
-## of traversal rising, not the ceiling.
+## Holding one direction on the ground for STRIDE_DELAY of unbroken travel settles the miner into a run
+## that tops out STRIDE_GAIN faster. Turning, stopping, hitting a wall, wading or landing hard ends it.
+## Everything short of that happens at exactly the old speed, so the mining feel is untouched and
+## measured top speed still reads 150. The delay is long enough that the stride cannot be flicked into,
+## and it survives leaving the ground, so broken terrain can be run without breaking the run.
 const STRIDE_DELAY: float = 0.9      ## s of unbroken same-way ground travel before the run starts building
 const STRIDE_RAMP: float = 1.2       ## ...and s from there to full
 const STRIDE_GAIN: float = 0.55      ## extra top speed at full stride (150 -> 232 px/s)
 const STRIDE_DECAY: float = 3.0      ## per-second bleed once the run breaks (a third of a second to nothing)
 const STRIDE_LAND_COST: float = 0.5  ## fraction of the stride a hard landing takes
-## THE COST OF A LANDING. A fall was free. You could ride terminal velocity into rock and sprint off the
-## impact frame at full speed, which made every drop in the game weightless — and once the sinkholes
-## landed, it made a forty-row hole a strictly better staircase. Weight has to be felt somewhere.
+## The cost of a landing. Otherwise a fall is free: the body can ride terminal velocity into rock and
+## sprint off the impact frame at full speed, which makes a forty-row hole a strictly better staircase.
 ##
-## Deliberately NOT damage. There is no health system, and inventing one to price a fall is a far larger
-## decision than this needs; more importantly, a platformer that takes control AWAY feels broken however
-## justified the moment. So a hard landing costs GRIP: for a fraction of a second scaled by how hard you
-## hit, the legs have reduced authority and the stride is gone. You can still steer, still jump, still
-## mine — you just do not accelerate out of a forty-metre drop like you stepped off a kerb.
+## The cost is grip, not damage. There is no health system, and a platformer that takes control away
+## feels broken however justified the moment, so a hard landing instead leaves the legs with reduced
+## authority for a fraction of a second scaled by how hard the body hit. Steering, jumping and mining
+## all still work.
 ##
-## And the rope is the answer, for free and without a special case: arresting on the line bleeds the fall
-## before it lands, so a descent you actually FLEW costs nothing, and one you merely survived costs a beat.
-## That is the whole risk side of "dig, or find the open way and ride it" — priced in the only currency
-## this game has, which is time.
-## Priced on the DISTANCE fallen, not the speed of the impact, and that distinction is the whole design.
-## Impact speed saturates: terminal velocity arrives after 5.4 cells, so by that measure a six-cell hop and
-## a forty-row plunge land identically, and any threshold you pick either fires on both or on neither.
-## Distance keeps counting. It is also what the player is actually tracking — nobody feels px/s, everybody
-## feels "that was a long way down".
-##
-## And it makes the rope the answer without a special case: a taut line RESETS the fall, because a fall the
-## rope caught is over. Let go again and a new one starts from there. So a descent you flew properly costs
-## nothing, one you flew badly costs a beat, and neither needed a rule of its own.
-const STAGGER_FALL: float = CELL * 9.0   ## px of fall that lands clean — past any ordinary platforming drop
+## Priced on the distance fallen rather than on impact speed, because impact speed saturates: terminal
+## velocity arrives after 5.4 cells, so past that a six-cell hop and a forty-row plunge land identically
+## and any threshold fires on both or neither. A taut line resets the fall, since a fall the rope caught
+## is over, so a descent flown properly costs nothing and one merely survived costs a beat.
+const STAGGER_FALL: float = CELL * 9.0   ## px of fall that lands clean, past any ordinary platforming drop
 const STAGGER_FULL: float = CELL * 30.0  ## ...and the fall that costs the full beat
-const STAGGER_MAX: float = 0.26      ## s of reduced grip at the worst of it — a beat, never a lockout
-const STAGGER_GRIP: float = 0.34     ## × ACCEL while staggered: steering, but not steering WELL
-var stagger: float = 0.0             ## s of stagger left — also read by the view for the recovery pose
+const STAGGER_MAX: float = 0.26      ## s of reduced grip at the worst of it: a beat, never a lockout
+const STAGGER_GRIP: float = 0.34     ## × ACCEL while staggered: steering, but not steering well
+var stagger: float = 0.0             ## s of stagger left; also read by the view for the recovery pose
 var _fall_from: float = 0.0          ## world y the current fall began at (ground, rope or taut line)
 const STRIDE_LEAN: float = 0.07      ## radians the body tilts forward at full stride (~4 degrees)
-var stride: float = 0.0              ## 0..1 into the run — read by the lean, the camera and the dust
+var stride: float = 0.0              ## 0..1 into the run; read by the lean, the camera and the dust
 var _stride_hold: float = 0.0        ## s of unbroken qualifying travel so far (counts toward STRIDE_DELAY)
-const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body UP (the paid inverse of gravity)
+const LIFT_RISE_SPEED: float = 120.0 ## px/s the updraft carries the body up (the paid inverse of gravity)
 const CLIMB_SPEED: float = 110.0     ## px/s the body travels a gripped rope (hold W/S; release = hang)
-## Slope follow: a single-tile rise is walked as a 45° ramp (glide, not teleport); a taller rise is a
-## wall you must jump. A single-tile drop is glided down too; a bigger gap is a real fall.
+## Slope follow: a single-tile rise is walked as a 45° ramp rather than teleported over. A taller rise
+## is a wall that has to be jumped. A single-tile drop is glided down too; a bigger gap is a fall.
 const MAX_STEP: float = CELL * 1.3
 const MAX_DROP: float = CELL * 1.3
-## Floor-snap (hugging a descending step / catching a fast drop) applies when the body is genuinely MOVING —
-## walking sideways down stairs, or falling fast onto a ledge. What it must NOT do is fire when a ~stationary
-## body loses the floor from under it (you MINED it): that's not a step-down, it's the start of a FALL, so
-## gravity must take over and the body drops naturally instead of teleporting onto the next surface. The bug
-## case is the ONLY one stationary in BOTH axes, so we snap only if moving in one: sideways OR falling fast.
+## Floor-snap (hugging a descending step or catching a fast drop) applies only when the body is
+## genuinely moving: walking sideways down stairs, or falling fast onto a ledge. It must not fire when
+## a nearly stationary body loses the floor from under it, because that is the start of a fall and
+## gravity has to take over instead. That case is the only one stationary in both axes.
 const SNAP_WALK_MIN: float = 8.0     ## px/s of horizontal motion that counts as "walking" (stair-hug)
 const SNAP_FALL_MIN: float = 250.0   ## px/s of downward speed that counts as a real "drop" (fast-fall catch)
-const SNAP_STABILIZE: float = 4.0    ## a snap THIS small just keeps a resting body grounded (no flicker) — always allowed
-## The instant a resting body loses its floor (you MINED it out, or ran off a ledge), a fall that begins from
-## velocity.y = 0 creeps down under gravity for ~0.15s before it visibly moves — a mushy, "laggy" drop. Seed
-## this brisk minimum downward speed on that grounded→airborne edge so the descent reads IMMEDIATELY (Terraria-
-## snappy). It never touches jump arcs: a jump sets velocity.y NEGATIVE, so this max() leaves it untouched.
+const SNAP_STABILIZE: float = 4.0    ## a snap this small only keeps a resting body grounded (no flicker); always allowed
+## The instant a resting body loses its floor it would otherwise creep down from zero velocity for
+## about 0.15s before visibly moving, which reads as lag. Seeding a minimum downward speed makes the
+## descent read at once. Jump arcs are untouched: a jump sets velocity.y negative, so max() leaves it.
 const FALL_START: float = 150.0      ## px/s minimum fall speed seeded when a grounded body starts falling
-## WATER IMPEDANCE (L3 slice 3b — the located hazard the Pump later relieves). When the body's AABB
-## overlaps a water cell (sim.water_at > 0) it WADES: horizontal top-speed + accel are damped (you slog),
-## gravity is buoyantly slowed (a floaty near-neutral sink) with a gentle terminal-rise cap so you don't
-## plummet OR bob up, and the jump is weaker (harder to leap out). It's friction, NOT drowning — there's no
-## health system, so every mult keeps the body clearly MOVABLE (wade, exit, still jump). Gated ONLY on
-## _in_water(); dry-land movement (check_agility / check_walk) is untouched — the gate never leaks.
+## Water impedance, the located hazard the Pump later relieves. With the body's AABB over a water cell
+## it wades. Horizontal top speed and accel are damped, gravity is buoyantly slowed to a near-neutral
+## sink under a terminal cap, and the jump is weaker. It is friction rather than drowning: there is no
+## health system, so every multiplier keeps the body movable. Gated only on _in_water().
 const WATER_SPEED_MULT: float = 0.55   ## × RUN_SPEED horizontal top speed while wading
-const WATER_ACCEL_MULT: float = 0.6    ## × ACCEL/FRICTION — you build/shed speed sluggishly in water
-const WATER_GRAVITY_MULT: float = 0.45 ## × GRAVITY — buoyant slow-fall (a floaty descent, not a plummet)
-const WATER_JUMP_MULT: float = 0.7     ## × JUMP_VELOCITY — a weaker leap (harder to hop clear of a pool)
+const WATER_ACCEL_MULT: float = 0.6    ## × ACCEL/FRICTION: speed builds and sheds sluggishly in water
+const WATER_GRAVITY_MULT: float = 0.45 ## × GRAVITY: buoyant slow-fall, a descent rather than a plummet
+const WATER_JUMP_MULT: float = 0.7     ## × JUMP_VELOCITY: a weaker leap, harder to hop clear of a pool
 const WATER_MAX_SINK: float = 220.0    ## px/s terminal sink in water (a slow settle, not free-fall)
 const WATER_MIN_LEVEL: int = 1         ## water_at at/above this counts the cell as "wet" (any water impedes)
-## Physics integrates in chunks no larger than this, so a big frame delta — the fast-forward game clock
-## (Engine.time_scale > 1) or a real frame-drop — can't let the body skip past a tile between collision
-## resolves (tunnel). At time_scale 1 a normal 1/60 frame is a single substep, so play feel is unchanged;
-## only large deltas split. Matches the sim's own fixed-tick discipline (a step is a step).
+## Physics integrates in chunks no larger than this, so a big frame delta (fast-forward at
+## Engine.time_scale > 1, or a real frame drop) cannot let the body skip past a tile between collision
+## resolves. At time_scale 1 a 1/60 frame is a single substep, so play feel is unchanged.
 const MAX_SUBSTEP: float = 1.0 / 60.0
 
 var sim: FactorySim                  ## set by MainView; read-only use (collision queries)
-## When true (normal play) the controller samples the keyboard. The harness sets it false and
-## drives input_dir / request_jump() directly to measure motion deterministically.
+## When true (normal play) the controller samples the keyboard. Set it false and drive input_dir and
+## request_jump() directly to measure motion deterministically.
 var auto_input: bool = true
 var input_dir: float = 0.0           ## -1 left, +1 right
-var input_climb: float = 0.0         ## +1 up, -1 down — the rope-climb axis (W/S; harness-drivable)
+var input_climb: float = 0.0         ## +1 up, -1 down: the rope-climb axis (W/S, drivable directly)
 var velocity: Vector2 = Vector2.ZERO
 var on_floor: bool = false
 var climbing: bool = false           ## gripping a rope this step (read by the sprite/juice; repr-only)
 var facing: int = 1
 
-## Cosmetic feedback MainView reads to spawn juice (dust / shake) — never touches the sim.
+## Cosmetic feedback MainView reads to spawn juice (dust, shake). Never touches the sim.
 var landed_hard: bool = false        ## one-shot: set the frame the body lands from a real fall
-var last_impact: float = 0.0         ## the landing's downward speed (px/s) — juice scales with it (#43)
+var last_impact: float = 0.0         ## the landing's downward speed (px/s); juice scales with it
 var jump_held: bool = true           ## is the jump key still down (auto_input polls it; drivers may set)
-## Animation state (Phase C — drives sprite-frame selection only; pure representation). `digging` is a
-## brief held flag MainView pokes via note_dig() each time a cell is mined, so the dig pose shows across
-## the gaps between mine ticks. Both the walk clock and this clock pick frames; absent art they do nothing.
+## Animation state, pure representation: it drives sprite-frame selection only. `digging` is a brief
+## flag MainView pokes via note_dig() so the dig pose shows across the gaps between mine ticks.
 var digging: bool = false
 
 var _jump_request: bool = false
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
 var _was_on_floor: bool = false
-var _squash: float = 0.0             ## 0..1 landing squash, decays — pure visual
-var _land_hold: float = 0.0          ## seconds the landing-impact frame is held (#42)
-var _climb_phase: float = 0.0        ## climb-cycle clock, advanced by rope travel (#42)
+var _squash: float = 0.0             ## 0..1 landing squash, decays; pure visual
+var _land_hold: float = 0.0          ## seconds the landing-impact frame is held
+var _climb_phase: float = 0.0        ## climb-cycle clock, advanced by rope travel
 var _walk_phase: float = 0.0         ## walk-cycle clock for the bob / walk anim-frame pick
 var _anim_time: float = 0.0          ## free-running clock for non-walk frame cycling (the dig loop)
 var _dig_hold: float = 0.0           ## seconds the dig pose stays latched after the last mined cell
-## THE GRAPPLE (see scenes/grapple.gd). The body owns one because the line is a constraint on the body,
-## not a thing in the world: it changes how gravity resolves, so it has to live inside the same substep.
+## The grapple (see scenes/grapple.gd). The body owns one because the line is a constraint on the body
+## rather than a thing in the world: it changes how gravity resolves, so it lives inside the same substep.
 var grapple: Grapple = Grapple.new()
-## Air control is normally the same as ground control, which is generous and correct for a mining game.
-## On the rope it is deliberately WEAKER: a swing you can steer freely is not a swing, it is flying, and
-## the whole pleasure of a pendulum is that you commit to an arc and time your exit rather than driving
-## the arc directly. Enough authority to pump and to aim the release; not enough to cancel the physics.
+## Air control is normally the same as ground control, generous and correct for a mining game. On the
+## rope it is deliberately weaker, because a swing that can be steered freely is flying and the
+## pleasure of a pendulum is committing to an arc. Enough authority to pump and aim the release, no more.
 const SWING_ACCEL_MULT: float = 0.42
-const SWING_DRAG: float = 0.22       ## per-second velocity bleed while taut — a rope has losses, and
-                                     ## without one a pumped swing never settles and never feels heavy
-## A terminal speed for the arc. Measured: with almost no drag, a driver pumping perfectly every frame
-## reached 6.6x RUN_SPEED — about 31 cells a second — which is not a swing, it is a slingshot the player
-## has no chance of reading. Capping the arc keeps the reward real (comfortably faster than running, and
-## faster than you can fall) while leaving the body somewhere the camera and the collider can follow.
+const SWING_DRAG: float = 0.22       ## per-second velocity bleed while taut, or a pumped swing never settles
+## A terminal speed for the arc. With almost no drag, a driver pumping perfectly every frame reached
+## 6.6x RUN_SPEED, about 31 cells a second, which is a slingshot rather than a swing and unreadable at
+## that speed. The cap keeps the reward real while leaving it somewhere the camera and collider follow.
 const SWING_MAX_SPEED: float = RUN_SPEED * 2.8
 const SWING_LEAN: float = 0.40       ## radians (~23 deg) the body tilts into a full-speed arc
 const SWING_LEAN_EASE: float = 7.0   ## per-second easing so the tilt settles rather than snapping
-## How fast speed ABOVE the run cap bleeds off. Ground is a skid (you can feel the boots); air is nearly
-## free, because nothing is touching you. At these values a full-speed release (420px/s) coasts about
-## three seconds through open air and skids to a walk in a third of a second on landing — long enough
-## that a good swing visibly buys you distance, short enough that it never feels like ice.
+## How fast speed above the run cap bleeds off. Ground is a skid; air is nearly free, because nothing is
+## touching the body. At these values a full-speed release (420 px/s) coasts about three seconds through
+## open air and skids to a walk in a third of a second on landing: a good swing visibly buys distance.
 const GROUND_COAST_DRAG: float = 900.0
 const AIR_COAST_DRAG: float = 95.0
-var _step_grounded: bool = false     ## set per-step: may the horizontal resolve auto-step UP this frame?
-var _stepped: bool = false           ## set BY the resolve when it auto-stepped up onto a ledge this frame
+var _step_grounded: bool = false     ## set per-step: whether the horizontal resolve may auto-step up here
+var _stepped: bool = false           ## set by the resolve when it auto-stepped up onto a ledge this frame
 
 
 func _ready() -> void:
-	Controls.register()    # so the body works standalone in motion harnesses, not only under MainView
+	Controls.register()        # so the body works standalone, not only under MainView
 
 
-## THE WINCH DOES WORK. The distance constraint only ever CLAMPS a position to a circle and cancels the
-## outward radial velocity; shortening the line moved the body by correcting its position and left the
-## velocity untouched. So the reel was a lift, not a winch: it carried you along the rope and set you down
-## at a standstill, and letting go gave you nothing to let go WITH. Everything the swing physics conserves
-## so carefully was being handed a body with no momentum to conserve.
+## The winch does work. The distance constraint only clamps a position to a circle and cancels outward
+## radial velocity, so shortening the line corrects the body's position and leaves its velocity
+## untouched. That makes the reel a lift: it carries the body along the rope and sets it down at a
+## standstill, with no momentum to release into.
 ##
-## Stated physically, the fix is one line of intent: a winch taking line in at REEL_SPEED means the body
-## APPROACHES THE ANCHOR at REEL_SPEED. So set the inward radial component to the haul rate — never add to
-## it, which would compound every frame into nonsense, and never touch the tangential component, which is
-## the swing and belongs to the pendulum. It only ever speeds the body up along the line, so a body already
-## flying inward faster than the winch can pull keeps its own speed.
+## Taking line in at REEL_SPEED means the body approaches the anchor at REEL_SPEED, so the inward
+## radial component is set to the haul rate. Never added to it, which would compound every frame, and
+## never applied to the tangential component, which is the swing. So it only ever speeds the body up
+## along the line, and a body already closing faster than the winch keeps its own speed.
 func _winch_drive(delta: float) -> Vector2:
 	if grapple.hauled <= 0.0 or delta <= 0.0:
 		return velocity
@@ -223,12 +183,10 @@ func _winch_drive(delta: float) -> Vector2:
 	return velocity + out_dir * (want - radial)
 
 
-## Put the body somewhere without it counting as having FALLEN there.
-##
-## The landing cost is priced on distance dropped, which means anything that moves the body by assignment —
-## a savegame restoring your position, a harness rig setting up a shot — banks the whole teleport as a fall
-## and charges for it the next time you touch ground. Nothing in the game teleports during play, so this is
-## not a gameplay concern; it is the seam every non-gameplay mover has to go through, and it is one line.
+## Put the body somewhere without it counting as having fallen there. The landing cost is priced on
+## distance dropped, so anything moving the body by assignment (a savegame restoring a position, a rig
+## setting up a shot) would bank the whole teleport as a fall and charge for it at the next touchdown.
+## Nothing teleports during play, so this is the seam every non-gameplay mover goes through.
 func place(at: Vector2) -> void:
 	position = at
 	velocity = Vector2.ZERO
@@ -239,25 +197,19 @@ func place(at: Vector2) -> void:
 func _physics_process(delta: float) -> void:
 	if auto_input:
 		input_dir = Controls.axis(Controls.LEFT, Controls.RIGHT)  # remappable move axis (-1..+1)
-		input_climb = Controls.axis(Controls.DOWN, Controls.UP)   # W/S — grab + ride a rope
-		# JUMP is W or Space (playtest: Space-only was confusing; W jumps like Terraria). On a rope W
-		# CLIMBS instead (handled below), so holding either counts as "jump held" for the variable-height
-		# arc off-rope, and is harmless on-rope (the arc-cut is gated to non-climbing).
+		input_climb = Controls.axis(Controls.DOWN, Controls.UP)   # W/S: grab and ride a rope
+		# Jump is W or Space, but on a rope W climbs instead. Holding either counts as jump-held for the
+		# variable-height arc off-rope. On-rope it is harmless, since the arc-cut is gated to non-climbing.
 		jump_held = Controls.pressed(Controls.JUMP) or Controls.pressed(Controls.UP)
-	# Integrate in ≤MAX_SUBSTEP chunks so a large delta (fast-forward clock / frame-drop) resolves
-	# collision every tile instead of teleporting through walls. One substep at normal 1× speed.
-	landed_hard = false                       # reset ONCE per frame; a substep may only set it true
+	landed_hard = false                       # reset once per frame; a substep may only set it true
 	grapple.begin_frame()                     # same contract for the line's plant/release one-shots
 	var remaining: float = delta
 	while remaining > 0.0:
 		_step(minf(remaining, MAX_SUBSTEP))
 		remaining -= MAX_SUBSTEP
-	# THE LEAN (#S4). On a taut line the body tilts into its own arc. It is two lines of code and it does
-	# more for how a swing reads than the whole constraint does: a sprite that stays bolt upright while it
-	# travels sideways at 400px/s reads as a sticker being dragged, and the same sprite tilted 20 degrees
-	# reads as a person on a rope. Node rotation only touches _draw — the AABB the collider uses is built
-	# from position and the size constants, so leaning can never change where the body actually is.
-	# ...and on the ground the same two lines sell the RUN: a body at full stride leans into it.
+	# On a taut line the body tilts into its own arc, because a sprite that stays upright while moving
+	# sideways at 400 px/s reads as a sticker being dragged. Rotation only affects _draw: the collider's
+	# AABB comes from position and the size constants. On the ground the same lines lean a full stride.
 	var want_lean: float = (velocity.x / SWING_MAX_SPEED) * SWING_LEAN if grapple.taut \
 		else stride * STRIDE_LEAN * float(facing)
 	rotation = lerpf(rotation, clampf(want_lean, -SWING_LEAN, SWING_LEAN),
@@ -271,31 +223,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(Controls.JUMP):
 		request_jump()
 	elif event.is_action_pressed(Controls.UP) and not _on_rope():
-		request_jump()   # W jumps (Terraria) — UNLESS there's a rope here, where W climbs instead
+		request_jump()   # W jumps, unless there is a rope here, where W climbs instead
 
 
-## Is the body gripping / standing on a placed rope right now? Gates W between "jump" (no rope) and
-## "climb up" (on a rope), so the same key does the Terraria-natural thing in both contexts.
+## Is the body gripping or standing on a placed rope right now? Gates W between jump (no rope) and climb
+## up (on a rope), so the same key does the natural thing in both contexts.
 func _on_rope() -> bool:
 	return sim != null and sim.is_climbable(_cell_of(position))
 
 
-## Where the line leaves the body — the winch on the miner's belt, a little above centre so the rope
-## doesn't appear to grow out of their boots. Also the point the constraint measures from, so the swing
-## pivots around the torso rather than the feet.
+## Where the line leaves the body: the winch on the miner's belt, above centre so the rope does not
+## grow out of their boots. Also the point the constraint measures from, so the swing pivots at the torso.
 func hand() -> Vector2:
 	return position + Vector2(0.0, -HEIGHT * 0.18)
 
 
 func request_jump() -> void:
 	_jump_request = true
-	jump_held = true    # a requested jump implies the key is down NOW — polling (or a driver wanting a
-	                    # tap) may release it on any later frame; guards drivers against a stale false
+	jump_held = true        # a requested jump implies the key is down now. Polling or a driver
+	                    # wanting a tap may release it on a later frame, so never a stale false.
 
 
-## MainView pokes this each time a cell is actually mined (Phase-C dig anim). Latches the dig pose for a
-## beat (so it reads across the mine-cooldown gaps) and, when the body is standing still, turns it to face
-## the dug cell — so hand-mining a vein to your side looks like you're swinging at it. Cosmetic only.
+## MainView pokes this each time a cell is actually mined. Latches the dig pose for a beat so it reads
+## across the mine-cooldown gaps, and turns a standing body to face the dug cell. Cosmetic only.
 func note_dig(face: int) -> void:
 	_dig_hold = 0.18
 	if input_dir == 0.0 and face != 0:
@@ -304,9 +254,8 @@ func note_dig(face: int) -> void:
 
 ## One physics step: horizontal (with slope follow) then vertical, each integrated and collided.
 func _step(delta: float) -> void:
-	# WATER IMPEDANCE (L3 3b): sampled ONCE per step. When wading, top-speed/accel/gravity/jump are damped
-	# below; on dry land every mult is 1.0 so the resolve, step-up, snap, and agility are byte-for-byte
-	# unchanged. The gate is the ONLY thing gating impedance — it can't leak onto dry ground.
+	# Water impedance, sampled once per step and applied by the multipliers below. On dry land every
+	# multiplier is 1.0, so the resolve, step-up, snap and agility are unchanged.
 	var wet: bool = _in_water()
 	_update_stride(delta, wet)
 	var speed_top: float = RUN_SPEED * (1.0 + STRIDE_GAIN * stride) * (WATER_SPEED_MULT if wet else 1.0)
@@ -316,25 +265,19 @@ func _step(delta: float) -> void:
 	var gravity: float = GRAVITY * (WATER_GRAVITY_MULT if wet else 1.0)
 	var max_fall: float = WATER_MAX_SINK if wet else MAX_FALL
 
-	# Accelerate toward the input target / rub off speed with friction — not instant (which reads stiff).
-	# On a taut line the body is on a pendulum: input still bites (that is how you pump an arc and how you
-	# aim a release) but at reduced authority, and the top-speed clamp is lifted — a swing is allowed to
-	# carry you faster than your legs ever could, which is the entire reward for using it.
+	# Accelerate toward the input target, or rub off speed with friction. Instant reads stiff. On a taut
+	# line the body is on a pendulum: input still bites, which is how an arc is pumped and a release
+	# aimed, but at reduced authority, and the clamp is lifted so a swing can outrun the legs.
 	if grapple.taut:
 		if input_dir != 0.0:
 			velocity.x += input_dir * accel * SWING_ACCEL_MULT * delta
 			facing = int(signf(input_dir))
 	elif absf(velocity.x) > speed_top + 1.0:
-		# MOMENTUM SURVIVES (#S4). Above your own top speed you are COASTING, not running, and the normal
-		# controller would throw that away: move_toward(velocity, input * top) DECELERATES a body already
-		# travelling faster than top speed, and friction does the same when you let go — so every swing,
-		# every long drop, every hard release bled back to a walk inside a sixth of a second. Building
-		# speed you cannot keep is worse than not building it at all; it teaches the player that the fast
-		# tool does nothing. So: while over the cap, the only things that slow you down are a deliberate
-		# input AGAINST your travel (full braking authority — you must always be able to stop) and a slow
-		# coast drag, which is much weaker in the air than on the ground because ground is where friction
-		# lives. Steering WITH your travel does nothing, which is correct: you cannot run faster than you
-		# can run. Below the cap the controller is byte-for-byte what it was.
+		# Above top speed the body is coasting rather than running, and the normal controller throws that
+		# away: `move_toward(velocity, input * top)` decelerates a body already travelling faster than top
+		# speed, and friction does the same on release. While over the cap only two things slow the body.
+		# A deliberate input against its travel always has full braking authority. A coast drag, much
+		# weaker in the air than on the ground, does the rest. Below the cap nothing here applies.
 		var travel: float = signf(velocity.x)
 		if input_dir != 0.0:
 			facing = int(signf(input_dir))
@@ -350,13 +293,12 @@ func _step(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 
 	velocity.y = minf(velocity.y + gravity * delta, max_fall)
-	# Variable jump height (#43): rising with the jump key released → extra gravity clips the arc.
-	# In water the arc-cut uses the same buoyant gravity so a released hop settles gently, not sharply.
+	# Variable jump height: rising with the jump key released, extra gravity clips the arc. In water the
+	# arc-cut uses the same buoyant gravity, so a released hop settles gently.
 	if velocity.y < 0.0 and not jump_held and not climbing:
 		velocity.y = minf(velocity.y + gravity * (JUMP_CUT_GRAVITY - 1.0) * delta, max_fall)
-	# ROPE GRIP (representation-only, like the updraft): overlapping a placed rope, a climb press (W/S)
-	# grabs it; the grip holds until the body leaves the rope or jumps off. Gripping counts as GROUNDED
-	# below, so Space always jumps you off a rope and sideways-at-the-lip gets the auto step-up out.
+	# Rope grip, representation only like the updraft: overlapping a placed rope, a climb press grabs it
+	# and holds until the body leaves or jumps off. Gripping counts as grounded below, so Space jumps off.
 	var on_rope: bool = sim.is_climbable(_cell_of(position))
 	if not on_rope:
 		climbing = false
@@ -364,12 +306,10 @@ func _step(delta: float) -> void:
 		climbing = true
 	var grounded: bool = on_floor or _coyote > 0.0 or climbing
 	if _jump_request:
-		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant we land (forgiving)
+		_jump_buffer = JUMP_BUFFER          # remember a press so it fires the instant the body lands
 	_jump_request = false
-	# LEAP OFF THE SWING: jumping while the line is TAUT cuts it and adds the jump on top of whatever the
-	# arc had built up. This is the payoff move — time the release at the bottom of a swing and the leap
-	# stacks onto the swing's speed — and it needs no extra key, because "let go and jump" is one motion.
-	# A slack line is left alone, so hooking a ceiling and then hopping around under it keeps you hooked.
+	# Jumping while the line is taut cuts it and adds the jump on top of whatever the arc built up, so a
+	# release timed at the bottom stacks the leap onto the swing's speed. A slack line is left alone.
 	if _jump_buffer > 0.0 and grapple.taut:
 		grapple.cut()
 		velocity.y = minf(velocity.y, 0.0) + JUMP_VELOCITY * (WATER_JUMP_MULT if wet else 1.0)
@@ -378,64 +318,48 @@ func _step(delta: float) -> void:
 	elif _jump_buffer > 0.0 and grounded:
 		velocity.y = JUMP_VELOCITY * (WATER_JUMP_MULT if wet else 1.0)   # weaker leap out of a pool
 		on_floor = false
-		climbing = false                    # a jump lets GO of the rope (Space = off, W = up: distinct verbs)
+		climbing = false                    # a jump lets go of the rope (Space off, W up: distinct verbs)
 		_coyote = 0.0
 		grounded = false
 		_jump_buffer = 0.0
 	_jump_buffer = maxf(0.0, _jump_buffer - delta)
 	var impact_v: float = velocity.y         # remembered for the landing squash
 
-	# Updraft: standing in a lift's open shaft, the body is carried UP (the rideable half of the lift).
-	# Ensures at least rise speed upward — a jump can still beat it — and skips slope-follow (airborne).
+	# Updraft: in a lift's open shaft the body is carried up, the rideable half of the lift. It ensures
+	# at least rise speed upward, which a jump can still beat, and counts as airborne for slope-follow.
 	if sim.updraft_at(_cell_of(position)):
 		velocity.y = minf(velocity.y, -LIFT_RISE_SPEED)
 		grounded = false
 
-	# THE CLIMB: while gripping, gravity is REPLACED by direct travel — hold W/S to ride up/down the
-	# rope, release to HANG in place. Runs after the updraft so a gripped rope wins over a draft (your
-	# hands are on it). The vertical resolve below still applies: climbing up into a ceiling stops you,
-	# climbing down onto a floor lands you.
+	# The climb: while gripping, gravity is replaced by direct travel. Hold W/S to ride the rope, release
+	# to hang. Runs after the updraft so a gripped rope wins over a draft. The vertical resolve still
+	# applies: climbing into a ceiling stops the body, climbing down onto a floor lands it.
 	if climbing:
 		velocity.y = -input_climb * CLIMB_SPEED
-		# TOP-OF-ROPE HOLD: with no rope above this cell, rising further would push the centre off the
-		# rope → un-grip → fall → re-grip — a jittering stall at the anchor (the reported bug). Clamp the
-		# rise so the grip HOLDS just inside the top segment; leave by jumping (Space) or side-stepping.
+		# Top of rope: with no rope above this cell, rising further pushes the centre off the rope. That
+		# un-grips and falls and re-grips, jittering at the anchor. Clamp the rise so the grip holds.
 		if input_climb > 0.0 and not sim.is_climbable(_cell_of(position) + Vector2i(0, -1)):
 			var top_hold: float = float(_cell_of(position).y * CELL) + 6.0
 			velocity.y = clampf((top_hold - position.y) / delta, velocity.y, 0.0)
 
-	# THE LINE. Flown, reeled and constrained inside the substep so a fast swing collides every tile the
-	# same way a fast fall does. UP/DOWN reel while anchored — the same axis that rides a rope, because it
-	# is the same gesture.
+	# The line is flown, reeled and constrained inside the substep, so a fast swing collides every tile
+	# the same way a fast fall does. Up and down reel while anchored, the same axis that rides a rope.
 	#
-	# THE WINCH HAULS FROM STANDING. This was gated to being off the floor, and the gate was defending
-	# against a conflict that does not exist: jump is Space, the reel is W/S, and on the ground with a hook
-	# planted overhead W did nothing at all. What it actually cost was the tool's headline claim. The whole
-	# reason the grapple exists is the trip back up, and a winch that only engages once you are ALREADY
-	# airborne is not a way up, it is a thing you use after a jump — tools/check_plunge caught it the
-	# expensive way, watching a body stand on a shelf holding UP into a planted line for a hundred and fifty
-	# frames, three separate times, going nowhere. So it hauls from standing; the only thing still refused
-	# is winching toward an anchor at or below your own feet, which would wind you into the floor.
-	# ...and the refusal is about the DIRECTION of the pull, not about height alone. The first version of
-	# this refused any anchor that was not above you, which quietly killed the one thing the surface has to
-	# offer: a hook planted in ground AHEAD of you, at about your own height, several cells out. Winching
-	# that does not wind you into the floor, it hauls you ALONG it — a zip, and the only rope verb available
-	# under an open sky, where there is nothing overhead to swing from. tools/check_traverse caught it as a
-	# body that crossed seven columns in nine hundred frames while attached to a hook it could not use.
-	# What is still refused is a line that points mostly DOWNWARD while the boots are planted, which is the
-	# case that would genuinely wind you into the floor.
+	# The winch hauls from standing, because gating it to being off the floor would cost the tool its
+	# whole point: the trip back up. What is refused is not height but the direction of the pull. A hook
+	# planted in ground ahead of the body hauls it along, and that zip is the only rope verb available
+	# under an open sky. A line pointing mostly downward while the boots are planted would wind the body
+	# into the floor.
 	grapple.advance(sim, hand(), delta)
 	var reach: Vector2 = grapple.anchor - position
 	var into_floor: bool = on_floor and reach.y > absf(reach.x)
 	if grapple.state == Grapple.State.ANCHORED and not into_floor:
 		grapple.reel(input_climb, delta)
 
-	# Horizontal move. Two floor authorities, cleanly separated so they can't fight (the old conflict
-	# that trapped you in a dug 1-pit): on a GENUINE rendered ramp (ramp_dir≠0) the heightmap glides the
-	# feet up/down the 45° hypotenuse for a smooth slope; EVERYWHERE ELSE (flat, pits, valleys, caves,
-	# post-dig terrain, machines) the AABB is the sole authority — auto STEP-UP for ≤1-tile rises in the
-	# resolve below, and floor-SNAP for ≤1-tile descents. So slopes stay smooth, and you climb out of a
-	# pit / over a machine instead of wedging against it.
+	# Horizontal move. Two floor authorities, separated so they cannot fight and trap the body in a dug
+	# one-cell pit. On a genuine rendered ramp the heightmap glides the feet up and down the 45°
+	# hypotenuse; everywhere else the AABB is the sole authority, with auto step-up for rises of one tile
+	# or less and floor-snap for descents of the same. Slopes stay smooth and the body climbs out of pits.
 	position.x += velocity.x * delta
 	var glided: bool = false
 	if grounded and not climbing and velocity.y >= 0.0 and sim.ramp_dir(_cell_of(position).x) != 0:
@@ -444,11 +368,10 @@ func _step(delta: float) -> void:
 	_stepped = false
 	_resolve_axis(true)
 
-	# On a ramp the feet ride a virtual hypotenuse ABOVE the real solid square — _follow_slope grounds
-	# the body itself. An auto step-up likewise just placed the feet ON a ledge (perched on its edge, its
-	# footprint may still hang over the lower cell) — so SKIP this frame's gravity drop too, or the same
-	# frame's fall would yank it straight back down; next frame it walks forward fully onto the ledge.
-	# Otherwise integrate gravity, resolve, then snap down a descending step so the body HUGS the terrain.
+	# On a ramp the feet ride a virtual hypotenuse above the real solid square and _follow_slope grounds
+	# the body itself. An auto step-up likewise just placed the feet on a ledge, perched on its edge with
+	# the footprint possibly still over the lower cell, so this frame's gravity drop is skipped in both
+	# cases; otherwise the same frame's fall would yank the body straight back down.
 	if glided or _stepped:
 		velocity.y = 0.0
 		on_floor = true
@@ -456,28 +379,25 @@ func _step(delta: float) -> void:
 		position.y += velocity.y * delta
 		on_floor = false
 		_resolve_axis(false)
-		# Snap-hug the terrain below. A tiny snap always fires (keeps a resting body grounded, no flicker); a
-		# full STEP-DOWN only fires when the body is genuinely moving (walking down stairs, or falling fast).
-		# So when a ~stationary body loses its floor (you MINED it), there's no near floor to stabilize on and
-		# no motion to justify the step — it FALLS naturally instead of teleporting onto the next surface.
+		# Snap-hug the terrain below. A tiny snap always fires, keeping a resting body grounded without
+		# flicker; a full step-down fires only when the body is genuinely moving. So a nearly stationary
+		# body that loses its floor to a dig falls instead of teleporting onto the next surface.
 		if grounded and not on_floor and velocity.y >= 0.0:
 			var allow_step: bool = absf(velocity.x) > SNAP_WALK_MIN or velocity.y > SNAP_FALL_MIN
 			_snap_to_floor(allow_step)
 
-	# THE CONSTRAINT, applied after the body has integrated and collided on both axes: pull the position
-	# back onto the circle, then cancel the OUTWARD half of the velocity and nothing else. Because it runs
-	# last it can never fight the collider — a swing into a wall stops at the wall, and the line simply
-	# goes slack until the body swings back inside its radius. The re-resolve catches the rare case where
-	# the pull-back lands the box a pixel inside geometry.
+	# The constraint, applied after the body has integrated and collided on both axes: pull the position
+	# back onto the circle, then cancel the outward half of the velocity and nothing else. Running last
+	# is what stops it fighting the collider, so a swing into a wall stops at the wall and the line goes
+	# slack until the body swings back inside its radius. The re-resolve catches a stray pixel of overlap.
 	if grapple.state == Grapple.State.ANCHORED:
 		grapple.update_line(sim, position)     # catch the line on corners / let it off them, then constrain
 		var swung: Vector2 = grapple.constrain_position(position)
 		if grapple.taut:
 			position = swung
 			velocity = grapple.resolve_velocity(position, velocity)
-			# THE PUMP, before the winch: a shorter line carries the same angular momentum at a higher
-			# tangential speed, which is why reeling at the bottom of an arc winds it up. resolve_velocity
-			# has just made the velocity purely tangential, so this scales exactly the part it should.
+			# The pump, before the winch: a shorter line carries the same angular momentum at a higher
+			# tangential speed. resolve_velocity just made the velocity purely tangential, so this scales it.
 			velocity = grapple.pump(position, velocity)
 			velocity = _winch_drive(delta)
 			velocity -= velocity * SWING_DRAG * delta      # a rope has losses; a frictionless one feels fake
@@ -485,10 +405,9 @@ func _step(delta: float) -> void:
 			_resolve_axis(true)
 			_resolve_axis(false)
 
-	# FALL KICK: the frame a resting body loses its floor (mined out from under it, or ran off a ledge) it
-	# would otherwise creep down from zero velocity — the reported "laggy" drop. Seed a brisk minimum fall so
-	# the descent starts on the very next frame. Gated to the grounded→airborne edge (was_on_floor, now not)
-	# and to genuine falls (velocity.y >= 0 — a jump is negative here, so its arc is never altered).
+	# The frame a resting body loses its floor it would otherwise creep down from zero velocity, which
+	# reads as lag. Seed a brisk minimum fall so the descent starts on the next frame. Gated to the
+	# grounded-to-airborne edge and to genuine falls, since a jump is negative here and never altered.
 	if _was_on_floor and not on_floor and velocity.y >= 0.0:
 		velocity.y = maxf(velocity.y, FALL_START)
 
@@ -496,22 +415,19 @@ func _step(delta: float) -> void:
 	if on_floor and not _was_on_floor and impact_v > 240.0:
 		_squash = 1.0
 		landed_hard = true
-		last_impact = impact_v           # the consumer scales dust/shake/thump by how hard (#43)
-		_land_hold = 0.14                # hold the landing-impact frame a beat (#42)
-		stride *= 1.0 - STRIDE_LAND_COST # a heavy landing costs the run — weight has to be felt somewhere
+		last_impact = impact_v           # the consumer scales dust, shake and thump by this
+		_land_hold = 0.14                # hold the landing-impact frame a beat
+		stride *= 1.0 - STRIDE_LAND_COST # a heavy landing costs the run
 		var fell: float = position.y - _fall_from
 		if fell > STAGGER_FALL:
 			stagger = maxf(stagger, STAGGER_MAX * clampf(
 				(fell - STAGGER_FALL) / (STAGGER_FULL - STAGGER_FALL), 0.0, 1.0))
-			# Hold the impact pose for exactly as long as the grip is missing. A cost the player cannot SEE
-			# reads as the controller having gone vague — they feel the sluggishness and blame the game, not
-			# the forty metres they just fell. Tying the two together makes it one legible event: you land
-			# hard, you are folded up for a beat, you push off slowly, and all three are the same fact.
+			# Hold the impact pose for exactly as long as the grip is missing. A cost the player cannot see
+			# reads as the controller gone vague: land hard, fold up for a beat, push off slowly.
 			_land_hold = maxf(_land_hold, stagger)
 	_land_hold = maxf(0.0, _land_hold - delta)
 	stagger = maxf(0.0, stagger - delta)
-	# Anything holding you is where the next fall starts from: the ground, a gripped rope, or a line under
-	# tension. Everything else lets the drop keep accumulating.
+	# Anything holding the body is where the next fall starts from: ground, rope or a taut line.
 	if on_floor or climbing or grapple.taut:
 		_fall_from = position.y
 	if climbing:
@@ -526,14 +442,13 @@ func _step(delta: float) -> void:
 	_coyote = COYOTE_TIME if on_floor else _coyote - delta
 
 
-## Track the walkable surface as a 45° height field so the body GLIDES along ramps instead of
-## popping. Samples the surface under the body centre and its leading edge, snaps the feet onto the
-## higher of the two — but only within one tile of rise (taller = a wall, left for the resolve to
-## block) or drop (bigger = a real fall, left for gravity). Climbs are rejected if the new position
-## would push the head into a ceiling (a tight gap is a wall, not a step).
+## Track the walkable surface as a 45° height field so the body glides along ramps instead of popping.
+## Samples the surface under the body centre and its leading edge and snaps the feet onto the higher of
+## the two, but only within one tile of rise or of drop: taller is a wall for the resolve to block and
+## deeper is a real fall for gravity. A climb into a ceiling is rejected, since a tight gap is a wall.
 func _follow_slope(delta: float) -> bool:
 	var rect: Rect2 = _aabb()
-	# The box rests on the HIGHEST ground under its footprint — sample both bottom corners + centre.
+	# The box rests on the highest ground under its footprint: sample both bottom corners and the centre.
 	var target: float = minf(_surface_y(rect.position.x + 1.0),
 			_surface_y(rect.end.x - 1.0))
 	target = minf(target, _surface_y(position.x))
@@ -546,39 +461,36 @@ func _follow_slope(delta: float) -> bool:
 		if _blocked(_cell_of(Vector2(rect.position.x + 1.0, top_y))) \
 				or _blocked(_cell_of(Vector2(rect.end.x - 1.0, top_y))):
 			return false
-		# Cap the per-frame UPWARD glide to what horizontal travel warrants (a 45° ramp rises ≈ as fast as
-		# you walk) plus a small crest allowance. Without this, MOUNTING a ramp (where the sampled surface
-		# jumps a tile as the leading foot crosses into the higher column) is a one-frame pop — worse the
-		# taller the body. Clamping keeps the climb a smooth glide at ANY body size (guarded by check_stepup).
+		# Cap the per-frame upward glide to what horizontal travel warrants (a 45° ramp rises about as fast
+		# as the body walks) plus a small crest allowance. Without it, mounting a ramp is a one-frame pop
+		# where the sampled surface jumps a tile, and worse the taller the body. Guarded by check_stepup.
 		var max_rise: float = absf(velocity.x) * delta + 3.0
 		ny = maxf(ny, position.y - max_rise)   # limit this frame's rise (position.y is the current centre)
 	position.y = ny
 	return true
 
 
-## World-Y of the walkable surface at a horizontal position — read straight from the sim's shared
-## silhouette authority (sim.surface_row / sim.ramp_dir), the SAME source the renderer draws from, so
-## the hypotenuse we glide is exactly the diagonal on screen. A single-tile step is a 45° ramp across
-## its own column; flat otherwise. Terrain-only by construction: machines aren't in the silhouette, so
-## a placed machine is a box the square-resolve bumps/climbs — never a phantom invisible ramp.
+## World-Y of the walkable surface at a horizontal position, read from the sim's silhouette authority
+## (surface_row / ramp_dir). That is the same source the renderer draws from, so the hypotenuse the
+## body glides is exactly the diagonal on screen. Terrain only by construction: a placed machine is not
+## in the silhouette, so it is a box the square resolve bumps rather than a phantom invisible ramp.
 func _surface_y(world_x: float) -> float:
 	var c: int = floori(world_x / float(CELL))
 	var frac: float = world_x / float(CELL) - float(c)  # 0..1 across column c
 	var base: float = float(sim.surface_row(c) * CELL)
 	match sim.ramp_dir(c):
 		1:
-			return base - frac * float(CELL)          # one tile higher to the RIGHT → ramp up rightward
+			return base - frac * float(CELL)          # one tile higher to the right: ramp up rightward
 		-1:
-			return base - (1.0 - frac) * float(CELL)  # one tile higher to the LEFT → ramp up leftward
+			return base - (1.0 - frac) * float(CELL)  # one tile higher to the left: ramp up leftward
 		_:
 			return base                               # flat top (or peak/valley): no ramp
 
 
-## Push the body out of any blocked cell it now overlaps. The HORIZONTAL pass resolves by MINIMUM
-## penetration, pushing out by the overlap DEPTH — not snapping to the cell face. Two consequences that
-## kill the ~47px backward "teleport": (1) if the overlap is shallower in Y than X, it's a ledge/step
-## you're descending onto, NOT a wall — skip the sideways push and let the vertical pass land you; (2) a
-## real wall is pushed out by its (small) penetration, so a fast bump nudges a few px, never a whole tile.
+## Push the body out of any blocked cell it now overlaps. The horizontal pass resolves by minimum
+## penetration, pushing out by the overlap depth rather than snapping to the cell face. That removed a
+## 47px backward teleport. An overlap shallower in Y than in X is a ledge rather than a wall, so the
+## sideways push is skipped and the vertical pass lands the body instead.
 func _resolve_axis(horizontal: bool) -> void:
 	var rect: Rect2 = _aabb()
 	var lo: Vector2i = _cell_of(rect.position)
@@ -596,10 +508,9 @@ func _resolve_axis(horizontal: bool) -> void:
 				var ov_y: float = minf(rect.end.y, cell_rect.end.y) - maxf(rect.position.y, cell_rect.position.y)
 				if ov_x > ov_y:
 					continue          # shallower in Y → a ledge to step/land onto, not a wall to block
-				# A WALL in our path. Before blocking, try to STEP UP onto it — the unified auto-step the
-				# heightmap slope-follow can't give: identical for a dug pit's edge, a cave ledge, and a
-				# placed machine (none are in surface_row/ramp_dir). Only a ≤1-tile rise WITH head
-				# clearance steps; anything taller stays a wall you must jump.
+				# A wall in the path. Before blocking, try to step up onto it: the auto-step the heightmap
+				# cannot give, identical for a dug pit's edge, a cave ledge and a placed machine, none of
+				# which are in surface_row or ramp_dir. Only a rise of one tile or less with head clearance.
 				if _step_grounded and absf(velocity.x) > 1.0:
 					var lift: float = rect.end.y - cell_rect.position.y  # feet depth below the obstacle top
 					if lift > 0.5 and lift <= MAX_STEP:
@@ -632,10 +543,9 @@ func _blocked(cell: Vector2i) -> bool:
 		return true
 	if cell.y < 0:
 		return false
-	# WOOD + LEAVES are Terraria-style walk-THROUGH: tree trunks and foliage never wall the body (you pass
-	# them and chop them), and the bazaar's wood frame is a shop you ENTER — one rule covers both. Its earth
-	# interior floor is NOT wood, so it still blocks (you stand inside). Everything else solid blocks; a body
-	# taller than a tile would otherwise be walled by any surface trunk it can't duck under. Machines block.
+	# Wood and leaves are walk-through: tree trunks and foliage never wall the body, and the bazaar's
+	# wood frame is a shop the body enters, so one rule covers both. Its earth interior floor is not
+	# wood, so it still blocks. Without this a body taller than a tile would be walled by any trunk.
 	if sim.is_solid(cell):
 		var m: StringName = sim.material_at(cell)
 		if m != &"wood" and m != &"leaves":
@@ -643,13 +553,11 @@ func _blocked(cell: Vector2i) -> bool:
 	return sim.machine_at(cell) != null
 
 
-## Hug descending terrain WITHOUT the heightmap: after a grounded move that left the body hanging just
-## above a lower step (a 1-tile drop, a descending stair, the lip of a pit), snap the feet down onto the
-## nearest solid within MAX_DROP so walking down reads smooth. A real drop (nothing within range) finds
-## no floor and lets gravity take over. Mirror of the auto step-up; together they replace the heightmap
-## glide on all non-ramp terrain. `allow_step`: whether a full-tile step-DOWN is permitted (only while
-## moving) — a tiny stabilizing snap always is, so a stationary body that lost its floor (mined out) neither
-## stabilizes nor steps → it falls naturally (the mine-under-yourself fix).
+## Hug descending terrain without the heightmap. After a grounded move that left the body hanging just
+## above a lower step, snap the feet down onto the nearest solid within MAX_DROP so walking down reads
+## smooth. A real drop finds no floor in range and lets gravity take over. This mirrors the auto
+## step-up. `allow_step` permits a full-tile step down and is only true while moving; a tiny
+## stabilising snap always fires.
 func _snap_to_floor(allow_step: bool) -> void:
 	var rect: Rect2 = _aabb()
 	var feet: float = rect.end.y
@@ -673,8 +581,8 @@ func _snap_to_floor(allow_step: bool) -> void:
 			velocity.y = 0.0
 
 
-## True if any blocked cell overlaps `box` — the head-clearance check that gates an auto step-up (don't
-## step into a space the body won't fit, so a 2-tile wall or a low ceiling stays an honest wall).
+## True if any blocked cell overlaps `box`. This is the head-clearance check gating an auto step-up, so
+## the body never steps into a space it does not fit and a two-tile wall stays a wall.
 func _aabb_blocked(box: Rect2) -> bool:
 	var lo: Vector2i = _cell_of(box.position)
 	var hi: Vector2i = _cell_of(box.end - Vector2(0.001, 0.001))
@@ -694,16 +602,14 @@ func _cell_of(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(CELL)), floori(world_pos.y / float(CELL)))
 
 
-## Advance the stride (#S9). Three states and nothing else:
+## Advance the stride. Three states and nothing else:
 ##
-##   BUILDING  — grounded, dry, off the line, pushing one way and actually travelling that way at close
-##               to top speed. Time banks toward STRIDE_DELAY first, then the stride itself ramps.
-##   HOLDING   — airborne with a run already going. A ledge in the middle of a sprint must not cost the
-##               sprint, or the player learns to avoid terrain, which is the opposite of the point.
-##   BREAKING  — everything else. Bleeds fast enough that a mistake reads as a mistake.
+##   Building: grounded, dry, off the line, pushing one way and actually travelling that way at close
+##             to top speed. Time banks toward STRIDE_DELAY first, then the stride itself ramps.
+##   Holding:  airborne with a run already going, because a ledge mid-sprint must not cost the sprint.
+##   Breaking: everything else. Bleeds fast enough that a mistake reads as a mistake.
 ##
-## Note what needs no special case: a wall zeroes velocity.x, which fails the "actually travelling" test,
-## so running into rock breaks the run without the controller ever being told what a wall is.
+## A wall needs no special case: it zeroes velocity.x, which fails the travelling test.
 func _update_stride(delta: float, wet: bool) -> void:
 	var building: bool = on_floor and not wet and not climbing and not grapple.taut \
 		and input_dir != 0.0 and input_dir * velocity.x > 0.0 \
@@ -719,10 +625,9 @@ func _update_stride(delta: float, wet: bool) -> void:
 	stride = maxf(0.0, stride - STRIDE_DECAY * delta)
 
 
-## Is the body wading — does any cell its AABB overlaps hold water (≥ WATER_MIN_LEVEL)? Reads the sim's
-## water grid (never writes it); pure representation, like the collision queries. Returns false with no sim
-## (standalone harness boots) or a dry world. Feet-and-body coverage: the same cell span the resolve walks,
-## so stepping the feet into a pool impedes the moment you touch it, and a body half-submerged still wades.
+## Is the body wading: does any cell its AABB overlaps hold water at or above WATER_MIN_LEVEL? Reads
+## the sim's water grid and never writes it, like the collision queries. Returns false with no sim or a
+## dry world. Covers the same span the resolve walks, so feet entering a pool impede on contact.
 func _in_water() -> bool:
 	if sim == null:
 		return false
@@ -736,10 +641,9 @@ func _in_water() -> bool:
 	return false
 
 
-## Frame fallback chains: a state whose art hasn't landed borrows the NEAREST drawn pose rather than
-## snapping to a neutral stand, and every chain drains toward the idle frame — so the artist can land
-## climb_0 alone, or nothing at all, and every state still shows something that belongs to the motion.
-## The chains are deliberately acyclic; _resolve_tex walks them until a key hits.
+## Frame fallback chains: a state whose art has not landed borrows the nearest drawn pose rather than
+## snapping to a neutral stand, and every chain drains toward the idle frame. So climb_0 can land alone,
+## or nothing at all, and every state still shows something that belongs to the motion. Acyclic by hand.
 const SPRITE_FALLBACKS: Dictionary = {
 	"miner_swing": "miner_fall", "miner_fall": "miner_jump", "miner_jump": "miner_idle",
 	"miner_haul": "miner_climb_0",
@@ -753,28 +657,24 @@ const SPRITE_FALLBACKS: Dictionary = {
 }
 
 
-## The logical sprite-frame key for the body's current motion state (Phase C). Priority: digging > the
-## LINE > the rope > airborne > walking > idle. Walk cycles 4 frames off the walk clock; dig alternates 2
-## off the free clock.
+## The logical sprite-frame key for the body's current motion state, in priority order: digging, the
+## line, the rope, airborne, walking, idle. Walk cycles 4 frames off the walk clock; dig alternates 2.
 func _sprite_key() -> String:
 	if digging:
 		return "miner_dig_0" if int(_anim_time * 8.0) % 2 == 0 else "miner_dig_1"
-	# A live line outranks the floor AND the rope. Once the constraint is doing work he is not standing,
-	# jumping or climbing — he is hanging off it, and that is the only pose that explains what the body
-	# is about to do. Reeling on a planted line is the other half of the same story, so it gets its own
-	# frame instead of borrowing the climb: winching up and hand-over-hand are different verbs.
+	# A live line outranks the floor and the rope: once the constraint is doing work the body is hanging
+	# off it, and that is the only pose explaining what it is about to do. Reeling gets its own frame.
 	if grapple.taut:
 		return "miner_swing"
 	if grapple.state == Grapple.State.ANCHORED and input_climb > 0.0:
 		return "miner_haul"
 	if climbing:
-		# Moving on the rope cycles the climb; a still grip HANGS (a distinct held pose).
+		# Moving on the rope cycles the climb; a still grip hangs, a distinct held pose.
 		if absf(velocity.y) > 6.0:
 			return "miner_climb_%d" % (int(_climb_phase) % 2)
 		return "miner_hang"
 	if not on_floor:
-		# Up and down are different beats, and conflating them is why every fall used to read as a jump:
-		# the rise is a tuck, the drop streams the legs out behind him.
+		# Up and down are different beats: the rise is a tuck, the drop streams the legs out behind.
 		return "miner_fall" if velocity.y > 0.0 else "miner_jump"
 	if _land_hold > 0.0:
 		return "miner_land"        # the landing-impact beat, right after touchdown
@@ -783,9 +683,8 @@ func _sprite_key() -> String:
 	return "miner_idle"
 
 
-## The best drawn texture for a state key: walk its fallback chain, then try the baked idle and finally
-## the hand-made original. Returns null only when NO miner art exists at all — that null is load-bearing,
-## it is what hands the body back to the code-drawn figure.
+## The best drawn texture for a state key: walk its fallback chain, then the baked idle and finally the
+## hand-made original. Returning null is load-bearing: it hands the body back to the code-drawn figure.
 func _resolve_tex(key: String) -> Texture2D:
 	var k: String = key
 	while true:
@@ -799,14 +698,12 @@ func _resolve_tex(key: String) -> Texture2D:
 	return idle if idle != null else Art.tex("miner")
 
 
-## The MINER. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present (feet-anchored,
-## flipped by facing, landing squash applied), falling back to the idle frame and then the code-drawn
-## figure. Squash (flatten + widen on landing, + a tiny walk bob) is the first scrap of game-feel juice
-## and applies to either path.
+## The miner. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present, feet-anchored
+## and flipped by facing. Falls back to the idle frame and then to the code-drawn figure.
 func _draw() -> void:
 	var f: float = float(facing)
-	# Contact shadow — a soft dark ellipse at the feet so the body sits ON the ground, not floating.
-	# Shrinks while airborne (a small far shadow) so a jump reads as leaving the floor.
+	# Contact shadow: a soft dark ellipse at the feet so the body sits on the ground rather than floating.
+	# It shrinks while airborne, so a jump reads as leaving the floor.
 	var grounded_amt: float = 1.0 if on_floor else 0.45
 	draw_set_transform(Vector2(0.0, HEIGHT * 0.5 - 1.0), 0.0, Vector2(1.0, 0.30))
 	draw_circle(Vector2.ZERO, WIDTH * 0.72 * grounded_amt, Color(0.0, 0.0, 0.0, 0.34 * grounded_amt))
@@ -819,29 +716,23 @@ func _draw() -> void:
 		var w: float = float(tex.get_width()) * sxq
 		var h: float = float(tex.get_height()) * syq
 		var dst := Rect2(-w * 0.5, (HEIGHT * 0.5) - h + bob, w, h)  # feet on the AABB bottom, centred
-		# The drop-in miner art is authored facing LEFT, so flip it when the body faces RIGHT (f > 0).
+		# The miner art is authored facing left, so flip it when the body faces right (f > 0).
 		if f > 0.0:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1.0, 1.0))
 			dst.position.x = -w * 0.5
-		# THE RIM — readable on ANY background (blind testers kept finding the body only via the guide arrow,
-		# not the sprite itself: tiny + low-contrast over the gear/hills/trees, and a single DARK outline
-		# vanished against the dark terrain/machines/underground he actually stands in).
+		# The rim is what makes the body findable on any background. The sprite is small and low contrast
+		# over the gear, hills and trees, and a single dark outline vanishes against the dark terrain and
+		# machines it stands in.
 		#
-		# It is COOL + bright on purpose. The miner's own art is warm (leather/amber) — the SAME warm family
-		# as the dirt, the FORGE boxes and the amber UI, so a warm outline just deepened the collision (blind
-		# testers read the body as "one of three machine-ish objects"). A cool bright edge is the one thing in
-		# the warm-brown world nothing else wears, so the body reads instantly as THE player.
+		# Cool and bright on purpose. The miner's art is warm leather and amber, the same family as the
+		# dirt, the forge boxes and the amber UI, so a warm outline would deepen that collision. A cool
+		# bright edge is the one thing in this warm-brown world nothing else wears.
 		#
-		# It used to be TWO rings — this halo at 2.6px plus a near-black inner edge at 1.4px — because the
-		# sprite it was built for had no silhouette of its own to lean on. The authored pixel art does: it
-		# carries its own one-pixel near-black outline, so the second ring was drawing a black edge on top of
-		# a black edge. At 1.4px offset in eight directions on art whose pixels are ONE world px, that is up
-		# to two solid pixels of black wrapped round every limb, and it printed exactly as it sounds — the
-		# legs turned into black boxes with boots inside them and the shoulders into lumps. Deleting it costs
-		# nothing on the bright sky, where the art's own outline does the same job, and returns the shape the
-		# art was drawn to have. What is left is one thin cool rim: separation, not a sticker.
-		var rim := Color(0.80, 0.93, 1.0, 0.85)                 # cool bright halo — the reserved "that's me" edge
-		const RW: float = 1.5                                   # ~1.5 art pixels: a rim you read, not one you see
+		# One ring, not two. The authored pixel art already carries its own one-pixel near-black outline,
+		# so a second inner ring at 1.4px in eight directions printed up to two solid pixels of black
+		# around every limb: the legs came out as black boxes with boots inside them.
+		var rim := Color(0.80, 0.93, 1.0, 0.85)                 # cool bright halo, reserved for the player
+		const RW: float = 1.5                                   # about 1.5 art pixels: read, but not seen
 		for d: Vector2 in [Vector2(-RW, 0.0), Vector2(RW, 0.0), Vector2(0.0, -RW), Vector2(0.0, RW),
 				Vector2(-RW, -RW), Vector2(RW, -RW), Vector2(-RW, RW), Vector2(RW, RW)]:
 			draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, rim)
@@ -849,14 +740,12 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 
-	# A subtle 1px dark edge tracing the TRUE AABB (drawn un-scaled so it hugs the collision box) — keeps the
-	# body crisp without a hard silhouette plate fighting the soft lighting.
+	# A 1px dark edge tracing the true AABB, drawn unscaled so it hugs the collision box.
 	var outline := Color(0.03, 0.03, 0.05, 0.5)
 	draw_rect(Rect2(-WIDTH * 0.5 - 1.0, -HEIGHT * 0.5 - 1.0, WIDTH + 2.0, HEIGHT + 2.0), outline, false, 1.0)
 
-	# The code-drawn miner (art-less fallback) was authored for the old 20×44 body; SCALE it by the current
-	# body's ratio so it shrinks WITH the AABB and its proportions are preserved at any size (feet on the
-	# AABB bottom via the y-offset below).
+	# The code-drawn fallback was authored for a 20x44 body and is scaled by the current body's ratio, so
+	# it shrinks with the AABB and keeps its proportions at any size.
 	var body_scale: float = HEIGHT / 44.0
 	draw_set_transform(Vector2(0.0, (HEIGHT * 0.5) * (1.0 - syq * body_scale) + bob), 0.0,
 		Vector2(sxq * body_scale, syq * body_scale))
@@ -865,22 +754,17 @@ func _draw() -> void:
 	var skin := Color(0.84, 0.66, 0.50)
 	var helmet := Color(0.95, 0.78, 0.22)
 
-	# Legs + boots.
 	draw_rect(Rect2(-5.0, 5.0, 4.0, 8.0), legs)
 	draw_rect(Rect2(1.0, 5.0, 4.0, 8.0), legs)
 	draw_rect(Rect2(-5.0, 11.0, 4.5, 2.0), Color(0.10, 0.11, 0.14))  # boot
 	draw_rect(Rect2(0.5, 11.0, 4.5, 2.0), Color(0.10, 0.11, 0.14))
 
-	# Torso (overalls) with a strap highlight.
 	draw_rect(Rect2(-6.0, -5.0, 12.0, 11.0), overalls)
 	draw_rect(Rect2(-1.0, -5.0, 2.0, 11.0), overalls.lightened(0.12))
 
-	# Head.
 	var head := Vector2(f * 0.5, -9.0)
 	draw_circle(head, 4.2, skin)
-	# Hardhat: a cap over the top of the head + a brim toward the facing side.
 	draw_rect(Rect2(head.x - 4.6, head.y - 5.0, 9.2, 4.2), helmet)
 	draw_rect(Rect2(head.x + (1.0 if f > 0.0 else -5.5), head.y - 1.4, 4.5, 1.6), helmet)
-	# Head-lamp glow on the facing side.
 	draw_circle(head + Vector2(f * 4.2, -2.2), 1.5, Color(1.0, 0.97, 0.7))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)  # clear the squash transform

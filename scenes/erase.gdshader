@@ -1,14 +1,11 @@
 shader_type canvas_item;
 render_mode blend_disabled, unshaded;
 
-// THE ERASER (#S14). The coarse-terrain bake is a RETAINED render target: a dig re-renders only the two or
-// three chunks that changed, and everything else keeps the pixels it already had. That only works if a
-// changed chunk can first take its old pixels away, and ordinary alpha blending cannot — blending can add
-// coverage, never remove it, so a cell dug open at the surface would keep its rock forever.
-//
-// `blend_disabled` writes COLOR straight to the target, alpha included, instead of blending with what is
-// there. Drawing a transparent rect with it therefore CLEARS that rect. Ordered below the chunk painters,
-// it gives each dirty chunk a blank slate without clearing the other 16 megapixels the frame did not touch.
+// The eraser. The coarse-terrain bake is a retained render target: a dig re-renders only the chunks that
+// changed and the rest keep their pixels. Alpha blending adds coverage but can never remove it, so a
+// changed chunk could not take its old rock away. `blend_disabled` writes COLOR straight to the target,
+// alpha included, so drawing a transparent rect with this clears it. Ordered below the chunk painters, it
+// gives each dirty chunk a blank slate without clearing the rest of the roughly 16-megapixel target.
 void fragment() {
 	COLOR = vec4(0.0);
 }

@@ -1,43 +1,29 @@
 class_name Score
 extends Node
 
-## THE SCORE. Sinkforge had a full ambience layer — wind, cave-air, drips, a factory hum that swells
-## with nearby machinery — and no TONE. Ambience tells you where you are. Tone tells you how to feel
-## about it, and a game whose whole subject is a long patient descent into somewhere older and colder
-## than you is a game that lives or dies on that.
+## The score. There is no track list and no cue system: the music is a pure function of depth. Three
+## synthesized beds run continuously in parallel, always in tune with each other, and the mix between
+## them is set by how far down the body is.
 ##
-## THE ONE IDEA: THE MUSIC DESCENDS WITH YOU. There is no track list and no cue system, because a
-## cue system would need something to cue off and the only thing that reliably means anything here is
-## depth. Three synthesized beds run continuously in parallel, always in tune with each other, and the
-## mix between them is a pure function of how far down the body is:
+##   OPEN   root, fifth, octave, twelfth. No third, so it states a key without stating a mood. Loudest
+##          at the surface, thinning as you descend.
+##   MINOR  the minor third and minor seventh. Fading this in turns the same harmony sad without a key
+##          change, a transition or a second recording.
+##   SUB    a very low sine under a breath of filtered noise. Weight. Grows the whole way down.
 ##
-##   OPEN   — root, fifth, octave, twelfth. No third at all, so it is neither major nor minor: this is
-##            the bed that carries "air", and it is loudest at the surface and thins as you descend.
-##   MINOR  — the minor third and minor seventh. Fading this in is what turns the same harmony sad,
-##            without a key change, a transition, or a second recording.
-##   SUB    — a very low sine under a breath of filtered noise. Weight. It grows the whole way down and
-##            is most of what the deep sounds like.
-##
-## and the whole stack is PITCHED DOWN with depth, all three players by the same factor, so they stay
-## in tune while the tonal centre physically falls. That is the trick the entire system rests on: you
-## are not hearing four tracks fade between each other, you are hearing one thing sink.
-##
-## WHY IT IS BUILT THIS WAY. Naively this wants one long recording per depth zone, which is 4 x 20s of
-## additive synthesis — tens of millions of sin() calls in GDScript at boot, i.e. seconds of black
-## screen. Three short loops mixed and pitch-shifted give more variety than four fixed beds for a
-## fraction of the cost, and every intermediate depth gets its own blend rather than snapping between
-## presets. The pads are also synthesized at a much LOWER RATE than the effects: the top partial here is
-## 220 Hz, so 8 kHz is far above Nyquist for anything audible in them — and it is a third of the work.
-##
-## Headless-safe on the same terms as Sfx: synthesis still runs (the code path stays warm) but nothing
-## is ever played, because the Dummy driver never reaps a started voice and trips the leak warning.
+## The whole stack is pitched down with depth, all three players by the same factor, so they stay in
+## tune while the tonal centre falls. That is what makes it read as one thing sinking rather than as
+## tracks crossfading. A per-zone bed would be tens of millions of sin() calls at boot and would snap
+## between presets instead of blending. Headless-safe on the same terms as Sfx: synthesis still runs
+## so the code path stays warm, but nothing plays, because the Dummy driver never reaps a started
+## voice and trips the leak warning.
 
-const RATE: int = 8000              ## top partial is 220 Hz; 8 kHz is far above Nyquist and a third the work
+const RATE: int = 8000              ## Hz; top partial is 220 Hz, so this is well above Nyquist at a third the work
 const LOOP_SECONDS: float = 6.0     ## every partial below is a whole number of cycles in this window
-const ROOT: float = 55.0            ## A1 — the tonal floor everything is built on
+const ROOT: float = 55.0            ## Hz, A1: the tonal floor everything is built on
 
-## Depth → mix. `t` is 0 at the surface and 1 at the bottom of the world, and every curve here is
-## deliberately gentle: the point is that you cannot name the moment it changed.
+## Depth to mix. `t` is 0 at the surface and 1 at the bottom of the world. The curves are gentle on
+## purpose, so the change is never attributable to a moment.
 const OPEN_AT_TOP: float = 0.62
 const OPEN_AT_BOTTOM: float = 0.20
 const MINOR_AT_TOP: float = 0.00
@@ -45,10 +31,10 @@ const MINOR_AT_BOTTOM: float = 0.70
 const SUB_AT_TOP: float = 0.12
 const SUB_AT_BOTTOM: float = 0.85
 const PITCH_AT_TOP: float = 1.00
-const PITCH_AT_BOTTOM: float = 0.68  ## a bit over a fifth down by the bottom of the world
+const PITCH_AT_BOTTOM: float = 0.68    ## just under a fifth down by the bottom of the world
 
-const BASE_DB: float = -17.0         ## a bed at full mix, before the music slider — just under the ambience beds
-const FADE_RATE: float = 0.25        ## per-second travel of the depth mix — slower than walking on purpose
+const BASE_DB: float = -17.0                  ## dB at full mix, before the music slider; matches Sfx's loudest bed
+const FADE_RATE: float = 0.25        ## per-second travel of the depth mix, slower than walking on purpose
 
 var _open: AudioStreamPlayer
 var _minor: AudioStreamPlayer
@@ -59,14 +45,14 @@ var _muted: bool = DisplayServer.get_name() == "headless"
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 20260816                        # fixed seed — the same "recording" every boot
+	rng.seed = 20260816                        # fixed: the same "recording" every boot
 	_open = _bed(_gen_open())
 	_minor = _bed(_gen_minor())
 	_sub = _bed(_gen_sub(rng))
-	set_depth(0.0, 1.0)                        # start settled at the surface rather than fading up into it
+	set_depth(0.0, 1.0)                        # start settled at the surface, not fading up into it
 
 
-## Stop every bed on teardown, same as Sfx: a stream still playing at quit leaves its playback object
+## Stop every bed on teardown, as Sfx does: a stream still playing at quit leaves its playback object
 ## alive in the mixer and trips the ObjectDB leak warning on exit.
 func _exit_tree() -> void:
 	for bed: AudioStreamPlayer in [_open, _minor, _sub]:
@@ -75,9 +61,8 @@ func _exit_tree() -> void:
 			bed.stream = null
 
 
-## Called every frame with how far down the body is, 0 (surface) .. 1 (bottom of the world). The mix
-## eases toward it, so a fast fall does not slam the score — a descent should sound like a descent even
-## when it takes two seconds.
+## Called every frame with how far down the body is, 0 at the surface to 1 at the bottom of the world.
+## The mix eases toward it, so a fast fall does not slam the score.
 func set_depth(t: float, delta: float) -> void:
 	_depth = move_toward(_depth, clampf(t, 0.0, 1.0), delta * FADE_RATE)
 	var d: float = smoothstep(0.0, 1.0, _depth)
@@ -87,16 +72,15 @@ func set_depth(t: float, delta: float) -> void:
 	_apply(_sub, lerpf(SUB_AT_TOP, SUB_AT_BOTTOM, d), pitch)
 
 
-## The mix levels are LINEAR gains, not dB positions — three beds of one chord have to balance against
-## each other the way a mixer balances them, and lerping in dB would make the quiet end vanish long
-## before the curve says it should.
+## `level` is a linear gain, not a dB position. Three beds of one chord have to balance the way a mixer
+## balances them; lerping in dB would make the quiet end vanish long before the curve says it should.
 func _apply(p: AudioStreamPlayer, level: float, pitch: float) -> void:
 	p.pitch_scale = pitch
 	p.volume_db = -80.0 if level <= 0.01 else linear_to_db(level) + BASE_DB + Settings.music_db()
 
 
 ## One looping bed: a seamless WAV on its own player, started at boot and never stopped. Mixing is done
-## entirely with volume, so the three stay sample-locked forever and can never drift out of phase.
+## entirely with volume, so the three stay sample-locked and can never drift out of phase.
 func _bed(samples: PackedFloat32Array) -> AudioStreamPlayer:
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS
@@ -117,18 +101,17 @@ func _bed(samples: PackedFloat32Array) -> AudioStreamPlayer:
 	return p
 
 
-## Additive sine stack with a slow amplitude LFO per partial, so the chord BREATHES instead of sitting
-## still. Every partial frequency and every LFO rate is a whole number of cycles across the loop window,
-## which is the entire reason the loop is seamless — no crossfade, no click, no fade envelope eating the
-## ends. `partials` is [[harmonic_ratio, gain, lfo_cycles_per_loop], ...].
+## Additive sine stack with a slow amplitude LFO per partial, so the chord breathes instead of sitting
+## still. Every partial frequency and every LFO rate must be a whole number of cycles across the loop
+## window: that alone is what makes the loop seamless. `partials` rows are `[ratio, gain, lfo_cycles]`.
 func _stack(partials: Array) -> PackedFloat32Array:
 	var n: int = int(RATE * LOOP_SECONDS)
 	var out := PackedFloat32Array()
 	out.resize(n)
 	for p: Array in partials:
 		var freq: float = ROOT * float(p[0])
-		# Snap to the nearest frequency that completes whole cycles in the window — inaudible at these
-		# ratios (well under a cent) and it is what makes the seam vanish.
+		# Snap to the nearest frequency completing whole cycles in the window. Every ratio below already
+		# lands exactly, so this moves nothing today; it is what stops a new ratio breaking the loop.
 		var cycles: float = round(freq * LOOP_SECONDS)
 		freq = cycles / LOOP_SECONDS
 		var gain: float = float(p[1])
@@ -140,15 +123,14 @@ func _stack(partials: Array) -> PackedFloat32Array:
 	return out
 
 
-## OPEN: root, fifth, octave, twelfth — a stack with no third in it, so it states a key without stating
-## a mood. Everything the score does later is a modification of this.
+## OPEN: the no-third chord everything else in the score modifies.
 func _gen_open() -> PackedFloat32Array:
 	return _stack([
 		[1.0, 0.30, 1.0],      # root
 		[1.5, 0.20, 2.0],      # fifth
 		[2.0, 0.16, 3.0],      # octave
 		[3.0, 0.09, 5.0],      # twelfth
-		[4.0, 0.05, 7.0],      # double octave — just enough air to not be a drone
+		[4.0, 0.05, 7.0],      # double octave: just enough air to not be a drone
 	])
 
 
@@ -162,15 +144,15 @@ func _gen_minor() -> PackedFloat32Array:
 	])
 
 
-## SUB: weight. A very low sine, its own octave, and a breath of low-passed noise so the bottom of the
-## mix moves. This is most of what the deep sounds like, and at the surface it is barely present.
+## SUB: weight. A very low sine with its own octave, under a breath of low-passed noise so the bottom
+## of the mix moves. Most of what the deep sounds like, and barely present at the surface.
 func _gen_sub(rng: RandomNumberGenerator) -> PackedFloat32Array:
 	var out: PackedFloat32Array = _stack([
 		[0.5, 0.34, 1.0],      # an octave below the root
 		[1.0, 0.14, 2.0],
 	])
 	# The breath is noise through a one-pole low-pass, faded across the seam so the loop stays silent at
-	# the join. Noise cannot be made periodic the way a sine can, so it gets the envelope instead.
+	# the join. Noise cannot be made periodic the way a sine can, so it needs the envelope instead.
 	var n: int = out.size()
 	var lp: float = 0.0
 	for i: int in n:

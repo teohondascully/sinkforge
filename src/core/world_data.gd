@@ -17,21 +17,21 @@ var walls: Dictionary = {}
 ## FactorySim.DEFAULT_ORE_DEPOSIT, currently 250, which is what all seven consumers pass to `.get`.
 ## The gen->sim channel for finite, depth-scaled deposits.
 var amounts: Dictionary = {}
-## THE LODE PLANE: cell -> ore material id, in the BACKGROUND plane behind whatever rock `blocks` puts in front
-## of it. Sparse. The gen->sim channel for lodes: without it the only writer of `sim.lode` outside save/load is
-## `factory_sim.gd`'s mining branch, so a fresh world holds none.
+## The lode plane: cell -> ore material id, in the background plane behind whatever rock `blocks` puts in
+## front of it. Sparse. The gen-to-sim channel for lodes: without it the only writer of `sim.lode` outside
+## save and load is `factory_sim.gd`'s mining branch and a fresh world holds none.
 ##
-## INVARIANT, since `blocks` and this grid address the same cells: a lode may sit under solid HOST ROCK, but
-## never in the same cell as a solid ORE-LIKE block, which would be double-sourced because mining an ore block
-## writes its own lode there and overwrites this one's richness. Enforced in `_grow_lode`; `load_world` ingests
-## faithfully, so a violation fails a test rather than going missing.
+## Invariant, since `blocks` and this grid address the same cells: a lode may sit under solid host rock but
+## never in the same cell as a solid ore-like block, which would be double-sourced because mining an ore
+## block writes its own lode there and overwrites this richness. Enforced in `_grow_lode`; `load_world`
+## ingests faithfully, so a violation fails a test rather than going missing.
 var lodes: Dictionary = {}
 ## Aquifer water (L3): cell -> level (1..FactorySim.WATER_MAX). Sparse, and only in carved-open cells
 ## deep in the rock. Ingested by FactorySim.load_world; absent means a dry world.
 var water: Dictionary = {}
-## PROVENANCE, not content: cell -> true for every cell a deliberate vertical route carved, i.e. the rifts and
-## the sinkhole throats. Never read by the sim, never saved. It lets the dig-your-factory identity guard exclude
-## designed structure from its open-cell count, which cannot otherwise tell a cut chasm from undirected cave.
+## Provenance rather than content: cell -> true for every cell a deliberate vertical route carved, meaning the
+## rifts and the sinkhole throats. Never read by the sim, never saved. It lets the dig-your-factory guard drop
+## designed structure from its open-cell count, which cannot otherwise tell a cut chasm from a plain cave.
 var routes: Dictionary = {}
 
 

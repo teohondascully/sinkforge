@@ -1,29 +1,24 @@
 extends RefCounted
 
-## Builds the HOVER READOUT — the dictionary the HUD's info panel renders for whatever cell the cursor
-## (or the pinned config panel) is over: a machine's mode/buffers/rate/knobs, or, on bare terrain, the
-## ore-vein / seal / rope / too-hard-rock hints. Extracted from MainView so the controller isn't carrying
-## ~120 lines of presentation logic; this is a pure READ (queries the sim, never mutates it) and returns
-## the same {name, in, out, holding, mode, …} shape hud.gd already consumes.
-##
-## The controller stays the source of two bits of context the readout needs and can't compute itself:
-## whether the cell is in REACH (MainView._can_reach — the same reach-gate the verbs use) and the current
-## DRILL rate (MainView._drill_rate, which reads the machine-def table). MainView hands both in.
+## Builds the hover readout: the dictionary the HUD's info panel renders for whatever cell the cursor or
+## the pinned config panel is over. That is a machine's mode / buffers / rate / knobs; on bare terrain it
+## is the ore vein, seal, rope and too-hard-rock hints. Pure read: it queries the sim and never mutates it,
+## and returns the {name, in, out, holding, mode, …} shape hud.gd consumes. Two pieces of context cannot
+## be computed here and reach it from MainView: whether the cell is in reach (`_can_reach` is the gate the
+## verbs use) and the current drill rate (`_drill_rate` reads the machine-def table).
 
-## Describe an explicit cell. MainView calls this for the live cursor AND — via the config-panel PIN (#32) —
-## for the latched machine while the cursor is off exploring the panel's own knobs. Empty dict = nothing to
-## show (out of reach, or bare cell with no hint).
+## Describe an explicit cell. Called for the live cursor, and for the latched machine while the config
+## panel is pinned and the cursor is off over its knobs. An empty dict means nothing to show: out of
+## reach, or a bare cell with no hint.
 static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate: float) -> Dictionary:
 	if not reachable:
 		return {}
 	var m: MachineState = sim.machine_at(aim)
 	if m == null:
-		# A visible SOLID ore vein — show how much ore is in it + the nudge to automate it. The readout the
-		# user asked for ("hover to see how much ore is left"), now on the vein itself (no cavity to explain).
-		# AN EXPOSED LODE (`docs/LODE.md`) answers first, because it is the same question with a different
-		# answer: the rock in front of it is gone, so there is nothing to drop a drill ABOVE — you work the
-		# face. The tier line comes before the amount, since "you cannot touch this yet" outranks "there is
-		# a lot of it".
+		# A solid ore vein reports how much ore is left plus the nudge to automate it. An exposed lode
+		# (docs/LODE.md) is answered first: the rock in front of it is gone, so there is nothing to drop a
+		# drill above and you work the face instead. Within the lode branch the tier line comes before the
+		# amount, because "you cannot touch this yet" outranks "there is a lot of it".
 		var vein: StringName = sim.lode_at(aim)
 		if vein != &"" and not sim.is_solid(aim):
 			if not MiningRules.can_mine(vein, sim.inventory):
@@ -37,22 +32,21 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 		if dep > 0:
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],
 				"mode": "%d ore — drop a Drill just above it (%s)" % [dep, _rate_eta(drill_rate, dep)]}
-		# THE SEAL is its own answer: no pick ever opens it — the Descent Engine does (docs/PROGRESSION.md).
+		# The seal is its own answer: no pick ever opens it, the Descent Engine does (docs/PROGRESSION.md).
 		if sim.material_at(aim) == &"sealrock":
 			return {"name": "The Seal", "in": [], "out": [], "holding": [],
 				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
-		# A hanging rope: its coil count + the one-action recovery affordance.
+		# A hanging rope: its coil count and the one-action recovery.
 		if sim.is_climbable(aim):
 			return {"name": "Rope", "in": [], "out": [], "holding": [],
 				"mode": "%d segments hung — RMB takes the whole rope back" % sim.rope_length(aim)}
-		# Rock you can't break with your current tools — the depth-gate's "why?" answer.
+		# Rock your current tools cannot break: the depth gate's explanation of itself.
 		if sim.is_solid(aim):
 			var rock: StringName = sim.material_at(aim)
 			if not MiningRules.can_mine(rock, sim.inventory):
-				# NAME THE DRIVE THIS ROCK ACTUALLY WANTS. This line used to say "craft a Stone Pickaxe"
-				# for every over-tier rock in the game, which is true today only because deepslate is the
-				# deepest band that exists; the moment L3's rock lands it would be telling you to craft a
-				# pick you already own. `drive_for` derives it from the same table the gate reads.
+				# Name the drive this rock wants. Never hardcode a tool here: `drive_for` derives it from
+				# the same table the gate reads, so a new rock band cannot end up telling the player to
+				# craft a pick they already own.
 				return {"name": String(rock).capitalize(), "in": [], "out": [], "holding": [],
 					"mode": "too hard — the %s (tier %d) bites it" % [
 						MiningRules.tool_name(MiningRules.drive_for(rock)), MiningRules.required_tier(rock)]}
@@ -75,7 +69,7 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 			info["mode"] = ["splits DOWN + RIGHT evenly",
 				"splits 2:1 favouring DOWN",
 				"splits 1:2 favouring RIGHT"][m.mode % 3]
-			# The config panel's clickable ratio chips (#32) — R still cycles for keyboard hands.
+			# The config panel's clickable ratio chips. R still cycles, for keyboard hands.
 			info["knobs"] = [{"kind": "choice", "label": "ratio",
 				"options": ["1:1", "2:1 v", "1:2 >"], "current": m.mode % 3}]
 		&"hopper":
@@ -140,8 +134,8 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 	for it: StringName in hold:
 		holding.append({"item": it, "count": int(hold[it])})
 	info["holding"] = holding
-	# The factory-wide make-rate of this machine's product (sim.production_rate — the "12/min" read).
-	# Recipe machines rate their first output; a drill rates the material it's boring.
+	# The factory-wide make-rate of this machine's product, in items per minute. Recipe machines rate
+	# their first output; a drill rates the material it is boring.
 	var rate_item: StringName = &""
 	if recipe != null and not recipe.outputs.is_empty():
 		rate_item = recipe.outputs.keys()[0]
@@ -156,8 +150,8 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 	return info
 
 
-## Format a rate + an ETA-to-empty for a deposit — "1.0/s, ~4m left" — so the player reads throughput AND
-## how long the patch lasts at that rate (the "is this worth automating?" answer). Rate 0 → amount only.
+## Format a rate and an ETA-to-empty for a deposit, as "1.0/s · ~4m left", so throughput and how long
+## the patch lasts are both readable. A rate of 0 formats the amount alone.
 static func _rate_eta(rate: float, amount: int) -> String:
 	if rate <= 0.0:
 		return "%d left" % amount
