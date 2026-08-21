@@ -5,26 +5,26 @@ extends "res://tools/check_base.gd"
 ## Everything the rope has been asked to prove so far has been VERTICAL. check_grapple swings it on a rig
 ## built to suit it, check_plunge rides it down a sinkhole and climbs back out, check_impact catches a fall
 ## with it. All of that says the tool works. None of it says the tool is how you MOVE, and "a movement
-## overhaul centred on the grappling hook" is a claim about horizontal distance per second — about whether
+## overhaul centred on the grappling hook" is a claim about horizontal distance per second, about whether
 ## a player crossing the world reaches for the line instead of the walk key.
 ##
 ## So: cross the same span, twice, in the same world.
 ##
-##   ON LEGS   — hold the run and jump at anything in the way. The stride, coast drag and momentum-above-cap
+##   ON LEGS:    hold the run and jump at anything in the way. The stride, coast drag and momentum-above-cap
 ##               rules are all already tuned for this; it is a fast, pleasant baseline and it should be.
-##   ON THE ROPE — throw forward and up, reel to tighten the arc, lean into the swing, let go on the upswing
+##   ON THE ROPE: throw forward and up, reel to tighten the arc, lean into the swing, let go on the upswing
 ##               and throw the next one. The rhythm a player would find, driven as a player would drive it.
 ##
 ## Two numbers, and the second is the one that matters:
 ##
-##   DISTANCE  — columns covered inside one identical budget. If the rope loses here it is not travel, it is
+##   DISTANCE:   columns covered inside one identical budget. If the rope loses here it is not travel, it is
 ##               a stunt, and every hour spent on swing physics was spent on a garnish.
-##   TOP SPEED — the fastest the body ever goes on each route. This is what the swing is FOR: the controller
+##   TOP SPEED:  the fastest the body ever goes on each route. This is what the swing is FOR: the controller
 ##               lifts the top-speed clamp while a line is taut precisely so an arc can carry you faster than
 ##               your legs can, and if that ceiling is never actually reached the lift is theoretical.
 ##
 ## VENUE MATTERS, and it is the finding this layer exists to keep visible. A grapple needs something
-## overhead to bite. In a gallery — a corridor with a roof, which is what most of this world is — that is
+## overhead to bite. In a gallery, a corridor with a roof, which is what most of this world is, that is
 ## everywhere. Under open sky it is nothing at all, and no amount of swing tuning changes it. So the gallery
 ## is the gate, because it isolates the mechanic from the geography, and the real surface is measured
 ## alongside it and PRINTED rather than gated: the honest report is not "the rope is fast" or "the rope is
@@ -100,7 +100,7 @@ func _run() -> void:
 	_check(int(rope["bit"]) > 0,
 		"...because there is always something over your head to bite (%d of %d throws)"
 			% [rope["bit"], rope["throws"]])
-	# NOT a gate, and deliberately so. A hook with nothing to hook is not a bug in the hook — it is what the
+	# NOT a gate, and deliberately so. A hook with nothing to hook is not a bug in the hook; it is what the
 	# sky is. Printed because the number is a level-design instruction: rope traversal on the surface needs
 	# overhead rock, which in this world means the scarp faces and the sinkhole mouths, not the open plain.
 	var wall: Dictionary = await _climb_scarp()
@@ -185,7 +185,7 @@ func _cross(with_rope: bool, roofed: bool) -> Dictionary:
 						var shot: Dictionary = p.grapple.trace(sim, p.hand(), cand)
 						# A hold you swing FROM is a hold ABOVE you. Without this the flatter candidate
 						# happily hooked the far wall of the corridor dead ahead, which is not a swing and not
-						# a zip — it is a leash, and it cost the gallery run the whole budget.
+						# a zip; it is a leash, and it cost the gallery run the whole budget.
 						if bool(shot["hit"]) \
 								and p.hand().distance_to(shot["at"]) >= MIN_USEFUL * float(CELL) \
 								and (shot["at"] as Vector2).y <= p.hand().y - HOLD_ABOVE * float(CELL):
@@ -221,7 +221,7 @@ func _cross(with_rope: bool, roofed: bool) -> Dictionary:
 			# Given to BOTH routes, for the same reason _climb gives both routes legs: a player carrying a
 			# rope still has boots, and the rope is an ADDITION to the body rather than a replacement for it.
 			# Withholding the jump from the roped run is how the surface run came back at seven columns in
-			# nine hundred frames — not because the rope failed, but because the rig had quietly taken away
+			# nine hundred frames, not because the rope failed, but because the rig had quietly taken away
 			# the one move that gets over a step.
 			p.request_jump()
 		await physics_frame
@@ -283,11 +283,11 @@ func _try_face(main: MainView, sim: FactorySim, foot: int, top: int, with_rope: 
 				coast -= 1
 			elif not p.grapple.live():
 				# AIM AT THE LIP, which is what the aiming ghost is for. The first version threw steeply up
-				# and across — the instinctive move, and a complete miss: a five-row plateau three columns
+				# and across; the instinctive move, and a complete miss: a five-row plateau three columns
 				# away is CLEARED by any throw steeper than about forty-five degrees, so the hook sailed over
 				# the top and out into open sky every single time, and the face read as unclimbable when it
 				# was only badly aimed at. So target the ground just past the top edge, at whatever angle
-				# that happens to be — a shallow throw that lands ON the terrace rather than a tall one that
+				# that happens to be: a shallow throw that lands ON the terrace rather than a tall one that
 				# flies over it.
 				p.grapple.fire(p.hand(), Vector2(float(top) * CELL + 16.0,
 					float(goal_row) * CELL - CELL * 0.5))
@@ -322,7 +322,7 @@ func _blocked(sim: FactorySim, at: Vector2i) -> bool:
 	return false
 
 
-## THE GALLERY. A level floor, headroom to swing in, and a solid roof over the lot — the shape of most of
+## THE GALLERY. A level floor, headroom to swing in, and a solid roof over the lot: the shape of most of
 ## this world once a player has been in it a while, and the venue where a hook always has something to find.
 func _carve(sim: FactorySim) -> void:
 	for x: int in range(HALL_LEFT, HALL_RIGHT + 1):

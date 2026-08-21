@@ -3,32 +3,32 @@ extends "res://tools/check_base.gd"
 ## VEINS GROW INTO ROCK. THEY DO NOT FILL THE HOLES YOU ARE MEANT TO WALK THROUGH.
 ##
 ## `LayeredWorldGen._grow_vein` accretes a blob outward from a seed cell and skips any cell that is not
-## `earth`, `stone`, `deepslate` or `shale` — *"only replace SOLID rock (never fill a carved cave)"*. That
+## `earth`, `stone`, `deepslate` or `shale`: *"only replace SOLID rock (never fill a carved cave)"*. That
 ## line is load-bearing and nothing in the suite held it: deleting it produced a green sweep. Which is the
-## only reason it is worth a layer of its own — a guard whose removal changes nothing measurable is not
+## only reason it is worth a layer of its own: a guard whose removal changes nothing measurable is not
 ## protected by the harness, it is protected by nobody having touched it.
 ##
 ## AND IT IS LIVE, not defensive. The pass order settles that (`generate`, :317-322): caves, big caverns and
 ## tunnels are carved BEFORE `_scatter_veins` runs, so at the moment the blob accretes, the holes are
-## already there and adjacent. The aquifer path is stronger still — `_seed_aquifer_ore` (:1104) seeds
+## already there and adjacent. The aquifer path is stronger still: `_seed_aquifer_ore` (:1104) seeds
 ## deliberately from *"the SOLID rim: cells adjacent to a flooded cell"*, which is to say it starts the blob
 ## one step from open water on purpose and relies entirely on this guard to stop it going in.
 ##
 ## TWO HALVES, because one of them cannot see the whole failure.
 ##
-##   THE UNIT HALF   builds a world by hand — solid rock, one carved cave, a seed on its rim — and asserts
+##   THE UNIT HALF   builds a world by hand, solid rock with one carved cave and a seed on its rim, and asserts
 ##                   no cell that was air came back a vein. It is the only half that can attribute a
 ##                   failure to this function rather than to something downstream of it.
 ##
 ##   THE WORLD HALF  generates the real shipping world and asserts the invariant `WorldData.water`
 ##                   documents and `FactorySim.load_world` DEPENDS on: water lives only in carved-open
-##                   cells. That dependency is why this matters more than tidiness — `load_world` ingests
+##                   cells. That dependency is why this matters more than tidiness: `load_world` ingests
 ##                   water with `if in_bounds(cell) and not solid.has(cell)`, so a vein that grows into a
 ##                   flooded pocket does not raise anything. The water is silently dropped, the pocket is
 ##                   quietly dry, and the aquifer you were supposed to breach is just rock.
 ##
-## Both halves carry their own positive control, because both are assertions of ABSENCE — "no air became
-## ore", "no watered cell is solid" — and an absence is satisfied perfectly by a fixture that generated
+## Both halves carry their own positive control, because both are assertions of ABSENCE: "no air became
+## ore", "no watered cell is solid". An absence is satisfied perfectly by a fixture that generated
 ## nothing. Each first proves the thing it is looking for exists.
 ##
 ##   godot --headless --path . --script res://tools/check_vein_guard.gd
@@ -65,7 +65,7 @@ func _unit_half() -> void:
 	var gen := LayeredWorldGen.new()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260817
-	# Seeded on the cave's RIM — one cell outside it — which is exactly where `_seed_aquifer_ore` starts.
+	# Seeded on the cave's RIM, one cell outside it, which is exactly where `_seed_aquifer_ore` starts.
 	gen._grow_vein(world, rng, Vector2i(9, 9), VEIN_SIZE, 5, &"ore")
 
 	# POSITIVE CONTROL FIRST. "No air became ore" is true of a vein that placed nothing at all.
@@ -115,8 +115,8 @@ func _world_half() -> void:
 			% [world.water.size(), drowned.size(),
 				"" if drowned.is_empty() else ": " + ", ".join(drowned.slice(0, 6))])
 
-	# The same invariant read from the SIM's side. Mostly it restates the check above — `load_world` drops
-	# on `solid.has(cell)`, which is what `drowned` scans — but not entirely: it also drops on
+	# The same invariant read from the SIM's side. Mostly it restates the check above, since `load_world`
+	# drops on `solid.has(cell)`, which is what `drowned` scans, but not entirely: it also drops on
 	# `not in_bounds(cell)`, which the generator-side scan cannot see. So this catches an out-of-bounds
 	# watered cell, and otherwise it is the same fact counted where the game will actually feel it.
 	var sim := FactorySim.new()

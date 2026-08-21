@@ -9,8 +9,8 @@ extends "res://tools/check_base.gd"
 ## close, and it is why nothing here calls `can_carry` directly. A test that asks the predicate whether it
 ## would refuse cannot notice that nobody asks it.
 ##
-## So every assertion below goes through `mine()` and `collect_ground()` — the calls the player's swing and
-## the player's step actually make — and reads the pack afterwards.
+## So every assertion below goes through `mine()` and `collect_ground()`, the calls the player's swing and
+## the player's step actually make, and reads the pack afterwards.
 ##
 ## THE FOUR PROPERTIES, and each of them is one somebody could plausibly "fix" into being wrong:
 ##
@@ -20,7 +20,7 @@ extends "res://tools/check_base.gd"
 ##   THE PACK NEVER EXCEEDS THE CAP. The whole point.
 ##   THE OVERFLOW IS CONSERVED. It falls. This file argues for conservation everywhere else and a cap that
 ##     quietly deletes ore would be the one place it lies. Asserted by finding the units, not by observing
-##     that the pack failed to grow — those two are indistinguishable from inside the pack and only one of
+##     that the pack failed to grow; those two are indistinguishable from inside the pack and only one of
 ##     them is correct.
 ##   A FULL PACK DOES NOT SCOOP ITS OWN SPILL. `collect_ground` is capped too. Without that the material
 ##     lands and is picked straight back up on the next step, the return trip never happens, and the cap
@@ -58,7 +58,7 @@ func _initialize() -> void:
 ## A sim with ground under the test cell and a known deposit in it. THE FLOOR IS NOT DECORATION: a falling
 ## item goes to the first machine below, else the first floor, else the void sink, so a bare `FactorySim`
 ## has a bottomless column and the sink eats the spill. The first run of this fixture reported the overflow
-## destroyed and the seam was fine — it was this. A real world always has rock under a mined cell.
+## destroyed and the seam was fine; it was this. A real world always has rock under a mined cell.
 func _rig(cell: Vector2i, prefill: int) -> FactorySim:
 	var sim := FactorySim.new()
 	for dy: int in range(1, FLOOR_ROWS + 1):
@@ -75,7 +75,7 @@ func _rig(cell: Vector2i, prefill: int) -> FactorySim:
 ## THE LODE FACE, WHICH THE FIRST VERSION OF THIS LAYER DID NOT COVER AND SHOULD HAVE.
 ##
 ## `mine()` breaks blocks; `take_lode` is the hand verb for working an exposed ore face one unit at a time,
-## and the lode is where ore actually lives — terrain is what you carve, the lode is what you extract. The
+## and the lode is where ore actually lives: terrain is what you carve, the lode is what you extract. The
 ## first version asserted through `mine()` and `collect_ground()` only, so the cap could have bound on rock
 ## and missed ore entirely and this layer would have stayed green. Found by c1 reading the seam against the
 ## call sites rather than against the layer.
@@ -129,12 +129,12 @@ func _the_lode_face_is_the_ore_verb(cap: int) -> void:
 ## missed is that an unrouted path and a deliberately exempt one look identical in the source.
 ##
 ## `is_bulk_item` says `wood` and `sapling` are freight and `conduit`, `rope`, `torch` and machine items are
-## not. So a site writing `inventory` inline is only safe if what it writes is exempt — and nothing in the
+## not. So a site writing `inventory` inline is only safe if what it writes is exempt, and nothing in the
 ## file says which sites were considered and which were simply never visited. These three write BULK:
 ##
-##   `_fell_foliage_cell` — the cascade when a cut trunk drops the rest of the tree. Wood and saplings.
-##   `remove_sapling`     — taking a planted sapling back out of the ground.
-##   `pickup_machine`     — salvaging a machine, which hands you its BUFFERED CONTENTS. A hopper sitting on
+##   `_fell_foliage_cell`:  the cascade when a cut trunk drops the rest of the tree. Wood and saplings.
+##   `remove_sapling`:      taking a planted sapling back out of the ground.
+##   `pickup_machine`:      salvaging a machine, which hands you its BUFFERED CONTENTS. A hopper sitting on
 ##                          forty units of ore empties straight into the pack.
 ##
 ## THE RULE FOLLOWS THE SAME DISTINCTION `take_lode` established. A path that DESTROYS or REMOVES the thing
@@ -143,12 +143,12 @@ func _the_lode_face_is_the_ore_verb(cap: int) -> void:
 ## `remove_sapling` leaves a growable sapling in the ground if it refuses, so it refuses.
 ##
 ## `craft_item` is EXEMPT AND THAT IS A DECISION, not an oversight. Crafting spends bulk from the same pack
-## it deposits into and almost always nets downward — ore into an ingot, plates into a gear — so capping the
+## it deposits into and almost always nets downward: ore into an ingot, plates into a gear. So capping the
 ## output could refuse a craft that would have made room. A cap that blocks the act of getting lighter is
 ## the wrong shape, and the constraint is already applied at every door the material came in through.
 func _the_rest_of_the_yield_paths(cap: int) -> void:
 	# FELLING THE CASCADE, not a lone block. The first version of this arm mined a single wood cell and
-	# passed — because `mine()`'s foliage branch was already routed and `_fell_foliage_cell` was never
+	# passed, because `mine()`'s foliage branch was already routed and `_fell_foliage_cell` was never
 	# reached. The cascade only fires when standing foliage LOSES ITS ROOT, so the fixture has to be a tree:
 	# cut the base and the blocks above come down through a different function with its own inline write.
 	var base := Vector2i(40, 40)
@@ -173,7 +173,7 @@ func _the_rest_of_the_yield_paths(cap: int) -> void:
 			% _on_floor(fell, &"wood"))
 
 	# REMOVING A PLANTED SAPLING refuses instead, because refusing leaves a growing sapling in the ground
-	# rather than a hole — nothing is destroyed, so nothing needs a home.
+	# rather than a hole; nothing is destroyed, so nothing needs a home.
 	var plot := Vector2i(45, 40)
 	var garden := FactorySim.new()
 	garden.sapling[plot] = 0.0
@@ -214,7 +214,7 @@ func _the_rest_of_the_yield_paths(cap: int) -> void:
 
 ## Every unit of `item` anywhere in the world's piles, so conservation is checked by finding the material
 ## rather than by noting its absence from the pack. Returns 0 for an empty world, which is the honest answer
-## and also the FAILING one wherever it is used below — a helper whose empty case satisfies its caller is
+## and also the FAILING one wherever it is used below; a helper whose empty case satisfies its caller is
 ## this repository's most repeated defect.
 func _on_floor(sim: FactorySim, item: StringName) -> int:
 	var total: int = 0

@@ -1,17 +1,17 @@
 extends "res://tools/check_base.gd"
 
-## THE WALK — the body moves the way you asked it to, everywhere on the real generated surface.
+## THE WALK: the body moves the way you asked it to, everywhere on the real generated surface.
 ##
-## Born as a bug hunt for "walking and I get teleported back ~1 foot": every frame where the body moves
+## Born as a bug hunt for "walking and getting teleported back ~1 foot": every frame where the body moves
 ## BACKWARD against its own input is a snap, and a snap is logged with its surroundings so the cause is
 ## visible rather than guessed at. That part is unchanged and is still the headline property.
 ##
-## WHY IT NO LONGER WALKS THE WORLD IN ONE LINE. The original drove one continuous traverse — stand at the
-## far west, hold right until the far east, turn round, come back — and it never once finished. The body
+## WHY IT NO LONGER WALKS THE WORLD IN ONE LINE. The original drove one continuous traverse: stand at the
+## far west, hold right until the far east, turn round, come back. And it never once finished. The body
 ## ran off the western hills, fell nine rows, and spent the remaining 3,500 frames at the foot of a bluff
 ## it cannot climb, jumping into the wall. It reached column 28 of 128 and the layer exited 0, because the
 ## only failure path was "a snap happened" and a body pinned against rock cannot snap. Its own report
-## string said so out loud — "OR the body never got far" — and printed it every single run.
+## string said so out loud, "OR the body never got far", and printed it every single run.
 ##
 ## The premise was the defect, not the body. This world HAS bluffs; `check_relief` asserts they exist,
 ## because a landscape you can walk end-to-end without ever meeting an obstacle is not a landscape. So a
@@ -20,8 +20,8 @@ extends "res://tools/check_base.gd"
 ## problem, not a journey.
 ##
 ## So: place the body on the surface at regular columns across the whole world, walk each one for a fixed
-## burst, and accumulate. Every column band gets exercised — western hills, the flat plateau and its
-## fixtures, the eastern hills — no bluff can end the run early, and the layer now covers 100% of the
+## burst, and accumulate. Every column band gets exercised: western hills, the flat plateau and its
+## fixtures, the eastern hills. No bluff can end the run early, and the layer now covers 100% of the
 ## world's width instead of 22% of it.
 ##
 ## Run: godot --headless --path . --script res://tools/check_walk.gd
@@ -80,7 +80,7 @@ func _phys() -> void:
 		return
 	_player.input_dir = 1.0
 	var dx: float = _player.position.x - _prev_x
-	# A SNAP is moving opposite to held input by more than BACK_EPS — not merely decelerating into a wall,
+	# A SNAP is moving opposite to held input by more than BACK_EPS, not merely decelerating into a wall,
 	# which reads as dx≈0. This is the property the layer exists for and it is judged on every walked frame.
 	if dx < -BACK_EPS:
 		_snaps += 1
@@ -120,7 +120,7 @@ func _boot() -> void:
 	_sim = _main.sim
 	_player.auto_input = false
 	# A MACHINE IN THE PATH. Machines are not in the slope authority, so the body cannot glide over a
-	# one-tile machine the way it glides over a one-tile terrain step — it meets the box head-on. That was
+	# one-tile machine the way it glides over a one-tile terrain step; it meets the box head-on. That was
 	# the prime suspect for "walking and snapped back", so one is planted on the flat plateau's clear left
 	# lane and a sample band is aimed straight at it.
 	var proc: MachineDef = load("res://src/data/machines/processor.tres")
@@ -138,7 +138,7 @@ func _boot() -> void:
 	_next_band()
 
 
-## What is around the body at the moment of a snap — the diagnostic payload that made this layer worth
+## What is around the body at the moment of a snap: the diagnostic payload that made this layer worth
 ## having in the first place.
 func _context() -> String:
 	var c: Vector2i = _main._cell_at(_player.position)
@@ -164,7 +164,7 @@ func _report() -> void:
 	# HOW MANY BANDS MUST GO SOMEWHERE. Not all of them can, and that is the landscape working: a band that
 	# lands at the foot of a bluff is legitimate, and `check_relief` asserts those bluffs exist on purpose.
 	# Measured dead stable across three runs at seed 1337: 22 bands walked, 4204px of an unobstructed
-	# 4950px (85%), 20 bands clearing a full cell. The floor is 18 and 55% — enough room for terrain to
+	# 4950px (85%), 20 bands clearing a full cell. The floor is 18 and 55%: enough room for terrain to
 	# move without a false red, and its job is to catch a body that has stopped moving, not name a target.
 	_check(_moved_bands >= 18, "at least 18 bands cleared a full cell of ground (%d)" % _moved_bands)
 	# …and the aggregate, which catches the other shape of the same failure: a body that creeps everywhere

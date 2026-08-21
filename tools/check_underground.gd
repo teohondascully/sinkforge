@@ -5,12 +5,12 @@ extends "res://tools/check_base.gd"
 ## check_opening put a number on dead space in the first screen and the first screen got fixed. But the
 ## first screen is the EASY half and it is the half a player looks at for thirty seconds: the sky does most
 ## of the composition, daylight does most of the lighting, and the soil profile does the rest. Everything
-## after that happens underground, lit by a lamp, under a veil that MULTIPLIES — and multiplying is exactly
+## after that happens underground, lit by a lamp, under a veil that MULTIPLIES, and multiplying is exactly
 ## the operation that took the opening's bottom half down to five distinct levels while every terrain pass
 ## ran correctly. There is no reason to think the same arithmetic stops applying below the surface, and
 ## every reason to think it applies harder, because down there the multiplier is smaller.
 ##
-## THE ONE THING THIS TEST MUST NOT DO is punish darkness. Down here the dark is the DESIGN — the veil is
+## THE ONE THING THIS TEST MUST NOT DO is punish darkness. Down here the dark is the DESIGN: the veil is
 ## supposed to take the far rock away, that is what makes the lamp mean anything, and a guard that counted
 ## unlit tiles would only ever be measuring how much unlit rock is in frame. It would push the whole game
 ## toward flat and bright, which is the opposite of the goal.
@@ -30,15 +30,15 @@ const DEAD := preload("res://tools/dead_space.gd")
 const SETTLE: int = 60
 
 ## How far below its column's surface the shaft is sunk, and how big a work chamber is cut at the bottom.
-## Deep enough to be past the daylight soak entirely — the point is to judge lamp-lit rock, not dim soil —
-## and wide enough that the frame contains a back wall rather than a slot.
+## Deep enough to be past the daylight soak entirely, since the point is to judge lamp-lit rock and not
+## dim soil, and wide enough that the frame contains a back wall rather than a slot.
 const DELVE_ROWS: int = 16
 const ROOM_W: int = 11
 const ROOM_H: int = 6
 
 ## How deep the shaft must ACTUALLY get before the frame is worth judging. Set from measurement, not from
-## taste: across the committed eight-seed corpus a successful delve lands at 14 rows every time — the body
-## stands on the chamber floor, two rows above the cell it dug to — while the one world where the dig never
+## taste: across the committed eight-seed corpus a successful delve lands at 14 rows every time, the body
+## standing on the chamber floor two rows above the cell it dug to, while the one world where the dig never
 ## started reads -1. Anything between 0 and 14 separates them; 12 leaves two rows of slack for terrain that
 ## makes the descent awkward without coming near the failure it is there to catch.
 const MIN_DELVE: int = 12
@@ -48,7 +48,7 @@ const MIN_DELVE: int = 12
 const HUD_TOP: float = 0.16
 const HUD_BOTTOM: float = 0.20
 
-## Mean luminance a tile needs before it is judged at all — the line between "the player can see this" and
+## Mean luminance a tile needs before it is judged at all: the line between "the player can see this" and
 ## "the player is looking into the dark on purpose".
 const LIT_FLOOR: float = 26.0
 
@@ -85,7 +85,7 @@ func _run() -> void:
 	# daylight, and until this check existed nothing noticed the difference.
 	#
 	# The first multi-seed sweep found it (the audit notes, Strike 11). On seed 99 the delve
-	# reached -1 rows — it never started — and the layer judged the surface, in sunlight, against the
+	# reached -1 rows because it never started, and the layer judged the surface, in sunlight, against the
 	# underground standard, and reported 23% dead as though the rock had failed. Seven other seeds reached
 	# 14 and scored 0%. The tell was not the verdict but the DENOMINATOR: 74 lit tiles where every other
 	# world had ~12. A frame six times brighter is not the same frame.
@@ -131,11 +131,11 @@ func _run() -> void:
 		quit(1)
 
 
-## Sink a shaft and cut a work chamber at the bottom of it — the pocket a player carves when they stop to
+## Sink a shaft and cut a work chamber at the bottom of it: the pocket a player carves when they stop to
 ## set up a drill site, and the only view that shows the back wall as a plane rather than as a sliver.
 ##
-## Returns HOW MANY ROWS BELOW ITS SURFACE the body actually ended up. `dig_down_to` can give up — blocked,
-## out of durability, out of patience — and this used to discard that entirely: whatever depth the agent
+## Returns HOW MANY ROWS BELOW ITS SURFACE the body actually ended up. `dig_down_to` can give up: blocked,
+## out of durability, out of patience. And this used to discard that entirely: whatever depth the agent
 ## reached, the chamber was cut there and the frame was judged as though it were lamp-lit deep rock. A
 ## shaft that stopped short is still in the daylight soak, and dim soil in daylight is a different picture
 ## being held to a standard written for something else. The caller checks this before judging anything.
@@ -151,7 +151,7 @@ func _delve(main: MainView) -> int:
 	# column MOVES that column's surface to the bottom of the shaft, so re-reading it here measures the
 	# body against the hole it just made and reports roughly -3 no matter how deep it actually went. That
 	# is what the first version of this line did, on all eight seeds, and the constant answer is what gave
-	# it away — a depth gauge that reads the same in every world is not reading depth.
+	# it away: a depth gauge that reads the same in every world is not reading depth.
 	var landed: Vector2i = main._cell_at(agent.player.position)
 	var reached: int = landed.y - from_surface
 	# Cut through sim.mine rather than main.try_mine: try_mine enforces the player's 3.2-cell REACH, and a

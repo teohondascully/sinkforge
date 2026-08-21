@@ -1,25 +1,25 @@
 extends SceneTree
 
-## LOCAL DESIGN TOOL — draws PROPOSAL mockups of the Bazaar counter over a real frame of the real game, so
+## LOCAL DESIGN TOOL. Draws PROPOSAL mockups of the Bazaar counter over a real frame of the real game, so
 ## a look can be judged against the thing it would replace rather than against a description of it. Outputs
 ## _mock_bazaar_<variant>.png (gitignored, like every _moment_*.png).
 ##
-## Run WITHOUT --headless (needs a real GL context — headless is the dummy renderer and saves blank frames):
+## Run WITHOUT --headless (needs a real GL context; headless is the dummy renderer and saves blank frames):
 ##   godot --path . --script res://tools/mock_bazaar.gd -- a
 ##
-## Every mock draws through the SAME pipeline the HUD does — a CanvasLayer scaled by MainView.HUD_SCALE over
-## a 640x360 authoring canvas — so what you see is what the panel would actually look like, at the real type
+## Every mock draws through the SAME pipeline the HUD does, a CanvasLayer scaled by MainView.HUD_SCALE over
+## a 640x360 authoring canvas, so what you see is what the panel would actually look like, at the real type
 ## sizes, with the real item glyphs, over the real world. Nothing here is a Photoshop promise.
 ##
 ## The backdrop is the live frame, snapshotted and then BLURRED in-image, because the treatment of what is
 ## behind the counter is half of each proposal: today the world is dimmed 38% and left sharp, which reads as
 ## a screenshot with a sheet over it. A blurred backdrop is the single cheapest thing that makes a panel look
-## like it is in front of something rather than pasted on top of it — and it is a two-line shader in the real
+## like it is in front of something rather than pasted on top of it, and it is a two-line shader in the real
 ## build (`scenes/main.gd` already runs a full-screen FX layer).
 ##
-##   a — THE LEDGER    a physical object: slate, brass frame, rivets, file tabs, a lit detail plate.
-##   b — THE WORKBENCH modern dark product UI: icon rail, cards, one accent, big type scale, real buttons.
-##   c — THE STALL     no panel at all: a bottom counter slab, goods on a shelf, the world left visible.
+##   a:  THE LEDGER    a physical object: slate, brass frame, rivets, file tabs, a lit detail plate.
+##   b:  THE WORKBENCH modern dark product UI: icon rail, cards, one accent, big type scale, real buttons.
+##   c:  THE STALL     no panel at all: a bottom counter slab, goods on a shelf, the world left visible.
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 50
@@ -107,9 +107,9 @@ func _draw_mock(c: Control, blur: ImageTexture, sharp: ImageTexture) -> void:
 
 
 # =========================================================================================================
-# A — THE LEDGER. The counter is a physical object you are standing at: a slate plate in a brass frame,
+# A: THE LEDGER. The counter is a physical object you are standing at: a slate plate in a brass frame,
 # rivets at the corners, tabs cut into the top edge like a ledger's, and a lamp above and to the left. The
-# right two-fifths is a DETAIL PLATE — the single change that both kills the dead space and makes buying
+# right two-fifths is a DETAIL PLATE: the single change that both kills the dead space and makes buying
 # feel like a decision, because the thing you are about to buy is finally drawn large enough to want.
 # =========================================================================================================
 func _variant_a(c: Control, blur: ImageTexture) -> void:
@@ -195,7 +195,7 @@ func _variant_a(c: Control, blur: ImageTexture) -> void:
 	_well(c, det)
 	c.draw_rect(Rect2(det.position, Vector2(det.size.x, 82.0)), Color(0.098, 0.086, 0.055, 0.85))
 	c.draw_line(det.position + Vector2(0.0, 82.0), Vector2(det.end.x, det.position.y + 82.0), BRASS_DIM, 1.0)
-	# A lamp glow behind the goods, three rings — the cheapest way to say "this one is lit".
+	# A lamp glow behind the goods, three rings: the cheapest way to say "this one is lit".
 	for k: int in 3:
 		c.draw_circle(det.position + Vector2(det.size.x * 0.5, 40.0), 34.0 - float(k) * 8.0,
 			Color(0.85, 0.70, 0.35, 0.05 + float(k) * 0.02))
@@ -235,8 +235,8 @@ func _foot_a(c: Control, panel: Rect2) -> void:
 
 
 # =========================================================================================================
-# B — THE WORKBENCH. Not diegetic at all: a 2026 product UI with a game's palette. No border, no bevel, no
-# 1px outline anywhere — depth comes from ELEVATION (shadow + surface tint) the way every modern dark UI
+# B: THE WORKBENCH. Not diegetic at all: a 2026 product UI with a game's palette. No border, no bevel, no
+# 1px outline anywhere; depth comes from ELEVATION (shadow + surface tint) the way every modern dark UI
 # does it. A vertical icon rail replaces the tab strip, rows become cards with air around them, and there is
 # exactly one accent colour doing exactly one job (this is selected / this is affordable).
 # =========================================================================================================
@@ -331,7 +331,7 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 		"↑↓ pick    1/2/3 tab    E close", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, FAINT)
 
 
-## A machine drawn with its OWN glyph — `Visuals.draw_item` only knows carried goods, and a machine drawn as
+## A machine drawn with its OWN glyph. `Visuals.draw_item` only knows carried goods, and a machine drawn as
 ## a carried good is the white square this mock caught on its first pass.
 func _machine(c: Control, at: Vector2, def_name: String, s: float) -> void:
 	var def: MachineDef = load("res://src/data/machines/%s.tres" % def_name) as MachineDef
@@ -359,20 +359,20 @@ func _rail_glyph(c: Control, at: Vector2, kind: int, on: bool) -> void:
 
 
 # =========================================================================================================
-# C — THE STALL. The most aggressive answer to "it feels like a menu": stop drawing a menu. The world stays
+# C: THE STALL. The most aggressive answer to "it feels like a menu": stop drawing a menu. The world stays
 # SHARP and lit; a counter slab slides up from the bottom edge with the goods laid out on it as physical
 # plates, the selected one raised into the lamp light. You never lose sight of your miner, the stall, or the
-# sky — which is the whole argument for it, and also its risk: less room for text, so prices have to be
+# sky, which is the whole argument for it, and also its risk: less room for text, so prices have to be
 # glanceable rather than readable.
 # =========================================================================================================
 func _variant_c(c: Control, sharp: ImageTexture) -> void:
 	c.draw_texture_rect(sharp, Rect2(Vector2.ZERO, CANVAS), false)
-	# No dim over the world at all — only a vignette, and a warm wash near the counter as if the stall's
+	# No dim over the world at all: only a vignette, and a warm wash near the counter as if the stall's
 	# lantern had been turned up.
 	_vignette(c, 0.62)
 	c.draw_rect(Rect2(0.0, 250.0, CANVAS.x, 110.0), Color(0.06, 0.05, 0.04, 0.25))
 
-	# The awning board — three hanging signs are the tabs.
+	# The awning board: three hanging signs are the tabs.
 	var sx: float = 150.0
 	for i: int in 3:
 		var name: String = ["PACK", "WORKS", "BENCH"][i]
@@ -443,7 +443,7 @@ func _w(s: String, size: int) -> float:
 	return _font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 
 
-## What `_tracked` actually occupies — the plain width plus one gap per letter. Measuring tracked type with
+## What `_tracked` actually occupies: the plain width plus one gap per letter. Measuring tracked type with
 ## `_w` is how the mock's first pass printed a caption straight through its own title.
 func _tracked_w(s: String, size: int, track: float) -> float:
 	return _w(s, size) + track * float(maxi(s.length() - 1, 0))
@@ -491,7 +491,7 @@ func _well(c: Control, rect: Rect2) -> void:
 
 
 ## A REAL rounded rect, via StyleBoxFlat, because composing one from a rect plus four circles double-blends
-## every corner when the fill is translucent — which is exactly the case a modern surface tint is.
+## every corner when the fill is translucent, which is exactly the case a modern surface tint is.
 func _rrect(c: Control, rect: Rect2, r: float, col: Color) -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
@@ -500,7 +500,7 @@ func _rrect(c: Control, rect: Rect2, r: float, col: Color) -> void:
 	sb.draw(c.get_canvas_item(), rect)
 
 
-## Rounded on the left two corners only — for a rail flush against a panel's edge.
+## Rounded on the left two corners only, for a rail flush against a panel's edge.
 func _rrect_left(c: Control, rect: Rect2, r: float, col: Color) -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
@@ -511,7 +511,7 @@ func _rrect_left(c: Control, rect: Rect2, r: float, col: Color) -> void:
 	sb.draw(c.get_canvas_item(), rect)
 
 
-## have/need as one chip: the icon, what it costs, and what you are carrying, so "can I afford this" is
+## have/need as one chip: the icon, what it costs, and what you are carrying, so "is this affordable" is
 ## answered in the same glance as "what does it cost".
 func _cost_chip(c: Control, at: Vector2, item: StringName, need: String, have: String, ok: bool) -> void:
 	var label: String = "%s / %s" % [need, have]

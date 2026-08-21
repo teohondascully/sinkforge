@@ -1,14 +1,14 @@
 extends "res://tools/check_base.gd"
 
-## Harness layer — MOVEMENT AGILITY, scored (playtest: "movement/build/drop agility is awkward — I need a
-## scoring FUNCTION to optimize against"). This turns "does it feel awkward?" into a repeatable NUMBER.
+## Harness layer: MOVEMENT AGILITY, scored (playtest: "movement/build/drop agility is awkward", with a
+## scoring FUNCTION to optimize against). This turns "does it feel awkward?" into a repeatable NUMBER.
 ##
 ## It builds a fixed obstacle course (a floating platform that ramps up/down by a tile and throws in one
 ## 2-tile ledge to jump), walks the real body across it with the real reach-gated navigation, and records
-## per physics-frame: horizontal progress, STALLS (on the floor, steering into geometry, going nowhere —
+## per physics-frame: horizontal progress, STALLS (on the floor, steering into geometry, going nowhere;
 ## the literal feel of "awkward"), JUMPS spent, and the frames-vs-par efficiency. Plus JUMP RESPONSIVENESS
 ## (frames from request to leaving the ground). From those it prints an AGILITY SCORE (0-100) and its
-## breakdown — the thing to optimize — and fails if the score drops below a floor or the body can't finish
+## breakdown, the thing to optimize, and fails if the score drops below a floor or the body can't finish
 ## (so a movement REGRESSION trips the harness, not just a bigger number). Ratchet the floor UP as movement
 ## improves, exactly like the friction ceilings in play_tests.
 ##   godot --headless --path . --script res://tools/check_agility.gd
@@ -22,10 +22,10 @@ const START_COL: int = 12
 const BASE_ROW: int = 14
 const CELL: int = 32
 
-## Score floor + component caps — headroom over today's MEASURED baseline (deterministic across 3 runs, ZERO
+## Score floor + component caps: headroom over today's MEASURED baseline (deterministic across 3 runs, ZERO
 ## variance: score 95.3, slowness 1.00×, 1 stall, jump-latency 1f) so a real movement regression trips while
 ## the clean run passes. RATCHET the floor UP as movement improves, exactly like the friction ceilings in
-## play_tests. (Ratcheted 2026-08-09: floor 80→90 · slowness 2.0→1.30 · stalls 40→12 — the gauge proved
+## play_tests. (Ratcheted 2026-08-09: floor 80→90 · slowness 2.0→1.30 · stalls 40→12; the gauge proved
 ## rock-stable, so a SMALLER regression now trips; margins still absorb an integer-quantized penalty wobble.)
 const SCORE_FLOOR: float = 90.0        ## baseline 95.3, floor 90.0 (one extra thrash-jump = -4 survives)
 const MAX_SLOWNESS: float = 1.30       ## frames may be up to this × the top-speed par (baseline 1.00×)
@@ -34,7 +34,7 @@ const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne
 ## GRANULARITY-AGILITY dimensions (#104). Fine/molded terrain + the scale (#94) and fine-collision (#88)
 ## reworks all move the agility standard (proven when the P3 fine-collision change popped step-up). These
 ## turn the user's "smaller char / taller jump / MID-AIR direction change" hypothesis into NUMBERS so those
-## changes are judged on data, not vibes — and so a rework can't silently kill responsiveness. Caps carry
+## changes are judged on data, not vibes, and so a rework can't silently kill responsiveness. Caps carry
 ## headroom over today's measured baseline; ratchet them as movement improves.
 const TURN_LATENCY_CAP: int = 9        ## frames from a full-speed input FLIP to velocity crossing zero (baseline 6; ratcheted 12→9)
 const AIR_CONTROL_FLOOR: float = 0.80  ## fraction of ground top-speed steer-able MID-AIR in a 12f window (baseline 1.00; ratcheted 0.5→0.80)
@@ -134,7 +134,7 @@ func _build_course(sim: FactorySim) -> void:
 
 
 ## Course features that legitimately warrant a hop: a 2-tile rise (a wall to clear) OR a 2-tile drop
-## (the walker hops off a ledge). Jumps BEYOND this count are thrash — the movement-quality signal.
+## (the walker hops off a ledge). Jumps BEYOND this count are thrash: the movement-quality signal.
 func _jump_feature_count() -> int:
 	var n: int = 0
 	for i: int in range(1, HEIGHTS.size()):
@@ -143,7 +143,7 @@ func _jump_feature_count() -> int:
 	return n
 
 
-## Frames from request_jump() to the body actually leaving the ground — input→motion responsiveness.
+## Frames from request_jump() to the body actually leaving the ground: input→motion responsiveness.
 func _jump_latency(main: MainView) -> int:
 	var p: Player = main._player
 	p.input_dir = 0.0
@@ -162,7 +162,7 @@ func _jump_latency(main: MainView) -> int:
 
 
 ## GROUND TURN LATENCY (#104): frames from an input FLIP at full speed to the velocity crossing zero (i.e.
-## actually reversing). The feel of "I pressed the other way, when does the body respond?" — the ground
+## actually reversing). The feel of pressing the other way and waiting for the body to respond: the ground
 ## snappiness that char-size / friction / scale changes all perturb. Baseline is ~RUN_SPEED/ACCEL frames.
 func _turn_latency(main: MainView) -> int:
 	var p: Player = main._player
@@ -178,7 +178,7 @@ func _turn_latency(main: MainView) -> int:
 	while acc < 60 and p.velocity.x < Player.RUN_SPEED * 0.85:
 		await physics_frame
 		acc += 1
-	# Flip — count frames until the horizontal velocity crosses zero (now moving the other way).
+	# Flip: count frames until the horizontal velocity crosses zero (now moving the other way).
 	p.input_dir = -1.0
 	var t: int = 0
 	while t < 40:
@@ -190,9 +190,9 @@ func _turn_latency(main: MainView) -> int:
 
 
 ## AIR CONTROL (#104): the fraction of ground top-speed you can build up HORIZONTALLY while airborne, over a
-## short window from a standing jump — the user's "movement can happen mid-air so you can change direction"
+## short window from a standing jump: the user's "movement can happen mid-air so you can change direction"
 ## made a number. 1.0 = full air control (steer as freely as on the ground); 0.0 = a committed leap you
-## can't redirect. Instrumentation: it tells us whether air-steer is the lever to pull for agility (today it
+## can't redirect. Instrumentation: it says whether air-steer is the lever to pull for agility (today it
 ## already reads ~full, so it is NOT the missing piece) and guards a rework from silently removing it.
 func _air_control(main: MainView) -> float:
 	var p: Player = main._player
@@ -218,7 +218,7 @@ func _air_control(main: MainView) -> float:
 	return clampf(gained / Player.RUN_SPEED, 0.0, 1.5)
 
 
-## Instrumented traversal to goal_col — the same reach-gated navigation a play-goal uses (steer toward the
+## Instrumented traversal to goal_col: the same reach-gated navigation a play-goal uses (steer toward the
 ## target; hop a gap or a wall you're stuck against), while sampling stalls + jumps every frame.
 func _traverse(main: MainView, goal_col: int) -> Dictionary:
 	var p: Player = main._player

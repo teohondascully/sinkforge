@@ -1,12 +1,12 @@
 extends "res://tools/check_base.gd"
 
 ## Harness layer: NO TWO ACTIONS MAY ANSWER TO ONE KEY, and a rebind may not cost you the bindings you
-## did not touch. Headless, no scene — `Settings`, `Controls` and `Hud._binding_clashes` are reachable
+## did not touch. Headless, no scene: `Settings`, `Controls` and `Hud._binding_clashes` are reachable
 ## without rendering, so the whole contract checks in milliseconds.
 ##   godot --headless --path . --script res://tools/check_binding_conflict.gd
 ##
 ## WHY THIS FILE REPLACED A LONGER ONE. An earlier 371-line draft of this layer was written, cited in
-## `docs/MENU_MATRIX.md` as MNU-29a's "knockout-proven" evidence, and never registered — `git ls-files`
+## `docs/MENU_MATRIX.md` as MNU-29a's "knockout-proven" evidence, and never registered: `git ls-files`
 ## returned nothing for it and `run_harness.sh` never named it, so **it had never run once.** Reviewed, its
 ## centrepiece "no duplicate exists" assertion compared `Settings.binding_label`, which is `events[0]`,
 ## which is exactly the predicate the defect hides behind. Its knockout could only fire in the half of the
@@ -19,22 +19,22 @@ extends "res://tools/check_base.gd"
 ##    persisted, unannounced. Three inputs from the shipped page.
 ## 2. **The rebind that erased what it did not touch.** `rebind` wrote `bindings[action] = [spec]` and
 ##    `_apply_action` opens with `action_erase_events`, so EVERY rebind destroyed that action's other
-##    events — rebind grapple to a key and middle-mouse and right-bumper grapple were gone. That one fires
+##    events; rebind grapple to a key and middle-mouse and right-bumper grapple were gone. That one fires
 ##    on a player who never picks a used key at all, and it had no ticket. `check_gamepad` cannot see it,
 ##    because it reads the static defaults TABLE and never asks `InputMap` what is live.
 ## 3. **The label that was a developer identifier.** `event_label`'s fallback was a bare
-##    `OS.get_keycode_string(code)`, and `OS.get_keycode_string(KEY_PERIOD)` is `"Period"` — TitleCase,
+##    `OS.get_keycode_string(code)`, and `OS.get_keycode_string(KEY_PERIOD)` is `"Period"`: TitleCase,
 ##    three times the width of every cap beside it, shipped on the CONTROLS page as the game-speed key in
 ##    a column of `M`, `T`, `Z`, `X`, `F5`. The cosmetic half is the half you can see. The load-bearing
 ##    half is that these strings are IDENTITY: `rebind` decides two bindings are the same physical input
 ##    by comparing labels (settings.gd:142-163), so any two keycodes that share a label are ONE key to
-##    the conflict detector — it stands down on a real duplicate and the page never marks it. §7 sweeps
+##    the conflict detector; it stands down on a real duplicate and the page never marks it. §7 sweeps
 ##    every keycode `KEY_CAPS` names plus A-Z, 0-9, F1-F12 and the keypad digits for both halves.
 ##
 ## EVERY ASSERTION IN §1-§6 IS AT PER-EVENT GRAIN, because that is the grain the defects live at. The
 ## `_the_old_predicate_is_blind` arm exists so that claim is proven rather than asserted: it recomputes the
 ## SUPERSEDED first-event comparison beside the new one, on the same state, in the same process. A control
-## that travels inside the measurement cannot disagree about the state it was taken from — and without it,
+## that travels inside the measurement cannot disagree about the state it was taken from, and without it,
 ## "the new detector sees more" is a sentence rather than a result.
 ##
 ## WHAT THIS LAYER DOES NOT COVER, stated so it is not mistaken for coverage:
@@ -49,7 +49,7 @@ const TEST_PATH: String = "user://binding_conflict_check.cfg"
 
 ## How wide a keycap chip is, in characters. The CONTROLS page lays the caps out in one column beside the
 ## action names, so width is a layout constraint and not a taste: `"NUM ENT"` is the widest label the table
-## ships and it is exactly at the line. The thing that blows the column out is the fallback — a key the cap
+## ships and it is exactly at the line. The thing that blows the column out is the fallback: a key the cap
 ## table has not learned comes back as the engine's whole word for it, and `"BACKSPACE"` is nine.
 const CAP_CHARS: int = 7
 
@@ -60,7 +60,7 @@ func _labels(action: StringName) -> Array[String]:
 
 ## THE KEYCODE POPULATION the label rules are swept over: every code `KEY_CAPS` has an opinion about, plus
 ## the ordinary keys a player rebinds to. The second half is not padding. Those codes are exactly the ones
-## with no table entry, so every one of them exercises the `OS.get_keycode_string` fallback — which is the
+## with no table entry, so every one of them exercises the `OS.get_keycode_string` fallback, which is the
 ## line `"Period"` came out of, and the line any future leak will come out of too.
 func _keycodes() -> Array[int]:
 	var codes: Array[int] = []
@@ -161,7 +161,7 @@ func _initialize() -> void:
 	# table landed, which is the harmless way for a stale literal to fail. The third, `not ... has("Up")`,
 	# went the other way and kept passing: the new labeller cannot emit `"Up"` at all, so the assertion was
 	# true whether or not the arrow still climbed. A literal that no longer names anything the code can
-	# produce does not fail — it stops being an assertion, and it is silent about it.
+	# produce does not fail; it stops being an assertion, and it is silent about it.
 	Settings.reset_bindings()
 	var displaced: Array[StringName] = Settings.rebind(Controls.JUMP, {"key": KEY_UP})
 	_check(displaced.has(Controls.UP),
@@ -172,7 +172,7 @@ func _initialize() -> void:
 		"jump answers the arrow and still answers its pad %s" % str(_labels(Controls.JUMP)))
 
 	# --- 3. KNOCKOUT: the detector must FIRE on a non-first-event duplicate ---------------------
-	# Forced through the path `load_settings` uses — an override applied with no conflict resolution —
+	# Forced through the path `load_settings` uses, an override applied with no conflict resolution,
 	# because that is the state a player who rebound anything before the fix actually boots into.
 	Settings.reset_bindings()
 	Settings.bindings[Controls.JUMP] = [{"key": KEY_UP}]
@@ -198,7 +198,7 @@ func _initialize() -> void:
 	_check(none.is_empty(),
 		"no clash on the shipped defaults — the detector is not simply always-on %s" % str(none.keys()))
 
-	# --- 7. ONE KEY, ONE CAP — AND THE CAP LOOKS LIKE A CAP ------------------------------------
+	# --- 7. ONE KEY, ONE CAP, AND THE CAP LOOKS LIKE A CAP -------------------------------------
 	var caps: Dictionary = _cap_table()
 	var swept: int = _keycodes().size()
 	_check(swept >= 90, "the label sweep is 90+ distinct keycodes wide (%d)" % swept)

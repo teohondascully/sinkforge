@@ -3,16 +3,16 @@ extends "res://tools/check_base.gd"
 ## THE ROCK THAT SAYS NO.
 ##
 ## `docs/BITS.md` §2 deleted the speed axis: a drive is a KEY, not a stat, and rock above your tier does not
-## come slowly — it does not come at all. §5 is the other half of that bargain, and it is the half that was
+## come slowly; it does not come at all. §5 is the other half of that bargain, and it is the half that was
 ## missing: **a binary gate is only honest if you can see it coming.** Until now a swing at over-tier rock
-## produced nothing whatsoever — no sound, no spark, no words — which is indistinguishable from a game that
+## produced nothing whatsoever, no sound and no spark and no words, which is indistinguishable from a game that
 ## dropped your click. That is the single worst thing a hard gate can feel like.
 ##
 ##   IT STILL REFUSES.   Holding on rock over your drive yields NO progress at all, ever. Not slow: none.
-##   IT SAYS SO FIRST.   The aim cursor reports the refusal BEFORE the press — `_drive_bites` is false on
+##   IT SAYS SO FIRST.   The aim cursor reports the refusal BEFORE the press: `_drive_bites` is false on
 ##                       over-tier rock and true on rock your pick can take, so the cold crossed cursor and
 ##                       the actual gate can never disagree.
-##   IT SKIDS.           Holding fires the skid on its own cadence — a real sound, from the real library —
+##   IT SKIDS.           Holding fires the skid on its own cadence, a real sound from the real library,
 ##                       so what you feel is swinging and not biting rather than nothing happening.
 ##   IT NAMES THE RUNG.  Once, on a cooldown: the drive this rock wants, by name, derived from the same
 ##                       table the gate reads. "You need a better pick" is not information.
@@ -66,7 +66,7 @@ func _the_table() -> void:
 ## A SEALED POCKET whose every wall is `mat`, with the body standing in it. The mining LOOP derives its own
 ## aim from the real cursor, and a headless cursor sits twenty cells off the body (the snap only considers
 ## cells within reach of the CURSOR), so the loop can never be pointed at a wall from here. What can be
-## driven honestly is the gate, the predicate the loop branches on, and the skid itself — which is all of
+## driven honestly is the gate, the predicate the loop branches on, and the skid itself, which is all of
 ## the mechanism; the loop's own line is `if pressed and _refuses(_aim): _skid(...)`.
 func _pocket(mat: StringName) -> Vector2i:
 	var home: Vector2i = _main._cell_at(_main._player.position)
@@ -88,7 +88,7 @@ func _pocket(mat: StringName) -> Vector2i:
 	return home + Vector2i(2, 0)
 
 
-## IT STILL REFUSES — through try_mine, the verb the play-harness drives and the one real gate.
+## IT STILL REFUSES, through try_mine, the verb the play-harness drives and the one real gate.
 func _it_refuses() -> void:
 	var face: Vector2i = _pocket(&"deepslate")
 	var broke: bool = false
@@ -118,7 +118,7 @@ func _it_says_so_first() -> void:
 		"…while open air is never a refusal — there is nothing there to refuse")
 
 
-## IT SKIDS, AND THE RUNG IS NAMED — by the inspector, which is the panel that is already on screen for
+## IT SKIDS, AND THE RUNG IS NAMED, by the inspector, which is the panel that is already on screen for
 ## as long as you hold the cursor on the rock. The skid brings the sound and the sparks; the words are
 ## said once, in one place, by whichever tell owns them.
 func _it_skids_and_names_the_rung() -> void:
@@ -135,14 +135,14 @@ func _it_skids_and_names_the_rung() -> void:
 		"…with the tier, so the ladder is legible and not just the next purchase")
 	_check(_main._hud._flash_text == "",
 		"…and nothing shouts it a second time — two panels saying one sentence is noise")
-	# The drive the inspector names is the drive that actually opens the rock — asserted, not assumed.
+	# The drive the inspector names is the drive that actually opens the rock: asserted, not assumed.
 	_sim.inventory[&"stone_pickaxe"] = 1
 	_check(MiningRules.can_mine(&"deepslate", _sim.inventory),
 		"…and owning the named drive is exactly what makes the rock give")
 	_sim.inventory.erase(&"stone_pickaxe")
 
 
-## THE OTHER REFUSAL. The Wedge splits along the grain and does nothing whatsoever across it — a different
+## THE OTHER REFUSAL. The Wedge splits along the grain and does nothing whatsoever across it: a different
 ## no, wanting a different answer. "You need a better pick" would be a lie: the pick is fine, the ANGLE is
 ## wrong, and the tell has to say so.
 func _the_wedge_refusal() -> void:
@@ -174,7 +174,7 @@ func _the_wedge_refusal() -> void:
 		"…so the tell names the GRAIN, not a pick you already have")
 	_check(_main._hover_info_at(across).is_empty(),
 		"…and it is the skid that has to say it: the inspector has nothing to add about rock you CAN mine")
-	# Once, then quiet — nagging on every swing would train you to ignore the one message that matters.
+	# Once, then quiet; nagging on every swing would train you to ignore the one message that matters.
 	_main._hud._flash_text = ""
 	for _i: int in 10:
 		_main._skid_clock = MainView.SKID_PERIOD

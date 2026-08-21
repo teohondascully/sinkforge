@@ -6,25 +6,25 @@ extends SceneTree
 ## comparative claim is the one thing a per-machine assertion cannot make. Counting primitives in the source
 ## gets you a proxy; the drawings are the subject.
 ##
-## Not a harness layer and not registered as one — it asserts nothing. It is a viewer.
+## Not a harness layer and not registered as one; it asserts nothing. It is a viewer.
 ##
 ## SIZE MATTERS HERE MORE THAN IT DOES FOR ICONS. A machine is drawn one `CELL` wide in the world, and the
 ## casing's own detail pass is gated on zoom (`world_renderer.gd` `DETAIL_ZOOM`), so a sheet rendered at
-## some flattering size answers a question nobody asked. Default is one cell — what the player sees at 1.00x
-## zoom — with `SF_MACHINE_PX` to ask for another.
+## some flattering size answers a question nobody asked. Default is one cell, what the player sees at 1.00x
+## zoom, with `SF_MACHINE_PX` to ask for another.
 ##
-## The glyph scale is DERIVED from `SF_MACHINE_PX` and `WorldRenderer.CELL`, never passed in pixels — see the
+## The glyph scale is DERIVED from `SF_MACHINE_PX` and `WorldRenderer.CELL`, never passed in pixels; see the
 ## note in `Bench._draw`, which is the whole reason the first render of this sheet was unreadable.
 ##
 ## WHAT THIS SHEET CANNOT BE USED TO JUDGE, above one cell: STROKE WEIGHT. Twenty-one `draw_line` widths in
-## `visuals.gd` are absolute rather than multiplied by `s` — in `_drift` and `_crusher` and `_hopper` as much
+## `visuals.gd` are absolute rather than multiplied by `s`, in `_drift` and `_crusher` and `_hopper` as much
 ## as in `_drill` and `_generator`. That is not a bug, because `s` never exceeds 1.0 at any call site in the
 ## game (the HUD's boxes give 0.65/0.75/0.85, `world_renderer.gd:1360` passes 1.0 and `:2818` clamps to it),
 ## so those widths act as a MINIMUM STROKE: relatively thicker as the icon shrinks, which is what keeps a
 ## hairline alive at 13 pixels. Above `SF_MACHINE_PX = CELL` this sheet leaves the range the game uses and
 ## every one of those strokes renders proportionally THINNER than it ever does in play. Judging "these look
-## spindly" off the 96px sheet would be judging an artefact of the sheet, and the fix it invites — scaling
-## all 21 — would thin the hotbar icons that the floor exists to protect. The tool says so at runtime.
+## spindly" off the 96px sheet would be judging an artefact of the sheet, and the fix it invites, scaling
+## all 21, would thin the hotbar icons that the floor exists to protect. The tool says so at runtime.
 ##
 ##     SF_MACHINE_PX=32 SF_SHEET_SCALE=8    one cell, the play size
 ##     SF_MACHINE_PX=96 SF_SHEET_SCALE=3    the drawing as drawn, for judging detail density
@@ -40,7 +40,7 @@ const UNSCALED_STROKES: int = 21
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the padding is handed to it
-## rather than read from `PAD` — which would not compile. Same trap `check_item_reads` records.
+## rather than read from `PAD`, which would not compile. Same trap `check_item_reads` records.
 class Bench extends Node2D:
 	var kind: String
 	var col: Color
@@ -50,17 +50,17 @@ class Bench extends Node2D:
 
 	func _draw() -> void:
 		# THE TWO ARGUMENTS BELOW ARE IN DIFFERENT UNITS. `draw_machine_casing` takes PIXELS,
-		# `draw_machine_glyph` takes CELLS, and passing pixels to the second drew the family at 32x and 96x —
+		# `draw_machine_glyph` takes CELLS, and passing pixels to the second drew the family at 32x and 96x:
 		# every cell of the first sheet a flat colour fill, which read as an art defect and was a driver
 		# defect.
 		#
-		# I first wrote here that neither signature said so. THAT WAS FALSE and the correction is the useful
+		# The first note here said neither signature stated so. THAT WAS FALSE and the correction is the useful
 		# part. `draw_machine_casing`'s parameter is literally named `cell_px`, and `draw_machine_glyph`
 		# carried a docstring reading "scaled by `s` (1.0 = full 32px world icon, smaller for HUD chips)".
-		# Both units were documented. I read the two `static func` lines and not the four lines above one of
-		# them, then inferred the unit from the argument NAME — `s` reads as "size" — and from the fact that
-		# its neighbour took pixels. So this was not an undocumented API; it was me not reading it, and the
-		# remedy I proposed (add a docstring) was the remedy already in place and already failing.
+		# Both units were documented. The two `static func` lines were read and the four lines above one of
+		# them were not, so the unit was inferred from the argument NAME (`s` reads as "size") and from the
+		# fact that its neighbour took pixels. So this was not an undocumented API; it was an unread one, and
+		# the remedy proposed (add a docstring) was the remedy already in place and already failing.
 		#
 		# What actually reaches someone at a CALL SITE is the parameter name, because GDScript has no named
 		# arguments and the call shows a bare `1.0`. c1 made that fix in `c256d6e` by renaming the parameter
@@ -105,7 +105,7 @@ func _initialize() -> void:
 	print("  %d kinds at %.0f px (%s), x%d -> %s"
 		% [kinds.size(), px, "running" if active else "idle", scale, out])
 	if px > float(WorldRenderer.CELL):
-		# Not a warning about the render, which is correct — a warning about what may be READ off it.
+		# Not a warning about the render, which is correct; a warning about what may be READ off it.
 		print("  NOTE: %.0f px is %.2fx the %d px cell, so glyph scale is %.2f and the game never exceeds"
 			% [px, px / float(WorldRenderer.CELL), WorldRenderer.CELL, px / float(WorldRenderer.CELL)])
 		print("        1.0. The %d absolute stroke widths in visuals.gd render %.2fx thinner here than in"

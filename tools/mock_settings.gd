@@ -1,15 +1,15 @@
 extends SceneTree
 
-## LOCAL DESIGN TOOL — draws the PROPOSAL for the settings page over a real frame of the real game, so the
+## LOCAL DESIGN TOOL. Draws the PROPOSAL for the settings page over a real frame of the real game, so the
 ## look can be judged against the thing it would replace rather than against a description of it. Outputs
 ## _mock_settings.png (gitignored, like every _moment_*.png).
 ##
-## Run WITHOUT --headless (needs a real GL context — headless is the dummy renderer and saves blank frames):
+## Run WITHOUT --headless (needs a real GL context; headless is the dummy renderer and saves blank frames):
 ##   godot --path . --script res://tools/mock_settings.gd -- a     the counter's fourth face
 ##   godot --path . --script res://tools/mock_settings.gd -- b     the brief's compact utility page
 ##
 ## WHY THIS SCREEN AND NOT THE COUNTER. `tools/mock_bazaar.gd` put three proposals over a real frame and the
-## Bazaar we have today came out of that round (docs/FEEL_GAP.md §the counter). Settings never went through
+## Bazaar in the game today came out of that round (docs/FEEL_GAP.md §the counter). Settings never went through
 ## it. The seven-rung menu matrix photographs the consequence: the two screens are the same game's two
 ## modals and they share nothing.
 ##
@@ -52,7 +52,7 @@ const WELL := Color(0.0, 0.0, 0.0, 0.22)
 ## AND THE TWO GOLDS ARE READ OFF IT TOO, for the reason written under them and one more that is specific
 ## to this pair. These were byte-identical copies of `UI_ACCENT` and of the `GOLD_PALE` derived from it, so
 ## a page arguing about the settings screen was arguing in a gold that nothing in the file related to the
-## game's — and the accent is the constant most likely to move next, since it is the one whose MEANING is
+## game's, and the accent is the constant most likely to move next, since it is the one whose MEANING is
 ## under review. A copy of it diverges silently and shows up as a mock that looks right and is not.
 const ACCENT := Hud.UI_ACCENT
 const ACCENT_HI := Hud.GOLD_PALE
@@ -219,13 +219,13 @@ func _draw_mock(c: Control, blur: ImageTexture) -> void:
 	var dx: float = detail.position.x + 92.0
 	_tracked(c, str(ROWS[PICKED][0]).to_upper(), Vector2(dx, detail.position.y + 24.0), 13, 2.4, ACCENT_HI)
 	# WRAPPED, NOT CLIPPED. `draw_string` with a width TRUNCATES; the first render of this mock cut the
-	# grapple's sentence at "it takes your weight, a" — a page arguing that the detail plate is where the
+	# grapple's sentence at "it takes your weight, a": a page arguing that the detail plate is where the
 	# explanation goes, with the explanation running off the edge of the plate.
 	c.draw_multiline_string(_font, Vector2(dx, detail.position.y + 42.0), str(ROWS[PICKED][2]),
 		HORIZONTAL_ALIGNMENT_LEFT, detail.size.x - 250.0, 9, 2, DIM)
 	c.draw_string(_font, Vector2(dx, detail.end.y - 14.0), "held: your weight swings from it · cut it with the same key",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, FAINT)
-	# The verb as a real button carrying the key that runs it — the counter's BUILD / RESEARCH, in the one
+	# The verb as a real button carrying the key that runs it: the counter's BUILD / RESEARCH, in the one
 	# place this page has never had one. Remapping stops being "hit the small chip" and becomes a decision
 	# you make about the thing the plate is describing.
 	var btn := Rect2(detail.end.x - 132.0, detail.position.y + 46.0, 122.0, 26.0)
@@ -243,17 +243,17 @@ func _draw_mock(c: Control, blur: ImageTexture) -> void:
 
 
 # =========================================================================================================
-# B — THE COMPACT UTILITY PAGE, which is what `T2.1m` actually asked for: *"an independent compact utility
+# B: THE COMPACT UTILITY PAGE, which is what `T2.1m` actually asked for: *"an independent compact utility
 # layout instead of the Bazaar shell"*.
 #
 # The argument the brief is making, once you look at the counter: THE COUNTER IS A PLACE. You walk to a
 # claimed Bazaar and stand at it, and `at a claimed Bazaar` is printed on the WORKS plate as a precondition
-# of building anything. Settings is not a place and has no precondition — it is the pause menu. Folding it
+# of building anything. Settings is not a place and has no precondition; it is the pause menu. Folding it
 # into the counter would say the game's audio levels live at a ruin you have to reach.
 #
 # So this borrows the counter's MATERIAL and none of its shell: a rounded plate with elevation instead of a
 # border, a blurred backdrop, key caps instead of bordered rectangles, one accent doing one job. 296x214
-# against the counter's 608x348 — a third of the area, which is the whole point of the word "compact".
+# against the counter's 608x348, a third of the area, which is the whole point of the word "compact".
 #
 # AND IT SOLVES THE THING THAT BROKE THE OLD PAGE, which a repaint would not. Twenty-two bindings do not fit
 # in a compact utility page and never will; the current fix (two columns of eleven, `d3e4be7`) only fits
@@ -265,10 +265,10 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 	c.draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42))
 	_vignette(c, 0.5)
 
-	# 266 AND NOT 214, WHICH IS WHERE I FIRST PUT IT. The first render of this page — a mock whose entire
-	# argument is that the settings page outgrew its panel — put its own `keys` row 29px BELOW the bottom of
-	# its own plate. The content is 253px tall and I sized the box by eye. Written down rather than quietly
-	# corrected: the defect I had spent the evening fixing in the real page reappeared in the drawing of the
+	# 266 AND NOT 214, WHICH IS WHERE IT FIRST WENT. The first render of this page, a mock whose entire
+	# argument is that the settings page outgrew its panel, put its own `keys` row 29px BELOW the bottom of
+	# its own plate. The content is 253px tall and the box had been sized by eye. Written down rather than
+	# quietly corrected: the defect fixed in the real page that same evening reappeared in the drawing of the
 	# proposal, in the same session, by the same method (a height chosen instead of a height summed).
 	var panel := Rect2((CANVAS.x - 296.0) * 0.5, (CANVAS.y - 266.0) * 0.5, 296.0, 266.0)
 	_shadow(c, panel, 12, 0.34)
@@ -297,7 +297,7 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 		_toggle(c, Vector2(right, y), str(pair[1]), str(pair[1]) == "ON")
 		y += 17.0
 
-	# THE ONE ROW THAT IS A DOOR, not a control. The table is not on this page and the row says so — with
+	# THE ONE ROW THAT IS A DOOR, not a control. The table is not on this page and the row says so, with
 	# the count, so "how many keys does this game have" is answered without opening it, and with the key it
 	# is bound to, because a door with no key legend is the thing the whole page is about.
 	y += 12.0
@@ -312,7 +312,7 @@ func _variant_b(c: Control, blur: ImageTexture) -> void:
 
 
 ## The rail with FOUR faces. The fourth slot costs nothing: the rail is 348 tall and three tabs use 242 of
-## it, so KEYS lands at y+242 with room under it — which is the cheapest possible evidence that settings
+## it, so KEYS lands at y+242 with room under it, which is the cheapest possible evidence that settings
 ## was always meant to live here.
 func _rail(c: Control, origin: Vector2, size: Vector2) -> void:
 	var rail := Rect2(origin, Vector2(Hud.BAZAAR_RAIL, size.y))
@@ -333,8 +333,8 @@ func _rail(c: Control, origin: Vector2, size: Vector2) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.34, 0.30, 0.22) if on else Color(0.24, 0.26, 0.31))
 
 
-## Three of these are the counter's own glyphs; the fourth is the proposal. A key drawn as a key — bow,
-## shank, two teeth — so the rail stays four pictures rather than three pictures and a word.
+## Three of these are the counter's own glyphs; the fourth is the proposal. A key drawn as a key: bow,
+## shank, two teeth, so the rail stays four pictures rather than three pictures and a word.
 func _rail_glyph(c: Control, at: Vector2, kind: int, on: bool) -> void:
 	var col: Color = ACCENT_HI if on else Color(0.40, 0.43, 0.50)
 	match kind:
@@ -389,7 +389,7 @@ func _toggle(c: Control, right_top: Vector2, text: String, on: bool) -> void:
 func _round_rect(c: Control, r: Rect2, rad: float, col: Color) -> void:
 	# StyleBoxFlat, exactly as `Hud._round_rect` does it, and not a hand-decomposed rect-plus-four-circles.
 	# The hand version double-blends wherever the corner discs overlap the middle band, which is invisible
-	# at the plate's 0.985 and produced four bright dots on the corners of a 0.035 detail plate — a mock
+	# at the plate's 0.985 and produced four bright dots on the corners of a 0.035 detail plate: a mock
 	# arguing for elevation, with a blending artefact on the one surface it was arguing about.
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col

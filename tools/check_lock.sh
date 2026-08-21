@@ -5,19 +5,19 @@
 #
 # `with_machine.sh` is the reason two runs can share one machine, and until now nothing tested it. That
 # is a bad place for an untested tool, but it is not the reason this file exists. The reason is that one of
-# its paths — GIVE UP — is a run that never happened, and a run that never happened is the single most
+# its paths, GIVE UP, is a run that never happened, and a run that never happened is the single most
 # dangerous thing a test harness can report, because the shape it reports it in is silence. A backgrounded
 # call came back "completed (exit code 0)" after waiting fifteen minutes and never booting Godot, and the
 # only thing standing between that and a false green was a human reading the log text.
 #
-# Needs no Godot and no display: a stub stands in for the engine so the exit codes are ours to choose. Runs
+# Needs no Godot and no display: a stub stands in for the engine so the exit codes can be chosen here. Runs
 # in about five seconds.
 #
 #   GIVE UP IS NOT SUCCESS.  A lock that never frees ends the run with 5 and says so in words, on stdout,
 #                            where a log skim will find it even if the exit code has been thrown away.
 #   STALE LOCKS CLEAR.       A holder that was killed cannot release its own lock. If a dead pid wedged the
 #                            lock, one crashed run would cost every future run on the box.
-#   THE INNER CODE SURVIVES.  The harness protocol is three-state — 0 pass, 1 fail, 42 skip — and all three
+#   THE INNER CODE SURVIVES.  The harness protocol is three-state: 0 pass, 1 fail, 42 skip. And all three
 #                            travel through the wrapper. A wrapper that flattened 42 to 0 would turn every
 #                            skipped layer into a passing one.
 #   ONE AT A TIME.           The whole point. Two runs racing for the lock must not overlap.
@@ -35,7 +35,7 @@ trap 'rm -rf "$TMP"' EXIT
 LOCK="$TMP/lock"
 fails=0
 
-# A stand-in for Godot. `with_machine` always injects `--path <root>`, so drop those two and run the rest —
+# A stand-in for Godot. `with_machine` always injects `--path <root>`, so drop those two and run the rest;
 # which lets a case below choose its own exit code and its own timing.
 cat > "$TMP/fake_godot" <<'EOF'
 #!/bin/sh
@@ -45,7 +45,7 @@ EOF
 chmod +x "$TMP/fake_godot"
 # SF_ALLOW_POSITIONAL, because the cases below drive a STUB and not Godot, so their first argument is a
 # path (`/bin/sh`) rather than a Godot flag. The refusal that flag disables gets its own case at the end,
-# tested WITHOUT the escape hatch — otherwise this file would be the one place the guard never fires.
+# tested WITHOUT the escape hatch; otherwise this file would be the one place the guard never fires.
 run() { SF_LOCK="$LOCK" SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_godot" bash "$WITH" "$@"; }
 
 check() {  # check <ok:0|1> <label>
@@ -68,7 +68,7 @@ out="$(SF_LOCK="$LOCK" SF_LOCK_WAIT=2 SF_ALLOW_POSITIONAL=1 GODOT="$TMP/fake_god
 code=$?
 kill "$holder" 2>/dev/null
 [ "$code" -eq 5 ]; check $? "a lock that never frees ends the run with 5, not 0 (got $code)"
-# ...and says so where a reader will see it. The exit code is the half that gets discarded — by a
+# ...and says so where a reader will see it. The exit code is the half that gets discarded: by a
 # background runner, by a trailing `; echo done`, by a pipeline. The words are the half that survives.
 case "$out" in *"NOTHING RAN"*) r=0 ;; *) r=1 ;; esac
 check $r "...and says NOTHING RAN on stdout, for every caller that drops the code"
@@ -98,7 +98,7 @@ run /bin/sh -c 'exit 1' >/dev/null 2>&1
 
 # --- ONE AT A TIME ---
 # Two runs race; each stamps the log on the way in and on the way out. If the lock works the stamps are
-# strictly paired — in/out/in/out. An overlap shows up as two INs in a row, which is exactly the eight
+# strictly paired: in/out/in/out. An overlap shows up as two INs in a row, which is exactly the eight
 # concurrent Godot processes this tool exists to prevent.
 rm -rf "$LOCK"
 log="$TMP/order"; : > "$log"
@@ -110,12 +110,12 @@ wait "$a"; wait "$b"
 got="$(tr '\n' ' ' < "$log")"
 [ "$got" = "in out in out " ]; check $? "two runs racing for the machine never overlap (saw: $got)"
 # NON-VACUITY: the assertion above is satisfied by a log that was never written to, and by one run that
-# died on startup — both of which would leave the pairing trivially intact.
+# died on startup; both of which would leave the pairing trivially intact.
 [ "$(grep -c . "$log")" -eq 4 ]; check $? "...and both runs actually ran (4 stamps)"
 
 # --- A COMMAND IS NOT AN ARGUMENT LIST ---
 # The real incident, kept as a case. `with_machine.sh bash tools/run_harness.sh` reads like a runner taking
-# a command and becomes `godot --path <repo> bash tools/run_harness.sh` — Godot ignores the positionals,
+# a command and becomes `godot --path <repo> bash tools/run_harness.sh`: Godot ignores the positionals,
 # boots the project and plays the game. It ran for 39 minutes, no layer executed, and the task notification
 # said "completed (exit code 0)". Elapsed time and CPU looked healthy throughout, because a game genuinely
 # was running. Only the argv would have shown it.
@@ -130,7 +130,7 @@ check $r "...and says NOTHING RAN, on stdout, before taking the lock"
 # --- A HANG IS NOT A RUN ---
 # The fifth property, and the newest. A scratch fixture put its work in `_init()` rather than
 # `_initialize()`; `_init` is the Object constructor, so the error there aborted the function before it
-# ever reached `quit(0)`, and the SceneTree then came up normally and idled — forever, holding this lock.
+# ever reached `quit(0)`, and the SceneTree then came up normally and idled forever, holding this lock.
 #
 #   A FIXTURE THAT DIES BEFORE ITS `quit()` DOES NOT FAIL. IT HANGS.
 #

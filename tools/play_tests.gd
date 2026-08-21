@@ -1,13 +1,13 @@
 extends SceneTree
 
-## Layer 6 — the SCRIPTED play-test (a new test TYPE). Instead of poking the sim, a PlayAgent literally
+## Layer 6: the SCRIPTED play-test (a new test TYPE). Instead of poking the sim, a PlayAgent literally
 ## PLAYS the real game to a GOAL: it walks the real body with real physics and triggers the real reach-
 ## gated verbs (mine / deposit / craft / build / select), looping until the goal is met or a frame
-## budget runs out. A pass means "a person could actually do this from where they're standing" — the
+## budget runs out. A pass means "a person could actually do this from where they're standing": the
 ## one guarantee headless sim tests can't give (they bypass the body, reach, and terrain entirely).
 ##
 ## Each goal boots a FRESH scene, plays, asserts, tears down. Resource INJECTION (agent.give) is allowed
-## to ARRANGE a situation (e.g. top up ingots before a craft goal) — the verb under test stays real.
+## to ARRANGE a situation (e.g. top up ingots before a craft goal); the verb under test stays real.
 ##
 ## Run HEADED (the body needs real physics frames):
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/play_tests.gd
@@ -23,9 +23,9 @@ var _last_trace: Array[String] = []  # the failing try's narration, printed only
 
 
 ## Fast-forward the whole suite with the game clock (Engine.time_scale): the body moves proportionally
-## more per physics frame, so goals are reached in a fraction of the frames — the play-tests run faster.
+## more per physics frame, so goals are reached in a fraction of the frames; the play-tests run faster.
 ## Kept MODERATE: the agent's arrival tolerance is ~3px, so too large a per-frame step overshoots targets
-## and the heuristic navigation oscillates. 2x is the MEASURED sweet spot — clean 6/6 at 29s vs 39s at 1x;
+## and the heuristic navigation oscillates. 2x is the MEASURED sweet spot: clean 6/6 at 29s vs 39s at 1x;
 ## 3x+ overshoots and gets SLOWER (32s) from oscillation, 4x misses goals. (The gain is sub-linear because
 ## per-goal scene boot/teardown is fixed overhead the clock can't touch.) Override with SINKFORGE_PLAY_SCALE.
 const PLAY_TIME_SCALE: float = 2.0
@@ -41,7 +41,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	# Each goal returns whether it was MET. These run on real-time physics with heuristic navigation, so
-	# a single miss can be timing variance, not a broken game — _attempt retries once. A genuine breakage
+	# a single miss can be timing variance, not a broken game, so _attempt retries once. A genuine breakage
 	# fails BOTH tries; a flake passes on the retry. (Pure-logic guarantees live in the headless suite.)
 	for goal: Array in [
 		["find & dig ore", _goal_find_and_dig_ore],
@@ -56,7 +56,7 @@ func _run() -> void:
 		["RUNG 5 — drain the aquifer (L3 flood loop)", _goal_drain_the_aquifer],
 		["RUNG 6 — breach a worldgen aquifer (real descent)", _goal_breach_worldgen_aquifer],
 		["RUNG 7 — pump out a worldgen aquifer (full L3 loop)", _goal_pump_out_a_worldgen_aquifer],
-		# FRICTION journeys — the BYPRODUCT experiences a real player MUST go through (the descent, and above
+		# FRICTION journeys: the BYPRODUCT experiences a real player MUST go through (the descent, and above
 		# all the climb back UP), measured for effort, not just did-it-happen. These are where the game earns
 		# "fun & frictionless" or fails it. A FAIL here = the player gets trapped / the loop is exhausting.
 		["friction: round-trip to a buried vein", _goal_round_trip_to_vein],
@@ -76,7 +76,7 @@ func _run() -> void:
 
 ## Run a goal, retrying up to TRIES times if missed (real-time physics flake guard). Fresh scene each
 ## try. 3 tries keeps the inherently timing-sensitive goals (walk-there-and-act) reliably green while a
-## GENUINE break — which fails deterministically — still fails every try.
+## GENUINE break, which fails deterministically, still fails every try.
 const TRIES: int = 3
 
 func _attempt(name: String, fn: Callable) -> bool:
@@ -98,7 +98,7 @@ func _attempt(name: String, fn: Callable) -> bool:
 
 # --- goals ----------------------------------------------------------------------------------------
 
-## The body finds a buried ore vein and digs down to mine it — the core by-hand "go get the ore" loop.
+## The body finds a buried ore vein and digs down to mine it: the core by-hand "go get the ore" loop.
 func _goal_find_and_dig_ore() -> bool:
 	var agent: PlayAgent = await _boot()
 	var ore: Vector2i = agent.nearest_material(&"ore")
@@ -111,7 +111,7 @@ func _goal_find_and_dig_ore() -> bool:
 		"agent dug down to %s and mined ore (got %d)" % [ore, got])
 
 
-## The body cycles its pack and lands the active slot on each carried item type — the hotbar select verb.
+## The body cycles its pack and lands the active slot on each carried item type: the hotbar select verb.
 func _goal_switch_items() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ore", 2)
@@ -126,7 +126,7 @@ func _goal_switch_items() -> bool:
 		"agent switched the active slot between ore and ingot")
 
 
-## The body crafts a machine item from carried ingots — the Factorio-style craft verb (keys 1/2/3).
+## The body crafts a machine item from carried ingots: the Factorio-style craft verb (keys 1/2/3).
 func _goal_craft_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
@@ -140,7 +140,7 @@ func _goal_craft_a_machine() -> bool:
 		"agent crafted a processor (spent 3 ingots, gained the item)")
 
 
-## The body crafts then PLACES a machine on an open cell within reach — the embodied build verb.
+## The body crafts then PLACES a machine on an open cell within reach: the embodied build verb.
 func _goal_build_a_machine() -> bool:
 	var agent: PlayAgent = await _boot()
 	agent.give(&"ingot", 3)
@@ -158,7 +158,7 @@ func _goal_build_a_machine() -> bool:
 		"agent placed a processor at %s and it's there" % target)
 
 
-## The body stands BESIDE the forge, FACES it, and TOSSES ore into its column (Q) — gravity feeds it in —
+## The body stands BESIDE the forge, FACES it, and TOSSES ore into its column (Q) so gravity feeds it in,
 ## and the forge smelts an ingot. The embodied gravity-feed loop with the forward-toss: you don't deposit,
 ## you stand next to a machine and fling the stack into its column, where it falls in.
 func _goal_feed_and_smelt() -> bool:
@@ -178,16 +178,16 @@ func _goal_feed_and_smelt() -> bool:
 		"agent stood beside the forge, tossed ore into its column; it fed and smelted (forged %d)" % forged)
 
 
-## RUNG 1 — the headline integration play-test. Booting with NOTHING, the agent follows the on-screen
+## RUNG 1: the headline integration play-test. Booting with NOTHING, the agent follows the on-screen
 ## objective ladder (scenes/objectives.gd) step by step, doing ONLY what each signpost says through the
 ## real reach-gated verbs, and must reach FIRST AUTOMATION: a self-feeding drill→forge line pouring ingots
-## on its own. This is "is the game playable to its first goal?" made executable — if any signposted step
+## on its own. This is "is the game playable to its first goal?" made executable: if any signposted step
 ## can't be performed from where the player stands, or doing it never advances the chain, it FAILS with
 ## which step dead-ended. That failure is the "there's nothing to do" complaint, caught by a test.
 func _goal_reach_first_automation() -> bool:
 	var agent: PlayAgent = await _boot()
 	var obj: Objectives = agent.main._objectives
-	# This rung's goal is FIRST AUTOMATION — the tutorial ladder up to and including "auto". The steps AFTER
+	# This rung's goal is FIRST AUTOMATION, the tutorial ladder up to and including "auto". The steps AFTER
 	# it (power/generator/descent/breach) are the gentle L1→L2 handoff, whose journey RUNG 2 plays end-to-end;
 	# stop once "auto" latches so this rung stays scoped to what it asserts (and its verbs).
 	for step: Dictionary in obj.steps:
@@ -212,9 +212,9 @@ func _goal_reach_first_automation() -> bool:
 		"followed the signposts all the way to FIRST AUTOMATION")
 
 
-## RUNG 2 — the L1→L2 GATE is playable end-to-end (docs/PROGRESSION.md §2): descend a shaft to THE SEAL,
+## RUNG 2. The L1→L2 GATE is playable end-to-end (docs/PROGRESSION.md §2): descend a shaft to THE SEAL,
 ## stand a Descent Engine ON it, climb out, FEED it by tossing ingots down the shaft (gravity is the
-## feeder — the hook working as the gate's conveyor), watch the BREACH open, drop through into
+## feeder; the hook working as the gate's conveyor), watch the BREACH open, drop through into
 ## Stonereach, mine an IRON sample (the new material), and climb all the way home. Research/crafting the
 ## engine are proven by the headless suite + RUNG 1's bench flow; the setup hatch supplies the loadout so
 ## THIS goal measures the gate journey itself.
@@ -230,7 +230,7 @@ func _goal_breach_the_seal() -> bool:
 	sim.set_solid(Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS), &"iron")
 	sim.deposits[Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS)] = 40
 	agent.give(&"rope", 250)                                 # BOTH ~36-row shafts want a full hang each, plus
-	                                                         # exit-cycle re-anchors — rope economy isn't what
+	                                                         # exit-cycle re-anchors; rope economy isn't what
 	                                                         # this goal measures, the GATE is
 	sim.place_rope(Vector2i(col, top - 1))                   # the way back up, hung at the mouth
 	agent.give(&"descent_engine", 1)
@@ -251,7 +251,7 @@ func _goal_breach_the_seal() -> bool:
 	if not await agent.build_at(Vector2i(col + 1, LayeredWorldGen.SEAL_TOP - 1)):
 		return await _finish(agent, false, "could not stand the engine on the seal")
 	# 3. Climb home, then FEED the gate from the surface: toss the ingots down its shaft. (Home = the
-	# mouth row `top`, not top-1 — the neighbouring ground can naturally sit a row lower than the mouth.)
+	# mouth row `top`, not top-1; the neighbouring ground can naturally sit a row lower than the mouth.)
 	if not await agent.climb_to_surface(top):
 		return await _finish(agent, false, "could not climb back out before feeding")
 	if not await agent.walk_to_column(col + 2, 900):
@@ -274,7 +274,7 @@ func _goal_breach_the_seal() -> bool:
 		return await _finish(agent, false, "could not reclaim the engine off the seal")
 	if not await agent.walk_to_column(col + 1, 600):
 		return await _finish(agent, false, "could not drop through the breach into L2")
-	# 5. The prize: mine the IRON under your feet — the first touch of L2's new material.
+	# 5. The prize: mine the IRON under your feet, the first touch of L2's new material.
 	var iron := Vector2i(col + 1, LayeredWorldGen.SEAL_TOP + LayeredWorldGen.SEAL_ROWS)
 	var g: int = 0
 	while sim.is_solid(iron) and g < 40:
@@ -282,7 +282,7 @@ func _goal_breach_the_seal() -> bool:
 		await agent.wait(4); g += 1
 	if int(sim.inventory.get(&"iron", 0)) < 1:
 		return await _finish(agent, false, "stood in L2 but could not mine the iron")
-	# 6. And home — the whole loop closes on the surface.
+	# 6. And home: the whole loop closes on the surface.
 	var home: bool = await agent.climb_to_surface(top, 6000)
 	print("  gate: %s  (iron=%d home=%s)" % [agent.friction(), int(sim.inventory.get(&"iron", 0)), home])
 	return await _finish(agent, home, "breached the seal, mined L2 iron, and returned to the surface")
@@ -295,17 +295,17 @@ func _engine_fed(agent: PlayAgent) -> int:
 	return -1
 
 
-## RUNG 4 — the BORER is playable embodied: dig a socket at a rock face, stand the
+## RUNG 4. The BORER is playable embodied: dig a socket at a rock face, stand the
 ## Borer in it facing the wall, feed it coal by toss, let it chew the face into its belly (it sits
-## sealed — the on-hook rule pools the haul), then PICK IT BACK UP and walk away with the haul in the
+## sealed; the on-hook rule pools the haul), then PICK IT BACK UP and walk away with the haul in the
 ## pack (pickup salvages buffers). The manual "send the ferret into the wall, bring it back full"
 ## loop, all through real verbs.
 ## The furthest column toward `pref` that the body can actually WALK to from `from`, and that is worth
 ## building a fixture on when it gets there.
 ##
-## Two conditions, and it took both: the ground has to be FOOTED — a column can be perfectly level on top
+## Two conditions, and it took both. The ground has to be FOOTED: a column can be perfectly level on top
 ## and open into a rift two cells down, which is level ground you cannot dig a two-deep socket into,
-## because the second cut drops the body through the floor and out of its own reach — and it has to be
+## because the second cut drops the body through the floor and out of its own reach. And it has to be
 ## REACHABLE, because the generator now cuts sinkhole mouths and a forty-row hole between here and there
 ## is a wall, however good the ground looks on the far side of it.
 func _standing_ground(sim: FactorySim, from: int, pref: int) -> int:
@@ -338,7 +338,7 @@ func _footed(sim: FactorySim, col: int) -> bool:
 func _goal_borer() -> bool:
 	var agent: PlayAgent = await _boot()
 	var sim: FactorySim = agent.sim
-	# Clear of every fixture — and clear of the generator's sinkholes, which are the one thing that can put
+	# Clear of every fixture, and clear of the generator's sinkholes, which are the one thing that can put
 	# a forty-row hole where a hardcoded column expected a hillside. Ask for solid walkable ground near the
 	# spot rather than asserting the world still has some there.
 	var col: int = _standing_ground(sim, agent.main._cell_at(agent.player.position).x, 84)
@@ -373,7 +373,7 @@ func _goal_borer() -> bool:
 		return await _finish(agent, false, "no coal to feed it")
 	agent.player.facing = 1
 	agent.main.try_drop()
-	# It chews the face into its belly (sealed below — the haul POOLS, nothing spills).
+	# It chews the face into its belly (sealed below; the haul POOLS, nothing spills).
 	var t2: int = 0
 	var borer: MachineState = sim.machine_at(Vector2i(col, top + 1))
 	if borer == null or borer.facing != 1:
@@ -383,7 +383,7 @@ func _goal_borer() -> bool:
 	if int(borer.output_buffer.get(&"earth", 0)) < 3:
 		return await _finish(agent, false, "the borer never filled its belly (bellied %d)"
 			% int(borer.output_buffer.get(&"earth", 0)))
-	# Bring the ferret home: pick it up — the salvage lands its belly in YOUR pack.
+	# Bring the ferret home: pick it up; the salvage lands its belly in YOUR pack.
 	if not await agent.build_at(Vector2i(col, top + 1)):
 		return await _finish(agent, false, "could not reclaim the borer")
 	var haul: int = int(sim.inventory.get(&"earth", 0))
@@ -392,32 +392,32 @@ func _goal_borer() -> bool:
 		"sent the borer into the wall and brought it back full (haul=%d)" % haul)
 
 
-## RUNG 5 — the L3 FLOOD LOOP is playable embodied (the Aquifer answer): the pump falls
-## on the LOCKED hook — water floods a dig for FREE, pumping it back OUT costs POWER. The sim tests prove
+## RUNG 5. The L3 FLOOD LOOP is playable embodied (the Aquifer answer): the pump falls
+## on the LOCKED hook: water floods a dig for FREE, pumping it back OUT costs POWER. The sim tests prove
 ## water/pump/reward in ISOLATION; this proves a PLAYER can actually DO it from where a body stands. In a
-## STAGED, SEALED, flooded surface pocket (a flat-floored watertight box with a pump sump — reachable
+## STAGED, SEALED, flooded surface pocket (a flat-floored watertight box with a pump sump, reachable
 ## without the descent-and-climb, which is RUNG 2's business), the agent: (1) WADES the flood and feels the
-## impedance (_in_water); (2) builds a POWERED pump — stands a fueled generator up in the walk-space, lays a
+## impedance (_in_water); (2) builds a POWERED pump: stands a fueled generator up in the walk-space, lays a
 ## conduit run that carries its power over to beside the pump's cell, and drops the pump into the sump;
 ## (3) stands back while the powered pump DRAINS the pocket substantially; (4) walks to the now-exposed
 ## rich_ore in the drained floor and mines it. Any step unreachable/unbuildable through the real verbs FAILS
-## with which one dead-ended — an L3 reachability gap made executable (this rung caught one: see step 2).
+## with which one dead-ended; an L3 reachability gap made executable (this rung caught one: see step 2).
 func _goal_drain_the_aquifer() -> bool:
 	var agent: PlayAgent = await _boot()
 	var sim: FactorySim = agent.sim
 	var col: int = 90                                        # clear of every fixture (they end at 84)
 	var r: int = MainView.SURFACE
 	# --- STAGE a flooded surface PUDDLE, carved clean + placed by hand (the RUNG-fixture pattern) so the
-	# geometry is deterministic run-to-run AND the whole loop sits within a standing body's reach — with NO
+	# geometry is deterministic run-to-run AND the whole loop sits within a standing body's reach, with NO
 	# descent-and-climb (that's RUNG 2's business). The floor is CONTINUOUS at row r+1 (the body walks along
 	# it standing at row r); the water sits in a shallow puddle IN the body's own standing row (row r),
-	# penned by 1-tile lips, so the body wades by simply walking THROUGH it and out onto dry ground — no pit
+	# penned by 1-tile lips, so the body wades by simply walking THROUGH it and out onto dry ground: no pit
 	# to escape, no reliance on a lucky wading jump. A 1-cell SUMP under the puddle gives the pump depth. ---
-	# FIRST wipe the whole fixture footprint clean (worldgen at col 90 is past the flat plateau — its
-	# undulating surface + any seeded aquifer here would sit UNDER our stamp and lift the body / add stray
+	# FIRST wipe the whole fixture footprint clean (worldgen at col 90 is past the flat plateau; its
+	# undulating surface + any seeded aquifer here would sit UNDER the stamp and lift the body / add stray
 	# water), then SEAL the box: fill everything at/below the walk floor solid (a watertight bed) and wall
-	# the box's left/right edges. This pens our puddle so a neighbouring worldgen aquifer can't leak in and
-	# dilute it — the drain we measure is our pump's alone. Rows above the floor stay open (walk-space).
+	# the box's left/right edges. This pens the puddle so a neighbouring worldgen aquifer can't leak in and
+	# dilute it: the drain measured is this pump's alone. Rows above the floor stay open (walk-space).
 	var box_lo_x: int = col - 10
 	var box_hi_x: int = col + 7
 	for x: int in range(box_lo_x, box_hi_x + 1):
@@ -430,11 +430,11 @@ func _goal_drain_the_aquifer() -> bool:
 				sim.set_solid(c, &"")                       # open walk-space above the floor
 	# The continuous walk floor is now the top of the solid bed (row r+1). Open a SUMP under the puddle centre
 	# so the pump has drain depth: a 2-cell shaft (col r+1, r+2) above the solid sump floor at r+3. The floor
-	# is otherwise UNBROKEN and FLAT (no surface lips) — the body wades the whole span freely (wading is just
+	# is otherwise UNBROKEN and FLAT (no surface lips); the body wades the whole span freely (wading is just
 	# slower, never blocking), so there's no lip to trip on and no pit to escape while impeded.
 	sim.set_solid(Vector2i(col, r + 1), &"")
 	sim.set_solid(Vector2i(col, r + 2), &"")
-	# THE REWARD: a rich_ore vein in the walk floor two cells left of the pump — submerged now, mineable dry
+	# THE REWARD: a rich_ore vein in the walk floor two cells left of the pump, submerged now, mineable dry
 	# once the pump exposes it. On the build side of the pump so the body never has to cross the pump (a
 	# machine walls the body) to reach it. rich_ore is tier-2 rock, so the loadout carries a stone pickaxe.
 	var reward := Vector2i(col - 2, r + 1)
@@ -454,7 +454,7 @@ func _goal_drain_the_aquifer() -> bool:
 		poured += sim.add_water(wet_cell, FactorySim.WATER_MAX)
 	if poured < FactorySim.WATER_MAX * 8:
 		return await _finish(agent, false, "the pocket should start deeply flooded (poured=%d)" % poured)
-	# The loadout (setup hatch — the bench/craft flow is proven in RUNG 1 + headless): a pump, a fueled
+	# The loadout (setup hatch; the bench/craft flow is proven in RUNG 1 + headless): a pump, a fueled
 	# generator, a run of conduit to wire them, and the tier-2 pick the rich_ore needs.
 	agent.give(&"pump", 1)
 	agent.give(&"generator", 1)
@@ -464,7 +464,7 @@ func _goal_drain_the_aquifer() -> bool:
 	agent.player.position = agent.main._cell_center(Vector2i(col - 5, r))
 	for _i: int in 20:
 		await physics_frame                                 # settle onto the floor
-	# --- STEP 1: the flood is a real hazard — standing in the flooded pocket, the body WADES (impedance
+	# --- STEP 1: the flood is a real hazard. Standing in the flooded pocket, the body WADES (impedance
 	# registers). Confirm the wading gate trips (the body slogs, doesn't stroll). ---
 	var waded: bool = false
 	for _i: int in 60:
@@ -478,7 +478,7 @@ func _goal_drain_the_aquifer() -> bool:
 	# --- STEP 2: build the powered pump. Standing back at the build end, the body stands the generator up in
 	# the walk-space, lays a conduit run along row r-1 that ends orthogonally BESIDE the pump, and drops the
 	# pump into the flooded sump. Power routes gen → the conduit below it → across the run → bleeds into the
-	# pump's cell (the "generator far, conduit delivers" geometry — the conduit is load-bearing, asserted
+	# pump's cell (the "generator far, conduit delivers" geometry; the conduit is load-bearing, asserted
 	# below). Every placement goes through build_at on reach-valid cells; the flat flooded floor is trivially
 	# navigable (wading only slows the body, never blocks) and the body stays clear of the open sump. ---
 	if not await agent.walk_to_column(col - 5, 1200):
@@ -489,14 +489,14 @@ func _goal_drain_the_aquifer() -> bool:
 	if not await agent.build_at(gen_cell):
 		return await _finish(agent, false, "could not stand the generator at %s" % str(gen_cell))
 	# Fuel it by hand-loading its buffer (feeding coal by toss is RUNG-1's proven verb; here the POWER
-	# WIRING is what's under test, so we hatch the fuel — the generator must actually burn to power the pump).
+	# WIRING is what's under test, so the fuel is hatched; the generator must actually burn to power the pump).
 	var gen: MachineState = sim.machine_at(gen_cell)
 	if gen == null:
 		return await _finish(agent, false, "the generator vanished after placement")
 	gen.input_buffer[&"coal"] = 60
 	sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 60
 	# The conduit run: it starts DIRECTLY UNDER the generator (which feeds its full output down into it), runs
-	# right along row r-1, then drops one cell to (col-1, r) — orthogonally BESIDE the pump — so its power
+	# right along row r-1, then drops one cell to (col-1, r), orthogonally BESIDE the pump, so its power
 	# bleeds sideways into the pump's cell. (The body builds this walking the flat flooded floor; it never has
 	# to stand over the open sump.) All r-1 cells + (col-1,r) are open, so every tube is placeable.
 	var conduit_cells: Array[Vector2i] = [Vector2i(col - 4, r - 1), Vector2i(col - 3, r - 1),
@@ -518,13 +518,13 @@ func _goal_drain_the_aquifer() -> bool:
 		return await _finish(agent, false, "could not stand beside the puddle to place the pump")
 	if not agent.main.try_build(pump_cell):                  # reach in from col-2 (in range, off the sump)
 		# If the cell is reach-valid + placeable but the build still refuses, the pump ISN'T a resolvable
-		# placeable machine — the L3 REACHABILITY GAP this rung exists to catch. The pump has a .tres, a sim
+		# placeable machine: the L3 REACHABILITY GAP this rung exists to catch. The pump has a .tres, a sim
 		# behavior, a Visuals glyph, and a research unlock (ResearchRules "drainage"), but is MISSING from
 		# MainView._craftable (scenes/main.gd ~L177), the one list that feeds both the craft menu (craft_ids)
 		# AND the item→def resolver (_machine_defs_by_id) used to PLACE it. So a player who researches
 		# Drainage still cannot craft OR place a pump: the whole L3 flood-defeat loop is unreachable. FIX =
 		# add `load("res://src/data/machines/pump.tres")` to _craftable. (Verified: with the pump registered,
-		# this rung drives the full loop green — wade → power → drain → mine.)
+		# this rung drives the full loop green: wade → power → drain → mine.)
 		var reachable: bool = agent.main._can_reach(pump_cell)
 		var placeable: bool = agent.main._placeable(pump_cell)
 		var resolves: bool = agent.main._machine_defs_by_id.has(&"pump")
@@ -553,7 +553,7 @@ func _goal_drain_the_aquifer() -> bool:
 		return await _finish(agent, false, "the powered pump never drained the flood (%d -> %d)" % [water_before, water_after])
 	if water_after > water_before / 2:
 		return await _finish(agent, false, "the pump barely touched the flood (%d -> %d) — not substantially drained" % [water_before, water_after])
-	# --- STEP 4: the prize. The rich_ore in the drained floor (2 cells left of the pump) is now exposed —
+	# --- STEP 4: the prize. The rich_ore in the drained floor (2 cells left of the pump) is now exposed;
 	# walk onto it and mine it dry (it sits directly under the body's feet there, in reach). ---
 	if not await agent.select_item(&"stone_pickaxe"):
 		return await _finish(agent, false, "no pickaxe to mine the reward")
@@ -570,27 +570,27 @@ func _goal_drain_the_aquifer() -> bool:
 			% [water_before, water_after, got])
 
 
-## RUNG 6 — BREACH A REAL WORLDGEN AQUIFER (the L3 loop on the SHIPPING WORLD): RUNG 5 proved the flood
-## loop on a hand-staged surface puddle; this proves the world worldgen actually SHIPS is playable — a body
+## RUNG 6. BREACH A REAL WORLDGEN AQUIFER (the L3 loop on the SHIPPING WORLD): RUNG 5 proved the flood
+## loop on a hand-staged surface puddle; this proves the world worldgen actually SHIPS is playable: a body
 ## DESCENDS into the deep, digs into a genuine sealed worldgen aquifer, and breaching it RELEASES the flood
 ## AND yields the rich_ore treasure lining it (the risk/reward, #126). The aquifer is DISCOVERED dynamically
 ## (scan sim.water for a deep, substantial, treasure-lined pocket), so the rung guards WORLDGEN too: a gen
 ## retune that stops shipping breachable, treasure-lined aquifers at depth fails here. The breach is ONE
-## honest cut — a rim rich_ore cell at the waterline — that CLAIMS the treasure and OPENS the seal in a single
+## honest cut, a rim rich_ore cell at the waterline, that CLAIMS the treasure and OPENS the seal in a single
 ## move, after which the released flood pours laterally into the dig (the body wades). Setup hatch (RUNG-3's
 ## "guarantee the site"): the descent column is made solid + a foothold set at the breach level, so a worldgen
-## cave in the shaft can't drop the body out of reach mid-dig — the DESCENT dig, the BREACH cut, and the flood
+## cave in the shaft can't drop the body out of reach mid-dig; the DESCENT dig, the BREACH cut, and the flood
 ## are all real. The pump-drain claim is RUNG 5's business; this rung's novelty is descent + breach + release.
 func _goal_breach_worldgen_aquifer() -> bool:
 	var agent: PlayAgent = await _boot()
 	var sim: FactorySim = agent.sim
-	# The deep band AND its rich_ore both need a tier-2 pick (MiningRules) — hand it (the craft is proven in
+	# The deep band AND its rich_ore both need a tier-2 pick (MiningRules); hand it (the craft is proven in
 	# RUNG 1); the descent dig, the breach cut, and the claim are what's under test.
 	agent.give(&"stone_pickaxe", 1)
 
 	# --- FIND a real worldgen aquifer to breach: the shallowest pocket that is DEEP (in the aquifer band),
 	# SUBSTANTIAL, and TREASURE-LINED, with a rim rich_ore cell sitting horizontally between pocket water and
-	# OUTSIDE solid rock — so one sideways cut claims the ore AND opens the seal. Dynamic = a worldgen guard. ---
+	# OUTSIDE solid rock, so one sideways cut claims the ore AND opens the seal. Dynamic = a worldgen guard. ---
 	var pockets: Array = _water_pockets(sim)
 	pockets.sort_custom(func(a: Array, b: Array) -> bool: return _pocket_top(a) < _pocket_top(b))
 	var target: Array = []
@@ -642,15 +642,15 @@ func _goal_breach_worldgen_aquifer() -> bool:
 	if not await agent.select_item(&"stone_pickaxe"):
 		return await _finish(agent, false, "no pick to dig the deep")
 
-	# --- STEP 1: the DESCENT — dig straight down the deep column to the breach level (a genuine reach-gated
-	# deep dig; deepslate needs the tier-2 pick we selected). ---
+	# --- STEP 1: the DESCENT. Dig straight down the deep column to the breach level (a genuine reach-gated
+	# deep dig; deepslate needs the tier-2 pick selected above). ---
 	if not await agent.dig_down_to(Vector2i(breach_col, breach.y)):
 		return await _finish(agent, false,
 			"could not descend the deep shaft to the aquifer (stuck at %s)" % str(agent.main._cell_at(agent.player.position)))
 
-	# --- STEP 2: the BREACH + the CLAIM — one honest cut. Mine the rim rich_ore at the waterline: it CLAIMS
+	# --- STEP 2: the BREACH + the CLAIM, one honest cut. Mine the rim rich_ore at the waterline: it CLAIMS
 	# the flood-guarded treasure AND opens the sealed pocket wall. Reach in horizontally from the dry shaft
-	# (re-select the pick — picking up deepslate on the way down can swap the active slot). ---
+	# (re-select the pick; picking up deepslate on the way down can swap the active slot). ---
 	if not agent.main._can_reach(breach):
 		return await _finish(agent, false, "descended, but the rim vein at %s is out of reach from the shaft" % str(breach))
 	if not await agent.select_item(&"stone_pickaxe"):
@@ -666,8 +666,8 @@ func _goal_breach_worldgen_aquifer() -> bool:
 	if got < 1:
 		return await _finish(agent, false, "cut into the aquifer wall but the rich_ore treasure didn't drop (got %d)" % got)
 
-	# --- STEP 3: the FLOOD RELEASES — the sealed pocket, breached, pours into the dig. Let the game tick and
-	# confirm water floods the shaft the body stands in (it wades) — the sealed-pocket-releases fantasy, on
+	# --- STEP 3: the FLOOD RELEASES. The sealed pocket, breached, pours into the dig. Let the game tick and
+	# confirm water floods the shaft the body stands in (it wades): the sealed-pocket-releases fantasy, on
 	# real worldgen water at real depth. ---
 	var flooded: bool = false
 	for _i: int in 60:
@@ -683,7 +683,7 @@ func _goal_breach_worldgen_aquifer() -> bool:
 		"descended into the deep, breached a real worldgen aquifer to claim its guarded rich_ore (%d), and released the flood" % got)
 
 
-## Flood-fill sim.water into connected 4-neighbour pockets — RUNG 6 uses this to DISCOVER a real worldgen
+## Flood-fill sim.water into connected 4-neighbour pockets. RUNG 6 uses this to DISCOVER a real worldgen
 ## aquifer to breach rather than hand-staging one, so the rung guards worldgen (it must keep shipping deep,
 ## treasure-lined, breachable water pockets) as well as the embodied breach loop.
 func _water_pockets(sim: FactorySim) -> Array:
@@ -714,12 +714,12 @@ func _pocket_top(cells: Array) -> int:
 	return t
 
 
-## RUNG 7 — PUMP OUT A REAL WORLDGEN AQUIFER (the FULL L3 loop, end to end on the shipping world): RUNG 6
-## proved descent + breach + release + claim; this closes the arc with the DESIGNED tool — descend → build a
+## RUNG 7. PUMP OUT A REAL WORLDGEN AQUIFER (the FULL L3 loop, end to end on the shipping world): RUNG 6
+## proved descent + breach + release + claim; this closes the arc with the DESIGNED tool: descend → build a
 ## POWERED PUMP → breach the sealed pocket (claim its guarded rich_ore) → the released flood pours in → the
 ## pump DRAINS it → climb back out with the flood at your back. The aquifer is DISCOVERED dynamically, so the
 ## rung guards the whole loop on real worldgen geometry. The play here is "prep, then breach": the pump loop is
-## built DRY in a small room carved into the rim rock (the pocket stays sealed, so the build is a dry walk —
+## built DRY in a small room carved into the rim rock (the pocket stays sealed, so the build is a dry walk;
 ## generators/pumps aren't water-gated anyway), THEN the wall is cut so the pre-built pump immediately handles
 ## the flood. Setup hatch (RUNG-3's guarantee-the-site): the room + descent shaft are carved; the DESCENT dig,
 ## the gen/conduit/pump BUILDS, the breach CUT, the DRAIN, and the CLIMB-OUT are all real reach-gated verbs.
@@ -730,7 +730,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 		sim.research[t] = true
 
 	# --- FIND the aquifer + the breach vein: a deep, substantial pocket with a rim rich_ore R that has pocket
-	# water on one side and OUTSIDE solid rock on the other, as LOW as possible (a low breach drains best — the
+	# water on one side and OUTSIDE solid rock on the other, as LOW as possible (a low breach drains best; the
 	# sump sits near the pocket floor so gravity feeds the whole pocket into it). dir = toward the pocket. ---
 	var pockets: Array = _water_pockets(sim)
 	pockets.sort_custom(func(a: Array, b: Array) -> bool: return _pocket_top(a) < _pocket_top(b))
@@ -767,7 +767,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 
 	# --- geometry: a tight room carved on the -dir (OUTSIDE) side of the breach vein R, at R's row. The body
 	# works entirely from ONE solid-floored STAND column: it breaches R across the sump gap (dist 2), drops the
-	# pump into the adjacent sump (dist 1), and the generator sits one cell ABOVE it — close enough to power the
+	# pump into the adjacent sump (dist 1), and the generator sits one cell ABOVE it: close enough to power the
 	# pump by its innate AURA (radius 2, no conduit) and clear of both the walk row and the climb shaft. ---
 	var r: int = R.y                                  # the room floor walk row + the breach row (level with the vein)
 	var pump_col: int = R.x - dir                     # the pump + sump: one cell out from R (floods when R is cut)
@@ -777,7 +777,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	var lo_x: int = mini(wall_col, pump_col)
 	var hi_x: int = maxi(wall_col, pump_col)
 
-	# Carve the DRY room (pocket stays sealed — R and the pocket water are untouched). Floor bed solid at r+1,
+	# Carve the DRY room (pocket stays sealed; R and the pocket water are untouched). Floor bed solid at r+1,
 	# outer wall solid, descent shaft solid (dug on the way down), the sump open under the pump with depth below.
 	const DESCENT_ROWS: int = 10
 	var settle_row: int = r - DESCENT_ROWS
@@ -797,7 +797,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	sim.set_solid(Vector2i(ds, settle_row), &"")      # foothold at the top
 	sim.set_solid(Vector2i(ds, settle_row - 1), &"")
 	# A LANDING at the shaft mouth. Climbing back up only counts as "out" if there is somewhere to STAND
-	# there, and once the shaft below has been dug the top cell has no floor left — so the body rides the
+	# there, and once the shaft below has been dug the top cell has no floor left, so the body rides the
 	# rope to the lip, finds no footed exit either side, and hangs there until the budget runs out. A
 	# player descending from a chamber cuts this ledge before dropping in; the fixture cuts it too.
 	for dx: int in [-1, 1]:
@@ -807,7 +807,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 		sim.set_solid(Vector2i(ds + dx, settle_row - 1), &"")
 		sim.set_solid(Vector2i(ds + dx, settle_row + 1), &"deepslate")
 
-	# Loadout: a pump, a generator (its aura powers the adjacent pump — no wiring; conduit delivery is RUNG 5's
+	# Loadout: a pump, a generator (its aura powers the adjacent pump: no wiring; conduit delivery is RUNG 5's
 	# proof), the tier-2 pick (deepslate + rich_ore), rope for the climb out.
 	agent.give(&"pump", 1)
 	agent.give(&"generator", 1)
@@ -825,8 +825,8 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 		return await _finish(agent, false, "could not descend into the pump room (stuck at %s)" % str(agent.main._cell_at(agent.player.position)))
 
 	# --- STEP 2: build the GENERATOR DRY (pocket still sealed), diagonally up from the stand column so it never
-	# overlaps the body, sitting one cell ABOVE the pump's cell. Fuel it; its aura powers the pump we drop below
-	# it after the breach — no wiring to lay (RUNG 5 proves conduit delivery). ---
+	# overlaps the body, sitting one cell ABOVE the pump's cell. Fuel it; its aura powers the pump dropped below
+	# it after the breach: no wiring to lay (RUNG 5 proves conduit delivery). ---
 	if not await agent.walk_to_column(gen_col, 900):
 		return await _finish(agent, false, "could not reach the build spot in the room")
 	var gen_cell := Vector2i(pump_col, r - 1)
@@ -840,7 +840,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	gen.input_buffer[&"coal"] = 60                    # hatch the fuel (the toss-feed verb is RUNG-1's; the loop is under test)
 	sim.total_produced[&"coal"] = int(sim.total_produced.get(&"coal", 0)) + 60
 
-	# --- STEP 3: the BREACH + the CLAIM — cut the rim rich_ore R. One move claims the flood-guarded treasure AND
+	# --- STEP 3: the BREACH + the CLAIM. Cut the rim rich_ore R. One move claims the flood-guarded treasure AND
 	# opens the sealed pocket wall; the released flood pours into the room and down into the sump. Reach across the
 	# sump gap from the stand column (the body never crosses into the pocket or onto the sump). ---
 	if not await agent.walk_to_column(gen_col, 900):
@@ -875,7 +875,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	if sim.power_at(pump_cell) <= 0.0:
 		return await _finish(agent, false, "the pump is placed but no power reaches it (power=%.2f)" % sim.power_at(pump_cell))
 
-	# --- STEP 5: DRAIN — the pump chews the released flood down. Read the connected pocket + sump water so a
+	# --- STEP 5: DRAIN. The pump chews the released flood down. Read the connected pocket + sump water so a
 	# far-off worldgen aquifer can't mask the drain. ---
 	var drain_cells: Array[Vector2i] = []
 	for w: Vector2i in pk:
@@ -896,7 +896,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	if water_after >= water_before or water_after > water_before / 2:
 		return await _finish(agent, false, "the powered pump never substantially drained the aquifer (%d -> %d)" % [water_before, water_after])
 
-	# --- STEP 6: CLIMB OUT — escape the drained pocket back up the descent shaft, the flood at your back. Step
+	# --- STEP 6: CLIMB OUT. Escape the drained pocket back up the descent shaft, the flood at your back. Step
 	# onto the (guaranteed, dug-clear) shaft column first, then rope up. The shaft is open the whole way (the
 	# body dug out its own footing on the way down), so "escaped" = climbed clear of the flooded floor back up
 	# near the top of the shaft (out of the water), not landing on a surface that no longer exists down here. ---
@@ -912,9 +912,9 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 			% [got, water_before, water_after])
 
 
-## RUNG 3 — the L2 IRON CHAIN is playable embodied: with the iron
+## RUNG 3. The L2 IRON CHAIN is playable embodied: with the iron
 ## tier researched and the modules in the pack (bench/craft flows proven headless + in RUNG 1), the
-## agent DIGS a socket pit, stands the gravity chain in it — Iron Forge over Plate Press — pours raw
+## agent DIGS a socket pit, stands the gravity chain in it as Iron Forge over Plate Press, pours raw
 ## iron into the open column above, and must end up holding a PLATE: dig, place, toss, collect, all
 ## through the real reach-gated verbs from where a body can actually stand.
 func _goal_l2_chain() -> bool:
@@ -930,22 +930,22 @@ func _goal_l2_chain() -> bool:
 		return await _finish(agent, false, "never reached the build site")
 	var top: int = sim.surface_row(col)
 	# Guarantee the socket site (the RUNG-4 pattern): the column must be SOLID down through the socket
-	# + its floor — a worldgen cave/tunnel under this col (pure vein-RNG luck, it shifts whenever a
+	# + its floor; a worldgen cave/tunnel under this col (pure vein-RNG luck, it shifts whenever a
 	# gen pass changes) would drop the body out of reach mid-dig. The dig itself stays the tested verb.
 	for y: int in range(top, top + 3):
 		if not sim.is_solid(Vector2i(col, y)):
 			sim.set_solid(Vector2i(col, y), &"earth")
-	# Sink the 2-deep socket exactly like a player does — the proven dig_down_to loop (stay CENTRED
+	# Sink the 2-deep socket exactly like a player does: the proven dig_down_to loop (stay CENTRED
 	# over the column, cut under the feet, fall in, repeat). The old hand-rolled version could stall
 	# with the feet straddling the socket lip: a cell-match stop leaves the body standing on the
 	# neighbour floor, never falling in, and the second cut corner-blocks forever.
 	if not await agent.dig_down_to(Vector2i(col, top + 1)):
 		return await _finish(agent, false, "could not dig the module socket at %s" % str(Vector2i(col, top + 1)))
 	await agent.wait(20)                                     # settle on the socket floor
-	# Out of the socket (a 2-tile wall — exactly what the jump clears) and to its lip.
+	# Out of the socket (a 2-tile wall, exactly what the jump clears) and to its lip.
 	if not await agent.walk_to_column(col + 1, 900):
 		return await _finish(agent, false, "could not jump out of the socket")
-	# The chain: press at the socket bottom, forge stacked on it flush with the ground — the open air
+	# The chain: press at the socket bottom, forge stacked on it flush with the ground; the open air
 	# above the forge is the feed mouth.
 	if not await agent.select_item(&"plate_press"):
 		return await _finish(agent, false, "no press in the pack")
@@ -955,7 +955,7 @@ func _goal_l2_chain() -> bool:
 		return await _finish(agent, false, "no iron forge in the pack")
 	if not await agent.build_at(Vector2i(col, top)):
 		return await _finish(agent, false, "could not stack the forge on the press")
-	# Feed it: face the column and toss the whole iron stack in — gravity is the feeder.
+	# Feed it: face the column and toss the whole iron stack in; gravity is the feeder.
 	if not await agent.select_item(&"iron"):
 		return await _finish(agent, false, "no iron to pour in")
 	agent.player.facing = -1 if agent.main._cell_at(agent.player.position).x > col else 1
@@ -972,13 +972,13 @@ func _goal_l2_chain() -> bool:
 
 # --- FRICTION journeys ----------------------------------------------------------------------------
 # These model the WHOLE realistic user experience, not just the headline verb. A player who wants to
-# "drill a buried vein" doesn't teleport there — they dig DOWN to it (byproduct), do the thing, then
-# claw their way back UP (the big one). We PLAY those byproduct steps and print the effort (friction())
-# so we can SEE the game get less painful as mobility tools land. Blocks are topped up (setup hatch) so a
-# journey measures TRAVERSAL friction, not resource starvation — the pit/shaft is what we're testing.
+# "drill a buried vein" doesn't teleport there; they dig DOWN to it (byproduct), do the thing, then
+# claw their way back UP (the big one). Those byproduct steps are PLAYED and the effort printed (friction())
+# so the game can be SEEN getting less painful as mobility tools land. Blocks are topped up (setup hatch) so a
+# journey measures TRAVERSAL friction, not resource starvation; the pit/shaft is what is under test.
 
 ## Fill a clean vertical column of earth from the surface down to `depth` below it and bury an ore vein at
-## the bottom — a deterministic shaft to dig, so the friction numbers are comparable run to run.
+## the bottom: a deterministic shaft to dig, so the friction numbers are comparable run to run.
 func _bury_vein(agent: PlayAgent, col: int, depth: int) -> Vector2i:
 	var target := Vector2i(col, MainView.SURFACE + depth)
 	for y: int in range(MainView.SURFACE, target.y):
@@ -990,8 +990,8 @@ func _bury_vein(agent: PlayAgent, col: int, depth: int) -> Vector2i:
 
 
 ## Round-trip: dig DOWN to a buried vein, mine it, and climb back to the SURFACE. The most common real loop
-## and the friction the user named — "mine down, then mine a staircase back up". Pass = ore in hand AND body
-## back on the surface (not stranded). Friction printed so we watch it drop when the rope lands.
+## and the friction the user named: "mine down, then mine a staircase back up". Pass = ore in hand AND body
+## back on the surface (not stranded). Friction printed so the drop is visible when the rope lands.
 func _goal_round_trip_to_vein() -> bool:
 	var agent: PlayAgent = await _boot()
 	var col: int = 34                                        # a clean plateau column, clear of the fixtures (40-56)
@@ -1004,15 +1004,15 @@ func _goal_round_trip_to_vein() -> bool:
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
 	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope this cost places=15/jumps=18/frames=320 of
-	# pillar-jumping; the rope ride measures places=3 jumps=1 frames=58 — locked in so it can't regress).
+	# pillar-jumping; the rope ride measures places=3 jumps=1 frames=58, locked in so it can't regress).
 	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: mines=9 places=3 jumps=2 frames=82):
-	# mines 15→12 · places 6→5 · frames 120→100 (jumps kept at 4 — the loosest integer metric).
+	# mines 15→12 · places 6→5 · frames 120→100 (jumps kept at 4, the loosest integer metric).
 	var within: bool = _within_ceilings(agent, {"mines": 12, "places": 5, "jumps": 4, "frames": 100})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug to the buried vein, mined it, and climbed back to the surface")
 
 
-## A DEEP round-trip — the same journey as the shallow one but to a vein twice as far down, so the friction
+## A DEEP round-trip: the same journey as the shallow one but to a vein twice as far down, so the friction
 ## SCALES visibly with depth (deeper = a longer, more punishing climb back). This is the number that must not
 ## explode as the game asks you to go deeper: it's the argument for the lift over the rope. Pass = ore in
 ## hand AND back on the surface; the friction() print is the depth-scaling read.
@@ -1028,17 +1028,17 @@ func _goal_descend_build_return() -> bool:
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (depth=14 down=%s ore=%d up=%s)" % [agent.friction(), dug, got, up])
 	# Rope-era ceilings (RATCHETED 2026-07-11: pre-rope places=24/jumps=26/frames=520; the rope ride
-	# measures places=6 jumps=1 frames=111 — the deep climb no longer scales in pain, locked in).
+	# measures places=6 jumps=1 frames=111; the deep climb no longer scales in pain, locked in).
 	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: mines=15 places=6 jumps=2 frames=134):
-	# mines 24→20 · places 10→8 · frames 200→165 (jumps kept at 4 — the loosest integer metric).
+	# mines 24→20 · places 10→8 · frames 200→165 (jumps kept at 4, the loosest integer metric).
 	var within: bool = _within_ceilings(agent, {"mines": 20, "places": 8, "jumps": 4, "frames": 165})
 	return await _finish(agent, dug and got >= 1 and up and within,
 		"dug 14 deep to a vein, mined it, and climbed all the way back out")
 
 
-## The pure "am I TRAPPED?" test: drop the body into a deep 1-wide pit (walls solid both sides) with blocks
+## The pure "is the body TRAPPED?" test: drop the body into a deep 1-wide pit (walls solid both sides) with blocks
 ## in the pack, and require it to get out. If it can't, the player is stranded at the bottom of their own
-## shaft — the worst friction this game could ship. DELIBERATELY ROPE-LESS: this journey guards the
+## shaft: the worst friction this game could ship. DELIBERATELY ROPE-LESS: this journey guards the
 ## pillar-jump fallback (the worst-case loadout), while the round-trip journeys measure the rope era.
 func _goal_escape_deep_pit() -> bool:
 	var agent: PlayAgent = await _boot()
@@ -1058,12 +1058,12 @@ func _goal_escape_deep_pit() -> bool:
 	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
 	print("  friction: %s  (escaped=%s)" % [agent.friction(), up])
 	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: places=6 jumps=6 frames=132):
-	# places 12→9 · jumps 12→9 · frames 220→175 — the pillar-jump escape now can't quietly get worse.
+	# places 12→9 · jumps 12→9 · frames 220→175; the pillar-jump escape now can't quietly get worse.
 	var within: bool = _within_ceilings(agent, {"places": 9, "jumps": 9, "frames": 175})
 	return await _finish(agent, up and within, "climbed out of a %d-deep pit (must not be trapped)" % depth)
 
 
-## Cross a JAGGED horizontal tunnel (up-and-down 1-tile steps, like a natural cave floor) — the finicky
+## Cross a JAGGED horizontal tunnel (up-and-down 1-tile steps, like a natural cave floor): the finicky
 ## cave-traversal the user flagged as feeling bad. Pass = reaches the far end; the friction (stuck_frames,
 ## jumps) is the read on how AGILE lateral cave movement feels.
 func _goal_cross_jagged_tunnel() -> bool:
@@ -1073,7 +1073,7 @@ func _goal_cross_jagged_tunnel() -> bool:
 	var base: int = MainView.SURFACE + 4
 	# Carve a corridor with a FLAT ceiling well above the highest lump and a FLOOR that jitters ±1 tile each
 	# column (a lumpy cave floor). The ceiling clears rows down to the highest lump so undulating floors never
-	# leave original terrain protruding into the walk path — the body only ever meets ±1 floor steps.
+	# leave original terrain protruding into the walk path; the body only ever meets ±1 floor steps.
 	var ceiling: int = base - 4                              # above the highest possible lump (base-1)
 	for i: int in range(length):
 		var c: int = start_col + i
@@ -1086,13 +1086,13 @@ func _goal_cross_jagged_tunnel() -> bool:
 	agent.give(&"stone", 8)
 	for _i: int in 20:
 		await physics_frame
-	# Just WALK it (hold toward the far column, hop only when genuinely stuck) — the way a player crosses a
+	# Just WALK it (hold toward the far column, hop only when genuinely stuck), the way a player crosses a
 	# lumpy floor. This isolates the BODY's step-up/snap-down over ±1 lumps from the pathfinder's cleverness.
 	var far_col: int = start_col + length - 1
 	var reached: bool = await agent.walk_to_column(far_col, 1200)
 	print("  friction: %s  (reached=%s at col %d)" % [agent.friction(), reached, agent.main._cell_at(agent.player.position).x])
 	# RATCHETED 2026-08-09 (measured dead-stable across 3 runs: jumps=2 stuck_frames=1):
-	# jumps 8→5 · stuck_frames 40→20 — lumpy-floor lateral movement now guarded far tighter.
+	# jumps 8→5 · stuck_frames 40→20; lumpy-floor lateral movement now guarded far tighter.
 	var within: bool = _within_ceilings(agent, {"jumps": 5, "stuck_frames": 20})
 	return await _finish(agent, reached and within, "walked a %d-cell jagged tunnel end to end" % length)
 
@@ -1115,7 +1115,7 @@ func _do_step(agent: PlayAgent, id: StringName) -> bool:
 
 ## Earn ingots the tutorial way: mine the starter veins for ore, toss it into the bootstrap forge, and
 ## reach-collect until `want` ingots are carried. The shared acquisition loop for the bench price
-## (research) and the drill craft — both real ore→ingot labour through the real verbs.
+## (research) and the drill craft; both real ore→ingot labour through the real verbs.
 func _ensure_ingots(agent: PlayAgent, want: int) -> bool:
 	var guard: int = 0
 	while int(agent.sim.inventory.get(&"ingot", 0)) < want and guard < 12:
@@ -1146,8 +1146,8 @@ func _ensure_ingots(agent: PlayAgent, want: int) -> bool:
 	return int(agent.sim.inventory.get(&"ingot", 0)) >= want
 
 
-## Step — RESEARCH Automation at the bench: earn the bench price (2 ingots), keep an ore SAMPLE to
-## analyze, then stand at the Bazaar and research. The PULL the chain funnels through — the drill stays
+## Step: RESEARCH Automation at the bench. Earn the bench price (2 ingots), keep an ore SAMPLE to
+## analyze, then stand at the Bazaar and research. The PULL the chain funnels through; the drill stays
 ## locked until the bench opens it, so this proves a player can actually pay the first unlock.
 func _step_research(agent: PlayAgent) -> bool:
 	if agent.sim.is_researched(&"automation"):
@@ -1174,7 +1174,7 @@ func _step_research(agent: PlayAgent) -> bool:
 	return ok
 
 
-## Step 1 — hand-dig the bootstrap ore (4) from the starter vein near spawn, never the mineshaft's vein.
+## Step 1. Hand-dig the bootstrap ore (4) from the starter vein near spawn, never the mineshaft's vein.
 func _step_mine(agent: PlayAgent) -> bool:
 	var guard: int = 0
 	while int(agent.sim.inventory.get(&"ore", 0)) < 4 and guard < 8:
@@ -1187,7 +1187,7 @@ func _step_mine(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"ore", 0)) >= 4
 
 
-## Step 2 — toss the surface ore into the bootstrap forge pocket (col 46) from beside it (col 45), let it
+## Step 2. Toss the surface ore into the bootstrap forge pocket (col 46) from beside it (col 45), let it
 ## smelt, and stand by the pocket to reach-collect the 2 bootstrap ingots.
 func _step_smelt(agent: PlayAgent) -> bool:
 	if not await agent.select_item(&"ore"):
@@ -1210,7 +1210,7 @@ func _step_smelt(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"ingot", 0)) >= 2
 
 
-## Step 3 — chop a tree for wood (the bazaar's build material). Chop one trunk block of the nearest tree
+## Step 3. Chop a tree for wood (the bazaar's build material). Chop one trunk block of the nearest tree
 ## (block-by-block now); one wood is enough to claim the bazaar.
 func _step_wood(agent: PlayAgent) -> bool:
 	var base: Vector2i = _nearest_tree_base(agent)
@@ -1223,7 +1223,7 @@ func _step_wood(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"wood", 0)) >= 1
 
 
-## Step 4 — claim the Bazaar: place one wood block in the gap of the ruined frame near spawn, completing it.
+## Step 4. Claim the Bazaar: place one wood block in the gap of the ruined frame near spawn, completing it.
 func _step_bazaar(agent: PlayAgent) -> bool:
 	var gap: Vector2i = agent.sim.bazaar_completion_cell()
 	if gap.x < 0:
@@ -1237,7 +1237,7 @@ func _step_bazaar(agent: PlayAgent) -> bool:
 	return not agent.sim.find_bazaars().is_empty()
 
 
-## Step 5 — craft a Drill AT the Bazaar: earn its ingot price (research just spent the last batch), then
+## Step 5. Craft a Drill AT the Bazaar: earn its ingot price (research just spent the last batch), then
 ## walk to the stall (crafting is gated on proximity) and craft.
 func _step_craft(agent: PlayAgent) -> bool:
 	var price: int = int((load(DRILL) as MachineDef).craft_cost.get(&"ingot", 0))
@@ -1254,9 +1254,9 @@ func _step_craft(agent: PlayAgent) -> bool:
 	return int(agent.sim.inventory.get(&"drill", 0)) >= 1 or _has_drill(agent)
 
 
-## Step 4 — drop the Drill above the vein (boring model): the mineshaft has a VISIBLE solid ore vein with an
+## Step 4. Drop the Drill above the vein (boring model): the mineshaft has a VISIBLE solid ore vein with an
 ## OPEN cell above it; place the Drill in that open cell and it bores DOWN into the ore, whose pull falls into
-## the forge below. We reach in from the shaft EDGE (col-1) so we never drop into the very cell we're placing.
+## the forge below. The reach-in comes from the shaft EDGE (col-1) so the body never drops into the cell being placed.
 func _step_build(agent: PlayAgent) -> bool:
 	if not await agent.walk_to_column(MainView.MINESHAFT_COL - 1):  # stand on the surface beside the shaft, in reach
 		return false
@@ -1275,8 +1275,8 @@ func _step_build(agent: PlayAgent) -> bool:
 	return agent.sim.machine_at(d) != null
 
 
-## Step 5 — fuel the Drill: mine the coal vein (right of the shaft), then drop coal down the open shaft so
-## it lands in the drill (the demand-web — the drill won't pull ore without coal).
+## Step 5. Fuel the Drill: mine the coal vein (right of the shaft), then drop coal down the open shaft so
+## it lands in the drill (the demand-web; the drill won't pull ore without coal).
 func _step_fuel(agent: PlayAgent) -> bool:
 	agent._note("  fuel: START body@%s (coal target=%s)" % [
 		agent.main._cell_at(agent.player.position), _nearest_coal(agent)])
@@ -1329,7 +1329,7 @@ func _drill_has_fuel(agent: PlayAgent) -> bool:
 	return false
 
 
-## Step 6 — stand back and let the fueled line run until it pours ingots on its own (no further input).
+## Step 6. Stand back and let the fueled line run until it pours ingots on its own (no further input).
 func _step_auto(agent: PlayAgent) -> bool:
 	for _i: int in 200:
 		await physics_frame
@@ -1345,7 +1345,7 @@ func _has_drill(agent: PlayAgent) -> bool:
 
 
 ## The base (lowest) trunk cell of the nearest TREE. Identifies a trunk as a WOOD cell crowned by LEAVES
-## directly above (which only a real tree-top has — a bazaar frame post has wood or sky above it, never
+## directly above (which only a real tree-top has; a bazaar frame post has wood or sky above it, never
 ## leaves), then descends that column to the base. Robust even when a canopy overlaps the frame's columns.
 func _nearest_tree_base(agent: PlayAgent) -> Vector2i:
 	var top := Vector2i(-1, -1)
@@ -1376,7 +1376,7 @@ func _walk_to_bazaar(agent: PlayAgent) -> bool:
 	var bzs: Array[Vector2i] = agent.sim.find_bazaars()
 	if bzs.is_empty():
 		return false
-	# Stand just outside the frame on the RIGHT (spawn/shaft) side — the whole hand-work + shaft lie to its
+	# Stand just outside the frame on the RIGHT (spawn/shaft) side; the whole hand-work + shaft lie to its
 	# right, so crafting from that side keeps the agent on the working side. (The frame is walk-through now,
 	# so this is about staying near the work, not avoiding a wall.) The craft radius reaches the interior.
 	await agent.walk_to_column(bzs[0].x + FactorySim.BAZAAR_W)
@@ -1407,7 +1407,7 @@ func _claim_and_approach_bazaar(agent: PlayAgent) -> bool:
 	return near
 
 
-## The nearest solid ORE cell to the body that is NOT in the mineshaft column — so hand-mining the
+## The nearest solid ORE cell to the body that is NOT in the mineshaft column, so hand-mining the
 ## bootstrap never eats the vein the automated line will drill.
 func _nearest_ore_not_shaft(agent: PlayAgent) -> Vector2i:
 	var best := Vector2i(-1, -1)
@@ -1453,10 +1453,10 @@ func _open_cell_near(agent: PlayAgent) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-## Assert a friction journey's byproduct-effort stays under its ceiling — so a MOVEMENT REGRESSION (digging
+## Assert a friction journey's byproduct-effort stays under its ceiling, so a MOVEMENT REGRESSION (digging
 ## and climbing back gets more punishing) FAILS the harness, not just prints a bigger number. Ceilings sit
 ## ~1.6× above today's baseline: normal real-time variance passes, a doubling trips. RATCHET these DOWN as
-## the mobility tools (rope/lift) land and these numbers should plummet — that's the whole point of them.
+## the mobility tools (rope/lift) land and these numbers should plummet; that's the whole point of them.
 func _within_ceilings(agent: PlayAgent, ceilings: Dictionary) -> bool:
 	var ok: bool = true
 	for metric: String in ceilings:

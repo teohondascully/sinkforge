@@ -3,20 +3,20 @@ extends "res://tools/check_base.gd"
 ## EVERY KEY THE GAME NAMES IN PROSE MUST BE A KEY THAT DOES THAT.
 ##
 ## The other half of COMPREHENSIVE_AUDIT §199. `check_tool_text` holds a tool's blurb to the mining data;
-## this holds every player-facing sentence to the input map. The tooltips are full of keys —
+## this holds every player-facing sentence to the input map. The tooltips are full of keys:
 ##
 ##   "smeltable — a Forge turns it into ingots (toss it in, Q)"
 ##   "RMB above a drop — it unrolls down; W/S climbs it"
 ##   "routes falling items DOWN + RIGHT (aim R at it: ratio)"
 ##
-## — and nothing held any of them to `Controls.defaults()`. Bindings move more often than data tables do:
+## And nothing held any of them to `Controls.defaults()`. Bindings move more often than data tables do:
 ## `sf_research` alone has already moved once, and the comment recording it is still in controls.gd
 ## ("#S33: CONFIGURE the machine you are aiming at. Research moved to ENTER."). Every one of those moves is a
 ## chance to leave a sentence behind pointing at a key that now does something else, or nothing.
 ##
 ## A TOOLTIP THAT NAMES THE WRONG KEY IS WORSE THAN ONE THAT NAMES NONE. A player who reads "press Q" and
 ## gets nothing concludes the mechanic is broken, or that they are. There is no in-game way to discover that
-## the sentence is the thing at fault, which is what makes this whole family — text against mechanics —
+## the sentence is the thing at fault, which is what makes this whole family, text against mechanics,
 ## worth a harness layer rather than a proofread.
 ##
 ## TWO RULES, AND THE SECOND IS THE ONE WITH TEETH:
@@ -30,7 +30,7 @@ extends "res://tools/check_base.gd"
 ## THE SECOND RULE NEEDS A HAND-WRITTEN TABLE, which is the very thing this project keeps getting bitten by,
 ## so it is held from both ends: every row must be exercised by some sentence (or it is a stale row nobody
 ## noticed), and every token found in prose must have a row (or it is a key nothing is guarding). What the
-## table maps is a WORD to an ACTION — the stable half — while the part that actually moves, the action to
+## table maps is a WORD to an ACTION, the stable half, while the part that actually moves, the action to
 ## its key, is read live from Controls. A row only goes stale if the prose stops mentioning it at all.
 ##
 ## Runs headless: InputMap registration needs no display.
@@ -128,7 +128,7 @@ func _run() -> void:
 	for tok: Variant in CLAIMS:
 		if not found.has(String(tok)):
 			stale.append(String(tok))
-	# A stale row is not a failure — prose is allowed to stop mentioning a key — but an accumulation of
+	# A stale row is not a failure, since prose is allowed to stop mentioning a key, but an accumulation of
 	# them means the table has drifted away from the text it claims to guard, and a table nobody exercises
 	# is not a guard. Reported, and floored, rather than asserted empty.
 	print("  %d of %d claim rows are exercised by prose%s"
@@ -138,7 +138,7 @@ func _run() -> void:
 		"at least 6 claim rows are actually exercised (%d are)" % (CLAIMS.size() - stale.size()))
 
 	# NON-VACUITY. Every assertion above is satisfied by prose containing no keys at all, which is exactly
-	# what a broken tokeniser produces — and the LIVE and CORRECT rules would both report perfect health.
+	# what a broken tokeniser produces, and the LIVE and CORRECT rules would both report perfect health.
 	_check(found.size() >= 6, "%d distinct keys were found in the prose" % found.size())
 	_check(prose.size() >= 20, "%d player-facing sentences were read" % prose.size())
 
@@ -176,7 +176,7 @@ func _labels_in_use() -> Dictionary:
 	return out
 
 
-## Does `action` have ANY bound event labelled `label`? Not just its first — GRAPPLE is F and the middle
+## Does `action` have ANY bound event labelled `label`? Not just its first: GRAPPLE is F and the middle
 ## mouse button, and a sentence naming either one is telling the truth.
 func _action_has_label(action: StringName, label: String) -> bool:
 	if not InputMap.has_action(action):

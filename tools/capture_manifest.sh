@@ -12,8 +12,8 @@
 # WHAT THIS IS NOT, and the two designs it replaces, because both were wrong in instructive ways:
 #
 #   "no capture may be older than the newest file that draws it."  Its population is "did any drawing file
-#   change" and its claim is "is this frame out of date" — different populations. Under it, a commit that
-#   reordered a price label in the Bazaar marks `_moment_delve.png` — rock in the dark — stale. It would
+#   change" and its claim is "is this frame out of date": different populations. Under it, a commit that
+#   reordered a price label in the Bazaar marks `_moment_delve.png`, rock in the dark, stale. It would
 #   also be red within the hour of every renderer commit, and a permanently red gate gets ignored or gets
 #   its floor lowered.
 #
@@ -30,7 +30,7 @@
 # 'regenerable'. Re-running tools/sees.sh does not reproduce them, because the game underneath has changed;
 # each capture records a world that no longer exists. That is an argument for versioning them, not against."*
 #
-# So the set is an ARCHIVE, not a baseline, and the defect is not that it is mixed — it is that it is mixed
+# So the set is an ARCHIVE, not a baseline, and the defect is not that it is mixed; it is that it is mixed
 # SILENTLY. A mixed archive that says so is usable; a uniform one that says nothing is only accidentally
 # safe. This describes rather than forbids: every frame, the commit that wrote it, and a signature of the
 # drawing sources as they stood in that commit's tree, so two frames sharing a signature are pictures of the
@@ -47,12 +47,12 @@
 # to the question anyway: "which commit" is a pointer, "which renderer" is the fact. `git log -1 -- <file>`
 # recovers the sha in one command when somebody actually wants it.
 #
-# It still lags by one commit — a capture must be committed before this can describe it — so adding or
+# It still lags by one commit, since a capture must be committed before this can describe it, so adding or
 # re-shooting frames is two commits: the frames, then the manifest. `--check` gates the PUSHED tip, where
 # the first is already history.
 #
 # THE MANIFEST IS GENERATED, NEVER EDITED. `--check` regenerates it and diffs, so it cannot drift from the
-# repository the way a hand-kept list would — the failure this project has now hit in `check_item_reads`'s
+# repository the way a hand-kept list would: the failure this project has now hit in `check_item_reads`'s
 # ITEMS list, in the capture count, and in the material registry.
 #
 # A CORRECTION TO `3c46c8c`, PLACED HERE BECAUSE A COMMIT MESSAGE CANNOT BE EDITED. That commit bars lossy
@@ -64,9 +64,9 @@
 # The knockout evidence is decisive the other way: `check_rock_reads` moved 61% -> 87% across a shader
 # mutation with no capture re-shot, which is only possible if it renders live.
 #
-# The bar on lossy is probably still right — an archive of pixel evidence should not be requantized — but
-# it is resting on a coupling that is not there, and a rule with a false reason is a rule that gets refuted
-# and taken down with it.
+# The bar on lossy is probably still right, since an archive of pixel evidence should not be requantized,
+# but it is resting on a coupling that is not there, and a rule with a false reason is a rule that gets
+# refuted and taken down with it.
 #
 # Needs no Godot and no display. Pure git.
 
@@ -96,11 +96,11 @@ sed -n '/^	match moment:/,/^		_:/p' tools/capture_moments.gd \
 # WHAT WAS AND WAS NOT MEASURED, because the difference decides how much this fix is worth. Adding them did
 # NOT change the partition of the existing 52 captures: the same frames group together before and after, only
 # the labels moved. No frame in the manifest today was ever mislabelled. What IS true is that the collision is
-# reachable — 9 of the 283 commits that touch any drawer touch ONLY these two among them (four of those on
+# reachable: 9 of the 283 commits that touch any drawer touch ONLY these two among them (four of those on
 # 2026-08-20, rewriting the star field and the clouds), and two captures either side of one of those nine
 # would have collided. The bug is real and unphotographed, not real and demonstrated.
 #
-# The test for membership is "does this file put pixels in a capture", not "is it part of terrain" — which
+# The test for membership is "does this file put pixels in a capture", not "is it part of terrain", which
 # is the reading that let two obviously-drawing files sit outside a list named for drawing.
 { echo scenes/world_renderer.gd; echo scenes/visuals.gd; echo scenes/hud.gd
   echo scenes/fine_terrain.gd; echo scenes/terrain_painter.gd
@@ -171,7 +171,7 @@ n=0
 } > "$TMP/manifest.md"
 
 # The summary is appended after the table so the counts are of what was actually written, not of what was
-# expected — a header that states a count it did not derive is the defect this repo has hit twice.
+# expected; a header that states a count it did not derive is the defect this repo has hit twice.
 {
 	echo
 	echo "## Cohorts"

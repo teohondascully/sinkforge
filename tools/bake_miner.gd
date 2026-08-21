@@ -2,16 +2,16 @@ extends SceneTree
 
 ## THE MINER, AUTHORED.
 ##
-## What was here: one 32x48 PNG with 877 distinct colours in 1111 opaque pixels — very nearly a unique
+## What was here: one 32x48 PNG with 877 distinct colours in 1111 opaque pixels, very nearly a unique
 ## colour per pixel. That is a soft image at pixel-art size, not pixel art, and it loses twice over. It
 ## fights a world whose terrain, ore and machines are all code-drawn from a tight palette, and it wrecks
 ## the sticker rim: Player._draw builds that rim by stamping the sprite eight times behind itself, so a
 ## silhouette with soft alpha edges smears into a halo instead of cutting a crisp outline. Every other
-## animation key — walk, jump, climb, dig — fell back to that same still frame, so the body was a decal
+## animation key fell back to that same still frame: walk, jump, climb, dig. So the body was a decal
 ## while the rope did all the moving.
 ##
 ## So the miner is authored the way everything else in this game is authored: from source, in a tool, with
-## a palette you can read. Frames are ASCII over a named palette. That is not a gimmick — at 32x48 the art
+## a palette you can read. Frames are ASCII over a named palette. That is not a gimmick: at 32x48 the art
 ## IS the data, and having it in the repo as text means a limb can be moved by editing a line, the whole
 ## set stays consistent because every frame shares one BASE, and a diff shows what changed.
 ##
@@ -20,7 +20,7 @@ extends SceneTree
 ##   INTERIOR VALUE.  The old sprite was one mid-brown mass. Under the veil, at 32px, that reads as a blob.
 ##                    Every limb here is lit on its FRONT edge and shadowed on its back, so the figure has
 ##                    form before any lighting touches it, and the leading edge is what the eye finds first.
-##   A COLOUR NOTHING ELSE WEARS. The world is warm — dirt, brass, forge glow, amber UI — and the miner
+##   A COLOUR NOTHING ELSE WEARS. The world is warm, all dirt, brass, forge glow and amber UI, and the miner
 ##                    was warm too, which is why testers kept reading him as one of the machines. Lamp
 ##                    housing, goggles, a bandolier down the chest, the glove cuffs and the belt buckle are
 ##                    TEAL. Same reasoning that made the outer rim cool, carried inside the silhouette
@@ -33,7 +33,7 @@ extends SceneTree
 ##                    streams the legs back, hauling folds the arm in, hanging drops them straight.
 ##
 ## Writes assets/sprites/miner_*.png plus a labelled contact sheet for eyeballing. It does NOT overwrite
-## assets/sprites/miner.png — the hand-made original and its .aseprite stay exactly where they are, and
+## assets/sprites/miner.png; the hand-made original and its .aseprite stay exactly where they are, and
 ## the new idle lands as miner_idle.png until someone decides to promote it.
 ##
 ##   godot --headless --path . --script res://tools/bake_miner.gd
@@ -70,7 +70,7 @@ const PALETTE: Dictionary = {
 	"F": Color8(178, 142, 104),      # ...and its lit side, so the head is not a flat patch
 }
 
-## THE BASE: helmet, lamp, face, torso, pack and belt — everything that does not move. Authored facing
+## THE BASE: helmet, lamp, face, torso, pack and belt; everything that does not move. Authored facing
 ## LEFT, because Player._draw flips for a body facing right. Rows are y, characters are x; a row may stop
 ## early and the rest is treated as transparent, which keeps the leading-dot count the only thing to get
 ## right. Rows 0-33; the legs take over at 34.
@@ -111,7 +111,7 @@ const BASE: Array[String] = [
 	"......kddddddddddddddk",
 ]
 
-## GEAR: stamped BEFORE the base, so the body occludes it. That is the whole trick — the haft can run
+## GEAR: stamped BEFORE the base, so the body occludes it. That is the whole trick: the haft can run
 ## straight into the pack and simply stop being drawn, which is what a strapped-on tool looks like.
 ## Rows are absolute y, same as BASE.
 const GEAR: Dictionary = {
@@ -136,11 +136,11 @@ const GEAR: Dictionary = {
 }
 
 ## ARMS: rows start at y=12 (ARM_TOP) so a raised arm can reach face height, and a block may run as long
-## as it likes — dig_down's pick keeps going down past the hips. Stamped LAST, over everything, because
+## as it likes; dig_down's pick keeps going down past the hips. Stamped LAST, over everything, because
 ## the near arm is the nearest thing to the camera. Only non-'.' cells are written, so the torso shows
 ## through everywhere an arm is not.
 const ARMS: Dictionary = {
-	# At rest, hanging down the front of the coat. Every arm carries 'h' on its leading edge — a full step
+	# At rest, hanging down the front of the coat. Every arm carries 'h' on its leading edge, a full step
 	# lighter than the torso it hangs over, which is the only thing that stops it disappearing into the coat.
 	"rest": [
 		"", "", "", "", "", "", "",
@@ -188,7 +188,7 @@ const ARMS: Dictionary = {
 		"..........kSssk",
 		"...........kkk",
 	],
-	# Up and forward — reaching for a line that is above and ahead of him.
+	# Up and forward: reaching for a line that is above and ahead of him.
 	"reach": [
 		"", "",
 		"..kSssk",
@@ -199,7 +199,7 @@ const ARMS: Dictionary = {
 		".....klbk",
 		"......khhk",
 	],
-	# Straight up — a fist closed on a rope directly overhead.
+	# Straight up: a fist closed on a rope directly overhead.
 	"grip": [
 		"",
 		".....kSsk",
@@ -260,7 +260,7 @@ const ARMS: Dictionary = {
 
 ## LEGS: rows start at y=34 (LEG_TOP). The near leg carries the lit edge 'l' on its front, the far leg
 ## carries 'd' on its back, so even when the two overlap you can tell which is which. Every grounded pose
-## puts a sole on row 47 — the bottom of the sprite, which is the bottom of the collider.
+## puts a sole on row 47: the bottom of the sprite, which is the bottom of the collider.
 const LEGS: Dictionary = {
 	"stand": [
 		".........kbbbbkbbddk",
@@ -295,7 +295,7 @@ const LEGS: Dictionary = {
 		"...kSsssssk....kSssssk",
 		"...kkkkkkkk....kkkkkkk",
 	],
-	# Contact pose B: the same stride with the roles swapped — far leg leads, so the lit edge moves.
+	# Contact pose B: the same stride with the roles swapped; far leg leads, so the lit edge moves.
 	"stride_b": [
 		".........kbbbbkbbddk",
 		"........kdbbbkklbbbk",
@@ -329,7 +329,7 @@ const LEGS: Dictionary = {
 		"..............kSsssk",
 		"..............kkkkkk",
 	],
-	# Pass B: the mirror — far leg swings through behind him, near leg holds the weight. Having two
+	# Pass B: the mirror; far leg swings through behind him, near leg holds the weight. Having two
 	# different pass frames is what stops walk_1 and walk_3 from being the same picture twice.
 	"pass_b": [
 		".........kbbbbkbbddk",
@@ -394,7 +394,7 @@ const LEGS: Dictionary = {
 		"...........kSsssskSsssk",
 		"...........kkkkkkkkkkkk",
 	],
-	# Straight down and closed up — dead weight on a line.
+	# Straight down and closed up: dead weight on a line.
 	"hang": [
 		".........kbbbbkbbddk",
 		"..........klbbkbddk",

@@ -6,16 +6,16 @@ extends "res://tools/check_base.gd"
 ## calves the contiguous run with it. The mechanic has exactly one rule that must never bend, stated twice in
 ## `docs/BITS.md` §4 on purpose: **cutting ACROSS the grain costs nothing extra.** It is today's mining, one
 ## cell, at today's speed. The moment a wrong swing is slower than it used to be, this stops being a reward
-## for reading the rock and becomes the treadmill wearing a hat — so that is the property this layer exists
+## for reading the rock and becomes the treadmill wearing a hat, so that is the property this layer exists
 ## to hold, and it is checked from both ends: along the grain must take MORE than one cell, across it must
 ## take EXACTLY one.
 ##
 ## The other three are the ways a run could quietly become a cheat:
-##   * THE CAP — a blow may never take more than `RUN_CAP` cells however long the plane runs.
-##   * THE DRIVE — a run re-checks `can_mine` per cell, so a seam can never smuggle you through rock your
+##   * THE CAP: a blow may never take more than `RUN_CAP` cells however long the plane runs.
+##   * THE DRIVE: a run re-checks `can_mine` per cell, so a seam can never smuggle you through rock your
 ##     pick cannot bite. Without this a bedding plane running into the deepslate band would hand a wood pick
 ##     the deep third of the world.
-##   * CONTIGUITY — a run stops at the first cell that is not part of it, so one blow can never reach across
+##   * CONTIGUITY: a run stops at the first cell that is not part of it, so one blow can never reach across
 ##     an open chamber and take rock on the far side.
 ##
 ## Determinism gets its own check because the whole design rests on it: a seam is a pure function of
@@ -74,13 +74,13 @@ func _field() -> void:
 	_check(density >= MIN_DENSITY and density <= MAX_DENSITY,
 		"between %.0f%% and %.0f%% of the rock is grained" % [MIN_DENSITY * 100.0, MAX_DENSITY * 100.0])
 
-	# THIS READ `Seams.at(probe, seed) == Seams.at(probe, seed)` — the identical call on both sides of the
+	# THIS READ `Seams.at(probe, seed) == Seams.at(probe, seed)`: the identical call on both sides of the
 	# equals, at one hand-picked cell. It could only have failed for a function that answered two adjacent
 	# invocations differently, and it would have passed just as cheerfully for a `Seams.at` that returned
 	# NONE for the entire world. The property its label claims is PURITY: the answer depends on (cell,
-	# seed) and on nothing else — not on call order, not on what was asked before it. So take a spread of
+	# seed) and on nothing else: not on call order, not on what was asked before it. So take a spread of
 	# cells, keep the answers, then ask again in REVERSE order with a different seed interleaved between
-	# every pair, which is where a memo on "the last seed I was given" would die.
+	# every pair, which is where a memo on "the last seed handed in" would die.
 	var probes: Array[Vector2i] = []
 	var first: Array[int] = []
 	for i: int in range(0, 96):
@@ -108,21 +108,21 @@ func _field() -> void:
 
 	# PRECEDENCE, WHERE THE TWO PLANES CROSS. Bedding beats joint. That order is arbitrary but it must be
 	# FIXED, because the renderer draws the grain and the swing calves along it and the two have to be
-	# reading the same answer — and this file already DEPENDS on it in two places (`_plain_row` exists only
+	# reading the same answer, and this file already DEPENDS on it in two places (`_plain_row` exists only
 	# because a joint on a bedding row would report as bedding and be struck along the grain instead of
 	# across it). It was stated in a comment and relied on by the fixtures, and asserted nowhere, which is
 	# the shape of a rule that gets quietly inverted by a refactor while every test stays green.
 	#
 	# The FIXTURE guard carries the "this is really a joint" half: `_joint_column` returns a column only if
 	# it answered VERTICAL on that row, so the `>= 0` below already says so and re-asserting it here would
-	# be a check that cannot fail — the exact thing this commit is repairing elsewhere. One assertion, then,
+	# be a check that cannot fail: the exact thing this commit is repairing elsewhere. One assertion, then,
 	# and it is the load-bearing one. What it does NOT prove is that the joint SPANS as far as the bedding
 	# row: a joint that simply stops short reads identically from outside. So this is precedence as far as
 	# the field exposes it, which is further than nothing and is all that can be claimed honestly.
 	var cross_row: int = _bedding_row()
 	var cross_plain: int = _plain_row()
 	var cross_col: int = _joint_column(cross_plain) if cross_plain >= 0 else -1
-	# NON-VACUITY — the CROSSING has to exist before anything can be claimed about precedence at it.
+	# NON-VACUITY: the CROSSING has to exist before anything can be claimed about precedence at it.
 	_check(cross_row >= 0 and cross_col >= 0,
 		"there is a bedding row and a joint column to cross (row %d, joint at col %d on plain row %d)"
 			% [cross_row, cross_col, cross_plain])
@@ -134,7 +134,7 @@ func _field() -> void:
 				% Seams.at(Vector2i(cross_col, cross_row), seed))
 
 	# PLANES, not a sprinkle. A bedding row must be bedding for its WHOLE length, because that is what makes
-	# runs exist at all — a per-cell roll would give a run of three about once in six hundred cells.
+	# runs exist at all; a per-cell roll would give a run of three about once in six hundred cells.
 	var row: int = _bedding_row()
 	_check(row >= 0, "the world has at least one bedding plane in it")
 	if row >= 0:
@@ -162,7 +162,7 @@ func _swings() -> void:
 	_check(took > 1, "striking ALONG the grain calves more than the struck cell")
 	_check(took <= Seams.RUN_CAP, "a blow never takes more than RUN_CAP (%d) cells" % Seams.RUN_CAP)
 
-	# ACROSS THE GRAIN — the rule that must never bend. A JOINT (vertical plane) struck sideways is being
+	# ACROSS THE GRAIN: the rule that must never bend. A JOINT (vertical plane) struck sideways is being
 	# cut across, so it must cost exactly what it always cost: one cell.
 	# The joint has to be sampled on a row that is NOT itself bedding: bedding wins the precedence, so a
 	# joint crossing a bedding plane reports as bedding, and striking it sideways would be along the grain.
@@ -238,7 +238,7 @@ func _bedding_row() -> int:
 	return -1
 
 
-## A row with no bedding plane on it — where a joint can actually surface.
+## A row with no bedding plane on it, where a joint can actually surface.
 func _plain_row() -> int:
 	for y: int in range(MainView.SURFACE + 6, MainView.SURFACE + 40):
 		if Seams.at(Vector2i(0, y), _sim.world_seed) != Seams.HORIZONTAL:

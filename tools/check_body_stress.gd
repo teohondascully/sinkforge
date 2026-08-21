@@ -1,20 +1,20 @@
 extends SceneTree
 
-## Harness layer — ADVERSARIAL BODY PHYSICS under TERRAIN CHURN. The static-course movement layers
+## Harness layer: ADVERSARIAL BODY PHYSICS under TERRAIN CHURN. The static-course movement layers
 ## (check_step / check_walk / check_stepup / check_agility) prove the body moves well on terrain that
 ## HOLDS STILL. Live play surfaces a different bug class: the body getting STUCK, CLIPPING INTO SOLID,
-## or FLUNG OUT OF THE WORLD when the ground changes UNDER and AROUND it — you mine the cell under your
+## or FLUNG OUT OF THE WORLD when the ground changes UNDER and AROUND it: you mine the cell under your
 ## feet, you wall yourself in with placed blocks, you drop into a freshly-carved pit, the world churns
 ## while you're mid-step. That's what this hunts, in the REAL-TIME physics the sim-level stress tests
 ## can't reach: boot the real scene, drive the real Player, edit terrain with the sim's discrete API,
 ## and after each churn run the body a bounded number of frames (steering / jumping to escape) and
-## assert the BODY INVARIANTS — never asserting exact positions (real-time physics has minor variance),
+## assert the BODY INVARIANTS, never asserting exact positions (real-time physics has minor variance),
 ## only the invariants that a shipping body must never violate:
 ##   - NEVER INSIDE SOLID: after it settles, no solid cell overlaps the body's AABB.
 ##   - IN-WORLD: the body's cell stays within the world rect at all times (never flung out of bounds).
 ##   - NOT PERMANENTLY STUCK: given open floor, steering produces horizontal movement within N frames.
 ##   - no crash / valid state throughout.
-## Deterministic fixed scenario sequence — NO unseeded random. HEADED:
+## Deterministic fixed scenario sequence, NO unseeded random. HEADED:
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_body_stress.gd
 
 const SCENE: String = "res://scenes/main.tscn"
@@ -67,7 +67,7 @@ func _body_cells() -> Array[Vector2i]:
 			out.append(Vector2i(cx, cy))
 	return out
 
-## How many of the body's overlapped cells are BLOCKING solid (earth/stone/etc — NOT walk-through
+## How many of the body's overlapped cells are BLOCKING solid (earth/stone/etc, NOT walk-through
 ## wood/leaves, which the body legitimately passes). 0 = the body is not inside rock.
 func _solid_overlap_count() -> int:
 	var n: int = 0
@@ -78,7 +78,7 @@ func _solid_overlap_count() -> int:
 				n += 1
 	return n
 
-## True iff the body is FULLY inside solid — every overlapped cell is blocking rock. A body perched on a
+## True iff the body is FULLY inside solid: every overlapped cell is blocking rock. A body perched on a
 ## ledge or squeezed in a gap may clip ONE cell for a frame during a resolve; being wholly buried in rock
 ## (no open cell in its footprint at all) is the real "clipped into solid" bug.
 func _fully_buried() -> bool:
@@ -87,7 +87,7 @@ func _fully_buried() -> bool:
 		return false
 	return _solid_overlap_count() == cells.size()
 
-## The body's center cell — used for the settled "not inside solid" invariant (its feet/center must be
+## The body's center cell, used for the settled "not inside solid" invariant (its feet/center must be
 ## a standable, non-solid cell once the dust settles).
 func _center_cell() -> Vector2i:
 	return Vector2i(floori(_player.position.x / 32.0), floori(_player.position.y / 32.0))
@@ -106,7 +106,7 @@ func _fail(msg: String) -> void:
 
 
 ## Leftmost column of a flat clear run of `length` columns (open air above the surface for the body to
-## stand in), or -1. Mirrors check_step._flat_run — clean terrain so the churn isn't fighting a ramp.
+## stand in), or -1. Mirrors check_step._flat_run: clean terrain so the churn isn't fighting a ramp.
 func _flat_run(start: int, length: int) -> int:
 	for c: int in range(start, FactorySim.GRID_COLS - length - 1):
 		var r: int = _sim.surface_row(c)
@@ -201,7 +201,7 @@ func _run_mine_under_feet() -> void:
 		_start_wall_in()
 		return
 	if _budget <= 0:
-		# It never came to rest — either fell forever (out of world caught above) or is jittering.
+		# It never came to rest: either fell forever (out of world caught above) or is jittering.
 		if _fully_buried():
 			_fail("[1] body never settled and is buried in solid (cell=%s)" % _center_cell())
 		else:
@@ -309,27 +309,27 @@ func _run_carved_pit() -> void:
 		_fail("[3] body clipped INTO solid inside the pit (cell=%s overlap=%d)"
 				% [_center_cell(), _solid_overlap_count()])
 		_start_churn_burst(); return
-	# Let it fall and settle with NO input first — count consecutive grounded frames as "settled"
+	# Let it fall and settle with NO input first; count consecutive grounded frames as "settled"
 	# (leaving the floor resets it, so a bounce doesn't count as rest).
 	_player.input_dir = 0.0
 	_sub = _sub + 1 if _player.on_floor else 0
 	if _sub >= SETTLE_FRAMES:
-		# It rests cleanly on the pit floor (not buried, in-world — asserted above). That IS the pass: a
+		# It rests cleanly on the pit floor (not buried, in-world, asserted above). That IS the pass: a
 		# 1-wide 4-deep pit is a legitimate trap you'd need a rope/pillar to leave; the invariant is that
 		# the drop was CLEAN and the body is in a valid resting state, not clipped, not flung out.
 		print("    PASS: fell into the pit cleanly, rests not-clipped and in-world (cell=%s)" % _center_cell())
 		_start_churn_burst()
 		return
 	if _budget <= 0:
-		# Never settled in budget — still a pass IF it stayed clean the whole time (invariants above held).
+		# Never settled in budget; still a pass IF it stayed clean the whole time (invariants above held).
 		print("    PASS(soft): never buried / in-world through the pit fall (didn't fully rest in budget)")
 		_start_churn_burst()
 
 
-# --- SCENARIO 4: a churn burst — a fixed interleaved sequence of edits around the steered body -----
+# --- SCENARIO 4: a churn burst, a fixed interleaved sequence of edits around the steered body -----
 
 ## The fixed churn program: (op, dx, dy) relative to the body's footing column/surface row. op 0 =
-## set_solid stone, op 1 = mine/erase. Deterministic, ~30 edits touching the body's neighbourhood — the
+## set_solid stone, op 1 = mine/erase. Deterministic, ~30 edits touching the body's neighbourhood: the
 ## cells beside, above, and below it while it's steered left/right. NO random.
 const CHURN: Array[Vector3i] = [
 	Vector3i(0, 1, 0),   Vector3i(0, -1, 0),  Vector3i(1, 0, 0),   Vector3i(0, 0, -3),

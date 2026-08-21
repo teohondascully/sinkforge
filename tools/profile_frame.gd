@@ -3,14 +3,14 @@ extends SceneTree
 ## WHERE DOES THE FRAME GO?
 ##
 ## check_frametime says a frame costs 39.59ms during a dig against an 8.33ms budget. It does not say WHY,
-## and the project has never had a tool that does — `_crystal_seams_cached()` carries a comment reading
+## and the project has never had a tool that does. `_crystal_seams_cached()` carries a comment reading
 ## "the profiler measures it in isolation", and there is no profiler and never was. So every optimisation
 ## decision so far has been taken against a total, which is how you end up tuning the wrong thing
 ## confidently.
 ##
 ## This measures the two costs the dig path pays every frame, ON A REAL WORLD, AT DEPTH:
 ##
-##   _exposed_ore_cells()  scans sim.deposits — EVERY deposit in the world, not the ones in view — and
+##   _exposed_ore_cells()  scans sim.deposits, EVERY deposit in the world, not the ones in view, and
 ##                         view-culls each one. Its cost is a property of the world, not of the screen.
 ##   _crystal_seams()      floods those survivors into clusters with an inner `for other in cells` rescan
 ##                         per frontier pop. That is O(n^2) in exposed ore, and a dig EXPOSES ore, so n
@@ -18,15 +18,15 @@ extends SceneTree
 ##
 ## and one structural fact that decides whether the cache in front of them does anything at all:
 ##
-##   THE CACHE.  _crystal_seams_cached() refloods when `view != _crystal_seams_view` — exact float Rect2
+##   THE CACHE.  _crystal_seams_cached() refloods when `view != _crystal_seams_view`: exact float Rect2
 ##               equality. If the camera moves at all, that is a miss. Standing still it is a hit. So the
 ##               cache may be protecting IDLE and doing nothing whatsoever for RUN, DIG and SWING, which
 ##               are three of the four phases that have to make budget. This counts the misses instead of
 ##               reasoning about them.
 ##
 ## WHAT THIS IS NOT: it is not a pass/fail layer and it asserts nothing. It prints numbers to attribute a
-## budget failure. Absolute milliseconds are only worth quoting from an otherwise idle machine — the same
-## caveat add_excl exists for — and the RATIOS and the COUNTS below survive contention regardless, which
+## budget failure. Absolute milliseconds are only worth quoting from an otherwise idle machine, the same
+## caveat add_excl exists for, and the RATIOS and the COUNTS below survive contention regardless, which
 ## is deliberate: the load-bearing outputs of this tool are `n` and `misses`, not the ms.
 ##
 ##   godot --path . --script res://tools/profile_frame.gd
@@ -44,7 +44,7 @@ const REPEATS: int = 12           ## calls per probe, medianed — one call is n
 ## How far below the body to look for real rock. This tool originally aimed each dig blindly at the cell
 ## one row down, which is the defect found in check_frametime's DIG phase (8d72dae): on
 ## frames where that cell is already open the dig lands on air, the frame costs nothing, and the profile
-## prices a body standing still. A profiler with that bug is worse than none — it reports its cheapest
+## prices a body standing still. A profiler with that bug is worse than none: it reports its cheapest
 ## numbers exactly when it is measuring the least, so the wrong thing looks fast. Every table below
 ## therefore also prints the mines that actually LANDED.
 const DIG_REACH: int = 6
@@ -83,7 +83,7 @@ func _run() -> void:
 	print("  depth  mines   n(exposed)   exposed_ore_cells   crystal_seams   seams   frame   seams as %% of frame")
 
 	for p: int in PROBES:
-		# Dig down PROBE_FRAMES cells, timing the real frames as we go — the same drive check_frametime uses.
+		# Dig down PROBE_FRAMES cells, timing the real frames along the way: the same drive check_frametime uses.
 		var frames: PackedFloat32Array = PackedFloat32Array()
 		var mined: int = 0
 		var last: int = Time.get_ticks_usec()
@@ -125,7 +125,7 @@ func _run() -> void:
 		prev = now_view
 	print("  view-rect cache: %d/60 frames of digging saw a MOVED view (each one refloods)" % misses)
 
-	# And the control — standing perfectly still, which is the only case the cache was ever measured in.
+	# And the control: standing perfectly still, which is the only case the cache was ever measured in.
 	player.input_dir = 0.0
 	for _i: int in 20:
 		await RenderingServer.frame_post_draw
@@ -147,13 +147,13 @@ func _run() -> void:
 	# presentation at all.
 	#
 	# So this does the renderer's own job under a stopwatch. `try_mine` leaves its edits in
-	# `sim.terrain_dirty`; we take that list, CLEAR it so _process does not also bake it, and then run the
-	# exact three passes _process would have run — the chunk repaint, the fine-region patch, and the veil —
-	# timing each. Same work, same order, once, measured.
+	# `sim.terrain_dirty`; that list is taken and CLEARED so _process does not also bake it, and then the
+	# exact three passes _process would have run are timed one by one: the chunk repaint, the fine-region
+	# patch, and the veil. Same work, same order, once, measured.
 	print("")
 	print("  --- the cost of ONE dig, timed directly (immune to presentation pacing) ---")
 	# The depth probes above leave the body at the bottom of the shaft it just dug, with nothing solid
-	# within reach below it. Measuring here without moving first prices forty failed swings at air — which
+	# within reach below it. Measuring here without moving first prices forty failed swings at air, which
 	# is precisely the fixture defect that voided every DIG number this project has ever quoted, so the
 	# body gets planted on fresh ground and the guard at the end stays in regardless.
 	var fresh_col: int = _main._cell_at(player.position).x + 40
@@ -163,8 +163,8 @@ func _run() -> void:
 	for _i: int in 30:
 		await physics_frame
 	# ...and then DOWN, before measuring anything. Planting on the surface and pricing a dig there was a
-	# confound of my own making: the DIG phase this is meant to explain runs at row ~77, and the surface is
-	# the cheap case — thin rock, no ore, few lights, a veil that has barely anything to cut. A per-dig cost
+	# self-inflicted confound: the DIG phase this is meant to explain runs at row ~77, and the surface is
+	# the cheap case: thin rock, no ore, few lights, a veil that has barely anything to cut. A per-dig cost
 	# measured in daylight does not describe the frame that is failing the budget.
 	for _i: int in 70:
 		_main.try_mine(_dig_target(player))
@@ -236,7 +236,7 @@ func _run() -> void:
 
 	# WHERE INSIDE THE REGION BAKE?
 	#
-	# `rebake_region` exists to paint only the cells a dig touched — and `last_baked_cells` says it does.
+	# `rebake_region` exists to paint only the cells a dig touched, and `last_baked_cells` says it does.
 	# But it finishes by handing the WHOLE buffer to set_data and the whole image to the texture, so the
 	# dirty-region fast lane covers the paint and not the upload. These two calls are timed here exactly as
 	# rebake_region makes them, with no edit pending, so whatever they cost is what they cost per dig no
@@ -262,7 +262,7 @@ func _run() -> void:
 
 		# So it is the PAINT, not the upload. _paint_fine runs once per fine cell in the dilated region and
 		# costs ~4.7us each, which is a great deal for one texel. Its most suspicious ingredient is two
-		# FastNoiseLite lookups for the rock-hue pole — and those are PURE FUNCTIONS OF (fx, fy), exactly
+		# FastNoiseLite lookups for the rock-hue pole, and those are PURE FUNCTIONS OF (fx, fy), exactly
 		# like the `_tone` field the same file already caches and deliberately never refreshes on a dig.
 		# If they dominate, they are cacheable by the argument the file has already made once. Timed here
 		# over the same 1024-cell region a dig actually repaints.
@@ -306,7 +306,7 @@ func _run() -> void:
 				paint_ms * 1000.0 / float(maxi(n_rect, 1))])
 		print("        fine_is_solid              %6.3f ms" % solid_direct_ms)
 
-		# NO SINGLE TERM DOMINATES — stubbing six of the nine noise fields to a constant moved 7.25us/texel
+		# NO SINGLE TERM DOMINATES: stubbing six of the nine noise fields to a constant moved 7.25us/texel
 		# to 6.40, which is 12%. So the next candidate is not a term at all but the SHAPE of the function:
 		# _paint_fine makes roughly twenty helper calls per texel, and a GDScript call is expensive relative
 		# to the arithmetic inside it. If these few add up to a large fraction, the fix is inlining, which
@@ -340,8 +340,8 @@ func _run() -> void:
 	# WHAT THIS SECTION USED TO CLAIM, AND WHY IT WAS WRONG. It said: a frame that mines NOTHING still costs
 	# ~8.4ms against a budget of 8.33, so the game is at 120fps and no better even standing still, so the dig
 	# path is the smaller half of the problem. That reading was refuted by the drop-rate instrument built
-	# afterwards — an idle frame misses its deadline 0-6% of the time, and a digging frame
-	# misses 63-68%. The 8.4ms was the PANEL handing us frames at 120Hz, not the game filling them. See the
+	# afterwards: an idle frame misses its deadline 0-6% of the time, and a digging frame
+	# misses 63-68%. The 8.4ms was the PANEL delivering frames at 120Hz, not the game filling them. See the
 	# pacing detection immediately below, which is the part of this file that was right.
 	#
 	# The lesson is kept here rather than deleted, because the trap is still live: on this display "makes
@@ -377,17 +377,17 @@ func _run() -> void:
 		% [_pct(cpu, 0.50), _pct(cpu, 0.95)])
 	# A GPU timer that reads exactly zero is an unimplemented timer, not an idle GPU. Metal does not fill
 	# these timestamp queries in this build, and printing "0.00ms (executing it)" invites the reader to
-	# conclude the GPU is free — which is a claim nobody measured. Say which it is.
+	# conclude the GPU is free, which is a claim nobody measured. Say which it is.
 	if _pct(gpu, 0.50) <= 0.0 and _pct(gpu, 0.95) <= 0.0:
 		print("    render GPU         NOT MEASURED — this backend does not fill the timestamp query")
 	else:
 		print("    render GPU         p50 %5.2fms   p95 %5.2fms   (executing it)"
 			% [_pct(gpu, 0.50), _pct(gpu, 0.95)])
 	# THE SCRIPT ROW IS GONE ON PURPOSE. It read `Performance.TIME_PROCESS` and reported p50 21.89ms inside
-	# frames whose whole duration was 8.4ms — our own per-frame code taking two and a half times the frame
-	# it runs in. That is not a slow number, it is an impossible one, and I quoted it in a conclusion before
-	# noticing. I do not know what that monitor is counting here; until I do, it does not belong in a table
-	# people make decisions from. An unexplained number is worse than a missing one, because it gets used.
+	# frames whose whole duration was 8.4ms: per-frame game code taking two and a half times the frame it
+	# runs in. That is not a slow number, it is an impossible one, and it was quoted in a conclusion before
+	# anyone noticed. What that monitor is counting here is not known; until it is, it does not belong in a
+	# table people make decisions from. An unexplained number is worse than a missing one, because it gets used.
 	print("    draw calls %d · objects %d · vertices %d"
 		% [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
@@ -395,11 +395,11 @@ func _run() -> void:
 
 	# IS THIS THE GAME OR IS IT THE PANEL?
 	#
-	# This machine's display refreshes at 120Hz, so its frame interval is 8.333ms — which is EXACTLY the
+	# This machine's display refreshes at 120Hz, so its frame interval is 8.333ms, which is EXACTLY the
 	# 120fps budget. That coincidence is poison for the measurement: "the game makes budget" and "the game
 	# is pinned to the panel and its real cost is invisible" produce the same p95, and only the SHAPE of
 	# the distribution tells them apart. Paced frames pile onto multiples of the interval; frames doing
-	# real work spread out. Requesting VSYNC_DISABLED is not proof it took, either — the report below is.
+	# real work spread out. Requesting VSYNC_DISABLED is not proof it took, either; the report below is.
 	var interval: float = 1000.0 / maxf(DisplayServer.screen_get_refresh_rate(), 1.0)
 	var pinned: int = 0
 	for s: float in whole:
@@ -418,7 +418,7 @@ func _run() -> void:
 	await physics_frame
 
 
-## The first solid cell at or below the body — the same search check_frametime uses, and for the same
+## The first solid cell at or below the body: the same search check_frametime uses, and for the same
 ## reason: aiming one row down blindly makes the measurement depend on the body's sub-pixel position.
 func _dig_target(player: Player) -> Vector2i:
 	var here: Vector2i = _main._cell_at(player.position)

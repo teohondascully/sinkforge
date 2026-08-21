@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Runner instrument (NOT a harness layer — it asserts nothing on its own): brackets a harness run and
+## Runner instrument (NOT a harness layer; it asserts nothing on its own): brackets a harness run and
 ## proves the developer's real save came out the other side byte-identical.
 ##
 ## `tools/check_save_isolation.gd` proves no fixture can NAME the production slot. That is a source scan,
@@ -11,30 +11,30 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/save_sentinel.gd -- verify <statefile>
 ##   godot --headless --path . --script res://tools/save_sentinel.gd -- disarm <statefile>
 ##
-## When a real save is present it is READ ONLY — hashed, never rewritten, never moved. When none is
+## When a real save is present it is READ ONLY: hashed, never rewritten, never moved. When none is
 ## present a sentinel is planted so the empty case is still covered, and `verify` removes what `arm`
 ## planted. The planted bytes are deliberately NOT a valid SaveGame envelope: if anything did try to load
 ## it, `SaveGame.read` returns {} and the game says "no save to load" rather than acting on garbage.
 ##
-## WHY PLANT AT ALL — the question is worth answering, because this instrument writing the real save path
+## WHY PLANT AT ALL. The question is worth answering, because this instrument writing the real save path
 ## is the one thing about it that looks wrong. Without a plant, the empty case reads "absent before,
 ## absent after: pass", and that is precisely the shape of the original defect, which drove the real slot
 ## and then DELETED it. Absent-to-absent cannot tell "nothing happened" from "written, then removed".
 ## The marker turns both halves of that into evidence: overwrite it and the hash moves, delete it and the
-## file is gone. So the plant stays — and `disarm` is what pays for it, so an aborted run cannot leave the
+## file is gone. So the plant stays, and `disarm` is what pays for it, so an aborted run cannot leave the
 ## marker sitting at the player's path waiting for some later run to adopt it.
 ##
 ## WHAT DISARM ACTUALLY COVERS, measured 2026-08-17 by killing real runs mid-sweep rather than reasoning
 ## about it. The runner's EXIT trap fires on an untrapped fatal signal, so:
 ##   SIGHUP  (rc 129)  disarm ran, slot clean, lock released
 ##   SIGTERM (rc 143)  disarm ran, slot clean, lock released
-##   SIGKILL (rc 137)  NOT COVERED, and cannot be — the trap never runs. Marker and lock both survive.
+##   SIGKILL (rc 137)  NOT COVERED, and cannot be: the trap never runs. Marker and lock both survive.
 ##   SIGINT            not exercised. Bash sets SIG_IGN on asynchronous jobs and `trap -` cannot reset a
 ##                     signal inherited as ignored, so a scripted Ctrl-C is swallowed and every attempt to
 ##                     test it produced a run that simply finished. Interactively (job control on) it is
 ##                     the same bash path as HUP/TERM, but that is an argument, not a measurement.
-## SIGKILL is left uncovered on purpose. Both leftovers already have backstops that ARE tested — the next
-## `arm` adopts a stale marker as litter, and the runner clears a lock whose owning pid is gone — and a
+## SIGKILL is left uncovered on purpose. Both leftovers already have backstops that ARE tested: the next
+## `arm` adopts a stale marker as litter, and the runner clears a lock whose owning pid is gone. And a
 ## `kill -9` that still tidied up after itself would mean trapping the one signal that must stay untrappable.
 
 const SLOT: String = "user://sinkforge.save"
@@ -44,12 +44,12 @@ const SLOT: String = "user://sinkforge.save"
 const MARKER_HEAD: String = "SINKFORGE-HARNESS-SENTINEL"
 
 
-## The marker THIS run plants — carrying its pid, so no two runs ever plant the same bytes.
+## The marker THIS run plants, carrying its pid, so no two runs ever plant the same bytes.
 ##
 ## It used to be a constant, and that made every run's marker byte-identical, which quietly broke the one
 ## thing the state file is for. `verify` and `disarm` decide what they may remove by comparing the slot's
 ## hash to the digest they armed with; against a fixed string that comparison says "these are the same
-## BYTES", not "this is MY marker" — so a run finishing next to a neighbour would cheerfully delete the
+## BYTES", not "this marker is this run's". So a run finishing next to a neighbour would cheerfully delete the
 ## neighbour's live plant, and each would then accuse the harness of eating a save that never existed.
 ## The pid makes the digest a genuine identity. Two runs at once is still a thing the lock exists to stop;
 ## it should not also be a thing that produces false accusations when somebody overrides it.
@@ -58,12 +58,12 @@ static func _plant() -> String:
 
 
 # THE PRODUCTION WITNESS, and why it is a different instrument from everything above.
-# Once `run_harness.sh` moved HOME, `user://` stopped being the player's directory — so the marker this
+# Once `run_harness.sh` moved HOME, `user://` stopped being the player's directory, so the marker this
 # file plants is planted in scratch, and the old claim "the harness never touches your save" became true
 # by construction. True by construction is not proved: the isolation is three lines of shell that a future
-# edit can drop without any test noticing. So the runner hands us the REAL path it just stopped using and
-# we hash it, before and after, WITHOUT EVER OPENING IT FOR WRITE. Absent is a legitimate reading and is
-# recorded as such — the player having no save is not a failure, but "absent then present" is.
+# edit can drop without any test noticing. So the runner hands over the REAL path it just stopped using
+# and it is hashed, before and after, WITHOUT EVER OPENING IT FOR WRITE. Absent is a legitimate reading
+# and is recorded as such: the player having no save is not a failure, but "absent then present" is.
 const NO_WITNESS: String = "-"
 
 
@@ -89,10 +89,10 @@ func _initialize() -> void:
 	if mode == "arm":
 		# "Is there a real save here?" is NOT the same question as "does the file exist". A marker left
 		# behind by a run that was killed, or by a concurrent run on this machine (user:// is keyed on the
-		# project NAME, so worktrees share one slot), exists — and arming on existence alone recorded it as
+		# project NAME, so worktrees share one slot), exists, and arming on existence alone recorded it as
 		# kind=real, which meant verify would never clean it up and every later run reported "REAL SAVE
 		# PRESENT" for the harness's own litter. That happened, and it cost an investigation.
-		# Our own bytes are recognisable, so recognise them: a marker is ours to own and ours to remove.
+		# The harness's own bytes are recognisable, so recognise them: a marker it planted is its to remove.
 		var existing: bool = FileAccess.file_exists(SLOT)
 		var stale: bool = existing and FileAccess.get_file_as_string(SLOT).begins_with(MARKER_HEAD)
 		var planted: bool = not existing or stale
@@ -116,7 +116,7 @@ func _initialize() -> void:
 		var what: String = "planted"
 		if stale:
 			# ADOPTED, not re-planted. The bytes on disk are left exactly where they are and hashed as they
-			# stand — nothing is rewritten on this path. Saying "re-planted" described a write that never
+			# stand; nothing is rewritten on this path. Saying "re-planted" described a write that never
 			# happened, in the log line of the one instrument whose whole subject is who wrote what.
 			what = "adopted a stale marker"
 		elif not planted:
@@ -148,7 +148,7 @@ func _initialize() -> void:
 
 		# The witness is checked AFTER the slot verdict and reported separately, because the two answer
 		# different questions and a run can fail one while passing the other. `-` means the runner never
-		# named a production slot, so this run claims nothing about one — printed, not silently skipped.
+		# named a production slot, so this run claims nothing about one: printed, not silently skipped.
 		var was: String = st[2].strip_edges() if st.size() >= 3 else NO_WITNESS
 		var now: String = _production_digest()
 		if was != NO_WITNESS and now != was:
@@ -165,13 +165,13 @@ func _initialize() -> void:
 		quit(0)
 		return
 
-	# DISARM: the abort path. `verify` is the normal way a plant comes back up, but a run that is killed —
-	# Ctrl-C, a crashed runner, a machine that goes down — never reaches it, and the marker then sits at the
+	# DISARM: the abort path. `verify` is the normal way a plant comes back up, but a run that is killed by
+	# Ctrl-C, a crashed runner, or a machine that goes down never reaches it, and the marker then sits at the
 	# player's real save path until some later run happens to adopt it. The instrument whose entire subject
 	# is "nothing wrote that path" must not itself be what leaves litter on it.
 	#
 	# Removes ONLY what this run planted, and only while it is still byte-identical to what was planted. If
-	# the bytes moved, something wrote the slot during the run, and that is evidence — it stays on disk for
+	# the bytes moved, something wrote the slot during the run, and that is evidence; it stays on disk for
 	# whoever comes to look at it.
 	#
 	# DISARM NEVER FAILS. It is a shell trap handler's last act, and cleanup that can abort the trap is how
