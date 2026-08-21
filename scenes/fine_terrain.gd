@@ -297,7 +297,18 @@ const ROOT_DARKEN: float = 0.30
 ## visible. Roughness locates the term, it cannot choose the value.
 const COBBLE_SCALE: float = 1.0           ## pebbles you can see, not speckle you can't resolve
 const COBBLE_THRESH: float = 0.26
-const COBBLE_LIGHTEN: float = 0.26
+## A cobble is lit by the same sun as the dirt around it, so this is a gain, not a lift toward white.
+##
+## `Color.lightened(k)` is `c + (1 - c) * k`, so its absolute lift grows as the host darkens: chips in
+## shadow came out brighter than chips in light, and desaturated toward grey as they went. That is a
+## property of the operator rather than of the constant, and every k has the same sign of dependence.
+##
+## `CLAST_DARKEN` below is the same field through `Color.darkened(k)` = `c * (1 - k)`, which is
+## multiplicative and tracks host brightness 1:1. The pale half was the outlier.
+##
+## 0.942 reproduces the previous mean lift exactly, so amplitude is unchanged and only the
+## light-dependence differs. It is near 1.0 because a chip has to roughly double a dark host to read at all.
+const COBBLE_GAIN: float = 0.942
 const CLAST_THRESH: float = -0.30         ## ...and below this the inclusion is a dark lump instead
 const CLAST_DARKEN: float = 0.20
 ## The rock gets a top and a bottom.
@@ -1301,8 +1312,10 @@ func _soil(c: Color, fx: int, fy: int, pcol: int) -> Color:
 	# rather than ending at a ruled line.
 	var peb: float = _stone.get_noise_2d(float(fx) * COBBLE_SCALE, float(fy) * COBBLE_SCALE)
 	if peb > COBBLE_THRESH:
-		out = out.lightened(COBBLE_LIGHTEN * smoothstep(0.0, 1.0, (peb - COBBLE_THRESH) * STONE_RAMP)
-			* strength)
+		# Per channel and clamped, rather than `Color * float`, which would scale alpha too.
+		var gain: float = 1.0 + COBBLE_GAIN \
+			* smoothstep(0.0, 1.0, (peb - COBBLE_THRESH) * STONE_RAMP) * strength
+		out = Color(minf(out.r * gain, 1.0), minf(out.g * gain, 1.0), minf(out.b * gain, 1.0), out.a)
 	elif peb < CLAST_THRESH:
 		out = out.darkened(CLAST_DARKEN * smoothstep(0.0, 1.0, (CLAST_THRESH - peb) * STONE_RAMP)
 			* strength)
