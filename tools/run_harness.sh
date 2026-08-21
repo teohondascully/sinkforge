@@ -82,14 +82,24 @@
 #   SF_LOCK_WAIT=900   seconds to wait for a run already in flight before giving up (exit 5)
 #   SF_NO_LOCK=1       run anyway, concurrently, and own the consequences
 #
-# EXIT CODES, because there are five now and a caller that treats "not 0" as "a test failed" will
-# misdiagnose four of them:
+# EXIT CODES, because there are SEVEN now and a caller that treats "not 0" as "a test failed" will
+# misdiagnose six of them. The count said five for long enough to outlive two additions, which is the
+# small version of the same fault this list exists to prevent.
 #   0  everything that ran passed, and anything skipped is named in the summary
 #   1  a layer failed
 #   2  could not start — the sentinel would not arm, or SF_ONLY matched nothing
 #   3  the production save slot was touched (layer results are moot)
 #   4  something was skipped while SF_STRICT was on: not a full sweep
 #   5  another harness run holds the lock
+#   6  a run was killed by the wall-clock cap (see tools/with_machine.sh)
+#  43  VOID: a layer ran and could not measure its subject. NOT a failure and NOT a skip — the sample
+#      was spoiled by something outside the code, so the correct response is to run it again. Deliberately
+#      the same integer the layers use for it, so the value cannot drift between the two halves.
+#
+# 0 IS THE MOST DANGEROUS OF THESE AND IT IS NOT LISTED AS SUCH ABOVE, so it is said here: `godot --script`
+# exits 0 when the script cannot be parsed AND when the script does not exist. On a fresh clone with no
+# import step, every layer dies at load and this runner would print ALL 103 HARNESS LAYERS PASS over 103
+# layers that never ran. CI is gated against that by .github/actions/harness-verdict; a local run is not.
 #
 # THEY ARE ORDERED BY SEVERITY AND THAT MEANS 1 MASKS 4. A run that both fails a layer AND stands an
 # assertion group down exits 1, so the exit code alone cannot say the run was also incomplete — the words
@@ -187,6 +197,13 @@ fi
 # hardcoded as `const SKIP: int = 42` in the four layers that can use it — the pair is load-bearing, so if
 # you move it, move both.
 SKIP_CODE=42
+# A RUN THAT MEASURED NOTHING USABLE IS NOT A FAILURE AND NOT A SKIP. A skip is a decision the layer
+# takes from its own knowledge: no display, no declared performance host, and re-running changes
+# nothing. A VOID is the opposite — the layer ran, tried to measure, and something outside the code
+# spoiled the sample, so the correct response is to run it again. Folding that into SKIP actively
+# punishes honesty, because on a machine with a display STRICT defaults on and a skip exits 4: a
+# layer admitting its sample was dirty would go red in a way a re-run could not clear.
+VOID_CODE=43
 
 # Strict = any skip is a failure. Default: on wherever we have a display, because that is a run whose
 # results get quoted as the full suite. Off with no display, where skipping is the correct behaviour and
@@ -608,9 +625,11 @@ pass=0
 fail=0
 skip=0
 partial=0
+voided=0
 failed_names=()
 skipped_names=()
 partial_names=()
+voided_names=()
 REPORTED=()
 launched=0
 done_count=0
@@ -943,6 +962,22 @@ while [ "$done_count" -lt "$total" ]; do
 				else
 					say "$(printf '  [%2d/%2d] %-36s PASS  %3ds' "$done_count" "$total" "${NAMES[$i]}" "$el")"
 				fi
+			elif [ "$r" = "$VOID_CODE" ]; then
+				# Same two-part contract as SKIP, for the same reason: the code alone cannot distinguish a
+				# deliberate declaration from a layer that fell into a path it had no business reaching.
+				vwhy="$(grep -m1 ': VOID' "$log" | sed 's/^[[:space:]]*//' | cut -c1-88)"
+				if [ -z "$vwhy" ]; then
+					say "$(printf '  [%2d/%2d] %-36s FAIL  %3ds  exit %d (VOID) with no reason line' \
+						"$done_count" "$total" "${NAMES[$i]}" "$el" "$VOID_CODE")"
+					fail=$((fail + 1))
+					failed_names+=("${NAMES[$i]}")
+					excerpt "$log"
+				else
+					say "$(printf '  [%2d/%2d] %-36s VOID  %3ds  %s' \
+						"$done_count" "$total" "${NAMES[$i]}" "$el" "$vwhy")"
+					voided=$((voided + 1))
+					voided_names+=("${NAMES[$i]}")
+				fi
 			elif [ "$r" = "$SKIP_CODE" ]; then
 				# Half a contract is not a contract: 42 buys the SKIP state only together with a line saying why.
 				# Without one there is no telling a deliberate opt-out from a layer that fell into a skip path it
@@ -1002,6 +1037,7 @@ SENTINEL_ARMED=0
 # sentence impossible to print again: the tally always carries all four numbers, anything that did not run
 # is named, and the word ALL is reserved for a full list that skipped nothing at any level.
 tally="$pass PASS / $fail FAIL / $skip SKIP of $total"
+[ "$voided" -gt 0 ] && tally="$pass PASS / $fail FAIL / $skip SKIP / $voided VOID of $total"
 [ "$partial" -gt 0 ] && tally="$tally ($partial of those passes stood assertions down)"
 [ "$total" -ne "$DECLARED" ] && tally="$tally selected (of $DECLARED declared — SUBSET RUN)"
 
@@ -1011,10 +1047,21 @@ fi
 if [ "$partial" -gt 0 ]; then
 	say "PASSED WITHOUT VERIFYING EVERYTHING — assertions stood down inside: ${partial_names[*]}"
 fi
+if [ "$voided" -gt 0 ]; then
+	say "VOID — MEASURED NOTHING USABLE, RUN THESE AGAIN: ${voided_names[*]}"
+fi
 
 if [ "$fail" -gt 0 ]; then
 	say "$tally — FAILED: ${failed_names[*]}  (${wall}s wall-clock)"
 	exit 1
+fi
+
+if [ "$voided" -gt 0 ]; then
+	# DELIBERATELY ABOVE THE STRICT BRANCH, so strict mode cannot fold a void into the skip verdict and
+	# cannot turn it into a red a re-run is unable to clear. It is its own exit code because the action it
+	# asks for is its own: run it again.
+	say "$tally — VOID: $voided layer(s) could not measure their subject; this run is not a result  (${wall}s)"
+	exit "$VOID_CODE"
 fi
 
 if [ "$((skip + partial))" -gt 0 ] && [ "$STRICT" = "1" ]; then

@@ -138,6 +138,32 @@ func _skip_layer(layer: String, why: String) -> void:
 ## the clock or the box was present for those assertions too, and the whole point of this state is that
 ## nobody can tell which of them it reached.
 func _void_layer(layer: String, why: String) -> void:
+	# A VOID MUST CARRY ITS WITNESS, AND UNTIL THIS BRANCH EXISTED THE RULE WAS ONLY PROSE.
+	#
+	# The doc comment above says a layer may not void itself to escape a red. Nothing enforced it: `why`
+	# was a free string that nothing inspected, so `_void_layer("check_aim", "contaminated")` satisfied
+	# the rule completely. A guard stated where nothing evaluates it is not a guard.
+	#
+	# It could not bite yet only because the runner did not know 43, so a VOID reported as an ordinary
+	# FAIL and nobody had any reason to reach for it. It goes live the moment the runner honours the code
+	# — which is the same commit as this one — and at that instant a doc comment would have become the
+	# only thing between a red layer and a re-run verdict. Assertions already made are DISCARDED by
+	# design, so a layer sitting on three genuine failures could void them away.
+	#
+	# The bar is deliberately crude and deliberately cheap: the reason must contain a NUMBER. Every real
+	# contamination detector in this repository reports one — `FixturePointer.reason()` quotes the pixels
+	# it saw move — and a sentence with no measurement in it is an excuse rather than evidence. Refusing
+	# is reported as a FAILURE rather than a skip, so voiding without a witness is never the cheaper exit.
+	var has_measurement: bool = false
+	for c: String in why:
+		if c >= "0" and c <= "9":
+			has_measurement = true
+			break
+	if not has_measurement:
+		printerr("%s: FAIL — a VOID must quote the measurement that shows the run was disturbed, and" % layer
+			+ " \"%s\" carries no number. Refusing to void without a witness." % why)
+		quit(1)
+		return
 	print("%s: VOID — %s" % [layer, why])
 	if _passes > 0 or _failures > 0:
 		print("  (discarding %d assertion(s) made before the contamination was detected — a disturbed run"
