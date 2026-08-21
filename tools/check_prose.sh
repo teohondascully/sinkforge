@@ -289,7 +289,14 @@ for wp in WIDE_PATHS:
     wide_read += 1
     hits = []
     for pat, name in WIDE_TOKENS:
-        k = len(re.findall(pat, wsrc))
+        # CASE-INSENSITIVE, like the narrow sweep twelve lines down and unlike the first version of
+        # this line. The word list's own header promised whole-word AND case-insensitive matching while
+        # the code did neither half of the second part, so `SCRIPTED` passed a gate that stopped
+        # `scripted`. origin/main carries exactly that: play_tests.gd:3 spells it capitalised in a
+        # docstring and play_tests.gd:34 spells it lowercase in a print, and only the second was
+        # reachable. A rule documented one way and implemented another is the quieter half of a guard
+        # that cannot be false.
+        k = len(re.findall(pat, wsrc, re.IGNORECASE))
         if k:
             hits.append("%dx %s" % (k, name))
     if hits:
