@@ -54,6 +54,18 @@ set -eu
 
 REF_FILE="scenes/fine_terrain.gd"     # the hand-written reference; excluded from its own check
 COMMA_SLACK="1.10"                    # how far above the reference a file may sit before it reads mechanical
+# THE CEILING IS DERIVED FROM THE REFERENCE, SO THE REFERENCE CAN RAISE THE CEILING WITHOUT ANYONE SAYING
+# SO. That is the one hole in the relative design above, and it is not the quantile-that-moves-its-own-
+# threshold -- the ceiling moves with a THIRD file, not with the file under test, and deriving it from a
+# file a person actually wrote is a deliberate choice (see the note at the top). What was missing is any
+# statement of where that anchor is allowed to be.
+#
+# A RATCHET, NOT A BOUND, and the direction is the whole point. The reference may become LEANER freely:
+# that only tightens every other file's ceiling, which is the direction we want and would otherwise be
+# punished. It may not become COMMA-DENSER than the value recorded here without somebody editing this
+# line, because that silently relaxes the gate for the entire tree. Recorded rather than guessed: this is
+# what shipping already decided, measured off the tree at f097834.
+REF_COMMA_MAX="0.705"                 # ratchet: `scenes/fine_terrain.gd` measured 0.700 on 2026-08-21
 
 cd "$(dirname "$0")/.."
 
@@ -68,10 +80,10 @@ echo "check_prose: $BRANCH @ $SHA$DIRTY"
 echo "check_prose: a file named here may be absent or already correct on another ref."
 echo
 
-python3 - "$REF_FILE" "$COMMA_SLACK" <<'PYEOF'
-import os, re, sys, glob, subprocess
+python3 - "$REF_FILE" "$COMMA_SLACK" "$REF_COMMA_MAX" <<'PYEOF'
+import os, re, sys, subprocess
 
-ref_path, slack = sys.argv[1], float(sys.argv[2])
+ref_path, slack, ref_max = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
 EMDASH = "—"
 
 # Comment-only text. A "#" inside a string literal is code, so trailing comments are found by scanning
@@ -149,12 +161,34 @@ TOKENS = [
 ref = metrics(ref_path)
 ceiling = ref["comma"] * slack
 print("reference  %-34s %5d comment lines  %.3f commas/line" % (ref_path, ref["comment_lines"], ref["comma"]))
-print("ceiling    %.3f commas/line  (reference x %.2f)" % (ceiling, slack))
+print("ceiling    %.3f commas/line  (reference x %.2f, anchor ratchet %.3f)" % (ceiling, slack, ref_max))
+drifted = ref["comma"] > ref_max
+if drifted:
+    print()
+    print("!! THE ANCHOR HAS DRIFTED UP: %s is at %.3f commas/line against a recorded maximum of %.3f,"
+          % (ref_path, ref["comma"], ref_max))
+    print("   so the ceiling every other file is judged against has risen to %.3f with nothing saying so."
+          % ceiling)
+    print("   Either that file's comment style moved and should be looked at, or the move is intended and")
+    print("   REF_COMMA_MAX in this script should be raised deliberately. A ceiling derived from a subject")
+    print("   that is free to move is not a ceiling.")
 print()
 
-paths = sorted(set(glob.glob("scenes/**/*.gd", recursive=True)
-                 + glob.glob("scenes/**/*.gdshader", recursive=True)
-                 + glob.glob("src/**/*.gd", recursive=True)))
+# TRACKED FILES ONLY, HERE TOO. The wide sweep below has always done this and says why; this sweep globbed
+# the filesystem instead, and the two happened to name the same 47 files on the day it was checked. That is
+# a fact with a date on it, not a property: a generated `.gd`, a scratch copy, or anything a worktree left
+# behind under `scenes/` or `src/` would be judged by a gate about what SHIPS. Hardening rather than a
+# repair, and said as such — nothing untracked was found there, and the measurement is the reason the
+# change is small.
+_tracked = subprocess.run(["git", "ls-files", "-z"], capture_output=True, text=True, check=True)
+_tracked = set(_tracked.stdout.split("\0")) - {""}
+paths = sorted(f for f in _tracked
+               if (f.startswith(("scenes/", "src/"))
+                   and (f.endswith(".gd") or (f.startswith("scenes/") and f.endswith(".gdshader")))))
+if not paths:
+    print("check_prose: the tracked-file scan of scenes/ and src/ found NOTHING, which is a statement")
+    print("             about the scan and not about the tree. Nothing was measured.")
+    sys.exit(2)
 
 # THE SECOND SWEEP, AND THE REASON IT IS SEPARATE.
 #
@@ -183,9 +217,7 @@ if os.path.isfile(_words):
 # rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
 # authorship vocabulary is SUPPOSED to live, and scanning them would fail this gate permanently on files
 # no clone will ever see. What ships is what `git ls-files` says ships.
-_tracked = subprocess.run(["git", "ls-files", "-z"], capture_output=True, text=True, check=True)
-_tracked = set(_tracked.stdout.split("\0")) - {""}
-WIDE_PATHS = sorted(f for f in _tracked
+WIDE_PATHS = sorted(f for f in _tracked          # the same enumeration as the sweep above, read once
                     if f.startswith(("tools/", ".github/"))
                     or (f.startswith("docs/") and f.endswith(".md"))
                     or f in ("README.md", "CONTRIBUTING.md"))
@@ -257,7 +289,9 @@ if wide_fails:
     for wp, hits in wide_fails:
         print("  %-42s %s" % (wp, "; ".join(hits)))
 
-if fails or wide_fails:
+if fails or wide_fails or drifted:
+    if drifted:
+        print("\nthe comma ceiling's anchor drifted above its recorded maximum (see the banner above).")
     if fails:
         print("\n%d file(s) failed:" % len(fails))
         for p, bad in fails:
