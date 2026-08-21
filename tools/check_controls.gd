@@ -3,7 +3,7 @@ extends "res://tools/check_base.gd"
 ## Harness layer 14 — CONTROL-SCHEME context rules (playtest: "W should be jump like Terraria", but W
 ## must still CLIMB on a rope). Feeds synthetic action events to Player._unhandled_input and checks the
 ## resulting jump request, so a remap or a movement refactor can't silently break the scheme:
-##   - W (Controls.UP) OFF a rope  → requests a JUMP (the Terraria feel the user asked for)
+##   - W (Controls.UP) OFF a rope  → requests a JUMP (the Terraria-style feel this targets)
 ##   - W ON a rope                 → does NOT jump (it climbs)
 ##   - Space                       → always jumps (incl. off a rope)
 ##

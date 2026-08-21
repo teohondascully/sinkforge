@@ -2,7 +2,7 @@ extends "res://tools/check_base.gd"
 
 ## Guards the "mine the floor from under yourself" bug (user report): standing on a block and breaking the
 ## block beneath your feet must make you FALL under gravity — NOT teleport instantly onto the next surface,
-## and NOT creep down mushily from zero velocity (the "laggy/glitchy" fall the user then reported). Beyond
+## and NOT creep down mushily from zero velocity (the "laggy/glitchy" fall that followed). Beyond
 ## the no-teleport correctness, this asserts the fall FEEL: the drop starts PROMPTLY (a couple frames, not a
 ## visible hang) and descends SMOOTHLY (monotone, no upward stutter, no single-frame tile jump).
 ##   HEADED:  /Applications/Godot.app/Contents/MacOS/Godot --path . --script res://tools/check_fall.gd

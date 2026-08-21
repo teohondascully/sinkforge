@@ -17,9 +17,11 @@ extends "res://tools/check_base.gd"
 ##      search, so `MIN_CLAIMS` asserts the scan found several. Rename the section headings and this fails
 ##      rather than going quiet.
 ##   2. Counting the registrations wrongly in the same direction as the docs. The count is taken from the
-##      three registration verbs with a required trailing space, which is what excludes the three FUNCTION
-##      DEFINITIONS `add() {`, `add_gl() {` and `add_excl() {`. A peer counting `^add` on this same file got
-##      104 for a real 101 by matching the definition of the thing being counted.
+##      registration verbs with a required trailing space, which is what excludes their own FUNCTION
+##      DEFINITIONS. Counting bare `^add` on this same file overcounts by exactly those definitions, by
+##      matching the definition of the thing being counted. Stated as a relation rather than as a pair of
+##      numbers on purpose: the note below records this same comment naming three verbs after a fourth had
+##      been added, and a pinned total is what rots.
 ##   3. Reading a doc it cannot find and calling that agreement. A file that will not open is a FAIL here,
 ##      never a skip: the whole point is that these two files exist and are read.
 ##

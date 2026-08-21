@@ -247,8 +247,8 @@ if os.path.isfile(WORDS_PATH):
             # matcher cannot see a listed word written inside a REGEX LITERAL: in `\b<listed-word>`
             # the character before it is the `b` of `\b`, which is a word character, so the
             # lookbehind rejects it. The public tree carries exactly that, in a token list, inside the
-            # gate that hunts these words -- found by a peer scanning without anchors and missed by
-            # three separately built scans that all had them. The precision was the blind spot.
+            # gate that hunts these words -- found by scanning without anchors, and missed by three
+            # separately built scans that all had them. The precision was the blind spot.
             #
             # Short tokens still need both anchors, because they occur inside ordinary English: the
             # two-letter one matches "remains", "available", "again". Longer ones are matched as plain
@@ -258,7 +258,7 @@ if os.path.isfile(WORDS_PATH):
             # whoever next writes the word in a document. The first draft of this comment claimed that
             # longer vendor names do not occur inside ordinary words. That is false at nine letters:
             # prefixing one of the tokens with `phil` or `mis`, or suffixing it with `al`, gives three
-            # ordinary English adjectives. A peer found it by testing the invariant instead of reading
+            # ordinary English adjectives. It surfaced by testing the invariant instead of reading
             # it. Written as prefixes rather than spelled out because spelling them turns this comment
             # into three hits -- which is the collision demonstrating itself, and the reason the
             # placeholder convention above exists.

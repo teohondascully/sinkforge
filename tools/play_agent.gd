@@ -10,7 +10,7 @@ extends RefCounted
 ## Actions are async (await the tree's physics_frame) so a goal reads as a linear script:
 ##   await agent.dig_down_to(ore); await agent.deposit_into_forge(); ...
 ## with generous frame budgets and a give() hatch to INJECT resources for setup (e.g. top up ingots
-## before testing crafting) — the user-sanctioned shortcut for "arrange the situation, then play it".
+## before testing crafting) — the deliberate shortcut for "arrange the situation, then play it".
 ##
 ## Used by tools/play_tests.gd (the driven play-test TYPE).
 
@@ -31,7 +31,7 @@ var jumps: int = 0
 var builds: int = 0
 var stuck_frames: int = 0
 ## FRICTION metrics — the byproduct-effort a real player spends getting places (not just did-the-goal-happen).
-## A high count here is the friction the user feels: mines = blocks broken, places = blocks laid (staircases/
+## A high count here is the friction the player feels: mines = blocks broken, places = blocks laid (staircases/
 ## pillars to get back up), frames = time spent. The mobility tools (rope/lift) should make these PLUMMET.
 var mines: int = 0
 var places: int = 0
@@ -72,7 +72,7 @@ var peak: Dictionary = {}
 
 ## WHAT COUNTS AS BULK — the set the carry cap would govern.
 ##
-## The user's shape is that tools and construction components stay convenient while raw ore and bulk
+## The intended shape is that tools and construction components stay convenient while raw ore and bulk
 ## freight consume cargo capacity, so the two lists are separate and BOTH are enumerated. Anything in
 ## neither is reported as UNCLASSIFIED rather than silently assumed harmless: a hand-kept list that fails
 ## open is the defect this project has found in the icon list, the CI job list and the worktree count, and

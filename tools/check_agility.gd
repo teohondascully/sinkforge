@@ -33,7 +33,7 @@ const STALL_CAP: int = 12              ## stuck-frames tolerated before it's "aw
 const JUMP_LATENCY_CAP: int = 3        ## frames from request_jump() to airborne (baseline 1; kept — already tight)
 ## GRANULARITY-AGILITY dimensions (#104). Fine/molded terrain + the scale (#94) and fine-collision (#88)
 ## reworks all move the agility standard (proven when the P3 fine-collision change popped step-up). These
-## turn the user's "smaller char / taller jump / MID-AIR direction change" hypothesis into NUMBERS so those
+## turn the "smaller char / taller jump / MID-AIR direction change" hypothesis into NUMBERS so those
 ## changes are judged on data, not vibes, and so a rework can't silently kill responsiveness. Caps carry
 ## headroom over today's measured baseline; ratchet them as movement improves.
 const TURN_LATENCY_CAP: int = 9        ## frames from a full-speed input FLIP to velocity crossing zero (baseline 6; ratcheted 12→9)
@@ -190,8 +190,8 @@ func _turn_latency(main: MainView) -> int:
 
 
 ## AIR CONTROL (#104): the fraction of ground top-speed you can build up HORIZONTALLY while airborne, over a
-## short window from a standing jump: the user's "movement can happen mid-air so you can change direction"
-## made a number. 1.0 = full air control (steer as freely as on the ground); 0.0 = a committed leap you
+## short window from a standing jump: "movement can happen mid-air so you can change direction", made
+## a number. 1.0 = full air control (steer as freely as on the ground); 0.0 = a committed leap you
 ## can't redirect. Instrumentation: it says whether air-steer is the lever to pull for agility (today it
 ## already reads ~full, so it is NOT the missing piece) and guards a rework from silently removing it.
 func _air_control(main: MainView) -> float:

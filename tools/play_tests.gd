@@ -1310,7 +1310,7 @@ func _bury_vein(agent: PlayAgent, col: int, depth: int) -> Vector2i:
 
 
 ## Round-trip: dig DOWN to a buried vein, mine it, and climb back to the SURFACE. The most common real loop
-## and the friction the user named: "mine down, then mine a staircase back up". Pass = ore in hand AND body
+## and the friction it targets: "mine down, then mine a staircase back up". Pass = ore in hand AND body
 ## back on the surface (not stranded). Friction printed so the drop is visible when the rope lands.
 func _goal_round_trip_to_vein() -> bool:
 	var agent: PlayAgent = await _boot()
@@ -1384,7 +1384,7 @@ func _goal_escape_deep_pit() -> bool:
 
 
 ## Cross a JAGGED horizontal tunnel (up-and-down 1-tile steps, like a natural cave floor): the finicky
-## cave-traversal the user flagged as feeling bad. Pass = reaches the far end; the friction (stuck_frames,
+## cave-traversal that reads as feeling bad. Pass = reaches the far end; the friction (stuck_frames,
 ## jumps) is the read on how AGILE lateral cave movement feels.
 func _goal_cross_jagged_tunnel() -> bool:
 	var agent: PlayAgent = await _boot()

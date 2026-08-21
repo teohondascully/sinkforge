@@ -54,12 +54,12 @@ tools/*.uid
 # under docs/media/, which carries a .gdignore, so the engine does not import them and they need no
 # .import sidecars.
 # THE VISUAL RECORD — history/ (the curated archive) and the canonical capture set — is
-# COMMITTED, at the user's instruction on 2026-08-17. Both sat here ignored before, history/ under a note
-# reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
-# (docs/DECISIONS.md, "Never destroy anything the user made") forbids DESTROYING them, and it exists
+# COMMITTED, reversing an earlier decision on 2026-08-17. Both sat here ignored before, history/ under a
+# note reading "NEVER publish or delete", which welded two unrelated things together. The LOCKED rule
+# (docs/DECISIONS.md, "Never destroy a curated file") forbids DESTROYING them, and it exists
 # because 84 of these screenshots were once purged during a refactor. Committing is the strongest
 # available form of not destroying, so it serves that rule rather than breaking it; only the unbacked
-# "publish" half is reversed, and a public MIT repo of the user's own game discloses nothing by carrying
+# "publish" half is reversed, and a public MIT repo of one's own game discloses nothing by carrying
 # pictures of it.
 #
 # Neither set is regenerable, whatever the old comment claimed. The game changes underneath them, so a
