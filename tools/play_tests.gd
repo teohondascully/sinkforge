@@ -827,7 +827,10 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	# --- STEP 2: build the GENERATOR DRY (pocket still sealed), diagonally up from the stand column so it never
 	# overlaps the body, sitting one cell ABOVE the pump's cell. Fuel it; its aura powers the pump dropped below
 	# it after the breach: no wiring to lay (RUNG 5 proves conduit delivery). ---
-	if not await agent.walk_to_column(gen_col, 900):
+	# `on_surface = false`: this is a walk across the floor of a pump room far underground, not an
+	# approach over open ground. The room's floor sits around row 92 while that column's own surface is
+	# row 13, so the surface contract is the wrong question to ask here.
+	if not await agent.walk_to_column(gen_col, 900, false):
 		return await _finish(agent, false, "could not reach the build spot in the room")
 	var gen_cell := Vector2i(pump_col, r - 1)
 	if not await agent.select_item(&"generator"):
@@ -843,7 +846,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	# --- STEP 3: the BREACH + the CLAIM. Cut the rim rich_ore R. One move claims the flood-guarded treasure AND
 	# opens the sealed pocket wall; the released flood pours into the room and down into the sump. Reach across the
 	# sump gap from the stand column (the body never crosses into the pocket or onto the sump). ---
-	if not await agent.walk_to_column(gen_col, 900):
+	if not await agent.walk_to_column(gen_col, 900, false):
 		return await _finish(agent, false, "could not reach the breach wall")
 	if not agent.main._can_reach(R):
 		return await _finish(agent, false, "at the wall, but the rim vein %s is out of reach" % str(R))
@@ -862,7 +865,7 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 
 	# --- STEP 4: drop the PUMP into the flooded sump (reach in from the dry side so the body never stands over
 	# the sump) and confirm the pre-built power reaches it. ---
-	if not await agent.walk_to_column(gen_col, 900):
+	if not await agent.walk_to_column(gen_col, 900, false):
 		return await _finish(agent, false, "could not step back to place the pump")
 	if not await agent.select_item(&"pump"):
 		return await _finish(agent, false, "no pump in the pack")
@@ -900,7 +903,11 @@ func _goal_pump_out_a_worldgen_aquifer() -> bool:
 	# onto the (guaranteed, dug-clear) shaft column first, then rope up. The shaft is open the whole way (the
 	# body dug out its own footing on the way down), so "escaped" = climbed clear of the flooded floor back up
 	# near the top of the shaft (out of the water), not landing on a surface that no longer exists down here. ---
-	if not await agent.walk_to_column(ds, 900):
+	# `on_surface = false`: the body is on the floor of a drained pocket far below, stepping onto the
+	# shaft column before roping up. Demanding the top of the column here asks for a surface that, as the
+	# note above says, no longer exists down here. This rung passed for a long time only because the old
+	# one-axis test could not tell the difference: the body was at row 92 against a surface row of 13.
+	if not await agent.walk_to_column(ds, 900, false):
 		return await _finish(agent, false, "drained the aquifer but could not reach the shaft to climb out")
 	var climbed: bool = await agent.climb_to_surface(settle_row)
 	var out_row: int = agent.main._cell_at(agent.player.position).y
@@ -926,6 +933,29 @@ func _goal_l2_chain() -> bool:
 	agent.give(&"iron_forge", 1)
 	agent.give(&"plate_press", 1)
 	agent.give(&"iron", 8)
+
+	# GUARANTEE THE APPROACH, AND THIS IS AN ACCOMMODATION, SO IT SAYS SO OUT LOUD.
+	#
+	# The walk from spawn to column 75 crosses a full-depth chasm at column 71 that worldgen opened when
+	# the shelf bands were scattered. The body falls in on the way and walks along the bottom. It is not a
+	# new failure so much as a newly VISIBLE one: the arrival predicate used to compare columns only, so a
+	# body that fell reported arrival from far below and the dig that followed was aimed at a cell above
+	# its own head.
+	#
+	# Levelling a walkable ledge into the site removes terrain luck from a step that is scenery here. This
+	# rung is named "the L2 iron chain" and exists to prove iron -> forge -> press is playable end to end;
+	# traversal has its own layers and they are better at it. A rung that can also fail on terrain reports
+	# a progression defect when the real finding is a chasm.
+	#
+	# THE COST, STATED: RUNG 3 IS NO LONGER EVIDENCE THAT THE BUILD SITE IS REACHABLE. It never honestly
+	# was, since it passed a long run of sweeps only because that approach happened to be walkable, but
+	# from here nothing in this rung may be read as a claim about traversal. `check_traverse` and
+	# `check_plunge` own that. Picking a nearer column was tried first and is worse: `_standing_ground`
+	# returns 55, which is inside the 40-56 fixture band, so the press lands on top of a fixture.
+	for bx: int in range(col - 9, col + 1):
+		sim.set_solid(Vector2i(bx, MainView.SURFACE + 1), &"earth")
+		for by: int in range(MainView.SURFACE - 1, MainView.SURFACE + 1):
+			sim.set_solid(Vector2i(bx, by), &"")
 	if not await agent.walk_to_column(col, 1200):
 		return await _finish(agent, false, "never reached the build site")
 	var top: int = sim.surface_row(col)
@@ -950,7 +980,9 @@ func _goal_l2_chain() -> bool:
 	if not await agent.select_item(&"plate_press"):
 		return await _finish(agent, false, "no press in the pack")
 	if not await agent.build_at(Vector2i(col, top + 1)):
-		return await _finish(agent, false, "could not stand the press in the socket")
+		return await _finish(agent, false,
+			"could not stand the press in the socket at %s (chose col %d, surface row %d, body at %s)"
+				% [str(Vector2i(col, top + 1)), col, top, str(agent.main._cell_at(agent.player.position))])
 	if not await agent.select_item(&"iron_forge"):
 		return await _finish(agent, false, "no iron forge in the pack")
 	if not await agent.build_at(Vector2i(col, top)):

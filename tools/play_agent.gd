@@ -304,16 +304,52 @@ func mine_cell(cell: Vector2i, budget: int = 720) -> bool:
 	return not sim.is_solid(cell)
 
 
-## Walk along the surface until the body's own column is `col` (and it's standing, not mid-air). The
-## prerequisite for sinking a straight shaft — you have to be standing over it first.
-func walk_to_column(col: int, budget: int = 600) -> bool:
+## How far below a column's own surface still counts as standing on it. One row, so a body resting in
+## the shallow socket it just dug is not called a fall.
+const SURFACE_SLACK: int = 1
+
+
+## Is the body standing ON this column rather than somewhere inside it? One-sided on purpose: standing
+## on a placed block or a machine puts the body ABOVE the surface row and is still arrival, while the
+## failure this exists to catch is always far below. Asking the column for its own surface rather than
+## comparing against the starting row is what makes it slope-proof, because the real terrain drops ten
+## rows across columns 69 and 70 without anything being wrong.
+func _on_surface_of(col: int) -> bool:
+	return main._cell_at(player.position).y <= sim.surface_row(col) + SURFACE_SLACK
+
+
+## Walk until the body's own column is `col` and it is standing, not mid-air. The prerequisite for
+## sinking a straight shaft: you have to be standing over it first.
+##
+## TWO CONTRACTS, NAMED, because for a long time this promised the first and delivered only the second.
+##
+##   on_surface = true (default) is "put the body on top of this column". The docstring here used to say
+##     "walk along the SURFACE" while the test was `here_cell.x == col`, which is one axis when the claim
+##     needs two. Any row satisfied it, so a body that fell down a hole on the way and kept walking along
+##     the bottom reported ARRIVAL, and every caller that then dug, built or reached from "there" was
+##     working from a place it had never been told about.
+##   on_surface = false is "get the body into this column, wherever it is". Honest for a caller already
+##     underground walking a tunnel, and it has to be asked for by name.
+##
+## Measured, not reasoned. Rung 3 walks to column 75 to build the iron chain. A worldgen change opened a
+## 58-row chasm at column 71, across the approach; the body fell in, walked the floor, and this returned
+## true at row 75 against a surface row of 21. `dig_down_to` was then handed a target 53 rows ABOVE the
+## body, which it cannot dig toward, so it mined downward for its whole budget. The rung had passed a
+## long run of sweeps before that, not because the predicate was right but because the ground happened
+## to be flat.
+func walk_to_column(col: int, budget: int = 600, on_surface: bool = true) -> bool:
 	var col_x: float = main._cell_center(Vector2i(col, 0)).x
 	var last_x: float = player.position.x
 	var still: int = 0
 	var t: int = 0
 	while t < budget:
 		var here_cell: Vector2i = main._cell_at(player.position)
-		if here_cell.x == col and player.on_floor:
+		# THE DEPTH TEST BELONGS IN THIS CONDITION, not inside the branch after `_settle`. `_settle`
+		# breaks out of its loop without ever awaiting when the body is already stopped on the floor, so
+		# a body standing in the right column at the wrong depth would reach the `continue` below having
+		# advanced neither a physics frame nor `t`, and spin forever. Failing here instead falls through
+		# to the walking code, which awaits, counts, and eventually gives up.
+		if here_cell.x == col and player.on_floor and (not on_surface or _on_surface_of(col)):
 			if await _settle(col):
 				return true
 			# Coasted a cell too far. That is a miss, not an arrival, so fall back into the loop and walk
@@ -365,10 +401,15 @@ func walk_to_column(col: int, budget: int = 600) -> bool:
 	# with nothing in it. Corpus seed 20260817 fails the opening at `smelt`, and the entire diagnostic
 	# record was "could not perform signposted step 'smelt'", which names the step and not the reason.
 	# Three of that step's four exits were already noted; this was the fourth, one function down.
-	var arrived: bool = main._cell_at(player.position).x == col
+	# THE GIVE-UP PATH ANSWERS THE SAME QUESTION THE ARRIVAL PATH DOES. It used to answer a weaker one:
+	# after `still > 150` broke the loop, a body wedged in the right column at the wrong depth still
+	# returned true, so the timeout branch handed back the value that makes the caller proceed.
+	var ended: Vector2i = main._cell_at(player.position)
+	var arrived: bool = ended.x == col and (not on_surface or _on_surface_of(col))
 	if not arrived:
-		_note("could not walk to column %d in %d frames (stopped at %s, %s)"
-			% [col, t, main._cell_at(player.position), "still" if still > 150 else "out of budget"])
+		_note("could not walk to column %d (on_surface=%s) in %d frames (stopped at %s, that column's surface is row %d, %s)"
+			% [col, str(on_surface), t, ended, sim.surface_row(col),
+			"still" if still > 150 else "out of budget"])
 	return arrived
 
 
@@ -424,8 +465,12 @@ const ARRIVE_SLACK: int = 3
 func dig_down_to(cell: Vector2i, budget: int = 2400, require_arrival: bool = false) -> bool:
 	var col: int = cell.x
 	var col_x: float = main._cell_center(Vector2i(col, 0)).x
-	if not await walk_to_column(col):
-		_note("could not walk over column %d" % col)
+	# `on_surface = false` on purpose, and this is the caller that genuinely needs the weaker contract.
+	# Sinking a shaft does not restart at the surface: a rung that continues a descent calls in again
+	# part way down, and demanding the top of the column there would fail a body that is exactly where
+	# it should be. What this needs is the body plumb over the column at whatever depth it has reached.
+	if not await walk_to_column(col, 600, false):
+		_note("could not walk over column %d at any depth" % col)
 		return false
 	var t: int = 0
 	while t < budget:
