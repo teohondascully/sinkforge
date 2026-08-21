@@ -249,14 +249,32 @@ if os.path.isfile(WORDS_PATH):
 # rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
 # authorship vocabulary is SUPPOSED to live, and scanning them would fail this gate permanently on files
 # no clone will ever see. What ships is what `git ls-files` says ships.
-WIDE_PATHS = sorted(f for f in _tracked          # the same enumeration as the sweep above, read once
-                    if f.startswith(("tools/", ".github/"))
-                    or (f.startswith("docs/") and f.endswith(".md"))
-                    or f in ("README.md", "CONTRIBUTING.md"))
+# AND THE POPULATION IS THE WHOLE TRACKED TREE, because the enumerated directory list this replaced was
+# a second hole of the same kind. It read `tools/`, `.github/`, `docs/*.md` and two root files, so
+# `tests/` -- five tracked .gd files, 264KB, one of them 117KB -- plus both git hooks, project.godot and
+# the LICENSE were read by NEITHER sweep, ever. `scenes/` and `src/` were read only by the narrow sweep,
+# which sees comment BODIES and not string literals, and whose token list carries none of the eight
+# vendor words. Measured, with a control leg, by planting three lines in scenes/player.gd:
+#
+#     # scripted probe comment.        exit 1   caught      <- control: file is in population, gate is live
+#     # Assistant wrote this helper.     exit 0   MISSED
+#     print("scripted probe")          exit 0   MISSED
+#
+# The two misses are the hole; the control is what makes them mean blindness rather than a broken probe.
+# Note which one nearly shipped: the instance that started this was a print() banner, the highest-value
+# surface there is, and it was caught only because it happened to live under `tools/`.
+#
+# The list's own premise is vocabulary wrong ANYWHERE in a repository written by one person, so any
+# population narrower than the tree is a claim that some corner is exempt, and no such corner was ever
+# argued for. Measured before the change: 0 hits across the 58 text files it adds, so this hardens the
+# gate and moves no verdict.
+WIDE_PATHS = sorted(_tracked)
 # The gate is excluded from its own scan: with the word list external it no longer carries the literals,
-# but a file that reports on the list would still match anything the list names. `.gitignore` is excluded
-# for the same reason one line down. Both exclusions are counted and printed below, because an exclusion
-# nobody can see is indistinguishable from a scan that missed.
+# but a file that reports on the list would still match anything the list names. The comment here used
+# to claim `.gitignore` was excluded too -- it never was, in this set or any other; the old population
+# simply never reached it. It is in scope now and measures clean, and an ignore file that ever names a
+# vendor is a real finding rather than a nuisance. Exclusions are counted and printed below, because an
+# exclusion nobody can see is indistinguishable from a scan that missed.
 WIDE_SKIP = {"tools/check_prose.sh"}
 # A LIST THAT IS NOT THERE IS NOT A CLEAN SWEEP, AND SAYING SO IN PROSE IS NOT ENOUGH. The first version
 # of this printed a warning and then exited 0 with no marker, so the runner scored the layer a plain PASS,
@@ -276,16 +294,36 @@ if not WIDE_TOKENS:
 else:
     print("  HELD: [prose.wide-word-list] this run asserted it (%d word(s))" % len(WIDE_TOKENS))
 wide_fails, wide_read, wide_skipped = [], 0, 0
+wide_binary, wide_absent, wide_unreadable = 0, 0, []
 for wp in WIDE_PATHS:
-    if not os.path.isfile(wp):
-        continue
     if wp in WIDE_SKIP:
         wide_skipped += 1
         continue
+    if not os.path.isfile(wp):
+        wide_absent += 1      # tracked but not in the worktree: counted, because it was not scanned
+        continue
     try:
-        wsrc = open(wp, encoding="utf-8").read()
-    except (UnicodeDecodeError, OSError):
-        continue          # binary or unreadable: not prose, and not silently counted as clean either
+        raw = open(wp, "rb").read()
+    except OSError as exc:
+        # A TRACKED FILE THE GATE CANNOT OPEN IS A HOLE, NOT A PASS. The line this replaced swallowed
+        # OSError next to a comment claiming the file was "not silently counted as clean either" -- and
+        # `continue` is exactly that: no counter, no output, nothing in the summary. It described a
+        # property the code did not have, which is the same defect as the case-insensitivity one below
+        # and was written the same night. Never taken while the population was 152 curated text files;
+        # taken ~250 times a run now, so it had to be right before the population grew.
+        wide_unreadable.append((wp, str(exc)))
+        continue
+    # Git's own text/binary heuristic: a NUL byte near the head. Reading 8KB of each of 247 PNGs costs
+    # nothing, and it means the binary decision is made by inspection rather than by an extension
+    # allowlist -- which would be the same enumerated-set mistake one level down.
+    if b"\0" in raw[:8192]:
+        wide_binary += 1
+        continue
+    try:
+        wsrc = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        wide_binary += 1
+        continue
     wide_read += 1
     hits = []
     for pat, name in WIDE_TOKENS:
@@ -338,15 +376,30 @@ if unreadable:
     for p in unreadable:
         print("  %s" % p)
 
-print("\nwide sweep: %d word(s) tested over %d file(s) across tools/, .github/, docs/ and the root"
+print("\nwide sweep: %d word(s) tested over %d text file(s) -- every tracked file in the repository"
       % (len(WIDE_TOKENS), wide_read))
-print("            markdown, %d skipped (the gate does not scan itself)" % wide_skipped)
+print("            %d binary, %d self-skipped (the gate does not scan itself), %d tracked-but-absent,"
+      % (wide_binary, wide_skipped, wide_absent))
+print("            %d unreadable" % len(wide_unreadable))
+# THE POPULATION HAS TO ADD UP. Every path out of the loop above increments exactly one counter, so if
+# these do not sum to the population then a file left through a path nobody counts -- which is precisely
+# the bug this block replaced, and precisely the thing that makes a small sweep read as a clean one.
+_acct = wide_read + wide_binary + wide_skipped + wide_absent + len(wide_unreadable)
+if _acct != len(WIDE_PATHS):
+    print("\n!! POPULATION DOES NOT ADD UP: %d accounted for against %d tracked. A file left the wide"
+          % (_acct, len(WIDE_PATHS)))
+    print("   sweep through an uncounted path, so this sweep's silence is not evidence about anything.")
+    sys.exit(2)
+if wide_unreadable:
+    print("\n%d tracked file(s) could not be opened, so they were NOT scanned:" % len(wide_unreadable))
+    for wp, why in wide_unreadable:
+        print("  %-42s %s" % (wp, why))
 if wide_fails:
-    print("\n%d file(s) carry authorship vocabulary outside the game code:" % len(wide_fails))
+    print("\n%d file(s) carry authorship vocabulary:" % len(wide_fails))
     for wp, hits in wide_fails:
         print("  %-42s %s" % (wp, "; ".join(hits)))
 
-if fails or wide_fails or drifted:
+if fails or wide_fails or drifted or wide_unreadable:
     if drifted:
         print("\nthe comma ceiling's anchor drifted above its recorded maximum (see the banner above).")
     if fails:
