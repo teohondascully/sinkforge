@@ -867,7 +867,7 @@ func _draw_alerts() -> void:
 		var box := Rect2(x + 6.0, y + 2.5, 13.0, 13.0)
 		draw_rect(box, Visuals.machine_color(mdef))
 		Visuals.draw_machine_glyph(self, box.position + box.size * 0.5, Visuals.machine_kind(mdef),
-			box.size.y / 20.0, false, 0.0)
+			Visuals.glyph_cells_for(box.size.y), false, 0.0)
 		var cnt: int = int(a["count"])
 		var nm: String = str(a["name"]) + ("  ×%d" % cnt if cnt > 1 else "")
 		draw_string(_font, Vector2(x + 24.0, y + 8.0), nm, HORIZONTAL_ALIGNMENT_LEFT, w - 28.0, 9,
@@ -2623,7 +2623,7 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 			return
 		draw_rect(box, machine_icons[id]["color"])
 		Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
-			str(machine_icons[id]["kind"]), box.size.y / 20.0, false, 0.0)
+			str(machine_icons[id]["kind"]), Visuals.glyph_cells_for(box.size.y), false, 0.0)
 		return
 	if id != &"":
 		Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, id)
@@ -3743,7 +3743,7 @@ func _draw_dashboard_overlay() -> void:
 			var box := Rect2(rx, y2 - 11.0, 15.0, 15.0)
 			draw_rect(box, Visuals.machine_color(mdef))
 			Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
-				Visuals.machine_kind(mdef), box.size.y / 20.0, false, 0.0)
+				Visuals.machine_kind(mdef), Visuals.glyph_cells_for(box.size.y), false, 0.0)
 			draw_string(_font, Vector2(rx + 20.0, y2), str(row["name"]), HORIZONTAL_ALIGNMENT_LEFT, 96.0, 9, UI_TEXT)
 			# The count and the working count: green when all are running, and the alert colour when some are
 			# stalled. This used to draw `UI_ACCENT`, the colour this same panel uses for its heading and its
@@ -4700,7 +4700,7 @@ func _draw_inventory() -> void:
 					draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
 					# The same glyph the world draws, from the shared Visuals, scaled to the chip, so it never drifts.
 					Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
-						icon.size.y / 20.0, false, 0.0)
+						Visuals.glyph_cells_for(icon.size.y), false, 0.0)
 			else:  # a resource item: its sprite (item_<id>.png) or the flat colour chip
 				Visuals.draw_item(self, icon.position + icon.size * 0.5, icon.size.y, item)
 			# Count badge bottom-right with a dark backing so it stays legible over any icon colour.

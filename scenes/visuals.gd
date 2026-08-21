@@ -472,6 +472,24 @@ static func _cold_iron(c: Color) -> Color:
 	return c.lerp(Color(grey, grey, grey), COLD_DESAT).darkened(COLD_DARKEN)
 
 
+## The box height a glyph is authored to fill at `cells = 1.0`, and the divisor every HUD chip uses to
+## turn the box it has into the scale `draw_machine_glyph` wants.
+##
+## An authored fit, not a derived one. The glyph helpers mix offsets and extents inside the same
+## expression: `_furnace` writes the offset `c.x - 8.0 * s` beside the width `16.0 * s`. So there is
+## no honest one-line derivation of the family's span, and scanning for the largest coefficient of `s`
+## returns 21.0 for the Drift Rig, which is a rectangle's width rather than its reach. What was wrong
+## was writing this number four separate times in `hud.gd`. Retune a glyph and four literals in four
+## panels silently stop fitting, with nothing able to notice. One definition, four callers.
+const GLYPH_BOX_PX: float = 20.0
+
+
+## Cells to hand `draw_machine_glyph` so its icon fills a chip `px` tall. Named rather than inlined so
+## the call site says which unit it is producing. See `draw_machine_glyph` for why that matters.
+static func glyph_cells_for(px: float) -> float:
+	return px / GLYPH_BOX_PX
+
+
 ## Draw a machine's silhouette glyph centred at `center`, scaled by `s` (1.0 = full 32px world icon,
 ## smaller for HUD chips). `active` + `t` (a free-running clock) drive the WORKING animation: a gear
 ## that spins, an ember that breathes, lift chevrons that march up; pass active=false for a still icon.
