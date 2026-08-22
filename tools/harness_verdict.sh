@@ -348,7 +348,16 @@ EOF
 		fi
 		if [ -n "$sd_env" ]; then
 			note "stand-downs: conditional (env) rows and how each resolved this run:$sd_env"
-			note "   ASSERTED means the debt is paid on this machine and the row can be deleted."
+			# ASSERTED IS NOT A DELETION NOTICE, and the line that said so was inviting the wrong edit.
+			# An `env` row resolves ASSERTED on the machines that CAN reach the assertion; several of
+			# these exist precisely FOR the machines that cannot. `prose.wide-word-list` holds the word
+			# list out of the repository, so a fresh clone has the gate without the list and the row is
+			# what stops that reading as a pass. `save-durability.failed-backup` has never fired on
+			# macOS because the platform refuses the write that forces the path. Deleting either on the
+			# strength of an ASSERTED here would remove the protection exactly where it is needed and
+			# leave a green sweep saying nothing about it.
+			note "   ASSERTED means this run reached the assertion. Before deleting a row, read it:"
+			note "   several exist for the machines where they do NOT resolve ASSERTED."
 		fi
 		if [ -n "$sd_absent" ]; then
 			# NAMED, NEVER SILENT. An exemption nobody prints is a licence: a layer that quietly stopped
