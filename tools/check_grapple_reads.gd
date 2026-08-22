@@ -1302,34 +1302,34 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		return BOW_NO_CHORD
 	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
-	# THE CEILING IS A CURVE, NOT A BAND, and it has no chosen number in it.
+	# THE CEILING IS FLAT AND CARRIES A COSINE, and the shaped version that stood here was WRONG.
 	#
-	# The first rejection here used a flat `span * SAG_CAP` at every station. That is the right idea at the
-	# wrong resolution: it asks "could the cord ever be this far out" when the answer available is "could
-	# the cord be this far out HERE". `_draw_cord` bows the line by `sin(t * PI) * sag` in Y, and `sag` is
-	# clamped to `span * SAG_CAP`, so at station t the furthest the cord can possibly sit from its chord is
+	# It read `sin(along / span * PI) * SAG_CAP * span * |cos|`, treating `along` as the cord's parameter.
+	# It is not. `_draw_cord` displaces each point by `sin(t * PI) * sag` in Y, and Y has a component along
+	# a chord that is not horizontal:
 	#
-	#     sin(t * PI) * SAG_CAP * span * |cos(chord angle)|   plus half a stroke for the outer edge
+	#     along(t) = t * span + sin(t * PI) * sag * axis.y
 	#
-	# and the `|cos|` is there because the bow is applied in Y while this mask measures perpendicular
-	# distance. Every term is read off the renderer at run time. Nothing is tuned, and it is the same
-	# refusal the flat band was making, asked per station.
+	# On this rig `axis.y` is -0.758, so the apex at t=0.50 lands at along/span = 0.22, and the profile's
+	# stations are not the cord's parameter at all. Solving that mapping for the observed argmax gives
+	# t = 0.585 and a predicted offset of 124 px against 122 measured. So the "contamination at t=0.19"
+	# WAS THE CORD'S OWN APEX, and the shaped ceiling was cutting the middle out of the rope: it refused
+	# every point from t=0.30 to t=0.585 and dropped `clean` from 0.2366 to 0.1866, away from the 0.2422
+	# the renderer says it drew. A tighter bound that moves the answer away from the truth is not tighter.
 	#
-	# It matters because the contamination sits at the ENDS, where a flat band is at its most generous and
-	# a shaped one at its least. Measured, the flat band let all of these through and the curve refuses
-	# every one while keeping the cord:
+	# What survives is the part that was missing from the original flat band: the bow is applied in Y and
+	# this mask measures PERPENDICULAR distance, so the largest the cord can ever sit from its chord is
 	#
-	#     lavapipe taut   t=0.81   223 px against a ceiling of  86     the flat band allowed 224
-	#     lavapipe slack  t=0.81   221 px against               83
-	#     hardware slack  t=0.19   125 px against               83
-	#     hardware slack  t=0.52    95 px against              146     kept, and this one is the cord
+	#     SAG_CAP * span * |cos(chord angle)|   plus half a fibre
+	#
+	# which is 145 px here against the 221 the uncorrected band allowed. Flat, because the along-mapping
+	# makes a per-station bound unsafe, and still entirely derived. It refuses the lavapipe contamination
+	# at 221 and 223 px and keeps the cord's apex at 125.
 	var axis_cos: float = absf(axis.x)
-	var reach: float = span * WorldRenderer.SAG_CAP * axis_cos
-	# THE MINER IS NOT THE ROPE, and this scan was the one place that did not say so. `_body_mask` is
-	# applied at four other sites here and was never applied to the bow. The miner stands at the HAND end
-	# of the chord, wears rope-coloured pixels, and the scan only excludes 6px of each end, so the body
-	# sat inside the corridor at low `along` and set the profile there. Taken from the body's real
-	# half-extents for the same reason `_body_mask` is: a generous invented box would start eating cord.
+	var ceil_off: float = span * WorldRenderer.SAG_CAP * axis_cos + WorldRenderer.CORD_CORE_W * 0.5
+	# THE MINER IS NOT THE ROPE. `_body_mask` is applied at four other sites in this layer and never here,
+	# and the miner stands at the HAND end of the chord wearing rope-coloured pixels. It discards 0 on this
+	# rig, so it is not what the bow was reading, and it stays as a guard that reports only when it fires.
 	var bhalf: Vector2 = Vector2(Player.WIDTH, Player.HEIGHT) * 0.5
 	var b0: Vector2 = _screen(_main._player.position - bhalf)
 	var b1: Vector2 = _screen(_main._player.position + bhalf)
@@ -1361,8 +1361,7 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 			# into. A pixel out there is therefore not cord, whatever colour it is. Taking the best
 			# IN-BAND offset per station rather than rejecting the whole station keeps a station that
 			# holds both cord and contamination, which the far end of this chord does.
-			var ceil_here: float = sin(along / span * PI) * reach + WorldRenderer.CORD_CORE_W * 0.5
-			if off > ceil_here:
+			if off > ceil_off:
 				_bow_over[bi] += 1
 			elif off > _bow_best[bi]:
 				_bow_best[bi] = off
@@ -1375,9 +1374,21 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		% [pct, _bow_binned() / span, _bow_occupied(), BOW_BINS, offs.size(), span, _bow_rim()])
 	print("    [bow-diag] profile %s   (each station's peak offset as a share of the rim, . = empty)"
 		% _bow_sketch())
-	print("    [bow-diag] clean %s  sag-median %s  stations agreeing with it %.0f%%  in-band %d/%d  "
-		% [_bow_clean_str(span), _bow_sag_str(span), _bow_agree(span) * 100.0, _bow_occupied(), BOW_BINS]
-		+ "over-band stations %d  (NEITHER is yet what this layer asserts on)" % _bow_over_stations())
+	# THE SAG ITSELF, recovered by undoing the projection rather than by dividing station by station.
+	#
+	# `_bow_sag_median` and `_bow_agree` are WITHDRAWN and their numbers should not be quoted: both divide
+	# a station's offset by `sin(t * PI)` with `t` taken from `along`, and the paragraph above shows those
+	# are not the same quantity. They agreed to four decimals across two renderers, which read as
+	# robustness and was actually two runs making one systematic error identically.
+	#
+	# What the geometry does support needs no station at all. Wherever the apex lands in `along`, the
+	# LARGEST perpendicular offset anywhere on the cord is `sag * |cos(chord angle)|`, so dividing the
+	# largest offset by that cosine recovers the drawn sag as a share of the chord, which is exactly what
+	# `rope_sag` reports and therefore checkable against it every run.
+	var sag_est: float = _bow_clean(span) / maxf(axis_cos, 0.01)
+	print("    [bow-diag] clean %s  ->  sag %.4f of the chord once the cosine is undone  in-band %d/%d  "
+		% [_bow_clean_str(span), sag_est, _bow_occupied(), BOW_BINS]
+		+ "over-band %d  (NOT yet what this layer asserts on)" % _bow_over_stations())
 	# WHAT THE RENDERER SAYS IT DREW, beside what the mask read off it. `rope_sag` is scale-free once
 	# divided by its own chord, so a world-space prediction is directly comparable to a screen-space
 	# measurement -- and the gap between them is the point. The cord is bowed in Y (`p.y += sin(t * PI) *
@@ -1392,6 +1403,19 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	var got: float = _main._player.grapple.slack(from)
 	var pred: float = WorldRenderer.rope_sag(wspan, got) / maxf(wspan, 1.0)
 	var ang: float = absf(rad_to_deg((to - from).angle()))
+	# IS THE WHOLE CHORD EVEN IN THE PICTURE? `span` is computed from two projected points and neither has
+	# to be on screen. If an end is outside the frame, the stations near it can hold no pixels at all and
+	# the t-axis this profile is read against covers geometry the camera never saw.
+	var iw2: int = img.get_width()
+	var ih2: int = img.get_height()
+	var a_in: bool = a.x >= 0.0 and a.y >= 0.0 and a.x < float(iw2) and a.y < float(ih2)
+	var b_in: bool = b.x >= 0.0 and b.y >= 0.0 and b.x < float(iw2) and b.y < float(ih2)
+	if not (a_in and b_in):
+		print("    [bow-diag] CHORD LEAVES THE FRAME: hand %s in=%s, hitch %s in=%s, image %dx%d"
+			% [str(a.round()), str(a_in), str(b.round()), str(b_in), iw2, ih2])
+	else:
+		print("    [bow-diag] chord fully inside the frame (hand %s, hitch %s, image %dx%d)"
+			% [str(a.round()), str(b.round()), iw2, ih2])
 	# WHERE THE LARGEST OFFSET SITS, which decides whether an agreement is the cord or a coincidence. The
 	# hang is `sin(t * PI) * sag`, so its apex is at mid-chord by construction. A maximum found near
 	# either end is not the hang, however well its VALUE matches the prediction.
