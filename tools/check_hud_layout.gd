@@ -1005,10 +1005,21 @@ func _check_lesson_footprint() -> void:
 func _check_helper_registry() -> void:
 	var hud: Hud = _main._hud
 	var found: Array[String] = []
-	# BOTH objects, because the settings page's drawing moved to `SettingsPage` and did not stop being
-	# a drawing surface by changing file. Enumerating only the Hud would have let three classified
-	# surfaces leave the registry silently, which is the failure this assertion exists to prevent.
-	var surfaces: Array = [hud, hud._settings_page]
+	# The Hud AND every page object it delegates drawing to. A surface does not stop being a surface by
+	# moving to its own file, and a hand-written list of those files is the wrong instrument: it has to be
+	# edited on the same commit that would otherwise be caught, so it fails exactly when it is needed. The
+	# list is derived instead, from whatever the Hud is holding, so a page added tomorrow is enumerated
+	# without anyone remembering to come back here.
+	var surfaces: Array = [hud]
+	for prop: Dictionary in hud.get_property_list():
+		if int(prop["type"]) != TYPE_OBJECT:
+			continue
+		var held: Object = hud.get(String(prop["name"])) as Object
+		# Script-backed only. Every RefCounted the Hud holds includes its `Font`, and engine resources
+		# carry private `_draw_rect`-shaped methods of their own that nobody here should be classifying.
+		# A page is one of ours, and one of ours has a script.
+		if held != null and held is RefCounted and held.get_script() != null and not surfaces.has(held):
+			surfaces.append(held)
 	for obj: Object in surfaces:
 		for m: Dictionary in obj.get_method_list():
 			var n: String = String(m["name"])

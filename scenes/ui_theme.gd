@@ -157,6 +157,10 @@ const UI_MODAL := Color(0.062, 0.070, 0.094, 0.985)
 ## The rail behind both tab strips. `RAIL_ON_FILL` is a plain lift off this value, so a rail that moves
 ## now takes its own lit tile with it.
 const UI_RAIL := Color(0.043, 0.049, 0.070, 0.92)
+## The green that says "already yours". The ladder paints owned rungs in it, the counter's state plate
+## marks a verb with nothing to run in it, and the bench sets a researched name in it. Three surfaces,
+## one meaning, so it is one colour.
+const STATE_INK := Color(0.48, 0.70, 0.52)
 
 
 ## ---- SHARED LAYOUT AND RAIL SKIN ----

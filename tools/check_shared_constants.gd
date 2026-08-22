@@ -60,6 +60,13 @@ const EXEMPT: Dictionary = {}
 ## "there is exactly one of it" is true the whole time. The location check is skipped when the count is
 ## already wrong, because two owners have no single place to be.
 const SOLE_OWNER: Dictionary = {
+	"BENCH_NARROW": "res://scenes/bazaar_page.gd",
+	"BENCH_DOT_R": "res://scenes/bazaar_page.gd",
+	"BENCH_NAME_AIR": "res://scenes/bazaar_page.gd",
+	"BENCH_NAME_PAD": "res://scenes/bazaar_page.gd",
+	"BENCH_NAME_FS": "res://scenes/bazaar_page.gd",
+	"BENCH_NAME_FS_MIN": "res://scenes/bazaar_page.gd",
+	"STATE_INK": "res://scenes/ui_theme.gd",
 	"REMAP_ROWS": "res://scenes/settings_page.gd",
 	"AUDIO_ROWS": "res://scenes/settings_page.gd",
 	"FEEL_ROWS": "res://scenes/settings_page.gd",
