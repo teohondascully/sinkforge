@@ -404,10 +404,9 @@ func _capture(moment: String, zoom_idx: int, name_suffix: String = "") -> int:
 	# and have not yet decided about. The gate above stops a CONTAMINATED capture replacing a good one, and
 	# does nothing about a perfectly valid capture of a moment you did not mean to retake.
 	#
-	# The `docs/DECISIONS.md` rule about never destroying the user's artifacts is why this exists at all,
-	# and it was written while the tool that overwrites them was left unchanged: the same gap as a locked
-	# commit trailer that 23 commits carried anyway. A rule in a document is enforced by whoever last read
-	# the document.
+	# The `docs/DECISIONS.md` rule about never destroying a curated file is why this exists at all, and it
+	# was written while the tool that overwrites them was left unchanged. A rule stated in a document is
+	# enforced by whoever last read the document; a rule with a guard in the code is enforced every run.
 	#
 	# One generation is enough to be an undo. If the copy cannot be made, REFUSE: a capture is worth less
 	# than the capture it would destroy, so the failing side is the side that keeps what already exists.
