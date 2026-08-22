@@ -32,6 +32,10 @@ var _bench: BazaarBench = BazaarBench.new()
 ## The pack tab, on the same terms.
 var _pack: BazaarPack = BazaarPack.new()
 
+## What the counter has on offer. Model rather than a tab, so it is not one of the surfaces above: the
+## shell queries it and so does WORKS, and the four lists it holds are the ones `scenes/main.gd` fills.
+var _cat: BazaarCatalogue = BazaarCatalogue.new()
+
 ## The hovered-thing tooltip. The pack tab and the hotbar both set it and the Hud draws it. The pack owns
 ## the state now that it is a file of its own, and this page keeps a property of each name so that the
 ## Hud's three -- which forward to these -- did not have to learn where it went.
@@ -323,21 +327,21 @@ const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR
 ## and six tools have always read them there.
 var bazaar_tab: int = TAB_PACK
 var bazaar_row: int = 0
-var craft_ids: Array[StringName] = []
-var craft_options: Array[Dictionary] = []
-var rack_ids: Array[StringName] = []
-var rack_options: Array[Dictionary] = []
+var craft_ids: Array[StringName]:
+	get: return _cat.craft_ids
+	set(v): _cat.craft_ids = v
+var craft_options: Array[Dictionary]:
+	get: return _cat.craft_options
+	set(v): _cat.craft_options = v
+var rack_ids: Array[StringName]:
+	get: return _cat.rack_ids
+	set(v): _cat.rack_ids = v
+var rack_options: Array[Dictionary]:
+	get: return _cat.rack_options
+	set(v): _cat.rack_options = v
 var _bazaar_rows: PackedInt32Array = PackedInt32Array()
 var _bazaar_t: float = 0.0            ## 0..1 open ease, driven in _process
 
-
-
-func open_machines() -> Array[int]:
-	return _unlocked(craft_ids, craft_options.size())
-
-
-func open_rack() -> Array[int]:
-	return _unlocked(rack_ids, rack_options.size())
 
 
 ## How many columns each WORKS group takes, at this row height. Groups are laid left to right and never
@@ -374,16 +378,6 @@ static func works_window_first(count: int, capacity: int, base: int, cursor: int
 	if count <= capacity:
 		return 0
 	return clampi(cursor - base - capacity / 2, 0, count - capacity)
-
-
-## The id of the i-th craftable, supplied explicitly by MainView as `craft_ids`, parallel to
-## `craft_options`, so machines and tools can interleave without relying on `_icons` insertion
-## order. It falls back to the old `_icons`-keys derivation if `craft_ids` was not set.
-func _craft_id(i: int) -> StringName:
-	if i < craft_ids.size():
-		return craft_ids[i]
-	var keys: Array = _icons.keys()
-	return keys[i] if i < keys.size() else &""
 
 
 ## The fewest rows at which the two WORKS lists fit the counter's columns, asked of `works_columns`
@@ -477,21 +471,6 @@ func set_bazaar_tab(tab: int) -> void:
 func _bazaar_ease() -> float:
 	var u: float = 1.0 - _bazaar_t
 	return 1.0 - u * u * u
-
-
-## What the counter will sell you today: the indices of the rows whose tech is already yours.
-##
-## WORKS used to list the whole catalogue, sixteen machines deep with thirteen greyed out behind techs
-## you had not reached, which is a wall of things you cannot have in the place you go to get things. The
-## future has a home already: the BENCH, where every locked machine sits under the rung that unlocks it.
-func _unlocked(ids: Array[StringName], n: int) -> Array[int]:
-	var out: Array[int] = []
-	for i: int in n:
-		var id: StringName = ids[i] if i < ids.size() else &""
-		var lock: StringName = ResearchRules.locking_tech(id)
-		if lock == &"" or _sim.is_researched(lock):
-			out.append(i)
-	return out
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1634,3 +1613,23 @@ func _pack_page() -> BazaarPack:
 ## Forwarded for the same reason as the bench above: the shell draws the tabs.
 func _tab_pack(g: Dictionary) -> void:
 	_pack_page()._tab_pack(g)
+
+
+## Hand the catalogue the two things its answers depend on. The three queries under it stay methods of
+## this page because the shell, `scenes/main.gd` and two of the checks have always called them here.
+func _catalogue() -> BazaarCatalogue:
+	_cat._sim = _sim
+	_cat._icons = _icons
+	return _cat
+
+
+func _craft_id(i: int) -> StringName:
+	return _catalogue()._craft_id(i)
+
+
+func open_machines() -> Array[int]:
+	return _catalogue().open_machines()
+
+
+func open_rack() -> Array[int]:
+	return _catalogue().open_rack()
