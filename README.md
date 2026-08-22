@@ -222,6 +222,27 @@ friction on journeys a player has to make anyway, including the climb back out o
 goal gets up to three tries, because real-time physics and heuristic navigation can miss once. Some
 goals inject resources to arrange the situation; the verb under test is always the real one.
 
+`tools/play_agent.gd` is the driver underneath it, and the split is the point. The agent owns a body and
+a verb set: it walks the real `Player` through real platformer physics and calls the same reach-gated
+verbs the mouse and keyboard call, `try_mine`, `try_build`, `try_deposit`, `try_craft` and `select`.
+Nothing in it reaches past that surface to write a result directly, so if the body cannot walk to a cell
+it cannot mine it, exactly as a player cannot. Actions await the physics frame, which is what lets a goal
+read as a linear script rather than a state machine:
+
+```gdscript
+await agent.dig_down_to(ore)
+await agent.deposit_into_forge()
+```
+
+The one deliberate hatch is `give()`, which injects resources to arrange a situation, such as topping up
+ingots before exercising crafting. It short-circuits the setup and never the verb.
+
+The agent also reports *how* it played, not only whether it finished. Each goal prints jumps, gaps
+bridged, staircases built and frames spent making no progress, alongside blocks broken and blocks laid.
+Those last are friction counts: the byproduct effort of getting somewhere, as distinct from the effort
+the goal is actually about. A goal can pass while thrashing, and these are what make that visible. When
+a mobility tool lands, they are the numbers that are supposed to fall.
+
 A layer reports pass, fail or skip, and skip has its own exit code rather than a quiet zero. 17 layers
 are registered as needing a real window, three of which also need the machine to themselves, and the
 layers that judge pixels detect the absence of a display and skip themselves. The runner prints the
@@ -295,6 +316,52 @@ only as truthful as the thing that drew the pixels, and there are two renderers.
 `docs/HARNESS_LAYERS.md` covers the shape of a layer, the three-state exit protocol, and the failure
 modes that have actually bitten this suite. `CONTRIBUTING.md` covers running a subset safely.
 
+### More test code than game code
+
+Rounded, and counted over tracked GDScript and shell:
+
+| | Files | Lines |
+| --- | --- | --- |
+| Game — `scenes/` and `src/` | 52 | ~27,000 |
+| Tooling — `tools/` | 131 | ~41,000 |
+
+That ratio is not a big generated suite padding a small game. It is what verifying *presentation* costs.
+
+A simulation assertion is cheap to write, because the answer is a number and the check is an equality.
+Most of what makes this project succeed or fail is not a number: whether a machine reads as that machine,
+whether a tunnel reads as carved rock rather than as a hole in a texture, whether a menu's hierarchy
+survives being seen for the first time. None of that can be asserted on directly, so a large share of
+`tools/` is not assertions at all. It is **instruments**: things that render a real frame, reduce it to a
+statistic with a stated meaning, and then assert on the statistic.
+
+An instrument is only worth its verdict if it can still register the thing it is pointed at, so the
+layers that use one carry their controls in the same run rather than in a separate test. The machine
+identity layer is a representative example. Before it compares any two machines it establishes that the
+camera has stopped, that still-frame noise masks less of the cell than two machines are required to
+differ by, that a mask against itself scores zero, and that two masks known to differ by 30% score 0.30.
+Only then does the comparison mean anything, and a failure of one of those controls is a different
+finding from a failure of the comparison.
+
+### The harness polices the harness
+
+A test suite is code, and this one has produced every failure mode it now guards against. So a group of
+layers take the repository, or the suite itself, as their subject rather than the game.
+
+| Layer | What it refuses to let happen |
+| --- | --- |
+| `check_vacuous_assertions` | an assertion that cannot fail: a bound outside the range the expression can reach, or an error path that returns the value the assertion wants |
+| `check_verdict_claims` | a verdict line claiming more than any assertion in that layer actually tested |
+| `check_ci_coverage` | a registered layer that no CI job runs. The motivating defect was live with both jobs green over it: the display job selected its pixel layers by name, so a layer added afterwards was registered, passing locally, and never once run on a build machine |
+| `check_doc_counts` | a layer count printed in prose drifting from the count the runner registers |
+| `check_fixture_pointer` | the guard that turns "a person moved the mouse mid-measurement" into a void rather than a failure, checked in *both* directions, since a guard that never fires voids nothing and a guard that always fires voids every aim assertion in the suite |
+| `check_shared_constants` | two files agreeing on a value by both happening to write it, with no line relating them that could fail when one moves |
+| `check_prose` | the comment register, and documents citing a layer by its index in the registry instead of by its path |
+| `check_binding_conflict`, `check_binding_text` | two keys claiming one job, and key names shown in the UI drifting from the bindings behind them |
+| `check_trailers` | authorship on every commit, through the tracked hooks in `.githooks/` |
+
+The rule they all descend from is in `CONTRIBUTING.md`: *a comment that states a number is a test with no
+runner.* Either derive the fact from the constant, or put it somewhere the harness checks it.
+
 ### CI
 
 `.github/workflows/harness.yml` runs three jobs on every push to `main` and every pull request: an
@@ -344,6 +411,16 @@ This README carries no build badge while any job is red.
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
 | `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |
 | `.githooks/` | the tracked `commit-msg` and `pre-commit` hooks. Activate them once per clone; `CONTRIBUTING.md` says how. |
+
+**On clone size.** `history/` and `docs/media/` are together most of the repository, and both are tracked
+on purpose. The captures under `docs/media/` are the evidence the presentation work argues from:
+`docs/CAPTURE_MANIFEST.md` records the date and the renderer signature of the build that produced each
+frame, and several documents reason from specific named frames. A claim of the form "this change is
+invisible at play zoom" is only checkable while the before frame is still in the tree, and a baseline
+that has to be regenerated to be consulted is not a baseline. `history/` is the same argument over a
+longer span. Moving either to a release attachment or an LFS store would shrink the clone and make those
+arguments unverifiable, so the size is accepted deliberately rather than by neglect. Neither directory is
+read by the game; both carry a `.gdignore` so the engine does not import them.
 
 ## Documents
 
