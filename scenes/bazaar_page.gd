@@ -24,6 +24,15 @@ var _font: Font = ThemeDB.fallback_font
 var _sim: FactorySim = null
 var _icons: Dictionary = {}                 ## `Hud.machine_icons`, assembled by `main.gd`
 var _inv_selected: Callable                 ## `Hud.inv_selected_getter`, set from outside the Hud
+## Near a claimed Bazaar. The Hud owns it because `main.gd` writes it and `tools/capture_moments.gd`
+## reads it there; the accessor copies it in, the same way `probing` arrives.
+var can_craft: bool = false
+
+## Measured once per item and kept. The sentences are `const`, the column derives from constants and the
+## font, and neither moves while the game is running, so there is nothing for this to go stale against.
+## The alternative is re-shaping every carried sentence on every frame the pack is open.
+var _blurb_lines_memo: Dictionary = {}
+
 var probing: bool = false
 var panel_probe: Array[Rect2] = []          ## THE SAME array object Hud holds, shared by reference
 
@@ -127,6 +136,187 @@ const DETAIL_TAIL: float = 8.0        ## last baseline to the bottom of the plat
 ## nothing.
 const DETAIL_TEXT_GAP: float = 14.0
 
+## THE DETAIL PLATE'S OWN MEASUREMENTS. Thirty-three constants that no other tab reads, which is the
+## measured reason they travel with it rather than sitting in a shared table.
+
+## The Bazaar: one counter with three tabs (`docs/BAZAAR.md`).
+##
+## It is one panel at one size with the same three tabs, and it opens the same everywhere, including at
+## the bottom of a shaft, where the point is to read every recipe and every tech price and plan the trip
+## back. Away from a Bazaar the verbs are dimmed and one line says where they live; nothing moves and
+## nothing disappears.
+##
+## There is no scrolling viewport and no dead space. The rows are a dense card grid across three
+## columns, and the bottom of the panel is a detail plate drawing the thing you are about to buy large
+## enough to want. Twenty-one rows fit unscrolled, which `check_pack_layout` asserts rather than trusts.
+## The counter's width and the height it is allowed to reach rather than the height it takes.
+##
+## 608x348 on a 640x360 canvas is 91.8% of the screen by area. The counter takes the height its active
+## tab asks for through `_bazaar_wanted_h`, clamped between `BAZAAR_MIN_H` and this. A fresh PACK
+## therefore lands at 190, or 50.1% of the canvas: head 48 + one row of wells 46 + the gap 8 + the
+## compact plate 72 + the foot 16. BENCH still asks for more than this and is still clamped to it.
+##
+## Both percentages are areas and neither is a height. That is worth a line because the two frames give
+## different answers: as heights the same panels are 52.8% and 96.7%.
+##
+## The width does not move. The detail plate carries a machine's whole sentence, which is what the 528px
+## of content width buys. Narrowing it to match one 46px well would trade a void for a truncation.
+const BAZAAR_SIZE := Vector2(608.0, 348.0)
+
+## The detail plate is the height of what it draws, and it draws two different things.
+##
+## The full plate is for a thing you are deciding whether to spend on: a lit square, a title, a two-line
+## blurb and a row of price chips. The square is `DETAIL_ART` on a side with `DETAIL_PAD`
+## above and below, which is the 88 exactly. The chips are the deepest thing in the text column beside
+## it, starting 62 below the plate's top and standing 19 tall. So 81 of the 88 is spoken for and 78 of
+## it by the square alone, and the two columns reach the same floor independently. Nothing here scales:
+## a coefficient in front of the 88 clips the chips before it has taken a fifth of the height away.
+##
+## The compact plate is for a thing there is nothing to weigh. What is already in the pack has no price
+## and PACK's own summary has no cost, so neither draws the chip row. The deepest thing left is then the
+## last blurb line plus one fact under it. That sum is `BAZAAR_DETAIL_MIN`, and the square becomes
+## whatever fits beside it, which is why `_draw_bazaar_detail` reads it off the plate's rect.
+##
+## The plate sits inside the height it is a share of. A fresh PACK is 118px of head, wells, gap and foot
+## plus the plate, so the share is plate/(118+plate) and shrinking the plate shrinks the panel under it.
+## 88 of 206 is 42.7% and 72 of 190 is 37.9%. `check_pack_layout` floors the plate at 70px, so 37.2% is
+## all this lever has ever been worth.
+const DETAIL_PAD: float = 10.0        ## plate edge to the art square, and the same again under it
+
+const BAZAAR_DETAIL: float = DETAIL_PAD * 2.0 + DETAIL_ART
+
+## The lamp's rings and the thing inside them are sized off the square rather than written down, because
+## the square is no longer one size. An 8px step off a 34px radius spills over the edge of a compact
+## plate's square, and a 44px glyph would swallow the rim the lamp needs to read against.
+## Ring to ring, as a share of the square's radius rather than the 8px it is at the full depth.
+## The compact plate's text column, which is what sets its height. `DETAIL_LINE` is what the plate
+## reserves per blurb line rather than what the face draws, because `draw_multiline_string` takes its own
+## pitch from the font. The tail pays for what hangs off the last baseline.
+##
+## The reserve is a floor and not a cap. Both numbers have to stay `const`, because `BAZAAR_MIN_H` is
+## built out of `BAZAAR_DETAIL_MIN` and `check_pack_layout` asserts that a fresh pack lands on that
+## floor rather than being caught by it, so they cannot be the font's own measurement. What they can
+## stop being is the last word: `_hold_overflow_h` measures the sentence about to be drawn and adds the
+## font's real line height for every line past these two.
+const DETAIL_BLURB_Y: float = 40.0    ## first blurb baseline, below the plate's top
+
+const DETAIL_BLURB_LINES: int = 2     ## the lines the floor pays for, not a limit on what the blurb takes
+
+const DETAIL_BLURB_SIZE: int = 9      ## and the size it is set at, which is what makes the pitch measurable
+
+## Where the fact under the blurb sits when the plate is at its floor, which is the sum the floor is
+## written as. The plates take it off their own bottom edge instead, so a plate that grew a line carries
+## the fact down with it rather than printing it through the blurb's last row.
+const DETAIL_LINE: float = 12.0       ## reserved per blurb line
+const DETAIL_FACT_Y: float = DETAIL_BLURB_Y + DETAIL_LINE * DETAIL_BLURB_LINES
+
+const BAZAAR_DETAIL_MIN: float = DETAIL_FACT_Y + DETAIL_TAIL
+
+const DETAIL_TEXT_RIGHT: float = 24.0
+
+## The pack plate's verb and its key, named because the column's width is measured off the button and
+## the button is drawn from the same pair. A second copy of the word would be a width that stops
+## matching the button the day the word changes.
+const HOLD_VERB: String = "HOLD"
+
+const HOLD_KEY: String = "ENTER"
+
+## The counter has exactly one verb button. Until now it was drawn twice from two sets of numbers.
+##
+## It was never photographed live. `capture_moments` set `_hud.can_craft = true` and `main.gd`
+## recomputed it from `_near_bazaar()` before the shutter, so every menu capture shows the dead branch
+## of this if. The first frame taken with `ready` true read `BUILDENTER`: the key hint started four
+## pixels after the verb's last stroke at 10pt against 8pt, which is one word. `_detail_hold` drew the
+## same construct with the hint hardcoded at `x + 58.0`, a gap of about 20px, so two buttons in one
+## plate disagreed by a factor of five. The fixed 104px plate could not hold RESEARCH either, which is
+## eight tracked characters, since it was sized for BUY.
+##
+## So: one function, one gap constant, and a width derived from the verb rather than asserted over it.
+## The button stays anchored to the plate's right edge, so growing it moves its left edge inward and
+## nothing downstream shifts. It returns the rect it drew, because the caller prints the note above it.
+const VERB_SIZE: int = 10
+
+const VERB_TRACK: float = 2.0
+
+const VERB_HINT_SIZE: int = 8
+
+const VERB_GAP: float = 14.0          ## verb ink to key hint; at the shipped 4.0 the two read as one word
+
+const VERB_PAD: float = 12.0          ## plate edge → ink, both ends
+
+const VERB_MIN_W: float = 104.0       ## BUY and BUILD keep the width the layout was drawn around
+
+const VERB_H: float = 24.0
+
+const VERB_BASE: float = 16.0         ## button top → the verb's baseline. The state form shares the line.
+
+## The ink on a live button. The key hint beside it is that same ink thinned, rather than a second copy
+## of the literal carrying its own alpha, which is what the file held: `Color(0.08, 0.07, 0.04)` and
+## `Color(0.08, 0.07, 0.04, 0.62)`, three lines apart, with nothing relating them.
+##
+## The alpha is bounded by the contrast floor and not by taste, which is the whole reason it moved. The
+## hint measured 3.77:1 against the gold it is printed on while the verb above it read 8.30, so the
+## thinning that made the hint subordinate had taken it under 4.5 and the one glyph naming the key that
+## runs the button was the least legible thing on it. At 0.75 it is 5.15:1 and still visibly quieter
+## than the word. 0.70 would have cleared at 4.57, and a floor of 4.5 with a value at 4.57 is a defect
+## waiting for the next palette nudge, so it is not set there.
+const VERB_INK := Color(0.08, 0.07, 0.04)
+
+const VERB_HINT_A: float = 0.75       ## the hint is the verb's own ink, thinned to the floor and no further
+
+const DETAIL_ROW_GAP: float = 8.0     ## between the row's three parts: the price, the reason, the verb
+
+const DETAIL_NOTE_SIZE: int = 8       ## the reason the verb will not run; the smallest type on the plate
+
+const STATE_TICK: float = 9.0         ## the mark's width
+
+const STATE_GAP: float = 6.0          ## mark → word
+
+## The one word on the row that says which way the numbers point, named because the row measures it and
+## draws it from the same string. Every other numeral on this counter is a price for the thing named
+## beside it. These are one item's line in somebody else's price, and without the lead-in the row is a
+## rebus.
+const DEMAND_LEAD: String = "wanted by"
+
+## The price chip's own measurements, named because the decision row packs from its right edge leftward
+## and has to know how tall and how wide a chip is before it can place one. The height matters twice
+## over, since it is what seats the chips on the row's floor beside a button half again their depth.
+##
+## `DETAIL_CHIP_WELL` is not `DETAIL_CHIP_H` wearing another hat. One is the room the glyph stands in
+## and the other is how deep the card is, and the two are equal by coincidence, so they are left as
+## separate numbers on purpose. The well is named at all only because a chip without a card has to know
+## where its numerals start without the card's width to read it off.
+const DETAIL_CHIP_H: float = 19.0
+
+const DETAIL_CHIP_BASE: float = 13.5  ## chip top → the numeral pair's baseline, which the reason shares
+
+const DETAIL_CHIP_SIZE: int = 9
+
+const DETAIL_CHIP_WELL: float = 19.0  ## chip left edge → the numerals: the well the item glyph stands in
+
+const DETAIL_CHIP_PAD: float = 26.0   ## the glyph well and the right margin, around the numeral pair
+
+## The card's right margin, which is `DETAIL_CHIP_PAD` less the well the numerals start after, and
+## therefore not a fifth number that has to be kept in step with the other four by hand. It is derived
+## rather than written as a `7.0` for the reason this file has had to learn twice: a literal that must
+## equal the difference between two other literals, with nothing relating them, is wrong the first time
+## either of them moves and nothing anywhere fails when it does.
+##
+## It is named because a settled line has no card, and a margin is a property of the card. Such a line
+## gives this back, which is what makes the covered run sit tighter than the owed one, so the grouping
+## is paid for out of a number the drawing already contained rather than out of a new gap invented to
+## sit between the runs. A new gap was the first design and it was wrong: `DETAIL_CHIP_GAP` is
+## deliberately tighter than `DETAIL_ROW_GAP` so the price reads as one of the row's three parts, and
+## any seam wide enough to group chips inside the price would have been wider than the gap that
+## separates the price from the reason.
+const DETAIL_CHIP_RIM: float = DETAIL_CHIP_PAD - DETAIL_CHIP_WELL
+
+## Chip to chip inside the price, deliberately tighter than `DETAIL_ROW_GAP`. A four-ingredient price
+## and the three parts of the row set at one spacing would be seven equal things in a line, and the
+## price has to read as one of the three.
+const DETAIL_CHIP_GAP: float = 6.0
+
+
 ## The counter's own state. `Hud` keeps a property of each name forwarding here, because `scenes/main.gd`
 ## and six tools have always read them there.
 var bazaar_tab: int = TAB_PACK
@@ -197,13 +387,6 @@ func _craft_id(i: int) -> StringName:
 		return craft_ids[i]
 	var keys: Array = _icons.keys()
 	return keys[i] if i < keys.size() else &""
-
-
-func _can_afford(cost: Dictionary) -> bool:
-	for item: StringName in cost:
-		if int(_sim.inventory.get(item, 0)) < int(cost[item]):
-			return false
-	return true
 
 
 ## The fewest rows at which the two WORKS lists fit the counter's columns, asked of `works_columns`
@@ -621,7 +804,7 @@ func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int,
 ## outlined, because an outline around every row makes every row shout and the selected one shout no
 ## louder.
 func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> void:
-	var afford: bool = _can_afford(opt["cost"])
+	var afford: bool = BazaarCosts.can_afford(_sim.inventory, opt["cost"])
 	if selected:
 		_round_rect(rr, 4.0, Color(0.176, 0.153, 0.098))
 		_canvas.draw_rect(Rect2(rr.position + Vector2(0.0, 2.0), Vector2(2.0, rr.size.y - 4.0)), UiTheme.UI_ACCENT)
@@ -670,7 +853,7 @@ func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 	# One walk order for both passes. The sum is the same whichever way the dictionary is read, so the
 	# width pass does not need this. It takes it anyway, because the day the two passes walk the price by
 	# two different rules is the day one of them stops describing the other.
-	var order: Array[StringName] = _cost_order(cost)
+	var order: Array[StringName] = BazaarCosts.order(_sim.inventory, cost)
 	var w: float = 0.0
 	for item: StringName in order:
 		w += 12.0 + _font.get_string_size(_cost_numeral(item, int(cost[item])),
@@ -695,49 +878,8 @@ func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 ## cosmetic here: `_works_row` subtracts this function's total from the name's budget, so a numeral that
 ## measures narrower than it draws puts the price on top of the word it was widened to protect.
 func _cost_numeral(item: StringName, need: int) -> String:
-	var gap: int = _cost_gap(item, need)
+	var gap: int = BazaarCosts.gap(_sim.inventory, item, need)
 	return ("-%d" % gap) if gap > 0 else str(need)
-
-
-## The bill-of-materials order: the lines you still owe first, the lines the pack already settles after.
-##
-## The numerals were the half of this that shipped first, a deficit printing as a signed `-N` instead of
-## leaving the subtraction to the reader, and fixing a numeral does not make a row of chips a bill. A
-## bill is a list whose outstanding lines are grouped, because the only question anybody brings to a
-## price is which lines are still open. Interleaved, that question is a scan of every ingredient and a
-## comparison per chip. Grouped, it is a glance at the front of the price, and the count of open lines is
-## the length of the first run.
-##
-## Stable inside each run, so a recipe keeps the order its `.tres` or its rung wrote it in and the only
-## thing that ever moves a chip is that ingredient crossing the line. The crossing is the point rather
-## than the price of it: the frame where you pick up the last ingot is the frame the owed run gets
-## shorter, which is the most direct feedback on the panel and the one thing a static row could never say.
-##
-## It sorts the works rows and the detail plate alike, so a machine's price does not rearrange itself
-## between the row you picked it from and the plate that prices it.
-func _cost_order(cost: Dictionary) -> Array[StringName]:
-	var owed: Array[StringName] = []
-	var settled: Array[StringName] = []
-	for item: StringName in cost:
-		if _cost_gap(item, int(cost[item])) > 0:
-			owed.append(item)
-		else:
-			settled.append(item)
-	owed.append_array(settled)
-	return owed
-
-
-## The one subtraction, and the one predicate. What this ingredient is short by: positive while the pack
-## cannot cover the line, zero or below once it can.
-##
-## Everything that tells an outstanding ingredient from a settled one reads this and nothing else: the
-## order the price is walked in, the card under a detail chip, the sign on both surfaces' numerals and
-## the ink they are drawn in. `have < need` was written out at four addresses before, which is
-## survivable only while the four cannot disagree. They can, and a mark that disagrees with the colour
-## beside it about one ingredient is worse than either cue missing, because each reader only ever sees
-## one of them.
-func _cost_gap(item: StringName, need: int) -> int:
-	return need - int(_sim.inventory.get(item, 0))
 
 
 ## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects a
@@ -1068,3 +1210,680 @@ func _detail_lamp(art: Rect2, alpha: float) -> void:
 		_canvas.draw_circle(art.get_center(), r * (1.0 - float(k) * DETAIL_LAMP_STEP),
 			Color(0.85, 0.70, 0.35, alpha))
 	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
+
+
+## How tall the plate wants to be for the thing that is selected. Every site positioning against the
+## plate reads this number. There is deliberately no second copy: `_bazaar_geometry` buys the content
+## box out of it, the panel's asking height adds it, and `_draw_bazaar_detail` takes the art square back
+## off the rect it is handed.
+##
+## The plate expands for a choice. A machine, a Rack row and a rung of the ladder all cost something,
+## and the chip row saying whether you can afford it is what the full 88 is for. What is already in your
+## pack has no price to weigh and PACK's summary is not a purchase, so both get the compact plate.
+##
+## It is keyed on the selection rather than on the tab, because the content decides. The kinds partition
+## by tab all the same, which is what makes the depth constant while a tab is open.
+##
+## The compact depth is a floor rather than the answer. `BAZAAR_DETAIL_MIN` pays for two lines of
+## sentence and `_hold_overflow_h` is what the pack needs beyond that. A pack whose sentences fit the
+## reserve adds nothing, which is how a fresh game still lands exactly on `BAZAAR_MIN_H`.
+func _detail_wanted_h() -> float:
+	if _sim == null:
+		return BAZAAR_DETAIL
+	match str(bazaar_action().get("kind", "")):
+		"machine", "rack", "tech":
+			return BAZAAR_DETAIL
+		_:
+			return BAZAAR_DETAIL_MIN + _hold_overflow_h()
+
+
+## The width the pack plate's sentence wraps at. Both the height above and the drawing below take it
+## from here. It was `box.size.x - 260.0` at the draw and nothing at all at the measure. 260 is the sum
+## of nothing on this plate: it stopped the column 70px short of the button it was meant to stop at,
+## which is why the longest sentence in the catalogue needed a third line that `DETAIL_BLURB_LINES` was
+## then cutting off.
+##
+## It is measured against the largest square the plate may draw. The square is read back off the plate's
+## height, and the height is what this width is being asked for, so a column that narrowed as the plate
+## grew would be an input to its own answer. `DETAIL_ART` is the square's ceiling.
+##
+## It reserves for the button and not for the state. `HELD` is a tick and a word where `HOLD` is a pill
+## with a key in it. Sizing the column to whichever form a row carries would rewrap the sentence you are
+## reading as a consequence of pressing the key underneath it.
+func _hold_text_w() -> float:
+	return BAZAAR_SIZE.x - UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD * 2.0 \
+		- (DETAIL_PAD + DETAIL_ART + DETAIL_TEXT_GAP) \
+		- _verb_button_w(HOLD_VERB, HOLD_KEY) - DETAIL_TEXT_RIGHT
+
+
+## How many lines a sentence takes in a column `w` wide, asked of the font that will draw it rather than
+## estimated from a character count. The reported height is the line count times the line height, so the
+## division is exact. It uses `roundi` rather than `ceili`, because a paragraph coming back a hair over
+## a whole number would otherwise reserve a line nobody needs.
+func _blurb_lines(text: String, w: float) -> int:
+	var block: float = _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, w,
+		DETAIL_BLURB_SIZE).y
+	return maxi(1, roundi(block / _font.get_height(DETAIL_BLURB_SIZE)))
+
+
+## How much deeper than its floor the compact plate has to be, for the pack that is open. It is zero for
+## a pack whose sentences all fit the two lines `BAZAAR_DETAIL_MIN` pays for, which is every pack the
+## catalogue can make today. The point is the day one does not. The plate grows a line instead of eating
+## the end of the sentence, which the hold plate used to do by handing `DETAIL_BLURB_LINES` to
+## `draw_multiline_string` as a cap.
+##
+## It is asked of the whole pack and not of the selected row, because the plate's depth has to stay
+## constant while the tab is open. An empty pack asks for nothing, which keeps a fresh game on the floor.
+##
+## Only PACK can ask. The compact plate is also what a WORKS or BENCH tab with no selection falls back
+## to, and `_detail_pack` has no sentence on it. Sizing it against a pack it is not showing would
+## reserve depth for text on another tab.
+##
+## Growth is in the font's own line height while the floor is in the written one. See `DETAIL_LINE`.
+func _hold_overflow_h() -> float:
+	if bazaar_tab != TAB_PACK:
+		return 0.0
+	var w: float = _hold_text_w()
+	var over: int = 0
+	for slot: Dictionary in _sim.inventory_slots():
+		var id: StringName = slot["item"]
+		if not _blurb_lines_memo.has(id):
+			_blurb_lines_memo[id] = _blurb_lines(str(Visuals.ITEM_PURPOSE.get(id, "—")), w)
+		over = maxi(over, int(_blurb_lines_memo[id]) - DETAIL_BLURB_LINES)
+	# There is no floor on `over`: it opens at zero and `maxi` only ever raises it, so a clamp would be a
+	# guard that cannot fire.
+	return float(over) * _font.get_height(DETAIL_BLURB_SIZE)
+
+
+## The plate's bottom shelf, computed once for everything that stands on it. `_verb_button` and
+## `_state_plate` each wrote `box.size.y - 34.0`, and 34 has no relation anywhere in this file to the two
+## numbers it is the sum of: the 24 the button is tall, and the `DETAIL_PAD` of margin the plate keeps
+## under everything else. It is the sum now, so the row's floor is the plate's own bottom margin.
+func _detail_row(box: Rect2) -> Rect2:
+	return Rect2(box.position.x, box.end.y - DETAIL_PAD - VERB_H, box.size.x, VERB_H)
+
+
+## How wide the button has to be for this verb. It is separate from the drawing because the blurb beside
+## it wraps against the button's left edge, and a blurb wrapping against a guessed width runs under it.
+func _verb_button_w(verb: String, hint: String) -> float:
+	var hw: float = 0.0 if hint == "" else _font.get_string_size(
+		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE).x
+	return maxf(VERB_MIN_W, VERB_PAD * 2.0 + _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+		+ (0.0 if hint == "" else VERB_GAP + hw))
+
+
+func _verb_button(box: Rect2, verb: String, hint: String, live: bool) -> Rect2:
+	var vw: float = _tracked_w(verb, VERB_SIZE, VERB_TRACK)
+	var w: float = _verb_button_w(verb, hint)
+	var row: Rect2 = _detail_row(box)
+	var btn := Rect2(row.end.x - DETAIL_PAD - w, row.position.y, w, VERB_H)
+	var ty: float = btn.position.y + VERB_BASE
+	if live:
+		_round_rect(btn, 5.0, UiTheme.UI_ACCENT)
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK, VERB_INK)
+		if hint != "":
+			_canvas.draw_string(_font, Vector2(btn.position.x + VERB_PAD + vw + VERB_GAP, ty), hint,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, VERB_HINT_SIZE, Color(VERB_INK, VERB_HINT_A))
+	else:
+		_round_rect(btn, 5.0, Color(1.0, 1.0, 1.0, 0.05))
+		_tracked(verb, Vector2(btn.position.x + VERB_PAD, ty), VERB_SIZE, VERB_TRACK,
+			Color(0.44, 0.46, 0.52))
+	return btn
+
+
+func _state_plate_w(word: String) -> float:
+	return STATE_TICK + STATE_GAP + _tracked_w(word, VERB_SIZE, VERB_TRACK)
+
+
+## Set on the button's own baseline and against the plate's right edge, because a state and a verb are
+## read in the same place at the same moment, and only one of them is ever on a given plate.
+func _state_plate(box: Rect2, word: String) -> void:
+	var row: Rect2 = _detail_row(box)
+	var x: float = row.end.x - DETAIL_PAD - _state_plate_w(word)
+	var ty: float = row.position.y + VERB_BASE
+	var mid: float = ty - 4.0
+	_canvas.draw_line(Vector2(x, mid), Vector2(x + 3.5, mid + 3.5), UiTheme.STATE_INK, 1.6)
+	_canvas.draw_line(Vector2(x + 3.5, mid + 3.5), Vector2(x + STATE_TICK, mid - 4.5), UiTheme.STATE_INK, 1.6)
+	_tracked(word, Vector2(x + STATE_TICK + STATE_GAP, ty), VERB_SIZE, VERB_TRACK, UiTheme.STATE_INK)
+
+
+## The detail plate: the selected thing drawn large under a lamp, with one sentence of what it is for,
+## its price as one chip per ingredient, and the verb as a real button carrying the key that runs it.
+## This is where the panel stops being a list and starts being a shop, and it puts the three answers a
+## player is after in one place: what this is, whether they can afford it, and what they press.
+##
+## It is also where the plate's share of the panel is decided, because the plate is the height of what
+## it draws and this is what draws it. A thing on sale gets the full 88, while a thing you already own
+## gets the compact plate, which is the same card with the price taken out.
+func _draw_bazaar_detail(g: Dictionary) -> void:
+	var box: Rect2 = g["detail"]
+	_round_rect(box, 6.0, Color(1.0, 1.0, 1.0, 0.028))
+	# The one place the art square is built, for all three plates, since `_detail_hold` and `_detail_pack`
+	# are handed this rect rather than each writing the margin down again. It is read off the plate, being
+	# what is left of the plate's height once its margins are taken, so at the full depth it is the
+	# `DETAIL_ART` that `BAZAAR_DETAIL` is built from, and at the compact depth it is whatever fits beside
+	# the text.
+	#
+	# It is capped, because the plate can now be deeper than the full 88 as well as shallower. A compact
+	# plate carrying a third line of sentence is taller than the square is meant to be, and letting the
+	# square follow it up would push the text column right, narrow the sentence and ask for a fourth line,
+	# which is the height feeding its own input.
+	var side: float = minf(DETAIL_ART, box.size.y - DETAIL_PAD * 2.0)
+	var art := Rect2(box.position + Vector2(DETAIL_PAD, DETAIL_PAD), Vector2(side, side))
+	var act: Dictionary = bazaar_action()
+	var kind: String = str(act.get("kind", ""))
+	if kind == "":
+		_detail_pack(box, art)
+		return
+	var id: StringName = act["id"]
+	if kind == "hold":
+		_detail_hold(box, art, id, int(act.get("row", 0)))
+		return
+	var title: String = ""
+	var blurb: String = ""
+	var cost: Dictionary = {}
+	var verb: String = ""
+	var ready: bool = false
+	var note: String = ""
+	# The word for a thing you already have and the counter's one flag for having it. Everything the plate
+	# does differently for such a thing hangs off this: the state form instead of the button and no price.
+	var state: String = ""
+	if kind == "tech":
+		var t: Dictionary = ResearchRules.tech(id)
+		title = str(t["name"])
+		cost = t["cost"]
+		var sample: StringName = t.get("sample", &"")
+		# What it buys you, by name. A ladder that only prices its rungs asks you to buy a number, while the
+		# reason to climb is the machines waiting at the top of it, and now that WORKS lists only what you can
+		# already build, this plate is the only place those machines are named at all.
+		var names: PackedStringArray = []
+		for uid: StringName in (t.get("unlocks", []) as Array):
+			names.append(_item_label(uid))
+		if not names.is_empty():
+			blurb = "unlocks " + " · ".join(names)
+		elif sample != &"":
+			blurb = "analyze a sample of %s, then pour in the metal" % _item_label(sample)
+		else:
+			blurb = "a rung of the ladder — spend the metal, keep the knowledge"
+		if sample != &"" and not names.is_empty():
+			blurb += "\nanalyze a sample of %s, then pour in the metal" % _item_label(sample)
+		var next: StringName = ResearchRules.next_tech(_sim.research)
+		if _sim.is_researched(id):
+			# One plate said it twice. The note under the button read "already yours" over a button reading
+			# RESEARCHED, which is one sentence in two registers, so the word that names the state keeps the job.
+			# A rung you have climbed has no precondition left to name.
+			state = "RESEARCHED"
+		elif id != next:
+			verb = "LOCKED"
+			var req: StringName = t.get("requires", &"")
+			note = "behind %s" % (str(ResearchRules.tech(req)["name"]) if req != &"" else "an earlier rung")
+		else:
+			verb = "RESEARCH"
+			ready = can_craft and BazaarCosts.can_afford(_sim.inventory, cost) \
+				and (sample == &"" or int(_sim.inventory.get(sample, 0)) >= 1)
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, sample)
+	else:
+		var opts: Array[Dictionary] = craft_options if kind == "machine" else rack_options
+		var row: int = int(act.get("row", 0))
+		if row < 0 or row >= opts.size():
+			return
+		title = str(opts[row]["name"])
+		cost = opts[row]["cost"]
+		blurb = str(Visuals.ITEM_PURPOSE.get(id, "—"))
+		var lock: StringName = ResearchRules.locking_tech(id)
+		# This branch cannot fire today and it is kept anyway. `kind`, `id` and `row` come from
+		# `bazaar_action()` and from nowhere else. Its RACK arm resolves the id as
+		# `rack_ids[r] if r < rack_ids.size() else &""`. That is textually the expression `_unlocked` filtered
+		# on, at the index `_unlocked` handed back, so for a Rack row this test is false by construction. Its
+		# MACHINE arm resolves through `_craft_id`, which falls back to `machine_icons.keys()[i]` when
+		# `craft_ids` is short, while `_unlocked` was handed `craft_ids` and filtered on the `&""` it read
+		# past the end. Two functions answer "which thing is works row i" by two rules. They agree only while
+		# `craft_ids` is as long as `craft_options`, which `main.gd` gets right and nothing in this tree
+		# asserts.
+		#
+		# So the counter cannot reach this and deleting it would change no state on any screen. What deletion
+		# would cost is a filled gold BUILD and an ENTER hint for a machine behind unresearched tech, in the
+		# one configuration `_craft_id`'s fallback is written for. The defect worth fixing is the two
+		# resolvers rather than the guard that outlives them, and that is a change to `_unlocked`.
+		if lock != &"" and not _sim.is_researched(lock):
+			verb = "LOCKED"
+			note = "research %s first" % str(ResearchRules.tech(lock)["name"])
+		else:
+			verb = "BUILD" if kind == "machine" else "BUY"
+			ready = can_craft and BazaarCosts.can_afford(_sim.inventory, cost)
+			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
+
+	_detail_lamp(art, 0.045)
+	if kind == "tech":
+		_draw_tech_art(id, art)
+	else:
+		_draw_thing_icon(id, _detail_glyph(art))
+
+	var tx: float = art.end.x + DETAIL_TEXT_GAP
+	var reserve: float = _state_plate_w(state) if state != "" \
+		else _verb_button_w(verb, "ENTER" if ready else "")
+	var text_w: float = box.end.x - tx - reserve - DETAIL_TEXT_RIGHT
+	_tracked(title.to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, UiTheme.GOLD_PALE)
+	_canvas.draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y), blurb,
+		HORIZONTAL_ALIGNMENT_LEFT, text_w, 9, DETAIL_BLURB_LINES, UiTheme.UI_TEXT_DIM)
+	# A thing you own has no price left to weigh and no verb to run, so the plate stops at the word for
+	# having it. It was printing the price: the AUTOMATION rung read RESEARCHED and still carried a "64/2"
+	# chip, which invites being read as "64 of 3 required" on a rung nobody can buy. The plate keeps its
+	# full depth all the same, since `_detail_wanted_h` is keyed on the kind, so the tree does not reflow
+	# under a cursor walking across researched and unresearched rungs.
+	if state != "":
+		_state_plate(box, state)
+		return
+	# The decision row: the price, the reason the verb will not run, and the verb, on one shelf against the
+	# plate's right margin.
+	#
+	# They were three things at three addresses on three different lines. The chips started at the text
+	# column's left edge. The button was pinned to the plate's right edge with the better part of 300px of
+	# nothing between them. The reason floated in that void a line above the button. Chip tops sat at 62,
+	# the button top at 54 and the reason baseline at 48.
+	#
+	# It packs from the button leftward, because the button is the one element whose position may not move.
+	# `text_w` above measures the blurb's column against it, so a verb walking with the length of a
+	# shortfall sentence would rewrap the sentence it stands under.
+	#
+	# The blurb's reserve is still the button alone, which reads like an oversight and is not one. The
+	# price and the reason do overlap the sentence in x, by some 20px on the Prospecting plate, but they
+	# clear it in the other axis. The chips stand on the row's floor, `DETAIL_CHIP_H` up from a shelf
+	# `DETAIL_PAD` off the plate's bottom, which puts their ceiling 59 down an 88px plate. The blurb's
+	# second line is `DETAIL_BLURB_Y` plus one font line height, landing 53 down on the BENCH plate with
+	# descenders bottoming out at 55. Four pixels. Only the button is tall enough to reach the sentence's
+	# line, and a bigger blurb face or a third reserved line would move `BAZAAR_DETAIL_MIN`.
+	var btn: Rect2 = _verb_button(box, verb, "ENTER" if ready else "", ready)
+	var shelf: Rect2 = _detail_row(box)
+	# The price as a bill: what you still owe first, what the pack already settles after (`_cost_order`),
+	# and the two runs told apart by the card rather than by a gap or a fourth colour (`_detail_chip`).
+	# The width pass and the draw pass below take the same array, so the row cannot pack one arrangement
+	# and paint another. The row's give point is unchanged, because a settled line is narrower than it was.
+	var order: Array[StringName] = BazaarCosts.order(_sim.inventory, cost)
+	var chips_w: float = 0.0
+	for item: StringName in order:
+		if chips_w > 0.0:
+			chips_w += DETAIL_CHIP_GAP
+		chips_w += _detail_chip_w(item, int(cost[item]))
+	var note_w: float = 0.0 if note == "" \
+		else _font.get_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+	var note_gap: float = 0.0 if note == "" else DETAIL_ROW_GAP
+	# The row gives at the reason and never at the art. The column is 426 wide, the panel's inner width
+	# less the square, its gaps and the plate's two margins, and nothing bounds a price and a shortfall
+	# sentence against it: the widest thing the catalogue quotes today is the Drift Rig's three ingredients
+	# with all three short, and a fourth ingredient is one `.tres` away. So the chips stop at the text
+	# column's left edge and the reason takes what is left, drawn to that width rather than through the art
+	# square. A sentence clipped at its end is a bad frame; one printed across the picture is a broken one.
+	var cx: float = maxf(tx, btn.position.x - DETAIL_ROW_GAP - note_w - note_gap - chips_w)
+	var chip_y: float = shelf.end.y - DETAIL_CHIP_H
+	for item: StringName in order:
+		cx = _detail_chip(Vector2(cx, chip_y), item, int(cost[item])) + DETAIL_CHIP_GAP
+	# Left open, and recorded rather than quietly created. Now that a short chip prints the deficit, the
+	# shortfall branch of this note is the same number a second time some two hundred pixels along one
+	# row, "-2/3" beside "short 2 Iron Ingot". That is the shape `_detail_hold` stood a note down for, and
+	# the argument for standing this one down too is already written there. It is not stood down here, for
+	# two reasons that are about evidence rather than taste. It is the shipped treatment for a dead button
+	# saying why it is dead, and one surface does not get to retire a decision that was made for the whole
+	# counter. It is also the only prose account of the shortfall on the plate, which a reader who is not
+	# reading the glyphs has instead of them, and whether the chips cover that reader is a question for a
+	# text-only review rather than an edit. The note's other branches, the sample material, "behind
+	# Automation" and "at a claimed Bazaar", say things no chip can and are not in question either way.
+	if note != "":
+		# On the price's own baseline, because the reason and the numbers it is derived from are one sentence.
+		# The verb's label sits a couple of pixels higher, centred in a pill half again as deep: text aligns to
+		# text, and a button's word aligns to its button.
+		var nx: float = maxf(cx - DETAIL_CHIP_GAP + note_gap, btn.position.x - DETAIL_ROW_GAP - note_w)
+		_canvas.draw_string(_font, Vector2(nx, chip_y + DETAIL_CHIP_BASE), note, HORIZONTAL_ALIGNMENT_LEFT,
+			btn.position.x - DETAIL_ROW_GAP - nx, DETAIL_NOTE_SIZE, UiTheme.GOLD_DIM)
+
+
+## Why the button is dead, when the reason is the pack and not the place.
+##
+## The plate has always had a line for the precondition it cannot meet, "at a claimed Bazaar" or "behind
+## Automation" or "research Ironworks first", and every one of those fires for a reason outside the
+## pack. Stand at a counter you cannot afford anything at and the line was blank: a grey button, no
+## sentence, and a red numeral in a price chip as the only account of why ENTER does nothing. The
+## captures could not show that gap. A fixture standing away always took the "at a claimed Bazaar"
+## branch, the one state where the note is never empty.
+##
+## It says the deficit and not the price because the price is already on the chips this sentence sits
+## beside. The sample material, a tech's analysis input, is a cost the chips do not show, so it is named
+## here or nowhere.
+func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
+	var parts: PackedStringArray = []
+	for item: StringName in cost:
+		var gap: int = int(cost[item]) - int(_sim.inventory.get(item, 0))
+		if gap > 0:
+			parts.append("%d %s" % [gap, _item_label(item)])
+	if sample != &"" and int(_sim.inventory.get(sample, 0)) < 1:
+		parts.append("a sample of %s" % _item_label(sample))
+	return "" if parts.is_empty() else "short " + " · ".join(parts)
+
+
+## The plate for a thing you are carrying: what it is for, how many you have, and the pack screen's one
+## verb, which is to put it in your hand.
+##
+## Two quantities, two words, and neither borrows the other's. This plate used to say "carrying 24" next
+## to a button reading "IN HAND", over a grid whose lit well was badged "HELD". Carrying, holding and
+## having in hand are the same thing in English, so "carrying 24" could be read as 24 in your hand.
+##
+## So the pack owns one vocabulary and the hand owns the other. What you have is in the pack, the word
+## the tab, the plate title and the head's chips already use. What you are wielding is HELD.
+##
+## The lifetime figure is all told, with no verb in front of it, because no verb is true of every row.
+## This plate prices ore you mined, wood you chopped and ingots your line poured. It is the only
+## per-item total on any screen, since the FORGED chip counts ingots and says so.
+func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
+	_detail_lamp(art, 0.045)
+	_draw_thing_icon(id, _detail_glyph(art))
+	var tx: float = art.end.x + DETAIL_TEXT_GAP
+	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, UiTheme.GOLD_PALE)
+	# There is no line cap, because the plate was sized to hold this. `_hold_overflow_h` measured every
+	# sentence in the pack at `_hold_text_w` and bought the deepest one its lines, so the count this used
+	# to be capped at is a floor the height already answered. It is the same width at both ends for the
+	# same reason: a blurb wrapping at a different number than the height was computed from would run off.
+	_canvas.draw_multiline_string(_font, Vector2(tx, box.position.y + DETAIL_BLURB_Y),
+		str(Visuals.ITEM_PURPOSE.get(id, "—")), HORIZONTAL_ALIGNMENT_LEFT, _hold_text_w(),
+		DETAIL_BLURB_SIZE, -1, UiTheme.UI_TEXT_DIM)
+	# The tally sits where the blurb ends, not at a baseline of its own. It used to be written 76 down a
+	# plate that was always 88, which is the shop chip row's depth borrowed by a plate that has no chips,
+	# and this is the plate that no longer has the height to spare. It is taken off the plate's own bottom
+	# edge rather than off `DETAIL_FACT_Y`, because the two are the same pixel only while the plate is at
+	# its floor and a fact pinned to the constant would print through a row the blurb had grown into.
+	var carried: int = int(_sim.inventory.get(id, 0))
+	var made: int = int(_sim.total_produced.get(id, 0))
+	var tally: String = "%d in the pack   ·   %d all told" % [carried, made]
+	_canvas.draw_string(_font, Vector2(tx, box.end.y - DETAIL_TAIL), tally,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_BLURB_SIZE, UiTheme.UI_TEXT_FAINT)
+	# And then the rest of that line, which was the emptiest run of pixels on the counter: two counters at
+	# the left margin, a button at the right, and the whole middle of the plate's bottom shelf holding
+	# nothing. `_detail_demand` fills it with the one live fact the pack screen can answer, per its note.
+	#
+	# It is handed the tally's measured right edge, not a column the two agree about by writing the same
+	# number twice. The tally is the fixed thing on this line, being the plate's own fact, and the demand
+	# gives, so the row's give point is at the demand's left end and the string that decides where that is
+	# is the string that was just drawn.
+	_detail_demand(box, id, tx + _font.get_string_size(tally, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_BLURB_SIZE).x + DETAIL_ROW_GAP)
+	var held: int = _inv_selected.call() if _inv_selected.is_valid() else -1
+	if row == held:
+		# HELD is not HOLD greyed out. It answers "which one is in my hand", which is what the pack screen is
+		# opened to ask, while the dead pill said the pack's one verb had broken.
+		_state_plate(box, "HELD")
+	else:
+		_verb_button(box, HOLD_VERB, HOLD_KEY, true)
+
+
+## Who else wants this, and how short you still are for them: the pack plate's half of the bill.
+##
+## The standing rule is that the inspector expands only for a meaningful choice. The height half of that
+## is refused with its evidence written beside the constants: 81 of the full plate's 88 is spoken for,
+## the chips run off the bottom 29px before the old share is reached, and `check_pack_layout` floors the
+## plate at 70 independently. What was left is the content, and on PACK the content was the complaint.
+## The plate drew a sentence out of a `const` table and two counters, "24 in the pack · 61 all told",
+## and then left the right two thirds of its bottom shelf empty beside the one verb this tab has.
+## Neither number is a thing you act on. A lifetime total is a souvenir.
+##
+## The question a pack screen is actually opened with is whether to keep gathering the stuff, and the
+## counter is the one screen in the game that knows, because it holds every price this stack is a line
+## in. So the shelf carries the transpose of a works row. A price is indexed by product and answers
+## "what does this machine cost", while standing in your own pack you are asking it the other way round,
+## "what is this stack short for", and nothing anywhere answered that. `ITEM_PURPOSE`'s own docstring
+## says the resource lines exist so that resources answer "what wants this". This is that sentence with
+## the pack's state in it.
+##
+## A buyer is whatever the counter would let you press ENTER on today: the open machines, the open Rack
+## rows, and the next rung of the ladder. They come from `open_machines()`, `open_rack()` and
+## `ResearchRules.next_tech`, the three sources the tabs themselves list from, so this row and those
+## tabs cannot come to disagree about what is buildable. The locked half is deliberately absent, for the
+## reason `_tab_works` gives for hiding it there: a wall of what you cannot have is what that rebuild
+## was clearing out, and the future has a home already on the BENCH where it reads as a ladder.
+##
+## The rung's sample is part of the rung's price. Research eats one of its signature material on top of
+## the metal, a cost the rung's own `cost` dictionary does not carry and which `_shortfall_note` is
+## otherwise the only place in this file to name. It is folded into the rung's line rather than listed
+## as a second one, because a rung that wants six iron ingots and a seventh to analyze wants seven.
+func _item_demand(id: StringName) -> Array[Dictionary]:
+	var owed: Array[Dictionary] = []
+	var settled: Array[Dictionary] = []
+	if _sim == null or id == &"":
+		return owed
+	for i: int in open_machines():
+		_demand_line(id, _craft_id(i), "", craft_options[i]["cost"], owed, settled)
+	for r: int in open_rack():
+		# The same expression `bazaar_action` resolves a Rack row with, so the row you can select and the
+		# row this prices are the same row by construction rather than by two rules that agree today.
+		_demand_line(id, rack_ids[r] if r < rack_ids.size() else &"", "",
+			rack_options[r]["cost"], owed, settled)
+	var next: StringName = ResearchRules.next_tech(_sim.research)
+	if next != &"":
+		var rung: Dictionary = ResearchRules.tech(next)
+		var price: Dictionary = (rung.get("cost", {}) as Dictionary).duplicate()
+		var sample: StringName = rung.get("sample", &"")
+		if sample == id:
+			price[id] = int(price.get(id, 0)) + 1
+		# A rung is named rather than drawn. It has no glyph of its own, which is the whole reason
+		# `_draw_tech_art` exists, and at plate size that function's answer is to show the machines the
+		# rung unlocks. Borrowing one of those down here would put a Drill on the row and mean Automation,
+		# so the ladder's entry wears its word instead. There is at most one of them and it is always last.
+		_demand_line(id, &"", str(rung.get("name", "")), price, owed, settled)
+	# Owed first and settled after, which is `_cost_order`'s rule one level up. There it groups the
+	# ingredients of one price; here it groups the prices of one ingredient, and the reason is the same.
+	# The only question anybody brings to a bill is which lines are still open, and the count of open
+	# lines is the length of the first run. What crosses a line here is the same subtraction, `_cost_gap`.
+	owed.append_array(settled)
+	return owed
+
+
+## One buyer's line, or none if this buyer does not name the item. Split out so the three sources above
+## cannot each grow their own copy of the predicate that decides which run a line belongs in.
+func _demand_line(id: StringName, glyph: StringName, word: String, cost: Dictionary,
+		owed: Array[Dictionary], settled: Array[Dictionary]) -> void:
+	var need: int = int(cost.get(id, 0))
+	if need <= 0:
+		return
+	var line: Dictionary = {"glyph": glyph, "word": word, "need": need}
+	if BazaarCosts.gap(_sim.inventory, id, need) > 0:
+		owed.append(line)
+	else:
+		settled.append(line)
+
+
+## The row, right-packed against the space the verb keeps and given whatever the tally leaves it.
+##
+## That space is reserved for the button and not for the state, which is `_hold_text_w`'s rule and it is
+## here for the same reason. `HELD` is a tick and a word where `HOLD` is a pill with a key in it, so a
+## row measured against whichever form this slot carries would slide sideways, or drop a line, as a
+## consequence of pressing the key underneath it.
+##
+## It sits on the tally's baseline rather than on the shelf's floor where the priced plate stands its
+## chips. Text aligns to text, and a card cannot follow it here: a chip's baseline is `DETAIL_CHIP_BASE`
+## down its own top edge, so the card runs `DETAIL_CHIP_H - DETAIL_CHIP_BASE` past whatever line it is
+## set on, and this line is `DETAIL_TAIL` off the bottom of the plate. Seat a card on it and the card's
+## bottom edge lands inside the `DETAIL_PAD` margin every other thing on the plate keeps. So the buyers
+## are drawn the way a works row prices instead, glyph and signed numeral straight onto the plate with
+## no well. That is the form `_cost_glyphs` has always used, and the form a settled chip already falls
+## back to on the plate above. The elevation that tells the two runs apart there is spent here on the
+## order, which is the cue that costs no pixels.
+##
+## The ink reads the sign, out of the same `_cost_numeral` the works rows print, so a machine that is
+## two ingots short says `-2` in the list and `-2` here. Nothing new is coloured in. A shortfall is
+## `UI_WARN` as it is everywhere else, and a covered line is drawn in the type ramp's quiet rung rather
+## than in the price surfaces' green: on those surfaces green means "you can pay this" about a price you
+## are standing in front of, while here a covered line means there is nothing to do, which is what this
+## counter draws quiet everywhere. The minus is the cue either way and needs no comparison to read.
+func _detail_demand(box: Rect2, id: StringName, left: float) -> void:
+	var lines: Array[Dictionary] = _item_demand(id)
+	if lines.is_empty():
+		return
+	# The glyph is the height of the line it stands in, asked of the font rather than written as the 12
+	# the works row happens to use. A mark on a text line that is not the text's own line height is a
+	# number that has to be re-guessed the day the face or the size moves, and this row already has to
+	# fit under a baseline 8px off the bottom of the plate.
+	var glyph: float = _font.get_height(DETAIL_BLURB_SIZE)
+	var lead: float = _font.get_string_size(DEMAND_LEAD, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_NOTE_SIZE).x
+	var right: float = box.end.x - DETAIL_PAD - _verb_button_w(HOLD_VERB, HOLD_KEY) - DETAIL_ROW_GAP
+	var runs: PackedFloat32Array = PackedFloat32Array()
+	var whole: float = 0.0
+	for e: Dictionary in lines:
+		var ew: float = _demand_w(id, e, glyph)
+		runs.append(ew)
+		whole += ew + (DETAIL_ROW_GAP if runs.size() > 1 else 0.0)
+	var budget: float = right - left - lead - DETAIL_ROW_GAP
+	# What did not fit is said rather than swallowed. A row that quietly stops after two buyers reads as
+	# "two things want this", which is a stronger claim than the truth and one the reader has no way to
+	# doubt. The reserve is taken at the count's widest, with every line dropped, because the marker's
+	# width decides how many lines fit and how many lines fit decides the marker. An upper bound settles
+	# that in one pass, and it can only ever leave a pixel or two of air before the button.
+	var more_w: float = _font.get_string_size("+%d" % lines.size(), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_NOTE_SIZE).x
+	if whole > budget:
+		budget -= more_w + DETAIL_ROW_GAP
+	var shown: int = 0
+	var used: float = 0.0
+	for i: int in runs.size():
+		var step: float = runs[i] + (DETAIL_ROW_GAP if i > 0 else 0.0)
+		if used + step > budget:
+			break
+		used += step
+		shown += 1
+	# The row gives at the demand, never at the tally. The tally is this plate's own fact about the thing
+	# under the cursor, while the demand is about everything else. A pack whose longest tally leaves no
+	# room for a lead-in and one buyer draws the plate it drew before, rather than a lead-in with nothing
+	# after it.
+	if shown <= 0:
+		return
+	var cut: int = lines.size() - shown
+	var span: float = lead + DETAIL_ROW_GAP + used + (0.0 if cut <= 0 else DETAIL_ROW_GAP + more_w)
+	var at := Vector2(right - span, box.end.y - DETAIL_TAIL)
+	_canvas.draw_string(_font, at, DEMAND_LEAD, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE, UiTheme.UI_TEXT_FAINT)
+	at.x += lead + DETAIL_ROW_GAP
+	for i: int in shown:
+		at.x += _demand_mark(at, id, lines[i], glyph) + DETAIL_ROW_GAP
+	if cut > 0:
+		_canvas.draw_string(_font, at, "+%d" % cut, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE,
+			UiTheme.UI_TEXT_FAINT)
+
+
+## How wide one buyer's line is. Asked before the row is packed and returned by the drawing below, which
+## calls this rather than adding the same three terms a second time. The width pass and the draw pass on
+## the plate above are two walks of one dictionary and used to each format their own numeral, which is
+## survivable only for as long as the two spellings cannot differ.
+##
+## The inner gap is tighter than the outer one, and the two are the constants that already say so:
+## `DETAIL_CHIP_GAP` holds a buyer to its number, `DETAIL_ROW_GAP` separates one buyer from the next.
+## That is the plate's own spacing argument, that a price and the three parts of a row set at one
+## spacing would be seven equal things in a line, applied to a row whose parts are buyers.
+func _demand_w(id: StringName, e: Dictionary, glyph: float) -> float:
+	var word: String = str(e["word"])
+	var head: float = glyph if word == "" else _font.get_string_size(word,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+	return head + DETAIL_CHIP_GAP + _font.get_string_size(_cost_numeral(id, int(e["need"])),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
+
+
+## One buyer drawn, and the width it took, which is the measured one and not a second sum of the same
+## terms.
+##
+## `at` is the row's baseline, and a baseline sits about two thirds down its line box, so the mark is
+## centred a third of a line height above it and comes out optically level with the digits beside it.
+## Said as a fraction of the line rather than as an offset in pixels, because the line height is asked
+## of the font: pin it to a number and it is a guess again the day the face or the size moves.
+func _demand_mark(at: Vector2, id: StringName, e: Dictionary, glyph: float) -> float:
+	var word: String = str(e["word"])
+	var head: float = glyph
+	if word == "":
+		var mark: StringName = e["glyph"]
+		_draw_thing_icon(mark, Rect2(at.x, at.y - glyph / 3.0 - glyph * 0.5, glyph, glyph))
+	else:
+		head = _font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE).x
+		_canvas.draw_string(_font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_NOTE_SIZE, UiTheme.UI_TEXT_FAINT)
+	var num: String = _cost_numeral(id, int(e["need"]))
+	_canvas.draw_string(_font, Vector2(at.x + head + DETAIL_CHIP_GAP, at.y), num, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_CHIP_SIZE, UiTheme.UI_WARN if num.begins_with("-") else UiTheme.UI_TEXT_FAINT)
+	return _demand_w(id, e, glyph)
+
+
+## What one chip's pair says. The denominator is always the price. The numerator is the number you can
+## act on: the deficit while the line is outstanding, the count you hold once it is settled.
+##
+## The plate first shipped have/need with the affordability colour on the number you hold, and that
+## survives wherever a held count is still the useful one, because on a covered line there is nothing
+## left to close and what you are carrying is the whole of the answer. On a short line it was the wrong
+## number. "1/3" says where you stand, while the only question anybody asks a short line is how far
+## there is to go, and that was a subtraction left to the reader on the one screen they are doing
+## arithmetic on already. "-2/3" answers both at once, in the same width, and the price is not lost: it
+## is still the denominator it always was.
+##
+## Nothing is lost that was not recoverable the other way round. What you hold is the price less the
+## gap, so the reading this drops is itself one subtraction away. The difference is that it is now the
+## subtraction nobody was doing rather than the one everybody was.
+##
+## And it is the works row's spelling. `_cost_glyphs` has printed a signed deficit per ingredient for
+## longer, so a machine you cannot afford said "-2" in the list and "1/3" on the plate: one fact in two
+## registers, two rows apart, which is how a reader ends up believing the two are about different
+## things. The sign also carries affordability without hue, per that function's own argument, since a
+## greyscale reader and a one-ingredient recipe both have nothing to compare a colour against and a
+## leading minus needs no comparison.
+func _chip_numeral(item: StringName, need: int) -> String:
+	var gap: int = BazaarCosts.gap(_sim.inventory, item, need)
+	# `need - gap` is what the pack holds, out of the same read the sign came from. Asking the inventory
+	# a second time here would put the numerator and the mark above it on two different states of it.
+	return ("-%d" % gap) if gap > 0 else str(need - gap)
+
+
+## The pair whole, which is the string the width below measures and the two halves below that paint.
+func _chip_label(item: StringName, need: int) -> String:
+	return "%s/%d" % [_chip_numeral(item, need), need]
+
+
+## Asked before the chip is drawn and asked by the chip when it draws itself, so the row cannot pack to
+## one width and paint at another. It measures the pair whole while `_detail_chip` paints it in two
+## halves, in two colours.
+##
+## It takes the item rather than a count, because what a chip says and how wide its card is both depend
+## on whether the line is settled, and a caller that measured from a count would have to know that rule
+## too.
+##
+## The row gets narrower more often than it gets wider. A settled line drops `DETAIL_CHIP_RIM`, while an
+## outstanding one grows by whatever a signed deficit costs over the held count it replaced, which is
+## bounded by the price's own digits: the whole catalogue's largest single ingredient is 12, in BROAD's
+## stone and AUTOMATION's ingots, and no recipe with a two-digit ingredient has more than two of them.
+func _detail_chip_w(item: StringName, need: int) -> float:
+	var w: float = _font.get_string_size(_chip_label(item, need),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x + DETAIL_CHIP_PAD
+	return w if BazaarCosts.gap(_sim.inventory, item, need) > 0 else w - DETAIL_CHIP_RIM
+
+
+## One line of the bill. A line you still owe gets a card under it, a line the pack already settles does
+## not, and that is the grouping the numerals on their own could not give. How much of the price is
+## raised is how much of it is outstanding, countable at a glance and without reading a numeral at all.
+## Afford everything and the price goes flat, leaving the gold button the only lifted thing on the row.
+## Afford nothing and every line of it stands up.
+##
+## Shape before colour, which is the rule `_state_plate` is already built on, and it is why this adds no
+## fourth ink to the three the screen spent two passes concentrating down to. Both forms were already in
+## the file: the card is the same surface tint every chip wore, and a settled line is drawn in exactly
+## the form the works row prices in, glyph and numeral straight onto the plate with no well.
+##
+## The order the two runs arrive in is `_cost_order`'s, so the raised lines are also the first lines, and
+## the two cues cannot say different things about one ingredient: both read `_cost_gap` and nothing else.
+func _detail_chip(at: Vector2, item: StringName, need: int) -> float:
+	# Have over need, which is what the three comments above have always said it was and what the code did
+	# not do. It drew `need/have`, so a fresh save priced the Forge at "3/0", a fraction with a zero
+	# denominator, and a finished save priced it at "3/64", which reads as five percent of the way there
+	# while you carry twenty-one times what it asks. The numerator is the number you can act on, which is
+	# also the one the affordability colour belongs on.
+	var w: float = _detail_chip_w(item, need)
+	var ok: bool = BazaarCosts.gap(_sim.inventory, item, need) <= 0
+	if not ok:
+		_round_rect(Rect2(at, Vector2(w, DETAIL_CHIP_H)), 4.0, Color(1.0, 1.0, 1.0, 0.05))
+	Visuals.draw_item(_canvas, at + Vector2(11.0, DETAIL_CHIP_H * 0.5), 13.0, item)
+	var head: String = _chip_numeral(item, need)
+	_canvas.draw_string(_font, at + Vector2(DETAIL_CHIP_WELL, DETAIL_CHIP_BASE), head, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		DETAIL_CHIP_SIZE, Color(0.482, 0.796, 0.518) if ok else UiTheme.UI_WARN)
+	var hw: float = _font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE).x
+	_canvas.draw_string(_font, at + Vector2(DETAIL_CHIP_WELL + hw, DETAIL_CHIP_BASE), "/%d" % need,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE, UiTheme.UI_TEXT_FAINT)
+	return at.x + w

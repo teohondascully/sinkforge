@@ -1052,6 +1052,64 @@ static func item_color(item: StringName) -> Color:
 		return Color(0.40, 0.42, 0.45)       # crushed rock, cooler and flatter than the stone it came from
 	return Color.WHITE
 
+## What a stack in the hand is FOR, one sentence each. It sat on `Hud` while the Hud was the only
+## reader; the Bazaar's detail plate reads it now, and so do `tools/check_tool_text.gd` and
+## `tools/check_binding_text.gd`, so it lives with the other item tables rather than behind whichever
+## screen happened to need it first.
+## Item tooltips, which say what an item is for when you hover a hotbar or pack slot. One line per id,
+## the reference card behind the one-shot acquisition hints: machines answer "what does placing it buy"
+## and resources answer "what wants this". An absent id draws no purpose line.
+const ITEM_PURPOSE: Dictionary = {
+	&"ore": "smeltable — a Forge turns it into ingots (toss it in, Q)",
+	&"ingot": "the L1 metal — pays for crafting, research, the Engine's toll",
+	&"coal": "FUEL — generators, drills and borers burn it (drop it on them)",
+	&"wood": "placeable block (RMB) — crafts ropes, torches, the Bazaar frame",
+	&"stone": "placeable block — and the Stone Pickaxe's making",
+	&"earth": "placeable block — plug a pit, bridge a gap",
+	&"deepslate": "the deep rock — the sample that unlocks DESCENT research",
+	&"gravel": "PACKED fill — the one block that doesn't weep when water leans on it",
+	&"iron": "L2 ore — the Iron Forge smelts it into iron ingots",
+	&"iron_ingot": "the L2 metal — plates, gears and the Iron Pickaxe",
+	&"plate": "pressed iron sheet — the Borer's frame wants them",
+	&"gear": "milled cog (iron + ingot) — the Borer's works want them",
+	&"wood_pickaxe": "breaks tier-1 rock (earth · stone · ore · coal) — hold LMB",
+	&"stone_pickaxe": "tier-2 pick — opens deepslate, iron and rich ore. A key, not a stat",
+	&"iron_pickaxe": "tier-3 pick — the deepest key on the ladder, for what waits under L2",
+	&"wood_axe": "an old hatchet — your pick chops trees now; this is a keepsake",
+	&"sapling": "RMB plants it on grassy ground — a new tree grows (renewable wood)",
+	&"rich_ore": "high-grade ore from the deep shelf — a Blast Furnace pours 2 ingots from 1",
+	&"shale": "placeable block — the banded rock of the middle band; nothing is made from it yet",
+	# Each line is the bit's own entry in `BitRules.BIT` said in the second person. `keeps: false` is why
+	# the Broad's says nothing reaches your pack, `recovery: 0.85` is the Lance's long pause, and
+	# `grain_only: true` is why the Wedge does nothing across the grain.
+	&"broad_bit": "2x2 head — but it PULVERISES: nothing it breaks reaches your pack. Rooms, never veins",
+	&"sinker_bit": "sinks three cells straight down, walls untouched — the clean 1-wide shaft",
+	&"lance_bit": "drives five the way you face, then a long recovery — a commitment, not a rhythm",
+	&"wedge_bit": "splits eight ALONG a seam — and does nothing whatsoever across the grain",
+	&"blast_furnace": "smelts RICH ore 1 → 2 ingots — the deep veins' payoff",
+	&"scanner": "sonar — select it, RMB pulses: nearby veins echo through the rock",
+	&"rope": "RMB above a drop — it unrolls down; W/S climbs it",
+	&"torch": "RMB on a wall-backed cell — light that STAYS",
+	&"conduit": "RMB lays power tube — power flows down + sideways, never up",
+	&"processor": "the Forge — smelts what falls into it (ore → ingots)",
+	&"splitter": "routes falling items DOWN + RIGHT (aim R at it: ratio)",
+	&"spur": "one more mouth on a Head — reaches across a vein the drill alone cannot (it says 'unlinked' if it reaches nothing)",
+	&"pump": "POWERED, it drains water from its own cell and the ones below — the way back out of a flood",
+	&"lift": "hauls goods — and YOU — up its column; power multiplies it",
+	&"drill": "bores straight down through an ore vein — burns coal",
+	&"hopper": "banks what falls in, meters it DOWN — keeps the first item it tastes",
+	&"generator": "burns coal into POWER for the machines around it",
+	&"descent_engine": "stand it ON the seal, feed it ingots — it breaches the way down",
+	&"iron_forge": "smelts iron ore into iron ingots (the L2 chain's base)",
+	&"plate_press": "presses iron ingots into plates",
+	&"gear_mill": "mills iron ingots + ingots into gears (two inputs, one column)",
+	&"h_drill": "the Borer — chews sideways the way you faced; its haul drops below it",
+	&"drift_rig": "cuts a 2-high gallery on POWER, and sorts it: ore drops below, spoil drops behind",
+	&"crusher": "eats SPOIL, pours GRAVEL — pay falls straight through it, untouched",
+}
+
+
+
 
 ## Draw an item icon centred at `center`, `size` px square. Sprite-ready: an item_<id>.png
 ## replaces the procedural glyph the moment it exists; absent → a drawn glyph that

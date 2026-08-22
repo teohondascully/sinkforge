@@ -113,6 +113,14 @@ const SOLE_OWNER: Dictionary = {
 ## Choosing a fragment is the whole skill. Too generic and it fires on innocent code; too specific and a
 ## reformat makes it vacuous, which is the worse failure because it goes green. Both below are the load
 ## bearing line of their routine, the one you cannot write the routine without.
+##
+## The shortfall subtraction is here for a reason worth stating: `have < need` had been written out
+## at four addresses in the counter before it was pulled into one place, and four copies of a
+## comparison are survivable only while they cannot disagree. A shortfall mark that contradicts the
+## ink beside it about one ingredient is worse than either cue being absent. Note the scope -- this
+## guards the SURFACE's arithmetic. `src/core/factory_sim.gd` holds the transaction's own gate on the
+## same question, deliberately, and whether those two should be one thing is a larger question than
+## a fragment table can ask.
 const SOLE_IMPL: Dictionary = {
 	"sb.corner_detail = 8": "res://scenes/visuals.gd",
 	"get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT": "res://scenes/visuals.gd",
@@ -120,6 +128,7 @@ const SOLE_IMPL: Dictionary = {
 	"Vector2(0.0, KEYCAP_DROP)": "res://scenes/visuals.gd",
 	"Art.tex(\"machine_\" + String(": "res://scenes/visuals.gd",
 	"return String(id).capitalize()": "res://scenes/visuals.gd",
+	"return need - int(inventory.get(item, 0))": "res://scenes/bazaar_costs.gd",
 }
 
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.

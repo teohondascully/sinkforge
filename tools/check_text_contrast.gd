@@ -102,6 +102,7 @@ extends "res://tools/check_base.gd"
 
 const HUD: String = "res://scenes/hud.gd"
 const UI_THEME: String = "res://scenes/ui_theme.gd"
+const BAZAAR_PAGE: String = "res://scenes/bazaar_page.gd"
 
 ## WCAG 2 AA for body text. See the header: chosen after the nine rows were measured, and set at the level
 ## the palette's dimmest named ink already reached on its own.
@@ -134,8 +135,10 @@ func _initialize() -> void:
 	#
 	# Order matters only for a name defined twice, and then the Hud wins, because a Hud that still names a
 	# colour is still drawing with it. Add a source here when a palette constant moves to a new home; the
-	# absence check below is what makes that failure loud instead of silent.
-	_sources = [UI_THEME, HUD]
+	# absence check below is what makes that failure loud instead of silent, and it has earned its keep
+	# once already: `VERB_INK` and `VERB_HINT_A` left with the verb button when the detail plate moved
+	# to `BazaarPage`, and this failed naming both colours and the sources it had searched.
+	_sources = [UI_THEME, HUD, BAZAAR_PAGE]
 	for path: String in _sources:
 		var script: GDScript = load(path) as GDScript
 		if script == null:
