@@ -1,5 +1,5 @@
 class_name BazaarPage
-extends RefCounted
+extends PageSurface
 
 ## THE COUNTER'S PAGES, WHICH ARE NOT THE COUNTER.
 ##
@@ -16,11 +16,8 @@ extends RefCounted
 ## Nothing here calls back into `Hud`. That is the property worth keeping while the rest arrives: the
 ## shell may call in, and this may not call out, so no slice has to unpick a cycle a previous one made.
 
-## The canvas, the font, the sim and the icon table are held rather than passed. Nine functions handing
-## each other five arguments on every hop is the shape this decomposition exists to avoid; `Hud` re-binds
-## them on entry so nothing observed here can be stale.
-var _canvas: CanvasItem = null
-var _font: Font = ThemeDB.fallback_font
+## The canvas, the font and the probe come from `PageSurface`, along with the eleven helpers that
+## bind them onto the primitives in `Visuals` and `UiTheme`.
 var _sim: FactorySim = null
 var _icons: Dictionary = {}                 ## `Hud.machine_icons`, assembled by `main.gd`
 var _inv_selected: Callable                 ## `Hud.inv_selected_getter`, set from outside the Hud
@@ -36,9 +33,6 @@ var can_craft: bool = false
 ## font, and neither moves while the game is running, so there is nothing for this to go stale against.
 ## The alternative is re-shaping every carried sentence on every frame the pack is open.
 var _blurb_lines_memo: Dictionary = {}
-
-var probing: bool = false
-var panel_probe: Array[Rect2] = []          ## THE SAME array object Hud holds, shared by reference
 
 
 ## Where the name starts and how much of the chip is left for it. The lamp is the only other thing on
@@ -533,11 +527,6 @@ func _unlocked(ids: Array[StringName], n: int) -> Array[int]:
 
 ## The two primitives the bench reaches for, mirrored with the canvas this page was handed.
 
-func _round_rect(rect: Rect2, r: float, col: Color) -> void:
-	if probing:
-		panel_probe.append(rect)
-	Visuals.round_rect(_canvas, rect, r, col)
-
 
 func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 	Visuals.thing_icon(_canvas, id, box, _icons)
@@ -547,48 +536,8 @@ func _detail_glyph(art: Rect2) -> Rect2:
 	return art.grow(-DETAIL_GLYPH_INSET)
 
 
-func _tracked_w(text: String, size: int, track: float) -> float:
-	return Visuals.tracked_width(_font, text, size, track)
-
-
-func _keycap_w(key: String, fs: int) -> float:
-	return Visuals.keycap_width(_font, key, fs)
-
-
-func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
-	Visuals.round_rect_left(_canvas, rect, r, col)
-
-
-func _rail_word_dy() -> float:
-	return UiTheme.rail_word_dy(_font)
-
-
-func _rail_key_dy() -> float:
-	return UiTheme.rail_key_dy(_font)
-
-
-func _rail_key_slot_h() -> float:
-	return UiTheme.rail_key_slot_h(_font)
-
-
-func _rail_word_slot_h() -> float:
-	return UiTheme.rail_word_slot_h(_font)
-
-
-func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
-	return UiTheme.rail_slots(rail, n, min_pitch, slot_h)
-
-
 func _item_label(item: StringName) -> String:
 	return Visuals.thing_label(item, _icons)
-
-
-func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
-	Visuals.tracked(_canvas, _font, text, at, size, track, col)
-
-
-func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
-	return Visuals.keycap(_canvas, _font, at, key, fs, panel_probe if probing else [])
 
 
 ## BENCH: the research ladder as a graph and the verb that acts on it, on one screen.
@@ -2065,8 +2014,3 @@ func _price_items(cost: Dictionary, out: Array[StringName]) -> void:
 		if not out.has(item):
 			out.append(item)
 
-
-## Darkens the frame's edges so the eye is pushed to the counter. Every modern pause screen does it, and
-## this one did not, which was part of why the panel read as pasted onto a screenshot.
-func _bazaar_vignette(peak: float) -> void:
-	Visuals.edge_vignette(_canvas, UiTheme.CANVAS, peak)

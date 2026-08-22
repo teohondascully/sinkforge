@@ -1449,7 +1449,7 @@ func _draw_inventory_overlay() -> void:
 	# being in front of something.
 	var t: float = _bazaar_ease()
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.02, 0.025, 0.04, 0.42 * t))
-	_bazaar_vignette(0.5 * t)
+	_modal_vignette(0.5 * t)
 	var g: Dictionary = _bazaar_geometry()
 	var origin: Vector2 = g["origin"]
 	var panel := Rect2(origin, Vector2(g["w"], g["h"]))
@@ -1505,8 +1505,8 @@ func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
 	_bazaar()._draw_bazaar_foot(origin, g)
 
 
-func _bazaar_vignette(peak: float) -> void:
-	_bazaar()._bazaar_vignette(peak)
+func _modal_vignette(peak: float) -> void:
+	_bazaar()._modal_vignette(peak)
 
 
 # --- the tabs -------------------------------------------------------------------------------------------

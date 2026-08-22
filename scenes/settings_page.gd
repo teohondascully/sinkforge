@@ -1,5 +1,5 @@
 class_name SettingsPage
-extends RefCounted
+extends PageSurface
 
 ## WHAT THE SETTINGS PAGE SHOWS, WHICH IS NOT THE SAME QUESTION AS WHAT THE SETTINGS ARE.
 ##
@@ -224,10 +224,8 @@ const CATEGORY_LINE: Array[String] = [
 # `Hud` re-binds them on entry to each forwarded call, so a `probing` flag a fixture flips between
 # frames cannot be observed stale here.
 
-var _canvas: CanvasItem = null              ## the Hud, as something to draw on and nothing more
-var _font: Font = ThemeDB.fallback_font
-var probing: bool = false                   ## mirrored from Hud; see its `panel_probe` note
-var panel_probe: Array[Rect2] = []          ## THE SAME array object Hud holds, shared by reference
+## The canvas, the font and the probe come from `PageSurface`, along with the eleven helpers that
+## bind them onto the primitives in `Visuals` and `UiTheme`.
 
 var settings_cat: int = CAT_AUDIO           ## which face of the page is open (the rail's selection)
 var settings_row: int = 0                   ## the keyboard cursor on the binding list
@@ -242,19 +240,6 @@ var _set_t: float = 0.0                     ## the page's own rise, 0..1; drives
 ## replaced by the canvas this page was handed. They are private because they are not this page's
 ## interface -- `Visuals` is -- and they exist only to spare every call site two extra arguments.
 
-func _round_rect(rect: Rect2, r: float, col: Color) -> void:
-	# The probe entry travels with the drawing. `check_hud_layout` reads `panel_probe` off the Hud
-	# and still sees every settings panel, because the array here IS the Hud's array. Dropping this
-	# would have left the page silently unmeasured -- the same transitive reach that made the rail
-	# constants look settings-specific when the bazaar was using every one of them.
-	if probing:
-		panel_probe.append(rect)
-	Visuals.round_rect(_canvas, rect, r, col)
-
-
-func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
-	Visuals.round_rect_left(_canvas, rect, r, col)
-
 
 func _panel_sheen(rect: Rect2) -> void:
 	Visuals.panel_sheen(_canvas, rect)
@@ -264,48 +249,8 @@ func _soft_shadow(rect: Rect2, spread: int, peak: float) -> void:
 	Visuals.soft_shadow(_canvas, rect, spread, peak)
 
 
-func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
-	Visuals.tracked(_canvas, _font, text, at, size, track, col)
-
-
-func _tracked_w(text: String, size: int, track: float) -> float:
-	return Visuals.tracked_width(_font, text, size, track)
-
-
 func _focus_ring(box: Rect2, grow: float = Visuals.FOCUS_GROW, spine: bool = false) -> void:
 	Visuals.focus_ring(_canvas, box, UiTheme.GOLD_PALE, UiTheme.UI_ACCENT, grow, spine)
-
-
-func _bazaar_vignette(peak: float) -> void:
-	Visuals.edge_vignette(_canvas, UiTheme.CANVAS, peak)
-
-
-func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
-	return Visuals.keycap(_canvas, _font, at, key, fs, panel_probe if probing else [])
-
-
-func _keycap_w(key: String, fs: int) -> float:
-	return Visuals.keycap_width(_font, key, fs)
-
-
-func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
-	return UiTheme.rail_slots(rail, n, min_pitch, slot_h)
-
-
-func _rail_word_slot_h() -> float:
-	return UiTheme.rail_word_slot_h(_font)
-
-
-func _rail_word_dy() -> float:
-	return UiTheme.rail_word_dy(_font)
-
-
-func _rail_key_dy() -> float:
-	return UiTheme.rail_key_dy(_font)
-
-
-func _rail_key_slot_h() -> float:
-	return UiTheme.rail_key_slot_h(_font)
 
 
 func _settings_geometry() -> Dictionary:
@@ -351,7 +296,7 @@ func _draw_settings_overlay() -> void:
 	# screen you are on.
 	var t: float = settings_ease()
 	_canvas.draw_rect(Rect2(Vector2.ZERO, UiTheme.CANVAS), Color(0.02, 0.025, 0.04, 0.42 * t))
-	_bazaar_vignette(0.5 * t)
+	_modal_vignette(0.5 * t)
 	var g: Dictionary = _settings_geometry()
 	var origin: Vector2 = g["origin"]
 	var mouse: Vector2 = Controls.pointer_viewport(_canvas)
