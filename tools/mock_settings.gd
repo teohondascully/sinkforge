@@ -54,17 +54,17 @@ const WELL := Color(0.0, 0.0, 0.0, 0.22)
 ## a page arguing about the settings screen was arguing in a gold that nothing in the file related to the
 ## game's, and the accent is the constant most likely to move next, since it is the one whose MEANING is
 ## under review. A copy of it diverges silently and shows up as a mock that looks right and is not.
-const ACCENT := Hud.UI_ACCENT
-const ACCENT_HI := Hud.GOLD_PALE
+const ACCENT := UiTheme.UI_ACCENT
+const ACCENT_HI := UiTheme.GOLD_PALE
 ## THE INKS ARE READ OFF THE HUD, not copied from it. All three were byte-identical duplicates of the
 ## shipped palette, which is what a proposal wants -- the parts NOT being proposed have to match the thing
 ## it is judged against, or the comparison is between two different games. Copies cannot hold that: the
 ## faint ink was raised for readability and this file went on drawing the old one, so the mock would have
 ## argued its case in a colour the game no longer uses. Anything this page actually proposes changing
 ## should be written here as its own literal, deliberately and with a reason.
-const TEXT := Hud.UI_TEXT
-const DIM := Hud.UI_TEXT_DIM
-const FAINT := Hud.UI_TEXT_FAINT
+const TEXT := UiTheme.UI_TEXT
+const DIM := UiTheme.UI_TEXT_DIM
+const FAINT := UiTheme.UI_TEXT_FAINT
 const LIT_ROW := Color(0.145, 0.129, 0.082)
 
 ## The list, with the sentence each binding is missing. This is the proposal's real content: a key legend

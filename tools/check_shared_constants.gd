@@ -70,6 +70,10 @@ const SOLE_OWNER: Dictionary = {
 	"FOCUS_SPINE_DX": "res://scenes/visuals.gd",
 	"KEYCAP_BASE": "res://scenes/visuals.gd",
 	"KEYCAP_DROP": "res://scenes/visuals.gd",
+	# The page's palette. Aliased on Hud, so these prove the alias is an alias and not a second literal.
+	"UI_ACCENT": "res://scenes/ui_theme.gd",
+	"UI_TEXT": "res://scenes/ui_theme.gd",
+	"UI_MODAL": "res://scenes/ui_theme.gd",
 }
 
 
