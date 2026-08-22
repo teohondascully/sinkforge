@@ -176,3 +176,57 @@ const BAZAAR_PAD: float = 12.0
 const RAIL_ON_LIFT := Color(0.047, 0.051, 0.060, 0.0)
 const RAIL_ON_FILL := Color(UI_RAIL.r + RAIL_ON_LIFT.r, UI_RAIL.g + RAIL_ON_LIFT.g,
 	UI_RAIL.b + RAIL_ON_LIFT.b)
+
+
+## ---- THE RAIL ----
+##
+## The counter and the settings page each carry one and they are the same furniture: same icon size, same
+## label metrics, same slot arithmetic. These sat beside the settings page because that is where they were
+## last edited, which is not the same as where they belong. The bazaar rail reaches every one of them
+## through the helpers below, so filing them as the settings page's was wrong.
+
+## What a rail slot is made of. Both rails stack a tile with one line of type under it and neither may
+## print into the slot below, so the pitch is a clearance and not a taste: at the old 150 floor the FEEL
+## page came out 186 tall, the pitch collapsed to exactly `RAIL_ICON`, and the tiles met.
+##
+## What the two rails do not share is the line. The settings rail writes a word there and its slot ends
+## at the word's descender, while the counter's rail puts the key that selects the tab on that same line
+## as a cap and a cap is taller than a word, so its slot ends where the cap's shadow does. Both floors
+## are the same sentence, the slot's last mark plus air, read off each rail's own drawing. For the
+## settings rail that returns 54.0, which is the number this file shipped.
+const RAIL_ICON: float = 38.0         ## the tile at the top of every slot, both rails
+const RAIL_LABEL_FS: int = 7          ## and the type on the line under it
+const RAIL_LABEL_DY: float = 44.0     ## the settings word's baseline, below the tile
+const RAIL_TEXT_AIR: float = 2.0      ## tile to the top of the type under it
+const RAIL_SLOT_AIR: float = 7.0      ## a slot's last mark to the next slot's tile
+const RAIL_PITCH_MAX: float = 58.0    ## a tall rail spreads its tabs no further than this
+const RAIL_TOP: float = 62.0          ## where the first tile sits when the rail has the room
+const RAIL_TOP_FRAC: float = 0.18     ## ...and the share of a shorter rail it takes instead
+const RAIL_EDGE: float = 6.0          ## the margin no slot crosses at either end
+const RAIL_KEY_GAP: float = 3.0       ## cap to word, on the counter's rail
+
+static func rail_word_dy(font: Font) -> float:
+	return RAIL_ICON + font.get_ascent(RAIL_LABEL_FS) + RAIL_TEXT_AIR
+
+static func rail_key_dy(font: Font) -> float:
+	return rail_word_dy(font) - (Visuals.keycap_height(RAIL_LABEL_FS) - Visuals.KEYCAP_BASE)
+
+static func rail_key_slot_h(font: Font) -> float:
+	return rail_key_dy(font) + Visuals.keycap_height(RAIL_LABEL_FS) + Visuals.KEYCAP_DROP
+
+static func rail_word_slot_h(font: Font) -> float:
+	return RAIL_LABEL_DY + font.get_descent(RAIL_LABEL_FS)
+
+static func rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
+	# The floor is not cosmetic. Without one, a short page drives the pitch down to the tile's own height
+	# and the boxes become contiguous. A floor above `RAIL_PITCH_MAX` wins over it, because the cap limits
+	# how far a tall rail may spread while the floor is a clearance the drawing cannot do without.
+	var pitch: float = maxf(min_pitch,
+		minf(RAIL_PITCH_MAX, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
+	var top: float = minf(minf(RAIL_TOP, rail.size.y * RAIL_TOP_FRAC),
+		rail.size.y - RAIL_EDGE - (float(n - 1) * pitch + slot_h))
+	top = maxf(top, RAIL_EDGE)
+	var out: Array = []
+	for i: int in n:
+		out.append(rail.position.y + top + float(i) * pitch)
+	return out

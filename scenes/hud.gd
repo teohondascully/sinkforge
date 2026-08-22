@@ -3604,21 +3604,21 @@ const SET_FOOT := SettingsPage.SET_FOOT
 const SET_DETAIL := SettingsPage.SET_DETAIL
 const SET_ROW := SettingsPage.SET_ROW
 const SET_MIN_H := SettingsPage.SET_MIN_H
-const RAIL_ICON := SettingsPage.RAIL_ICON
-const RAIL_LABEL_FS := SettingsPage.RAIL_LABEL_FS
-const RAIL_LABEL_DY := SettingsPage.RAIL_LABEL_DY
-const RAIL_TEXT_AIR := SettingsPage.RAIL_TEXT_AIR
-const RAIL_SLOT_AIR := SettingsPage.RAIL_SLOT_AIR
-const RAIL_PITCH_MAX := SettingsPage.RAIL_PITCH_MAX
-const RAIL_TOP := SettingsPage.RAIL_TOP
-const RAIL_TOP_FRAC := SettingsPage.RAIL_TOP_FRAC
-const RAIL_EDGE := SettingsPage.RAIL_EDGE
+const RAIL_ICON := UiTheme.RAIL_ICON
+const RAIL_LABEL_FS := UiTheme.RAIL_LABEL_FS
+const RAIL_LABEL_DY := UiTheme.RAIL_LABEL_DY
+const RAIL_TEXT_AIR := UiTheme.RAIL_TEXT_AIR
+const RAIL_SLOT_AIR := UiTheme.RAIL_SLOT_AIR
+const RAIL_PITCH_MAX := UiTheme.RAIL_PITCH_MAX
+const RAIL_TOP := UiTheme.RAIL_TOP
+const RAIL_TOP_FRAC := UiTheme.RAIL_TOP_FRAC
+const RAIL_EDGE := UiTheme.RAIL_EDGE
 const SET_CTRL_DX := SettingsPage.SET_CTRL_DX
 const SET_BAR_W := SettingsPage.SET_BAR_W
 const SET_VALUE_DX := SettingsPage.SET_VALUE_DX
 const REMAP_ROW_H := SettingsPage.REMAP_ROW_H
 const REMAP_GAP := SettingsPage.REMAP_GAP
-const RAIL_KEY_GAP: float = 3.0       ## cap to word, on the counter's rail
+const RAIL_KEY_GAP := UiTheme.RAIL_KEY_GAP
 
 ## The page's shape lives in `SettingsPage`, aliased here so the drawing below reads unchanged and there
 ## is still exactly one of each in the tree.
@@ -3632,6 +3632,28 @@ const REMAP_ROWS: Array[Array] = SettingsPage.REMAP_ROWS
 
 ## The page's geometry for the category that is open: the counter's `_bazaar_geometry` in every respect
 ## except its numbers so the two pages cannot drift into different shapes.
+## The rail's geometry lives in `UiTheme`. The counter's rail and the settings page's rail are the same
+## furniture and were already computing off the same numbers.
+func _rail_word_dy() -> float:
+	return UiTheme.rail_word_dy(_font)
+
+
+func _rail_key_dy() -> float:
+	return UiTheme.rail_key_dy(_font)
+
+
+func _rail_key_slot_h() -> float:
+	return UiTheme.rail_key_slot_h(_font)
+
+
+func _rail_word_slot_h() -> float:
+	return UiTheme.rail_word_slot_h(_font)
+
+
+func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
+	return UiTheme.rail_slots(rail, n, min_pitch, slot_h)
+
+
 func _settings_geometry() -> Dictionary:
 	var h: float = _set_h
 	var origin := Vector2((CANVAS.x - SET_W) * 0.5, (CANVAS.y - h) * 0.5)
@@ -3745,20 +3767,6 @@ func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void
 ## and the cap is hung so its key lands on that same baseline, leaving the cap's shadow as the lowest
 ## mark in the slot. Every one of these is read from the font at the size the rail actually draws,
 ## because a metric copied into a constant stops being true when the type changes.
-func _rail_word_dy() -> float:
-	return RAIL_ICON + _font.get_ascent(RAIL_LABEL_FS) + RAIL_TEXT_AIR
-
-
-func _rail_key_dy() -> float:
-	return _rail_word_dy() - (_keycap_h(RAIL_LABEL_FS) - Visuals.KEYCAP_BASE)
-
-
-func _rail_key_slot_h() -> float:
-	return _rail_key_dy() + _keycap_h(RAIL_LABEL_FS) + Visuals.KEYCAP_DROP
-
-
-func _rail_word_slot_h() -> float:
-	return RAIL_LABEL_DY + _font.get_descent(RAIL_LABEL_FS)
 
 
 ## Where a rail's boxes sit, for a rail of any height and any number of slots. It is extracted from the
@@ -3773,19 +3781,6 @@ func _rail_word_slot_h() -> float:
 ## `slot_h` is what a slot draws below its own top, and it is here so a stack too tall for its rail
 ## comes back inside the panel rather than off the bottom of it: the floor clears the slot above, and
 ## this clears the panel's own edge. Where there is room to spare the first tile sits at `RAIL_TOP`.
-func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
-	# The floor is not cosmetic. Without one, a short page drives the pitch down to the tile's own height
-	# and the boxes become contiguous. A floor above `RAIL_PITCH_MAX` wins over it, because the cap limits
-	# how far a tall rail may spread while the floor is a clearance the drawing cannot do without.
-	var pitch: float = maxf(min_pitch,
-		minf(RAIL_PITCH_MAX, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
-	var top: float = minf(minf(RAIL_TOP, rail.size.y * RAIL_TOP_FRAC),
-		rail.size.y - RAIL_EDGE - (float(n - 1) * pitch + slot_h))
-	top = maxf(top, RAIL_EDGE)
-	var out: Array = []
-	for i: int in n:
-		out.append(rail.position.y + top + float(i) * pitch)
-	return out
 
 
 ## Three category glyphs, drawn rather than lettered, in the counter's hand: a speaker cone with two
@@ -4236,7 +4231,6 @@ func _settings_chip(x: float, y: float, text: String, payload: Dictionary, activ
 func set_settings_cat(cat: int) -> void:
 	settings_cat = SettingsPage.clamp_cat(cat)
 	settings_row = clampi(settings_row, 0, settings_focus_count() - 1)
-
 
 
 ## The control payload under a canvas point, or {} for none. Sliders add the clicked fraction, so a

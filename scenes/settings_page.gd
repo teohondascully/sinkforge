@@ -177,24 +177,6 @@ const SET_FOOT: float = 16.0          ## the key legend
 const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0           ## an audio/feel row
 const SET_MIN_H: float = 196.0
-## What a rail slot is made of. Both rails stack a tile with one line of type under it and neither may
-## print into the slot below, so the pitch is a clearance and not a taste: at the old 150 floor the FEEL
-## page came out 186 tall, the pitch collapsed to exactly `RAIL_ICON`, and the tiles met.
-##
-## What the two rails do not share is the line. The settings rail writes a word there and its slot ends
-## at the word's descender, while the counter's rail puts the key that selects the tab on that same line
-## as a cap and a cap is taller than a word, so its slot ends where the cap's shadow does. Both floors
-## are the same sentence, the slot's last mark plus air, read off each rail's own drawing. For the
-## settings rail that returns 54.0, which is the number this file shipped.
-const RAIL_ICON: float = 38.0         ## the tile at the top of every slot, both rails
-const RAIL_LABEL_FS: int = 7          ## and the type on the line under it
-const RAIL_LABEL_DY: float = 44.0     ## the settings word's baseline, below the tile
-const RAIL_TEXT_AIR: float = 2.0      ## tile to the top of the type under it
-const RAIL_SLOT_AIR: float = 7.0      ## a slot's last mark to the next slot's tile
-const RAIL_PITCH_MAX: float = 58.0    ## a tall rail spreads its tabs no further than this
-const RAIL_TOP: float = 62.0          ## where the first tile sits when the rail has the room
-const RAIL_TOP_FRAC: float = 0.18     ## ...and the share of a shorter rail it takes instead
-const RAIL_EDGE: float = 6.0          ## the margin no slot crosses at either end
 ## The shared grid, measured from the content's left edge. It is named because a layout assertion that
 ## re-derives them is checking its own arithmetic against itself.
 const SET_CTRL_DX: float = 116.0
