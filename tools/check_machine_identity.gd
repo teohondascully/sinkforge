@@ -45,6 +45,7 @@ extends "res://tools/check_base.gd"
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
 const SHOW_FRAMES: int = 12           ## frames a newly placed machine gets before the shutter
+const ANIM_POSE: float = 0.0          ## the cosmetic clock is held here while a frame is read
 
 ## THE WHOLE REGISTRY, DISCOVERED RATHER THAN LISTED. A hand-written subject list in a layer about "do the
 ## machines look alike" would go stale the first time somebody adds a machine, and the machine most
@@ -329,7 +330,25 @@ func _lock_patch(cell: Vector2i) -> Rect2i:
 	return Rect2i(x0, y0, int(ceil(maxf(tl.x, br.x))) - x0, int(ceil(maxf(tl.y, br.y))) - y0)
 
 
+## POSE THE COSMETIC CLOCK BEFORE EVERY SHUTTER, subjects and baseline alike.
+##
+## Machine glyphs are drawn with the renderer's `_anim_time` (`world_renderer.gd:2859` hands it straight to
+## `Visuals.draw_machine_glyph`), and that clock free-runs on wall-clock delta while this layer counts
+## frames. Alone the two agree well enough; inside a parallel sweep they come apart, and each machine is
+## then photographed at a different point of its own animation.
+##
+## What gave it away was not a number drifting. In every standalone run and in the green sweeps the tightest
+## pair is Iron Forge/Forge at 0.005, which the family exemption covers. In the failing sweep that pair was
+## not tightest at all and three unrelated pairs -- Plate Press/Forge, Forge/Splitter, Pump/Splitter -- had
+## collapsed onto the bound instead. A shifted reading is noise. A REORDERED DISTANCE MATRIX means the
+## subjects were photographed in different states.
+##
+## Zero is the pose because it is where the glyph animations start, and `_process` is stopped first: setting
+## the clock and letting the frame run advances it again before the draw.
 func _luma_patch() -> PackedFloat32Array:
+	_main._renderer.set_process(false)
+	_main._renderer._anim_time = ANIM_POSE
+	_main._renderer.repaint_world()
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var img: Image = get_root().get_texture().get_image()
@@ -341,6 +360,7 @@ func _luma_patch() -> PackedFloat32Array:
 				continue
 			var c: Color = img.get_pixel(x, y)
 			out.append(0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b)
+	_main._renderer.set_process(true)
 	return out
 
 
