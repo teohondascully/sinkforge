@@ -5,6 +5,14 @@ extends Node2D
 ## only and draws in screen space.
 
 const CANVAS := UiTheme.CANVAS
+
+## The counter's own, aliased rather than copied so there is one of each in the tree.
+const BAZAAR_COLS := BazaarPage.BAZAAR_COLS
+const PACK_CELL := BazaarPage.PACK_CELL
+const TAB_PACK := BazaarPage.TAB_PACK
+const TAB_WORKS := BazaarPage.TAB_WORKS
+const TAB_BENCH := BazaarPage.TAB_BENCH
+const TAB_NAMES := BazaarPage.TAB_NAMES
 const SLOT: float = 30.0        ## inventory hotbar slot size
 const SLOT_GAP: float = 4.0
 ## Where the bottom furniture starts, as one definition rather than two. `_draw_inventory` derives the
@@ -50,12 +58,16 @@ var time_scale: float = 1.0
 ## The tutorial chain, which answers "how do I play?". Set by MainView.
 var objectives: Objectives
 ## Craftable machines for the CRAFT strip (set by MainView): [{name: String, cost: {item->count}}].
-var craft_options: Array[Dictionary] = []
+var craft_options: Array[Dictionary]:
+	get: return _bazaar_page.craft_options
+	set(v): _bazaar_page.craft_options = v
 ## Machine item id -> {color: Color, tag: String}, so machine items in the hotbar read as machines.
 var machine_icons: Dictionary = {}
 ## The item id per craft row, parallel to `craft_options` and set by MainView, machines then tools. It
 ## lets the craft panel render either a machine or a tool per row without depending on insertion order.
-var craft_ids: Array[StringName] = []
+var craft_ids: Array[StringName]:
+	get: return _bazaar_page.craft_ids
+	set(v): _bazaar_page.craft_ids = v
 ## The active carried-item slot in the inventory hotbar (set by MainView; mouse-wheel cycles it).
 var inv_selected_getter: Callable
 ## Inspector facts for the machine under the aim, pushed here by MainView: name, recipe, routing mode
@@ -123,7 +135,6 @@ var can_craft: bool = false        ## near a claimed Bazaar? gates the verbs, ne
 ## The width does not move. The detail plate carries a machine's whole sentence, which is what the 528px
 ## of content width buys. Narrowing it to match one 46px well would trade a void for a truncation.
 const BAZAAR_SIZE := Vector2(608.0, 348.0)
-const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
 const BAZAAR_RAIL := UiTheme.BAZAAR_RAIL
 const BAZAAR_PAD := UiTheme.BAZAAR_PAD
 const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
@@ -206,30 +217,38 @@ const BAZAAR_GUTTER: float = 10.0
 ## Three columns of eight is twenty-four rows, not the 22 a two-column layout needed, so the row can
 ## afford the two pixels back and the type can breathe.
 const BAZAAR_ROW_H: float = 24.0
-const BAZAAR_COLS: int = 3
 ## How long the counter takes to arrive. A panel that appears fully formed in one frame is the loudest
 ## thing separating a menu from an interface, and 0.13s of rise is cheaper than any art.
 const BAZAAR_RISE: float = 0.13
-const TAB_PACK: int = 0
-const TAB_WORKS: int = 1
-const TAB_BENCH: int = 2
-const TAB_NAMES: Array[String] = ["PACK", "WORKS", "BENCH"]
-var bazaar_tab: int = TAB_PACK
-var _bazaar_t: float = 0.0            ## 0..1 open ease, driven in _process
+var bazaar_tab: int:
+	get: return _bazaar_page.bazaar_tab
+	set(v): _bazaar_page.bazaar_tab = v
+var _bazaar_t: float:  ## 0..1 open ease, driven in _process
+	get: return _bazaar_page._bazaar_t
+	set(v): _bazaar_page._bazaar_t = v
 var _bazaar_h: float = BAZAAR_SIZE.y  ## the height the counter is currently at, eased toward its tab's
 ## The rack, the shop half of WORKS, set by MainView beside `craft_options` in the same {name, cost}
 ## shape with `rack_ids` parallel to it. It is kept a separate list rather than appended to the craft
 ## list because the two columns mean different things: the left is what you build from your own
 ## materials, the right is what you buy with refined goods (`docs/BITS.md` §7).
-var rack_options: Array[Dictionary] = []
-var rack_ids: Array[StringName] = []
+var rack_options: Array[Dictionary]:
+	get: return _bazaar_page.rack_options
+	set(v): _bazaar_page.rack_options = v
+var rack_ids: Array[StringName]:
+	get: return _bazaar_page.rack_ids
+	set(v): _bazaar_page.rack_ids = v
 ## The highlighted row on the active tab. One cursor serves the whole panel, and what "acts" means is
 ## the tab's own business: buy, craft or research.
-var bazaar_row: int = 0
+var bazaar_row: int:
+	get: return _bazaar_page.bazaar_row
+	set(v): _bazaar_page.bazaar_row = v
 ## ...and where that cursor was left on each of the other two, one slot per tab. The cursor is shared
 ## but the place is not, so a glance sideways no longer costs the walk back down a long list. It is kept
 ## here rather than as three cursors because everything reading the selection asks the one that is live.
-var _bazaar_rows: PackedInt32Array = PackedInt32Array()
+# `_bazaar_rows` is deliberately NOT forwarded. It is a PackedInt32Array, which is a value type, so a
+# property getter hands back a copy and `hud._bazaar_rows[i] = x` would write to a temporary and vanish.
+# Nothing outside the page reads it, and the page mutates its own field directly, so the safe thing is
+# for the name not to exist here at all rather than to exist and quietly not work.
 var show_minimap: bool = false
 var minimap_large: bool = false    ## M cycles corner → LARGE (centred) → hidden
 ## True while a grapple line is on screen, hook in flight or anchored, pushed every frame by MainView.
@@ -443,10 +462,6 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## Ease-out cubic. The counter's rise reads as arriving because it slows down at the end.
-func _bazaar_ease() -> float:
-	var u: float = 1.0 - _bazaar_t
-	return 1.0 - u * u * u
 
 
 ## THE SETTINGS PAGE, WHICH LIVES IN `SettingsPage` AND IS REACHED THROUGH HERE.
@@ -1594,7 +1609,7 @@ func _bazaar_wanted_h() -> float:
 	var need: float = 0.0
 	match bazaar_tab:
 		TAB_WORKS:
-			need = float(_works_rows_needed()) * BAZAAR_ROW_H
+			need = float(_bazaar()._works_rows_needed()) * BAZAAR_ROW_H
 		TAB_BENCH:
 			# The tree sizes its own chips down to fit whatever it is given, so what it wants is the tallest tier
 			# at full chip height. Today that asks for more than the panel may ever be, so BENCH is clamped and
@@ -1605,7 +1620,7 @@ func _bazaar_wanted_h() -> float:
 			# The wells and the summary band under them. The band was missing from this sum while the summary's
 			# own guard tested against a content box this sum had already decided, so the two could only agree by
 			# accident. `_ledger_h` carries the reasoning.
-			need = float(_pack_rows(inner_w)) * PACK_CELL + _ledger_h()
+			need = float(_bazaar()._pack_rows(inner_w)) * PACK_CELL + _ledger_h()
 	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + _detail_wanted_h() + BAZAAR_FOOT,
 		BAZAAR_MIN_H, BAZAAR_SIZE.y)
 
@@ -1699,129 +1714,28 @@ func _hold_overflow_h() -> float:
 	return float(over) * _font.get_height(DETAIL_BLURB_SIZE)
 
 
-## How many wells fit across the content and how many rows they take. `_tab_pack` calls the first of
-## these rather than keeping its own copy of the division.
-func _pack_cols(w: float) -> int:
-	return maxi(1, int(w / PACK_CELL))
-
-
-func _pack_rows(w: float) -> int:
-	var n: int = sim.inventory_slots().size()
-	return maxi(1, ceili(float(n) / float(_pack_cols(w))))
-
-
-## The fewest rows at which the two WORKS lists fit the counter's columns, asked of `works_columns`
-## itself so the squeeze rule and this measure cannot disagree. Fresh, machines 4 and rack 6 fit in
-## three columns at four rows. With the full tech tree, machines 19 and rack 7, it wants ten rows, which
-## asks for more height than the counter has and is clamped.
-func _works_rows_needed() -> int:
-	for r: int in range(1, 25):
-		if int(works_demand(r)["total"]) <= BAZAAR_COLS:
-			return r
-	return 24
 
 
 
 
 
 
-## What the counter will sell you today: the indices of the rows whose tech is already yours.
-##
-## WORKS used to list the whole catalogue, sixteen machines deep with thirteen greyed out behind techs
-## you had not reached, which is a wall of things you cannot have in the place you go to get things. The
-## future has a home already: the BENCH, where every locked machine sits under the rung that unlocks it.
-func _unlocked(ids: Array[StringName], n: int) -> Array[int]:
-	var out: Array[int] = []
-	for i: int in n:
-		var id: StringName = ids[i] if i < ids.size() else &""
-		var lock: StringName = ResearchRules.locking_tech(id)
-		if lock == &"" or sim.is_researched(lock):
-			out.append(i)
-	return out
 
 
-func open_machines() -> Array[int]:
-	return _unlocked(craft_ids, craft_options.size())
 
 
-func open_rack() -> Array[int]:
-	return _unlocked(rack_ids, rack_options.size())
 
 
-## How many columns each WORKS group takes, at this row height. Groups are laid left to right and never
-## share a column, because the left list is what you build from your own materials and the right is what
-## you buy with refined goods, and a player should not have to work that out from a row's position.
-func works_columns(rows: int) -> Dictionary:
-	var want: Dictionary = works_demand(rows)
-	var m: int = int(want["machines"])
-	var r: int = int(want["rack"])
-	# The counter has a fixed number of columns, so two lists asking for more than it has get squeezed
-	# rather than allowed to run off the panel's edge, and the group that overflows falls back to a window
-	# around the cursor. This clamp is the failure mode made legible rather than the intended layout, and
-	# it is the late-game normal rather than a safety valve. Measured on the real scene:
-	#
-	#   FRESH      machines= 4 rack= 6   ask 1+1=2 of 3   no squeeze
-	#   FULL TECH  machines=19 rack= 7   ask 3+1=4 of 3   squeezed, granted 2+1
-	#
-	# The squeeze is kept because the alternative measured worse: a fourth column is 124.5px, and
-	# `_works_row` would give the name about 48px, truncating every machine. Three columns and a cursor
-	# window is the design, and `works_window_first` is what makes the window testable.
-	if m + r > BAZAAR_COLS:
-		r = clampi(r, 1, BAZAAR_COLS - 1)
-		m = BAZAAR_COLS - r
-	return {"machines": m, "rack": r, "total": m + r}
 
 
-## What the two lists ask for at a given row count, before the squeeze. The split exists because a
-## caller that needs the demand and gets the grant reads a constant. `works_columns` clamps its answer
-## to `BAZAAR_COLS`, so its total is never above three whatever the catalogue does, and
-## `_works_rows_needed` scanning for the first row count whose total fits got three at one row and sized
-## the counter for a single row of WORKS.
-func works_demand(rows: int) -> Dictionary:
-	var m: int = maxi(1, ceili(float(open_machines().size()) / float(maxi(rows, 1))))
-	var r: int = maxi(1, ceili(float(open_rack().size()) / float(maxi(rows, 1))))
-	return {"machines": m, "rack": r, "total": m + r}
 
 
-## How many rows the active tab offers the cursor. WORKS is the two lists end to end; BENCH is the ladder.
-func bazaar_row_count() -> int:
-	match bazaar_tab:
-		TAB_WORKS:
-			return open_machines().size() + open_rack().size()
-		TAB_BENCH:
-			return ResearchRules.ORDER.size()
-		_:
-			return sim.inventory_slots().size()
 
 
-## What Enter would do, as {kind, id}, where kind is "machine", "rack", "tech" or "". The panel owns the
-## cursor because the panel draws it, and MainView owns the verbs, so the highlighted row and the thing
-## that happens cannot drift apart.
-func bazaar_action() -> Dictionary:
-	var i: int = bazaar_row
-	match bazaar_tab:
-		TAB_WORKS:
-			if i < 0 or i >= bazaar_row_count():
-				return {}
-			# The cursor walks the open rows, while `row` indexes the full catalogue, because that is what
-			# MainView's verbs are keyed on. Filtering the view must never renumber the world.
-			var open_m: Array[int] = open_machines()
-			if i < open_m.size():
-				return {"kind": "machine", "id": _craft_id(open_m[i]), "row": open_m[i]}
-			var r: int = open_rack()[i - open_m.size()]
-			return {"kind": "rack", "id": rack_ids[r] if r < rack_ids.size() else &"", "row": r}
-		TAB_BENCH:
-			if i < 0 or i >= ResearchRules.ORDER.size():
-				return {}
-			return {"kind": "tech", "id": ResearchRules.ORDER[i], "row": i}
-		_:
-			# PACK's verb is HOLD. It was the one tab with a cursor and nothing to do with it, and holding a
-			# thing from the pack screen is what the stateless bit-equipping in `BitRules` wants: what is in your
-			# hand is what you dig with.
-			var slots: Array[Dictionary] = sim.inventory_slots()
-			if i < 0 or i >= slots.size():
-				return {}
-			return {"kind": "hold", "id": slots[i]["item"], "row": i}
+
+
+
+
 
 
 ## Move the cursor. `dy` steps a row, while `dx` jumps a whole column, which is the same motion your eye
@@ -1835,28 +1749,6 @@ func bazaar_move(dx: int, dy: int) -> void:
 	bazaar_row = clampi(bazaar_row + dy, 0, n - 1)
 
 
-## Change tab, keeping each tab's place in its own list. Re-picking the tab you are already on means
-## "back to the top", which is the only way left to send the cursor home now that leaving and returning
-## no longer does it.
-func set_bazaar_tab(tab: int) -> void:
-	var want: int = clampi(tab, TAB_PACK, TAB_BENCH)
-	# Sized from the tab list itself on first use, so a fourth tab needs no change here and cannot index
-	# past the end of the store. `resize` fills the new slots with zero, which is row one.
-	if _bazaar_rows.size() < TAB_NAMES.size():
-		_bazaar_rows.resize(TAB_NAMES.size())
-	if want == bazaar_tab:
-		bazaar_row = 0
-		_bazaar_rows[want] = 0
-		return
-	_bazaar_rows[bazaar_tab] = bazaar_row
-	bazaar_tab = want
-	# A list can shrink under a stored index while you are away from it: spend the last of a material and
-	# its well leaves the pack, or build a machine and the rack row goes. So the stored row is re-clamped
-	# against the count the tab has now. `bazaar_row_count()` reads the sim on two of the three tabs, so a
-	# HUD without one keeps the old behaviour of landing at the top rather than reaching through a null.
-	var n: int = bazaar_row_count() if sim != null else 0
-	bazaar_row = clampi(_bazaar_rows[want], 0, maxi(n - 1, 0))
-	_bazaar_rows[want] = bazaar_row
 
 
 ## The counter, drawn as a lamp-lit object rather than as a dialog box: elevation instead of a border, a
@@ -2056,7 +1948,7 @@ func _tab_pack(g: Dictionary) -> void:
 	var content: Rect2 = g["content"]
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	var cell: float = PACK_CELL
-	var cols: int = _pack_cols(content.size.x)
+	var cols: int = _bazaar()._pack_cols(content.size.x)
 	# The wells are served first and the summary gets what is left. `_bazaar_wanted_h` asks for both, so
 	# below the panel's height cap this subtraction takes nothing the grid needed, and above the cap the
 	# band gives way, because the grid is the tab's subject and the summary is a footnote on it.
@@ -2337,16 +2229,6 @@ func _tab_works(g: Dictionary) -> void:
 		draw_string(_font, Vector2(x, y), "BENCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, dim)
 
 
-## The window's first row. A group shorter than its columns starts at 0 and this is a no-op, while a
-## longer one shows `capacity` rows centred on the cursor, clamped so it never runs past either end.
-##
-## Three columns and a window is the right answer rather than a fourth column: 528px of content over
-## four columns is 124.5px a row, and `_works_row` gives the name `width - 36 - cost glyphs`, about 48px
-## at size 10, which truncates every machine name. Measured before choosing.
-static func works_window_first(count: int, capacity: int, base: int, cursor: int) -> int:
-	if count <= capacity:
-		return 0
-	return clampi(cursor - base - capacity / 2, 0, count - capacity)
 
 
 ## One group: a list poured down as many columns as it needs, left to right. `base` is where the group
@@ -2409,7 +2291,7 @@ const SHORT_SELECTED := Color(
 ## outlined, because an outline around every row makes every row shout and the selected one shout no
 ## louder.
 func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> void:
-	var afford: bool = _can_afford(opt["cost"])
+	var afford: bool = _bazaar()._can_afford(opt["cost"])
 	if selected:
 		_round_rect(rr, 4.0, Color(0.176, 0.153, 0.098))
 		draw_rect(Rect2(rr.position + Vector2(0.0, 2.0), Vector2(2.0, rr.size.y - 4.0)), UI_ACCENT)
@@ -2535,6 +2417,48 @@ func _bazaar() -> BazaarPage:
 	_bazaar_page.probing = probing
 	_bazaar_page.panel_probe = panel_probe
 	return _bazaar_page
+
+
+## THE COUNTER, WHICH LIVES IN `BazaarPage` AND IS REACHED THROUGH HERE.
+##
+## The model moved first and the tabs follow it. What stays is the address: one forwarder per name that
+## `scenes/main.gd` or a tool has always called, and the properties above for the state they read.
+
+func open_machines() -> Array[int]:
+	return _bazaar().open_machines()
+
+
+func open_rack() -> Array[int]:
+	return _bazaar().open_rack()
+
+
+func works_columns(rows: int) -> Dictionary:
+	return _bazaar().works_columns(rows)
+
+
+static func works_window_first(count: int, capacity: int, base: int, cursor: int) -> int:
+	return BazaarPage.works_window_first(count, capacity, base, cursor)
+
+
+func _craft_id(i: int) -> StringName:
+	return _bazaar()._craft_id(i)
+
+
+func bazaar_row_count() -> int:
+	return _bazaar().bazaar_row_count()
+
+
+func bazaar_action() -> Dictionary:
+	return _bazaar().bazaar_action()
+
+
+func set_bazaar_tab(tab: int) -> void:
+	_bazaar().set_bazaar_tab(tab)
+
+
+func _bazaar_ease() -> float:
+	return _bazaar()._bazaar_ease()
+
 
 func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 	# The wrapper stays so the eight call sites and the helper-registry entry do not move. `machine_icons`
@@ -2717,7 +2641,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			note = "behind %s" % (str(ResearchRules.tech(req)["name"]) if req != &"" else "an earlier rung")
 		else:
 			verb = "RESEARCH"
-			ready = can_craft and _can_afford(cost) \
+			ready = can_craft and _bazaar()._can_afford(cost) \
 				and (sample == &"" or int(sim.inventory.get(sample, 0)) >= 1)
 			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, sample)
 	else:
@@ -2748,7 +2672,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			note = "research %s first" % str(ResearchRules.tech(lock)["name"])
 		else:
 			verb = "BUILD" if kind == "machine" else "BUY"
-			ready = can_craft and _can_afford(cost)
+			ready = can_craft and _bazaar()._can_afford(cost)
 			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
 
 	_detail_lamp(art, 0.045)
@@ -3453,14 +3377,6 @@ func _draw_dashboard_overlay() -> void:
 			y2 += 16.6
 
 
-## The id of the i-th craftable, supplied explicitly by MainView as `craft_ids`, parallel to
-## `craft_options`, so machines and tools can interleave without relying on `machine_icons` insertion
-## order. It falls back to the old `machine_icons`-keys derivation if `craft_ids` was not set.
-func _craft_id(i: int) -> StringName:
-	if i < craft_ids.size():
-		return craft_ids[i]
-	var keys: Array = machine_icons.keys()
-	return keys[i] if i < keys.size() else &""
 
 
 ## The CONTROLS card's measurements, hoisted out of `_draw_help_overlay` so `check_hud_layout` can
@@ -3635,11 +3551,6 @@ func _draw_hint() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
 
 
-func _can_afford(cost: Dictionary) -> bool:
-	for item: StringName in cost:
-		if int(sim.inventory.get(item, 0)) < int(cost[item]):
-			return false
-	return true
 
 
 ## The carried pack as a hotbar of slots, icon and count, centred along the bottom. The active slot,
