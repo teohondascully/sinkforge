@@ -1068,6 +1068,19 @@ static func item_color(item: StringName) -> Color:
 ## `rim` outlines the casing swatch, between the colour and the glyph, and only when a sprite is absent.
 ## The hotbar wants it and the bazaar does not; it is a colour rather than a flag so the caller says how
 ## dark, and a fully transparent default means "no rim" without a second branch at every other call.
+## What a thing is called, the naming half of the pair `thing_icon` draws. Same table, same reason it
+## arrives as an argument. Machines carry a display name; anything else is its own id, capitalised.
+##
+## The lookup is the forgiving one. Two versions of this existed on the Hud, differing only in that the
+## other indexed `["name"]` directly and would have failed on an entry without one. `main.gd` builds
+## every entry with a name at a single site, so the two agreed in practice; keeping the total one costs
+## nothing and removes a way to be wrong later.
+static func thing_label(id: StringName, icons: Dictionary) -> String:
+	if icons.has(id):
+		return String(icons[id].get("name", id))
+	return String(id).capitalize()
+
+
 static func thing_icon(canvas: CanvasItem, id: StringName, box: Rect2, icons: Dictionary,
 		rim: Color = Color(0.0, 0.0, 0.0, 0.0)) -> void:
 	if icons.has(id):

@@ -298,6 +298,10 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 	Visuals.thing_icon(_canvas, id, box, _icons)
 
 
+func _item_label(item: StringName) -> String:
+	return Visuals.thing_label(item, _icons)
+
+
 func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
 	Visuals.tracked(_canvas, _font, text, at, size, track, col)
 

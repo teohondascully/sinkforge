@@ -119,6 +119,7 @@ const SOLE_IMPL: Dictionary = {
 	"box.grow(grow - 1.0)": "res://scenes/visuals.gd",
 	"Vector2(0.0, KEYCAP_DROP)": "res://scenes/visuals.gd",
 	"Art.tex(\"machine_\" + String(": "res://scenes/visuals.gd",
+	"return String(id).capitalize()": "res://scenes/visuals.gd",
 }
 
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.

@@ -2421,7 +2421,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 		# already build, this plate is the only place those machines are named at all.
 		var names: PackedStringArray = []
 		for uid: StringName in (t.get("unlocks", []) as Array):
-			names.append(_thing_label(uid))
+			names.append(_item_label(uid))
 		if not names.is_empty():
 			blurb = "unlocks " + " · ".join(names)
 		elif sample != &"":
@@ -2603,11 +2603,6 @@ func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
 	return "" if parts.is_empty() else "short " + " · ".join(parts)
 
 
-## A machine's display name if it is one, an item's label otherwise. The tech ladder names both.
-func _thing_label(id: StringName) -> String:
-	if machine_icons.has(id):
-		return str(machine_icons[id]["name"])
-	return _item_label(id)
 
 
 
@@ -3497,9 +3492,7 @@ func _draw_item_tooltip() -> void:
 ## Human-readable name for a carried item. A machine item uses its def's display name, such as Forge or
 ## Drill, and a resource its capitalised id, so ore becomes "Ore".
 func _item_label(item: StringName) -> String:
-	if machine_icons.has(item):
-		return String(machine_icons[item].get("name", item))
-	return String(item).capitalize()
+	return Visuals.thing_label(item, machine_icons)
 
 
 func _buf(d: Dictionary) -> String:
