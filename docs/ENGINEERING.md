@@ -11,9 +11,9 @@ A game is hard to test for an ordinary reason: most of what makes it good is a p
 feeling in the hand, and neither is a return value. The layers here exist to turn as much of that as
 possible into something that can fail.
 
-## Three execution classes, because the environment is part of the measurement
+## Four execution classes, because the environment is part of the measurement
 
-`tools/run_harness.sh` registers every layer under one of three verbs, and the verb is load-bearing.
+`tools/run_harness.sh` registers every layer under one of four verbs, and the verb is load-bearing.
 
 | verb | count | meaning |
 |---|---|---|
@@ -102,3 +102,43 @@ switches.
 Exit codes and the parse-check trap are documented in `CONTRIBUTING.md`. The short version of the trap:
 `--check-only` prints the parse error and then exits `0` anyway, so read the output rather than the
 status.
+
+## Limits that are named rather than hidden
+
+A suite that reports only successes is not being honest about what it can see. These are the places
+where the instruments are known to fall short, kept here so that a green sweep is not read as a claim
+they do not.
+
+### One reading the software renderer cannot currently give
+
+`check_grapple_reads` judges whether a rope hangs. It measures the cord's greatest departure from the
+straight line between the hand and the piton, as a share of that line, and compares a slack rope against
+a taut one. On real hardware it separates them cleanly. On the software renderer used by the build
+machines it does not: both arms come back pinned at the top of what the measurement can represent, which
+is a statement about the instrument and not about the rope.
+
+The layer says so itself rather than passing. The two saturated readings are reported as failures, and
+the assertion that would have used them stands down with its reason printed, because a verdict on the
+rope computed from the instrument's own ceiling would be a claim about the instrument wearing the rope's
+name. The measurement is published; the conclusion is withheld. That is the intended behaviour for a
+reading that cannot be trusted on the machine taking it.
+
+Note what is *not* being done. The bound has not been lowered to fit the saturated number, and the layer
+has not been switched off on the machine where it struggles. Either would turn a known blind spot into a
+green tick, which is the failure this suite is most concerned with.
+
+A replacement measurement is being developed alongside the incumbent rather than in place of it, so both
+can be read on both renderers before either is trusted.
+
+### Timing is a property of the box
+
+Three layers assert on a duration, and a duration measured on a busy machine is a measurement of the
+machine. They are registered to run alone, and anything that boots the engine takes a machine-wide lock.
+A timing number from this suite describes one machine with nothing else running on it, and is not a
+portable claim about performance.
+
+### A pixel judgement is only as good as the renderer under it
+
+Two renderers do not draw the same frame. A layer that photographs the frame is therefore making a claim
+about the renderer as much as about the code, which is why a green local sweep and a red build are not a
+contradiction and why the pixel layers are registered in their own execution class.
