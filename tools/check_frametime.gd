@@ -404,9 +404,45 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			+ " SF_PERF_HOST is unset, so the paced branch is never evaluated on this machine")
 		return true
 
+	var interval: float = _interval
+
+	# A BUSY BOX IS A SPOILED SAMPLE, NOT A FAILING GAME -- AND THIS LAYER CANNOT TELL THE TWO APART.
+	# Written down because I shipped a guard that claimed it could, and the guard was wrong.
+	#
+	# The problem is real. Both terms are ratchets onto behaviour measured on an idle machine; run them
+	# while something else owns the box and they measure that instead. Observed here while four unrelated
+	# processes held ~100% CPU each at load average 11.3: IDLE 13.5% missed, RUN 38.5%, and RUN 4.5% on the
+	# very next run of the same build. A number that moves eightfold between consecutive runs of identical
+	# code is not a verdict about the code.
+	#
+	# THE GUARD I WROTE FOR IT stood the SLO down when the quiet-phase median sat off the refresh interval
+	# by more than `VSYNC_PINNED_MS`, on the theory that a quiet box paces on the panel. Checked afterwards
+	# against the 146 quiet medians in the retained sweep logs, that guard declines on HALF of all runs:
+	#
+	#     min 7.37  p05 7.76  p25 8.02  median 8.31  p75 8.34  p95 9.35  max 29.41   (interval 8.33ms)
+	#     below the window 55 (38%)  ·  asserts 73 (50%)  ·  above the window 18 (12%)
+	#
+	# Two faults there, both worth keeping. First, 38% of runs sit BELOW the interval, which is the
+	# direction contention cannot produce -- those frames finished early, and `absf()` spent half the
+	# budget on a reading that is evidence of health. Second, and fatal: the contended runs measured that
+	# day read 8.67, 9.35 and 9.44, while ordinary sweep runs in the same log set read 9.23, 9.31, 9.49,
+	# 9.69 and 9.86. The distributions OVERLAP, so no bar on this quantity separates them at all. It was
+	# the wrong constant besides -- `VSYNC_PINNED_MS` answers "is this run vsync-pinned", a different
+	# question, and its margin against the worst clean reading was 0.01ms.
+	#
+	# WHY NOTHING ELSE IN REACH WORKS EITHER. The quiet phases' own miss rate is the obvious discriminator
+	# and is disqualified twice: it IS the subject of the IDLE term, so a guard keyed on it would stand the
+	# assertion down exactly when it was about to fail, and it has false negatives anyway -- the first
+	# contended run read IDLE 0.5% / RUN 0.0% while both working phases fell over. A CPU-starvation probe
+	# is blind to it too, because what breaks frame pacing on this platform is largely compositor-side:
+	# WindowServer was the top process on the box, ahead of any of the hogs.
+	#
+	# SO THE CONTRACT IS THE OPERATOR'S, WHICH IS WHAT `SF_PERF_HOST` ALREADY MEANS -- setting it is a
+	# promise that this is controlled, quiet hardware. The layer cannot verify that promise, so it does not
+	# pretend to. It prints the evidence a reader needs in order to classify a red, and lets the red stand.
+	# A stand-down that fires on half of all runs is not caution, it is a gate that runs nowhere.
 	_asserted("frametime.absolute-budget")
 
-	var interval: float = _interval
 	var paced: bool = false
 	if interval > 0.0:
 		var fastest: float = _fastest(phases)
@@ -440,6 +476,7 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		+ " Rate alone cannot see a stall getting shallower; severity alone cannot see one getting more"
 		+ " frequent. Both are ratchets on measured behaviour, not a claim about what is good enough.")
 	var ok: bool = true
+	var red: int = 0
 	for i: int in labels.size():
 		var ms: PackedFloat32Array = phases[i]
 		if ms.is_empty():
@@ -473,8 +510,22 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 			bad = true
 		if bad:
 			ok = false
+			red += 1
 		else:
 			print("      PASS: %s holds the SLO" % labels[i])
+
+	# A RED HERE IS NOT AUTOMATICALLY A DEFECT, and whoever classifies it needs the evidence in the same
+	# place as the verdict rather than in a comment forty lines up. This layer cannot decide between a
+	# contended box and a slower game -- the note at the top of this function records the discriminators
+	# that were tried and why each one failed -- so it hands over the two facts that do separate them in
+	# practice, and names the classification as work still owed rather than leaving the red to be dismissed.
+	if not ok:
+		printerr("      ^ CLASSIFY THIS BEFORE RECORDING IT AS A REGRESSION. %d of %d phases are red, and"
+				% [red, labels.size()]
+			+ " the quiet-phase reference was %.2fms against a %.2fms refresh." % [quiet, interval]
+			+ " A GAME regression is confined to the phase whose code changed and REPEATS on a re-run; a"
+			+ " contended box moves unrelated phases together and reads differently the very next run."
+			+ " Check what else holds the cores, then re-run: a spoiled sample is void, not failed.")
 	return ok
 
 
