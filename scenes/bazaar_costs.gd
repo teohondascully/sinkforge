@@ -32,11 +32,11 @@ static func gap(inventory: Dictionary, item: StringName, need: int) -> int:
 
 
 
+## The counter's name for the question, and NOT a second implementation of it. The rule belongs to the
+## layer that gates the spend; see `FactorySim.can_afford` for why two copies of it was a bug waiting for
+## a disagreement rather than a tidy-up.
 static func can_afford(inventory: Dictionary, cost: Dictionary) -> bool:
-	for item: StringName in cost:
-		if int(inventory.get(item, 0)) < int(cost[item]):
-			return false
-	return true
+	return FactorySim.can_afford(inventory, cost)
 
 
 ## The bill-of-materials order: the lines you still owe first, the lines the pack already settles after.

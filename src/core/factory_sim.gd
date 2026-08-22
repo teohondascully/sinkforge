@@ -1550,6 +1550,28 @@ func craft(def: MachineDef) -> bool:
 
 
 ## Is this craftable unlocked, meaning free of a locking tech or with its tech researched?
+## CAN THIS BE PAID FOR. One rule, and it lives here because this is the layer that gates the spend.
+##
+## It was written three times: twice inline in this file, and once as `BazaarCosts.can_afford` for the
+## counter, which draws the chips. That is not a duplicated helper, it is a duplicated RULE at two layers,
+## and the failure it invites is specific -- if they ever disagree, the counter offers a craft the sim then
+## refuses, which reads to a player as the button lying. Nothing would have caught that; both sides pass
+## their own tests.
+##
+## The direction of the dependency is the whole decision. The surface asks the sim, never the reverse:
+## `scenes/` may name `FactorySim`, and `src/core/` must not know a counter exists. `BazaarCosts.can_afford`
+## is kept as the counter's name for the question and now delegates here, so the call sites that read
+## better with the UI-side name keep it while there is only one implementation underneath.
+##
+## STATIC, because affordability is a question about two dictionaries and not about a world. That is also
+## what lets the surface call it without holding a sim.
+static func can_afford(inv: Dictionary, cost: Dictionary) -> bool:
+	for item: StringName in cost:
+		if int(inv.get(item, 0)) < int(cost[item]):
+			return false
+	return true
+
+
 func craft_unlocked(item_id: StringName) -> bool:
 	var lock: StringName = ResearchRules.locking_tech(item_id)
 	return lock == &"" or research.has(lock)
@@ -1572,9 +1594,8 @@ func research_tech(tech_id: StringName) -> bool:
 	if sample != &"" and int(inventory.get(sample, 0)) < 1:
 		return false
 	var cost: Dictionary = t.get("cost", {})
-	for item: StringName in cost:
-		if int(inventory.get(item, 0)) < int(cost[item]):
-			return false
+	if not can_afford(inventory, cost):
+		return false
 	if sample != &"":
 		_take_from_pack(sample, 1)
 		total_consumed[sample] = int(total_consumed.get(sample, 0)) + 1
@@ -1605,9 +1626,8 @@ func craft_item(output: StringName, cost: Dictionary, count: int = 1) -> bool:
 		return false
 	if not craft_unlocked(output):
 		return false                # the research gate, same as machine-craft (tools with no locking tech pass)
-	for item: StringName in cost:
-		if int(inventory.get(item, 0)) < int(cost[item]):
-			return false
+	if not can_afford(inventory, cost):
+		return false
 	for item: StringName in cost:
 		var n: int = int(cost[item])
 		_take_from_pack(item, n)
