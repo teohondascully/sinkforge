@@ -106,6 +106,45 @@ const BOW_FLOOR: float = 0.15
 ## meaning "could not look" must never be arithmetic on the same axis as one meaning "looked".
 const BOW_NO_CHORD: float = -101.0
 const BOW_NO_CORD: float = -102.0
+const BOW_BINS: int = 24
+var _bow_best := PackedFloat32Array()
+var _bow_hits := PackedInt32Array()
+
+
+## Stations along the chord that saw any cord-coloured pixel. A cord spans the chord; a patch does not.
+func _bow_occupied() -> int:
+	var n: int = 0
+	for i: int in _bow_hits.size():
+		if _bow_hits[i] > 0:
+			n += 1
+	return n
+
+
+## The per-station profile as one line. A real cord is a smooth arc rising to the middle; a patch of
+## rock the mask has mistaken for cord is a spike, and a mask admitting the whole corridor is a wall.
+## Which of the three CI is looking at cannot be read off a single percentile, and is the whole question.
+func _bow_sketch() -> String:
+	var rim: float = maxf(_bow_rim() * _bow_span, 1.0)
+	var out: String = ""
+	for i: int in _bow_best.size():
+		if _bow_best[i] < 0.0:
+			out += "."
+		else:
+			out += str(clampi(int(_bow_best[i] / rim * 9.0), 0, 9))
+	return out
+
+
+## The peak of the per-station profile, median-filtered across neighbours so one contaminated station
+## cannot set the answer while a real arc, which is smooth across its neighbours, survives.
+func _bow_binned() -> float:
+	var peak: float = 0.0
+	for i: int in range(1, BOW_BINS - 1):
+		if _bow_best[i - 1] < 0.0 or _bow_best[i] < 0.0 or _bow_best[i + 1] < 0.0:
+			continue
+		var t: Array[float] = [_bow_best[i - 1], _bow_best[i], _bow_best[i + 1]]
+		t.sort()
+		peak = maxf(peak, t[1])
+	return peak
 
 ## ...and `_corridor_fill`'s, for the same reason and by the same rule. It used to answer a zero-length
 ## throw with `0.0`, which is a legal share and therefore indistinguishable from "the preview drew nothing
@@ -1095,6 +1134,8 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
 	var offs := PackedFloat32Array()
+	_bow_best.resize(BOW_BINS); _bow_best.fill(-1.0)
+	_bow_hits.resize(BOW_BINS); _bow_hits.fill(0)
 	for y: int in img.get_height():
 		for x: int in img.get_width():
 			var d := Vector2(float(x), float(y)) - a
@@ -1106,11 +1147,20 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 			if Vector3(c.r, c.g, c.b).distance_to(Vector3(ROPE_HUE.r, ROPE_HUE.g, ROPE_HUE.b)) > ROPE_TOL:
 				continue
 			offs.append(off)
+			var bi: int = clampi(int(along / span * float(BOW_BINS)), 0, BOW_BINS - 1)
+			_bow_hits[bi] += 1
+			if off > _bow_best[bi]:
+				_bow_best[bi] = off
 	if offs.size() < 40:
 		return BOW_NO_CORD                   # too little cord found to say anything about its shape
 	var arr: Array = Array(offs)
 	arr.sort()
-	return float(arr[int(float(arr.size() - 1) * 0.99)]) / span
+	var pct: float = float(arr[int(float(arr.size() - 1) * 0.99)]) / span
+	print("    [bow-diag] pct99 %.4f  binned %.4f  occupied %d/%d  px %d  span %.0f  rim %.4f"
+		% [pct, _bow_binned() / span, _bow_occupied(), BOW_BINS, offs.size(), span, _bow_rim()])
+	print("    [bow-diag] profile %s   (each station's peak offset as a share of the rim, . = empty)"
+		% _bow_sketch())
+	return pct
 
 
 ## The largest number `_bow_now`'s own mask can ever return, as a share of the chord. It discards every
