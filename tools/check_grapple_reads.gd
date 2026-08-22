@@ -109,6 +109,7 @@ const BOW_NO_CORD: float = -102.0
 const BOW_BINS: int = 24
 var _bow_best := PackedFloat32Array()
 var _bow_hits := PackedInt32Array()
+var _bow_over := PackedInt32Array()
 
 
 ## Stations along the chord that saw any cord-coloured pixel. A cord spans the chord; a patch does not.
@@ -132,6 +133,82 @@ func _bow_sketch() -> String:
 		else:
 			out += str(clampi(int(_bow_best[i] / rim * 9.0), 0, 9))
 	return out
+
+
+## How many stations saw a pixel the renderer could not have drawn. Reported rather than used: a cord that
+## reads clean at every station and a cord with a wall behind two of them are different situations, and a
+## single number that had already discarded the wall could not tell them apart.
+func _bow_over_stations() -> int:
+	var n: int = 0
+	for i: int in _bow_over.size():
+		if _bow_over[i] > 0:
+			n += 1
+	return n
+
+
+## WHAT MAKES A SET OF STATIONS A CORD, and the first version of this got it wrong in a way worth keeping.
+##
+## I required two thirds of the stations to be occupied. That rejected the TAUT arm at 13 of 24 while it
+## was reading perfectly well, because a taut rope is a thinner thing than a slack one: fewer of its
+## pixels clear `ROPE_TOL`, so it drops stations to antialiasing even where the cord plainly is. A count
+## was measuring line width and calling it evidence.
+##
+## A cord runs from the hand to the piton, so the property that actually separates it from a patch is
+## EXTENT: its occupied stations must reach across the chord. Dropouts in the middle are the mask
+## blinking, not the rope stopping. The count floor stays only to stop two lone stations at opposite ends
+## from qualifying as a span.
+##
+##     local taut    ......01111.00..00.0000.    13 stations, extent 6..22   a cord with gaps
+##     local slack   33444..44..333...1111000    17 stations, extent 0..22   a cord
+##
+const BOW_MIN_EXTENT: float = 2.0 / 3.0
+const BOW_MIN_STATIONS: float = 0.5
+
+
+## The bow, measured only from what the renderer could actually have drawn.
+##
+## THE FAILURE THIS REPLACES. `pct99` is a percentile over every cord-coloured pixel in the corridor, and
+## the corridor is 24px wider than the clamp on purpose. On the software renderer the far end of the
+## chord, stations 17 to 20 of 24, sits against something that fills that strip, and a percentile cannot
+## tell "the rope hangs this far" from "a fifth of my pixels are not rope". Both arms read 0.4624 and
+## 0.4634 against a rim of 0.4650: pinned, and pinned is not a measurement.
+##
+## Median filtering alone did not fix it and the profile shows why. The contaminated block is three to
+## four stations WIDE, so a three-wide median sees a majority of contaminated neighbours and returns
+## contamination. Width is what defeats a smoother, which is why the rejection has to come first and be
+## about physics rather than about smoothness.
+##
+## Returns `BOW_NO_CORD` when too few stations survive, because a peak over a handful of stations is not
+## a statement about a cord and must not be arithmetic on the same axis as one that is.
+func _bow_clean(span: float) -> float:
+	var first: int = -1
+	var last: int = -1
+	for i: int in _bow_best.size():
+		if _bow_best[i] >= 0.0:
+			if first < 0:
+				first = i
+			last = i
+	if first < 0:
+		return BOW_NO_CORD
+	var extent: float = float(last - first + 1) / float(BOW_BINS)
+	if extent < BOW_MIN_EXTENT or float(_bow_occupied()) < BOW_MIN_STATIONS * float(BOW_BINS):
+		return BOW_NO_CORD
+	var peak: float = 0.0
+	for i: int in range(1, BOW_BINS - 1):
+		if _bow_best[i - 1] < 0.0 or _bow_best[i] < 0.0 or _bow_best[i + 1] < 0.0:
+			continue
+		var t: Array[float] = [_bow_best[i - 1], _bow_best[i], _bow_best[i + 1]]
+		t.sort()
+		peak = maxf(peak, t[1])
+	return peak / maxf(span, 1.0)
+
+
+## `_bow_clean` for the run log, with the sentinel spelled rather than printed as a negative share.
+func _bow_clean_str(span: float) -> String:
+	var v: float = _bow_clean(span)
+	if is_equal_approx(v, BOW_NO_CORD):
+		return "TOO FEW STATIONS"
+	return "%.4f" % v
 
 
 ## The peak of the per-station profile, median-filtered across neighbours so one contaminated station
@@ -1133,9 +1210,11 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		return BOW_NO_CHORD
 	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
+	var band: float = span * WorldRenderer.SAG_CAP
 	var offs := PackedFloat32Array()
 	_bow_best.resize(BOW_BINS); _bow_best.fill(-1.0)
 	_bow_hits.resize(BOW_BINS); _bow_hits.fill(0)
+	_bow_over.resize(BOW_BINS); _bow_over.fill(0)
 	for y: int in img.get_height():
 		for x: int in img.get_width():
 			var d := Vector2(float(x), float(y)) - a
@@ -1149,7 +1228,15 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 			offs.append(off)
 			var bi: int = clampi(int(along / span * float(BOW_BINS)), 0, BOW_BINS - 1)
 			_bow_hits[bi] += 1
-			if off > _bow_best[bi]:
+			# IN-BAND ONLY, and the band is the renderer's own clamp rather than the mask's. `half` above
+			# is `span * SAG_CAP + 24.0`: the 24 exists so a rope pinned AT the cap can still be seen to
+			# be pinned, and it is also the exact width of a strip the renderer will never draw a hang
+			# into. A pixel out there is therefore not cord, whatever colour it is. Taking the best
+			# IN-BAND offset per station rather than rejecting the whole station keeps a station that
+			# holds both cord and contamination, which the far end of this chord does.
+			if off > band:
+				_bow_over[bi] += 1
+			elif off > _bow_best[bi]:
 				_bow_best[bi] = off
 	if offs.size() < 40:
 		return BOW_NO_CORD                   # too little cord found to say anything about its shape
@@ -1160,6 +1247,9 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		% [pct, _bow_binned() / span, _bow_occupied(), BOW_BINS, offs.size(), span, _bow_rim()])
 	print("    [bow-diag] profile %s   (each station's peak offset as a share of the rim, . = empty)"
 		% _bow_sketch())
+	print("    [bow-diag] clean %s  in-band %d/%d  over-band stations %d  (peak of the in-band profile, "
+		% [_bow_clean_str(span), _bow_occupied(), BOW_BINS, _bow_over_stations()]
+		+ "median-filtered; NOT yet what this layer asserts on)")
 	return pct
 
 
