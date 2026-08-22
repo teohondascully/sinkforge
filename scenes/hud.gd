@@ -3596,57 +3596,29 @@ func _draw_help_overlay() -> void:
 			lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, HELP_TEXT_SIZE, UI_TEXT)
 
 
-## The settings page, which takes the counter's grammar and keeps its own state.
-##
-## It shares the counter's plate, rail, head, detail plate and sizing behaviour, while `_settings_open`
-## and ESC stay its own. It is not the counter's fourth face, and the reason lives in the input handlers
-## rather than in proximity. `main.gd:1006` routes every event to `_settings_input` and returns. That
-## total intercept is what key capture requires, because it must be able to swallow any key, while the
-## counter binds the digit row and the mouse wheel to tab selection. A binding capture cannot live
-## inside a tab strip. The other reason once recorded, that the counter is a place with a precondition,
-## is not true: `E` sets `_inventory_open` with no proximity check, and `_near_bazaar()` gates exactly
-## one field.
-##
-## The grid. The old page put slider bars at x0+62 and chips at x0+92: two control columns in one stack,
-## 30px apart. There is now one label x, one control x and one value x.
-##
-## The height. The old page was a fixed 592x286 whatever it was showing. One category at a time on a
-## panel that sizes to it makes FEEL barely half the height of CONTROLS.
-const SET_W: float = 432.0
-const SET_HEAD: float = 40.0          ## title + category name
-const SET_FOOT: float = 16.0          ## the key legend
-## The plate that says what the control under your hand does. It was 56, tall enough for three lines and
-## never given more than one, because the CONTROLS face is the only one that puts anything else in it, and
-## that is a single RESET KEYS button on the same baseline. 36 holds both with room and takes 20px off
-## every page height, which is 20px less of the banner above and the hotbar below that this panel prints
-## over: the settings footprint measured 47.22% of canvas, down from 50.97%.
-const SET_DETAIL: float = 36.0
-const SET_ROW: float = 22.0           ## an audio/feel row
-const SET_MIN_H: float = 196.0
-## What a rail slot is made of. Both rails stack a tile with one line of type under it and neither may
-## print into the slot below, so the pitch is a clearance and not a taste: at the old 150 floor the FEEL
-## page came out 186 tall, the pitch collapsed to exactly `RAIL_ICON`, and the tiles met.
-##
-## What the two rails do not share is the line. The settings rail writes a word there and its slot ends
-## at the word's descender, while the counter's rail puts the key that selects the tab on that same line
-## as a cap and a cap is taller than a word, so its slot ends where the cap's shadow does. Both floors
-## are the same sentence, the slot's last mark plus air, read off each rail's own drawing. For the
-## settings rail that returns 54.0, which is the number this file shipped.
-const RAIL_ICON: float = 38.0         ## the tile at the top of every slot, both rails
-const RAIL_LABEL_FS: int = 7          ## and the type on the line under it
-const RAIL_LABEL_DY: float = 44.0     ## the settings word's baseline, below the tile
+## The settings page's own measurements live with the page, in `scenes/settings_page.gd`. Aliased
+## here so the drawing below reads unchanged while there is one of each in the tree.
+const SET_W := SettingsPage.SET_W
+const SET_HEAD := SettingsPage.SET_HEAD
+const SET_FOOT := SettingsPage.SET_FOOT
+const SET_DETAIL := SettingsPage.SET_DETAIL
+const SET_ROW := SettingsPage.SET_ROW
+const SET_MIN_H := SettingsPage.SET_MIN_H
+const RAIL_ICON := SettingsPage.RAIL_ICON
+const RAIL_LABEL_FS := SettingsPage.RAIL_LABEL_FS
+const RAIL_LABEL_DY := SettingsPage.RAIL_LABEL_DY
+const RAIL_TEXT_AIR := SettingsPage.RAIL_TEXT_AIR
+const RAIL_SLOT_AIR := SettingsPage.RAIL_SLOT_AIR
+const RAIL_PITCH_MAX := SettingsPage.RAIL_PITCH_MAX
+const RAIL_TOP := SettingsPage.RAIL_TOP
+const RAIL_TOP_FRAC := SettingsPage.RAIL_TOP_FRAC
+const RAIL_EDGE := SettingsPage.RAIL_EDGE
+const SET_CTRL_DX := SettingsPage.SET_CTRL_DX
+const SET_BAR_W := SettingsPage.SET_BAR_W
+const SET_VALUE_DX := SettingsPage.SET_VALUE_DX
+const REMAP_ROW_H := SettingsPage.REMAP_ROW_H
+const REMAP_GAP := SettingsPage.REMAP_GAP
 const RAIL_KEY_GAP: float = 3.0       ## cap to word, on the counter's rail
-const RAIL_TEXT_AIR: float = 2.0      ## tile to the top of the type under it
-const RAIL_SLOT_AIR: float = 7.0      ## a slot's last mark to the next slot's tile
-const RAIL_PITCH_MAX: float = 58.0    ## a tall rail spreads its tabs no further than this
-const RAIL_TOP: float = 62.0          ## where the first tile sits when the rail has the room
-const RAIL_TOP_FRAC: float = 0.18     ## ...and the share of a shorter rail it takes instead
-const RAIL_EDGE: float = 6.0          ## the margin no slot crosses at either end
-## The shared grid, measured from the content's left edge. It is named because a layout assertion that
-## re-derives them is checking its own arithmetic against itself.
-const SET_CTRL_DX: float = 116.0
-const SET_BAR_W: float = 116.0
-const SET_VALUE_DX: float = 242.0     ## SET_CTRL_DX + SET_BAR_W + 10
 
 ## The page's shape lives in `SettingsPage`, aliased here so the drawing below reads unchanged and there
 ## is still exactly one of each in the tree.
@@ -3656,8 +3628,6 @@ const CAT_FEEL: int = SettingsPage.CAT_FEEL
 const CAT_NAMES: Array[String] = SettingsPage.CAT_NAMES
 
 const REMAP_ROWS: Array[Array] = SettingsPage.REMAP_ROWS
-const REMAP_ROW_H: float = 15.0
-const REMAP_GAP: float = 16.0
 
 
 ## The page's geometry for the category that is open: the counter's `_bazaar_geometry` in every respect

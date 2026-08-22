@@ -76,6 +76,8 @@ const SOLE_OWNER: Dictionary = {
 	"UI_MODAL": "res://scenes/ui_theme.gd",
 	"CANVAS": "res://scenes/ui_theme.gd",
 	"RAIL_ON_FILL": "res://scenes/ui_theme.gd",
+	"SET_W": "res://scenes/settings_page.gd",
+	"RAIL_TOP_FRAC": "res://scenes/settings_page.gd",
 }
 
 
