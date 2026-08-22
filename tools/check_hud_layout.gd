@@ -1011,15 +1011,23 @@ func _check_helper_registry() -> void:
 	# list is derived instead, from whatever the Hud is holding, so a page added tomorrow is enumerated
 	# without anyone remembering to come back here.
 	var surfaces: Array = [hud]
-	for prop: Dictionary in hud.get_property_list():
-		if int(prop["type"]) != TYPE_OBJECT:
-			continue
-		var held: Object = hud.get(String(prop["name"])) as Object
-		# Script-backed only. Every RefCounted the Hud holds includes its `Font`, and engine resources
-		# carry private `_draw_rect`-shaped methods of their own that nobody here should be classifying.
-		# A page is one of ours, and one of ours has a script.
-		if held != null and held is RefCounted and held.get_script() != null and not surfaces.has(held):
-			surfaces.append(held)
+	# Walk transitively, because a page may now hold a page: the research ladder is a `BazaarBench` held
+	# by the `BazaarPage` held by the Hud, and a one-level sweep stops one short of it. Appending to the
+	# array being walked is the whole trick — each surface found is itself searched — and `has` does
+	# double duty as the de-duplicator and the cycle break.
+	var at: int = 0
+	while at < surfaces.size():
+		var owner_obj: Object = surfaces[at]
+		at += 1
+		for prop: Dictionary in owner_obj.get_property_list():
+			if int(prop["type"]) != TYPE_OBJECT:
+				continue
+			var held: Object = owner_obj.get(String(prop["name"])) as Object
+			# Script-backed only. Every RefCounted one of these holds includes its `Font`, and engine
+			# resources carry private `_draw_rect`-shaped methods of their own that nobody here should be
+			# classifying. A page is one of ours, and one of ours has a script.
+			if held != null and held is RefCounted and held.get_script() != null and not surfaces.has(held):
+				surfaces.append(held)
 	for obj: Object in surfaces:
 		for m: Dictionary in obj.get_method_list():
 			var n: String = String(m["name"])
