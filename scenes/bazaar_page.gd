@@ -61,6 +61,36 @@ const TAB_BENCH: int = 2
 
 const TAB_NAMES: Array[String] = ["PACK", "WORKS", "BENCH"]
 
+## The ink for a short row with the cursor on it. Affordability and the cursor are orthogonal, so there
+## are four combinations and not three. The name colour read `(gold if selected else UiTheme.UI_TEXT) if afford
+## else grey`, with the test on `afford` outermost, so it swallowed the test on `selected` whole. A
+## short row drew the same grey whether or not the cursor was on it while `if selected:` still lifted
+## the plate and hung a gold spine off its left edge. That put the row being read at 3.74:1 against its
+## own plate.
+##
+## The unselected short row moved off its own literal at the same time. `Color(0.48, 0.50, 0.56)` read
+## 4.44:1 on the plain row fill, under the 4.5 this repository holds named inks to. The faint rung reads
+## 5.05:1 and sits 74 steps below `UiTheme.UI_TEXT`, so the row still says "you cannot afford this" at a glance.
+##
+## The lift is the ramp's own step. `UiTheme.UI_TEXT_DIM` is `UiTheme.UI_TEXT_FAINT` plus exactly 0.04 on every channel,
+## so one more of that unit lands the selected short row at 5.51:1 against the 5.05:1 it reads
+## unselected. `UiTheme.UI_TEXT_DIM` itself measured 4.86:1: over the floor but under the unselected figure,
+## which is the same inversion in miniature. It is written as the gap between the two named rungs rather
+## than as `0.04`, which would be a literal equal to a difference nothing in the file relates it to.
+##
+## Ratios are WCAG relative luminance with channels linearised before weighing, per
+## `tools/check_text_contrast.gd`. They are not the gamma-encoded Y709 quoted beside them for the plates.
+const SHORT_SELECTED := Color(
+	UiTheme.UI_TEXT_DIM.r + (UiTheme.UI_TEXT_DIM.r - UiTheme.UI_TEXT_FAINT.r),
+	UiTheme.UI_TEXT_DIM.g + (UiTheme.UI_TEXT_DIM.g - UiTheme.UI_TEXT_FAINT.g),
+	UiTheme.UI_TEXT_DIM.b + (UiTheme.UI_TEXT_DIM.b - UiTheme.UI_TEXT_FAINT.b))
+
+const BAZAAR_GUTTER: float = 10.0
+
+## Three columns of eight is twenty-four rows, not the 22 a two-column layout needed, so the row can
+## afford the two pixels back and the type can breathe.
+const BAZAAR_ROW_H: float = 24.0
+
 ## The counter's own state. `Hud` keeps a property of each name forwarding here, because `scenes/main.gd`
 ## and six tools have always read them there.
 var bazaar_tab: int = TAB_PACK
@@ -268,6 +298,14 @@ func _draw_thing_icon(id: StringName, box: Rect2) -> void:
 	Visuals.thing_icon(_canvas, id, box, _icons)
 
 
+func _tracked(text: String, at: Vector2, size: int, track: float, col: Color) -> void:
+	Visuals.tracked(_canvas, _font, text, at, size, track, col)
+
+
+func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
+	return Visuals.keycap(_canvas, _font, at, key, fs, panel_probe if probing else [])
+
+
 ## BENCH: the research ladder as a graph and the verb that acts on it, on one screen.
 ##
 ## The tree used to be a separate full-screen overlay on `T` that showed the ladder you could not act
@@ -428,3 +466,193 @@ func _draw_tech_art(tid: StringName, art: Rect2) -> void:
 	for i: int in n:
 		_draw_thing_icon(unlocks[i], Rect2(at + Vector2(float(i % cols) * cell + 2.0,
 			float(i / cols) * cell + 2.0), Vector2(cell - 4.0, cell - 4.0)))
+
+
+## WORKS: the counter, what you build from your own materials, and the Rack, what you buy with refined
+## goods, as a dense card grid. No scrolling, no scrollbar, no shift-digit.
+func _tab_works(g: Dictionary) -> void:
+	var content: Rect2 = g["content"]
+	var rows: int = int(g["rows"])
+	var lay: Dictionary = works_columns(rows)
+	# The columns spread to fill the counter. Once WORKS lists only what you can build, most of the game is
+	# two columns rather than three, and three columns of narrow rows with an empty third is exactly the
+	# dead space this layout exists to kill. It is capped, because a row wide enough to lose its price at
+	# the far end is its own problem.
+	var used: int = maxi(1, int(lay["total"]))
+	var col_w: float = minf(268.0,
+		(content.size.x - BAZAAR_GUTTER * float(used - 1)) / float(used))
+	var open_m: Array[int] = open_machines()
+	var open_r: Array[int] = open_rack()
+	_works_group(content, 0, int(lay["machines"]), col_w, rows, "MACHINES", craft_options, open_m, 0, true)
+	_works_group(content, int(lay["machines"]), int(lay["rack"]), col_w, rows, "THE RACK",
+		rack_options, open_r, open_m.size(), false)
+	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only
+	# honest if the panel still says there is one, because otherwise the counter looks finished at four
+	# machines and the tech ladder looks optional.
+	var hidden: int = (craft_options.size() - open_m.size()) + (rack_options.size() - open_r.size())
+	if hidden > 0:
+		# The key is a cap and not a word in a sentence. "press 3 for the BENCH" asks the reader to parse an
+		# instruction to find the one glyph that matters, while the cap grammar the rail and footer already
+		# use puts it where the eye lands.
+		#
+		# The line is a pointer rather than an offer: the thing your input reaches is the cap, and the cap
+		# draws itself. Off the gold with the headings, for the reason written at `GOLD_DIM`.
+		var dim: Color = UiTheme.UI_TEXT_DIM
+		var y: float = content.end.y - 2.0
+		var head: String = "%d more wait behind research" % hidden
+		_canvas.draw_string(_font, Vector2(content.position.x + 1.0, y), head,
+			HORIZONTAL_ALIGNMENT_LEFT, content.size.x, 9, dim)
+		var x: float = content.position.x + 1.0 \
+			+ _font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 10.0
+		x += _keycap(Vector2(x, y - 10.0), "3", 8) + 5.0
+		_canvas.draw_string(_font, Vector2(x, y), "BENCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, dim)
+
+
+## One group: a list poured down as many columns as it needs, left to right. `base` is where the group
+## starts in the panel's flat cursor index, so the highlight and `bazaar_action()` cannot disagree.
+func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int, title: String,
+		opts: Array[Dictionary], open_rows: Array[int], base: int, machines: bool) -> void:
+	var x0: float = content.position.x + float(col0) * (col_w + BAZAAR_GUTTER)
+	# MACHINES / THE RACK are labels, in the grey ramp for the reason written at `GOLD_DIM`. This is the
+	# site where the gold rung was doing the most damage: a dimmed cut of the affordance colour, standing
+	# directly over rows where dim genuinely means you cannot afford the thing.
+	_tracked(title, Vector2(x0 + 1.0, content.position.y - 6.0), 8, 2.0, UiTheme.UI_TEXT_DIM)
+	if open_rows.is_empty():
+		_canvas.draw_string(_font, Vector2(x0 + 1.0, content.position.y + 16.0), "(nothing unlocked yet)",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UiTheme.UI_TEXT_DIM)
+		return
+	# A group longer than its columns shows a window around the cursor rather than truncating. It is lifted
+	# out of this loop so `check_pack_layout` can assert a property of what the drawing computes, that the
+	# cursor is always inside the window, instead of re-deriving the arithmetic and agreeing with itself.
+	# It also runs headless, which `_works_group` cannot, since that only executes inside `_draw`.
+	var capacity: int = rows * cols
+	var first: int = works_window_first(open_rows.size(), capacity, base, bazaar_row)
+	for i: int in mini(capacity, open_rows.size()):
+		var oi: int = open_rows[first + i]
+		var rr := Rect2(x0 + float(i / rows) * (col_w + BAZAAR_GUTTER),
+			content.position.y + float(i % rows) * BAZAAR_ROW_H, col_w, BAZAAR_ROW_H - 3.0)
+		_works_row(rr, opts[oi], _works_id(machines, oi), base + first + i == bazaar_row)
+
+
+## One row, drawn as a card and not as an outlined box: a surface tint you can see through to the panel,
+## a well for the glyph and a brass edge with a warmer fill when the cursor is on it. Nothing is
+## outlined, because an outline around every row makes every row shout and the selected one shout no
+## louder.
+func _works_row(rr: Rect2, opt: Dictionary, id: StringName, selected: bool) -> void:
+	var afford: bool = _can_afford(opt["cost"])
+	if selected:
+		_round_rect(rr, 4.0, Color(0.176, 0.153, 0.098))
+		_canvas.draw_rect(Rect2(rr.position + Vector2(0.0, 2.0), Vector2(2.0, rr.size.y - 4.0)), UiTheme.UI_ACCENT)
+	else:
+		_round_rect(rr, 4.0, Color(1.0, 1.0, 1.0, 0.030))
+	_draw_thing_icon(id, Rect2(rr.position + Vector2(6.0, 2.5), Vector2(16.0, 16.0)))
+	var name_col: Color = (UiTheme.GOLD_PALE if selected else UiTheme.UI_TEXT) if afford \
+		else (SHORT_SELECTED if selected else UiTheme.UI_TEXT_FAINT)
+	var cw: float = _cost_glyphs(rr, opt["cost"])
+	_canvas.draw_string(_font, rr.position + Vector2(26.0, 14.0), str(opt["name"]),
+		HORIZONTAL_ALIGNMENT_LEFT, rr.size.x - 36.0 - cw, 10, name_col)
+
+
+func _works_id(machines: bool, i: int) -> StringName:
+	if machines:
+		return _craft_id(i)
+	return rack_ids[i] if i < rack_ids.size() else &""
+
+
+## The price as glyphs rather than prose. "6 Iron Ingot 3 Wood" is a hundred pixels of a hundred-and-
+## seventy pixel row and it clipped the name off the thing being bought: "Iron Pickax", "Blast Furnac".
+## The same fact as two icons and two numbers is forty, and it reads faster besides.
+##
+## An ingredient you are short of prints what you are short by (`-2`) where this printed `2` in red and
+## left the subtraction to the reader. It is the same number `_shortfall_note` prints in words under the
+## detail button, so the row is the compressed form of that sentence. An ingredient the pack covers
+## still prints its price, which is what an expert scans a row end for.
+##
+## The sign exists so the hue is not the only copy of it. Green covered against red short is a hue
+## difference. That is nothing to a greyscale reader and nothing on a one-ingredient recipe with no
+## second numeral to compare against. Both come off the same string below, so the two readers cannot be
+## told different things.
+##
+## It costs 3px per short ingredient and nothing per covered one. A deficit cannot carry more digits
+## than the price it was subtracted from, so the only growth is the sign itself: 3.0px at size 9 in the
+## Open Sans SemiBold `ThemeDB.fallback_font` resolves to here. Measured at the tightest row this panel
+## can draw, three ingredients in a 169.3px column with every one short, the name's budget goes 58.3 to
+## 49.3. The longest name a three-ingredient row can carry is Drift Rig at 40.0px, which clears it by
+## 9.3. Nothing clips.
+##
+## What it does not fix is the red. Against the selected row's plate that literal measures 4.20:1, under
+## the 4.5 `tools/check_text_contrast.gd` holds body text to and under the 4.99 the same red reads on an
+## unselected row. Every lift of it closes the value gap between green and red, which used to be the
+## only thing carrying affordability without colour. The sign now carries that job.
+func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
+	# One walk order for both passes. The sum is the same whichever way the dictionary is read, so the
+	# width pass does not need this. It takes it anyway, because the day the two passes walk the price by
+	# two different rules is the day one of them stops describing the other.
+	var order: Array[StringName] = _cost_order(cost)
+	var w: float = 0.0
+	for item: StringName in order:
+		w += 12.0 + _font.get_string_size(_cost_numeral(item, int(cost[item])),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
+	var x: float = rr.end.x - 5.0 - w
+	for item: StringName in order:
+		var label: String = _cost_numeral(item, int(cost[item]))
+		Visuals.draw_item(_canvas, Vector2(x + 6.0, rr.position.y + 10.5), 12.0, item)
+		# The ink reads the sign rather than asking the pack a second time. `have < need` written out twice,
+		# three lines apart, is how the mark and the colour start disagreeing about one ingredient, and
+		# disagreeing is worse than either cue missing, because each reader sees only one of them.
+		_canvas.draw_string(_font, Vector2(x + 13.0, rr.position.y + 14.5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+			UiTheme.UI_WARN if label.begins_with("-") else Color(0.482, 0.796, 0.518))
+		x += 12.0 + _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 7.0
+	return w
+
+
+## What one ingredient's numeral says: the deficit when you are short of it, the price when you are not.
+##
+## It is a function and not an expression because the width pass and the draw pass above are two walks
+## of the same dictionary, and they used to each format the numeral for themselves. The width is not
+## cosmetic here: `_works_row` subtracts this function's total from the name's budget, so a numeral that
+## measures narrower than it draws puts the price on top of the word it was widened to protect.
+func _cost_numeral(item: StringName, need: int) -> String:
+	var gap: int = _cost_gap(item, need)
+	return ("-%d" % gap) if gap > 0 else str(need)
+
+
+## The bill-of-materials order: the lines you still owe first, the lines the pack already settles after.
+##
+## The numerals were the half of this that shipped first, a deficit printing as a signed `-N` instead of
+## leaving the subtraction to the reader, and fixing a numeral does not make a row of chips a bill. A
+## bill is a list whose outstanding lines are grouped, because the only question anybody brings to a
+## price is which lines are still open. Interleaved, that question is a scan of every ingredient and a
+## comparison per chip. Grouped, it is a glance at the front of the price, and the count of open lines is
+## the length of the first run.
+##
+## Stable inside each run, so a recipe keeps the order its `.tres` or its rung wrote it in and the only
+## thing that ever moves a chip is that ingredient crossing the line. The crossing is the point rather
+## than the price of it: the frame where you pick up the last ingot is the frame the owed run gets
+## shorter, which is the most direct feedback on the panel and the one thing a static row could never say.
+##
+## It sorts the works rows and the detail plate alike, so a machine's price does not rearrange itself
+## between the row you picked it from and the plate that prices it.
+func _cost_order(cost: Dictionary) -> Array[StringName]:
+	var owed: Array[StringName] = []
+	var settled: Array[StringName] = []
+	for item: StringName in cost:
+		if _cost_gap(item, int(cost[item])) > 0:
+			owed.append(item)
+		else:
+			settled.append(item)
+	owed.append_array(settled)
+	return owed
+
+
+## The one subtraction, and the one predicate. What this ingredient is short by: positive while the pack
+## cannot cover the line, zero or below once it can.
+##
+## Everything that tells an outstanding ingredient from a settled one reads this and nothing else: the
+## order the price is walked in, the card under a detail chip, the sign on both surfaces' numerals and
+## the ink they are drawn in. `have < need` was written out at four addresses before, which is
+## survivable only while the four cannot disagree. They can, and a mark that disagrees with the colour
+## beside it about one ingredient is worse than either cue missing, because each reader only ever sees
+## one of them.
+func _cost_gap(item: StringName, need: int) -> int:
+	return need - int(_sim.inventory.get(item, 0))
