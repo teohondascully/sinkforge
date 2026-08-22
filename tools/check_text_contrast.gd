@@ -101,6 +101,7 @@ extends "res://tools/check_base.gd"
 ## Both restored, and green.
 
 const HUD: String = "res://scenes/hud.gd"
+const UI_THEME: String = "res://scenes/ui_theme.gd"
 
 ## WCAG 2 AA for body text. See the header: chosen after the nine rows were measured, and set at the level
 ## the palette's dimmest named ink already reached on its own.
@@ -118,16 +119,30 @@ const REF_TOL: float = 0.02
 const OPAQUE: float = 0.98
 
 var _consts: Dictionary = {}
+var _sources: Array[String] = []
 
 
 func _initialize() -> void:
 	print("== text against the plate it is drawn on ==")
-	var script: GDScript = load(HUD) as GDScript
-	if script == null:
-		_skip_layer("check_text_contrast", "scenes/hud.gd did not load, so there are no palette constants "
-			+ "to measure and a green result here would be a statement about an empty table")
-		return
-	_consts = script.get_script_constant_map()
+	# THE PALETTE MOVED OUT FROM UNDER THIS LAYER, so it reads the owners rather than one file. It used to
+	# load `scenes/hud.gd` alone and that worked while the Hud aliased every colour, because an alias
+	# resolves to its value in the constant map. As the Hud decomposes those aliases go, and the first one
+	# to go took `UI_RAIL` with it -- four rows failed here naming a colour that had simply moved house.
+	#
+	# Reading the owners is the fix rather than putting the alias back: a constant kept alive on the Hud
+	# only so a checker can find it is a checker deciding where the code lives.
+	#
+	# Order matters only for a name defined twice, and then the Hud wins, because a Hud that still names a
+	# colour is still drawing with it. Add a source here when a palette constant moves to a new home; the
+	# absence check below is what makes that failure loud instead of silent.
+	_sources = [UI_THEME, HUD]
+	for path: String in _sources:
+		var script: GDScript = load(path) as GDScript
+		if script == null:
+			_skip_layer("check_text_contrast", "%s did not load, so there are no palette constants "
+				% path + "to measure and a green result here would be a statement about an empty table")
+			return
+		_consts.merge(script.get_script_constant_map(), true)
 	_calibrate()
 	_measure()
 	_stand_down("contrast.bright-backdrop", "the bright-backdrop column", "how much light the world can put through a 0.90 plate is a "
@@ -233,7 +248,8 @@ func _measure() -> void:
 ## opaque black and quietly turn one row into a measurement of nothing.
 func _colour(name: String) -> Color:
 	if not _consts.has(name):
-		_check(false, "scenes/hud.gd still defines %s, which a row here measures" % name)
+		_check(false, "%s is defined by none of the %d palette source(s) searched (%s), and a row here measures"
+			% [name, _sources.size(), ", ".join(_sources)])
 		return Color.BLACK
 	return _consts[name] as Color
 
@@ -243,7 +259,8 @@ func _colour(name: String) -> Color:
 ## returns the passing value is how a thinned ink gets measured at full strength and reads green.
 func _alpha(name: String) -> float:
 	if not _consts.has(name):
-		_check(false, "scenes/hud.gd still defines %s, which a row here thins an ink by" % name)
+		_check(false, "%s is defined by none of the %d palette source(s) searched (%s), and a row here thins an ink by"
+			% [name, _sources.size(), ", ".join(_sources)])
 		return 0.0
 	return float(_consts[name])
 

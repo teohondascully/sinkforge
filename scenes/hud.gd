@@ -10,6 +10,9 @@ const CANVAS := UiTheme.CANVAS
 const BAZAAR_COLS := BazaarPage.BAZAAR_COLS
 const BAZAAR_GUTTER := BazaarPage.BAZAAR_GUTTER
 const BAZAAR_ROW_H := BazaarPage.BAZAAR_ROW_H
+const DETAIL_TAIL := BazaarPage.DETAIL_TAIL
+const DETAIL_TEXT_GAP := BazaarPage.DETAIL_TEXT_GAP
+const DETAIL_ART := BazaarPage.DETAIL_ART
 const PACK_CELL := BazaarPage.PACK_CELL
 const TAB_PACK := BazaarPage.TAB_PACK
 const TAB_WORKS := BazaarPage.TAB_WORKS
@@ -49,7 +52,6 @@ const UI_TEXT_DIM := UiTheme.UI_TEXT_DIM
 const UI_TEXT_FAINT := UiTheme.UI_TEXT_FAINT
 const UI_SLOT := UiTheme.UI_SLOT
 const UI_MODAL := UiTheme.UI_MODAL
-const UI_RAIL := UiTheme.UI_RAIL
 
 var sim: FactorySim
 var _font: Font = ThemeDB.fallback_font
@@ -160,14 +162,11 @@ const BAZAAR_FOOT: float = 16.0       ## the key legend
 ## 88 of 206 is 42.7% and 72 of 190 is 37.9%. `check_pack_layout` floors the plate at 70px, so 37.2% is
 ## all this lever has ever been worth.
 const DETAIL_PAD: float = 10.0        ## plate edge to the art square, and the same again under it
-const DETAIL_ART: float = 68.0        ## the lit square a thing on sale is drawn in
 const BAZAAR_DETAIL: float = DETAIL_PAD * 2.0 + DETAIL_ART
 ## The lamp's rings and the thing inside them are sized off the square rather than written down, because
 ## the square is no longer one size. An 8px step off a 34px radius spills over the edge of a compact
 ## plate's square, and a 44px glyph would swallow the rim the lamp needs to read against.
-const DETAIL_GLYPH_INSET: float = 12.0  ## square edge to the thing in it
 ## Ring to ring, as a share of the square's radius rather than the 8px it is at the full depth.
-const DETAIL_LAMP_STEP: float = 8.0 / (DETAIL_ART * 0.5)
 ## The compact plate's text column, which is what sets its height. `DETAIL_LINE` is what the plate
 ## reserves per blurb line rather than what the face draws, because `draw_multiline_string` takes its own
 ## pitch from the font. The tail pays for what hangs off the last baseline.
@@ -180,18 +179,12 @@ const DETAIL_LAMP_STEP: float = 8.0 / (DETAIL_ART * 0.5)
 const DETAIL_BLURB_Y: float = 40.0    ## first blurb baseline, below the plate's top
 const DETAIL_BLURB_LINES: int = 2     ## the lines the floor pays for, not a limit on what the blurb takes
 const DETAIL_LINE: float = 12.0       ## reserved per blurb line
-const DETAIL_TAIL: float = 8.0        ## last baseline to the bottom of the plate
 const DETAIL_BLURB_SIZE: int = 9      ## and the size it is set at, which is what makes the pitch measurable
 ## Where the fact under the blurb sits when the plate is at its floor, which is the sum the floor is
 ## written as. The plates take it off their own bottom edge instead, so a plate that grew a line carries
 ## the fact down with it rather than printing it through the blurb's last row.
 const DETAIL_FACT_Y: float = DETAIL_BLURB_Y + DETAIL_LINE * DETAIL_BLURB_LINES
 const BAZAAR_DETAIL_MIN: float = DETAIL_FACT_Y + DETAIL_TAIL
-## The horizontal furniture the text column is bought out of: the square's right edge to the first
-## letter, and the last letter to the margin the verb button keeps. Both were repeated literals at the
-## two plates that draw a blurb, which is how the hold plate came to wrap against a 260 that sums to
-## nothing.
-const DETAIL_TEXT_GAP: float = 14.0
 const DETAIL_TEXT_RIGHT: float = 24.0
 ## The pack plate's verb and its key, named because the column's width is measured off the button and
 ## the button is drawn from the same pair. A second copy of the word would be a width that stops
@@ -214,7 +207,6 @@ const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR
 ## The lift is per-channel and deliberately not flat. 0.047 / 0.051 / 0.060 rises toward blue, so the
 ## lit tile comes up slightly cooler than its rail rather than just brighter, which keeps it from
 ## reading as the gold beside it. Alpha is zeroed: the rail is 92% and the tile inside it is opaque.
-const RAIL_ON_FILL := UiTheme.RAIL_ON_FILL
 ## How long the counter takes to arrive. A panel that appears fully formed in one frame is the loudest
 ## thing separating a menu from an interface, and 0.13s of rise is cheaper than any art.
 const BAZAAR_RISE: float = 0.13
@@ -366,9 +358,15 @@ const ITEM_PURPOSE: Dictionary = {
 	&"crusher": "eats SPOIL, pours GRAVEL — pay falls straight through it, untouched",
 }
 ## The hovered slot this frame (captured while drawing the hotbar/pack grid, drawn last, on top).
-var _tooltip_item: StringName = &""
-var _tooltip_count: int = 0
-var _tooltip_anchor: Vector2 = Vector2.ZERO   ## top-centre of the hovered slot
+var _tooltip_item: StringName:
+	get: return _bazaar_page._tooltip_item
+	set(v): _bazaar_page._tooltip_item = v
+var _tooltip_count: int:
+	get: return _bazaar_page._tooltip_count
+	set(v): _bazaar_page._tooltip_count = v
+var _tooltip_anchor: Vector2:   ## top-centre of the hovered slot
+	get: return _bazaar_page._tooltip_anchor
+	set(v): _bazaar_page._tooltip_anchor = v
 
 
 ## Show a short transient notice centred under the objective banner (~2s, fades).
@@ -458,8 +456,6 @@ func _process(delta: float) -> void:
 	else:
 		_set_h += (set_want - _set_h) * clampf(delta / BAZAAR_RISE, 0.0, 1.0)
 	queue_redraw()
-
-
 
 
 ## THE SETTINGS PAGE, WHICH LIVES IN `SettingsPage` AND IS REACHED THROUGH HERE.
@@ -1618,7 +1614,7 @@ func _bazaar_wanted_h() -> float:
 			# The wells and the summary band under them. The band was missing from this sum while the summary's
 			# own guard tested against a content box this sum had already decided, so the two could only agree by
 			# accident. `_ledger_h` carries the reasoning.
-			need = float(_bazaar()._pack_rows(inner_w)) * PACK_CELL + _ledger_h()
+			need = float(_bazaar()._pack_rows(inner_w)) * PACK_CELL + _bazaar()._ledger_h()
 	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + _detail_wanted_h() + BAZAAR_FOOT,
 		BAZAAR_MIN_H, BAZAAR_SIZE.y)
 
@@ -1712,30 +1708,6 @@ func _hold_overflow_h() -> float:
 	return float(over) * _font.get_height(DETAIL_BLURB_SIZE)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Move the cursor. `dy` steps a row, while `dx` jumps a whole column, which is the same motion your eye
 ## makes and carries you across the counter-to-Rack gap in one keystroke rather than ten.
 func bazaar_move(dx: int, dy: int) -> void:
@@ -1745,8 +1717,6 @@ func bazaar_move(dx: int, dy: int) -> void:
 	if dx != 0:
 		bazaar_row = clampi(bazaar_row + dx * int(_bazaar_geometry()["rows"]), 0, n - 1)
 	bazaar_row = clampi(bazaar_row + dy, 0, n - 1)
-
-
 
 
 ## The counter, drawn as a lamp-lit object rather than as a dialog box: elevation instead of a border, a
@@ -1770,7 +1740,7 @@ func _draw_inventory_overlay() -> void:
 	_panel_sheen(panel)
 	# The rail is the tab strip turned on its side and given room to be an object, since three icons you
 	# can hit with a glance beat three words you have to read.
-	_draw_bazaar_rail(origin, g)
+	_bazaar()._draw_bazaar_rail(origin, g)
 	_draw_bazaar_head(origin, g)
 	match bazaar_tab:
 		TAB_WORKS:
@@ -1781,16 +1751,10 @@ func _draw_inventory_overlay() -> void:
 			var bact: Dictionary = bazaar_action()
 			_bazaar()._tab_bench(g, bact["id"] if bact.get("kind", "") == "tech" else &"")
 		_:
-			_tab_pack(g)
+			_bazaar()._tab_pack(g)
 	_draw_bazaar_detail(g)
 	_draw_bazaar_foot(origin, g)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-
-## The cap's measurements and its drawing live in `Visuals`. These wrappers bind this page's font, and
-## `_keycap` hands its rects to `panel_probe` so `check_hud_layout` still sees every cap it used to.
-func _keycap_w(key: String, fs: int) -> float:
-	return Visuals.keycap_width(_font, key, fs)
 
 
 func _keycap_h(fs: int) -> float:
@@ -1799,61 +1763,6 @@ func _keycap_h(fs: int) -> float:
 
 func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
 	return Visuals.keycap(self, _font, at, key, fs, panel_probe if probing else [])
-
-
-## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects a
-## tab rides on the word as a cap because a key legend nobody can find is a key nobody presses.
-##
-## The cap sits on the word's baseline and may not hang below it. Hung below it sat at `y + 51` and
-## stands 14 tall, so a slot ran to `y + 65` while `_rail_slots` caps the pitch at 58, and every cap
-## landed 7px inside the footprint of the tile beneath it at every height the counter can take. No pitch
-## fixes that, which is worth stating because it is where a fix wants to go first: clearing a cap that
-## ends at `y + 65` needs a pitch of at least 65 and three slots on the shortest page, 190, leave room
-## for 45. On the word's baseline a slot ends at `y + 54`, where three fit any page this panel has.
-func _draw_bazaar_rail(origin: Vector2, g: Dictionary) -> void:
-	var rail := Rect2(origin, Vector2(BAZAAR_RAIL, float(g["h"])))
-	_round_rect_left(rail, 8.0, UI_RAIL)
-	# The rail's pitch follows the panel, and the arithmetic that makes it follow lives in `_rail_slots`,
-	# shared with the settings rail. At full height these are the numbers they always were, top 62, and on
-	# a short counter the slots close up to their floor rather than into each other.
-	var ys: Array = _rail_slots(rail, 3, _rail_key_slot_h() + RAIL_SLOT_AIR, _rail_key_slot_h())
-	for i: int in 3:
-		var y: float = ys[i]
-		var on: bool = i == bazaar_tab
-		var box := Rect2(rail.position.x + 9.0, y, RAIL_ICON, RAIL_ICON)
-		if on:
-			_round_rect(box, 6.0, RAIL_ON_FILL)
-			draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UI_ACCENT)
-		_rail_glyph(box.get_center(), i, on)
-		# The cap and the word are one thing, laid out and centred as one. The key belongs to the name it
-		# selects, and a cap centred on the tile with a word centred under it are two objects that only look
-		# related at the width they happen to have today.
-		var key: String = str(i + 1)
-		var label: String = TAB_NAMES[i]
-		var kw: float = _keycap_w(key, RAIL_LABEL_FS)
-		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS).x
-		var lx: float = box.get_center().x - (kw + RAIL_KEY_GAP + lw) * 0.5
-		_keycap(Vector2(lx, y + _rail_key_dy()), key, RAIL_LABEL_FS)
-		draw_string(_font, Vector2(lx + kw + RAIL_KEY_GAP, y + _rail_word_dy()), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, RAIL_LABEL_FS, UI_TEXT if on else UI_TEXT_FAINT)
-
-
-## The three tab glyphs, drawn rather than lettered: a satchel, a gear, a ladder of rungs.
-func _rail_glyph(at: Vector2, kind: int, on: bool) -> void:
-	var col: Color = GOLD_PALE if on else Color(0.40, 0.43, 0.50)
-	match kind:
-		TAB_PACK:
-			draw_rect(Rect2(at + Vector2(-8.0, -3.0), Vector2(16.0, 11.0)), col)
-			draw_arc(at + Vector2(0.0, -3.0), 5.5, PI, TAU, 10, col, 1.8)
-		TAB_WORKS:
-			draw_arc(at, 6.5, 0.0, TAU, 20, col, 2.2)
-			for i: int in 6:
-				var a: float = TAU * float(i) / 6.0
-				draw_line(at + Vector2(cos(a), sin(a)) * 6.5, at + Vector2(cos(a), sin(a)) * 9.5, col, 1.8)
-		_:
-			for i: int in 3:
-				draw_rect(Rect2(at.x - 8.0 + float(i) * 2.0, at.y + 5.0 - float(i) * 6.0,
-					16.0 - float(i) * 4.0, 2.6), col)
 
 
 ## The materials the open tab is pricing in, in the order that tab lists them. It is empty for a tab
@@ -1940,270 +1849,6 @@ func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
 
 # --- the tabs -------------------------------------------------------------------------------------------
 
-## PACK: the whole carried inventory as a grid of wells, given the whole width. It is the same pack it
-## always was, and it simply stopped sharing a 360px column with two other screens.
-func _tab_pack(g: Dictionary) -> void:
-	var content: Rect2 = g["content"]
-	var slots: Array[Dictionary] = sim.inventory_slots()
-	var cell: float = PACK_CELL
-	var cols: int = _bazaar()._pack_cols(content.size.x)
-	# The wells are served first and the summary gets what is left. `_bazaar_wanted_h` asks for both, so
-	# below the panel's height cap this subtraction takes nothing the grid needed, and above the cap the
-	# band gives way, because the grid is the tab's subject and the summary is a footnote on it.
-	#
-	# It uses `maxi(1, ...)` rather than the slot count, so an empty pack reserves the one row `_pack_rows`
-	# charged the panel for and the band lands where the height was bought. An empty pack with a running
-	# factory is a real state: it is what standing at the counter having just fed everything in looks like,
-	# and it is the state `_detail_pack` exists for.
-	var rows: int = maxi(1, (slots.size() + cols - 1) / cols)
-	var band: float = clampf(content.size.y - float(rows) * cell, 0.0, _ledger_h())
-	var wells := Rect2(content.position, Vector2(content.size.x, content.size.y - band))
-	if slots.is_empty():
-		draw_string(_font, content.position + Vector2(2.0, 20.0), "(empty — go dig)",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT_DIM)
-		_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
-		return
-	var held: int = inv_selected_getter.call() if inv_selected_getter.is_valid() else -1
-	for i: int in slots.size():
-		var box := Rect2(content.position.x + float(i % cols) * cell, content.position.y + float(i / cols) * cell,
-			cell - 6.0, cell - 6.0)
-		if box.end.y > wells.end.y:
-			break
-		var item: StringName = slots[i]["item"]
-		var hot: bool = box.has_point(Controls.pointer_viewport(self))
-		var picked: bool = i == bazaar_row
-		if picked:
-			_round_rect(box, 5.0, Color(0.176, 0.153, 0.098))
-			draw_rect(Rect2(box.position + Vector2(0.0, 3.0), Vector2(2.0, box.size.y - 6.0)), UI_ACCENT)
-		else:
-			_round_rect(box, 5.0, Color(1.0, 1.0, 1.0, 0.062 if hot else 0.030))
-		if hot:
-			_tooltip_item = item
-			_tooltip_count = int(slots[i]["count"])
-			_tooltip_anchor = Vector2(box.get_center().x, box.position.y)
-		_draw_thing_icon(item, Rect2(box.position + Vector2(8.0, 5.0),
-			Vector2(box.size.x - 16.0, box.size.y - 17.0)))
-		draw_string(_font, box.position + Vector2(box.size.x - 13.0, box.size.y - 4.0),
-			str(int(slots[i]["count"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT)
-		# The thing actually in your hand wears a mark, because "what am I holding" is the question the pack
-		# screen is opened to answer, and the hotbar is behind the panel while it is open.
-		#
-		# It is a state rather than the cursor, which is why it is no longer in the cursor's colour. The
-		# held well is usually not the picked well, so the grid was carrying two golds a row apart saying
-		# two different things, the doubling the gold rule exists to stop. `_state_plate` has always drawn
-		# this exact word in `STATE_INK` a couple of hundred pixels to the right, and green is already
-		# this file's colour for a fact that is true of you rather than an offer: the researched tech's
-		# name, the finished lamp. One word, one colour, on one screen. The well's wash goes from 12.22:1
-		# to 7.20:1 and the picked row's brass from 10.29:1 to 6.06:1, both clear of the 4.5 floor.
-		if i == held:
-			draw_string(_font, box.position + Vector2(5.0, 12.0), "HELD",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 7, STATE_INK)
-	_pack_ledger(Rect2(wells.position.x, wells.end.y, content.size.x, band))
-
-
-## How tall the summary under the wells is and 0.0 when it has nothing to say. `_bazaar_wanted_h` adds
-## this to what PACK asks for and `_tab_pack` takes the same number back off the bottom of the grid. The
-## band the summary draws into and the height the panel was sized to are therefore one piece of
-## arithmetic run twice rather than two numbers that have to agree.
-##
-## They were two numbers and they did not agree. The summary tested `top > content.end.y - 30.0`, which
-## needs `content.size.y >= rows*46 + 44`, while PACK's asking height had no term for the summary in it
-## and `content` came out at exactly `rows*46`. Across 1 to 6 rows of wells the guard's two sides read
-## 185/141, 208/164, 231/187, 254/210, 298/212 and 344/212. The summary has therefore only ever reached
-## the screen on frames where `_bazaar_h` was still easing down from a taller tab.
-##
-## Four rows, because the band is bought out of the grid above it. At four the band is
-## 14 + 12 + 3*17 + 7 = 84px, which a one-row and a two-row pack both fit under the 348 cap.
-const LEDGER_GAP: float = 14.0        ## last row of wells to the header's baseline
-const LEDGER_HEAD: float = 12.0       ## header baseline to the first row's baseline
-const LEDGER_ROW: float = 17.0        ## row pitch
-const LEDGER_TAIL: float = 7.0        ## last baseline to the bottom of the bar sitting on it
-const LEDGER_MAX: int = 4             ## goods listed; the verdict shares the header's line
-func _ledger_h() -> float:
-	if sim == null:
-		return 0.0
-	var n: int = mini(LEDGER_MAX, sim.production_rates().size())
-	if n <= 0:
-		return 0.0
-	return LEDGER_GAP + LEDGER_HEAD + float(n - 1) * LEDGER_ROW + LEDGER_TAIL
-
-
-## What the line takes back. Per input item, how many of it a minute the placed recipe machines are
-## consuming, derived from the measured output rates and nothing else. A forge measured at 2.2 ingot/min
-## has, by smelt_ingot's 2 ore for 1 ingot, consumed exactly 4.4 ore/min. The ratio is the recipe's and
-## the rate is the sim's, so there is no capacity model here and nothing to calibrate.
-##
-## It returns {"draw": item -> per minute, "eater": item -> the machine's display name, or "" when more
-## than one type is eating it, "mute": item -> true for the ones this cannot speak about}.
-##
-## The mute set is the point. Two placed machine types can output the same good. A measured ingot rate
-## cannot be split between a Forge turning 2 ore into 1 and a Blast Furnace turning 1 rich_ore into 2.
-## Attributing the whole rate to either invents the other's throughput, so every input of every
-## candidate recipe goes mute instead. That is a different state from an item nothing consumes, which
-## reports a real zero.
-##
-## Machines running their own tick carry no recipe inputs to add up here. A drill's mine_ore has none,
-## and the descent engine eats ingots through DESCENT_EATS with no recipe at all. So the clause says "to
-## the Forge" rather than "consumed", which is true whatever else is also eating.
-func _line_offtake() -> Dictionary:
-	var makers: Dictionary = {}                       # output item -> [{recipe, name}, ...]
-	for row: Dictionary in sim.machine_census():
-		var rec: RecipeDef = (row["def"] as MachineDef).recipe
-		if rec == null or rec.inputs.is_empty():
-			continue
-		for out: StringName in rec.outputs:
-			if not makers.has(out):
-				makers[out] = []
-			(makers[out] as Array).append({"recipe": rec, "name": str(row["name"])})
-	var taken: Dictionary = {}
-	var eater: Dictionary = {}
-	var mute: Dictionary = {}
-	for r: Dictionary in sim.production_rates():
-		var out: StringName = r["item"]
-		var mk: Array = makers.get(out, [])
-		if mk.is_empty():
-			continue
-		if mk.size() > 1:
-			for m: Dictionary in mk:
-				for item: StringName in (m["recipe"] as RecipeDef).inputs:
-					mute[item] = true
-			continue
-		var rec: RecipeDef = mk[0]["recipe"]
-		var per: float = float(int(rec.outputs[out]))
-		if per <= 0.0:
-			continue
-		var who: String = str(mk[0]["name"])
-		for item: StringName in rec.inputs:
-			taken[item] = float(taken.get(item, 0.0)) \
-				+ float(r["rate"]) * float(int(rec.inputs[item])) / per
-			# Two machine types can share one ingredient, since the Gear Mill and the Plate Press both eat iron
-			# ingots, and the total stays right while the name stops being. Naming neither beats naming whichever
-			# the census happened to yield last.
-			eater[item] = who if not eater.has(item) or str(eater[item]) == who else ""
-	return {"draw": taken, "eater": eater, "mute": mute}
-
-
-## Under the grid: what the factory is making for you, and what the rest of the line does with it.
-##
-## The bar is not a magnitude. Drawn as a share of the fastest number on the panel, a trickle of a
-## refined good and a flood of a common raw look like the same kind of fact at two lengths, and the
-## length moves when an unrelated row moves. It is the share of that item's own income the line is
-## taking back, a 0..1 quantity meaning the same thing on every row. The /min number beside it keeps the
-## magnitude. Rows split into two kinds out of the data rather than out of a rule: an item the line
-## consumes gets a bar and a clause naming what eats it, and anything unattributable gets neither.
-##
-## The verdict on the header's line is the decision the rows only imply. It is chosen over the items the
-## line actually consumes, so it is always about a live flow rather than the earth and stone a
-## hand-mining player's rate list is full of. A deficit outranks a surplus. A step drawing more than its
-## feed earns will stall, and a pile that is growing can wait.
-func _pack_ledger(band: Rect2) -> void:
-	var rates: Array[Dictionary] = sim.production_rates()
-	if rates.is_empty() or band.size.y <= 0.0:
-		return
-	var off: Dictionary = _line_offtake()
-	var taken: Dictionary = off["draw"]
-	var eater: Dictionary = off["eater"]
-	var mute: Dictionary = off["mute"]
-	var hb: float = band.position.y + LEDGER_GAP
-	var head: String = "YOUR LINE IS MAKING"
-	# A heading is a label, and gold does not label. See `GOLD_DIM`, where the type-weight argument that
-	# put this in gold is taken apart. `UI_TEXT_DIM` is the grey ramp's subordinate rung and reads brighter
-	# here than the gold rung did (6.15:1 against 5.40), while staying a step under the `UI_TEXT` verdict
-	# printed beside it, which is the order the two lines are supposed to be read in.
-	_tracked(head, Vector2(band.position.x + 1.0, hb), 8, 2.0, UI_TEXT_DIM)
-	var vx: float = band.position.x + 1.0 + _tracked_w(head, 8, 2.0) + 12.0
-	var verdict: String = _ledger_verdict(rates, off)
-	if verdict != "" and band.end.x > vx:
-		draw_string(_font, Vector2(vx, hb), verdict, HORIZONTAL_ALIGNMENT_RIGHT, band.end.x - vx, 9,
-			UI_TEXT)
-	# The columns are the glyph, the name, the rate right-aligned against the bar's left edge, the bar and
-	# the clause. The bar is 120 rather than the old `min(240, width/2)`, because a share does not need
-	# half the panel to be read and the clause beside it does need the room: 246px of the 528.
-	var bar_x: float = band.position.x + 154.0
-	var bar_w: float = 120.0
-	for i: int in mini(LEDGER_MAX, rates.size()):
-		var y: float = hb + LEDGER_HEAD + float(i) * LEDGER_ROW
-		if y + LEDGER_TAIL > band.end.y:
-			return
-		var item: StringName = rates[i]["item"]
-		var rate: float = float(rates[i]["rate"])
-		Visuals.draw_item(self, Vector2(band.position.x + 8.0, y + 3.0), 13.0, item)
-		draw_string(_font, Vector2(band.position.x + 18.0, y + 7.0), _item_label(item),
-			HORIZONTAL_ALIGNMENT_LEFT, 80.0, 9, UI_TEXT)
-		draw_string(_font, Vector2(band.position.x + 100.0, y + 7.0), "%.1f/min" % rate,
-			HORIZONTAL_ALIGNMENT_RIGHT, 46.0, 9, UI_TEXT)
-		var took: float = float(taken.get(item, 0.0))
-		if mute.has(item) or took <= 0.0 or rate <= 0.0:
-			continue
-		_round_rect(Rect2(bar_x, y - 3.0, bar_w, 10.0), 3.0, Color(1.0, 1.0, 1.0, 0.035))
-		# The item's own colour rather than the panel's gold. The dashboard's throughput bars already read
-		# this way, and gold on this screen means selected, affordable and the live verb, which is not what a
-		# share of an income is.
-		_round_rect(Rect2(bar_x, y - 3.0, maxf(3.0, bar_w * clampf(took / rate, 0.0, 1.0)), 10.0), 3.0,
-			Color(Visuals.item_color(item), 0.62))
-		var who: String = str(eater.get(item, ""))
-		var clause: String = "%.1f/min back into the line" % took
-		if who != "":
-			clause = "%.1f/min to the %s" % [took, who]
-		draw_string(_font, Vector2(bar_x + bar_w + 8.0, y + 7.0), clause,
-			HORIZONTAL_ALIGNMENT_LEFT, band.end.x - bar_x - bar_w - 8.0, 9, UI_TEXT_DIM)
-
-
-## The one line of the summary that asks for a decision instead of reporting a number. It is empty when
-## the offtake has nothing it can speak about, which is the same silence the rows keep in that state.
-func _ledger_verdict(rates: Array[Dictionary], off: Dictionary) -> String:
-	var taken: Dictionary = off["draw"]
-	var mute: Dictionary = off["mute"]
-	# Empty because nothing refines anything, and empty because everything that does is unattributable, are
-	# two different states, and only the first is a fact about the factory. Measured: place a Forge and a
-	# Blast Furnace together and the offtake goes to {} with ore and rich_ore muted, which reads as
-	# "nothing on the line refines any of it yet" while two machines are refining it.
-	if taken.is_empty():
-		return "" if not mute.is_empty() else "nothing on the line refines any of it yet"
-	var by_item: Dictionary = {}
-	for r: Dictionary in rates:
-		by_item[r["item"]] = float(r["rate"])
-	var pick: StringName = &""
-	var spare: float = 0.0
-	for item: StringName in taken:
-		if mute.has(item):
-			continue
-		var s: float = float(by_item.get(item, 0.0)) - float(taken[item])
-		# A deficit wins outright, and between two of the same sign the larger one wins.
-		var better: bool = (s < 0.0 and spare >= 0.0) \
-			or (spare < 0.0 and s < spare) \
-			or (spare >= 0.0 and s > spare)
-		if pick == &"" or better:
-			pick = item
-			spare = s
-	if pick == &"":
-		return ""
-	var label: String = _item_label(pick).to_lower()
-	var who: String = str((off["eater"] as Dictionary).get(pick, ""))
-	if who == "":
-		who = "line"
-	if spare < 0.0:
-		return "the %s outruns your %s by %.1f/min" % [who, label, -spare]
-	return "%.1f %s/min spare past the %s" % [spare, label, who]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## A machine's sprite or an item's glyph, whichever this id is. The pack grid, the works rows and the
 ## tech chips all want exactly this and used to each carry their own copy of it.
@@ -2215,6 +1860,7 @@ func _bazaar() -> BazaarPage:
 	_bazaar_page._font = _font
 	_bazaar_page._sim = sim
 	_bazaar_page._icons = machine_icons
+	_bazaar_page._inv_selected = inv_selected_getter
 	_bazaar_page.probing = probing
 	_bazaar_page.panel_probe = panel_probe
 	return _bazaar_page
@@ -2396,7 +2042,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 	var act: Dictionary = bazaar_action()
 	var kind: String = str(act.get("kind", ""))
 	if kind == "":
-		_detail_pack(box, art)
+		_bazaar()._detail_pack(box, art)
 		return
 	var id: StringName = act["id"]
 	if kind == "hold":
@@ -2476,11 +2122,11 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			ready = can_craft and _bazaar()._can_afford(cost)
 			note = "at a claimed Bazaar" if not can_craft else _shortfall_note(cost, &"")
 
-	_detail_lamp(art, 0.045)
+	_bazaar()._detail_lamp(art, 0.045)
 	if kind == "tech":
 		_bazaar()._draw_tech_art(id, art)
 	else:
-		_draw_thing_icon(id, _detail_glyph(art))
+		_draw_thing_icon(id, _bazaar()._detail_glyph(art))
 
 	var tx: float = art.end.x + DETAIL_TEXT_GAP
 	var reserve: float = _state_plate_w(state) if state != "" \
@@ -2560,26 +2206,6 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 			btn.position.x - DETAIL_ROW_GAP - nx, DETAIL_NOTE_SIZE, GOLD_DIM)
 
 
-## The lamp. Three rings behind the goods is the whole trick, and it is what makes a glyph read as lit
-## rather than as big. All three plates light their square the same way and each used to say so in its
-## own numbers, which stopped being survivable the moment the compact plate gave one of them a smaller
-## square: a radius written as 34 hangs a third of the outer ring over the edge of a 52px square.
-func _detail_lamp(art: Rect2, alpha: float) -> void:
-	var r: float = art.size.x * 0.5
-	for k: int in 3:
-		draw_circle(art.get_center(), r * (1.0 - float(k) * DETAIL_LAMP_STEP),
-			Color(0.85, 0.70, 0.35, alpha))
-	_round_rect(art, 5.0, Color(0.0, 0.0, 0.0, 0.26))
-
-
-## The thing itself, inside the square: the square inset by a rim, rather than a 44 written at two of
-## the three plates and a 40 at the third, both of which overflow the compact square. `_draw_tech_art`
-## keeps its own composition, since it lays four unlock icons out in the square rather than centring one
-## thing and a tech is only ever selected on BENCH, where the plate is at full depth.
-func _detail_glyph(art: Rect2) -> Rect2:
-	return art.grow(-DETAIL_GLYPH_INSET)
-
-
 ## Why the button is dead, when the reason is the pack and not the place.
 ##
 ## The plate has always had a line for the precondition it cannot meet, "at a claimed Bazaar" or "behind
@@ -2603,10 +2229,6 @@ func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
 	return "" if parts.is_empty() else "short " + " · ".join(parts)
 
 
-
-
-
-
 ## The plate for a thing you are carrying: what it is for, how many you have, and the pack screen's one
 ## verb, which is to put it in your hand.
 ##
@@ -2621,8 +2243,8 @@ func _shortfall_note(cost: Dictionary, sample: StringName) -> String:
 ## This plate prices ore you mined, wood you chopped and ingots your line poured. It is the only
 ## per-item total on any screen, since the FORGED chip counts ingots and says so.
 func _detail_hold(box: Rect2, art: Rect2, id: StringName, row: int) -> void:
-	_detail_lamp(art, 0.045)
-	_draw_thing_icon(id, _detail_glyph(art))
+	_bazaar()._detail_lamp(art, 0.045)
+	_draw_thing_icon(id, _bazaar()._detail_glyph(art))
 	var tx: float = art.end.x + DETAIL_TEXT_GAP
 	_tracked(_item_label(id).to_upper(), Vector2(tx, box.position.y + 24.0), 13, 1.8, GOLD_PALE)
 	# There is no line cap, because the plate was sized to hold this. `_hold_overflow_h` measured every
@@ -2859,40 +2481,6 @@ func _demand_mark(at: Vector2, id: StringName, e: Dictionary, glyph: float) -> f
 	return _demand_w(id, e, glyph)
 
 
-## PACK has nothing to buy, so its plate answers the other question a pack screen is asked: what the
-## factory is making for you while you stand here.
-func _detail_pack(box: Rect2, art: Rect2) -> void:
-	_detail_lamp(art, 0.035)
-	Visuals.draw_item(self, art.get_center(), _detail_glyph(art).size.x, &"ingot")
-	var tx: float = art.end.x + DETAIL_TEXT_GAP
-	_tracked("THE PACK", Vector2(tx, box.position.y + 24.0), 13, 1.8, GOLD_PALE)
-	var rates: Array[Dictionary] = sim.production_rates()
-	if rates.is_empty():
-		draw_string(_font, Vector2(tx, box.position.y + 42.0),
-			"nothing is running — build a Forge at the WORKS tab and feed it ore",
-			HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 120.0, 9, UI_TEXT_DIM)
-		return
-	draw_string(_font, Vector2(tx, box.position.y + 42.0), "your line is making",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
-	# The rate chips sit on the compact plate's last line, the same line the hold plate's tally uses, so
-	# the one plate with two contents puts both in the same place. They are taken off the plate's bottom
-	# edge for the reason `_detail_hold` gives: this plate carries no sentence of its own but shares a
-	# height with one that does, and it has to land wherever that height puts it.
-	var cx: float = tx
-	var base: float = box.end.y - DETAIL_TAIL
-	for i: int in mini(5, rates.size()):
-		var item: StringName = rates[i]["item"]
-		var label: String = "%.1f/min" % float(rates[i]["rate"])
-		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 25.0
-		if cx + cw > box.end.x - 12.0:
-			break
-		_round_rect(Rect2(cx, base - 14.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
-		Visuals.draw_item(self, Vector2(cx + 11.0, base - 4.0), 13.0, item)
-		draw_string(_font, Vector2(cx + 19.0, base), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.85, 0.72, 0.42))
-		cx += cw + 6.0
-
-
 ## The price chip's own measurements, named because the decision row packs from its right edge leftward
 ## and has to know how tall and how wide a chip is before it can place one. The height matters twice
 ## over, since it is what seats the chips on the row's floor beside a button half again their depth.
@@ -3011,17 +2599,6 @@ func _detail_chip(at: Vector2, item: StringName, need: int) -> float:
 # --- the bench ------------------------------------------------------------------------------------------
 
 
-
-
-
-
-
-
-
-
-
-
-
 # --- the counter's surface primitives --------------------------------------------------------------------
 
 ## A real rounded rect. Composing one from a rect plus four circles double-blends every corner the
@@ -3037,11 +2614,6 @@ func _round_rect(rect: Rect2, r: float, col: Color) -> void:
 	if probing:
 		panel_probe.append(rect)
 	Visuals.round_rect(self, rect, r, col)
-
-
-## Rounded on the left two corners only, for the rail, flush against the panel's edge.
-func _round_rect_left(rect: Rect2, r: float, col: Color) -> void:
-	Visuals.round_rect_left(self, rect, r, col)
 
 
 ## The focus ring. Shape, weight and inset live in `Visuals.focus_ring`; the page supplies its own gold.
@@ -3173,8 +2745,6 @@ func _draw_dashboard_overlay() -> void:
 			y2 += 16.6
 
 
-
-
 ## The CONTROLS card's measurements, hoisted out of `_draw_help_overlay` so `check_hud_layout` can
 ## measure it. Text is the half a panel-rect test cannot see: every line is drawn inside a fixed-width
 ## column and a line wider than its column spills across the card while the panel it overflows still
@@ -3242,10 +2812,6 @@ func _draw_help_overlay() -> void:
 
 ## The settings page's own measurements live with the page, in `scenes/settings_page.gd`. Aliased
 ## here so the drawing below reads unchanged while there is one of each in the tree.
-const RAIL_ICON := UiTheme.RAIL_ICON
-const RAIL_LABEL_FS := UiTheme.RAIL_LABEL_FS
-const RAIL_SLOT_AIR := UiTheme.RAIL_SLOT_AIR
-const RAIL_KEY_GAP := UiTheme.RAIL_KEY_GAP
 
 ## The page's shape lives in `SettingsPage`, aliased here so the drawing below reads unchanged and there
 ## is still exactly one of each in the tree.
@@ -3255,30 +2821,6 @@ const CAT_FEEL: int = SettingsPage.CAT_FEEL
 const CAT_NAMES: Array[String] = SettingsPage.CAT_NAMES
 
 const REMAP_ROWS: Array[Array] = SettingsPage.REMAP_ROWS
-
-
-## The page's geometry for the category that is open: the counter's `_bazaar_geometry` in every respect
-## except its numbers so the two pages cannot drift into different shapes.
-## The rail's geometry lives in `UiTheme`. The counter's rail and the settings page's rail are the same
-## furniture and were already computing off the same numbers.
-func _rail_word_dy() -> float:
-	return UiTheme.rail_word_dy(_font)
-
-
-func _rail_key_dy() -> float:
-	return UiTheme.rail_key_dy(_font)
-
-
-func _rail_key_slot_h() -> float:
-	return UiTheme.rail_key_slot_h(_font)
-
-
-func _rail_word_slot_h() -> float:
-	return UiTheme.rail_word_slot_h(_font)
-
-
-func _rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
-	return UiTheme.rail_slots(rail, n, min_pitch, slot_h)
 
 
 const AUDIO_ROWS: Array[Array] = SettingsPage.AUDIO_ROWS
@@ -3345,8 +2887,6 @@ func _draw_hint() -> void:
 		return                            # everything here has been used, so the line has finished its job
 	draw_string(_font, Vector2(10.0, CANVAS.y - 8.0), "   ·   ".join(parts),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
-
-
 
 
 ## The carried pack as a hotbar of slots, icon and count, centred along the bottom. The active slot,
