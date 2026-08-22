@@ -186,12 +186,23 @@ fi
 # nobody may quietly stop asserting something, AND a registered layer standing down fewer is ALSO a red,
 # because a list that is not tightened when the debt is paid stops being a bound and becomes a licence.
 #
-# SUBSET RUNS ARE EXEMPT, and this is a real exemption rather than a convenience: SF_ONLY selects a handful
-# of layers, so the set legitimately will not match and firing here would train people to ignore it.
+# SUBSET RUNS ARE CHECKED TOO. The exemption that stood here read "SF_ONLY selects a handful of layers, so
+# the set legitimately will not match and firing here would train people to ignore it", and that was true
+# when it was written -- before `sd_absent` existed. It is not true now: a registered layer that did not
+# run in this job is named and held out BY ID, so the comparison is already restricted to the layers that
+# actually reported, which is exactly what the exemption was hand-waving.
+#
+# What it cost is the reason it is gone. The one job whose stand-downs most needed checking is the display
+# job, and the display job selects by SF_GL_ONLY, prints `SUBSET RUN`, and therefore had its stand-downs
+# unexamined on every run it has ever made. An exemption written for ad-hoc SF_ONLY runs was silently
+# covering a permanent CI job.
+#
+# Verified in both directions on a three-layer subset before removing it. Clean, it reports `exactly the
+# registered ones, 2 id(s)` and names the six registered layers that did not run. With one invented
+# `SKIP: [grapple.invented-row]` appended to a layer log, it reports NOT REGISTERED and exits 1. A gate
+# that has not been shown to fail is not a gate.
 SD_REG="$(dirname "$0")/stand_downs.txt"
-if grep -q 'SUBSET RUN' "$SUM" 2>/dev/null; then
-	note "stand-downs: not checked (SUBSET RUN -- the registry describes a full sweep)"
-elif [ ! -s "$SD_REG" ]; then
+if [ ! -s "$SD_REG" ]; then
 	note "!! the stand-down registry at $SD_REG is missing or empty, so 'exactly these and no others' was"
 	note "   not checked. That is an unverified run, not a clean one."
 	bad=1

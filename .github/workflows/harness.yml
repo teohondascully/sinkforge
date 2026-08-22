@@ -252,7 +252,26 @@ jobs:
           SF_GREADS_DUMP: ${{ runner.temp }}/harness-logs
           SF_MIDENT_DUMP: ${{ runner.temp }}/harness-logs
           SF_MSTATE_DUMP: ${{ runner.temp }}/harness-logs
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
+        # EXIT 4 IS THIS JOB'S GREEN, AND FOR ITS WHOLE LIFE IT HAS BEEN THIS JOB'S RED. SF_STRICT above
+        # makes any stand-down a non-zero exit, and two of the layers selected here carry registered
+        # `always` rows -- grapple.gr05-preview-share and ceremony.words-vs-sky -- that stand down on
+        # every run on every machine. So this step could not return 0 on ANY tree, and the workflow was
+        # red on all of its last 40 runs. Commit 32e7a45 is the proof rather than the theory: the table
+        # read 16 PASS / 0 FAIL / 0 SKIP of 16 and the job still failed.
+        #
+        # tools/harness_verdict.sh states the reachable target out loud -- "EXIT 4, WITH EXACTLY THESE
+        # STAND-DOWNS AND NO OTHERS" -- and the step below is what judges it. That check used to exempt
+        # subset runs, which is what this job is, so nothing was judging it from either end. With the
+        # exemption gone, tolerating 4 here hands the verdict to the thing designed to give it.
+        #
+        # ONLY 4. A FAIL still fails this step, and exit 1 masks 4, so a failure cannot hide inside the
+        # tolerance -- which is the only way this could have become a licence.
+        run: |
+          set +e
+          xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
+          rc=$?
+          echo "run_harness.sh exited $rc"
+          case $rc in 0|4) exit 0 ;; *) exit "$rc" ;; esac
 
       - name: Publish the result table, and check the run was a result
         if: always()
