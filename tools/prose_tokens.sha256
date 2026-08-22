@@ -1,0 +1,32 @@
+# Vocabulary this project does not use in its own prose, stored as salted digests.
+#
+# WHY IT IS INDIRECT, stated plainly because an unexplained hash file is worse than the thing it
+# replaces. This list previously shipped as plaintext and then, for a while, did not ship at all: a
+# file naming the words a reader would look for publishes its author's expectation of finding them,
+# and every word on it occurs zero times in the tracked tree, so the only surviving instance of each
+# was the line forbidding it. Keeping it out of the repository fixed that and broke something else --
+# the gate then ran only on the machine that already had the list, and never in a fresh clone or in CI,
+# which is the one environment where the tree becomes public. Digests get both properties at once.
+#
+# WHAT THIS IS NOT. It is not secrecy. Salted sha256 defeats pasting a digest into a search engine; it
+# does not stop anyone who already suspects a word from confirming it in one line. That is the whole
+# intended strength: the file stops BEING the list, it does not hide it.
+#
+# FORMAT  <sha256 of SALT + ":" + token>  <word|part>
+#   word  matches a complete token only (short tokens collide inside ordinary English)
+#   part  matches any substring, so a token glued to other characters cannot slip past
+# SALT    sinkforge/prose/v1
+#
+# REBUILD  see tools/check_prose.sh; the generator takes one token per line on stdin and is four lines.
+# One row is a nonsense sentinel the gate scans for on every run as its positive control, so a broken
+# matcher fails loudly instead of reporting a clean tree.
+0d83a44cc26459191eb13eae3b2786ffa624f6a1982347ced91db8e7e4ed4223  part
+1c25d0c09c7ee71e29d3f2b5f0f856661ee5ee566f7d15468af6a8369b9b2672  part
+29ea06f439c3409e8638bb239127df278fa192b6618b5d6d96a1ddfa2b57b84e  word
+706dc1f598637b28e5f3d15d17122a2dee6d9c8d89a19e4278ae29fe81f8095c  part
+7cb9cbd31b664d36ba577a827ded0dddc97e3ce6317c6910093a753f22351486  part
+9d7b91812bec637ed06bce8d37a92ca866fc4913c08ad7d2a88213c7049f1609  part
+cb5da032f12c3b080bb8d6ace6d995ecd0408539b73adcf57075239dfce4e958  word
+cb9600c50fa5c8fd8a623003b7d01b5bd856e8683d0d93d749fbde1f8b27669c  part
+e7dbf568a7df1066b35af8cbb3bbd560876067c5bb13bf1a04cf056b2cb36c2b  part
+e93572bad0fc083ccc30375f182953aef307f4e1379a20f128068464053f57d0  part

@@ -81,7 +81,7 @@ echo "check_prose: a file named here may be absent or already correct on another
 echo
 
 python3 - "$REF_FILE" "$COMMA_SLACK" "$REF_COMMA_MAX" <<'PYEOF'
-import os, re, sys, subprocess
+import os, re, sys, subprocess, hashlib
 
 ref_path, slack, ref_max = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
 EMDASH = "—"
@@ -237,61 +237,86 @@ if not paths:
 # `__file__` is not this .sh (the python arrives on stdin), so the default is resolved against the tree
 # the layer already runs from. The first draft used `__file__` and silently pointed one directory too
 # high, which the "list present" control caught by naming a path that did not exist.
-WORDS_PATH = os.environ.get("SF_PROSE_WORDS") or os.path.join(os.getcwd(), "tools", "prose_words.txt")
-WIDE_TOKENS = []
-if os.path.isfile(WORDS_PATH):
-    for _w in open(WORDS_PATH, encoding="utf-8").read().splitlines():
-        _w = _w.split("#", 1)[0].strip()
-        if _w:
-            # ANCHORING IS WHAT HID ONE, so it is now applied only where it is needed. A whole-word
-            # matcher cannot see a listed word written inside a REGEX LITERAL: in `\b<listed-word>`
-            # the character before it is the `b` of `\b`, which is a word character, so the
-            # lookbehind rejects it. The public tree carries exactly that, in a token list, inside the
-            # gate that hunts these words -- found by scanning without anchors, and missed by three
-            # separately built scans that all had them. The precision was the blind spot.
-            #
-            # Short tokens still need both anchors, because they occur inside ordinary English: the
-            # two-letter one matches "remains", "available", "again". Longer ones are matched as plain
-            # substrings, which is strictly more sensitive and cannot be evaded by any prefix.
-            #
-            # THE LENGTH RULE IS A PROXY AND IT HAS A KNOWN EXCEPTION, named here rather than left for
-            # whoever next writes the word in a document. The first draft of this comment claimed that
-            # longer vendor names do not occur inside ordinary words. That is false at nine letters:
-            # prefixing one of the tokens with `phil` or `mis`, or suffixing it with `al`, gives three
-            # ordinary English adjectives. It surfaced by testing the invariant instead of reading
-            # it. Written as prefixes rather than spelled out because spelling them turns this comment
-            # into three hits -- which is the collision demonstrating itself, and the reason the
-            # placeholder convention above exists.
-            #
-            # It stays a substring anyway, and the honest statement of the trade is not "no collisions"
-            # but this: a short token collides so often that anchoring is the only way it is usable at
-            # all, while a long one collides rarely and LOUDLY. The list already makes that trade
-            # explicitly for the two-letter entry, whose note says a loud wrong answer is what it is
-            # buying. A false positive here reds the gate and gets read; a false negative is silent and
-            # ships. The whole reason this line changed is that the anchors were producing the silent
-            # kind.
-            #
-            # MEASURED, so the threshold is evidence and not a claim. Whole tracked tree at the commit
-            # that introduced this, 322 text files of 570 paths:
-            #
-            #     2 short tokens, substring    11773 hit(s) in 222 file(s)   every one a false positive
-            #     2 short tokens, anchored         0
-            #     9 long tokens,  substring        0
-            #
-            # Anchoring exactly where it is needed costs nothing; anchoring everywhere is what hid the
-            # sixth occurrence on the public tree. Note also which error was cheap. The 11773 was caught
-            # in seconds because it is absurd on its face. The anchored zero was clean, plausible and
-            # wrong, and it survived three separately built instruments across two separate attempts. Loud and
-            # wrong is cheap. Quiet and wrong is what ships.
-            #
-            # Measured: 0 hits from substring-matching every longer token across the whole tracked tree,
-            # and 0 occurrences of the three colliding forms on either tree, so this hardens the gate
-            # and moves no verdict today. If a document ever legitimately needs one of them, the fix is
-            # a word-specific exception with the reason beside it, never a return to blanket anchoring.
-            if len(_w) <= 3:
-                WIDE_TOKENS.append((r"(?<![A-Za-z0-9_])" + re.escape(_w) + r"s?(?![A-Za-z0-9_])", _w))
-            else:
-                WIDE_TOKENS.append((re.escape(_w), _w))
+# THE LIST SHIPS AS SALTED DIGESTS, which is the answer to a trade this gate lost both ways for a while.
+# Plaintext in the tree publishes the author's expectation of finding those words, and every one of them
+# occurs zero times in the tracked tree -- so the only surviving instance of each was the line forbidding
+# it. Holding the list OUT of the tree fixed that and broke reproducibility: the gate then ran only where
+# someone already had the file, never in a clean clone and never in CI. Digests get both properties.
+#
+# HONEST ABOUT THE STRENGTH: this is not secrecy. A salted sha256 stops the file from BEING the list and
+# defeats pasting a digest into a search engine. It does not stop anyone who suspects a word from
+# confirming it in one line, and it is not meant to.
+#
+# WHAT IS LOST AND WHAT IS KEPT. A digest cannot be a regex, so the old per-word patterns are gone. The
+# distinction they encoded is not: short tokens still match whole words only, because a two-letter one
+# occurs inside "remains", "available" and "again"; longer ones still match as SUBSTRINGS, which is
+# strictly more sensitive and cannot be evaded by gluing characters on. That mattered concretely -- a
+# listed word written inside a regex literal as \b<word> has a word character before it, so whole-word
+# anchoring could not see it, and the public tree carried exactly that inside this gate.
+TOKENS_PATH = os.environ.get("SF_PROSE_TOKENS") or os.path.join(os.getcwd(), "tools", "prose_tokens.sha256")
+TOKEN_SALT = b"sinkforge/prose/v1"
+MIN_PART, MAX_PART = 5, 24
+WIDE_DIGESTS = {}
+if os.path.isfile(TOKENS_PATH):
+    for _line in open(TOKENS_PATH, encoding="utf-8").read().splitlines():
+        _line = _line.split("#", 1)[0].strip()
+        if not _line:
+            continue
+        _parts = _line.split()
+        if len(_parts) == 2 and len(_parts[0]) == 64:
+            WIDE_DIGESTS[_parts[0]] = _parts[1]
+_PART = set(d for d, m in WIDE_DIGESTS.items() if m == "part")
+_WORD = set(WIDE_DIGESTS)
+
+
+def _tok_digest(s):
+    return hashlib.sha256(TOKEN_SALT + b":" + s.encode("utf-8")).hexdigest()
+
+
+def WIDE_SCAN(text):
+    """Occurrences of any listed token, reported as the SOURCE span that matched.
+
+    Not the listed word and not its digest: the run of text the author actually wrote. That keeps a
+    failure actionable without this file having to name the vocabulary, and it is why a hit on a
+    substring reports the whole surrounding word rather than the fragment inside it.
+    """
+    low = text.lower()
+    runs = [(m.group(0), "run") for m in re.finditer(r"[a-z]+", low)]
+    spans = [(m.start(), m.group(0)) for m in re.finditer(r"[a-z]+", low)]
+    # Adjacent runs are also offered as one token so that the two spellings of a hyphenated name, and
+    # the two-word form of a phrase, reduce to a single digest.
+    #
+    # THE TWO JOIN KINDS ARE NOT TREATED ALIKE, and the reason is a false positive this produced on its
+    # first run. Joining across a space and then stripping a plural turned the ordinary English "a is"
+    # -- in "a is killed hard" and "6a is closed" -- into a three-letter token that matched a listed
+    # short one. A join across a space is a guess about phrasing, so it now has to earn its match: it is
+    # tested whole-word only, never as a substring, never with a plural stripped, and only when the
+    # result is long enough that it cannot collide with a short listed token. A hyphen join is not a
+    # guess -- the author wrote one word -- so it keeps the full treatment.
+    SPACE_JOIN_MIN = 8
+    for _i in range(len(spans) - 1):
+        _s0, _t0 = spans[_i]
+        _s1, _t1 = spans[_i + 1]
+        _sep = low[_s0 + len(_t0):_s1]
+        if _sep == "-":
+            runs.append((_t0 + _t1, "run"))
+        elif _sep == " " and len(_t0) + len(_t1) >= SPACE_JOIN_MIN:
+            runs.append((_t0 + _t1, "space"))
+    found = {}
+    for tok, kind in runs:
+        cands = [tok]
+        if kind == "run" and len(tok) > 2 and tok.endswith("s"):
+            cands.append(tok[:-1])
+        for c in cands:
+            if _tok_digest(c) in _WORD:
+                found[tok] = found.get(tok, 0) + 1
+        if _PART and kind == "run":
+            n = len(tok)
+            for _L in range(MIN_PART, min(n - 1, MAX_PART) + 1):
+                for _i2 in range(0, n - _L + 1):
+                    if _tok_digest(tok[_i2:_i2 + _L]) in _PART:
+                        found[tok] = found.get(tok, 0) + 1
+    return ["%dx %s" % (v, k) for k, v in sorted(found.items())]
 # TRACKED FILES ONLY, and this is the difference between a gate and a nuisance. The working tree carries
 # coordination documents that are deliberately kept out of the repository through `.git/info/exclude`
 # rather than `.gitignore` (because the ignore file itself ships). Those are exactly where process and
@@ -355,12 +380,39 @@ WIDE_SKIP = set()
 # when it ran. tools/stand_downs.txt carries the row and tools/harness_verdict.sh resolves it, so the
 # verdict reads PASS* and names which assertion did not happen. Same three-valued accounting a check_base
 # layer gets, spelled out by hand because this layer is a shell script and has no base class.
-if not WIDE_TOKENS:
-    print("  SKIP: [prose.wide-word-list] no wide word list at %s, so no authorship vocabulary was"
-          % WORDS_PATH)
-    print("        tested. Point SF_PROSE_WORDS at a file with one word per line to enable it.")
-else:
-    print("  HELD: [prose.wide-word-list] this run asserted it (%d word(s))" % len(WIDE_TOKENS))
+# ABSENCE IS NOW A FAILURE, NOT A STAND-DOWN, and that is the point of the digest file. The list used to
+# live outside the repository, so a fresh clone and CI ran the gate without it and this printed SKIP. The
+# protection therefore existed on the machine that did not need it and was absent where the tree becomes
+# public -- and a permanent stand-down in exactly the environment that matters is the quiet green this
+# project is built around catching. `tools/prose_tokens.sha256` is tracked, so every clone has it and
+# there is no legitimate reason for it to be missing. Missing means broken, and broken fails.
+if not WIDE_DIGESTS:
+    print("  FAIL: prose wide sweep - no digest file at %s. This file is TRACKED, so its absence"
+          % TOKENS_PATH)
+    print("        means a broken checkout or a bad SF_PROSE_TOKENS, not an optional check. Refusing to")
+    print("        report a clean sweep over a vocabulary that was never tested.")
+    sys.exit(1)
+# THE CONTROLS RUN BEFORE THE SWEEP DOES, because a matcher that cannot match reports a clean tree, and
+# a clean tree is exactly what this gate is supposed to be unable to fake. The sentinel is a nonsense
+# token carried in the digest file for no other purpose; it is assembled from pieces here so that this
+# file, which the sweep also reads, does not contain the literal it is hunting for.
+_SENTINEL = "qzz" + "vocab" + "probe"
+_pos = WIDE_SCAN("a line of ordinary prose containing " + _SENTINEL + " once")
+_neg = WIDE_SCAN("a line of ordinary prose about rope, ore and the bazaar counter")
+if not _pos:
+    print("  FAIL: prose wide sweep - the positive control did not fire: the matcher failed to see a")
+    print("        token whose digest is in the file. Every clean result below would be meaningless.")
+    sys.exit(1)
+if _neg:
+    print("  FAIL: prose wide sweep - the negative control fired on clean prose (%s)." % _neg)
+    sys.exit(1)
+# NO `HELD:`/`SKIP:` MARKER ANY MORE, and the absence is the improvement. Those belong to the harness's
+# three-valued stand-down protocol, which exists for assertions that legitimately cannot run somewhere.
+# This one now runs everywhere -- the digests are tracked -- so a registry row for it would describe a
+# condition that can no longer occur, and a row nobody can trip is a claim the sweep keeps making and
+# never tests. The row is deleted from tools/stand_downs.txt in the same change.
+print("  wide sweep: asserted unconditionally (%d digest(s); positive and negative controls both behaved)"
+      % len(WIDE_DIGESTS))
 wide_fails, wide_read, wide_skipped = [], 0, 0
 wide_emdash, wide_emdash_files = 0, 0
 _emdash_gated = set(paths)   # the population the categorical em-dash rule already covers
@@ -411,18 +463,7 @@ for wp in WIDE_PATHS:
         if _n_em:
             wide_emdash += _n_em
             wide_emdash_files += 1
-    hits = []
-    for pat, name in WIDE_TOKENS:
-        # CASE-INSENSITIVE, like the narrow sweep twelve lines down and unlike the first version of
-        # this line. The word list's own header promised whole-word AND case-insensitive matching while
-        # the code did neither half of the second part, so the CAPITALISED spelling of a listed word
-        # passed a gate that stopped its lowercase form. origin/main carries exactly that pair in one
-        # file: a docstring spells it capitalised, a print() twelve lines later spells it lowercase, and
-        # only the second was reachable. A rule documented one way and implemented another is the quieter half of a guard
-        # that cannot be false.
-        k = len(re.findall(pat, wsrc, re.IGNORECASE))
-        if k:
-            hits.append("%dx %s" % (k, name))
+    hits = WIDE_SCAN(wsrc)
     if hits:
         wide_fails.append((wp, hits))
 
@@ -463,7 +504,7 @@ if unreadable:
         print("  %s" % p)
 
 print("\nwide sweep: %d word(s) tested over %d text file(s) -- every tracked file in the repository"
-      % (len(WIDE_TOKENS), wide_read))
+      % (len(WIDE_DIGESTS), wide_read))
 print("            %d binary, %d excluded by name, %d tracked-but-absent,"
       % (wide_binary, wide_skipped, wide_absent))
 print("            %d unreadable" % len(wide_unreadable))
@@ -553,6 +594,6 @@ if fails or wide_fails or drifted or wide_unreadable or cite_fails:
 # tests nothing, and the first version of this line called that "clean" -- a quiet green printed by the
 # gate whose whole job is to stop one.
 print("\ncheck_prose: %d file(s) clean, %s" % (len(rows),
-    "%d more clean on the wide sweep" % wide_read if WIDE_TOKENS
+    "%d more clean on the wide sweep" % wide_read if WIDE_DIGESTS
     else "and the wide sweep ASSERTED NOTHING (no word list; %d file(s) read, 0 words tested)" % wide_read))
 PYEOF
