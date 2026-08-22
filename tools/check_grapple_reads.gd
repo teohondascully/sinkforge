@@ -1446,7 +1446,33 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	print("    [bow-diag] renderer drew %.4f of the chord at slack %.3f (asked %.2f); chord %.1f deg off "
 		% [pred, got, want, ang] + "horizontal, cos %.3f, so a perpendicular mask should read %.4f"
 		% [cos(deg_to_rad(ang)), pred * cos(deg_to_rad(ang))])
-	return pct
+	# WHAT THIS FUNCTION RETURNS, and it is no longer the percentile.
+	#
+	# `pct99` is a 99th percentile over every rope-coloured pixel in the corridor and cannot tell a cord
+	# from lamp-lit rock. On lavapipe that is fatal: it read 0.4624 and 0.4634, both pinned. The value
+	# below is the peak of the per-station profile after the physical ceiling has removed what the
+	# renderer could not have drawn, divided by `|cos(chord angle)|` to undo the projection.
+	#
+	# The division is what puts it on `SAG_CAP`'s own scale. `rope_sag` returns a VERTICAL hang and
+	# `_draw_cord` applies it in Y, while this mask measures perpendicular departure, so the two differ by
+	# exactly that cosine -- which the saturation guard below has described in prose since it was written
+	# without anything acting on it. With the division the guard's `v >= SAG_CAP` is a true statement
+	# about the same quantity, and `BOW_FLOOR`'s note ("the sag-by-length rope bows 0.42, its cap") is
+	# about this scale too. No constant moves.
+	#
+	# Checked against the renderer's own `rope_sag` rather than against a calibration, on both renderers:
+	#
+	#                 recovered   rope_sag says
+	#     slack        0.3631        0.3718        hardware AND lavapipe, identically
+	#     taut         0.0809/15     0.0056
+	#
+	# The taut arm is still contaminated and that does NOT invalidate the comparison it feeds: junk can
+	# only push a reading up, so an inflated taut makes the measured slack-to-taut ratio a LOWER bound on
+	# the true one. 4.5x clearing a 3.0x margin is therefore conservative.
+	var clean_share: float = _bow_clean(span)
+	if is_equal_approx(clean_share, BOW_NO_CORD):
+		return BOW_NO_CORD
+	return clean_share / maxf(axis_cos, 0.01)
 
 
 ## The largest number `_bow_now`'s own mask can ever return, as a share of the chord. It discards every
