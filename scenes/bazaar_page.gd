@@ -26,6 +26,10 @@ var _icons: Dictionary = {}                 ## `Hud.machine_icons`, assembled by
 var _inv_selected: Callable                 ## `Hud.inv_selected_getter`, set from outside the Hud
 ## Near a claimed Bazaar. The Hud owns it because `main.gd` writes it and `tools/capture_moments.gd`
 ## reads it there; the accessor copies it in, the same way `probing` arrives.
+## The height the counter has eased to. The Hud owns the easing because its `_process` runs it and
+## `tools/check_hud_layout.gd` reads it there; the accessor hands the settled value across.
+var _bazaar_h: float = BAZAAR_SIZE.y
+
 var can_craft: bool = false
 
 ## Measured once per item and kept. The sentences are `const`, the column derives from constants and the
@@ -315,6 +319,22 @@ const DETAIL_CHIP_RIM: float = DETAIL_CHIP_PAD - DETAIL_CHIP_WELL
 ## and the three parts of the row set at one spacing would be seven equal things in a line, and the
 ## price has to read as one of the three.
 const DETAIL_CHIP_GAP: float = 6.0
+
+## THE COUNTER'S OWN FRAME: the head, the foot and the height it eases to.
+
+const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
+
+const BAZAAR_FOOT: float = 16.0       ## the key legend
+
+const BAZAAR_DETAIL_GAP: float = 8.0  ## rows to plate: the body's one gap, named once for its three sites
+
+## Head, one row of pack wells, the gap, the detail plate and the foot, added up rather than written
+## down. It was a 196 sitting beside that same sentence, which sums to 206.
+##
+## The plate term is the compact one, because this is PACK's floor and PACK never draws the other. A
+## floor carrying the taller plate would sit 16px above where a fresh pack's own sum lands, and
+## `check_pack_layout` asserts that a fresh pack lands on this floor rather than being caught by it.
+const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR_DETAIL_MIN + BAZAAR_FOOT
 
 
 ## The counter's own state. `Hud` keeps a property of each name forwarding here, because `scenes/main.gd`
@@ -1887,3 +1907,166 @@ func _detail_chip(at: Vector2, item: StringName, need: int) -> float:
 	_canvas.draw_string(_font, at + Vector2(DETAIL_CHIP_WELL + hw, DETAIL_CHIP_BASE), "/%d" % need,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, DETAIL_CHIP_SIZE, UiTheme.UI_TEXT_FAINT)
 	return at.x + w
+
+
+## The head: who you are talking to, which counter you are at, and what you are carrying of what this
+## tab charges, as chips you can count without reading.
+func _draw_bazaar_head(origin: Vector2, g: Dictionary) -> void:
+	var x: float = origin.x + UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD
+	_tracked("BAZAAR", Vector2(x, origin.y + 29.0), 17, 2.8, UiTheme.UI_TEXT)
+	var tab_x: float = x + _tracked_w("BAZAAR", 17, 2.8) + 16.0
+	_tracked(TAB_NAMES[bazaar_tab], Vector2(tab_x, origin.y + 29.0), 17, 2.8, UiTheme.UI_TEXT_FAINT)
+	# The strip stops one panel pad short of the title's last stroke, measured off the title rather than
+	# guessed at. It was `x + 170.0`, a statement about the widths of "BAZAAR" and the longest tab name at
+	# 17pt with 2.8 of tracking, with nothing in the file relating it to either.
+	var floor_x: float = tab_x + _tracked_w(TAB_NAMES[bazaar_tab], 17, 2.8) + UiTheme.BAZAAR_PAD
+	var rx: float = origin.x + float(g["w"]) - UiTheme.BAZAAR_PAD
+	# A material priced but not held draws no chip. The shortfall for the thing under the cursor is
+	# answered per ingredient on the detail plate instead, and a strip of zeroes for everything the ladder
+	# will ever charge would be a wall of what you do not have, on the tab where you choose what next.
+	for item: StringName in _priced_materials():
+		var n: int = int(_sim.inventory.get(item, 0))
+		if n <= 0:
+			continue
+		var label: String = str(n)
+		var cw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 25.0
+		rx -= cw + 5.0
+		if rx < floor_x:
+			break
+		_round_rect(Rect2(rx, origin.y + 6.0, cw, 20.0), 4.0, Color(1.0, 1.0, 1.0, 0.045))
+		Visuals.draw_item(_canvas, Vector2(rx + 11.0, origin.y + 16.0), 13.0, item)
+		_canvas.draw_string(_font, Vector2(rx + 19.0, origin.y + 20.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UiTheme.UI_TEXT)
+
+
+## The footer is one line: the keys. What you are carrying moved to the head as chips, and where the
+## verbs live moved onto the verb button, where it answers the question you are actually asking.
+func _draw_bazaar_foot(origin: Vector2, g: Dictionary) -> void:
+	# One input grammar, and it is the rail's. This was a single run-on string using double spaces as
+	# structure, which reads as prose and gets skipped like prose: keys and verbs sat at the same weight,
+	# so nothing said which half was the thing to press. Each key is a cap now, with its verb beside it at
+	# the old dim weight so the eye lands on the key.
+	var x: float = origin.x + UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD
+	var y: float = origin.y + float(g["h"]) - 15.0
+	for pair: Array in [["up/dn", "pick"], ["1-3", "tab"], ["E", "close"]]:
+		x += _keycap(Vector2(x, y), str(pair[0]), 8) + 5.0
+		var label: String = str(pair[1])
+		_canvas.draw_string(_font, Vector2(x, y + 11.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UiTheme.UI_TEXT_FAINT)
+		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 16.0
+
+
+## The Bazaar's geometry: one shape computed in one place and read by both the drawing and the layout
+## check, so what is seen is what is tested. Nothing here depends on where you are standing. A panel
+## that changes shape depending on where you are is a panel you cannot learn.
+##
+## What it does depend on is what the open tab holds: `h` through `_bazaar_wanted_h` and the plate
+## through `_detail_wanted_h`. Both are read here rather than recomputed, so the content box is bought
+## out of the same number the plate is drawn at. The plate's depth is a property of the selection, but
+## the kinds a selection can have partition by tab, so it stays constant while a tab is open. That is
+## what keeps a cursor move from reflowing the rows it walks through, and `_hold_overflow_h` asks the
+## whole pack for its deepest sentence for the same reason.
+##
+## The shape is a rail, a head, a grid of rows and a detail plate across the bottom. Rows are for
+## choosing between and the plate is for wanting. Splitting those two jobs is what let the rows get
+## denser, because a row no longer has to carry a description.
+func _bazaar_geometry() -> Dictionary:
+	var h: float = _bazaar_h
+	var origin := Vector2((UiTheme.CANVAS.x - BAZAAR_SIZE.x) * 0.5, (UiTheme.CANVAS.y - h) * 0.5)
+	var inner_x: float = origin.x + UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD
+	var inner_w: float = BAZAAR_SIZE.x - UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD * 2.0
+	var body_h: float = h - BAZAAR_HEAD - BAZAAR_FOOT
+	var plate: float = _detail_wanted_h()
+	var content := Rect2(inner_x, origin.y + BAZAAR_HEAD, inner_w,
+		body_h - plate - BAZAAR_DETAIL_GAP)
+	var detail := Rect2(inner_x, content.end.y + BAZAAR_DETAIL_GAP, inner_w, plate)
+	return {
+		"origin": origin, "w": BAZAAR_SIZE.x, "h": h,
+		"content": content, "detail": detail, "cols": BAZAAR_COLS,
+		"col_w": (content.size.x - BAZAAR_GUTTER * float(BAZAAR_COLS - 1)) / float(BAZAAR_COLS),
+		"row_h": BAZAAR_ROW_H,
+		"rows": int(content.size.y / BAZAAR_ROW_H),
+	}
+
+
+## How tall the counter wants to be, for the tab that is open.
+##
+## Every term here comes from the function that draws it, never from a second copy of its arithmetic,
+## because a height computed from a duplicated layout rule is right on the day it is written and
+## silently wrong the day either copy moves. So `_pack_cols` is the single source for the well grid,
+## `_works_rows_needed` asks `works_columns` itself, `_bench_tiers` is the tier walk lifted out of
+## `_tab_bench` whole, and the plate term is `_detail_wanted_h` rather than the constant it sometimes
+## equals.
+func _bazaar_wanted_h() -> float:
+	if _sim == null:
+		return BAZAAR_SIZE.y
+	var inner_w: float = BAZAAR_SIZE.x - UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD * 2.0
+	var need: float = 0.0
+	match bazaar_tab:
+		TAB_WORKS:
+			need = float(_works_rows_needed()) * BAZAAR_ROW_H
+		TAB_BENCH:
+			# The tree sizes its own chips down to fit whatever it is given, so what it wants is the tallest tier
+			# at full chip height. Today that asks for more than the panel may ever be, so BENCH is clamped and
+			# unchanged, which is the correct outcome rather than a coincidence to rely on.
+			var tall: int = maxi(1, _bench_tallest())
+			need = float(tall) * 64.0 + float(tall - 1) * 6.0
+		_:
+			# The wells and the summary band under them. The band was missing from this sum while the summary's
+			# own guard tested against a content box this sum had already decided, so the two could only agree by
+			# accident. `_ledger_h` carries the reasoning.
+			need = float(_pack_rows(inner_w)) * PACK_CELL + _ledger_h()
+	return clampf(BAZAAR_HEAD + need + BAZAAR_DETAIL_GAP + _detail_wanted_h() + BAZAAR_FOOT,
+		BAZAAR_MIN_H, BAZAAR_SIZE.y)
+
+
+## Move the cursor. `dy` steps a row, while `dx` jumps a whole column, which is the same motion your eye
+## makes and carries you across the counter-to-Rack gap in one keystroke rather than ten.
+func bazaar_move(dx: int, dy: int) -> void:
+	var n: int = bazaar_row_count()
+	if n <= 0:
+		return
+	if dx != 0:
+		bazaar_row = clampi(bazaar_row + dx * int(_bazaar_geometry()["rows"]), 0, n - 1)
+	bazaar_row = clampi(bazaar_row + dy, 0, n - 1)
+
+
+## The materials the open tab is pricing in, in the order that tab lists them. It is empty for a tab
+## that prices nothing.
+##
+## The head strip used to be a literal six written into the drawing function. Against the prices it is
+## read next to it was wrong in both directions. `ore` is the cost of nothing the counter sells: no
+## `craft_cost` in `src/data/machines/*.tres` names it, no rung in `src/data/research_rules.gd` does,
+## and neither does a tool or bit recipe. Three materials that are costs could never appear at all:
+## `plate` and `gear` (research_rules.gd:69, 81 and 96, plus the craft costs of the Crusher, Blast
+## Furnace, Drift Rig and Borer) and `iron` (iron_forge.tres:14).
+##
+## Reading the costs also answers where the strip belongs. It is a global account of the pack but is
+## only ever read against a price, so it lives on the tabs that quote prices. PACK returns nothing here.
+## Every chip it drew duplicated a well two rows underneath it.
+##
+## BENCH walks the whole ladder rather than the reachable rungs, because the tree draws the whole
+## ladder. A tech's sample material is a real cost and is deliberately not in here. It is not in the
+## rung's `cost` dictionary either, and `_shortfall_note` is the one place that names it.
+func _priced_materials() -> Array[StringName]:
+	var out: Array[StringName] = []
+	match bazaar_tab:
+		TAB_WORKS:
+			for i: int in open_machines():
+				_price_items(craft_options[i]["cost"], out)
+			for i: int in open_rack():
+				_price_items(rack_options[i]["cost"], out)
+		TAB_BENCH:
+			for tid: StringName in ResearchRules.ORDER:
+				_price_items(ResearchRules.tech(tid).get("cost", {}), out)
+	return out
+
+
+func _price_items(cost: Dictionary, out: Array[StringName]) -> void:
+	for item: StringName in cost:
+		if not out.has(item):
+			out.append(item)
+
+
+## Darkens the frame's edges so the eye is pushed to the counter. Every modern pause screen does it, and
+## this one did not, which was part of why the panel read as pasted onto a screenshot.
+func _bazaar_vignette(peak: float) -> void:
+	Visuals.edge_vignette(_canvas, UiTheme.CANVAS, peak)
