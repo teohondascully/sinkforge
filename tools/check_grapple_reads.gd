@@ -1298,7 +1298,29 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		return BOW_NO_CHORD
 	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
-	var band: float = span * WorldRenderer.SAG_CAP
+	# THE CEILING IS A CURVE, NOT A BAND, and it has no chosen number in it.
+	#
+	# The first rejection here used a flat `span * SAG_CAP` at every station. That is the right idea at the
+	# wrong resolution: it asks "could the cord ever be this far out" when the answer available is "could
+	# the cord be this far out HERE". `_draw_cord` bows the line by `sin(t * PI) * sag` in Y, and `sag` is
+	# clamped to `span * SAG_CAP`, so at station t the furthest the cord can possibly sit from its chord is
+	#
+	#     sin(t * PI) * SAG_CAP * span * |cos(chord angle)|   plus half a stroke for the outer edge
+	#
+	# and the `|cos|` is there because the bow is applied in Y while this mask measures perpendicular
+	# distance. Every term is read off the renderer at run time. Nothing is tuned, and it is the same
+	# refusal the flat band was making, asked per station.
+	#
+	# It matters because the contamination sits at the ENDS, where a flat band is at its most generous and
+	# a shaped one at its least. Measured, the flat band let all of these through and the curve refuses
+	# every one while keeping the cord:
+	#
+	#     lavapipe taut   t=0.81   223 px against a ceiling of  86     the flat band allowed 224
+	#     lavapipe slack  t=0.81   221 px against               83
+	#     hardware slack  t=0.19   125 px against               83
+	#     hardware slack  t=0.52    95 px against              146     kept, and this one is the cord
+	var axis_cos: float = absf(axis.x)
+	var reach: float = span * WorldRenderer.SAG_CAP * axis_cos
 	# THE MINER IS NOT THE ROPE, and this scan was the one place that did not say so. `_body_mask` is
 	# applied at four other sites here and was never applied to the bow. The miner stands at the HAND end
 	# of the chord, wears rope-coloured pixels, and the scan only excludes 6px of each end, so the body
@@ -1335,7 +1357,8 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 			# into. A pixel out there is therefore not cord, whatever colour it is. Taking the best
 			# IN-BAND offset per station rather than rejecting the whole station keeps a station that
 			# holds both cord and contamination, which the far end of this chord does.
-			if off > band:
+			var ceil_here: float = sin(along / span * PI) * reach + WorldRenderer.CORD_W * 0.5
+			if off > ceil_here:
 				_bow_over[bi] += 1
 			elif off > _bow_best[bi]:
 				_bow_best[bi] = off
