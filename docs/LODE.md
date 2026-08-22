@@ -4,11 +4,11 @@
 > (2026-08-16); 2b-4 SPEC.** The lode layer, the hand-work
 > verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
 > `take_lode` / `lode_fraction`, `MainView.try_work_lode`, `WorldRenderer._draw_lode` and the lode's entry
-> into `_wall_base_color` — held by `tools/check_lode.gd` (harness layer 56, 39 assertions) and photographed
+> into `_wall_base_color` — held by `tools/check_lode.gd` and photographed
 > at `history/118-the-vein-outlives-the-blow.png`. Ore is still authored SOLID by the generator in the BLOCK
 > plane and converting it is phase 3b — but as of 2026-08-17 the generator also seeds a separate LODE plane,
 > so "a generated world contains no lode" is no longer true. **§5's Drill Head shipped as #S39** — a drill placed ON a lode drains it in place and pours
-> down its own column, held by `tools/check_head.gd` (harness layer 57) and photographed at
+> down its own column, held by `tools/check_head.gd` and photographed at
 > `history/119-stand-it-on-the-thing-it-eats.png`. The Spur is 2b.
 > Migration plan, blast radius and eval gate: `docs/LODE_PLAN.md`.
 >

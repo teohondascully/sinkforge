@@ -6,7 +6,7 @@
 > and `tools/check_bits.gd`. **§5's refusal tells shipped as #S37**, the other half of the binary gate:
 > `MainView._refuses` / `_drive_bites` / `_skid`, the crossed cursor in `WorldRenderer._draw_aim`, the
 > synthesised `skid` scrape in `scenes/sfx.gd`, and `MiningRules.drive_for()` so the words come from the same
-> table as the gate. Held by `tools/check_refusal.gd` (harness layer 55), photographed at
+> table as the gate. Held by `tools/check_refusal.gd`, photographed at
 > `history/117-the-rock-that-says-no.png`.
 > Still spec: the Rack (bits are crafted at the Bazaar's existing counter for now, `docs/BAZAAR.md` §6) and
 > §7's drives as research rather than as craftable picks.

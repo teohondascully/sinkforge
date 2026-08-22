@@ -484,6 +484,31 @@ others and read as a magnifying glass, and it found that the icon suite was grad
 game draws at 13px. Both were invisible to a passing, correct test suite. An artifact you can look at is a
 population of one, and looking is cheap.
 
+## Errata: claims in pushed commit messages that are wrong
+
+A commit message is the one artifact in this repository that cannot be corrected in place. Amending a
+pushed commit rewrites history that other clones may hold, so the standing decision is **not to rewrite
+history for a wrong message** — the correction is recorded here instead, where it is public and lives
+next to the reasoning.
+
+Both entries below are mine, both were caught within a day, and both come from the same root: a claim
+that felt established but was read off too little data.
+
+**`e9feb96` — "`scenes/bazaar_page.gd` is 1412 lines."** It is 1441. 1412 was the count before the
+accessor and forwarders the same commit adds. The extraction figures in that message are correct; only
+the total is wrong.
+
+**`a499e06` — "waiting on `lamp_residual()` … made the spread worse."** Unsupported. The comparison was
+five samples against five: 1.35 against 2.70. Eight further runs of the first arm also read 2.70, so the
+1.35 was a lucky draw and the difference was never there. The supportable claim is that the change showed
+**no measurable improvement** and was reverted for lack of evidence, not that it was harmful. The
+mechanism offered for the harm — that a variable-length wait re-varies everything else that free-runs —
+is plausible and unevidenced, and should not be repeated as a finding. That commit is itself reverted by
+`00ec990` for an unrelated and larger reason, recorded in the revert's own message.
+
+The general rule this produced: **a spread is not a number you can read off five samples, and neither is
+a difference between two spreads.** Put comparative claims where they can be amended.
+
 ## Measurements worth not re-deriving
 
 Not decisions, but numbers that were expensive to establish once.

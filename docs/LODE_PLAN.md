@@ -90,7 +90,7 @@ Player-visible change: mining ore stops destroying the vein. Nothing is removed.
   so a worked-out vein looks worked out; the glint pass extended to lodes.
 - `hover_info.gd`: an exposed lode reads as a vein with what is left in it.
 
-New layer `tools/check_lode.gd`, now 53 assertions. Two existing assertions changed and were argued in
+New layer `tools/check_lode.gd`, 53 assertions when this phase shipped. Two existing assertions changed and were argued in
 place: `test_sim`'s finite-deposit inversion, and the save round-trip. The lode's rendering wanted to be
 part of the wall bake rather than an overlay, which the plan had not anticipated; `docs/LODE.md` records
 the deviation. One assertion in `check_lode` was caught passing vacuously, because the Wedge never landed
@@ -116,7 +116,7 @@ assertion needed to change, which is the additive claim in §3 holding rather th
 - A Head is never `blocked`. With no shaft under it the ore piles at its feet, like every other item in
   this game when it lands; refusing to run to prevent a pile would invent a chore (`docs/DRIFT.md` §5).
 
-New layer `tools/check_head.gd`, now 40 assertions.
+New layer `tools/check_head.gd`, 40 assertions when this phase shipped.
 
 ### Phase 2b: the Spur (SHIPPED)
 

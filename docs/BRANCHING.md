@@ -8,6 +8,29 @@ lost, but the inventory itself became misleading: thirty of those branches were 
 of them were pending work. An ahead-count that means nothing is worse than no count, because it reads as
 a backlog and invites merging.
 
+## The workflow, as it actually runs
+
+One clone, one working tree, `main`. Work lands as a sequence of small commits pushed straight to
+`origin/main`, each one green on a full sweep before it goes. There is no feature branch, no integration
+branch, and no merge: the history is linear because nothing else is ever open.
+
+This is a deliberate reversal. The rules below were written after the repository reached 58 branches
+across 49 working trees, and they describe how to close a branch safely because closing them was the work
+that had to be done. Keeping them is not nostalgia — a branch is still occasionally the right tool, and
+when one exists it declares the four things below. But the default is now that one does not exist.
+
+A **temporary worktree** is a different thing and is allowed: a second checkout used to run a comparison
+against another commit, or to hold a control while the canonical tree carries a treatment. Three rules
+govern it, and they exist because each has already been paid for:
+
+- It is for **reading**, not for building. Authored work goes in the canonical tree.
+- **Never copy generated files out of one** — `.uid` and `.import` belong to the tree that produced them,
+  and carrying one back is how a stale identifier reaches a commit.
+- Remove it only after proving it holds nothing unique: `git status --porcelain` in it, every entry either
+  preserved or classified as generated, and no process still running against it. Then `git worktree prune`.
+
+`git worktree list` showing a single row is the normal state, and is worth checking before a release.
+
 ## Every branch declares four things
 
 A branch with no owner is a branch nobody will close.

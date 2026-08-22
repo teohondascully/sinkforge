@@ -1,9 +1,9 @@
 # THE DRIFT RIG & SPOIL — horizontal extraction, vertical logistics
 
 > **Status: §3 SHIPPED as STRIKE 35, §4 SHIPPED as STRIKE 36** (2026-08-16) — the Drift Rig is in the game, researched under
-> **Galleries**, asserted by `check_drift` (harness layer 53) and photographed at
+> **Galleries**, asserted by `check_drift` and photographed at
 > `history/115-a-gallery-that-sorts-itself.png`. §4's **Crusher** and **packing** followed as Strike 36 —
-> researched under **Packing**, asserted by `check_spoil` (harness layer 54), photographed at
+> researched under **Packing**, asserted by `check_spoil`, photographed at
 > `history/116-the-wall-that-weeps.png`. What is still SPEC: the per-layer packing payoffs BELOW L3 (magma
 > insulation, Hollow ballast) and the §7 play-test rung that runs a whole gallery end to end. Pairs with
 > `docs/BITS.md` (the Lance is this machine's hand-held half) and `docs/BAZAAR.md`.

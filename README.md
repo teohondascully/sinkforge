@@ -225,10 +225,43 @@ goals inject resources to arrange the situation; the verb under test is always t
 A layer reports pass, fail or skip, and skip has its own exit code rather than a quiet zero. 17 layers
 are registered as needing a real window, three of which also need the machine to themselves, and the
 layers that judge pixels detect the absence of a display and skip themselves. The runner prints the
-three counts separately and will not print the word "ALL" over a list containing a skip. On a machine
-that has a display, strict mode is on by default, so any skip fails the whole run with exit code 4.
-There are six exit codes in all, and a caller that reads "not zero" as "a test failed" will misdiagnose
-four of them.
+three counts separately and will not print the word "ALL" over a list containing a skip. There are six
+exit codes in all, and a caller that reads "not zero" as "a test failed" will misdiagnose four of them.
+
+### Exit 4, and why a green sweep does not exit 0
+
+This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
+
+```
+109 PASS / 0 FAIL / 0 SKIP of 109
+HARNESS_EXIT=4
+```
+
+Nothing failed and nothing was skipped, and the run still does not exit 0. **Exit 4 means the sweep was
+not complete, which is a different claim from "something went wrong."** Two things reach it:
+
+- a **skip** — a whole layer that declined to run, under strict mode, which is on by default where there
+  is a display;
+- a **stand-down** — a layer that ran and passed, having declined *some* of its assertions because a
+  precondition for them was not met on this machine.
+
+The second is the usual cause and the reason the number above is 4 rather than 0. Every stand-down is
+declared ahead of time in `tools/stand_downs.txt` with an id, the layer that owns it, and a paragraph
+saying what is not being asserted and why. The runner prints each one and how it resolved, refuses to
+run if it meets an undeclared one, and refuses to let the ledger name a row nobody exercises. So the
+exit code is saying: *these assertions were not made, they are the ones on the list, and the list is
+the same list you could read before the run.*
+
+A row marked `env` is conditional, and the run reports whether this machine reached the assertion or
+not. It is tempting to read a row that reached it as retired. **It usually is not.** Several exist for
+the machines where they do *not* resolve — the authorship word list is deliberately kept out of the
+repository, so a fresh clone has the gate without the list, and the row is what stops that reading as a
+pass over words nothing tested. `ASSERTED` is the state in which such a row is least informative, not
+the state that retires it.
+
+The practical rule: **read the words, not the number.** `HARNESS_RESULT=yes` is the line that says the
+run is quotable at all — that the runner finished, every declared layer reported, and every layer log
+holds the output of a layer that actually executed. A verdict without it is not a result.
 
 109 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
@@ -237,6 +270,27 @@ claim.
 The suite protects the real save while it runs. Every layer executes against an isolated `HOME`, and
 a sentinel hashes the production save slot before and after the sweep, so a layer that writes to it
 fails the run loudly with its own exit code instead of quietly eating a game.
+
+### Four ways a layer can run, and what each one can be trusted about
+
+The table above groups layers by *what they assert*. This one groups them by *what has to be true of the
+machine* for the assertion to mean anything, which is the distinction that decides where a layer can run
+and why no single job runs all of them.
+
+| Mode | Registered as | Needs | Trustworthy about | Not trustworthy about |
+| --- | --- | --- | --- | --- |
+| Headless | `add` | nothing but a CPU | logic, state, content, save round-trips | anything drawn |
+| Headed, pixel-reading | `add_gl` | a real surface to draw into | what a frame contains | how long anything took |
+| Headed, exclusive | `add_excl` | the surface **and** the machine to itself | the same, where a neighbour would perturb the picture | anything, if run in parallel |
+| Timing | `add_excl_hl` | the machine to itself, headless | cost on *this* machine, nothing else running | cost anywhere else |
+
+The last row is why `check_frametime` is excluded from CI rather than made to pass there: a software
+rasterizer draws at 6 to 9 fps, so its hitch ratios describe the rasterizer. A timing layer that "passes"
+under those conditions has measured the wrong thing, and the fix for a number that does not transfer is
+not to widen the bound until it does.
+
+The middle two rows are why a green local sweep and a red CI are not a contradiction. A pixel layer is
+only as truthful as the thing that drew the pixels, and there are two renderers.
 
 `docs/HARNESS_LAYERS.md` covers the shape of a layer, the three-state exit protocol, and the failure
 modes that have actually bitten this suite. `CONTRIBUTING.md` covers running a subset safely.
@@ -255,9 +309,9 @@ into jobs:
 
 | Where | Renderer | What runs | Result |
 | --- | --- | --- | --- |
-| a local sweep | the machine's real GPU, through a real window | all 109 layers in one run | 109 pass, 0 fail, 0 skip |
-| CI, headless job | Godot's dummy renderer | all 109 declared; the 15 needing a surface skip themselves | 92 pass, 0 fail, 15 skip |
-| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | only the layers needing a surface | 15 pass, 1 fail |
+| a local sweep | the machine's real GPU, through a real window | all 109 layers in one run | 109 pass, 0 fail, 0 skip — and `HARNESS_EXIT=4`, for the six declared stand-downs |
+| CI, headless job | Godot's dummy renderer | all 109 declared; the 15 that detect the absent display stand themselves down | 94 pass, 0 fail, 15 skip |
+| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 15 pass, 1 fail |
 
 So "the suite passes" and "CI is red" are statements about different renderers, and both are true. The
 authorship job passes in all cases. A layer that reads pixels can only be as truthful as the thing that

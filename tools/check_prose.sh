@@ -492,7 +492,55 @@ if wide_fails:
     for wp, hits in wide_fails:
         print("  %-42s %s" % (wp, "; ".join(hits)))
 
-if fails or wide_fails or drifted or wide_unreadable:
+# THE THIRD SWEEP: a document that cites a harness layer BY ITS POSITION IN THE REGISTRY.
+#
+# `docs/ARCHITECTURE.md` already warns against naming "harness layer 13", on the grounds that it drifted
+# the moment anyone added a layer above it. Four tracked documents were doing exactly that anyway, and
+# every one of the five citations was wrong:
+#
+#     check_refusal   doc said 55   actually 51
+#     check_drift     doc said 53   actually 50
+#     check_spoil     doc said 54   actually 52
+#     check_lode      doc said 56   actually 55
+#     check_head      doc said 57   actually 60
+#
+# Nothing read them, so nothing could notice. An index is a fact about insertion order; the script path
+# beside it already identifies the layer and does not move. So: cite the path, never the number.
+#
+# A quoted mention is the anti-pattern being discussed rather than committed, which is why the lookbehind
+# is here and why ARCHITECTURE's own warning does not trip its own gate.
+LAYER_CITE = re.compile(r'(?<!")harness layer\s+([0-9]+)')
+
+# THE CONTROL TRAVELS INSIDE THE CHECK. A scan that reports nothing has said nothing until it has been
+# shown it can still find something; this one is the same shape as a citation and must match.
+if not LAYER_CITE.search("held by `tools/check_x.gd` (harness layer 42), photographed at"):
+    print("check_prose: the positional-citation matcher does not match a known citation. Nothing")
+    print("             was measured by the third sweep.")
+    sys.exit(2)
+
+cite_fails, cite_read = [], 0
+for wp in sorted(f for f in _tracked if f.endswith(".md")):
+    try:
+        with open(wp, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError):
+        continue
+    cite_read += 1
+    for m in LAYER_CITE.finditer(text):
+        cite_fails.append((wp, text[:m.start()].count("\n") + 1, m.group(1)))
+
+if cite_read < 5:
+    print("check_prose: the positional-citation sweep opened %d tracked .md file(s), which is too few" % cite_read)
+    print("             for its silence to mean anything.")
+    sys.exit(2)
+print("\npositional-layer sweep: %d tracked .md file(s) read; a layer is cited by path, never by index"
+      % cite_read)
+if cite_fails:
+    print("\n%d positional harness-layer citation(s) -- an index is insertion order, not identity:" % len(cite_fails))
+    for wp, ln, num in cite_fails:
+        print("  %s:%d  cites layer %s" % (wp, ln, num))
+
+if fails or wide_fails or drifted or wide_unreadable or cite_fails:
     if drifted:
         print("\nthe comma ceiling's anchor drifted above its recorded maximum (see the banner above).")
     if fails:
