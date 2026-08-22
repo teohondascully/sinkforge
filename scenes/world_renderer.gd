@@ -3603,6 +3603,10 @@ const ROPE_SEGMENTS: int = 14
 ## Capped, because past a point the loop leaves the screen and stops being information, and floored at a
 ## couple of pixels so a nearly-taut line still reads as rope rather than as a drawn ray.
 const SAG_CAP: float = 0.42             ## most of the chord the hang may ever be
+## The widest stroke the cord is drawn with, the dark under-stroke. NAMED because a fixture measuring the
+## hang measures the cord's OUTER EDGE, which stands half of this off the centreline the sag describes.
+## Two files agreeing on 4.5 by both writing 4.5 is a pair no assertion can fail on.
+const CORD_W: float = 4.5
 const SAG_MIN: float = 2.0              ## px, so even a tight line keeps a whisker of curve
 
 
@@ -3731,7 +3735,7 @@ func _draw_cord(from: Vector2, to: Vector2, sag: float) -> void:
 		pts.append(p)
 	# Two passes: a dark under-stroke that gives the rope an edge against light rock, then the fibre.
 	for i: int in ROPE_SEGMENTS:
-		draw_line(pts[i], pts[i + 1], ROPE_SHADE, 4.5)
+		draw_line(pts[i], pts[i + 1], ROPE_SHADE, CORD_W)
 	for i: int in ROPE_SEGMENTS:
 		draw_line(pts[i], pts[i + 1], ROPE_CORE, 2.0)
 	# A twist highlight every other segment: at this scale, whether the line reads as rope or as a laser is

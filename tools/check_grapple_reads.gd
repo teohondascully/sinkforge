@@ -165,6 +165,56 @@ const BOW_MIN_EXTENT: float = 2.0 / 3.0
 const BOW_MIN_STATIONS: float = 0.5
 
 
+## WHERE THE ESTIMATOR IS WELL CONDITIONED. `_draw_cord` puts the departure at `sin(t * PI) * sag`, so
+## every station is an independent estimate `sag = offset / sin(t * PI)` -- and near either end that
+## divisor goes to zero and multiplies the cord's own half-width, and any noise, without limit. At
+## `sin >= 0.70`, the central half of the chord, the amplification is at most 1.43x. This is a fact about
+## the estimator rather than a number chosen to suit a reading.
+const BOW_SIN_FLOOR: float = 0.70
+## Fewer contributing stations than this and a median is not a median.
+const BOW_MIN_EST: int = 4
+
+
+## THE BOW AS THE MEDIAN OF PER-STATION ESTIMATES, which is what the shape of the cord makes available.
+##
+## `_bow_clean` takes the PEAK of the surviving profile, and a peak is a maximum: one contaminated station
+## sets it, whatever the other twenty-three say. On the software renderer that is exactly what happens.
+## Rejecting out-of-band pixels moved the reading from 0.4638 to 0.4106 and no further, because the thing
+## at stations 17 to 20 straddles the band edge and its INSIDE half is still the largest offset present.
+##
+## The cord's own geometry gives a better answer. `_draw_cord` draws the hang as `sin(t * PI) * sag`, so
+## each station carries an independent estimate of the SAME quantity, and the median of those survives a
+## minority of contaminated stations in a way a maximum cannot. The half-width is subtracted first because
+## the mask finds the stroke's outer edge, not its centreline.
+##
+## Returns `BOW_NO_CORD` rather than a small number when too few stations are usable, for the same reason
+## as everything else on this axis: a failure to measure must not be arithmetic alongside a measurement.
+func _bow_sag_median(span: float) -> float:
+	var est: Array[float] = []
+	for i: int in _bow_best.size():
+		if _bow_best[i] < 0.0:
+			continue
+		var t: float = (float(i) + 0.5) / float(BOW_BINS)
+		var k: float = sin(t * PI)
+		if k < BOW_SIN_FLOOR:
+			continue
+		est.append(maxf(_bow_best[i] - WorldRenderer.CORD_W * 0.5, 0.0) / k)
+	if est.size() < BOW_MIN_EST:
+		return BOW_NO_CORD
+	est.sort()
+	var mid: int = est.size() / 2
+	var med: float = est[mid] if est.size() % 2 == 1 else (est[mid - 1] + est[mid]) * 0.5
+	return med / maxf(span, 1.0)
+
+
+## `_bow_sag_median` for the run log, sentinel spelled out.
+func _bow_sag_str(span: float) -> String:
+	var v: float = _bow_sag_median(span)
+	if is_equal_approx(v, BOW_NO_CORD):
+		return "TOO FEW STATIONS"
+	return "%.4f" % v
+
+
 ## The bow, measured only from what the renderer could actually have drawn.
 ##
 ## THE FAILURE THIS REPLACES. `pct99` is a percentile over every cord-coloured pixel in the corridor, and
@@ -1247,9 +1297,9 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		% [pct, _bow_binned() / span, _bow_occupied(), BOW_BINS, offs.size(), span, _bow_rim()])
 	print("    [bow-diag] profile %s   (each station's peak offset as a share of the rim, . = empty)"
 		% _bow_sketch())
-	print("    [bow-diag] clean %s  in-band %d/%d  over-band stations %d  (peak of the in-band profile, "
-		% [_bow_clean_str(span), _bow_occupied(), BOW_BINS, _bow_over_stations()]
-		+ "median-filtered; NOT yet what this layer asserts on)")
+	print("    [bow-diag] clean %s  sag-median %s  in-band %d/%d  over-band stations %d  (NEITHER is yet "
+		% [_bow_clean_str(span), _bow_sag_str(span), _bow_occupied(), BOW_BINS, _bow_over_stations()]
+		+ "what this layer asserts on)")
 	return pct
 
 
