@@ -68,6 +68,8 @@ const SOLE_OWNER: Dictionary = {
 	# the catalogs above there is no alias left behind: a second FOCUS_KEYLINE anywhere is a second ring.
 	"FOCUS_KEYLINE": "res://scenes/visuals.gd",
 	"FOCUS_SPINE_DX": "res://scenes/visuals.gd",
+	"KEYCAP_BASE": "res://scenes/visuals.gd",
+	"KEYCAP_DROP": "res://scenes/visuals.gd",
 }
 
 
@@ -91,6 +93,7 @@ const SOLE_IMPL: Dictionary = {
 	"sb.corner_detail = 8": "res://scenes/visuals.gd",
 	"get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT": "res://scenes/visuals.gd",
 	"box.grow(grow - 1.0)": "res://scenes/visuals.gd",
+	"Vector2(0.0, KEYCAP_DROP)": "res://scenes/visuals.gd",
 }
 
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.

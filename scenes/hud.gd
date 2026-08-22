@@ -1953,39 +1953,18 @@ func _draw_inventory_overlay() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## What a cap is made of, named rather than written inline. Caps are placed by callers that own a
-## baseline and not a box, and a caller working those numbers out for itself is a second copy that stops
-## agreeing the day the cap changes size.
-const KEYCAP_PAD_X: float = 8.0       ## ink to either edge
-const KEYCAP_MIN_W: float = 14.0      ## a single digit still wants a square-ish cap
-const KEYCAP_PAD_Y: float = 7.0       ## how much taller than its type the cap stands
-const KEYCAP_BASE: float = 5.0        ## the key's baseline, up from the cap's floor
-const KEYCAP_DROP: float = 1.0        ## and the shadow, one under the cap: the slot's last mark
-
-
+## The cap's measurements and its drawing live in `Visuals`. These wrappers bind this page's font, and
+## `_keycap` hands its rects to `panel_probe` so `check_hud_layout` still sees every cap it used to.
 func _keycap_w(key: String, fs: int) -> float:
-	return maxf(_font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + KEYCAP_PAD_X,
-		KEYCAP_MIN_W)
+	return Visuals.keycap_width(_font, key, fs)
 
 
 func _keycap_h(fs: int) -> float:
-	return float(fs) + KEYCAP_PAD_Y
+	return Visuals.keycap_height(fs)
 
 
-## One key, drawn as a key. A bare digit in the corner of a tile reads as a step number, which is what
-## makes a three-tab counter feel like a three-page wizard, while the same digit inside a raised cap
-## reads as something to press. It returns the width it consumed, so a row of them lays out once.
 func _keycap(at: Vector2, key: String, fs: int = 8) -> float:
-	var tw: float = _font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var w: float = _keycap_w(key, fs)
-	var h: float = _keycap_h(fs)
-	var box := Rect2(at, Vector2(w, h))
-	_round_rect(Rect2(box.position + Vector2(0.0, KEYCAP_DROP), box.size), 3.0,
-		Color(0.0, 0.0, 0.0, 0.35))
-	_round_rect(box, 3.0, Color(0.13, 0.145, 0.18))
-	draw_string(_font, at + Vector2((w - tw) * 0.5, h - KEYCAP_BASE), key,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.74, 0.78, 0.86))
-	return w
+	return Visuals.keycap(self, _font, at, key, fs, panel_probe if probing else [])
 
 
 ## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects a
@@ -3933,11 +3912,11 @@ func _rail_word_dy() -> float:
 
 
 func _rail_key_dy() -> float:
-	return _rail_word_dy() - (_keycap_h(RAIL_LABEL_FS) - KEYCAP_BASE)
+	return _rail_word_dy() - (_keycap_h(RAIL_LABEL_FS) - Visuals.KEYCAP_BASE)
 
 
 func _rail_key_slot_h() -> float:
-	return _rail_key_dy() + _keycap_h(RAIL_LABEL_FS) + KEYCAP_DROP
+	return _rail_key_dy() + _keycap_h(RAIL_LABEL_FS) + Visuals.KEYCAP_DROP
 
 
 func _rail_word_slot_h() -> float:

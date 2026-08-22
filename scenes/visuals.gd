@@ -1671,3 +1671,49 @@ static func focus_ring(canvas: CanvasItem, box: Rect2, ring: Color, spine_col: C
 	if spine:
 		canvas.draw_rect(Rect2(box.position.x - FOCUS_SPINE_DX, box.position.y + FOCUS_SPINE_INSET,
 			FOCUS_SPINE_W, box.size.y - FOCUS_SPINE_INSET * 2.0), spine_col)
+
+
+## ---- KEYCAPS ----
+## A bare digit in the corner of a tile reads as a step number, which is what makes a three-tab counter
+## feel like a three-page wizard. The same digit inside a raised cap reads as something to press.
+##
+## Named rather than written inline because caps are placed by callers that own a BASELINE and not a box,
+## and a caller working these numbers out for itself is a second copy that stops agreeing the day the cap
+## changes size.
+const KEYCAP_PAD_X: float = 8.0       ## ink to either edge
+const KEYCAP_MIN_W: float = 14.0      ## a single digit still wants a square-ish cap
+const KEYCAP_PAD_Y: float = 7.0       ## how much taller than its type the cap stands
+const KEYCAP_BASE: float = 5.0        ## the key's baseline, up from the cap's floor
+const KEYCAP_DROP: float = 1.0        ## and the shadow, one under the cap: the slot's last mark
+
+
+static func keycap_width(font: Font, key: String, fs: int) -> float:
+	return maxf(font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + KEYCAP_PAD_X,
+		KEYCAP_MIN_W)
+
+
+static func keycap_height(fs: int) -> float:
+	return float(fs) + KEYCAP_PAD_Y
+
+
+## Draws one cap and returns the width it consumed, so a row of them lays out once.
+##
+## `probe` IS NOT OPTIONAL DECORATION. The caps are drawn out of `round_rect`, and on the Hud that routine
+## records every rect it draws into `panel_probe`, which is the population `check_hud_layout` measures
+## overlap across. Drawing them here without a way to report them would have quietly removed every keycap
+## from that population, and a coverage loss reads as a pass. The caller hands in the array it wants them
+## in, or an empty one it then discards.
+static func keycap(canvas: CanvasItem, font: Font, at: Vector2, key: String, fs: int,
+		probe: Array = []) -> float:
+	var tw: float = font.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var w: float = keycap_width(font, key, fs)
+	var h: float = keycap_height(fs)
+	var box := Rect2(at, Vector2(w, h))
+	var shadow := Rect2(box.position + Vector2(0.0, KEYCAP_DROP), box.size)
+	probe.append(shadow)
+	probe.append(box)
+	round_rect(canvas, shadow, 3.0, Color(0.0, 0.0, 0.0, 0.35))
+	round_rect(canvas, box, 3.0, Color(0.13, 0.145, 0.18))
+	canvas.draw_string(font, at + Vector2((w - tw) * 0.5, h - KEYCAP_BASE), key,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.74, 0.78, 0.86))
+	return w
