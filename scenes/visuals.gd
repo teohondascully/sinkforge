@@ -1609,3 +1609,65 @@ static func tracked(canvas: CanvasItem, font: Font, text: String, at: Vector2, s
 static func tracked_width(font: Font, text: String, size: int, track: float) -> float:
 	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x \
 		+ track * float(maxi(text.length() - 1, 0))
+
+
+
+## The focus ring: where the next keypress will land, on any control that can take the keyboard.
+##
+## The measurement shipped for the two cursors that had one, the counter's row and the hotbar's lit
+## slot, and it left the rest of the page open, because every other traversable control loses the caret
+## the moment you leave those two surfaces. This is the mark the rest of them wear.
+##
+## It is the idiom the two measured cursors already use rather than a third invention. The hotbar's lit
+## slot swaps a 1px `UI_EDGE` border for a 2px `UI_ACCENT` one and hangs a glow outside it, an outline
+## at double weight sitting off the well's own edge. That is what this draws, in the same gold family
+## (`GOLD_PALE`, which is `UI_ACCENT` lifted, already the page's token for the hot one) and at the same
+## 2px. The counter's spine is the other half of the idiom, and row-shaped controls keep it (`spine`).
+##
+## It is not a hue. The finding behind that measurement was that the game's affordance signal had been
+## concentrated into one colour channel, and a focus ring that is only a colour change repeats that on a
+## new surface. Three channels carry this mark, and any one of them alone would still say focus:
+##
+##   Shape. An unbroken ring is drawn in no other state on this page. Selection fills and hover lifts a
+##   fill, while neither of them outlines, so present against absent needs no colour to read.
+##
+##   Weight. 2px, against the 1px every edge on the page is drawn at: the chip's keyline, the slider's
+##   frame, the row plates. Twice the ink of anything it could be confused with.
+##
+##   Inset. It is drawn outside the control's own box, which is the one place no other state paints.
+##   Focus is the only thing here that changes a control's footprint rather than its interior, so it
+##   survives on a chip that is already filled gold for being on.
+##
+## The keyline is the fourth: one dark line immediately inside the ring, so the pale gold cannot merge
+## into a light fill under it. The lamp swatches on the title card are the case that needs it, since
+## there the thing being chosen is itself a colour and five bright tints would each have argued with a
+## bare gold ring.
+##
+## `grow` is the caller's, because the clearance is the caller's. A chip has air around it and takes the
+## default, while the binding rows are drawn on a 15px pitch with 15px plates and would have rung their
+## neighbours, so they pass 0.0 and the ring lands on the plate's own edge.
+const FOCUS_W: float = 2.0            ## the ring, at double the weight of every 1px edge near it
+const FOCUS_GROW: float = 2.5         ## how far outside the control it sits, where nothing else paints
+const FOCUS_KEYLINE := Color(0.0, 0.0, 0.0, 0.55)   ## one dark line inside it, so it reads on any fill
+const FOCUS_SPINE_W: float = 2.0      ## the counter's mark, kept for the controls that are rows
+## Far enough left of the plate that the two marks stay two marks. The ring at `grow` 0.0 straddles the
+## plate's edge, half a `FOCUS_W` either side of it, so a spine parked flush against that edge merges with
+## it into one thicker bar and the row loses the spine it is supposed to be carrying: 4.0 leaves 1px of
+## ground between them at the weights above, and any future change to either has to be checked against
+## that subtraction rather than against the picture.
+const FOCUS_SPINE_DX: float = 4.0
+const FOCUS_SPINE_INSET: float = 2.0  ## ...and how far short of the row's ends it stops, as the counter's
+
+
+## The mark itself. See the block above the constants for why it is shaped the way it is.
+## THE TWO COLOURS ARE THE CALLER'S, not this file's. The shape, the weight and the inset are properties
+## of the mark and live here with it; which gold a given page paints it in is that page's palette, and
+## the palette has not moved. Passing them keeps this file free of a token it would otherwise have to
+## own or duplicate, which is the failure this whole pass is about.
+static func focus_ring(canvas: CanvasItem, box: Rect2, ring: Color, spine_col: Color,
+		grow: float = FOCUS_GROW, spine: bool = false) -> void:
+	canvas.draw_rect(box.grow(grow - 1.0), FOCUS_KEYLINE, false, 1.0)
+	canvas.draw_rect(box.grow(grow), ring, false, FOCUS_W)
+	if spine:
+		canvas.draw_rect(Rect2(box.position.x - FOCUS_SPINE_DX, box.position.y + FOCUS_SPINE_INSET,
+			FOCUS_SPINE_W, box.size.y - FOCUS_SPINE_INSET * 2.0), spine_col)

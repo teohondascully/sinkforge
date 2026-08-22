@@ -64,6 +64,10 @@ const SOLE_OWNER: Dictionary = {
 	"AUDIO_ROWS": "res://scenes/settings_page.gd",
 	"FEEL_ROWS": "res://scenes/settings_page.gd",
 	"CAT_NAMES": "res://scenes/settings_page.gd",
+	# The focus ring's shape constants. They are used by exactly one routine and moved with it, so unlike
+	# the catalogs above there is no alias left behind: a second FOCUS_KEYLINE anywhere is a second ring.
+	"FOCUS_KEYLINE": "res://scenes/visuals.gd",
+	"FOCUS_SPINE_DX": "res://scenes/visuals.gd",
 }
 
 
@@ -86,6 +90,7 @@ const SOLE_OWNER: Dictionary = {
 const SOLE_IMPL: Dictionary = {
 	"sb.corner_detail = 8": "res://scenes/visuals.gd",
 	"get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT": "res://scenes/visuals.gd",
+	"box.grow(grow - 1.0)": "res://scenes/visuals.gd",
 }
 
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.
