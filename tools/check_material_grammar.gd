@@ -92,6 +92,7 @@ const STEP: int = 3
 const LIT_FLOOR: float = 22.0  ## mean window luma above which rock is actually visible
 const READ_FLOOR: float = 0.75 ## the same bar check_rock_reads holds rock/void to
 const NULL_CEILING: float = 0.62  ## the null rig may not separate by more than this on structure
+const ANIM_POSE: float = 0.0   ## the cosmetic clock is held here while a frame is read; see _sample_at
 
 func _initialize() -> void:
 	if DisplayServer.get_name() == "headless":
@@ -272,6 +273,25 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 	main._renderer.repaint_world()
 	for _i: int in 40:
 		await physics_frame
+
+	# AND POSE THE COSMETIC CLOCK, for the same reason and against a bigger term than the pointer.
+	#
+	# `_anim_time` free-runs on wall-clock delta and the lamp's amber pool rides it:
+	# `0.17 + 0.030 * sin(t * 11.0) + 0.020 * sin(t * 27.0)`, a swing of +-0.05 on 0.17, which is +-29% of
+	# the bloom laid over the band this layer measures. One grabbed frame therefore sampled one arbitrary
+	# phase of it, and three placements pooled three arbitrary phases. Five repeats on a byte-identical
+	# tree read 78.38, 78.38, 74.32, 77.03 and 75.68 against a floor of 75.00 -- one red in five, on a
+	# tree nobody had touched.
+	#
+	# Stopping `_process` is what makes it hold: setting the clock and letting the frame run advances it
+	# again by a delta before the draw, which shrinks the wobble instead of removing it.
+	#
+	# Zero is not an arbitrary pose, it is the flicker's own mean: both sine terms vanish there, so the
+	# band is lit at exactly the average brightness the free-running clock would have delivered. The
+	# statistic is therefore posed at the middle of the distribution it used to sample from at random.
+	main._renderer.set_process(false)
+	main._renderer._anim_time = ANIM_POSE
+	main._renderer.repaint_world()
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 
@@ -316,6 +336,10 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 			_take(out, "l", data, iw, int(lp.x), int(lp.y), rx, ry)
 			_take(out, "r", data, iw, int(rp.x), int(rp.y), rx, ry)
 
+
+	# Hand the clock back, so nothing after this reads a frozen scene.
+	main._renderer.set_process(true)
+	main._renderer._anim_time = ANIM_POSE
 	return out
 
 
