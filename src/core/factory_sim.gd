@@ -1218,7 +1218,15 @@ func is_bazaar_at(o: Vector2i) -> bool:
 ## CACHED: this is a full-grid scan (~7700 cells × a 4×3 window) and the representation calls it several
 ## times PER FRAME, for the bazaar transform view and the near-bazaar craft gate, costing ~10ms/frame
 ## and a steady-state stutter. Bazaars are made of blocks, so the result changes only on a terrain edit:
-## the mutators flip `_bazaars_dirty` and the rescan is lazy. O(1) amortized between digs.
+## the mutators flip `_bazaars_dirty` and the rescan is lazy.
+##
+## "O(1) AMORTIZED BETWEEN DIGS" IS WHAT THIS USED TO SAY, and between digs it is true. The cost it hides
+## is the one a player meets: a dig invalidates the cache, so the next frame pays a whole rescan, and
+## while mining that is most frames. Measured on mac16,8 the rescan was 16.4ms -- two full frames at
+## 120fps -- and it was the single largest cost in the profile, larger than every terrain bake put
+## together. It arrived as `check_frametime`'s DIG p99 of 30.5ms, which that layer's own header attributes
+## to the fine-terrain region rebake; the region rebake measures 3.6ms and was never the subject.
+## The scan now rejects an origin in two dictionary reads, and the same profile shows nothing above 5.9ms.
 var _bazaars_cache: Array[Vector2i] = []
 var _ruins_cache: Array[Dictionary] = []       ## {origin, gap}: frames ONE block short (find_bazaar_ruins)
 var _bazaars_dirty: bool = true
@@ -1247,6 +1255,19 @@ func _rescan_bazaars() -> void:
 	for y: int in range(0, GRID_ROWS - BAZAAR_H):
 		for x: int in range(0, GRID_COLS - BAZAAR_W + 1):
 			var o := Vector2i(x, y)
+			# TWO READS INSTEAD OF A WINDOW WALK, and the reject is EXACT rather than a heuristic.
+			# A bazaar needs eight cells in wood: the four-cell top beam, and a post either side on each
+			# of the two rows below it. A ruin is the same frame with exactly ONE of those eight missing.
+			# So among ANY TWO of the eight, at least one is wood in both cases -- if two are missing it
+			# is neither. The two top-beam corners are the cheapest such pair to name, and rejecting on
+			# them skips the `bazaar_gap_at` below, which walks the whole window before returning nothing.
+			#
+			# This is the entire cost. `is_bazaar_at` fails on its first read for almost every origin, but
+			# `bazaar_gap_at` ran on all ~16,000 of them, and the pair together measured 16.4ms per
+			# rescan -- see the note on `_bazaars_dirty` for why that lands on a dig.
+			if solid.get(o, &"") != &"wood" \
+					and solid.get(o + Vector2i(BAZAAR_W - 1, 0), &"") != &"wood":
+				continue
 			if is_bazaar_at(o):
 				_bazaars_cache.append(o)
 				continue
