@@ -64,7 +64,7 @@ const SOLE_OWNER: Dictionary = {
 	"BAZAAR_GUTTER": "res://scenes/bazaar_page.gd",
 	"BAZAAR_ROW_H": "res://scenes/bazaar_page.gd",
 	"BAZAAR_COLS": "res://scenes/bazaar_page.gd",
-	"PACK_CELL": "res://scenes/bazaar_page.gd",
+	"PACK_CELL": "res://scenes/bazaar_surface.gd",
 	"TAB_PACK": "res://scenes/bazaar_page.gd",
 	"TAB_WORKS": "res://scenes/bazaar_page.gd",
 	"TAB_BENCH": "res://scenes/bazaar_page.gd",

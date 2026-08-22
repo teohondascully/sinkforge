@@ -4,14 +4,19 @@ extends PageSurface
 ## WHAT EVERY PART OF THE COUNTER NEEDS: the sim it is reporting on, and the three questions all of its
 ## tabs ask about a thing.
 ##
-## `PageSurface` underneath holds what any page needs to draw at all — the canvas, the font, the probe,
+## `PageSurface` underneath holds what any page needs to draw at all -- the canvas, the font, the probe,
 ## the rounded plates. This layer is the counter's own: the tabs share a sim and a table of faces, and
 ## the moment one of them became a file of its own it had to write both out again for itself.
 ##
 ## Only what is actually shared lives here. Measured over the tabs, `_draw_thing_icon` is called from all
-## of them, `_item_label` from two, and `_cost_numeral` from two. The plate's own fabric — the lamp, the
-## glyph inset, the verb button — is called from the detail plate and the shell and nowhere else, so it
+## of them, `_item_label` from two, and `_cost_numeral` from two. The plate's own fabric -- the lamp, the
+## glyph inset, the verb button -- is called from the detail plate and the shell and nowhere else, so it
 ## stays with them rather than being promoted to a base on the strength of sounding general.
+
+
+## The pitch of a pack well. It is here rather than with the pack tab because the panel's own minimum
+## height is written from it, and a constant two siblings both need cannot live in either of them.
+const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
 
 
 ## The sim every tab reports on, and the machine-icon table, both handed down from the Hud.
