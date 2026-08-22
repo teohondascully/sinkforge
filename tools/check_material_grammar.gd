@@ -59,6 +59,18 @@ const DEPTHS: Array[int] = [22, 26, 30]
 ## sits at 55.5 windows. The worst honest reading, 56, clears it by half a window while the observed
 ## spread is two. A bound with less margin than the measurement's own quantum is not a bound.
 ##
+## WHAT HAPPENED WHEN THE REPLICATION BELOW ACTUALLY ENGAGED, recorded here because it changes what this
+## layer is claiming. The denominator went from 74 windows at one column to 116 across five placements,
+## and the reading went from 74.32-79% to 71.55%. It did not drift; the pooled figure fell clean through
+## the floor and stayed there. The old greens were a statement about one column of rock, and the spread
+## that made them flake was the only visible symptom of that. So this layer now FAILS, and the failure is
+## not a regression in the grammar: nothing about the terrain changed. A bound that was being met by a
+## sample too small to test it is a bound that was never being met.
+##
+## READ_FLOOR is deliberately NOT moved. The number to change is the separability, not the bar -- see the
+## note on `usable`, where the direction half of the grammar is already recorded as not reaching the
+## frame at all. This red is the ticket for that work, and it is worth more standing than satisfied.
+##
 ## Sideways is the one axis where replication is real. `HALF_W` bounds a rig's reach, so rigs a full
 ## width apart cannot share a cell, cannot share a torch and cannot share a lamp. It is also the move the
 ## note above rejects, and the rejection is about something else: moving the BODY off the seam unmatches
@@ -176,10 +188,17 @@ func _run() -> void:
 	# A CUE IS DISQUALIFIED BY ITS OWN NULL, per cue rather than in aggregate. The null rig holds the SAME
 	# material on both sides, so any separation it shows is the instrument reading position, lighting or
 	# geometry, and a cue that separates identical rock cannot be trusted to be reading material when the
-	# rock differs. Pooled over three placements the two structure cues come apart sharply: GRAIN reads 51%
-	# on the null, ANISO reads 73%. So ANISO is not a material cue in this rig and is excluded from the
+	# rock differs. Pooled over five placements the two structure cues come apart: GRAIN stays under the
+	# ceiling, ANISO reads 63%. So ANISO is not a material cue in this rig and is excluded from the
 	# verdict by rule rather than by picking a preferred number. It is still printed, because "the attempt
 	# to read direction failed" is a finding about the seams, not an absence of one.
+	#
+	# AND THE POOLING IS NOT A CONVENIENCE, IT IS WHAT MAKES THE NULL MEAN ANYTHING. `[mg-rig]` prints the
+	# same cue per placement, and on the null rig -- identical earth either side of the seam -- GRAIN reads
+	# 57.1, 63.2, 85.7, 52.2 and 61.9 across the five. A placement that separates rock from itself at 85.7%
+	# is a demonstration that one placement's AUC cannot carry a verdict at this n, whatever it says. The
+	# pooled null falls back under the ceiling because those deviations point in different directions and
+	# cancel. Read the pooled figure; treat any single `[mg-rig]` line as texture, not evidence.
 	#
 	# ANISO's failure is also informative rather than merely inconvenient: the treatment's own anisotropy
 	# reads 50-51%, so the per-grammar seam DIRECTION (bedded running flat, massive running steep) is not
@@ -271,18 +290,45 @@ func _run() -> void:
 ## THE REQUIREMENT IS THE BAND ITSELF, not a tolerance on the surface row. A row tolerance is a guess at
 ## the thing that matters; `Strata.band_at` IS the thing that matters, and it is the same table the HUD
 ## reads to print the band's name in the corner of those two captures. So a candidate is admitted when
-## EVERY depth in `DEPTHS` lands in the same band there as it does at the base column, and refused
+## the depth being sampled lands in the same band there as it does at the base column, and refused
 ## otherwise. Nothing to tune, and it cannot drift away from the bands it is protecting.
+##
+## AND IT IS ASKED PER DEPTH, WHICH IS NOT A RELAXATION OF THAT TEST BUT AN UNSTACKING OF IT. The first
+## version conjoined the test across all of `DEPTHS` and admitted a column only if every depth matched at
+## once. That is a stronger demand than the paragraph above makes, and it is stronger in a direction that
+## protects nothing: the depths are not required to share a band WITH EACH OTHER, and at the shipped seed
+## they do not. Base surface row 20 puts depth 22 at row 42, THE CLAYBAND, and depths 26 and 30 at rows 46
+## and 50, SHALE REACH. Conjoining their admission tests therefore guards a homogeneity the pooled set has
+## never had and was never claimed to have.
+##
+## What the conjunction did instead was refuse the terrain outright. Each depth on its own admits a wide
+## span of surface rows; the intersection is four rows:
+##
+##     depth 22   surface rows  8..21   14 rows admissible
+##     depth 26   surface rows 18..33   16 rows
+##     depth 30   surface rows 14..29   16 rows
+##     all three  surface rows 18..21    4 rows
+##
+## and the nearest candidate the terrain offered sat 3 rows off, just outside. So the layer reported
+##
+##     rig offsets [0] -- 18 candidate(s) refused; nearest refused sat 3 row(s) off
+##
+## on every run: the sideways replication this section exists to describe was INERT for its whole life,
+## and the denominator stayed at the 74 windows the margin note above calls too few to carry the bound.
+## Asking each depth for its own columns applies the identical admission test, once per rig instead of
+## once per column-triple.
 ##
 ## Where the terrain offers no such column, the layer replicates less rather than replicating wrongly,
 ## and prints how near it got so that a thin n is a stated limit rather than a silent one.
 
 
-func _rig_offsets(sim: FactorySim, base_x: int) -> Array[int]:
+func _rig_offsets(sim: FactorySim, base_x: int, depth: int) -> Array[int]:
 	var step: int = 2 * HALF_W + 1
 	var base_row: int = sim.surface_row(base_x)
+	var want: int = Strata.band_at(base_row + depth)
 	var out: Array[int] = [0]
 	var rejected: int = 0
+	var crowded: int = 0
 	var closest: int = 9999
 	var off: int = step
 	while out.size() < RIG_COLS and off < FactorySim.GRID_COLS:
@@ -292,20 +338,29 @@ func _rig_offsets(sim: FactorySim, base_x: int) -> Array[int]:
 			var cx: int = base_x + sign * off
 			if cx - HALF_W < 0 or cx + HALF_W >= FactorySim.GRID_COLS:
 				continue
-			var same: bool = true
-			for depth: int in DEPTHS:
-				if Strata.band_at(sim.surface_row(cx) + depth) != Strata.band_at(base_row + depth):
-					same = false
-			if not same:
+			# AGAINST THE ONES ALREADY TAKEN, not just against the base. `off` walks outward one column
+			# at a time, so the first admitted offset is a rig-width out and the SECOND can be one column
+			# past it -- two rigs overlapping in 40 of their 41 columns, pooled as if independent. This
+			# was latent for as long as the band test admitted nothing but `[0]`; unstacking that test
+			# uncovered it immediately, as offsets [0, 48, 49].
+			var crowds: bool = false
+			for got: int in out:
+				if absi(sign * off - got) < step:
+					crowds = true
+			if crowds:
+				crowded += 1
+				continue
+			if Strata.band_at(sim.surface_row(cx) + depth) != want:
 				rejected += 1
 				closest = mini(closest, absi(sim.surface_row(cx) - base_row))
 				continue
 			out.append(sign * off)
 		off += 1
-	print("    [mg] base column %d at surface row %d; rig offsets %s -- %d candidate(s) refused for a "
-		% [base_x, base_row, str(out), rejected]
-		+ "depth band that differs at one or more of %s; nearest refused sat %s row(s) off"
-		% [str(DEPTHS), "no" if closest > 9000 else str(closest)])
+	print("    [mg] depth %d (row %d, %s): base column %d at surface row %d; rig offsets %s -- "
+		% [depth, base_row + depth, Strata.name_at(base_row + depth), base_x, base_row, str(out)]
+		+ "%d candidate(s) refused for a depth band that differs there (nearest sat %s row(s) off), "
+		% [rejected, "no" if closest > 9000 else str(closest)]
+		+ "%d for overlapping a rig already taken" % crowded)
 	return out
 
 
@@ -317,15 +372,38 @@ func _measure(main: MainView, left: StringName, right: StringName, label: String
 		"l_aniso": [] as Array[float], "r_aniso": [] as Array[float]}
 	if _base_x < 0:
 		_base_x = main._cell_at(main._player.position).x
-	var offsets: Array[int] = _rig_offsets(main.sim, _base_x)
-	_rigs = offsets.size() * DEPTHS.size()
-	for off: int in offsets:
-		for depth: int in DEPTHS:
+	_rigs = 0
+	for depth: int in DEPTHS:
+		var offsets: Array[int] = _rig_offsets(main.sim, _base_x, depth)
+		_rigs += offsets.size()
+		for off: int in offsets:
 			var one: Dictionary = await _sample_at(main, left, right, depth, off)
+			_rig_note(one, label, depth, off)
 			for k: String in pooled:
 				(pooled[k] as Array[float]).append_array(one[k] as Array[float])
 	return _report(pooled, label)
 
+
+
+## PER PLACEMENT, PRINTED AND NOT ASSERTED. Five rigs pooled into one number cannot say whether the
+## grammar reads the same in different rock, and that is the question sideways replication raises the
+## moment it starts working: the single-column rig reported 74 to 79% and the pooled set reads five
+## points under the bottom of that range. A small-sample artefact and a spatial finding look identical
+## in the pooled figure and completely different here, so the split is what decides which one it is.
+func _rig_note(one: Dictionary, label: String, depth: int, off: int) -> void:
+	var lv: Array[float] = one["l_value"]
+	var rv: Array[float] = one["r_value"]
+	var lit: Array[int] = []
+	for i: int in lv.size():
+		if (lv[i] + rv[i]) * 0.5 >= LIT_FLOOR:
+			lit.append(i)
+	var parts: String = ""
+	for cue: String in ["grain", "aniso"]:
+		var a: Array[float] = one["l_" + cue]
+		var b: Array[float] = one["r_" + cue]
+		parts += "  %s %5.1f%%" % [cue.to_upper(), _paired(_pick(a, lit), _pick(b, lit)) * 100.0]
+	print("      [mg-rig] %-28s depth %d offset %+3d: %2d lit of %2d%s"
+		% [label, depth, off, lit.size(), lv.size(), parts])
 
 func _sample_at(main: MainView, left: StringName, right: StringName, depth: int,
 		col_off: int) -> Dictionary:
