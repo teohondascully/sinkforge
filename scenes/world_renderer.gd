@@ -460,6 +460,11 @@ func setup(world_sim: FactorySim, falling_items: FallingItems, body: Player) -> 
 	tooth_mat.shader = load("res://scenes/rock_tooth.gdshader")
 	_tooth.material = tooth_mat
 	add_child(_tooth)
+	# HERE AND NOT AFTER THE BAKE ABOVE, because the bake runs before this node exists and clears
+	# `_fine_dirty` on its way out, so the per-frame lane that normally refreshes this would never fire on
+	# a fresh boot. The map would be missing for the whole session and the shader's hint_default_black
+	# would make that look exactly like the isotropic tooth it replaces.
+	_tooth_grammar()
 	# Player intent sits above the dark. The map beacon, the dig plan and the objective marker are not part of
 	# the world; they are things the player put there, and the veil was taking two thirds of each. Measured
 	# at 24 metres by differencing per-pixel maxima with the cue placed against the cue cleared (null
@@ -628,8 +633,10 @@ func _process(delta: float) -> void:
 		_veil_cols_dirty = true
 	if _fine_dirty:
 		_bake_fine_terrain()          # Full rebake (initial / load): the slow lane
+		_tooth_grammar()
 	elif _fine_region_pending:
 		_bake_fine_region(_fine_dirty_min, _fine_dirty_max)   # the per-dig fast lane
+		_tooth_grammar()
 		_fine_region_pending = false
 	elif _fine != null and _fine.pending_rows() > 0:
 		# The boot bake painted only what was on screen. Fill the rest a slice per frame, off-camera and
@@ -3380,6 +3387,21 @@ func _view_world_rect(margin_cells: float = 1.0) -> Rect2:
 ## Draw the baked fine-terrain mold stretched over the world; the nearest filter keeps the 8px fine pixels
 ## crisp. Its one draw command replays for free, and content only changes when _bake_fine_terrain
 ## re-uploads.
+## Hand the post-veil tooth the coarse grammar map, so its hash cell can run along the material's own
+## grain instead of being square everywhere. Without this the tooth is isotropic white noise laid over
+## every material at the largest amplitude any rock mark gets, and it flattens the grammar's direction to
+## nothing -- see the header of rock_tooth.gdshader for the measurement that caught it.
+##
+## Cheap enough to call after every bake: `grammar_texture()` rebuilds only when a bake actually rewrote
+## the map, and the uniform keeps the same ImageTexture across updates.
+func _tooth_grammar() -> void:
+	if _fine == null or _tooth == null:
+		return
+	var mat: ShaderMaterial = _tooth.material as ShaderMaterial
+	if mat != null:
+		mat.set_shader_parameter("gram_tex", _fine.grammar_texture())
+
+
 func _paint_fine_terrain(layer: LightLayer) -> void:
 	if _fine == null:
 		return

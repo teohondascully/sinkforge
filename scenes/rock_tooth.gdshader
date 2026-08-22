@@ -1,99 +1,43 @@
 shader_type canvas_item;
 render_mode blend_add;
 
-// The tooth that survives the dark: the same job as rock_grit.gdshader, done above the veil.
+// The tooth: the one rock pass that draws ABOVE the darkness veil, adding in absolute value levels.
+// See the standing constraint at the head of scenes/fine_terrain.gd -- everything painted into the bake
+// is multiplied by a veil that takes underground rock to a mean of ~10/255, so a mark written there is
+// divided by the dark. This pass is what survives it.
 //
-// rock_grit runs on the fine-terrain layer at z=-9. The darkness veil is a multiply layer at z=50, so
-// every texture the terrain paints, including rock_grit's `grit_add` (the additive floor written
-// specifically "so rock that the veil has taken most of the way down still has something in it"), is
-// scaled by exactly the factor that made the rock dark. Outside the lamp the sampled median is
-// 8.7/255, so to land 2 levels through that veil the floor would have to be 20 levels in lit rock.
-// The mechanism cannot reach its own stated purpose from below the multiply. The failure is one of
-// layer order rather than tuning. That is why raising GRAIN_AMP came to nothing; so did an additive
-// companion and so did a higher noise frequency (58% -> 55% -> 59%, against a 75% floor).
+// AND IT USED TO CARRY NO DIRECTION, which cost the material grammar its second cue. The grammar states
+// two things about a material: how loud its surface is, and which way it runs. The loudness reached the
+// frame; the direction did not. `check_material_grammar` measured stone's rendered anisotropy at +0.019
+// against earth's +0.022, on a scale where +-1 is fully directional -- a difference of 0.003, and
+// indistinguishable from that layer's earth-vs-earth null at +0.019/+0.017. Two materials whose seam
+// sampling differs by 3.40 against 1.00 on x were rendering as the same isotropic field.
 //
-// So this draws the same fine texture again, above the veil, and adds tooth in absolute levels. Being
-// additive and post-veil, what it writes is what arrives.
+// The cause was here. `hash(floor(world_pos))` is per-world-pixel white noise: the highest-frequency,
+// most isotropic signal available, added on top of everything else at the largest amplitude any rock
+// mark gets. It raised the horizontal and vertical gradients by the same amount everywhere and flattened
+// the grammar underneath it. The layer's own TOOTH OFF arm had been printing the evidence all along --
+// with this pass disabled the earth/stone anisotropy gap is 0.038 against 0.019, six times wider than
+// with it on.
 //
-// It masks on VOID_ALPHA, the other half of the same story. fine_terrain paints the back wall opaque.
-// So rock_grit's `step(0.004, COLOR.a)` was true of the void as well, under a comment reading "air
-// gets none of this". Before that was fixed air carried more tooth than rock (grain 2.06 vs 1.83).
-// Texturing both equally cannot separate them at any amplitude.
-//
-// Positive only, because an additive pass cannot subtract. The consequence is honest and small: rock
-// gains about `tooth_add/2` of mean brightness where it is nearly black, which also puts solid rock
-// above open air in value. Without it the two invert, air 9.0 against rock 8.5, so the thing you walk
-// through reads as more substantial than the thing you dig. This is not a global brighten: air, sky and
-// every lit surface are untouched, and the amount is a couple of levels on the darkest rock in the frame.
+// So the tooth now asks what it is drawing over. `gram_tex` is the coarse GRAM_* map on the same world
+// rect as the bake, so it samples with the identical UV, and the hash cell is stretched to match: soil
+// stays square because loose ground has no grain, bedded rock runs flat, and massive rock runs steep.
+// hint_default_black means an unbound sampler reads as GRAM_CLASTIC, so a missing map is the old
+// isotropic behaviour rather than a wrong one.
+uniform sampler2D gram_tex : hint_default_black, filter_nearest, repeat_disable;
 
-// The back wall deliberately gets no share of this tooth, and giving it one was measured and rejected.
-//
-// The mask below is `step(0.998, src.a)` and takes solids only. The note above explains why: before it
-// air carried more tooth than rock. That was right about the void and questionable about the back wall.
-// The wall is not void but the earth you did not dig one plane behind the face. And it is measurably flat:
-// inside the lamp at 22 rows, local texture (mean |luma delta| to the neighbouring pixel) is 4.13 on rock
-// against 2.02 on the wall, at medians of 31.5 and 18.8. The hole is not dark but smooth. Similar
-// value with no structure is exactly what a cut-out looks like. So the complaint about it is real and
-// the word "black" points the wrong way. Dropping this pass costs the rock 1.43 levels/px and the wall
-// nothing, so this one mask is two thirds of the gap.
-//
-// A `wall_frac = 0.5` band was built and measured. It works, and it is not worth it:
-//
-//     wall texture   2.02 -> 2.30   (+14%, and the wall's median rises 2 levels with it)
-//     contact-edge detectability   95% -> 94%,  edge step median 15.5 -> 14.9
-//     lit edge step  23.27 -> 21.57      polarity unchanged at 97%
-//
-// The gain is subliminal: across the frame 55% of pixels move by >=2 levels but only 0.04% by >=10,
-// and the cost lands on the rock/void gate, a property already proved and guarded by "existing
-// rock/void gate must not regress". Trading a guarded property for one below the perceptual threshold is
-// the wrong trade even when both are small.
-//
-// Why it cannot be fixed by tuning, which is the part worth keeping: this pass is `blend_add` and
-// positive only, so any texture it gives the wall also raises the wall's mean, and raising the wall's mean
-// is precisely what narrows the face step. The wall does not need brightness, it needs structure: a
-// zero-mean texture that darkens as much as it lightens. An additive pass cannot make one at any
-// amplitude. A post-veil mix layer can, and one now exists at z 53 (`_marks`); that is where a back-wall
-// grain belongs, not here.
-// Fine rock texture drawn above the darkness veil, in absolute levels. Same texture as rock_grit.
-//
-// rock_grit paints the fine-terrain layer at z=-9 and the veil is a multiply at z=50, so everything the
-// terrain paints is scaled by the factor that made the rock dark in the first place. Outside the lamp the
-// median rock level is 8.7/255: a floor worth two levels through the veil would need twenty levels in lit
-// rock. The limit is layer order, so no amount of amplitude or frequency in rock_grit can reach it. This
-// pass draws the same texture one layer up instead.
-//
-// Being additive it raises rock's mean by about tooth_add/2 where rock is nearly black. That is what puts
-// solid rock above open air in value; without it the two invert, air at 9.0 against rock at 8.5. Air, sky
-// and lit surfaces are untouched, so this is not a global brighten.
-//
-// The mask is solids only. fine_terrain paints the back wall opaque, so an alpha test against 0 is true of
-// the void as well and would texture air as heavily as rock at any amplitude.
-//
-// The back wall deliberately gets no tooth. blend_add is positive only, so texture given to the wall
-// raises its mean and narrows the rock-to-void value step. At a 0.5 wall share the wall's texture rises
-// from 2.02 to 2.30 mean absolute luma delta per pixel against rock's 4.13, and contact-edge detectability
-// falls from 95% to 94%. Dropping the pass costs rock 1.43 levels per pixel and the wall nothing. A
-// back-wall grain has to be zero-mean, which puts it in the post-veil mix layer (_marks, z 53).
-//
-// Amplitude swept against the rock-versus-void reading, two runs per arm, rock and air medians:
-//
-//     0.030  rock 2.99  air 1.88  ->  73% (below floor)      0.060  rock 4.63  air 1.95  ->  84%
-//     0.045  rock 3.78  air 1.93  ->  78%                    0.090  rock 6.44  air 2.00  ->  92%
-//
-// 0.060 rather than the cheaper 0.045 because the deficit it answers is one-sided: voids get read as
-// solid and never the reverse, so the margin wanted is on the rock side.
-//
-// The cost was measured on the frame rather than assumed. Mean absolute horizontal neighbour delta on a
-// surface capture goes 2.507 to 3.378 on dark rock (+35%) and 3.043 to 3.245 on lit pixels (+7%): the
-// daylight half of the original claim survives, and the dark half is what needed the amplitude. Sampled
-// median luminance goes 11.1 to 13.9 against this layer's own 34.0 darkness ceiling, so the region still
-// reads as dark.
-//
-// The hint_range ceiling sits above the shipped value on purpose. A default pinned to the top of its own
-// range documents nothing about how much headroom the effect has.
 uniform float tooth_add : hint_range(0.0, 0.12) = 0.060;   // absolute value added at peak, post-veil
 uniform float mottle_add : hint_range(0.0, 0.03) = 0.006;  // coarser octave so the tooth is not uniform
 uniform float mottle_scale : hint_range(1.0, 16.0) = 5.0;  // world px per mottle sample
+
+// Hash cell in world px per grammar, as (width, height). A cell wider than it is tall makes the field
+// change slowly along x and quickly along y, which is a flat lamina; the transpose is a steep one. The
+// measuring window steps 3px, so an elongation of 3 is what it takes for the long axis to still be
+// correlated at the sample spacing while the short axis is not.
+uniform vec2 cell_clastic = vec2(1.0, 1.0);   // soil: granular, no direction
+uniform vec2 cell_bedded = vec2(3.0, 1.0);    // bedding: features run flat
+uniform vec2 cell_massive = vec2(1.0, 3.0);   // massive: seams dip steeply
 
 varying vec2 world_pos;
 
@@ -109,9 +53,17 @@ void vertex() {
 
 void fragment() {
 	vec4 src = texture(TEXTURE, UV);
-	// Solid rock only. 254/255 = 0.996 is air with something behind it; 1.0 is rock; 0.0 is sky.
 	float solid = step(0.998, src.a);
-	float tooth = hash(floor(world_pos)) * tooth_add;
+	// 0 clastic, 1 bedded, 2 massive -- one byte per coarse cell, so the read is exact rather than a
+	// threshold on a blended value; the sampler is nearest for that reason.
+	float g = texture(gram_tex, UV).r * 255.0;
+	vec2 cell = cell_clastic;
+	if (g > 1.5) {
+		cell = cell_massive;
+	} else if (g > 0.5) {
+		cell = cell_bedded;
+	}
+	float tooth = hash(floor(world_pos / cell)) * tooth_add;
 	float mottle = hash(floor(world_pos / mottle_scale) + 17.0) * mottle_add;
 	COLOR = vec4(vec3((tooth + mottle) * solid), 1.0);
 }

@@ -438,6 +438,13 @@ var _huex: FastNoiseLite                               ## region hue field, x ax
 var _huey: FastNoiseLite                               ## region hue field, y axis
 var _img: Image
 var _tex: ImageTexture
+## The coarse grammar map, exposed as a texture so a POST-VEIL pass can know which material it is
+## drawing over. Everything in this file paints BELOW the darkness multiply, which is why the standing
+## constraint at the head of the file says direction never survives depth; the tooth is the one pass that
+## draws above it, and until now it had no way to ask what it was drawing on. See rock_tooth.gdshader.
+var _gram_img: Image
+var _gram_tex: ImageTexture
+var _gram_dirty: bool = true
 # Persisted caches so a per-dig rebake can patch a sub-rect instead of the whole grid. The full rebake
 # fills them, and rebake_region refreshes only the changed cells and reads neighbours out of them.
 var _data: PackedByteArray = PackedByteArray()          ## the baked pixel bytes (region rebakes overwrite a sub-rect)
@@ -535,6 +542,26 @@ func _init(cols: int, rows: int, seed: int) -> void:
 
 func texture() -> Texture2D:
 	return _tex
+
+
+## R8 at COARSE resolution, one byte per cell holding the GRAM_* index, over the same world rect as
+## `texture()` so a shader can sample it with the identical UV. Rebuilt lazily: the map changes only when
+## a bake rewrites `_mat_gram`, which is the same cadence as the bake itself.
+func grammar_texture() -> Texture2D:
+	if _gram_dirty:
+		_rebuild_grammar_texture()
+	return _gram_tex
+
+
+func _rebuild_grammar_texture() -> void:
+	if _cols <= 0 or _rows <= 0 or _mat_gram.size() != _cols * _rows:
+		return
+	_gram_img = Image.create_from_data(_cols, _rows, false, Image.FORMAT_R8, _mat_gram)
+	if _gram_tex == null:
+		_gram_tex = ImageTexture.create_from_image(_gram_img)
+	else:
+		_gram_tex.update(_gram_img)
+	_gram_dirty = false
 
 
 ## World-space rect the baked texture covers (the whole world, stretched 1 fine texel = FINE px).
@@ -669,6 +696,7 @@ func rebake(solid_at: Callable, fine_solid_at: Callable, material_color_at: Call
 			# two disagree by a couple of pixels in accreted rock. Stale is not merely wrong, it is
 			# instance-dependent, which is the one thing a region-vs-full comparison cannot tolerate.
 			_mat_gram[idx] = _grammar_of(cell) if _solid_mask[idx] > 0.5 else GRAM_CLASTIC
+			_gram_dirty = true
 			if _solid_mask[idx] > 0.5:
 				_mat_col[idx] = material_color_at.call(cell) as Color
 			_wall_col[idx] = wall_color_at.call(cell) as Color
@@ -873,8 +901,10 @@ func rebake_region(cmin: Vector2i, cmax: Vector2i, solid_at: Callable, fine_soli
 			if s:
 				_mat_col[idx] = material_color_at.call(Vector2i(cx, cy)) as Color
 				_mat_gram[idx] = _grammar_of(Vector2i(cx, cy))
+				_gram_dirty = true
 			else:
 				_mat_gram[idx] = GRAM_CLASTIC   # never leave an entry to go stale (see rebake)
+				_gram_dirty = true
 			_wall_col[idx] = wall_color_at.call(Vector2i(cx, cy)) as Color
 			_wall_has[idx] = 1 if bool(has_wall_at.call(Vector2i(cx, cy))) else 0
 	# _tone is deliberately not refreshed: a tone is a pure function of (x, y), so mining cannot change
