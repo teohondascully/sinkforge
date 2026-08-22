@@ -3607,6 +3607,10 @@ const SAG_CAP: float = 0.42             ## most of the chord the hang may ever b
 ## hang measures the cord's OUTER EDGE, which stands half of this off the centreline the sag describes.
 ## Two files agreeing on 4.5 by both writing 4.5 is a pair no assertion can fail on.
 const CORD_W: float = 4.5
+## The FIBRE stroke, laid over the under-stroke. Named for the same reason and one more: a fixture masking
+## the cord by colour matches `ROPE_CORE`, which is only ever drawn this wide, so this is the width that
+## sets how far a found pixel can sit from the centreline. `CORD_W` is the wrong one to subtract.
+const CORD_CORE_W: float = 2.0
 const SAG_MIN: float = 2.0              ## px, so even a tight line keeps a whisker of curve
 
 
@@ -3737,7 +3741,7 @@ func _draw_cord(from: Vector2, to: Vector2, sag: float) -> void:
 	for i: int in ROPE_SEGMENTS:
 		draw_line(pts[i], pts[i + 1], ROPE_SHADE, CORD_W)
 	for i: int in ROPE_SEGMENTS:
-		draw_line(pts[i], pts[i + 1], ROPE_CORE, 2.0)
+		draw_line(pts[i], pts[i + 1], ROPE_CORE, CORD_CORE_W)
 	# A twist highlight every other segment: at this scale, whether the line reads as rope or as a laser is
 	# entirely whether it has any internal structure at all.
 	for i: int in ROPE_SEGMENTS:

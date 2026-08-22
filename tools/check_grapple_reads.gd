@@ -198,7 +198,7 @@ func _bow_sag_median(span: float) -> float:
 		var k: float = sin(t * PI)
 		if k < BOW_SIN_FLOOR:
 			continue
-		est.append(maxf(_bow_best[i] - WorldRenderer.CORD_W * 0.5, 0.0) / k)
+		est.append(maxf(_bow_best[i] - WorldRenderer.CORD_CORE_W * 0.5, 0.0) / k)
 	if est.size() < BOW_MIN_EST:
 		return BOW_NO_CORD
 	est.sort()
@@ -233,7 +233,7 @@ func _bow_agree(span: float) -> float:
 		if k < BOW_SIN_FLOOR:
 			continue
 		total += 1
-		var est: float = maxf(_bow_best[i] - WorldRenderer.CORD_W * 0.5, 0.0) / k
+		var est: float = maxf(_bow_best[i] - WorldRenderer.CORD_CORE_W * 0.5, 0.0) / k
 		if absf(est - target) <= target * BOW_AGREE_BAND:
 			near += 1
 	return float(near) / maxf(float(total), 1.0)
@@ -1282,7 +1282,11 @@ func _corridor(a: Vector2, b: Vector2, half: float = CORRIDOR_HALF) -> PackedByt
 ##
 ## RETURNS `BOW_NO_CHORD` OR `BOW_NO_CORD` WHEN IT COULD NOT LOOK, and neither is a small bow. Put every
 ## result through `_bow_measured` before it is allowed to be arithmetic.
-const ROPE_HUE := Color(0.78, 0.70, 0.52)
+## DERIVED, NOT TYPED. This was `Color(0.78, 0.70, 0.52)` written out by hand, which is the same three
+## floats as `WorldRenderer.ROPE_CORE` and nothing relating them: a repaint of the rope would have left
+## this mask hunting the old colour and reporting a rope that had vanished. The under-stroke is 0.888 away
+## and `ROPE_TOL` is 0.20, so this mask sees the FIBRE and never the shade under it.
+const ROPE_HUE := WorldRenderer.ROPE_CORE
 const ROPE_TOL: float = 0.20
 
 func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
@@ -1357,7 +1361,7 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 			# into. A pixel out there is therefore not cord, whatever colour it is. Taking the best
 			# IN-BAND offset per station rather than rejecting the whole station keeps a station that
 			# holds both cord and contamination, which the far end of this chord does.
-			var ceil_here: float = sin(along / span * PI) * reach + WorldRenderer.CORD_W * 0.5
+			var ceil_here: float = sin(along / span * PI) * reach + WorldRenderer.CORD_CORE_W * 0.5
 			if off > ceil_here:
 				_bow_over[bi] += 1
 			elif off > _bow_best[bi]:
