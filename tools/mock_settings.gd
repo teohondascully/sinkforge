@@ -43,7 +43,7 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 50
-const CANVAS := Vector2(640.0, 360.0)
+const CANVAS := UiTheme.CANVAS
 
 # The counter's palette, sampled from hud.gd rather than re-chosen, for the same reason as the geometry.
 const PLATE := Color(0.062, 0.070, 0.094, 0.985)

@@ -45,7 +45,7 @@ const ITEMS: Array[StringName] = [
 	&"broad_bit", &"sinker_bit", &"lance_bit", &"wedge_bit",
 ]
 
-const CANVAS: int = 64          ## px per icon render
+const ICON_PX: int = 64          ## px per icon render; NOT the page canvas, which is UiTheme.CANVAS
 ## THE SIZE THIS LAYER MEASURES AT IS NOT THE SIZE THE GAME DRAWS AT, and the comment that used to sit here
 ## said otherwise. It read "roughly a hotbar cell". It is roughly FOUR of them. Every `Visuals.draw_item`
 ## call site in `scenes/`: **13.0** through most of the HUD (carried-count chips, pack rows, detail chips,
@@ -78,11 +78,11 @@ var _icon_px: float = ICON
 ## that are drawn perfectly well. That is a defect in the harness, not in the art, and it is what the
 ## first run at SF_ICON_PX=13 actually said. Scaling by the same ratio keeps every threshold meaning what
 ## it meant, and at the default it is 64 exactly, so the shipped measurement does not move.
-var _canvas: int = CANVAS
+var _canvas: int = ICON_PX
 
 
 ## An inner class is its own scope and cannot see this script's constants, so the geometry is handed to it
-## rather than read from CANVAS/ICON directly, which would not compile.
+## rather than read from ICON_PX/ICON directly, which would not compile.
 class Glyph extends Node2D:
 	var item: StringName
 	var at: Vector2
@@ -95,7 +95,7 @@ func _initialize() -> void:
 	var raw: String = str(OS.get_environment("SF_ICON_PX"))
 	if raw.is_valid_float():
 		_icon_px = float(raw)
-		_canvas = maxi(8, int(round(float(CANVAS) * _icon_px / ICON)))
+		_canvas = maxi(8, int(round(float(ICON_PX) * _icon_px / ICON)))
 	print("== can you tell what you are holding ==")
 	if not is_equal_approx(_icon_px, ICON):
 		print("  NOTE: rendering at %.0f px, not the default %.0f (SF_ICON_PX)" % [_icon_px, ICON])
@@ -269,7 +269,7 @@ func _report_at_hotbar_size() -> void:
 	var keep_canvas: int = _canvas
 	_icon_px = HOTBAR_PX
 	# Scaled by the same ratio, because `_coverage` and every threshold are relative to the image area.
-	_canvas = maxi(8, int(round(float(CANVAS) * HOTBAR_PX / ICON)))
+	_canvas = maxi(8, int(round(float(ICON_PX) * HOTBAR_PX / ICON)))
 	var small: Dictionary = {}
 	for item: StringName in ITEMS:
 		small[item] = await _render(item)

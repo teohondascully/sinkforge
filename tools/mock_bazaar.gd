@@ -23,7 +23,7 @@ extends SceneTree
 
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 50
-const CANVAS := Vector2(640.0, 360.0)
+const CANVAS := UiTheme.CANVAS
 
 # --- palette ------------------------------------------------------------------------------------------
 # Warmer and deeper than the current UI constants on purpose: the counter is lamp-lit, and every surface in
