@@ -201,7 +201,7 @@ wired to anything. Run it once and that layer passes. Build machines set `CI`, w
 that one assertion down and says so, because nothing commits from a build machine and the wiring
 would prove nothing there.
 
-The runner registers 109 layers, one script each, and launches each as its own Godot process, up to
+The runner registers 110 layers, one script each, and launches each as its own Godot process, up to
 the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
 into roughly six kinds:
 
@@ -254,7 +254,7 @@ exit codes in all, and a caller that reads "not zero" as "a test failed" will mi
 This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
 
 ```
-109 PASS / 0 FAIL / 0 SKIP of 109
+110 PASS / 0 FAIL / 0 SKIP of 110
 HARNESS_EXIT=4
 ```
 
@@ -284,7 +284,7 @@ The practical rule: **read the words, not the number.** `HARNESS_RESULT=yes` is 
 run is quotable at all — that the runner finished, every declared layer reported, and every layer log
 holds the output of a layer that actually executed. A verdict without it is not a result.
 
-109 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
+110 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
 claim.
 
@@ -376,8 +376,8 @@ into jobs:
 
 | Where | Renderer | What runs | Result |
 | --- | --- | --- | --- |
-| a local sweep | the machine's real GPU, through a real window | all 109 layers in one run | 109 pass, 0 fail, 0 skip — and `HARNESS_EXIT=4`, for the six declared stand-downs |
-| CI, headless job | Godot's dummy renderer | all 109 declared; the 15 that detect the absent display stand themselves down | 94 pass, 0 fail, 15 skip |
+| a local sweep | the machine's real GPU, through a real window | all 110 layers in one run | 110 pass, 0 fail, 0 skip — and `HARNESS_EXIT=4`, for the six declared stand-downs |
+| CI, headless job | Godot's dummy renderer | all 110 declared; the 15 that detect the absent display stand themselves down | 95 pass, 0 fail, 15 skip |
 | CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 15 pass, 1 fail |
 
 So "the suite passes" and "CI is red" are statements about different renderers, and both are true. The
@@ -406,7 +406,7 @@ This README carries no build badge while any job is red.
 | `scenes/` | everything visible: the controller `main.gd`, the renderer, the HUD, the player body, and five shaders. |
 | `assets/sprites/` | the only authored art in the project: 16 miner frames and their Aseprite source. |
 | `tests/` | four headless suites sharing `test_base.gd`, 64 test functions, run with no scene tree. |
-| `tools/` | the harness runner and its 109 layers, the play-tests, the capture and profiling tools, the machine lock. |
+| `tools/` | the harness runner and its 110 layers, the play-tests, the capture and profiling tools, the machine lock. |
 | `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
 | `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |
