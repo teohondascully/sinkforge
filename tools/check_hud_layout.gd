@@ -1005,10 +1005,15 @@ func _check_lesson_footprint() -> void:
 func _check_helper_registry() -> void:
 	var hud: Hud = _main._hud
 	var found: Array[String] = []
-	for m: Dictionary in hud.get_method_list():
-		var n: String = String(m["name"])
-		if n.begins_with("_draw") and not found.has(n):
-			found.append(n)
+	# BOTH objects, because the settings page's drawing moved to `SettingsPage` and did not stop being
+	# a drawing surface by changing file. Enumerating only the Hud would have let three classified
+	# surfaces leave the registry silently, which is the failure this assertion exists to prevent.
+	var surfaces: Array = [hud, hud._settings_page]
+	for obj: Object in surfaces:
+		for m: Dictionary in obj.get_method_list():
+			var n: String = String(m["name"])
+			if n.begins_with("_draw") and not found.has(n):
+				found.append(n)
 	_check(found.size() >= 20,
 		"the HUD reports %d _draw* methods to classify (if this collapses, everything below passes empty)"
 			% found.size())
