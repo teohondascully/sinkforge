@@ -332,6 +332,45 @@ func _run() -> void:
 ## WHOEVER SETS THIS: take it on a quiet box with the harness lock held and `pgrep Godot` returning one
 ## process, over at least eight runs, and write the distribution here. Do not derive it from a suite run.
 const DROP_AT: float = 1.5
+
+
+## THE FRAME SLO. Two terms, because one of them cannot express what the other measures.
+##
+## This replaces `p95 <= FRAME_BUDGET_MS`, which was the only 120fps assertion in the project and was
+## invalid on the one kind of display it would ever run on. Under vsync a frame lands on 1.0x or 2.0x the
+## interval and nothing between, so p95 measures the PACING and not the work -- the section above this
+## function has said so in prose since it was written. Turned on for the first time on 2026-08-22 it
+## failed all four phases, including RUN at p95 9.46ms with 0.0% of frames missing their slot and a mean
+## of 8.31ms. A phase comfortably holding 120fps, marked as under it. That is a false positive, not a bar.
+##
+## WHY TWO TERMS. `_drop_rate` answers how often a deadline is missed, which is what a player feels and
+## which pacing cannot fake in either direction. It is necessary and it is not sufficient: fixing the
+## bazaar rescan on 2026-08-22 took the DIG p99 from 30.5ms to 17.1ms, halving how LATE the stalls were,
+## and the miss RATE did not move at all -- the same six to eight frames still missed, by less. A contract
+## written on rate alone would have scored that fix as nothing. So severity is a term of its own.
+##
+## THESE ARE RATCHETS, NOT TARGETS, and the distinction is the honest part. Nobody has decided what frame
+## behaviour this game owes a player; what follows is measured behaviour with margin, so that a REGRESSION
+## is caught while nothing is claimed about what is good enough. Measured on mac16,8, quiet box, the layer
+## running alone, five consecutive runs of 200 frames per phase:
+##
+##     IDLE   0.5  0.5  0.5  0.5  0.5 %        worst ~1.8x interval
+##     RUN    0.0  0.0  0.0  0.0  0.0 %        worst ~1.4x
+##     SWING  0.0  0.0  0.0  0.0  0.0 %        worst ~1.4x
+##     DIG    3.2  3.0  4.0  3.2  3.0 %        worst ~2.5x
+##
+## DIG has its own allowance because it is the only phase doing work a player asked for mid-frame, and
+## hiding that behind one global number would let a dig regression spend the quiet phases' headroom.
+## 200 samples means the rate is quantised at 0.5%, so IDLE's reading is one single frame and the quiet
+## allowance is two of them.
+const MISS_QUIET: float = 0.010     ## IDLE, RUN, SWING: measured 0.0-0.5%, allow 1.0%
+const MISS_WORKING: float = 0.060   ## DIG: measured 3.0-4.0%, allow 6.0%
+## No frame may take more than this many refresh intervals. At 3.0 the pre-fix bazaar rescan FAILS -- DIG
+## worst ran 31.4 to 34.1ms against a 25.0ms bar -- and the fixed build passes at 17.7 to 20.8ms. A bound
+## that would have caught the largest stall this project has measured, and that clears it afterwards.
+const SEVERITY_X: float = 3.0
+const MISS_ALLOW: Dictionary = {"IDLE": MISS_QUIET, "RUN": MISS_QUIET, "SWING": MISS_QUIET,
+	"DIG": MISS_WORKING}
 func _drop_rate(ms: PackedFloat32Array, interval: float) -> float:
 	if ms.is_empty() or interval <= 0.0:
 		return 0.0
@@ -386,48 +425,67 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 				+ " pass. Over-budget phases still FAIL, and that is sound: pacing only ever makes a frame"
 				+ " report the same or SLOWER, so a phase that exceeded the budget really did exceed it.")
 
-	print("  absolute: SF_PERF_HOST=%s — every phase p95 must fit in %.2fms (120fps); the display refreshes"
-		% [_perf_host, FRAME_BUDGET_MS]
-		+ (" every %.2fms" % interval if interval > 0.0 else " at an unreported rate"))
+	# THE SLO NEEDS AN INTERVAL, and without one neither term means anything: "missed its slot" and
+	# "three intervals late" are both defined against the refresh. A run that cannot report the refresh
+	# has not measured the contract, so it declines rather than passing on a zero.
+	if interval <= 0.0:
+		_stand_down("frametime.paced-phase", "the frame SLO on %s" % _perf_host,
+			"the display did not report a refresh interval, and both SLO terms are defined against it;"
+			+ " a rate of frames past 1.5x of nothing is not a measurement")
+		return true
+
+	print("  absolute: SF_PERF_HOST=%s — the frame SLO, against a %.2fms refresh. TWO terms: how OFTEN a"
+		% [_perf_host, interval]
+		+ " deadline is missed (a frame past %.1fx the interval), and how LATE the worst one is." % DROP_AT
+		+ " Rate alone cannot see a stall getting shallower; severity alone cannot see one getting more"
+		+ " frequent. Both are ratchets on measured behaviour, not a claim about what is good enough.")
 	var ok: bool = true
 	for i: int in labels.size():
 		var ms: PackedFloat32Array = phases[i]
 		if ms.is_empty():
-			printerr("      FAIL: %s produced no samples — the budget was not measured" % labels[i])
+			printerr("      FAIL: %s produced no samples — the SLO was not measured" % labels[i])
 			ok = false
 			continue
 		var p95: float = _pct(ms, 0.95)
-		# The missed-deadline rate alongside the p95, always, whichever way the budget goes. On a paced run
-		# it is the only one of the two that distinguishes "slow" from "occasionally late", and a reader
-		# comparing 8.81ms to 8.33ms without it will conclude the wrong thing, as has happened twice here.
 		var drops: float = _drop_rate(ms, interval)
-		print("      %s: p95 %.2fms · %.1f%% of frames missed their %.2fms slot (>%.2fms)"
-			% [labels[i], p95, drops * 100.0, interval, interval * DROP_AT])
-		if p95 > FRAME_BUDGET_MS:
-			printerr("      FAIL: %s p95 %.2fms is over the %.2fms budget — that phase is under 120fps on %s"
-				% [labels[i], p95, FRAME_BUDGET_MS, _perf_host]
-				+ (". NOTE: it missed only %.1f%% of its slots, so on a paced display this p95 is consistent"
-					% (drops * 100.0)
-					+ " with a phase that is comfortably fast and occasionally late rather than a slow one —"
-					+ " read the drop rate before acting on this number."
-					if drops <= 0.10 else ""))
-			# ASSERTED AND FAILED IS STILL ASSERTED. The accounting question is whether the property was
-			# put to the test, not whether it survived; a row that only registers on the green path would
-			# report a failing layer as one that never made the claim.
-			_asserted("frametime.paced-phase")
+		var worst: float = _worst(ms)
+		var allow: float = float(MISS_ALLOW.get(labels[i], MISS_QUIET))
+		var late_x: float = worst / interval
+		print("      %s: %.1f%% missed (allow %.1f%%) · worst %.2fms = %.1fx interval (allow %.1fx)"
+			% [labels[i], drops * 100.0, allow * 100.0, worst, late_x, SEVERITY_X]
+			+ " · p95 %.2fms, reported and NOT asserted" % p95)
+		# NO PACED BRANCH ANY MORE, and its absence is the point. Pacing cannot fake either term: a frame
+		# that fits presents at 1.0x and one that misses at 2.0x, so both numbers read the same whether
+		# the panel is waiting or the game is. That was the whole reason p95 had to go.
+		_asserted("frametime.paced-phase")
+		var bad: bool = false
+		if drops > allow:
+			printerr("      FAIL: %s missed %.1f%% of its deadlines, over the %.1f%% allowed on %s"
+				% [labels[i], drops * 100.0, allow * 100.0, _perf_host]
+				+ " — a RATE regression: the phase is late more often than it was measured to be.")
+			bad = true
+		if late_x > SEVERITY_X:
+			printerr("      FAIL: %s stalled %.2fms, %.1fx the %.2fms refresh, over the %.1fx allowed"
+				% [labels[i], worst, late_x, interval, SEVERITY_X]
+				+ " — a SEVERITY regression: something in that phase is doing several frames of work"
+				+ " inside one. Profile the phase and not the frame; the last one of these was a"
+				+ " full-grid rescan in the sim, and nothing the renderer was doing.")
+			bad = true
+		if bad:
 			ok = false
-		elif paced:
-			# Deliberately a stand-down and not a pass. A paced under-budget number is consistent with a
-			# game costing 0.2ms and with one costing 8.3ms, and the harness counts this line, so the run
-			# reports "passed without verifying everything" rather than banking a green nobody earned.
-			_stand_down("frametime.paced-phase", "%s p95 %.2fms against the %.2fms budget"
-				% [labels[i], p95, FRAME_BUDGET_MS],
-				"the run is vsync-paced — a frame that fits inside the refresh reports AS the refresh, so"
-				+ " this number cannot tell a fast phase from a pinned one")
 		else:
-			_asserted("frametime.paced-phase")
-			print("      PASS: %s p95 %.2fms fits in %.2fms" % [labels[i], p95, FRAME_BUDGET_MS])
+			print("      PASS: %s holds the SLO" % labels[i])
 	return ok
+
+
+## Its own function because `_pct` indexes a SORTED array and this must not care: the phase buffers reach
+## `_absolute` in capture order, and a max read off an unsorted array by index is exactly the kind of
+## quietly-wrong number this layer exists to catch.
+func _worst(ms: PackedFloat32Array) -> float:
+	var out: float = 0.0
+	for v: float in ms:
+		out = maxf(out, v)
+	return out
 
 
 ## THE FASTEST FRAME IN THE RUN, and the reason this function exists is worth more than the function.

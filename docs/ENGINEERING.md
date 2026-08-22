@@ -103,6 +103,31 @@ Exit codes and the parse-check trap are documented in `CONTRIBUTING.md`. The sho
 `--check-only` prints the parse error and then exits `0` anyway, so read the output rather than the
 status.
 
+## The frame SLO, and what it deliberately does not promise
+
+Performance claims are worth exactly as much as the hardware they name, so this project makes one only on
+a machine you have named yourself. Set `SF_PERF_HOST=<machine-id>` and `check_frametime` asserts a frame
+SLO; leave it unset, and the layer measures, prints, and explicitly declines to conclude.
+
+The SLO has **two terms**, and the reason is worth stating because a single number cannot carry it:
+
+| term | what it asks | why it alone is not enough |
+| --- | --- | --- |
+| **miss rate** | what share of frames run past 1.5x the display's refresh interval | it cannot see a stall getting shallower -- halving a 30ms stall to 17ms leaves the same frames late |
+| **severity** | how many refresh intervals the worst frame took | it cannot see a stall becoming more frequent |
+
+Both are **ratchets on measured behaviour, not targets.** Nobody has decided what frame behaviour this
+game owes a player. What the numbers encode is "no worse than it was measured to be", with margin, so a
+regression is caught while nothing is claimed about what is good enough. The allowances are separated by
+phase because digging is the only phase doing work the player asked for mid-frame, and one global number
+would let a dig regression quietly spend the idle phases' headroom.
+
+**What it does not use is a percentile against a millisecond budget**, and that is the part most people
+would write first. Under vsync a frame lands on 1.0x or 2.0x the refresh and nothing between, so p95
+measures the *pacing* and not the work. The first time that assertion was actually switched on it failed
+a phase that was holding 120fps with 0.0% of its frames late. The p95 is still printed beside the verdict;
+it is a diagnostic, not a bar.
+
 ## Limits that are named rather than hidden
 
 A suite that reports only successes is not being honest about what it can see. These are the places
