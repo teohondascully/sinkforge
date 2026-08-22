@@ -1,5 +1,5 @@
 class_name BazaarBench
-extends PageSurface
+extends BazaarSurface
 
 ## THE BENCH TAB: what you could build next, and what stands between you and it.
 ##
@@ -9,16 +9,6 @@ extends PageSurface
 ##
 ## Everything it draws with -- the canvas, the font, the probe, the rounded plates, the letter-spacing --
 ## comes from `PageSurface`, so none of that is written out again here.
-
-
-## The machine-icon table, handed down from the Hud along with the sim.
-var _sim: FactorySim = null
-var _icons: Dictionary = {}
-
-
-## The one primitive it needs that is not on the surface: a thing drawn in a box, from the table above.
-func _draw_thing_icon(id: StringName, box: Rect2) -> void:
-	Visuals.thing_icon(_canvas, id, box, _icons)
 
 
 ## Where the name starts and how much of the chip is left for it. The lamp is the only other thing on

@@ -1,5 +1,5 @@
 class_name BazaarPage
-extends PageSurface
+extends BazaarSurface
 
 ## THE COUNTER'S PAGES, WHICH ARE NOT THE COUNTER.
 ##
@@ -18,8 +18,6 @@ extends PageSurface
 
 ## The canvas, the font and the probe come from `PageSurface`, along with the eleven helpers that
 ## bind them onto the primitives in `Visuals` and `UiTheme`.
-var _sim: FactorySim = null
-var _icons: Dictionary = {}                 ## `Hud.machine_icons`, assembled by `main.gd`
 var _inv_selected: Callable                 ## `Hud.inv_selected_getter`, set from outside the Hud
 ## Near a claimed Bazaar. The Hud owns it because `main.gd` writes it and `tools/capture_moments.gd`
 ## reads it there; the accessor copies it in, the same way `probing` arrives.
@@ -521,16 +519,8 @@ func _unlocked(ids: Array[StringName], n: int) -> Array[int]:
 ## The two primitives the bench reaches for, mirrored with the canvas this page was handed.
 
 
-func _draw_thing_icon(id: StringName, box: Rect2) -> void:
-	Visuals.thing_icon(_canvas, id, box, _icons)
-
-
 func _detail_glyph(art: Rect2) -> Rect2:
 	return art.grow(-DETAIL_GLYPH_INSET)
-
-
-func _item_label(item: StringName) -> String:
-	return Visuals.thing_label(item, _icons)
 
 
 ## A tech has no glyph of its own, being knowledge, so its plate shows what it buys: the machines it
@@ -691,15 +681,6 @@ func _cost_glyphs(rr: Rect2, cost: Dictionary) -> float:
 	return w
 
 
-## What one ingredient's numeral says: the deficit when you are short of it, the price when you are not.
-##
-## It is a function and not an expression because the width pass and the draw pass above are two walks
-## of the same dictionary, and they used to each format the numeral for themselves. The width is not
-## cosmetic here: `_works_row` subtracts this function's total from the name's budget, so a numeral that
-## measures narrower than it draws puts the price on top of the word it was widened to protect.
-func _cost_numeral(item: StringName, need: int) -> String:
-	var gap: int = BazaarCosts.gap(_sim.inventory, item, need)
-	return ("-%d" % gap) if gap > 0 else str(need)
 
 
 ## The rail: three tabs as glyphs, the live one lit and carrying a brass edge. The key that selects a
