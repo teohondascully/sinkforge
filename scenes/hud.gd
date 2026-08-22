@@ -2537,17 +2537,10 @@ func _cost_order(cost: Dictionary) -> Array[StringName]:
 ## A machine's sprite or an item's glyph, whichever this id is. The pack grid, the works rows and the
 ## tech chips all want exactly this and used to each carry their own copy of it.
 func _draw_thing_icon(id: StringName, box: Rect2) -> void:
-	if machine_icons.has(id):
-		var spr: Texture2D = Art.tex("machine_" + String(id))
-		if spr != null:
-			draw_texture_rect(spr, box, false)
-			return
-		draw_rect(box, machine_icons[id]["color"])
-		Visuals.draw_machine_glyph(self, box.position + box.size * 0.5,
-			str(machine_icons[id]["kind"]), Visuals.glyph_cells_for(box.size.y), false, 0.0)
-		return
-	if id != &"":
-		Visuals.draw_item(self, box.position + box.size * 0.5, box.size.y, id)
+	# The wrapper stays so the eight call sites and the helper-registry entry do not move. `machine_icons`
+	# is the Hud's, assembled by `main.gd`, and handing it over is the whole reason `Visuals.thing_icon`
+	# takes a table instead of reaching for one.
+	Visuals.thing_icon(self, id, box, machine_icons)
 
 
 ## The counter has exactly one verb button. Until now it was drawn twice from two sets of numbers.
@@ -3853,19 +3846,11 @@ func _draw_inventory() -> void:
 			var item: StringName = slots[i]["item"]
 			var count: int = int(slots[i]["count"])
 			var icon := Rect2(sx + 6.0, y + 6.0, SLOT - 12.0, SLOT - 14.0)
-			if machine_icons.has(item):  # a machine item: its sprite, or casing colour + a mini silhouette
-				var mspr: Texture2D = Art.tex("machine_" + String(item))
-				if mspr != null:
-					draw_texture_rect(mspr, icon, false)
-				else:
-					var ic: Dictionary = machine_icons[item]
-					draw_rect(icon, ic["color"])
-					draw_rect(icon, Color(0.0, 0.0, 0.0, 0.35), false, 1.0)
-					# The same glyph the world draws, from the shared Visuals, scaled to the chip, so it never drifts.
-					Visuals.draw_machine_glyph(self, icon.position + icon.size * 0.5, str(ic["kind"]),
-						Visuals.glyph_cells_for(icon.size.y), false, 0.0)
-			else:  # a resource item: its sprite (item_<id>.png) or the flat colour chip
-				Visuals.draw_item(self, icon.position + icon.size * 0.5, icon.size.y, item)
+			# A machine's sprite or casing-colour-plus-glyph, or a resource's sprite or colour chip. This
+			# used to be twelve lines of that decision written out again, differing from the Bazaar's copy
+			# only by the rim, which is now the argument. `inventory_slots()` iterates real inventory keys,
+			# so the empty-id branch inside is unreachable from here.
+			Visuals.thing_icon(self, item, icon, machine_icons, Color(0.0, 0.0, 0.0, 0.35))
 			# Count badge bottom-right with a dark backing so it stays legible over any icon colour.
 			var cnt: String = str(count)
 			var cw: float = _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x

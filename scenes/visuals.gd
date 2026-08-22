@@ -1057,6 +1057,34 @@ static func item_color(item: StringName) -> Color:
 ## replaces the procedural glyph the moment it exists; absent → a drawn glyph that
 ## actually READS as the thing (a pickaxe looks like a pickaxe, an ingot like a bar). One helper so ground
 ## piles, the hotbar, the craft screen, and anything else share the same look + the same sprite swap.
+## A thing's icon, where "thing" is either a machine or an item and the caller does not want to care
+## which. Machines resolve through the caller's icon table -- `Hud.machine_icons`, built by `main.gd`
+## from the craftable list -- and fall back to a flat swatch plus a glyph when there is no sprite.
+## Items resolve through `draw_item` and its own art lookup.
+##
+## The table arrives as an argument rather than being reached for, because it is assembled per-run from
+## the craft registry and this file has no business knowing that. It is the only argument here that is
+## not geometry, and it is the reason this could not simply become a two-line wrapper.
+## `rim` outlines the casing swatch, between the colour and the glyph, and only when a sprite is absent.
+## The hotbar wants it and the bazaar does not; it is a colour rather than a flag so the caller says how
+## dark, and a fully transparent default means "no rim" without a second branch at every other call.
+static func thing_icon(canvas: CanvasItem, id: StringName, box: Rect2, icons: Dictionary,
+		rim: Color = Color(0.0, 0.0, 0.0, 0.0)) -> void:
+	if icons.has(id):
+		var spr: Texture2D = Art.tex("machine_" + String(id))
+		if spr != null:
+			canvas.draw_texture_rect(spr, box, false)
+			return
+		canvas.draw_rect(box, icons[id]["color"])
+		if rim.a > 0.0:
+			canvas.draw_rect(box, rim, false, 1.0)
+		draw_machine_glyph(canvas, box.position + box.size * 0.5,
+			str(icons[id]["kind"]), glyph_cells_for(box.size.y), false, 0.0)
+		return
+	if id != &"":
+		draw_item(canvas, box.position + box.size * 0.5, box.size.y, id)
+
+
 static func draw_item(canvas: CanvasItem, center: Vector2, size: float, item: StringName) -> void:
 	var tex: Texture2D = Art.tex("item_" + String(item))
 	if tex != null:

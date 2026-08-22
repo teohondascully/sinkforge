@@ -102,6 +102,7 @@ const SOLE_IMPL: Dictionary = {
 	"get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT": "res://scenes/visuals.gd",
 	"box.grow(grow - 1.0)": "res://scenes/visuals.gd",
 	"Vector2(0.0, KEYCAP_DROP)": "res://scenes/visuals.gd",
+	"Art.tex(\"machine_\" + String(": "res://scenes/visuals.gd",
 }
 
 ## EACH ASSERTION IS PROVED SEPARATELY, because one mutant leaves the others unproven.
