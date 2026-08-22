@@ -19,6 +19,13 @@ extends PageSurface
 const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
 
 
+## The counter's column geometry. Down here for the same reason as the pitch above: the shell sizes the
+## panel from these and the WORKS tab lays its rows out on them.
+const BAZAAR_COLS: int = 3
+const BAZAAR_GUTTER: float = 10.0
+const BAZAAR_ROW_H: float = 24.0
+
+
 ## The sim every tab reports on, and the machine-icon table, both handed down from the Hud.
 var _sim: FactorySim = null
 var _icons: Dictionary = {}                 ## `Hud.machine_icons`, assembled by `main.gd`
