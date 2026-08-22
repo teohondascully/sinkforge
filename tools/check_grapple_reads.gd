@@ -207,6 +207,44 @@ func _bow_sag_median(span: float) -> float:
 	return med / maxf(span, 1.0)
 
 
+## HOW MANY STATIONS AGREE WITH THE MEDIAN, which is the shape test the value alone cannot give.
+##
+## For a real hang every well-conditioned station estimates the SAME `sag`, because the offset is
+## `sin(t * PI) * sag` and the estimator divides that back out. So the estimates should cluster. Anything
+## that is not the hang -- rock inside `ROPE_TOL`, another rope, a hook -- lands at its own arbitrary
+## distance and estimates something else. A tight cluster is a cord; a scatter is a mask that found
+## several different objects and averaged them.
+##
+## Reported, not asserted, until it has been read on both renderers. What it is FOR: `pct99` returns the
+## right number from the wrong place on this rig, 125px at t=0.19 where the cord can reach 71px, and no
+## test on the VALUE can catch that. A test on the agreement can.
+func _bow_agree(span: float) -> float:
+	var mid: float = _bow_sag_median(span)
+	if is_equal_approx(mid, BOW_NO_CORD) or mid <= 0.0:
+		return -1.0
+	var target: float = mid * span
+	var near: int = 0
+	var total: int = 0
+	for i: int in _bow_best.size():
+		if _bow_best[i] < 0.0:
+			continue
+		var t: float = (float(i) + 0.5) / float(BOW_BINS)
+		var k: float = sin(t * PI)
+		if k < BOW_SIN_FLOOR:
+			continue
+		total += 1
+		var est: float = maxf(_bow_best[i] - WorldRenderer.CORD_W * 0.5, 0.0) / k
+		if absf(est - target) <= target * BOW_AGREE_BAND:
+			near += 1
+	return float(near) / maxf(float(total), 1.0)
+
+
+## How far a station may sit from the median and still count as agreeing with it. A quarter is wide enough
+## that antialiasing and the bin's own width do not disqualify a good station, and narrow enough that a
+## contaminant at twice or half the hang does not slip in.
+const BOW_AGREE_BAND: float = 0.25
+
+
 ## `_bow_sag_median` for the run log, sentinel spelled out.
 func _bow_sag_str(span: float) -> String:
 	var v: float = _bow_sag_median(span)
@@ -1261,6 +1299,16 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	_bow_span = span
 	var half: float = span * WorldRenderer.SAG_CAP + 24.0
 	var band: float = span * WorldRenderer.SAG_CAP
+	# THE MINER IS NOT THE ROPE, and this scan was the one place that did not say so. `_body_mask` is
+	# applied at four other sites here and was never applied to the bow. The miner stands at the HAND end
+	# of the chord, wears rope-coloured pixels, and the scan only excludes 6px of each end, so the body
+	# sat inside the corridor at low `along` and set the profile there. Taken from the body's real
+	# half-extents for the same reason `_body_mask` is: a generous invented box would start eating cord.
+	var bhalf: Vector2 = Vector2(Player.WIDTH, Player.HEIGHT) * 0.5
+	var b0: Vector2 = _screen(_main._player.position - bhalf)
+	var b1: Vector2 = _screen(_main._player.position + bhalf)
+	var body := Rect2(b0.min(b1), (b1 - b0).abs())
+	var body_hits: int = 0
 	var offs := PackedFloat32Array()
 	_bow_best.resize(BOW_BINS); _bow_best.fill(-1.0)
 	_bow_hits.resize(BOW_BINS); _bow_hits.fill(0)
@@ -1274,6 +1322,9 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 				continue                     # the ends are the hand and the piton, not the hang
 			var c: Color = img.get_pixel(x, y)
 			if Vector3(c.r, c.g, c.b).distance_to(Vector3(ROPE_HUE.r, ROPE_HUE.g, ROPE_HUE.b)) > ROPE_TOL:
+				continue
+			if body.has_point(Vector2(float(x), float(y))):
+				body_hits += 1
 				continue
 			offs.append(off)
 			var bi: int = clampi(int(along / span * float(BOW_BINS)), 0, BOW_BINS - 1)
@@ -1297,9 +1348,53 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 		% [pct, _bow_binned() / span, _bow_occupied(), BOW_BINS, offs.size(), span, _bow_rim()])
 	print("    [bow-diag] profile %s   (each station's peak offset as a share of the rim, . = empty)"
 		% _bow_sketch())
-	print("    [bow-diag] clean %s  sag-median %s  in-band %d/%d  over-band stations %d  (NEITHER is yet "
-		% [_bow_clean_str(span), _bow_sag_str(span), _bow_occupied(), BOW_BINS, _bow_over_stations()]
-		+ "what this layer asserts on)")
+	print("    [bow-diag] clean %s  sag-median %s  stations agreeing with it %.0f%%  in-band %d/%d  "
+		% [_bow_clean_str(span), _bow_sag_str(span), _bow_agree(span) * 100.0, _bow_occupied(), BOW_BINS]
+		+ "over-band stations %d  (NEITHER is yet what this layer asserts on)" % _bow_over_stations())
+	# WHAT THE RENDERER SAYS IT DREW, beside what the mask read off it. `rope_sag` is scale-free once
+	# divided by its own chord, so a world-space prediction is directly comparable to a screen-space
+	# measurement -- and the gap between them is the point. The cord is bowed in Y (`p.y += sin(t * PI) *
+	# sag`) while this mask measures distance PERPENDICULAR to the chord, so a chord at angle t to the
+	# horizontal should read `cos(t)` of what was drawn. Printing the angle makes that checkable instead
+	# of arguable: if measured/predicted tracks cos(angle), the instrument has a known scale error rather
+	# than a mystery, and a floor can be derived from the renderer instead of calibrated against readings.
+	var wspan: float = from.distance_to(to)
+	# THE SLACK THE RENDERER USED, not the slack that was asked for. `_at_slack` clamps `g.length` to
+	# [MIN_LENGTH, MAX_RANGE], so `want` is a request and `g.slack()` is the answer. Predicting from the
+	# request would be predicting from a number the drawing never saw.
+	var got: float = _main._player.grapple.slack(from)
+	var pred: float = WorldRenderer.rope_sag(wspan, got) / maxf(wspan, 1.0)
+	var ang: float = absf(rad_to_deg((to - from).angle()))
+	# WHERE THE LARGEST OFFSET SITS, which decides whether an agreement is the cord or a coincidence. The
+	# hang is `sin(t * PI) * sag`, so its apex is at mid-chord by construction. A maximum found near
+	# either end is not the hang, however well its VALUE matches the prediction.
+	var arg: int = -1
+	var argv: float = -1.0
+	for i: int in _bow_best.size():
+		if _bow_best[i] > argv:
+			argv = _bow_best[i]
+			arg = i
+	# Both of the next two report only when they fire. Each was a CANDIDATE source of the contamination
+	# and each was refused by its own count: the body discards 0 pixels here and the rope carries 0
+	# pivots, so neither is what sits 125px off the chord. They stay as guards, silent while true.
+	if body_hits > 0:
+		print("    [bow-diag] %d rope-coloured pixel(s) discarded as the miner's own body" % body_hits)
+	# THE OTHER ROPE IN THE PICTURE. `world_renderer.gd` draws `_draw_cord(at, pivot, 0.0)` for every
+	# pivot before it draws the hanging span, so a WRAPPED rope puts extra straight, rope-coloured
+	# segments in the frame that belong to no chord this scan knows about. `hitch()` is the LAST pivot, so
+	# the chord measured here is only the final span; the earlier ones are loose in the corridor.
+	var g2: Grapple = _main._player.grapple
+	if not g2.pivots.is_empty():
+		print("    [bow-diag] the rope has %d pivot(s), so the frame holds straight rope-coloured segments "
+			% g2.pivots.size() + "belonging to no chord this scan measures")
+	print("    [bow-diag] largest offset %.0f px at station %d of %d (t=%.2f); the hang's apex must be at "
+		% [argv, arg, BOW_BINS, (float(arg) + 0.5) / float(BOW_BINS)]
+		+ "t=0.50, and the renderer's apex here is %.0f px"
+		% (WorldRenderer.rope_sag(from.distance_to(to), _main._player.grapple.slack(from))
+			/ maxf(from.distance_to(to), 1.0) * span * cos((to - from).angle())))
+	print("    [bow-diag] renderer drew %.4f of the chord at slack %.3f (asked %.2f); chord %.1f deg off "
+		% [pred, got, want, ang] + "horizontal, cos %.3f, so a perpendicular mask should read %.4f"
+		% [cos(deg_to_rad(ang)), pred * cos(deg_to_rad(ang))])
 	return pct
 
 
