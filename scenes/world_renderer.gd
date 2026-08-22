@@ -2911,7 +2911,12 @@ func _draw_machine(machine: MachineState) -> void:
 		draw_rect(Rect2(face.position.x, bar_y, face.size.x * frac, PROGRESS_BAR_H),
 			Color(0.40, 0.90, 0.45))
 
-	_draw_machine_io(machine, pos, face)
+	# A PORT IS NOT A BODY. The wedges are item-tinted cosmetics bolted onto the casing, and they sat
+	# inside the silhouette capture for as long as it existed: check_machine_identity announces "with
+	# the icons off" and was reading the Lift's teal up-spout as part of the Lift's shape. A machine
+	# whose outline is told apart by its output arrow has not got a distinct outline.
+	if not SILHOUETTE_ONLY:
+		_draw_machine_io(machine, pos, face)
 	if not BARE_MACHINES:
 		_draw_machine_status(machine, face, show_text)
 	if _construct.has(machine.cell):     # the one-shot assemble overlay, on top of the finished draw

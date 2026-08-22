@@ -258,7 +258,10 @@ func _report(subjects: Array[Dictionary]) -> void:
 			if is_zero_approx(d):
 				twins.append(label)
 			elif d < SHAPE_FLOOR:
-				below.append("%s (%.3f)" % [label, d])
+				# FOUR DECIMALS, AND THE FLOOR PRINTED THE SAME WAY. At three, a pair at 0.0249 printed
+				# as "0.025" against a bound printed as "2.5%", so the failure line read as a pair
+				# sitting exactly on its own limit and said nothing about which side it was on.
+				below.append("%s (%.4f)" % [label, d])
 	print("    %d pairs — mean %.3f, tightest %.3f (%s), widest %.3f (%s)"
 		% [pairs, total / maxf(float(pairs), 1.0), worst, worst_pair, best, best_pair])
 	# THE TIGHT END IS THE ONLY END WITH INFORMATION IN IT. A mean over 190 pairs is dominated by the
@@ -284,8 +287,8 @@ func _report(subjects: Array[Dictionary]) -> void:
 		"the family exemption covers %d of %d pairs (cap %.0f%%) — an exemption that grows to fit the "
 			% [family.size(), pairs, FAMILY_SHARE_CAP * 100.0] + "registry has stopped being one")
 	_check(below.is_empty(),
-		"every pair of machines of DIFFERENT kinds disagrees about at least %.1f%% of the cell%s"
-			% [SHAPE_FLOOR * 100.0,
+		"every pair of machines of DIFFERENT kinds disagrees about at least %.4f of the cell%s"
+			% [SHAPE_FLOOR,
 				"" if below.is_empty() else " — TOO ALIKE: " + ", ".join(below.slice(0, 8))])
 
 
@@ -343,8 +346,25 @@ func _lock_patch(cell: Vector2i) -> Rect2i:
 ## collapsed onto the bound instead. A shifted reading is noise. A REORDERED DISTANCE MATRIX means the
 ## subjects were photographed in different states.
 ##
-## Zero is the pose because it is where the glyph animations start, and `_process` is stopped first: setting
-## the clock and letting the frame run advances it again before the draw.
+## Zero is the pose, and `_process` is stopped first: setting the clock and letting the frame run advances
+## it again before the draw.
+##
+## HOW MUCH THE FREE CLOCK WAS WORTH, paired and alternated on one box, three runs each. The pair below is
+## the tightest one in the registry, so it is where an inflation shows first:
+##
+##     free-running   0.0391  0.0336  0.0591      spread 0.0255, no two runs alike
+##     posed          0.0281  0.0259  0.0255      spread 0.0026
+##
+## Every free reading is larger than every posed reading. That is the direction worth being clear about:
+## the free clock did not add scatter around the true value, it added DISTANCE. Two machines photographed
+## seconds apart are compared against a background that moved between the two shutters, and every pixel
+## that moved lands in one mask and not the other, which reads as shape the machines do not have. The
+## layer was passing partly on that, and posing the clock took it away rather than adding it.
+##
+## Which is also why the still-frame control above can be trusted only while this pose is in force: it
+## diffs two CONSECUTIVE bare frames, a window far shorter than the seconds that separate the twenty
+## subject captures. With the clock frozen the two windows are the same window. Without it they are not,
+## and the control would certify a mask threshold against the easiest interval in the run.
 func _luma_patch() -> PackedFloat32Array:
 	_main._renderer.set_process(false)
 	_main._renderer._anim_time = ANIM_POSE

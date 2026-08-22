@@ -295,9 +295,12 @@ const MACHINE_PROFILE: Dictionary = {
 	"lift": [BODY, Rect2(0.08, 0.0, 0.18, 0.22), Rect2(0.74, 0.0, 0.18, 0.22)],
 	# A SPLITTER TAKES ONE INLET. A single central stack over a body that fans out below it.
 	"fork": [BODY, Rect2(0.36, 0.0, 0.28, 0.22)],
-	# A CRUSHER HAS TEETH.
-	"crush": [BODY, Rect2(0.08, 0.04, 0.18, 0.18), Rect2(0.41, 0.04, 0.18, 0.18),
-		Rect2(0.74, 0.04, 0.18, 0.18)],
+	# A CRUSHER HAS TEETH, and for a long time it had three of them standing on the Lift's own grid: the
+	# outer two took the same x and the same width as the gantry posts, so the two crowns differed by four
+	# hundredths of drop and one middle tooth. Four teeth on a regular comb, 4px wide with 4px between
+	# them, is a jaw instead of a gantry, and nothing else in the table is a repeating row.
+	"crush": [BODY, Rect2(0.0625, 0.0, 0.125, 0.22), Rect2(0.3125, 0.0, 0.125, 0.22),
+		Rect2(0.5625, 0.0, 0.125, 0.22), Rect2(0.8125, 0.0, 0.125, 0.22)],
 	# A PRESS IS A RAM: one heavy block, centred, wider than a chimney and shorter than a post.
 	"press": [BODY, Rect2(0.26, 0.06, 0.48, 0.16)],
 	# A MILL IS DRIVEN FROM ABOVE: a narrow drive shaft off-centre the other way from the furnace stack,
