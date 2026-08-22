@@ -4,7 +4,7 @@ extends Node2D
 ## Screen-fixed HUD. It lives under a CanvasLayer so the follow camera does not scroll it, reads the sim
 ## only and draws in screen space.
 
-const CANVAS := Vector2(640, 360)
+const CANVAS := UiTheme.CANVAS
 const SLOT: float = 30.0        ## inventory hotbar slot size
 const SLOT_GAP: float = 4.0
 ## Where the bottom furniture starts, as one definition rather than two. `_draw_inventory` derives the
@@ -126,8 +126,8 @@ var can_craft: bool = false        ## near a claimed Bazaar? gates the verbs, ne
 ## of content width buys. Narrowing it to match one 46px well would trade a void for a truncation.
 const BAZAAR_SIZE := Vector2(608.0, 348.0)
 const PACK_CELL: float = 46.0         ## pitch of a pack well; the well itself is 6px smaller
-const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
-const BAZAAR_PAD: float = 12.0
+const BAZAAR_RAIL := UiTheme.BAZAAR_RAIL
+const BAZAAR_PAD := UiTheme.BAZAAR_PAD
 const BAZAAR_HEAD: float = 48.0       ## title + the carried-goods strip, with air under it
 const BAZAAR_FOOT: float = 16.0       ## the key legend
 ## The detail plate is the height of what it draws, and it draws two different things.
@@ -203,9 +203,8 @@ const BAZAAR_MIN_H: float = BAZAAR_HEAD + PACK_CELL + BAZAAR_DETAIL_GAP + BAZAAR
 ## The lift is per-channel and deliberately not flat. 0.047 / 0.051 / 0.060 rises toward blue, so the
 ## lit tile comes up slightly cooler than its rail rather than just brighter, which keeps it from
 ## reading as the gold beside it. Alpha is zeroed: the rail is 92% and the tile inside it is opaque.
-const RAIL_ON_LIFT := Color(0.047, 0.051, 0.060, 0.0)
-const RAIL_ON_FILL := Color(UI_RAIL.r + RAIL_ON_LIFT.r, UI_RAIL.g + RAIL_ON_LIFT.g,
-	UI_RAIL.b + RAIL_ON_LIFT.b)
+const RAIL_ON_LIFT := UiTheme.RAIL_ON_LIFT
+const RAIL_ON_FILL := UiTheme.RAIL_ON_FILL
 const BAZAAR_GUTTER: float = 10.0
 ## Three columns of eight is twenty-four rows, not the 22 a two-column layout needed, so the row can
 ## afford the two pixels back and the type can breathe.
@@ -3425,17 +3424,7 @@ func _tracked_w(text: String, size: int, track: float) -> float:
 ## Darkens the frame's edges so the eye is pushed to the counter. Every modern pause screen does it, and
 ## this one did not, which was part of why the panel read as pasted onto a screenshot.
 func _bazaar_vignette(peak: float) -> void:
-	if peak <= 0.001:
-		return
-	for i: int in 18:
-		var t: float = float(i) / 18.0
-		var inset: float = t * 130.0
-		draw_rect(Rect2(0.0, 0.0, CANVAS.x, 1.0 + inset * 0.5), Color(0.0, 0.0, 0.0, peak * 0.030))
-		draw_rect(Rect2(0.0, CANVAS.y - 1.0 - inset * 0.5, CANVAS.x, 1.0 + inset * 0.5),
-			Color(0.0, 0.0, 0.0, peak * 0.030))
-		draw_rect(Rect2(0.0, 0.0, 1.0 + inset, CANVAS.y), Color(0.0, 0.0, 0.0, peak * 0.024))
-		draw_rect(Rect2(CANVAS.x - 1.0 - inset, 0.0, 1.0 + inset, CANVAS.y),
-			Color(0.0, 0.0, 0.0, peak * 0.024))
+	Visuals.edge_vignette(self, UiTheme.CANVAS, peak)
 
 
 ## The production dashboard, on G: the factory's whole output at a glance, so scaling is felt rather

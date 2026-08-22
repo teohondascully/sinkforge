@@ -157,3 +157,22 @@ const UI_MODAL := Color(0.062, 0.070, 0.094, 0.985)
 ## The rail behind both tab strips. `RAIL_ON_FILL` is a plain lift off this value, so a rail that moves
 ## now takes its own lit tile with it.
 const UI_RAIL := Color(0.043, 0.049, 0.070, 0.92)
+
+
+## ---- SHARED LAYOUT AND RAIL SKIN ----
+
+## The authoring canvas. Everything the page lays out is in these coordinates and is scaled to the
+## window by `MainView.HUD_SCALE`, which is why a layout number here is a number you can reason about.
+const CANVAS := Vector2(640, 360)
+
+## The tab rail and the plate's inner air. Shared by the counter and the settings page, which is the
+## whole reason they are here: two pages carrying their own copy is how the two drift apart.
+const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
+const BAZAAR_PAD: float = 12.0
+
+## The lift is per-channel and deliberately not flat. 0.047 / 0.051 / 0.060 rises toward blue, so the
+## lit tile comes up slightly cooler than its rail rather than just brighter, which keeps it from
+## reading as the gold beside it. Alpha is zeroed: the rail is 92% and the tile inside it is opaque.
+const RAIL_ON_LIFT := Color(0.047, 0.051, 0.060, 0.0)
+const RAIL_ON_FILL := Color(UI_RAIL.r + RAIL_ON_LIFT.r, UI_RAIL.g + RAIL_ON_LIFT.g,
+	UI_RAIL.b + RAIL_ON_LIFT.b)

@@ -74,6 +74,8 @@ const SOLE_OWNER: Dictionary = {
 	"UI_ACCENT": "res://scenes/ui_theme.gd",
 	"UI_TEXT": "res://scenes/ui_theme.gd",
 	"UI_MODAL": "res://scenes/ui_theme.gd",
+	"CANVAS": "res://scenes/ui_theme.gd",
+	"RAIL_ON_FILL": "res://scenes/ui_theme.gd",
 }
 
 

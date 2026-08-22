@@ -1717,3 +1717,22 @@ static func keycap(canvas: CanvasItem, font: Font, at: Vector2, key: String, fs:
 	canvas.draw_string(font, at + Vector2((w - tw) * 0.5, h - KEYCAP_BASE), key,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.74, 0.78, 0.86))
 	return w
+
+
+## Darkens the frame's edges so the eye is pushed to whatever plate is open. Every modern pause screen
+## does it, and this one did not, which was part of why the panel read as pasted onto a screenshot.
+##
+## The canvas SIZE is a parameter rather than a constant here: this file draws for whoever asks, and a
+## renderer that knows the page's authoring dimensions has quietly become part of the page.
+static func edge_vignette(canvas: CanvasItem, canvas_size: Vector2, peak: float) -> void:
+	if peak <= 0.001:
+		return
+	for i: int in 18:
+		var t: float = float(i) / 18.0
+		var inset: float = t * 130.0
+		canvas.draw_rect(Rect2(0.0, 0.0, canvas_size.x, 1.0 + inset * 0.5), Color(0.0, 0.0, 0.0, peak * 0.030))
+		canvas.draw_rect(Rect2(0.0, canvas_size.y - 1.0 - inset * 0.5, canvas_size.x, 1.0 + inset * 0.5),
+			Color(0.0, 0.0, 0.0, peak * 0.030))
+		canvas.draw_rect(Rect2(0.0, 0.0, 1.0 + inset, canvas_size.y), Color(0.0, 0.0, 0.0, peak * 0.024))
+		canvas.draw_rect(Rect2(canvas_size.x - 1.0 - inset, 0.0, 1.0 + inset, canvas_size.y),
+			Color(0.0, 0.0, 0.0, peak * 0.024))
