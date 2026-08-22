@@ -39,6 +39,36 @@ const SETTLE: int = 70
 ## independent. Rebuilding the rig at three depths gives genuinely separate rock and keeps the player
 ## centred on the seam each time.
 const DEPTHS: Array[int] = [22, 26, 30]
+## ...AND THE SAME TRICK SIDEWAYS, WHICH IS THE ONLY DIRECTION IT ACTUALLY WORKS IN.
+##
+## The paragraph above calls the three depths "genuinely separate rock". They are not. A slab is
+## `HALF_H` tall and the depths are four rows apart, so with `STRIDE` of 2 each rig samples nine rows and
+## adjacent rigs share seven of them:
+##
+##     depth 22   +14 +16 +18 +20 +22 +24 +26 +28 +30
+##     depth 26           +18 .............. +34          7 of 9 shared
+##     depth 30                   +22 .............. +38  7 of 9 shared
+##
+## Twenty-seven rig-rows drawn from thirteen distinct world rows. The slab is repainted for every rig, so
+## a shared row is not merely nearby, it is the same cells wearing the same materials under a lamp that
+## moved with the rig. Pooling those inflates n without adding evidence, and the tell is in the readings:
+## ten of them across two renderers land on three values, 56, 57 and 58 lit windows out of 74, because
+## the statistic has far fewer independent samples than its denominator claims.
+##
+## THE MARGIN THAT MOTIVATED THIS. One window is 1.35 points at that denominator, and the floor of 75%
+## sits at 55.5 windows. The worst honest reading, 56, clears it by half a window while the observed
+## spread is two. A bound with less margin than the measurement's own quantum is not a bound.
+##
+## Sideways is the one axis where replication is real. `HALF_W` bounds a rig's reach, so rigs a full
+## width apart cannot share a cell, cannot share a torch and cannot share a lamp. It is also the move the
+## note above rejects, and the rejection is about something else: moving the BODY off the seam unmatches
+## the mirror pairs on lamp distance. Moving the whole rig, seam and body together, is what the depth
+## replication already does, and it keeps the player centred on the seam exactly as that does.
+##
+## DERIVED, NOT TYPED. The step is the rig's own footprint, so it cannot drift away from `HALF_W`.
+const RIG_COLS: int = 3
+var _base_x: int = -1        ## the body's starting column, captured once so rigs do not walk
+var _rigs: int = 0           ## how many placements the last pooling actually used
 const HALF_W: int = 20         ## corridor half-width in cells
 ## SHALLOW ON PURPOSE. Torch light reaches a few cells into rock, so a slab ten rows deep puts most of its
 ## windows where nothing is visible: the first lit rig lit 12 of 48. The sampled band is now the rock a
@@ -222,25 +252,89 @@ func _run() -> void:
 
 
 ## Build the cross-section, photograph it, and return every cue's separability.
+## The rig columns, as offsets from the body's column. A replicate is only admitted where the SURFACE SITS
+## AT THE SAME ROW, and that requirement is the whole of this function.
+##
+## THE CONFOUND IT EXISTS TO STOP, found by photographing the rigs rather than by reading their numbers.
+## `cy` is `surface_row(cx) + depth`, so a column over a valley puts its rig deeper in absolute terms. The
+## first version of this took the widest spacing the grid allowed and the two rigs came back labelled
+##
+##     28 m  SHALE REACH          the body's column
+##     41 m  THE LONG DARK        one rig-width to the right
+##
+## and read 75.68% and 61.43%. That looks like a finding about where the grammar works and it is nothing
+## of the kind: the second rig was in another depth band, with another tint and another ambient, painting
+## the same two materials into a different picture. Holding `depth` fixed while `surface_row` moves does
+## not hold depth fixed. See the sibling requirement on `DEPTHS`, which keeps every rig inside one band
+## for exactly this reason.
+##
+## THE REQUIREMENT IS THE BAND ITSELF, not a tolerance on the surface row. A row tolerance is a guess at
+## the thing that matters; `Strata.band_at` IS the thing that matters, and it is the same table the HUD
+## reads to print the band's name in the corner of those two captures. So a candidate is admitted when
+## EVERY depth in `DEPTHS` lands in the same band there as it does at the base column, and refused
+## otherwise. Nothing to tune, and it cannot drift away from the bands it is protecting.
+##
+## Where the terrain offers no such column, the layer replicates less rather than replicating wrongly,
+## and prints how near it got so that a thin n is a stated limit rather than a silent one.
+
+
+func _rig_offsets(sim: FactorySim, base_x: int) -> Array[int]:
+	var step: int = 2 * HALF_W + 1
+	var base_row: int = sim.surface_row(base_x)
+	var out: Array[int] = [0]
+	var rejected: int = 0
+	var closest: int = 9999
+	var off: int = step
+	while out.size() < RIG_COLS and off < FactorySim.GRID_COLS:
+		for sign: int in [1, -1]:
+			if out.size() >= RIG_COLS:
+				break
+			var cx: int = base_x + sign * off
+			if cx - HALF_W < 0 or cx + HALF_W >= FactorySim.GRID_COLS:
+				continue
+			var same: bool = true
+			for depth: int in DEPTHS:
+				if Strata.band_at(sim.surface_row(cx) + depth) != Strata.band_at(base_row + depth):
+					same = false
+			if not same:
+				rejected += 1
+				closest = mini(closest, absi(sim.surface_row(cx) - base_row))
+				continue
+			out.append(sign * off)
+		off += 1
+	print("    [mg] base column %d at surface row %d; rig offsets %s -- %d candidate(s) refused for a "
+		% [base_x, base_row, str(out), rejected]
+		+ "depth band that differs at one or more of %s; nearest refused sat %s row(s) off"
+		% [str(DEPTHS), "no" if closest > 9000 else str(closest)])
+	return out
+
+
 func _measure(main: MainView, left: StringName, right: StringName, label: String,
 		_tooth_on: bool) -> Dictionary:
 	var pooled: Dictionary = {"l_value": [] as Array[float], "r_value": [] as Array[float],
 		"l_chroma": [] as Array[float], "r_chroma": [] as Array[float],
 		"l_grain": [] as Array[float], "r_grain": [] as Array[float],
 		"l_aniso": [] as Array[float], "r_aniso": [] as Array[float]}
-	for depth: int in DEPTHS:
-		var one: Dictionary = await _sample_at(main, left, right, depth)
-		for k: String in pooled:
-			(pooled[k] as Array[float]).append_array(one[k] as Array[float])
+	if _base_x < 0:
+		_base_x = main._cell_at(main._player.position).x
+	var offsets: Array[int] = _rig_offsets(main.sim, _base_x)
+	_rigs = offsets.size() * DEPTHS.size()
+	for off: int in offsets:
+		for depth: int in DEPTHS:
+			var one: Dictionary = await _sample_at(main, left, right, depth, off)
+			for k: String in pooled:
+				(pooled[k] as Array[float]).append_array(one[k] as Array[float])
 	return _report(pooled, label)
 
 
-func _sample_at(main: MainView, left: StringName, right: StringName, depth: int) -> Dictionary:
+func _sample_at(main: MainView, left: StringName, right: StringName, depth: int,
+		col_off: int) -> Dictionary:
 	var sim: FactorySim = main.sim
 	var p: Player = main._player
-	var home: Vector2i = main._cell_at(p.position)
-	var cy: int = sim.surface_row(home.x) + depth
-	var cx: int = home.x
+	# THE BASE COLUMN IS CAPTURED ONCE, not read off the body. Every rig MOVES the body to its own centre,
+	# so reading the body's column here would make each rig relative to the last one and walk the set.
+	var cx: int = _base_x + col_off
+	var cy: int = sim.surface_row(cx) + depth
 
 	# Fill the slab. GAP columns astride the seam are filled but never sampled: a contact is a different
 	# subject with its own layer (check_contact_edge), and letting one leak in here would let an edge
@@ -276,6 +370,13 @@ func _sample_at(main: MainView, left: StringName, right: StringName, depth: int)
 	await RenderingServer.frame_post_draw
 
 	var img: Image = get_root().get_texture().get_image()
+	# `SF_MG_DUMP=<dir>` writes every rig it photographs. Kept because it is what caught the depth-band
+	# confound: the numbers alone said one column read 61% and another 76%, which looked like a finding
+	# about the grammar, and the pictures said 28 m SHALE REACH against 41 m THE LONG DARK, which is a
+	# finding about the rig. A number cannot tell you what it photographed.
+	if OS.has_environment("SF_MG_DUMP"):
+		img.save_png("%s/rig_%s_c%d_d%d.png" % [OS.get_environment("SF_MG_DUMP"),
+			String(left) + "_" + String(right), col_off, depth])
 	if img.get_format() != Image.FORMAT_RGBA8:
 		img.convert(Image.FORMAT_RGBA8)
 	var data: PackedByteArray = img.get_data()
@@ -324,7 +425,7 @@ func _report(out: Dictionary, label: String) -> Dictionary:
 	var lv: Array[float] = out["l_value"]
 	var n: int = lv.size()
 	print("  %s — %d mirrored windows pooled over %d placements, %.0fx%.0f cells"
-		% [label, n, DEPTHS.size(), WIN_W, WIN_H])
+		% [label, n, _rigs, WIN_W, WIN_H])
 	_check(n >= MIN_SAMPLES,
 		"  %s found %d pairs to judge (floor %d)" % [label, n, MIN_SAMPLES])
 
