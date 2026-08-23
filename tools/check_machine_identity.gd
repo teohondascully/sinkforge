@@ -214,9 +214,23 @@ func _run() -> void:
 		waited += 1
 		after = await _luma_patch()
 		empty_cover = _coverage(_mask(after, bare))
+	# AND WHEN IT FAILS, SAY WHICH OF THE TWO THINGS IT IS. The wait above treats a stage that still shows a
+	# machine as a slow removal, and eight runs of the CI display job say that is not what this is: the
+	# passes clear at 0.0000 after ZERO frames and the two failures sat at 0.0187 and 0.0489 after the full
+	# 180. Bimodal, not a settle -- it either clears instantly or never, so waiting longer was never going
+	# to be the repair.
+	#
+	# Which leaves two rivals that the number above cannot tell apart: the sim never lost the machine, or
+	# the sim lost it and the picture kept it. `machine_at` answers that in one call, and it is the number
+	# a reader would need first, so it leads the failure rather than sitting in a comment for whoever
+	# reproduces it next.
+	# Phrased as a FACT rather than as a diagnosis, because `_check` prints one label on both paths: a
+	# passing run said "so this is the RENDERER holding the last frame" about a stage that had cleared.
+	var still_there: bool = sim.machine_at(STAGE) != null
 	_check(empty_cover <= noisy_share,
-		"CONTROL: the empty stage does NOT clear the bar the machines cleared (%.4f against %.4f, "
-			% [empty_cover, noisy_share] + "after %d frame(s) of clearing)" % waited)
+		"CONTROL: the empty stage does NOT clear the bar the machines cleared [sim: %s] (%.4f against "
+			% ["A MACHINE IS STILL AT THE STAGE" if still_there else "stage empty", empty_cover]
+			+ "%.4f, after %d frame(s) of clearing)" % [noisy_share, waited])
 
 	if not unplaceable.is_empty():
 		print("    could not place: " + ", ".join(unplaceable))
