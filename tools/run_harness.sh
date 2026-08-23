@@ -335,6 +335,7 @@ add "check_binding_conflict (one key, one job)" "res://tools/check_binding_confl
 # than the commit, and no flag skips the suite." It was in no sweep, so no flag needed to skip it. Found by
 # running it by hand, where it went red on a second author identity sitting one merge from main.
 add "check_trailers (one author, no trailers)" "res://tools/check_trailers.sh"
+add "check_capture_manifest (the archive is described)" "res://tools/check_capture_manifest.sh"
 # TWO MORE GATES THAT RAN IN NO SWEEP, found by the same question that found `check_trailers`: which of
 # these files is only ever executed by a human who remembers it exists?
 #
