@@ -167,7 +167,12 @@ agreement would stop being evidence.
 3. **One duplicate in shipping code, now removed.** `_nearest_ore_to_player` and `_nearest_tree_to_player`
    in `main.gd` had byte-identical bodies apart from one material literal. They are one
    `_nearest_material_to_player(material)`. Neither copy was wrong, which is how it lasted: a duplicate
-   only announces itself when the two sides drift.
+   only announces itself when the two sides drift. Equivalence was checked in both directions — the new
+   body with the parameter bound to each literal reproduces each original token for token, with the
+   literals swapped as the negative control — and stubbing the search takes `check_loop_health` from 98.7
+   to 76.5 against a floor of 90.0, so a layer does reach it. That change landed in `31698a7`, whose
+   message describes only the control retraction it was committed beside; recorded here because the commit
+   message does not, and the history is not rewritten to fix a message.
 
 **Three categories came back clean, and the limits of each check are stated with it.** The nine
 invalidation flags are each written from exactly one file, the file that owns them — though that scan
