@@ -110,8 +110,7 @@ func _arm(main: MainView, phase: int) -> Dictionary:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_failures += 1
-		printerr("  FAIL: the hook never planted — no arc to judge")
+		_check(false, "the hook never planted — no arc to judge")
 		return {"widest": 0.0, "rate": 0.0}
 	var start_len: float = p.grapple.length
 	var widest: float = 0.0

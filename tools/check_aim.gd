@@ -118,8 +118,7 @@ func _chain_keeps_the_arc(main: MainView, p: Player) -> void:
 	var chained: Dictionary = await _reach(main, p, true)
 	var toggled: Dictionary = await _reach(main, p, false)
 	if chained.is_empty() or toggled.is_empty():
-		_failures += 1
-		printerr("  FAIL: could not fly the arc to compare the two reaches")
+		_check(false, "could not fly the arc to compare the two reaches")
 		return
 	print("  the same arc (%.0f px/s at the throw), %d frames on from reaching for the same hold:"
 		% [chained["was"], HORIZON])

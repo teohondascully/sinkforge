@@ -272,8 +272,7 @@ func _judge_rope(main: MainView, hints: Hints) -> void:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_failures += 1
-		printerr("  FAIL: the hook never planted — nothing to teach")
+		_check(false, "the hook never planted — nothing to teach")
 		return
 
 	# THE BEND. Swing in under the spur; the line has to catch, and the game has to say so.

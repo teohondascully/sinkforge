@@ -87,8 +87,7 @@ func _run() -> void:
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
 	if p.grapple.state != Grapple.State.ANCHORED:
-		_failures += 1
-		printerr("  FAIL: the hook never planted — nothing to test")
+		_check(false, "the hook never planted — nothing to test")
 		main.queue_free()
 		return
 	var hook: Vector2 = p.grapple.anchor

@@ -114,8 +114,7 @@ func _run() -> void:
 	var band: Rect2i = _on_screen(main, img)
 	print("  the cistern occupies %s of a %dx%d frame" % [band, img.get_width(), img.get_height()])
 	if band.size.x < 40 or band.size.y < 40:
-		_failures += 1
-		printerr("  FAIL: the cistern did not land on screen — nothing to judge")
+		_check(false, "the cistern did not land on screen — nothing to judge")
 		main.queue_free()
 		return
 

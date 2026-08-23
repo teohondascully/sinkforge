@@ -65,6 +65,39 @@ const EXEMPT: Dictionary = {}
 ## directory thinning, not only vanishing.
 const MIN_POPULATION: int = 80
 
+## THE SECOND RULE, AND IT IS THE SAME DEFECT WEARING THE OTHER GLOVE. A layer may not move `_passes` or
+## `_failures` itself.
+##
+## `_check(false, label)` is exactly `_failures += 1` followed by `printerr("  FAIL: %s")`, and six layers
+## had written that pair out by hand at a fixture-bail: check_aim, check_plunge, check_pump, check_teaching,
+## check_water_reads, check_wrap. Byte-identical output, so nothing in any log could tell them apart. They
+## were harmless as written — the counter really was incremented — and that is the point: the danger is not
+## the six sites, it is that the counter is reachable at all. `_passes += 1` at a fixture-bail would be the
+## same keystrokes and would manufacture the assertion count that `_verdict()`'s refusal keys on, turning
+## the one guard against a layer that stopped judging into a number the layer supplies itself.
+##
+## READS ARE FINE and are left alone. `if _failures > 0:` in check_item_reads decides whether a headless
+## run reports a failure or a skip, which is a real decision that needs the count.
+const COUNTER_WRITE: String = "(_passes|_failures)\\s*(\\+=|-=|\\*=|/=|=[^=])"
+
+## The positive control for it: a hand-rolled failed assertion.
+const CONTROL_COUNTER: String = """
+func _run() -> void:
+	if not _ready_to_judge():
+		_failures += 1
+		printerr("  FAIL: nothing to judge")
+		return
+"""
+
+## ...and the read that must stay allowed, so the rule is about writing and not about the name.
+const CONTROL_COUNTER_READ: String = """
+func _run() -> void:
+	if _failures > 0:
+		printerr("  the pixel half could not run, and the half that could run failed")
+		return
+	_verdict("check_thing", "the thing holds")
+"""
+
 ## The detector's own positive control: a hand-rolled green.
 const CONTROL_BAD: String = """
 func _initialize() -> void:
@@ -127,9 +160,14 @@ func _initialize() -> void:
 		"...and still flags one that shares its line with a trailing comment")
 	_check(not _exits_zero(CONTROL_IN_STRING),
 		"...and does not flag a `quit(0)` that only ever appears inside a string literal")
+	_check(_writes_counter(CONTROL_COUNTER),
+		"the detector flags a layer moving _failures itself (positive control)")
+	_check(not _writes_counter(CONTROL_COUNTER_READ),
+		"...and leaves a layer that only READS the counter alone")
 
 	var pop: Array[String] = []
 	var offenders: Array[String] = []
+	var counter_writers: Array[String] = []
 	var unreadable: Array[String] = []
 	var dir := DirAccess.open(SCAN_ROOT)
 	if dir == null:
@@ -150,6 +188,8 @@ func _initialize() -> void:
 		pop.append(f)
 		if _exits_zero(src) and not EXEMPT.has(f):
 			offenders.append(f)
+		if _writes_counter(src):
+			counter_writers.append(f)
 
 	_check(unreadable.is_empty(), "every check_*.gd in %s could be read (%d unreadable)"
 		% [SCAN_ROOT, unreadable.size()])
@@ -163,6 +203,11 @@ func _initialize() -> void:
 	for o: String in offenders:
 		printerr("    %s exits 0 by hand — route it through _verdict(), or add it to EXEMPT with a"
 			% o + " reason a reader can check")
+	_check(counter_writers.is_empty(),
+		"no layer moves _passes or _failures itself (%d scanned)" % pop.size())
+	for c: String in counter_writers:
+		printerr("    %s writes an assertion counter directly — say it with _check(cond, label), which is"
+			% c + " the same two statements and goes through the one place that counts them")
 
 	_ratchet(pop)
 	_verdict("check_verdict_route",
@@ -191,6 +236,13 @@ func _ratchet(pop: Array[String]) -> void:
 func _exits_zero(src: String) -> bool:
 	var code: String = _strip_comments(src)
 	return code.contains("quit(0)") or code.contains("quit()")
+
+
+## Does this source assign to an assertion counter? Comments and strings stripped for the same reason as
+## above: `_failures += 1` is written ABOUT in this suite as often as it used to be written.
+func _writes_counter(src: String) -> bool:
+	var re := RegEx.create_from_string(COUNTER_WRITE)
+	return re.search(_strip_comments(src)) != null
 
 
 ## Everything from an unquoted `#` to the end of its line, removed, and every string literal replaced by

@@ -93,8 +93,7 @@ func _run() -> void:
 	var shaft: Dictionary = await _dig()
 
 	if legs.is_empty() or roped.is_empty() or shaft.is_empty():
-		_failures += 1
-		printerr("  FAIL: one of the routes could not be played at all")
+		_check(false, "one of the routes could not be played at all")
 		return
 
 	var speedup: float = float(shaft["frames"]) / maxf(float(roped["frames"]), 1.0)
