@@ -1702,3 +1702,32 @@ This is the second time this programme has answered "what bound goes here" with 
 The first was `grapple.gr05-preview-share`, where the cap that used to stand was `1.01` over a quantity
 bounded at 1.0 by construction — an assertion that could not fail. Recording the refusal with its data
 costs a line of prose and saves the next reader from re-deriving a number that does not exist.
+
+
+## The census confirms the grapple repair, the way it confirmed the water one
+
+A second valid pair, two sweeps at clean `782b194`, taken because the only earlier pair sat one commit
+before the shader-clock fix and so could not speak to it.
+
+```
+                        pair at e8d832f      pair at 782b194
+check_grapple_reads     8/27   100.0%        8/27    16.7%
+check_snap_frame        4/8    100.0%        3/8      0.3%
+check_water_reads       3/8      4.5%        2/8     13.5%
+layers reproducing      95 of 107            92 of 107
+```
+
+**The same count of grapple numbers still move, and the size of the move collapsed** — which is the right
+signature for this repair. It never claimed to make the layer deterministic; it claimed to stop the
+preview's reading being a function of machine load. The reading itself now goes 142.5 against 142.2, a
+0.2% move where it once went 134.2 against 43.6. What is left at 16.7% is the still-frame churn
+**diagnostic** (0.10% → 0.12%), a number nothing judges, printed beside the control that reads it as a
+boolean.
+
+Two honest notes against the win. `check_snap_frame` fell from 100.0% to 0.3% and nothing was done to it —
+its control compares against a count that happens to be 0, 1 or 2, so its relative move is decided by which
+small integer it lands on, exactly as its row has said all along. And `check_water_reads` moved the other
+way, 4.5% to 13.5%: the surface reading went 11.1 to 9.6 against a floor of 7.0. That is 37% of headroom
+and not a risk, but it is a wider spread than the settle repair's own six runs showed, and it is the number
+to watch if that layer is opened again. The count of exactly-reproducing layers also went 95 to 92 — a
+different pair, three small new movers, none above 6.7%.
