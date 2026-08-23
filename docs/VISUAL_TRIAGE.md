@@ -238,7 +238,7 @@ Observations to preserve, not twenty independent implementation tickets.
 
 > ### The helper inventory, taken 2026-08-23 — and the registry that already exists is total over the wrong population
 >
-> `docs/PRIORITY.md:1317` gates `UI-09`–`UI-15` on "a helper inventory", and the row above names it as the
+> `docs/PRIORITY.md` gates `UI-09`–`UI-15` on "a helper inventory", and the row above names it as the
 > first investigation. **Most of it already existed and nobody had said so.** `Hud.HELPER_TAGS` classifies
 > every drawing surface as `critical` / `active` / `discoverable` / `ambient` / `internal`, the `critical`
 > tag carries a one-at-a-time rule, and `check_hud_layout._check_helper_registry()` asserts the table

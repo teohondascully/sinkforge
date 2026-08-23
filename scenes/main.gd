@@ -2567,10 +2567,10 @@ func _selected_build_material() -> StringName:
 
 ## A cell takes a hand-placed machine when it is in-bounds, unoccupied, and not the cell the body is
 ## standing in, so you can never seal yourself inside a machine you place. Occupancy is the sim's answer
-## and not a second opinion. `factory_sim.gd:855` records the stress test that caught per-function guards
+## and not a second opinion. `factory_sim.gd` records the stress test that caught per-function guards
 ## each checking a different subset of the placed layers, and this copy had drifted the same way: it listed
 ## solid/machine/conduit/rope and never asked about `torch`. The ghost therefore drew its placeable border
-## over a mounted torch and unrolled the rope and drill previews (`world_renderer.gd:1689-1696`) where the
+## over a mounted torch and unrolled the rope and drill previews (`world_renderer.gd`) where the
 ## click is really the pickup at :2386 that every sim placement path refuses outright. Bounds and the body
 ## are the two halves the sim cannot answer, because it owns no avatar. The placed layers are asked once
 ## over there, so the next one added there arrives here free.

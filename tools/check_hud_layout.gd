@@ -118,9 +118,9 @@ func _run() -> void:
 		{"name": "a stratum arrival, BIG map up", "modal": false, "set": {"_minimap_mode": 2},
 			"announce": true, "twin": "the BIG map up (M twice)"},
 		# ...and the big map WITH a machine hovered. The inspector is right-anchored and its width has a
-		# 218px floor (hud.gd:831), so its left edge is at most 640-218-12 = 410 against a large map
-		# spanning x 181..459. `hud.gd:837` asserts in prose that "the large map is centred, off this
-		# column — so the inspector never collides"; that is false for a 128-wide world, and this row is
+		# 218px floor (`hud.gd`'s `HOVER_MIN_W`), so its left edge is at most 640-218-12 = 410 against a large map
+		# spanning x 181..459. `hud.gd` asserts in prose that the large map is centred and off this
+		# column — so the inspector never collides; that is false for a 128-wide world, and this row is
 		# what makes the claim answerable instead of asserted.
 		# EXPECTED TWIN of the row above, and declared rather than tolerated: once the inspector stands
 		# down under the large map, these two states draw the same screen BY DESIGN. That is the fix, so
@@ -258,7 +258,7 @@ func _run() -> void:
 ## THE BIG MAP IS THE SCREEN, so nothing may be left under it. And nothing may be left HALF under it.
 ##
 ## This layer already CAUGHT this, once, and then stopped being able to. A real failing run named two
-## collisions against the large map; the banner was fixed by standing it down at `hud.gd:699`, and the
+## collisions against the large map; the banner was fixed by standing it down at `hud.gd`, and the
 ## second (a 46x44 panel at (297,295), overlap 46x24) was left as an open lead: *"either that panel moved,
 ## or it is state-dependent and the current fixture no longer samples it."* It is the second. The panel
 ## is `_draw_inventory`'s backing at ONE slot (`x0 = (CANVAS.x - total_w) * 0.5` = (640-30)/2 = 305, and
@@ -272,7 +272,7 @@ func _run() -> void:
 ##
 ## WHY THIS IS NAMED RATHER THAN LEFT TO THE GENERIC SWEEP ABOVE. That sweep judges whatever a state
 ## HAPPENED to draw, so it also passes the moment a panel stops being drawn at all. And `_draw_minimap`
-## returns before its first `_panel()` when the sim or the colour callable is unbound (`hud.gd:977-978`).
+## returns before its first `_panel()` when the sim or the colour callable is unbound (`hud.gd`'s `if sim == null or not minimap_color.is_valid()`).
 ## A map that never drew collides with nothing. So the subject is proved PRESENT first, and the stand-down
 ## is asserted as its own property rather than inferred from a quiet sweep.
 func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
@@ -308,11 +308,11 @@ func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
 	_check(still_there.position.y <= Hud.CANVAS.y * 0.5,
 		"the pack bar stands down while the big map is up (found %s)" % still_there)
 
-	# D. THE GOAL PLATE STANDS DOWN (`hud.gd:699-700`). That guard has never once executed under test:
+	# D. THE GOAL PLATE STANDS DOWN (`hud.gd`). That guard has never once executed under test:
 	#    `minimap_large` comes only from `_minimap_mode == 2` (main.gd:778) and no fixture reached a 2, so
 	#    deleting it would have been invisible. Proved by DIFFERENCE in both directions; absence alone
 	#    proves nothing, because the plate legitimately hides itself when the chain is finished
-	#    (`hud.gd:690`) or once `goal_a` has decayed (`hud.gd:724`, `:728`).
+	#    (`hud.gd`) or once `goal_a` has decayed.
 	var plate: Rect2 = _goal_plate(bare)
 	_check(plate.size.y >= MIN_PANEL,
 		"the bare screen drew the goal plate at top-centre (%s) — there was something to suppress" % plate)
@@ -391,7 +391,7 @@ func _bottom_panel(rects: Array[Rect2]) -> Rect2:
 	return out
 
 
-## The objective plate: the ONE panel centred on the canvas at y=8 (`hud.gd:744`). The depth chip is
+## The objective plate: the ONE panel centred on the canvas at y=8 (`hud.gd`). The depth chip is
 ## left-anchored at x=10 (`:477`), FORGED is right-anchored (`:623`), the fast-forward chip sits at y=34
 ## (`:602`) and PAUSED at y=50 (`:283`). So the anchor identifies it and nothing else does. Deliberately
 ## BLIND TO HEIGHT: the plate is 24px or 37px depending on `step_age` (`hud.gd`), and that is the exact
@@ -857,7 +857,7 @@ func _check_announce_channel() -> void:
 	# ---- the lesson under the plate ----------------------------------------------------------------
 	#
 	# EVERY WAIT BELOW IS A DRAWN FRAME AND NOT A PHYSICS STEP, WHICH IS THE WHOLE OF THIS SECTION'S FIX.
-	# `Hints` is clocked from `_process`: `main.gd:781` calls `refresh(delta)`, and `main.gd:777` is the
+	# `Hints` is clocked from `_process`: `main.gd`'s `_hints.refresh(delta)` call, and the line above it, is the
 	# only writer of `_ceremony`. A fixture that advances the game with `physics_frame` is winding a clock
 	# this subject never reads. On a 60fps desktop the two ticks interleave 1:1 and the mistake is
 	# invisible; CI draws this game at 6-9 fps under a software rasteriser
@@ -867,7 +867,7 @@ func _check_announce_channel() -> void:
 	# clock reported 7.664 -> 7.664 and `active_alpha()` short-circuited to 0.00.
 	#
 	# THE CLOCK WAS HEALTHY THROUGHOUT, which is what makes this a fixture defect and not a product one:
-	# `SHOW_SECONDS` is 9.0 (`hints.gd:17`) and the layer read 7.664, so 1.336 s had already burned in the
+	# `SHOW_SECONDS` is 9.0 (`hints.gd`) and the layer read 7.664, so 1.336 s had already burned in the
 	# arming loop below: the same kind of loop, just long enough to span a drawn frame by accident.
 	# **A wait that works only because it is long enough to accidentally contain the tick you meant is not
 	# the tick you meant**, and it stops working the moment the box gets slower.
@@ -899,8 +899,8 @@ func _check_announce_channel() -> void:
 	for _i: int in 6:
 		await RenderingServer.frame_post_draw
 	# THE PREMISE OF THE FOUR ASSERTIONS BELOW, ASSERTED. On the render clock this window costs real wall
-	# seconds, and the ceremony it is measured under only lives `ARRIVAL_HOLD` = 3.4 of them (`hud.gd:224`,
-	# spent in `hud.gd:353`). Seven drawn frames is under a second at the 8 fps end of the CI range; the
+	# seconds, and the ceremony it is measured under only lives `ARRIVAL_HOLD` = 3.4 of them (`hud.gd`,
+	# spent in `hud.gd`). Seven drawn frames is under a second at the 8 fps end of the CI range; the
 	# 1.336 s the arming loop burns over a handful of frames says the slowest frame here can cost a third
 	# of a second, which puts this window near 2.3 s; inside 3.4, with less room than anything should rely
 	# on silently. A plate that expired mid-window would fail all four below for a reason that has nothing
@@ -915,7 +915,7 @@ func _check_announce_channel() -> void:
 	# THIS ONE PASSED VACUOUSLY UNTIL THE AWAITS ABOVE MOVED TO THE RENDER CLOCK. It claims the clock is
 	# STOPPED, and it was satisfied by nothing having happened at all: the identical zero `_process` calls
 	# that failed its two neighbours. Nothing about it changed here except that it can now fail: it is a
-	# live test of `hints.gd:212`, whose `not _ceremony` guard wraps `_lingered` and `_life` together, over
+	# live test of `hints.gd`, whose `not _ceremony` guard wraps `_lingered` and `_life` together, over
 	# six real `_process` ticks. If it goes red, that guard is the thing to read, not this line.
 	_check(is_equal_approx(hints._life, life_under),
 		"...with its clock stopped, not burning down unseen (%.3f -> %.3f)" % [life_under, hints._life])

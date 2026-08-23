@@ -181,7 +181,7 @@ static func _draw_cell_silhouette(r: WorldRenderer, ci: CanvasItem, c: Vector2i,
 ## at a junction patch their own face; the scoop is symmetric and neither draws outside its own box.
 ##
 ## What the pass is worth depends on depth. It draws on the coarse layer at z=-10. `FineTerrain` draws its
-## mold at z=-9 and writes alpha 255 over every solid cell (`fine_terrain.gd:822`), so a coarse pixel can
+## mold at z=-9 and writes alpha 255 over every solid cell (`scenes/fine_terrain.gd`'s mold bake), so a coarse pixel can
 ## survive only where the mold has eroded back from the cell edge. The mold is organic and does not fill a
 ## cell to its square boundary, and that eroded band is exactly where these strips sit.
 ##

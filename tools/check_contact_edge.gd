@@ -177,7 +177,7 @@ const ORIENT_NAME: Array[String] = ["rock TOP (lit lip)", "rock UNDER (ceiling)"
 ##
 ## 2. LODE-STAINED ROCK IS SAMPLED IN, AND REPORTED AS ITS OWN ARM.
 ##    A generated world now carries 378 lode cells, and the renderer stains a BURIED lode through its host
-##    rock (`world_renderer.gd:1338`). Excluding them would make this instrument answer a question about a
+##    rock (`world_renderer.gd`). Excluding them would make this instrument answer a question about a
 ##    world the player does not see. Stained rock is still rock. If the stained and unstained arms disagree,
 ##    that is a finding about ore tell doing legibility work and it is reportable in its own right rather
 ##    than something to average away.

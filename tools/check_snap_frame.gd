@@ -52,7 +52,7 @@ extends SceneTree
 ## AND THAT IS EXACTLY WHAT CI HAD BEEN READING, on every run this layer has ever had there: control ratios
 ## of 0.79, 0.76 and 0.81 against the 4.0 below -- the two arms converged, the convergence the paragraph
 ## above says is a frame-diff that sees nothing. The layer posed `_cam_pos` and then waited two drawn
-## frames, and `main.gd:737` lerps that field back toward the body every `_process` at
+## frames, and `main.gd` lerps that field back toward the body every `_process` at
 ## `1.0 - exp(-CAMERA_FOLLOW_SPEED * delta)`, CAMERA_FOLLOW_SPEED = 8.0. At 60 fps a posed 1 px survives
 ## two frames as 0.766 px and `snap_to_pixel`'s `round()` returns it to a whole pixel, so on a developer
 ## machine the control fired. Under CI's software rasterizer the game draws at 6-9 fps
@@ -172,7 +172,7 @@ func _run() -> void:
 	quit(1 if _fail > 0 else 0)
 
 ## Pose the follow TARGET and photograph what the game does with it. Nothing here assigns the camera: the
-## snap that has to reach the framebuffer is `main.gd:738`'s, and a fixture writing that position itself is
+## snap that has to reach the framebuffer is `main.gd`'s `snap_to_pixel`, and a fixture writing that position itself is
 ## a fixture checking its own arithmetic. Only sound with the world stopped — see the docstring.
 func _shoot(main: MainView, target: Vector2) -> Image:
 	main._cam_pos = target

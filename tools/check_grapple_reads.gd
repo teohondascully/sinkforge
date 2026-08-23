@@ -781,7 +781,7 @@ func _run() -> void:
 		# `_bow_now` throws away every pixel further than `span * SAG_CAP + 24.0` from the chord, so the
 		# largest number it can return is `SAG_CAP + 24/span`, 0.4621 on this rig's 570px chord. CI read
 		# **0.463 slack against 0.462 taut**. That is not a slack rope beside a taut one, it is the same
-		# mask rim twice, and `world_renderer.gd:3125` settles it: the DRAWN hang is hard-clamped to
+		# mask rim twice, and `world_renderer.gd` settles it: the DRAWN hang is hard-clamped to
 		# `span * SAG_CAP`, so a reading at or above `SAG_CAP` provably did not come off the cord. It came
 		# off whatever else in a lamp-lit rock pocket falls within `ROPE_TOL` of `ROPE_HUE`, and inside a
 		# band 263px either side of the chord there is plenty of it.
@@ -1118,7 +1118,7 @@ func _check_pointer_seam() -> void:
 ## intended detector.
 ## HOW LONG THE LAMP MAY TAKE TO FOLLOW, and how still counts as settled.
 ##
-## Posing the pointer is instant; what the pointer DRIVES is not. `world_renderer.gd:554` eases the
+## Posing the pointer is instant; what the pointer DRIVES is not. `world_renderer.gd` eases the
 ## head-lamp toward the aim with `lerp(target, 1.0 - exp(-9.0 * delta))`, so after a pose the dominant
 ## underground light source keeps sliding for roughly thirty frames. Photographing during that slide makes
 ## two "untouched" captures differ because the LIGHTING changed between them, which is a self-inflicted

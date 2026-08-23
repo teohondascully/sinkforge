@@ -168,7 +168,7 @@ func _run() -> void:
 		await physics_frame
 	# TAKE THE SCENE'S EARS OFF, AFTER A FRAME HAS PASSED.
 	#
-	# This layer opens a REAL WINDOW with live input callbacks, and `main.gd:991` toggles `_paused` from
+	# This layer opens a REAL WINDOW with live input callbacks, and `main.gd` toggles `_paused` from
 	# `_unhandled_input` on Controls.PAUSE: KEY_P or JOY_BUTTON_START. `_paused` is the FIRST gate
 	# `try_mine` tests, so one stray keystroke, or a joypad that enumerates START, silently pauses the run
 	# and every mine for the rest of it returns false with the world in perfect condition.
