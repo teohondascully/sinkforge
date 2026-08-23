@@ -214,11 +214,15 @@ func _run() -> void:
 		waited += 1
 		after = await _luma_patch()
 		empty_cover = _coverage(_mask(after, bare))
-	# AND WHEN IT FAILS, SAY WHICH OF THE TWO THINGS IT IS. The wait above treats a stage that still shows a
-	# machine as a slow removal, and eight runs of the CI display job say that is not what this is: the
-	# passes clear at 0.0000 after ZERO frames and the two failures sat at 0.0187 and 0.0489 after the full
-	# 180. Bimodal, not a settle -- it either clears instantly or never, so waiting longer was never going
-	# to be the repair.
+	# AND WHEN IT FAILS, SAY WHICH OF THE TWO THINGS IT IS. The wait above treats a stage that still shows
+	# a machine as a slow removal. Twenty-five runs say the removal usually reaches the picture on the
+	# frame it happens -- 0 frames on twenty of the twenty-two passes -- but not always: one pass took 21
+	# frames and another 39, so the wait is doing real work and is not merely masking. What it does not
+	# cover is the tail: three failures, at 0.0187, 0.0489 and 0.1131, all still uncleared at the 180
+	# bound. Whether that tail is the same latency stretched further or a stage that never clears at all
+	# is UNRESOLVED, and three failures cannot decide it. (An earlier note here read the distribution as
+	# bimodal and concluded waiting could never be the repair; it was written from eight runs and missed
+	# the 39-frame sample that was already on record. Retracted.)
 	#
 	# Which leaves two rivals that the number above cannot tell apart: the sim never lost the machine, or
 	# the sim lost it and the picture kept it. `machine_at` answers that in one call, and it is the number
