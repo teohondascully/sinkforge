@@ -336,7 +336,13 @@ done
 # `cap_lib.sh` explains the hazard by NAMING the bad pattern -- "the obvious version, `sleep "$CAP"` in a
 # subshell, CAUSED the failure the cap exists to prevent" -- and a grep for the bad pattern found the
 # sentence warning against it. The guard was reading the prose about its subject as its subject.
-if sed 's/#.*//' "$ROOT/tools/cap_lib.sh" | grep -qE 'sleep +"?\$(_cw_secs|\{_cw_secs\}|CAP)'; then
+# NO PIPE INTO `grep -q`, and the reason is that this guard fails toward GREEN. Under `pipefail` (set at
+# the top of this file) a `producer | grep -q` pipeline reports 141 when grep exits on an early match and
+# the producer takes SIGPIPE -- so the `if` would take its `else` branch and `check $?` would PASS on the
+# very pattern it exists to refuse. cap_lib.sh is 3719 bytes today, comfortably inside the 16KB pipe
+# buffer, so the producer always finishes first and the hazard cannot fire; that is a fact about the file's
+# CURRENT SIZE and not about this guard. `check_exit_codes.sh` shipped a red from exactly this shape.
+if grep -qE 'sleep +"?\$(_cw_secs|\{_cw_secs\}|CAP)' <<< "$(sed 's/#.*//' "$ROOT/tools/cap_lib.sh")"; then
 	false
 else
 	true
