@@ -49,8 +49,9 @@ const ICON_PX: int = 64          ## px per icon render; NOT the page canvas, whi
 ## THE SIZE THIS LAYER MEASURES AT IS NOT THE SIZE THE GAME DRAWS AT, and the comment that used to sit here
 ## said otherwise. It read "roughly a hotbar cell". It is roughly FOUR of them. Every `Visuals.draw_item`
 ## call site in `scenes/`: **13.0** through most of the HUD (carried-count chips, pack rows, detail chips,
-## the legend), **12.0** at `hud.gd:2785`, **9.0** for an item lying in the world
-## (`world_renderer.gd:2321`), and the detail plate at 40 or a well's own height; the only large ones.
+## the legend), **12.0** at `bazaar_works.gd`, **11.0** on a machine's need chip (`machine_view.gd`), **9.0** for an item lying in the world
+## (`world_renderer.gd`, the `draw_item(self, p, 9.0, item)` call), and the detail plate at 40 or a well's
+## own height; the only large ones.
 ##
 ## **So a cue that exists at 48 and dies at 13 is invisible to every number below.** That is not
 ## hypothetical: a glyph detail at `size * 0.035` is 1.7px here and 0.46px in the hotbar. The general form,
@@ -63,9 +64,15 @@ const ICON_PX: int = 64          ## px per icon render; NOT the page canvas, whi
 ## motion, and then neither could be attributed. `SF_ICON_PX=13` runs it where the player actually is; what
 ## falls out of that is a finding about the icons, to be reported before anything here is re-pitched.
 const ICON: float = 48.0
-## The size the HUD actually asks for, at almost every call site (`hud.gd:2315`, `:2535`, `:3547`, `:3658`,
-## `:3984`). The second pass below runs here and REPORTS, so a pair that collides where the player is cannot
-## sit unseen behind a comfortable margin measured somewhere they never look.
+## The size the HUD actually asks for, at five of the ten `Visuals.draw_item` call sites in `scenes/`:
+## the hotbar row in `hud.gd`, the pack band in `bazaar_pack.gd`, and three in `bazaar_page.gd`. The rest
+## are 12.0 (`bazaar_works.gd`), 11.0 (`machine_view.gd`), 9.0 for an item lying in the world
+## (`world_renderer.gd`), and the two large ones on the detail plate (`bazaar_page.gd`, 40.0 and a glyph's
+## own width). RE-COUNTED AGAINST THE TREE rather than carried forward: this list used to name five line
+## numbers in `hud.gd` and the decomposition moved four of those call sites into `bazaar_*.gd`, so a reader
+## following any of them landed past the end of a file that had lost two thirds of its length. The second
+## pass below runs here and REPORTS, so a pair that collides where the player is cannot sit unseen behind a
+## comfortable margin measured somewhere they never look.
 const HOTBAR_PX: float = 13.0
 const SAME_SHAPE: float = 0.90  ## silhouette IoU at or above which two icons share an outline
 const SAME_TINT: float = 10.0   ## CIELab dE below which two icons share a colour

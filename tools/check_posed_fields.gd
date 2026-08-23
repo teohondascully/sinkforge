@@ -3,7 +3,7 @@ extends "res://tools/check_base.gd"
 ## A FIXTURE MUST NOT POSE A FIELD THE GAME RECOMPUTES EVERY FRAME.
 ##
 ## `capture_moments` set `main._hud.can_craft = true` and shuttered sixty settle frames later.
-## `main.gd:793` re-derives that field from `_near_bazaar()` on every `_process`. The write was gone long
+## `main.gd` re-derives that field from `_near_bazaar()` on every `_process`. The write was gone long
 ## before the picture, and ten menu captures (the whole baseline a redesign was to be judged against)
 ## photographed the counter as seen by somebody standing nowhere near it. The Bazaar's gold verb button was
 ## not in the archive at all, so the first frame ever taken of it live turned out to read `BUILDENTER`.
@@ -26,7 +26,7 @@ extends "res://tools/check_base.gd"
 ##
 ## THE BARE FORM WAS MISSING FOR AS LONG AS THIS FILE EXISTED, and it is the commoner of the two: a
 ## `_process` writing its own state needs no receiver, so `_assigned_pair` (which requires one) could not
-## see it. `main.gd:737` recomputes `_cam_pos` and was invisible; `_camera.global_position`, derived from it
+## see it. `main.gd` recomputes `_cam_pos` and was invisible; `_camera.global_position`, derived from it
 ## on the NEXT line, was caught and then exempted on a reason that only holds at 60 fps. The layer was
 ## looking straight at the defect and keying on the line beneath it, which is this layer's own subject
 ## arriving as this layer. Turning the rule on took the population from 20 fields to 50.
@@ -332,7 +332,7 @@ func _initialize() -> void:
 ##
 ## THE BARE FORM IS THE COMMON ONE AND IT WAS THE INVISIBLE ONE, which is not a coincidence: it is what a
 ## `_process` does to its OWN state, and its own state is most of what a `_process` writes. `_assigned_pair`
-## needs a receiver, so `main.gd:737`'s `_cam_pos = _cam_pos.lerp(...)` was outside the population while
+## needs a receiver, so `main.gd`'s `_cam_pos = _cam_pos.lerp(...)` was outside the population while
 ## `_camera.global_position` one line BELOW it was inside: caught, and then exempted on a reason that only
 ## held at 60 fps. The layer looked at the defect and saw the line under it. Turning the rule on took the
 ## population from 20 fields to 50.

@@ -607,7 +607,7 @@ func _bending_geometry(main: MainView) -> void:
 ## STANDING AT THE COUNTER, WHICH IS NOT THE SAME AS WRITING `can_craft = true`.
 ##
 ## Every menu pose in this file used to set `main._hud.can_craft = true` and shutter six frames later.
-## `main.gd:793` re-derives that field from `_near_bazaar()` on EVERY `_process`, so the write was gone
+## `main.gd` re-derives that field from `_near_bazaar()` on EVERY `_process`, so the write was gone
 ## before the picture was taken and the whole matrix, seven captures built to be the redesign's baseline,
 ## photographed the counter as seen by someone standing nowhere near it. The tell was in the frames the
 ## entire time: BUILD greyed out under the note "at a claimed Bazaar" in `works_full`, where the pack holds

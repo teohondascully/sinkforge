@@ -169,7 +169,7 @@ static func clamp_cat(cat: int) -> int:
 ##
 ## It shares the counter's plate, rail, head, detail plate and sizing behaviour, while `_settings_open`
 ## and ESC stay its own. It is not the counter's fourth face, and the reason lives in the input handlers
-## rather than in proximity. `main.gd:1006` routes every event to `_settings_input` and returns. That
+## rather than in proximity. `main.gd` routes every event to `_settings_input` and returns. That
 ## total intercept is what key capture requires, because it must be able to swallow any key, while the
 ## counter binds the digit row and the mouse wheel to tab selection. A binding capture cannot live
 ## inside a tab strip. The other reason once recorded, that the counter is a place with a precondition,

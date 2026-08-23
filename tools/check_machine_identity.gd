@@ -414,7 +414,7 @@ func _lock_patch(cell: Vector2i) -> Rect2i:
 
 ## POSE THE COSMETIC CLOCK BEFORE EVERY SHUTTER, subjects and baseline alike.
 ##
-## Machine glyphs are drawn with the renderer's `_anim_time` (`world_renderer.gd:2859` hands it straight to
+## Machine glyphs are drawn with the renderer's `_anim_time` (`world_renderer.gd` hands it straight to
 ## `Visuals.draw_machine_glyph`), and that clock free-runs on wall-clock delta while this layer counts
 ## frames. Alone the two agree well enough; inside a parallel sweep they come apart, and each machine is
 ## then photographed at a different point of its own animation.

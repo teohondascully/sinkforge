@@ -261,8 +261,9 @@ func _run() -> void:
 ## collisions against the large map; the banner was fixed by standing it down at `hud.gd:699`, and the
 ## second (a 46x44 panel at (297,295), overlap 46x24) was left as an open lead: *"either that panel moved,
 ## or it is state-dependent and the current fixture no longer samples it."* It is the second. The panel
-## is `_draw_inventory`'s backing at ONE slot (`hud.gd:2292`: x0 = (640-30)/2 = 305, so
-## Rect2(297, 295, 46, 44)), drawn unconditionally at `hud.gd:263`. It never moved. The matrix asked for
+## is `_draw_inventory`'s backing at ONE slot (`x0 = (CANVAS.x - total_w) * 0.5` = (640-30)/2 = 305, and
+## `backing = Rect2(x0 - 8.0, ..., total_w + 16.0, ...)` = Rect2(297, 295, 46, 44)), drawn unconditionally
+## from `hud.gd`'s top-level `_draw()`. It never moved. The matrix asked for
 ## `_minimap_mode` **1**, which is the CORNER map (122x122 in the top-right, 142px clear of the bar), so
 ## the state that collides was never entered.
 ##
@@ -393,7 +394,7 @@ func _bottom_panel(rects: Array[Rect2]) -> Rect2:
 ## The objective plate: the ONE panel centred on the canvas at y=8 (`hud.gd:744`). The depth chip is
 ## left-anchored at x=10 (`:477`), FORGED is right-anchored (`:623`), the fast-forward chip sits at y=34
 ## (`:602`) and PAUSED at y=50 (`:283`). So the anchor identifies it and nothing else does. Deliberately
-## BLIND TO HEIGHT: the plate is 24px or 37px depending on `step_age` (`hud.gd:743`), and that is the exact
+## BLIND TO HEIGHT: the plate is 24px or 37px depending on `step_age` (`hud.gd`), and that is the exact
 ## timing dependence that made the last collision here intermittent.
 func _goal_plate(rects: Array[Rect2]) -> Rect2:
 	for r: Rect2 in rects:
