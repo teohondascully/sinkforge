@@ -332,9 +332,68 @@ Observations to preserve, not twenty independent implementation tickets.
 | Underground darkness masks mass while texture persists | T3.1 with V2 | Functional | Interior readability treatment before art polish |
 | Cavities read as cut-out black rather than excavated volume | V2 and V3 | Play-disrupting | Compare fresh-cut face and background-plane treatment |
 | Tree, ruin and surface structures feel tile-adjacent | T3.11 | Craft debt | Revisit only after the ground is coherent |
-| Machine labels and status are more vivid than the machines | V1 with T3.2 | Play-disrupting | Give hardware state a visible world expression before adding more chrome |
+| Machine labels and status are more vivid than the machines (**measured 2026-08-23** — four standing marks exceed the file's own `CHROME` ceiling; see the note below the table) | V1 with T3.2 | Play-disrupting | Give hardware state a visible world expression before adding more chrome |
 | The screen is busy even in an idle moment (**criterion specified 2026-08-23** — the duty period is 62.83s, so a one-frame criterion cannot work; see the note below the table) | V1 | Frame-breaking | Create a quiet-frame capture criterion |
 | Player silhouette is not the default focal point | V1, V2, V4 | Play-disrupting | Eye-path review of normal surface and underground frames |
+
+> ### "More vivid than the machines", measured 2026-08-23 — against the project's own rule rather than against taste
+>
+> The row's remedy is a design call, but its DIAGNOSIS is a number and nobody had taken it. It can be taken
+> without any aesthetic judgement at all, because `world_renderer.gd` already states the rule:
+>
+> > *Pure white is the brightest mark this screen can make and there is exactly one of it, so it is spent on
+> > the rarest thing: something that has just happened, at the moment it happens. Chrome is what the player
+> > looks through rather than at, and it has no moment: the cursor, the build ghost's border, guidance. It
+> > is allowed to be bright, and it is not allowed to be white.*
+> >
+> >     const CHROME := Color(0.78, 0.83, 0.92)      # luma 0.8253, or 210/255
+>
+> **So "too vivid" has a definition here: a STANDING mark brighter than CHROME.** The audit rule, so it can
+> be re-run: every `Color(r, g, b)` literal with all channels ≤ 1.0, in the nine world-plane files, scored
+> by Rec.601 luma. **Forty come out above CHROME.** Most are entitled to: sparks, glints, mine cracks,
+> crumble, scan returns and speed streaks are events, and `LAMP_COLOR`, torch pools and the light-layer
+> gradients are light sources rather than marks. Sorting them into event / light / standing is a judgement
+> and it is mine.
+>
+> **Four standing marks are left, and one of them is the control.**
+>
+> | site | luma | how far CHROME → white | delta from CHROME |
+> |---|---:|---:|---|
+> | `machine_view.gd:538` nameplate text | 229 | **+41.1%** | `(+0.08, +0.07, +0.06)` |
+> | `rope_view.gd:148` `AIM_MARK`, the grapple aim ring | 223 | **+29.3%** | `(+0.21, +0.05, −0.36)` |
+> | `machine_view.gd:560` `out_col`, "neutral routes" | 217 | **+14.8%** | `(+0.02, +0.03, +0.02)` |
+> | `machine_view.gd:259` held-count badge | 210 | 0.0% | exact — it takes the constant |
+>
+> **The deltas separate two different faults, and the badge proves the rule is followable.** The badge takes
+> `WorldRenderer.CHROME` and carries a comment defending the choice: *"a count is a standing quantity rather
+> than something that just happened, and it sits on its own near-black plate, so it keeps every bit of its
+> contrast at the lower value."* **That argument applies word for word to the nameplate three hundred lines
+> later, which sits on its own near-black plate and does not take the constant.**
+>
+> The nameplate and `out_col` are not independent colour choices. Both are **near-uniform positive offsets**
+> from CHROME — `(+0.08, +0.07, +0.06)` and `(+0.02, +0.03, +0.02)` — which is the signature of a value
+> typed from memory rather than chosen. The constant's own docstring anticipates exactly this: *"One constant
+> rather than a palette, because the sites that take it differ only in alpha."* These two differ in more
+> than alpha, by hand, in the brighter direction both times.
+>
+> `AIM_MARK` is the other kind. Its delta is not uniform — it is a warm amber, a deliberate hue away from
+> chrome's cool. So it is a real decision, and only its LUMA is in question.
+>
+> ### And this hands `GR-06` a lever it did not have
+>
+> `AIM_MARK` is drawn at `rope_view.gd:208` as the ring on the hook target, which is inside what `GR-06`
+> measures. That red is logged as settled-measurement-awaiting-a-design-call, with *"next experiment: none"*
+> and two options: the aim mark is too loud, or the pairing is wrong. **The first option is no longer a
+> matter of taste.** A standing mark at 223 against a stated ceiling of 210 is out of contract with a rule
+> the file already carries, so quietening it is a change the codebase licenses rather than one somebody has
+> to defend.
+>
+> The minimal form, if that is the call: hold the hue and scale to CHROME's luma, `Color(0.99, 0.88, 0.56)`
+> → `Color(0.93, 0.83, 0.53)`, a factor of 0.9417. Taking it to CHROME outright is a hue decision and a
+> larger one. **Neither is taken here** — `GR-06` is director-owned and this only narrows it.
+>
+> For the nameplate and `out_col` the change is smaller than a decision: take the constant. That is what it
+> is for, and the badge beside them already does.
 
 > ### The quiet-frame capture criterion, specified 2026-08-23 — and the first thing it has to say is that a quiet frame is not a frame
 >
