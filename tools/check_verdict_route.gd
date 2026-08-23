@@ -28,11 +28,14 @@ extends "res://tools/check_base.gd"
 ## A BARE `quit()` IS `quit(0)`. Godot's default exit code is 0, so `quit()` opts out in exactly the same
 ## way while looking like it says nothing about the result. Both spellings are the subject.
 ##
-## THE EXEMPTIONS ARE A RATCHET AND NOT A LIST OF EXCUSES. Three layers are named below because they
-## hand-roll their comparisons AND their diagnostics and call `_check()` nowhere, so there is no shared
-## tail in them to move; converting them is assertion rewriting. The list may only ever shrink: an
-## exemption whose layer has since become compliant is a RED here, not a quiet no-op, because a stale
-## exemption is how a permission granted once becomes permanent.
+## THE EXEMPTIONS ARE A RATCHET AND NOT A LIST OF EXCUSES. The list is EMPTY. Three layers were named
+## below -- check_frametime, check_opening, check_underground -- on the grounds that they hand-roll their
+## comparisons AND their diagnostics, so there was no shared tail in them to move; all three were then
+## converted anyway, by recording each decision with `_check()` beside the sentence rather than instead of
+## it. `EXEMPT` below carries that account in full. The list may only ever shrink: an exemption whose
+## layer has since become compliant is a RED here, not a quiet no-op, because a stale exemption is how a
+## permission granted once becomes permanent -- and that is not hypothetical, because the ratchet fired on
+## all three the moment they complied, which is why there is nothing left here to name.
 ##
 ##   godot --headless --script res://tools/check_verdict_route.gd
 
