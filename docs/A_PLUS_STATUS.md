@@ -1442,3 +1442,38 @@ and the margin stays an honest 1.68x. `GRADIENT_MIN` is untouched.
 
 One correction to my own working: an intermediate reading of this put the settled value at ~8.2. That was
 measured through the stale rect. Over the correctly relocated one it is 4.2.
+
+
+## The reproducibility census could not check the one thing it depends on
+
+The census compares two finished sweeps and reports, per layer, how many of the numbers inside its
+PASS/FAIL lines moved. It only measures reproducibility if the two sweeps ran on the same tree, and until
+now that was a sentence in its docstring asking the operator to guarantee it.
+
+That is not a small gap, because of what the census is for. A layer whose source was repaired between the
+two sweeps moves every number it prints. Run across a repair, the census ranks the layers that were just
+fixed as the least reproducible in the suite — the exact inverse of the truth. Four layers were repaired
+in a single day here, and the obvious next step was to re-run the census over the sweeps either side of
+them.
+
+Auditing the archive to find a valid pair turned up that there wasn't one. Of 23 retained sweeps, **14 ran
+on a modified worktree**, and no two shared a clean head. The precondition had never been met by
+construction, only by the three sweeps it was first run against — and those were all dirty, so a
+clean-only rule would have refused them. They share a head *and* a `delta`, the content-address of the
+uncommitted diff that every sweep already writes into its own `summary.txt`. Same head plus same delta is
+the same tree, clean or not, so the check is on that pair and the original use stands.
+
+Its recorded limit: the delta comes from `git diff HEAD`, which reports nothing for a file git has never
+seen. Two trees agreeing on head and delta can still differ by an untracked file. No registered layer can
+arrive that way — the registry is tracked — but an untracked asset can change pixels. This makes the
+precondition testable, not certain.
+
+Four controls: two sweeps on the same commit with different deltas are refused; two on different commits
+are refused and the nine differing files under `tools/` are named, `check_machine_state.gd` among them,
+which is precisely the false drift the guard exists to prevent; the legitimate dirty trio is accepted; and
+the new pair is accepted. `--cross-tree` still allows the comparison with a banner saying any row may be a
+code change.
+
+**The first valid pair, two sweeps at clean `e8d832f`: 95 of 107 layers reproduce exactly, up from 91.**
+`check_water_reads` fell from 100.0% widest move to 4.5%, which is the water repair confirmed by an
+instrument that knows nothing about it.

@@ -2,8 +2,25 @@
 """DOES THIS LAYER GIVE THE SAME ANSWER TWICE?
 
 Not a harness layer, and named so it cannot be taken for one: it compares two FINISHED sweeps, which no
-layer can see. Point it at two retained sweep directories taken on trees where the layers themselves did
-not change, and it reports, per layer, what fraction of the numbers inside its PASS/FAIL lines moved.
+layer can see. Point it at two retained sweep directories and it reports, per layer, what fraction of the
+numbers inside its PASS/FAIL lines moved.
+
+**THE TWO SWEEPS MUST HAVE RUN ON THE SAME TREE, AND THIS TOOL NOW CHECKS IT RATHER THAN ASKING.** That
+used to be a sentence here telling the operator to guarantee it, which protects nothing. The census exists
+to rank layers by how unstable their numbers are, and a layer whose source was REPAIRED between the two
+sweeps moves every number it prints -- so run across a repair, it ranks the layers that were just fixed as
+the least reproducible in the run. That is not a hypothetical: four layers were repaired in a single day
+here, and the obvious next step was to re-run the census over the sweeps either side of them.
+
+Every sweep records what it ran on in its own `summary.txt`: a head commit, and for a modified worktree a
+`delta` that content-addresses the uncommitted diff. Same head and same delta is the same tree, whether or
+not it was clean -- the three sweeps this tool was first run against were all taken on the same 3-file
+delta over `fc8d22f`, and refusing them for being dirty would have been a false refusal.
+
+    THE DELTA IS BLIND TO UNTRACKED FILES. It comes from `git diff HEAD`, which reports nothing for a file
+    git has never seen, so two trees agreeing on head and delta can still differ by an untracked one. No
+    registered layer can be added that way (the registry is tracked), but an untracked asset can change
+    pixels. This check makes the precondition testable, not certain.
 
 Diagnostic numbers are deliberately excluded. A layer may print a duration, a frame count or a seed and be
 perfectly sound; what matters is whether the numbers its VERDICT rests on reproduce. Those are the numbers
@@ -11,6 +28,7 @@ a threshold is compared against, and a threshold compared against a number that 
 at random.
 
     python3 tools/sweep_drift.py <sweep-dir-a> <sweep-dir-b>
+    python3 tools/sweep_drift.py --cross-tree <a> <b>    # different trees, on purpose; says what differs
 
 Reading the output: a layer whose subject IS time (frametime, dig_hitch, lock, pacing) is expected here and
 is not a defect. A layer that judges PIXELS and appears here has a verdict with a random component. A layer
@@ -49,6 +67,43 @@ def judged(text):
     return NUM.findall("\n".join(ASSERTION.findall(text)))
 
 
+def provenance(d):
+    """(tree, why) from a sweep's own summary.txt, where `tree` is head+delta. A sweep that does not
+    record what it ran on cannot be paired with anything, so an unreadable header is a refusal."""
+    f = os.path.join(d, "summary.txt")
+    if not os.path.exists(f):
+        return None, "no summary.txt, so the tree it ran on is unrecorded"
+    head = None
+    delta = "clean"
+    for line in io.open(f, encoding="utf-8", errors="replace"):
+        m = re.search(r"\bhead:\s*([0-9a-f]{7,40})\b", line)
+        if not m:
+            continue
+        head = m.group(1)[:7]
+        d2 = re.search(r"\bdelta\s+([0-9a-f]+)", line)
+        if d2:
+            delta = d2.group(1)
+        elif "worktree: clean" not in line:
+            return None, "summary.txt records a modified worktree with no delta to identify it"
+        break
+    if head is None:
+        return None, "summary.txt records no head commit"
+    return (head, delta), ""
+
+
+def changed_under_tools(head_a, head_b):
+    """Which files under tools/ differ between two commits. None means git could not say."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "diff", "--name-only", head_a, head_b, "--", "tools/"],
+                             capture_output=True, text=True, timeout=30)
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    return [ln for ln in out.stdout.split("\n") if ln.strip()]
+
+
 def read_layers(d):
     out = {}
     for f in glob.glob(os.path.join(d, "*.log")):
@@ -85,14 +140,57 @@ def compare(a, b):
 
 
 def main():
-    if len(sys.argv) != 3:
+    argv = [x for x in sys.argv[1:] if x != "--cross-tree"]
+    cross = len(argv) != len(sys.argv) - 1
+    if len(argv) != 2:
         print(__doc__)
         return 2
-    da, db = sys.argv[1], sys.argv[2]
+    da, db = argv[0], argv[1]
     a, b = read_layers(da), read_layers(db)
     if not a or not b:
         print("sweep_drift: REFUSED - one of the directories holds no *.log files", file=sys.stderr)
         return 1
+
+    # THE PRECONDITION, CHECKED. Reproducibility is only what this measures if the thing measured was the
+    # same both times, and neither way that fails is visible anywhere in the logs being compared.
+    ta, wa = provenance(da)
+    tb, wb = provenance(db)
+    if ta is None or tb is None:
+        print("sweep_drift: REFUSED - %s: %s" % (os.path.basename((da if ta is None else db).rstrip("/")),
+                                                 wa or wb), file=sys.stderr)
+        print("  Without both trees this cannot tell reproducibility from a code change.", file=sys.stderr)
+        return 1
+    if ta != tb:
+        print("sweep_drift: the two sweeps ran on DIFFERENT trees.", file=sys.stderr)
+        print("    %-34s %s" % (os.path.basename(da.rstrip("/")), "%s + %s" % ta), file=sys.stderr)
+        print("    %-34s %s" % (os.path.basename(db.rstrip("/")), "%s + %s" % tb), file=sys.stderr)
+        if ta[0] != tb[0]:
+            touched = changed_under_tools(ta[0], tb[0])
+            if touched is None:
+                print("  git could not diff the two commits, so which layers changed is unknown.",
+                      file=sys.stderr)
+            elif touched:
+                print("  %d file(s) under tools/ differ between the commits:" % len(touched),
+                      file=sys.stderr)
+                for t in touched[:12]:
+                    print("      %s" % t, file=sys.stderr)
+                if len(touched) > 12:
+                    print("      ... and %d more" % (len(touched) - 12), file=sys.stderr)
+            else:
+                print("  No file under tools/ differs; any movement below would be the game's, not the",
+                      file=sys.stderr)
+                print("  layers'.", file=sys.stderr)
+        else:
+            print("  Same commit, different uncommitted delta.", file=sys.stderr)
+        if not cross:
+            print("sweep_drift: REFUSED. A layer repaired between these two sweeps moves every number it",
+                  file=sys.stderr)
+            print("  prints and would rank as the least reproducible layer here. Pass --cross-tree if you",
+                  file=sys.stderr)
+            print("  have a reason to compare them anyway.", file=sys.stderr)
+            return 1
+        print("sweep_drift: --cross-tree given. ANY ROW BELOW MAY BE A CODE CHANGE.", file=sys.stderr)
+        print(file=sys.stderr)
 
     # THE COMPARISON HAS TO BE ABLE TO SAY BOTH THINGS, shown on this data and not argued. A census that
     # reports "nothing moved" is the same output a dead comparison produces, and a census that reports
