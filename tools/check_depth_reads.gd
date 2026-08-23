@@ -53,12 +53,7 @@ func _initialize() -> void:
 	print("== does the running game know how deep you are ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_depth_reads: PASS — the shipped consumers read the ground, not the floor of your shaft")
-		quit(0)
-	else:
-		print("check_depth_reads: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_depth_reads", "the shipped consumers read the ground, not the floor of your shaft")
 
 
 func _run() -> void:

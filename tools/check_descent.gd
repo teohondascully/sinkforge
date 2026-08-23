@@ -46,12 +46,7 @@ func _initialize() -> void:
 	print("== is there a way down ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_descent: PASS — the world offers a way down that is not a pickaxe")
-		quit(0)
-	else:
-		print("check_descent: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_descent", "the world offers a way down that is not a pickaxe")
 
 
 func _run() -> void:

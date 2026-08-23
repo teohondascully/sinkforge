@@ -124,7 +124,4 @@ func _phys() -> void:
 				_check(false, "never exited the shaft at the lip (stuck at %s)" % c)
 				_phase = 5
 		5:
-			if _failures == 0:
-				print("CLIMB OK"); quit(0)
-			else:
-				printerr("%d CLIMB CHECK(S) FAILED" % _failures); quit(1)
+			_verdict("check_climb")

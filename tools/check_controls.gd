@@ -79,12 +79,7 @@ func _on_frame() -> void:
 	process_frame.disconnect(_on_frame)
 	_one_verb_r()
 	_main.queue_free()
-	if _failures == 0:
-		print("CONTROLS OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_controls")
 
 
 ## R DOES ONE THING. Both halves, in the one situation where the old scheme would have run the wrong one:

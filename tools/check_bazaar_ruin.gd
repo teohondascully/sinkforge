@@ -49,12 +49,7 @@ func _initialize() -> void:
 	_shipping_world()
 	_strictness()
 	_view_wiring()
-	if _failures == 0:
-		print("check_bazaar_ruin: PASS — the unfinished stall is a thing the game can see and point at")
-		quit(0)
-	else:
-		printerr("check_bazaar_ruin: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_bazaar_ruin", "the unfinished stall is a thing the game can see and point at")
 
 
 # --- the world a player actually gets ----------------------------------------------------------------

@@ -43,12 +43,7 @@ func _initialize() -> void:
 	print("== agility check ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("AGILITY OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_agility")
 
 
 func _run() -> void:

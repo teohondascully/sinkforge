@@ -283,12 +283,7 @@ func _on_frame() -> void:
 
 		_cost(r, ref)
 
-		if _failures == 0:
-			print("check_dig_hitch: PASS")
-			quit(0)
-		else:
-			printerr("check_dig_hitch: %d FAILURE(S)" % _failures)
-			quit(1)
+		_verdict("check_dig_hitch")
 
 
 ## THE COST GATE. `ref` has already been fully baked once by the caller, so its caches are sized and warm,

@@ -48,12 +48,7 @@ func _initialize() -> void:
 	print("== the hook you can aim ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_aim: PASS — the marker is honest and the chain holds the arc")
-		quit(0)
-	else:
-		print("check_aim: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_aim", "the marker is honest and the chain holds the arc")
 
 
 func _run() -> void:

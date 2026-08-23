@@ -47,12 +47,7 @@ func _on_frame() -> void:
 	_pulverise()
 	_gates()
 	_wedge()
-	if _failures == 0:
-		print("check_bits: PASS — every bit is worse than the Point somewhere")
-		quit(0)
-	else:
-		printerr("check_bits: FAIL — %d failure(s)" % _failures)
-		quit(1)
+	_verdict("check_bits", "every bit is worse than the Point somewhere")
 
 
 ## Equipping is stateless: the bit is whatever is in the selected slot, and everything else is the Point.

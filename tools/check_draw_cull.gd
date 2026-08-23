@@ -95,9 +95,4 @@ func _initialize() -> void:
 		flood.append([Vector2(9000, 9000), Vector2(9000, 9200), 0.5])
 	_check(_drawn(flood) == 0, "400 off-screen drops cost nothing (and MAX_ITEMS caps the list at 240)")
 
-	if _failures == 0:
-		print("check_draw_cull: PASS — off-screen drops are free, and on-screen ones still arrive")
-		quit(0)
-	else:
-		printerr("check_draw_cull: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_draw_cull", "off-screen drops are free, and on-screen ones still arrive")
