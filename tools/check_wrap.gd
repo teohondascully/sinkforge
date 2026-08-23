@@ -63,12 +63,7 @@ func _initialize() -> void:
 	print("== does the rope catch on things ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_wrap: PASS — the line goes around the rock, and comes back off it")
-		quit(0)
-	else:
-		print("check_wrap: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_wrap", "the line goes around the rock, and comes back off it")
 
 
 func _run() -> void:

@@ -63,12 +63,7 @@ func _initialize() -> void:
 	print("== does the game teach what it actually does ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_teaching: PASS — every technique is taught, once, in real keys, in time to read")
-		quit(0)
-	else:
-		print("check_teaching: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_teaching", "every technique is taught, once, in real keys, in time to read")
 
 
 ## A SLOT OF THIS LAYER'S OWN, SET BEFORE THE SCENE EXISTS.

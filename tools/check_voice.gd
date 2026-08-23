@@ -37,12 +37,7 @@ const LOUD_DB: float = -40.0         ## ...and at full level must be at least th
 func _initialize() -> void:
 	print("== can you tell what happened with your eyes shut ==")
 	await _run()
-	if _failures == 0:
-		print("check_voice: PASS — every event has a voice, and no two share one")
-		quit(0)
-	else:
-		print("check_voice: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_voice", "every event has a voice, and no two share one")
 
 
 func _run() -> void:

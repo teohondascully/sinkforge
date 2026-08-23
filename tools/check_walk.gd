@@ -180,9 +180,4 @@ func _report() -> void:
 		_check(false, "REPRODUCED: %d backward-snap frames, worst %.1fpx" % [_snaps, _worst])
 		printerr("  context: %s" % _worst_ctx)
 
-	if _failures == 0:
-		print("WALK OK")
-		quit(0)
-	else:
-		printerr("%d WALK FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_walk")

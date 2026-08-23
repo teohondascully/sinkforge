@@ -68,12 +68,7 @@ func _initialize() -> void:
 	print("== is the rope a way to travel ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_traverse: PASS — under a roof, the line is the fast way across")
-		quit(0)
-	else:
-		print("check_traverse: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_traverse", "under a roof, the line is the fast way across")
 
 
 func _run() -> void:

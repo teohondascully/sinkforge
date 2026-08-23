@@ -38,12 +38,7 @@ func _initialize() -> void:
 	print("== the run ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_stride: PASS — the run is worth building, costs something, and leaves mining alone")
-		quit(0)
-	else:
-		print("check_stride: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_stride", "the run is worth building, costs something, and leaves mining alone")
 
 
 func _run() -> void:

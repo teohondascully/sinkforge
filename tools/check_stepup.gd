@@ -129,10 +129,7 @@ func _phys() -> void:
 			elif _t >= 2.5:
 				_sq_i += 1; _sq_built = false
 		4:
-			if _failures == 0:
-				print("STEP-UP OK"); quit(0)
-			else:
-				printerr("%d STEP-UP CHECK(S) FAILED" % _failures); quit(1)
+			_verdict("check_stepup")
 
 
 ## A flat floor with a ONE-ROW tunnel: floor at row 12, ceiling at row 10, so row 11 is the only opening

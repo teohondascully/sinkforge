@@ -73,12 +73,7 @@ func _initialize() -> void:
 		return
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_water_reads: PASS — a body of water, not a blue rectangle")
-		quit(0)
-	else:
-		print("check_water_reads: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_water_reads", "a body of water, not a blue rectangle")
 
 
 func _run() -> void:

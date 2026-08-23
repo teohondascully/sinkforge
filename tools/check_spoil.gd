@@ -34,12 +34,7 @@ func _initialize() -> void:
 	_loose_fill_weeps()
 	_packed_gravel_holds()
 	_the_chain()
-	if _failures == 0:
-		print("check_spoil: PASS — spoil crushes to gravel, and only packed gravel holds water back")
-		quit(0)
-	else:
-		printerr("check_spoil: FAIL — %d failure(s)" % _failures)
-		quit(1)
+	_verdict("check_spoil", "spoil crushes to gravel, and only packed gravel holds water back")
 
 ## Ticks driven ONE AT A TIME: advance() caps the backlog it will chew in a single call, so handing it
 ## twenty seconds at once runs a fraction of them and reads as "the machine does nothing".

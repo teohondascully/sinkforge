@@ -44,12 +44,7 @@ func _initialize() -> void:
 	print("== the rock tells you what is behind it ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_tells: PASS — the tell rises on approach and stays silent in solid rock")
-		quit(0)
-	else:
-		print("check_tells: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_tells", "the tell rises on approach and stays silent in solid rock")
 
 
 func _run() -> void:

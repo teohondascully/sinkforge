@@ -34,12 +34,7 @@ func _initialize() -> void:
 	print("== water-move check (L3 impedance) ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("WATER-MOVE OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_water_move")
 
 
 func _run() -> void:
