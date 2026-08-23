@@ -92,6 +92,17 @@ if fast_ms < slow_ms:
 	_verdict("check_control", "the two agree, and the first is faster")
 """
 
+## AND A THIRD KIND OF WRONG: a claim the detector INVENTED. Two quote characters in a comment, three
+## lines apart, with the words `: PASS` and a speed word in the prose between them. There is no literal
+## here and no verdict — but a pattern whose negated class forgets the newline reads the whole span as
+## one string. Flagged by the version of this file that shipped until 2026-08-23; it must be silent now.
+const CONTROL_SPAN: String = """
+var fast_ms: float = 0.0
+# a comment that opens a quote "here
+# and shuts it three lines down, having said : PASS
+# and said the word faster" on the way past
+"""
+
 
 func _initialize() -> void:
 	var pos: Array[String] = _claims_without_evidence(CONTROL_SRC)
@@ -103,6 +114,8 @@ func _initialize() -> void:
 		"...and flags the same claim when it is made through _verdict()'s note instead of a print")
 	_check(_claims_without_evidence(CONTROL_NOTE_CLEAN).is_empty(),
 		"...and stays quiet on THAT one too once a comparison guards it")
+	_check(_claims_without_evidence(CONTROL_SPAN).is_empty(),
+		"...and does not read a claim out of the prose between two quotes on different lines")
 
 	var scanned: int = 0
 	var bad: Array[String] = []
@@ -140,9 +153,16 @@ func _initialize() -> void:
 ## `_verdict()` a note and the base class builds the line around it, in which case the literal carries
 ## nothing this gate can key on. Both are collected here. Anything that only reads the first shape reports
 ## a clean tree over the second, which is the failure this file is about, one level up.
+## A LITERAL DOES NOT SPAN A LINE, AND UNTIL 2026-08-23 THIS PATTERN THOUGHT IT COULD.
+## `[^"\\]*` matches newlines, so between any two quote characters in the file — including two that
+## belong to different sentences of a COMMENT — the pattern would happily read the prose in between as one
+## string literal. It flagged check_seam_flood on a "claim" assembled from six comment lines, one of which
+## contained the words `: PASS` because it was describing this gate. A detector that can invent its subject
+## out of the commentary about it is worse than one that misses: the miss is quiet, this is a confident
+## wrong red. Excluding the newline costs nothing real, because a GDScript literal cannot contain one.
 func _verdict_lines(src: String) -> Array[String]:
 	var out: Array[String] = []
-	var re := RegEx.create_from_string("\"([^\"\\\\]*:\\s*PASS[^\"\\\\]*)\"")
+	var re := RegEx.create_from_string("\"([^\"\\\\\\n]*:\\s*PASS[^\"\\\\\\n]*)\"")
 	for m: RegExMatch in re.search_all(src):
 		out.append(m.get_string(1))
 	for note: String in _verdict_notes(src):
