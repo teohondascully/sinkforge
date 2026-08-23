@@ -1323,3 +1323,43 @@ first version of that guard did not work, and the control is what found it: `qui
 exit and does not return, so the mutant printed the FAIL line, then printed "PASS (0 asserted)", and
 exited 0 — the exact shape the guard exists to stop. With an explicit `return` after it, the mutant exits 1
 and prints only the failure.
+
+
+## `check_machine_state` did not have its sibling's race, but its bar was one draw
+
+The question was whether the other 2026-08-22 red shared the fixed-frame fault that turned out to be
+`check_machine_identity`'s. It does not: it waits on a condition (`_settle_until(sim, m, &"working")`) and
+then gives the light 75 frames to reach steady, and six runs of one tree pass with `D_state` stable to
+3–6%.
+
+What it did have is a bar drawn once. `D_motion` — the same state photographed at two animation phases —
+is what `D_state` must clear by `MOTION_MARGIN`, and over six runs it swung **3.75 to 16.83** on the
+Generator, 4.5x, while that machine's `D_state` moved 6%. Which phase pair the shutter caught was doing
+more to the margin than the machine was.
+
+Three estimators were measured and two were wrong, which is why the workings are in the source:
+
+| estimator | Forge `D_motion` | verdict |
+|---|---|---|
+| one draw (shipped) | 10.6 – 13.1 | passes, but the Generator's twin swings 4.5x |
+| max, each draw vs `a1` | 32.9 – 35.7 | **all six red** — the draws span 22/44/66/88 frames, four intervals of a growing quantity |
+| max of consecutive pairs | 43.1 – 43.9 | **all six red** — dominated by one discrete event |
+| median of consecutive pairs | 15.0 – 15.5 | passes, and stable |
+
+The first wrong estimator is the mistake `check_grapple_reads` made and had to unmake, with a second edge
+here: the recipe bar fills as the machine works, and a window four times longer admits four times as much
+of it. The second was caught by printing every pair instead of the summary. One run's Forge read **11.25,
+43.39, 18.87, 9.26** with the status `working` throughout — pair 1 is a craft completing, the bar
+resetting, an output appearing. A discrete event, not an animation phase, and a maximum is certain to find
+it.
+
+The median of consecutive pairs is what this repository already settled on for a statistic over a
+duty-cycled cue. `MOTION_MARGIN` is untouched at 3.0, and the new bar is **stricter than what shipped**:
+the single draw it replaces was the first pair, and the Generator's went from as low as 3.75 to a steady
+24.4. Margins are 5.0–6.2x. The Generator's 4.5x instability is gone: 24.02–24.97 across six runs.
+Subject-removed control still fires — every machine SILENT with state equal to motion.
+
+And a note this layer needed once `SF_ANIM_FROZEN` existed: **the clock must not be posed here.** This
+layer's bar IS the animation. Freezing it drives `D_motion` toward zero and makes the margin trivially
+satisfied — the exact opposite of what posing bought the grapple layer, where the animation was the
+contaminant rather than the control.

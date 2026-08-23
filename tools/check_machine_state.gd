@@ -40,6 +40,9 @@ const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
 const STEADY_FRAMES: int = 75         ## frames a state is given to reach its steady LIGHT before the
                                       ## shutter; status says "running", not "finished changing"
+## How many same-state phase pairs `D_motion` is drawn from; the worst is kept. One draw of a duty-cycled
+## quantity is a sample of the shutter, not of the machine.
+const MOTION_SAMPLES: int = 4
 const PHASE_FRAMES: int = 22          ## frames between the two same-state captures — a visibly different
                                       ## point in every machine animation in the vocabulary
 ## THE FAMILY, not one machine. `PC-05` asks for *"one physical state cue for forge/drill family"*, and a
@@ -221,14 +224,59 @@ func _run() -> void:
 		var live_work: bool = _main._renderer._machines._machine_active(m)
 		var a1: PackedFloat32Array = await _luma_patch()
 		_dump("%s_work" % String(spec["name"]).to_lower().replace(" ", "_"))
-		for _i: int in PHASE_FRAMES:
-			await physics_frame
-		# NOT RE-FED HERE. Depositing between the two shots changes `progress` and the fill of the recipe
+		# NOT RE-FED HERE. Depositing between the shots changes `progress` and the fill of the recipe
 		# bar, which would land in `D_motion` as though it were animation. The single feed above is large
 		# enough that the machine is still working; if it is not, the check below says so rather than
 		# quietly comparing a working frame to a starving one.
-		var still: bool = sim.machine_status(m) == &"working"
-		var a2: PackedFloat32Array = await _luma_patch()
+		#
+		# ONE DRAW OF AN ANIMATION BASELINE IS NOT A BASELINE. `D_motion` is the same state photographed at
+		# two animation phases, and it is the bar `D_state` has to clear by `MOTION_MARGIN`. Measured over
+		# six runs of one unchanged tree it swung 3.75 to 16.83 levels on the Generator alone, 4.5x, while
+		# that machine's `D_state` moved 6% — so which phase pair the shutter happened to catch was doing
+		# more to the margin than the machine was. Several pairs are taken now and the WORST is kept. That
+		# RAISES the bar the state cue must clear: it can only make this check harder to pass.
+		#
+		# AND THE CLOCK MUST NOT BE POSED HERE. `SF_ANIM_FROZEN` exists now and it would be exactly wrong
+		# on this layer: the animation IS the bar. Freezing it drives `D_motion` toward zero and makes the
+		# margin trivially satisfied. It bought the grapple layer its subject back because there the
+		# animation was the contaminant; here it is the control.
+		# CONSECUTIVE PAIRS, EACH THE SAME LENGTH, AND THE MEDIAN OF THEM. Three estimators were measured
+		# here and two were wrong, so the workings are kept.
+		#
+		# Comparing every draw back to `a1` spans 22, 44, 66 and 88 frames: four different intervals of a
+		# growing quantity rather than four draws of one — the mistake `check_grapple_reads` made and had
+		# to unmake — and it has a second edge here, because the recipe bar fills as the machine works and
+		# a window four times longer admits four times as much of it.
+		#
+		# Taking the WORST of four consecutive pairs is wrong for a different reason, and the per-pair
+		# numbers are what showed it. One run's Forge read 11.25, 43.39, 18.87, 9.26 with the status
+		# `working` throughout: pair 1 is a craft completing, the bar resetting and an output appearing.
+		# That is a discrete event, not an animation phase, and a maximum is certain to find it. It drove
+		# the Forge to ~43 levels and turned all six runs red against a bar it had been clearing by 5.9x.
+		#
+		# The median of consecutive pairs is what this repository already settled on for a statistic over
+		# a duty-cycled cue. It is also STRICTER than what shipped: the single draw this replaces was the
+		# first pair, 11.25, and the median of the four is 15.06. Every pair is printed so a reader can
+		# see what one draw would have been worth.
+		var still: bool = true
+		var a2: PackedFloat32Array = PackedFloat32Array()
+		var phases: Array[float] = []
+		var prev_phase: PackedFloat32Array = a1
+		for _s: int in MOTION_SAMPLES:
+			for _i: int in PHASE_FRAMES:
+				await physics_frame
+			still = still and sim.machine_status(m) == &"working"
+			var cand: PackedFloat32Array = await _luma_patch()
+			phases.append(_mean_abs(prev_phase, cand))
+			if a2.is_empty():
+				a2 = cand
+			prev_phase = cand
+		phases.sort()
+		var worst_motion: float = 0.5 * (phases[(phases.size() - 1) / 2] + phases[phases.size() / 2])
+		var spread: String = ""
+		for v: float in phases:
+			spread += "%.2f " % v
+		print("      %s same-state pairs: %s(median %.2f)" % [String(spec["name"]), spread, worst_motion])
 		_starve(sim, m)
 		var stopped: bool = await _settle_until_not(sim, m, &"working")
 		for _i: int in STEADY_FRAMES:
@@ -241,7 +289,7 @@ func _run() -> void:
 			await physics_frame
 			continue
 		var live_stop: bool = _main._renderer._machines._machine_active(m)
-		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "i1": i1, "empty": empty,
+		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "d_motion": worst_motion, "i1": i1, "empty": empty,
 			"live_work": live_work, "live_stop": live_stop, "flash_work": flash_work,
 			"status": String(sim.machine_status(m)), "stopped": stopped})
 		sim.remove_machine(STAGE)
@@ -423,7 +471,10 @@ func _report(rows: Array[Dictionary], still: float) -> void:
 		var a1: PackedFloat32Array = r["a1"]
 		var a2: PackedFloat32Array = r["a2"]
 		var i1: PackedFloat32Array = r["i1"]
-		var d_motion: float = _mean_abs(a1, a2)
+		# TAKEN FROM THE SAMPLING, NOT RECOMPUTED. `a2` is only the frame that produced the worst pair;
+		# re-differencing it against `a1` would measure a1-to-a2 again and throw away the consecutive
+		# spacing the sampling exists to keep.
+		var d_motion: float = float(r["d_motion"])
 		var d_state: float = _mean_abs(a1, i1)
 		if d_motion < 0.0 or d_state < 0.0:
 			blind.append(String(r["name"]))
