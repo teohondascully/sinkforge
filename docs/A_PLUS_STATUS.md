@@ -1,17 +1,27 @@
 # Engineering programme — status
 
 A bounded quality programme run over this repository before further feature work. Six areas, fixed order,
-no new gameplay until it exits. This file is the current disposition; an area is CLOSED only where the
-evidence is named, and a partial area is stated as partial rather than rounded up.
+no new gameplay until it exits. An area is CLOSED only where the evidence is named, and a partial area is
+stated as partial rather than rounded up.
+
+**FRAME FOR EVERY NUMBER BELOW.** This page is two documents. The **disposition table** immediately below
+is a present-tense claim and has to be true today. **Everything after it is a chronological log**: each
+section was written when its work landed and records what was measured then, so its numbers are readings
+at their own date and are not restated as the suite grows. A heading that says the assertion floor reaches
+109 of 113 and a later one that says it reaches every layer in the suite are both correct — they are
+waypoints, not contradictions. Treat a count in the log as evidence that an experiment happened and
+produced that value, and re-derive from the repository before quoting one as current. Where a section
+makes a present-tense claim about *status* rather than reporting a measurement, staying true is that
+section's job; the exit condition carries a dated re-read for exactly that reason.
 
 | Area | State | Evidence |
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
-| 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
-| 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. The measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. All 92 inheritors now reach exit 0 only through `_verdict()`, none of them moves an assertion counter itself, and both rules are gated by `check_verdict_route` with a shrink-only exemption list that is empty. |
+| 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions (3569 today — the 3557 is what the extractions achieved, not a current size, and this row is in the present-tense table so it says which is which), each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
+| 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers then inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. The measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. All 92 inheritors now reach exit 0 only through `_verdict()`, none of them moves an assertion counter itself, and both rules are gated by `check_verdict_route` with a shrink-only exemption list that is empty. |
 | 4. Performance and maintainability | **Closed** | a formal pass found seven full-grid loops, one of which ran every frame; both cliffs are fixed and the residual is measured at 2.74ms, which the charter's *fix confirmed cliffs only* answers rather than defers. The frame SLO has been evaluated on the host it was written for, and its allowances — one machine's numbers applied to any machine — are now a per-host registry that refuses rather than borrows. The hidden-coupling bullet found a live defect: a tree could grow inside a bazaar and the cache would not notice, reachable through an ordinary player verb. Fixed, and gated behaviourally plus by writer population. |
 | 5. Documentation and contributor readiness | **Done, with one gap now named** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is gated by `check_doc_counts` against the runner's registration. **That gate covers the five phrasings it enumerates, and only those.** It deliberately refuses a loose `[0-9]+ layers`, because "17 layers" and "16 layers" are correct statements about other populations — so it trades false positives for false negatives, and a total written in a sixth phrasing is ungated. On 2026-08-23 that was not hypothetical: the README's CI table said "all 110 layers" twice and "110 PASS ... of 110" once, against a suite of 114, while the gate passed. Corrected at `36144de`; widening the gate is harness expansion and wants a priority ID. The claim that "a stated total cannot rot" was too strong and is withdrawn. |
-| 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
+| 6. Public presentation | **Complete, and decaying between audits** | the README explains the engineering system and the test-surface ratio, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. **The same caveat as Area 5, and it is the sharper one:** on 2026-08-23 the README's CI section was found describing a 110-layer suite and explaining a red that had been repaired days earlier, having drifted silently while three gates passed over it. Corrected at `36144de`. "Explains it accurately" is not a property a repository holds; it is one that decays with every commit, and nothing currently gates it. |
 
 ## Area 2 — closed
 
@@ -1053,10 +1063,29 @@ plausible shape and no evidence yet, and the honest note is that nobody has test
 All six areas closed, the full suite green on `main`, and every remaining stand-down carrying a written
 reason. No new gameplay work begins until then.
 
-**Where that stands.** Areas 1, 2, 3, 4, 5 and 6 are closed. The configured sweep is green on `main` at
-`112 PASS / 0 FAIL / 0 SKIP`, and each of the six stand-downs carries its reason in `tools/stand_downs.txt`
-and resolves on every run of its layer. One finding remains open and is not an area: the pixel-layer
-flakiness below, which is classified environmental and unexplained with all four sweeps retained.
+**Where that stands — re-read 2026-08-24, and the previous version of this paragraph had stopped being
+true without changing.** Areas 1 through 6 are closed, with the qualifications now written into Areas 5
+and 6. **The suite is not green.** The configured sweep at `e89eef9`, tree clean from launch to verdict,
+reads `113 PASS / 1 FAIL / 0 SKIP of 114`, and the single red is `check_grapple_reads` (`GR-06`). Each of
+the six stand-downs a display sweep resolves carries its reason in `tools/stand_downs.txt`. This paragraph
+previously read `112 PASS / 0 FAIL / 0 SKIP`; that was true when it was written and was left standing
+afterwards, which is the failure mode the frame at the top of this file exists to make visible.
+
+**So has the programme exited?** The condition above asks for "the full suite green on `main`", and by
+those words, no. The words predate the red-disposition policy this work now runs under, in which a red is
+classified rather than counted. `GR-06` is P3, scoped to grapple presentation, director-owned, with a
+measured next step and an expiry, and it fails identically on a real GPU and on CI's software rasterizer —
+so it is a finding about the game, not an unexplained instability. Treating it as a global stop would
+freeze the whole programme over something that blocks one surface. The accurate statement is that **five
+criteria hold outright and the sixth holds in substance but not in the words it was written in.** It is
+the words being corrected here, not the criterion, and the criterion is not being relaxed to fit.
+
+**And "one finding remains open" is no longer true either.** Beyond the pixel-layer flakiness below, which
+is still classified environmental and unexplained with its sweeps retained, `FLOORS-UNJUDGED` and
+`DOC-COUNTS-NARROW` were both found after this section was last written, and both qualify areas marked
+closed: the floors gate declines to judge either CI job, and the doc-count gate checks five enumerated
+phrasings rather than a population. Neither reopens an area. Both are reasons to stop reading "closed" as
+"nothing left to find".
 
 It is worth being exact about what "the full suite green" can mean here, because the runner is. A sweep
 with a display cannot reach exit 0 and never will — three of the stand-downs are structural — so the
