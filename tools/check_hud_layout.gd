@@ -392,8 +392,9 @@ func _bottom_panel(rects: Array[Rect2]) -> Rect2:
 
 
 ## The objective plate: the ONE panel centred on the canvas at y=8 (`hud.gd`). The depth chip is
-## left-anchored at x=10 (`:477`), FORGED is right-anchored (`:623`), the fast-forward chip sits at y=34
-## (`:602`) and PAUSED at y=50 (`:283`). So the anchor identifies it and nothing else does. Deliberately
+## left-anchored at x=10, FORGED is right-anchored, the fast-forward chip sits at y=34 and PAUSED at
+## y=60 (`hud.gd`'s `PAUSED_CHIP` is `Rect2(10.0, 60.0, 104.0, 22.0)`; this line said y=50, which was
+## never a value in the file). So the anchor identifies it and nothing else does. Deliberately
 ## BLIND TO HEIGHT: the plate is 24px or 37px depending on `step_age` (`hud.gd`), and that is the exact
 ## timing dependence that made the last collision here intermittent.
 func _goal_plate(rects: Array[Rect2]) -> Rect2:
