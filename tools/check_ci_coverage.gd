@@ -173,6 +173,25 @@ func _initialize() -> void:
 			"every layer file on disk is registered in the runner%s"
 			% ("" if orphans.is_empty() else " — these are not, so they run nowhere: " + ", ".join(orphans)))
 
+		# THE MEMBERSHIP TEST HAS TO BE ABLE TO SAY NO, shown on this run rather than recorded as a knockout
+		# somebody performed once by hand. Both assertions above pass over an empty orphan list, and an
+		# empty list is exactly what a `registered` set built from the wrong text produces: every file looks
+		# registered, nothing is reported, and the layer whose whole job is "every layer runs" reports that
+		# every layer runs. The floor above catches a scan that found no FILES. It cannot catch a set that
+		# matched everything. So a path the runner cannot contain goes through the same test, and so does
+		# one it demonstrably does.
+		var absent: String = "res://tools/check_no_such_layer_as_this_one.gd"
+		var present: String = ""
+		for f: String in layer_files:
+			if registered.has("res://tools/" + f):
+				present = "res://tools/" + f
+				break
+		_check(not registered.has(absent),
+			"CONTROL: the membership test says no to %s, which the runner cannot register" % absent.get_file())
+		_check(present != "" and registered.has(present),
+			"CONTROL: ...and yes to %s, which it does"
+				% ("nothing on disk was registered at all" if present == "" else present.get_file()))
+
 	# THE DISPLAY JOB MUST NOT SELECT BY NAME. This is the regression itself, stated as an assertion: a
 	# workflow that enumerates pixel layers is a workflow that will be stale the next time one is added,
 	# and the staleness is invisible from either job's output.

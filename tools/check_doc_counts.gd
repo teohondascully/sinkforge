@@ -70,15 +70,12 @@ func _initialize() -> void:
 			# A doc that will not open is a failure, not an absence. See non-vacuity note 3.
 			_check(false, "%s opens and can be read" % doc)
 			continue
-		for pattern: String in CLAIMS:
-			var re := RegEx.new()
-			re.compile(pattern)
-			for m: RegExMatch in re.search_all(text):
-				found += 1
-				var claimed: int = int(m.get_string(1))
-				_check(claimed == registered,
-					"%s says %d where the runner registers %d (\"%s\")"
-					% [doc.get_file(), claimed, registered, m.get_string(0)])
+		for c: Array in _claims_in(text):
+			found += 1
+			var claimed: int = int(c[0])
+			_check(claimed == registered,
+				"%s says %d where the runner registers %d (\"%s\")"
+				% [doc.get_file(), claimed, registered, String(c[1])])
 
 	# AND EVERY VERB THE RUNNER DEFINES MUST HAVE A ROW. Checking only the rows that exist lets a new
 	# execution class be undocumented and still green -- the table would be internally consistent and
@@ -102,8 +99,53 @@ func _initialize() -> void:
 	_check(found >= MIN_CLAIMS,
 		"the scan actually found the layer-count claims (%d found, at least %d expected)"
 		% [found, MIN_CLAIMS])
+	_matcher_control(registered)
 	_verdict("check_doc_counts", "%d claim(s) across %d doc(s) agree with the runner's %d"
 		% [found, DOCS.size(), registered])
+
+
+## Every layer-count claim in one document, as [number, the text that stated it]. Factored out so the
+## control below and the real scan run the SAME matcher over the same patterns: a control that reimplements
+## the thing it controls has proved that the reimplementation works.
+func _claims_in(text: String) -> Array[Array]:
+	var out: Array[Array] = []
+	for pattern: String in CLAIMS:
+		var re := RegEx.new()
+		re.compile(pattern)
+		for m: RegExMatch in re.search_all(text):
+			out.append([int(m.get_string(1)), m.get_string(0)])
+	return out
+
+
+## THE MATCHER HAS TO BE ABLE TO CATCH A STALE NUMBER, and nothing here showed that it could.
+##
+## Every assertion above compares a number read out of a document against a number read out of the runner,
+## and when the reading is broken the comparison agrees with itself: a capture group pointed at the wrong
+## subexpression, a phrase that stopped matching once a heading was reworded, both sides counted off the
+## same source. Each of those reports a clean tree, which is the report this layer exists to make
+## impossible. `MIN_CLAIMS` says the scan found claims. It says nothing about whether a WRONG one would be
+## caught, and those are different questions.
+##
+## So the matcher is run over two sentences built here, one stating a count that is wrong by one and one
+## stating the count the runner actually registers, and it has to catch exactly the first.
+func _matcher_control(registered: int) -> void:
+	var phrase: String = "the harness registers %d layers"
+	var stale: Array[Array] = _claims_in(phrase % (registered + 1))
+	var fresh: Array[Array] = _claims_in(phrase % registered)
+	var caught: int = 0
+	for c: Array in stale:
+		if int(c[0]) != registered:
+			caught += 1
+	var wrongly: int = 0
+	for c: Array in fresh:
+		if int(c[0]) != registered:
+			wrongly += 1
+	_check(caught == 1,
+		"CONTROL: the matcher catches a claim of %d against the runner's %d (%d caught, %d matched)"
+			% [registered + 1, registered, caught, stale.size()])
+	_check(wrongly == 0,
+		"CONTROL: ...and does not fire on the same sentence stating %d (%d matched, %d called wrong)"
+			% [registered, fresh.size(), wrongly])
 
 
 ## THE VERBS ARE DERIVED FROM THE RUNNER, and this function used to name three of them. `add_excl_hl` was
