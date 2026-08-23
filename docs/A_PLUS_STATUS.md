@@ -1253,3 +1253,30 @@ One inference along the way was wrong and is worth recording. The five unreachab
 are off the base class and fifteen of them are held, because they print a PASS line per claim. Being off
 `check_base.gd` is necessary but not sufficient; the boundary is the dialect a layer speaks, not what it
 inherits from.
+
+
+## The floor reaches 111 of 113; the last two are shell layers
+
+`check_score` and `check_water_audio` could not be held because they counted only their FAILURES, and a
+failure count of zero is what both a layer that checked twenty-one things and a layer that checked nothing
+report. No pattern could fix that from outside, so it was fixed at the source: each gained a
+`_claim(ok, msg)` that tallies the attempt and returns the result, leaving the `continue` paths intact.
+
+Both now print "(N asserted)" on the passing path and "N FAILURE(S) of M asserted" on the failing one, so
+a red still reports its count — the property whose absence made this gate accuse `check_grapple_reads` of
+a drop it had not made. Counts: `check_score` 21, `check_water_audio` 10, each reconstructible by hand
+from the source (score: 1 muted + 3 beds x 5 + 2 monotonicity + 2 endpoints + 1 easing).
+
+One judgement call inside `check_score`. Its descent walk checks monotonicity at every sampled step, and
+claiming per step would tie the layer's assertion count to the number of steps, so re-sampling the descent
+would read as assertions appearing or going missing. Those are collected and claimed once, with every
+violation still named in the message. The per-bed checks stay granular, because bed count is content: if a
+bed disappears, the floor should notice.
+
+Controls: a mutant that breaks the swell assertion prints "check_water_audio: 1 FAILURE(S) of 10 asserted"
+and the gate reads 10 from it. The earlier standalone red on `check_score` — "expected _muted under the
+headless driver" — was the harness's `--headless` missing from the invocation, not a regression; it is a
+driver failure and is recorded as one.
+
+Two rows remain: `check_capture_manifest` and `check_prose`, both shell layers, which need a shell
+convention rather than a pattern or a source tally.

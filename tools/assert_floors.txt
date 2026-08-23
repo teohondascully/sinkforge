@@ -16,10 +16,12 @@
 #   tools/assert_floors.sh --write <log-dir>
 #
 # THE POPULATION, STATED, because a number of rows against a suite of 113 is a gap and a gap nobody names
-# reads as coverage. 108 of 113 rows are held, under TWO rules: 91 report "(N asserted)" from `_verdict()`,
-# and 17 have no `_check` to count and print one PASS line per claim instead. The second rule is what
+# reads as coverage. 111 of 113 rows are held, under THREE rules: 93 report "(N asserted)" -- 91 from
+# `_verdict()` and two that were taught to print it, below -- 17 have no `_check` to count and print one
+# PASS line per claim instead, and one writes its verdict at the end of the line. The second rule is what
 # brings in the four largest bodies of assertions in the suite, none of which anything held before:
-# `sim` 526, `stress` 447, `power_water` 203, `worldgen` 147. Each row carries the rule that produced it.
+# `sim` 526, `stress` 447, `power_water` 203, `worldgen` 147. Each row carries the rule that produced it,
+# and a floor set under one rule is never compared against a count taken under another.
 #
 # A THIRD RULE BROUGHT IN ONE OF THE FIVE. `measure_player` writes its verdict at the END of the line,
 # "run speed px/s: measured 150.0, intended 150.0 (+/-6%)  OK", which neither of the first two rules can
@@ -27,13 +29,21 @@
 # and the trailing-OK pattern counts 3 for `measure_player` and 0 for the other four, so it holds exactly
 # one new row and moves nothing that was already held.
 #
-# FOUR ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest, check_prose, check_score and
-# check_water_audio. Two are shell layers and two are GDScript layers that `extends SceneTree` rather than
-# `check_base.gd`, so none of them has a `_check` to tally; each prints diagnostics and then one summary
-# sentence with the verdict in the middle of it. No pattern can count assertions that were never
-# enumerated, so closing these four means changing what they print, not adding a fourth rule. Being off
-# `check_base.gd` is necessary but NOT sufficient to be unreachable: 19 registered layers are off it and
-# 15 of them are held, because they print a PASS line per claim.
+# TWO OF THOSE FOUR WERE CLOSED AT THE SOURCE, which was the only way to close them: no pattern can count
+# assertions a layer never enumerated. `check_score` and `check_water_audio` counted their FAILURES only,
+# and a failure count of zero is what both a layer that checked twenty-one things and a layer that checked
+# nothing report. Each gained a `_claim(ok, msg)` that tallies the attempt and returns the result, so the
+# `continue` paths still work, and each now prints "(N asserted)" on the passing path and
+# "N FAILURE(S) of M asserted" on the failing one — so a red still reports its count, which is the
+# property whose absence made this gate accuse `check_grapple_reads` of a drop it had not made.
+#
+# The descent walk's per-step checks in `check_score` were collected rather than claimed per step: one
+# claim per step would tie the layer's count to the number of steps sampled, so re-sampling the descent
+# would read as assertions appearing or going missing. Every violation is still reported, in one message.
+#
+# TWO ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest and check_prose, both shell
+# layers, which need a shell convention rather than a pattern. Being off `check_base.gd` is necessary but
+# NOT sufficient to be unreachable: 19 registered layers are off it and 15 were held even before this.
 #
 # Re-derive the gap with:
 #   for f in <log-dir>/*.log; do grep -qE '\([0-9]+ asserted\)|of [0-9]+ asserted|^[[:space:]]*(PASS|ok|OK)[: ]|[[:space:]]OK$' "$f" \
@@ -115,6 +125,7 @@ check_save_frontier	12	asserted
 check_save_isolation	27	asserted
 check_saveload	8	asserted
 check_scan	11	asserted
+check_score	21	asserted
 check_seam	14	asserted
 check_seam_flood	11	asserted
 check_selection_reads	10	asserted
@@ -140,6 +151,7 @@ check_verdict_claims	7	asserted
 check_verdict_route	12	asserted
 check_voice	11	asserted
 check_walk	4	asserted
+check_water_audio	10	asserted
 check_water_move	5	asserted
 check_water_reads	4	asserted
 check_wrap	7	asserted
