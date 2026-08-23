@@ -663,6 +663,11 @@ add "check_wrap (rope bends)"         "res://tools/check_wrap.gd"
 add "check_voice (audio reads)"       "res://tools/check_voice.gd"
 add "check_teaching (it teaches)"     "res://tools/check_teaching.gd"
 add "check_hint_gate (lesson waits)"  "res://tools/check_hint_gate.gd"
+# The other half of "a lesson waits": `check_hint_gate` asserts that a lesson DOES wait for a ceremony.
+# This asserts it stops waiting once the ceremony is no longer on screen, which is not the same claim and
+# was the live defect: a plate held by a rope draws nothing and silenced every lesson for as long as the
+# line was out. Pure Hud logic, so it runs headless.
+add "check_announce_channel (one thing at a time)" "res://tools/check_announce_channel.gd"
 add "check_depth_reads (how deep)"    "res://tools/check_depth_reads.gd"
 add "check_pump (wind it up)"         "res://tools/check_pump.gd"
 add "check_plunge (ride it down)"     "res://tools/check_plunge.gd"

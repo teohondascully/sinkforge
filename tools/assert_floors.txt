@@ -66,6 +66,7 @@
 # stand-downs: 6
 check_agility	7	asserted
 check_aim	7	asserted
+check_announce_channel	17	asserted
 check_bake_idempotent	3	passlines
 check_base_namespace	2	passlines
 check_bazaar_cache	35	asserted
