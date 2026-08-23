@@ -133,12 +133,35 @@ func _run() -> void:
 	# difference between its own two states says.
 	_rect = _lock_patch(STAGE)
 	var bare: PackedFloat32Array = await _luma_patch()
-	print("    empty stage mean luma %.1f" % _mean(bare))
+	# AND MEASURED, NOT JUST DESCRIBED. The comment above claimed the empty stage was the control for "did
+	# anything change at all" for as long as it has existed, and the capture was taken, printed, and never
+	# compared to anything. A layer whose subject failed to draw scored every machine at 0.0 against 0.0
+	# and reported that the machines have no state cue, which is a finding about the art, from a frame with
+	# no art in it. The claim needs a floor, and a floor for "something is there" has to be read off the
+	# stage with nothing on it, so the empty cell is photographed five times and the largest difference
+	# between consecutive shots is what a subject has to beat.
+	var drift: float = 0.0
+	var prev: PackedFloat32Array = bare
+	for _i: int in 4:
+		var again: PackedFloat32Array = await _luma_patch()
+		drift = maxf(drift, _mean_abs(prev, again))
+		prev = again
+	print("    empty stage mean luma %.1f, %.2f levels of still-frame drift across five shots"
+		% [_mean(bare), drift])
 
 	var rows: Array[Dictionary] = []
 	var undrivable: Array[String] = []
 	for spec: Dictionary in SUBJECTS:
 		sim.set_solid(STAGE + Vector2i(0, 1), StringName(spec["under"]))
+		# THE REFERENCE IS TAKEN PER SUBJECT, UNDER THE FLOOR THAT SUBJECT STANDS ON. One reference taken
+		# before the loop is a photograph of a different scene: each subject puts a different material in
+		# the cell below, and the light that material throws reaches into the patch. Measured, not argued.
+		# The first version compared against the single pre-loop shot and the empty stage came back 12.16
+		# levels away from it at the end of the run, against a still-frame drift of 1.22, so a machine
+		# could have scored several levels of presence without being drawn at all.
+		for _i: int in 8:
+			await physics_frame
+		var empty: PackedFloat32Array = await _luma_patch()
 		var def: MachineDef = load("res://src/data/machines/%s.tres" % spec["res"]) as MachineDef
 		if def == null:
 			_check(false, "%s's definition loads" % spec["name"])
@@ -208,12 +231,28 @@ func _run() -> void:
 			await physics_frame
 			continue
 		var live_stop: bool = _main._renderer._machines._machine_active(m)
-		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "i1": i1,
+		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "i1": i1, "empty": empty,
 			"live_work": live_work, "live_stop": live_stop, "flash_work": flash_work,
 			"status": String(sim.machine_status(m)), "stopped": stopped})
 		sim.remove_machine(STAGE)
 		for _i: int in 6:
 			await physics_frame
+	# AND THE PRESENCE BAR CAN BE FAILED, shown on this run rather than argued. The last subject has been
+	# taken off, so the stage is empty again and is photographed once more. It must NOT clear the bar every
+	# machine above cleared; if it does, the bar is not measuring presence.
+	if not rows.is_empty():
+		# THE LIGHT HAS TO FINISH LEAVING. The loop gives six frames between subjects, which is enough to
+		# stop the next one being placed into the last one's glow but not enough for an ember to reach the
+		# floor: the same decay that made the first version of this layer photograph transients. The
+		# reference the machines were measured against was taken on a settled cell, so this one is too.
+		for _i: int in STEADY_FRAMES:
+			await physics_frame
+		var after: PackedFloat32Array = await _luma_patch()
+		var empty_presence: float = _mean_abs(after, rows[rows.size() - 1]["empty"])
+		_check(empty_presence <= drift * PRESENCE_MARGIN,
+			"CONTROL: the empty stage does NOT clear the presence bar the machines cleared (%.2f levels "
+				% empty_presence + "against %.2f)" % (drift * PRESENCE_MARGIN))
+
 	# NOT A SILENT CAP. A family test that quietly drops the members it could not drive reports on
 	# whichever ones cooperated and calls that the family.
 	print("    drove %d of %d subjects to `working`%s"
@@ -222,7 +261,7 @@ func _run() -> void:
 	_check(rows.size() >= 2,
 		"at least two machines could be driven to `working` (%d) — one is a machine, not a family"
 			% rows.size())
-	_report(rows)
+	_report(rows, drift)
 	_main.queue_free()
 	await physics_frame
 
@@ -356,11 +395,12 @@ func _mean(a: PackedFloat32Array) -> float:
 ## has 45% headroom. Before the gate the Drill sat at ~1.9x. **Any threshold in (2.5, 4.0) separates those
 ## two populations stably**; 3.0 is the middle of that band and would have failed the old Drill on every
 ## one of the six runs, including the ones where 2.0 passed it.
+const PRESENCE_MARGIN: float = 3.0      ## a drawn machine beats the empty stage's own drift by this
 const MOTION_MARGIN: float = 3.0
 const MIN_STATE_LEVELS: float = 6.0     ## ...and an absolute floor, so two near-identical frames cannot
                                         ## satisfy the ratio by both being nearly still
 
-func _report(rows: Array[Dictionary]) -> void:
+func _report(rows: Array[Dictionary], still: float) -> void:
 	print("    %-11s %8s %8s %8s %9s %9s %7s %7s   %s"
 		% ["machine", "ignite", "work", "stop", "D_motion", "D_state", "clip@ig", "clip@wk", "verdict"])
 	print("    (ignite = the frame the status flips; work = the same state %d frames later;"
@@ -370,6 +410,7 @@ func _report(rows: Array[Dictionary]) -> void:
 	var clipped: Array[String] = []
 	var disagrees: Array[String] = []
 	var lagged: Array[String] = []
+	var absent: Array[String] = []
 	for r: Dictionary in rows:
 		var a1: PackedFloat32Array = r["a1"]
 		var a2: PackedFloat32Array = r["a2"]
@@ -378,6 +419,16 @@ func _report(rows: Array[Dictionary]) -> void:
 		var d_state: float = _mean_abs(a1, i1)
 		if d_motion < 0.0 or d_state < 0.0:
 			blind.append(String(r["name"]))
+			continue
+		# THE SUBJECT HAS TO BE IN THE PICTURE BEFORE ITS PICTURE IS JUDGED. Everything below asks whether
+		# this machine's body distinguishes running from stopped, and every one of those questions answers
+		# "no, and identically no" for a machine that was never drawn. Presence is judged first, against
+		# the empty stage, and a subject that failed it is not also accused of having a weak cue: it is
+		# reported as missing and its cue is not scored at all.
+		var presence: float = _mean_abs(a1, r["empty"])
+		if presence <= still * PRESENCE_MARGIN:
+			absent.append("%s (%.2f levels against the empty stage, drift %.2f)" % [r["name"], presence, still])
+			continue
 			continue
 		# SATURATION IS ITS OWN VERDICT, not a low score. A patch pinned near white has no room left to
 		# carry a cue, and reporting that as "this machine has no state cue" would blame the machine for
@@ -414,6 +465,9 @@ func _report(rows: Array[Dictionary]) -> void:
 		# generator drawn cold, which no eye resolves, but it is exactly the shape a real desync would
 		# take, so it is printed every run rather than smoothed away.
 		print("    settling lag (not a failure): " + ", ".join(lagged))
+	_check(absent.is_empty(),
+		"CONTROL: every subject was actually drawn on the stage%s"
+			% ("" if absent.is_empty() else " — NOT DRAWN: " + ", ".join(absent)))
 	_check(disagrees.is_empty(),
 		"the renderer's `_machine_active` and the sim's `machine_status` agree once both have settled%s"
 			% ("" if disagrees.is_empty() else " — DISAGREE: " + ", ".join(disagrees)))

@@ -187,11 +187,21 @@ func _run() -> void:
 		for _i: int in 4:
 			await physics_frame
 
+	# AND THE BAR CAN BE FAILED, shown on this run rather than argued. The last subject has been taken off,
+	# so the stage is empty again: it is photographed once more and put through the same mask the machines
+	# went through. Nothing on it should clear the bar. If an empty cell does, the bar is not measuring
+	# presence and the control above it is decoration.
+	var after: PackedFloat32Array = await _luma_patch()
+	var empty_cover: float = _coverage(_mask(after, bare))
+	_check(empty_cover <= noisy_share,
+		"CONTROL: the empty stage does NOT clear the bar the machines cleared (%.4f against %.4f)"
+			% [empty_cover, noisy_share])
+
 	if not unplaceable.is_empty():
 		print("    could not place: " + ", ".join(unplaceable))
 	_check(subjects.size() >= 10,
 		"%d machines stood on the stage — fewer than ten is not a registry" % subjects.size())
-	_report(subjects)
+	_report(subjects, noisy_share)
 
 	# THE GUARD MUST BITE, and on this layer that is not a formality: the entire failure mode is a
 	# comparison that returns zero for everything and reads as "no differences found". Two synthetic masks
@@ -224,10 +234,34 @@ func _registry() -> PackedStringArray:
 	return out
 
 
-func _report(subjects: Array[Dictionary]) -> void:
+func _report(subjects: Array[Dictionary], floor_share: float) -> void:
 	print("    %-16s %9s" % ["machine", "cell used"])
 	for s: Dictionary in subjects:
 		print("    %-16s %8.0f%%" % [s["name"], float(s["cover"]) * 100.0])
+
+	# THE STAGE MUST HAVE DRAWN, and every other control on this layer passes its hardest on a frame where
+	# nothing did. An unmoving camera is unmoving. Still-frame noise is at its quietest when there is no
+	# picture to be noisy. The two synthetic masks do their arithmetic without looking at the screen. On a
+	# blank stage every mask is empty, every pair scores zero, and the layer reports that twenty machines
+	# are drawn as the same shape, which is an art finding, in a sweep, about a frame with no art in it.
+	#
+	# The quantity that tells the two apart was already in the table above and was never asserted. It is
+	# checked against this run's own empty-stage reading rather than against zero, because the floor for
+	# "something is there" has to come from a measurement of the stage with nothing on it.
+	var blank: Array[String] = []
+	for s: Dictionary in subjects:
+		if float(s["cover"]) <= floor_share:
+			blank.append("%s (%.4f)" % [s["name"], float(s["cover"])])
+	_check(blank.is_empty(),
+		"CONTROL: every machine put more of itself on the stage than still-frame noise does (%.4f)%s"
+			% [floor_share, "" if blank.is_empty() else " — DREW NOTHING: " + ", ".join(blank.slice(0, 8))
+				+ ("" if blank.size() <= 8 else " ... and %d more" % (blank.size() - 8))])
+	if not blank.is_empty():
+		# The pair statistics below are about shapes, and there are no shapes. They are not stood down and
+		# not skipped: the control above has already failed the layer. They are simply not reported, because
+		# a number computed from an empty stage would be quoted as if it were about the machines.
+		print("    the stage did not draw, so the pair statistics are not computed")
+		return
 
 	var worst: float = 9.0
 	var best: float = -1.0
