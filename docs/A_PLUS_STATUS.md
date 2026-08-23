@@ -754,6 +754,33 @@ Mutation controls, both layers, both exit 1:
             levels against the empty stage, drift 1.24), Drill (0.00), Generator (0.00)
       and the SILENT accusation against those three does not appear
 
+## Area 3 — a gate that ran in one place, and that place had been red for days
+
+The published head carried a failing CI check while the local suite reported `112 PASS`. The failing check
+was `capture_manifest.sh --check`, and it ran in exactly ONE place: the CI authorship job. So the person
+running the sweep by hand to decide whether to commit was the one reader it could not reach, and a red that
+nobody sees is a gate that has stopped working while still being correct.
+
+**Censused rather than assumed.** Every `run:` step in the workflow was listed against the runner's
+registrations: `capture_manifest.sh --check` was the only CI step with no local counterpart, and
+`check_trailers.sh` was already registered. The population was one and is now zero. The gate is registered
+through a wrapper that exists only to pass `--check`, because the runner takes a path with no arguments and
+the generator's default mode rewrites a tracked file: registering the generator itself would have a sweep
+mutate the tree.
+
+**And the staleness is explained rather than regenerated away.** A regenerated tracked artifact with no
+reason attached cannot be told apart from one regenerated to make a red disappear. Only column three moved,
+on 51 of 52 rows: names, dates and recipes byte-identical, and the grouping summary unchanged at 37 / 8 /
+4 / 2 frames with only its four labels rebased. That is the signature of a history rewrite and not of a
+renderer change. The identifier is a hash of the drawing sources as they stood in the tree of the commit
+that last wrote each capture; the rewrite moved which commit `git log --follow` lands on, so the trees moved
+while the author dates the same lookup provides were preserved.
+
+**The part worth keeping is what the rewrite's own verification could not see.** It asserted the tree
+byte-identical, and it was. *A byte-identical tree is exactly what a stale generated file gives you.* A
+file whose content depends on commit identity does not survive a rewrite, and no tree comparison can
+register that it has gone stale.
+
 ## Area 3 — the floor between "asserted nothing" and "asserted everything"
 
 `_verdict()` refuses a green that asserted NOTHING, and that was the only floor in the suite. Between
