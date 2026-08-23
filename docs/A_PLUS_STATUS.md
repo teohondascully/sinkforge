@@ -1063,3 +1063,49 @@ with a display cannot reach exit 0 and never will — three of the stand-downs a
 reachable target is **exit 4 with exactly the registered six and no others**, which is what the sweeps in
 `docs/tracelog/sweeps/` show. "Configured sweep passed with six documented stand-downs" is the accurate
 sentence; "all 112 layers fully asserted" is not.
+
+
+## The sky control was measuring an animation, not a preview
+
+`check_grapple_reads` has one control that asks whether the aim preview drew anything at all against open
+sky: `_count(guide) > 60`. It passes. It passed on every run below. It is also two pixels from a red, and
+what it counts is not what its message says it counts.
+
+Sixteen runs of one unchanged tree put the count at 62, 173, 186, 195, 198, 298, 326, 412, 880, 1292,
+1381, 3985, 7613, 8090, 8324, 9264. Nothing in the build moved between them. That is a 150x spread on a
+control whose floor is 60, and the lowest observation clears the floor by two pixels.
+
+The spread is not noise, it is two states. Dumping the mask with `SF_GREADS_DUMP` and taking the centroid
+and extent of each shows the shape of both:
+
+| run | pixels | centroid | extent |
+|---|---|---|---|
+| a | 7613 | (1027, 466) | x[933,1148] y[346,556] |
+| b | 8324 | (1027, 466) | x[931,1118] y[373,557] |
+| d | 173 | (994, 497) | x[958,1065] y[421,519] |
+| c | 62 | (976, 499) | x[958,996] y[471,516] |
+
+The small masks are not scattered fragments of the large ones. They are **prefixes**: they begin at the
+same place near the hand and stop early, and the ring at the far end of the throw is present at (1135,
+357) in the large runs and absent from the small ones. The preview reveals outward from the hand, and the
+shot is taken a fixed four frames after the ghost is switched on. Four frames is a frame count against a
+reveal that runs on elapsed time, so the capture lands wherever the reveal happened to be. The count is a
+measure of how far the animation had got.
+
+Two things follow. The control cannot fail for the reason it names — a preview that never drew and a
+preview caught one frame into its reveal produce the same small number, and the 2026-08-22 red on this
+line read 0 pixels without being able to say which it was. And the layer's reported design figure is
+drawn from the same mask: `GR-04 REPRODUCES` prints the endpoint mark carrying 3 levels of edge over 8090
+pixels on one run and 165 over 62 on the next, which is the reveal's progress wearing the costume of a
+contrast measurement.
+
+What is committed here is the witness, not the repair. `moving` is subtracted from the preview mask
+before it is counted, so a small count has a second possible cause — the difference mask ate the corridor
+— and the two were indistinguishable. The eaten count is now computed over the same corridor with the
+same body cut and printed beside the survivor, and it earned itself immediately: the 62-pixel run has the
+largest eaten count of any run at 6558. A low survivor beside a large eaten count is weather; beside a
+small one it is a preview that did not draw.
+
+The repair is to capture on the reveal's own completion rather than on a frame count, which is the next
+item. Raising the floor is not the repair and was not done: a floor set against sixteen samples of one
+machine would be a guess, and the number the floor guards is the wrong number regardless of where it sits.

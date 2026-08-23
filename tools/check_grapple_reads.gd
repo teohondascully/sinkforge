@@ -851,10 +851,21 @@ func _check_against_sky() -> void:
 	var body: PackedByteArray = _body_mask()
 	var guide_edge: float = _edge_gain(aim, bg, guide)
 	var body_edge: float = _edge_p90(aim, body)
-	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels)"
-		% [body_edge, guide_edge, _count(guide)])
+	# WHAT THE SUBTRACTION ATE, over the same corridor and with the same body cut, because otherwise a red
+	# on the next line has two causes and names neither. `_mask` zeroes every pixel `moving` marks, and up
+	# here `moving` is cloud drift, so the count below is the preview MINUS an uncontrolled subtrahend:
+	# seven runs of one unchanged tree put it at 186, 198, 326, 412, 880, 1381, 3985 pixels. Nothing in the
+	# build moved. The clouds did. The 2026-08-22 red on this line read 0 pixels, and a bare count cannot
+	# tell "the preview never drew" from "the corridor was under cloud and the mask ate the preview whole".
+	# So both numbers are reported: a small preview beside a SMALL eaten count is a preview that did not
+	# draw, and a small one beside a LARGE eaten count is a frame that could not be measured.
+	var eaten: int = _count(_without(_without(moving, _invert(lane)), _body_mask()))
+	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels, "
+		% [body_edge, guide_edge, _count(guide)] + "%d corridor pixels eaten by drift)" % eaten)
 	_check(_count(guide) > 60,
-		"CONTROL: the preview drew something against the sky at all (%d pixels)" % _count(guide))
+		"CONTROL: the preview drew something against the sky at all (%d pixels, with %d corridor "
+		% [_count(guide), eaten] + "pixels eaten by drift — a low count beside a large eaten count is "
+		+ "weather, not the preview)")
 	# REPORTED, NOT ASSERTED, AND THAT IS `GR-04`'s OWN SHAPE. Its approach line is *"state-based alpha and
 	# endpoint emphasis"*: how loud an aim mark should be is a design call, and the two candidate floors
 	# here are not comparable quantities: the miner's number is the step between an opaque body and what is
