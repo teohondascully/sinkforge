@@ -224,6 +224,12 @@ func _run() -> void:
 	# the sim lost it and the picture kept it. `machine_at` answers that in one call, and it is the number
 	# a reader would need first, so it leads the failure rather than sitting in a comment for whoever
 	# reproduces it next.
+	# AND THE FRAME ITSELF, because `[sim: stage empty]` narrows this to the renderer and then stops. What
+	# is still drawn there -- the machine's body, its glow, a hole it cut in the lightmap veil -- is a
+	# question only the picture answers, and the layer already writes every other patch it takes.
+	_dump_luma("_stage_after", after)
+	_dump_mask("_stage_after", _mask(after, bare))
+
 	# Phrased as a FACT rather than as a diagnosis, because `_check` prints one label on both paths: a
 	# passing run said "so this is the RENDERER holding the last frame" about a stage that had cleared.
 	var still_there: bool = sim.machine_at(STAGE) != null
