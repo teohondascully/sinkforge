@@ -754,6 +754,31 @@ Mutation controls, both layers, both exit 1:
             levels against the empty stage, drift 1.24), Drill (0.00), Generator (0.00)
       and the SILENT accusation against those three does not appear
 
+## Area 3 — the runner's own two protections, exercised rather than assumed
+
+The verdict gate carries two checks that nothing in the suite can trigger on purpose: did the engine fail
+to LOAD a layer, and did a layer produce no output at all. Both exist because `godot --script` exits 0 when
+a script is missing or unparseable, so a layer that never ran reports PASS. Both were written from measured
+output. **Neither had been fired in a long time**, and a protection nobody has seen fire is a claim.
+
+Both were fired, by registering a layer for one subset run and taking it out again:
+
+    a path to a file that does not exist
+      [ 1/ 2] check_ghost (a layer that does not exist)   PASS   1s        <- the table says PASS
+      layer logs: 2   engine-level load failures: 1   silent: 0
+      !! THESE LAYERS DID NOT RUN - the engine could not load them
+      HARNESS_EXIT=0 ... !! exiting 7: the sweep above is NOT A RESULT
+
+    a layer that boots and calls quit(0) without printing
+      [ 1/ 2] check_mute (a layer that says nothing)      PASS   1s        <- the table says PASS again
+      layer logs: 2   engine-level load failures: 0   silent: 1
+      !! THESE LAYERS PRODUCED NO OUTPUT AT ALL beyond the engine banner
+      HARNESS_EXIT=0 ... !! exiting 7: the sweep above is NOT A RESULT
+
+**In both cases the layer table shows a green row and the run is still rejected**, which is the design: the
+table classifies on exit codes, and an exit code is exactly what a layer that never ran is best at
+producing. The gate names the layer in both branches rather than only counting it.
+
 ## Area 3 — a gate that ran in one place, and that place had been red for days
 
 The published head carried a failing CI check while the local suite reported `112 PASS`. The failing check
