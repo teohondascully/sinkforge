@@ -19,12 +19,18 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 axes: what the candidate would still need from its parent, how wide an interface the parent needs back,
 and how much mutable state crosses the line.
 
-| candidate | lines | outbound calls | inbound calls | vars read | vars written on BOTH sides |
-|---|---|---|---|---|---|
-| lighting / veil | 955 | 10 | 5 | 68 | 2 |
-| machines | 642 | 1 | 4 | 10 | 0 |
-| water | 307 | 1 | 3 | 4 | 0 |
-| terrain bake | 498 | 2 | 9 | 12 | 1 |
+| candidate | lines | outbound calls | inbound calls | vars read | consts read | vars written on BOTH sides |
+|---|---|---|---|---|---|---|
+| lighting / veil | 639 | 8 | 5 | 23 | 35 | 2 |
+| machines | 460 | 1 | 4 | 11 | 17 | 0 |
+| water | 214 | 1 | 3 | 3 | 19 | 0 |
+| terrain bake | 223 | 1 | 9 | 12 | 12 | 1 |
+
+**Corrected.** An earlier version of this table was measured with a span rule that ended each function at
+the next `func`, so every row absorbed the declarations sitting between functions. It reported 955 lines
+and 68 variables for lighting/veil against a true 639 and 23. The ranking and the decision are unchanged
+— lighting/veil is worst on every axis either way — but the same defective span rule also tried to delete
+twelve constants during the extraction itself, so the two failures share one cause and both are recorded.
 
 **The largest and most contiguous block is the worst candidate.** Lighting and veil occupy nearly a
 thousand unbroken lines, which is exactly what makes them look extractable. They read 68 of the file's

@@ -9,11 +9,18 @@ extends RefCounted
 ## candidate still needs from its parent, how wide an interface the parent needs back, and how much
 ## MUTABLE STATE crosses the line.
 ##
-##     candidate        lines   outbound   inbound   vars read   vars written BOTH sides
-##     lighting/veil      955         10         5          68                         2
-##     machines           642          1         4          10                         0
-##     water              307          1         3           4                         0
-##     terrain bake       498          2         9          12                         1
+##     candidate        lines   outbound   inbound   vars read   consts   written BOTH sides
+##     lighting/veil      639          8         5          23       35                    2
+##     machines           460          1         4          11       17                    0
+##     water              214          1         3           3       19                    0
+##     terrain bake       223          1         9          12       12                    1
+##
+## THOSE NUMBERS ARE THE SECOND SET, and the first set is why this comment says so. The original table
+## was produced by the same span rule that nearly broke this extraction: a function ended at the next
+## `func`, so every measurement absorbed the declarations sitting between functions. It reported 955
+## lines and 68 variables for lighting/veil against a true 639 and 23, and inflated every row. The
+## ranking and the decision are unchanged, because lighting/veil is still worst on all four axes, but a
+## measurement that is wrong by three times is worth correcting even when the conclusion survives it.
 ##
 ## The largest and most contiguous candidate is the worst one. Lighting and veil run nearly a thousand
 ## almost unbroken lines, which is exactly what makes them look extractable; they read 68 of the file's
