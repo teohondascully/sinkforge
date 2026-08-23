@@ -754,6 +754,53 @@ Mutation controls, both layers, both exit 1:
             levels against the empty stage, drift 1.24), Drill (0.00), Generator (0.00)
       and the SILENT accusation against those three does not appear
 
+## Area 3 — which layers can fail, counted
+
+Positive controls were being added one layer at a time, on suspicion. This is the population, so the next
+one is chosen by evidence instead. The rule: a layer that asserts anything, and whose assertions are at
+least half of the form `_check(something.is_empty(), ...)`, passes over an empty list, and an empty list is
+what a dead instrument produces. Those are the layers where a control matters most.
+
+    grep -oE 'res://(tools|tests)/[a-z_]*\.(gd|sh)' tools/run_harness.sh | sed 's|res://||' | sort -u > /tmp/reg.txt
+    python3 - <<'EOF'
+    import io, os, re
+    reg = [l.strip() for l in io.open('/tmp/reg.txt') if l.strip()]
+    ctrl, chk = re.compile(r'"\s*CONTROL'), re.compile(r'_check\(')
+    emp = re.compile(r'_check\(\s*[A-Za-z_][A-Za-z_0-9]*\.is_empty\(\)')
+    rows = []
+    for f in reg:
+        if not os.path.exists(f): continue
+        s = io.open(f, encoding='utf-8', errors='replace').read()
+        n = len(chk.findall(s))
+        if n: rows.append((f, n, len(emp.findall(s)), bool(ctrl.search(s))))
+    risky = [r for r in rows if not r[3] and r[2] > 0 and r[2] >= r[1] * 0.5]
+    print(len(rows), sum(1 for r in rows if r[3]), len(risky), [r[0] for r in risky])
+    EOF
+
+| | before | after |
+|---|---|---|
+| registered files that assert anything | 99 | 99 |
+| ...carrying an assertion labelled CONTROL | 17 | **19** |
+| ...majority-emptiness with no such label | 5 | **3** |
+
+**And the five were read rather than counted**, because the label is a convention and not a property. Three
+of them are controlled under other names: `check_item_reads` plants an unknown item and requires it caught,
+`check_encoding` runs its detector over deliberate mojibake, `check_save_frontier` requires a field to have
+changed. The two that were not are both COLLISION DETECTORS that had never been shown finding a collision:
+
+- **`check_gamepad`** asserts that no pad input drives two verbs. A label function that never collides makes
+  that unfalsifiable, while `owner.size()` keeps counting up and the non-vacuity floor at the bottom of the
+  file keeps reporting health. That floor covers a table with no pad bindings; it does not cover a detector
+  that cannot detect.
+- **`check_status_reads`** asserts that no two different jobs share a mark. Its two drift scans control each
+  other, one reading sim to table and one table to sim, so a scanner that read nothing is caught by the
+  second even though it satisfies the first. This rule has no such partner.
+
+Each detector is a function now that the control and the real scan both call, run over two tables built
+from data the game really carries: one where the collision is present, one where it is not. Forcing each
+comparison false makes the positive half fail and **leaves every real assertion in both layers passing**,
+which is the finding stated as an experiment.
+
 ## An open flakiness finding, recorded rather than absorbed
 
 Four configured sweeps were run on effectively one tree while reconciling the population above. The only
