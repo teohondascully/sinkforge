@@ -1162,12 +1162,34 @@ The floor stays at 60. It now sits between a residual of nothing and a signal re
 pixels, which is the first time it has meant anything. It was not raised: six samples on one machine can
 say the gap is real and cannot say where inside it a bound belongs.
 
+### The dark-rock half, and the red it uncovered
+
+The same fault and the same fix. That block's exclusion is unioned from pairs thirty frames apart and its
+reference, `bg`, sits 120 frames and three and a half lamp periods before the shot. The churn control
+above it must keep running on the live frame — it asserts the frame is mostly still, and a held clock
+would make it unfalsifiable — so only the capture pair is posed, against a fresh reference taken with the
+clock already stopped. The pose is released on every path out, including the one where the hook fails.
+
+| dark rock | preview drawn | preview never drawn |
+|---|---|---|
+| edge levels | 141.3, 142.6 | 0.0, 0.0 |
+| mask pixels | 148, 138 | 1, 0 |
+
+Was 2.4–3.7 against 1.9–3.5, which is no separation at all.
+
+**This turns `GR-06` red, and the red is real.** The assertion is that the miner out-reads their own
+telemetry, `body_edge >= guide_edge * 1.15`, and it is asserted on purpose: a tool easier to see than the
+person holding it has inverted the frame. It now reads **88.2 levels for the miner against 141.3 for the
+preview**. It was passing because the preview's number was p90 over a mask that was mostly lamp shimmer;
+measured over the preview itself it is forty times larger. Both quantities are the same statistic — p90 of
+a four-neighbour maximum gradient, in levels — so this is not a ruler mismatch, and `_edge_gain` subtracts
+the background's own gradient so the preview is not being credited with the rock behind it.
+
+`BODY_MARGIN` was not touched and the assertion was not retracted. Which way this resolves is a design
+call, not a harness one: either the aim mark is genuinely louder than the miner and should be quietened,
+or `GR-06` wants a different pairing. It is queued as an authorization-boundary item.
+
 ### Still open
 
-**The dark-rock block is still blind, and it is the half that carries `GR-04`'s assertion.** It reads
-2.4–3.7 levels with the preview drawn and 1.9–3.5 with it never drawn. It has the same cause — its
-exclusion is unioned from pairs thirty frames apart — and the same fix is available, but it cannot simply
-be wrapped in the pose: that block also asserts `churn < 0.06`, that the live frame is mostly still, and
-freezing the clock would make that control unfalsifiable. The churn control has to keep running unposed
-and the capture pair has to be posed, which is a larger edit than the one made here.
-
+The layer's other reported figures were all computed from the blind masks and are superseded. `GR-04
+REPRODUCES` in particular now quotes real contrast on both surfaces for the first time.

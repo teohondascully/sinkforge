@@ -526,13 +526,30 @@ func _run() -> void:
 	_dump("bg")
 
 	# --- GR-05 / GR-01: how much of the throw does the preview draw? ------------------
+	# THE CHURN CONTROL ABOVE RUNS ON THE LIVE FRAME AND HAS TO. It asserts that the frame is mostly still,
+	# and a held clock would make that unfalsifiable — the same reason the sky block poses only its own
+	# capture pair. What follows asks a different question, what switching the preview on changed, and for
+	# that the clock is held.
+	#
+	# `bg` above is the wrong reference for it twice over: it is 120 frames and three and a half lamp
+	# periods before the shot, and the exclusion beside it is unioned from pairs 30 frames apart while the
+	# shot is a 4-frame difference. Measured on the sky half, which had the identical fault, the exclusion
+	# mask came back in phase and saw almost nothing while the short pair saw 15716 corridor pixels. This
+	# half reads 2.4..3.7 levels with the preview drawn and 1.9..3.5 with it never drawn, which is the same
+	# blindness. `posed_bg` is captured with the clock already stopped, so what separates it from `aim` is
+	# the preview and nothing else. `bg` keeps its other jobs; only the preview differences move.
+	WorldRenderer.ANIM_FROZEN = true
+	for _i: int in 4:
+		await physics_frame
+	var posed_bg: PackedFloat32Array = await _luma()
+	_dump("posed_bg")
 	RopeView.AIM_GHOST_OFF = false
 	for _i: int in 4:
 		await physics_frame
 	var aim: PackedFloat32Array = await _luma()
 	_dump("aim")
 	var hand: Vector2 = p.hand()
-	var guide: PackedByteArray = _without(_mask(aim, bg, hand, moving), _body_mask())
+	var guide: PackedByteArray = _without(_mask(aim, posed_bg, hand, moving), _body_mask())
 	_dump_mask("aim_guide", guide)
 	var reach: float = _screen(hand).distance_to(_screen(target))
 	var span: float = _corridor_reach(guide, _screen(hand), _screen(target))
@@ -560,7 +577,7 @@ func _run() -> void:
 	# --- GR-06 / GR-04: does the miner out-read the miner's tool? ---------------------
 	var body: PackedByteArray = _body_mask()
 	_dump_mask("body", body)
-	var guide_edge: float = _edge_gain(aim, bg, guide)
+	var guide_edge: float = _edge_gain(aim, posed_bg, guide)
 	var body_edge: float = _edge_p90(aim, body)
 	print("    against dark rock — miner %.1f levels, preview %.1f levels (%d preview pixels)"
 		% [body_edge, guide_edge, _count(guide)])
@@ -580,10 +597,16 @@ func _run() -> void:
 			% [body_edge, guide_edge, BODY_MARGIN])
 
 	# --- GR-02: is a thrown rope a different picture from an aimed one? ---------------
-	if await _hook(Vector2i(TARGET_COL, CEIL_ROW)):
+	# THE POSE IS RELEASED ON EVERY PATH OUT of this block. The hook is thrown once and its result held,
+	# because `_hook` drives a real throw and asking twice is not free; a clock left held on the failing
+	# path would silence the phase baselines the checks below depend on, and would do it quietly.
+	var hooked: bool = await _hook(Vector2i(TARGET_COL, CEIL_ROW))
+	if not hooked:
+		WorldRenderer.ANIM_FROZEN = false
+	if hooked:
 		var roped: PackedFloat32Array = await _luma()
 		_dump("anchored")
-		var rope: PackedByteArray = _mask(roped, bg, hand, moving)
+		var rope: PackedByteArray = _mask(roped, posed_bg, hand, moving)
 		_dump_mask("rope", rope)
 		# The two live in the same corridor by construction: same hand, same target. If they were the same
 		# picture the difference between their masks would be nothing, and `GR-02`'s complaint would stand.
@@ -592,6 +615,9 @@ func _run() -> void:
 		_check(_shape_diff(guide, rope) > 0.20,
 			"an aimed line and an attached one are not the same picture (%.3f of the corridor differs)"
 				% _shape_diff(guide, rope))
+		# THE POSE ENDS HERE. GR-03 below takes a phase baseline on purpose, to keep a rope's own animation
+		# from scoring as a tension cue, and a held clock would zero the very quantity it needs.
+		WorldRenderer.ANIM_FROZEN = false
 
 		# --- GR-03: does tension have a still-frame form? -----------------------------
 		# SLACK against TAUT, and the phase baseline in between, because a rope with a wind animation on it
