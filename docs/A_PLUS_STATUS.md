@@ -1514,3 +1514,29 @@ gets filed.
 
 The pose is released at the end of the capture pair rather than with `ANIM_FROZEN`, which runs on into
 GR-02. `_hook` drives a real throw, and a throw needs physics to advance.
+
+
+## The sky half had the same fault, and its own control had been naming it for days
+
+The grain contaminates any two-frame difference, so the open-sky block had it too — but there the cost
+landed on the exclusion rather than on the mask. That block poses the world clock *before* building its
+drift exclusion, so with the grain still running the only pixels `_moving` can find ARE grain. The
+exclusion stopped being a drift mask and became a noise mask sized by machine load, and every pixel it
+holds is a corridor pixel taken away from the measurement.
+
+```
+only _anim_time posed    ate 344 / 51 / 21 corridor px   142.8 .. 160.2 levels   181..185 mask px
+shader clock posed too   ate   0 /  0 /  0 /  0          156.4 .. 159.1 levels   182 mask px every run
+```
+
+**The layer already had the control that says this.** `eaten` is documented in place as "the travelling
+control on the pose: a corridor that is still losing pixels means something in the frame is alive that
+`_anim_time` does not drive". That sentence is an exact description of the film grain, and the number
+beside it printed 21, 30, 51 and 344 across recent runs while nothing read it. A control that reports and
+cannot fail is a control that gets read only after someone already suspects the answer.
+
+It is still not asserted, and that is now a recorded gap rather than an oversight. With both clocks posed
+it reads 0 in the corridor over four runs, but the whole-frame mover count over those same four reads
+0, 0, 0 and 3 — the residual is not identically zero, and four samples do not locate a bound. A cap could
+not catch every unposed run either: one of the five measured without the shader clock happened to eat 0.
+Both populations are written into the source so the next pass starts from data instead of from a guess.

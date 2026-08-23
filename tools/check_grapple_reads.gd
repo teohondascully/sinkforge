@@ -882,6 +882,15 @@ func _check_against_sky() -> void:
 	# runs in four failed a control that had been passing on the flicker. The clock is posed instead, which
 	# is what the repository already does to the pointer for this same measurement.
 	WorldRenderer.ANIM_FROZEN = true
+	# AND THE SHADER CLOCK WITH IT, for the reason written at the dark-rock block above: `ANIM_FROZEN` holds
+	# a GDScript variable and `post_fx`'s film grain runs off the shader built-in `TIME`. Here the cost
+	# landed on the exclusion rather than on the mask. With the world clock posed and the grain still
+	# running, the only pixels `_moving` can find ARE grain, so the exclusion stopped being a drift mask and
+	# became a noise mask whose size tracked machine load -- and every pixel it holds is a corridor pixel
+	# taken away from the measurement. Three runs with only `_anim_time` posed ate 344, 51 and 21 corridor
+	# pixels and read 142.8, 160.2 and 155.6 levels over 181..185 mask pixels. Four with the shader clock
+	# posed too ate 0, 0, 0 and 0, read 156.4..159.1 levels, and found exactly 182 mask pixels every run.
+	Engine.time_scale = 0.0
 	# THE EXCLUSION IS BUILT AT THE MEASUREMENT'S OWN TIME SCALE, and the version before this one was not.
 	# It differenced `aim` against a reference four frames away and then excluded the pixels that moved
 	# between two references THIRTY-EIGHT frames apart. A difference taken at one separation cannot be
@@ -927,6 +936,7 @@ func _check_against_sky() -> void:
 		await physics_frame
 	var bg: PackedFloat32Array = await _luma()
 	_dump("sky_bg")
+	Engine.time_scale = 1.0
 	WorldRenderer.ANIM_FROZEN = false
 	RopeView.AIM_GHOST_OFF = false
 	# RESTRICTED TO THE CORRIDOR, and the surface is why it has to be. Underground the background is flat
@@ -946,9 +956,18 @@ func _check_against_sky() -> void:
 	var guide_edge: float = _edge_gain(aim, bg, guide)
 	var body_edge: float = _edge_p90(aim, body)
 	# WHAT THE SUBTRACTION ATE, over the same corridor and with the same body cut. It is the travelling
-	# control on the pose: with the clock held, a corridor that is still losing thousands of pixels means
-	# something in the frame is alive that `_anim_time` does not drive, and the count beside it is not the
-	# preview. Posed, this reads 0..162; unposed it read 4720..12364.
+	# control on the pose: a corridor that is still losing pixels means something in the frame is alive that
+	# the pose does not reach, and the count beside it is not the preview.
+	#
+	# THIS CONTROL WAS RIGHT AND NOBODY MADE IT FAIL. Its own sentence said a nonzero count meant "something
+	# alive that `_anim_time` does not drive", which is precisely what the film grain was, and it printed
+	# 21, 30, 51 and 344 across recent runs while nothing read it. It is still printed and still not
+	# asserted, and that is now a deliberate gap rather than an oversight: with both clocks posed it reads 0
+	# in the corridor over four runs, but the whole-frame mover count over those same four reads 0, 0, 0 and
+	# 3, so the residual is not identically zero and four samples do not locate a bound. A cap could also
+	# not catch every unposed run -- one of the five measured without the shader clock posed happened to eat
+	# 0 as well. The numbers on both sides are recorded here so the next pass starts from data: posed 0 0 0 0
+	# in-corridor, unposed 344 51 21 30 0. Unposed with neither clock held it read 4720..12364.
 	var eaten: int = _count(_without(_without(moving, _invert(lane)), _body_mask()))
 	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels, "
 		% [body_edge, guide_edge, _count(guide)] + "%d corridor pixels eaten by drift)" % eaten)
