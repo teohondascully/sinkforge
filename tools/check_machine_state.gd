@@ -459,7 +459,7 @@ const PRESENCE_MARGIN: float = 3.0      ## a drawn machine beats the empty stage
 ## PRESENCE_MARGIN's semantic and not this one, and its quoted ratios (Forge ~16x, Drill ~10x, Generator
 ## ~4.4x) are not this check's ratios.
 ##
-## Measured 2026-08-24, one run, `d_state / d_motion` as asserted at the `ok` line below:
+## Measured 2026-08-23, one run, `d_state / d_motion` as asserted at the `ok` line below:
 ##
 ##     Forge      79.75 / 14.94 = 5.34x        Drill  87.47 / 14.06 = 6.22x
 ##     Generator 119.75 / 23.50 = 5.10x

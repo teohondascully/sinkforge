@@ -1063,7 +1063,7 @@ plausible shape and no evidence yet, and the honest note is that nobody has test
 All six areas closed, the full suite green on `main`, and every remaining stand-down carrying a written
 reason. No new gameplay work begins until then.
 
-**Where that stands — re-read 2026-08-24, and the previous version of this paragraph had stopped being
+**Where that stands — re-read 2026-08-23, and the previous version of this paragraph had stopped being
 true without changing.** Areas 1 through 6 are closed, with the qualifications now written into Areas 5
 and 6. **The suite is not green.** The configured sweep at `e89eef9`, tree clean from launch to verdict,
 reads `113 PASS / 1 FAIL / 0 SKIP of 114`, and the single red is `check_grapple_reads` (`GR-06`). Each of

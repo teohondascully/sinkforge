@@ -102,7 +102,7 @@ var _passes: int = 0
 ## file, 31 called it and 58 printed their own line and `quit()` directly, so a hook there would have been
 ## an instrument that cannot register most of its subject. That was true when it was written and it is not
 ## true now: the verdict-tail conversion of 2026-08-23 moved 55 of those 58 across, and the last three
-## followed. RE-DERIVED 2026-08-24, because this paragraph had itself gone stale a second time: of the 92
+## followed. RE-DERIVED 2026-08-23, because this paragraph had itself gone stale a second time: of the 92
 ## layers now inheriting this file, ALL 92 call `_verdict()` and none hand-rolls. check_frametime,
 ## check_opening and check_underground were named right here as the survivors and have since been
 ## converted, so the sentence naming them was accusing compliant layers. The population argument would no
