@@ -820,13 +820,30 @@ one key is a reader taking whichever one grep hands them first.
     bash tools/run_harness.sh
     112 PASS / 0 FAIL / 0 SKIP of 112, six documented stand-downs
     HARNESS_EXIT=4   HARNESS_RESULT=yes
-    assert_floors: PASS - 91 layers still assert at least what they did (control: check_agility at 7)
+    assert_floors: PASS - 108 layers still assert at least what they did (control: check_agility at 7)
     HARNESS_QUOTABLE=yes
 
     with one floor raised by one, which is what a layer going quiet looks like:
     112 PASS / 0 FAIL / 0 SKIP of 112
     assert_floors: FAIL - DROPPED: check_agility asserted 7, floor is 8
     !! exiting 7: the sweep above is NOT A RESULT
+
+**A second rule followed, and it brought in the four largest bodies of assertions in the suite.** The gate
+reached 91 of 113 rows; the 22 it could not reach have no `_check` to count and print one PASS line per
+claim instead, which is the same quantity arrived at differently. Among them: `sim` at 526 assertions,
+`stress` at 447, `power_water` at 203, `worldgen` at 147. **Nothing held any of them.** `sim` could have
+fallen from 526 claims to one and the sweep would have reported PASS. Coverage is 108 of 113 now, each row
+carrying the rule that produced it, and the same three-sweep stability check was run first: identical
+counts, no membership drift.
+
+Five rows remain unreachable and are named in the floors header rather than left to be discovered:
+`check_capture_manifest`, `check_prose`, `check_score`, `check_water_audio` and `measure_player` each print
+a verdict in a shape neither rule counts. They are not exempted; holding them needs a third rule or a
+change to what they print, and neither is written.
+
+The control that matters most for a second rule is the one that breaks the rule itself. With the PASS-line
+pattern forced to match nothing, all 17 rows it reaches report `MISSING` rather than vanishing: **a dead
+rule does not quietly shrink the population.**
 
 Four more controls were exercised and are listed here so nobody has to rediscover which paths were tested:
 a layer with no floor row reports `UNFLOORED`, a floor with no layer reports `MISSING`, a subset and a
