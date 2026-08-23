@@ -1065,47 +1065,59 @@ reachable target is **exit 4 with exactly the registered six and no others**, wh
 sentence; "all 112 layers fully asserted" is not.
 
 
-## The sky control was measuring an animation, not a preview
+## `check_grapple_reads` does not register the aim preview
 
-`check_grapple_reads` has one control that asks whether the aim preview drew anything at all against open
-sky: `_count(guide) > 60`. It passes. It passed on every run below. It is also two pixels from a red, and
-what it counts is not what its message says it counts.
+**This section replaces one written an hour earlier under the heading "the sky control was measuring an
+animation". That account was wrong, and so was the one before it. Both are kept below, because the way
+this was got wrong twice is the useful part.**
 
-Sixteen runs of one unchanged tree put the count at 62, 173, 186, 195, 198, 298, 326, 412, 880, 1292,
-1381, 3985, 7613, 8090, 8324, 9264. Nothing in the build moved between them. That is a 150x spread on a
-control whose floor is 60, and the lowest observation clears the floor by two pixels.
+The layer photographs the grapple's aim preview by differencing two otherwise identical frames, once
+against dark rock and once against open sky. The dark-rock number carries the assertion — `GR-04`'s claim
+that the cable stays readable underground — and the open-sky number is reported beside a control asking
+whether the preview drew anything at all, `_count(guide) > 60`.
 
-The spread is not noise, it is two states. Dumping the mask with `SF_GREADS_DUMP` and taking the centroid
-and extent of each shows the shape of both:
+Flip every `AIM_GHOST_OFF = false` in a copy of the layer to `true` and the preview is never drawn at all.
+The measurement does not notice:
 
-| run | pixels | centroid | extent |
-|---|---|---|---|
-| a | 7613 | (1027, 466) | x[933,1148] y[346,556] |
-| b | 8324 | (1027, 466) | x[931,1118] y[373,557] |
-| d | 173 | (994, 497) | x[958,1065] y[421,519] |
-| c | 62 | (976, 499) | x[958,996] y[471,516] |
+| | preview drawn | preview never drawn |
+|---|---|---|
+| open sky, mask pixels | 62 … 9264 (n=16) | 15 … 10076 (n=8) |
+| open sky, median | 646 | 471 |
+| dark rock, edge levels | 2.4 – 3.7 (n=9) | 1.9 – 3.5 (n=8) |
+| dark rock, mask pixels | 2692 – 5170 (n=9) | 2856 – 4539 (n=8) |
 
-The small masks are not scattered fragments of the large ones. They are **prefixes**: they begin at the
-same place near the hand and stop early, and the ring at the far end of the throw is present at (1135,
-357) in the large runs and absent from the small ones. The preview reveals outward from the hand, and the
-shot is taken a fixed four frames after the ghost is switched on. Four frames is a frame count against a
-reveal that runs on elapsed time, so the capture lands wherever the reveal happened to be. The count is a
-measure of how far the animation had got.
+The subject-removed runs reach higher than any run with the preview on. Their medians are the same order.
+Every range overlaps. Turning off the thing being measured is not visible in the number that measures it,
+which means the green this layer has been printing says nothing about the aim preview, and the design
+sentence it publishes — `GR-04 REPRODUCES`, quoting contrast levels on rock and on sky — is quoting the
+residual. The floor of 60 is not merely low: a run with no preview whatsoever read 196 against it. The
+2026-08-22 red at 0 pixels was that residual landing small, not the preview going missing.
 
-Two things follow. The control cannot fail for the reason it names — a preview that never drew and a
-preview caught one frame into its reveal produce the same small number, and the 2026-08-22 red on this
-line read 0 pixels without being able to say which it was. And the layer's reported design figure is
-drawn from the same mask: `GR-04 REPRODUCES` prints the endpoint mark carrying 3 levels of edge over 8090
-pixels on one run and 165 over 62 on the next, which is the reveal's progress wearing the costume of a
-contrast measurement.
+### The two wrong explanations
 
-What is committed here is the witness, not the repair. `moving` is subtracted from the preview mask
-before it is counted, so a small count has a second possible cause — the difference mask ate the corridor
-— and the two were indistinguishable. The eaten count is now computed over the same corridor with the
-same body cut and printed beside the survivor, and it earned itself immediately: the 62-pixel run has the
-largest eaten count of any run at 6558. A low survivor beside a large eaten count is weather; beside a
-small one it is a preview that did not draw.
+The spread across sixteen same-tree runs was first read as cloud drift: `moving` is subtracted from the
+mask before it is counted, and on the surface `moving` is drifting cloud, so a small count could be a
+preview the difference mask had eaten. That is a real mechanism and it is not this one. Measuring the
+eaten corridor over the same lane with the same body cut refuted it — eaten and survivor move together
+across the spread, not against each other.
 
-The repair is to capture on the reveal's own completion rather than on a frame count, which is the next
-item. Raising the floor is not the repair and was not done: a floor set against sixteen samples of one
-machine would be a guess, and the number the floor guards is the wrong number regardless of where it sits.
+It was then read as a reveal animation caught mid-draw, because the small masks are spatial prefixes of
+the large ones: same start near the hand, stopping early, with the endpoint ring present in the large runs
+at (1135, 357) and absent from the small. That is a real pattern in the dumps and it is still unexplained.
+It is not a reveal, because `_draw_aim_ghost` has no state — it is a dotted stub capped at `AIM_STUB_MAX`
+plus a ring, recomputed whole every frame, with nothing drawn in between.
+
+Both explanations were consistent with the data in hand and both survived until the cheap decisive test
+was run: remove the subject and see whether the instrument notices. Neither hypothesis needed to be
+settled to answer the question the layer exists to answer. The prefix geometry is a live loose end, but it
+is a question about what the mask *does* contain, and that is downstream of the finding that it does not
+contain the preview.
+
+### What is committed
+
+The eaten count, as a second true quantity over the same corridor, because any repair needs it. The
+control's message now says it is known blind and quotes the 196. Nothing else: the floor is untouched,
+because a floor cannot fix an instrument that cannot see its subject, and no assertion has been softened
+or skipped. The layer still passes, and that pass should not be quoted for anything about the aim preview
+until the measurement is rebuilt.
+
