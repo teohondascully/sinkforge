@@ -8,7 +8,7 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
-| 3. Harness quality | **Closed, with one audited finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing; proven by paired mutation, scoped by an independence check, and with the population named explicitly below. |
+| 3. Harness quality | **Closed, with one narrowed finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. Fifty-five are converted; the measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. Three remain uncovered and are named below, because they call neither `_check()` nor `_verdict()` and so cannot be reached by a tail conversion. |
 | 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
@@ -314,7 +314,14 @@ every inheritor is named `check_*`. Both set differences are empty — checked a
 
 Over `P_INHERIT` the partition is complete, with nothing left over:
 
-**89 inheritors = 31 calling `_verdict()` + 58 hand-rolling the verdict + 0 neither.**
+**89 inheritors = 31 calling `_verdict()` + 58 hand-rolling the verdict + 0 neither** — as it stood when
+the audit was written. After the conversion below it is **86 + 3 + 0**, over the same population and by the
+same rule.
+
+**A fifth denominator exists and is not an error.** `tools/check_base_namespace.sh` reports 106 subclasses
+because it searches with `grep -r` and so sees the 17 untracked, gitignored `tools/_scratch_*.gd` probes
+that `git grep` cannot: 106 = 89 tracked + 17 scratch. Its population is deliberately the wider one — a
+scratch probe that shadows a base member is a real collision — so the two numbers disagree correctly.
 
 **Reconciling the two numbers that were in the record.** `check_base.gd` states 86 = 29 + 57. That was true
 when written and has drifted by three layers added since; measured now it is 89 = 31 + 58, and the comment
@@ -329,9 +336,11 @@ comment stating a number is a test with no runner, and `check_doc_counts` enforc
 gate's population, which is how 86/29/57 went stale unnoticed while the rule against it was being enforced
 three files away.
 
-**A second gap, from the same audit.** Nineteen layers print a green line that never names them —
-`AGILITY OK` rather than `check_agility: PASS`. `check_verdict_claims` defines its subject as
-"any string containing `<layer>: PASS`", so those nineteen are outside its population by construction.
+**A second gap, from the same audit — since closed.** Nineteen layers printed a green line that never
+named them — `AGILITY OK` rather than `check_agility: PASS` — so they sat outside `check_verdict_claims`'
+population by construction. The conversion below puts all of them on `_verdict()`, which prints the layer
+name, and the gate now reads notes as well as literals. Measured over the sweep logs afterwards: every one
+of the 89 inheritors self-names.
 
 **The independence check changed the recommended fix, which is why it was run first.** Only the trailing
 verdict is protocol. Twenty-one of the forty carry real judgement inside `_initialize()` — `check_settings`
@@ -349,6 +358,88 @@ The conversion itself is the next slice and is deliberately not folded into the 
 sweep retained at `docs/tracelog/sweeps/2026-08-22-area2-close/`, 112 per-layer logs, `summary.txt` stamped
 `head: 793d834, worktree: clean`, `110 PASS / 0 FAIL / 0 SKIP`, `HARNESS_RESULT=yes`, exactly the six
 registered stand-downs.
+
+### The conversion, and the number the before-state turned out to be
+
+Fifty-five of the fifty-eight are converted, in five batches, `97c62d8` through `9474ffd`. Only the tail
+moved: every layer's `_initialize()` body, its fixtures and its assertions are untouched, and the one tail
+that carried a comment kept it.
+
+**The before-state was measured, once, over the whole population, and it is the reason the slice was worth
+running.** With `_check` overridden to record nothing — assertions still executing, none of them counted —
+the fifty-five hand-rollers returned:
+
+    55 PASS / 0 FAIL / 0 SKIP of 55 selected
+
+Fifty-five registered layers exited 0, reported green by the runner and quotable in a summary, having
+tested nothing. Not one noticed. Confirmed rather than inferred: `grep -cE '^[[:space:]]*(PASS|FAIL):'`
+over all fifty-five retained logs returns 0 for every one, and the same grep over the unmutated run returns
+26 for `check_bits`, 21 for `check_drift`, 14 for `check_seam` — so the zero is a measured zero and not a
+broken pattern. Retained at
+`docs/tracelog/sweeps/2026-08-22-verdict-tail-00-baseline-noop-mutant/`.
+
+After conversion the identical mutation turns every one of the fifty-five red, each naming the defect.
+
+**Three controls per batch, all three run on every batch rather than argued from the base class:**
+
+| control | mutation | required outcome |
+|---|---|---|
+| a real assertion still fails when broken | `_check` → `super._check(false, label)` | every layer red, and the count in `N FAILURE(S) of N asserted` equal to the clean run's count, layer for layer |
+| a zero-assertion layer cannot pass | `_check` → records nothing | every layer red with *the layer made NO ASSERTIONS and reached its verdict anyway* |
+| the exit code and verdict are still reported correctly | none | every layer green, each printing its own count |
+
+The count equality is the part that does more than the exit code: it shows the same assertions ran under
+the mutant and merely failed, rather than the layer having taken some other path to a red.
+
+**What the conversion also fixed, found by counting rather than by intent.** Nineteen of the fifty-five
+sent their FAIL verdict to `print` rather than `printerr`, so a real failure went to stdout. All nineteen
+now go to stderr. And measured over the sweep's own logs rather than over source, **99 of 110 layers now
+print a self-naming verdict line**, against 84 on the green sweep of the day before; the eleven that do not are the four `tests/test_*.gd`
+suites, `play_tests`, `measure_player`, four of the ten layers that extend `SceneTree`, and the shell layer
+`check_prose` — none of them in `P_INHERIT`. Every one of the 89 inheritors self-names.
+
+**The tree now matches its own contributor guide, which it did not before.** `CONTRIBUTING.md`'s canonical
+layer template has always ended `_verdict("check_thing", "the thing holds")`, and has always described the
+exit protocol in terms of `_verdict()`. Fifty-eight layers did something else. Nothing compared the two,
+which is the same shape as everything else in this section: a rule with no runner.
+
+### The three that a tail conversion cannot reach
+
+`check_frametime`, `check_opening` and `check_underground` call neither `_check()` nor `_verdict()`. They
+hand-roll their comparisons *and* their diagnostics — `check_underground` distinguishes a fixture that
+could not reach the rock from a verdict on the rock, in its own words, over several lines. There is no
+shared protocol tail in them to move, and rewriting their judgement is a different piece of work with a
+different risk.
+
+They are, for exactly that reason, **the three layers the no-assertions guard still does not cover**, and
+they are recorded here as an open finding rather than counted as done. Nothing today would notice if one of
+them stopped judging.
+
+### Arming the gate before the shape arrived
+
+The conversion would have disarmed `check_verdict_claims`, which exists to refuse a verdict claiming a
+speed the layer never compared. It matched string literals containing `<layer>: PASS`; a layer calling
+`_verdict(layer, note)` writes only the note, and the base class builds the line. It was already blind to
+the 31 existing `_verdict()` users, and the conversion would have taken it to blind for 86 of 89 — with
+nothing going red to say so.
+
+Armed first, in `a91725c`, with a positive control for the note form and a mutation control showing the
+new assertion is the only thing the new code holds up. Then the sharpened gate immediately found a second
+defect in itself, `782c6d9`: its pattern's negated class `[^"\\]*` matches newlines, so any two quote
+characters anywhere in a file bracketed a candidate literal, and it reported a "claim" assembled from six
+lines of comment — prose *about this gate*, which happened to contain the words `: PASS`. A detector that
+can build its own subject out of the commentary about it is worse than one that misses, because the miss is
+quiet and this is a confident wrong red.
+
+One real note changed as a result. `check_seam_flood`'s verdict was two concatenated chunks, and the word
+the gate keys on sat in the second, which its pattern never reached — so its green was a property of the
+detector's blind spot rather than of the note. Reworded to say the same thing in the layer's own terms:
+both timings are reported, neither is asserted. No bound was moved and no rule relaxed.
+
+**Evidence:** configured sweep `110 PASS / 0 FAIL / 0 SKIP` with six documented stand-downs,
+`HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, 287s, retained at
+`docs/tracelog/sweeps/2026-08-23-verdict-tail-converted-green/`. Not a full sweep, and the runner says so
+itself.
 
 ## An open flakiness finding, recorded rather than absorbed
 
