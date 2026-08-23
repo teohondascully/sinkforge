@@ -29,6 +29,14 @@ count_in() {
 	local c
 	c="$(grep -o '([0-9]\+ asserted)' "$1" 2>/dev/null | grep -o '[0-9]\+' | tail -1)"
 	if [ -n "$c" ]; then printf '%s\tasserted' "$c"; return; fi
+	# A LAYER THAT FAILED STILL ASSERTED. `_verdict()` prints "(N asserted)" only on the passing path; a
+	# failing one prints "check_x: 1 FAILURE(S) of 13 asserted", with no parentheses. The pattern above
+	# misses it, the pass-line rule below then counts 12 PASS lines, and the gate compares a pass-line
+	# count against a floor set from an asserted count and reports a drop that did not happen. That is
+	# exactly what it did to `check_grapple_reads` on the 2026-08-23 sweep: "asserted 12, floor is 13",
+	# against a layer whose own summary line said 13.
+	c="$(grep -o 'of [0-9]\+ asserted' "$1" 2>/dev/null | grep -o '[0-9]\+' | tail -1)"
+	if [ -n "$c" ]; then printf '%s\tasserted' "$c"; return; fi
 	c="$(grep -cE '^[[:space:]]*(PASS|ok|OK)[: ]' "$1" 2>/dev/null)"
 	[ "${c:-0}" -gt 0 ] && printf '%s\tpasslines' "$c"
 }
@@ -50,11 +58,25 @@ counts_in() {
 compare() {
 	local floors="$1" observed="$2"
 	awk -F'\t' '
-		NR == FNR { if ($0 !~ /^#/ && NF >= 2) { want[$1] = $2 }; next }
+		NR == FNR { if ($0 !~ /^#/ && NF >= 2) { want[$1] = $2; rule[$1] = $3 }; next }
 		{
 			seen[$1] = $2
 			if (!($1 in want)) { print "  UNFLOORED: " $1 " asserts " $2 " and has no row" ; next }
-			if ($2 + 0 < want[$1] + 0) { print "  DROPPED: " $1 " asserted " $2 ", floor is " want[$1] }
+			# TWO RULES ARE TWO QUANTITIES, and a floor set under one cannot convict a count taken
+			# under the other. The guard sits inside the complaint and not in front of it: the two
+			# rules agree exactly for most passing layers, so refusing to judge every row whose rule
+			# moved would silence the gate on whole sweeps to prevent an error that only ever happens
+			# when it is about to accuse. A shortfall measured across a rule change is unjudged and
+			# says so; a shortfall under the same rule is still a drop.
+			if ($2 + 0 < want[$1] + 0) {
+				if (rule[$1] != "" && $3 != "" && $3 != rule[$1]) {
+					print "  RULE CHANGED: " $1 " has a floor of " want[$1] " set by the " \
+						rule[$1] " rule and this run reported " $2 " by the " $3 \
+						" rule; those are different quantities, so this row is unjudged"
+				} else {
+					print "  DROPPED: " $1 " asserted " $2 ", floor is " want[$1]
+				}
+			}
 		}
 		END { for (k in want) if (!(k in seen)) print "  MISSING: " k " has a floor of " want[k] " and reported no count" }
 	' "$floors" "$observed" | sort
@@ -122,6 +144,20 @@ printf '%s\t%s\t%s\n' "$ctl_layer" "$((ctl_count + 1))" "$ctl_rule" > "$CTL"
 ctl_hits="$(compare "$CTL" "$CTL_OBS" | grep -c 'DROPPED')"
 printf '%s\t%s\t%s\n' "$ctl_layer" "$ctl_count" "$ctl_rule" > "$CTL"
 ctl_quiet="$(compare "$CTL" "$CTL_OBS" | grep -c .)"
+# AND A THIRD CONTROL, for the rule guard added after the gate mis-read a failing layer. The same row at
+# the same count, with only the rule name changed, must come back as unjudged and NOT as a drop.
+printf '%s\t%s\t%s\n' "$ctl_layer" "$((ctl_count + 1))" "not-${ctl_rule}" > "$CTL"
+ctl_mixed="$(compare "$CTL" "$CTL_OBS")"
+ctl_mixed_flag="$(printf '%s' "$ctl_mixed" | grep -c 'RULE CHANGED')"
+ctl_mixed_drop="$(printf '%s' "$ctl_mixed" | grep -c 'DROPPED')"
+printf '%s\t%s\t%s\n' "$ctl_layer" "$ctl_count" "$ctl_rule" > "$CTL"
+if [ "$ctl_mixed_flag" != "1" ] || [ "$ctl_mixed_drop" != "0" ]; then
+	echo "assert_floors: REFUSED -- the rule control did not behave: a floor above $ctl_layer's" >&2
+	echo "  $ctl_count under a different rule name produced $ctl_mixed_flag unjudged line(s) and" >&2
+	echo "  $ctl_mixed_drop drop(s), where exactly one and none were due." >&2
+	echo "HARNESS_QUOTABLE=no"
+	exit 1
+fi
 if [ "$ctl_hits" != "1" ] || [ "$ctl_quiet" != "0" ]; then
 	echo "assert_floors: REFUSED -- the control did not behave: a floor one above $ctl_layer's $ctl_count" >&2
 	echo "  produced $ctl_hits complaint(s) where one was due, and a floor equal to it produced $ctl_quiet" >&2
