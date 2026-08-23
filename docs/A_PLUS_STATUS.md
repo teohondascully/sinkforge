@@ -927,6 +927,47 @@ from data the game really carries: one where the collision is present, one where
 comparison false makes the positive half fail and **leaves every real assertion in both layers passing**,
 which is the finding stated as an experiment.
 
+## Area 3 — which layers give the same answer twice, measured
+
+Every red this month came from a layer that judges pixels, and "the pixel layers are flaky" was folklore.
+`tools/sweep_drift.py` turns it into a measurement: two finished sweeps taken on trees where no layer
+changed, compared per layer on the numbers inside its `PASS`/`FAIL` lines only. A duration or a seed in a
+diagnostic can move without meaning anything; a number a threshold is compared against cannot.
+
+**91 of 107 layers reproduce EXACTLY.** That is the control as much as the finding: exact reproduction is
+the norm here, so the movers are a real subset rather than noise spread over everything. Stable across
+three independent same-tree pairs:
+
+| layer | pair 1 | pair 2 | pair 3 |
+|---|---|---|---|
+| `check_rock_reads` | 50% | 50% | 25% |
+| `check_snap_frame` | 50% | 50% | 37% |
+| `check_grapple_reads` | 36% | 40% | 40% |
+| `check_water_reads` | 37% | 25% | 37% |
+| `check_contact_edge` | 40% | 20% | 30% |
+| `check_ceremony_reads` | 30% | 20% | 30% |
+| `check_dig_hitch` | 18% | 18% | 18% |
+| `check_material_grammar` | 6% | 6% | 11% |
+
+**Three groups, and only one is a defect.** Layers whose SUBJECT is time — `check_frametime`,
+`check_dig_hitch`, `check_lock`, `check_pacing` — belong on this list and are sound; `dig_hitch` moving
+exactly 7 of 38 in all three pairs is a duration measurement doing its job. Layers whose INPUT legitimately
+changed between the two sweeps — `check_trailers` reads commits, `check_prose` reads files — are evidence
+the comparison is alive rather than findings. What remains is the layers that judge PIXELS, and for those
+a moved judged number means the verdict carries a random component.
+
+**That set is the set with a red history**: `check_grapple_reads`, `check_material_grammar` (whose own
+closure figure is recorded elsewhere in this document as one draw of 76.72 / 78.45 / 98.28 / 100.00), and
+`check_ceremony_reads`, whose mechanism was found and fixed. `check_machine_identity` and
+`check_machine_state` are the instructive exception: their diagnostics move 17% and 30% while their judged
+numbers hold, which is what assertions built on set emptiness rather than on a magnitude look like. It also
+means the drift census would NOT have predicted their reds, and saying so is the honest limit of it.
+
+Two controls run against the very logs being censused, and nothing is printed if either misbehaves: a
+sweep compared against ITSELF must report zero movers, and one digit changed inside one `PASS` line must
+be caught with only that layer named. Forcing the comparison to find nothing is refused by the second;
+forcing it to flag everything is refused by the first.
+
 ## An open flakiness finding, recorded rather than absorbed
 
 Four configured sweeps were run on effectively one tree while reconciling the population above. The only
