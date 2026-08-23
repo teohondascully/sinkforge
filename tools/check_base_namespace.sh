@@ -71,6 +71,60 @@ else
 	expect="$n_pop"
 fi
 
+# ONE COMPARISON, CALLED BY THE CONTROL AND BY THE REAL SCAN. It was written out once inside the loop
+# below, which meant the control had to be a second copy of it, and a control that is a copy of the
+# detector tests the copy.
+collisions_in() {   # collisions_in <file> -> prints one line per collision, empty if clean
+	_ci_f="$1"
+	_ci_vars="$(sed -nE 's/^[[:space:]]*(static[[:space:]]+)?(var|const|signal|enum)[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\3/p' "$_ci_f" | sort -u)"
+	_ci_funcs="$(sed -nE 's/^[[:space:]]*(static[[:space:]]+)?func[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\2/p' "$_ci_f" | sort -u)"
+	for _ci_n in $_ci_vars; do
+		printf '%s\n%s\n' "$base_vars" "$base_funcs" | grep -qx "$_ci_n" \
+			&& printf '  %s declares  var/const %s  — the base class already has it\n' "$_ci_f" "$_ci_n"
+	done
+	for _ci_n in $_ci_funcs; do
+		printf '%s\n' "$base_vars" | grep -qx "$_ci_n" \
+			&& printf '  %s declares  func %s  — the base class has a var/const of that name\n' "$_ci_f" "$_ci_n"
+	done
+}
+
+# THE POSITIVE CONTROL, AND THIS FILE HAD NONE FOR ITS WHOLE LIFE.
+#
+# Every guard here was a POPULATION guard: zero subclasses found is a failure, and scanning fewer than the
+# population is a failure naming the files that were skipped. Both are right and neither is a control.
+# They answer "did the scan read the tree" and leave "can the comparison find anything" untested, so a
+# broken comparison over a fully-read tree reported a clean namespace and there was nothing to say
+# otherwise. That is the shape this repository keeps finding: an instrument that cannot register its
+# subject, reporting a quiet green.
+#
+# The control is built from a REAL base member rather than from a made-up one, so it cannot pass while the
+# base extraction above is broken -- if `base_vars` came back empty the collision could not be constructed
+# and the negative twin would be the only case left, which is why the emptiness is checked first.
+_ctl_dir="$(mktemp -d)"
+trap 'rm -rf "$_ctl_dir"' EXIT INT TERM
+_ctl_member="$(printf '%s\n' "$base_vars" | grep -m1 .)"
+if [ -z "$_ctl_member" ]; then
+	printf 'check_base_namespace: FAIL — no base var/const parsed, so no control could be built.\n' >&2
+	exit 1
+fi
+printf 'extends "res://tools/check_base.gd"\nvar %s: int = 0\n' "$_ctl_member" > "$_ctl_dir/bad.gd"
+printf 'extends "res://tools/check_base.gd"\nvar _sf_ns_control_name_nobody_uses: int = 0\n' > "$_ctl_dir/clean.gd"
+if [ -n "$(collisions_in "$_ctl_dir/bad.gd")" ]; then
+	printf '  PASS  the detector finds a redeclared `%s` (positive control)\n' "$_ctl_member"
+else
+	printf 'check_base_namespace: FAIL — the detector did NOT flag a subclass redeclaring `%s`.\n' \
+		"$_ctl_member" >&2
+	printf '  The instrument is broken, so a clean verdict below would mean nothing. Not reporting one.\n' >&2
+	exit 1
+fi
+if [ -z "$(collisions_in "$_ctl_dir/clean.gd")" ]; then
+	printf '  PASS  ...and stays quiet on a subclass that redeclares nothing (negative control)\n'
+else
+	printf 'check_base_namespace: FAIL — the detector flagged a subclass that redeclares nothing.\n' >&2
+	printf '  It fires on everything, so a red below would mean nothing either. Not reporting a verdict.\n' >&2
+	exit 1
+fi
+
 scanned=0
 bad=""
 for f in $targets; do
@@ -78,18 +132,9 @@ for f in $targets; do
 	[ "$f" = "$BASE" ] && continue
 	head -1 "$f" | grep -q 'check_base\.gd' || continue
 	scanned=$((scanned + 1))
-	sub_vars="$(sed -nE 's/^[[:space:]]*(static[[:space:]]+)?(var|const|signal|enum)[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\3/p' "$f" | sort -u)"
-	sub_funcs="$(sed -nE 's/^[[:space:]]*(static[[:space:]]+)?func[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\2/p' "$f" | sort -u)"
-	for n in $sub_vars; do
-		printf '%s\n%s\n' "$base_vars" "$base_funcs" | grep -qx "$n" \
-			&& bad="$bad
-  $f declares  var/const $n  — the base class already has it"
-	done
-	for n in $sub_funcs; do
-		printf '%s\n' "$base_vars" | grep -qx "$n" \
-			&& bad="$bad
-  $f declares  func $n  — the base class has a var/const of that name"
-	done
+	_hits="$(collisions_in "$f")"
+	[ -n "$_hits" ] && bad="$bad
+$_hits"
 done
 
 if [ "$scanned" -eq 0 ]; then
