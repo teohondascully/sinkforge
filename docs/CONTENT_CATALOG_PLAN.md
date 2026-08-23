@@ -49,7 +49,7 @@ files.** Named, in the order a person doing the work hits them:
 | 4 | `scenes/main.gd:260` | a `load()` line in `_craftable` | uncraftable **and** unplaceable (the Pump) |
 | 5 | `src/data/research_rules.gd:11` and `:101` | `TECHS` unlock, `ORDER` | craftable from the start, ungated |
 | 6 | `scenes/hud.gd:406` | an `ITEM_PURPOSE` line | the tooltip has a name and no purpose line |
-| 7 | `scenes/hints.gd:33` | a `LESSONS` row | no first-acquisition bubble |
+| 7 | `scenes/hints.gd:35` | a `_defs` row | no first-acquisition bubble |
 
 Rows 2 and 3 carry real work (a tick hook, a glyph) and are not the problem. **Rows 4, 5, 6 and 7 are pure
 registration**: four hand-maintained lists in four files across both sides of the sim/representation seam,
@@ -90,7 +90,7 @@ between them. This is the full map.
 | Bench order | `src/data/research_rules.gd:101` `ORDER` | tech id | 11 | tech unreachable via the R key |
 | Hardness / tool gate | `src/data/mining_rules.gd:12`, `:26`, `:38` | material id | 9/4/9 | hand-mineable at `DEFAULT_HARDNESS` |
 | Tool + bit recipes | `src/data/mining_rules.gd:73`, `src/data/bit_rules.gd:53` | item id | 3 + 4 | not craftable |
-| First-acquisition hints | `scenes/hints.gd:33` `LESSONS` | item id | 12 item-keyed | no bubble |
+| First-acquisition hints | `scenes/hints.gd:35` `_defs` | item id | 12 item-keyed | no bubble |
 | Strike / step audio | `scenes/sfx.gd:29`, `:39` | material id | 10 / 10 | plain `crunch` (deliberate, documented at `:27`) |
 | Craft tools + bits | `scenes/main.gd:158` `CRAFT_TOOLS` | item id | 7 | absent from the Rack |
 | Build materials | `scenes/main.gd:80` `BUILD_MATERIALS` | material id | 5 | not placeable from the pack |
@@ -167,7 +167,7 @@ call it, and it reaches back into `MainView.CRAFT_TOOLS` at `:493` to finish the
 a content list out of a `Node2D`. Lifting that function into `Catalog.items()` and having the layer call it
 is behaviour-preserving by construction and closes the boundary crossing in the same move.
 
-**What must NOT be derived.** `MACHINE_STYLE`, `ITEM_PURPOSE`, `LESSONS` and the sfx tables are authored
+**What must NOT be derived.** `MACHINE_STYLE`, `ITEM_PURPOSE`, `Hints._defs` and the sfx tables are authored
 content: a glyph kind, a casing hue, a sentence of copy, a lesson. There is no honest derivation of a
 sentence. The catalog's job for those is **coverage**, not generation: it supplies the population, and a
 harness layer asserts the table covers it. That is the split in the map above. Three of those surfaces are
@@ -368,8 +368,8 @@ has no direct dictionary access at all, and a source scan can then assert that t
 **V-2. The seeder's layout constants live on a `Node2D`.** `world_seeder.gd` reads `MainView.SURFACE`,
 `MINESHAFT_COL`, `MINESHAFT_FORGE_CELL`, `MINESHAFT_DRILL_CELL`, `MINESHAFT_ORE_CELL`, `AUTO_FORGE_CELL`,
 `MINESHAFT_ORE_RICHNESS`, `TUTORIAL_COAL_CELLS`, `TUTORIAL_TREE_COL`, `ADIT_COLS`, `ADIT_CHAMBER_COL`,
-`ADIT_ROOF`, `ADIT_FACE_AMOUNT`, `ADIT_DEEP_AMOUNT` — fourteen constants declared between
-`scenes/main.gd:566` and `:628`. The opening of the game is authored in the controller. This is why the
+`ADIT_ROOF`, `ADIT_FACE_AMOUNT`, `ADIT_DEEP_AMOUNT` — the thirteen constants listed here, all declared
+in the opening-seeding block of `scenes/main.gd` (which holds sixteen `const` lines in total). The opening of the game is authored in the controller. This is why the
 seeder cannot simply move to `src/`: the constants have to go first.
 
 A fifteenth constant shows what happens to a layout fact with no owner. `MainView.STARTER_VEIN_CELL` is
