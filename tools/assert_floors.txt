@@ -15,6 +15,13 @@
 # gate says it did not judge rather than inventing a verdict. Regenerate after a deliberate change:
 #   tools/assert_floors.sh --write <log-dir>
 #
+# THE POPULATION, STATED, because 91 rows against a suite of 113 is a gap and a gap nobody names reads as
+# coverage. 22 registered rows report no assertion count and are therefore outside this gate entirely: the
+# shell layers, which have no `_check` and print their own verdict; the four `tests/test_*.gd` rows; and
+# `measure_player`, `play-tests`, and the layers that print a bare PASS line. They are not exempted, they
+# are unreachable by this instrument, and holding them needs a different one. Re-derive the gap with:
+#   for f in <log-dir>/*.log; do grep -q '([0-9]* asserted)' "$f" || basename "$f"; done
+#
 # stand-downs: 6
 check_agility	7
 check_aim	7
