@@ -64,6 +64,34 @@ if fast_ms < slow_ms:
 	print("check_control: PASS — the two agree, and the first is faster")
 """
 
+## THE SAME CLAIM, MADE THROUGH `_verdict()`, WHICH THIS GATE COULD NOT SEE UNTIL 2026-08-23.
+##
+## `_verdict(layer, note)` prints `<layer>: PASS (n asserted) — <note>`, and it builds that line inside
+## `tools/check_base.gd`. The literal in the layer is the NOTE ALONE, which contains no `: PASS`, so the
+## string search below walked straight past it. Measured before the fix: of 89 layers inheriting the base,
+## 31 already reached the terminal this way and every claim any of them made was invisible here. The
+## comment at the top of this file reasoned about the opposite direction — that keying on `_verdict()`
+## would miss the hand-rollers — and shipped the mirror of the bug it was warning about.
+##
+## The verdict-tail conversion of 2026-08-23 moves 55 more layers onto `_verdict()`, which would have
+## taken this gate from blind to a third of the tree to blind to 86 of 89. That is why the fix lands
+## first: a gate must be armed for the shape before the shape arrives, or the arrival is what disarms it.
+const CONTROL_NOTE: String = """
+var fast_ms: float = 0.0
+var slow_ms: float = 1.0
+_verdict("check_control", "the two agree, and the first is faster")
+"""
+
+## ...and ITS negative twin. Note the layer-name argument is a string too: a reader that took every
+## literal in the call would treat `check_control` as part of the claim, which is noise rather than a
+## claim, so the first argument is skipped by position.
+const CONTROL_NOTE_CLEAN: String = """
+var fast_ms: float = 0.0
+var slow_ms: float = 1.0
+if fast_ms < slow_ms:
+	_verdict("check_control", "the two agree, and the first is faster")
+"""
+
 
 func _initialize() -> void:
 	var pos: Array[String] = _claims_without_evidence(CONTROL_SRC)
@@ -71,6 +99,10 @@ func _initialize() -> void:
 		"the detector flags its own positive control (a speed claim with nothing compared)")
 	_check(_claims_without_evidence(CONTROL_CLEAN).is_empty(),
 		"...and stays quiet on the same file once a comparison guards it")
+	_check(not _claims_without_evidence(CONTROL_NOTE).is_empty(),
+		"...and flags the same claim when it is made through _verdict()'s note instead of a print")
+	_check(_claims_without_evidence(CONTROL_NOTE_CLEAN).is_empty(),
+		"...and stays quiet on THAT one too once a comparison guards it")
 
 	var scanned: int = 0
 	var bad: Array[String] = []
@@ -102,12 +134,66 @@ func _initialize() -> void:
 	_verdict("check_verdict_claims", "%d layers, every speed claim backed by a comparison" % scanned)
 
 
-## The verdict lines of a source, however they reach the terminal.
+## The verdict lines of a source, however they reach the terminal — and there are two ways, not one.
+##
+## A layer either builds the whole line itself, in which case the literal carries `: PASS`, or it hands
+## `_verdict()` a note and the base class builds the line around it, in which case the literal carries
+## nothing this gate can key on. Both are collected here. Anything that only reads the first shape reports
+## a clean tree over the second, which is the failure this file is about, one level up.
 func _verdict_lines(src: String) -> Array[String]:
 	var out: Array[String] = []
 	var re := RegEx.create_from_string("\"([^\"\\\\]*:\\s*PASS[^\"\\\\]*)\"")
 	for m: RegExMatch in re.search_all(src):
 		out.append(m.get_string(1))
+	for note: String in _verdict_notes(src):
+		out.append(note)
+	return out
+
+
+## Every `note` argument passed to `_verdict()` in this source, with the concatenation flattened.
+##
+## NOT A REGEX, AND THE REASON IS WORTH THE TWENTY LINES. A note is frequently wrapped across lines with
+## `+`, and it is sometimes built with `%`, so `_verdict\("[^"]*",\s*"([^"]*)"\)` reads the FIRST chunk of
+## a wrapped claim and stops — and a claim's verb tends to live at the end of the sentence, which is
+## exactly the half it would drop. Scan to the matching parenthesis instead, honouring string literals so
+## a bracket inside a note cannot close the call early, and take every literal after the first.
+##
+## The first literal is the LAYER NAME and is skipped by position. It is not a claim, and `check_faster`
+## would otherwise read as one.
+func _verdict_notes(src: String) -> Array[String]:
+	var out: Array[String] = []
+	var at: int = src.find("_verdict(")
+	while at != -1:
+		var i: int = at + "_verdict(".length()
+		var depth: int = 1
+		var in_str: bool = false
+		var lits: Array[String] = []
+		var cur: String = ""
+		while i < src.length() and depth > 0:
+			var c: String = src[i]
+			if in_str:
+				if c == "\\":
+					i += 2
+					continue
+				if c == "\"":
+					in_str = false
+					lits.append(cur)
+					cur = ""
+				else:
+					cur += c
+			elif c == "\"":
+				in_str = true
+			elif c == "(":
+				depth += 1
+			elif c == ")":
+				depth -= 1
+			i += 1
+		# An unterminated call means the scan ran off the end of the file, which is a broken read rather
+		# than a clean one. Say so by reporting nothing FOR THIS CALL and carrying on, so one malformed
+		# site cannot silence the rest of the file.
+		if depth == 0 and lits.size() > 1:
+			out.append(" ".join(lits.slice(1)))
+		at = src.find("_verdict(", at + 1)
 	return out
 
 
