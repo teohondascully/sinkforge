@@ -64,6 +64,16 @@ func _init() -> void:
 
 	sfx.free()                                          # teardown must be clean (no live voice at quit)
 
+	# AND A GREEN THAT ASSERTED NOTHING IS REFUSED, which is what `check_base._verdict()` does for every
+	# layer that inherits it. Counting failures alone cannot tell "checked everything and passed" from
+	# "checked nothing": both report zero. Now that this layer has a count, it can say so.
+	if asserted == 0:
+		print("%s: FAIL — the layer made NO ASSERTIONS and reached its verdict anyway" % "check_water_audio")
+		quit(1)
+		# `quit()` REQUESTS the tree to exit, it does not return. Without this the verdict below ran too:
+		# the mutant printed the FAIL line AND "PASS (0 asserted)" AND exited 0, which is the exact shape
+		# this guard exists to stop. Caught by the control, not by reading it.
+		return
 	if fails == 0:
 		print("check_water_audio: PASS (%d asserted) — pour + pump beds synthesized, set_water drives + "
 			% asserted + "decays, headless-safe")

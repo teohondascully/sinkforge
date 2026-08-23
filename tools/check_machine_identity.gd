@@ -45,6 +45,9 @@ extends "res://tools/check_base.gd"
 const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
 const SHOW_FRAMES: int = 12           ## frames a newly placed machine gets before the shutter
+## How long the stage is given to lose the last machine before the empty-stage control is judged.
+## Four frames was the old implicit budget and it was not enough on three runs in six.
+const CLEAR_FRAMES: int = 180
 const ANIM_POSE: float = 0.0          ## the cosmetic clock is held here while a frame is read
 
 ## THE WHOLE REGISTRY, DISCOVERED RATHER THAN LISTED. A hand-written subject list in a layer about "do the
@@ -191,11 +194,29 @@ func _run() -> void:
 	# so the stage is empty again: it is photographed once more and put through the same mask the machines
 	# went through. Nothing on it should clear the bar. If an empty cell does, the bar is not measuring
 	# presence and the control above it is decoration.
+	#
+	# TAKING THE MACHINE OFF IS NOT THE SAME AS THE PICTURE LOSING IT, and the four frames waited after
+	# `remove_machine` were a guess, not a wait. Six runs of one unchanged tree photographed this stage
+	# three times while the last subject was still on it: 0.0089, 0.1037 and 0.1084 of the cell, and the
+	# last two are more than FOUR TIMES the 0.0250 two machines must differ by. That is a machine in the
+	# frame, not noise, so the control was right to fail and the layer was wrong to ask it then.
+	#
+	# The bar is untouched: still `empty_cover <= noisy_share`, both measured exactly as before. What
+	# changed is that the removal is given until `CLEAR_FRAMES` to reach the picture instead of four, and
+	# the wait ends the moment it has. A stage that never clears still fails, and now says how long it was
+	# given. This is the same fixed-frame-count mistake the grapple layer made against the lamp: a wait
+	# whose length is a constant is not a wait on the thing you are waiting for.
 	var after: PackedFloat32Array = await _luma_patch()
 	var empty_cover: float = _coverage(_mask(after, bare))
+	var waited: int = 0
+	while empty_cover > noisy_share and waited < CLEAR_FRAMES:
+		await physics_frame
+		waited += 1
+		after = await _luma_patch()
+		empty_cover = _coverage(_mask(after, bare))
 	_check(empty_cover <= noisy_share,
-		"CONTROL: the empty stage does NOT clear the bar the machines cleared (%.4f against %.4f)"
-			% [empty_cover, noisy_share])
+		"CONTROL: the empty stage does NOT clear the bar the machines cleared (%.4f against %.4f, "
+			% [empty_cover, noisy_share] + "after %d frame(s) of clearing)" % waited)
 
 	if not unplaceable.is_empty():
 		print("    could not place: " + ", ".join(unplaceable))

@@ -148,6 +148,8 @@ const PAINT_ROW1: int = 110
 
 ## The three grammars, by their index in FineTerrain's GRAM_* tables. Named here rather than reached for
 ## through the enum so the printed report can say which is which.
+## The directory the grammar table is built from; named once so the failure can name what it opened.
+const MATERIAL_DIR: String = "res://src/data/materials"
 const GRAMMARS: Array[String] = ["clastic", "bedded", "massive"]
 
 ## `_profile` population selectors that are not a grammar index. Negative so they cannot collide with
@@ -193,7 +195,7 @@ func _initialize() -> void:
 			fails += 1
 
 	fails += _check_paint()
-	_report_world()
+	fails += _report_world()
 
 	if fails == 0:
 		print("check_texture: PASS — fields resolve, and every grammar's rock reads as rock")
@@ -339,7 +341,8 @@ func _measure(fine: FineTerrain) -> Dictionary:
 ## pooled figure stays comparable. It is deliberately not asserted: it is a property of worldgen, it
 ## moves when worldgen moves, and holding a paint layer to it is the defect this file was repaired for.
 ## The guard that belongs on a material population belongs in a worldgen layer, and there isn't one.
-func _report_world() -> void:
+func _report_world() -> int:
+	var fails: int = 0
 	print("== census: what worldgen actually put in rows %d..%d (REPORT ONLY, nothing asserted) =="
 		% [PAINT_ROW0, PAINT_ROW1])
 	var cols: int = FactorySim.GRID_COLS
@@ -349,11 +352,25 @@ func _report_world() -> void:
 	sim.rebuild_fine_terrain()
 
 	var defs: Dictionary = {}
-	var mdir := DirAccess.open("res://src/data/materials")
-	for f: String in mdir.get_files():
-		var mdef: MaterialDef = load("res://src/data/materials/" + f.trim_suffix(".remap")) as MaterialDef
-		if mdef != null:
-			defs[mdef.id] = mdef
+	var mdir := DirAccess.open(MATERIAL_DIR)
+	var seen: int = 0
+	if mdir != null:
+		for f: String in mdir.get_files():
+			seen += 1
+			var mdef: MaterialDef = load(MATERIAL_DIR + "/" + f.trim_suffix(".remap")) as MaterialDef
+			if mdef != null:
+				defs[mdef.id] = mdef
+	# THE SCAN NEEDS A WITNESS. Every grammar this layer judges is looked up through `defs`, and the
+	# lookup falls back to grammar 0 when a material is missing: `gram[i] = d.grammar if d != null else 0`.
+	# An empty `defs` is therefore not an error, it is a world where every deep cell reports the same
+	# grammar, and the per-grammar profiles below would be computed over that instead of over the world.
+	# `DirAccess.open` returns null on failure, which used to be dereferenced immediately; now it is
+	# survived and reported. The bound is derived, not invented: every file in the directory must load.
+	if seen == 0 or defs.size() != seen:
+		push_error("check_texture: the materials scan found %d file(s) and loaded %d MaterialDef(s) from "
+			% [seen, defs.size()] + MATERIAL_DIR + " — every grammar below is looked up through "
+			+ "this table and falls back to grammar 0 when it misses")
+		fails += 1
 	var fine: FineTerrain = FineTerrain.new(cols, rows, 1337)
 	fine.grammar_at = func(c: Vector2i) -> int:
 		var dd: MaterialDef = defs.get(sim.material_at(c))
@@ -427,6 +444,7 @@ func _report_world() -> void:
 		var st: Array = _profile(lum, interior, step, gram, STRADDLING)
 		print("      contact  %-14s lag-1 %.2f  roughness %.2f%%  (%d samples)"
 			% [axis[0], st[0], st[1] * 100.0, int(st[2])])
+	return fails
 
 
 ## A fine cell in the MIDDLE of rock: itself and all eight fine neighbours solid.

@@ -1280,3 +1280,46 @@ driver failure and is recorded as one.
 
 Two rows remain: `check_capture_manifest` and `check_prose`, both shell layers, which need a shell
 convention rather than a pattern or a source tally.
+
+
+## The 2026-08-22 machine-identity red, explained and fixed
+
+It came back. The sweep at `92e5eda` failed `check_machine_identity` on the control that photographs the
+empty stage after the last machine is taken off. Six standalone runs of one unchanged tree:
+
+| run | empty-stage cover |
+|---|---|
+| 1, 2, 5 | 0.0000 — pass |
+| 6 | 0.0089 — fail |
+| 3, 4 | **0.1037, 0.1084** — fail |
+
+The first reading of this was that the bar had no headroom: it compares against still-frame noise, which
+measures exactly 0.0000, so the control demands a pixel-perfect match. That is true and it is not the
+cause. 0.10 is **four times** the 0.0250 two machines must differ by. That is a machine in the frame, not a
+transient. The layer waited four fixed frames after `remove_machine` and then photographed, and taking the
+machine off is not the same as the picture losing it.
+
+The bar is untouched — still `empty_cover <= noisy_share`, both measured exactly as before. What changed is
+that the removal is given up to `CLEAR_FRAMES` to reach the picture and the wait ends the moment it has.
+Six runs after: all pass, and one of them needed **39 frames**, nearly ten times the old budget, which is
+the evidence that the old number was a guess rather than a wait. Mutation: with the machine never removed
+at all, the control reads 0.7092 after the full 180 frames and fails. It cannot mask a real failure.
+
+This is the same mistake the grapple layer made against the lamp — a wait whose length is a constant is
+not a wait on the thing you are waiting for — and it retires ENVIRONMENTAL / UNEXPLAINED for this layer.
+
+## Two more witnesses, and a guard that did not work
+
+`check_texture` builds its whole grammar table from a directory scan with nothing checking the scan found
+anything. The lookup falls back to grammar 0 on a miss, so an empty table is not an error: it is a world
+where every deep cell reports the same grammar, and the per-grammar profiles would be computed over that.
+`DirAccess.open` returning null was dereferenced immediately. Now the scan is survived, counted, and held
+to a derived bound — every file in the directory must load — and `_report_world` returns its failures
+instead of discarding them. Mutant pointing at a directory that does not exist: exit 1, naming the scan.
+
+The two layers taught to count in this iteration also needed `check_base`'s refusal to green on zero
+assertions, since a failure count of zero cannot tell "checked everything" from "checked nothing". The
+first version of that guard did not work, and the control is what found it: `quit()` requests the tree to
+exit and does not return, so the mutant printed the FAIL line, then printed "PASS (0 asserted)", and
+exited 0 — the exact shape the guard exists to stop. With an explicit `return` after it, the mutant exits 1
+and prints only the failure.
