@@ -73,7 +73,13 @@ fi
 #    statement about the runner rather than a true one about the gate.
 missing=""
 for c in $doc; do
-	printf '%s\n' "$got" | grep -qx "$c" || missing="$missing $c"
+	# NO PIPE HERE, AND THE REASON IS TWELVE LINES BELOW UNDER `_calls_gate`: `producer | grep -q` under
+	# `pipefail` reports FAILURE when the match is found EARLY, because the producer takes SIGPIPE and 141
+	# is promoted over grep's 0. That note was written for `_calls_gate` and the fix was applied only
+	# there; these two loops kept the pattern and are the ones it bites, because a sorted list matches its
+	# first entries first. It cost a red in the sweep at 97f1c7a -- code 0, line 1 of `got`, and code 4,
+	# line 5 of `doc` -- while the same tree passed standalone with 11 documented and 11 handled.
+	grep -qx "$c" <<< "$got" || missing="$missing $c"
 done
 if [ -n "$missing" ]; then
 	no "codes the runner documents and the gate does not interpret:$missing"
@@ -85,7 +91,7 @@ fi
 #    harmless: it is a reader's evidence that the code exists, and it will be believed.
 extra=""
 for c in $got; do
-	printf '%s\n' "$doc" | grep -qx "$c" || extra="$extra $c"
+	grep -qx "$c" <<< "$doc" || extra="$extra $c"      # same reason as the loop above
 done
 if [ -n "$extra" ]; then
 	no "codes the gate interprets that the runner's table does not document:$extra"
