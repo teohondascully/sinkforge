@@ -125,11 +125,37 @@ func peaks() -> String:
 	return " ".join(parts) if parts.size() > 0 else "(carried nothing)"
 
 
+## AN UNCOUNTED frame-wait THAT STILL SAMPLES THE PACK. Every `await tree.physics_frame` in this file
+## goes through here.
+##
+## THE SAMPLER USED TO BE REACHABLE ONLY FROM `step()` AND `do_mine()`, and the journeys that carry the
+## most freight reach neither. `_goal_cross_jagged_tunnel` hands the body 8 `stone` -- bulk, by this
+## file's own BULK list -- walks it across a lumpy floor via `walk_to_column`, and printed:
+##
+##     PEAKBULK=0 HANDED=0 MINED=0 | peak carried: (carried nothing)
+##
+## Those zeros are the counters' initial values. `_sample_peak()` was never called once, because
+## `walk_to_column` waits on a bare physics frame and the rung never mines. "Carried nothing" was printed
+## about a pack holding eight units, and it read exactly like a measurement.
+##
+## The two worst sites are the two whose docstrings say they ACCUMULATE: `wait()` ("the sim ticks, the
+## body integrates, ground auto-collects") and `collect_below()` ("wait for product to fall + auto-collect
+## into the pack"). The pack grows in both and neither was sampled, so the peak was blind precisely where
+## freight enters it.
+##
+## THIS DOES NOT COUNT A FRAME, and that separation is the point. `frames` is a FRICTION metric with
+## ratcheted ceilings asserted against it in `play_tests.gd`; the peak is a reported quantity nothing
+## asserts on. Sampling more often must not move a number a ceiling judges, so the counter stays in
+## `step()` and only the observation moves down here.
+func _tick() -> void:
+	await tree.physics_frame
+	_sample_peak()
+
+
 ## A COUNTED frame-wait (used by journey code so `frames` measures how long a byproduct step really took).
 func step() -> void:
-	await tree.physics_frame
+	await _tick()
 	frames += 1
-	_sample_peak()
 
 
 ## Mine a cell through the real verb, counting it as friction. Returns whether the strike landed.
@@ -166,7 +192,7 @@ func _note(msg: String) -> void:
 ## Advance the live game by N physics frames (the sim ticks, the body integrates, ground auto-collects).
 func wait(frames: int) -> void:
 	for _i: int in frames:
-		await tree.physics_frame
+		await _tick()
 
 
 ## Hold a jump for a couple of frames.
@@ -240,7 +266,7 @@ func approach(cell: Vector2i, budget: int = 600) -> bool:
 		else:
 			still = 0
 		last_x = player.position.x
-		await tree.physics_frame
+		await _tick()
 		t += 1
 		if still > 150:                                    # ~2.5s of genuinely no progress → stop wasting budget
 			break
@@ -403,7 +429,7 @@ func walk_to_column(col: int, budget: int = 600, on_surface: bool = true) -> boo
 		else:
 			still = 0
 		last_x = player.position.x
-		await tree.physics_frame
+		await _tick()
 		t += 1
 		if still > 150:
 			break
@@ -465,7 +491,7 @@ func _settle(col: int) -> bool:
 	for _i: int in SETTLE_FRAMES:
 		if absf(player.velocity.x) <= SETTLE_SPEED and player.on_floor:
 			break
-		await tree.physics_frame
+		await _tick()
 	return main._cell_at(player.position).x == col
 
 
@@ -532,7 +558,7 @@ func dig_down_to(cell: Vector2i, budget: int = 2400, require_arrival: bool = fal
 			if main._can_reach(cell):
 				if main.try_mine(cell):
 					mines += 1
-		await tree.physics_frame
+		await _tick()
 		t += 1
 	player.input_dir = 0.0
 	_note("ran out of budget digging to %s (stuck near %s)" % [cell, main._cell_at(player.position)])
@@ -751,7 +777,7 @@ func collect_below(col: int, want_item: StringName, want: int, budget: int = 600
 	await approach(Vector2i(col, maxi(floor_row - 1, 0)), budget)
 	var t: int = 0
 	while int(sim.inventory.get(want_item, 0)) < want and t < budget:
-		await tree.physics_frame
+		await _tick()
 		t += 1
 	return int(sim.inventory.get(want_item, 0)) >= want
 
