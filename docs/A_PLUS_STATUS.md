@@ -1598,7 +1598,24 @@ The display path is unchanged and still passes in 5s. The population was enumera
 of the 17 layers registered `add_gl`, six already exit 42 on this branch and this was the only one exiting
 0. A scan for the same shape across all 104 registered GDScript layers returns exactly this one.
 
-**What is left open, and stated rather than folded in:** the other ten `add_gl` layers carry no display
-guard at all. The runner hands them `--headless` when there is no display, so what they do in the CI job is
-unmeasured — they may fail honestly, or they may judge the dummy renderer's blank frames. That is a
-separate question with its own risk of hanging a sweep, and it is the next item rather than this one.
+**Correction, measured within the hour: "the other ten carry no display guard at all" was wrong.** They
+all carry one. They call `_skip_layer()`, the `check_base.gd` helper that prints the SKIP line and calls
+`quit(SKIP)` for them, and the scan that produced the claim looked for a literal `quit(` within three lines
+of the headless test — so it saw the guard's absence rather than the helper's presence. A declaration form
+a scan omits reads as a finding.
+
+Running the job that settles it, `SF_HEADLESS=1 SF_GL_ONLY=1`:
+
+```
+1 PASS / 0 FAIL / 16 SKIP of 17
+```
+
+Sixteen skip and say why. The single pass is `check_dig_hitch`, which is registered `add_gl` for its
+pixel-timing half but whose headless assertions are bake REGION ARITHMETIC — rect containment, 43520 of
+262144 cells, 418 rows outstanding before and after a dig — and its pixel group stood down. That is a real
+pass on a real subject.
+
+So the correction tightens the finding rather than softening it. Every `add_gl` layer guards itself; the
+one that got the exit code wrong is the one layer that **could not call the helper**, because it extends
+`SceneTree` and had to hand-roll both the guard and the constant. Same root, one level down. After
+`9d16f81` the headless job carries no false green from this class.
