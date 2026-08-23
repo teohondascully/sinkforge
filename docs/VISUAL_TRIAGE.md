@@ -436,7 +436,25 @@ Observations to preserve, not twenty independent implementation tickets.
 >
 > The minimal form, if that is the call: hold the hue and scale to CHROME's luma, `Color(0.99, 0.88, 0.56)`
 > → `Color(0.93, 0.83, 0.53)`, a factor of 0.9417. Taking it to CHROME outright is a hue decision and a
-> larger one. **Neither is taken here** — `GR-06` is director-owned and this only narrows it.
+> larger one. **Neither is taken here** — the aim mark is director-owned and this only narrows it.
+>
+> **CORRECTION TO THE PARAGRAPH ABOVE, AND IT NAMES A BETTER TICKET.** This was first written against
+> `GR-06`, which is the assertion in `check_grapple_reads`. **`GR-04` is the ticket that already localised
+> the ring**, and its statement in that file's own header is:
+>
+> > *"REPRODUCES, and it is the endpoint MARK rather than the lead: the same preview adds ~15 levels of edge
+> > on dark rock and its ring alone carries ~208 against open sky. Reported, never asserted: how loud an aim
+> > mark should be is a design call."*
+>
+> So the ring was identified before this note existed, by a different route, and the contribution here is
+> narrower than first claimed: not *which* mark is loud, which `GR-04` already had, but that the mark is
+> **out of contract with a ceiling its own repository states**, which turns "how loud should it be" from an
+> open question into a bounded one.
+>
+> **The two are convergent because they measure different quantities, and that is the only reason the
+> convergence counts.** `GR-04` measures rendered edge gradient against a photographed sky; this measures
+> the authored colour literal against a named constant. Two instruments agreeing on a shared number would
+> be worth little; two unrelated quantities pointing at the same object is evidence about the object.
 >
 > For the nameplate and `out_col` the change is smaller than a decision: take the constant. That is what it
 > is for, and the badge beside them already does.
