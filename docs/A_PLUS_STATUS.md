@@ -938,16 +938,33 @@ diagnostic can move without meaning anything; a number a threshold is compared a
 the norm here, so the movers are a real subset rather than noise spread over everything. Stable across
 three independent same-tree pairs:
 
-| layer | pair 1 | pair 2 | pair 3 |
-|---|---|---|---|
-| `check_rock_reads` | 50% | 50% | 25% |
-| `check_snap_frame` | 50% | 50% | 37% |
-| `check_grapple_reads` | 36% | 40% | 40% |
-| `check_water_reads` | 37% | 25% | 37% |
-| `check_contact_edge` | 40% | 20% | 30% |
-| `check_ceremony_reads` | 30% | 20% | 30% |
-| `check_dig_hitch` | 18% | 18% | 18% |
-| `check_material_grammar` | 6% | 6% | 11% |
+| layer | how many judged numbers moved | the widest single move, relative |
+|---|---|---|
+| `check_snap_frame` | 4 of 8 | 100% |
+| `check_water_reads` | 3 of 8 | 100% |
+| `check_lock` | 2 of 29 | 68% |
+| `check_grapple_reads` | 9 of 25 | 43% |
+| `check_ceremony_reads` | 6 of 20 | 16% |
+| `check_hud_layout` | 10 of 206 | 12% |
+| `check_dig_hitch` | 7 of 38 | 2% |
+| `check_rock_reads` | 4 of 8 | 1.5% |
+
+**THE FIRST VERSION OF THIS TABLE RANKED BY THE LEFT COLUMN ALONE AND WAS QUOTED AS A RISK RANKING. It is
+not one, and neither column is.** Both were caught over-reporting on this very data, in opposite
+directions, which is why both are printed:
+
+- **A count of movers over-reports last-digit wobble.** `check_rock_reads` led that first ranking at 50%,
+  four of eight. The largest of those four was a legibility cue reading 87.68% against a floor of 75.00%
+  on one run and 87.55% on the next. Twelve points of headroom; nothing at risk.
+- **A relative magnitude over-reports small integers.** `check_snap_frame` leads this one at 100%, because
+  a control line went from `198193 changed against 0` to `198193 changed against 1`. A count of 0 to 1 is
+  a 100% move and that control needs a factor of four.
+
+The quantity that WOULD rank risk is headroom consumed: movement as a fraction of the distance to the
+assertion's own bound. It is deliberately not computed. **Only 159 of 3266 assertion lines state a bound at
+all**, and pairing a stated bound with the right value inside a free-text line is a guess that would be
+silently wrong on some of them — which is the failure this whole section is about. The tool says WHERE TO
+LOOK and refuses to say HOW BAD.
 
 **Three groups, and only one is a defect.** Layers whose SUBJECT is time — `check_frametime`,
 `check_dig_hitch`, `check_lock`, `check_pacing` — belong on this list and are sound; `dig_hitch` moving
@@ -956,7 +973,7 @@ changed between the two sweeps — `check_trailers` reads commits, `check_prose`
 the comparison is alive rather than findings. What remains is the layers that judge PIXELS, and for those
 a moved judged number means the verdict carries a random component.
 
-**That set is the set with a red history**: `check_grapple_reads`, `check_material_grammar` (whose own
+**Read with that caveat, the set still coincides with the red history**: `check_grapple_reads`, `check_material_grammar` (whose own
 closure figure is recorded elsewhere in this document as one draw of 76.72 / 78.45 / 98.28 / 100.00), and
 `check_ceremony_reads`, whose mechanism was found and fixed. `check_machine_identity` and
 `check_machine_state` are the instructive exception: their diagnostics move 17% and 30% while their judged

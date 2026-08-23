@@ -16,6 +16,23 @@ Reading the output: a layer whose subject IS time (frametime, dig_hitch, lock, p
 is not a defect. A layer that judges PIXELS and appears here has a verdict with a random component. A layer
 whose INPUT changed between the two sweeps (trailers reads commits, prose reads files) is a control that
 the comparison is alive rather than a finding.
+
+THIS IS A SCREEN, NOT A RISK RANKING, and the first version of it was quoted as one. Two columns are
+printed because neither is enough on its own, and both were caught over-reporting on real data here:
+
+    COUNT of numbers that moved over-reports last-digit wobble. `check_rock_reads` scored 50% because
+    four of its eight judged numbers moved -- and the biggest of those was a cue reading 87.68% against
+    a floor of 75.00% on one run and 87.55% on the next. Twelve points of headroom, nothing at risk.
+
+    RELATIVE MAGNITUDE over-reports small integers. `check_snap_frame` scored 100% because a control
+    line went from "198193 changed against 0" to "197995 changed against 1". A count of 0 to 1 is a
+    100% move and the control needs a factor of four.
+
+The quantity that would actually rank risk is headroom consumed: the movement as a fraction of the
+distance to the assertion's own bound. It is not computed, and deliberately: only 159 of 3266 assertion
+lines state a bound at all, and pairing the stated bound with the right value inside a free-text line is a
+guess that would be silently wrong on some of them. **So this tool says WHERE TO LOOK and refuses to say
+HOW BAD.** Read the layer's own PASS lines before concluding anything from a row here.
 """
 import glob
 import io
@@ -49,11 +66,21 @@ def compare(a, b):
         if not na and not nb:
             continue
         if len(na) != len(nb):
-            rows.append((n, -1, len(na)))
+            rows.append((n, -1, len(na), 0.0))
             continue
-        moved = sum(1 for x, y in zip(na, nb) if x != y)
+        moved = 0
+        worst = 0.0
+        for x, y in zip(na, nb):
+            if x == y:
+                continue
+            moved += 1
+            try:
+                fx, fy = float(x), float(y)
+            except ValueError:
+                continue
+            worst = max(worst, abs(fx - fy) / max(abs(fx), abs(fy), 1e-9))
         if moved:
-            rows.append((n, moved, len(na)))
+            rows.append((n, moved, len(na), worst))
     return rows
 
 
@@ -93,12 +120,16 @@ def main():
     print("sweep_drift: %d layers carry judged numbers in both sweeps" % both)
     print("             %d reproduce EXACTLY, %d moved" % (both - len(rows), len(rows)))
     print("             controls: self-comparison 0 movers, planted digit caught in %s" % victim)
-    for n, moved, total in sorted(rows, key=lambda r: -(r[1] / max(r[2], 1))):
+    print()
+    print("  %-26s %8s  %9s   %s" % ("layer", "moved", "widest", "judged numbers"))
+    for n, moved, total, worst in sorted(rows, key=lambda r: -r[3]):
         if moved < 0:
             print("  %-26s SHAPE CHANGED - %d judged numbers on one side" % (n, total))
         else:
-            print("  %-26s %5.1f%%  (%d of %d judged numbers moved)"
-                  % (n, 100.0 * moved / total, moved, total))
+            print("  %-26s %6d/%-3d %8.1f%%   %d" % (n, moved, total, 100.0 * worst, total))
+    print()
+    print("  moved  = how many judged numbers differ.  widest = the largest single move, relative.")
+    print("  Neither ranks risk. See the header of this file for the two ways each one lies.")
     return 0
 
 
