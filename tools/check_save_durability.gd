@@ -70,12 +70,7 @@ func _initialize() -> void:
 	_seed_ownership()
 	_backup_generation()
 	_sweep()
-	if _failures == 0:
-		print("check_save_durability: PASS")
-		quit(0)
-	else:
-		printerr("check_save_durability: %d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_save_durability")
 
 
 ## 1. THE WRITE IS ATOMIC AND KEEPS THE PREVIOUS SAVE.

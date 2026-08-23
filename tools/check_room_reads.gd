@@ -58,12 +58,7 @@ func _on_frame() -> void:
 		return
 	process_frame.disconnect(_on_frame)
 	_run()
-	if _failures == 0:
-		print("check_room_reads: PASS")
-		quit(0)
-	else:
-		print("check_room_reads: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_room_reads")
 
 
 ## A column where this fixture actually means something, searched outward from the middle so the shipping

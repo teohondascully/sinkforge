@@ -56,12 +56,7 @@ func _initialize() -> void:
 	print("== does the scanner answer in a colour you can see ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_scan: PASS — a buried vein answers in its own ore colour, not in the rock's")
-		quit(0)
-	else:
-		print("check_scan: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_scan", "a buried vein answers in its own ore colour, not in the rock's")
 
 
 func _run() -> void:

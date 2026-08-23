@@ -50,12 +50,7 @@ func _on_frame() -> void:
 	_sim = _main.sim
 	_field()
 	_swings()
-	if _failures == 0:
-		print("check_seam: PASS — reading the grain pays, and ignoring it costs nothing")
-		quit(0)
-	else:
-		printerr("check_seam: FAIL — %d failure(s)" % _failures)
-		quit(1)
+	_verdict("check_seam", "reading the grain pays, and ignoring it costs nothing")
 
 
 ## The field itself: stable, dense enough to matter, sparse enough to be a feature, and made of PLANES

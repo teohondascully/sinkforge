@@ -66,12 +66,7 @@ func _initialize() -> void:
 	_tools()
 	_bits()
 	_techs()
-	if _failures == 0:
-		print("check_rules_registry: PASS — nine hand-kept tables, no id in one that another disowns")
-		quit(0)
-	else:
-		printerr("check_rules_registry: FAIL — %d failure(s)" % _failures)
-		quit(1)
+	_verdict("check_rules_registry", "nine hand-kept tables, no id in one that another disowns")
 
 
 ## Every id the mining tables key on is a material that exists, and every material either has a hardness

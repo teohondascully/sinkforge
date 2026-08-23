@@ -115,9 +115,4 @@ func _initialize() -> void:
 	Settings.zoom_idx = 0
 	Settings.apply_audio()
 
-	if _failures == 0:
-		print("check_settings: PASS")
-		quit(0)
-	else:
-		printerr("check_settings: %d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_settings")

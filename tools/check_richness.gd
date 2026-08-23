@@ -61,12 +61,7 @@ func _initialize() -> void:
 	print("== is there anything down there ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_richness: PASS — the earth has things in it")
-		quit(0)
-	else:
-		print("check_richness: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_richness", "the earth has things in it")
 
 
 func _run() -> void:

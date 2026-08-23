@@ -72,12 +72,7 @@ func _initialize() -> void:
 	_check(fields.size() >= 30, "FactorySim's field list was read (%d script variables)" % fields.size())
 	_partition(fields)
 	_no_leak(fields)
-	if _failures == 0:
-		print("check_save_frontier: PASS")
-		quit(0)
-	else:
-		printerr("check_save_frontier: %d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_save_frontier")
 
 
 func _script_fields() -> Array[String]:

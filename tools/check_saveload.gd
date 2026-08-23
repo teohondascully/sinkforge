@@ -95,9 +95,4 @@ func _on_frame() -> void:
 		_check(int(SaveGame.read(TEST_SLOT).get("world_seed", -1)) == moved,
 			"F5 saves the seed the SIM was built with, not a second copy the controller kept")
 		_sweep()
-		if _failures == 0:
-			print("check_saveload: PASS")
-			quit(0)
-		else:
-			printerr("check_saveload: %d FAILURE(S)" % _failures)
-			quit(1)
+		_verdict("check_saveload")

@@ -319,9 +319,4 @@ func _initialize() -> void:
 	_check(sentinel_src.contains("func _unguarded()"),
 		"…through a named refusal of its own, not by hoping the runner always wraps it")
 
-	if _failures == 0:
-		print("check_save_isolation: PASS")
-		quit(0)
-	else:
-		printerr("check_save_isolation: %d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_save_isolation")

@@ -59,19 +59,24 @@ var _rng := RandomNumberGenerator.new()
 func _initialize() -> void:
 	print("== the fast flood draws the same picture as the obvious one ==")
 	_run()
-	if _failures == 0:
-		# THE VERDICT MAY NOT CLAIM MORE THAN THE ASSERTIONS DO. This line used to end "and the hash is
-		# faster", which nothing in this layer tests: `fast_ms`, `slow_ms` and `speedup` are computed, printed
-		# and never asserted, deliberately, because a duration assertion in an `add` layer measures the box
-		# and this one is not `add_excl`. The body already says so in as many words. The VERDICT said it
-		# anyway, and the verdict is the line a reader takes away, so the layer would have announced the hash
-		# was faster with the hash ten times slower.
-		print("check_seam_flood: PASS — spatial hash and quadratic scan draw the same picture "
-			+ "(the speedup is printed below, not asserted)")
-		quit(0)
-	else:
-		printerr("check_seam_flood: FAIL (%d)" % _failures)
-		quit(1)
+	# THE VERDICT MAY NOT CLAIM MORE THAN THE ASSERTIONS DO. This line used to end "and the hash is
+	# faster", which nothing in this layer tests: `fast_ms`, `slow_ms` and `speedup` are computed, printed
+	# and never asserted, deliberately, because a duration assertion in an `add` layer measures the box
+	# and this one is not `add_excl`. The body already says so in as many words. The VERDICT said it
+	# anyway, and the verdict is the line a reader takes away, so the layer would have announced the hash
+	# was faster with the hash ten times slower.
+	#
+	# STILL TRUE OF THE NOTE, AND NOW CHECKED BY SOMETHING RATHER THAN INTENDED. The claim moved into
+	# `_verdict()`'s note argument, which `check_verdict_claims` could not read at all until a91725c.
+	#
+	# AND THE OLD LINE WOULD HAVE TRIPPED IT. The sentence above was written as two concatenated chunks,
+	# and the word that gate keys on -- "speedup" -- sat in the SECOND one, which its pattern never
+	# reached. So the green here was a property of the detector's blind spot and not of this note. Said
+	# in the layer's own units instead, which is what the disclaimer meant in the first place: the two
+	# durations are reported, and neither is compared to anything.
+	_verdict("check_seam_flood",
+		"spatial hash and quadratic scan draw the same picture (both timings are reported below, neither"
+		+ " is asserted)")
 
 
 func _run() -> void:
