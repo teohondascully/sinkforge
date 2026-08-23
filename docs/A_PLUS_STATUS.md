@@ -781,6 +781,31 @@ is patched, with the before-and-after concurrency measurements recorded in the r
 retained under `docs/tracelog/sweeps/` including the two reds, because a red that is deleted once it stops
 reproducing is a red nobody can ever study.
 
+**The shader-cache hypothesis was tested and is weakened, not retired.** Its precondition is real and is
+now verified rather than asserted: the harness redirects `HOME` so `user://` is isolated per repo root,
+Godot keeps its shader and pipeline caches under the user directory, and of the fifty isolated homes on
+this machine **none contains a single file matching `*shader*`**, against a real user directory that has
+both `shader_cache/` and `vulkan/`. Every harness run genuinely boots with nothing cached.
+
+What the hypothesis predicts is a degenerate early frame, and a probe that boots the scene and captures the
+viewport at eleven offsets from frame 0 to frame 90 does not find one:
+
+| frame | 0 | 1 | 3 | 8 | 21 | 55 | 90 |
+|---|---|---|---|---|---|---|---|
+| mean luma | 63.34 | 62.97 | 62.71 | 62.66 | 62.68 | 62.54 | 62.67 |
+| distinct tones | 227 | 228 | 233 | 231 | 229 | 227 | 228 |
+| black | 0.7% | 0.7% | 0.7% | 0.8% | 0.7% | 0.8% | 0.7% |
+
+The first captured frame is as fully rendered as the ninetieth, and the layers that went red wait 40 to 90
+frames before they photograph anything.
+
+**The limit of that result, stated rather than left for a reader to notice.** The probe ran ALONE. Both reds
+appeared only inside a sweep, under a dozen concurrent engine processes, and no run of this probe has been
+taken in that condition, because the machine lock exists precisely to stop concurrent engine runs. So the
+treatment was not applied in the domain where the symptom lives, and a null from outside the domain
+excludes nothing. The probe is kept at `tools/_scratch_cold_pipeline.gd`, untracked and registered nowhere,
+so the next attempt starts from a working instrument.
+
 **What changed since, and what did not.** `check_grapple_reads` leaves this group: its red was its own
 positive controls firing, which is a layer working rather than a layer confused. The two machine layers
 stay in it. Nothing here reproduced them and nothing here diagnoses them, and the state layer's red had
