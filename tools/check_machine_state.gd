@@ -452,6 +452,25 @@ func _mean(a: PackedFloat32Array) -> float:
 ## two populations stably**; 3.0 is the middle of that band and would have failed the old Drill on every
 ## one of the six runs, including the ones where 2.0 passed it.
 const PRESENCE_MARGIN: float = 3.0      ## a drawn machine beats the empty stage's own drift by this
+
+## MOTION_MARGIN IS UNJUSTIFIED RATHER THAN VIOLATED, and this says so instead of leaving it bare beside a
+## neighbour that carries a full derivation. Two things are wrong with reading the block above as its
+## justification: that block's body derives "a drawn machine beats the empty stage's own drift", which is
+## PRESENCE_MARGIN's semantic and not this one, and its quoted ratios (Forge ~16x, Drill ~10x, Generator
+## ~4.4x) are not this check's ratios.
+##
+## Measured 2026-08-24, one run, `d_state / d_motion` as asserted at the `ok` line below:
+##
+##     Forge      79.75 / 14.94 = 5.34x        Drill  87.47 / 14.06 = 6.22x
+##     Generator 119.75 / 23.50 = 5.10x
+##
+## All three clear 3.0 by 70% or more, and NOTHING in the corpus sits between 3.0 and 5.10 -- so there is
+## no observed case that this value separates. That is an evidence gap, not a pass: a threshold no subject
+## has ever come near is untested in the only direction that matters.
+##
+## IT IS NOT RAISED TO FIT. Three positives and no negative cannot locate a bound, and moving it to hug the
+## observed minimum would be inventing a floor from one side of the population. Deriving it needs a case
+## that genuinely fails the motion cue, or enough runs to bound the spread honestly; neither exists yet.
 const MOTION_MARGIN: float = 3.0
 const MIN_STATE_LEVELS: float = 6.0     ## ...and an absolute floor, so two near-identical frames cannot
                                         ## satisfy the ratio by both being nearly still
