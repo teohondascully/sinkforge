@@ -333,8 +333,62 @@ Observations to preserve, not twenty independent implementation tickets.
 | Cavities read as cut-out black rather than excavated volume | V2 and V3 | Play-disrupting | Compare fresh-cut face and background-plane treatment |
 | Tree, ruin and surface structures feel tile-adjacent | T3.11 | Craft debt | Revisit only after the ground is coherent |
 | Machine labels and status are more vivid than the machines | V1 with T3.2 | Play-disrupting | Give hardware state a visible world expression before adding more chrome |
-| The screen is busy even in an idle moment | V1 | Frame-breaking | Create a quiet-frame capture criterion |
+| The screen is busy even in an idle moment (**criterion specified 2026-08-23** — the duty period is 62.83s, so a one-frame criterion cannot work; see the note below the table) | V1 | Frame-breaking | Create a quiet-frame capture criterion |
 | Player silhouette is not the default focal point | V1, V2, V4 | Play-disrupting | Eye-path review of normal surface and underground frames |
+
+> ### The quiet-frame capture criterion, specified 2026-08-23 — and the first thing it has to say is that a quiet frame is not a frame
+>
+> The row asks for a criterion, so this is a criterion rather than a fix. The finding that shapes it came
+> out of counting, and it is the reason a single capture cannot serve.
+>
+> **The idle frame is driven by fourteen distinct oscillators, and its composite duty period is 62.83
+> seconds.** The rule, so the number is re-measurable: distinct multipliers in `sin`/`cos` calls taken on
+> `_anim_time`, across `world_renderer.gd` (13), `machine_view.gd` (3, two shared) and `rope_view.gd` (1).
+>
+>     0.7  0.9  1.4  1.6  1.8  2.2  2.6  3.0  4.0  6.5  9.0  11.0  23.0  27.0   rad/s
+>
+> Every one is a multiple of 0.1 rad/s, so the fundamental is 0.1 and the composite repeats every
+> **2π/0.1 = 62.83 s, or 3770 frames at 60Hz**. The fastest cue is the lamp's 27.0 at a 0.233 s period; the
+> slowest is a 0.7 shimmer at 8.98 s. **A one-frame capture criterion samples one of 3770 phases.**
+>
+> **And it is worse than fourteen, because most of them carry a per-element phase term.** `+ float(cx) *
+> 0.35` on the seal breath, `+ float(c.x) * 1.3` on the sapling sway, `+ float(seam["pos"].x) * 0.02` on
+> the seam, `+ float(tc.x) * 1.7` and `+ float(tc.y)` on the torch gutter, `+ float(c.x) * 0.6 + float(c.y)
+> * 0.4` on the rock breath, `+ float(col) * 1.3` on the column shimmer. The offsets do not change the
+> period, they change the phase — so this is not fourteen things breathing together, it is **one phase per
+> drawn cell**. "Busy in an idle moment" is not an accident of tuning; it is the shape of the field.
+>
+> **The grain is outside the period entirely.** `post_fx.gdshader` re-seeds on `fract(TIME * 0.96)`, a
+> 1.042 s cycle on the shader built-in that no GDScript pose reaches. 62.83 / 1.042 = 60.32, not an
+> integer, so with grain included the frame state **never exactly repeats**.
+>
+> ### The criterion
+>
+> **A quiet frame is a statistic over a posed duty period, in three parts.** Only the third is new, and the
+> third is the one the symptom is actually about.
+>
+> | part | what it bounds | instrument |
+> |---|---|---|
+> | **static coverage** | share of canvas under HUD panels | EXISTS — `check_hud_layout`'s footprint report; the bare screen measures 7.84% against a ratchet of 8.00%. Read its stated limit: `panel_probe` sees panels, not loose glyphs, so it is a LOWER bound |
+> | **live attention surfaces** | how many things are asking | PARTLY EXISTS — `HELPER_TAGS` gives the tags and the one-`critical`-at-a-time rule, but classifies 30 of 88 surfaces (see the helper-inventory note above), so the world plane must be enumerated before this part can be stated at all |
+> | **animated fraction** | share of pixels that MOVE over the duty period | **DOES NOT EXIST.** This is the part to build |
+>
+> **How the third part must be measured, because two of this repo's standing traps sit directly on it.**
+>
+> - **Pose both clocks, and pose them by SETTING rather than waiting.** `WorldRenderer.ANIM_FROZEN` holds
+>   `_anim_time`; only `Engine.time_scale = 0.0` reaches the shader grain. Waiting out a 62.83 s duty
+>   period is not available to a test, and waiting would advance the sim as well, so the phase has to be
+>   assigned: set `_anim_time` to each sample point and capture.
+> - **Sample above Nyquist for the FASTEST cue, not the slowest.** 27.0 rad/s is 4.297 Hz, so the duty
+>   period needs **at least 540 samples**. Undersampling does not merely miss the lamp flicker: it folds it
+>   into a low frequency and reports a slow, wide shimmer that is not there.
+> - **Count changed pixels above a floor, and keep the diff map.** A mean delta reads a crushed cue as an
+>   absent one, and captures on this project differ run-to-run by enough that a bare difference is not
+>   evidence. The floor has to come from a subject-removed run rather than from zero.
+>
+> **Not built here.** The harness workstream is frozen and this is a new instrument rather than a repair,
+> so it wants a director-approved priority ID. What is settled and does not need re-deriving is the shape:
+> 62.83 s, 540 samples, both clocks posed, changed-pixel count with a measured floor.
 
 > ### The `FORGE` labels row, investigated 2026-08-23 — two thirds of its remedy already shipped, and the third is somewhere else
 >
