@@ -136,6 +136,15 @@ func _run() -> void:
 		# exotic; crossing a band is when a player stops to read.
 		{"name": "PAUSED during a stratum arrival", "modal": false, "set": {"_paused": true},
 			"announce": true},
+		# FOUND BY POINTING AT A MACHINE IN A CAPTURE rather than by predicting it, which is the whole reason
+		# it is here. Every other pairing above exists because somebody thought of that collision first, so
+		# the matrix covers exactly the collisions somebody thought of and no others. The inspector is
+		# right-anchored with a `HOVER_MIN_W` 218 floor and the arrival plate is centred, so they share the
+		# right-hand strip: measured at 21x32 canvas px of overlap before the stand-down that answers it, and
+		# the photographed inspector is wider than the posed one, so that figure is a floor rather than the
+		# size of the problem. Pointing at a machine as you cross a stratum line is not an exotic input.
+		{"name": "a stratum arrival WITH a machine hovered", "modal": false, "set": {}, "hover": true,
+			"announce": true},
 		{"name": "the Bazaar open", "modal": true, "set": {"_inventory_open": true}},
 		{"name": "the dashboard open", "modal": true, "set": {"_show_dashboard": true}},
 		{"name": "the help overlay", "modal": true, "set": {"_show_help": true}},

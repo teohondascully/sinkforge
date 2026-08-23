@@ -1167,7 +1167,19 @@ func _draw_hover() -> void:
 	# A modal earns the same stand-down, and it has to happen here rather than at the call site. The rect
 	# is a click region, so a skipped call leaves the last one behind and a click on the counter lands on
 	# an invisible knob. You also cannot aim at a machine while a plate covers the world.
-	if minimap_large or _modal_open():
+	#
+	# AND THE ARRIVAL PLATE EARNS IT TOO, which is `HELPER_TAGS` finally having a consequence for this pair.
+	# That table already ranks `_draw_arrival` critical and this panel active, and already says a critical
+	# surface "arrives on its own schedule and expects to be read now"; nothing acted on the ranking, so the
+	# two were free to print over each other and did. Between them the inspector is the one with somewhere
+	# else to be, because the plate is centred and there is nowhere on a 640px canvas to put it that is not
+	# over the miner's own column. Posed, they overlap by 21x32 canvas px: the panel's left edge cuts the
+	# hairlines that frame the plate and closes to within a letter of the stratum's name.
+	#
+	# THE PREDICATE IS VISIBILITY AND NOT LIFETIME. A plate held behind a live rope draws nothing while
+	# `announcing()` stays true for as long as it is held, so gating on that would blank the inspector for a
+	# ceremony nobody can see. This file has already made that exact mistake once, in the other direction.
+	if minimap_large or _modal_open() or plate_on_screen():
 		return
 	var ins: Array = hover_info.get("in", [])
 	var outs: Array = hover_info.get("out", [])
