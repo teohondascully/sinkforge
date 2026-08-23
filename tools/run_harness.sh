@@ -927,6 +927,21 @@ harness_cleanup() {
 					"$DIR/summary.txt"
 				VERDICT_RC=$?
 			fi
+			# AND DID EVERY LAYER STILL SAY AS MUCH AS IT USED TO? The gate above asks whether the run
+			# happened. This asks whether the layers are still doing the work their verdicts claim: a
+			# layer that quietly stops asserting things does not go red, because `_verdict()` only refuses
+			# a green that asserted NOTHING, and between zero and everything there was no floor at all.
+			# Folded into VERDICT_RC rather than given a code of its own, because the consequence is the
+			# same one exit 7 already names: the verdict above is not quotable.
+			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/assert_floors.sh" ]; then
+				bash "$ROOT/tools/assert_floors.sh" "$DIR" "$DIR/summary.txt" \
+					2>&1 | tee -a "$DIR/summary.txt"
+				# The status of `assert_floors.sh`, not of `tee`. PIPESTATUS is the only way to reach it,
+				# and reading `$?` here would report the pipe's last command every time.
+				if [ "${PIPESTATUS[0]}" != "0" ]; then
+					VERDICT_RC=8
+				fi
+			fi
 			;;
 	esac
 	# TAKE BACK THE SENTINEL FIRST, while its state file still exists — the log dir it lives in is removed

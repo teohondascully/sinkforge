@@ -1,0 +1,109 @@
+# HOW MANY ASSERTIONS EACH LAYER MUST STILL MAKE.
+#
+# A layer that stops asserting things does not go red. `_verdict()` refuses a green that asserted NOTHING,
+# and between zero and everything there was no floor at all: the widest layer here makes 112 assertions and
+# could have fallen to one and still printed PASS. Measured across three consecutive sweeps of 91 layers,
+# the only counts that moved were the five layers edited between them, and each moved by exactly the number
+# of assertions added or withdrawn. The count is a faithful signal, so it is held.
+#
+# THE FLOOR IS THE OBSERVED COUNT, NOT A MARGIN BELOW IT. A margin would absorb the first real loss silently,
+# which is the whole failure being guarded against. Lowering a row is a deliberate act and the commit that
+# does it has to say which assertion went and why; a row is never lowered to clear a red.
+#
+# JUDGED ONLY ON A FULL CONFIGURED SWEEP with this exact stand-down set. A subset run has no opinion about
+# layers it did not run, and a different stand-down set means different assertions were reached, so the
+# gate says it did not judge rather than inventing a verdict. Regenerate after a deliberate change:
+#   tools/assert_floors.sh --write <log-dir>
+#
+# stand-downs: 6
+check_agility	7
+check_aim	7
+check_bazaar_cache	35
+check_bazaar_ruin	17
+check_binding_conflict	28
+check_binding_persistence	49
+check_binding_text	6
+check_bits	26
+check_carry_cap	39
+check_casing_light	67
+check_ceremony_reads	9
+check_ci_coverage	19
+check_climb	7
+check_contact_edge	6
+check_controls	10
+check_craftable_registry	21
+check_depth_reads	7
+check_descent	3
+check_dig_hitch	22
+check_doc_counts	21
+check_draw_cull	8
+check_drift	21
+check_encoding	4
+check_fall	6
+check_frametime	5
+check_gamepad	9
+check_grapple	9
+check_grapple_reads	13
+check_hash_mixing	24
+check_head	40
+check_hint_gate	32
+check_hud_layout	112
+check_impact	6
+check_input_deafness	7
+check_item_reads	11
+check_lift	2
+check_lode	62
+check_loop_health	6
+check_machine_identity	10
+check_machine_state	7
+check_material_grammar	8
+check_material_registry	36
+check_mining	24
+check_nameplate_truth	10
+check_opening	3
+check_pacing	5
+check_pack_layout	55
+check_paint_terms	7
+check_pixel_snap	91
+check_plunge	8
+check_posed_fields	24
+check_progression_payable	45
+check_progressive_bake	13
+check_pump	8
+check_refusal	25
+check_relief	6
+check_rhythm	8
+check_richness	3
+check_rock_reads	4
+check_room_reads	7
+check_row_identity	28
+check_rules_registry	105
+check_save_durability	107
+check_save_frontier	12
+check_save_isolation	27
+check_saveload	8
+check_scan	11
+check_seam	14
+check_seam_flood	11
+check_selection_reads	10
+check_settings	22
+check_shaders	5
+check_shared_constants	80
+check_spoil	29
+check_status_reads	11
+check_stepup	5
+check_stride	8
+check_teaching	24
+check_tells	5
+check_text_contrast	18
+check_tool_text	23
+check_traverse	5
+check_underground	3
+check_vein_guard	6
+check_verdict_claims	7
+check_verdict_route	12
+check_voice	11
+check_walk	4
+check_water_move	5
+check_water_reads	4
+check_wrap	7

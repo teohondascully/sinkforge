@@ -280,9 +280,14 @@ repository, so a fresh clone has the gate without the list, and the row is what 
 pass over words nothing tested. `ASSERTED` is the state in which such a row is least informative, not
 the state that retires it.
 
-The practical rule: **read the words, not the number.** `HARNESS_RESULT=yes` is the line that says the
-run is quotable at all — that the runner finished, every declared layer reported, and every layer log
-holds the output of a layer that actually executed. A verdict without it is not a result.
+The practical rule: **read the words, not the number.** Two lines carry the answer and they ask different
+questions. `HARNESS_RESULT=yes` says the run *happened*: the runner finished, every declared layer
+reported, and every layer log holds the output of a layer that actually executed. `HARNESS_QUOTABLE=yes`
+says the layers are still doing the work their verdicts claim — every one of them asserted at least as
+many things as it did the last time the floors in `tools/assert_floors.txt` were taken. A layer that
+quietly stops asserting does not go red on its own: refusing a green that asserted *nothing* is cheap,
+and between nothing and everything the widest layer here could have fallen from 112 assertions to one
+and still printed PASS. A verdict missing either line is not a result.
 
 112 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
