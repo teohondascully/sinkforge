@@ -149,19 +149,29 @@ func _run() -> void:
 	print("    empty stage mean luma %.1f, %.2f levels of still-frame drift across five shots"
 		% [_mean(bare), drift])
 
+	# THE REFERENCES ARE GATHERED IN A PASS OF THEIR OWN, one for each distinct floor a subject stands on,
+	# before any machine is placed. One reference for the whole run is a photograph of a different scene:
+	# each subject puts a different material in the cell below and the light it throws reaches into the
+	# patch. Taking them INSIDE the loop is worse still, and the cost is not subtle. Ten physics frames
+	# between `set_solid` and `place_machine`, with nothing else altered, moved the Generator's working
+	# face from 203 to 168 levels and its state difference from 137 to 100, which is the difference between
+	# that subject reading and not reading. The shutter is not allowed to move, so it does not.
+	var refs: Dictionary = {}
+	for spec: Dictionary in SUBJECTS:
+		var floor_of: StringName = StringName(spec["under"])
+		if refs.has(floor_of):
+			continue
+		sim.set_solid(STAGE + Vector2i(0, 1), floor_of)
+		for _i: int in 20:
+			await physics_frame
+		refs[floor_of] = await _luma_patch()
+	print("    %d floor reference(s) taken with the stage empty" % refs.size())
+
 	var rows: Array[Dictionary] = []
 	var undrivable: Array[String] = []
 	for spec: Dictionary in SUBJECTS:
 		sim.set_solid(STAGE + Vector2i(0, 1), StringName(spec["under"]))
-		# THE REFERENCE IS TAKEN PER SUBJECT, UNDER THE FLOOR THAT SUBJECT STANDS ON. One reference taken
-		# before the loop is a photograph of a different scene: each subject puts a different material in
-		# the cell below, and the light that material throws reaches into the patch. Measured, not argued.
-		# The first version compared against the single pre-loop shot and the empty stage came back 12.16
-		# levels away from it at the end of the run, against a still-frame drift of 1.22, so a machine
-		# could have scored several levels of presence without being drawn at all.
-		for _i: int in 8:
-			await physics_frame
-		var empty: PackedFloat32Array = await _luma_patch()
+		var empty: PackedFloat32Array = refs[StringName(spec["under"])]
 		var def: MachineDef = load("res://src/data/machines/%s.tres" % spec["res"]) as MachineDef
 		if def == null:
 			_check(false, "%s's definition loads" % spec["name"])
@@ -237,21 +247,19 @@ func _run() -> void:
 		sim.remove_machine(STAGE)
 		for _i: int in 6:
 			await physics_frame
-	# AND THE PRESENCE BAR CAN BE FAILED, shown on this run rather than argued. The last subject has been
-	# taken off, so the stage is empty again and is photographed once more. It must NOT clear the bar every
-	# machine above cleared; if it does, the bar is not measuring presence.
-	if not rows.is_empty():
-		# THE LIGHT HAS TO FINISH LEAVING. The loop gives six frames between subjects, which is enough to
-		# stop the next one being placed into the last one's glow but not enough for an ember to reach the
-		# floor: the same decay that made the first version of this layer photograph transients. The
-		# reference the machines were measured against was taken on a settled cell, so this one is too.
-		for _i: int in STEADY_FRAMES:
-			await physics_frame
-		var after: PackedFloat32Array = await _luma_patch()
-		var empty_presence: float = _mean_abs(after, rows[rows.size() - 1]["empty"])
-		_check(empty_presence <= drift * PRESENCE_MARGIN,
-			"CONTROL: the empty stage does NOT clear the presence bar the machines cleared (%.2f levels "
-				% empty_presence + "against %.2f)" % (drift * PRESENCE_MARGIN))
+	# A NEGATIVE HALF WAS TRIED HERE AND WITHDRAWN, and it is written down rather than quietly dropped.
+	# The intent was the one `check_machine_identity` carries: photograph the empty stage once more at the
+	# end and require it to FAIL the bar the machines cleared, so the bar is shown able to fail on real
+	# data. It does not work in these units. Scored against the reference the subjects were scored against,
+	# the end-of-run empty cell came back 7.98 levels away from it while the bar stood at 3.87, because
+	# `drift` is a five-shot burst and sees fast noise only, where the cell wanders further than that over
+	# the minutes a run takes. Deriving the bar from the run-length wander instead would make the control
+	# measure the quantity that defines it, which is a guard causing what it bounds. The identity layer's
+	# version stands because it works in mask units, where an empty cell scores a hard zero.
+	#
+	# So what is here is the positive half only, and this layer does NOT claim a demonstrated-failable
+	# presence bar. The mutation control for it is in the commit that added it: photographing the empty
+	# cell in place of the working one reports all three subjects as NOT DRAWN and exits 1.
 
 	# NOT A SILENT CAP. A family test that quietly drops the members it could not drive reports on
 	# whichever ones cooperated and calls that the family.

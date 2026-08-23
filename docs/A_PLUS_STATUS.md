@@ -712,20 +712,35 @@ refuse with.
   printed, and never compared to anything. It now has a floor read off five shots of the cell with nothing
   on it, and a subject that fails presence is reported as missing rather than accused of a weak cue.
 
-Both layers now photograph the empty stage once more at the end and require it to FAIL the bar the machines
-cleared, so the bar is shown able to fail on real data every run. That control immediately found two
-contaminations in the state layer's own reference, and neither threshold moved to accommodate either:
+`check_machine_identity` also photographs the empty stage once more at the end and requires it to FAIL the
+bar the machines cleared, so the bar is shown able to fail on real data every run. It works there because
+that layer judges in mask units, where an empty cell scores a hard zero.
 
-| the empty stage measured against | levels | bar |
-|---|---|---|
-| the single pre-loop reference | 12.16 | 3.74 |
-| a reference taken under the same floor tile | 4.03 | 3.73 |
-| ...once the last machine's ember has finished decaying | **1.46** | 3.69 |
+**The same negative half was tried on `check_machine_state` and withdrawn**, which is recorded in that file
+rather than quietly dropped. Scored against the reference the subjects were scored against, the end-of-run
+empty cell came back 7.98 levels away from it while the bar stood at 3.87: the noise term is a five-shot
+burst and sees fast noise only, where the cell wanders further than that over the minutes a run takes.
+Deriving the bar from the run-length wander instead would make the control measure the quantity that
+defines it. So that layer carries the positive half only and does not claim a demonstrated-failable bar.
 
-Each subject puts a different material in the cell below the stage and its light reaches into the patch, so
-the reference is taken per subject now. Six frames between subjects is enough that the next one is not
-placed into the last one's glow, but not enough for an ember to reach the floor, which is the same decay
-that made an early version of that layer photograph transients.
+**And the attempt cost a lesson worth more than the control.** Taking the empty reference inside the subject
+loop put ten physics frames between `set_solid` and `place_machine`. With nothing else altered, on the
+pre-change file:
+
+| Generator | working face | D_state | ratio against a 3.0 bound |
+|---|---|---|---|
+| placed immediately, as the layer always did | 203.5 | 136.9 | 4.07 |
+| ...again | 203.7 | 137.0 | 4.48 |
+| placed ten frames later, nothing else changed | 167.8 | 100.5 | **2.96, DOES NOT READ** |
+
+Ten frames of fixture timing decide that subject's verdict. The references are gathered in a pass of their
+own now, one per distinct floor material, before any machine is placed, so the shutter does not move. **The
+finding that remains open is not the control: it is that this layer's ratios are a function of when it
+photographs.** The same three subjects have read 16x / 10x / 4.4x when `MOTION_MARGIN` was calibrated,
+8.6x / 5.0x / 3.0x with the reference inside the loop, and 6.9x / 6.3x / 28.1x with it in a pass of its own.
+A bound of 3.0 chosen from a measured gap cannot be trusted against numbers that move like that, and
+re-deriving it needs the negative population it was derived against, which was the pre-gate Drill at 1.9x
+and no longer exists. **That decision is queued and not taken here: nothing was moved to accommodate a red.**
 
 Mutation controls, both layers, both exit 1:
 
