@@ -470,6 +470,20 @@ for wp in WIDE_PATHS:
 ref_abs = os.path.abspath(ref_path)
 
 fails, rows, unreadable = [], [], []
+
+
+def _asserted():
+    """Files this run actually TESTED, which is what the assertion floor may hold it to.
+
+    Not files opened. The wide sweep with no word list opens every tracked file and tests nothing, and
+    counting those would put a number on a silence -- the same quiet green the line at the bottom of this
+    script already exists to refuse. So the wide population counts only when there is a list to test it
+    against, and the positional-citation sweep counts because it applies a rule to every file it reads.
+    """
+    n = len(rows) + cite_read
+    if WIDE_DIGESTS:
+        n += wide_read
+    return n
 for p in paths:
     m = metrics(p)
     if m["comment_lines"] == 0:
@@ -588,12 +602,17 @@ if fails or wide_fails or drifted or wide_unreadable or cite_fails:
         print("\n%d file(s) failed:" % len(fails))
         for p, bad in fails:
             print("  %-42s %s" % (p, "; ".join(bad)))
+    # THE COUNT SURVIVES THE FAILURE, so `tools/assert_floors.sh` can still hold this layer to it. A gate
+    # that reports a count only when it passes cannot tell a red layer from a layer that quietly stopped
+    # checking things, which is the accusation the floor gate itself once got wrong.
+    print("check_prose: %d FAILURE(S) of %d asserted"
+          % (len(fails) + len(wide_fails) + len(cite_fails), _asserted()))
     sys.exit(1)
 
 # WHAT THE WIDE SWEEP ASSERTED, not how many files it opened. With no word list it opens all 151 and
 # tests nothing, and the first version of this line called that "clean" -- a quiet green printed by the
 # gate whose whole job is to stop one.
-print("\ncheck_prose: %d file(s) clean, %s" % (len(rows),
+print("\ncheck_prose: PASS (%d asserted) — %d file(s) clean, %s" % (_asserted(), len(rows),
     "%d more clean on the wide sweep" % wide_read if WIDE_DIGESTS
     else "and the wide sweep ASSERTED NOTHING (no word list; %d file(s) read, 0 words tested)" % wide_read))
 PYEOF

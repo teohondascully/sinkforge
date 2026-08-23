@@ -16,8 +16,8 @@
 #   tools/assert_floors.sh --write <log-dir>
 #
 # THE POPULATION, STATED, because a number of rows against a suite of 113 is a gap and a gap nobody names
-# reads as coverage. 111 of 113 rows are held, under THREE rules: 93 report "(N asserted)" -- 91 from
-# `_verdict()` and two that were taught to print it, below -- 17 have no `_check` to count and print one
+# reads as coverage. ALL 113 of 113 rows are held, under THREE rules: 95 report "(N asserted)" -- 91 from
+# `_verdict()` and four that were taught to print it, below -- 17 have no `_check` to count and print one
 # PASS line per claim instead, and one writes its verdict at the end of the line. The second rule is what
 # brings in the four largest bodies of assertions in the suite, none of which anything held before:
 # `sim` 526, `stress` 447, `power_water` 203, `worldgen` 147. Each row carries the rule that produced it,
@@ -41,9 +41,23 @@
 # claim per step would tie the layer's count to the number of steps sampled, so re-sampling the descent
 # would read as assertions appearing or going missing. Every violation is still reported, in one message.
 #
-# TWO ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest and check_prose, both shell
-# layers, which need a shell convention rather than a pattern. Being off `check_base.gd` is necessary but
-# NOT sufficient to be unreachable: 19 registered layers are off it and 15 were held even before this.
+# AND THE LAST TWO WERE CLOSED THE SAME WAY, at the source rather than with a fourth pattern. Both are
+# shell layers, so the convention is simply that a shell layer prints the same two sentences a GDScript
+# one does: "(N asserted)" when it passes and "N FAILURE(S) of M asserted" when it does not.
+#
+# `check_capture_manifest` needed a witness before it could be counted at all. Its claim is that the
+# tracked manifest equals a freshly regenerated one, and a claim of SAMENESS is satisfied by a build where
+# nothing happened: had the scan found no captures, `diff` would have been quiet and the layer would have
+# reported the archive correctly described while describing nothing. The population is asserted first —
+# it currently describes 52 captures — so the comparison is a comparison of something. Three claims.
+#
+# `check_prose` counts the files it actually TESTED, which is not the files it opened. Its wide sweep with
+# no word list opens every tracked file and tests nothing, and that population is excluded from the count
+# for the same reason the script's own last line refuses to call it clean. 444 = 60 narrow + 22 positional
+# + 362 wide.
+#
+# Being off `check_base.gd` was never why any of them were unreachable: 19 registered layers are off it
+# and 15 were held before any of this work. The boundary was always the dialect a layer speaks.
 #
 # Re-derive the gap with:
 #   for f in <log-dir>/*.log; do grep -qE '\([0-9]+ asserted\)|of [0-9]+ asserted|^[[:space:]]*(PASS|ok|OK)[: ]|[[:space:]]OK$' "$f" \
@@ -61,6 +75,7 @@ check_binding_persistence	49	asserted
 check_binding_text	6	asserted
 check_bits	26	asserted
 check_body_stress	5	passlines
+check_capture_manifest	3	asserted
 check_carry_cap	39	asserted
 check_casing_light	67	asserted
 check_ceremony_reads	9	asserted
@@ -111,6 +126,7 @@ check_plunge	8	asserted
 check_posed_fields	24	asserted
 check_progression_payable	45	asserted
 check_progressive_bake	13	asserted
+check_prose	444	asserted
 check_pump	8	asserted
 check_refusal	25	asserted
 check_relief	6	asserted

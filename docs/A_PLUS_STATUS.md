@@ -1363,3 +1363,32 @@ And a note this layer needed once `SF_ANIM_FROZEN` existed: **the clock must not
 layer's bar IS the animation. Freezing it drives `D_motion` toward zero and makes the margin trivially
 satisfied — the exact opposite of what posing bought the grapple layer, where the animation was the
 contaminant rather than the control.
+
+
+## The assertion floor now reaches every layer in the suite
+
+The last two rows were the shell layers, and they closed the same way the GDScript ones did: at the
+source, not with a fourth pattern. The convention is that a shell layer prints the same two sentences a
+GDScript one does — "(N asserted)" passing, "N FAILURE(S) of M asserted" failing — so a red still carries
+its count.
+
+`check_capture_manifest` could not be counted until it had a witness. Its claim is that the tracked
+manifest equals a freshly regenerated one, and **a claim of sameness is satisfied by a build where nothing
+happened**: had the scan found no captures, `diff` would have been quiet and the layer would have reported
+the archive correctly described while describing nothing. This is the third instance of that shape this
+run, after `check_bake_idempotent`'s witness and `check_texture`'s materials scan. The population is
+asserted first — 52 captures today — so the comparison is a comparison of something. Three claims.
+Mutant forcing the scan to describe nothing: exit 1, "the scan described 0 capture(s), so there is nothing
+for the manifest to be right or wrong about".
+
+`check_prose` counts the files it actually **tested**, which is not the files it opened: its wide sweep
+with no word list opens every tracked file and tests nothing, and that population is excluded for exactly
+the reason the script's own last line already refuses to call it clean. 444 = 60 narrow + 22 positional +
+362 wide. Mutant injecting one failure: "check_prose: 1 FAILURE(S) of 444 asserted", which the gate reads.
+A second mutant pointing the word list at a missing file showed the layer refusing outright before it ever
+reaches the vacuous branch — a guard that was already there.
+
+**113 of 113.** Three rules: 95 report "(N asserted)", 17 print one PASS line per claim, one writes its
+verdict at the end of the line. Being off `check_base.gd` was never why any row was unreachable — 19
+registered layers are off it and 15 were held before any of this work. The boundary was always the dialect
+a layer speaks, and four layers were taught to speak one.

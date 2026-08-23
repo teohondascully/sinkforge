@@ -194,16 +194,35 @@ n=0
 } >> "$TMP/manifest.md"
 
 if [ "$MODE" = "--check" ]; then
-	if [ ! -f "$OUT" ]; then
-		echo "  FAIL  $OUT does not exist — run tools/capture_manifest.sh" >&2
+	# THE CLAIM HERE IS THAT TWO THINGS ARE THE SAME, and a claim of sameness is satisfied by a build where
+	# nothing happened. If the scan that builds `$TMP/manifest.md` found no captures at all, and the
+	# tracked file were regenerated from the same empty scan, `diff` would be quiet and this layer would
+	# report the archive as correctly described while describing nothing. The population is asserted first
+	# so the comparison below is a comparison of something.
+	ASSERTED=0
+	FOUND="$(grep -c '^| `' "$TMP/manifest.md" 2>/dev/null || echo 0)"
+	ASSERTED=$((ASSERTED + 1))
+	if [ "${FOUND:-0}" -lt 1 ]; then
+		echo "  FAIL  the scan described $FOUND capture(s), so there is nothing for the manifest to be" >&2
+		echo "        right or wrong about" >&2
+		echo "capture_manifest: 1 FAILURE(S) of $ASSERTED asserted" >&2
 		exit 1
 	fi
+	ASSERTED=$((ASSERTED + 1))
+	if [ ! -f "$OUT" ]; then
+		echo "  FAIL  $OUT does not exist — run tools/capture_manifest.sh" >&2
+		echo "capture_manifest: 1 FAILURE(S) of $ASSERTED asserted" >&2
+		exit 1
+	fi
+	ASSERTED=$((ASSERTED + 1))
 	if diff -q "$OUT" "$TMP/manifest.md" >/dev/null; then
-		echo "capture_manifest: PASS — the manifest matches the repository"
+		echo "capture_manifest: PASS ($ASSERTED asserted) — the manifest matches the repository, and it"
+		echo "  describes $FOUND capture(s)"
 		exit 0
 	fi
 	echo "  FAIL  $OUT is out of date. Regenerate it with: bash tools/capture_manifest.sh" >&2
 	diff "$OUT" "$TMP/manifest.md" | head -20 >&2
+	echo "capture_manifest: 1 FAILURE(S) of $ASSERTED asserted" >&2
 	exit 1
 fi
 
