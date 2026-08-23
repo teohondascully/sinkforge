@@ -2717,7 +2717,7 @@ func _guide_targets() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	match _objectives.current_id():
 		&"mine":
-			var ore: Vector2i = _nearest_ore_to_player()
+			var ore: Vector2i = _nearest_material_to_player(&"ore")
 			if ore.x >= 0:
 				out.append({"cell": ore, "mode": "act"})
 		&"smelt":
@@ -2725,7 +2725,7 @@ func _guide_targets() -> Array[Dictionary]:
 			if forge.x >= 0:
 				out.append({"cell": forge, "mode": "act"})
 		&"wood":
-			var tree: Vector2i = _nearest_tree_to_player()
+			var tree: Vector2i = _nearest_material_to_player(&"wood")
 			if tree.x >= 0:
 				out.append({"cell": tree, "mode": "act"})
 		&"bazaar":
@@ -2763,32 +2763,21 @@ func _first_forge() -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-## The ore cell nearest the player, the dig target for the opening step. Scans the bounded terrain; the
-## starter vein by spawn wins by proximity, and it keeps pointing at real ore as veins deplete.
-func _nearest_ore_to_player() -> Vector2i:
+## The nearest solid cell of one material, by squared cell distance from the body. Two callers: the dig
+## target for the opening step, where the starter vein by spawn wins by proximity and the answer keeps
+## pointing at real ore as veins deplete; and the chop target for the wood step, where trees are sparse on
+## the surface so the closest one is the difference between an errand and a hunt.
+##
+## THIS WAS THE SAME FUNCTION TWICE, differing in one material literal. Neither copy was wrong, which is
+## how it survived: a duplicate only announces itself when the two sides drift, and until then it reads as
+## two functions that happen to agree.
+func _nearest_material_to_player(material: StringName) -> Vector2i:
 	var here: Vector2i = _cell_at(_player.position)
 	var best := Vector2i(-1, -1)
 	var best_d: int = 1 << 30
 	for cell_v: Variant in sim.solid:
 		var cell: Vector2i = cell_v
-		if sim.solid[cell] != &"ore":
-			continue
-		var d: int = (cell - here).length_squared()
-		if d < best_d:
-			best_d = d
-			best = cell
-	return best
-
-
-## The nearest wood (tree trunk) cell to the player, the chop target for the wood step. Trees are sparse on
-## the surface, so this points at the closest one and go-get-wood is not a hunt.
-func _nearest_tree_to_player() -> Vector2i:
-	var here: Vector2i = _cell_at(_player.position)
-	var best := Vector2i(-1, -1)
-	var best_d: int = 1 << 30
-	for cell_v: Variant in sim.solid:
-		var cell: Vector2i = cell_v
-		if sim.solid[cell] != &"wood":
+		if sim.solid[cell] != material:
 			continue
 		var d: int = (cell - here).length_squared()
 		if d < best_d:

@@ -102,8 +102,22 @@ it draws anything:
 | drawn | 13.0  13.7  17.9  19.6  26.7  28.3  29.7  31.7 |
 | removed | 3.8  4.6  4.6  4.7  4.8  5.1  5.2  5.4 |
 
-The floor is now **8.0**, which sits 1.48x above the loudest frame with no preview in it and 1.63x below
-the quietest frame with one. It fails on the mutant at 4.7 and passes clean at 13.5.
+A floor of **8.0** separates those cleanly, fails on the mutant at 4.7 and passes clean at 13.5 — and it
+**failed inside the full sweep, on an honest frame, at 2.8 levels over 3982 pixels.** All sixteen samples
+above were taken with the layer run on its own, where the mask settles around 700 to 1100 pixels. The
+statistic is a mean over that mask, so a mask four times the size dilutes the same signal below what the
+subject's own absence produces: in the sweep with the ghost drawn it reads lower than standalone with the
+ghost removed. No fixed floor is valid across both conditions.
+
+**The tightening is therefore withdrawn, not tuned down.** A bound chosen on a population that excludes the
+condition the gate actually runs in is not a bound, and lowering it until the sweep went green would have
+restored exactly the vacuity it was meant to remove. The floor returns to 1.0, the defect stays written
+down in the layer beside the measurement, and the next attempt starts from a statistic that does not
+dilute. One is already in the file: the body's own control uses a p90, which also means the comparison
+underneath these two controls currently weighs a p90 against a mean.
+
+The mistake worth keeping is the measurement frame. Sixteen samples looked like plenty; every one of them
+came from the same condition, and the condition was the one the gate does not run in.
 
 **A second control on the same subject is reported rather than adjusted.** The companion assertion — the
 preview drew something against open sky, floor 60 pixels — discriminates on fifteen of those sixteen runs.
@@ -113,6 +127,55 @@ and 5496 against a median of 198. That single tail event is why the first mutati
 green. No bound can fix this: excluding 5922 would need a floor above every honest run. The tail has a
 cause worth finding, and moving the number would only hide it, so the number stays and the instability is
 recorded here with its samples.
+
+### Duplication audit, over the tracked tree
+
+The population is `git ls-files '*.gd'` and nothing else — 179 files, 1927 functions of twenty tokens or
+more. An untracked scratch copy of a test layer exists in `tools/` and is deliberately excluded: it is not
+shipped code, and counting it would report a duplicate the repository does not have.
+
+| pass | groups | redundant copies |
+|---|---|---|
+| byte-identical bodies, literals preserved | 25 | 26 |
+| identical once string literals are normalised | 37 | 61 |
+
+**Both numbers are reported because the second one is easy to quote as the first.** Normalising literals is
+what lets a scan see a copy that differs only in a constant, and it is also what makes two genuinely
+different functions look the same. The twelve extra groups are the interesting ones and they are named
+below rather than folded into a headline.
+
+**Almost all of it is in the test layers, and most of that is deliberate.** `check_progressive_bake` says
+in its own comment that it duplicates a converter *rather than* sharing it, because a test that borrows the
+production code it judges cannot catch that code being wrong. That reasoning is correct and generalises:
+consolidating a shared *judge* would make one bug break several layers in the same direction, and their
+agreement would stop being evidence.
+
+**Three findings survive that reasoning.**
+
+1. **The boot preamble is copied across the layers instead of living in the base class.** Fifteen layers
+   share one `_initialize()` shape and six more share another, differing only in a banner string, a pass
+   message and the layer's own name. This is protocol, not judgement — it decides the exit code the runner
+   reads — and `tools/check_base.gd` already exists to hold exactly that. Copies of a protocol are the
+   thing most likely to drift out of step with the runner that reads them. Recorded as the next
+   consolidation; it touches twenty-one layers and is not folded into another change.
+
+2. **A copy documented as a copy, with nothing enforcing it.** `check_rock_reads._delve` carries the
+   comment *"lifted from check_underground so the two layers judge the same place"*. The intent is that the
+   two are identical; the mechanism is that somebody keeps them so. If either drifts, the stated invariant
+   breaks silently and both layers keep passing — against two different places.
+
+3. **One duplicate in shipping code, now removed.** `_nearest_ore_to_player` and `_nearest_tree_to_player`
+   in `main.gd` had byte-identical bodies apart from one material literal. They are one
+   `_nearest_material_to_player(material)`. Neither copy was wrong, which is how it lasted: a duplicate
+   only announces itself when the two sides drift.
+
+**Three categories came back clean, and the limits of each check are stated with it.** The nine
+invalidation flags are each written from exactly one file, the file that owns them — though that scan
+matches `= true` and `= false`, so an invalidation carried by an array or a counter is invisible to it and
+`terrain_dirty` is exactly that case. There are four serializer entry points and no duplication among them.
+Seventeen predicate names are defined in more than one place, and every one of them is a different body: a
+facade delegating to the real implementation, or two bounds checks over two different objects. Same name is
+not same logic, and none of these are a defect.
 
 ## Area 4 — the frame SLO, run on the host it was written for
 

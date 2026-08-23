@@ -343,23 +343,33 @@ const FILL_NO_SPAN: float = -103.0
 ## `GR-06`: the miner must out-read their own telemetry. This one IS asserted, because it is not a matter
 ## of taste: a tool that is easier to see than the person holding it has inverted the frame.
 const BODY_MARGIN: float = 1.15
-## The floor the aim ghost's own edge has to clear before "the preview was actually drawn" means anything.
-## IT USED TO BE 1.0, AND THE SUBJECT COULD BE DELETED OUTRIGHT WITHOUT TRIPPING IT. Removing every stroke
-## `_draw_aim_ghost` makes still leaves a residual in this mask -- the head-lamp swings with the cursor and
-## the rock it lights is not identical between the two captures -- and that residual is four to five levels,
-## not zero. So the control passed on a frame with no preview in it, and the GR-06 comparison underneath it
-## then read a 4.6-level nothing as the tool it was weighing the miner against.
+## THE AIM GHOST'S CONTROL, AND A TIGHTER FLOOR FOR IT THAT WAS TRIED AND WITHDRAWN.
 ##
-## Set from both sides, eight runs each, the OFF side produced by returning from `_draw_aim_ghost` before it
-## draws anything:
+## `guide_edge > 1.0` cannot fail for the reason it is written. Removing every stroke `_draw_aim_ghost`
+## makes still leaves a residual in this mask -- the head-lamp swings with the cursor, so the rock it lights
+## is not identical between the two captures -- and that residual is four to five levels, not zero. The
+## control passes on a frame with no preview in it, and the GR-06 comparison underneath then weighs the
+## miner against a 4.6-level nothing.
+##
+## Measured, eight runs each side, the OFF side produced by returning from `_draw_aim_ghost` before it draws:
 ##
 ##     ghost drawn      13.0  13.7  17.9  19.6  26.7  28.3  29.7  31.7   levels of edge
 ##     ghost removed     3.8   4.6   4.6   4.7   4.8   5.1   5.2   5.4
 ##
-## 8.0 sits 1.48x above the loudest frame with no preview in it and 1.63x below the quietest frame with one,
-## which is as near the geometric middle of the gap as a round number gets. The ON side is the wide one, so
-## the headroom that matters is the lower gap, and it is the one this leaves larger.
-const GHOST_EDGE_FLOOR: float = 8.0
+## A floor of 8.0 separates those cleanly and it FAILED INSIDE THE SWEEP, on an honest frame, at 2.8 levels
+## over 3982 pixels. Every one of the sixteen samples above was taken with the layer run on its own, where
+## the mask settles around 700-1100 pixels. `_edge_gain` is a MEAN over that mask, so a mask four times the
+## size dilutes the same signal below the level the subject's own absence produces: in-sweep WITH the ghost
+## reads lower than standalone WITHOUT it. No fixed floor is valid across both, and the bound is not the
+## part that is wrong.
+##
+## So the number stays at 1.0 and the defect stays written down. The measurement above is kept because it is
+## the evidence the next attempt starts from, and the next attempt is a statistic that does not dilute --
+## `_edge_p90` is already in this file and already used for the body, which also means GR-06 currently
+## compares a p90 against a mean. Withdrawn rather than tuned: a bound chosen on a population that excludes
+## the condition the gate runs in is not a bound, and lowering it until the sweep goes green would restore
+## exactly the vacuity this was trying to remove.
+const GHOST_EDGE_FLOOR: float = 1.0
 
 var _skipped: bool = false
 var _main: MainView = null
@@ -553,9 +563,12 @@ func _run() -> void:
 		% [body_edge, guide_edge, _count(guide)])
 	_rock_gain = guide_edge
 	_rock_px = _count(guide)
+	# The floor is the WITHDRAWN one; see GHOST_EDGE_FLOOR. The pixel count is printed beside the level
+	# because the two together are what showed the mean was being diluted, and neither alone did.
 	_check(guide_edge > GHOST_EDGE_FLOOR,
-		"CONTROL: the preview was actually drawn (%.1f levels of edge over %d pixels, floor %.1f)"
-			% [guide_edge, _count(guide), GHOST_EDGE_FLOOR])
+		"CONTROL: the preview was actually drawn (%.1f levels of edge over %d pixels, floor %.1f — a floor"
+			% [guide_edge, _count(guide), GHOST_EDGE_FLOOR]
+			+ " this low cannot fail; see GHOST_EDGE_FLOOR)")
 	_check(body_edge > 1.0,
 		"CONTROL: the miner was actually drawn (%.1f levels of edge, over %d pixels)"
 			% [body_edge, _count(body)])
