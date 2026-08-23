@@ -270,18 +270,30 @@ func _contamination(main: MainView, moment: String) -> String:
 			# the lesson was never active, or it is active and suppressed -- and they need different fixes,
 			# so both are printed rather than the legible one.
 			wrong.append(("the visible lesson is '%s', not the caught-line one — this frame is named for a "
-				+ "bubble it does not contain [_active=%s alpha=%.2f busy-speed=%.0f px/s, taught=%s]")
+				+ "bubble it does not contain [_active=%s alpha=%.2f busy-speed=%.0f px/s, taught=%s, "
+				+ "life=%.2f lingered=%.2f/%.1f queued=%d]")
 				% [str(th.active_text()).substr(0, 24), "empty" if str(th.active_text()) == "" else "set",
 					th.active_alpha(),
 					main._player.velocity.length() if main._player != null else -1.0,
 					"yes" if th.get("_done") != null and (th.get("_done") as Dictionary).has(&"wrapped")
-						else "NO"])
+						else "NO",
+					float(th.get("_life")), float(th.get("_lingered")), Hints.MAX_LINGER,
+					(th.get("_queue") as Array).size()])
 		elif th.active_alpha() < 0.9:
-			wrong.append(("the caught-line bubble is at alpha %.2f, so it is not in the picture. The body "
-				+ "is moving at %.0f px/s and the lesson is suppressed above %.0f — this photographs the "
-				+ "game declining to teach, not the teaching")
-				% [th.active_alpha(), main._player.velocity.length() if main._player != null else -1.0,
-					Player.RUN_SPEED * 1.25])
+			# READ THE FLAGS, DO NOT INFER THEM FROM SPEED. `active_alpha()` returns a flat 0.0 for three
+			# different reasons -- no active lesson, a ceremony owning the announce channel, or a busy body
+			# -- and they need different fixes. An earlier version of this message printed the body's speed
+			# against `RUN_SPEED * 1.25` and let the reader infer which. It misled its author twice over:
+			# the busy rule is HYSTERETIC (main.gd:720), so once armed it releases only below 0.9x, and the
+			# message was quoting the ARM threshold at a body that was already busy and under it. Printing
+			# 154 px/s against 188 read as "not busy" when busy was exactly what it was.
+			wrong.append(("the caught-line bubble is at alpha %.2f, so it is not in the picture "
+				+ "[busy=%s ceremony=%s speed=%.0f px/s, arms at %.0f and releases below %.0f; "
+				+ "life=%.2f lingered=%.2f/%.1f] — this photographs the game declining to teach")
+				% [th.active_alpha(), str(th.get("_busy")), str(th.get("_ceremony")),
+					main._player.velocity.length() if main._player != null else -1.0,
+					Player.RUN_SPEED * 1.25, Player.RUN_SPEED * 0.9,
+					float(th.get("_life")), float(th.get("_lingered")), Hints.MAX_LINGER])
 		# AND THE OTHER HALF OF THE PAIRING. The moment is a lesson AND the geometry it is about; a bubble
 		# over a straight line would be the lesson arriving about nothing.
 		if main._player != null and main._player.grapple.pivots.is_empty():
