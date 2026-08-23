@@ -142,12 +142,32 @@ func _finish_walk() -> void:
 
 ## A: a 1-tile-thick ledge (row r solid) with 4 rows of VOID beneath it, then a catch floor far below.
 ## Drop the body ~6 tiles above the ledge so it hits terminal speed before impact.
+## HOW MANY OF THE TWO CASES WERE ACTUALLY POSED, and which were not.
+##
+## Both setups need terrain to build on, and both used to answer "no site" by printing a line to stderr and
+## moving on without recording anything. `_done()` prints FAST-FORWARD GUARD PASS whenever `_fails == 0`,
+## and a run that posed nothing has `_fails == 0` -- so a world that offered neither site produced a green
+## over no cases at all. `check_step` had the identical defect and was found in the same audit.
+##
+## `SF_FF_NOSITE=1` forces both finders to fail, in the same spirit as `SF_FF_MUTANT` below: the claim that
+## this refusal fires should be re-runnable by anyone who doubts it, without editing the file.
+const CASES: int = 2
+var _posed: int = 0
+var _missed: PackedStringArray = PackedStringArray()
+
+
+func _no_site() -> bool:
+	return OS.get_environment("SF_FF_NOSITE") == "1"
+
+
 func _setup_ledge() -> void:
-	var f: int = _flat_run(12, 4)
+	var f: int = -1 if _no_site() else _flat_run(12, 4)
 	if f < 0:
 		printerr("  (no flat run found — skipping A)")
+		_missed.append("A (the ledge)")
 		_setup_walk()
 		return
+	_posed += 1
 	var c: int = f + 1
 	var r: int = _sim.surface_row(c)
 	_ledge_col = c
@@ -227,11 +247,13 @@ func _runway_site(from: int) -> int:
 			return lo
 	return -1
 func _setup_walk() -> void:
-	var lo: int = _runway_site(maxi(4, _ledge_col + 5))
+	var lo: int = -1 if _no_site() else _runway_site(maxi(4, _ledge_col + 5))
 	if lo < 0:
 		printerr("  (no machine-free %d-column site with room to build — skipping B)" % RUNWAY_COLS)
+		_missed.append("B (the runway walk)")
 		_done()
 		return
+	_posed += 1
 	var r: int = _sim.surface_row(lo)
 	_runway_hi = lo + RUNWAY_COLS
 	for col: int in range(lo, _runway_hi):
@@ -283,8 +305,17 @@ func _dump_runway(at_col: int) -> void:
 func _done() -> void:
 	physics_frame.disconnect(_phys)
 	Engine.time_scale = 1.0
+	# A CASE THAT WAS NEVER POSED IS NOT ONE THAT PASSED, and this is checked before `_fails`, because
+	# `_fails == 0` is what a run that posed nothing reports.
+	if _posed < CASES:
+		printerr("  %d of %d guard cases were never posed, so this run judged nothing about them: %s"
+			% [CASES - _posed, CASES, ", ".join(_missed)])
+		printerr("%d fast-forward guard case(s) FAILED, and %d were not attempted"
+			% [_fails, CASES - _posed])
+		quit(1)
+		return
 	if _fails == 0:
-		print("FAST-FORWARD GUARD PASS")
+		print("FAST-FORWARD GUARD PASS (%d cases posed)" % _posed)
 		quit(0)
 	else:
 		printerr("%d fast-forward guard case(s) FAILED" % _fails)

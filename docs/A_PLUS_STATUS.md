@@ -1768,3 +1768,37 @@ the message now says why instead of leaving a reader to decide which number is w
 
 Controls: the mutant exits 1 with `0 step-up traversal(s) FAILED, and 3 were not attempted`; the real layer
 still prints its three PASS lines and exits 0, so the floor of 3 is untouched.
+
+
+## The same defect in a second layer, found because the first one named its shape
+
+`check_fastforward` has two guard cases — a body falling onto a one-tile ledge under fast-forward without
+tunnelling, and a body walking a built runway — and both setups need terrain to build on. Both answered
+"no site" the way `check_step` did: a line to stderr, no failure recorded, and `_done()` printing
+`FAST-FORWARD GUARD PASS` because `_fails == 0`, which is exactly what a run that posed nothing reports.
+
+The mutant is kept in the file rather than applied by hand, following the convention this layer already
+set for its other guard: it carries `SF_FF_MUTANT`, with the reasoning that *"prove the guard goes red is a
+claim that should be re-runnable by anyone who doubts it"*. `SF_FF_NOSITE=1` now forces both finders to
+fail:
+
+```
+  (no flat run found — skipping A)
+  (no machine-free 56-column site with room to build — skipping B)
+  2 of 2 guard cases were never posed, so this run judged nothing about them: A (the ledge), B (the runway walk)
+0 fast-forward guard case(s) FAILED, and 2 were not attempted
+EXIT=1
+```
+
+Before the change that same run printed `FAST-FORWARD GUARD PASS` and exited 0. The real layer still poses
+both cases, prints its two PASS lines and exits 0, so the floor of 2 is untouched.
+
+**The audit that found both is worth stating as a method rather than as two fixes.** The question asked of
+all thirteen `SceneTree` layers was not "does it assert enough" — the floor gate already answers that on a
+sweep — but "can its population go empty without anything noticing". Grepping for a minimum guard returned
+two layers with none: `check_step` and `measure_player`. `check_step` was live. `measure_player` was a
+false positive of the grep and is structurally protected: it is a phase machine where each phase only
+advances after calling `_report`, with a TIMEOUT path that exits 1, so reaching the verdict implies all
+three reports happened. `check_fastforward` was not on that shortlist at all — it was found by then reading
+the *verdict paths* of the two layers whose guard count was merely thin, which is the check the grep could
+not do.
