@@ -95,13 +95,24 @@ judge() {
 		if [ -z "$v" ]; then unmapped="$unmapped $name"; continue; fi
 		mapped=$((mapped + 1))
 		ann="$(announce_of "$f")"
-		[ -z "$ann" ] && continue
-		case "$v" in
-			PASS|PASS\*)
-				printf '  %s reported %s while its own log says it did not run:\n' "$name" "$v"
-				printf '      %s\n' "$ann"
-				;;
-		esac
+		if [ -n "$ann" ]; then
+			case "$v" in
+				PASS|PASS\*)
+					printf '  %s reported %s while its own log says it did not run:\n' "$name" "$v"
+					printf '      %s\n' "$ann"
+					;;
+			esac
+		else
+			# THE MIRROR: the runner says this layer did not run, and the layer never said why. A skip is
+			# the one verdict that reports nothing about the subject, so the reason is the entire content
+			# of the row -- without it, a layer that opted out because it is broken is indistinguishable
+			# from one that opted out because the display is absent, and only the second is acceptable.
+			case "$v" in
+				SKIP)
+					printf '  %s was reported SKIP and its log never says why.\n' "$name"
+					;;
+			esac
+		fi
 	done
 	printf '%d\t%d\t%s\n' "$logs" "$mapped" "$unmapped" >"$tally"
 	rm -f "$rows"
@@ -127,16 +138,30 @@ printf 'check_opening: SKIP — no display; a picture cannot be judged by the du
 printf '  [ 1/ 1] check_opening (no dead space)        SKIP    1s  check_opening: SKIP — no display\n' \
 	>"$ctl_dir/c/summary.txt"
 
+# AND THE MIRROR'S POSITIVE CONTROL IS SYNTHETIC, which is worth saying rather than hiding among three
+# controls built from real lines. Every one of the suite's twenty-one skip routes announces a reason today
+# -- eleven through `_skip_layer()`, which cannot skip without one, and ten that print their own line, of
+# which `check_material_grammar` prints it to stderr and is caught only because the runner folds stderr
+# into the log. So this arm's violating population is EMPTY and no historical line exists to control it
+# with. That is the argument for the ratchet, not against it: the rule is currently a convention held by
+# twenty-one separate authors remembering, and the twenty-second route is the one that will not.
+mkdir -p "$ctl_dir/d"
+printf 'check_thing: some ordinary output, and not one word about why it did not run\n' \
+	>"$ctl_dir/d/00-check_thing.log"
+printf '  [ 1/ 1] check_thing (does a thing)           SKIP    1s\n' >"$ctl_dir/d/summary.txt"
+
 ctl_tally="$(mktemp)"
 a_hits="$(judge "$ctl_dir/a" "$ctl_dir/a/summary.txt" "$ctl_tally" | grep -c 'reported')"
-b_hits="$(judge "$ctl_dir/b" "$ctl_dir/b/summary.txt" "$ctl_tally" | grep -c 'reported')"
-c_hits="$(judge "$ctl_dir/c" "$ctl_dir/c/summary.txt" "$ctl_tally" | grep -c 'reported')"
+b_hits="$(judge "$ctl_dir/b" "$ctl_dir/b/summary.txt" "$ctl_tally" | grep -c '.')"
+c_hits="$(judge "$ctl_dir/c" "$ctl_dir/c/summary.txt" "$ctl_tally" | grep -c '.')"
+d_hits="$(judge "$ctl_dir/d" "$ctl_dir/d/summary.txt" "$ctl_tally" | grep -c 'never says why')"
 rm -rf "$ctl_dir"
-if [ "$a_hits" != "1" ] || [ "$b_hits" != "0" ] || [ "$c_hits" != "0" ]; then
+if [ "$a_hits" != "1" ] || [ "$b_hits" != "0" ] || [ "$c_hits" != "0" ] || [ "$d_hits" != "1" ]; then
 	echo "assert_skip_route: REFUSED -- the controls did not behave." >&2
 	echo "  the real SKIP-then-PASS line produced $a_hits complaint(s) where 1 was due;" >&2
 	echo "  a per-assertion stand-down produced $b_hits where 0 was due;" >&2
-	echo "  an honest skip row produced $c_hits where 0 was due." >&2
+	echo "  an honest skip row produced $c_hits where 0 was due;" >&2
+	echo "  a reasonless skip row produced $d_hits where 1 was due." >&2
 	echo "  The instrument is broken, so a clean verdict here would mean nothing." >&2
 	echo "HARNESS_QUOTABLE=no"
 	exit 1
@@ -171,13 +196,22 @@ if [ -n "${unmapped// /}" ]; then
 fi
 
 if [ -n "$BAD" ]; then
-	echo "assert_skip_route: FAIL -- a layer was counted as a pass after saying it did not run"
+	echo "assert_skip_route: FAIL -- a layer's own log and the row the runner wrote for it disagree"
 	echo "$BAD"
-	echo "  A layer that declines to run exits 42 and the runner reports SKIP. Exiting 0 makes it a green"
-	echo "  over a subject nothing looked at. If the layer cannot inherit \`_skip_layer()\`, it carries its"
-	echo "  own \`const SKIP: int = 42\` -- see check_bake_idempotent."
+	# Both directions can appear in one run, so each remedy is printed only when its direction fired --
+	# advice for a defect that is not present reads as though it were.
+	if printf '%s' "$BAD" | grep -q 'while its own log says'; then
+		echo "  A layer that declines to run exits 42 and the runner reports SKIP. Exiting 0 makes it a green"
+		echo "  over a subject nothing looked at. If the layer cannot inherit \`_skip_layer()\`, it carries its"
+		echo "  own \`const SKIP: int = 42\` -- see check_bake_idempotent."
+	fi
+	if printf '%s' "$BAD" | grep -q 'never says why'; then
+		echo "  A skip reports nothing about the subject, so the reason is the whole of what the row says."
+		echo "  Print \`<layer>: SKIP — <why>\` at column 0 before exiting 42, or use \`_skip_layer(name, why)\`,"
+		echo "  which cannot be called without one."
+	fi
 	echo "HARNESS_QUOTABLE=no"
 	exit 1
 fi
-echo "assert_skip_route: PASS -- $mapped layer(s) checked, none reported a pass over a skip"
+echo "assert_skip_route: PASS -- $mapped layer(s) checked; no pass over a skip, and every skip says why"
 exit 0
