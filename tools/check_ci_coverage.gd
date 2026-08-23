@@ -32,8 +32,11 @@ extends "res://tools/check_base.gd"
 
 const RUNNER: String = "tools/run_harness.sh"
 const WORKFLOW: String = ".github/workflows/harness.yml"
-## Below this the scan has plainly broken rather than the suite having shrunk. 72 layers today; a suite that
-## genuinely fell under 40 is a thing somebody should have to come here and change on purpose.
+## Below this the scan has plainly broken rather than the suite having shrunk. The live counts are NOT
+## restated here: this layer prints both of them on every run, as "the runner registers N layers" and
+## "found N layer files on disk", so a number in this comment would be a second copy with no runner --
+## which is the defect the comment would be helping to cause. A suite that genuinely fell under 40 is a
+## thing somebody should have to come here and change on purpose.
 const MIN_LAYERS: int = 40
 
 

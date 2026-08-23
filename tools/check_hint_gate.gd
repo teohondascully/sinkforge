@@ -105,7 +105,7 @@ const CEREMONY_CAP: int = 480
 ## never has to be taken on trust.
 ##
 ## RENAMED FROM `_asserted` BECAUSE THE BASE CLASS TOOK THAT NAME, and the collision is worth a line. A
-## member added to `tools/check_base.gd` lands in the namespace of all 86 layers that inherit it, and
+## member added to `tools/check_base.gd` lands in the namespace of all 92 layers that inherit it, and
 ## GDScript rejects the SUBCLASS ("the member already exists in parent class") -- so `--check-only` on the
 ## edited base file is clean and a layer nobody touched stops loading. The runner then reported it as a
 ## PASS, because `godot --script` exits 0 when a script fails to load; only `tools/harness_verdict.sh`

@@ -101,9 +101,12 @@ var _passes: int = 0
 ## INTERESTING PART. It ran: `_verdict()` reads as universal and is not — of the 89 layers inheriting this
 ## file, 31 called it and 58 printed their own line and `quit()` directly, so a hook there would have been
 ## an instrument that cannot register most of its subject. That was true when it was written and it is not
-## true now: the verdict-tail conversion of 2026-08-23 moved 55 of those 58 across, and the split is 86
-## calling `_verdict()` against 3 still hand-rolling (check_frametime, check_opening, check_underground,
-## none of which call `_check()` either). The population argument would no longer block the hook. The
+## true now: the verdict-tail conversion of 2026-08-23 moved 55 of those 58 across, and the last three
+## followed. RE-DERIVED 2026-08-24, because this paragraph had itself gone stale a second time: of the 92
+## layers now inheriting this file, ALL 92 call `_verdict()` and none hand-rolls. check_frametime,
+## check_opening and check_underground were named right here as the survivors and have since been
+## converted, so the sentence naming them was accusing compliant layers. The population argument would no
+## longer block the hook. The
 ## always-runs argument still does, so the placement stands on one leg instead of two — said out loud,
 ## because a conclusion whose stated reasons have quietly changed underneath it is how a wrong thing
 ## survives a review.
