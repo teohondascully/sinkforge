@@ -334,7 +334,53 @@ Observations to preserve, not twenty independent implementation tickets.
 | Tree, ruin and surface structures feel tile-adjacent | T3.11 | Craft debt | Revisit only after the ground is coherent |
 | Machine labels and status are more vivid than the machines (**measured 2026-08-23** — four standing marks exceed the file's own `CHROME` ceiling; see the note below the table) | V1 with T3.2 | Play-disrupting | Give hardware state a visible world expression before adding more chrome |
 | The screen is busy even in an idle moment (**criterion specified 2026-08-23** — the duty period is 62.83s, so a one-frame criterion cannot work; see the note below the table) | V1 | Frame-breaking | Create a quiet-frame capture criterion |
-| Player silhouette is not the default focal point | V1, V2, V4 | Play-disrupting | Eye-path review of normal surface and underground frames |
+| Player silhouette is not the default focal point (**measured 2026-08-23** — true on the surface at 0.18% of the top decile, FALSE underground at 5.11%; see the last note below the table) | V1, V2, V4 | Play-disrupting | Eye-path review of normal surface and underground frames |
+
+> ### The silhouette row, measured 2026-08-23 — true on the surface, and the opposite underground
+>
+> The stated investigation is an eye-path review of surface and underground frames. Both frames existed
+> already, from captures taken for other rows. The instrument is the one the vividness note above
+> established: luma, and specifically **what share of a frame's brightest 0.1% of pixels lands on each
+> subject.** Boxes were placed by hand and every one was cropped and looked at before its number was used.
+>
+> **SURFACE** (`_moment_line.png`; frame mean 66, p99.9 threshold luma 239, 2837 pixels above it):
+>
+> | subject | box mean | px in the frame's top 0.1% | share |
+> |---|---:|---:|---:|
+> | the **miner** | 64 | **5** | **0.18%** |
+> | one **Drill**, a single cell | 198 | 464 | **16.36%** |
+> | the **Bazaar awning** | 172 | 1406 | **49.56%** |
+>
+> **A one-cell machine takes ninety-one times the miner's share of the frame's brightest pixels, and the
+> market awning alone takes half of them.** Background-free samples put the miner's torso at luma **32**
+> against a sky of **98** — the player is a dark shape, and the darkest significant object in a frame
+> containing his own factory.
+>
+> **UNDERGROUND** (`_moment_fall_plate.png`; frame mean 23, p99.9 threshold 222, 2132 pixels above it): the
+> miner holds **109 of them, 5.11%** — **twenty-nine times his surface share.**
+>
+> ### The mechanism, and it decides the remedy
+>
+> **The miner's own emission is the same in both frames.** Torso 32 on the surface and 33 underground; hard
+> hat 107 and 101. He did not get brighter. What changed is what he is standing in front of: sky at 98 and
+> an awning at 172 become rock at 14.
+>
+> So the row is **half right, and the half it gets wrong is the important one.** It names surface and
+> underground together, and underground the player already is the focal point — dominating his surround
+> (33 against 14) and carrying a lamp glow besides.
+>
+> > **Therefore the remedy is subtraction on the surface, not a brighter miner.** Brightening him is the
+> > obvious reading of "not the default focal point" and it would break the frame where he currently works.
+> > This is the same conclusion `T2.1` reaches from a different direction, and it is the reason that ticket
+> > is written as a subtraction pass rather than an emphasis pass.
+>
+> **What this does not measure.** Two frames, one apiece, both from moments built for other rows. Luma
+> only: no saturation, no motion, no colour opponency. And brightness dominance is one axis of attention,
+> not attention itself — on the other obvious axis, local contrast, the miner does well in BOTH frames (32
+> against a 98 sky, 33 against 14 rock), which is why he reads as a legible silhouette while still not
+> being what the eye goes to first. The row conflates those two axes and the measurement separates them.
+> Whether the Bazaar is entitled to its half of the top decile — it is a destination, and destinations may
+> earn salience — is a design question this cannot answer.
 
 > ### "More vivid than the machines", measured 2026-08-23 — against the project's own rule rather than against taste
 >
