@@ -7,11 +7,38 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 | Area | State | Evidence |
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
-| 2. Architecture | **Partial, open** | three seams cut out of `world_renderer.gd` (4601 -> 3555 lines) against a measured ranking; every remaining candidate in that file is rejected with its numbers. `main.gd` and `factory_sim.gd` are measured and found to have no separable seam, which is a result rather than a deferral. See below. |
+| 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
 | 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. |
 | 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
+
+## Area 2 — closed
+
+`world_renderer.gd` went 4601 -> 3557 lines. The three extractions are in history and are not new here:
+
+| seam | class | commit | file after |
+|---|---|---|---|
+| machines | `scenes/machine_view.gd` | `097c769` | 4008 |
+| water | `scenes/water_view.gd` | `8fa99a8` | 3727 |
+| rope + grapple | `scenes/rope_view.gd` | `d1d5ab8` | 3557 |
+
+**This entry closes the cumulative programme; it does not land those seams.** Each was proven
+token-identical to its original after un-prefixing, with span logic written independently of the
+extractor's, a one-token mutation as the negative control, and a check layer shown to go red on a
+deliberate defect in the moved code.
+
+Two line counts in the older record are wrong by small amounts and are corrected rather than quietly
+replaced. The starting figure appears as both 4601 and 4602; 4601 is right, confirmed by `wc -l` and
+`grep -c` agreeing on a file that ends in a newline. The finishing figure was written as 3555, which was
+measured after the block came out and before the parent's field and constructor call went back in; the
+file is 3557.
+
+**What closes it is the rejection evidence, not the subtraction.** The ranking below scores every remaining
+candidate, and the two files that were never measured have now been measured. Area 2 asked for oversized
+files to be broken along real boundaries. Three real boundaries existed, all three were cut, and the
+remaining ones are named with the numbers that disqualify them — which is the same claim as "the file is
+the right size now", made in a form a reader can check.
 
 ## Area 2 — the seams, measured before they were cut
 
