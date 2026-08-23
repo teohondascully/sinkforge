@@ -100,7 +100,7 @@ So the lode is not a new plane. It is a new material family in an existing one, 
 behind it reads differently, the reading climbs *before* the face breaks, and it is silent in dead mass. That
 is exactly the honest-telegraph problem the stain has to solve, already solved once and asserted.
 
-**And the glint is built.** `_draw_ore_glints` gives exposed ore its starfield across a dark cavern. Today it
+**And the glint is built.** `_draw_glint_flares` gives exposed ore its starfield across a dark cavern. Today it
 fires on solid ore blocks; the same pass over wall cells is the reveal state for free.
 
 **What is genuinely new:** ore-bearing wall materials, a stain tell over unbroken rock, the hand-extract
@@ -120,7 +120,7 @@ cannot carry has personally felt the problem the drill solves, standing in front
 - **Behind unbroken rock — the STAIN.** Mineral staining bleeding through the rock face over a lode: the
   honest-telegraph contract from `check_tells.gd`, in colour rather than in feel. It must climb near a lode
   and read ~0 in dead rock, or it is noise and gets tuned out.
-- **Exposed — the GLINT.** `_draw_ore_glints`, unchanged in spirit, now permanent and buildable-on rather
+- **Exposed — the GLINT.** `_draw_glint_flares`, unchanged in spirit, now permanent and buildable-on rather
   than a thing you punch out.
 
 **The deposit becomes visible for the first time.** Fleck density falls as the lode drains, so a worked-out
@@ -243,7 +243,7 @@ Three strikes, each provable on its own and each leaving the game playable:
 > that §7's reveal is still a reveal; nobody has yet established that it lands.
 >
 > `check_lode:_the_rock_tells_on_itself` holds all of it, including the one that is easy to lose: the buried
-> tell must be **still**. `_draw_ore_glints` learned at cost that sparkling sealed cells read as a starfield,
+> tell must be **still**. `_draw_glint_flares` learned at cost that sparkling sealed cells read as a starfield,
 > so a sealed cell is asserted not to be a glint candidate. And what an open face buys you is not a louder
 > stain — it is the metal itself: only an exposed lode draws grain, and only an exposed lode is workable.
 
@@ -266,7 +266,7 @@ That is also just true of metal in rock. It has no light in it. It catches yours
 
 ### What this fixes that is already broken
 
-`_draw_ore_glints` runs on a free-running **per-cell** timer (`PERIOD` 3.4s, each cell independently phased)
+`_draw_glint_flares` runs on a free-running **per-cell** timer (`PERIOD` 3.4s, each cell independently phased)
 and gates on `_skylight_alpha` — *daylight*, so that a surface vein does not sparkle at noon. It therefore has
 no idea where your lamp is or where your torches are. Every exposed ore cell on screen twinkles on its own
 schedule, forever, which is exactly the **"ore reads as a floating starfield"** finding already recorded

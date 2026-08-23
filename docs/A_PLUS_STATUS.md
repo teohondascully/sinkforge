@@ -433,9 +433,17 @@ this prevents.
 
 | population | definition | size |
 |---|---|---|
-| `P_REG` | rows the runner registers, from its `add`/`add_gl`/`add_excl`/`add_excl_hl` calls | 110 at the audit, **111** today (106 of them `.gd`) |
-| `P_GLOB` | tracked files whose basename starts with `check_` | 100 at the audit, **101** today |
-| **`P_INHERIT`** | **tracked `.gd` matching `^extends "res://tools/check_base.gd"`** | **89 at the audit, 90 today** |
+| `P_REG` | rows the runner registers, from its `add`/`add_gl`/`add_excl`/`add_excl_hl` calls | 110 at the audit. Re-take: `grep -cE '^(add\|add_gl\|add_excl\|add_excl_hl) ' tools/run_harness.sh` |
+| `P_GLOB` | tracked files whose basename starts with `check_` | 100 at the audit. Re-take: `git ls-files \| grep -c '/check_[a-z_]*\.\(gd\|sh\)$'` |
+| **`P_INHERIT`** | **tracked `.gd` matching `^extends "res://tools/check_base.gd"`** | **89 at the audit.** Re-take: `git grep -l '^extends "res://tools/check_base.gd"' \| wc -l` |
+
+**THE "TODAY" COLUMN IS GONE, AND THAT IS THE POINT.** This table used to carry a second figure per row
+labelled *today* — 111, 101, 90. They were 114, 109 and 94 when this was written, so all three had rotted,
+**inside a document whose very first line declares `FRAME FOR EVERY NUMBER BELOW`.** A frame protects a
+number that admits to being a snapshot; the word *today* is a claim of currency, and it overrides the frame
+for any reader who takes it at face value. The audit figure keeps its date and the second figure is
+replaced by the command that re-takes it, which is what this page already says it wants: *the commands
+beneath are the record, not the numbers.*
 
 `P_INHERIT` is the one the finding is about, and it is well-behaved: every inheritor is registered, and
 every inheritor is named `check_*`. Both set differences are empty — checked as sets, not as counts. Eleven
