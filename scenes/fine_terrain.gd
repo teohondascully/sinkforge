@@ -278,18 +278,12 @@ const ROOT_DARKEN: float = 0.30
 ## dark clasts where it runs low. Same geometry, seen from two sides, at three times the density.
 ##
 ## The scale has to land the inclusions at pebble size rather than boulder size. That is the difference
-## between soil and rubble and the eye is very sure about it. Read at the rock's own scale and threshold
-## the first attempt turned the whole opening frame into a gravel pit that scored well on every content
-## metric and looked worse than the dead gradient it replaced.
-## Cobbles and clasts. Soil is a mixture, not a solid, and that is the difference the eye actually reads
-## between dirt and rock: rock is one substance with texture on it, soil is full of things that are not
-## soil. So the same inclusion field the rock reads as a dark embedded stone is read here at a far lower
-## threshold and in both directions, pale cobbles where it runs high (a stone in dirt catches light) and
-## dark clasts where it runs low. Same geometry, seen from two sides, at three times the density.
-##
-## The scale has to land the inclusions at pebble size. Sampled much finer they stop being stones and
-## become one-cell dots that fire in both signs at once, which is the noisiest thing this field can do:
-## at 1.9 the soil carried 18.4% paint roughness where every other material sits between 2.9% and 7.6%.
+## between soil and rubble and the eye is very sure about it. It is wrong in both directions. Read at the
+## rock's own scale the first attempt turned the opening frame into a gravel pit that scored well on
+## every content metric and looked worse than the dead gradient it replaced. Sampled much finer they stop
+## being stones and become one-cell dots that fire in both signs at once, which is the noisiest thing
+## this field can do: at 1.9 the soil carried 18.4% paint roughness where every other material sits
+## between 2.9% and 7.6%.
 ##
 ## Do not tune it downward by that number. Roughness keeps falling below 1.0 while the wall goes dead
 ## long before the curve does. 0.4 measures the same as removing the inclusions entirely, and the curve
