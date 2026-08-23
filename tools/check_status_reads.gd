@@ -77,19 +77,29 @@ func _run() -> void:
 			% ["" if dead.is_empty() else " — DEAD: " + ", ".join(dead)])
 
 	# --- the redundancy rule: a different job must never wear the same mark ---
-	var clashes: Array[String] = []
-	for a: Variant in table:
-		for b: Variant in table:
-			if String(a) >= String(b):
-				continue
-			var la: Dictionary = Visuals.STATUS_LOOK[a]
-			var lb: Dictionary = Visuals.STATUS_LOOK[b]
-			if la["mark"] == lb["mark"] and la["fix"] != lb["fix"]:
-				clashes.append("%s/%s both draw %s but want %s vs %s"
-					% [a, b, la["mark"], la["fix"], lb["fix"]])
+	var clashes: Array[String] = _mark_clashes(Visuals.STATUS_LOOK)
 	_check(clashes.is_empty(),
 		"no two different jobs share a mark%s"
 			% ["" if clashes.is_empty() else " — " + "; ".join(clashes)])
+
+	# AND THE DETECTOR HAS TO BE ABLE TO FIND ONE. The two drift scans above control each other, one
+	# reading sim to table and the other table to sim, so a scanner that read nothing is caught by the
+	# second even though it satisfies the first. This rule has no such partner: it passes over an empty
+	# list, and an empty list is what a comparison that never matches produces. The same function runs over
+	# two tables built here, one holding two jobs that draw the same mark and want different fixes, one
+	# holding the same two jobs on different marks.
+	var same: Dictionary = {
+		&"control_one": {"mark": &"control_mark", "fix": &"feed", "feeds": false},
+		&"control_two": {"mark": &"control_mark", "fix": &"power", "feeds": false},
+	}
+	var apart: Dictionary = {
+		&"control_one": {"mark": &"control_mark_a", "fix": &"feed", "feeds": false},
+		&"control_two": {"mark": &"control_mark_b", "fix": &"power", "feeds": false},
+	}
+	_check(_mark_clashes(same).size() == 1,
+		"CONTROL: the mark detector finds two jobs drawing one mark (%d found)" % _mark_clashes(same).size())
+	_check(_mark_clashes(apart).is_empty(),
+		"CONTROL: ...and finds none when the marks differ (%d found)" % _mark_clashes(apart).size())
 
 	# --- the bubble may only speak when it has something true to say ---
 	# It can draw an ITEM and nothing else. A status whose fix is power, a jam or wiring has no item to hold
@@ -166,6 +176,23 @@ func _run() -> void:
 ## The jobs `Visuals.draw_fix_glyph` actually has a match arm for, by reading its source. Same method and
 ## same reason as the sim scan: there is no runtime way to ask a function which values it handles, and a
 ## hand-kept mirror would be one more thing to drift.
+## Pairs of statuses that draw the same mark while wanting different fixes. Factored out so the control
+## and the real scan run the SAME comparison: a control that reimplements what it controls has only proved
+## that the reimplementation works.
+func _mark_clashes(look: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for a: Variant in look:
+		for b: Variant in look:
+			if String(a) >= String(b):
+				continue
+			var la: Dictionary = look[a]
+			var lb: Dictionary = look[b]
+			if la["mark"] == lb["mark"] and la["fix"] != lb["fix"]:
+				out.append("%s/%s both draw %s but want %s vs %s"
+					% [a, b, la["mark"], la["fix"], lb["fix"]])
+	return out
+
+
 func _scan_fix_glyphs() -> Array[String]:
 	var f: FileAccess = FileAccess.open("res://scenes/visuals.gd", FileAccess.READ)
 	if f == null:

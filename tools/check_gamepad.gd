@@ -73,16 +73,33 @@ func _run() -> void:
 	# Keyed by the LABEL rather than the raw spec, because that is what the player experiences: two specs
 	# that render the same on a remap page are the same input to the hand holding the pad.
 	var owner: Dictionary = {}
-	var clashes: Array[String] = []
-	for action: Variant in specs:
-		for spec: Dictionary in _pad_specs(specs[action]):
-			var label: String = Settings.event_label(Controls.event_from_spec(spec))
-			if owner.has(label):
-				clashes.append("%s drives both %s and %s" % [label, owner[label], action])
-			else:
-				owner[label] = action
+	var clashes: Array[String] = _clashes_in(specs, owner)
 	_check(clashes.is_empty(),
 		"no pad input drives two verbs%s" % ["" if clashes.is_empty() else " — " + "; ".join(clashes)])
+
+	# AND THE DETECTOR HAS TO BE ABLE TO FIND ONE. The assertion above passes over an empty list, and an
+	# empty list is exactly what a label function that never collides produces: give every binding a name of
+	# its own and the property becomes unfalsifiable while `owner.size()` keeps counting up and the floor at
+	# the bottom of this file keeps reporting health. The non-vacuity note there covers a table with no pad
+	# bindings; it does not cover a detector that cannot detect. So the same function runs over two tables
+	# built here from bindings this game really has, one where two actions carry the SAME input and one
+	# where they carry different ones.
+	var probe: Array[Dictionary] = []
+	for action: Variant in specs:
+		for spec: Dictionary in _pad_specs(specs[action]):
+			if probe.size() < 2:
+				probe.append(spec)
+	if probe.size() < 2:
+		_check(false, "CONTROL: two pad bindings exist to build the clash control out of")
+	else:
+		var same: Dictionary = {&"control_one": [probe[0]], &"control_two": [probe[0]]}
+		var apart: Dictionary = {&"control_one": [probe[0]], &"control_two": [probe[1]]}
+		var caught: Array[String] = _clashes_in(same, {})
+		var quiet: Array[String] = _clashes_in(apart, {})
+		_check(caught.size() == 1,
+			"CONTROL: the clash detector finds two verbs on one input (%d found)" % caught.size())
+		_check(quiet.is_empty(),
+			"CONTROL: ...and finds none when they are on different inputs (%d found)" % quiet.size())
 
 	# --- AXES SPLIT ---
 	var unsigned: Array[String] = []
@@ -137,6 +154,21 @@ func _run() -> void:
 	var labels: Array = owner.keys()
 	labels.sort()
 	print("  the pad drives: %s" % ", ".join(labels))
+
+
+## Every pad input bound by more than one action, as sentences, filling `owner` with label -> first action
+## as it goes. Factored out so the control and the real scan run the SAME detector: a control that
+## reimplements what it controls has only proved that the reimplementation works.
+func _clashes_in(specs: Dictionary, owner: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for action: Variant in specs:
+		for spec: Dictionary in _pad_specs(specs[action]):
+			var label: String = Settings.event_label(Controls.event_from_spec(spec))
+			if owner.has(label):
+				out.append("%s drives both %s and %s" % [label, owner[label], action])
+			else:
+				owner[label] = action
+	return out
 
 
 ## The pad-flavoured specs in one action's list — buttons and axes, not keys or mouse buttons.
