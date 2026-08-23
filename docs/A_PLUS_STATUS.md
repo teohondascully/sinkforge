@@ -84,13 +84,35 @@ whole draw pass. The seam that scored best in the table is one this instrument c
 families were therefore enumerated by topic as a second, orthogonal pass — which is how `rope + grapple`
 surfaced.
 
-### One coverage gap, found and reported
+### A control that could not fail, found by mutation and corrected
 
-Building a mutation control for the extracted block turned up something the extraction did not cause:
-`_draw_aim_ghost` is drawn every frame and asserted by nothing. Disabling it entirely leaves
-`check_grapple_reads`, `check_aim`, `check_ceremony_reads` and `check_teaching` all green —
-`check_grapple_reads` switches the ghost off for its own reference frames on purpose, and no other layer
-picked it up.
+Building a mutation control for the extracted block turned up a defect the extraction did not cause.
+`check_grapple_reads` asserts *"CONTROL: the preview was actually drawn"* against a floor of **1.0 levels
+of edge**. Delete every stroke the aim ghost makes and that measurement still reads **3.8 to 5.4**: the
+head-lamp swings with the cursor, so the rock it lights is not identical between the reference capture and
+the measured one, and the residual is not zero. The control passed on a frame with no preview in it, and
+the comparison underneath it — the miner must out-read their own telemetry — then weighed the miner
+against a 4.6-level nothing and passed too.
+
+Measured from both sides, eight runs each, the removed side produced by returning from the draw call before
+it draws anything:
+
+| aim ghost | levels of edge |
+|---|---|
+| drawn | 13.0  13.7  17.9  19.6  26.7  28.3  29.7  31.7 |
+| removed | 3.8  4.6  4.6  4.7  4.8  5.1  5.2  5.4 |
+
+The floor is now **8.0**, which sits 1.48x above the loudest frame with no preview in it and 1.63x below
+the quietest frame with one. It fails on the mutant at 4.7 and passes clean at 13.5.
+
+**A second control on the same subject is reported rather than adjusted.** The companion assertion — the
+preview drew something against open sky, floor 60 pixels — discriminates on fifteen of those sixteen runs.
+Its one miss is a heavy tail that appears on both sides: with the ghost removed the mask came back at 5922
+pixels once, larger than any run with the ghost drawn, and the drawn side has its own tail at 1791, 2323
+and 5496 against a median of 198. That single tail event is why the first mutation run left the whole layer
+green. No bound can fix this: excluding 5922 would need a floor above every honest run. The tail has a
+cause worth finding, and moving the number would only hide it, so the number stays and the instability is
+recorded here with its samples.
 
 ## Area 4 — the bazaar cache, verified rather than assumed
 
