@@ -51,12 +51,7 @@ func _on_frame() -> void:
 		return
 	process_frame.disconnect(_on_frame)
 	_run()
-	if _failures == 0:
-		print("ALL MATERIAL-REGISTRY CHECKS PASS")
-		quit(0)
-	else:
-		printerr("%d MATERIAL-REGISTRY FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_material_registry")
 
 
 func _run() -> void:

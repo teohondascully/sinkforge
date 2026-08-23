@@ -42,12 +42,7 @@ var _sim: FactorySim
 func _initialize() -> void:
 	print("== the vein outlives the blow ==")
 	await _run()
-	if _failures == 0:
-		print("check_lode: PASS — the blow opens the vein instead of ending it")
-		quit(0)
-	else:
-		printerr("check_lode: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_lode", "the blow opens the vein instead of ending it")
 
 func _run() -> void:
 	MainView.dev_start = false

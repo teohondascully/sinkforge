@@ -48,12 +48,7 @@ func _initialize() -> void:
 	_a_spur_is_one_more_mouth()
 	_a_spur_must_reach_something()
 	_the_chain_outlives_its_links()
-	if _failures == 0:
-		print("check_head: PASS — a Head works the face it stands on")
-		quit(0)
-	else:
-		printerr("check_head: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_head", "a Head works the face it stands on")
 
 ## A sim with a lode at `at`, holding `amount`, and a floor `drop` rows below it.
 func _rig(at: Vector2i, amount: int, drop: int = 3) -> FactorySim:

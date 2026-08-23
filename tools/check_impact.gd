@@ -53,12 +53,7 @@ func _initialize() -> void:
 	print("== what a fall costs ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_impact: PASS — a drop has weight, and the rope is the way out of it")
-		quit(0)
-	else:
-		print("check_impact: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_impact", "a drop has weight, and the rope is the way out of it")
 
 
 func _run() -> void:

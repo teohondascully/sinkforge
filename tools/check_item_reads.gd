@@ -106,12 +106,7 @@ func _initialize() -> void:
 	# three-state runner exists to prevent. Caught by expecting 42 and getting 0.
 	if _skipped:
 		return
-	if _failures == 0:
-		print("check_item_reads: PASS — no two items wear the same icon")
-		quit(0)
-	else:
-		printerr("check_item_reads: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_item_reads", "no two items wear the same icon")
 
 
 func _run() -> void:

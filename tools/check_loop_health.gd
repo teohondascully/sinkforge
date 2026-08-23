@@ -78,12 +78,7 @@ func _initialize() -> void:
 	print("== loop-health check ==")
 	MainView.dev_start = false      # score a CLEAN boot (no dev kit) — the real new-player early game
 	await _run()
-	if _failures == 0:
-		print("LOOP HEALTH OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_loop_health")
 
 
 func _run() -> void:

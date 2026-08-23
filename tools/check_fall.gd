@@ -108,9 +108,4 @@ func _phys() -> void:
 
 
 func _finish() -> void:
-	if _failures == 0:
-		print("ALL FALL CHECKS PASS")
-		quit(0)
-	else:
-		printerr("%d FALL FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_fall")

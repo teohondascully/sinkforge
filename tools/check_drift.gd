@@ -41,12 +41,7 @@ func _initialize() -> void:
 	_two_jams()
 	_power_not_coal()
 	_two_high()
-	if _failures == 0:
-		print("check_drift: PASS — it sorts at the face, and neither stream ever moves sideways")
-		quit(0)
-	else:
-		printerr("check_drift: FAIL — %d failure(s)" % _failures)
-		quit(1)
+	_verdict("check_drift", "it sorts at the face, and neither stream ever moves sideways")
 
 ## A world with a rig at `at` facing +1, a mixed wall in front of it, and (unless `drains` says otherwise)
 ## an open shaft under both of its columns so the haul has somewhere to go.

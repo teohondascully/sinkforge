@@ -71,7 +71,4 @@ func _phys() -> void:
 					"rode to the top of the shaft, stopped by the ceiling (y=%.0f)" % _player.position.y)
 				_phase = 2
 		2:
-			if _failures == 0:
-				print("LIFT OK"); quit(0)
-			else:
-				printerr("%d LIFT CHECK(S) FAILED" % _failures); quit(1)
+			_verdict("check_lift")

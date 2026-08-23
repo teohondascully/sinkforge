@@ -50,12 +50,7 @@ func _initialize() -> void:
 	print("== grapple check ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("GRAPPLE OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_grapple")
 
 
 func _run() -> void:

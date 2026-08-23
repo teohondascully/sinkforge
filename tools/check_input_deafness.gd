@@ -29,12 +29,7 @@ const SETTLE: int = 8
 func _initialize() -> void:
 	print("== a capture photographs the fixture, not the keyboard ==")
 	await _run()
-	if _failures == 0:
-		print("check_input_deafness: PASS — held keys reach a live game and cannot reach a deafened one")
-		quit(0)
-	else:
-		printerr("check_input_deafness: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_input_deafness", "held keys reach a live game and cannot reach a deafened one")
 
 
 func _run() -> void:
