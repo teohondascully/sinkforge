@@ -1406,3 +1406,39 @@ The limit is worth stating exactly, because it is the kind of thing that reads a
 floor gate judges **only on a full configured sweep**, by its own header, and a subset run has no opinion
 about layers it did not run. So a layer run standalone still gets no zero-assertion protection unless it
 inherits `check_base`. That is a real remaining gap and a much smaller one than eleven unguarded layers.
+
+
+## The water depth reading was a transient measured through a stale rectangle
+
+The open question was whether `check_water_reads`'s tightest assertion — 3.3 to 6.8 levels over 45
+retained sweep logs, against a floor of 2.5 — was a single draw of something that animates, as
+`check_machine_state`'s bar had been. It was not. Sampling the quantity every six frames from the point
+the layer shoots gives a curve, not an oscillation:
+
+```
+frame  0     6     12    18    24    30    36    42    48    60   ...  234
+fall   1.59  3.28  4.90  6.34  6.77  7.90  7.95  8.17  8.20  8.57 ...  8.51
+```
+
+A ramp for roughly forty frames, then a plateau. `SHOT_SETTLE` is 90 frames and was already there for
+exactly this reason, and it was not enough: the shutter lands on the ramp, so every one of those 45
+historical readings was a measurement of the veil converging rather than of the body.
+
+The wait is now on stability rather than on frames — consecutive draws within 0.25 twice running, with a
+budget that says so if it expires. It ends on stability and never on the floor, because a settle that
+stopped when the number cleared its bound would be a waiter inside its own condition; a mutant with the
+floor raised to 99 settles at the usual 48 frames and fails at 4.2, which is the proof.
+
+**And fixing that exposed a second fault, which was mine.** The rect locating the body was computed on the
+ramp frame and then applied to the settled one, and the body's detected top edge moves as the veil
+converges — 118 and 117 on runs that passed, 112 and 115 on runs where the surface assertion read 0.9 and
+0.7 levels against a floor of 7.0, because a rect starting a few pixels high puts air where the surface
+should be. A rect measured on one frame is not a rect on another. It is relocated on the settled frame now.
+
+Six runs after both fixes: `fall` 4.2, 4.2, 4.2, 4.2, 4.3, 4.3 and `rise` 10.0 to 11.2, every run green,
+the settle taking 48 frames every time. The spread went from a factor of two to two percent. The magnitude
+did not move — 4.2 is about what the old readings averaged — so this bought reproducibility, not headroom,
+and the margin stays an honest 1.68x. `GRADIENT_MIN` is untouched.
+
+One correction to my own working: an intermediate reading of this put the settled value at ~8.2. That was
+measured through the stale rect. Over the correctly relocated one it is 4.2.

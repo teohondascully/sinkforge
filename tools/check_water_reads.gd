@@ -30,6 +30,18 @@ const DEAD := preload("res://tools/dead_space.gd")
 const CELL: int = FactorySim.CELL
 const SETTLE: int = 30
 const SHOT_SETTLE: int = 90   ## frames for the light/veil layers to repaint after the body is placed
+## ...AND 90 WAS NOT ENOUGH, which only a trajectory could show. Sampling the depth separation every six
+## frames from the old shutter point gives 1.59, 3.28, 4.90, 6.34, 6.77, 7.90, 7.95, 8.17, 8.20 and then a
+## plateau at 8.0-8.6 out to 234 frames. The old shot lands on the RAMP, so all 45 historical readings of
+## this quantity (3.3 to 6.8) were transients of the veil converging, not measurements of the body.
+##
+## The wait below ends on STABILITY, never on the floor. A settle that stopped when the number cleared its
+## bound would be a waiter inside its own condition, and it would manufacture the pass it is waiting for;
+## this one ends when consecutive draws stop moving, so a body whose settled gradient is genuinely too
+## small settles there and still fails.
+const SETTLE_STEP: int = 6            ## frames between draws while waiting for the veil to converge
+const SETTLE_EPS: float = 0.25        ## consecutive draws this close, twice running, is settled
+const SETTLE_MAX: int = 360           ## ...and it is measured anyway after this many frames, and says so
 const POOL_TICKS: int = 600   ## SIM ticks driven directly, so the body is evenly settled on any machine
 
 ## The cistern: a chamber cut into real rock well below the surface, flooded to the brim.
@@ -122,6 +134,36 @@ func _run() -> void:
 	# of them, which over a chamber twenty cells wide in a frame sixty cells wide means most of what it
 	# grades is the dark rock either side and whatever HUD is floating over it; the first run of this
 	# reported the deadest tile at an x the cistern does not even reach.
+	# THE VEIL IS STILL CONVERGING AT THIS POINT. Every measurement below is taken from `img`, so the wait
+	# happens here, once, and the settled frame replaces the ramp frame for all of them.
+	var settled_at: int = 0
+	var prev_fall: float = _fall_of(img, band)
+	var stable: int = 0
+	while settled_at < SETTLE_MAX and stable < 2:
+		for _f: int in SETTLE_STEP:
+			await physics_frame
+		await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw
+		settled_at += SETTLE_STEP
+		img = get_root().get_texture().get_image()
+		var now_fall: float = _fall_of(img, band)
+		stable = stable + 1 if absf(now_fall - prev_fall) <= SETTLE_EPS else 0
+		prev_fall = now_fall
+	print("  the depth tint settled after %d further frame(s)%s"
+		% [settled_at, "" if stable >= 2 else " — IT DID NOT SETTLE, measured on the ramp"])
+	# AND THE BODY IS FOUND AGAIN ON THE FRAME THAT WILL BE MEASURED. The first version of this wait kept
+	# the rect located on the ramp frame and applied it to the settled one, and the body's detected top
+	# edge moves as the veil converges: 118, 117 on runs that then passed, 112 and 115 on runs that read
+	# the surface at 0.9 and 0.7 levels against a floor of 7.0, because a rect starting a few pixels high
+	# puts air where the surface should be. A rect measured on one frame is not a rect on another.
+	band = _on_screen(main, img)
+	print("  after settling it occupies %s" % band)
+	if band.size.x < 40 or band.size.y < 40:
+		_check(false, "the cistern did not land on screen once settled — nothing to judge")
+		main.queue_free()
+		return
+	img.save_png("res://_diag_water.png")
+
 	var sub: Image = img.get_region(band)
 	sub.save_png("res://_diag_water_body.png")
 	# The dead-space fraction is REPORTED, not gated, and that is a deliberate reversal. Running the shared
@@ -166,14 +208,17 @@ func _run() -> void:
 	# Measured on the COOL axis this same body separates by 4.3-5.2 levels across three runs, so the property
 	# is plainly there. The floor is set from those measurements, not guessed ahead of them.
 	#
-	# AND THREE RUNS WERE NOT ENOUGH TO SEE THE SPREAD. Re-read later across 45 retained sweep logs, this
-	# separation runs 3.3 to 6.8 levels — twice the width the three runs showed, and its MINIMUM sits below
-	# the 4.3 those three suggested was the bottom. The floor still holds and is not moved: 3.3 clears 2.5
-	# by 32%. What is corrected is the basis. A range from three draws is not a range, and a floor derived
-	# from one reads as calibrated when it is a guess with a number attached. Whoever revisits this bound
-	# should start from those 45 samples, and should first find out whether this is a single draw of a
-	# quantity that animates — `check_machine_state` had exactly that fault, and a median of consecutive
-	# draws cured a 4.5x swing there.
+	# AND THREE RUNS WERE NOT ENOUGH TO SEE THE SPREAD. Read across 45 retained sweep logs this separation
+	# ran 3.3 to 6.8 levels, twice the width three runs showed. Those 45 readings were all transients: the
+	# shot was taken while the veil was still converging, and the rect it was measured through had been
+	# located on an earlier frame than the one it was applied to. Both are fixed above, and six runs now
+	# read 4.2, 4.2, 4.2, 4.2, 4.3, 4.3 — the same magnitude the old readings averaged to, reproducible to
+	# 2% instead of varying by a factor of two.
+	#
+	# The floor stays at 2.5 and the margin it leaves is honest rather than generous: 1.68x. It was not
+	# raised to sit under the settled value, because the settled value has been known for six runs and a
+	# bound wants better evidence than that. What is retired is the guess that this was a quantity that
+	# animates; it was a ramp and a stale rectangle.
 	var fall: float = (ctop.z - ctop.x) - (cbot.z - cbot.x)
 	print("  the body reads %.1f blue-over-red at the top and %.1f near its floor (luma %.1f / %.1f)"
 		% [ctop.z - ctop.x, cbot.z - cbot.x, top, bottom])
@@ -255,6 +300,18 @@ func _rock_below(main: MainView, img: Image) -> Rect2i:
 
 
 ## Mean sRGB (r, g, b) of a region; the channel split is the point, so this cannot collapse to luma.
+## The depth separation on one frame: blue-over-red at the top of the body minus the same at its floor.
+## Split out so the settle wait above measures exactly the quantity the assertion below judges, rather
+## than a proxy that could converge on a different schedule.
+func _fall_of(frame: Image, band: Rect2i) -> float:
+	var b: Image = frame.get_region(band)
+	var t: Vector3 = _cool(b.get_region(Rect2i(0, int(float(b.get_height()) * 0.10),
+		b.get_width(), int(float(b.get_height()) * 0.25))))
+	var f: Vector3 = _cool(b.get_region(Rect2i(0, int(float(b.get_height()) * 0.65),
+		b.get_width(), int(float(b.get_height()) * 0.27))))
+	return (t.z - t.x) - (f.z - f.x)
+
+
 func _cool(img: Image) -> Vector3:
 	var total := Vector3.ZERO
 	var n: int = 0
