@@ -440,10 +440,23 @@ the audit was written. After the conversion below it is **86 + 3 + 0**, over the
 same rule, and **90 = 87 + 3 + 0** once `check_verdict_route` joined the population it audits. Every size
 in this table is a snapshot with a date on it; the commands beneath are the record, not the numbers.
 
-**A fifth denominator exists and is not an error.** `tools/check_base_namespace.sh` reports 106 subclasses
-because it searches with `grep -r` and so sees the 17 untracked, gitignored `tools/_scratch_*.gd` probes
-that `git grep` cannot: 106 = 89 tracked + 17 scratch. Its population is deliberately the wider one — a
-scratch probe that shadows a base member is a real collision — so the two numbers disagree correctly.
+**A fifth denominator exists and is not an error.** `tools/check_base_namespace.sh` reports 108 subclasses
+(it read 106 when this was written; the rule, not the number, is the record) because it searches with
+`grep -r` and so sees the untracked, gitignored `tools/_scratch_*.gd` probes that `git grep` cannot. Its
+population is deliberately the wider one — a scratch probe that shadows a base member is a real collision
+— so the two numbers disagree correctly.
+
+**And that layer had no way to fail.** It walked its subclasses looking for a member name colliding with
+one the base already owns and reported none, every run, having never been shown finding one: a typo in the
+comparison, a member list read off the wrong file, or an empty subclass set all report exactly that. The
+comparison is a function now, `collisions_in`, and the real scan and the controls call the same one. The
+positive control writes a subclass into a temp dir shadowing `_failures`, a member the base genuinely has,
+and the negative twin writes the same file with the name left alone. If the control comes back clean or the
+twin comes back dirty the layer says the instrument is broken and refuses to report a verdict at all,
+because a green from a broken instrument is worse than a red.
+
+    bash tools/check_base_namespace.sh
+    PASS - 108 of 108 subclasses, none shadowing a base member (control: _failures)
 
 **Reconciling the two numbers that were in the record.** `check_base.gd` states 86 = 29 + 57. That was true
 when written and has drifted by three layers added since; measured now it is 89 = 31 + 58, and the comment
@@ -635,6 +648,97 @@ documented stand-downs, `HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, retained at
 `.../2026-08-23-last-three-converted-green/` and `.../2026-08-23-counter-writes-green/`. Not full sweeps,
 and the runner says so itself.
 
+## Area 3 — a wait with a budget smaller than the thing it waited for
+
+`check_ceremony_reads` went red on a configured sweep and green standalone four minutes later on the same
+tree, which is the shape of the flakiness finding below. It is not that. Tracing the mechanism instead of
+re-running it found a defect that had been shipping in both directions.
+
+The layer measures what the arrival plate does to a rope hanging in a dark shaft, and it first waits for a
+frame with nothing else happening on it. That wait is not decoration: `_rope_x` takes the brightest pixel
+in the column, so a lesson bubble drawn over the rope BECOMES the rope, and every reading after it is of
+the wrong pixel. The wait could not do its job:
+
+| quantity | value |
+|---|---|
+| what the frame needs to clear when a lesson fires behind the plate | `Hud.ARRIVAL_HOLD` 3.4s + `Hints.SHOW_SECONDS` 9.0s = **12.4s** |
+| what the wait allowed | `QUIET_MAX` 600 physics frames = **10.0s** |
+
+The same file's surface wait is `SURFACE_QUIET_MAX`, 1500 frames, which does cover it. The asymmetry is
+the evidence: the wider budget was already discovered empirically at the other site.
+
+**The green was the dangerous outcome, not the red.** Promotion sets `_life` to `SHOW_SECONDS` with nothing
+shown yet, so the first frame of the fade-IN reads `hint_alpha` 0.00 exactly. A threshold on the alpha
+cannot tell that frame from a bubble that has worn out, and the wait exited on it. Both observed outcomes
+were one defect: the passing run sampled the promotion frame, the failing run sampled a frame later and
+then ran out of budget.
+
+The fix makes the frame quiet by construction rather than by waiting for it, through the game's own
+returning-player path (`restore_taught` then `resync`) with the ids read off the lesson tables so a lesson
+added later is covered unasked, and moves the exit condition off the alpha onto the state behind it. No
+budget was raised.
+
+    godot --script res://tools/check_ceremony_reads.gd
+    PASS: the reference frame carries no interrupt of its own
+          (waited 146 frames; arrival 0.00, lesson none, 0 queued, hint 0.00)
+    check_ceremony_reads: PASS (9 asserted)
+
+    with the pose removed, which is the control:
+    FAIL: ... (waited 600 frames; arrival 0.00, lesson rope, 1 queued, hint 1.00)
+
+The control names the rope lesson the layer's own comment was written about, with a second one queued
+behind it: two bubbles at nine seconds each, on a ten second budget.
+
+## Area 3 — two layers reported on the art when the art had not been drawn
+
+Both machine-judging layers in the flakiness table below emit findings about sprites. One says twenty
+machines are drawn as the same shape, twenty-eight pairs of them pixel-identical. The other says the Forge
+and the Generator have no state cue at all, 0.0 against 0.0. **Neither layer could distinguish that from a
+frame with nothing rendered in it**, and every control they already carried passes its hardest on exactly
+that frame: an unmoving camera is unmoving, still-frame noise is at its quietest when there is no picture
+to be noisy, and two synthetic masks do their arithmetic without looking at the screen.
+
+`check_grapple_reads` is the counter-example that makes the gap legible. Its red was its own positive
+controls firing, in its own words: the miner was not drawn, the preview drew nothing. Same environment,
+same sweep family, and that layer refused to report geometry. The other two did not have the control to
+refuse with.
+
+- **`check_machine_identity` already computed the missing quantity.** Coverage, the share of the cell each
+  machine puts material into, sat in the printed table and was never asserted. It is asserted now against
+  this run's own empty-stage reading, and when it fails the pair statistics are not computed at all,
+  because a number taken off an empty stage gets quoted as if it were about the machines.
+- **`check_machine_state`'s control existed only in prose.** The comment over its empty-stage capture calls
+  that capture "the control for saturation and for did anything change at all". The capture was taken,
+  printed, and never compared to anything. It now has a floor read off five shots of the cell with nothing
+  on it, and a subject that fails presence is reported as missing rather than accused of a weak cue.
+
+Both layers now photograph the empty stage once more at the end and require it to FAIL the bar the machines
+cleared, so the bar is shown able to fail on real data every run. That control immediately found two
+contaminations in the state layer's own reference, and neither threshold moved to accommodate either:
+
+| the empty stage measured against | levels | bar |
+|---|---|---|
+| the single pre-loop reference | 12.16 | 3.74 |
+| a reference taken under the same floor tile | 4.03 | 3.73 |
+| ...once the last machine's ember has finished decaying | **1.46** | 3.69 |
+
+Each subject puts a different material in the cell below the stage and its light reaches into the patch, so
+the reference is taken per subject now. Six frames between subjects is enough that the next one is not
+placed into the last one's glow, but not enough for an ember to reach the floor, which is the same decay
+that made an early version of that layer photograph transients.
+
+Mutation controls, both layers, both exit 1:
+
+    masking every subject against itself, which is what a blank stage looks like:
+      FAIL: CONTROL: every machine put more of itself on the stage than still-frame noise does
+            (0.0000) - DREW NOTHING: Blast Furnace (0.0000), Power Conduit (0.0000) ...
+      the stage did not draw, so the pair statistics are not computed
+
+    photographing the empty cell in place of the working one:
+      FAIL: CONTROL: every subject was actually drawn on the stage - NOT DRAWN: Forge (0.00
+            levels against the empty stage, drift 1.24), Drill (0.00), Generator (0.00)
+      and the SILENT accusation against those three does not appear
+
 ## An open flakiness finding, recorded rather than absorbed
 
 Four configured sweeps were run on effectively one tree while reconciling the population above. The only
@@ -660,7 +764,15 @@ is patched, with the before-and-after concurrency measurements recorded in the r
 
 **It is left classified as environmental and unexplained rather than dismissed**, with all four sweeps
 retained under `docs/tracelog/sweeps/` including the two reds, because a red that is deleted once it stops
-reproducing is a red nobody can ever study. One mechanism is worth testing and is **not** claimed here: the
+reproducing is a red nobody can ever study.
+
+**What changed since, and what did not.** `check_grapple_reads` leaves this group: its red was its own
+positive controls firing, which is a layer working rather than a layer confused. The two machine layers
+stay in it. Nothing here reproduced them and nothing here diagnoses them, and the state layer's red had
+the Drill at 11.8 levels against 14.1, which is a machine that drew. What the section above changes is only
+that the next occurrence can say which of the two candidate causes it was: a frame that did not render now
+withholds the art finding and says the stage did not draw, and sprites that really are alike are reported
+with the coverage table standing behind them. One mechanism is worth testing and is **not** claimed here: the
 harness runs with shader caching disabled, so every headed layer recompiles its pipeline on boot, and a
 frame captured before that pipeline is warm would read exactly like these. That is a hypothesis with a
 plausible shape and no evidence yet, and the honest note is that nobody has tested it.
