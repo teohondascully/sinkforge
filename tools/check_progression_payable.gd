@@ -49,12 +49,7 @@ func _initialize() -> void:
 	_payable(machines, raw, rungs, free)
 	_terminal(machines, raw)
 
-	if _failures == 0:
-		print("check_progression_payable: PASS — every rung can be paid for by the time you reach it")
-		quit(0)
-	else:
-		printerr("check_progression_payable: %d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_progression_payable", "every rung can be paid for by the time you reach it")
 
 
 func _machines() -> Array[MachineDef]:

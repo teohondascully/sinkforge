@@ -84,12 +84,7 @@ func _initialize() -> void:
 	print("== the descent, both ways ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_plunge: PASS — the hole is a route, and it is one you can steer")
-		quit(0)
-	else:
-		print("check_plunge: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_plunge", "the hole is a route, and it is one you can steer")
 
 
 func _run() -> void:

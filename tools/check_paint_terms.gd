@@ -34,12 +34,7 @@ const H: int = 47
 func _initialize() -> void:
 	print("== the inlined per-texel terms still say what the obvious ones said ==")
 	_run()
-	if _failures == 0:
-		print("check_paint_terms: PASS — the flat rewrites agree with the loops they replaced, everywhere")
-		quit(0)
-	else:
-		printerr("check_paint_terms: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_paint_terms", "the flat rewrites agree with the loops they replaced, everywhere")
 
 
 func _run() -> void:

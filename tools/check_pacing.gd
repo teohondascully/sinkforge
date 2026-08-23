@@ -85,12 +85,7 @@ func _initialize() -> void:
 	print("== the shape of a session ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_pacing: PASS — the session keeps talking")
-		quit(0)
-	else:
-		print("check_pacing: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_pacing", "the session keeps talking")
 
 
 func _run() -> void:

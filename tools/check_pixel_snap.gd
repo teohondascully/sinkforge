@@ -66,9 +66,4 @@ func _initialize() -> void:
 	# 4) zero-zoom guard (never divide by zero)
 	_check(MainView.snap_to_pixel(base, 0.0) == base, "zoom 0 is a safe no-op")
 
-	if _failures == 0:
-		print("PIXEL SNAP OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_pixel_snap")

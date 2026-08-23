@@ -268,12 +268,7 @@ func _initialize() -> void:
 
 	hud.free()
 	await _real_catalogue()
-	if _failures == 0:
-		print("PACK LAYOUT OK")
-		quit(0)
-	else:
-		printerr("%d FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_pack_layout")
 
 
 ## THE SHIPPING CATALOGUE, IN THE TWO RESEARCH STATES THAT ARE DIFFERENT SHAPES.

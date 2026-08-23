@@ -49,12 +49,7 @@ func _initialize() -> void:
 	print("== is the surface a place ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_relief: PASS — a landscape, and one you can still walk across")
-		quit(0)
-	else:
-		print("check_relief: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_relief", "a landscape, and one you can still walk across")
 
 
 func _run() -> void:

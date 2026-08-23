@@ -27,12 +27,7 @@ func _on_frame() -> void:
 	process_frame.disconnect(_on_frame)
 	_sim = _main.sim
 	_run()
-	if _failures == 0:
-		print("ALL MINING-LOS CHECKS PASS")
-		quit(0)
-	else:
-		printerr("%d MINING-LOS FAILURE(S)" % _failures)
-		quit(1)
+	_verdict("check_mining")
 
 
 func _run() -> void:

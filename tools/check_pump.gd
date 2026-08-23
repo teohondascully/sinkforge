@@ -62,12 +62,7 @@ func _initialize() -> void:
 	print("== can you wind a swing up ==")
 	MainView.dev_start = false
 	await _run()
-	if _failures == 0:
-		print("check_pump: PASS — the arc answers the rhythm, and you can hear it")
-		quit(0)
-	else:
-		print("check_pump: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_pump", "the arc answers the rhythm, and you can hear it")
 
 
 func _run() -> void:

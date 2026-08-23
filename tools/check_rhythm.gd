@@ -36,12 +36,7 @@ func _on_frame() -> void:
 		return
 	process_frame.disconnect(_on_frame)
 	_run()
-	if _failures == 0:
-		print("check_rhythm: PASS")
-		quit(0)
-	else:
-		print("check_rhythm: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_rhythm")
 
 
 func _run() -> void:

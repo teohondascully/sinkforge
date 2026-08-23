@@ -30,12 +30,7 @@ var _sim: FactorySim
 func _initialize() -> void:
 	print("== the rock that says no ==")
 	await _run()
-	if _failures == 0:
-		print("check_refusal: PASS — over-tier rock refuses, and you can see, hear and read why")
-		quit(0)
-	else:
-		printerr("check_refusal: FAIL (%d)" % _failures)
-		quit(1)
+	_verdict("check_refusal", "over-tier rock refuses, and you can see, hear and read why")
 
 func _run() -> void:
 	MainView.dev_start = false
