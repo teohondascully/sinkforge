@@ -682,6 +682,10 @@ func load_world(world: WorldData) -> void:
 	water.clear()
 	fill.clear()                       # a fresh world has no construction in it
 	world_seed = world.seed
+	# The bulk write. It invalidates HERE rather than at the call sites, which is the difference between a
+	# rule and a habit: this used to be left to the caller, `main.gd` got away with it by loading into a
+	# fresh sim whose flag starts dirty, and `SaveGame` did it by setting the private field by name.
+	invalidate_bazaars()
 	for cell: Vector2i in world.blocks:
 		if in_bounds(cell):
 			solid[cell] = world.blocks[cell]
@@ -1244,6 +1248,29 @@ func is_bazaar_at(o: Vector2i) -> bool:
 var _bazaars_cache: Array[Vector2i] = []
 var _ruins_cache: Array[Dictionary] = []       ## {origin, gap}: frames ONE block short (find_bazaar_ruins)
 var _bazaars_dirty: bool = true
+
+
+## Say that `solid` changed and the caches above no longer describe the world.
+##
+## PUBLIC, AND IT EXISTS BECAUSE THE FLAG WAS NOT. Every path inside this file that writes `solid` sets
+## `_bazaars_dirty` beside the write, and the two paths OUTSIDE it did not have that option: `Flora.grow`
+## stamps a trunk straight into `sim.solid`, and `SaveGame` reached in and set the private field by name.
+## One of those was a live defect and the other was the same defect with the right answer typed out by
+## hand.
+##
+## THE DEFECT, MEASURED RATHER THAN REASONED. A sapling planted in a bazaar's open interior (an ordinary
+## player verb; nothing stops it) grows a trunk two minutes later. `is_bazaar_at` then answers false,
+## because the interior is no longer open, and `find_bazaars()` went on answering `[(40, 40)]` because
+## nothing had told it. The stall stays drawn and the near-bazaar craft gate stays open over a structure
+## that is not a bazaar, until some unrelated dig happens to invalidate the cache. The mirror is worse:
+## a tree growing into a ruin's one missing cell completes a bazaar the game does not know it has.
+##
+## Named rather than left as an assignment so that the next writer outside this file has something to
+## call, and so `tools/check_bazaar_cache.gd` has a name to talk about.
+func invalidate_bazaars() -> void:
+	_bazaars_dirty = true
+
+
 func find_bazaars() -> Array[Vector2i]:
 	if _bazaars_dirty:
 		_rescan_bazaars()

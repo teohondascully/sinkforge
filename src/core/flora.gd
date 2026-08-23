@@ -33,6 +33,14 @@ static func grow(sim: FactorySim) -> void:
 	for c: Vector2i in grown:
 		sim.sapling.erase(c)
 		_stamp_tree(sim, c)
+	if not grown.is_empty():
+		# A TREE IS MADE OF WOOD, AND SO IS A BAZAAR. This pass writes `sim.solid` directly, and it was
+		# the one write in the game that did not invalidate the bazaar cache. Measured: a sapling planted
+		# in a bazaar's open interior grows a trunk, `is_bazaar_at` goes false, and `find_bazaars()` kept
+		# answering with the origin, so the stall stayed drawn and its craft gate stayed open over a
+		# structure that was no longer a bazaar. The mirror completes a bazaar nobody knows about, by
+		# growing into a ruin's one missing cell. Held by `tools/check_bazaar_cache.gd`.
+		sim.invalidate_bazaars()
 
 
 ## Stamp a tree with its trunk base at `base`: a 2-3 tall &"wood" trunk (height from the cell hash,

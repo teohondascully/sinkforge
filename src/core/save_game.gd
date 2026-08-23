@@ -262,7 +262,7 @@ static func _commit(sim: FactorySim, s: Dictionary) -> void:
 	sim.power.clear()
 	sim.flow_events.clear()
 	sim.terrain_dirty.clear()
-	sim._bazaars_dirty = true
+	sim.invalidate_bazaars()
 	# One-shot view channels. Left alone, `last_drop_landing` survives a load and grants pickup grace at a
 	# cell from the previous session.
 	sim.last_drop_landing = Vector2i(-1, -1)

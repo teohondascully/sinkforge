@@ -279,6 +279,18 @@ add "check_verdict_claims (a verdict claims what was tested)" "res://tools/check
 # layer is what stops the fifty-sixth. Three are exempt BY NAME with a shrink-only ratchet: an exemption
 # whose layer has since become compliant is a red here, not a quiet no-op.
 add "check_verdict_route (nobody exits 0 alone)" "res://tools/check_verdict_route.gd"
+# A CACHE THAT DISAGREED WITH THE WORLD, THROUGH AN ORDINARY PLAYER VERB. `find_bazaars()` is served from
+# a full-grid rescan refilled when `_bazaars_dirty` is set, so every write to `solid` is load-bearing
+# twice: once for the world and once for the flag. `Flora.grow` stamps a tree trunk straight into
+# `sim.solid` and set no flag, so a sapling planted in a bazaar's open interior -- nothing stops you --
+# closed the interior two minutes later while `find_bazaars()` went on naming the origin. The stall stayed
+# drawn and its craft gate stayed open over a structure that was not a bazaar. The mirror completes a
+# bazaar nobody has been told about, by growing into a ruin's one missing cell.
+#
+# Behavioural rather than a source scan, and that is the point: a grep for `_bazaars_dirty` beside every
+# `solid[` write would have missed this one, because the write is in another file through a preloaded
+# reference. Six ways the world can change, each compared against a brute-force walk of the whole grid.
+add "check_bazaar_cache (cache vs world)" "res://tools/check_bazaar_cache.gd"
 add "check_doc_counts (docs match the runner)" "res://tools/check_doc_counts.gd"
 add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "check_save_frontier (envelope)"  "res://tools/check_save_frontier.gd"
