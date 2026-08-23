@@ -958,6 +958,14 @@ func _teaching(main: MainView) -> void:
 	main._hints._lingered = 0.0
 	for _i: int in 20:
 		await physics_frame
+	# `SF_MOMENT_MUTANT=nowrap` withholds the lesson from the finished scene, which is the POSITIVE CONTROL
+	# for the shutter guard: everything else about the frame is right, and only the subject is missing. It
+	# was deliberately not written while the moment was unposeable, because a positive control carries no
+	# information until the UNMUTATED arm passes. Both arms failing proves only that something fails.
+	# An environment switch and not a hand-edit, for the reason `nosapling` gives: a commented-out line in a
+	# shared tree stays live for every run that follows, and the machine lock does not cover editing.
+	if OS.get_environment("SF_MOMENT_MUTANT") == "nowrap":
+		main._hints._active = &""
 
 
 ## THE HAUL. A body mid-arc in a gallery, moving faster than it can run: the thing check_traverse measures
