@@ -1392,3 +1392,17 @@ reaches the vacuous branch — a guard that was already there.
 verdict at the end of the line. Being off `check_base.gd` was never why any row was unreachable — 19
 registered layers are off it and 15 were held before any of this work. The boundary was always the dialect
 a layer speaks, and four layers were taught to speak one.
+
+
+### What reaching 113 bought that was not the point
+
+`check_base._verdict()` refuses a green from a layer that asserted nothing. Nineteen registered layers do
+not inherit it, and auditing each of them for an equivalent guard was queued as its own item. It is now
+largely moot: every one of the 113 rows carries a floor of at least 2, so a layer that asserted nothing
+reports 0 and is caught as DROPPED, and a layer that printed no count at all is caught as MISSING. The
+protection that was inline for 91 layers is now structural for all of them.
+
+The limit is worth stating exactly, because it is the kind of thing that reads as broader than it is: the
+floor gate judges **only on a full configured sweep**, by its own header, and a subset run has no opinion
+about layers it did not run. So a layer run standalone still gets no zero-assertion protection unless it
+inherits `check_base`. That is a real remaining gap and a much smaller one than eleven unguarded layers.
