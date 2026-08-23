@@ -167,6 +167,7 @@ func _run() -> void:
 	for _i: int in SETTLE:
 		await physics_frame
 	main._player.auto_input = false        # a hand on WASD would walk the body and take the camera with it
+	_silence_lessons(main)
 
 	_rig(main.sim)
 	main.sim.inventory[&"rope"] = 60
@@ -184,13 +185,14 @@ func _run() -> void:
 	# so a ghost letter lying on the rope BECOMES the rope and every reading afterwards is of the wrong
 	# pixel.
 	var quiet: int = 0
-	while (main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01) and quiet < QUIET_MAX:
+	while _interrupted(main) and quiet < QUIET_MAX:
 		await physics_frame
 		quiet += 1
-	_check(main._hud._arrival_life <= 0.0 and main._hud.hint_alpha <= 0.01,
-		"the reference frame carries no interrupt of its own (waited %d frames; arrival %.2f, hint %.2f)"
-			% [quiet, main._hud._arrival_life, main._hud.hint_alpha])
-	if main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01:
+	_check(not _interrupted(main), "the reference frame carries no interrupt of its own "
+		+ "(waited %d frames; arrival %.2f, lesson %s, %d queued, hint %.2f)"
+			% [quiet, main._hud._arrival_life, _lesson_name(main), main._hints._queue.size(),
+				main._hud.hint_alpha])
+	if _interrupted(main):
 		return
 
 	_sc = _screen_scale(main)
@@ -216,8 +218,9 @@ func _run() -> void:
 	# it. That is correct behaviour and it makes the control conditional on the treatment, which is worth
 	# saying out loud rather than discovering as an unexplained red: if the bubble's timing ever drifts into
 	# this window, the run must void by name instead of blaming the world for moving.
-	_check(main._hud.hint_alpha <= 0.01,
-		"no lesson bubble arrived between the two captures (hint alpha %.2f)" % main._hud.hint_alpha)
+	_check(not _lesson_up(main),
+		"no lesson bubble arrived between the two captures (lesson %s, %d queued, hint alpha %.2f)"
+			% [_lesson_name(main), main._hints._queue.size(), main._hud.hint_alpha])
 
 	var dump: String = OS.get_environment("SF_CEREMONY_DUMP")
 	if dump != "":
@@ -430,10 +433,10 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		await physics_frame
 	await _drain(main)
 	var quiet: int = 0
-	while (main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01) and quiet < SURFACE_QUIET_MAX:
+	while _interrupted(main) and quiet < SURFACE_QUIET_MAX:
 		await physics_frame
 		quiet += 1
-	if main._hud._arrival_life > 0.0 or main._hud.hint_alpha > 0.01:
+	if _interrupted(main):
 		_stand_down("ceremony.words-vs-sky-arm", "the words against open sky",
 			"the HUD would not go quiet at the surface, so there was no uninterrupted reference to read "
 			+ "the words against")
@@ -691,6 +694,43 @@ func _drain(main: MainView) -> void:
 		fine.finish_pending()
 	for _i: int in 8:
 		await physics_frame
+
+
+## Pose the lesson system the way a loaded save leaves it: every lesson already given, the queue empty,
+## the edge snapshots re-armed against the world as it now stands. This is the game's own returning-player
+## path, `restore_taught` then `resync`, and not a door cut for the test.
+##
+## It replaces a wait that could not have worked. When the rope lesson fires behind the arrival plate the
+## frame needs `Hud.ARRIVAL_HOLD` plus `Hints.SHOW_SECONDS` to clear, which is 12.4 seconds, and QUIET_MAX
+## is 600 physics frames, or 10.0. The budget was smaller than the requirement, so the red was structural
+## and not weather. The green was the worse of the two outcomes: promotion sets `_life` to SHOW_SECONDS
+## with nothing shown yet, so the first frame of the fade-IN reads alpha 0.00 exactly, the wait exited on
+## it, and the layer went on to measure a rope with a letter arriving on top of it, which is the one thing
+## the wait is there to prevent.
+func _silence_lessons(main: MainView) -> void:
+	var every: Array[String] = []
+	for d: Dictionary in main._hints._defs:
+		every.append(String(d["id"]))
+	for m: Dictionary in main._hints._moments:
+		every.append(String(m["id"]))
+	main._hints.restore_taught(every)   # read off the tables, so a lesson added later is covered unasked
+	main._hints.resync()
+
+
+## A lesson is on screen, or one is waiting to be. The alpha alone cannot say this: it reads 0.00 both
+## when a bubble has worn out and on the first frame of its fade-in, and only one of those is quiet.
+func _lesson_up(main: MainView) -> bool:
+	return main._hud.hint_alpha > 0.01 or main._hints._active != &"" or not main._hints._queue.is_empty()
+
+
+## Nothing on the HUD is mid-announcement and no lesson is up or pending.
+func _interrupted(main: MainView) -> bool:
+	return main._hud._arrival_life > 0.0 or _lesson_up(main)
+
+
+## The lesson holding the bubble, for a failure line that has to say which one.
+func _lesson_name(main: MainView) -> String:
+	return "none" if main._hints._active == &"" else String(main._hints._active)
 
 
 func _screen(main: MainView, world: Vector2) -> Vector2:
