@@ -1540,3 +1540,27 @@ it reads 0 in the corridor over four runs, but the whole-frame mover count over 
 0, 0, 0 and 3 — the residual is not identically zero, and four samples do not locate a bound. A cap could
 not catch every unposed run either: one of the five measured without the shader clock happened to eat 0.
 Both populations are written into the source so the next pass starts from data instead of from a guess.
+
+
+## Reading every census nomination, and finding nothing left at risk
+
+The census says where to look and refuses to say how bad, so its twelve movers on the valid pair were read
+one at a time against the layers' own PASS lines. After the grapple repair, none of them threatens a bound:
+
+| layer | what moved | why it is not a finding |
+|---|---|---|
+| `check_hint_gate` | `alpha 0.048` → `0.025` | a fade envelope, and the verdict is the boolean beside it. The source says so in place: "not a legibility claim... what this asks is whether anything is CLAMPING it to zero". The wait is a proper wait-on-condition with a budget |
+| `check_ceremony_reads` | `mean 14.1` → `12.2` dE | printed beside a MEDIAN-based assertion (1.9 against a cap of 12.0). Reporting both is deliberate — a thresholded mean is the statistic this repository already caught measuring its own threshold |
+| `check_snap_frame` | `against 2` → `against 0` | the known small-integer artifact. A control needing 4x of a count that is 0 or 2 scores 100% relative movement and has 198000 of headroom |
+| `check_rock_reads` | 532 → 517 solid cells | a population count with a floor of 40, and the cue itself moved 87.41% → 87.70% against a floor of 75.00% |
+| `check_selection_reads` | 59650 → 59638 px | floor 800. Its colour-survival number moved 99% → 100% against a floor of 90% |
+| `check_hud_layout` | 3.367 → 3.366 s | twelve numbers, all sub-0.1% |
+| `check_contact_edge` | 608 → 609 faces | floor 40 |
+| `check_lock`, `check_frametime`, `check_dig_hitch` | durations | their subject IS time; the census header names these as expected |
+| `check_water_reads` | 4.5% widest | was 100.0% before the settle repair |
+
+Two of the top three non-time nominations turned out to be **printed diagnostics rather than judged
+bounds**. That is not a fault in the census — it counts the numbers inside PASS lines because it cannot
+know which of them a threshold is compared against, and its header already refuses to rank risk for
+exactly this reason. It is worth writing down as measured experience: a high row is a reason to open the
+layer, and opening the layer is where most of them end.
