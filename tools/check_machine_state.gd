@@ -437,7 +437,6 @@ func _report(rows: Array[Dictionary], still: float) -> void:
 		if presence <= still * PRESENCE_MARGIN:
 			absent.append("%s (%.2f levels against the empty stage, drift %.2f)" % [r["name"], presence, still])
 			continue
-			continue
 		# SATURATION IS ITS OWN VERDICT, not a low score. A patch pinned near white has no room left to
 		# carry a cue, and reporting that as "this machine has no state cue" would blame the machine for
 		# the tonemap. It is the same finding being bisected on the surface band, arriving here.

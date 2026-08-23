@@ -1193,3 +1193,38 @@ or `GR-06` wants a different pairing. It is queued as an authorization-boundary 
 
 The layer's other reported figures were all computed from the blind masks and are superseded. `GR-04
 REPRODUCES` in particular now quotes real contrast on both surfaces for the first time.
+
+
+## Which other layers cannot see their subject: all of them can
+
+`check_grapple_reads` was blind because it photographed a cue by subtracting two frames and its bar was set
+against a temporally distant reference. That shape is not unique to it, so the population was enumerated
+rather than guessed: of 15 layers that capture pixels at all, 5 contain a temporal-difference idiom, and
+of those `check_dig_hitch` is not a cue-photographing layer — it asserts bake region counts and carries its
+own `cells > 0` witness. Four remain.
+
+Each was tested the way the grapple layer should have been tested first: remove the subject in a scratch
+copy, run it, and see whether the layer notices. Reading the controls is not the test — the grapple layer
+had elaborate ones and was blind behind them.
+
+| layer | subject removed by | result |
+|---|---|---|
+| `check_machine_state` | idle frame replaced by a second active frame | **FAIL**, every machine `SILENT`, state ≡ motion (11.9/11.9, 14.5/14.5, 2.7/2.7) |
+| `check_machine_identity` | machine taken off the stage before its portrait | **FAIL**, `DREW NOTHING` for all 20 |
+| `check_bake_idempotent` | the dig loop neutered | **witness FAILS**, "that column moved 0" |
+| `check_grapple_reads` | `AIM_GHOST_OFF` forced true | repaired this run; 182 px drawn against 0 removed |
+
+All three unrepaired layers catch it, and each catches it in the right place: `check_machine_state`'s other
+controls — presence, drawn-on-stage, renderer/sim agreement, clipping — all still passed, so the failure
+lands on the cue and not on the driver.
+
+`check_bake_idempotent` is the one worth keeping in mind. With the digs removed its **headline claim still
+passes**: "12 of 12 cells nobody dug hold their colour after 8 digs elsewhere (worst drift 0, tol 1)". Only
+the witness fails. A layer that asserts two things are the SAME is satisfied by a build where nothing
+happened, and the only thing standing between that and a green is a control the layer already has. It is
+load-bearing, not decorative, and this run is the demonstration.
+
+What separates the grapple layer from these three is not care taken; it is where the bar sits. In all three
+the quantity being asserted against is measured from the same run under the subject-removed condition — the
+empty stage, the same-state pair, the witness column. The grapple layer's bar was a constant, and a
+constant cannot notice that its subject has gone.
