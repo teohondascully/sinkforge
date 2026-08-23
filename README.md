@@ -254,7 +254,7 @@ exit codes in all, and a caller that reads "not zero" as "a test failed" will mi
 This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
 
 ```
-110 PASS / 0 FAIL / 0 SKIP of 110
+114 PASS / 0 FAIL / 0 SKIP of 114
 HARNESS_EXIT=4
 ```
 
@@ -375,31 +375,37 @@ under xvfb with a software Vulkan driver. No single job runs every layer. `check
 deliberately excluded from CI, because a software rasterizer draws at 6 to 9 fps and its hitch ratios
 then describe the rasterizer.
 
-CI is red on one layer, and the number it reports is not the number a local sweep reports. That is not a
-contradiction, and the difference is worth stating because it is the whole reason this suite is split
+CI is red on two layers and a local sweep is red on one of them, and no job's numbers are another's. None
+of that is a contradiction, and it is worth setting out because it is the whole reason this suite is split
 into jobs:
 
 | Where | Renderer | What runs | Result |
 | --- | --- | --- | --- |
-| a local sweep | the machine's real GPU, through a real window | all 110 layers in one run | 110 pass, 0 fail, 0 skip — and `HARNESS_EXIT=4`, for the six declared stand-downs |
-| CI, headless job | Godot's dummy renderer | all 110 declared; the 15 that detect the absent display stand themselves down | 95 pass, 0 fail, 15 skip |
-| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 15 pass, 1 fail |
+| a local sweep | the machine's real GPU, through a real window | all 114 layers in one run | 113 pass, 1 fail, 0 skip — `check_grapple_reads`, with the six declared stand-downs |
+| CI, headless job | Godot's dummy renderer | all 114 declared; the 16 that detect the absent display stand themselves down | 98 pass, 0 fail, 16 skip |
+| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 14 pass, 2 fail — `check_grapple_reads` and `check_machine_identity` |
 
-So "the suite passes" and "CI is red" are statements about different renderers, and both are true. The
-authorship job passes in all cases. A layer that reads pixels can only be as truthful as the thing that
-drew them, which is why the display job exists at all and why its one failure is a real finding rather
-than a nuisance.
+**The frame for those tallies.** They were read at `e89eef9` on 2026-08-23, from one local sweep and one CI
+run, and every one of them moves when a layer is added or a red is fixed. Trust the layer names and the
+shape of the split; the totals are prose, and prose has no runner. The authorship job passes in all cases.
 
-The one failure is `check_grapple_reads`, and it is the layer refusing to answer rather than answering
-wrongly. It measures how far a rope departs the straight line between its ends, and it throws away every
-pixel further from that line than the renderer can possibly draw. Under the software rasterizer CI uses,
-both the taut and the slack rope read at that cutoff — 0.4624 and 0.4634 against a rim of 0.4650 — which
-means the number came off the edge of the mask and not off the cord. The layer detects exactly that and
-fails, because a reading taken from the rim of its own mask would be a green assertion about a rope
-nobody measured. The same layer passes on hardware, where the same rope reads 0.053 taut and 0.237 slack.
+The useful part is that one red crosses both renderers and the other does not. `check_grapple_reads` fails
+the same assertion on a real GPU and on lavapipe, and reads almost the same number doing it: the grapple
+preview out-reads the miner throwing it, 143.3 levels of edge against the body's 87.3 locally and 141.5
+against 88.3 in CI, where the layer wants the body to lead by at least 1.15x. That is a finding about the
+game and not about a rasterizer — an aiming aid is currently louder than the character it belongs to — and
+it is open work. `check_machine_identity` is the other kind: it fails in CI and only intermittently on
+hardware, where the stage cell of a removed machine has not gone quiet within the 180 frames the layer
+allows it. A layer that reads pixels can only be as truthful as the thing that drew them, which is why the
+display job exists at all.
 
-So this is a measurement that one rendering path cannot deliver, not a defect in the rope. Fixing it means
-making the mask reject non-cord pixels robustly enough for a software rasterizer, which is open work.
+Neither CI job has its assertion floors judged, and the two jobs miss for different reasons. The headless
+job resolves three of the six stand-downs, so `assert_floors` refuses to compare it against floors taken
+under six; the display job is a subset run, and a subset says nothing about the layers it did not run. Both
+print `HARNESS_QUOTABLE=unjudged`. The skip-route gate does judge both jobs, and passes. So the floor gate
+that guards a local sweep is, in CI, running and then declining to answer — a real gap, written down here
+rather than left for a reader to find.
+
 This README carries no build badge while any job is red.
 
 ## Repository map

@@ -1,10 +1,10 @@
 # HOW MANY ASSERTIONS EACH LAYER MUST STILL MAKE.
 #
 # A layer that stops asserting things does not go red. `_verdict()` refuses a green that asserted NOTHING,
-# and between zero and everything there was no floor at all: the widest layer here makes 112 assertions and
-# could have fallen to one and still printed PASS. Measured across three consecutive sweeps of 91 layers,
-# the only counts that moved were the five layers edited between them, and each moved by exactly the number
-# of assertions added or withdrawn. The count is a faithful signal, so it is held.
+# and between zero and everything there was no floor at all: the widest layer here makes several hundred
+# assertions and could have fallen to one and still printed PASS. Measured across three consecutive sweeps
+# of 91 layers, the only counts that moved were the five layers edited between them, and each moved by
+# exactly the number of assertions added or withdrawn. The count is a faithful signal, so it is held.
 #
 # THE FLOOR IS THE OBSERVED COUNT, NOT A MARGIN BELOW IT. A margin would absorb the first real loss silently,
 # which is the whole failure being guarded against. Lowering a row is a deliberate act and the commit that
@@ -15,8 +15,8 @@
 # gate says it did not judge rather than inventing a verdict. Regenerate after a deliberate change:
 #   tools/assert_floors.sh --write <log-dir>
 #
-# THE POPULATION, STATED, because a number of rows against a suite of 113 is a gap and a gap nobody names
-# reads as coverage. ALL 113 of 113 rows are held, under THREE rules: 95 report "(N asserted)" -- 91 from
+# THE POPULATION, STATED, because a number of rows against a suite of 114 is a gap and a gap nobody names
+# reads as coverage. ALL 114 of 114 rows are held, under THREE rules: 96 report "(N asserted)" -- 92 from
 # `_verdict()` and four that were taught to print it, below -- 17 have no `_check` to count and print one
 # PASS line per claim instead, and one writes its verdict at the end of the line. The second rule is what
 # brings in the four largest bodies of assertions in the suite, none of which anything held before:
