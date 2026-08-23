@@ -1666,3 +1666,39 @@ HARNESS_EXIT=0     HARNESS_RESULT=yes
 ```
 
 to `assert_skip_route: FAIL`, one `HARNESS_QUOTABLE=no`, and `!! exiting 7: the sweep above is NOT A RESULT`.
+
+
+## Measuring whether a bound was possible, and finding it was not
+
+The grapple pose left a gap on purpose: `eaten` is documented in the layer as the travelling control on
+the pose and asserts nothing. Closing it needed the distribution on both sides, so both were measured —
+eight runs each, **interleaved rather than run in blocks**, so drift in machine conditions could not
+separate the arms, against a copy of the layer differing by exactly one line.
+
+```
+posed     0    0    0    0    0    7    0    0        max 7, median 0
+unposed   0    2    2    6   19   19  213  557        sorted; median 12.5
+```
+
+**The distributions overlap, so no cap separates them.** A cap at the posed arm's maximum of 7 passes four
+of the eight unposed runs. A cap at 0 breaks one of the eight posed runs. Either is a red that means
+nothing or a green that means nothing, and there is no third number to pick.
+
+The reason is in the mechanism rather than the sample size, which is what makes this a conclusion instead
+of a pause. The grain decorrelates with wall time between the two captures, so an idle machine barely
+contaminates the mask whether the clock is held or not — which is exactly why the defect this control
+exists for stayed invisible until a sweep ran twelve engines at once and the mask reached 465 pixels. The
+arm that would separate them is the *loaded* one, and eight sweeps to get eight samples of it is not a
+measurement anyone will repeat.
+
+So it stays a printed diagnostic, and the note left in the source says a bound here needs the loaded
+distribution and not more idle runs. Two smaller things recorded with it: the posed arm is **not**
+identically zero — one run in eight ate 7, and whole-frame movers under the same pose read 0, 0, 0, 3 —
+and the preview mask held at exactly 182 pixels in 8 of 8 posed runs against 5 of 8 unposed, which is a
+sharper contrast than `eaten` gives but is not assertable either, since pinning an exact pixel count would
+fail on any legitimate change to how the mark is drawn.
+
+This is the second time this programme has answered "what bound goes here" with "none, and here is why".
+The first was `grapple.gr05-preview-share`, where the cap that used to stand was `1.01` over a quantity
+bounded at 1.0 by construction — an assertion that could not fail. Recording the refusal with its data
+costs a line of prose and saves the next reader from re-deriving a number that does not exist.

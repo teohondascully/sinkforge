@@ -961,13 +961,29 @@ func _check_against_sky() -> void:
 	#
 	# THIS CONTROL WAS RIGHT AND NOBODY MADE IT FAIL. Its own sentence said a nonzero count meant "something
 	# alive that `_anim_time` does not drive", which is precisely what the film grain was, and it printed
-	# 21, 30, 51 and 344 across recent runs while nothing read it. It is still printed and still not
-	# asserted, and that is now a deliberate gap rather than an oversight: with both clocks posed it reads 0
-	# in the corridor over four runs, but the whole-frame mover count over those same four reads 0, 0, 0 and
-	# 3, so the residual is not identically zero and four samples do not locate a bound. A cap could also
-	# not catch every unposed run -- one of the five measured without the shader clock posed happened to eat
-	# 0 as well. The numbers on both sides are recorded here so the next pass starts from data: posed 0 0 0 0
-	# in-corridor, unposed 344 51 21 30 0. Unposed with neither clock held it read 4720..12364.
+	# 21, 30, 51 and 344 across recent runs while nothing read it.
+	#
+	# IT IS STILL NOT ASSERTED, AND THAT IS NOW A MEASURED CONCLUSION RATHER THAN AN UNFINISHED ONE. Eight
+	# runs of each arm, INTERLEAVED rather than run in blocks so drift in machine conditions could not
+	# separate them, against a copy differing by exactly one line -- the `Engine.time_scale = 0.0` above:
+	#
+	#   posed     0    0    0    0    0    7    0    0        max 7, median 0
+	#   unposed   0    2    2    6   19   19  213  557        sorted; median 12.5
+	#
+	# THE TWO DISTRIBUTIONS OVERLAP, so no cap separates them. A cap at the posed arm's maximum of 7 passes
+	# four of the eight unposed runs; a cap at 0 breaks one of the eight posed runs. Either bound is a red
+	# that means nothing or a green that means nothing, and there is no third number.
+	#
+	# The reason is in the mechanism and not in the sample size. The grain decorrelates with WALL TIME
+	# between the two captures, so an idle machine barely contaminates the mask whether or not the clock is
+	# held -- which is why the defect this control exists for was invisible until a sweep ran twelve engines
+	# at once and the mask reached 465 pixels. **The arm that would separate them is the loaded one**, and
+	# eight sweeps to get eight samples of it is not a measurement anyone will repeat.
+	#
+	# So it stays a printed diagnostic, deliberately, and the note to the next reader is that a bound here
+	# needs the LOADED distribution, not more idle runs. Note also that posed is not identically zero: one
+	# run in eight ate 7, and whole-frame movers under the same pose read 0, 0, 0, 3. With neither clock
+	# held it read 4720..12364.
 	var eaten: int = _count(_without(_without(moving, _invert(lane)), _body_mask()))
 	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels, "
 		% [body_edge, guide_edge, _count(guide)] + "%d corridor pixels eaten by drift)" % eaten)
