@@ -1227,6 +1227,20 @@ func is_bazaar_at(o: Vector2i) -> bool:
 ## together. It arrived as `check_frametime`'s DIG p99 of 30.5ms, which that layer's own header attributes
 ## to the fine-terrain region rebake; the region rebake measures 3.6ms and was never the subject.
 ## The scan now rejects an origin in two dictionary reads, and the same profile shows nothing above 5.9ms.
+##
+## THE RESCAN ITSELF, MEASURED DIRECTLY (mac16,8, headless, machine lock held). The line
+## above proves the repair with a frame-level number, which is the right evidence for "is the stutter
+## gone" and the wrong evidence for "what does one rescan cost now": a frame ceiling bounds the
+## rescan without measuring it. Timing the call directly, 40 samples, forcing the dirty flag before
+## each one:
+##
+##     rescan   min 2.69  p25 2.72  median 2.74  mean 2.75  p95 2.82  max 2.86   (ms)
+##     cached   median 0.000, and the ratio between them is ~27000x
+##
+## The cached row is the control and it travels in the same run: if the two came back alike, the
+## timer would be measuring call overhead and neither number would mean anything. So the repair is
+## 16.4ms to 2.74ms, roughly 6x, and a dig now costs a third of a 120fps frame rather than two whole
+## ones. The spread is 0.17ms across 40 samples, so this is a stable cost and not a sampled one.
 var _bazaars_cache: Array[Vector2i] = []
 var _ruins_cache: Array[Dictionary] = []       ## {origin, gap}: frames ONE block short (find_bazaar_ruins)
 var _bazaars_dirty: bool = true
