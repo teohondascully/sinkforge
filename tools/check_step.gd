@@ -18,6 +18,22 @@ var _frames: int = 0
 var _phase: int = 0
 var _budget: int = 0
 var _fails: int = 0
+
+## HOW MANY OF THE THREE TRAVERSALS WERE ACTUALLY POSED, and which were not.
+##
+## Every setup below needs a flat run to build its subject on, and every one of them used to answer "no
+## flat run" by printing a line to stderr and moving on. None recorded a failure, and `_done()` prints
+## ALL STEP-UP TRAVERSALS PASS whenever `_fails == 0` -- so a world with no 5-wide flat run at the searched
+## offsets produced a green over nothing. Measured, not argued: a copy with `_flat_run` forced to return -1
+## printed "skipping A", "skipping B" and then ALL STEP-UP TRAVERSALS PASS, and exited 0. It skipped
+## straight from B to `_done()`, so C was never even announced.
+##
+## The sweep was protected by the assertion floor -- three pass lines, and a full skip prints none -- but
+## the floor only judges on a full configured sweep, so a standalone run of this layer reported success.
+## The refusal belongs where the layer can make it, which is here.
+const TRAVERSALS: int = 3
+var _posed: int = 0
+var _missed: PackedStringArray = PackedStringArray()
 var _pit := Vector2i(-1, -1)
 var _mach_col: int = -1
 var _tree_col: int = -1
@@ -96,6 +112,7 @@ func _setup_pit() -> void:
 	var f: int = _flat_run(12, 5)
 	if f < 0:
 		printerr("  (no flat run found to test the pit — skipping A)")
+		_missed.append("A (the 1-pit)")
 		_setup_machine()
 		return
 	var r: int = _sim.surface_row(f)
@@ -106,6 +123,7 @@ func _setup_pit() -> void:
 	_phase = 0
 	_budget = 150
 	print("  dug a 1-pit at %s; body dropped in" % _pit)
+	_posed += 1
 
 
 ## B: place a machine on a fresh flat run; the body walks into it from the left.
@@ -113,6 +131,7 @@ func _setup_machine() -> void:
 	var g: int = _flat_run(maxi(4, _pit.x + 4), 5)
 	if g < 0:
 		printerr("  (no flat run found to test the machine — skipping B)")
+		_missed.append("B (the machine)")
 		_done()
 		return
 	var r: int = _sim.surface_row(g)
@@ -123,6 +142,7 @@ func _setup_machine() -> void:
 	_phase = 1
 	_budget = 220
 	print("  placed a machine at col %d; body left of it" % _mach_col)
+	_posed += 1
 
 
 ## C: plant a 2-tall WOOD trunk (rows r-1, r-2) on a fresh flat run — a wall taller than the body — and
@@ -131,6 +151,7 @@ func _setup_tree() -> void:
 	var g: int = _flat_run(maxi(4, _mach_col + 4), 5)
 	if g < 0:
 		printerr("  (no flat run found to test the tree — skipping C)")
+		_missed.append("C (the wood trunk)")
 		_done()
 		return
 	var r: int = _sim.surface_row(g)
@@ -142,12 +163,28 @@ func _setup_tree() -> void:
 	_phase = 2
 	_budget = 220
 	print("  planted a 2-tall wood trunk at col %d; body left of it" % _tree_col)
+	_posed += 1
 
 
 func _done() -> void:
 	physics_frame.disconnect(_phys)
+	# A TRAVERSAL THAT WAS NEVER POSED IS NOT ONE THAT PASSED. This is checked before `_fails`, because
+	# `_fails == 0` is what a run that tested nothing reports.
+	if _posed < TRAVERSALS:
+		# THE COUNT AND THE LIST DO NOT HAVE TO AGREE, and saying so is cheaper than a reader deciding one
+		# of them is wrong. A skip jumps straight to this verdict, so the traversals after it never run and
+		# never announce a reason: the first draft printed "3 of 3 were never posed: A, B" and read like an
+		# off-by-one.
+		var tail: String = "" if _missed.size() == TRAVERSALS - _posed \
+			else " — the rest were never reached, because a skip jumps straight here"
+		printerr("  %d of %d traversals were never posed, so this run judged nothing about them: %s%s"
+			% [TRAVERSALS - _posed, TRAVERSALS,
+				", ".join(_missed) if not _missed.is_empty() else "none announced a reason", tail])
+		printerr("%d step-up traversal(s) FAILED, and %d were not attempted" % [_fails, TRAVERSALS - _posed])
+		quit(1)
+		return
 	if _fails == 0:
-		print("ALL STEP-UP TRAVERSALS PASS")
+		print("ALL STEP-UP TRAVERSALS PASS (%d traversals posed)" % _posed)
 		quit(0)
 	else:
 		printerr("%d step-up traversal(s) FAILED" % _fails)

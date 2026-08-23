@@ -1731,3 +1731,40 @@ way, 4.5% to 13.5%: the surface reading went 11.1 to 9.6 against a floor of 7.0.
 and not a risk, but it is a wider spread than the settle repair's own six runs showed, and it is the number
 to watch if that layer is opened again. The count of exactly-reproducing layers also went 95 to 92 — a
 different pair, three small new movers, none above 6.7%.
+
+
+## Three traversals, none of them posed, and a green
+
+Auditing the thirteen layers that extend `SceneTree` for a population guard turned up two with none at
+all. The first, `check_step`, is a live instance of the shape this programme keeps finding.
+
+It makes three claims — a body climbs out of a 1-pit, walks over a machine, walks through a wood trunk —
+and each needs a flat run of terrain to build its subject on. Each setup answered "no flat run" by printing
+a line to stderr and moving on. None recorded a failure. `_done()` prints `ALL STEP-UP TRAVERSALS PASS`
+whenever `_fails == 0`, and a run that tested nothing has `_fails == 0`.
+
+Measured rather than argued, with `_flat_run` forced to return -1:
+
+```
+  (no flat run found to test the pit — skipping A)
+  (no flat run found to test the machine — skipping B)
+ALL STEP-UP TRAVERSALS PASS
+EXIT=0
+```
+
+C was never even announced, because B's skip jumps straight to the verdict. Three claims, none posed, exit
+0 — and the two stderr lines saying so are the same shape as `check_bake_idempotent` printing SKIP before
+exiting PASS: the sentence is right and the thing being read is the exit code.
+
+The sweep was covered by the assertion floor — three pass lines, and a full skip prints none — but the
+floor only judges on a full configured sweep, so a standalone run reported success. The layer now counts
+what it actually posed and refuses a verdict below three, before looking at `_fails`, because `_fails == 0`
+is exactly what a run that tested nothing reports.
+
+One detail worth the line it costs: the first version of the refusal printed *"3 of 3 traversals were never
+posed: A, B"* and read like an off-by-one. It is not — a skip jumps straight to the verdict, so the
+traversals after it never run and never announce a reason. The count and the list genuinely disagree, and
+the message now says why instead of leaving a reader to decide which number is wrong.
+
+Controls: the mutant exits 1 with `0 step-up traversal(s) FAILED, and 3 were not attempted`; the real layer
+still prints its three PASS lines and exits 0, so the floor of 3 is untouched.
