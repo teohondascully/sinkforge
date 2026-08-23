@@ -230,6 +230,63 @@ func _contamination(main: MainView, moment: String) -> String:
 		if pl.on_floor:
 			wrong.append("the body is STANDING — a swing shot of a body on the ground is the exact frame "
 				+ "this moment produced for its entire life while exiting 0")
+	# THE TEACH SHOT HAS THE SAME SUBJECT AS THE SAPLING SHOT AND HAD NONE OF ITS GUARD, which is how it
+	# spent its whole life saving a frame with no lesson in it and printing CAPTURED. The moment exists to
+	# answer one question from a picture -- does the lesson arrive on the moment it explains? -- and a
+	# bubble-less frame answers it, wrongly, to any zero-context viewer handed the file.
+	#
+	# WHAT IS OBSERVED, kept separate from what is inferred, because the first mechanism written here was
+	# wrong and the guard caught its author. `_teaching` reaches the caught line by real play and the lesson
+	# genuinely fires -- `_done` carries `wrapped`, no warning prints, `_active` is assigned. At the shutter
+	# `active_text()` is the EMPTY STRING, so `_active` has been cleared again in the eighty-odd frames
+	# between the two. That is the fact. WHY it clears is NOT established.
+	#
+	# The mechanism first written here was that the body is still swinging, `main.gd:720` marks it busy
+	# above 1.25x run speed, and `Hints.active_alpha()` returns a flat 0.0 while busy. All three of those
+	# are true and none of them is this: a busy body zeroes the ALPHA and leaves `_active` alone, and the
+	# refusal names an empty `_active`. The suppression is real and would bite next, once whatever empties
+	# `_active` is fixed; it is not what bites first. The message below prints both quantities so the next
+	# reader does not have to re-derive which one fired.
+	#
+	# Worth knowing for the fix either way: the swing is a pendulum on a constraint that is non-dissipative
+	# by construction ("a projection cannot add energy on its own", grapple.gd:22), so it never slows on its
+	# own. Nothing here poses the body -- a posed hang is a frame the game never produces.
+	#
+	# So this guard REFUSES EVERY RUN TODAY, and that is the correct state: the moment has no committed
+	# capture to regress, and a loud refusal is worth more than a frame that lies. Making it capturable is a
+	# separate change and needs the body slow AT THE SHUTTER with the line still wrapped -- landing it on
+	# the shelf `_bending_geometry` builds at rows (38..44, 31) is the obvious candidate.
+	#
+	# NO MUTANT ACCOMPANIES THIS ONE, deliberately. `sapling` has `SF_MOMENT_MUTANT=nosapling` because a
+	# guard is only worth having once it has been SEEN to refuse -- but a positive control only carries
+	# information while the UNMUTATED arm passes. Both arms refuse here, so a mutant would prove nothing it
+	# does not already prove by failing for the ordinary reason. It belongs with the fix, not before it.
+	if moment == "teach":
+		var th: Object = main._hints
+		if th == null:
+			wrong.append("the hint system does not exist, so there is no lesson in this frame")
+		elif not str(th.active_text()).begins_with("THE LINE CAUGHT"):
+			# LEAD WITH THE QUANTITY THAT SEPARATES THE RIVALS. "No bubble" has two very different causes --
+			# the lesson was never active, or it is active and suppressed -- and they need different fixes,
+			# so both are printed rather than the legible one.
+			wrong.append(("the visible lesson is '%s', not the caught-line one — this frame is named for a "
+				+ "bubble it does not contain [_active=%s alpha=%.2f busy-speed=%.0f px/s, taught=%s]")
+				% [str(th.active_text()).substr(0, 24), "empty" if str(th.active_text()) == "" else "set",
+					th.active_alpha(),
+					main._player.velocity.length() if main._player != null else -1.0,
+					"yes" if th.get("_done") != null and (th.get("_done") as Dictionary).has(&"wrapped")
+						else "NO"])
+		elif th.active_alpha() < 0.9:
+			wrong.append(("the caught-line bubble is at alpha %.2f, so it is not in the picture. The body "
+				+ "is moving at %.0f px/s and the lesson is suppressed above %.0f — this photographs the "
+				+ "game declining to teach, not the teaching")
+				% [th.active_alpha(), main._player.velocity.length() if main._player != null else -1.0,
+					Player.RUN_SPEED * 1.25])
+		# AND THE OTHER HALF OF THE PAIRING. The moment is a lesson AND the geometry it is about; a bubble
+		# over a straight line would be the lesson arriving about nothing.
+		if main._player != null and main._player.grapple.pivots.is_empty():
+			wrong.append("the line has no pivot at the shutter — it is not caught on anything, so the "
+				+ "frame cannot show a line that 'bent around the rock instead of through it'")
 	if moment == "sapling":
 		var hints: Object = main._hints
 		if hints == null:
