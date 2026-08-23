@@ -37,10 +37,21 @@ const WITNESS_MIN: int = 8           ## the dug column must move by at least thi
 
 var _fails: int = 0
 
+## THE HARNESS'S SKIP CONTRACT, HARDCODED BECAUSE THIS LAYER CANNOT INHERIT IT. `check_base.gd` declares
+## `const SKIP: int = 42` and the six other display-guarded layers get it for free; this one extends
+## `SceneTree`, so it has to carry its own copy. `run_harness.sh` keeps the other half as `SKIP_CODE=42` and
+## says the pair is load-bearing: move one, move both.
+const SKIP: int = 42
+
 func _initialize() -> void:
 	if DisplayServer.get_name() == "headless":
+		# AND IT EXITS 42, NOT 0. It said the word SKIP and then exited 0, which the runner reads as PASS --
+		# so in the headless CI job this layer reported a green having rendered nothing. The sentence was
+		# right and the exit code was the thing being read. Of the 17 layers registered `add_gl`, six already
+		# exit 42 here and this was the only one exiting 0; the other ten carry no display guard at all,
+		# which is a separate question and not this one.
 		print("check_bake_idempotent: SKIP — needs a display (the bake is a SubViewport render target)")
-		quit(0)
+		quit(SKIP)
 		return
 	MainView.dev_start = false
 	await _run()

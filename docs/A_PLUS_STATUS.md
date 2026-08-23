@@ -1564,3 +1564,41 @@ bounds**. That is not a fault in the census — it counts the numbers inside PAS
 know which of them a threshold is compared against, and its header already refuses to rank risk for
 exactly this reason. It is worth writing down as measured experience: a high row is a reason to open the
 layer, and opening the layer is where most of them end.
+
+
+## A layer that said SKIP and exited PASS
+
+`check_verdict_route` enforces that no layer exits 0 by hand, and its exemption list is empty. Its
+population is documented as the INHERITORS of `check_base.gd`, on the reasoning that a layer extending
+`SceneTree` "has no base-class guard to bypass". True, and it also means the thirteen `SceneTree` layers
+are the ones nothing checks — which is the shape this repository has found before: the opt-out predicts
+the defect.
+
+Auditing their exit paths found one. `check_bake_idempotent` guards itself for a display it needs, prints
+
+    check_bake_idempotent: SKIP — needs a display (the bake is a SubViewport render target)
+
+and then exits **0**. The harness's skip contract is exit 42; `SKIP_CODE=42` in the runner and
+`const SKIP: int = 42` in the layers, described in the runner as a load-bearing pair. Exit 0 is a pass. So
+in the headless CI job this layer reported green having rendered nothing, and the sentence saying otherwise
+was in the log where nothing reads it. The word was right and the exit code was the part being read.
+
+Before and after, same runner, same flags:
+
+```
+  [ 1/ 1] check_bake_idempotent (bake holds)   PASS    1s
+  1 PASS / 0 FAIL / 0 SKIP of 1 selected — subset green
+
+  [ 1/ 1] check_bake_idempotent (bake holds)   SKIP    0s
+  SKIPPED — NOT RUN, NOT PASSED: check_bake_idempotent (bake holds)
+  0 PASS / 0 FAIL / 1 SKIP of 1 selected
+```
+
+The display path is unchanged and still passes in 5s. The population was enumerated rather than guessed:
+of the 17 layers registered `add_gl`, six already exit 42 on this branch and this was the only one exiting
+0. A scan for the same shape across all 104 registered GDScript layers returns exactly this one.
+
+**What is left open, and stated rather than folded in:** the other ten `add_gl` layers carry no display
+guard at all. The runner hands them `--headless` when there is no display, so what they do in the CI job is
+unmeasured — they may fail honestly, or they may judge the dummy renderer's blank frames. That is a
+separate question with its own risk of hanging a sweep, and it is the next item rather than this one.
