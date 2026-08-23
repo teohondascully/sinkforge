@@ -165,6 +165,15 @@ func _run() -> void:
 	# only ever reported green in the harness on runs where this GL layer self-skipped for want of a window.
 	# Measured on the COOL axis this same body separates by 4.3-5.2 levels across three runs, so the property
 	# is plainly there. The floor is set from those measurements, not guessed ahead of them.
+	#
+	# AND THREE RUNS WERE NOT ENOUGH TO SEE THE SPREAD. Re-read later across 45 retained sweep logs, this
+	# separation runs 3.3 to 6.8 levels — twice the width the three runs showed, and its MINIMUM sits below
+	# the 4.3 those three suggested was the bottom. The floor still holds and is not moved: 3.3 clears 2.5
+	# by 32%. What is corrected is the basis. A range from three draws is not a range, and a floor derived
+	# from one reads as calibrated when it is a guess with a number attached. Whoever revisits this bound
+	# should start from those 45 samples, and should first find out whether this is a single draw of a
+	# quantity that animates — `check_machine_state` had exactly that fault, and a median of consecutive
+	# draws cured a 4.5x swing there.
 	var fall: float = (ctop.z - ctop.x) - (cbot.z - cbot.x)
 	print("  the body reads %.1f blue-over-red at the top and %.1f near its floor (luma %.1f / %.1f)"
 		% [ctop.z - ctop.x, cbot.z - cbot.x, top, bottom])
