@@ -199,7 +199,7 @@ Observations to preserve, not twenty independent implementation tickets.
 | Symptom | Root | Severity | First investigation |
 |---|---|---:|---|
 | Lesson bubble prints over the world object its own lesson names (`UI-01`, **open, and re-scoped from evidence** — see the note below the table) | V1 | Frame-breaking | Read the number `capture_moments -- teach` now prints; then decide where a lesson may sit relative to its subject |
-| Multiple arrows, rings and labels in one surface frame | V1 | Frame-breaking | Inventory simultaneous helper states and assign priority tiers |
+| Multiple arrows, rings and labels in one surface frame (**inventory taken 2026-08-23** — see the second note below the table; the count is structural and the tier assignment is a director call) | V1 | Frame-breaking | Inventory simultaneous helper states and assign priority tiers |
 
 > ### `UI-01` was re-scoped on 2026-08-23, because two of its three claims were measurably wrong
 >
@@ -235,6 +235,71 @@ Observations to preserve, not twenty independent implementation tickets.
 > This also has no home in `check_hud_layout`, and that is not an oversight in the layer. It compares HUD
 > rectangles against HUD rectangles; every rope is drawn in world space. The same wall stopped the zone
 > ceremony's rope half, where it was recorded as *"not a missing state, a missing plane"*.
+
+> ### The helper inventory, taken 2026-08-23 — and the registry that already exists is total over the wrong population
+>
+> `docs/PRIORITY.md:1317` gates `UI-09`–`UI-15` on "a helper inventory", and the row above names it as the
+> first investigation. **Most of it already existed and nobody had said so.** `Hud.HELPER_TAGS` classifies
+> every drawing surface as `critical` / `active` / `discoverable` / `ambient` / `internal`, the `critical`
+> tag carries a one-at-a-time rule, and `check_hud_layout._check_helper_registry()` asserts the table
+> against the live method list in BOTH directions, so a surface added without a tag fails rather than
+> becoming the eighth thing on the screen. Measured on tonight's sweep:
+>
+>     helpers: critical 4 · active 3 · discoverable 6 · ambient 5 · internal 12
+>     PASS: the HUD reports 30 _draw* methods to classify
+>
+> **The gap is the population, not the rule.** The registry is built by walking `_main._hud` and every
+> object it transitively holds that is `RefCounted` and script-backed. `WorldRenderer` is a Node held by
+> `MainView`, so it is excluded twice over. `scenes/world_renderer.gd` declares **thirty more `_draw*`
+> methods and not one of them is classified**, and an assertion that prints *"every drawing surface is
+> classified"* over a population containing none of them. The two thirties are a coincidence and not a
+> comparison: the registry's is counted from the live object graph across the Hud AND its pages, where
+> `scenes/hud.gd` alone declares 23; the world plane's is counted from one file's declarations. This is the missing plane
+> `UI-01` and the ceremony's rope half both hit, arrived at from the third direction: not a missing state,
+> not a missing measurement, a **missing half of the register**.
+>
+> **The guidance surfaces that live outside it, with the cardinality each can reach.** Eight of the thirty
+> are guidance rather than world content; that split is a judgement and is mine, and the remaining
+> twenty-two are terrain, décor and effects, for which the registry's vocabulary has no tag at all.
+>
+> | surface | plane | how many at once | live when |
+> |---|---|---|---|
+> | `_draw_dig_marks` | marks | **0..N**, view-culled only | any marked cell is on screen |
+> | `_draw_scan` echoes | world | **0..N**, one ring + diamond + pip each | for `SCAN_ECHO_LINGER` after a sonar pulse |
+> | `_draw_scan` front | world | 0..1, two concentric arcs | while the pulse still travels |
+> | `_draw_guide_targets` | marks | **0..1** | the current objective has a spatial step |
+> | `_draw_ping` | marks | 0..1, ring + bobbing pin | a map-click beacon is set |
+> | `_draw_aim` reticle | world | 0..1 | the cursor is on an in-bounds cell |
+> | `_draw_interact_pulse` | world | 0..1 | the cursor is on a rich vein or a machine |
+> | one of four `*_preview` | world | 0..1 | build mode; `_ghost_def.behavior` holds one value |
+>
+> **Two of those are unbounded, and they are the two the symptom names.** Dig marks draw one bracketed cell
+> per mark with no cap beyond the view rect, and each scan echo draws its own expanding ring. "Multiple
+> arrows, rings and labels in one surface frame" is therefore **structural rather than a defect**: it is
+> what the build is specified to do, and no rule anywhere says how much of it may happen at once.
+>
+> **What is NOT the cause, checked and cleared.** `_draw_guide_targets` loops, which reads like the obvious
+> culprit. It cannot be: `MainView._guide_targets()` matches on a single `_objectives.current_id()` and
+> every branch does exactly one `out.append(...)`, so the array holds **0 or 1** and the chevron cannot
+> multiply. The plural loop is the shape of the code, not the shape of the screen.
+>
+> **The arithmetic the ticket was reaching for.** A player mid-build with marks down, shortly after a scan,
+> standing on an objective step, cursor on a machine, can hold: N dig-mark brackets, M echo rings, a
+> travelling front, a chevron on a tether over a washed cell, a reticle, an interact pulse, a build ghost,
+> and — across the HUD plane, governed by a rule that does not know the above exists — an objective line, a
+> hover panel and one `critical` interrupt. **The one-at-a-time rule caps the last of those at one and says
+> nothing about the other ten.**
+>
+> **Proposed tiers, and this half is a director call rather than a finding.** The existing vocabulary
+> extends to the world plane without new words: `_draw_guide_targets` and `_draw_ping` are `critical` (each
+> is a summons that expects to be answered), `_draw_aim`, `_draw_interact_pulse` and the previews are
+> `active` (they describe what is under your hand this instant, and already cannot coexist), and
+> `_draw_dig_marks` and the scan echoes are `ambient` (state you read at a glance) — which, if adopted,
+> would put **two `critical` surfaces on screen together**, the chevron and the ping, in flat breach of the
+> rule the HUD half already enforces. That collision is the reason the tiers are proposed here and not
+> committed: extending the registry is a five-line change, and deciding what happens when it immediately
+> goes red is the design question the ticket actually contains.
+
 | `FORGE` labels and pointers read as duplicated UI | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
 | Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
 | Dashed grapple guide reads as debug geometry | V4 | Play-disrupting | Three-state motion comparison |
