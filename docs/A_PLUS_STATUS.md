@@ -8,8 +8,8 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
-| 3. Harness quality | **Closed, with one narrowed finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. Fifty-five are converted; the measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. Three remain uncovered and are named below, because they call neither `_check()` nor `_verdict()` and so cannot be reached by a tail conversion. |
-| 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
+| 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. The measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. All 90 inheritors now reach exit 0 only through `_verdict()`, none of them moves an assertion counter itself, and both rules are gated by `check_verdict_route` with a shrink-only exemption list that is empty. |
+| 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement; the frame SLO has been evaluated on the host it was written for; and its allowances, which were one machine's numbers applied to any machine, are now a per-host registry that refuses rather than borrows. Remaining: the `solid` mutator, which is a hidden-coupling item sized at 37 mutation sites and deliberately not attempted. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
 
@@ -268,6 +268,53 @@ The spread is 0.17 ms across 40 samples, so this is a stable cost rather than a 
 No defect: the cache is correct and the repair holds at roughly six times. A dig costs a third of a 120fps
 frame rather than two whole ones.
 
+## Area 4 — the frame SLO's allowances were one machine's numbers, applied to any machine
+
+Area 4 asks for reproducible performance semantics: *a number that means the same thing on two machines*.
+The one place this project makes an absolute performance claim was the one place that property did not
+hold, and nothing said so.
+
+`MISS_QUIET` 1.0%, `MISS_WORKING` 6.0% and `SEVERITY_X` 3.0x were **global constants**, ratcheted onto five
+runs of one `Mac16,8`, and they applied unchanged to any box whose operator set `SF_PERF_HOST`. Naming a
+second machine would have asserted the first machine's behaviour on it. A green would have meant *this box
+behaves like that one* while reading as *this box holds the contract*.
+
+`tools/perf_hosts.txt` holds them now: one row per host per phase, each carrying the measurement it came
+from and the **model** that measurement was taken on. A host with no rows is a hard FAIL —
+
+- **not a fallback to the defaults**, because the defaults were the defect, and putting them back on the
+  error path is where a defect goes to be hard to see;
+- **not a stand-down**, because answering *we have never measured this machine* with a skip files it under
+  *nothing to report*.
+
+The model column is checked against `OS.get_model_name()`. An environment variable travels — a shell
+profile, a CI secret, a copied command line — and the failure that causes is the quietest kind: the wrong
+allowances applied silently on hardware nobody calibrated.
+
+| path | result |
+|---|---|
+| `SF_PERF_HOST` unset | stands down exactly as before, `PASS (5 asserted)` |
+| `SF_PERF_HOST=some-other-box` | FAIL — *a machine this repository has never measured* |
+| `SF_PERF_HOST=mac16-8-120hz` | asserts, *allowances read from … (4 phase rows)* |
+| model column changed to `MacIntel99,1` | FAIL — *measured on MacIntel99,1 and this box reports Mac16,8* |
+| a tab removed from one row | FAIL — *line 56 has 5 tab-separated fields, needs 6* |
+
+### A reading that did not fit, kept
+
+Six runs on the named host at load average 3.1–5.3 — a working box, not the quiet one the original seven
+were taken on. Five came back with every phase at 0.0% except DIG at 3.0–3.8%. The sixth read **SWING at
+1.5% against its 1.0% allowance**: three late frames in a phase that read 0.0% in all five neighbours and
+in all seven original runs.
+
+**The allowance was not moved.** One run in six over a bar is either a contended box or a real tail, and
+this layer cannot tell those apart — `_absolute`'s own note records every discriminator that was tried and
+why each failed. Widening a bar to fit a reading converts *we cannot tell* into *this is fine*, which is
+the one move a ratchet exists to prevent.
+
+So the host stays unarmed, and now for two reasons rather than one: IDLE's known one-frame margin, and
+SWING's exceedance measured today. All seven runs are retained under
+`docs/tracelog/sweeps/2026-08-23-perf-hosts-registry-green/frametime-runs/`.
+
 ## Area 3 — the verdict protocol, audited
 
 The duplication audit flagged a copied boot preamble across the test layers. Examined properly it is not a
@@ -406,17 +453,45 @@ layer template has always ended `_verdict("check_thing", "the thing holds")`, an
 exit protocol in terms of `_verdict()`. Fifty-eight layers did something else. Nothing compared the two,
 which is the same shape as everything else in this section: a rule with no runner.
 
-### The three that a tail conversion cannot reach
+### The three a tail conversion could not reach, and how they were reached
 
 `check_frametime`, `check_opening` and `check_underground` call neither `_check()` nor `_verdict()`. They
 hand-roll their comparisons *and* their diagnostics — `check_underground` distinguishes a fixture that
 could not reach the rock from a verdict on the rock, in its own words, over several lines. There is no
-shared protocol tail in them to move, and rewriting their judgement is a different piece of work with a
-different risk.
+shared protocol tail in them to move, so the batch conversion refused all three, by itself, rather than
+guessing.
 
-They are, for exactly that reason, **the three layers the no-assertions guard still does not cover**, and
-they are recorded here as an open finding rather than counted as done. Nothing today would notice if one of
-them stopped judging.
+They were recorded here as an open finding: three layers nothing would notice going quiet. Closed in
+`abf8969`, and not by rewriting their judgement. Each decision is recorded with `_check()` **beside** the
+diagnostic rather than instead of it — the `_check` carries the property and the numbers, the `printerr`
+beneath keeps the prose that makes a red usable, and every early return stays where it was so a later
+reading is never taken over an earlier one that failed. `check_opening` and `check_underground` assert 3
+properties each; `check_frametime` asserts 5.
+
+`check_frametime` is the one worth naming. `_gate`, `_workload` and `_absolute` each print lines reading
+`      PASS:` and `      FAIL:` that no counter has ever seen — they only ever fed a local boolean. **A
+layer printing assertion-shaped lines that nothing counts is harder to notice than one printing none.**
+The helpers are untouched and their detail lines stay; the five call sites now record what they returned.
+
+**The exemption list is empty, and the ratchet is what asked for that.** It went `3 FAILURE(S) of 12` the
+moment the three became compliant, one red per stale row, saying *tighten the list the day it does not* —
+the ratchet firing on real data rather than on the synthetic mutant it shipped with. The machinery stays:
+a gate that cannot express an exemption gets one anyway, in the form of somebody quietly not registering
+their layer. What must stay expensive is adding a row.
+
+### The second way to hand-roll the protocol
+
+`_check(false, label)` is exactly `_failures += 1` followed by `printerr("  FAIL: %s")`. Six layers had
+written that pair out by hand at a fixture-bail — `check_aim`, `check_plunge`, `check_pump`,
+`check_teaching`, `check_water_reads`, `check_wrap` — with byte-identical output, so nothing in any log
+could tell them apart.
+
+**They were harmless as written, and that is the point.** The counter really was incremented. The danger is
+not the six sites, it is that the counter is reachable at all: `_passes += 1` at a fixture-bail is the same
+keystrokes and would manufacture the number `_verdict()`'s refusal keys on — turning the one guard against
+a layer that stopped judging into a value the layer supplies itself. The first rule stops a layer exiting 0
+around the guard; the second stops it feeding the guard. Reads stay allowed: `check_item_reads` decides
+between a failure and a skip on `if _failures > 0:`, which is a real decision that needs the count.
 
 ### Arming the gate before the shape arrived
 
@@ -466,8 +541,11 @@ be tightened, not a quiet no-op. That is the difference between a permission and
 | `quit(0)` only in a comment | silent |
 | `quit(0)` sharing a line with a trailing comment | flagged |
 | `quit(0)` only inside a string literal | silent |
+| positive: a layer moving `_failures` itself | flagged |
+| negative twin: a layer that only READS `_failures` | silent |
 | mutation: hand-rolled tail put back into `check_agility` | FAIL naming `check_agility.gd` |
 | mutation: an exemption added for a layer that does not need one | FAIL demanding the list be tightened |
+| mutation: the hand-rolled counter pair put back into `check_pump` | FAIL naming `check_pump.gd` |
 
 **It flagged itself on its first run**, and that is recorded in the file rather than smoothed over. Its own
 controls are triple-quoted blocks containing the exact shape it hunts, and its comment stripper did not
@@ -475,9 +553,15 @@ understand triple quotes. The fix on offer was a per-file exemption for the dete
 fixed instead, with a control for it, because widening a permission list to hide a defect in the detector
 is the trade the layer exists to refuse.
 
-**Evidence:** configured sweep `111 PASS / 0 FAIL / 0 SKIP` with six documented stand-downs,
-`HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, 294s, retained at
-`docs/tracelog/sweeps/2026-08-23-verdict-route-gate-green/`.
+It carries two rules, not one. **An inheritor may not exit 0 under its own power**, and **an inheritor may
+not write `_passes` or `_failures`.** Each turns exactly one assertion red under its own mutant, and the
+exemption list — a shrink-only ratchet — is empty.
+
+**Evidence:** four configured sweeps across the day, every one `111 PASS / 0 FAIL / 0 SKIP` with six
+documented stand-downs, `HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, retained at
+`docs/tracelog/sweeps/2026-08-23-verdict-route-gate-green/`,
+`.../2026-08-23-last-three-converted-green/` and `.../2026-08-23-counter-writes-green/`. Not full sweeps,
+and the runner says so itself.
 
 ## An open flakiness finding, recorded rather than absorbed
 
