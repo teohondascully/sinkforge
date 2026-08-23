@@ -333,14 +333,15 @@ const FULL_PROFILE: Array = [Rect2(0.0, 0.0, 1.0, 1.0)]
 ## bar ran across rock beside its foot. A cue anchored to a rectangle the machine no longer occupies is a
 ## cue pointing at nothing, and it is the exact cost of carving a silhouette out of a full square.
 ##
-## The default is the largest part by area, which is right for eleven of the thirteen. `lift` is the
-## exception the default gets wrong: its two gantry posts are each fractionally larger than the base beam
-## they stand on, so the glyph would ride up one leg. `check_casing_light` asserts every face here is
-## contained in one of its kind's own parts, so this table cannot drift away from the profile above it.
-## Empty on purpose, and kept because the moment a profile stops being "one body plus a crown" the default
-## stops being right. The default is the largest part by area, which for every entry above is `BODY`, so
-## the glyph, the badge, the bar and the ports all sit on the same solid rectangle they always sat on,
-## three pixels lower than the cell's centre and never on a crown.
+## The default is the largest part by area. For the thirteen profiles that carry `BODY` that is always
+## `BODY`, which at 0.80 of the cell beats the widest crown any of them wears by better than five to one.
+## The other three carry no body rectangle at all: `rope` and `conduit` are a single bar, so the face is
+## that bar, and `torch` is a post under a head, so the face is the post. Every cue therefore lands on the
+## largest solid the machine actually has, three pixels below the cell's centre and never on a crown.
+##
+## EMPTY ON PURPOSE. Nothing in the table yet needs a face the default gets wrong; the override is kept
+## for the first profile that stops being a body under a crown. `check_casing_light` holds every face
+## inside one of its own kind's parts, so an entry added here cannot drift off the silhouette.
 const MACHINE_FACE: Dictionary = {}
 
 

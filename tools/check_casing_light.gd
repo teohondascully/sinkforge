@@ -166,6 +166,14 @@ func _both_states(col: Color) -> Array:
 ## are two dictionaries keyed by the same strings, which is a promise nothing enforces, and the failure is
 ## silent and total: a face that has slipped off its parts draws every cue on the machine onto bare rock,
 ## and looks exactly like a face that has not.
+##
+## WHAT IT PROVES TODAY IS LESS THAN THAT, AND THE GAP IS WORTH SAYING OUT LOUD. The face override is
+## empty, so `machine_face` derives the face FROM the profile and hands back one of the very parts it is
+## then compared against. `Rect2.encloses` accepts an identical rectangle, so every per-kind check below
+## passes by construction and no edit to the profile table can redden one. This is a guard held cocked
+## rather than a measurement: it starts discriminating the first time somebody writes an entry into the
+## override, which is the only way the two tables can come apart. The control underneath is what carries
+## the weight meanwhile.
 func _check_face_sits_on_body() -> void:
 	var judged: int = 0
 	for kind: Variant in Visuals.MACHINE_PROFILE:
@@ -177,7 +185,9 @@ func _check_face_sits_on_body() -> void:
 		_check(on_body, "%s's face sits on one of its own body parts" % String(kind))
 		judged += 1
 	_check(judged >= 10, "%d profiles were judged" % judged)
-	# THE GUARD MUST BITE: a face deliberately off the body must be rejected, or the loop above is a loop.
+	# THE PREDICATE MUST BITE. A face that is not one of the parts is the one input the loop above cannot
+	# currently produce, so it is built here by hand and required to be rejected. That is a statement about
+	# `encloses` discriminating, not about the loop being reachable; the note on the function says which.
 	var stray := Rect2(0.0, 0.0, 1.0, 1.0)
 	var any: bool = false
 	for part: Rect2 in Visuals.machine_profile("drill"):
