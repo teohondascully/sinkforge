@@ -86,7 +86,7 @@ var _passes: int = 0
 ## conditions a summary happens to record and could not be written for the rest.
 ##
 ## So the layer RESOLVES what it reached and nothing more; the third state is DERIVED by
-## `tools/harness_verdict.sh` as "registered against this layer, and nothing in its log resolved it".
+## `tools/harness_verdict.sh` as UNACCOUNTED -- "the layer ran and nothing in its log declined it".
 ##
 ##   _sd_stood   ids `_stand_down()` declined this run
 ##   _sd_held    ids `_asserted()` made this run

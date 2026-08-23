@@ -403,7 +403,7 @@ The duplication audit flagged a copied boot preamble across the test layers. Exa
 tidiness problem: **the copies are missing a guard the original has.**
 
 `check_base.gd` exposes `_verdict(layer, note)`, which refuses a green that asserted nothing —
-"a layer that has nothing to assert must skip and say why" — and prints the assertion count as part of the
+"a layer that has nothing to assert must `_skip_layer()` or `_void_layer()` and say why" — and prints the assertion count as part of the
 verdict. A hand-rolled tail does neither:
 
 ```
