@@ -264,11 +264,31 @@ func announce(text: String, kicker: String, color: Color) -> void:
 var _pending_arrival: Array = []
 
 
-## Is the announce channel occupied right now? One caller, the controller, uses it to hold a
-## just-in-time lesson back rather than stack it under the ceremony. Only one primary attention state
-## may be up at a time, and this is the predicate that makes that rule enforceable.
+## Does an arrival plate EXIST right now — drawn or held? This is the plate's lifetime, not its
+## visibility, and the difference is load-bearing: a plate whose clock is frozen by `_announce_held()`
+## still answers true here while drawing nothing at all.
+##
+## Use `plate_on_screen()` for "is a ceremony occupying the player's attention". This one is for callers
+## asking whether an announcement is still owed.
 func announcing() -> bool:
 	return _arrival_life > 0.0
+
+
+## Is the arrival plate ACTUALLY ON SCREEN? Exactly the condition `_draw_arrival` returns on, and shared
+## with it rather than restated, so the predicate and the picture cannot come apart.
+##
+## THIS EXISTS BECAUSE THE OTHER ONE WAS USED FOR IT, and the bug that produced is worth keeping next to
+## the fix. `main.gd` gated just-in-time lessons on `announcing()`, under a comment saying to read the HUD
+## rather than mirror it because "only one of them draws" — and then read the predicate that is not the
+## one that draws. A plate already in flight when a rope goes live has its clock STOPPED on purpose
+## (`_announce_held`, and `_scratch_rope_ceremony` case 3 asserts it), so `announcing()` stays true for as
+## long as the line is out. The plate is invisible the whole time and every lesson waits behind it.
+##
+## The lesson that suffers most is the one about ropes. `wrapped` — "THE LINE CAUGHT" — can only fire
+## while a line is live, which is precisely the condition that freezes the plate, so a player who crossed
+## a stratum shortly before grappling could never be taught the technique at the moment it happened.
+func plate_on_screen() -> bool:
+	return _arrival_life > 0.0 and not _announce_held()
 
 
 ## The conditions under which an arrival ceremony is held.
@@ -801,7 +821,7 @@ const SCRIM_ABOVE: float = 32.0
 const SCRIM_BELOW: float = 18.0
 
 func _draw_arrival() -> void:
-	if _arrival_life <= 0.0 or _announce_held():
+	if not plate_on_screen():
 		return
 	var t: float = _arrival_life / ARRIVAL_HOLD
 	var a: float = clampf(minf((1.0 - t) * 6.0, t * 2.4), 0.0, 1.0)     # fast in, slow out

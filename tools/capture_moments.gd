@@ -902,6 +902,17 @@ func _the_sapling(main: MainView) -> void:
 		await physics_frame
 
 
+## How long `_teaching` will wait for a body that can read the lesson before giving up and letting the
+## shutter guard refuse. Sized from the two things being waited on rather than picked: `Hud.ARRIVAL_HOLD`
+## is 3.4s (~204 frames) and a swing arc is a second or two on top, so 600 frames is roughly double the
+## worst honest case. A bound, not a settle -- reaching it means the moment could not be posed.
+const READY_MAX: int = 600
+
+## Consecutive frames the body must read calm AND unceremonied before the lesson is armed. Half a second:
+## long enough that an arc extreme cannot satisfy it, short enough to leave room inside `READY_MAX`.
+const CALM_FRAMES: int = 30
+
+
 func _teaching(main: MainView) -> void:
 	await _bending_geometry(main)
 	if main._hints == null:
@@ -909,6 +920,38 @@ func _teaching(main: MainView) -> void:
 	if not main._hints._done.has(&"wrapped"):
 		push_warning("the swing never caught the corner — no lesson to photograph")
 		return
+	# WAIT FOR A BODY THAT CAN READ, which this moment never did and which is why it spent its life
+	# photographing an empty frame. `Hints.active_alpha()` returns a flat 0.0 under THREE conditions and two
+	# of them are live the instant the line catches: the arrival plate owns the announce channel
+	# (`ARRIVAL_HOLD` is 3.4s from the descent that got us here), and the body is over the busy threshold
+	# mid-swing. Setting `_active` before either clears just arms a lesson the HUD will not draw.
+	#
+	# The condition is the game's own, not a proxy: the busy rule is hysteretic, arming at 1.25x run speed
+	# and releasing only below 0.9x, so 0.9x is what has to be reached. And it must be reached by LANDING
+	# rather than by waiting -- the swing is a pendulum on a non-dissipative constraint (grapple.gd:22), so
+	# it passes under the threshold at each arc extreme and is moving again by the shutter. `on_floor` is
+	# the difference between a body that is briefly slow and one that will still be slow in sixty frames.
+	# SUSTAINED, NOT INSTANTANEOUS. A pendulum passes under any speed threshold twice an arc, so a single
+	# slow frame says nothing about the frame the shutter takes sixty later. `CALM_FRAMES` consecutive
+	# readings under the release threshold is the difference between a body at an arc extreme and a body at
+	# rest. The first version of this loop demanded `on_floor` instead and hit its bound every time: the
+	# body does not land, it comes to REST HANGING on the line at 8..16 px/s, which is a fine thing to
+	# photograph and reads nothing like standing.
+	var p: Player = main._player
+	var waited: int = 0
+	var calm: int = 0
+	while waited < READY_MAX:
+		await physics_frame
+		waited += 1
+		if p.grapple.pivots.is_empty():
+			break        # the corner came off the line; the shutter guard will refuse and say so
+		var slow: bool = p.velocity.length() < Player.RUN_SPEED * 0.9
+		calm = (calm + 1) if (slow and not main._hints._ceremony) else 0
+		if calm >= CALM_FRAMES:
+			break
+	print("    [teach] ready after %d frame(s), %d calm: speed=%.0f ceremony=%s pivots=%d on_floor=%s"
+		% [waited, calm, p.velocity.length(), str(main._hints._ceremony),
+			p.grapple.pivots.size(), str(p.on_floor)])
 	main._hints._queue.clear()
 	main._hints._active = &"wrapped"
 	main._hints._life = Hints.SHOW_SECONDS - 1.0    # past the fade-in, nowhere near the fade-out

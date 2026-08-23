@@ -722,7 +722,13 @@ func _process(delta: float) -> void:
 			# ...and whether the ceremony currently owns the announce channel, so a lesson waits for it rather than
 			# being stacked under it. Read from the HUD rather than mirrored here: a second copy of "is the plate up"
 			# is a second thing that can be wrong, and only one of them draws.
-			_hints.note_ceremony(_hud.announcing())
+			#
+			# AND THIS LINE READ THE WRONG ONE, under that exact comment, until 2026-08-23. `announcing()` is the
+			# plate's LIFETIME; `plate_on_screen()` is its VISIBILITY, and they differ for as long as a line is out,
+			# because a plate in flight when the rope goes live has its clock frozen rather than dropped. A lesson
+			# gated on the first waits behind a plate nobody can see. `wrapped` fires only while a line is live, so
+			# the rope lesson was suppressed by the rope.
+			_hints.note_ceremony(_hud.plate_on_screen())
 			# The feet, not the body centre: standing on the grass, the centre cell is the air above it, which read as
 			# open sky while the miner was plainly stood on the ground.
 			_note_stratum(_cell_at(_player.position + Vector2(0.0, Player.HEIGHT * 0.5 + 2.0)).y)
