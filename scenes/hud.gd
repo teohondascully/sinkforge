@@ -656,6 +656,30 @@ static func hint_box(font: Font, text: String) -> Vector2:
 	return Vector2(minf(ts.x, HINT_WRAP) + 16.0, ts.y + 11.0)
 
 
+## The canvas point the bubble's tail reaches toward: the anchor, clamped into the band a bubble is
+## allowed to point at.
+static func hint_tail(anchor: Vector2) -> Vector2:
+	return Vector2(clampf(anchor.x, 8.0, CANVAS.x - 8.0),
+		clampf(anchor.y, 60.0, HOTBAR_BAND_TOP - 6.0))
+
+
+## The rect `_draw_hint_bubble` actually fills. `hint_box` gives the SIZE and that was enough while the
+## only question was whether a lesson is too big; asking what a lesson COVERS needs the placement too, and
+## the placement is where the non-obvious rule lives: the bubble sits above its anchor unless that would
+## put it under the objective line, and then it flips below.
+##
+## Extracted for the reason `hint_box` was, stated there: a second copy of this arithmetic would agree
+## with itself and not with the screen. The draw calls this, so a measurement built on it is measuring the
+## rect that was drawn rather than one that resembles it.
+static func hint_rect(font: Font, text: String, anchor: Vector2) -> Rect2:
+	var box: Vector2 = hint_box(font, text)
+	var tail: Vector2 = hint_tail(anchor)
+	var origin := Vector2(clampf(tail.x - box.x * 0.5, 6.0, CANVAS.x - box.x - 6.0), tail.y - 7.0 - box.y)
+	if origin.y < 38.0:
+		origin.y = tail.y + 7.0
+	return Rect2(origin, box)
+
+
 func _draw_hint_bubble() -> void:
 	if hint_text == "" or hint_alpha <= 0.01:
 		return
@@ -664,13 +688,10 @@ func _draw_hint_bubble() -> void:
 	var box: Vector2 = hint_box(_font, hint_text)
 	var w: float = box.x
 	var h: float = box.y
-	var tail := Vector2(clampf(hint_anchor.x, 8.0, CANVAS.x - 8.0),
-		clampf(hint_anchor.y, 60.0, HOTBAR_BAND_TOP - 6.0))
-	var origin := Vector2(clampf(tail.x - w * 0.5, 6.0, CANVAS.x - w - 6.0), tail.y - 7.0 - h)
-	if origin.y < 38.0:                       # never under the objective line, so flip below the anchor
-		origin.y = tail.y + 7.0
+	var tail: Vector2 = hint_tail(hint_anchor)
+	var rect: Rect2 = hint_rect(_font, hint_text, hint_anchor)
+	var origin: Vector2 = rect.position
 	var a: float = hint_alpha
-	var rect := Rect2(origin, Vector2(w, h))
 	# Elevation, not an outline. A flat fill inside a 1px border with a full-width bar across the top is a
 	# dialog box and reads as one. A soft drop shadow puts the plate above the world instead of cut into
 	# it and the rule shrinks to a left edge so the eye lands on the word rather than the frame.

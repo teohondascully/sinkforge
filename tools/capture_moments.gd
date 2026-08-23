@@ -294,6 +294,33 @@ func _contamination(main: MainView, moment: String) -> String:
 					main._player.velocity.length() if main._player != null else -1.0,
 					Player.RUN_SPEED * 1.25, Player.RUN_SPEED * 0.9,
 					float(th.get("_life")), float(th.get("_lingered")), Hints.MAX_LINGER])
+		# THE OCCLUSION MEASUREMENT (`UI01-OCCLUSION`), REPORTED AND NOT ASSERTED. Where a lesson may sit
+		# relative to the world is a director call, so this prints the number the call needs and refuses
+		# nothing on it. Both quantities are available here and neither is re-derived: `Hud.hint_rect()` is
+		# the rect the bubble actually filled, shared with `_draw_hint_bubble`, and the pivot comes from
+		# the grapple. World maps to HUD-draw space exactly as main.gd maps the anchor -- canvas transform
+		# to the render viewport, then divided by HUD_SCALE.
+		if main._hud != null and main._player != null and not main._player.grapple.pivots.is_empty():
+			var f: Font = main._hud._font
+			if f != null and str(main._hud.hint_text) != "":
+				var r: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor)
+				var xf: Transform2D = main.get_viewport().get_canvas_transform()
+				var covered: int = 0
+				var worst: float = 0.0
+				for pv: Vector2 in main._player.grapple.pivots:
+					var c: Vector2 = (xf * pv) / MainView.HUD_SCALE
+					if r.has_point(c):
+						covered += 1
+						# How far inside, in canvas px: the smallest push that would clear the bubble.
+						var d: float = minf(minf(c.x - r.position.x, r.end.x - c.x),
+							minf(c.y - r.position.y, r.end.y - c.y))
+						worst = maxf(worst, d)
+				print(("    [UI01] bubble %s covers %d of %d pivot(s); deepest %.1f canvas px inside "
+					+ "(anchor %s, gate=%s)")
+					% [str(r), covered, main._player.grapple.pivots.size(), worst,
+						str(main._hud.hint_anchor),
+						"none" if main._hints == null or main._hints.active_gate() == &""
+							else str(main._hints.active_gate())])
 		# AND THE OTHER HALF OF THE PAIRING. The moment is a lesson AND the geometry it is about; a bubble
 		# over a straight line would be the lesson arriving about nothing.
 		if main._player != null and main._player.grapple.pivots.is_empty():
@@ -550,8 +577,10 @@ func _bending_geometry(main: MainView) -> void:
 		await physics_frame
 		if p.grapple.state == Grapple.State.ANCHORED:
 			break
-	# Swing in until the line has actually caught, then hold that frame.
-	for _i: int in 150:
+	# Swing in until the line has actually caught, then hold that frame. The bound was 150 and the catch
+	# missed it in three runs of five; a miss costs the whole moment, and the swing is cheap, so it gets
+	# more of the arc rather than one pass at it.
+	for _i: int in CATCH_FRAMES:
 		p.input_dir = -1.0
 		await physics_frame
 		if not p.grapple.pivots.is_empty():
@@ -908,17 +937,54 @@ func _the_sapling(main: MainView) -> void:
 ## worst honest case. A bound, not a settle -- reaching it means the moment could not be posed.
 const READY_MAX: int = 600
 
-## Consecutive frames the body must read calm AND unceremonied before the lesson is armed. Half a second:
-## long enough that an arc extreme cannot satisfy it, short enough to leave room inside `READY_MAX`.
-const CALM_FRAMES: int = 30
+## Consecutive frames the body must read calm AND unceremonied before the lesson is armed.
+##
+## SIZED FROM WHAT COMES AFTER IT, which the first value was not. Thirty frames is half a second, and a
+## run that passed it still reached the shutter at 420 px/s with another lesson in the channel: arming is
+## followed by 20 frames here and the shared 60-frame settle, so a calm window shorter than 80 frames
+## says nothing about the frame that actually gets photographed. A pendulum dwells near each arc extreme
+## for a good fraction of a second, which is exactly the length that fooled it.
+##
+## 90 frames is the remaining 80 with margin. A body genuinely at rest passes it easily; a body still
+## swinging cannot, hits `READY_MAX`, and the shutter guard refuses -- which is the correct outcome, and
+## is why this is not tuned until it passes.
+const CALM_FRAMES: int = 90
+
+## Frames the body is given to swing its line onto a corner before `_teaching` gives up on the moment.
+const CATCH_FRAMES: int = 420
+
+## Frames allowed for `Hints.refresh` to write the latch after the line physically catches. The two run on
+## different clocks; this is the gap between them, not a settle.
+const LATCH_FRAMES: int = 30
 
 
 func _teaching(main: MainView) -> void:
 	await _bending_geometry(main)
 	if main._hints == null:
 		return
+	# LET THE LATCH CATCH UP, because the two events are on different clocks and this was a RACE.
+	# `_bending_geometry` breaks out the instant `grapple.pivots` is non-empty, which happens in a physics
+	# step; `_done[&"wrapped"]` is written by `Hints.refresh` on a later `_process`. Checking `_done`
+	# immediately after the break therefore lost the moment on runs where the catch landed on the last
+	# frame of the swing, and the tell was unmistakable once the bail path was made to speak: it reported
+	# "never caught a corner" on runs whose shutter went on to report `taught=yes` with a live pivot. The
+	# line had caught; the record of it had not been written yet.
+	#
+	# Widening the swing window from 150 to 420 frames was tried first and changed nothing, which is the
+	# evidence that the swing was never the problem. The bound stays widened anyway -- it costs nothing and
+	# a real miss is still possible -- but it is not the repair.
+	var latch: int = 0
+	while latch < LATCH_FRAMES and not main._hints._done.has(&"wrapped"):
+		await physics_frame
+		latch += 1
 	if not main._hints._done.has(&"wrapped"):
-		push_warning("the swing never caught the corner — no lesson to photograph")
+		# LOUD, AND IN THE SAME VOICE AS THE SUCCESS PATH. This used to `push_warning` and return, and three
+		# refusals in five runs were diagnosed by noticing that a line was MISSING from the log rather than
+		# by reading one that was there. A bail path whose only tell is silence is indistinguishable from a
+		# path that never ran, and the capture continues to a shutter either way.
+		print(("    [teach] ABANDONED: no caught-line lesson after %d swing frame(s) and %d frame(s) "
+			+ "waiting for the latch (pivots=%d). The shutter guard below will refuse.")
+			% [CATCH_FRAMES, latch, main._player.grapple.pivots.size()])
 		return
 	# WAIT FOR A BODY THAT CAN READ, which this moment never did and which is why it spent its life
 	# photographing an empty frame. `Hints.active_alpha()` returns a flat 0.0 under THREE conditions and two
