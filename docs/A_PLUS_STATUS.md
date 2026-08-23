@@ -1228,3 +1228,28 @@ What separates the grapple layer from these three is not care taken; it is where
 the quantity being asserted against is measured from the same run under the subject-removed condition — the
 empty stage, the same-state pair, the witness column. The grapple layer's bar was a constant, and a
 constant cannot notice that its subject has gone.
+
+
+## The assertion floor reaches 109 of 113, and the last four need a source change
+
+`measure_player` writes its verdict at the end of the line — "run speed px/s: measured 150.0, intended
+150.0 (+/-6%)  OK" — which neither of the gate's two rules could see. A third rule counts trailing `OK`.
+It was checked against all 113 logs of a full sweep before being added: five layers matched neither of the
+first two rules, and the new pattern counts 3 for `measure_player` and 0 for the other four, so it holds
+exactly one new row and moves nothing that was already held. Controls: dropping one metric line from the
+log gives "DROPPED: measure_player asserted 2, floor is 3"; replacing the dialect entirely gives "MISSING:
+measure_player has a floor of 3 and reported no count", so a rule that stops matching cannot pass quietly.
+
+The remaining four — `check_capture_manifest`, `check_prose`, `check_score`, `check_water_audio` — will
+not yield to a fourth rule, and it is worth being exact about why. Two are shell layers and two are
+GDScript layers that `extends SceneTree` rather than `check_base.gd`, so none of them has a `_check` to
+tally. Each prints its diagnostics and then a single summary sentence with the verdict buried in the
+middle: "check_score: PASS — 3 seamless beds, monotone descent, eased mix, headless-safe". There is no
+count in that line because the layer never enumerated one. No pattern can count assertions that were not
+made individually, so closing these four means changing what they print.
+
+One inference along the way was wrong and is worth recording. The five unreachable rows are all off
+`check_base.gd`, which looked like the characterisation — until it was counted. Nineteen registered layers
+are off the base class and fifteen of them are held, because they print a PASS line per claim. Being off
+`check_base.gd` is necessary but not sufficient; the boundary is the dialect a layer speaks, not what it
+inherits from.

@@ -21,10 +21,22 @@
 # brings in the four largest bodies of assertions in the suite, none of which anything held before:
 # `sim` 526, `stress` 447, `power_water` 203, `worldgen` 147. Each row carries the rule that produced it.
 #
-# FIVE ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest, check_prose, check_score,
-# check_water_audio and measure_player each print a verdict in a shape neither rule counts. Holding them
-# needs a third rule or a change to what they print, and neither is written. Re-derive the gap with:
-#   for f in <log-dir>/*.log; do grep -qE '\([0-9]+ asserted\)|^[[:space:]]*(PASS|ok|OK)[: ]' "$f" \
+# A THIRD RULE BROUGHT IN ONE OF THE FIVE. `measure_player` writes its verdict at the END of the line,
+# "run speed px/s: measured 150.0, intended 150.0 (+/-6%)  OK", which neither of the first two rules can
+# see. Checked against all 113 logs of a full sweep before it was added: five layers matched neither rule,
+# and the trailing-OK pattern counts 3 for `measure_player` and 0 for the other four, so it holds exactly
+# one new row and moves nothing that was already held.
+#
+# FOUR ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest, check_prose, check_score and
+# check_water_audio. Two are shell layers and two are GDScript layers that `extends SceneTree` rather than
+# `check_base.gd`, so none of them has a `_check` to tally; each prints diagnostics and then one summary
+# sentence with the verdict in the middle of it. No pattern can count assertions that were never
+# enumerated, so closing these four means changing what they print, not adding a fourth rule. Being off
+# `check_base.gd` is necessary but NOT sufficient to be unreachable: 19 registered layers are off it and
+# 15 of them are held, because they print a PASS line per claim.
+#
+# Re-derive the gap with:
+#   for f in <log-dir>/*.log; do grep -qE '\([0-9]+ asserted\)|of [0-9]+ asserted|^[[:space:]]*(PASS|ok|OK)[: ]|[[:space:]]OK$' "$f" \
 #     || basename "$f"; done
 #
 # stand-downs: 6
@@ -131,6 +143,7 @@ check_walk	4	asserted
 check_water_move	5	asserted
 check_water_reads	4	asserted
 check_wrap	7	asserted
+measure_player	3	oklines
 play-tests	17	passlines
 power_water	203	passlines
 sim	526	passlines

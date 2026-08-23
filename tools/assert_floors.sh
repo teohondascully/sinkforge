@@ -38,7 +38,14 @@ count_in() {
 	c="$(grep -o 'of [0-9]\+ asserted' "$1" 2>/dev/null | grep -o '[0-9]\+' | tail -1)"
 	if [ -n "$c" ]; then printf '%s\tasserted' "$c"; return; fi
 	c="$(grep -cE '^[[:space:]]*(PASS|ok|OK)[: ]' "$1" 2>/dev/null)"
-	[ "${c:-0}" -gt 0 ] && printf '%s\tpasslines' "$c"
+	if [ "${c:-0}" -gt 0 ]; then printf '%s\tpasslines' "$c"; return; fi
+	# A THIRD DIALECT, AND ONLY ONE LAYER SPEAKS IT. `measure_player` writes its verdict at the END of the
+	# line -- "run speed px/s: measured 150.0, intended 150.0 (+/-6%)  OK" -- which neither rule above can
+	# see. Checked against all 113 logs of a full sweep: five layers match neither of the first two rules,
+	# and of those five this pattern counts 3 for `measure_player` and 0 for the other four, so it brings
+	# in exactly one row and moves nothing that was already held.
+	c="$(grep -cE '[[:space:]]OK$' "$1" 2>/dev/null)"
+	[ "${c:-0}" -gt 0 ] && printf '%s\toklines' "$c"
 }
 
 # Every "<layer>\t<count>\t<rule>" a log directory reports, sorted. The one place the sweep is read, so the
