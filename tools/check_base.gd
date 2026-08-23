@@ -92,23 +92,29 @@ var _passes: int = 0
 ##   _sd_held    ids `_asserted()` made this run
 ##   _sd_why     optional prose, from a branch that knows why a SIBLING branch will not be entered
 ##
-## THE DERIVATION LIVES IN THE GATE BECAUSE THE GATE IS THE ONLY PARTY THAT ALWAYS RUNS, and the obvious
-## alternative was measured before it was rejected. The first version derived it in `_verdict()`, which
-## reads as universal and is not: of the 89 layers inheriting this file, **31 call `_verdict()` and 58
-## print their own line and `quit()` directly** — including `check_frametime`, `check_dig_hitch` and
-## `check_save_durability`, three of the seven layers that own registered rows. The accounting was invisible
-## to all three on its first run, which is how the number came to be counted at all. A hook on a path most
-## of the population does not take is the same defect one level up: an instrument that cannot register its
-## subject. Two dictionaries and a print are what a layer can be trusted to do.
+## THE DERIVATION LIVES IN THE GATE BECAUSE THE GATE IS THE ONLY PARTY THAT ALWAYS RUNS. A branch that is
+## not taken cannot announce that it was not taken, so a third state emitted at the site would be absence
+## wearing a new label; only something outside the layer can say "control flow never got there". That
+## reason is structural and does not move.
 ##
-## THE TRIO ABOVE IS A COUNT IN PROSE, WHICH THIS REPOSITORY HAS A RULE AGAINST, AND IT WENT STALE.
-## It read 86/29/57 and measured 89/31/58 when someone finally re-derived it: three layers added since,
-## and no runner anywhere checking it. `check_doc_counts` enforces exactly this rule and its population is
-## README.md, CONTRIBUTING.md and docs/ENGINEERING.md, so a count living in a `.gd` comment is outside the
-## gate that exists for it. The numbers are load-bearing for the ARGUMENT (a hook on a path most of the
-## population does not take is the wrong place for it) and that argument survives any of these values, so
-## they stay as an illustration rather than becoming a fourth registry. Re-derive before quoting:
+## THE REASON THAT USED TO BE GIVEN FIRST HAS SINCE EXPIRED, AND IT IS LEFT HERE BECAUSE THE EXPIRY IS THE
+## INTERESTING PART. It ran: `_verdict()` reads as universal and is not — of the 89 layers inheriting this
+## file, 31 called it and 58 printed their own line and `quit()` directly, so a hook there would have been
+## an instrument that cannot register most of its subject. That was true when it was written and it is not
+## true now: the verdict-tail conversion of 2026-08-23 moved 55 of those 58 across, and the split is 86
+## calling `_verdict()` against 3 still hand-rolling (check_frametime, check_opening, check_underground,
+## none of which call `_check()` either). The population argument would no longer block the hook. The
+## always-runs argument still does, so the placement stands on one leg instead of two — said out loud,
+## because a conclusion whose stated reasons have quietly changed underneath it is how a wrong thing
+## survives a review.
+##
+## THE SPLIT ABOVE IS A COUNT IN PROSE, WHICH THIS REPOSITORY HAS A RULE AGAINST, AND IT HAS GONE STALE
+## TWICE NOW. It read 86/29/57, measured 89/31/58 when someone re-derived it, and reads 89/86/3 today.
+## `check_doc_counts` enforces exactly this rule and its population is README.md, CONTRIBUTING.md and
+## docs/ENGINEERING.md, so a count living in a `.gd` comment is outside the gate that exists for it.
+## Re-derive before quoting, both halves:
 ##     git grep -l '^extends "res://tools/check_base.gd"' -- '*.gd' | wc -l
+##     git grep -l '^extends "res://tools/check_base.gd"' -- '*.gd' | xargs grep -L '_verdict(' | wc -l
 var _sd_stood: Dictionary = {}
 var _sd_held: Dictionary = {}
 var _sd_why: Dictionary = {}

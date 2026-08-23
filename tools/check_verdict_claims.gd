@@ -20,16 +20,18 @@ extends "res://tools/check_base.gd"
 ## THE PREDICATE IS COMPARISONS, NOT ASSERTION HELPERS, AND THAT IS THE WHOLE DESIGN.
 ##
 ## The obvious version looks for the claim in a `_verdict()` note and the evidence in a `_check()` call.
-## Both halves are wrong here, and measurably: **under a third of the layers this gate scans call
-## `_verdict()`** and **about nine in ten call `_check()`**, so a detector written that way is blind to
-## roughly two thirds of the tree on one axis and a tenth on the other. Proportions rather than a pair of
-## totals: the totals move with every layer added, the argument does not, and a stale pair in a comment
-## about stale detectors is the joke writing itself. The one real instance reaches the terminal through a bare `print`, and a layer that
-## enforces its floor with `if r >= LAG1_FLOOR:` rather than `_check(r >= LAG1_FLOOR)` would be reported
-## as unguarded. Both mistakes were made while building this and both scored as coverage.
+## Both halves were wrong here, and one of them still is. When this was written, under a third of the
+## layers this gate scans called `_verdict()`, so keying on it would have been blind to most of the tree;
+## after the verdict-tail conversion of 2026-08-23 it is 86 of 99 and that half of the objection is gone.
+## The `_check()` half never depended on the count: 90 of 99 call it, and the nine that do not are exactly
+## where a claim is most likely to hide, because a layer enforcing its floor with `if r >= LAG1_FLOOR:`
+## rather than `_check(r >= LAG1_FLOOR)` would be reported as unguarded. Both mistakes were made while
+## building this and both scored as coverage.
 ##
-## So: the claim is any string containing `<layer>: PASS`, however it is printed, and the evidence is any
-## comparison operator anywhere in the file with a duration-bearing name on either side.
+## So: the claim is any string containing `<layer>: PASS`, HOWEVER it is printed, plus any note handed to
+## `_verdict()` — see `_verdict_lines()` for why the second reading had to be added and what it cost to
+## leave out. The evidence is any comparison operator anywhere in the file with a duration-bearing name on
+## either side.
 ##
 ## A NAME CARRIES A DURATION ONLY BY WHOLE PART. Substring matching finds `ms` inside items, seams,
 ## streams and materials; that search returned eight files of pure noise before it was written this way.
