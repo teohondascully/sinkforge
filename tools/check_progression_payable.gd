@@ -28,7 +28,7 @@ extends "res://tools/check_base.gd"
 const MACHINE_DIR: String = "res://src/data/machines/"
 const MATERIAL_DIR: String = "res://src/data/materials/"
 ## RUN rather than listed, so it cannot drift from what the world actually builds for you. Preloaded
-## because WorldSeeder declares no class_name; MainView reaches it exactly this way (main.gd:680).
+## because WorldSeeder declares no class_name; MainView reaches it exactly this way (`main.gd`).
 const SEEDER_SRC: String = "res://scenes/world_seeder.gd"
 const SEEDER := preload("res://scenes/world_seeder.gd")
 

@@ -86,7 +86,7 @@ func _phys() -> void:
 		# the top, so over a hole the "surface" became the hole's FLOOR, descending in step with the falling
 		# body: self-cancelling, quiet exactly when the body left the ground, green on a forty-row fall.
 		#
-		# Round two asked `is_solid(body_cell)`, the body's own collision authority (player.gd:639), immune
+		# Round two asked `is_solid(body_cell)`, the body's own collision authority (`player.gd`), immune
 		# to terrain shape and to the ground moving. Immune, but watching the wrong event. A body falling
 		# cleanly down an open shaft is in no rock at all, so it PASSED BY CONSTRUCTION. The old guard failed
 		# open on a fall; the replacement failed open on the same fall for a fresh reason.

@@ -89,8 +89,8 @@ extends "res://tools/check_base.gd"
 const EXEMPT: Dictionary = {
 	# THE NEXT FOUR ARE ONE ARGUMENT, and it is the one thing that distinguishes them from `can_craft`.
 	# Each writes the value the recompute ITSELF produces when nothing is happening: `_arrival_life = 0.0`
-	# against hud.gd:353's `maxf(0.0, _arrival_life - delta)`, `_hover_latch = Vector2i(-9999, -9999)`
-	# against main.gd:794's own else-branch. A pose the recompute converges to cannot be destroyed by it;
+	# against `hud.gd`'s `maxf(0.0, _arrival_life - delta)`, `_hover_latch = Vector2i(-9999, -9999)`
+	# against `main.gd`'s own else-branch. A pose the recompute converges to cannot be destroyed by it;
 	# `can_craft = true` was destroyed because `_near_bazaar()` said false and the picture agreed with the
 	# game. Both of these are RESETS, not poses: the fixture is clearing a transient, and the only thing
 	# that can overwrite the value is the game replacing it with the live truth.
@@ -99,9 +99,9 @@ const EXEMPT: Dictionary = {
 	# posed at a real cell, is a genuine offence of this class and these entries would cover it silently.
 	"capture_moments.gd:hud._arrival_life":
 		"four writes, all `= 0.0`, each clearing the stratum plate the fixture flew in on so it is not in "
-		+ "a shot about something else; hud.gd:353 decays the field toward exactly that value",
+		+ "a shot about something else; `hud.gd` decays the field toward exactly that value",
 	"capture_moments.gd:main._hover_latch":
-		"`_the_quiet` clears the latch to main.gd:794's own no-machine sentinel before shuttering the "
+		"`_the_quiet` clears the latch to `main.gd`'s own no-machine sentinel before shuttering the "
 		+ "frame defined by what is NOT in it; the recompute either writes the same sentinel back or "
 		+ "replaces it with the machine actually under the cursor, which is the truth the shot wants",
 	"check_hud_layout.gd:hud._arrival_life":
@@ -110,7 +110,7 @@ const EXEMPT: Dictionary = {
 	"check_hud_layout.gd:main._hover_latch":
 		"the same sentinel reset, and this layer already wrote the reasoning out at check_hud_layout:424 "
 		+ "when it stopped posing the latch at `_probe_cell`: the cursor is the input and the latch is only "
-		+ "ever an echo of it, so the fixture poses `Controls.pose_pointer` and lets main.gd:794 derive",
+		+ "ever an echo of it, so the fixture poses `Controls.pose_pointer` and lets `main.gd` derive",
 	"check_pack_layout.gd:hud.can_craft":
 		"operates on a bare `Hud.new()` with no MainView in the tree, so nothing recomputes anything; "
 		+ "the whole layer is geometry on a detached node and the write is the only source of the field",
@@ -118,8 +118,8 @@ const EXEMPT: Dictionary = {
 		"same bare Hud — and this one is swept deliberately through both values to check the frame fits",
 	"check_snap_frame.gd:main._cam_pos":
 		"the fixture stops the world — `Engine.time_scale = 0.0` for the whole measurement — and at "
-		+ "`delta == 0` main.gd:737's ease multiplier is `1.0 - exp(0)` = 0, so the recompute is arithmetic "
-		+ "that cannot move the pose. The one branch the freeze does not cover is main.gd:734, which SNAPS "
+		+ "`delta == 0` `main.gd`'s ease multiplier is `1.0 - exp(0)` = 0, so the recompute is arithmetic "
+		+ "that cannot move the pose. The one branch the freeze does not cover is `main.gd`'s stratum note, which SNAPS "
 		+ "rather than lerps when the pose is more than half a viewport from the body; check_snap_frame's "
 		+ "largest displacement is one screen pixel. THIS ENTRY REPLACES ONE FOR `camera.global_position`, "
 		+ "whose reason was wrong in a way worth keeping: it read 0.000 px of drift over four shots and "
@@ -135,7 +135,7 @@ const EXEMPT: Dictionary = {
 ## EXEMPT excuses one fixture's write because of that fixture's situation, this excuses it because the
 ## statement that would destroy the pose is behind an `if` the fixture itself opened.
 ##
-## All three below are player.gd:241-246, the three lines under `if auto_input:`, the switch player.gd:143
+## All three below are the three lines under `player.gd`'s `if auto_input:`, and the switch
 ## documents as the harness's own door in ("the harness sets it false and drives input_dir / request_jump()
 ## directly"). Without this the bare-field rule reported 70 offences across 13 fixtures, every one of them
 ## a fixture using the entry point the game built for it.

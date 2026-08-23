@@ -27,7 +27,7 @@ extends "res://tools/check_base.gd"
 ##    three times the width of every cap beside it, shipped on the CONTROLS page as the game-speed key in
 ##    a column of `M`, `T`, `Z`, `X`, `F5`. The cosmetic half is the half you can see. The load-bearing
 ##    half is that these strings are IDENTITY: `rebind` decides two bindings are the same physical input
-##    by comparing labels (settings.gd:142-163), so any two keycodes that share a label are ONE key to
+##    by comparing labels (`settings.gd`), so any two keycodes that share a label are ONE key to
 ##    the conflict detector; it stands down on a real duplicate and the page never marks it. §7 sweeps
 ##    every keycode `KEY_CAPS` names plus A-Z, 0-9, F1-F12 and the keypad digits for both halves.
 ##

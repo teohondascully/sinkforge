@@ -706,7 +706,7 @@ func load_world(world: WorldData) -> void:
 	# rock is not illegal, it is the design: clear the rock to expose the vein.
 	#
 	# Do NOT wrap these two loops in `if world.lodes != null:` / `if world.water != null:`. `lodes` and
-	# `water` are `Dictionary` (world_data.gd:43,48) and `{} != null` is TRUE in GDScript, so such a guard
+	# `water` are `Dictionary` (`world_data.gd`) and `{} != null` is TRUE in GDScript, so such a guard
 	# can never be false and protects nothing. Compatibility with an older WorldData that predates either
 	# grid comes from the DEFAULT: it arrives as `{}`, and iterating an empty Dictionary is a no-op.
 	for cell: Vector2i in world.lodes:

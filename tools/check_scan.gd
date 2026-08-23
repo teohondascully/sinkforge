@@ -8,15 +8,15 @@ extends "res://tools/check_base.gd"
 ##
 ## THE DEFECT THIS WAS WRITTEN TO CATCH, and it is mine. Phase 3a put ~378 generated lode cells into
 ## `world.lodes` per world; `FactorySim.load_world` copies their richness into the shared `deposits` grid.
-## The sonar walks `sim.deposits` (main.gd:1970) and keeps any cell that is SOLID and returns a positive
-## `ore_deposit_at` — and `ore_deposit_at` has a `lode.has(cell)` branch (factory_sim.gd:1370), so a vein
+## The sonar walks `sim.deposits` (`main.gd`) and keeps any cell that is SOLID and returns a positive
+## `ore_deposit_at` — and `ore_deposit_at` has a `lode.has(cell)` branch (`factory_sim.gd`), so a vein
 ## buried under stone qualifies. That much is correct and wanted: a scanner that cannot find buried ore is
 ## not a scanner.
 ##
 ## The echo then carries `sim.material_at(cell)` as its material — and `material_at` returns the SOLID
 ## there, which for a buried lode is `stone`. `stone.tres` sets `nugget_color = Color(0, 0, 0, 0)`, and the
 ## renderer paints all three parts of the return from that one colour: the ringing arc, the diamond pip
-## (world_renderer.gd:676-685) and the through-rock glow (:3487). At alpha 0 the arc, the pip and the glow
+## (`world_renderer.gd`) and the through-rock glow. At alpha 0 the arc, the pip and the glow
 ## are all nothing. What survives is a hardcoded 1.6px white core (:686) — so the echo is not invisible,
 ## it is DEGRADED to a dot that neither rings nor names its ore.
 ##

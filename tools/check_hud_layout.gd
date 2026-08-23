@@ -106,10 +106,10 @@ func _run() -> void:
 		{"name": "a stratum arrival, map up", "modal": false, "set": {"_minimap_mode": 1},
 			"announce": true},
 		# ...and the LARGE form, which no state here has ever produced. `_minimap_mode` cycles
-		# hidden -> corner -> LARGE (main.gd:1012) and only a 2 sets `minimap_large` (main.gd:778); this
+		# hidden -> corner -> LARGE and only a 2 sets `minimap_large` (`main.gd`); this
 		# matrix shipped with a 1 and nothing else in the file ever wrote a 2. NOT modal: an overlay is
 		# allowed to cover furniture, and the big map's rule is the opposite: the furniture stands down
-		# for IT (hud.gd:696). So it must face the same collision sweep as the bare screen.
+		# for IT (`hud.gd`). So it must face the same collision sweep as the bare screen.
 		{"name": "the BIG map up (M twice)", "modal": false, "set": {"_minimap_mode": 2},
 			"keep": "big_map"},
 		# The ceremony against the LARGE map. The corner form clears it (measured: no collision), but the
@@ -309,7 +309,7 @@ func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
 		"the pack bar stands down while the big map is up (found %s)" % still_there)
 
 	# D. THE GOAL PLATE STANDS DOWN (`hud.gd`). That guard has never once executed under test:
-	#    `minimap_large` comes only from `_minimap_mode == 2` (main.gd:778) and no fixture reached a 2, so
+	#    `minimap_large` comes only from `_minimap_mode == 2` (`main.gd`) and no fixture reached a 2, so
 	#    deleting it would have been invisible. Proved by DIFFERENCE in both directions; absence alone
 	#    proves nothing, because the plate legitimately hides itself when the chain is finished
 	#    (`hud.gd`) or once `goal_a` has decayed.
@@ -323,13 +323,13 @@ func _check_big_map(bare: Array[Rect2], big: Array[Rect2]) -> void:
 
 ## THE MACHINE INSPECTOR: the panel this matrix has claimed to judge since it was written, and never has.
 ##
-## Two rows carry `"hover": true`. Both were inert: they set `_main._hover_latch`, which main.gd:770-774
+## Two rows carry `"hover": true`. Both were inert: they set `_main._hover_latch`, which `main.gd`
 ## overwrites from `_aim` every frame. So the inspector was never drawn under test, and what WAS drawn
 ## depended on the operator's real mouse. `_snapshot` now warps the cursor onto the probe machine instead,
 ## and this proves the warp WORKED, because a hover fixture that silently fails to hover is the same
 ## vacuity one level up, and it would make the collision below look fixed.
 func _check_hover(bare: Array[Rect2], hover: Array[Rect2], big_hover: Array[Rect2]) -> void:
-	# THE FIXTURE DID ITS JOB. The inspector is right-anchored with a 218px width floor (hud.gd:831), so
+	# THE FIXTURE DID ITS JOB. The inspector is right-anchored with a 218px width floor (`hud.gd`'s `HOVER_MIN_W`), so
 	# it is the panel hugging the right edge that the bare screen does not have. If this fails, the warp
 	# did not take and every verdict below is void; reported as a FIXTURE failure, not as a HUD verdict.
 	_check(hover.size() > bare.size(),
@@ -340,8 +340,8 @@ func _check_hover(bare: Array[Rect2], hover: Array[Rect2], big_hover: Array[Rect
 		"...and the extra panel is the inspector, at its %.0fpx floor or wider (%s)"
 			% [Hud.HOVER_MIN_W, panel])
 
-	# THE COLLISION. hud.gd:837 claims the large map "is centred, off this column — so the inspector never
-	# collides". The inspector's left edge is at most CANVAS.x - HOVER_MIN_W - 12 = 410; the large map runs
+	# THE COLLISION. `hud.gd` claims the large map is centred and off this column, so the inspector never
+	# collides. The inspector's left edge is at most CANVAS.x - HOVER_MIN_W - 12 = 410; the large map runs
 	# to x=459. The prose asserted the impossibility of the thing the code caused.
 	var map := Rect2()
 	for r: Rect2 in big_hover:
@@ -371,7 +371,7 @@ func _signature(rects: Array[Rect2]) -> String:
 	return "|".join(parts)
 
 
-## The panel hugging the canvas's right edge, which is the inspector's anchor (hud.gd:840). `Rect2()` if
+## The panel hugging the canvas's right edge, which is the inspector's anchor (`hud.gd`). `Rect2()` if
 ## no panel reaches it.
 func _right_edge_panel(rects: Array[Rect2]) -> Rect2:
 	var out := Rect2()
@@ -409,7 +409,7 @@ func _goal_plate(rects: Array[Rect2]) -> Rect2:
 ## flag set by an earlier row cannot leak into a later one and quietly make the matrix one long state.
 func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 	# STATE IS SET ON MAINVIEW, NOT ON THE HUD, and that is not a style choice. MainView re-syncs every one
-	# of these fields into the HUD each frame (main.gd:765-788), so assigning `hud.inventory_open` directly
+	# of these fields into the HUD each frame (`main.gd`), so assigning `hud.inventory_open` directly
 	# is overwritten before the frame draws; the first version of this layer did exactly that and every
 	# modal state silently reported the bare screen's furniture, with the overlays never drawn at all. The
 	# clipping bug in the help overlay disappeared from the results the moment the capture got tighter,
@@ -427,9 +427,9 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 	# THE CURSOR IS THE INPUT; THE LATCH IS ONLY EVER AN ECHO OF IT.
 	#
 	# This used to read `_main._hover_latch = _probe_cell`, with a comment claiming the inspector was
-	# therefore built "exactly as it is in play". It was not built at all. main.gd:770-774 recomputes
+	# therefore built "exactly as it is in play". It was not built at all. `main.gd` recomputes
 	# `_hover_latch` from `_aim` on every frame, and `_update_mining` refreshes `_aim` from the real OS
-	# mouse on every `_process`, unconditionally, pause included (main.gd:709). So the assignment was
+	# mouse on every `_process`, unconditionally, pause included (`main.gd`). So the assignment was
 	# discarded before the frame drew, and BOTH "hover" rows in the matrix have never once drawn the
 	# inspector they exist to judge.
 	#
@@ -447,7 +447,7 @@ func _snapshot(hud: Hud, st: Dictionary) -> Array[Rect2]:
 
 	# THE CEREMONY IS SET AFTER THE SETTLE, NOT BEFORE, and that ordering is the whole point.
 	# `_arrival_life` is HUD-owned and decays in `Hud._process`, but MainView ANNOUNCES on its own during
-	# those settle frames whenever the body crosses a stratum line (main.gd:1248). Clearing before the
+	# those settle frames whenever the body crosses a stratum line (`main.gd`'s `_note_stratum`). Clearing before the
 	# settle therefore cleared nothing: the plate reappeared on rows that never asked for it, and the bare
 	# screen silently gained a sixth panel. That is the same defect as the uncontrolled mouse, a row
 	# whose content depends on something the fixture does not own, and it surfaced the moment
@@ -1291,7 +1291,7 @@ func _report_footprint(names: Array[String], fracs: Array[float]) -> void:
 ## cap sits WHOLLY inside the tile beneath it, which a rect probe cannot see because that tile is unlit.
 ##
 ## THE POPULATION WAS NEVER THE PROBLEM, which is worth saying because it is the diagnosis that would have
-## sent a fix to the wrong place. `_round_rect` registers with `panel_probe` (hud.gd:2888) and the rail's
+## sent a fix to the wrong place. `_round_rect` registers with `panel_probe` (`hud.gd`) and the rail's
 ## tiles and caps are all `_round_rect`, so every rect named above was in the array the matrix collected
 ## and the matrix simply never compared them. The second half of the blindness is the fixture rather than
 ## the predicate: the matrix opens the counter and never touches `bazaar_tab`, so it only ever photographs

@@ -119,10 +119,10 @@ func _text_visible(cell: Vector2i) -> bool:
 
 ## How near the body has to be, in cells, before a machine says its own name unasked.
 ##
-## Derived rather than picked. `MainView.REACH_CELLS` (scenes/main.gd:20) is 3.2, the distance at which the
+## Derived rather than picked. `MainView.REACH_CELLS` is 3.2, the distance at which the
 ## body can act on a cell at all, so twice it is the ring you are about to be able to touch: near enough
 ## that which box is which is a live question, far enough that walking toward a machine names it before you
-## arrive. At the default 1.00x zoom the view is 40x22 cells (scenes/main.gd:41), so this labels a
+## arrive. At the default 1.00x zoom the view is 40x22 cells (`MainView.VIEWPORT`), so this labels a
 ## neighbourhood rather than a screen.
 const LABEL_NEAR_CELLS: float = MainView.REACH_CELLS * 2.0
 
@@ -131,7 +131,7 @@ const LABEL_NEAR_CELLS: float = MainView.REACH_CELLS * 2.0
 ##
 ## The plate used to ride `_text_visible` alone, which made it a pure zoom gate, and the zoom that gate
 ## permitted was every zoom the game ships at except the two most distant: `TEXT_ZOOM` is 0.65 and
-## `MainView.ZOOM_LEVELS[0]`, the default the game boots at, is 1.00 (scenes/main.gd:49-50). So the
+## `MainView.ZOOM_LEVELS[0]`, the default the game boots at, is 1.00. So the
 ## condition was true for every machine on screen from the first frame and stayed true, and a base of any
 ## size wore a permanent band of text across it. A legibility threshold had been asked to answer a relevance
 ## question, which it cannot: whether 8px type resolves says nothing about whether this box's name is worth
@@ -301,7 +301,7 @@ func _draw_construct(pos: Vector2, t: float) -> void:
 
 
 ## Is the current objective already pointing at this cell? Cheap to ask: `MainView._guide_targets` returns
-## at most one target per step (scenes/main.gd:2648-2673, one `out.append` per branch), so this is a scan of
+## at most one target per step (one `out.append` per branch), so this is a scan of
 ## a list of one, and the loop is written for the list rather than for today's length.
 func _guided(cell: Vector2i) -> bool:
 	for t: Dictionary in _wr._guide_targets:
@@ -652,9 +652,9 @@ func _bulk_item(buffer: Dictionary) -> StringName:
 ## at all. A Forge holding two ore is not two percent of anything, and a well over it would be an invented
 ## denominator dressed as a measurement.
 ##
-##   Borer      output_buffer total   vs H_DRILL_BELLY_TOTAL  (src/core/factory_sim.gd:55, 2288-2294)
-##   Drift Rig  each stream's total   vs DRIFT_BELLY, twice   (src/core/factory_sim.gd:76, 2408-2412)
-##   Crusher    output_buffer gravel  vs CRUSH_BELLY          (src/core/factory_sim.gd:85, 2578-2585)
+##   Borer      output_buffer total   vs H_DRILL_BELLY_TOTAL  (`src/core/factory_sim.gd`)
+##   Drift Rig  each stream's total   vs DRIFT_BELLY, twice   (`src/core/factory_sim.gd`)
+##   Crusher    output_buffer gravel  vs CRUSH_BELLY          (`src/core/factory_sim.gd`)
 ##
 ## Each numerator is read off the same buffer the sim's own jam gate reads, which is the part that is easy
 ## to get wrong. `_held` sums input and output together, and the Borer's cap governs its output alone, so a

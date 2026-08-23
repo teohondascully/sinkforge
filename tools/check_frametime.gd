@@ -450,7 +450,7 @@ func _drop_rate(ms: PackedFloat32Array, interval: float) -> float:
 func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], quiet: float) -> bool:
 	if _perf_host == "":
 		# `SKIP:` at the start of the line is the harness contract for "this layer passed but stood part of
-		# itself down"; see run_harness.sh:43. It matters here more than anywhere: this is the project's
+		# itself down"; see `run_harness.sh`. It matters here more than anywhere: this is the project's
 		# ONLY 120fps assertion, SF_PERF_HOST was unset everywhere for the whole life of the code, and so
 		# the budget had never once run while the summary said ALL PASS. An opt-in assertion is fine; a
 		# SILENT opt-in assertion is decoration. It can no longer pass without saying it did not assert.
@@ -899,7 +899,7 @@ const DIG_REACH: int = int(floor(MainView.REACH_CELLS))
 ## Deriving `DIG_REACH` from `REACH_CELLS` fixed the gross case (it was a typed 4 against a 3.2 reach) and
 ## a docstring then claimed the fixture could no longer select a cell the verb was forbidden to service.
 ## That claim was too strong and this is the retraction. `_can_reach` is a EUCLIDEAN PIXEL distance from
-## the body's centre to the cell's centre (main.gd:2439); `dy <= DIG_REACH` is a ROW COUNT. They disagree
+## the body's centre to the cell's centre (`main.gd`); `dy <= DIG_REACH` is a ROW COUNT. They disagree
 ## by up to a cell depending on where in its own cell the body is standing: sitting high in row 19, the
 ## centre of row 22 is ~3.5 cells away and REFUSED, while `dy == 3` waves it through. A row count is not a
 ## radius, and rounding the radius down does not turn it into one; it only shrinks how often they differ.

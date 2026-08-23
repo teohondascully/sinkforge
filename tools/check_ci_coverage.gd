@@ -217,7 +217,7 @@ func _initialize() -> void:
 	var re: RegEx = RegEx.create_from_string(not_re)
 	_check(re.is_valid(), "SF_NOT ('%s') compiles as a pattern at all" % not_re)
 	# AND THE CLAIM THIS USED TO MAKE IS STILL NOT PROVEN BY THAT. Godot's RegEx is PCRE2; the runner
-	# filters with `grep -Eq` (run_harness.sh:317), which is POSIX ERE. `\d`, `(?i)` and lookarounds are
+	# filters with `grep -Eq` (`run_harness.sh`), which is POSIX ERE. `\d`, `(?i)` and lookarounds are
 	# valid PCRE2 and are not ERE, so "Godot compiled it" is not "grep will use it the same way". Rather
 	# than assert a cross-engine equivalence this layer cannot test, the pattern is held to the subset where
 	# the two engines cannot disagree: layer names and alternation, which is all SF_NOT has ever needed.

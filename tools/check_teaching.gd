@@ -103,7 +103,7 @@ func _run() -> void:
 ## HAS THIS HINT LATCHED YET? Waits a bounded number of frames for it, and says how long it took.
 ##
 ## THIS IS A FIX FOR A CI-ONLY RED, AND THE RACE IS STRUCTURAL RATHER THAN UNLUCKY. The hints are noted in
-## MainView._process (main.gd:1205, via :749). This layer drives the body with `await physics_frame`, and
+## `MainView._process` (`main.gd`). This layer drives the body with `await physics_frame`, and
 ## the drop loop below breaks on the very frame `on_floor and worst > 0.0` first holds, then asserted the
 ## hint on the next line. A GDScript coroutine resumes synchronously when the signal fires, so at that
 ## point ZERO process frames have necessarily run since the landing, and whether the hint has been noted
