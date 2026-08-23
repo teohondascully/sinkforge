@@ -250,17 +250,34 @@ Observations to preserve, not twenty independent implementation tickets.
 >
 > **The gap is the population, not the rule.** The registry is built by walking `_main._hud` and every
 > object it transitively holds that is `RefCounted` and script-backed. `WorldRenderer` is a Node held by
-> `MainView`, so it is excluded twice over. `scenes/world_renderer.gd` declares **thirty more `_draw*`
-> methods and not one of them is classified**, and an assertion that prints *"every drawing surface is
-> classified"* over a population containing none of them. The two thirties are a coincidence and not a
-> comparison: the registry's is counted from the live object graph across the Hud AND its pages, where
-> `scenes/hud.gd` alone declares 23; the world plane's is counted from one file's declarations. This is the missing plane
+> `MainView`, so it is excluded twice over — and so is everything it in turn holds.
+>
+> **The population partitions exactly, which is why these numbers can be re-measured rather than trusted.**
+> The rule: distinct `_draw*` names matching `^\s*(static\s+)?func\s+_draw`, over the tracked `.gd` files
+> that declare any. Fourteen files do.
+>
+> | | files | distinct `_draw*` names |
+> |---|---:|---:|
+> | reachable from the Hud, and classified | 5 — `hud`, `bazaar_page`, `settings_page`, `bazaar_bench`, `bazaar_surface` | **30** |
+> | the world plane, and classified by nothing | 9 — `world_renderer`, `machine_view`, `rope_view`, `terrain_painter`, `water_view`, `bazaars`, `player`, `light_layer`, `falling_items` | **58** |
+>
+> The five-file count of 30 **reproduces the registry's own measured 30 exactly**, and every name in
+> `HELPER_TAGS` is declared in one of those five, so the partition is checked rather than assumed. The only
+> name the two sides share is `_draw` itself, which is Godot's dispatch and a collision rather than a
+> shared surface. **So the registry classifies 30 of 88 drawing surfaces and asserts, of all of them, that
+> "every drawing surface is classified".** This is the missing plane
 > `UI-01` and the ceremony's rope half both hit, arrived at from the third direction: not a missing state,
 > not a missing measurement, a **missing half of the register**.
 >
-> **The guidance surfaces that live outside it, with the cardinality each can reach.** Eight of the thirty
-> are guidance rather than world content; that split is a judgement and is mine, and the remaining
-> twenty-two are terrain, décor and effects, for which the registry's vocabulary has no tag at all.
+> **AND THE WORLD PLANE IS NOT UNGOVERNED — IT HAS ITS OWN, SEPARATE RULE.** `machine_view.gd` packs its
+> name plates onto shelves (`_label_plan`, `LABEL_SHELVES`) and drops any plate that would overlap a
+> neighbour's, which is a layout system with a collision policy. It simply is not `HELPER_TAGS`, knows
+> nothing of it, and is known by nothing. Two independent layout authorities over one screen, neither aware
+> the other exists, is a better description of this ticket than "no rule".
+>
+> **The guidance surfaces outside the registry, with the cardinality each can reach.** Twelve of the 58 are
+> guidance rather than world content; that split is a judgement and is mine, and the remaining forty-six
+> are terrain, décor and effects, for which the registry's vocabulary has no tag at all.
 >
 > | surface | plane | how many at once | live when |
 > |---|---|---|---|
@@ -272,8 +289,12 @@ Observations to preserve, not twenty independent implementation tickets.
 > | `_draw_aim` reticle | world | 0..1 | the cursor is on an in-bounds cell |
 > | `_draw_interact_pulse` | world | 0..1 | the cursor is on a rich vein or a machine |
 > | one of four `*_preview` | world | 0..1 | build mode; `_ghost_def.behavior` holds one value |
+> | `_draw_machine_label` | machines | **0..N**, shelf-packed, overlaps dropped | one per visible machine that wins a shelf |
+> | `_draw_machine_status` | machines | **0..N** | one per visible machine |
+> | `_draw_machine_io` | machines | **0..N** | one per visible machine; its own comment calls it cosmetic |
+> | `_draw_load_gauge` | machines | **0..N** | one per visible machine |
 >
-> **Two of those are unbounded, and they are the two the symptom names.** Dig marks draw one bracketed cell
+> **Six of those are unbounded, and they include the two the symptom names.** Dig marks draw one bracketed cell
 > per mark with no cap beyond the view rect, and each scan echo draws its own expanding ring. "Multiple
 > arrows, rings and labels in one surface frame" is therefore **structural rather than a defect**: it is
 > what the build is specified to do, and no rule anywhere says how much of it may happen at once.
@@ -284,11 +305,12 @@ Observations to preserve, not twenty independent implementation tickets.
 > multiply. The plural loop is the shape of the code, not the shape of the screen.
 >
 > **The arithmetic the ticket was reaching for.** A player mid-build with marks down, shortly after a scan,
-> standing on an objective step, cursor on a machine, can hold: N dig-mark brackets, M echo rings, a
-> travelling front, a chevron on a tether over a washed cell, a reticle, an interact pulse, a build ghost,
-> and — across the HUD plane, governed by a rule that does not know the above exists — an objective line, a
-> hover panel and one `critical` interrupt. **The one-at-a-time rule caps the last of those at one and says
-> nothing about the other ten.**
+> standing on an objective step, cursor on a machine, in sight of a drill/forge stack, can hold: N dig-mark
+> brackets, M echo rings, a travelling front, a chevron on a tether over a washed cell, a reticle, an
+> interact pulse, a build ghost, and per visible machine a name plate, a status bubble, IO ports and a load
+> gauge — and then, across the HUD plane, governed by a rule that does not know any of the above exists, an
+> objective line, a hover panel and one `critical` interrupt. **The one-at-a-time rule caps the last of
+> those at one and says nothing about the rest.**
 >
 > **Proposed tiers, and this half is a director call rather than a finding.** The existing vocabulary
 > extends to the world plane without new words: `_draw_guide_targets` and `_draw_ping` are `critical` (each
