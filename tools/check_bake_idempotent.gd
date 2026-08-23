@@ -47,7 +47,8 @@ func _initialize() -> void:
 	if DisplayServer.get_name() == "headless":
 		# AND IT EXITS 42, NOT 0. It said the word SKIP and then exited 0, which the runner reads as PASS --
 		# so in the headless CI job this layer reported a green having rendered nothing. The sentence was
-		# right and the exit code was the thing being read. Of the 17 layers registered `add_gl`, six already
+		# right and the exit code was the thing being read. Of the 17 WINDOW-DEPENDENT layers (14 `add_gl` plus
+		# 3 `add_excl`; `add_excl_hl` sets `GLFLAG=0`), six already
 		# exit 42 here and this was the only one exiting 0; the other ten carry no display guard at all,
 		# which is a separate question and not this one.
 		print("check_bake_idempotent: SKIP — needs a display (the bake is a SubViewport render target)")

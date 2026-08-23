@@ -22,8 +22,11 @@ extends "res://tools/check_base.gd"
 ## The obvious version looks for the claim in a `_verdict()` note and the evidence in a `_check()` call.
 ## Both halves were wrong here, and one of them still is. When this was written, under a third of the
 ## layers this gate scans called `_verdict()`, so keying on it would have been blind to most of the tree;
-## after the verdict-tail conversion of 2026-08-23 it is 86 of 99 and that half of the objection is gone.
-## The `_check()` half never depended on the count: 90 of 99 call it, and the nine that do not are exactly
+## after the verdict-tail conversion of 2026-08-23 it was 86 of the 99 layers this gate then scanned, and
+## that half of the objection is gone. Those two denominators are frozen at that measurement on purpose --
+## the SUITE has grown since, and this layer prints its own live count on every run, so a maintained copy
+## here could only ever be the stale one. The `_check()` half never depended on the count: 90 of those 99
+## called it, and the ones that did not are exactly
 ## where a claim is most likely to hide, because a layer enforcing its floor with `if r >= LAG1_FLOOR:`
 ## rather than `_check(r >= LAG1_FLOOR)` would be reported as unguarded. Both mistakes were made while
 ## building this and both scored as coverage.

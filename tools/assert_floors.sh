@@ -6,7 +6,8 @@
 # non-zero status here means the sweep above is not quotable for the same reason the gate's is not.
 #
 # `_verdict()` already refuses a green that asserted NOTHING. Between zero and everything there was no
-# floor: the widest layer in this suite makes 112 assertions and could have fallen to one, silently, and
+# floor: the widest layer in this suite makes several hundred assertions and could have fallen to one,
+# silently, and
 # still printed PASS. An early `return` after a guard, a loop whose population went empty, a block moved
 # behind a condition that is now always false -- all of them leave a green.
 #

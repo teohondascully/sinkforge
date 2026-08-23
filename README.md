@@ -286,7 +286,8 @@ reported, and every layer log holds the output of a layer that actually executed
 says the layers are still doing the work their verdicts claim — every one of them asserted at least as
 many things as it did the last time the floors in `tools/assert_floors.txt` were taken. A layer that
 quietly stops asserting does not go red on its own: refusing a green that asserted *nothing* is cheap,
-and between nothing and everything the widest layer here could have fallen from 112 assertions to one
+and between nothing and everything the widest layer here makes several hundred assertions and could have
+fallen to one
 and still printed PASS. A verdict missing either line is not a result.
 
 114 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
