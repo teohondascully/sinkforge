@@ -111,27 +111,35 @@ func _initialize() -> void:
 	var cols_j: int = w / tile
 	var want: int = rows_j * cols_j
 	print("  the band from the horizon to the HUD is %d x %d tiles" % [cols_j, rows_j])
+	# EACH DECISION IS RECORDED BEFORE IT IS ACTED ON, and the short-circuit is unchanged.
+	#
+	# This layer used to compare, print its own sentence and `quit()`, which meant nothing counted its
+	# assertions and `_verdict()`'s refusal of a green-that-asserted-nothing never applied to it. That
+	# refusal is the only thing standing between the suite and a layer which quietly stops judging; 55
+	# layers were converted onto it on 2026-08-23 and this was one of three left outside, because the
+	# judgement here is not a one-line `_check` — the failures explain WHICH of three different things
+	# went wrong. So the judgement stays exactly where it is and the accounting is added around it: the
+	# `_check` records the property, the `printerr` beneath keeps the sentence that makes the red usable,
+	# and the early return keeps a later reading from being taken over an earlier one that failed.
+	_check(want > 0, "the judged band is at least one tile tall (%dpx over a %dpx tile)" % [y1 - y0, tile])
 	if want <= 0:
-		printerr("check_opening: FAIL — the judged band is %dpx tall, under one %dpx tile: there was nothing"
-			% [y1 - y0, tile] + " to judge, and a dead fraction of a judged nothing is not a pass")
-		quit(1)
+		printerr("    there was nothing to judge, and a dead fraction of a judged nothing is not a pass")
+		_verdict("check_opening")
 		return
+	_check(int(j["total"]) == want,
+		"every tile in the band was judged (%d of %d)" % [int(j["total"]), want])
 	if int(j["total"]) != want:
-		printerr("check_opening: FAIL — %d tiles judged where the band holds %d; tiles were skipped"
-			% [int(j["total"]), want])
-		quit(1)
+		printerr("    tiles were skipped, so any fraction below is taken over a smaller band than the one"
+			+ " measured")
+		_verdict("check_opening")
 		return
 
 	var frac: float = float(j["frac"])
-	if frac <= DEAD_CAP:
-		print("check_opening: PASS — %d/%d tiles dead (%.0f%%, cap %.0f%%)"
-			% [int(j["dead"]), int(j["total"]), frac * 100.0, DEAD_CAP * 100.0])
-		quit(0)
-	else:
-		printerr("check_opening: FAIL — %d/%d tiles dead (%.0f%%, cap %.0f%%): a region of the first screen"
-			% [int(j["dead"]), int(j["total"]), frac * 100.0, DEAD_CAP * 100.0]
-			+ " a player ever sees has nothing in it")
-		quit(1)
+	_check(frac <= DEAD_CAP, "the opening ground has something in it (%d/%d tiles dead, %.0f%%, cap %.0f%%)"
+		% [int(j["dead"]), int(j["total"]), frac * 100.0, DEAD_CAP * 100.0])
+	if frac > DEAD_CAP:
+		printerr("    a region of the first screen a player ever sees has nothing in it")
+	_verdict("check_opening", "the ground in the opening frame is not empty")
 
 
 ## Screen row of the walked surface line, straight out of the sim and the live camera — so the judged

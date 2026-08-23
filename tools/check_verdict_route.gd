@@ -45,17 +45,21 @@ const TRIPLE_S: String = "'''"
 
 ## The layers that may still exit 0 by hand, each with the reason it cannot be converted. SHRINK-ONLY:
 ## see `_ratchet()`. Converting one of these means deleting its row here in the same commit.
-const EXEMPT: Dictionary = {
-	"check_frametime.gd":
-		"calls neither _check() nor _verdict(); every phase is a hand-rolled comparison with its own"
-		+ " multi-line diagnostic, and the SLO's two terms are printed at the site",
-	"check_opening.gd":
-		"same shape: the dead-tile fraction is compared inline and the failure explains which of three"
-		+ " different things went wrong, in its own words",
-	"check_underground.gd":
-		"same shape, and it additionally distinguishes a FIXTURE that could not reach the rock from a"
-		+ " verdict on the rock, which _check()'s one-line labels cannot carry",
-}
+##
+## IT IS EMPTY, AND IT WAS NOT WHEN THIS FILE WAS WRITTEN A FEW HOURS EARLIER.
+##
+## Three layers were named here — check_frametime, check_opening and check_underground — because they call
+## `_check()` nowhere and their failures say more than a one-line label can carry: check_underground
+## distinguishes a fixture that could not reach the rock from a verdict on the rock. All three are now
+## converted, by recording each decision with `_check()` *beside* the sentence rather than instead of it,
+## so nothing about their judgement or their diagnostics moved. The ratchet below is what asked: it went
+## red on all three the moment they became compliant, saying "tighten the list the day it does not", and
+## this is that day.
+##
+## KEPT RATHER THAN DELETED WITH THE ROWS. A gate that cannot express an exemption gets one anyway, in the
+## form of somebody quietly not registering their layer. What must not be cheap is ADDING a row: it takes
+## a sentence a reader can check, and the ratchet re-reads it on every run afterwards.
+const EXEMPT: Dictionary = {}
 
 ## A scan that read nothing is not a clean tree. Near the real count (89 on 2026-08-23) so it notices the
 ## directory thinning, not only vanishing.
@@ -162,8 +166,9 @@ func _initialize() -> void:
 
 	_ratchet(pop)
 	_verdict("check_verdict_route",
-		"%d inheritors, %d permitted to exit 0 by hand and every one of them still needs to"
-		% [pop.size(), EXEMPT.size()])
+		"%d inheritors, none of them exiting 0 without _verdict()" % pop.size() if EXEMPT.is_empty()
+		else "%d inheritors, %d permitted to exit 0 by hand and every one of them still needs to"
+			% [pop.size(), EXEMPT.size()])
 
 
 ## THE LIST MAY ONLY SHRINK. An exemption for a layer that no longer exits 0 by hand is not harmless: it

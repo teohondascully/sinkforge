@@ -92,13 +92,22 @@ func _run() -> void:
 	#
 	# So this fails as a FIXTURE failure, in its own words, and never as a legibility verdict. A layer that
 	# cannot get to the place it judges has not judged it.
+	# THE FIXTURE'S OWN REACH IS AN ASSERTION, AND IT IS RECORDED AS ONE.
+	#
+	# This layer compared, printed its own sentence and `quit()`, so nothing counted what it asserted and
+	# `_verdict()`'s refusal of a green-that-asserted-nothing could never apply. It was one of three left
+	# out of the conversion of 2026-08-23 because its failures say more than a one-line label can — this
+	# one distinguishes a fixture that could not reach the rock from a verdict on the rock, which is the
+	# distinction the layer exists to protect. The judgement is untouched; the accounting is added around
+	# it, and the sentences below stay where they are.
+	_check(reached >= MIN_DELVE,
+		"the delve reached the rock it judges (%d of %d rows)" % [reached, DELVE_ROWS])
 	if reached < MIN_DELVE:
-		printerr("check_underground: FAIL — the delve reached %d rows of %d, so the frame below is NOT"
-			% [reached, DELVE_ROWS]
-			+ " lamp-lit deep rock and the dead-space standard written for it does not apply.")
-		printerr("  This is the FIXTURE failing to reach its subject, not a verdict on the rock. Something"
+		printerr("    the frame below is NOT lamp-lit deep rock, so the dead-space standard written for it"
+			+ " does not apply.")
+		printerr("    This is the FIXTURE failing to reach its subject, not a verdict on the rock. Something"
 			+ " stopped `dig_down_to` on this world; fix that before reading any number below.")
-		quit(1)
+		_verdict("check_underground")
 		return
 
 	var img: Image = get_root().get_texture().get_image()
@@ -115,20 +124,18 @@ func _run() -> void:
 		% ", ".join(sorted.map(func(v: float) -> String: return "%.1f" % v)))
 	var frac: float = float(j["frac"])
 
+	_check(int(j["total"]) >= 6, "the lamp lights enough of the frame to judge (%d lit tiles, floor 6)"
+		% int(j["total"]))
 	if int(j["total"]) < 6:
-		printerr("check_underground: FAIL — only %d lit tiles in frame; the lamp lights almost nothing"
-			% int(j["total"]))
-		quit(1)
+		printerr("    the lamp lights almost nothing, so a dead fraction over what is left says nothing"
+			+ " about the rock")
+		_verdict("check_underground")
 		return
-	if frac <= DEAD_CAP:
-		print("check_underground: PASS — %d/%d lit tiles dead (%.0f%%, cap %.0f%%)"
-			% [int(j["dead"]), int(j["total"]), frac * 100.0, DEAD_CAP * 100.0])
-		quit(0)
-	else:
-		printerr("check_underground: FAIL — %d/%d lit tiles dead (%.0f%%, cap %.0f%%): the rock under the"
-			% [int(j["dead"]), int(j["total"]), frac * 100.0, DEAD_CAP * 100.0]
-			+ " player's own lamp has nothing in it")
-		quit(1)
+	_check(frac <= DEAD_CAP, "the lamp-lit rock has something in it (%d/%d lit tiles dead, %.0f%%, cap"
+		% [int(j["dead"]), int(j["total"]), frac * 100.0] + " %.0f%%)" % (DEAD_CAP * 100.0))
+	if frac > DEAD_CAP:
+		printerr("    the rock under the player's own lamp has nothing in it")
+	_verdict("check_underground", "the rock you can actually see is not empty")
 
 
 ## Sink a shaft and cut a work chamber at the bottom of it: the pocket a player carves when they stop to

@@ -222,9 +222,20 @@ func _run() -> void:
 			if _interval > 0.0 else "")
 		+ "; everything below is judged against it")
 
-	var ok: bool = true
+	# THE GATES ARE RECORDED AS ASSERTIONS, NOT ONLY ACCUMULATED INTO A BOOLEAN.
+	#
+	# This layer decided with `ok`, printed its own sentence and `quit()`, so nothing counted what it
+	# asserted and `_verdict()`'s refusal of a green-that-asserted-nothing could never apply to it. `_gate`,
+	# `_workload` and `_absolute` each print "      PASS:" and "      FAIL:" lines of their own, which LOOK
+	# like assertions and are not: they never touch `_passes` or `_failures`. That is the shape 55 other
+	# layers were converted off on 2026-08-23, and it is worse here, because a layer printing PASS-shaped
+	# lines that no counter has ever seen is harder to notice than one printing none.
+	#
+	# The helpers are left exactly as they are and their detail lines stay. `_check` beneath each call is
+	# what makes the count real; the terse label names the phase, the helper's own line carries the numbers.
 	var run_ms: PackedFloat32Array = await _phase(&"run")
-	ok = _gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO) and ok
+	_check(_gate("RUN   moving, chunks streaming", run_ms, quiet, MOVE_HITCH_RATIO),
+		"RUN holds its hitch gate")
 	# Stand the body over rock before the clock starts; see _stand_over_rock. Without this the DIG phase
 	# inherits wherever RUN happened to stop, which varies by several columns run to run, and lands over a
 	# void about half the time.
@@ -234,9 +245,11 @@ func _run() -> void:
 	print("      (dig site: %d rows of solid rock under the body, needs %d)" % [seam, DIG_MINES])
 	# until_mines 0: a fixed WINDOW, not a fixed quantity of work. See DIG_MIN_MINES.
 	var dig_ms: PackedFloat32Array = await _phase(&"dig", 0, SAMPLE * 2)
-	ok = _gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO) and ok
+	_check(_gate("DIG   mining, region rebakes", dig_ms, quiet, DIG_HITCH_RATIO),
+		"DIG holds its hitch gate")
 	var swing_ms: PackedFloat32Array = await _phase(&"swing")
-	ok = _gate("SWING on the rope at speed", swing_ms, quiet, MOVE_HITCH_RATIO) and ok
+	_check(_gate("SWING on the rope at speed", swing_ms, quiet, MOVE_HITCH_RATIO),
+		"SWING holds its hitch gate")
 
 	print("  draw calls in the last frame: %d   objects: %d"
 		% [int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
@@ -244,22 +257,18 @@ func _run() -> void:
 
 	# BEFORE any verdict about the timings: did the phases do their work at all? A timing distribution
 	# gathered while nothing happened is not a slow result or a fast one, it is a mislabelled one.
-	ok = _workload() and ok
+	_check(_workload(), "every phase did the work it is named for")
 
 	var phases: Array[PackedFloat32Array] = [idle, run_ms, dig_ms, swing_ms]
-	ok = _absolute(PackedStringArray(["IDLE", "RUN", "DIG", "SWING"]), phases, quiet) and ok
+	_check(_absolute(PackedStringArray(["IDLE", "RUN", "DIG", "SWING"]), phases, quiet),
+		"every phase meets the absolute frame SLO, where one applies")
 
-	if not ok:
-		printerr("check_frametime: FAIL — see the phase(s) marked FAIL above")
-		quit(1)
-		return
 	if _perf_host == "":
-		print("check_frametime: PASS — nothing hitches; a dig costs a few quiet frames, not twenty."
+		_verdict("check_frametime", "nothing hitches; a dig costs a few quiet frames, not twenty."
 			+ " Frame RATE is unasserted here (set SF_PERF_HOST on controlled hardware for that)")
 	else:
-		print("check_frametime: PASS — nothing hitches, and every phase fits in %.2fms on %s"
+		_verdict("check_frametime", "nothing hitches, and every phase fits in %.2fms on %s"
 			% [FRAME_BUDGET_MS, _perf_host])
-	quit(0)
 
 
 ## The absolute 120fps budget, and the whole of its refusal to run anywhere it would not mean anything.
