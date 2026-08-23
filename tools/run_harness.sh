@@ -598,7 +598,7 @@ add_gl "check_machine_identity (which box)" "res://tools/check_machine_identity.
 # The other observed contention red — `the renderer's cursor is where the fixture put it (415..435 px off)`
 # on two sweeps — is NOT explained. It did not reproduce in twelve concurrent runs, the mouse warp lands at
 # 1.0 px with `window_is_focused=false` so it is not focus, and the camera-lerp story is two orders of
-# magnitude short of the number (and `main.gd:731` snaps rather than lerps the large jumps that could
+# magnitude short of the number (and `main.gd` snaps rather than lerps the large jumps that could
 # produce it). **`add_excl` removes the condition, not the cause**, and that is worth saying out loud
 # because the layer will now be green without anybody having found out why it was not.
 add_excl "check_grapple_reads (tool not geometry)" "res://tools/check_grapple_reads.gd"

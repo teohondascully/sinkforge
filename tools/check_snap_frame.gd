@@ -62,14 +62,16 @@ extends SceneTree
 ##
 ## SO THE WORLD IS FROZEN FOR THE WHOLE MEASUREMENT -- `Engine.time_scale = 0.0`, the freeze
 ## `check_ceremony_reads._shot` and `check_selection_reads` already capture through. It is not comfort. At
-## `delta == 0` the follow's ease multiplier is `1.0 - exp(0)` = 0 -- the property `world_renderer.gd:205`
+## `delta == 0` the follow's ease multiplier is `1.0 - exp(0)` = 0 -- the property `world_renderer.gd`
 ## writes down for the lamp -- so the pose cannot be pulled anywhere however many or few frames pass
 ## between the write and the shutter. The one nudge in the frame is the one the control asserts on, at any
 ## frame rate, which is what a control has to be. The only pose the freeze does NOT protect is a jump past
-## `main.gd:734`'s half-a-viewport teleport threshold, and this layer's largest is one screen pixel.
+## `main.gd`'s half-a-viewport teleport threshold (`distance_to(target) > VIEWPORT.x / _current_zoom() *
+## 0.5`), and this layer's largest is one screen pixel.
 ##
 ## THE FIXTURE ALSO STOPPED TOUCHING THE CAMERA. It used to assign `_camera.global_position` itself, which
-## walked around `main.gd:738` -- the line that actually carries the snap to the framebuffer, and therefore
+## walked around `main.gd`'s `_camera.global_position = snap_to_pixel(...)` -- the line that actually
+## carries the snap to the framebuffer, and therefore
 ## the one line this layer exists to prove reaches it. Frozen, posing `_cam_pos` alone is enough: the
 ## game's own `_process` does the snapping and the picture comes from the real path.
 ##

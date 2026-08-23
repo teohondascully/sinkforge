@@ -12,7 +12,7 @@ extends SceneTree
 ##
 ## RENDER AT THE SIZE THE GAME ACTUALLY DRAWS, which is not the size the suite measures. `Visuals.draw_item`
 ## is called at **13.0** through most of the HUD, **12.0** in the pack rows and **9.0** for an item lying in
-## the world (`world_renderer.gd:2321`); the detail plate is the only large one. `check_item_reads` renders
+## the world (`world_renderer.gd`, the `draw_item(self, p, 9.0, item)` call); the detail plate is the only large one. `check_item_reads` renders
 ## at 48 and its constant is commented "roughly a hotbar cell" — it is roughly FOUR of them. A cue that
 ## exists at 48 and dies at 13 is invisible to that layer AND to a sheet drawn at its default, so the size is
 ## an env knob and the SMALL sizes are the ones that decide whether a glyph works.

@@ -80,7 +80,7 @@ func _run() -> void:
 		await physics_frame
 
 	# Enough carried types that a cursor has somewhere to go. Inventory is sim state and nothing recomputes
-	# it per frame, so this pose survives to the draw — unlike `_hud.inventory_open`, which `main.gd:792`
+	# it per frame, so this pose survives to the draw — unlike `_hud.inventory_open`, which `main.gd`
 	# overwrites every `_process`, and which silently defeated an earlier probe of this same panel.
 	main.sim.inventory[&"stone"] = 40
 	main.sim.inventory[&"coal"] = 12

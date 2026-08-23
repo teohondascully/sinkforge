@@ -4,7 +4,8 @@ class_name FixturePointer
 ## A HUMAN AT THE KEYBOARD IS A CONTAMINANT, AND OUR AIM LAYERS CANNOT CURRENTLY TELL.
 ##
 ## Every layer that checks aim poses the cursor with `Viewport.warp_mouse(...)` — which moves the REAL OS
-## pointer — and then reads the aim back out of `get_global_mouse_position()`. `main.gd:1349` derives the
+## pointer — and then reads the aim back out of `get_global_mouse_position()`. `main.gd`'s
+## `_aim = _effective_aim(mouse_world)` derives the
 ## player's aim from that same call. So the chain from "what the fixture asked for" to "what the renderer
 ## did" runs straight through a device that belongs to a person.
 ##

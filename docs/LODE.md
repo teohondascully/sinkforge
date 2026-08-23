@@ -60,8 +60,9 @@ One cell is currently **both terrain and resource**, and two verbs act on it wit
 | `mine()` by hand | a **3–6** loose burst | destroyed, and `deposits.erase(cell)` throws the rest away |
 | a drill above it | **250** (seeded: hundreds near spawn, thousands deep) | drained one unit at a time, then bored through |
 
-`factory_sim.gd:626-637` is explicit about the intent — hand-mining is "a quick, inefficient grab" and "the
-block's larger latent yield is NOT hand-extractable". That reads fine as a sentence and plays terribly as a
+`factory_sim.gd`'s `mine()` is explicit about the intent — a hand strike "clears the whole block in one
+strike and pockets a 3-6 burst of loose ore", and "the block's larger latent yield in `deposits` is NOT
+hand-extractable: a drill placed ABOVE a visible vein bores DOWN through the solid ore". That reads fine as a sentence and plays terribly as a
 rule: **swinging your pick at ore is the single most destructive act in the game, and nothing tells you.**
 A player who clears a room to build in it can annihilate a four-hundred-unit vein in six swings and never
 learn that they did. There is no tell, no refusal, no cost on screen — the number was never visible in the
@@ -87,9 +88,10 @@ slowly, or by machine steadily. Nothing you swing at can ever destroy a deposit 
 ## 3. What is already there (this is cheaper than it sounds)
 
 **The second plane is built and load-bearing.** `sim.wall` is a full background layer: per-cell material,
-mutated only by `set_wall`/`load_world`, serialised (`save_game.gd:36`), painted behind every dug cell
-(`world_renderer.gd:1563` — "a dug-out cell reveals the carved-room backing behind it"), drawn on the
-minimap (`hud.gd:1025`), fed into the fine-terrain bake, and **already authored per stratum by worldgen**
+mutated only by `set_wall`/`load_world`, serialised (`save_game.gd` carries `"wall"` in its env
+dictionary), painted behind every dug cell (`world_renderer.gd`'s background wall layer — "a dug-out cell
+reveals the carved-room backing behind it"), drawn on the minimap through `Hud.minimap_color`, fed into
+the fine-terrain bake, and **already authored per stratum by worldgen**
 (`stone_wall`, `deepslate_wall`, `shale_wall`). It is explicitly not collision: *"you walk through walls"*.
 
 So the lode is not a new plane. It is a new material family in an existing one, plus a verb change.

@@ -19,7 +19,8 @@ extends SceneTree
 ## WHAT THIS SHEET CANNOT BE USED TO JUDGE, above one cell: STROKE WEIGHT. Twenty-one `draw_line` widths in
 ## `visuals.gd` are absolute rather than multiplied by `s`, in `_drift` and `_crusher` and `_hopper` as much
 ## as in `_drill` and `_generator`. That is not a bug, because `s` never exceeds 1.0 at any call site in the
-## game (the HUD's boxes give 0.65/0.75/0.85, `world_renderer.gd:1360` passes 1.0 and `:2818` clamps to it),
+## game (the HUD's boxes give 0.65/0.75/0.85, `world_renderer.gd` passes 1.0 at both its
+## `Visuals.draw_machine_glyph` call sites, and the veil pass clamps to it),
 ## so those widths act as a MINIMUM STROKE: relatively thicker as the icon shrinks, which is what keeps a
 ## hairline alive at 13 pixels. Above `SF_MACHINE_PX = CELL` this sheet leaves the range the game uses and
 ## every one of those strokes renders proportionally THINNER than it ever does in play. Judging "these look
