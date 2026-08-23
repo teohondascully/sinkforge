@@ -304,19 +304,22 @@ this prevents.
 
 | population | definition | size |
 |---|---|---|
-| `P_REG` | rows the runner registers, from its `add`/`add_gl`/`add_excl`/`add_excl_hl` calls | 110 (105 of them `.gd`) |
-| `P_GLOB` | tracked files whose basename starts with `check_` | 100 |
-| **`P_INHERIT`** | **tracked `.gd` matching `^extends "res://tools/check_base.gd"`** | **89** |
+| `P_REG` | rows the runner registers, from its `add`/`add_gl`/`add_excl`/`add_excl_hl` calls | 110 at the audit, **111** today (106 of them `.gd`) |
+| `P_GLOB` | tracked files whose basename starts with `check_` | 100 at the audit, **101** today |
+| **`P_INHERIT`** | **tracked `.gd` matching `^extends "res://tools/check_base.gd"`** | **89 at the audit, 90 today** |
 
 `P_INHERIT` is the one the finding is about, and it is well-behaved: every inheritor is registered, and
 every inheritor is named `check_*`. Both set differences are empty — checked as sets, not as counts. Eleven
-`check_*` files do not inherit, which is why `P_GLOB` is larger.
+`check_*` files do not inherit, which is why `P_GLOB` is larger: ten extend `SceneTree` directly, and the
+eleventh is `check_base.gd` itself, which is a base class rather than a layer and is the one tracked
+`check_*.gd` the runner does not register.
 
 Over `P_INHERIT` the partition is complete, with nothing left over:
 
 **89 inheritors = 31 calling `_verdict()` + 58 hand-rolling the verdict + 0 neither** — as it stood when
 the audit was written. After the conversion below it is **86 + 3 + 0**, over the same population and by the
-same rule.
+same rule, and **90 = 87 + 3 + 0** once `check_verdict_route` joined the population it audits. Every size
+in this table is a snapshot with a date on it; the commands beneath are the record, not the numbers.
 
 **A fifth denominator exists and is not an error.** `tools/check_base_namespace.sh` reports 106 subclasses
 because it searches with `grep -r` and so sees the 17 untracked, gitignored `tools/_scratch_*.gd` probes
@@ -440,6 +443,41 @@ both timings are reported, neither is asserted. No bound was moved and no rule r
 `HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, 287s, retained at
 `docs/tracelog/sweeps/2026-08-23-verdict-tail-converted-green/`. Not a full sweep, and the runner says so
 itself.
+
+### The rule now has a runner
+
+None of the above would have been caught by anything. The refusal lived in `check_base.gd`'s docstring and
+in `CONTRIBUTING.md`'s layer template, and a rule with no runner is a preference. `check_verdict_route`
+asserts the narrow version of it: **an inheritor may not exit 0 under its own power.** Not "must call
+`_verdict()`", which a layer could satisfy while quitting 0 somewhere else, but the thing that actually
+bypasses the guard. `quit(1)`, `quit(SKIP)` and `_void_layer()` are left alone — a false red is loud, and a
+skip is already accounted for by `tools/stand_downs.txt`. A bare `quit()` is the same offence, since
+Godot's default exit code is 0.
+
+The three uncovered layers are named in the gate with the reason each cannot be converted, and the list is
+a **shrink-only ratchet**: an exemption whose layer has since become compliant is a red demanding the list
+be tightened, not a quiet no-op. That is the difference between a permission and a debt.
+
+| control | result |
+|---|---|
+| positive: a hand-rolled `quit(0)` green | flagged |
+| negative twin: the same layer through `_verdict()` | silent |
+| a bare `quit()` | flagged |
+| `quit(0)` only in a comment | silent |
+| `quit(0)` sharing a line with a trailing comment | flagged |
+| `quit(0)` only inside a string literal | silent |
+| mutation: hand-rolled tail put back into `check_agility` | FAIL naming `check_agility.gd` |
+| mutation: an exemption added for a layer that does not need one | FAIL demanding the list be tightened |
+
+**It flagged itself on its first run**, and that is recorded in the file rather than smoothed over. Its own
+controls are triple-quoted blocks containing the exact shape it hunts, and its comment stripper did not
+understand triple quotes. The fix on offer was a per-file exemption for the detector. The stripper was
+fixed instead, with a control for it, because widening a permission list to hide a defect in the detector
+is the trade the layer exists to refuse.
+
+**Evidence:** configured sweep `111 PASS / 0 FAIL / 0 SKIP` with six documented stand-downs,
+`HARNESS_EXIT=4`, `HARNESS_RESULT=yes`, 294s, retained at
+`docs/tracelog/sweeps/2026-08-23-verdict-route-gate-green/`.
 
 ## An open flakiness finding, recorded rather than absorbed
 

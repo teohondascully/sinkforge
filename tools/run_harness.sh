@@ -270,6 +270,15 @@ add "check_save_isolation (no harm)"  "res://tools/check_save_isolation.gd"
 add "check_ci_coverage (every layer runs)" "res://tools/check_ci_coverage.gd"
 add "check_shaders (they still compile)" "res://tools/check_shaders.gd"
 add "check_verdict_claims (a verdict claims what was tested)" "res://tools/check_verdict_claims.gd"
+# THE RULE THAT HAD NO RUNNER, GIVEN ONE. `check_base.gd`'s `_verdict()` refuses a green that asserted
+# nothing, and CONTRIBUTING.md's layer template has always ended with a call to it — but 58 of the 89
+# inheritors printed their own line and `quit(0)`, opting out of that refusal invisibly, because both
+# shapes are exit 0 over a log with no FAIL line. Measured on 2026-08-22 with `_check` overridden to record
+# nothing: 55 PASS / 0 FAIL / 0 SKIP. Fifty-five registered layers exiting 0 having tested nothing, and
+# nothing in this suite noticing, because nothing in this suite was looking. Fifty-five are converted; this
+# layer is what stops the fifty-sixth. Three are exempt BY NAME with a shrink-only ratchet: an exemption
+# whose layer has since become compliant is a red here, not a quiet no-op.
+add "check_verdict_route (nobody exits 0 alone)" "res://tools/check_verdict_route.gd"
 add "check_doc_counts (docs match the runner)" "res://tools/check_doc_counts.gd"
 add "check_save_durability (P0)"      "res://tools/check_save_durability.gd"
 add "check_save_frontier (envelope)"  "res://tools/check_save_frontier.gd"
