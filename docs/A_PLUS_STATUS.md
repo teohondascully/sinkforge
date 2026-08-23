@@ -754,6 +754,63 @@ Mutation controls, both layers, both exit 1:
             levels against the empty stage, drift 1.24), Drill (0.00), Generator (0.00)
       and the SILENT accusation against those three does not appear
 
+## Area 3 — the floor between "asserted nothing" and "asserted everything"
+
+`_verdict()` refuses a green that asserted NOTHING, and that was the only floor in the suite. Between
+nothing and everything there was none at all: measured on a green sweep, the widest layer here makes 112
+assertions and the median layer makes eight, so a layer could have fallen from 24 to one, silently, and
+still printed PASS. An early return after a guard, a loop whose population went empty, a block moved behind
+a condition that is now always false, all of them leave a green. Both of tonight's instrument defects were
+of that family, and neither was caught by the count.
+
+**The count turned out to be worth holding, which was measured before anything was built.** Across three
+consecutive sweeps of the same 91 layers, the only counts that moved were the five layers edited between
+those sweeps, and each moved by exactly the number of assertions added or withdrawn:
+
+| between | layers whose count changed |
+|---|---|
+| ceremony-quiescence → machine-presence | `check_machine_identity` 8→10, `check_machine_state` 6→8 |
+| machine-presence → detector-controls | `check_ci_coverage` 17→19, `check_doc_counts` 19→21, `check_gamepad` 7→9, `check_status_reads` 9→11, `check_machine_state` 8→7 |
+
+Nothing else drifted, on 91 layers, three times. So `tools/assert_floors.txt` holds one row per layer with
+the floor set to the observed count rather than a margin below it, because a margin absorbs the first real
+loss and that loss is the whole subject. `tools/assert_floors.sh` reads a finished sweep's per-layer logs
+and is called from `harness_cleanup` beside the verdict gate. It is deliberately not a harness layer and is
+named so it cannot be taken for one: no layer has the sweep's logs.
+
+**It judges only a full configured sweep with the recorded stand-down set.** A subset has no opinion about
+layers it did not run, and a different stand-down set means different assertions were reached, so it says
+it did not judge rather than inventing a verdict. The comparison is a function the real pass and the
+control both call: one row is raised by one against a copy of what the sweep just reported, the same
+function has to catch it, the untouched copy has to stay quiet, and if either control misbehaves the gate
+says the instrument is broken and prints no verdict at all.
+
+**`HARNESS_QUOTABLE` is a second key and not a second `HARNESS_RESULT` line.** They answer different
+questions. `HARNESS_RESULT` says the run happened, and after a floor failure it is still correctly `yes`.
+What stops being true is the sentence printed under it, that the verdict may be quoted. Two lines carrying
+one key is a reader taking whichever one grep hands them first.
+
+    bash tools/run_harness.sh
+    112 PASS / 0 FAIL / 0 SKIP of 112, six documented stand-downs
+    HARNESS_EXIT=4   HARNESS_RESULT=yes
+    assert_floors: PASS - 91 layers still assert at least what they did (control: check_agility at 7)
+    HARNESS_QUOTABLE=yes
+
+    with one floor raised by one, which is what a layer going quiet looks like:
+    112 PASS / 0 FAIL / 0 SKIP of 112
+    assert_floors: FAIL - DROPPED: check_agility asserted 7, floor is 8
+    !! exiting 7: the sweep above is NOT A RESULT
+
+Four more controls were exercised and are listed here so nobody has to rediscover which paths were tested:
+a layer with no floor row reports `UNFLOORED`, a floor with no layer reports `MISSING`, a subset and a
+mismatched stand-down set each report that they did not judge, and forcing the comparison's field separator
+wrong makes the gate refuse rather than report the clean tree it would otherwise have found.
+
+**One of those controls passed for the wrong reason first**, which is recorded because it is the same
+failure the gate exists to catch. The stand-down-mismatch control was driven with a process substitution,
+the script read the summary twice, the first `grep` consumed the pipe, and the second saw nothing and
+skipped the check. The control reported PASS. The script reads the summary once now.
+
 ## Area 3 — which layers can fail, counted
 
 Positive controls were being added one layer at a time, on suspicion. This is the population, so the next
