@@ -17,14 +17,25 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FLOORS="$ROOT/tools/assert_floors.txt"
 
-# The count a layer's log reports, or empty when that log reports none. LAST match: a layer that prints an
-# intermediate tally must not have it read as the verdict.
+# TWO RULES, BECAUSE THE SUITE SPEAKS TWO DIALECTS. `_verdict()` prints "(N asserted)", which is the exact
+# count and is preferred wherever it exists. The shell layers and the four `tests/test_*.gd` rows have no
+# `_check` to count and print one PASS line per claim instead, which is the same quantity arrived at
+# differently. Counting those brings in the four largest bodies of assertions in the suite: `sim` at 526,
+# `stress` at 447, `power_water` at 203 and `worldgen` at 147, none of which anything held before.
+#
+# LAST match on the asserted form: a layer that prints an intermediate tally must not have it read as the
+# verdict.
 count_in() {
-	grep -o '([0-9]\+ asserted)' "$1" 2>/dev/null | grep -o '[0-9]\+' | tail -1
+	local c
+	c="$(grep -o '([0-9]\+ asserted)' "$1" 2>/dev/null | grep -o '[0-9]\+' | tail -1)"
+	if [ -n "$c" ]; then printf '%s\tasserted' "$c"; return; fi
+	c="$(grep -cE '^[[:space:]]*(PASS|ok|OK)[: ]' "$1" 2>/dev/null)"
+	[ "${c:-0}" -gt 0 ] && printf '%s\tpasslines' "$c"
 }
 
-# Every "<layer>\t<count>" a log directory reports, sorted. The one place the sweep is read, so the control
-# below and the real comparison cannot disagree about what a sweep says.
+# Every "<layer>\t<count>\t<rule>" a log directory reports, sorted. The one place the sweep is read, so the
+# control below and the real comparison cannot disagree about what a sweep says. The rule is carried in the
+# row because two rules producing one number is exactly the kind of thing a reader has to be told.
 counts_in() {
 	local d="$1" f n c
 	for f in "$d"/*.log; do
@@ -39,7 +50,7 @@ counts_in() {
 compare() {
 	local floors="$1" observed="$2"
 	awk -F'\t' '
-		NR == FNR { if ($0 !~ /^#/ && NF == 2) { want[$1] = $2 }; next }
+		NR == FNR { if ($0 !~ /^#/ && NF >= 2) { want[$1] = $2 }; next }
 		{
 			seen[$1] = $2
 			if (!($1 in want)) { print "  UNFLOORED: " $1 " asserts " $2 " and has no row" ; next }
@@ -106,9 +117,10 @@ CTL="$(mktemp)"; CTL_OBS="$(mktemp)"
 head -1 "$OBS" > "$CTL_OBS"
 ctl_layer="$(cut -f1 "$CTL_OBS")"
 ctl_count="$(cut -f2 "$CTL_OBS")"
-printf '%s\t%s\n' "$ctl_layer" "$((ctl_count + 1))" > "$CTL"
+ctl_rule="$(cut -f3 "$CTL_OBS")"
+printf '%s\t%s\t%s\n' "$ctl_layer" "$((ctl_count + 1))" "$ctl_rule" > "$CTL"
 ctl_hits="$(compare "$CTL" "$CTL_OBS" | grep -c 'DROPPED')"
-printf '%s\t%s\n' "$ctl_layer" "$ctl_count" > "$CTL"
+printf '%s\t%s\t%s\n' "$ctl_layer" "$ctl_count" "$ctl_rule" > "$CTL"
 ctl_quiet="$(compare "$CTL" "$CTL_OBS" | grep -c .)"
 if [ "$ctl_hits" != "1" ] || [ "$ctl_quiet" != "0" ]; then
 	echo "assert_floors: REFUSED -- the control did not behave: a floor one above $ctl_layer's $ctl_count" >&2

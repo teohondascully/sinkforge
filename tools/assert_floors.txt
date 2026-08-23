@@ -15,102 +15,124 @@
 # gate says it did not judge rather than inventing a verdict. Regenerate after a deliberate change:
 #   tools/assert_floors.sh --write <log-dir>
 #
-# THE POPULATION, STATED, because 91 rows against a suite of 113 is a gap and a gap nobody names reads as
-# coverage. 22 registered rows report no assertion count and are therefore outside this gate entirely: the
-# shell layers, which have no `_check` and print their own verdict; the four `tests/test_*.gd` rows; and
-# `measure_player`, `play-tests`, and the layers that print a bare PASS line. They are not exempted, they
-# are unreachable by this instrument, and holding them needs a different one. Re-derive the gap with:
-#   for f in <log-dir>/*.log; do grep -q '([0-9]* asserted)' "$f" || basename "$f"; done
+# THE POPULATION, STATED, because a number of rows against a suite of 113 is a gap and a gap nobody names
+# reads as coverage. 108 of 113 rows are held, under TWO rules: 91 report "(N asserted)" from `_verdict()`,
+# and 17 have no `_check` to count and print one PASS line per claim instead. The second rule is what
+# brings in the four largest bodies of assertions in the suite, none of which anything held before:
+# `sim` 526, `stress` 447, `power_water` 203, `worldgen` 147. Each row carries the rule that produced it.
+#
+# FIVE ROWS REMAIN UNREACHABLE and are not exempted: check_capture_manifest, check_prose, check_score,
+# check_water_audio and measure_player each print a verdict in a shape neither rule counts. Holding them
+# needs a third rule or a change to what they print, and neither is written. Re-derive the gap with:
+#   for f in <log-dir>/*.log; do grep -qE '\([0-9]+ asserted\)|^[[:space:]]*(PASS|ok|OK)[: ]' "$f" \
+#     || basename "$f"; done
 #
 # stand-downs: 6
-check_agility	7
-check_aim	7
-check_bazaar_cache	35
-check_bazaar_ruin	17
-check_binding_conflict	28
-check_binding_persistence	49
-check_binding_text	6
-check_bits	26
-check_carry_cap	39
-check_casing_light	67
-check_ceremony_reads	9
-check_ci_coverage	19
-check_climb	7
-check_contact_edge	6
-check_controls	10
-check_craftable_registry	21
-check_depth_reads	7
-check_descent	3
-check_dig_hitch	22
-check_doc_counts	21
-check_draw_cull	8
-check_drift	21
-check_encoding	4
-check_fall	6
-check_frametime	5
-check_gamepad	9
-check_grapple	9
-check_grapple_reads	13
-check_hash_mixing	24
-check_head	40
-check_hint_gate	32
-check_hud_layout	112
-check_impact	6
-check_input_deafness	7
-check_item_reads	11
-check_lift	2
-check_lode	62
-check_loop_health	6
-check_machine_identity	10
-check_machine_state	7
-check_material_grammar	8
-check_material_registry	36
-check_mining	24
-check_nameplate_truth	10
-check_opening	3
-check_pacing	5
-check_pack_layout	55
-check_paint_terms	7
-check_pixel_snap	91
-check_plunge	8
-check_posed_fields	24
-check_progression_payable	45
-check_progressive_bake	13
-check_pump	8
-check_refusal	25
-check_relief	6
-check_rhythm	8
-check_richness	3
-check_rock_reads	4
-check_room_reads	7
-check_row_identity	28
-check_rules_registry	105
-check_save_durability	107
-check_save_frontier	12
-check_save_isolation	27
-check_saveload	8
-check_scan	11
-check_seam	14
-check_seam_flood	11
-check_selection_reads	10
-check_settings	22
-check_shaders	5
-check_shared_constants	80
-check_spoil	29
-check_status_reads	11
-check_stepup	5
-check_stride	8
-check_teaching	24
-check_tells	5
-check_text_contrast	18
-check_tool_text	23
-check_traverse	5
-check_underground	3
-check_vein_guard	6
-check_verdict_claims	7
-check_verdict_route	12
-check_voice	11
-check_walk	4
-check_water_move	5
-check_water_reads	4
-check_wrap	7
+check_agility	7	asserted
+check_aim	7	asserted
+check_bake_idempotent	3	passlines
+check_base_namespace	2	passlines
+check_bazaar_cache	35	asserted
+check_bazaar_ruin	17	asserted
+check_binding_conflict	28	asserted
+check_binding_persistence	49	asserted
+check_binding_text	6	asserted
+check_bits	26	asserted
+check_body_stress	5	passlines
+check_carry_cap	39	asserted
+check_casing_light	67	asserted
+check_ceremony_reads	9	asserted
+check_ci_coverage	19	asserted
+check_climb	7	asserted
+check_contact_edge	6	asserted
+check_controls	10	asserted
+check_craftable_registry	21	asserted
+check_depth_reads	7	asserted
+check_descent	3	asserted
+check_dig_hitch	22	asserted
+check_doc_counts	21	asserted
+check_draw_cull	8	asserted
+check_drift	21	asserted
+check_encoding	4	asserted
+check_exit_codes	6	passlines
+check_fall	6	asserted
+check_fastforward	2	passlines
+check_fixture_pointer	18	passlines
+check_frametime	5	asserted
+check_gamepad	9	asserted
+check_grapple	9	asserted
+check_grapple_reads	13	asserted
+check_grid	4	passlines
+check_hash_mixing	24	asserted
+check_head	40	asserted
+check_hint_gate	32	asserted
+check_hud_layout	112	asserted
+check_impact	6	asserted
+check_input_deafness	7	asserted
+check_item_reads	11	asserted
+check_lift	2	asserted
+check_lock	31	passlines
+check_lode	62	asserted
+check_loop_health	6	asserted
+check_machine_identity	10	asserted
+check_machine_state	7	asserted
+check_material_grammar	8	asserted
+check_material_registry	36	asserted
+check_mining	24	asserted
+check_nameplate_truth	10	asserted
+check_opening	3	asserted
+check_pacing	5	asserted
+check_pack_layout	55	asserted
+check_paint_terms	7	asserted
+check_pixel_snap	91	asserted
+check_plunge	8	asserted
+check_posed_fields	24	asserted
+check_progression_payable	45	asserted
+check_progressive_bake	13	asserted
+check_pump	8	asserted
+check_refusal	25	asserted
+check_relief	6	asserted
+check_rhythm	8	asserted
+check_richness	3	asserted
+check_rock_reads	4	asserted
+check_room_reads	7	asserted
+check_row_identity	28	asserted
+check_rules_registry	105	asserted
+check_save_durability	107	asserted
+check_save_frontier	12	asserted
+check_save_isolation	27	asserted
+check_saveload	8	asserted
+check_scan	11	asserted
+check_seam	14	asserted
+check_seam_flood	11	asserted
+check_selection_reads	10	asserted
+check_settings	22	asserted
+check_shaders	5	asserted
+check_shared_constants	80	asserted
+check_snap_frame	3	passlines
+check_spoil	29	asserted
+check_status_reads	11	asserted
+check_step	3	passlines
+check_stepup	5	asserted
+check_stride	8	asserted
+check_teaching	24	asserted
+check_tells	5	asserted
+check_text_contrast	18	asserted
+check_texture	20	passlines
+check_tool_text	23	asserted
+check_trailers	9	passlines
+check_traverse	5	asserted
+check_underground	3	asserted
+check_vein_guard	6	asserted
+check_verdict_claims	7	asserted
+check_verdict_route	12	asserted
+check_voice	11	asserted
+check_walk	4	asserted
+check_water_move	5	asserted
+check_water_reads	4	asserted
+check_wrap	7	asserted
+play-tests	17	passlines
+power_water	203	passlines
+sim	526	passlines
+stress	447	passlines
+worldgen	147	passlines
