@@ -8,7 +8,7 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
-| 3. Harness quality | **Closed, with one audited finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 40 layers hand-rolling the verdict protocol and so missing the base class's refusal of a green that asserted nothing; proven by paired mutation, scoped by an independence check, and recorded below. |
+| 3. Harness quality | **Closed, with one audited finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing; proven by paired mutation, scoped by an independence check, and with the population named explicitly below. |
 | 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
@@ -130,7 +130,7 @@ it draws anything:
 | removed | 3.8  4.6  4.6  4.7  4.8  5.1  5.2  5.4 |
 
 A floor of **8.0** separates those cleanly, fails on the mutant at 4.7 and passes clean at 13.5 — and it
-**failed inside the full sweep, on an honest frame, at 2.8 levels over 3982 pixels.** All sixteen samples
+**failed inside the configured sweep, on an honest frame, at 2.8 levels over 3982 pixels.** All sixteen samples
 above were taken with the layer run on its own, where the mask settles around 700 to 1100 pixels. The
 statistic is a mean over that mask, so a mask four times the size dilutes the same signal below what the
 subject's own absence produces: in the sweep with the ghost drawn it reads lower than standalone with the
@@ -296,9 +296,38 @@ the layer runs normally and records nothing — was applied to one layer of each
 Identical mutation, opposite outcomes, which isolates the preamble as the cause rather than anything about
 the two layers.
 
-**Population: 40 layers hand-roll the verdict**, against 31 that call `_verdict()`. The duplication scan
-had found 21, because it matched identical bodies; the protocol question has a wider population than the
-copy-paste question, and the protocol one is what matters.
+### The population, named — because two denominators were in the record
+
+Three different sets could be meant by "the layers", and until this was written down the record carried two
+different hand-roller counts with neither of them saying over what. Converting the wrong set is the failure
+this prevents.
+
+| population | definition | size |
+|---|---|---|
+| `P_REG` | rows the runner registers, from its `add`/`add_gl`/`add_excl`/`add_excl_hl` calls | 110 (105 of them `.gd`) |
+| `P_GLOB` | tracked files whose basename starts with `check_` | 100 |
+| **`P_INHERIT`** | **tracked `.gd` matching `^extends "res://tools/check_base.gd"`** | **89** |
+
+`P_INHERIT` is the one the finding is about, and it is well-behaved: every inheritor is registered, and
+every inheritor is named `check_*`. Both set differences are empty — checked as sets, not as counts. Eleven
+`check_*` files do not inherit, which is why `P_GLOB` is larger.
+
+Over `P_INHERIT` the partition is complete, with nothing left over:
+
+**89 inheritors = 31 calling `_verdict()` + 58 hand-rolling the verdict + 0 neither.**
+
+**Reconciling the two numbers that were in the record.** `check_base.gd` states 86 = 29 + 57. That was true
+when written and has drifted by three layers added since; measured now it is 89 = 31 + 58, and the comment
+is corrected. The other figure, 40, came from this document and was the same population classified by a
+narrower rule: it required the verdict tail to sit inside `_initialize()`. It does for 40 of them and lives
+elsewhere in the other 18. **Same 58 files; the 40 was a statement about where the tail is, not about which
+files have one.** The convertible set is 58.
+
+**The stale comment is itself the defect this repository has a rule against.** `CONTRIBUTING.md` says a
+comment stating a number is a test with no runner, and `check_doc_counts` enforces exactly that — over
+`README.md`, `CONTRIBUTING.md` and `docs/ENGINEERING.md`. A count inside a `.gd` comment is outside that
+gate's population, which is how 86/29/57 went stale unnoticed while the rule against it was being enforced
+three files away.
 
 **A second gap, from the same audit.** Nineteen layers print a green line that never names them —
 `AGILITY OK` rather than `check_agility: PASS`. `check_verdict_claims` defines its subject as
@@ -320,6 +349,36 @@ The conversion itself is the next slice and is deliberately not folded into the 
 sweep retained at `docs/tracelog/sweeps/2026-08-22-area2-close/`, 112 per-layer logs, `summary.txt` stamped
 `head: 793d834, worktree: clean`, `110 PASS / 0 FAIL / 0 SKIP`, `HARNESS_RESULT=yes`, exactly the six
 registered stand-downs.
+
+## An open flakiness finding, recorded rather than absorbed
+
+Four configured sweeps were run on effectively one tree while reconciling the population above. The only
+working-tree difference between them was two markdown files and one comment-only edit to `check_base.gd` —
+comment-only verified by counting non-comment lines in its own diff, with a planted code line as the
+positive control that the count can register one.
+
+| run | verdict | failing layers |
+|---|---|---|
+| 1 | 110 PASS / 0 FAIL / 0 SKIP | — |
+| 2 | 109 PASS / 1 FAIL | `check_grapple_reads` |
+| 3 | 108 PASS / 2 FAIL | `check_machine_identity`, `check_machine_state` |
+| 4 | 110 PASS / 0 FAIL / 0 SKIP | — |
+
+**Every failing layer judges pixels, and every one passed standalone immediately afterwards**, on the same
+tree, within minutes. The failures are degenerate readings rather than wrong ones: the miner's own
+silhouette measured 0.0 levels of edge over 1071 pixels where it normally reads 87; three masks came back
+at 0 px; 28 of 190 machine pairs were drawn IDENTICAL; a Forge read state 0.0 against motion 0.0. A body
+that measures as absent is a capture that did not happen, not a body that stopped being drawn.
+
+`check_grapple_reads` is already registered `add_excl`, and the exclusivity defect that used to make it red
+is patched, with the before-and-after concurrency measurements recorded in the runner. So this is not that.
+
+**It is left classified as environmental and unexplained rather than dismissed**, with all four sweeps
+retained under `docs/tracelog/sweeps/` including the two reds, because a red that is deleted once it stops
+reproducing is a red nobody can ever study. One mechanism is worth testing and is **not** claimed here: the
+harness runs with shader caching disabled, so every headed layer recompiles its pipeline on boot, and a
+frame captured before that pipeline is warm would read exactly like these. That is a hypothesis with a
+plausible shape and no evidence yet, and the honest note is that nobody has tested it.
 
 ## Exit condition
 

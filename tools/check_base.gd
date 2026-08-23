@@ -94,12 +94,21 @@ var _passes: int = 0
 ##
 ## THE DERIVATION LIVES IN THE GATE BECAUSE THE GATE IS THE ONLY PARTY THAT ALWAYS RUNS, and the obvious
 ## alternative was measured before it was rejected. The first version derived it in `_verdict()`, which
-## reads as universal and is not: of the 86 layers inheriting this file, **29 call `_verdict()` and 57
+## reads as universal and is not: of the 89 layers inheriting this file, **31 call `_verdict()` and 58
 ## print their own line and `quit()` directly** — including `check_frametime`, `check_dig_hitch` and
 ## `check_save_durability`, three of the seven layers that own registered rows. The accounting was invisible
 ## to all three on its first run, which is how the number came to be counted at all. A hook on a path most
 ## of the population does not take is the same defect one level up: an instrument that cannot register its
 ## subject. Two dictionaries and a print are what a layer can be trusted to do.
+##
+## THE TRIO ABOVE IS A COUNT IN PROSE, WHICH THIS REPOSITORY HAS A RULE AGAINST, AND IT WENT STALE.
+## It read 86/29/57 and measured 89/31/58 when someone finally re-derived it: three layers added since,
+## and no runner anywhere checking it. `check_doc_counts` enforces exactly this rule and its population is
+## README.md, CONTRIBUTING.md and docs/ENGINEERING.md, so a count living in a `.gd` comment is outside the
+## gate that exists for it. The numbers are load-bearing for the ARGUMENT (a hook on a path most of the
+## population does not take is the wrong place for it) and that argument survives any of these values, so
+## they stay as an illustration rather than becoming a fourth registry. Re-derive before quoting:
+##     git grep -l '^extends "res://tools/check_base.gd"' -- '*.gd' | wc -l
 var _sd_stood: Dictionary = {}
 var _sd_held: Dictionary = {}
 var _sd_why: Dictionary = {}

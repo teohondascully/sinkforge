@@ -11,7 +11,10 @@ a backlog and invites merging.
 ## The workflow, as it actually runs
 
 One clone, one working tree, `main`. Work lands as a sequence of small commits pushed straight to
-`origin/main`, each one green on a full sweep before it goes. There is no feature branch, no integration
+`origin/main`, each one green on the configured sweep before it goes -- green meaning
+`110 PASS / 0 FAIL / 0 SKIP` with `HARNESS_RESULT=yes` and no stand-down outside the registered set. It is
+deliberately not called a FULL sweep: conditional assertion groups stand down under `SF_STRICT` and the
+runner prints "this run does not count as a full sweep" whenever any did, which on this tree is every run. There is no feature branch, no integration
 branch, and no merge: the history is linear because nothing else is ever open.
 
 This is a deliberate reversal. The rules below were written after the repository reached 58 branches
