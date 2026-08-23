@@ -538,7 +538,32 @@ func _run() -> void:
 	# half reads 2.4..3.7 levels with the preview drawn and 1.9..3.5 with it never drawn, which is the same
 	# blindness. `posed_bg` is captured with the clock already stopped, so what separates it from `aim` is
 	# the preview and nothing else. `bg` keeps its other jobs; only the preview differences move.
+	#
+	# AND `ANIM_FROZEN` IS NOT THE WHOLE CLOCK. It holds `WorldRenderer._anim_time`, which is a GDScript
+	# variable; `post_fx.gdshader` runs film grain off the shader built-in `TIME`, which nothing in GDScript
+	# poses. The grain is faint -- `grain_amount` 0.014, about 3.6 levels -- and re-seeds on
+	# `fract(TIME * 0.96)`, so it cycles about once a second and two captures four frames apart hold two
+	# partially decorrelated grain fields. Every pixel of the screen therefore differs a little, and the
+	# ones sitting near `_mask`'s threshold cross it or do not depending on how much WALL TIME those four
+	# frames took. Under load they take longer, so the mask grows.
+	#
+	# That is not a cosmetic wobble, because the statistic is a p90 over the mask. Eight unloaded runs of
+	# this layer read 144, 147, 265, 176, 304, 149, 177, 153 preview pixels; two sweeps on this same commit
+	# read 322 and 465, and at 465 the p90 collapsed from ~142 levels to 43.6 and `GR-06` PASSED. The same
+	# tree gave a red and a green in the same hour, and the green was the broken measurement -- diluting
+	# the preview's reading is exactly what makes the miner look louder than it.
+	#
+	# `Engine.time_scale` scales shader `TIME`, so zero holds the grain as well. Six runs with it held read
+	# 146, 148, 143, 147, 149, 141 pixels and 140.6..142.4 levels: the count stops moving, the reading
+	# stops moving, and it stops at the value the clean runs already gave, so this is not stability bought
+	# by measuring nothing. `GR-06` still fails all six. The fix makes the red reliable; it does not
+	# remove it.
+	#
+	# IT IS RELEASED AT THE END OF THE PAIR AND NOT WITH `ANIM_FROZEN`, which runs on to GR-02 below.
+	# `_hook` drives a real throw and a throw needs physics to advance, so a zero time scale held that far
+	# would hang the layer waiting for a hook that cannot fly.
 	WorldRenderer.ANIM_FROZEN = true
+	Engine.time_scale = 0.0
 	for _i: int in 4:
 		await physics_frame
 	var posed_bg: PackedFloat32Array = await _luma()
@@ -547,6 +572,7 @@ func _run() -> void:
 	for _i: int in 4:
 		await physics_frame
 	var aim: PackedFloat32Array = await _luma()
+	Engine.time_scale = 1.0
 	_dump("aim")
 	var hand: Vector2 = p.hand()
 	var guide: PackedByteArray = _without(_mask(aim, posed_bg, hand, moving), _body_mask())

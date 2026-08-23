@@ -1477,3 +1477,40 @@ code change.
 **The first valid pair, two sweeps at clean `e8d832f`: 95 of 107 layers reproduce exactly, up from 91.**
 `check_water_reads` fell from 100.0% widest move to 4.5%, which is the water repair confirmed by an
 instrument that knows nothing about it.
+
+
+## The same commit gave a red and a green in the same hour, and the green was the broken one
+
+Two sweeps were taken at clean `e8d832f` to build the census pair. One reported `check_grapple_reads`
+FAILING `GR-06` and the other reported it PASSING. Same commit, same machine, an hour apart. Both asserted
+all 13 rows, so this was not a stand-down; the measurement itself moved:
+
+```
+A (red)    miner 88.1 levels, preview 134.2 levels (322 preview pixels)  -> FAIL
+B (green)  miner 88.1 levels, preview  43.6 levels (465 preview pixels)  -> PASS
+```
+
+The preview's reading is a p90 over a difference mask, so a mask that grows by 143 pixels of near-threshold
+noise dilutes it — and diluting the preview is precisely what makes the miner look louder than it. **The
+passing run was the broken measurement.**
+
+`ANIM_FROZEN` holds `WorldRenderer._anim_time`, a GDScript variable. `post_fx.gdshader` runs film grain off
+the shader built-in `TIME`, which nothing in GDScript poses: `grain_amount` 0.014, about 3.6 levels,
+re-seeded on `fract(TIME * 0.96)`, so it cycles about once a second. Two captures four frames apart hold
+two partially decorrelated grain fields, every pixel differs a little, and the pixels near the mask
+threshold cross it or do not depending on how much WALL TIME those four frames took. Under load they take
+longer. That is the whole mechanism, and it makes the layer's verdict a function of machine load.
+
+`Engine.time_scale` scales shader `TIME`, so zero holds the grain too. Eight unloaded control runs of the
+layer as it stood read 144, 147, 265, 176, 304, 149, 177, 153 preview pixels. Six with the clock held read
+146, 148, 143, 147, 149, 141, and 140.6..142.4 levels. Three confirmation runs of the committed layer read
+149, 145, 154 and 142.0, 141.2, 140.8.
+
+The count stops moving, the reading stops moving, and it stops at the value the clean runs already gave —
+so this is not stability bought by measuring nothing, which is the way this fix could have gone wrong.
+**`GR-06` still fails every run. The repair makes the red reliable; it does not remove it.** What it
+retires is the possibility of a false green, which is the direction that matters: a red gets read, a green
+gets filed.
+
+The pose is released at the end of the capture pair rather than with `ANIM_FROZEN`, which runs on into
+GR-02. `_hook` drives a real throw, and a throw needs physics to advance.
