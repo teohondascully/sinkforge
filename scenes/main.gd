@@ -723,7 +723,7 @@ func _process(delta: float) -> void:
 			# being stacked under it. Read from the HUD rather than mirrored here: a second copy of "is the plate up"
 			# is a second thing that can be wrong, and only one of them draws.
 			#
-			# AND THIS LINE READ THE WRONG ONE, under that exact comment, until 2026-08-23. `announcing()` is the
+			# AND THIS LINE READ THE WRONG ONE, under that exact comment. `announcing()` is the
 			# plate's LIFETIME; `plate_on_screen()` is its VISIBILITY, and they differ for as long as a line is out,
 			# because a plate in flight when the rope goes live has its clock frozen rather than dropped. A lesson
 			# gated on the first waits behind a plate nobody can see. `wrapped` fires only while a line is live, so

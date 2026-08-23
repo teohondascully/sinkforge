@@ -264,7 +264,7 @@ func announce(text: String, kicker: String, color: Color) -> void:
 var _pending_arrival: Array = []
 
 
-## Does an arrival plate EXIST right now — drawn or held? This is the plate's lifetime, not its
+## Does an arrival plate EXIST right now, drawn or held? This is the plate's lifetime, not its
 ## visibility, and the difference is load-bearing: a plate whose clock is frozen by `_announce_held()`
 ## still answers true here while drawing nothing at all.
 ##
@@ -279,12 +279,12 @@ func announcing() -> bool:
 ##
 ## THIS EXISTS BECAUSE THE OTHER ONE WAS USED FOR IT, and the bug that produced is worth keeping next to
 ## the fix. `main.gd` gated just-in-time lessons on `announcing()`, under a comment saying to read the HUD
-## rather than mirror it because "only one of them draws" — and then read the predicate that is not the
+## rather than mirror it because "only one of them draws", and then read the predicate that is not the
 ## one that draws. A plate already in flight when a rope goes live has its clock STOPPED on purpose
 ## (`_announce_held`, and `_scratch_rope_ceremony` case 3 asserts it), so `announcing()` stays true for as
 ## long as the line is out. The plate is invisible the whole time and every lesson waits behind it.
 ##
-## The lesson that suffers most is the one about ropes. `wrapped` — "THE LINE CAUGHT" — can only fire
+## The lesson that suffers most is the one about ropes. `wrapped`, the "THE LINE CAUGHT" bubble, can only fire
 ## while a line is live, which is precisely the condition that freezes the plate, so a player who crossed
 ## a stratum shortly before grappling could never be taught the technique at the moment it happened.
 func plate_on_screen() -> bool:
