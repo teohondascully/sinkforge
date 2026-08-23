@@ -9,7 +9,7 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
 | 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 58 of the 89 layers inheriting `check_base.gd` hand-rolling the verdict protocol, and so missing the base class's refusal of a green that asserted nothing. The measured before-state was **55 registered layers exiting 0 having asserted nothing at all**. All 90 inheritors now reach exit 0 only through `_verdict()`, none of them moves an assertion counter itself, and both rules are gated by `check_verdict_route` with a shrink-only exemption list that is empty. |
-| 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement; the frame SLO has been evaluated on the host it was written for; and its allowances, which were one machine's numbers applied to any machine, are now a per-host registry that refuses rather than borrows. Remaining: the `solid` mutator, which is a hidden-coupling item sized at 37 mutation sites and deliberately not attempted. |
+| 4. Performance and maintainability | **Closed** | a formal pass found seven full-grid loops, one of which ran every frame; both cliffs are fixed and the residual is measured at 2.74ms, which the charter's *fix confirmed cliffs only* answers rather than defers. The frame SLO has been evaluated on the host it was written for, and its allowances — one machine's numbers applied to any machine — are now a per-host registry that refuses rather than borrows. The hidden-coupling bullet found a live defect: a tree could grow inside a bazaar and the cache would not notice, reachable through an ordinary player verb. Fixed, and gated behaviourally plus by writer population. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
 
@@ -267,6 +267,78 @@ The spread is 0.17 ms across 40 samples, so this is a stable cost rather than a 
 
 No defect: the cache is correct and the repair holds at roughly six times. A dig costs a third of a 120fps
 frame rather than two whole ones.
+
+## Area 4 — hidden coupling: a tree could grow inside your bazaar and the game would not notice
+
+The Area 4 charter asks to *reduce hidden coupling between renderer, sim and save state*. The residual
+from the bazaar-cache work named a specific instance and deferred it: `solid` is mutated by direct
+dictionary assignment, so an index of wood cells could not be maintained soundly, and *"an index that any
+caller can silently invalidate is worse than the walk"*.
+
+**That was already true of the cache that exists, without any index, and nothing said so.**
+
+`find_bazaars()` is served from a cache refilled when `_bazaars_dirty` is set. `Flora.grow` runs inside
+`FactorySim.tick()` and stamps a tree trunk straight into `sim.solid` — and set no flag. Probed directly
+before anything was changed:
+
+    is_bazaar_at(o) before: true      find_bazaars() warm:  [(40, 40)]
+    is_bazaar_at(o) after:  false     find_bazaars() after: [(40, 40)]
+
+**Reachable through an ordinary verb.** `can_plant_sapling` asks only for empty ground on soil, and a
+bazaar's interior floor is earth, so a player can plant a sapling inside their own stall. Two minutes
+later the trunk closes the interior: the structure stops being a bazaar, the stall stays drawn, and the
+near-bazaar craft gate stays open — until an unrelated dig happens to invalidate the cache. The mirror is
+worse: a trunk growing into a ruin's one missing cell **completes a bazaar nobody has been told about**.
+
+A second instance, latent, from the same census: `load_world` writes `solid` in bulk and left the flag to
+its caller. `main.gd` got away with it by loading into a fresh sim whose flag starts dirty, so the miss was
+invisible from the only path anybody exercised, and `SaveGame` handled it by setting the private field by
+name from outside the class. Both now go through `FactorySim.invalidate_bazaars()`, which `load_world`
+calls itself.
+
+### The gate is behavioural, and then it is a population
+
+A grep for `_bazaars_dirty` beside every `solid[` write would have missed this one — the write is in
+another file, through a preloaded reference — and it would pass a flag set in a branch that is not taken.
+So `check_bazaar_cache` asserts the only thing that matters: after each way the world can change, does the
+cached answer equal a scan of the world as it now is. Six cases, compared as **sets of origins rather than
+counts**, with a brute-force walk of the grid as the control travelling inside each one. Every case also
+asserts that the world really did change, so no case can pass by measuring nothing.
+
+That covers the ways somebody thought of. `Flora.grow` was not one of them for as long as it existed, so
+the **writer population** is asserted too: 55 `.gd` files under `src/` and `scenes/` are scanned with
+comments and string literals stripped, and the set that writes the coarse grid must be exactly the two
+with a case in the layer. Clearing a red there means adding a case, not adding a name.
+
+| control | result |
+|---|---|
+| the scan sees a real `sim.solid[t] = &"wood"` | flagged |
+| …does not mistake a `_fine_solid` write for one | silent |
+| …does not mistake a read for a write | silent |
+| mutation: flora forgets to invalidate | 3 of 35 red — and in **both** directions: `cache [] / world [(40,40)]`, and `cache [(40,40)] / world []` |
+| mutation: `load_world` forgets | 1 of 35 red, on the load case alone |
+| mutation: a third file starts writing `solid` | 1 of 35 red, naming the file |
+| mutation: a known writer dropped from the list | 1 of 35 red |
+
+### The residual, and why it stays
+
+The coupling census, re-derived: **six external writes to a `FactorySim` private in game code** — three in
+`src/core/fine_terrain.gd`, three in `src/core/save_game.gd` — across ten distinct private names. Those are
+collaborator classes owning a slice of the sim's state by design, the same arrangement as `PowerFlow`,
+`WaterFlow` and `Flora`. The one that was load-bearing for *correctness* rather than for construction was
+the cache invalidation, and it is now a named method with a behavioural gate behind it.
+
+**The first census of this returned zero and was wrong**, which is worth recording next to the number it
+replaced. `git grep -E` silently drops `\b`, so a pattern anchored on a word boundary matched nothing and
+reported a clean tree. Caught by running the same pattern against the previous commit, where a known
+offender had to appear and did not.
+
+**The wood-cell index is not built, and that is the charter's answer rather than a deferral.** Area 4 says
+*fix confirmed scaling cliffs only*. The rescan was a cliff at 16.4ms and is not one now: measured directly
+it is 2.74ms with a 0.17ms spread over 40 samples, and seven fresh `check_frametime` runs put DIG at
+3.0–3.8% of deadlines missed against a 6.0% allowance and a worst of 2.2–2.7x against 3.0x. There is no
+confirmed cliff left to fix here, so building an index would be optimising against a named correctness
+risk with no measurement asking for it.
 
 ## Area 4 — the frame SLO's allowances were one machine's numbers, applied to any machine
 
@@ -597,3 +669,14 @@ plausible shape and no evidence yet, and the honest note is that nobody has test
 
 All six areas closed, the full suite green on `main`, and every remaining stand-down carrying a written
 reason. No new gameplay work begins until then.
+
+**Where that stands.** Areas 1, 2, 3, 4, 5 and 6 are closed. The configured sweep is green on `main` at
+`112 PASS / 0 FAIL / 0 SKIP`, and each of the six stand-downs carries its reason in `tools/stand_downs.txt`
+and resolves on every run of its layer. One finding remains open and is not an area: the pixel-layer
+flakiness below, which is classified environmental and unexplained with all four sweeps retained.
+
+It is worth being exact about what "the full suite green" can mean here, because the runner is. A sweep
+with a display cannot reach exit 0 and never will — three of the stand-downs are structural — so the
+reachable target is **exit 4 with exactly the registered six and no others**, which is what the sweeps in
+`docs/tracelog/sweeps/` show. "Configured sweep passed with six documented stand-downs" is the accurate
+sentence; "all 112 layers fully asserted" is not.
