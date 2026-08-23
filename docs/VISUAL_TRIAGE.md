@@ -394,6 +394,21 @@ Observations to preserve, not twenty independent implementation tickets.
 >
 > Suppressing a live inspector for 3.4s is still a change to what the player sees, so it is queued rather
 > than taken: fix first, then the matrix row, so the row lands green instead of reddening `main`.
+>
+> **A SECOND ceremony collision was predicted from the same camera constants and it is REFUTED.** If the
+> look-ahead can push the body down the frame, it can push it up the frame too, and a body falling past a
+> stratum line would then be behind the plate announcing it. The arithmetic said so: a terminal-velocity
+> fall with residual stride gives 162 world px of lead, 81 canvas px, which lands the body at canvas y ~99
+> inside a band of 61.6..111.6.
+>
+> **It does not happen, and the reason is the term the arithmetic left out.** Measured over a real
+> fifteen-row plunge with the plate up at full alpha, sampling every frame: the body's canvas y ranged
+> **161.0 to 184.4**, never within fifty pixels of the band's bottom edge at 110.3. The follow lag opposes
+> the look-ahead, and against a fall the two nearly cancel — at v=480 the body sat at 179, at v=525 it sat
+> at 179, both within a pixel of dead centre. The minimum of 161 was not reached while falling at all: it
+> came a frame after the body STOPPED, when the eased lead had not yet decayed.
+>
+> The ceremony ticket therefore does **not** gain a second collision, and `HOVER-CEREMONY` stands alone.
 
 > ### The selected-item row, investigated 2026-08-23 — the geometric reading is cleanly negative, with the margin stated
 >
@@ -402,16 +417,34 @@ Observations to preserve, not twenty independent implementation tickets.
 > action" and only one of them is answerable without a design call, so it was answered first: **does the
 > hotbar cover the place where actions happen?**
 >
-> **It does not, and the margin is about eleven canvas pixels.** Everything here is a constant:
+> **It does not, and the margin is about thirty-four canvas pixels.** Everything here is a constant. *(This
+> read "about eleven" when first written on 2026-08-23 and the figure was corrected the same day — see the
+> camera-model note below. The conclusion did not change; the margin got larger.)*
 >
 > | quantity | value | source |
 > |---|---|---|
 > | hotbar band | canvas y **295..339** | `HOTBAR_BAND_TOP` = 360 − 28 − `SLOT` 30 − 7; `HOTBAR_BAND_H` = 44 |
 > | world → canvas | **0.5** at zoom 1.00 | 40 cells x `CELL` 32 = 1280 world px across a 1280px viewport, halved into a 640px canvas |
 > | reach | **51.2 canvas px** | `REACH_CELLS` 3.2 x 16 canvas px per cell |
-> | worst body offset | **+52.9 canvas px** below centre | a full-stride jump: `JUMP_VELOCITY` 365 x `CAMERA_LEAD_TIME` 0.34 x (1 + `STRIDE_LEAD` 0.55) x `CAMERA_LEAD_VERTICAL` 0.55 = 105.8 world px |
+> | worst body offset | **+30.1 canvas px** below centre | a full-stride jump: lead 105.8 world px MINUS the follow trail 45.6, halved into canvas px |
 >
-> So the bottom of the reachable disc reaches canvas **284.1** against a band beginning at **295**.
+> So the bottom of the reachable disc reaches canvas **261.3** against a band beginning at **295**.
+>
+> **THE CAMERA MODEL, because the first version of this table used only half of it.** The camera lerps
+> toward `body + lead` at `CAMERA_FOLLOW_SPEED` 8/s, and a lerp chasing a moving target sits a steady
+> `v / k` behind it. So the camera settles at
+>
+>     camera = body + lead - v / CAMERA_FOLLOW_SPEED
+>
+> and the two terms **oppose each other**: the look-ahead pushes the camera along the motion, the follow lag
+> holds it back. Using the lead alone put the worst jump offset at 52.9 canvas px and the margin at 11. With
+> the trail it is 30.1 and 34. The error was conservative — it overstated the risk — but it was an error,
+> and it came from reading one line of `_process` and not the line under it.
+>
+> **The model is not asserted, it is checked against a measurement that was taken to refute something
+> else.** Over a real fifteen-row plunge down a generated shaft, sampled every frame, the body's canvas y
+> ranged **161.0 to 184.4** with velocity reaching 525 of a `MAX_FALL` 560. The model predicts **162.6** at
+> terminal velocity. Measured 161.0, predicted 162.6, and the two were arrived at independently.
 >
 > **The camera look-ahead is the whole reason this needed computing rather than asserting**, and it nearly
 > produced the opposite answer. `T2.1` states that "the camera centres the body, so the miner sits at canvas
