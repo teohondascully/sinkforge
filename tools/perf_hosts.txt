@@ -1,0 +1,56 @@
+# THE MACHINES THIS REPOSITORY HAS MEASURED, AND WHAT IT MEASURED ON EACH.
+#
+# Read by `tools/check_frametime.gd` when SF_PERF_HOST is set. TAB-separated:
+#
+#     <host>	<model>	<phase>	<miss-allow>	<severity-x>	<what was measured, over how many runs>
+#
+# WHY THIS FILE EXISTS. The frame SLO has two terms -- how OFTEN a frame misses its slot, and how LATE the
+# worst one is -- and both are RATCHETS ON MEASURED BEHAVIOUR rather than claims about what is good enough.
+# A ratchet is only meaningful over the thing it was measured on. Until 2026-08-23 the allowances were
+# three global constants in check_frametime.gd, ratcheted onto five runs of one Mac16,8, and they applied
+# unchanged to ANY box whose operator set SF_PERF_HOST. Naming a second machine would have asserted the
+# first machine's numbers on it, and a green would have meant "this box behaves like that one" while
+# reading as "this box holds the contract". That is the whole Area 4 requirement -- a number must mean the
+# same thing on two machines -- failing in the one place the project makes an absolute performance claim.
+#
+# SO A HOST IS EITHER MEASURED OR IT IS NOT, AND THERE IS NO THIRD STATE. Setting SF_PERF_HOST to a name
+# with no rows here is a hard FAIL, not a stand-down: the operator asserted something this repository
+# cannot back, and answering that with a skip would file "we have never measured this" under "nothing to
+# report". Leaving SF_PERF_HOST unset is still the honest default and still stands down, with a reason.
+#
+# THE MODEL COLUMN IS CHECKED AGAINST THE BOX. `OS.get_model_name()` must match, or the run fails saying
+# which two machines it is between. An environment variable travels -- in a shell profile, a CI secret, a
+# copied command line -- and the failure it causes is the quietest kind: the wrong allowances silently
+# applied, green, on hardware nobody calibrated.
+#
+# HOW TO ADD A HOST. Run the layer on it five times with the box quiet, read the per-phase rate and worst
+# columns it prints, and set an allowance with margin over the WORST reading you saw. Then say in the last
+# column what you saw and how many runs it was. An allowance with no measurement behind it is a guess with
+# a tab character in it.
+#
+# NOTHING SETS SF_PERF_HOST TODAY, INCLUDING ON THE HOST BELOW, and that is deliberate rather than
+# unfinished. On mac16-8-120hz the IDLE term sits one frame from red: 200 samples quantise the rate at
+# 0.5%, six of seven runs read exactly one late frame, and the allowance is two. Arming it here would buy
+# a real assertion and a flaky one. The obvious remedy -- a longer window -- was measured and rejected: at
+# 600 frames DIG's rate falls from 3.0-3.2% to 2.0% because the hitches cluster at a phase's start, so the
+# window grows the denominator and leaves the numerator alone. Keeping the same sensitivity there would
+# mean lowering every allowance to match a diluted measurement, which is loosening a contract to tidy its
+# arithmetic. Recorded in docs/A_PLUS_STATUS.md under Area 4.
+#
+# AND THE DECISION NOT TO ARM IT NOW HAS A SECOND PHASE BEHIND IT, MEASURED WHILE WRITING THIS FILE.
+# Six runs on mac16-8-120hz with SF_PERF_HOST set, load average 3.1 to 5.3 -- a working box, not the quiet
+# one the seven original runs were taken on. Five came back with every phase at 0.0% except DIG at
+# 3.0-3.8%, comfortably inside. The sixth read SWING at 1.5%: three late frames where the allowance is
+# two, and where all five neighbours read zero. So the phase that had never missed once in seven recorded
+# runs can miss three times in one, and the term that sits a frame from red is not only IDLE's.
+#
+# THE ALLOWANCE WAS NOT MOVED, and it is worth saying why rather than leaving it implied. 1.5% against a
+# 1.0% bar on one run of six is either a contended box or a real tail, and this layer cannot tell those
+# apart -- the note in check_frametime.gd's `_absolute` records every discriminator that was tried and why
+# each failed. Widening the bar to fit the reading would convert "we cannot tell" into "this is fine",
+# which is the one move a ratchet exists to prevent. The reading is recorded and the bar stands.
+
+mac16-8-120hz	Mac16,8	IDLE	0.010	3.0	Apple M4 Pro, 12 cores, 120Hz, quiet box, layer running alone, 200 frames per phase. Seven runs read 0.0-0.5% missed and a worst of 1.4-2.1x the interval. Allowance 1.0% is two late frames at this window's 0.5% quantisation, and 3.0x is the severity bound below.
+mac16-8-120hz	Mac16,8	RUN	0.010	3.0	Same seven runs: 0.0% missed every time, worst 1.1-1.4x. The most headroom of any phase, which is expected -- it moves the body and streams chunks and does nothing else.
+mac16-8-120hz	Mac16,8	DIG	0.060	3.0	Same seven runs: 2.8-3.2% missed, worst 2.2-2.7x. Its own allowance because it is the only phase doing work the player asked for mid-frame; folding it into one global number would let a dig regression spend the quiet phases' headroom.
+mac16-8-120hz	Mac16,8	SWING	0.010	3.0	Same seven runs: 0.0% missed, worst 1.3-1.5x.

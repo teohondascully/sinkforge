@@ -359,27 +359,84 @@ const DROP_AT: float = 1.5
 ## written on rate alone would have scored that fix as nothing. So severity is a term of its own.
 ##
 ## THESE ARE RATCHETS, NOT TARGETS, and the distinction is the honest part. Nobody has decided what frame
-## behaviour this game owes a player; what follows is measured behaviour with margin, so that a REGRESSION
-## is caught while nothing is claimed about what is good enough. Measured on mac16,8, quiet box, the layer
-## running alone, five consecutive runs of 200 frames per phase:
+## behaviour this game owes a player; what the registry holds is measured behaviour with margin, so that a
+## REGRESSION is caught while nothing is claimed about what is good enough.
 ##
-##     IDLE   0.5  0.5  0.5  0.5  0.5 %        worst ~1.8x interval
-##     RUN    0.0  0.0  0.0  0.0  0.0 %        worst ~1.4x
-##     SWING  0.0  0.0  0.0  0.0  0.0 %        worst ~1.4x
-##     DIG    3.2  3.0  4.0  3.2  3.0 %        worst ~2.5x
+## AND THEY ARE PER-HOST, WHICH THEY WERE NOT UNTIL 2026-08-23. Three global constants held them --
+## MISS_QUIET 1.0%, MISS_WORKING 6.0%, SEVERITY_X 3.0x -- ratcheted onto five runs of one Mac16,8 and
+## applied unchanged to any box whose operator set SF_PERF_HOST. Naming a second machine would have
+## asserted the first machine's numbers on it, and the green would have meant "this box behaves like that
+## one" while reading as "this box holds the contract". A ratchet is only meaningful over the thing it was
+## ratcheted on, and Area 4 asks for exactly the opposite property: a number that means the same thing on
+## two machines. They live in `tools/perf_hosts.txt` now, one row per host per phase, each carrying the
+## measurement it came from, and a host with no rows is a hard refusal rather than a borrowed default.
 ##
-## DIG has its own allowance because it is the only phase doing work a player asked for mid-frame, and
-## hiding that behind one global number would let a dig regression spend the quiet phases' headroom.
-## 200 samples means the rate is quantised at 0.5%, so IDLE's reading is one single frame and the quiet
-## allowance is two of them.
-const MISS_QUIET: float = 0.010     ## IDLE, RUN, SWING: measured 0.0-0.5%, allow 1.0%
-const MISS_WORKING: float = 0.060   ## DIG: measured 3.0-4.0%, allow 6.0%
-## No frame may take more than this many refresh intervals. At 3.0 the pre-fix bazaar rescan FAILS -- DIG
-## worst ran 31.4 to 34.1ms against a 25.0ms bar -- and the fixed build passes at 17.7 to 20.8ms. A bound
-## that would have caught the largest stall this project has measured, and that clears it afterwards.
-const SEVERITY_X: float = 3.0
-const MISS_ALLOW: Dictionary = {"IDLE": MISS_QUIET, "RUN": MISS_QUIET, "SWING": MISS_QUIET,
-	"DIG": MISS_WORKING}
+## The severity bound is worth keeping in view wherever it is written down: at 3.0x the pre-fix bazaar
+## rescan FAILS -- DIG worst ran 31.4 to 34.1ms against a 25.0ms bar -- and the fixed build passes at 17.7
+## to 20.8ms. A bound that would have caught the largest stall this project has measured, and that clears
+## it afterwards.
+
+
+## The measured machines. See the file's own header for why the allowances cannot be constants.
+const PERF_HOSTS: String = "res://tools/perf_hosts.txt"
+
+## Rows for `_perf_host`, {phase: {"miss": float, "severity": float}}, filled by `_load_host()`.
+var _host_rows: Dictionary = {}
+
+## Why the registry could not be used, if it could not. Empty means it was.
+var _host_error: String = ""
+
+
+## Read `perf_hosts.txt` and keep the rows for this host. Returns false, with `_host_error` set, on any
+## reason the allowances cannot be trusted.
+##
+## EVERY FAILURE HERE IS A REFUSAL AND NOT A FALLBACK. The tempting shape is "no rows for this host, so
+## use the defaults", and the defaults ARE one machine's measurements -- which is the defect this file
+## exists to remove, reintroduced as an error path. See `error-path-returns-the-passing-value`: for every
+## early return, ask whether it passes or fails.
+func _load_host() -> bool:
+	var src: String = FileAccess.get_file_as_string(PERF_HOSTS)
+	if src.is_empty():
+		_host_error = "%s is empty or unreadable, so no host's allowances are available" % PERF_HOSTS
+		return false
+	var seen_any: bool = false
+	var models: Dictionary = {}
+	var line_no: int = 0
+	for line: String in src.split("\n"):
+		line_no += 1
+		if line.begins_with("#") or line.strip_edges().is_empty():
+			continue
+		var col: PackedStringArray = line.split("\t")
+		if col.size() < 6:
+			_host_error = "%s line %d has %d tab-separated fields, needs 6" % [PERF_HOSTS, line_no, col.size()]
+			return false
+		seen_any = true
+		if col[0] != _perf_host:
+			continue
+		models[col[1]] = true
+		if col[5].strip_edges().is_empty():
+			_host_error = "%s line %d sets an allowance with no measurement behind it" % [PERF_HOSTS, line_no]
+			return false
+		_host_rows[col[2]] = {"miss": col[3].to_float(), "severity": col[4].to_float()}
+	if not seen_any:
+		_host_error = "%s has no rows at all; the registry parsed to nothing" % PERF_HOSTS
+		return false
+	if _host_rows.is_empty():
+		_host_error = ("SF_PERF_HOST=%s names a machine this repository has never measured." % _perf_host
+			+ " Add rows to %s -- five quiet runs, an allowance with margin over the worst reading, and" % PERF_HOSTS
+			+ " a sentence saying what you saw. Refusing rather than borrowing another box's numbers.")
+		return false
+	# ONE HOST, ONE MACHINE. An environment variable travels; the wrong allowances applied silently on
+	# uncalibrated hardware is the quietest possible way for this claim to go wrong.
+	var here: String = OS.get_model_name()
+	if not models.has(here):
+		_host_error = ("SF_PERF_HOST=%s was measured on %s and this box reports %s."
+			% [_perf_host, ", ".join(models.keys()), here]
+			+ " A ratchet means nothing off the hardware it was ratcheted on.")
+		return false
+	return true
+
+
 func _drop_rate(ms: PackedFloat32Array, interval: float) -> float:
 	if ms.is_empty() or interval <= 0.0:
 		return 0.0
@@ -452,6 +509,22 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 	# A stand-down that fires on half of all runs is not caution, it is a gate that runs nowhere.
 	_asserted("frametime.absolute-budget")
 
+	# THE ALLOWANCES COME FROM THE REGISTRY OR THE RUN FAILS. There is no default and there must not be:
+	# the default WAS one machine's numbers, and reinstating it as a fallback would put the defect back on
+	# the error path where it is harder to see. A named host with no rows is an operator asserting
+	# something this repository has never measured, which is a red rather than a skip -- answering "we have
+	# never measured this" with a stand-down files it under "nothing to report".
+	if not _load_host():
+		printerr("      FAIL: %s" % _host_error)
+		return false
+	for lab: String in labels:
+		if not _host_rows.has(lab):
+			printerr("      FAIL: %s has no %s row for the %s phase, so there is no allowance to judge it"
+				% [PERF_HOSTS, _perf_host, lab] + " against")
+			return false
+	print("  absolute: allowances read from %s for host %s (%d phase rows)"
+		% [PERF_HOSTS, _perf_host, _host_rows.size()])
+
 	var paced: bool = false
 	if interval > 0.0:
 		var fastest: float = _fastest(phases)
@@ -481,7 +554,8 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 
 	print("  absolute: SF_PERF_HOST=%s — the frame SLO, against a %.2fms refresh. TWO terms: how OFTEN a"
 		% [_perf_host, interval]
-		+ " deadline is missed (a frame past %.1fx the interval), and how LATE the worst one is." % DROP_AT
+		+ " deadline is missed (a frame past %.1fx the interval), and how LATE the worst one is," % DROP_AT
+		+ " both from %s." % PERF_HOSTS
 		+ " Rate alone cannot see a stall getting shallower; severity alone cannot see one getting more"
 		+ " frequent. Both are ratchets on measured behaviour, not a claim about what is good enough.")
 	var ok: bool = true
@@ -495,10 +569,15 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 		var p95: float = _pct(ms, 0.95)
 		var drops: float = _drop_rate(ms, interval)
 		var worst: float = _worst(ms)
-		var allow: float = float(MISS_ALLOW.get(labels[i], MISS_QUIET))
+		# NO `.get(..., default)` HERE, DELIBERATELY. A missing phase used to fall back to the quiet
+		# allowance, which is a silent decision about the phase this layer knows least about; `_load_host`
+		# has already refused a host whose rows do not cover every judged phase.
+		var row: Dictionary = _host_rows[labels[i]]
+		var allow: float = float(row["miss"])
+		var severity: float = float(row["severity"])
 		var late_x: float = worst / interval
 		print("      %s: %.1f%% missed (allow %.1f%%) · worst %.2fms = %.1fx interval (allow %.1fx)"
-			% [labels[i], drops * 100.0, allow * 100.0, worst, late_x, SEVERITY_X]
+			% [labels[i], drops * 100.0, allow * 100.0, worst, late_x, severity]
 			+ " · p95 %.2fms, reported and NOT asserted" % p95)
 		# NO PACED BRANCH ANY MORE, and its absence is the point. Pacing cannot fake either term: a frame
 		# that fits presents at 1.0x and one that misses at 2.0x, so both numbers read the same whether
@@ -510,9 +589,9 @@ func _absolute(labels: PackedStringArray, phases: Array[PackedFloat32Array], qui
 				% [labels[i], drops * 100.0, allow * 100.0, _perf_host]
 				+ " — a RATE regression: the phase is late more often than it was measured to be.")
 			bad = true
-		if late_x > SEVERITY_X:
+		if late_x > severity:
 			printerr("      FAIL: %s stalled %.2fms, %.1fx the %.2fms refresh, over the %.1fx allowed"
-				% [labels[i], worst, late_x, interval, SEVERITY_X]
+				% [labels[i], worst, late_x, interval, severity]
 				+ " — a SEVERITY regression: something in that phase is doing several frames of work"
 				+ " inside one. Profile the phase and not the frame; the last one of these was a"
 				+ " full-grid rescan in the sim, and nothing the renderer was doing.")
