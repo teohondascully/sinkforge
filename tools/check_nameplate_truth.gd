@@ -90,20 +90,20 @@ func _initialize() -> void:
 	# --- reading one: the body beside the run, every machine inside the radius ---
 	main._player.position = main._cell_center(Vector2i(x0, row))
 	var view: Rect2 = wr._view_world_rect()
-	wr._plan_machine_labels(view)
+	wr._machines._plan_machine_labels(view)
 	var near_plan: Dictionary = _snapshot(wr)
 
 	# --- reading two: the body walked west, the run now straddling the radius ---
 	main._player.position = main._cell_center(Vector2i(x0 - FAR_WEST_CELLS, row))
 	var far_view: Rect2 = wr._view_world_rect()
-	wr._plan_machine_labels(far_view)
+	wr._machines._plan_machine_labels(far_view)
 	var far_plan: Dictionary = _snapshot(wr)
 
 	# THE TREATMENT HAS TO HAVE BEEN APPLIED. Every assertion after this compares two readings and they are
 	# all satisfied by two readings taken under identical conditions — which is exactly what happens if the
 	# teleport did not move the body far enough to put any machine outside the radius. Assert the straddle
 	# exists before asserting anything about it.
-	var reach: float = WorldRenderer.LABEL_NEAR_CELLS * float(WorldRenderer.CELL)
+	var reach: float = MachineView.LABEL_NEAR_CELLS * float(WorldRenderer.CELL)
 	var outside: int = 0
 	for c: Vector2i in placed:
 		if main._cell_center(c).distance_to(main._player.position) > reach:
@@ -165,9 +165,9 @@ func _initialize() -> void:
 ## field, because the string is what a player sees and a field agreeing with itself proves nothing about it.
 func _snapshot(wr: WorldRenderer) -> Dictionary:
 	var out: Dictionary = {}
-	for key: Variant in wr._label_plan:
+	for key: Variant in wr._machines._label_plan:
 		var cell: Vector2i = key
-		var text: String = String(wr._label_plan[cell]["text"])
+		var text: String = String(wr._machines._label_plan[cell]["text"])
 		var n: int = 1
 		var at: int = text.rfind(" ×")
 		if at >= 0:

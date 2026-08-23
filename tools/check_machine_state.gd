@@ -175,7 +175,7 @@ func _run() -> void:
 		# three-arm match in the renderer that nothing checks against that vocabulary. **If a machine's
 		# pixels do not change, the first question is whether the renderer was ever told to change them**,
 		# and answering that from the outside is guesswork.
-		var flash_work: bool = _main._renderer._machine_active(m)
+		var flash_work: bool = _main._renderer._machines._machine_active(m)
 		var a0: PackedFloat32Array = await _luma_patch()
 		for _i: int in STEADY_FRAMES:
 			await physics_frame
@@ -185,7 +185,7 @@ func _run() -> void:
 		# machine working the moment it HOLDS coal, while `_machine_active` asks whether it is BURNING
 		# (`fuel > 0`), and the tick that converts one into the other had not run yet at the flip. Both
 		# samples are kept, because the gap between them is the only evidence of which of the two happened.
-		var live_work: bool = _main._renderer._machine_active(m)
+		var live_work: bool = _main._renderer._machines._machine_active(m)
 		var a1: PackedFloat32Array = await _luma_patch()
 		_dump("%s_work" % String(spec["name"]).to_lower().replace(" ", "_"))
 		for _i: int in PHASE_FRAMES:
@@ -207,7 +207,7 @@ func _run() -> void:
 			sim.remove_machine(STAGE)
 			await physics_frame
 			continue
-		var live_stop: bool = _main._renderer._machine_active(m)
+		var live_stop: bool = _main._renderer._machines._machine_active(m)
 		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "i1": i1,
 			"live_work": live_work, "live_stop": live_stop, "flash_work": flash_work,
 			"status": String(sim.machine_status(m)), "stopped": stopped})
