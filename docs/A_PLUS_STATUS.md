@@ -1113,11 +1113,61 @@ settled to answer the question the layer exists to answer. The prefix geometry i
 is a question about what the mask *does* contain, and that is downstream of the finding that it does not
 contain the preview.
 
-### What is committed
+### What it was: the lamp, and a mask built at the wrong time scale
 
-The eaten count, as a second true quantity over the same corridor, because any repair needs it. The
-control's message now says it is known blind and quotes the 196. Nothing else: the floor is untouched,
-because a floor cannot fix an instrument that cannot see its subject, and no assertion has been softened
-or skipped. The layer still passes, and that pass should not be quoted for anything about the aim preview
-until the measurement is rebuilt.
+The miner's head-lamp throws an amber pool over whatever is being aimed at, and it breathes by design on
+`0.030 * sin(t * 11.0) + 0.020 * sin(t * 27.0)` — periods of 34.3 and 14.0 frames. The corridor being
+photographed sits inside that pool. The old block differenced the shot against a reference **four** frames
+away and then excluded the pixels that moved between two references **thirty-eight** frames apart. On one
+run, in the window the corridor occupies:
+
+| pair | separation | slow periods | pixels over `DRAW_LEVEL` |
+|---|---|---|---|
+| reference to shot | 34 fr | 0.99 | 1645 |
+| reference to reference | 38 fr | 1.11 | 2642 |
+| shot to reference | 4 fr | 0.12 | **15716** |
+
+The long pairs come back nearly in phase and see almost nothing, so the exclusion they build excludes
+almost nothing. The four-frame pair catches the flicker mid-swing. Of that pair's 15892 differing pixels
+frame-wide, 15716 were inside the corridor. A difference taken at one separation cannot be removed by a
+mask built at another.
+
+### The repair, and the one that did not work
+
+Widening the exclusion was tried first: still pairs at the measurement's own four-frame separation,
+unioned across a full lamp period so every phase is covered. It fails, and it fails informatively — the
+corridor lost 4720..12364 pixels and the preview kept 0..167, three runs in four going red. The preview is
+drawn **on top of** the pool and shares every pixel with it, so any mask wide enough to cover the flicker
+covers the preview too. That result is kept in the layer's comment, because the next person to reach for a
+wider exclusion should see it already measured.
+
+What works is posing the clock. `SF_ANIM_FROZEN=1` holds `_anim_time`, the free-running cosmetic clock
+that drives the lamp flicker, the ping ring, the chevron bob, the dig pulse and the ore glints, and which
+never feeds the sim. It is the same move the repository already makes on the pointer, through
+`SF_AIM_GHOST_OFF`, for this same measurement. The layer holds it for the length of the sky block only.
+
+The pre-registered acceptance test — fixed before the repair was written, and not a threshold — was that
+the subject-removed run must separate from the subject-present run:
+
+| | preview drawn | preview never drawn |
+|---|---|---|
+| mask pixels | 182, 182, 189, 182 | 0, 0, 0 |
+| edge levels | 157.1, 158.4, 159.6 | 0.0, 0.0, 0.0 |
+
+A spread of 62..9264 became 182..189. The residual is exactly nothing. The union exclusion is kept as the
+travelling control on the pose: it read 4720..12364 unposed and reads 0..162 posed, so a corridor still
+losing thousands of pixels means something is alive that `_anim_time` does not drive.
+
+The floor stays at 60. It now sits between a residual of nothing and a signal reproducing to within seven
+pixels, which is the first time it has meant anything. It was not raised: six samples on one machine can
+say the gap is real and cannot say where inside it a bound belongs.
+
+### Still open
+
+**The dark-rock block is still blind, and it is the half that carries `GR-04`'s assertion.** It reads
+2.4–3.7 levels with the preview drawn and 1.9–3.5 with it never drawn. It has the same cause — its
+exclusion is unioned from pairs thirty frames apart — and the same fix is available, but it cannot simply
+be wrapped in the pose: that block also asserts `churn < 0.06`, that the live frame is mostly still, and
+freezing the clock would make that control unfalsifiable. The churn control has to keep running unposed
+and the capture pair has to be posed, which is a larger edit than the one made here.
 

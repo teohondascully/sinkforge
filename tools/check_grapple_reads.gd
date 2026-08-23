@@ -77,6 +77,9 @@ const QUIET_GAP: int = 30
 ## HOW MANY periods the self-motion controls sample before believing a number. Three runs of an unchanged
 ## build put the single-sample version at 5.04%, 6.10% and 3.20% against a 6% ceiling; the count is here so
 ## a reader can see that the stability came from sampling and not from moving the line.
+const SKY_PAIR_GAP: int = 4            ## the measurement's own separation; the exclusion uses the same one
+## 9 x SKY_PAIR_GAP = 36 frames, one full period of the lamp's slower flicker term (2*PI/11.0 = 34.3).
+const SKY_STILL_PAIRS: int = 9
 const CHURN_SAMPLES: int = 4
 const PHASE_SAMPLES: int = 3
 
@@ -820,21 +823,60 @@ func _check_against_sky() -> void:
 	# is excluded, and the nearer reference is four frames away rather than thirty.
 	RopeView.AIM_GHOST_OFF = true
 	await _look_at(target)
-	var bg_before: PackedFloat32Array = await _luma()
+	# THE COSMETIC CLOCK IS HELD FOR THE LENGTH OF THIS MEASUREMENT. Excluding the pixels the lamp moves
+	# cannot work here: the preview is drawn ON TOP of the lamp's pool and shares every pixel with it, so a
+	# mask wide enough to cover the flicker covers the preview too. Measured — with the exclusion unioned
+	# across a full lamp period the corridor lost 4720..12364 pixels and the preview kept 0..167, and three
+	# runs in four failed a control that had been passing on the flicker. The clock is posed instead, which
+	# is what the repository already does to the pointer for this same measurement.
+	WorldRenderer.ANIM_FROZEN = true
+	# THE EXCLUSION IS BUILT AT THE MEASUREMENT'S OWN TIME SCALE, and the version before this one was not.
+	# It differenced `aim` against a reference four frames away and then excluded the pixels that moved
+	# between two references THIRTY-EIGHT frames apart. A difference taken at one separation cannot be
+	# removed by a mask built at another, and here the two separations sit on opposite sides of a period.
+	# The head-lamp's amber pool covers this corridor and flickers by design on two sine terms,
+	# `0.030 * sin(t * 11.0) + 0.020 * sin(t * 27.0)`, whose periods are 34.3 and 14.0 frames. Measured on
+	# one run of the old code, in the window the corridor occupies:
+	#
+	#   reference to shot, 34 frames apart (0.99 of a period):   1645 pixels over DRAW_LEVEL
+	#   reference to reference, 38 frames (1.11 of a period):    2642
+	#   shot to reference, 4 frames (0.12 of a period):         15716
+	#
+	# The long pairs come back nearly in phase and see almost nothing, so the mask they build excludes
+	# almost nothing; the four-frame pair catches the flicker mid-swing and reads ten times as much. The
+	# whole-frame count for that pair was 15892, so 99% of it was inside this corridor. That is the lamp.
+	#
+	# What this cost: with the exclusion blind to the lamp, the count was the lamp's phase and not the
+	# preview. A copy of this layer with every `AIM_GHOST_OFF` flipped to `true`, so the preview is never
+	# drawn at all, scored 15..10076 pixels against runs of 62..9264 with it drawn, and reached HIGHER
+	# than any of them. The measurement did not contain its subject.
+	#
+	# So the still pairs are taken at SKY_PAIR_GAP, the same separation the shot is measured over, and
+	# unioned across SKY_STILL_PAIRS of them so that every phase of the slower term is covered. A pixel
+	# that moves on its own at this time scale, at any phase, is excluded. The preview does not move
+	# between two ghost-off captures, so none of its own pixels can be excluded by this.
+	var moving: PackedByteArray = PackedByteArray()
+	var still: PackedFloat32Array = await _luma()
 	_dump("sky_bare")
-	for _i: int in QUIET_GAP:
-		await physics_frame
+	for _s: int in SKY_STILL_PAIRS:
+		for _i: int in SKY_PAIR_GAP:
+			await physics_frame
+		var cur: PackedFloat32Array = await _luma()
+		var m: PackedByteArray = _moving(still, cur)
+		moving = m if moving.is_empty() else _either(moving, m)
+		still = cur
 	RopeView.AIM_GHOST_OFF = false
-	for _i: int in 4:
+	for _i: int in SKY_PAIR_GAP:
 		await physics_frame
 	var aim: PackedFloat32Array = await _luma()
 	_dump("sky_aim")
 	RopeView.AIM_GHOST_OFF = true
-	for _i: int in 4:
+	for _i: int in SKY_PAIR_GAP:
 		await physics_frame
 	var bg: PackedFloat32Array = await _luma()
+	_dump("sky_bg")
+	WorldRenderer.ANIM_FROZEN = false
 	RopeView.AIM_GHOST_OFF = false
-	var moving: PackedByteArray = _moving(bg_before, bg)
 	# RESTRICTED TO THE CORRIDOR, and the surface is why it has to be. Underground the background is flat
 	# dark rock and a difference mask is the preview; up here it is **clouds**, which drift, and the lesson
 	# plate, which fades. The first version measured 177 levels against the miner's 87 and the mask image
@@ -851,33 +893,21 @@ func _check_against_sky() -> void:
 	var body: PackedByteArray = _body_mask()
 	var guide_edge: float = _edge_gain(aim, bg, guide)
 	var body_edge: float = _edge_p90(aim, body)
-	# THIS BLOCK DOES NOT REGISTER ITS SUBJECT, and neither does the dark-rock block above it. Both were
-	# measured against a copy of this layer with every `AIM_GHOST_OFF = false` flipped to `true`, so the
-	# aim preview is never drawn and the mask can only contain things that are not the preview:
-	#
-	#   open sky, preview ON  (n=16): 62 173 186 195 198 298 326 412 880 1292 1381 3985 7613 8090 8324 9264
-	#   open sky, preview OFF (n=8):  15 15 38 196 746 6581 9210 10076
-	#   dark rock, ON (n=9): 2.4..3.7 levels over 2692..5170 px | OFF (n=8): 1.9..3.5 over 2856..4539
-	#
-	# The subject-removed runs reach HIGHER than any run with the preview on, and their median is the same
-	# order as the median with it. Turning the thing being measured off is not visible in the number. So
-	# the floor below is not merely low, it sits inside the residual: a run with no preview at all read 196
-	# against it. The 2026-08-22 red at 0 pixels was the residual landing small, not the preview missing.
-	#
-	# Two earlier explanations of the spread are recorded here as wrong. Cloud drift eating the mask was
-	# refuted by the eaten count moving WITH the survivor rather than against it. A reveal animation caught
-	# mid-draw was refuted by reading `_draw_aim_ghost`, which is stateless: a dotted stub capped at
-	# `AIM_STUB_MAX` and a ring, recomputed whole every frame, with nothing drawn in between.
-	#
-	# The eaten count stays because it is a true second quantity over the same corridor and the same body
-	# cut, and a repair needs it. It does not rescue the measurement: it does not separate the two states
-	# either.
+	# WHAT THE SUBTRACTION ATE, over the same corridor and with the same body cut. It is the travelling
+	# control on the pose: with the clock held, a corridor that is still losing thousands of pixels means
+	# something in the frame is alive that `_anim_time` does not drive, and the count beside it is not the
+	# preview. Posed, this reads 0..162; unposed it read 4720..12364.
 	var eaten: int = _count(_without(_without(moving, _invert(lane)), _body_mask()))
 	print("    against open sky — miner %.1f levels, preview %.1f levels (%d preview pixels, "
 		% [body_edge, guide_edge, _count(guide)] + "%d corridor pixels eaten by drift)" % eaten)
+	# THE FLOOR IS UNCHANGED AT 60 and it now means something. With the clock posed, three runs with the
+	# preview drawn read 182, 182 and 189 pixels, and three with it never drawn read 0, 0 and 0. The floor
+	# sits between a residual of nothing and a signal that reproduces to within seven pixels. It was not
+	# raised to sit closer to the signal: six samples on one machine can say the gap is real and cannot say
+	# where inside it a bound belongs.
 	_check(_count(guide) > 60,
-		"CONTROL: KNOWN BLIND, see the note above — a run with the preview never drawn read 196 against "
-		+ "this floor of 60 (%d pixels, %d corridor pixels eaten)" % [_count(guide), eaten])
+		"CONTROL: the preview drew something against the sky at all — %d pixels, %d eaten; with the "
+		% [_count(guide), eaten] + "preview never drawn this reads 0")
 	# REPORTED, NOT ASSERTED, AND THAT IS `GR-04`'s OWN SHAPE. Its approach line is *"state-based alpha and
 	# endpoint emphasis"*: how loud an aim mark should be is a design call, and the two candidate floors
 	# here are not comparable quantities: the miner's number is the step between an opaque body and what is

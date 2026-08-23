@@ -123,6 +123,17 @@ static var BARE_MACHINES: bool = OS.get_environment("SF_MACHINE_BARE") == "1"
 ## glyph especially is a decal on the front, so leaving it in would let `check_machine_identity` pass on
 ## twenty identical boxes wearing twenty different icons.
 static var SILHOUETTE_ONLY: bool = OS.get_environment("SF_MACHINE_SILHOUETTE") == "1"
+## `SF_ANIM_FROZEN=1`: hold the cosmetic clock, so a measurement that differences two frames sees only what
+## it changed between them. Nothing here feeds the sim; `_anim_time` drives the lamp flicker, the ping ring,
+## the objective chevron's bob, the dig pulse and the ore glints, all of which are alive by design.
+##
+## The lamp is why this exists. Its amber pool covers whatever the miner is aiming at and breathes on
+## `0.030 * sin(t * 11.0) + 0.020 * sin(t * 27.0)`, so two captures four frames apart differ across the
+## whole pool. `check_grapple_reads` photographed the aim preview inside that pool by subtraction and was
+## measuring the flicker's phase: with the preview never drawn at all it scored 15..10076 pixels against
+## 62..9264 with it drawn, and reached higher than any of them. Excluding the moving pixels instead does
+## not work, because the preview is drawn ON TOP of the pool and shares every pixel with it.
+static var ANIM_FROZEN: bool = OS.get_environment("SF_ANIM_FROZEN") == "1"
 ## One colour for all of them. Leaving each machine its registry hue and masking "material" as "far enough
 ## from bare rock" could not register its subject: the Descent Engine's shadowed foot lands within 3 levels
 ## of the rock behind it, so a dark machine measured as a smaller machine, and twenty bodies scored a mean
@@ -564,7 +575,8 @@ func start_scan(origin: Vector2, echoes: Array[Dictionary]) -> void:
 
 
 func _process(delta: float) -> void:
-	_anim_time += delta
+	if not ANIM_FROZEN:
+		_anim_time += delta
 	if not _construct.is_empty():                        # age the assemble overlays; drop the finished ones
 		for cell: Vector2i in _construct.keys():
 			var e: float = float(_construct[cell]) + delta
