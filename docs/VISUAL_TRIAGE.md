@@ -323,7 +323,7 @@ Observations to preserve, not twenty independent implementation tickets.
 > goes red is the design question the ticket actually contains.
 
 | `FORGE` labels and pointers read as duplicated UI (**investigated 2026-08-23** — two of its three remedies already shipped; see the third note below the table) | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
-| Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
+| Selected-item panel competes with the active action (**investigated 2026-08-23** — not occlusion, measured; the salience reading survives as a prototype call) | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
 | Dashed grapple guide reads as debug geometry | V4 | Play-disrupting | Three-state motion comparison |
 | Dirt has isolated pale and brown blocks | V2 | Frame-breaking | Measure accent density; test clustered low-frequency variation |
 | Stone, dirt and deposit share texture frequency | V2 | Frame-breaking | Define per-material silhouette, palette and variation rules |
@@ -394,6 +394,46 @@ Observations to preserve, not twenty independent implementation tickets.
 >
 > Suppressing a live inspector for 3.4s is still a change to what the player sees, so it is queued rather
 > than taken: fix first, then the matrix row, so the row lands green instead of reddening `main`.
+
+> ### The selected-item row, investigated 2026-08-23 — the geometric reading is cleanly negative, with the margin stated
+>
+> The row's first investigation is *"compare persistent versus action-only display in capture"*, which
+> presumes the competition is worth prototyping against. There are two readings of "competes with the active
+> action" and only one of them is answerable without a design call, so it was answered first: **does the
+> hotbar cover the place where actions happen?**
+>
+> **It does not, and the margin is about eleven canvas pixels.** Everything here is a constant:
+>
+> | quantity | value | source |
+> |---|---|---|
+> | hotbar band | canvas y **295..339** | `HOTBAR_BAND_TOP` = 360 − 28 − `SLOT` 30 − 7; `HOTBAR_BAND_H` = 44 |
+> | world → canvas | **0.5** at zoom 1.00 | 40 cells x `CELL` 32 = 1280 world px across a 1280px viewport, halved into a 640px canvas |
+> | reach | **51.2 canvas px** | `REACH_CELLS` 3.2 x 16 canvas px per cell |
+> | worst body offset | **+52.9 canvas px** below centre | a full-stride jump: `JUMP_VELOCITY` 365 x `CAMERA_LEAD_TIME` 0.34 x (1 + `STRIDE_LEAD` 0.55) x `CAMERA_LEAD_VERTICAL` 0.55 = 105.8 world px |
+>
+> So the bottom of the reachable disc reaches canvas **284.1** against a band beginning at **295**.
+>
+> **The camera look-ahead is the whole reason this needed computing rather than asserting**, and it nearly
+> produced the opposite answer. `T2.1` states that "the camera centres the body, so the miner sits at canvas
+> (320, 180)", and on that premise the disc bottom is 231.2 and the margin is 64px — comfortable, and wrong.
+> The camera does not centre the body: it leads by `_cam_lead`, and the lead is **subtracted** from the
+> body's screen position, so **upward** motion pushes the body DOWN the frame, toward the bar. Falling does
+> the opposite and is never the risky direction. At the `CAMERA_LEAD_MAX` cap of 170 world px the disc would
+> reach 316.2 and overlap by 21px — the cap is simply not reachable, because it needs about 909 px/s of pure
+> vertical and the fastest upward motion the build has is `SWING_MAX_SPEED` 420 and `JUMP_VELOCITY` 365.
+>
+> Two things make the real margin larger than the eleven above, and neither is relied on: the lead is eased
+> at `CAMERA_LEAD_EASE` 5/s so it never attains its steady-state value before gravity bleeds the climb, and
+> `stride` decays in the air, so the 1.55 multiplier is already falling by the time the body is high. Zoom
+> only helps: 1.00 is the largest in `ZOOM_LEVELS`, and every other level shrinks the disc in canvas px. The
+> bar widens with the pack but never grows taller, so a fuller pack cannot change the answer.
+>
+> **What survives is the other reading, and it is a design call.** "Competes" as *salience* — a lit,
+> saturated, permanently-present bar drawing the eye away from the work — is untouched by any of the above,
+> and it is what the row's own stated investigation is really asking for. That comparison needs the
+> persistent and action-only builds captured side by side, which is a prototype rather than a measurement.
+> Queued as such. **The value of the negative is that it removes the cheaper explanation**: if the bar reads
+> as competing, it is not because it is in the way.
 
 ## Milestones
 
