@@ -198,8 +198,43 @@ Observations to preserve, not twenty independent implementation tickets.
 
 | Symptom | Root | Severity | First investigation |
 |---|---|---:|---|
-| Multi-line tutorial panel over the body, occluding the thing it teaches (`UI-01`, still open) *(listed as "screen-centred" until 2026-08-20 — withdrawn: the anchor is a world position, the miner's head in the audited frame (`scenes/main.gd:826-841`), and the draw only clamps it on-canvas (`scenes/hud.gd:700-701`).)* | V1 | Frame-breaking | Measure duration and coverage; replace one lesson with a contextual first-use cue |
+| Lesson bubble prints over the world object its own lesson names (`UI-01`, **open, and re-scoped from evidence** — see the note below the table) | V1 | Frame-breaking | Read the number `capture_moments -- teach` now prints; then decide where a lesson may sit relative to its subject |
 | Multiple arrows, rings and labels in one surface frame | V1 | Frame-breaking | Inventory simultaneous helper states and assign priority tiers |
+
+> ### `UI-01` was re-scoped on 2026-08-23, because two of its three claims were measurably wrong
+>
+> The row above used to read *"Multi-line tutorial panel over the body, occluding the thing it teaches"*,
+> with a note withdrawing an earlier "screen-centred" reading. Captured on the current build, that
+> description fails on its first two clauses and holds on the third, which is the worst way for a ticket
+> to be wrong: the visible half is fixed, so a reader is sent to fix it again.
+>
+> - **"Multi-line" is stale.** The box was 250x52 at 11pt over a 230px wrap. It is 8pt over 176 with every
+>   lesson rewritten to one line, and `check_hud_layout._check_lesson_footprint()` measures all of them
+>   against a height ceiling with two controls. The capture the original claim was drawn from predates
+>   `1c21996`, which shortened the text.
+> - **"Over the body" is wrong.** The bubble draws ABOVE its anchor with the tail reaching down. On the
+>   SAPLING lesson it sits above and left of the miner and the grass it names is completely unoccluded.
+>   Its line references (`main.gd:826-841`, `hud.gd:700-701`) no longer point at the panel.
+> - **"Occluding the thing it teaches" is RIGHT, and now has a number.** On the `teach` moment the lesson
+>   reads *"THE LINE CAUGHT, it bent around the rock instead of through it"* and the bubble covers the
+>   bend. Measured at the shutter over four consecutive runs: **1 of 1 pivots covered, 23.0 to 23.4 canvas
+>   px inside the rect**, roughly a third of the bubble's height.
+>
+> **And the mechanism is a rule that already exists, applied to too small a population.** `main.gd`
+> anchors a lesson at its SUBJECT CELL rather than at the miner's head when the lesson has a relevance
+> gate, which is the same defect fixed once already for the planting lesson. `wrapped` has no gate, so it
+> falls back to the head, and on a rope the head is beside the bend. The measurement prints `gate=none`
+> for exactly this reason.
+>
+> **So the remaining work is a design call, not a refactor:** a lesson whose subject is a world object
+> should point at that object, and the object here is a pivot rather than a cell. Where a lesson may sit
+> relative to the world is the director's to decide, so the instrument reports the number and asserts
+> nothing. Reproduce with
+> `SF_MOMENT_DIR=<dir> godot --path . --script res://tools/capture_moments.gd -- teach`.
+>
+> This also has no home in `check_hud_layout`, and that is not an oversight in the layer. It compares HUD
+> rectangles against HUD rectangles; every rope is drawn in world space. The same wall stopped the zone
+> ceremony's rope half, where it was recorded as *"not a missing state, a missing plane"*.
 | `FORGE` labels and pointers read as duplicated UI | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
 | Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
 | Dashed grapple guide reads as debug geometry | V4 | Play-disrupting | Three-state motion comparison |
