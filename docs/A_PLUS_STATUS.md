@@ -8,7 +8,7 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 |---|---|---|
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Closed** | `world_renderer.gd` 4601 -> 3557 lines across three extractions, each cut against a measured ranking and each proven equivalent before it landed. Every candidate still in the file is rejected with its numbers rather than with a plan to get to it. `main.gd` and `factory_sim.gd` were measured and have no separable seam: their coupling is semantic, not a god-file boundary. Closed because the measurement says there is nothing left worth cutting, not because the time ran out. |
-| 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. |
+| 3. Harness quality | **Closed, with one audited finding open** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. A later audit found 40 layers hand-rolling the verdict protocol and so missing the base class's refusal of a green that asserted nothing; proven by paired mutation, scoped by an independence check, and recorded below. |
 | 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
@@ -267,6 +267,59 @@ The spread is 0.17 ms across 40 samples, so this is a stable cost rather than a 
 
 No defect: the cache is correct and the repair holds at roughly six times. A dig costs a third of a 120fps
 frame rather than two whole ones.
+
+## Area 3 — the verdict protocol, audited
+
+The duplication audit flagged a copied boot preamble across the test layers. Examined properly it is not a
+tidiness problem: **the copies are missing a guard the original has.**
+
+`check_base.gd` exposes `_verdict(layer, note)`, which refuses a green that asserted nothing —
+"a layer that has nothing to assert must skip and say why" — and prints the assertion count as part of the
+verdict. A hand-rolled tail does neither:
+
+```
+if _failures == 0:
+    print("check_x: PASS — ...")
+    quit(0)
+```
+
+Zero assertions and zero failures is a PASS.
+
+**Proven with a paired mutation, not by reading.** The same treatment — overriding `_check` to a no-op, so
+the layer runs normally and records nothing — was applied to one layer of each kind:
+
+| layer | verdict style | clean | zero assertions |
+|---|---|---|---|
+| `check_paint_terms` | hand-rolled | exit 0, PASS | **exit 0, PASS, wording unchanged** |
+| `check_shared_constants` | `_verdict()` | exit 0, PASS (80 asserted) | exit 1, FAIL naming the defect |
+
+Identical mutation, opposite outcomes, which isolates the preamble as the cause rather than anything about
+the two layers.
+
+**Population: 40 layers hand-roll the verdict**, against 31 that call `_verdict()`. The duplication scan
+had found 21, because it matched identical bodies; the protocol question has a wider population than the
+copy-paste question, and the protocol one is what matters.
+
+**A second gap, from the same audit.** Nineteen layers print a green line that never names them —
+`AGILITY OK` rather than `check_agility: PASS`. `check_verdict_claims` defines its subject as
+"any string containing `<layer>: PASS`", so those nineteen are outside its population by construction.
+
+**The independence check changed the recommended fix, which is why it was run first.** Only the trailing
+verdict is protocol. Twenty-one of the forty carry real judgement inside `_initialize()` — `check_settings`
+exercises the whole settings round-trip there, `check_pack_layout` runs its entire layout suite, and
+`check_water_reads` makes its headless skip decision there. Converting `_initialize()` wholesale would
+sweep layer-specific setup into shared code and silently change what other layers measure. The safe
+transformation is the tail alone, leaving every other statement where it is.
+
+**Blast radius, checked rather than assumed.** Nothing downstream parses the green line's text:
+`harness_verdict.sh` states outright that it is "deliberately not a search for PASS/FAIL" and classifies on
+exit codes and per-layer logs. So the tail conversion — which changes `PASS — note` to
+`PASS (N asserted) — note` — cannot disturb the runner's verdict.
+
+The conversion itself is the next slice and is deliberately not folded into the audit. **Evidence:** full
+sweep retained at `docs/tracelog/sweeps/2026-08-22-area2-close/`, 112 per-layer logs, `summary.txt` stamped
+`head: 793d834, worktree: clean`, `110 PASS / 0 FAIL / 0 SKIP`, `HARNESS_RESULT=yes`, exactly the six
+registered stand-downs.
 
 ## Exit condition
 
