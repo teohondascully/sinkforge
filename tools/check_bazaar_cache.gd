@@ -33,6 +33,36 @@ const Flora := preload("res://src/core/flora.gd")
 ## Somewhere with room around it, well away from the grid edges so a 4x4 window and a canopy both fit.
 const AT := Vector2i(40, 40)
 
+## The two triple-quote spellings, as constants: a literal `"""` inside the function that skips `"""`
+## blocks is a hall of mirrors for the next reader.
+const TRIPLE_D: String = '"""'
+const TRIPLE_S: String = "'''"
+
+## THE FILES ALLOWED TO WRITE THE COARSE `solid` GRID, and this list is a ratchet rather than a note.
+##
+## The behavioural cases below cover the ways the world changes THAT SOMEBODY THOUGHT OF. `Flora.grow`
+## was not one of them for as long as it existed, and the reason is worth keeping: it lives in another
+## file and reaches the grid through a preloaded reference, so nothing about `factory_sim.gd` suggested
+## that a second file was mutating the thing its cache describes. A new writer arriving the same way would
+## be just as quiet.
+##
+## So the population is asserted too. A file that writes `solid` and is not named here turns this layer
+## red, and clearing that red means adding a case below rather than adding a name up here.
+const SOLID_WRITERS: Array[String] = ["res://src/core/factory_sim.gd", "res://src/core/flora.gd"]
+
+## Where a writer could live. Not `res://` whole: `tools/` and `tests/` write `solid` constantly, by
+## design, to build fixtures, and they are not shipping paths.
+const WRITER_ROOTS: Array[String] = ["res://src/", "res://scenes/"]
+
+## A write to the COARSE grid. `_fine_solid` is a different grid with a different owner and no bazaar in
+## it, and the leading character class is what keeps this from matching it.
+const SOLID_WRITE: String = "(^|[^_A-Za-z])solid(\\[[^\\]]*\\]\\s*=[^=]|\\.erase\\()"
+
+## The positive control for that pattern, and its two near misses.
+const WRITE_YES: String = "\tsim.solid[t] = &\"wood\"\n"
+const WRITE_FINE: String = "\t_fine_solid[fy * _fcols + fx] = 1\n"
+const WRITE_READ: String = "\tif sim.solid[key] == &\"leaves\":\n"
+
 
 func _initialize() -> void:
 	_grows_into_a_bazaar()
@@ -41,6 +71,7 @@ func _initialize() -> void:
 	_placed()
 	_set_solid()
 	_loaded()
+	_writers()
 	_verdict("check_bazaar_cache",
 		"the cached answer matches a full scan after growth, mining, placing, set_solid and a world load")
 
@@ -179,3 +210,74 @@ func _ruin(o: Vector2i, missing: Vector2i) -> FactorySim:
 	sim.solid.erase(missing)
 	sim.invalidate_bazaars()
 	return sim
+
+
+## Nobody writes the coarse `solid` grid outside the files this layer knows about.
+func _writers() -> void:
+	var re := RegEx.create_from_string(SOLID_WRITE)
+	_check(re.search(WRITE_YES) != null, "the writer scan sees a real `solid` write (positive control)")
+	_check(re.search(WRITE_FINE) == null, "...and does not mistake a `_fine_solid` write for one")
+	_check(re.search(WRITE_READ) == null, "...and does not mistake a read for a write")
+
+	var found: Array[String] = []
+	var scanned: int = 0
+	for root: String in WRITER_ROOTS:
+		scanned += _scan(root, re, found)
+	found.sort()
+	var want: Array[String] = SOLID_WRITERS.duplicate()
+	want.sort()
+	_check(scanned >= 30, "the writer scan actually read the shipping tree (%d .gd files)" % scanned)
+	_check(found == want, "the files writing the coarse `solid` grid are the ones with a case here"
+		+ " (found %s, expected %s)" % [found, want])
+
+
+## Recurse a res:// directory, appending every .gd file whose code matches `re`. Returns how many were
+## read, because a scan that read nothing agrees with any expectation.
+func _scan(dir_path: String, re: RegEx, out: Array[String]) -> int:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		_check(false, "%s opens, so the writer scan has something to scan" % dir_path)
+		return 0
+	var n: int = 0
+	for d: String in dir.get_directories():
+		n += _scan(dir_path + d + "/", re, out)
+	for f: String in dir.get_files():
+		if not f.ends_with(".gd"):
+			continue
+		n += 1
+		var src: String = FileAccess.get_file_as_string(dir_path + f)
+		# COMMENTS OUT FIRST. `solid[cell] = ...` is written ABOUT in this tree as often as it is written,
+		# and a detector that reads prose as code answers a clean tree with a confident wrong red. Strings
+		# go too, for the same reason one level in.
+		if re.search(_code_only(src)) != null:
+			out.append(dir_path + f)
+	return n
+
+
+## Source with comments and string literals removed. Small on purpose, and its limit is stated rather than
+## discovered: a `#` inside a string does not start a comment, a quote inside a comment does not start a
+## string, and a triple-quoted block is skipped whole. Nothing else is understood, which is enough for a
+## question about whether a `solid[...] =` appears in executable code.
+func _code_only(src: String) -> String:
+	var out: String = ""
+	var i: int = 0
+	while i < src.length():
+		var three: String = src.substr(i, 3)
+		if three == TRIPLE_D or three == TRIPLE_S:
+			var close: int = src.find(three, i + 3)
+			i = src.length() if close == -1 else close + 3
+			continue
+		var c: String = src[i]
+		if c == "\"" or c == "'":
+			var j: int = i + 1
+			while j < src.length() and src[j] != c and src[j] != "\n":
+				j += 2 if src[j] == "\\" else 1
+			i = j + 1
+			continue
+		if c == "#":
+			while i < src.length() and src[i] != "\n":
+				i += 1
+			continue
+		out += c
+		i += 1
+	return out
