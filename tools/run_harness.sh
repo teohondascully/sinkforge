@@ -928,13 +928,41 @@ harness_cleanup() {
 					"$DIR/summary.txt"
 				VERDICT_RC=$?
 			fi
+			# AND DID ANY LAYER SAY IT DID NOT RUN AND GET COUNTED AS A PASS? `check_bake_idempotent`
+			# printed "SKIP -- needs a display" and exited 0, which is a pass, so the headless job reported
+			# a green over a layer that rendered nothing. Nothing noticed, because the skip contract lived
+			# in the runner's constants and in the layers' good manners, and a rule with no runner is a
+			# preference.
+			#
+			# UNLIKE THE FLOORS, THIS ONE JUDGES A SUBSET. A floor says nothing about layers that did not
+			# run, but every layer that DID run either announced a whole-layer skip or did not, and the
+			# contradiction is entirely inside the rows present. That matters here specifically: the job
+			# where this defect lives is the headless one, which is a subset by construction.
+			#
+			# IT GOES FIRST, AND THE FLOORS ARE SKIPPED IF IT FAILS, FOR A REASON THE FLOORS THEMSELVES
+			# WROTE DOWN: two lines with one key is a reader taking whichever one grep hands them first.
+			# Both gates end in a `HARNESS_QUOTABLE=` line, so running them unconditionally in sequence can
+			# print `=yes` and then `=no` about the same sweep. Exactly one is emitted in every case --
+			# this one is silent on the key when it passes, so a pass leaves the floors to answer.
+			SKIP_ROUTE_RC=0
+			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/assert_skip_route.sh" ]; then
+				bash "$ROOT/tools/assert_skip_route.sh" "$DIR" "$DIR/summary.txt" \
+					2>&1 | tee -a "$DIR/summary.txt"
+				if [ "${PIPESTATUS[0]}" != "0" ]; then
+					VERDICT_RC=9
+					SKIP_ROUTE_RC=1
+				fi
+			fi
 			# AND DID EVERY LAYER STILL SAY AS MUCH AS IT USED TO? The gate above asks whether the run
 			# happened. This asks whether the layers are still doing the work their verdicts claim: a
 			# layer that quietly stops asserting things does not go red, because `_verdict()` only refuses
 			# a green that asserted NOTHING, and between zero and everything there was no floor at all.
 			# Folded into VERDICT_RC rather than given a code of its own, because the consequence is the
 			# same one exit 7 already names: the verdict above is not quotable.
-			if [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/assert_floors.sh" ]; then
+			if [ "$SKIP_ROUTE_RC" != "0" ]; then
+				echo "assert_floors: not judged -- the run is already unquotable, see assert_skip_route" \
+					| tee -a "$DIR/summary.txt"
+			elif [ -n "${DIR:-}" ] && [ -d "${DIR:-}" ] && [ -r "$ROOT/tools/assert_floors.sh" ]; then
 				bash "$ROOT/tools/assert_floors.sh" "$DIR" "$DIR/summary.txt" \
 					2>&1 | tee -a "$DIR/summary.txt"
 				# The status of `assert_floors.sh`, not of `tee`. PIPESTATUS is the only way to reach it,

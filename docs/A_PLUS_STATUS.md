@@ -1619,3 +1619,50 @@ So the correction tightens the finding rather than softening it. Every `add_gl` 
 one that got the exit code wrong is the one layer that **could not call the helper**, because it extends
 `SceneTree` and had to hand-roll both the guard and the constant. Same root, one level down. After
 `9d16f81` the headless job carries no false green from this class.
+
+
+## Giving the skip contract a runner
+
+`check_bake_idempotent` said SKIP and exited 0 and nothing in the suite noticed. That is this repository's
+own test for whether a rule exists — a rule with no runner is a preference — and the skip contract had been
+living in the runner's constants and in the layers' good manners. `tools/assert_skip_route.sh` is the
+runner for it: it reads a finished sweep's per-layer logs and its summary table and refuses a sweep where a
+layer was counted as a pass after announcing that it did not run.
+
+**Telling the two SKIP shapes apart is the whole difficulty.** A layer declining ONE assertion prints an
+indented `SKIP: [some.id] ...` and is otherwise passing honestly; a layer declining to RUN prints
+`<name>: SKIP ...` hard against the left margin. Catching the first would turn every honest stand-down into
+a red, which is the fastest way to get a gate switched off. Only the second is the subject, and only in the
+false-green direction: a layer that announced a skip and then failed is odd, but nobody files a red.
+
+Two things it got wrong first, both caught before it ever issued a verdict:
+
+- **Mapping logs to rows by index is wrong.** Log files are numbered by declaration order and summary rows
+  stream in COMPLETION order, so `[12/113]` is a completion counter. Log 11 is `worldgen` while row 12 is
+  `check_bazaar_cache`. It maps by name instead, normalised on both sides because `power/water
+  (field/flood)` is logged as `power_water.log` — and a log it cannot place in the table is a REFUSAL, not
+  a skipped row, because the population this gate covers has to equal the population the sweep ran.
+- **The row pattern did not allow the runner's padding.** A full sweep prints `[ 1/113]` and a one-layer
+  subset prints `[ 1/ 1]`, with a space after the slash. `[0-9]+/[0-9]+` reads the second as no row at all,
+  so no rows parsed, no logs mapped, and the gate complained about nothing. Its own positive control caught
+  it — the entire argument for running controls on every invocation rather than once at authoring time.
+
+It runs before `assert_floors` and suppresses it on failure, because both end in a `HARNESS_QUOTABLE=` line
+and the floors' own comment already names the hazard: two lines with one key is a reader taking whichever
+one grep hands them first. Exactly one is emitted in every case.
+
+**Unlike the floors, it judges a subset.** A floor says nothing about layers that did not run, but every
+layer that DID run either announced a whole-layer skip or did not. That matters here specifically: the job
+where this defect lives is the headless one, which is a subset by construction.
+
+Five behaviours, each on real data: a 113-log display sweep passes; the headless GL run with sixteen honest
+skips passes; the same run with one row put back to PASS fails and names the layer with its own line; a log
+absent from the table refuses; an empty directory refuses. And end to end, with the defect reintroduced in
+the source, the runner goes from
+
+```
+1 PASS / 0 FAIL / 0 SKIP of 1 selected — subset green
+HARNESS_EXIT=0     HARNESS_RESULT=yes
+```
+
+to `assert_skip_route: FAIL`, one `HARNESS_QUOTABLE=no`, and `!! exiting 7: the sweep above is NOT A RESULT`.
