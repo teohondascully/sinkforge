@@ -20,6 +20,23 @@
 # `<name>: SKIP ...` hard against the left margin. Only the second is the subject here. Catching the first
 # would turn every honest stand-down into a red, which is the fastest way to get a gate switched off.
 #
+# WHAT THIS GATE DOES NOT SEE, WRITTEN HERE RATHER THAN KNOWN BY SOMEBODY. Its population is whole-layer
+# announcements at column 0. The defect CLASS is wider than that, and two live instances of the wider class
+# were found the same day this gate shipped: `check_step` printed
+#
+#     (no flat run found to test the pit — skipping A)
+#
+# indented and parenthesised, three times, and then `ALL STEP-UP TRAVERSALS PASS` at exit 0 having posed
+# none of its three subjects; `check_fastforward` did the same with two. Neither is matched here, and
+# widening the pattern to catch them would catch every honest per-assertion stand-down with it -- the
+# indentation and the `SKIP: [id]` prefix are the only things separating the two, and "skipping" in prose
+# is not a reliable third signal.
+#
+# Both layers now refuse from inside, so nothing is currently exposed. The limit stands anyway: **a layer
+# that declines part of its work in its own words, rather than in the runner's, is invisible to this gate
+# and has to refuse for itself.** Widening the population here would need a study of how layers actually
+# spell a partial decline, not another regex.
+#
 # ONLY THE FALSE-GREEN DIRECTION. A layer that announced a skip and then FAILED is odd, and it is loud;
 # nobody files a red. The dangerous asymmetry is a skip counted as a pass, so that is what is refused.
 #
