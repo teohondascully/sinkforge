@@ -60,11 +60,16 @@ func friction() -> String:
 
 ## PEAK CARRIED QUANTITY PER ITEM, across this agent's whole journey.
 ##
-## Measured because a bulk carry cap is being designed (T1.0) and nobody knows what the fixtures actually
-## hold. `factory_sim.gd:207` records that no capacity is enforced "yet — a knob to turn when trip-friction
-## is the thing being tuned", which is exactly now; the risk of turning it blind is that a fixture which has
-## always relied on infinite pockets goes red and is indistinguishable from a real regression. That
-## attribution problem is what made check_frametime expensive, so the number comes first this time.
+## Measured because a bulk carry cap was being designed (T1.0) and nobody knew what the fixtures actually
+## hold. THE KNOB HAS SINCE BEEN TURNED: `PACK_BULK_CAP = 90` is live at `factory_sim.gd:226`, enforced on
+## the player verbs through `can_carry`, and `tools/check_carry_cap.gd` asserts that it bites. So the
+## sentence this paragraph used to quote — that no capacity is enforced "yet" — is gone from the source,
+## and the reason it was worth quoting is gone with it.
+##
+## THE MEASUREMENT IS NOT. A fixture that has always relied on infinite pockets can still go red for that
+## reason and be indistinguishable from a real regression, and turning the cap on is exactly what makes
+## that possible rather than hypothetical. The attribution problem is what made check_frametime expensive,
+## which is why the number is still taken here every run instead of reconstructed after a red.
 ##
 ## Sampled rather than hooked into the sim: the sim is not mine to instrument, and every accumulation this
 ## project cares about passes through a frame boundary or a mine, both of which are here.
