@@ -36,7 +36,7 @@ extends "res://tools/check_base.gd"
 ## excluding a lamp-sized disc to compensate then blinded the layer to the near field, the only place a
 ## shortened lead lives, and it measured 0.04 of the throw inked while seeing the endpoint ring alone.
 ##
-## So there IS a switch (`WorldRenderer.AIM_GHOST_OFF`), and the reference frame has the cursor in exactly
+## So there IS a switch (`RopeView.AIM_GHOST_OFF`), and the reference frame has the cursor in exactly
 ## the same place, the lamp in exactly the same position, and the body in exactly the same pose. The
 ## difference is the preview and nothing else.
 ##
@@ -198,7 +198,7 @@ func _bow_sag_median(span: float) -> float:
 		var k: float = sin(t * PI)
 		if k < BOW_SIN_FLOOR:
 			continue
-		est.append(maxf(_bow_best[i] - WorldRenderer.CORD_CORE_W * 0.5, 0.0) / k)
+		est.append(maxf(_bow_best[i] - RopeView.CORD_CORE_W * 0.5, 0.0) / k)
 	if est.size() < BOW_MIN_EST:
 		return BOW_NO_CORD
 	est.sort()
@@ -233,7 +233,7 @@ func _bow_agree(span: float) -> float:
 		if k < BOW_SIN_FLOOR:
 			continue
 		total += 1
-		var est: float = maxf(_bow_best[i] - WorldRenderer.CORD_CORE_W * 0.5, 0.0) / k
+		var est: float = maxf(_bow_best[i] - RopeView.CORD_CORE_W * 0.5, 0.0) / k
 		if absf(est - target) <= target * BOW_AGREE_BAND:
 			near += 1
 	return float(near) / maxf(float(total), 1.0)
@@ -430,10 +430,10 @@ func _run() -> void:
 
 	# THE BACKGROUND, TWICE, and the second one is the noise floor. A threshold quoted without the noise it
 	# has to clear is a preference wearing a number. THE CURSOR IS ON THE TARGET FOR BOTH CAPTURES and the
-	# preview is switched off for the reference instead; see `WorldRenderer.AIM_GHOST_OFF`. Parking the
+	# preview is switched off for the reference instead; see `RopeView.AIM_GHOST_OFF`. Parking the
 	# cursor elsewhere also swings the aimed head-lamp, and excluding a lamp-sized disc to compensate
 	# blinded the measurement to the near field, which is the only place a shortened lead exists.
-	WorldRenderer.AIM_GHOST_OFF = true
+	RopeView.AIM_GHOST_OFF = true
 	await _look_at(target)
 	var bg: PackedFloat32Array = await _luma()
 	# THE CONTROL HAS TO COVER THE SAME DURATION AS THE COMPARISON, and the first version took its two
@@ -496,7 +496,7 @@ func _run() -> void:
 	_dump("bg")
 
 	# --- GR-05 / GR-01: how much of the throw does the preview draw? ------------------
-	WorldRenderer.AIM_GHOST_OFF = false
+	RopeView.AIM_GHOST_OFF = false
 	for _i: int in 4:
 		await physics_frame
 	var aim: PackedFloat32Array = await _luma()
@@ -788,22 +788,22 @@ func _check_against_sky() -> void:
 	# this scored the preview at 202 levels against the miner's 87 and its mask image was cloud outlines and
 	# the serifs of the word "ore". Sandwiching the shot means anything a cloud touched on either side of it
 	# is excluded, and the nearer reference is four frames away rather than thirty.
-	WorldRenderer.AIM_GHOST_OFF = true
+	RopeView.AIM_GHOST_OFF = true
 	await _look_at(target)
 	var bg_before: PackedFloat32Array = await _luma()
 	_dump("sky_bare")
 	for _i: int in QUIET_GAP:
 		await physics_frame
-	WorldRenderer.AIM_GHOST_OFF = false
+	RopeView.AIM_GHOST_OFF = false
 	for _i: int in 4:
 		await physics_frame
 	var aim: PackedFloat32Array = await _luma()
 	_dump("sky_aim")
-	WorldRenderer.AIM_GHOST_OFF = true
+	RopeView.AIM_GHOST_OFF = true
 	for _i: int in 4:
 		await physics_frame
 	var bg: PackedFloat32Array = await _luma()
-	WorldRenderer.AIM_GHOST_OFF = false
+	RopeView.AIM_GHOST_OFF = false
 	var moving: PackedByteArray = _moving(bg_before, bg)
 	# RESTRICTED TO THE CORRIDOR, and the surface is why it has to be. Underground the background is flat
 	# dark rock and a difference mask is the preview; up here it is **clouds**, which drift, and the lesson
@@ -1283,10 +1283,10 @@ func _corridor(a: Vector2, b: Vector2, half: float = CORRIDOR_HALF) -> PackedByt
 ## RETURNS `BOW_NO_CHORD` OR `BOW_NO_CORD` WHEN IT COULD NOT LOOK, and neither is a small bow. Put every
 ## result through `_bow_measured` before it is allowed to be arithmetic.
 ## DERIVED, NOT TYPED. This was `Color(0.78, 0.70, 0.52)` written out by hand, which is the same three
-## floats as `WorldRenderer.ROPE_CORE` and nothing relating them: a repaint of the rope would have left
+## floats as `RopeView.ROPE_CORE` and nothing relating them: a repaint of the rope would have left
 ## this mask hunting the old colour and reporting a rope that had vanished. The under-stroke is 0.888 away
 ## and `ROPE_TOL` is 0.20, so this mask sees the FIBRE and never the shade under it.
-const ROPE_HUE := WorldRenderer.ROPE_CORE
+const ROPE_HUE := RopeView.ROPE_CORE
 const ROPE_TOL: float = 0.20
 
 func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
@@ -1326,7 +1326,7 @@ func _bow_now(from: Vector2, to: Vector2, want: float) -> float:
 	# makes a per-station bound unsafe, and still entirely derived. It refuses the lavapipe contamination
 	# at 221 and 223 px and keeps the cord's apex at 125.
 	var axis_cos: float = absf(axis.x)
-	var ceil_off: float = span * WorldRenderer.SAG_CAP * axis_cos + WorldRenderer.CORD_CORE_W * 0.5
+	var ceil_off: float = span * WorldRenderer.SAG_CAP * axis_cos + RopeView.CORD_CORE_W * 0.5
 	# THE MINER IS NOT THE ROPE. `_body_mask` is applied at four other sites in this layer and never here,
 	# and the miner stands at the HAND end of the chord wearing rope-coloured pixels. It discards 0 on this
 	# rig, so it is not what the bow was reading, and it stays as a guard that reports only when it fires.
