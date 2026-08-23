@@ -9,7 +9,7 @@ evidence is named, and a partial area is stated as partial rather than rounded u
 | 1. Reliability and safety | **Closed** | save isolation, durable save transactions, explicit migration and version semantics, and honest PASS / FAIL / SKIP behaviour throughout. Audited and found substantially already met. |
 | 2. Architecture | **Partial, open** | three seams cut out of `world_renderer.gd` (4601 -> 3555 lines) against a measured ranking; every remaining candidate in that file is rejected with its numbers. `main.gd` and `factory_sim.gd` are measured and found to have no separable seam, which is a result rather than a deferral. See below. |
 | 3. Harness quality | **Closed** | seven sub-areas, each closed with evidence, including two where the first diagnosis was wrong and the record carries the correction rather than the conclusion. |
-| 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is now verified by direct measurement. The frame-SLO contract is still open. |
+| 4. Performance and maintainability | **Open, in progress** | a formal pass found seven full-grid loops, one of which ran every frame. The bazaar cache is verified by direct measurement, and the frame SLO has now been evaluated on the host it was written for — all four phases hold, with one resolution caveat recorded below. |
 | 5. Documentation and contributor readiness | **Done** | architecture docs reconciled with executable behaviour, contributor and release workflow written, repository map present, and layer-count drift is now gated by the registry so a stated total cannot rot. |
 | 6. Public presentation | **Complete** | the README explains the engineering system and the test-surface ratio accurately, history and media are retained deliberately with clone guidance, and the repository is legible to a reviewer in their first ten minutes. |
 
@@ -113,6 +113,44 @@ and 5496 against a median of 198. That single tail event is why the first mutati
 green. No bound can fix this: excluding 5922 would need a floor above every honest run. The tail has a
 cause worth finding, and moving the number would only hide it, so the number stays and the instability is
 recorded here with its samples.
+
+## Area 4 — the frame SLO, run on the host it was written for
+
+The contract exists and is host-gated: it asserts only when `SF_PERF_HOST` names the machine, because a
+frame-timing claim on arbitrary hardware is a statement about the box. Nothing sets that variable, so until
+now the contract had never been evaluated. Set on the development host (M4 Pro, 120Hz), seven runs, the
+layer running alone as a timing layer must:
+
+| phase | p50 | p95 | p99 | worst | deadlines missed (allow) | worst as x interval (allow 3.0) |
+|---|---|---|---|---|---|---|
+| IDLE | 8.00 | 10.5 | 14.5 | 17.7 | 0.0–1.0% (1.0%) | 1.4–2.1x |
+| RUN | 8.34 | 8.9 | 11.0 | 11.9 | 0.0% (1.0%) | 1.1–1.4x |
+| DIG | 8.32 | 10.5 | 18.1 | 22.1 | 2.8–3.2% (6.0%) | 2.2–2.7x |
+| SWING | 8.33 | 9.7 | 10.6 | 12.2 | 0.0% (1.0%) | 1.3–1.5x |
+
+All four phases hold, and DIG — the phase doing work the player asked for mid-frame — has roughly twice the
+headroom it needs on both terms.
+
+**The interesting number is IDLE's, and it is a resolution problem rather than a performance one.** Two
+hundred samples quantises the miss rate at 0.5%, so one late frame is the smallest reading there is and the
+quiet allowance is exactly two of them. Six runs read one late frame five times and two once. The contract
+is a single frame from red, on the phase that does the least work.
+
+**The obvious remedy was tried and is wrong, which is why it is written down.** Tripling the window to 600
+frames should sharpen the resolution to 0.17%. Measured, it does the opposite to the contract: DIG's miss
+rate falls from 2.8–3.2% to 2.0%, and RUN and SWING flatten to a p99 of 8.74ms against a worst of 8.84 —
+almost no variance at all. The hitches are not distributed across a phase, they are concentrated at its
+start, where chunks stream and the first rebake lands. A longer window therefore grows the denominator and
+leaves the numerator where it was. Keeping the same sensitivity at 600 frames would mean lowering every
+allowance to match a diluted measurement, which is loosening a contract to make its arithmetic tidier. The
+sample count stays at 200, and IDLE's one-frame margin is recorded here rather than papered over.
+
+**A confound was tested and excluded.** Every measurement taken through the test wrapper runs with shader
+caching disabled — the renderer initialises before the isolated home's user directory exists, and the engine
+does not retry. That was a plausible source of the late IDLE frames. Re-run against a home pre-populated
+with a copy of the real shader cache, the engine's complaint disappears, which proves the treatment reached
+its subject, and the numbers do not move: IDLE 0.5% missed, DIG 3.2%. The hypothesis is retired with a
+positive control rather than on argument.
 
 ## Area 4 — the bazaar cache, verified rather than assumed
 
