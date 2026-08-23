@@ -322,7 +322,7 @@ Observations to preserve, not twenty independent implementation tickets.
 > committed: extending the registry is a five-line change, and deciding what happens when it immediately
 > goes red is the design question the ticket actually contains.
 
-| `FORGE` labels and pointers read as duplicated UI | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
+| `FORGE` labels and pointers read as duplicated UI (**investigated 2026-08-23** — two of its three remedies already shipped; see the third note below the table) | V1 | Play-disrupting | Determine which state each communicates; collapse redundant state or bind it to object proximity |
 | Selected-item panel competes with the active action | V1 | Play-disrupting | Compare persistent versus action-only display in capture |
 | Dashed grapple guide reads as debug geometry | V4 | Play-disrupting | Three-state motion comparison |
 | Dirt has isolated pale and brown blocks | V2 | Frame-breaking | Measure accent density; test clustered low-frequency variation |
@@ -335,6 +335,65 @@ Observations to preserve, not twenty independent implementation tickets.
 | Machine labels and status are more vivid than the machines | V1 with T3.2 | Play-disrupting | Give hardware state a visible world expression before adding more chrome |
 | The screen is busy even in an idle moment | V1 | Frame-breaking | Create a quiet-frame capture criterion |
 | Player silhouette is not the default focal point | V1, V2, V4 | Play-disrupting | Eye-path review of normal surface and underground frames |
+
+> ### The `FORGE` labels row, investigated 2026-08-23 — two thirds of its remedy already shipped, and the third is somewhere else
+>
+> The row's first investigation reads *"determine which state each communicates; collapse redundant state or
+> bind it to object proximity."* **Both of those are done, and were done before this ticket was read.**
+>
+> - **Bound to proximity.** `MachineView._label_visible()` gates the nameplate on
+>   `LABEL_NEAR_CELLS = MainView.REACH_CELLS * 2.0`, derived rather than picked. Its own comment records the
+>   symptom this row describes and records fixing it: the plate used to ride a pure zoom gate that was true
+>   for every machine on screen from the first frame, so *"a base of any size wore a permanent band of text
+>   across it."*
+> - **Redundant state collapsed.** `_draw_machine_status()` returns early on `_guided(machine.cell)`,
+>   because a machine already wearing a guidance chevron does not also need a need-bubble bobbing in the
+>   same column *"saying a version of the same sentence."*
+>
+> **What survives is one duplication, and it is measured rather than argued.** Posing the pointer at a
+> machine after the drill/forge line runs reports, at the shutter:
+>
+>     aim=(56, 21) machine=true reach=true hover_empty=false label_visible=true name=Drill
+>
+> Both name it, in the same frame, in two planes: a world plate reading `DRILL` over the casing, and the HUD
+> inspector reading `Drill` in the corner. They are not merely coincident — **they fire on the same event.**
+> `_label_visible()` returns true unconditionally when `cell == _aim`, and `HoverInfo.describe()` returns
+> `{}` only when the cell is unreachable, so pointing at any machine you can act on raises both. And reach
+> (3.2 cells) sits inside label-near (6.4), so at any zoom past `TEXT_ZOOM` the plate was already up for
+> proximity before the aim exemption did anything.
+>
+> That exemption is justified in place as the case where *"a plate too small to read is still better than no
+> answer."* For a machine in reach the premise is false: there is another answer, in the corner, at 13pt.
+>
+> ### AND THE CAPTURE FOUND SOMETHING THE ROW IS NOT ABOUT — the inspector prints over the ceremony
+>
+> The same frame shows the machine inspector overlapping the stratum arrival plate, clipping `THE LINE RUNS`
+> and `IT WORKS WITHOUT YOU`. Unlike `UI-01`, this is **not** a missing plane: both surfaces register into
+> `panel_probe` and both are inside `check_hud_layout`'s population. It is a missing ROW. The matrix poses
+> fifteen states and pairs the arrival with the corner map, the big map and pause, and pairs the hover with
+> fast-forward and the big map — **and never pairs those two with each other.**
+>
+> Posed temporarily as `"a stratum arrival WITH a machine hovered"`, the layer convicts itself on the first
+> run:
+>
+>     FAIL: a stratum arrival WITH a machine hovered: no two panels collide —
+>       [P: (410.0, 44.0), S: (218.0, 50.0)] x [P: (209.1, 61.55), S: (221.8, 50.0)]  (overlap 21x32)
+>
+> **21x32 canvas px, and that is the floor rather than the figure.** The posed inspector is at
+> `HOVER_MIN_W` = 218; the photographed one carries `factory makes 53.1 ore/min` and is wider, so its left
+> edge sits further into the plate. The row was reverted rather than committed, because a red whose fix is a
+> design call should not be added before the call is made.
+>
+> **The fix has a precedent already in the file, which is why it is worth naming.** `_draw_hover()` ALREADY
+> stands down for `minimap_large` and for `_modal_open()`, on the stated rule that *"the big map is the
+> screen."* A ceremony is the screen too, for `ARRIVAL_HOLD` = 3.4s. `HELPER_TAGS` independently agrees:
+> the arrival is `critical` and the inspector is `active`, and the registry's own vocabulary says an
+> interrupt that *"arrives on its own schedule and expects to be read now"* outranks a surface describing
+> what is under your hand. **Three separate parts of the codebase already imply the answer and none of them
+> is wired to the others** — which is the same sentence as the helper-inventory note above.
+>
+> Suppressing a live inspector for 3.4s is still a change to what the player sees, so it is queued rather
+> than taken: fix first, then the matrix row, so the row lands green instead of reddening `main`.
 
 ## Milestones
 
