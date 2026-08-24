@@ -10,7 +10,13 @@ extends RefCounted
 ## Describe an explicit cell. Called for the live cursor, and for the latched machine while the config
 ## panel is pinned and the cursor is off over its knobs. An empty dict means nothing to show: out of
 ## reach, or a bare cell with no hint.
-static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate: float) -> Dictionary:
+##
+## `body_blocks` is the third piece MainView has to hand in, for the same reason as the other two: it is
+## the conjunction of where the BODY is, which the sim cannot answer because it owns no avatar, and what
+## the hotbar has selected. It is true only when the answer would be actionable, so standing somewhere
+## empty-handed says nothing.
+static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate: float,
+		body_blocks: bool = false) -> Dictionary:
 	if not reachable:
 		return {}
 	var m: MachineState = sim.machine_at(aim)
@@ -50,6 +56,20 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 				return {"name": String(rock).capitalize(), "in": [], "out": [], "holding": [],
 					"mode": "too hard — the %s (tier %d) bites it" % [
 						MiningRules.tool_name(MiningRules.drive_for(rock)), MiningRules.required_tier(rock)]}
+		# THE ONE PLACEMENT REFUSAL THAT HAD NO WORDS, and it is last for the reason `main.gd` writes down
+		# at the skid: the words, and only where nothing else has them. Standing on a rope cell, the rope's
+		# own line is the better answer and fires above this.
+		#
+		# It is also the refusal a player is least able to work out unaided, because the blocked region is
+		# NOT the square you are standing on. `_player_occupies` intersects the body RECT with the cell
+		# rect, and the body is 34 px tall against a 32 px cell, so it always covers TWO ROWS and never
+		# one; at 14 px wide it takes a second column whenever it straddles a boundary. Two to four cells,
+		# moving with the body to the pixel. The sentence says two rows out loud because that is the half
+		# no amount of aiming around will teach you.
+		if body_blocks:
+			return {"name": "Your own footing", "in": [], "out": [], "holding": [],
+				"mode": "step aside to build here — the body fills two rows, so the cell at your feet is "
+					+ "refused with the one at your chest"}
 		return {}
 	var info: Dictionary = {"name": m.def.display_name}
 	var recipe: RecipeDef = m.def.recipe

@@ -2553,7 +2553,11 @@ func _hover_info() -> Dictionary:
 ## The same read for an explicit cell: the config-panel pin re-reads the latched machine while the cursor
 ## is off exploring the panel's own knobs.
 func _hover_info_at(aim: Vector2i) -> Dictionary:
-	return HoverInfo.describe(sim, aim, _can_reach(aim), _drill_rate())
+	# Only when the answer is actionable: the body is in the way AND the hand is holding something that
+	# would have gone there. Standing about with a pickaxe selected says nothing.
+	var holding_placeable: bool = _selected_machine_def() != null or _selected_build_material() != &""
+	return HoverInfo.describe(sim, aim, _can_reach(aim), _drill_rate(),
+		holding_placeable and _player_occupies(aim))
 
 
 ## The item id in the active hotbar slot, or &"" when the pack is empty.
