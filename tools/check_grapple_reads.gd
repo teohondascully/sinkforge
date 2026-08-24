@@ -607,6 +607,39 @@ func _run() -> void:
 	var body_edge: float = _edge_p90(aim, body)
 	print("    against dark rock — miner %.1f levels, preview %.1f levels (%d preview pixels)"
 		% [body_edge, guide_edge, _count(guide)])
+	# WHY THE LADDER IS PRINTED BESIDE THE VERDICT, AND WHAT IT SAYS ABOUT THE VERDICT.
+	#
+	# GR-06 compares `_edge_p90` over the body against `_edge_gain`'s p90 over the preview. Both are p90.
+	# The MASKS are not comparable populations, and the ladder is how that became visible:
+	#
+	#     pctile      miner abs      preview abs      preview gain
+	#     p50              17.2             33.8              28.7
+	#     p90              88.0            142.7             140.8      <- the assertion reads here
+	#     p99             152.4            148.6             147.6
+	#     p100            214.2            149.7             148.7
+	#                (body 1071 px, guide 163 px)
+	#
+	# **The preview SATURATES and the miner does not.** The preview climbs 5% across its whole top decile,
+	# 142.7 to 149.7, because it is a thin bright outline in which nearly every pixel is already a maximal
+	# edge. That is the same saturation this file's `gr03-single-frame-bow` row was stood down for. The
+	# miner climbs 143% over the same span, 88.0 to 214.2, because it is a FILLED sprite whose rim is only
+	# about a tenth of its pixels: p90 over a 1071-pixel blob samples the flat INTERIOR, and p90 over a
+	# 163-pixel outline samples the outline.
+	#
+	# **So the verdict reverses inside the top decile.** At p90 the miner loses 88.0 to 140.8; at p99 it
+	# wins 152.4 to 147.6; at the maximum it wins by 1.44x and clears `BODY_MARGIN` outright. Same frame,
+	# same two objects, opposite answers.
+	#
+	# NOTHING IS CHANGED HERE ON THE STRENGTH OF THAT, deliberately. Picking the percentile at which the
+	# assertion passes is threshold-shopping wearing a diagnosis, and `BODY_MARGIN` is on the do-not-touch
+	# list for this red. What the comparison SHOULD be, rim against rim or rank-from-the-top rather than
+	# the same quantile of two differently-composed populations, is a design call about what GR-06 means,
+	# and GR-06 is director-owned. The ladder prints every run so the decision has its numbers to hand.
+	print("    GR-06 LADDER (diagnostic, asserts nothing) | pctile | miner abs | preview gain |"
+		+ "  body %d px, guide %d px" % [_count(body), _count(guide)])
+	for q: float in [0.50, 0.90, 0.99, 1.00]:
+		print("    GR-06 LADDER   p%3d  |  %8.1f  |  %8.1f"
+			% [int(q * 100.0), _edge_q(aim, body, q), _gain_q(aim, posed_bg, guide, q)])
 	_rock_gain = guide_edge
 	_rock_px = _count(guide)
 	# The floor is the WITHDRAWN one; see GHOST_EDGE_FLOOR. The pixel count is printed beside the level
@@ -1412,6 +1445,58 @@ func _edge_p90(luma: PackedFloat32Array, mask: PackedByteArray) -> float:
 	var arr: Array = Array(edges)
 	arr.sort()
 	return float(arr[int(float(arr.size() - 1) * 0.90)]) * 255.0
+
+
+## The two GR-06 statistics at an arbitrary quantile, for the diagnostic ladder above. They duplicate
+## `_edge_p90` and `_edge_gain` with the 0.90 lifted out rather than replacing them, because the assertion
+## must keep reading exactly the function it has always read while the ladder is only a report.
+func _edge_q(luma: PackedFloat32Array, mask: PackedByteArray, q: float) -> float:
+	var w: int = _full.size.x
+	var edges := PackedFloat32Array()
+	for i: int in mask.size():
+		if mask[i] == 0:
+			continue
+		var x: int = i % w
+		var y: int = i / w
+		var best: float = 0.0
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = x + d.x
+			var ny: int = y + d.y
+			if nx < 0 or ny < 0 or nx >= w or ny >= _full.size.y:
+				continue
+			best = maxf(best, absf(luma[i] - luma[ny * w + nx]))
+		edges.append(best)
+	if edges.is_empty():
+		return 0.0
+	var arr: Array = Array(edges)
+	arr.sort()
+	return float(arr[int(float(arr.size() - 1) * q)]) * 255.0
+
+
+func _gain_q(shot: PackedFloat32Array, bg: PackedFloat32Array, mask: PackedByteArray, q: float) -> float:
+	var w: int = _full.size.x
+	var gains := PackedFloat32Array()
+	for i: int in mask.size():
+		if mask[i] == 0:
+			continue
+		var x: int = i % w
+		var y: int = i / w
+		var bs: float = 0.0
+		var bb: float = 0.0
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = x + d.x
+			var ny: int = y + d.y
+			if nx < 0 or ny < 0 or nx >= w or ny >= _full.size.y:
+				continue
+			var j: int = ny * w + nx
+			bs = maxf(bs, absf(shot[i] - shot[j]))
+			bb = maxf(bb, absf(bg[i] - bg[j]))
+		gains.append(maxf(bs - bb, 0.0))
+	if gains.is_empty():
+		return 0.0
+	var arr: Array = Array(gains)
+	arr.sort()
+	return float(arr[int(float(arr.size() - 1) * q)]) * 255.0
 
 
 func _shape_diff(a: PackedByteArray, b: PackedByteArray) -> float:
