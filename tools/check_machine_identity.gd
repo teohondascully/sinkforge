@@ -495,6 +495,35 @@ func _luma_patch() -> PackedFloat32Array:
 	_main._renderer.set_process(false)
 	_main._renderer._anim_time = ANIM_POSE
 	_main._renderer.repaint_world()
+	# AND THE POSE HAS TO REACH THE LAYER THAT CARRIES THE COSMETIC CLOCK, WHICH IT DID NOT.
+	#
+	# `repaint_world()` queues the terrain chunks and nothing else. `_lights` and `_marks` are queued from
+	# `WorldRenderer._process`, which the line above has just switched off. So the two lines above held
+	# `_anim_time` at the pose and then photographed those layers exactly as the last FREE-RUNNING process
+	# tick had drawn them: the pose was real, and the frame did not contain it. `_paint_lights` draws the
+	# ore glint flares, whose flare window is `fmod(_anim_time + offset, PERIOD)`, so a warm circle a pixel
+	# or two across was being lit at whatever phase the free clock happened to be at, which is WALL CLOCK
+	# and not frame count.
+	#
+	# Measured, on a stage with NO MACHINE EVER PLACED, the same frame budget burned, coverage read against
+	# the run's own settled reference:
+	#
+	#     stale layers   t=0..320  maxabs 3.9, 5.2, 5.1, 5.9, 7.2, 7.6 levels and climbing
+	#     redrawn        t=0..320  maxabs 4.0 at every checkpoint, mean luma 23.3 at every checkpoint
+	#
+	# The layer's own free-versus-posed table above predicted the direction on live subjects, and the run
+	# agrees with it: the tightest pair goes 0.014 to 0.007 against the 0.005 recorded there, and it is the
+	# pair that table names rather than a reordered matrix.
+	#
+	# THIS DOES NOT CLOSE THE INTERMITTENT RED, and the same probe is why. A second transient still fires on
+	# an empty stage, warm and round and roughly 58 to 88 pixels, at an onset that moves between runs with
+	# identical frame budgets. `_haze` is left out of the redraw on purpose: its ripple runs off the shader
+	# `TIME` built-in, which no GDScript pose reaches, so queueing it would look like coverage it cannot give.
+	_main._renderer.queue_redraw()
+	if _main._renderer._lights != null:
+		_main._renderer._lights.queue_redraw()
+	if _main._renderer._marks != null:
+		_main._renderer._marks.queue_redraw()
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var img: Image = get_root().get_texture().get_image()
