@@ -667,6 +667,11 @@ add "check_hint_gate (lesson waits)"  "res://tools/check_hint_gate.gd"
 # This asserts it stops waiting once the ceremony is no longer on screen, which is not the same claim and
 # was the live defect: a plate held by a rope draws nothing and silenced every lesson for as long as the
 # line was out. Pure Hud logic, so it runs headless.
+# LESSON PLACEMENT HAD ZERO REGISTERED COVERAGE. `UI01-OCCLUSION` (the grapple lesson's keep-out list,
+# `5963bba`) and its measurement (`3b5d0dc`) were both proven only inside `capture_moments.gd -- teach`, a
+# manual capture tool nothing runs automatically -- so a shipped presentation rule had no harness receipt
+# at all. Headless: the measurement is pure Rect2/Vector2 geometry (`Hud.pivot_cover`), never a pixel read.
+add "check_lesson_occlusion (lesson clears its own subject)" "res://tools/check_lesson_occlusion.gd"
 add "check_announce_channel (one thing at a time)" "res://tools/check_announce_channel.gd"
 add "check_depth_reads (how deep)"    "res://tools/check_depth_reads.gd"
 add "check_pump (wind it up)"         "res://tools/check_pump.gd"

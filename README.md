@@ -201,7 +201,7 @@ wired to anything. Run it once and that layer passes. Build machines set `CI`, w
 that one assertion down and says so, because nothing commits from a build machine and the wiring
 would prove nothing there.
 
-The runner registers 114 layers, one script each, and launches each as its own Godot process, up to
+The runner registers 115 layers, one script each, and launches each as its own Godot process, up to
 the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
 into roughly six kinds:
 
@@ -254,7 +254,7 @@ exit codes in all, and a caller that reads "not zero" as "a test failed" will mi
 This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
 
 ```
-114 PASS / 0 FAIL / 0 SKIP of 114
+115 PASS / 0 FAIL / 0 SKIP of 115
 HARNESS_EXIT=4
 ```
 
@@ -290,7 +290,7 @@ and between nothing and everything the widest layer here makes several hundred a
 fallen to one
 and still printed PASS. A verdict missing either line is not a result.
 
-114 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
+115 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
 claim.
 
@@ -382,8 +382,8 @@ into jobs:
 
 | Where | Renderer | What runs | Result |
 | --- | --- | --- | --- |
-| a local sweep | the machine's real GPU, through a real window | all 114 layers in one run | 113 pass, 1 fail, 0 skip — `check_grapple_reads`, with the six declared stand-downs |
-| CI, headless job | Godot's dummy renderer | all 114 declared; the 16 that detect the absent display stand themselves down | 98 pass, 0 fail, 16 skip |
+| a local sweep | the machine's real GPU, through a real window | all 115 layers in one run | 114 pass, 1 fail, 0 skip — `check_grapple_reads`, with the six declared stand-downs |
+| CI, headless job | Godot's dummy renderer | all 115 declared; the 16 that detect the absent display stand themselves down | 99 pass, 0 fail, 16 skip |
 | CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 14 pass, 2 fail — `check_grapple_reads` and `check_machine_identity` |
 
 **The frame for those tallies.** They were read at `e89eef9` on 2026-08-23, from one local sweep and one CI
@@ -418,7 +418,7 @@ This README carries no build badge while any job is red.
 | `scenes/` | everything visible: the controller `main.gd`, the renderer, the HUD, the player body, and five shaders. |
 | `assets/sprites/` | the only authored art in the project: 16 miner frames and their Aseprite source. |
 | `tests/` | four headless suites sharing `test_base.gd`, 64 test functions, run with no scene tree. |
-| `tools/` | the harness runner and its 114 layers, the play-tests, the capture and profiling tools, the machine lock. |
+| `tools/` | the harness runner and its 115 layers, the play-tests, the capture and profiling tools, the machine lock. |
 | `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
 | `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |

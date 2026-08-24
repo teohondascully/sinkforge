@@ -108,6 +108,7 @@ check_hud_layout	114	asserted
 check_impact	6	asserted
 check_input_deafness	7	asserted
 check_item_reads	11	asserted
+check_lesson_occlusion	7	asserted
 check_lift	2	asserted
 check_lock	31	passlines
 check_lode	62	asserted
@@ -127,7 +128,7 @@ check_plunge	8	asserted
 check_posed_fields	24	asserted
 check_progression_payable	45	asserted
 check_progressive_bake	13	asserted
-check_prose	444	asserted
+check_prose	446	asserted
 check_pump	8	asserted
 check_refusal	25	asserted
 check_relief	6	asserted
@@ -173,7 +174,7 @@ check_water_move	5	asserted
 check_water_reads	4	asserted
 check_wrap	7	asserted
 measure_player	3	oklines
-play-tests	17	passlines
+play-tests	20	passlines
 power_water	203	passlines
 sim	526	passlines
 stress	447	passlines

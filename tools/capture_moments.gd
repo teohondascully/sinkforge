@@ -168,24 +168,6 @@ func _deafen(n: Node) -> void:
 
 
 ## "" when the scene really is showing what `moment` claims, otherwise what is wrong with it.
-## How many of these world pivots land inside a HUD-draw-space rect, and how deep the worst one sits.
-## Returns [covered: int, worst: float]. ONE function so the live rect and its control cannot diverge:
-## the whole UI01 assertion is a comparison between two calls to this, and a second copy of the geometry
-## would let them disagree for a reason that is not the keep-out list.
-static func _pivot_cover(r: Rect2, pivots: Array, xf: Transform2D) -> Array:
-	var covered: int = 0
-	var worst: float = 0.0
-	for pv: Vector2 in pivots:
-		var c: Vector2 = (xf * pv) / MainView.HUD_SCALE
-		if r.has_point(c):
-			covered += 1
-			# How far inside, in canvas px: the smallest push that would clear the bubble.
-			var d: float = minf(minf(c.x - r.position.x, r.end.x - c.x),
-				minf(c.y - r.position.y, r.end.y - c.y))
-			worst = maxf(worst, d)
-	return [covered, worst]
-
-
 func _contamination(main: MainView, moment: String) -> String:
 	var want: Dictionary = CALM.duplicate()
 	for k: Variant in (EXPECT.get(moment, {}) as Dictionary):
@@ -346,8 +328,8 @@ func _contamination(main: MainView, moment: String) -> String:
 				var r: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor,
 					main._hud.hint_avoid)
 				var bare: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor, none)
-				var live: Array = _pivot_cover(r, main._player.grapple.pivots, xf)
-				var ctl: Array = _pivot_cover(bare, main._player.grapple.pivots, xf)
+				var live: Array = Hud.pivot_cover(r, main._player.grapple.pivots, xf)
+				var ctl: Array = Hud.pivot_cover(bare, main._player.grapple.pivots, xf)
 				var covered: int = int(live[0])
 				var worst: float = float(live[1])
 				print(("    [UI01] bubble %s covers %d of %d pivot(s); deepest %.1f canvas px inside "
@@ -395,7 +377,7 @@ func _contamination(main: MainView, moment: String) -> String:
 		# measurement aimed at the tree would be measuring the wrong object and would report a clean zero
 		# for it, which is the quiet failure this file keeps having to defend against.
 		#
-		# `main._aim` is read rather than re-derived, and `_pivot_cover` is the same function the grapple
+		# `main._aim` is read rather than re-derived, and `Hud.pivot_cover` is the same function the grapple
 		# measurement uses, so the two lessons cannot be scored by different arithmetic.
 		if main._hud != null and main._hud._font != null and str(main._hud.hint_text) != "" \
 				and main._aim.x > -99:
@@ -404,7 +386,7 @@ func _contamination(main: MainView, moment: String) -> String:
 				main._hud.hint_avoid)
 			var sxf: Transform2D = main.get_viewport().get_canvas_transform()
 			var seat: Vector2 = (Vector2(main._aim) + Vector2(0.5, 0.5)) * float(MainView.CELL)
-			var sc: Array = _pivot_cover(sr, [seat], sxf)
+			var sc: Array = Hud.pivot_cover(sr, [seat], sxf)
 			print(("    [UI01-CLASS] the SAPLING lesson over the ground it names: bubble %s covers %d of 1 "
 				+ "(aim cell %s, canvas %s), deepest %.1f canvas px inside | keep-out list holds %d "
 				+ "point(s), and it is populated from grapple pivots ONLY")

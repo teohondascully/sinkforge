@@ -710,6 +710,25 @@ static func hint_rect(font: Font, text: String, anchor: Vector2, avoid: Array[Ve
 	return Rect2(origin, box)
 
 
+## How many world points land inside a HUD-draw-space rect, and how deep the worst one sits. Returns
+## `[covered: int, worst: float]`. Moved here from `tools/capture_moments.gd` (was `_pivot_cover`, private
+## to that file) so `check_lesson_occlusion.gd` can share it rather than carry a second copy: two
+## implementations of "does this rect cover this point" would agree with each other and not with the
+## screen, which is the exact defect `hint_rect` was already extracted to avoid.
+static func pivot_cover(r: Rect2, points: Array, xf: Transform2D) -> Array:
+	var covered: int = 0
+	var worst: float = 0.0
+	for pv: Vector2 in points:
+		var c: Vector2 = (xf * pv) / MainView.HUD_SCALE
+		if r.has_point(c):
+			covered += 1
+			# How far inside, in canvas px: the smallest push that would clear the bubble.
+			var d: float = minf(minf(c.x - r.position.x, r.end.x - c.x),
+				minf(c.y - r.position.y, r.end.y - c.y))
+			worst = maxf(worst, d)
+	return [covered, worst]
+
+
 func _draw_hint_bubble() -> void:
 	if hint_text == "" or hint_alpha <= 0.01:
 		return
