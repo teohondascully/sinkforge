@@ -40,8 +40,9 @@ const SCENE: String = "res://scenes/main.tscn"
 const SETTLE: int = 40
 const STEADY_FRAMES: int = 75         ## frames a state is given to reach its steady LIGHT before the
                                       ## shutter; status says "running", not "finished changing"
-## How many same-state phase pairs `D_motion` is drawn from; the worst is kept. One draw of a duty-cycled
-## quantity is a sample of the shutter, not of the machine.
+## How many same-state phase pairs `D_motion` is drawn from; the MEDIAN of them is kept, for the reasons
+## worked out where it is computed. One draw of a duty-cycled quantity is a sample of the shutter, not of
+## the machine.
 const MOTION_SAMPLES: int = 4
 const PHASE_FRAMES: int = 22          ## frames between the two same-state captures — a visibly different
                                       ## point in every machine animation in the vocabulary
@@ -233,8 +234,15 @@ func _run() -> void:
 		# two animation phases, and it is the bar `D_state` has to clear by `MOTION_MARGIN`. Measured over
 		# six runs of one unchanged tree it swung 3.75 to 16.83 levels on the Generator alone, 4.5x, while
 		# that machine's `D_state` moved 6% — so which phase pair the shutter happened to catch was doing
-		# more to the margin than the machine was. Several pairs are taken now and the WORST is kept. That
-		# RAISES the bar the state cue must clear: it can only make this check harder to pass.
+		# more to the margin than the machine was. Several pairs are taken now.
+		#
+		# THE TWO SENTENCES THAT STOOD HERE SAID THE WORST OF THEM IS KEPT, AND THAT HAS NOT BEEN TRUE
+		# SINCE THE BLOCK BELOW REPLACED IT. They also argued a property the median does not have — *"it
+		# can only make this check harder to pass"* — so a reader checking whether this bar is
+		# conservative would have been told yes by prose the code contradicts. The median is lower than
+		# the worst, which makes the check EASIER than that sentence promised, and it is still stricter
+		# than the single draw both of them replaced. Retracted rather than edited, because the wrong
+		# version is the thing worth being able to recognise.
 		#
 		# AND THE CLOCK MUST NOT BE POSED HERE. `SF_ANIM_FROZEN` exists now and it would be exactly wrong
 		# on this layer: the animation IS the bar. Freezing it drives `D_motion` toward zero and makes the
@@ -272,11 +280,11 @@ func _run() -> void:
 				a2 = cand
 			prev_phase = cand
 		phases.sort()
-		var worst_motion: float = 0.5 * (phases[(phases.size() - 1) / 2] + phases[phases.size() / 2])
+		var motion_bar: float = 0.5 * (phases[(phases.size() - 1) / 2] + phases[phases.size() / 2])
 		var spread: String = ""
 		for v: float in phases:
 			spread += "%.2f " % v
-		print("      %s same-state pairs: %s(median %.2f)" % [String(spec["name"]), spread, worst_motion])
+		print("      %s same-state pairs: %s(median %.2f)" % [String(spec["name"]), spread, motion_bar])
 		_starve(sim, m)
 		var stopped: bool = await _settle_until_not(sim, m, &"working")
 		for _i: int in STEADY_FRAMES:
@@ -289,7 +297,7 @@ func _run() -> void:
 			await physics_frame
 			continue
 		var live_stop: bool = _main._renderer._machines._machine_active(m)
-		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "d_motion": worst_motion, "i1": i1, "empty": empty,
+		rows.append({"name": String(spec["name"]), "a0": a0, "a1": a1, "a2": a2, "d_motion": motion_bar, "i1": i1, "empty": empty,
 			"live_work": live_work, "live_stop": live_stop, "flash_work": flash_work,
 			"status": String(sim.machine_status(m)), "stopped": stopped})
 		sim.remove_machine(STAGE)
