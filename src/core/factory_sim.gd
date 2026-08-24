@@ -381,9 +381,10 @@ const _COAL_BURNERS: Array[StringName] = [&"drill", &"h_drill", &"generator"]
 
 
 ## Would this machine consume `item` if fed it? True for a recipe machine's ingredients, a
-## coal-burner's coal and the descent engine's ingots; false for everything else, so a mis-aimed
-## handful cannot disappear into a box that will sit on it forever. Read-only derivation. `deposit`
-## itself stays unfiltered so a test rig may prime any buffer; this is the player-facing question.
+## coal-burner's coal, the descent engine's ingots, and the Freight Winch Head's own cargo; false for
+## everything else, so a mis-aimed handful cannot disappear into a box that will sit on it forever.
+## Read-only derivation. `deposit` itself stays unfiltered so a test rig may prime any buffer; this is
+## the player-facing question.
 func machine_eats(machine: MachineState, item: StringName) -> bool:
 	if machine == null:
 		return false
@@ -392,6 +393,13 @@ func machine_eats(machine: MachineState, item: StringName) -> bool:
 		return item == DESCENT_EATS
 	if item == &"coal" and _COAL_BURNERS.has(behavior):
 		return true
+	if behavior == &"winch_head":
+		# `_run_winch_head` hauls whatever sits in its own input_buffer, item-agnostic (see that func's
+		# header) -- the Head is freight, not a recipe, so it takes any BULK item a player can carry to a
+		# face: ore, coal, rock, ingots, plates, gears, saplings. Equipment and placeables (tools, bits,
+		# machine items, rope) stay excluded the same way `is_bulk_item` already excludes them everywhere
+		# else, so a mis-aimed toss cannot freight away a carried pickaxe or a spare winch item.
+		return is_bulk_item(item)
 	var recipe: RecipeDef = machine.def.recipe
 	return recipe != null and recipe.inputs.has(item)
 
