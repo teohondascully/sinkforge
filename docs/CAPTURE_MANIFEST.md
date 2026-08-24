@@ -60,6 +60,8 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `room_zoom` | 2026-08-17 14:03 | `0a2e586b7c` | `zoom.gd -- _moment_room.png <crop UNRECORDED>` |
 | `scarp` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- scarp` |
 | `settings` | 2026-08-18 03:12 | `2aedbf3c18` | `capture_moments.gd -- settings` |
+| `settings_audio` | 2026-08-24 11:20 | `ac865fa766` | `capture_moments.gd -- settings_audio` |
+| `settings_controls` | 2026-08-24 11:20 | `ac865fa766` | `capture_moments.gd -- settings_controls` |
 | `stain` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- stain` |
 | `swing` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- swing` |
 | `swing_zoom` | 2026-08-17 14:03 | `0a2e586b7c` | `zoom.gd -- _moment_swing.png <crop UNRECORDED>` |
@@ -74,6 +76,7 @@ A recipe invented to fill that column would be worse than a blank one, because i
 - `4d43d0337e` — 8 frames
 - `2aedbf3c18` — 4 frames
 - `bdb891424d` — 2 frames
+- `ac865fa766` — 2 frames
 - `b87bae9a44` — 1 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
