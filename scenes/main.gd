@@ -744,6 +744,7 @@ func _process(delta: float) -> void:
 		_selected_build_material(), _drive_bites(_aim))
 	_renderer.set_guide_targets(_guide_targets())   # pulse where the current objective happens
 	_push_feed_target()                             # and which mouth the held stack would go into
+	_push_placement_hint()                          # and where else it could go, if standing in the way
 	if _hud != null:
 		# The config-panel pin: while the cursor sits on the inspector itself, keep showing the machine it opened
 		# for, or reaching for a knob would move the aim and close the panel.
@@ -2476,6 +2477,42 @@ func _push_feed_target() -> void:
 			cell = mouth.cell
 			col = Visuals.item_color(item)
 	_renderer.set_feed_target(cell, col)
+
+
+## The other third of the "building under the player" acceptance note (`docs/PRIORITY.md`): the refusal
+## now explains itself (`baff88f`, the hover text), but nothing suggested where the machine COULD go.
+## Silent unless the answer is actionable, on the same test the hover text already uses: nothing in hand,
+## the aim is not refused for THIS reason (rock, out of reach and other refusals get no hint -- a hint
+## implying "move a step" would be wrong for a refusal a step cannot fix), or no open cell exists nearby.
+func _push_placement_hint() -> void:
+	var cell := Vector2i(WorldRenderer.PLACE_HINT_NONE, WorldRenderer.PLACE_HINT_NONE)
+	var holding_placeable: bool = _selected_machine_def() != null or _selected_build_material() != &""
+	if holding_placeable and _player_occupies(_aim):
+		cell = _nearest_valid_placement(_aim)
+	_renderer.set_placement_hint(cell)
+
+
+## The nearest cell where the current selection would actually fit, searched outward from the AIM rather
+## than from the body -- the question is "near where I am pointing", not "near where I stand". Capped at
+## `PLACEMENT_HINT_RADIUS` so this answers "right here" and not "somewhere in reach"; asks `_can_reach` and
+## `_placeable_here`, the same two gates the click itself uses, rather than a third opinion on either.
+## `PLACE_HINT_NONE`-shaped when nothing qualifies -- silence is the honest answer when there is nothing
+## nearby to suggest, not a wider search that would stop meaning "nearby".
+const PLACEMENT_HINT_RADIUS: int = 3
+
+func _nearest_valid_placement(aim: Vector2i) -> Vector2i:
+	var offsets: Array[Vector2i] = []
+	for dy: int in range(-PLACEMENT_HINT_RADIUS, PLACEMENT_HINT_RADIUS + 1):
+		for dx: int in range(-PLACEMENT_HINT_RADIUS, PLACEMENT_HINT_RADIUS + 1):
+			if dx != 0 or dy != 0:
+				offsets.append(Vector2i(dx, dy))
+	offsets.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.length_squared() < b.length_squared())
+	for off: Vector2i in offsets:
+		var cell: Vector2i = aim + off
+		if _can_reach(cell) and _placeable_here(cell):
+			return cell
+	return Vector2i(WorldRenderer.PLACE_HINT_NONE, WorldRenderer.PLACE_HINT_NONE)
 
 
 ## RMB build verb: standing in reach of `cell`, place the selected machine on an open cell, or pick one of

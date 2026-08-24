@@ -361,6 +361,12 @@ var _haze: LightLayer      ## the shared distortion pass: heat shimmer now, wate
 const FEED_NONE: int = -9999
 var _feed_cell := Vector2i(FEED_NONE, FEED_NONE)
 var _feed_col := Color.WHITE
+
+## THE NEAREST CELL THE HELD SELECTION WOULD ACTUALLY FIT, shown only while standing in your own way is
+## the reason the aim is refused, or `PLACE_HINT_NONE` for "nothing to suggest". Same contract as
+## `set_aim`: the controller owns reach and placeability, the view only draws what it is handed.
+const PLACE_HINT_NONE: int = -9999
+var _place_hint_cell := Vector2i(PLACE_HINT_NONE, PLACE_HINT_NONE)
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells; rebuilt on terrain change
 var _leaf_cache_dirty: bool = true
 var _glow_tex: GradientTexture2D
@@ -552,6 +558,12 @@ func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: Machine
 func set_feed_target(cell: Vector2i, col: Color) -> void:
 	_feed_cell = cell
 	_feed_col = col
+
+
+## The nearest cell the current selection would actually fit, while standing in your own way is the
+## reason the aim is refused. Pass `PLACE_HINT_NONE` for the cell to clear it.
+func set_placement_hint(cell: Vector2i) -> void:
+	_place_hint_cell = cell
 
 
 ## The controller hands over the cells the current objective points at, each {cell, mode}, drawn as a
@@ -829,6 +841,7 @@ func _paint_marks(layer: LightLayer) -> void:
 	_draw_ping(layer)           # the map-click beacon: a cyan pin bobbing over the marked spot with an
 	                            # expanding sonar ring, findable from across a cavern on foot
 	_draw_feed_target(layer)    # which mouth the held stack goes into, while it is held
+	_draw_placement_hint(layer) # the nearest open cell, while standing in your own way is the refusal
 
 
 ## WHICH MACHINE THE DROP WILL FEED, shown before the key is pressed rather than discovered after it.
@@ -868,6 +881,26 @@ func _draw_feed_target(canvas: CanvasItem) -> void:
 	var lip := Rect2(pos + Vector2((float(CELL) - lip_w) * 0.5, -1.5), Vector2(lip_w, 3.0))
 	canvas.draw_rect(lip.grow(1.5), Color(_feed_col.r, _feed_col.g, _feed_col.b, 0.22 * pulse))
 	canvas.draw_rect(lip, Color(_feed_col.r, _feed_col.g, _feed_col.b, 0.55 + 0.35 * pulse))
+
+
+## THE NEAREST OPEN CELL, shown only while standing in your own way is the reason placement is refused.
+## `docs/PRIORITY.md`'s "building under the player" finding fixed the refusal's reason (`baff88f`, the
+## hover text) but left a third of its own acceptance note owed: *"with a nearby valid placement path."*
+## Nothing suggested where the machine COULD go.
+##
+## A plain outline, not a wash and not the machine's glyph, because both already belong to the ghost
+## preview AT THE AIM (`_ghost_def`'s block above) and repeating them here would read as a second live
+## target rather than a suggestion elsewhere. Not a growing pulse either: `_draw_interact_pulse`'s
+## breathing outline means "the next press lands here", and this cell is not that -- the player has to
+## move first. Alpha-only breathing, in a colour neither the ghost (lifted toward CHROME) nor a refusal
+## (REFUSE) uses, so "you may place here" and "you may place THERE instead" cannot be confused for one
+## another even at a glance. Reuses `_mark_rect`'s geometry and `MARK_W`'s weight rather than a third
+## cell-outline convention.
+func _draw_placement_hint(canvas: CanvasItem) -> void:
+	if _place_hint_cell.x == PLACE_HINT_NONE:
+		return
+	var pulse: float = 0.35 + 0.25 * sin(_anim_time * 2.5)
+	canvas.draw_rect(_mark_rect(_place_hint_cell), Color(0.45, 0.85, 0.55, pulse), false, MARK_W)
 
 
 func _draw_ping(canvas: CanvasItem) -> void:
