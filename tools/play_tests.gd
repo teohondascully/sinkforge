@@ -86,6 +86,7 @@ func _run() -> void:
 		["friction: descend, build a drill, climb out", _goal_descend_build_return],
 		["friction: escape a deep pit (not trapped)", _goal_escape_deep_pit],
 		["friction: cross a jagged tunnel", _goal_cross_jagged_tunnel],
+		["friction: haul a pack that actually fills", _goal_haul_a_capped_pack],
 	]:
 		var goal_name: String = goal[0]
 		if _only != "" and not goal_name.to_lower().contains(_only.to_lower()):
@@ -1299,10 +1300,22 @@ func _goal_cross_to_the_far_site() -> bool:
 
 ## Fill a clean vertical column of earth from the surface down to `depth` below it and bury an ore vein at
 ## the bottom: a deterministic shaft to dig, so the friction numbers are comparable run to run.
-func _bury_vein(agent: PlayAgent, col: int, depth: int) -> Vector2i:
+## `ore_rows` AND `per_cell` DEFAULT TO THE OLD BEHAVIOUR, so the four call sites that predate them are
+## byte-equivalent: with `ore_rows` at 0 the ore branch below is unreachable, because `ore_top` equals
+## `target.y` and the loop stops one short of it. They exist for the capped-trip rung, which needs a shaft
+## whose spoil is ore rather than earth, since no arrangement of earth in Layer 1 can fill the pack.
+## `per_cell` is pinned low on purpose: `mini(_ore_burst, latent)` then takes exactly `per_cell`, the cell
+## is erased whole, and no lode residue is left behind, which matters because the pilot has no wrapper for
+## the lode verb and would walk past what it could not pick up.
+func _bury_vein(agent: PlayAgent, col: int, depth: int, ore_rows: int = 0, per_cell: int = 3) -> Vector2i:
 	var target := Vector2i(col, MainView.SURFACE + depth)
+	var ore_top: int = target.y - ore_rows
 	for y: int in range(MainView.SURFACE, target.y):
-		agent.sim.set_solid(Vector2i(col, y), &"earth")     # a clean earthen column (no caves/gaps to complicate)
+		if y >= ore_top:
+			agent.sim.set_solid(Vector2i(col, y), &"ore")
+			agent.sim.deposits[Vector2i(col, y)] = per_cell
+		else:
+			agent.sim.set_solid(Vector2i(col, y), &"earth")  # a clean earthen column (no caves/gaps to complicate)
 	agent.sim.set_solid(target, &"ore")
 	agent.sim.deposits[target] = 40
 	agent.sim.set_solid(Vector2i(col, target.y + 1), &"stone")  # a floor under the vein
@@ -1419,6 +1432,62 @@ func _goal_cross_jagged_tunnel() -> bool:
 
 ## Perform the real-verb action a single objective step asks for. Each branch uses only what a player has:
 ## the body, reach, and the hotbar. Returns whether the action could be carried out at all.
+
+## THE RUNG THAT FILLS THE PACK. It exists because nothing else in this suite can: the four rungs above
+## reach 25, 38, 12 and 8 bulk against a `PACK_BULK_CAP` of 90, and that is structural rather than a seed
+## accident, because their veins hold 40 units and their grants hand out 12 and 20 earth. The deepest of
+## them has an arithmetic ceiling near 74. **The cap cannot bind in any of them even in principle**, so the
+## question the cap was added to answer, whether a capped trip is still a trip or has become a job, has had
+## no instrument rather than no answer.
+##
+## An ore-bottomed shaft is what closes that. Thirty rows of ore at three units each is ninety bulk of
+## spoil on the way down, on top of a granted twenty, so the pack fills partway and the cap binds during
+## the descent rather than at the face.
+##
+## WHAT IT ASSERTS IS THAT IT POSED ITS SUBJECT AND SURVIVED IT: the pack reached ninety, and the body
+## carried ninety back to the surface. No friction ceiling on top of that: `frames` would be a ceiling on
+## a depth nobody has argued for, and three readings with no negative population cannot locate a bound.
+## Ratchet later, from a member list across seeds and a control that breaches it.
+##
+## AND `frames` IS NOT THE TRIP COST, which is the trap this rung is most likely to be misread through.
+## Only `step()` counts a frame and every one of its call sites is inside `climb_to_surface`, so the number
+## measures the climb and not the journey. The jagged-tunnel rung prints `frames=0` for exactly that
+## reason, having never climbed. Read `mines` and `peak carried` for what the descent cost.
+func _goal_haul_a_capped_pack() -> bool:
+	var agent: PlayAgent = await _boot()
+	var col: int = 32                                        # clear of the fixtures and of the other rungs
+	var vein: Vector2i = _bury_vein(agent, col, 40, 30, 3)
+	agent.give(&"earth", 20)
+	# FIFTY rope for a forty-deep shaft, and the margin is the point. `place_rope` spends one carried unit
+	# PER SEGMENT, so a rope budget under the depth strands the body at the top of its own hang with
+	# `rope_stall` and nothing to re-anchor from. This rung was written with twenty-five and read `up=false`
+	# at `stuck=128`, which looked exactly like a capped pack refusing to be hauled out. It was not: a
+	# control at four ore rows instead of thirty, nineteen bulk short of the cap, printed the SAME
+	# `mines=41 places=11 jumps=2 frames=394 stuck=128`. Every driver number was identical while the load
+	# differed, so the failure could not have been about the load. Provision the climb past the question,
+	# then `rope_left` shows the descent was never what bound it.
+	agent.give(&"rope", 50)
+	var dug: bool = await agent.dig_down_to(vein)
+	var up: bool = await agent.climb_to_surface(MainView.SURFACE - 1)
+	print("  friction: %s  (down=%s up=%s cap=%d peak=%d room_at_end=%d rope_left=%d)"
+		% [agent.friction(), dug, up, FactorySim.PACK_BULK_CAP, agent.peak_bulk, agent.sim.pack_room(),
+			int(agent.sim.inventory.get(&"rope", 0))])
+	# TWO CLAIMS, AND THE SECOND ONLY MEANS ANYTHING BECAUSE OF THE FIRST. That the journey reached the cap,
+	# because a rung that fills to eighty-nine measures an uncapped trip and the suite already had four of
+	# those. And that the body still got OUT carrying it, which is the question the cap was added to raise:
+	# a limit that strands a player at the bottom of their own shaft is a different feature from one that
+	# costs them a second trip. It costs a second trip. Ninety bulk climbs forty rows and surfaces.
+	var filled: bool = agent.peak_bulk >= FactorySim.PACK_BULK_CAP
+	if not filled:
+		print("  the pack never filled: peak %d against a cap of %d" % [agent.peak_bulk, FactorySim.PACK_BULK_CAP])
+	if not up:
+		# Read `rope_left` before reading this as the cap stranding anybody. At zero the loadout ran out and
+		# the rung is measuring its own provisioning; the trace carries the `climb:` note that says which.
+		print("  the full pack never surfaced: %d rope left, %d bulk aboard"
+			% [int(agent.sim.inventory.get(&"rope", 0)), agent.sim.carried_bulk()])
+	return await _finish(agent, dug and filled and up,
+		"hauled a pack that reached PACK_BULK_CAP back to the surface")
+
 func _do_step(agent: PlayAgent, id: StringName) -> bool:
 	match id:
 		&"mine":   return await _step_mine(agent)
