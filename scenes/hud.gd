@@ -222,6 +222,12 @@ const ARRIVAL_HOLD: float = 3.4          ## total life of the banner, fade inclu
 ## anchored near the body that teaches a newly acquired item's use. Empty text means none.
 var hint_text: String = ""
 var hint_anchor: Vector2 = Vector2.ZERO   ## canvas-space point the tail points at (above the head)
+## CANVAS-SPACE POINTS THE LESSON PLATE MAY NOT COVER: the world things the lesson is ABOUT. MainView
+## pushes this beside `hint_anchor` every frame, and empty is the ordinary case. It exists because a
+## bubble that knows where its subject IS still has no idea what is behind it, so the grapple lesson
+## printed across the bend it was describing: the line went under the plate's top corner and came out of
+## the bottom on a different slope, with the corner itself behind the words naming it.
+var hint_avoid: Array[Vector2] = []
 var hint_alpha: float = 0.0
 
 ## The hovered slot this frame (captured while drawing the hotbar/pack grid, drawn last, on top).
@@ -650,6 +656,11 @@ func _draw_flash() -> void:
 ## box around the same paragraph is just a smaller paragraph.
 const HINT_FS: int = 8
 const HINT_WRAP: float = 176.0
+## How far the tail may reach below the plate. IT IS A CAP AND NOT A LENGTH, and it is here because the
+## lift below would otherwise undo itself: the tail is drawn to the anchor, so raising the plate off the
+## thing it was covering grows a 7px bar down the same column and re-covers it. A nub that points is
+## worth as much as a spike that connects.
+const HINT_TAIL_REACH: float = 10.0
 
 static func hint_box(font: Font, text: String) -> Vector2:
 	var ts: Vector2 = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, HINT_WRAP, HINT_FS)
@@ -671,12 +682,31 @@ static func hint_tail(anchor: Vector2) -> Vector2:
 ## Extracted for the reason `hint_box` was, stated there: a second copy of this arithmetic would agree
 ## with itself and not with the screen. The draw calls this, so a measurement built on it is measuring the
 ## rect that was drawn rather than one that resembles it.
-static func hint_rect(font: Font, text: String, anchor: Vector2) -> Rect2:
+## `avoid` HAS NO DEFAULT ON PURPOSE. A defaulted parameter would let the measurement in
+## `capture_moments.gd` keep compiling while it recomputed the OLD placement, so the instrument would go on
+## reporting the bubble covering its subject after the placement had been fixed. Two call sites exist and
+## the compiler now makes both of them move together.
+static func hint_rect(font: Font, text: String, anchor: Vector2, avoid: Array[Vector2]) -> Rect2:
 	var box: Vector2 = hint_box(font, text)
 	var tail: Vector2 = hint_tail(anchor)
 	var origin := Vector2(clampf(tail.x - box.x * 0.5, 6.0, CANVAS.x - box.x - 6.0), tail.y - 7.0 - box.y)
 	if origin.y < 38.0:
 		origin.y = tail.y + 7.0
+		return Rect2(origin, box)
+	# LIFT UNTIL THE PLATE CLEARS WHAT THE LESSON IS ABOUT. Only upward, and only from the above-anchor
+	# branch: flipping below lands it on the miner, and sliding sideways needs 226px on a 640px canvas.
+	# Measured on the grapple lesson, the whole correction is 23.7px.
+	var lift: float = 0.0
+	for pt: Vector2 in avoid:
+		if pt.x < origin.x or pt.x > origin.x + box.x:
+			continue
+		if pt.y < origin.y or pt.y > origin.y + box.y:
+			continue
+		lift = maxf(lift, origin.y + box.y - pt.y + 1.0)
+	if lift > 0.0:
+		# Clamped rather than abandoned. A plate that cannot clear its subject entirely still covers less of
+		# it lifted than not, and 38.0 is the same ceiling the flip above respects.
+		origin.y = maxf(38.0, origin.y - lift)
 	return Rect2(origin, box)
 
 
@@ -689,7 +719,7 @@ func _draw_hint_bubble() -> void:
 	var w: float = box.x
 	var h: float = box.y
 	var tail: Vector2 = hint_tail(hint_anchor)
-	var rect: Rect2 = hint_rect(_font, hint_text, hint_anchor)
+	var rect: Rect2 = hint_rect(_font, hint_text, hint_anchor, hint_avoid)
 	var origin: Vector2 = rect.position
 	var a: float = hint_alpha
 	# Elevation, not an outline. A flat fill inside a 1px border with a full-width bar across the top is a
@@ -706,6 +736,8 @@ func _draw_hint_bubble() -> void:
 	draw_rect(Rect2(rect.position + Vector2(0.0, 3.0), Vector2(1.5, h - 6.0)),
 		Color(UI_EDGE_HI.r, UI_EDGE_HI.g, UI_EDGE_HI.b, a))
 	var tip_y: float = tail.y if origin.y < tail.y else origin.y - 1.0   # tail reaches toward the body
+	if origin.y < tail.y:
+		tip_y = minf(tail.y, origin.y + h + HINT_TAIL_REACH)
 	var base_y: float = (origin.y + h) if origin.y < tail.y else origin.y
 	var tx: float = clampf(tail.x, origin.x + 10.0, origin.x + w - 10.0)
 	draw_colored_polygon(PackedVector2Array([Vector2(tx - 3.5, base_y), Vector2(tx + 3.5, base_y),

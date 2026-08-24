@@ -303,7 +303,8 @@ func _contamination(main: MainView, moment: String) -> String:
 		if main._hud != null and main._player != null and not main._player.grapple.pivots.is_empty():
 			var f: Font = main._hud._font
 			if f != null and str(main._hud.hint_text) != "":
-				var r: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor)
+				var r: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor,
+					main._hud.hint_avoid)
 				var xf: Transform2D = main.get_viewport().get_canvas_transform()
 				var covered: int = 0
 				var worst: float = 0.0

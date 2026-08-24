@@ -792,6 +792,14 @@ func _process(delta: float) -> void:
 				if _hints.active_gate() != &"":
 					anchor = _cell_center(_aim) + Vector2(0.0, -float(CELL) * 0.5 - 6.0)
 				_hud.hint_anchor = (get_viewport().get_canvas_transform() * anchor) / HUD_SCALE
+			# AND WHAT THE LESSON IS ABOUT, through the same transform. `grapple.pivots` is "corners the line is
+			# currently caught on", so on the grapple lesson the keep-out point IS the bend the sentence names.
+			# Pushed every frame rather than latched: the line moves, and a stale keep-out point would lift the
+			# plate off somewhere the rope has already left.
+			var avoid: Array[Vector2] = []
+			for pv: Vector2 in _player.grapple.pivots:
+				avoid.append((get_viewport().get_canvas_transform() * pv) / HUD_SCALE)
+			_hud.hint_avoid = avoid
 
 
 ## Reconcile the Bazaar view against the sim's detected frames. When one completes this frame, throw a
