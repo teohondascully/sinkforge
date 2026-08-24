@@ -181,7 +181,12 @@ static func clamp_cat(cat: int) -> int:
 ##
 ## The height. The old page was a fixed 592x286 whatever it was showing. One category at a time on a
 ## panel that sizes to it makes FEEL barely half the height of CONTROLS.
-const SET_W: float = 432.0
+const SET_W: float = 432.0            ## CONTROLS only -- the one face wide enough for the two-column table
+## AUDIO and FEEL's width, which is Variant B's whole point: `SET_W` used to size every face for CONTROLS's
+## twenty-two rows, leaving the two faces that hold four sliders and three toggles sitting in a mostly-empty
+## panel. This is `mock_settings.gd`'s `_variant_b` panel width (296), already checked against the game's
+## real theme tokens before Variant B was approved over cramming every face into one shape.
+const SET_W_COMPACT: float = 296.0
 const SET_HEAD: float = 40.0          ## title + category name
 const SET_FOOT: float = 16.0          ## the key legend
 ## The plate that says what the control under your hand does. It was 56, tall enough for three lines and
@@ -192,11 +197,18 @@ const SET_FOOT: float = 16.0          ## the key legend
 const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0           ## an audio/feel row
 const SET_MIN_H: float = 196.0
-## The shared grid, measured from the content's left edge. It is named because a layout assertion that
-## re-derives them is checking its own arithmetic against itself.
-const SET_CTRL_DX: float = 116.0
-const SET_BAR_W: float = 116.0
-const SET_VALUE_DX: float = 242.0     ## SET_CTRL_DX + SET_BAR_W + 10
+## The shared grid, measured from the content's left edge, for AUDIO and FEEL -- the two faces that ever
+## call `_settings_slider` or hang a chip off it; CONTROLS lays its own two columns out from `col_w`,
+## computed fresh from whichever width is current, and never reads these three.
+##
+## Sized to fit inside `SET_W_COMPACT`'s content width (216px, after the rail and its padding), not the
+## old 432px one. At the former 116 / 116 / 242, built for the wide face every category used to share, the
+## volume bar's own right edge landed 4px past the compact plate's outer edge and the percentage past it
+## by 14 -- both drawing off the panel entirely, not merely tight against it. Shrinking them cost CONTROLS
+## nothing, since it never reads them.
+const SET_CTRL_DX: float = 84.0
+const SET_BAR_W: float = 78.0
+const SET_VALUE_DX: float = 172.0     ## SET_CTRL_DX + SET_BAR_W + 10
 const REMAP_ROW_H: float = 15.0
 const REMAP_GAP: float = 16.0
 
@@ -253,15 +265,22 @@ func _focus_ring(box: Rect2, grow: float = Visuals.FOCUS_GROW, spine: bool = fal
 	Visuals.focus_ring(_canvas, box, UiTheme.GOLD_PALE, UiTheme.UI_ACCENT, grow, spine)
 
 
+## The page's width for whichever category is open. CONTROLS is the one face that needs `SET_W`; AUDIO
+## and FEEL take the compact width Variant B was chosen for.
+func _settings_w() -> float:
+	return SET_W if settings_cat == CAT_CONTROLS else SET_W_COMPACT
+
+
 func _settings_geometry() -> Dictionary:
 	var h: float = _set_h
-	var origin := Vector2((UiTheme.CANVAS.x - SET_W) * 0.5, (UiTheme.CANVAS.y - h) * 0.5)
+	var w: float = _settings_w()
+	var origin := Vector2((UiTheme.CANVAS.x - w) * 0.5, (UiTheme.CANVAS.y - h) * 0.5)
 	var inner_x: float = origin.x + UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD
-	var inner_w: float = SET_W - UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD * 2.0
+	var inner_w: float = w - UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD * 2.0
 	var body_h: float = h - SET_HEAD - SET_FOOT
 	var content := Rect2(inner_x, origin.y + SET_HEAD, inner_w, body_h - SET_DETAIL - 8.0)
 	return {
-		"origin": origin, "w": SET_W, "h": h, "content": content,
+		"origin": origin, "w": w, "h": h, "content": content,
 		"detail": Rect2(inner_x, content.end.y + 8.0, inner_w, SET_DETAIL),
 		"col_w": (inner_w - REMAP_GAP) * 0.5,
 	}
@@ -300,7 +319,7 @@ func _draw_settings_overlay() -> void:
 	var g: Dictionary = _settings_geometry()
 	var origin: Vector2 = g["origin"]
 	var mouse: Vector2 = Controls.pointer_viewport(_canvas)
-	var plate := Rect2(origin, Vector2(SET_W, float(g["h"])))
+	var plate := Rect2(origin, Vector2(float(g["w"]), float(g["h"])))
 	# The page rises the last few pixels into place, one transform, exactly as the counter does.
 	_canvas.draw_set_transform(Vector2(0.0, (1.0 - t) * 14.0), 0.0, Vector2.ONE)
 	# Elevation, not a border. The old page was a hard-cornered rectangle with a 1px edge, while the
@@ -317,44 +336,73 @@ func _draw_settings_overlay() -> void:
 	# under it, it falls back to the category's own line, so the plate is never blank and never stale.
 	var told: String = _settings_body(g, mouse)
 	_draw_settings_detail(g, told, mouse)
-	# What the keyboard can do here, said on the page rather than left to be found. The line named 1 2 3
-	# and ESC because those were the only two keys true of the whole page: the arrows moved a cursor on one
-	# of the three faces and every other control was mouse-only. They are true of all three now, and a
-	# control you can focus but cannot discover is the same defect one step further in, on the page a
-	# player opens precisely when their input is not doing what they expect.
-	var legend: String = "arrows move   ENTER rebinds   1 2 3 category   ESC closes" \
+	# What the keyboard can do here, said on the page rather than left to be found. The line named the
+	# category keys and ESC because those were the only two things true of the whole page: the arrows
+	# moved a cursor on one of the three faces and every other control was mouse-only. They are true of
+	# all three now, and a control you can focus but cannot discover is the same defect one step further
+	# in, on the page a player opens precisely when their input is not doing what they expect.
+	#
+	# "1 2 K", not "1 2 3": CONTROLS is the door in the rail's third slot, opened by K, not by 3 -- see
+	# `_draw_settings_rail` and `main.gd`'s category-key branch.
+	var legend: String = "arrows move   ENTER rebinds   1 2 K category   ESC closes" \
 		if settings_cat == CAT_CONTROLS \
-		else "arrows move and adjust   ENTER acts   1 2 3 category   ESC closes"
+		else "arrows move and adjust   ENTER acts   1 2 K category   ESC closes"
 	_canvas.draw_string(_font, Vector2(origin.x + UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD, origin.y + float(g["h"]) - 5.0),
 		legend, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UiTheme.UI_TEXT_FAINT)
 	_canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## Rail display order: the on-screen position of each category's icon, left to right -- distinct from its
+## `settings_cat` id now, because CONTROLS sits third on screen as a door rather than a third equal tab at
+## its own id. AUDIO and FEEL keep id order; CONTROLS moves to the end and opens on K, not on 3 -- see
+## `main.gd`'s category-key branch.
+const RAIL_ORDER: Array[int] = [CAT_AUDIO, CAT_FEEL, CAT_CONTROLS]
+
+
 ## The category rail. It shares `_rail_slots` with the counter's rail so the two cannot drift apart and
 ## it registers a hit per category, since the rail is how you change page with the mouse.
+##
+## The loop runs over `RAIL_ORDER`, not `CAT_NAMES`, because the rail's left-to-right order is no longer
+## `settings_cat`'s id order. `slot` is the on-screen position -- it drives the tile's y and the leading
+## key-hint number -- and `cat` is the category that slot opens, which drives everything about what the
+## slot means: selection, glyph, payload.
 func _draw_settings_rail(origin: Vector2, g: Dictionary, mouse: Vector2) -> void:
 	var rail := Rect2(origin, Vector2(UiTheme.BAZAAR_RAIL, float(g["h"])))
 	_round_rect_left(rail, 8.0, UiTheme.UI_RAIL)
-	var ys: Array = _rail_slots(rail, CAT_NAMES.size(),
+	var ys: Array = _rail_slots(rail, RAIL_ORDER.size(),
 		_rail_word_slot_h() + UiTheme.RAIL_SLOT_AIR, _rail_word_slot_h())
-	for i: int in CAT_NAMES.size():
-		var y: float = ys[i]
-		var on: bool = i == settings_cat
+	for slot: int in RAIL_ORDER.size():
+		var cat: int = RAIL_ORDER[slot]
+		var y: float = ys[slot]
+		var on: bool = cat == settings_cat
 		var box := Rect2(rail.position.x + 9.0, y, UiTheme.RAIL_ICON, UiTheme.RAIL_ICON)
 		if on:
 			_round_rect(box, 6.0, UiTheme.RAIL_ON_FILL)
 			_canvas.draw_rect(Rect2(rail.position.x, y + 5.0, 2.5, 28.0), UiTheme.UI_ACCENT)
-		_settings_glyph(box.get_center(), i, on, box.has_point(mouse))
+		_settings_glyph(box.get_center(), cat, on, box.has_point(mouse))
 		# The number travels inside the word. It used to be drawn separately above the icon while the word
 		# sat below it, which put every word equidistant between the icon it names and the number of the
 		# next one: 47px to its own icon against 46px to the wrong number on the shipped frames, and on
 		# the shortest page they landed on one baseline and the rail printed "2 AUDIO" when 2 is CONTROLS.
 		# One string cannot drift away from itself at any pitch.
-		var label: String = "%d %s" % [i + 1, CAT_NAMES[i]]
+		#
+		# CONTROLS is the one exception, because it is not opened by its position in this list -- it is
+		# opened by K -- so it gets K's letter where the digit goes and the binding count in place of its
+		# name, rather than "3 CONTROLS" claiming a key that does not open it.
+		#
+		# This is short of the door's full billing ("Keys · 22 bindings · K" in the brief this shipped
+		# against) on purpose: the label prints on one line, centred under a 38px tile, on the rail this
+		# page shares with the Bazaar's -- `UiTheme.BAZAAR_RAIL` is 56px including its own margins -- and
+		# that line has no wrap and no second size to fall back to; widening the slot for one row alone
+		# would fork `_rail_slots`, which is exactly the shared helper this was told not to fork. The full
+		# sentence measures roughly four times what fits. Shortened to the key, the word and the count is
+		# as close as this renderer gets without that fork.
+		var label: String = ("K KEYS · %d" % REMAP_ROWS.size()) if cat == CAT_CONTROLS \
+			else "%d %s" % [slot + 1, CAT_NAMES[cat]]
 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.RAIL_LABEL_FS).x
 		_canvas.draw_string(_font, Vector2(box.get_center().x - lw * 0.5, y + UiTheme.RAIL_LABEL_DY), label,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.RAIL_LABEL_FS, UiTheme.UI_TEXT if on else UiTheme.UI_TEXT_FAINT)
-		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": i}})
+		_settings_hits.append({"rect": box.grow(6.0), "payload": {"cat": cat}})
 
 
 ## Three category glyphs, drawn rather than lettered, in the counter's hand: a speaker cone with two

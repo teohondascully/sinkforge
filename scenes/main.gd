@@ -118,6 +118,11 @@ var _hover_latch: Vector2i = Vector2i(-9999, -9999)   ## the machine the config 
 var _settings_open: bool = false
 var _capture_action: StringName = &""
 var _settings_drag: String = ""
+## Which category ESC returns to out of CONTROLS. CONTROLS is a door, not a face reached by its own key,
+## so the first ESC on it steps back to whichever compact category the player stepped through the door
+## from, rather than closing the whole page under them. Set by `_goto_settings_cat`; never CAT_CONTROLS
+## itself, since you cannot come from the page you are going to.
+var _settings_return_cat: int = SettingsPage.CAT_AUDIO
 var _show_help: bool = false
 var _show_dashboard: bool = false   ## G: the production dashboard, a non-modal read
 ## Fast-forward game clock: "." cycles Engine.time_scale through this ladder so the whole game, sim ticks
@@ -1113,16 +1118,35 @@ func _settings_input(event: InputEvent) -> void:
 			_capture_action = &""
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		# CONTROLS is a door, not a face of its own: the first ESC on it steps back to whichever compact
+		# category it was opened from, and a second ESC (now on that category, this same branch again)
+		# closes the whole page -- one level of nesting, the same shape "leave a submenu" has everywhere
+		# else. Every other face is unchanged: ESC closes on the first press, as it always has.
+		if _hud.settings_cat == SettingsPage.CAT_CONTROLS:
+			_hud.set_settings_cat(_settings_return_cat)
+			return
 		_settings_open = false
 		_settings_drag = ""
 		return
-	# The number row picks a category, and it sits below the capture branch above, which returns before
-	# reaching here. That order is the whole reason Settings is not the counter's fourth face: a page that can
-	# bind any key to anything cannot also spend the digits on navigation unless capture gets them first.
-	if event is InputEventKey and event.pressed and not event.echo \
-			and event.keycode >= KEY_1 and event.keycode <= KEY_3:
-		_hud.set_settings_cat(event.keycode - KEY_1)
-		return
+	# The category keys, and they sit below the capture branch above, which returns before reaching here.
+	# That order is the whole reason Settings is not the counter's fourth face: a page that can bind any
+	# key to anything cannot also spend keys on navigation unless capture gets them first.
+	#
+	# 1 and 2 open AUDIO and FEEL directly. CONTROLS is not a third digit: it is a door, opened by K, and
+	# the rail draws it that way (see `_draw_settings_rail`'s "K KEYS" slot) so the key and the row agree.
+	# Both go through `_goto_settings_cat` rather than `Hud.set_settings_cat` directly, so ESC out of
+	# CONTROLS has somewhere to return to no matter which of the two ways in was used -- this branch, or a
+	# rail click through `_apply_setting`'s "cat" payload.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_1:
+			_goto_settings_cat(SettingsPage.CAT_AUDIO)
+			return
+		if event.keycode == KEY_2:
+			_goto_settings_cat(SettingsPage.CAT_FEEL)
+			return
+		if event.keycode == KEY_K:
+			_goto_settings_cat(SettingsPage.CAT_CONTROLS)
+			return
 	# Keyboard operation of the binding list. Rebinding used to require a mouse: the only way to start a
 	# capture was to click a chip, which makes the one page a player goes to when their input is not working
 	# the page they cannot reach without it.
@@ -1269,7 +1293,17 @@ func _apply_setting(payload: Dictionary) -> void:
 		Settings.reset_bindings()
 		_hud.flash("bindings reset to defaults")
 	elif payload.has("cat"):
-		_hud.set_settings_cat(int(payload["cat"]))
+		_goto_settings_cat(int(payload["cat"]))
+
+
+## Change the settings category, remembering where CONTROLS was entered from first. Both routes into a
+## category -- the keyboard branch in `_settings_input` and a rail click landing here through the "cat"
+## payload -- go through this rather than `Hud.set_settings_cat` directly, so ESC out of CONTROLS always
+## has somewhere to return to, no matter which route opened it.
+func _goto_settings_cat(cat: int) -> void:
+	if cat == SettingsPage.CAT_CONTROLS and _hud.settings_cat != SettingsPage.CAT_CONTROLS:
+		_settings_return_cat = _hud.settings_cat
+	_hud.set_settings_cat(cat)
 
 
 ## The three things the rope can teach itself.
