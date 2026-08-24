@@ -89,6 +89,35 @@ const QUIET_MAX: int = 600
 ## subject. Waiting longer is the wrong fix; the arm needs somewhere the teaching is finished.
 const SURFACE_COL: int = 96
 const SURFACE_QUIET_MAX: int = 1500
+
+## HOW MANY TIMES MORE THE PLATE MUST PUT ON THE SCREEN THAN THE SKY PUTS THERE BY ITSELF.
+## Nine boots: plate 6763..6929 ink px against a worst sky drift of 247, an observed margin of 27x. Four
+## leaves that nearly seven times over, which is the room a duty-cycled cue with an unbounded tail needs.
+const INK_OVER_DRIFT: int = 4
+
+## THE ABSOLUTE INK COUNT THE ARM HAS ALWAYS DEMANDED, now named instead of typed twice. Unchanged at 400.
+const SKY_INK_MIN: int = 400
+
+## THE WORDS' MEDIAN SEPARATION FROM THEIR GROUND, AGAINST OPEN SKY. A RATCHET, NOT A DESIGN BOUND.
+##
+## THIRTEEN boots of one commit, sorted: 57.2, 57.4, 57.6, 57.6, 58.4, 60.1, 60.6, 60.8, 61.0, 61.0, 61.0,
+## 61.2, 61.2. The mean over the same thirteen spans 43.3 to 55.1 and is not usable as a bound, which is
+## the whole reason this row could not be asserted before.
+##
+## THE MINIMUM MOVED WHILE THIS WAS BEING WRITTEN, and that is the reason for the size of the gap rather
+## than an argument against it. Nine boots said 57.4; the tenth read 57.2. A duty-cycled cue's worst case
+## falls as n grows, so a ratchet set just under the observed minimum would be re-broken by the next
+## sample. This sits 12.6% under the worst of thirteen. It records what shipping produced after the scrim
+## went 0.80 to 0.28; it does not claim to know what the words OUGHT to read.
+##
+## The distribution is in two clumps, five near 57.5 and eight near 61, which is the sky's own phase and
+## not the words changing. Neither clump is anywhere near this floor.
+##
+## BOTH OF THIS ARM'S NEW ASSERTIONS WERE SHOWN TO FAIL BEFORE EITHER WAS BANKED. This ratchet raised to
+## 62.0, just over the best of thirteen, fails at 61.2. The ink ratio raised to 2000x fails at 103 drift px
+## against a bar of 206000. That second mutant had to be run four times to land on a boot where the sky
+## moved at all, which is the same duty cycle the sky-drift-ratio row is stood down for.
+const SKY_WORDS_MED: float = 50.0
 ## HOW WIDE THE SEARCH FOR THE FIBRE IS, and the first version searched five image px either side, which
 ## is wide enough to catch something else. The control band's dE distribution came back with a mean of 4.6
 ## and a 95th percentile of 34.5; a tail that heavy in a band where nothing is over the rope is not drift,
@@ -530,8 +559,34 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 	var half: int = int(120.0 * scale)
 	var ink: Dictionary = _ink(p3, q2, cx, top, bot, half)
 	var drift: Dictionary = _ink(p2, p3, cx, top, bot, half)
-	_check(int(ink["px"]) >= 400,
+	_check(int(ink["px"]) >= SKY_INK_MIN,
 		"the words were found against open sky too (%d ink pixels at row %d)" % [ink["px"], row])
+	# AND THE NUMBER THE BLOCK BELOW ASKED FOR NOW EXISTS, so the rewrite it called for is made here.
+	#
+	# Nine boots of this layer, drift px on the untreated pair: 0, 0, 1, 34, 125, 171, 200, 243, 247. The
+	# worst is 62% of the 400 the control above demands. It has never failed and it was never SAFE: its
+	# margin over the confound is 1.6x, on a cue that is duty-cycled and whose tail nine samples do not
+	# bound. The comment below said that if the figure came back anywhere near 400 the assertion wants
+	# rewriting rather than tightening, and 247 is near 400.
+	#
+	# The rewrite is a control that travels inside the measurement instead of a constant beside it. The
+	# same statistic, the same band, the same interval length, in the same run: what the plate put on the
+	# screen against what the sky put there by itself. Over those nine boots the plate read 6763 to 6929
+	# ink px against a worst drift of 247, so the observed margin is 27x and the floor below leaves it
+	# nearly seven times over. The 400 is KEPT rather than replaced, because the two fail differently: an
+	# absolute count catches a run where nothing drew at all, and the ratio catches the case the absolute
+	# count cannot see, which is words that vanished on a day the sky was moving.
+	#
+	# AND THE FIRST VERSION OF THIS WAS A GUARD THAT COULD NOT BE FALSE, which its own mutation control is
+	# how I know. Written as a bare `ink >= drift * INK_OVER_DRIFT`, it reads `ink >= 0` on the three or
+	# four boots in thirteen where the sky does not move at all, and a 100x mutant PASSED on such a run
+	# while still counting toward this layer's asserted total. The bar is floored at the absolute count so
+	# it is never weaker than the check above it and is strictly stronger whenever the sky moves.
+	var sky_bar: int = maxi(int(drift["px"]) * INK_OVER_DRIFT, SKY_INK_MIN)
+	_check(int(ink["px"]) >= sky_bar,
+		"the words put more on the screen than the sky did by itself (%d ink px against a bar of %d: the "
+			% [ink["px"], sky_bar]
+			+ "sky's own %d px at %dx, floored at %d)" % [drift["px"], INK_OVER_DRIFT, SKY_INK_MIN])
 	# WHAT THIS ARM COULD NOT SAY, AND WHAT THE LINE UNDER IT CHANGES. Three samples either side of a
 	# treatment came back 49.5 / 61.9 / 62.0 and 49.0 / 52.2 / 68.4: bimodal in BOTH configurations, ranges
 	# overlapping completely, and the highest of all six readings on the treated side. The background is a
@@ -568,11 +623,39 @@ func _on_the_surface(main: MainView, deep: Dictionary) -> void:
 		print("  the plate reads %.1fx the drift on the means and %.1fx on the medians"
 			% [float(ink["de"]) / maxf(float(drift["de"]), 0.001),
 				float(ink["med"]) / maxf(float(drift["med"]), 0.001)])
-	_stand_down("ceremony.words-vs-sky", "how well the words read against open sky",
-		"the arm now carries a drift floor measured inside its own run — same band, same length of "
-		+ "interval, no ceremony — so the reading finally has something in its own units to be a ratio "
-		+ "against; what is still owed is the decision about what that ratio must be, and that needs the "
-		+ "distribution across several runs, not a bound argued from the first one")
+	# THE DISTRIBUTION THIS ROW WAS WAITING FOR, AND WHY IT IS THE MEDIAN THAT CARRIES THE CLAIM.
+	#
+	# Nine boots, same commit, same rig. The MEAN is not a statistic here and never was:
+	#
+	#     mean dE      43.3 .. 55.1 over thirteen                              spread 11.8, 27% of the low
+	#     median dE    57.2  57.4  57.6  57.6  58.4  60.1  60.6  60.8          spread  4.0, 7.0% of the low
+	#                  61.0  61.0  61.0  61.2  61.2
+	#
+	# The old three-a-side table that this arm could not conclude anything from was built on the mean, and
+	# the swing it recorded was the mean's. The median is the same thing the DEEP arm found: a handful of
+	# rows where the sky moved lift a mean and leave a median alone. Four boots read a spread of 0.9, nine
+	# read 3.8 and thirteen read 4.0, so the first figure was luck and is not quoted.
+	#
+	# THE FLOOR IS A RATCHET AND IS NOT A DESIGN BOUND. Nobody has decided what the words OUGHT to read
+	# against open sky, and this does not decide it. It locks in what shipping already produced, 12.9%
+	# under the worst of nine, so a collapse is caught and ordinary run-to-run motion is not. Lower it by
+	# measurement if a deliberate change lowers the reading on purpose; never raise it to buy a green.
+	#
+	# It cannot be satisfied by a moving sky with the words gone, because the ratio control above fires
+	# first: the median is taken over pixels the plate lit, and if the plate lit nothing there are no
+	# pixels to take it over.
+	_check(float(ink["med"]) >= SKY_WORDS_MED,
+		"the ceremony's words read against open sky (%.1f dE median, ratchet %.1f, thirteen boots "
+			% [ink["med"], SKY_WORDS_MED] + "spanned 57.2 to 61.2)")
+	# WHAT IS STILL NOT ASSERTED, kept separate from what now is. The plate-over-drift RATIO on dE is the
+	# other thing this arm could grow into, and it is not ready: over the boots where the drift had any
+	# rows at all it ran 1.32x, 1.67x, 2.96x, 4.06x, 4.78x, 7.27x and 8.59x, and a bound near the worst of
+	# those would convert a windy sky into a red about the words. The ink-px ratio above is asserted
+	# instead because its margin is 27x rather than 1.32x. Printed, watched, not demanded.
+	_stand_down("ceremony.sky-drift-ratio", "what the plate must beat the sky's own motion by, on dE",
+		"nine boots put the dE ratio between 1.32x and 8.59x and left three of them with no drift rows at "
+		+ "all, so the worst case is one sample of a duty-cycled cue; a bound there would fail on the "
+		+ "weather rather than on the words, and the ink-px ratio is asserted in its place")
 
 
 ## HOW WELL THE CEREMONY'S OWN TYPE READS, row by row, inside the strip the words occupy.

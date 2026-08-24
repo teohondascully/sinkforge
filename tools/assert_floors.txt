@@ -79,7 +79,7 @@ check_body_stress	5	passlines
 check_capture_manifest	3	asserted
 check_carry_cap	39	asserted
 check_casing_light	67	asserted
-check_ceremony_reads	9	asserted
+check_ceremony_reads	11	asserted
 check_ci_coverage	19	asserted
 check_climb	7	asserted
 check_contact_edge	6	asserted
