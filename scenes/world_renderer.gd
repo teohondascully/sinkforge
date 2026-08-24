@@ -354,6 +354,13 @@ var _lights: LightLayer
 var _tooth: LightLayer                                 ## post-veil rock tooth (rock_tooth.gdshader)
 var _marks: LightLayer                                 ## post-veil player-intent markers (see _paint_marks)
 var _haze: LightLayer      ## the shared distortion pass: heat shimmer now, water later
+
+## THE CELL THE HELD STACK WOULD BE FED INTO, or `FEED_NONE` for "nothing is in hand that anything wants".
+## The controller owns this: reach and what a machine eats are its questions, and the view cannot derive
+## either. Same contract as `set_aim` directly above.
+const FEED_NONE: int = -9999
+var _feed_cell := Vector2i(FEED_NONE, FEED_NONE)
+var _feed_col := Color.WHITE
 var _leaf_cells: Array[Vector2i] = []   ## cached canopy cells; rebuilt on terrain change
 var _leaf_cache_dirty: bool = true
 var _glow_tex: GradientTexture2D
@@ -538,6 +545,13 @@ func set_aim(cell: Vector2i, in_reach: bool, placeable: bool, ghost_def: Machine
 	_aim_placeable = placeable
 	_ghost_def = ghost_def
 	_aim_bites = bites
+
+
+## Which machine the drop verb would feed right now, and the colour of what is in hand. Pass
+## `FEED_NONE` for the cell to clear it.
+func set_feed_target(cell: Vector2i, col: Color) -> void:
+	_feed_cell = cell
+	_feed_col = col
 
 
 ## The controller hands over the cells the current objective points at, each {cell, mode}, drawn as a
@@ -814,6 +828,46 @@ func _paint_marks(layer: LightLayer) -> void:
 	_draw_guide_targets(layer)  # bobbing chevron, or a placement ghost, on the current objective step
 	_draw_ping(layer)           # the map-click beacon: a cyan pin bobbing over the marked spot with an
 	                            # expanding sonar ring, findable from across a cavern on foot
+	_draw_feed_target(layer)    # which mouth the held stack goes into, while it is held
+
+
+## WHICH MACHINE THE DROP WILL FEED, shown before the key is pressed rather than discovered after it.
+##
+## A playtester reported that feeding coal with several machines adjacent is frustrating because the
+## intended receiver is not unambiguous. The RULE was never ambiguous: `_reachable_eater` takes the nearest
+## machine in reach that actually eats what you are holding. Nothing showed it, so with two eaters at
+## similar distance the answer was unknowable from the player's seat, which is the same thing from where
+## they sit.
+##
+## The tint is the HELD ITEM's colour, the same `Visuals.item_color` the toss already pops on arrival, so
+## the mark says which thing goes there as well as where, and a player who changes hotbar slot sees the
+## answer change with it. What SHAPE it is was decided by photographing it; see the draw body.
+##
+## It lives here with the dig plan and the objective chevron because it is the same KIND of thing: a
+## player-intent marker, drawn post-veil, breathing on `_anim_time`. It is not chrome and it is not a
+## lesson. It exists only while a stack that a machine in reach would take is actually in hand, so it
+## cannot become permanent furniture: change slot to a pickaxe, or step out of reach, and it is gone.
+func _draw_feed_target(canvas: CanvasItem) -> void:
+	if _feed_cell.x == FEED_NONE:
+		return
+	var pos := Vector2(_feed_cell) * float(CELL)
+	var pulse: float = 0.72 + 0.28 * sin(_anim_time * 3.0)
+	# A LIT MOUTH RATHER THAN AN ARROW, and the first draft is why. An arrow above the casing was drawn
+	# and photographed, and in the picture it was indistinguishable from the machine's own furniture: a
+	# working machine already wears amber IO triangles on its face and a status bubble directly above it,
+	# so a third amber triangle in that same band read as more of the same and answered nothing. The
+	# shapes near a machine are spoken for; the ones near a CELL are spoken for too, since corner brackets
+	# belong to the dig plan and the cursor square to the aim.
+	#
+	# What nothing else draws is the cell's own top LIP. It is unambiguous about which machine, because it
+	# is the machine's footprint rather than a glyph hovering between two of them, and it is diegetic about
+	# the verb: gravity feeds the toss, so the opening it falls into is exactly the right thing to light.
+	var wash := Rect2(pos, Vector2(float(CELL), float(CELL)))
+	canvas.draw_rect(wash, Color(_feed_col.r, _feed_col.g, _feed_col.b, 0.10 * pulse))
+	var lip_w: float = float(CELL) * 0.78
+	var lip := Rect2(pos + Vector2((float(CELL) - lip_w) * 0.5, -1.5), Vector2(lip_w, 3.0))
+	canvas.draw_rect(lip.grow(1.5), Color(_feed_col.r, _feed_col.g, _feed_col.b, 0.22 * pulse))
+	canvas.draw_rect(lip, Color(_feed_col.r, _feed_col.g, _feed_col.b, 0.55 + 0.35 * pulse))
 
 
 func _draw_ping(canvas: CanvasItem) -> void:

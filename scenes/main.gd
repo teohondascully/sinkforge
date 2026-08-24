@@ -743,6 +743,7 @@ func _process(delta: float) -> void:
 	_renderer.set_aim(_aim, _can_reach(_aim), _placeable_here(_aim), _selected_machine_def(),
 		_selected_build_material(), _drive_bites(_aim))
 	_renderer.set_guide_targets(_guide_targets())   # pulse where the current objective happens
+	_push_feed_target()                             # and which mouth the held stack would go into
 	if _hud != null:
 		# The config-panel pin: while the cursor sits on the inspector itself, keep showing the machine it opened
 		# for, or reaching for a knob would move the aim and close the panel.
@@ -2454,6 +2455,27 @@ func _reachable_eater(item: StringName) -> MachineState:
 			best_d = d
 			best = machine
 	return best
+
+
+## Tell the view which machine the drop verb would feed, so the answer is visible BEFORE the key is
+## pressed rather than discovered after it.
+##
+## It asks `_reachable_eater`, the same function `try_drop` will ask a frame later, rather than
+## re-deriving the rule. Those two coming apart is precisely the defect this is meant to cure, and a
+## second implementation of "which machine" is how they would.
+##
+## Silent unless the answer is actionable: nothing in hand, a tool in hand, or nothing in reach that eats
+## it, and the mark is cleared. Tools are excluded on the same test `try_drop` uses.
+func _push_feed_target() -> void:
+	var cell := Vector2i(WorldRenderer.FEED_NONE, WorldRenderer.FEED_NONE)
+	var col := Color.WHITE
+	var item: StringName = _selected_item()
+	if not _paused and item != &"" and not MiningRules.is_tool_item(item):
+		var mouth: MachineState = _reachable_eater(item)
+		if mouth != null:
+			cell = mouth.cell
+			col = Visuals.item_color(item)
+	_renderer.set_feed_target(cell, col)
 
 
 ## RMB build verb: standing in reach of `cell`, place the selected machine on an open cell, or pick one of
