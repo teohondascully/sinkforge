@@ -381,6 +381,57 @@ func _contamination(main: MainView, moment: String) -> String:
 		elif hints.active_alpha() < 0.9:
 			wrong.append("the SAPLING bubble is at alpha %.2f — mid-fade, so the shot understates it"
 				% hints.active_alpha())
+		# THE SAME OCCLUSION MEASUREMENT, POINTED AT THE OTHER LESSON. REPORTED AND NOT ASSERTED.
+		#
+		# `5963bba` gave the grapple lesson a keep-out list and `3b5d0dc` made it a rule, and the obvious
+		# next question is whether the rule reaches the lesson beside it. It is asked here rather than
+		# answered: EXTENDING A HUD RULE IS A DIRECTOR CALL, the same one that was made for the bend, and
+		# a refusal wired in on this line would red the sapling capture on a decision nobody has taken.
+		#
+		# WHAT THE SUBJECT IS, AND IT IS NOT THE TREE. `docs/VISUAL_TRIAGE.md` records this panel as
+		# obscuring "the tree the lesson is about", and the lesson says `SAPLING -- RMB plants it on
+		# grass.` Its gate is `main.gd:740`, `_can_reach(_aim) and sim.can_plant_sapling(_aim)`, so the
+		# thing the sentence is about is the CELL UNDER THE CURSOR, not the tree the seed came from. A
+		# measurement aimed at the tree would be measuring the wrong object and would report a clean zero
+		# for it, which is the quiet failure this file keeps having to defend against.
+		#
+		# `main._aim` is read rather than re-derived, and `_pivot_cover` is the same function the grapple
+		# measurement uses, so the two lessons cannot be scored by different arithmetic.
+		if main._hud != null and main._hud._font != null and str(main._hud.hint_text) != "" \
+				and main._aim.x > -99:
+			var sf: Font = main._hud._font
+			var sr: Rect2 = Hud.hint_rect(sf, str(main._hud.hint_text), main._hud.hint_anchor,
+				main._hud.hint_avoid)
+			var sxf: Transform2D = main.get_viewport().get_canvas_transform()
+			var seat: Vector2 = (Vector2(main._aim) + Vector2(0.5, 0.5)) * float(MainView.CELL)
+			var sc: Array = _pivot_cover(sr, [seat], sxf)
+			print(("    [UI01-CLASS] the SAPLING lesson over the ground it names: bubble %s covers %d of 1 "
+				+ "(aim cell %s, canvas %s), deepest %.1f canvas px inside | keep-out list holds %d "
+				+ "point(s), and it is populated from grapple pivots ONLY")
+				% [str(sr), int(sc[0]), str(main._aim),
+					str((sxf * seat) / MainView.HUD_SCALE), float(sc[1]),
+					main._hud.hint_avoid.size()])
+			# AND THE TRIAGE ROW'S OWN COMPLAINT, MEASURED ON ITS OWN TERMS. The paragraph above argues
+			# the lesson is about the aimed ground and not the tree, and that argument is exactly the kind
+			# that quietly deletes an observation: disqualifying a cue also blinds you to whatever only
+			# that cue could see. `docs/VISUAL_TRIAGE.md` says the panel obscures the TREE, so the tree is
+			# counted too, and the row is answered rather than reframed away.
+			var inv: Transform2D = sxf.affine_inverse()
+			var w0: Vector2 = inv * (sr.position * MainView.HUD_SCALE)
+			var w1: Vector2 = inv * (sr.end * MainView.HUD_SCALE)
+			var foliage: int = 0
+			var cells: int = 0
+			for cy: int in range(int(floorf(minf(w0.y, w1.y) / MainView.CELL)),
+					int(floorf(maxf(w0.y, w1.y) / MainView.CELL)) + 1):
+				for cx: int in range(int(floorf(minf(w0.x, w1.x) / MainView.CELL)),
+						int(floorf(maxf(w0.x, w1.x) / MainView.CELL)) + 1):
+					cells += 1
+					var m: StringName = main.sim.material_at(Vector2i(cx, cy))
+					if m == &"wood" or m == &"leaves":
+						foliage += 1
+			print(("    [UI01-CLASS] the same bubble against the TREE, which is what VISUAL_TRIAGE "
+				+ "actually reported: %d of %d world cell(s) under the panel are wood or leaves")
+				% [foliage, cells])
 	for field: Variant in want.keys():
 		var got: Variant = main.get(String(field))
 		if got == null:
