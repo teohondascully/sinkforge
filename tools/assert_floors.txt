@@ -112,7 +112,7 @@ check_lift	2	asserted
 check_lock	31	passlines
 check_lode	62	asserted
 check_loop_health	6	asserted
-check_machine_identity	11	asserted
+check_machine_identity	13	asserted
 check_machine_state	7	asserted
 check_material_grammar	8	asserted
 check_material_registry	36	asserted

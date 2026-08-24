@@ -295,6 +295,40 @@ func _run() -> void:
 		"%d machines stood on the stage — fewer than ten is not a registry" % subjects.size())
 	_report(subjects, noisy_share)
 
+	# AND THE SAME TREATMENT FOR `_count_over`, WHICH IS WHERE THAT FAILURE MODE ACTUALLY WAS. The two
+	# synthetic masks below have guarded `_mask` since this layer was written. `_count_over` had no such
+	# guard and had been returning ZERO FOR EVERY INPUT SINCE IT WAS WRITTEN: it compared `absf(a - b)`, a
+	# difference of two 0..1 luma values, against `MASK_LEVEL` of 12.0, which no such difference can ever
+	# exceed. `_mask` multiplies by 255 and `_count_over` did not. One threshold constant, two conventions,
+	# ten lines apart.
+	#
+	# What that cost is not hypothetical. It is both of this layer's uses of the function:
+	#
+	#     the settle loop   `if _count_over(ref_prev, ref_now, MASK_LEVEL) == 0: break` was `0 == 0`, so the
+	#                       reference "converged" on its first probe on every run ever taken. That is why
+	#                       the counter read the 30-frame minimum idle AND inside a twelve-way sweep, an
+	#                       anomaly recorded against `fac0c71` as unexplained. It was not convergence.
+	#     `noisy_share`     forced to exactly 0.0000, so the empty-stage bar was `empty_cover <= 0`: the
+	#                       stage had to come back BIT-IDENTICAL to a reference hundreds of frames old.
+	#                       The run that found this printed a 31.4-level still-frame difference and
+	#                       reported 0 of 2352 pixels over a 12.0 threshold in the same sentence.
+	#
+	# Repairing the units changes nothing on a quiet stage, measured three times: the back-to-back pair
+	# differs by 4.0 levels, under the threshold, so the floor is still 0.0000 and it is now 0.0000 because
+	# it was measured rather than because it could not be anything else. It differs only on the runs where
+	# the stage is genuinely moving, which are the runs that go red.
+	#
+	# The controls below are the ones that would have caught it: a pair differing by a known number of
+	# LEVELS, and a pair differing by nothing.
+	var lo := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	var hi := PackedFloat32Array([0.0, 20.0 / 255.0, 0.0, 20.0 / 255.0])
+	_check(_count_over(lo, hi, MASK_LEVEL) == 2,
+		"CONTROL: two of four pixels 20 levels apart count as over a %.0f-level bar (%d)"
+			% [MASK_LEVEL, _count_over(lo, hi, MASK_LEVEL)])
+	_check(_count_over(lo, lo, MASK_LEVEL) == 0,
+		"CONTROL: a patch against itself counts zero pixels over the bar (%d)"
+			% _count_over(lo, lo, MASK_LEVEL))
+
 	# THE GUARD MUST BITE, and on this layer that is not a formality: the entire failure mode is a
 	# comparison that returns zero for everything and reads as "no differences found". Two synthetic masks
 	# whose difference is known by construction are judged every run.
@@ -548,7 +582,7 @@ func _luma_patch() -> PackedFloat32Array:
 func _count_over(a: PackedFloat32Array, b: PackedFloat32Array, level: float) -> int:
 	var n: int = 0
 	for i: int in mini(a.size(), b.size()):
-		if absf(a[i] - b[i]) > level:
+		if absf(a[i] - b[i]) * 255.0 > level:
 			n += 1
 	return n
 
