@@ -2230,16 +2230,31 @@ func _run_winch_station(_machine: MachineState) -> void:
 	pass
 
 
-## Winch Head status, mirroring _run_winch_head's gates. `&"unlinked"` (shared with the Spur; Visuals
-## already knows its lamp colour and cross mark) covers "placed, but nothing to route to"; everything else
-## collapses to the _status_mover convention once linked -- working while it holds or is moving cargo,
-## idle while empty.
+## Winch Head status, mirroring _run_winch_head's gates in the SAME order (empty-buffer short-circuits
+## before the power check there, so it does here too -- a Head with nothing waiting reads `idle` even if
+## unpowered; feed it and THEN it will say what is actually stopping it). `&"unlinked"` (shared with the
+## Spur; Visuals already knows its lamp colour and cross mark) covers "placed, but nothing to route to". A
+## trip already in flight reads `working` regardless of current power, the same way `_advance_winch_transit`
+## does not re-check power once queued. `&"blocked"` is new here: `_run_winch_head` silently holds the trip
+## when the Station is at `WINCH_STATION_CAP`, which used to read identically to `working` -- a full
+## downstream station is exactly the kind of "something is stopping this" state the lamp exists to name.
 func _status_winch_head(machine: MachineState) -> StringName:
 	if not winch_routes.has(machine.cell):
 		return &"unlinked"
-	if winch_transit.has(machine.cell) or not machine.input_buffer.is_empty():
+	if winch_transit.has(machine.cell):
 		return &"working"
-	return &"idle"
+	if machine.input_buffer.is_empty():
+		return &"idle"
+	if power_throttle(machine.cell, WINCH_POWER_DEMAND) <= 0.0:
+		return &"no_power"
+	var station: MachineState = machine_at(winch_routes[machine.cell])
+	if station != null and station.def.behavior == &"winch_station":
+		var station_load: int = 0
+		for it: StringName in station.input_buffer:
+			station_load += int(station.input_buffer[it])
+		if station_load >= WINCH_STATION_CAP:
+			return &"blocked"
+	return &"working"
 
 
 ## A splitter runs no recipe: it moves whatever has fallen into it from its input to its output, with
