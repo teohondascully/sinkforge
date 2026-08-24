@@ -168,6 +168,24 @@ func _deafen(n: Node) -> void:
 
 
 ## "" when the scene really is showing what `moment` claims, otherwise what is wrong with it.
+## How many of these world pivots land inside a HUD-draw-space rect, and how deep the worst one sits.
+## Returns [covered: int, worst: float]. ONE function so the live rect and its control cannot diverge:
+## the whole UI01 assertion is a comparison between two calls to this, and a second copy of the geometry
+## would let them disagree for a reason that is not the keep-out list.
+static func _pivot_cover(r: Rect2, pivots: Array, xf: Transform2D) -> Array:
+	var covered: int = 0
+	var worst: float = 0.0
+	for pv: Vector2 in pivots:
+		var c: Vector2 = (xf * pv) / MainView.HUD_SCALE
+		if r.has_point(c):
+			covered += 1
+			# How far inside, in canvas px: the smallest push that would clear the bubble.
+			var d: float = minf(minf(c.x - r.position.x, r.end.x - c.x),
+				minf(c.y - r.position.y, r.end.y - c.y))
+			worst = maxf(worst, d)
+	return [covered, worst]
+
+
 func _contamination(main: MainView, moment: String) -> String:
 	var want: Dictionary = CALM.duplicate()
 	for k: Variant in (EXPECT.get(moment, {}) as Dictionary):
@@ -294,34 +312,60 @@ func _contamination(main: MainView, moment: String) -> String:
 					main._player.velocity.length() if main._player != null else -1.0,
 					Player.RUN_SPEED * 1.25, Player.RUN_SPEED * 0.9,
 					float(th.get("_life")), float(th.get("_lingered")), Hints.MAX_LINGER])
-		# THE OCCLUSION MEASUREMENT (`UI01-OCCLUSION`), REPORTED AND NOT ASSERTED. Where a lesson may sit
-		# relative to the world is a director call, so this prints the number the call needs and refuses
-		# nothing on it. Both quantities are available here and neither is re-derived: `Hud.hint_rect()` is
-		# the rect the bubble actually filled, shared with `_draw_hint_bubble`, and the pivot comes from
-		# the grapple. World maps to HUD-draw space exactly as main.gd maps the anchor -- canvas transform
-		# to the render viewport, then divided by HUD_SCALE.
+		# THE OCCLUSION MEASUREMENT (`UI01-OCCLUSION`), NOW ASSERTED. Both quantities are available here
+		# and neither is re-derived: `Hud.hint_rect()` is the rect the bubble actually filled, shared with
+		# `_draw_hint_bubble`, and the pivot comes from the grapple. World maps to HUD-draw space exactly
+		# as main.gd maps the anchor -- canvas transform to the render viewport, then divided by
+		# HUD_SCALE.
+		#
+		# IT WAS A PRINT UNTIL THE KEEP-OUT LIST SHIPPED, because where a lesson may sit relative to the
+		# world was an open director call and a number was the deliverable. `5963bba` made the call, so
+		# the number became a rule.
+		#
+		# AND IT CANNOT BE ASSERTED AS `covered == 0` ALONE, WHICH IS THE WHOLE DIFFICULTY. Zero is also
+		# what this block yields when the bubble was never drawn, when the text is empty, when the font is
+		# missing, and when the pivot happens to sit nowhere near the lesson: five ways to be green with
+		# nothing measured. So the control travels INSIDE the measurement rather than beside it. The same
+		# rect is built twice, once with the keep-out list the game passes and once with an EMPTY one, and
+		# the bare rect has to cover the pivot for the avoided rect's zero to mean anything. That makes the
+		# assertion a DIFFERENCE between two rects computed one line apart, which no early exit can fake:
+		# if the moment stops posing the question, the control fails and says so instead of passing.
+		#
+		# The empty list is not a mutant of the shipped code, it is the parameter's own null case, so this
+		# needs no test hook in `hud.gd` and cannot drift away from what ships.
 		if main._hud != null and main._player != null and not main._player.grapple.pivots.is_empty():
 			var f: Font = main._hud._font
-			if f != null and str(main._hud.hint_text) != "":
+			if f == null or str(main._hud.hint_text) == "":
+				wrong.append(("the lesson bubble has no drawable text at the shutter [font=%s text=%s], "
+					+ "so the occlusion rule was not measured -- and an unmeasured UI01 reports the same "
+					+ "zero as a satisfied one")
+					% ["null" if f == null else "ok", str(main._hud.hint_text)])
+			else:
+				var xf: Transform2D = main.get_viewport().get_canvas_transform()
+				var none: Array[Vector2] = []
 				var r: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor,
 					main._hud.hint_avoid)
-				var xf: Transform2D = main.get_viewport().get_canvas_transform()
-				var covered: int = 0
-				var worst: float = 0.0
-				for pv: Vector2 in main._player.grapple.pivots:
-					var c: Vector2 = (xf * pv) / MainView.HUD_SCALE
-					if r.has_point(c):
-						covered += 1
-						# How far inside, in canvas px: the smallest push that would clear the bubble.
-						var d: float = minf(minf(c.x - r.position.x, r.end.x - c.x),
-							minf(c.y - r.position.y, r.end.y - c.y))
-						worst = maxf(worst, d)
+				var bare: Rect2 = Hud.hint_rect(f, str(main._hud.hint_text), main._hud.hint_anchor, none)
+				var live: Array = _pivot_cover(r, main._player.grapple.pivots, xf)
+				var ctl: Array = _pivot_cover(bare, main._player.grapple.pivots, xf)
+				var covered: int = int(live[0])
+				var worst: float = float(live[1])
 				print(("    [UI01] bubble %s covers %d of %d pivot(s); deepest %.1f canvas px inside "
-					+ "(anchor %s, gate=%s)")
+					+ "(anchor %s, gate=%s) | CONTROL without the keep-out list: %s covers %d, deepest %.1f")
 					% [str(r), covered, main._player.grapple.pivots.size(), worst,
 						str(main._hud.hint_anchor),
 						"none" if main._hints == null or main._hints.active_gate() == &""
-							else str(main._hints.active_gate())])
+							else str(main._hints.active_gate()),
+						str(bare), int(ctl[0]), float(ctl[1])])
+				if int(ctl[0]) == 0:
+					wrong.append(("CONTROL FAILED: with the keep-out list emptied the bubble %s still "
+						+ "covers no pivot, so this shot does not pose the occlusion question and its "
+						+ "zero is not evidence the rule works. Re-pose the moment, do not read the zero")
+						% str(bare))
+				elif covered > 0:
+					wrong.append(("the lesson prints across %d of %d pivot(s), deepest %.1f canvas px "
+						+ "inside %s -- UI01-OCCLUSION, the rule that shipped at 5963bba")
+						% [covered, main._player.grapple.pivots.size(), worst, str(r)])
 		# AND THE OTHER HALF OF THE PAIRING. The moment is a lesson AND the geometry it is about; a bubble
 		# over a straight line would be the lesson arriving about nothing.
 		if main._player != null and main._player.grapple.pivots.is_empty():
