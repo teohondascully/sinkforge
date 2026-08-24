@@ -1628,11 +1628,23 @@ func _goal_trips_to_clear_a_face() -> bool:
 	var why: String = "the face ran out"
 	const TRIP_LIMIT: int = 9
 	const MAX_BURST: int = 6                                 # `_ore_burst` is 3 + (hash % 4)
+	# TRIP_FRAMES, PER TRIP: `frames` (declared on `PlayAgent`) counts only `step()`, and every `step()`
+	# call site is inside `climb_to_surface` -- it is a climb cost, not a trip cost, and this loop's descent
+	# and mining phases wait on `_tick()`, which the docstring at `play_agent.gd:146-149` says deliberately
+	# does not touch it. A round trip's actual cost -- descend, mine, climb -- has no counter that spans it.
+	# `Engine.get_physics_frames()` is the zero-instrumentation-cost reading: a monotonic engine counter, so
+	# a delta of two reads cannot be vacuous the way a hand-rolled counter could be, and it needs no change
+	# to `play_agent.gd`. Split at the climb boundary so a trip dominated by re-descent reads differently
+	# from one dominated by the carry, which is a live fork in `T1_0_SINK_DESIGN.md`'s decision table.
+	var trip_frames: Array = []
+	var descend_frames: Array = []
+	var climb_frames: Array = []
 	while _face_cells(agent, col, y0, vein.y) > 0:
 		if trips >= TRIP_LIMIT:
 			why = "TRIP_LIMIT reached, so this number is the limit and not the face"
 			break
 		trips += 1
+		var trip_t0: int = Engine.get_physics_frames()
 		var face: int = _top_ore(agent, col, y0, vein.y)
 		# The cell ABOVE the face, never the face itself: `descend_to` is `dig_down_to`, so aiming it at
 		# the ore makes the descent strike the column on the way down, outside the metered loop below.
@@ -1645,27 +1657,41 @@ func _goal_trips_to_clear_a_face() -> bool:
 				break
 			if not await agent.mine_cell(Vector2i(col, f)):
 				break
+		var trip_t1: int = Engine.get_physics_frames()
 		if not await agent.climb_to_surface(MainView.SURFACE - 1):
 			why = "trip %d filled but could not climb out" % trips
 			break
+		var trip_t2: int = Engine.get_physics_frames()
+		descend_frames.append(trip_t1 - trip_t0)
+		climb_frames.append(trip_t2 - trip_t1)
+		trip_frames.append(trip_t2 - trip_t0)
 		agent.select_item(&"ore")
 		var before: int = int(agent.sim.inventory.get(&"ore", 0))
 		var got: bool = await agent.deposit_selected()
 		var moved: int = before - int(agent.sim.inventory.get(&"ore", 0))
 		delivered += moved
-		print("    trip %d: delivered %d (deposit=%s), %d face cell(s) left, rope %d left"
+		print("    trip %d: delivered %d (deposit=%s), %d face cell(s) left, rope %d left, trip_frames=%d (descend=%d climb=%d)"
 			% [trips, moved, got, _face_cells(agent, col, y0, vein.y),
-				int(agent.sim.inventory.get(&"rope", 0))])
+				int(agent.sim.inventory.get(&"rope", 0)), trip_frames[-1], descend_frames[-1], climb_frames[-1]])
 		if moved <= 0:
 			why = "trip %d delivered nothing, so the pack cannot empty and no later trip can differ" % trips
 			break
 	var in_pack: int = int(agent.sim.inventory.get(&"ore", 0))
 	var produced: int = int(agent.sim.total_produced.get(&"ore", 0))
 	var accounted: int = delivered + in_pack
+	var climb_frames_sum: int = 0
+	for c: int in climb_frames:
+		climb_frames_sum += c
+	var trip_frames_sum: int = 0
+	for t: int in trip_frames:
+		trip_frames_sum += t
+	print("  CROSS-CHECK: sum(climb_frames)=%d against agent.frames=%d (both count physics frames spent "
+		% [climb_frames_sum, agent.frames]
+		+ "inside climb_to_surface, by different mechanisms -- a mismatch means the new counter is wrong)")
 	print(("  friction: %s  (trips=%d cells=%d units=%d produced=%d delivered=%d in_pack=%d "
-		+ "left_for_drill=%d | why: %s)")
+		+ "left_for_drill=%d | trip_frames=%s sum=%d | why: %s)")
 		% [agent.friction(), trips, cells0, units0, produced, delivered, in_pack,
-			_vein_units(agent, col, y0, vein.y), why])
+			_vein_units(agent, col, y0, vein.y), trip_frames, trip_frames_sum, why])
 	if trips < 2:
 		print("  the face was cleared in %d trip(s), so it never posed the question" % trips)
 	if accounted < produced:
