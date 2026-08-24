@@ -88,6 +88,7 @@ func _run() -> void:
 		["friction: cross a jagged tunnel", _goal_cross_jagged_tunnel],
 		["friction: haul a pack that actually fills", _goal_haul_a_capped_pack],
 		["friction: what a hand leaves behind", _goal_hand_leaves_the_vein],
+		["friction: trips to clear a face", _goal_trips_to_clear_a_face],
 	]:
 		var goal_name: String = goal[0]
 		if _only != "" and not goal_name.to_lower().contains(_only.to_lower()):
@@ -1586,6 +1587,94 @@ func _goal_hand_leaves_the_vein() -> bool:
 			% (produced - in_pack) + "measurement of the floor")
 	return await _finish(agent, produced > 0 and left > produced and in_pack == produced,
 		"a hand miner wins the burst and leaves most of the vein for a drill")
+
+
+## TRIPS PER FACE. The other half of T1.0's priority-1 row, which asked for frames AND TRIPS.
+##
+## The trip-count evidence this row had was `factory_sim.gd`'s arithmetic on a 263-unit lode: a floor,
+## computed, never walked. This walks it. `_goal_hand_leaves_the_vein` measures ONE descent and what the
+## hand wins from it; this one runs the loop until the face is out and counts the journeys.
+##
+## IT WAS BLOCKED FOR TWO ITERATIONS AND THE BLOCKER WAS IN THE PILOT, at `_rope_anchor_above`. A second
+## descent leaves a one-cell bare gap where the first trip's hang meets the second's, and the anchor
+## selector reported the stretch already roped because it only ever tested the top of it. The body rode
+## the lower run to its top, could not grip past the gap, and burned its budget stalling and leaping into
+## a cave. Fixed there, not worked around here.
+##
+## THE ASSERTIONS.
+##
+##   1. `trips >= 2`. A face holding more than one pack cannot be cleared in one journey.
+##   2. `why == "the face ran out"`. The loop ended on the ORE and not on `TRIP_LIMIT`, and not on a
+##      pilot failure. Without this, `trips` can be a measurement of the limit and assertion 1 passes by
+##      construction, which is exactly how the first draft of this rung passed while reporting `trips=2`
+##      against a derived floor of `4`.
+##   3. `accounted >= produced`. Everything the hand won reached a machine or is still in the pack.
+##      Nothing on the floor, so the trip count is over a loop that actually delivers.
+func _goal_trips_to_clear_a_face() -> bool:
+	var agent: PlayAgent = await _boot()
+	if agent.sim.machines.is_empty():
+		print("  VOID: no machine exists at boot, so there is nowhere to deliver and a trip count would "
+			+ "be counting journeys that end with the pack still full")
+		return await _finish(agent, false, "trips to clear a face")
+	var col: int = 40                                        # clear of 32 and 36, the other two rungs
+	var vein: Vector2i = _bury_vein(agent, col, 24, 24, 10)
+	var y0: int = MainView.SURFACE
+	var cells0: int = _face_cells(agent, col, y0, vein.y)
+	var units0: int = _vein_units(agent, col, y0, vein.y)
+	agent.give(&"earth", 20)
+	agent.give(&"rope", 300)
+	var trips: int = 0
+	var delivered: int = 0
+	var why: String = "the face ran out"
+	const TRIP_LIMIT: int = 9
+	const MAX_BURST: int = 6                                 # `_ore_burst` is 3 + (hash % 4)
+	while _face_cells(agent, col, y0, vein.y) > 0:
+		if trips >= TRIP_LIMIT:
+			why = "TRIP_LIMIT reached, so this number is the limit and not the face"
+			break
+		trips += 1
+		var face: int = _top_ore(agent, col, y0, vein.y)
+		# The cell ABOVE the face, never the face itself: `descend_to` is `dig_down_to`, so aiming it at
+		# the ore makes the descent strike the column on the way down, outside the metered loop below.
+		if not await agent.descend_to(Vector2i(col, face - 1)):
+			why = "trip %d could not reach the cell above the face at row %d" % [trips, face]
+			break
+		while agent.sim.pack_room() >= MAX_BURST:
+			var f: int = _top_ore(agent, col, y0, vein.y)
+			if f < 0:
+				break
+			if not await agent.mine_cell(Vector2i(col, f)):
+				break
+		if not await agent.climb_to_surface(MainView.SURFACE - 1):
+			why = "trip %d filled but could not climb out" % trips
+			break
+		agent.select_item(&"ore")
+		var before: int = int(agent.sim.inventory.get(&"ore", 0))
+		var got: bool = await agent.deposit_selected()
+		var moved: int = before - int(agent.sim.inventory.get(&"ore", 0))
+		delivered += moved
+		print("    trip %d: delivered %d (deposit=%s), %d face cell(s) left, rope %d left"
+			% [trips, moved, got, _face_cells(agent, col, y0, vein.y),
+				int(agent.sim.inventory.get(&"rope", 0))])
+		if moved <= 0:
+			why = "trip %d delivered nothing, so the pack cannot empty and no later trip can differ" % trips
+			break
+	var in_pack: int = int(agent.sim.inventory.get(&"ore", 0))
+	var produced: int = int(agent.sim.total_produced.get(&"ore", 0))
+	var accounted: int = delivered + in_pack
+	print(("  friction: %s  (trips=%d cells=%d units=%d produced=%d delivered=%d in_pack=%d "
+		+ "left_for_drill=%d | why: %s)")
+		% [agent.friction(), trips, cells0, units0, produced, delivered, in_pack,
+			_vein_units(agent, col, y0, vein.y), why])
+	if trips < 2:
+		print("  the face was cleared in %d trip(s), so it never posed the question" % trips)
+	if accounted < produced:
+		print("  %d produced unit(s) reached neither a machine nor the pack: they SPILLED"
+			% (produced - accounted))
+	if why != "the face ran out":
+		print("  the loop did not end on the ore: %s" % why)
+	return await _finish(agent, trips >= 2 and accounted >= produced and why == "the face ran out",
+		"a face bigger than the pack takes more than one trip, and every unit the hand wins arrives")
 
 
 func _do_step(agent: PlayAgent, id: StringName) -> bool:
