@@ -34,6 +34,7 @@ const TECH := &"sf_tech"
 const DASHBOARD := &"sf_dashboard"
 const GRAPPLE := &"sf_grapple"
 const MUTE := &"sf_mute"
+const LINK := &"sf_link"    ## the Freight Winch's link verb (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md)
 
 
 ## Deafness: the one switch that disconnects live hardware from the running game.
@@ -115,6 +116,9 @@ static func defaults() -> Dictionary:
 		# bindings are reachable without moving a hand off WASD and aim, or off a stick.
 		GRAPPLE: [{"key": KEY_F}, {"button": MOUSE_BUTTON_MIDDLE}, {"pad": JOY_BUTTON_RIGHT_SHOULDER}],
 		MUTE: [{"key": KEY_N}],       # sound on/off. M is the map, N is its free neighbour.
+		# The Freight Winch: aim at an unlinked Head and press, then aim at an unlinked Station and press
+		# again -- one key, two presses, the same "aim, confirm" shape GRAPPLE's own throw uses.
+		LINK: [{"key": KEY_L}],
 	}
 
 

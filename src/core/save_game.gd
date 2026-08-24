@@ -100,6 +100,10 @@ static func capture(sim: FactorySim) -> Dictionary:
 		"fill": sim.fill.duplicate(),
 		"research": sim.research.duplicate(),
 		"sapling": sim.sapling.duplicate(),
+		# The Freight Winch (additive, like water/fill/sapling above): absent in a pre-Winch save, which
+		# genuinely had no routes, so `{}` on load says exactly that -- no version bump needed.
+		"winch_routes": sim.winch_routes.duplicate(),
+		"winch_transit": sim.winch_transit.duplicate(true),   # deep: each entry holds its own "items" dict
 		# The seep phase (v2). Loose backfill weeps every SEEP_INTERVAL ticks, so the phase decides which tick
 		# the next weep lands on. Omit it and a reload resumes mid-cycle while a fresh process starts at zero.
 		"seep_tick": sim._seep_tick,
@@ -224,6 +228,12 @@ static func _stage(data: Dictionary) -> Dictionary:
 		"fill": (env.get("fill", {}) as Dictionary).duplicate(),     # additive: an older save has no packing
 		"research": (env["research"] as Dictionary).duplicate(),
 		"sapling": (env.get("sapling", {}) as Dictionary).duplicate(),   # additive: absent in older saves
+		# Additive, like sapling above. A value's own "items"/"ticks_remaining" fields are read defensively
+		# by the reconciliation pass _reconcile_winch_routes runs after commit, not validated here, matching
+		# how a malformed `lode`/`water` entry is handled today -- no new validation infrastructure for one
+		# more additive key.
+		"winch_routes": (env.get("winch_routes", {}) as Dictionary).duplicate(),
+		"winch_transit": (env.get("winch_transit", {}) as Dictionary).duplicate(true),
 		"seep_tick": int(env["seep_tick"]),     # NO_DEFAULT_KEYS: likewise
 		"machines": rebuilt,
 	}
@@ -250,6 +260,8 @@ static func _commit(sim: FactorySim, s: Dictionary) -> void:
 	sim.fill = s["fill"]
 	sim.research = s["research"]
 	sim.sapling = s["sapling"]
+	sim.winch_routes = s["winch_routes"]
+	sim.winch_transit = s["winch_transit"]
 	var rebuilt: Array[MachineState] = s["machines"]
 	sim.machines = rebuilt
 	sim.grid.clear()
@@ -283,7 +295,54 @@ static func restore(sim: FactorySim, data: Dictionary) -> bool:
 	if staged.is_empty():
 		return false
 	_commit(sim, staged)
+	_reconcile_winch_routes(sim)
 	return true
+
+
+## THE SEMANTIC HALF OF THE WINCH'S ADDITIVE KEYS, run once after `_commit` (grid is populated by then;
+## `_stage` cannot do this -- machine lookups need `sim.grid`, which only exists post-commit). A
+## well-typed but DANGLING route -- an endpoint cell that no longer holds the expected machine -- is not
+## save corruption, it is an ordinary consequence of a save file outliving the machines it was written
+## against (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md's "Route reference storage"), so it is dropped
+## rather than refusing the whole save, matching every other additive key's "structural corruption gets
+## the blind cast, semantic dangling gets a targeted fix" split.
+##
+## Dropping a dangling route may NOT silently drop cargo that was mid-trip: conservation is locked
+## architecture, and a loader that destroys items would be the load-time twin of the runtime bug
+## `pickup_machine`/`_purge_winch_route` already guard against. So a dropped route's transit, if it was
+## carrying anything, is materialized rather than erased:
+##   - the Head still exists (only the Station went missing) -> the cargo returns to the Head's OWN
+##     input_buffer, the same place a dead-route delivery already lands at runtime (`_advance_winch_transit`).
+##   - the Head itself is gone -> nothing in this sim can hold it as a buffer, so it lands on the world
+##     floor at the Head's last-known cell, through `_spill_to_world`, the SAME mechanism `take_into_pack`
+##     already uses for pack overflow -- not a new one.
+## Either branch prints a line saying so; a print is what a graybox slice needs here.
+static func _reconcile_winch_routes(sim: FactorySim) -> void:
+	for head_cell: Vector2i in sim.winch_routes.keys():
+		var station_cell: Vector2i = sim.winch_routes[head_cell]
+		var head: MachineState = sim.machine_at(head_cell)
+		var station: MachineState = sim.machine_at(station_cell)
+		var head_ok: bool = head != null and head.def.behavior == &"winch_head"
+		var station_ok: bool = station != null and station.def.behavior == &"winch_station"
+		if head_ok and station_ok:
+			continue
+		sim.winch_routes.erase(head_cell)
+		print("save: winch route %s -> %s dropped on load (head_ok=%s station_ok=%s)"
+			% [head_cell, station_cell, head_ok, station_ok])
+		var transit: Dictionary = sim.winch_transit.get(head_cell, {})
+		sim.winch_transit.erase(head_cell)
+		var items: Dictionary = transit.get("items", {}) as Dictionary
+		if items.is_empty():
+			continue
+		if head_ok:
+			for item: StringName in items:
+				head.input_buffer[item] = int(head.input_buffer.get(item, 0)) + int(items[item])
+			print("save: winch cargo at %s (dropped route) returned to the Head's own input_buffer"
+				% [head_cell])
+		else:
+			for item: StringName in items:
+				sim._spill_to_world(head_cell, item, int(items[item]))
+			print("save: winch cargo at %s (Head itself missing) spilled to the world floor" % [head_cell])
 
 
 ## Write an envelope to disk, keeping the previous good save as `<path>.bak`. On any failure the existing

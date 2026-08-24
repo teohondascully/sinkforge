@@ -112,6 +112,10 @@ var _minimap_mode: int = 0
 ## again to clear. A navigation bookmark, pushed to the HUD as a map dot and to the renderer as a beacon.
 var _ping_world: Vector2 = Vector2.INF
 var _hover_latch: Vector2i = Vector2i(-9999, -9999)   ## the machine the config panel is pinned to
+## Freight Winch link verb (L): the unlinked Head last armed, waiting for a Station press to complete the
+## route. Vector2i(-1,-1) = nothing armed. Transient controller state, not sim state -- the sim only ever
+## sees the finished route (sim.link_winch), never this in-between selection.
+var _winch_pending_head: Vector2i = Vector2i(-1, -1)
 ## The settings overlay: ESC with nothing else open summons it, for audio sliders, screen-shake, zoom and
 ## the key remap page. While it is open it eats all input, page-sized. _capture_action is the action
 ## awaiting its new key; _settings_drag is the slider id being dragged.
@@ -285,6 +289,8 @@ func _ready() -> void:
 		load("res://src/data/machines/crusher.tres"),     # spoil → gravel, the one material that packs
 		                                                  # (docs/DRIFT.md §4, Packing)
 		load("res://src/data/machines/pump.tres"),        # L3: power-drains flood water (Drainage)
+		load("res://src/data/machines/winch_head.tres"),     # Freight Winch: reads its own buffer, hauls
+		load("res://src/data/machines/winch_station.tres"),  # Freight Winch: the receiving end of a route
 	]
 	for def: MachineDef in _craftable:
 		_machine_defs_by_id[def.id] = def
@@ -1066,6 +1072,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_apply_knob(_hud.hover_click(Controls.pointer_viewport(self)))   # config-panel chips
 	elif event.is_action_pressed(Controls.GRAPPLE):
 		_toggle_grapple()
+	elif event.is_action_pressed(Controls.LINK):
+		try_link_winch(_aim)
 	elif event.is_action_pressed(Controls.ZOOM):
 		_cycle_zoom()
 	elif event.is_action_pressed(Controls.SPEED):
@@ -1452,6 +1460,34 @@ func _toggle_grapple() -> void:
 		return                                    # a hook is already out: let it land
 	g.fire(_player.hand(), Controls.pointer_world(self))
 	_sfx.play(&"clunk", _player.position, 1.9, -10.0)
+
+
+## The Freight Winch's link verb (L): aim at an owned, unlinked Head and press to arm it, then aim at an
+## owned, unlinked Station and press again to commit the route -- one key, two presses, the same "aim,
+## confirm" shape `_toggle_grapple` uses for its own single-key verb. No HUD affordance for this slice
+## (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md defers it explicitly); a console line is the confirmation.
+## `cell` is a parameter rather than reading `_aim` directly, matching `try_build`/`try_mine`'s reach-gated
+## shape. Returns whether anything happened (armed OR linked), so a caller can tell a real press from a
+## no-op one.
+func try_link_winch(cell: Vector2i) -> bool:
+	if _paused or not _can_reach(cell):
+		return false
+	var target: MachineState = sim.machine_at(cell)
+	if target == null:
+		return false
+	if target.def.behavior == &"winch_head" and not sim.winch_routes.has(cell):
+		_winch_pending_head = cell
+		print("winch: head armed at %s -- aim at an unlinked station and press link again" % [cell])
+		return true
+	if target.def.behavior == &"winch_station" and _winch_pending_head != Vector2i(-1, -1):
+		var linked: bool = sim.link_winch(_winch_pending_head, cell)
+		if linked:
+			print("winch: linked head %s -> station %s" % [_winch_pending_head, cell])
+		else:
+			print("winch: link failed (station already linked, or the armed head is no longer valid)")
+		_winch_pending_head = Vector2i(-1, -1)
+		return linked
+	return false
 
 
 # --- world-interaction tools (mining / depositing): discrete sim edits only ---

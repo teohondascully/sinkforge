@@ -851,6 +851,14 @@ func build_at(cell: Vector2i, budget: int = 720) -> bool:
 	return main.try_build(cell)
 
 
+## Walk within reach of `cell` and press the Freight Winch's link verb there (arms a Head, or completes a
+## route onto a Station — see MainView.try_link_winch). Returns whether the press did anything.
+func link_winch_at(cell: Vector2i, budget: int = 720) -> bool:
+	if not await approach(cell, budget):
+		return false
+	return main.try_link_winch(cell)
+
+
 # --- setup hatch (user-sanctioned) ----------------------------------------------------------------
 
 ## Inject resources straight into the pack to ARRANGE a situation before playing it (e.g. top up ingots

@@ -58,6 +58,7 @@ const CLAIMS: Dictionary = {
 	"S": &"sf_down",
 	"A": &"sf_left",
 	"D": &"sf_right",
+	"L": &"sf_link",
 }
 
 ## Single letters are read as keys; multi-letter words are not, so the prose can shout PACKED and FUEL for

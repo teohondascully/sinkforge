@@ -89,6 +89,7 @@ func _run() -> void:
 		["friction: haul a pack that actually fills", _goal_haul_a_capped_pack],
 		["friction: what a hand leaves behind", _goal_hand_leaves_the_vein],
 		["friction: trips to clear a face", _goal_trips_to_clear_a_face],
+		["freight winch: a linked head hauls ore into its station", _goal_freight_winch_delivers],
 	]:
 		var goal_name: String = goal[0]
 		if _only != "" and not goal_name.to_lower().contains(_only.to_lower()):
@@ -1701,6 +1702,104 @@ func _goal_trips_to_clear_a_face() -> bool:
 		print("  the loop did not end on the ore: %s" % why)
 	return await _finish(agent, trips >= 2 and accounted >= produced and why == "the face ran out",
 		"a face bigger than the pack takes more than one trip, and every unit the hand wins arrives")
+
+
+## The Freight Winch's first vertical slice (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md): place a Head, a
+## Station and a POWERED generator (the Head demands power the same way the lift/pump do -- an unpowered
+## Head queues nothing, so a goal that skipped this would test a trip that could never start), link the
+## Head to the Station with the real link verb, feed the Head some ore, and let a full transit cycle run.
+## Passes only if the ore actually lands in the Station's input_buffer AND the conservation ledger
+## (total_produced/total_consumed) is untouched by the trip itself -- the transit only ever MOVES items
+## between two buffers, through winch_transit, and never creates or destroys any. Placing/linking is the
+## real verb path; giving the machine items, the coal and the ore is setup INJECTION (agent.give / a
+## direct buffer write), matching this suite's own convention that injection may ARRANGE a situation
+## while the verb under test -- here, the winch itself -- stays real.
+func _goal_freight_winch_delivers() -> bool:
+	var agent: PlayAgent = await _boot()
+	var bc: Vector2i = agent.main._cell_at(agent.player.position)
+	# THREE cells are needed at once (Head, Station, and a generator directly above the Head for its aura --
+	# see below), so the single-cell `_open_cell_near` scan does not fit as-is. Same idea, widened: try
+	# several candidate anchor offsets for the Head (mirroring `_open_cell_near`'s own neighbour list) and
+	# take the first anchor whose whole three-cell shape is open, rather than one fixed offset that fails
+	# outright against whatever happens to sit beside spawn on this seed.
+	var head_cell: Vector2i = Vector2i(-9999, -9999)
+	var station_cell: Vector2i = Vector2i(-9999, -9999)
+	var gen_cell: Vector2i = Vector2i(-9999, -9999)
+	var found: bool = false
+	for anchor: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(2, 0), Vector2i(-2, 0),
+			Vector2i(1, 1), Vector2i(-1, 1), Vector2i(3, 0), Vector2i(-3, 0)]:
+		var h: Vector2i = bc + anchor
+		var s: Vector2i = h + Vector2i(1, 0)
+		var g: Vector2i = h + Vector2i(0, -1)   # directly above the Head: its aura powers it, no conduit
+		if agent.main._placeable(h) and agent.main._can_reach(h) \
+				and agent.main._placeable(s) and agent.main._can_reach(s) \
+				and agent.main._placeable(g) and agent.main._can_reach(g):
+			head_cell = h
+			station_cell = s
+			gen_cell = g
+			found = true
+			break
+	if not found:
+		return await _finish(agent, false,
+			"found open, reachable cells for a Head, a Station and a generator near %s" % [bc])
+
+	agent.give(&"winch_head", 1)
+	agent.give(&"winch_station", 1)
+	agent.give(&"generator", 1)
+	agent.sim.total_produced[&"winch_head"] = int(agent.sim.total_produced.get(&"winch_head", 0)) + 1
+	agent.sim.total_produced[&"winch_station"] = int(agent.sim.total_produced.get(&"winch_station", 0)) + 1
+	agent.sim.total_produced[&"generator"] = int(agent.sim.total_produced.get(&"generator", 0)) + 1
+	await agent.select_item(&"winch_head")
+	var head_built: bool = await agent.build_at(head_cell)
+	await agent.select_item(&"winch_station")
+	var station_built: bool = await agent.build_at(station_cell)
+	await agent.select_item(&"generator")
+	var gen_built: bool = await agent.build_at(gen_cell)
+	if not (head_built and station_built and gen_built):
+		return await _finish(agent, false, "placed a Winch Head at %s, a Station at %s and a generator at %s"
+			% [head_cell, station_cell, gen_cell])
+
+	# Hatch the generator's fuel directly (the toss-feed verb is a different rung's proof; the winch is
+	# what's under test here), the same shape RUNG 7's pump setup uses for its own aura-powered machine --
+	# plus `fuel` set directly too, so the aura is live from the very next power sweep instead of waiting
+	# on _run_generator's first coal->fuel conversion, and stays lit well past this goal's own wait window
+	# (no mid-test refuel event to contaminate the conservation snapshot below).
+	var gen: MachineState = agent.sim.machine_at(gen_cell)
+	gen.input_buffer[&"coal"] = 60
+	gen.fuel = FactorySim.GENERATOR_FUEL_TICKS * 3
+	agent.sim.total_produced[&"coal"] = int(agent.sim.total_produced.get(&"coal", 0)) + 60
+	for _i: int in 6:
+		await agent.step()
+	if agent.sim.power_at(head_cell) <= 0.0:
+		return await _finish(agent, false, "the Head is placed but no power reaches it (power=%.2f)"
+			% agent.sim.power_at(head_cell))
+
+	var armed: bool = await agent.link_winch_at(head_cell)
+	var pressed: bool = await agent.link_winch_at(station_cell)
+	var linked: bool = agent.sim.winch_routes.get(head_cell, Vector2i(-9, -9)) == station_cell
+	if not (armed and pressed and linked):
+		return await _finish(agent, false, "linked the Head to the Station with the link verb")
+
+	var head: MachineState = agent.sim.machine_at(head_cell)
+	head.input_buffer[&"ore"] = int(head.input_buffer.get(&"ore", 0)) + FactorySim.WINCH_TRIP_CAPACITY
+	agent.sim.total_produced[&"ore"] = int(agent.sim.total_produced.get(&"ore", 0)) + FactorySim.WINCH_TRIP_CAPACITY
+	var produced_before: Dictionary = agent.sim.total_produced.duplicate()
+	var consumed_before: Dictionary = agent.sim.total_consumed.duplicate()
+
+	# Long enough for one full trip (creation tick + WINCH_TRANSIT_TICKS decrements) twice over, derived
+	# from the constant rather than typed in so a slower/longer trip does not silently turn this into a
+	# no-op -- the same shape the L2 press-silence check uses for a recipe's cycle time.
+	var trip_seconds: float = float(FactorySim.WINCH_TRANSIT_TICKS + 5) / float(FactorySim.TICKS_PER_SECOND)
+	var window: int = int(ceil(trip_seconds * 60.0 / maxf(Engine.time_scale, 1.0))) * 2
+	await agent.wait(window)
+
+	var station: MachineState = agent.sim.machine_at(station_cell)
+	var delivered: int = int(station.input_buffer.get(&"ore", 0))
+	var ledger_untouched: bool = agent.sim.total_produced == produced_before \
+		and agent.sim.total_consumed == consumed_before
+	return await _finish(agent, delivered >= FactorySim.WINCH_TRIP_CAPACITY and ledger_untouched,
+		"the winch delivered %d/%d ore into the Station's input_buffer in %d frames (ledger untouched: %s)"
+			% [delivered, FactorySim.WINCH_TRIP_CAPACITY, window, ledger_untouched])
 
 
 func _do_step(agent: PlayAgent, id: StringName) -> bool:

@@ -41,6 +41,12 @@ const MACHINE_STYLE: Dictionary = {
 	# the Forge's sooty casing and a fire glyph. Cosmetic tag only: `&"ore_vent"` has no `_BEHAVIORS` entry,
 	# so the sim still falls through to the recipe runner exactly as it did with no behavior at all.
 	&"ore_vent": {"kind": "vent", "color": Color(0.24, 0.27, 0.31)},      # cold basalt, a hole in dark rock
+	# The Freight Winch's first vertical slice (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md) is explicitly
+	# graybox: reusing the "hopper" glyph (both are stockpile-shaped single-cell machines) rather than
+	# drawing a new kind is the in-scope choice -- the plan document defers the hero-machine's own
+	# silhouette to a later art pass, not this one.
+	&"winch_head": {"kind": "hopper", "color": Color(0.70, 0.48, 0.22)},      # cable amber: the hauling end
+	&"winch_station": {"kind": "hopper", "color": Color(0.34, 0.46, 0.56)},   # cool steel: the receiving end
 }
 
 
@@ -1110,6 +1116,8 @@ const ITEM_PURPOSE: Dictionary = {
 	&"h_drill": "the Borer — chews sideways the way you faced; its haul drops below it",
 	&"drift_rig": "cuts a 2-high gallery on POWER, and sorts it: ore drops below, spoil drops behind",
 	&"crusher": "eats SPOIL, pours GRAVEL — pay falls straight through it, untouched",
+	&"winch_head": "POWERED — hauls what falls into it up to a linked Station (L links them)",
+	&"winch_station": "the far end of a Winch route — what the Head hauls lands here",
 }
 
 

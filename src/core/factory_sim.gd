@@ -121,6 +121,20 @@ const CONDUIT_V_KEEP: float = 0.92      ## fraction kept crossing ONE cell DOWN 
 const CONDUIT_H_KEEP: float = 0.80      ## fraction kept crossing ONE cell SIDEWAYS (lateral is lossier)
 const CONDUIT_BLEED: float = 0.6        ## fraction a conduit shares to adjacent cells (so machines draw it)
 
+## The Freight Winch (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md), first vertical slice: two single-cell
+## machines, a Head and a Station, linked by one player-drawn route (`winch_routes`). The Head reads its
+## OWN input_buffer and never touches output_buffer, so `_flow()`'s per-machine step no-ops on it by
+## construction (no `dests`/`flow` registry entry exists for `&"winch_head"`). Once linked, with no trip
+## already in flight, it queues up to a power-scaled share of WINCH_TRIP_CAPACITY into a route-scoped
+## transit record (`winch_transit`), which counts down WINCH_TRANSIT_TICKS and then lands straight in the
+## Station's own input_buffer -- the Head stays the transit's ONLY writer end to end, so the Station's
+## `run` can be a no-op (see `_run_winch_station`). First-pass placeholder numbers, all four: a tuning
+## pass is an explicit follow-up (FREIGHT_WINCH_GRAYBOX_PLAN.md, "What this plan is not"), not this slice.
+const WINCH_TRIP_CAPACITY: int = 8       ## items queued into transit per trip, at full power
+const WINCH_TRANSIT_TICKS: int = 40      ## ticks one trip spends in flight (2s @ 20Hz)
+const WINCH_POWER_DEMAND: float = 4.0    ## power at the Head's cell for a full-capacity trip
+const WINCH_STATION_CAP: int = 60        ## Station input_buffer load (any items) that pauses new trips
+
 ## The behavior registry: the one sim-side table wiring a MachineDef.behavior tag into the tick.
 ## Entries (all optional):
 ##   run          its per-tick work (method name, called with the MachineState)
@@ -147,6 +161,8 @@ const _BEHAVIORS: Dictionary = {
 	&"pump": {"run": &"_run_pump", "status": &"_status_pump"},
 	&"crush": {"run": &"_run_crush", "status": &"_status_crush"},
 	&"spur": {"run": &"_run_spur", "status": &"_status_spur"},
+	&"winch_head": {"run": &"_run_winch_head", "status": &"_status_winch_head"},
+	&"winch_station": {"run": &"_run_winch_station", "status": &"_status_mover"},
 }
 
 ## The descent engine, the L1 to L2 gate (docs/PROGRESSION.md §2): placed over the seal, it eats
@@ -295,6 +311,20 @@ var research: Dictionary = {}
 ## of leaves, so wood renews instead of dead-ending when the worldgen trees run out. Authoritative,
 ## mutated by plant_sapling and the tick's growth sweep.
 var sapling: Dictionary = {}
+## The Freight Winch route table (docs/handoff/FREIGHT_WINCH_GRAYBOX_PLAN.md): Head cell -> Station cell.
+## A route is a PROPERTY of two placed machines, not a third placed object -- nothing occupies the cells
+## between a Head and its Station, so relocating either is free/instant like every other machine
+## (`pickup_machine`), and "recovering the cable" needs no code because nothing was ever spent as a
+## countable resource. At most one route per Head AND per Station in this slice; `link_winch` enforces
+## both endpoints unlinked before writing one, which is what lets `_purge_winch_route` assume a single
+## match. Mutated only by `link_winch` and `_purge_winch_route` (pickup_machine/remove_machine), never by
+## a `run` method, so the tick never has to guard against a route changing under it mid-frame.
+var winch_routes: Dictionary = {}      ## Head cell (Vector2i) -> Station cell (Vector2i)
+## Cargo mid-trip: Head cell -> {"items": Dictionary, "ticks_remaining": int}. Route-scoped rather than
+## machine-scoped so it can bypass `_flow()` entirely, while still counting as "present" for conservation:
+## items only ever move input_buffer -> this dictionary -> the Station's input_buffer, salvaged rather
+## than destroyed if either endpoint is picked up mid-trip (`_purge_winch_route`).
+var winch_transit: Dictionary = {}     ## Head cell (Vector2i) -> {"items": Dictionary, "ticks_remaining": int}
 
 ## Fine terrain: a second, finer terrain layer at SUBDIV times the coarse resolution (8px fine cells
 ## against 32px coarse). Additive and derived. The coarse `solid` dict stays the ONE authority for ALL
@@ -1664,6 +1694,28 @@ func build_from_pack(def: MachineDef, cell: Vector2i) -> MachineState:
 	return state
 
 
+## Does a `winch_routes` entry touch `cell`, as either the Head key or the Station value? Purge it (and
+## any in-flight `winch_transit` for that Head) and hand back whatever cargo was mid-trip ({} if none) for
+## the caller to dispose of. `pickup_machine` salvages it into the pack, exactly like every other buffer
+## it salvages; a raw `remove_machine` credits it to total_consumed, exactly like every other buffer it
+## destroys. Never called from a `run` method: routes and transit are edited from exactly three places
+## (this, `link_winch`, and the Head's own tick advancing a transit already in flight), so nothing here
+## races the tick. At most one route can match, per `link_winch`'s own unlinked-both-ends invariant.
+func _purge_winch_route(cell: Vector2i) -> Dictionary:
+	var head_cell: Vector2i = cell if winch_routes.has(cell) else Vector2i(-1, -1)
+	if head_cell.x < 0:
+		for h: Vector2i in winch_routes:
+			if winch_routes[h] == cell:
+				head_cell = h
+				break
+	if head_cell.x < 0:
+		return {}
+	winch_routes.erase(head_cell)
+	var transit: Dictionary = winch_transit.get(head_cell, {})
+	winch_transit.erase(head_cell)
+	return (transit.get("items", {}) as Dictionary)
+
+
 ## Player action: pick a placed machine back up into the pack, as one machine item by its def.id.
 ## Returns true if a machine was there. Any items the machine was holding are SALVAGED into the pack
 ## rather than discarded, so picking up a mid-work forge never silently destroys ore: the items move
@@ -1688,6 +1740,12 @@ func pickup_machine(cell: Vector2i) -> bool:
 		for item: StringName in buffer:
 			salvaged[item] = int(salvaged.get(item, 0)) + int(buffer[item])
 		buffer.clear()   # salvaged out either way, and cleared so remove_machine has nothing to destroy
+	# Freight Winch: purge before remove_machine, for the identical reason the buffers above were emptied
+	# first -- extract whatever this cell owed the route/transit tables so remove_machine's own purge (a
+	# few lines down) finds nothing left to destroy.
+	var transit_items: Dictionary = _purge_winch_route(cell)
+	for item: StringName in transit_items:
+		salvaged[item] = int(salvaged.get(item, 0)) + int(transit_items[item])
 	remove_machine(cell)
 	for item: StringName in salvaged:
 		take_into_pack(item, int(salvaged[item]), cell)
@@ -1818,6 +1876,14 @@ func remove_machine(cell: Vector2i) -> void:
 	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
 		for item: StringName in buffer:
 			total_consumed[item] = int(total_consumed.get(item, 0)) + int(buffer[item])
+	# Freight Winch: a route or an in-flight trip touching this cell does not survive the machine that
+	# anchored it either. pickup_machine already purged and salvaged both before calling here, so this
+	# finds nothing left in the ordinary player path; a raw removal (tests, or any future non-salvaging
+	# caller) reaches this live and destroys what pickup_machine would have saved -- credited the same way
+	# an ordinary buffer already is, two lines up.
+	var transit_items: Dictionary = _purge_winch_route(cell)
+	for item: StringName in transit_items:
+		total_consumed[item] = int(total_consumed.get(item, 0)) + int(transit_items[item])
 	grid.erase(cell)
 	machines.erase(state)
 
@@ -2077,6 +2143,95 @@ func _status_pump(machine: MachineState) -> StringName:
 		if water_at(c) > 0:
 			return &"working"                    # water in reach → draining
 	return &"idle"                               # powered but dry: nothing left to pump
+
+
+## THE FREIGHT WINCH -- the Head half. Reads its OWN input_buffer, never `output_buffer` (see the
+## constant block above for why): unlinked, unpowered, or with nothing waiting, it simply holds whatever
+## falls into it, the same as any machine with no drain. Once a trip is queued it is the Head that counts
+## the trip down AND delivers straight into the Station's input_buffer (`_advance_winch_transit`), so
+## `_run_winch_station` never has to touch a buffer that isn't its own and the two `run` methods can never
+## race the same write.
+func _run_winch_head(machine: MachineState) -> void:
+	machine.power_factor = power_throttle(machine.cell, WINCH_POWER_DEMAND)
+	if winch_transit.has(machine.cell):
+		_advance_winch_transit(machine)
+		return
+	if not winch_routes.has(machine.cell) or machine.input_buffer.is_empty():
+		return                                        # unlinked, or nothing waiting to haul
+	var station_cell: Vector2i = winch_routes[machine.cell]
+	var cap: int = int(round(float(WINCH_TRIP_CAPACITY) * machine.power_factor))
+	if cap <= 0:
+		return                                        # unpowered: no free ride, the pump's own cost rule
+	var station: MachineState = machine_at(station_cell)
+	if station == null or station.def.behavior != &"winch_station":
+		return   # dangling route: pickup_machine purges this the moment either endpoint is picked up, so
+		         # this only holds transiently, e.g. within the same tick a raw remove_machine bypassed it
+	var station_load: int = 0
+	for it: StringName in station.input_buffer:
+		station_load += int(station.input_buffer[it])
+	if station_load >= WINCH_STATION_CAP:
+		return                                        # Station backed up: hold the trip -- a visible queue
+	var load: Dictionary = {}
+	var moved: int = 0
+	for item: StringName in machine.input_buffer.keys():
+		if moved >= cap:
+			break
+		var take: int = mini(int(machine.input_buffer[item]), cap - moved)
+		load[item] = int(load.get(item, 0)) + take
+		var left: int = int(machine.input_buffer[item]) - take
+		if left > 0:
+			machine.input_buffer[item] = left
+		else:
+			machine.input_buffer.erase(item)
+		moved += take
+	if load.is_empty():
+		return
+	winch_transit[machine.cell] = {"items": load, "ticks_remaining": WINCH_TRANSIT_TICKS}
+
+
+## Count one tick off an in-flight trip. The tick that CREATES a trip does not also count against it (see
+## `_run_winch_head`: a fresh entry is only ever read back on a LATER call), so a trip spends exactly
+## WINCH_TRANSIT_TICKS full ticks in flight before it lands. On the tick it reaches 0 the cargo is
+## delivered straight into the Station's input_buffer; if the route died mid-flight (the Station left the
+## grid some way that skipped `_purge_winch_route`, e.g. a raw `remove_machine` call), the cargo returns to
+## the Head's own input_buffer instead of vanishing, the same salvage-not-destroy rule pickup_machine
+## already applies everywhere else.
+func _advance_winch_transit(machine: MachineState) -> void:
+	var transit: Dictionary = winch_transit[machine.cell]
+	var remaining: int = int(transit["ticks_remaining"]) - 1
+	if remaining > 0:
+		transit["ticks_remaining"] = remaining
+		return
+	var items: Dictionary = transit["items"]
+	winch_transit.erase(machine.cell)
+	var station_cell: Vector2i = winch_routes.get(machine.cell, machine.cell)
+	var station: MachineState = machine_at(station_cell)
+	if station == null or station.def.behavior != &"winch_station":
+		for item: StringName in items:
+			machine.input_buffer[item] = int(machine.input_buffer.get(item, 0)) + int(items[item])
+		return
+	for item: StringName in items:
+		station.input_buffer[item] = int(station.input_buffer.get(item, 0)) + int(items[item])
+
+
+## THE FREIGHT WINCH -- the Station half. A pure receiver: `_run_winch_head` is the transit's only writer
+## into this machine's input_buffer (see above), so there is nothing left for the Station's own tick to do.
+## Status still reads `_status_mover` (working while it holds anything), so it looks like every other
+## stockpile machine at a glance.
+func _run_winch_station(_machine: MachineState) -> void:
+	pass
+
+
+## Winch Head status, mirroring _run_winch_head's gates. `&"unlinked"` (shared with the Spur; Visuals
+## already knows its lamp colour and cross mark) covers "placed, but nothing to route to"; everything else
+## collapses to the _status_mover convention once linked -- working while it holds or is moving cargo,
+## idle while empty.
+func _status_winch_head(machine: MachineState) -> StringName:
+	if not winch_routes.has(machine.cell):
+		return &"unlinked"
+	if winch_transit.has(machine.cell) or not machine.input_buffer.is_empty():
+		return &"working"
+	return &"idle"
 
 
 ## A splitter runs no recipe: it moves whatever has fallen into it from its input to its output, with
@@ -2828,6 +2983,25 @@ func set_split_mode(cell: Vector2i, mode: int) -> String:
 		return ""
 	m.mode = clampi(mode, 0, _SPLIT_PATTERNS.size() - 1)
 	return ["splitter: even 1:1", "splitter: 2:1 DOWN", "splitter: 1:2 RIGHT"][m.mode]
+
+
+## Player action (the link verb, scenes/main.gd): join an unlinked Head to an unlinked Station, writing
+## one `winch_routes` entry. Both ends must already be the right machine AND unclaimed -- an already-linked
+## Head or Station refuses, which is what lets `_purge_winch_route` assume at most one route ever touches
+## a given cell. Reach is the caller's job (scenes/main.gd is reach-gated the same way every other verb
+## is); this is the sim-side atomic write, discrete like configure_machine and set_split_mode above.
+func link_winch(head_cell: Vector2i, station_cell: Vector2i) -> bool:
+	var head: MachineState = machine_at(head_cell)
+	if head == null or head.def.behavior != &"winch_head" or winch_routes.has(head_cell):
+		return false
+	var station: MachineState = machine_at(station_cell)
+	if station == null or station.def.behavior != &"winch_station":
+		return false
+	for existing: Vector2i in winch_routes.values():
+		if existing == station_cell:
+			return false                          # that Station already answers to a different Head
+	winch_routes[head_cell] = station_cell
+	return true
 
 
 ## Move a bundle of items from `machine` into one destination, logging the cosmetic flow event.
