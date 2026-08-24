@@ -48,6 +48,12 @@ const SHOW_FRAMES: int = 12           ## frames a newly placed machine gets befo
 ## How long the stage is given to lose the last machine before the empty-stage control is judged.
 ## Four frames was the old implicit budget and it was not enough on three runs in six.
 const CLEAR_FRAMES: int = 180
+
+## THE REFERENCE'S OWN SETTLE BUDGET, and it is a CONVERGENCE WAIT rather than a frame count because a
+## frame count is what was wrong. `REF_SETTLE_STEP` is the gap between two probes of the same cell and
+## `REF_SETTLE_MAX` bounds the whole wait.
+const REF_SETTLE_STEP: int = 30
+const REF_SETTLE_MAX: int = 600
 const ANIM_POSE: float = 0.0          ## the cosmetic clock is held here while a frame is read
 
 ## THE WHOLE REGISTRY, DISCOVERED RATHER THAN LISTED. A hand-written subject list in a layer about "do the
@@ -139,6 +145,47 @@ func _run() -> void:
 	# THE EMPTY STAGE, TWICE. The first capture is the reference every mask is taken against; the second
 	# exists only to measure how much two captures of an unchanging cell differ, which is the noise this
 	# layer's threshold has to clear. A threshold quoted without its noise floor is a preference.
+	# THE REFERENCE HAS TO BE SETTLED, NOT MERELY LATE, AND IT USED TO BE ONLY LATE.
+	#
+	# The after-capture below already waits for CONVERGENCE: it re-reads until the stage stops differing
+	# or `CLEAR_FRAMES` runs out. The reference did not. It was taken on a fixed 90-plus-20 frame budget,
+	# and a fixed window measures whatever the machine had time to finish. On an idle box that is enough;
+	# inside a twelve-way sweep it is not, and the reference then holds a half-settled picture that the
+	# settled after-capture is scored against. The difference gets charged to the machine that was
+	# removed, which is the one thing in the frame that did change.
+	#
+	# THAT IS WHY THIS LAYER WENT RED ON 2 OF 5 SWEEPS AND NEVER ONCE STANDALONE, and three tidier
+	# explanations died before this one. The residual is ONE COMPACT BLOB, so it is not the shader's
+	# film grain, which is diffuse. The after-capture shows no machine drawn and `machine_at` agrees, so
+	# it is not the removal being slow. `lamp_pos` is identical at both captures to five decimals, so the
+	# head-lamp is not drifting across the cell. Cutting this settle to two frames REPRODUCES the failure
+	# standalone at 0.0744, inside the 0.0187..0.1131 the sweeps had recorded.
+	#
+	# AND THE BACK-TO-BACK PAIR BELOW CANNOT SEE ANY OF IT, which is why the bar read a confident 0.0000
+	# through every one of those reds. Two captures taken one frame apart agree beautifully while both sit
+	# at the same point of a slow convergence. Agreement over a one-frame window is not stability; it is a
+	# statement about one frame. So the probes here are separated by `REF_SETTLE_STEP`, and the renderer's
+	# `_process` is put back between them, because `_luma_patch` switches it off and a frozen world cannot
+	# finish settling.
+	var ref_waited: int = 0
+	var ref_prev: PackedFloat32Array = await _luma_patch()
+	while ref_waited < REF_SETTLE_MAX:
+		_main._renderer.set_process(true)             # `_luma_patch` froze it; let the world run again
+		for _i: int in REF_SETTLE_STEP:
+			await physics_frame
+		ref_waited += REF_SETTLE_STEP
+		var ref_now: PackedFloat32Array = await _luma_patch()
+		if _count_over(ref_prev, ref_now, MASK_LEVEL) == 0:
+			break
+		ref_prev = ref_now
+	print("    reference settled after %d frame(s) of gapped waiting (step %d, bound %d)"
+		% [ref_waited, REF_SETTLE_STEP, REF_SETTLE_MAX])
+	# SAY SO IF IT NEVER SETTLED. An unconverged reference is not a machine finding and must not be read
+	# as one; every mask in this run is taken against it.
+	_check(ref_waited < REF_SETTLE_MAX,
+		"CONTROL: the reference picture stopped changing before it was used (%d frame(s), bound %d)"
+			% [ref_waited, REF_SETTLE_MAX])
+
 	var bare: PackedFloat32Array = await _luma_patch()
 	var bare2: PackedFloat32Array = await _luma_patch()
 	var floor_noise: float = _max_abs(bare, bare2)
