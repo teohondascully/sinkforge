@@ -712,14 +712,30 @@ func climb_to_surface(target_row: int, budget: int = 4000) -> bool:
 
 ## The highest open, in-reach cell straight above `bc` that a rope could anchor at — or (x, -1) when
 ## there's nothing to add (sealed above, out of reach, or that whole reachable stretch is already roped).
+## The highest in-reach open cell above the body that STILL NEEDS ROPE, or y = -1 when the whole reachable
+## stretch is already hung. `place_rope` unrolls DOWN from whatever this returns and stops at the first
+## occupied cell, so returning the topmost bare cell fills a gap from its top without disturbing the hang
+## below it.
+##
+## IT USED TO TAKE THE TOPMOST OPEN CELL AND THEN ASK WHETHER *THAT ONE* WAS ROPED, which is the same
+## answer whenever rope runs contiguously down from the top and the wrong answer the moment it does not.
+## A second descent makes it not: the first trip's rope unrolls down and stops on what was then solid
+## floor, the second trip mines that floor away and hangs a fresh run from below, and the two hangs meet
+## with a bare cell between them. Measured, at the row the body then stalled on:
+##
+##     30:R 31:R 32:R 33:R 34:R  35:-  36:R 37:R 38:R      one bare cell, rope 275 in the pack
+##
+## The old test read row 33 or so at the top of the reachable stretch, found rope, and reported the
+## stretch hung. Row 35 was in reach and bare the whole time, the body rode the lower run to its top,
+## could not grip past the gap, and `climb_to_surface` spent its whole budget stalling and leaping.
+## Checking every cell instead of the top one costs nothing and is the same answer in the contiguous case.
 func _rope_anchor_above(bc: Vector2i) -> Vector2i:
 	var best := Vector2i(bc.x, -1)
 	var c: Vector2i = bc
 	while sim.in_bounds(c) and not sim.is_solid(c) and sim.machine_at(c) == null and main._can_reach(c):
-		best = c
+		if not sim.is_climbable(c):
+			best = c                                     # highest cell in reach that rope would actually fill
 		c += Vector2i(0, -1)
-	if best.y >= 0 and sim.is_climbable(best):
-		return Vector2i(bc.x, -1)                        # the reachable stretch is already roped
 	return best
 
 
