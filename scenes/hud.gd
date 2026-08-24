@@ -1844,6 +1844,23 @@ const HELP_LINES: Array[String] = [
 	"configure   R  (aimed at a splitter / hopper)",
 	"dashboard   G",
 	"map         M  (again: LARGE · click it = ping)",
+	# ZOOM WAS THE ONE BOUND ACTION THIS CARD DID NOT LIST, and a playtester reported exactly the symptom
+	# that produces: "Z is an arbitrary choice a new player is unlikely to infer." It is bound (KEY_Z, and
+	# D-pad up), it is remappable in settings, and the feel page explains what it does. What it was missing
+	# is the one surface a first-timer is actively pointed at: the bottom-left legend says "H keys", H opens
+	# this card, and the key was not on it. Its sibling on the very same line of `REMAP_ROWS`, SPEED, has
+	# been on this card all along, which is the tell that this was an omission and not a decision.
+	#
+	# The row is free. `half` is `ceil(n / 2)` and that is 13 at both 25 rows and 26, so the card is exactly
+	# as tall as it was and the second column takes the extra entry.
+	#
+	# AND IT IS SHORT BECAUSE THE FIRST DRAFT OVERFLOWED THE PANEL, which a photograph caught and no
+	# assertion would have. `draw_string` is called with a width of -1, so THIS CARD HAS NO WIDTH GUARD:
+	# a row wider than `HELP_COL_W` runs straight out through the right border and nothing complains.
+	# "zoom Z (how much of the shaft you see)" was 49 characters against the 47 of the longest row already
+	# there, and its closing bracket sat outside the frame. Anyone adding a row here should photograph it;
+	# `check_hud_layout` measures panel RECTS and cannot see text leaving one.
+	"zoom        Z  (how much you see at once)",
 	"fast-fwd    .     (1x → 2x → 4x → 8x)",
 	"save / load  F5 / F9",
 	"pause       P     ·   help   H",
@@ -1855,11 +1872,13 @@ const HELP_LINES: Array[String] = [
 ## screen, on a centred card.
 func _draw_help_overlay() -> void:
 	draw_rect(Rect2(Vector2.ZERO, CANVAS), Color(0.0, 0.0, 0.0, 0.45))
-	# Two columns, because one did not fit on the screen. At 16px a row this list is 25 rows and 440px tall
+	# Two columns, because one did not fit on the screen. At 16px a row the list was 25 rows and 440px tall
 	# on a 360px canvas, centred, so it hung 40px off the top and 40px off the bottom, and the first and
 	# last controls were simply not on screen. Splitting rather than shrinking is the right repair twice
-	# over: a smaller font would have fitted the same wall of 25 rows into the same screen, and a wall of
+	# over: a smaller font would have fitted the same wall of rows into the same screen, and a wall of
 	# rows is the thing this card should least be.
+	#
+	# It is 26 rows now, and the height did not move: `half` rounds up, so 25 and 26 both split as 13.
 	var lines: Array[String] = HELP_LINES
 	var half: int = int(ceil(float(lines.size()) * 0.5))
 	var col_w: float = HELP_COL_W
