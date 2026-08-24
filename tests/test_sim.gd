@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_saplings()
 	_test_torch()
 	_test_save_load()
+	_test_freight_winch_lifecycle()
 	_test_iron_chain()
 	_test_h_drill()
 	_test_filter_ratio_passthrough()
@@ -1543,6 +1544,102 @@ func _test_save_load() -> void:
 	_check(sim.sink == sim2.sink and sim.total_produced == sim2.total_produced,
 		"…down to the ledgers")
 	DirAccess.remove_absolute(path)
+
+
+## The Freight Winch's lifecycle beyond the basic delivery already covered by the play-test rung
+## (tools/play_tests.gd, "freight winch: a linked head hauls ore into its station"): the two cases the
+## director's ruling on the economic envelope explicitly required evidence for, both about cargo that is
+## MID-TRIP, not sitting quietly in a buffer -- relocation must salvage it, and an invalid route on load
+## must fail closed without destroying it. Pure-sim, no scene needed, following _test_save_load's own
+## style of mutating a captured envelope before restore.
+func _test_freight_winch_lifecycle() -> void:
+	print("- freight winch (relocation mid-trip, invalid route on load)")
+	var head_def: MachineDef = load("res://src/data/machines/winch_head.tres")
+	var station_def: MachineDef = load("res://src/data/machines/winch_station.tres")
+	var gen_def: MachineDef = load("res://src/data/machines/generator.tres")
+	var head_cell := Vector2i(10, 10)
+	var station_cell := Vector2i(11, 10)
+	var gen_cell := Vector2i(10, 9)          # directly above the Head: its aura powers it, no conduit
+
+	# --- relocation mid-trip: pickup_machine purges the route and salvages in-flight cargo ---
+	var sim: FactorySim = FactorySim.new()
+	sim.place_machine(head_def, head_cell)
+	sim.place_machine(station_def, station_cell)
+	var gen: MachineState = sim.place_machine(gen_def, gen_cell)
+	gen.input_buffer[&"coal"] = 60
+	gen.fuel = FactorySim.GENERATOR_FUEL_TICKS * 3     # fueled from the start; conversion isn't the subject
+	sim.total_produced[&"coal"] = 60
+	_check(sim.link_winch(head_cell, station_cell),
+		"link_winch joins an unlinked head to an unlinked station")
+	_check(not sim.link_winch(head_cell, station_cell),
+		"…and refuses to link an already-linked head again")
+	var head: MachineState = sim.machine_at(head_cell)
+	head.input_buffer[&"ore"] = FactorySim.WINCH_TRIP_CAPACITY
+	sim.total_produced[&"ore"] = FactorySim.WINCH_TRIP_CAPACITY
+	for _i: int in 15:
+		sim.tick()
+	_check(sim.winch_transit.has(head_cell), "a trip queues into transit within a few powered ticks")
+	_check(_items_present(sim, &"ore") == FactorySim.WINCH_TRIP_CAPACITY,
+		"conservation holds MID-TRIP too, not just before/after (winch_transit counts as present)")
+	sim.pickup_machine(head_cell)
+	_check(not sim.winch_routes.has(head_cell), "picking up the head purges the route")
+	_check(not sim.winch_transit.has(head_cell), "…and the in-flight transit record with it")
+	_check(int(sim.inventory.get(&"ore", 0)) == FactorySim.WINCH_TRIP_CAPACITY,
+		"the ore mid-trip is salvaged into the pack, not destroyed")
+	_check(_items_present(sim, &"ore") == FactorySim.WINCH_TRIP_CAPACITY,
+		"conservation holds after the relocation (present == produced - consumed)")
+
+	# --- invalid route on load: fails closed, cargo survives via the surviving Head's own buffer ---
+	var sim2: FactorySim = FactorySim.new()
+	sim2.place_machine(head_def, head_cell)
+	sim2.place_machine(station_def, station_cell)
+	var gen2: MachineState = sim2.place_machine(gen_def, gen_cell)
+	gen2.input_buffer[&"coal"] = 60
+	gen2.fuel = FactorySim.GENERATOR_FUEL_TICKS * 3
+	sim2.total_produced[&"coal"] = 60
+	sim2.link_winch(head_cell, station_cell)
+	var head2: MachineState = sim2.machine_at(head_cell)
+	head2.input_buffer[&"ore"] = FactorySim.WINCH_TRIP_CAPACITY
+	sim2.total_produced[&"ore"] = FactorySim.WINCH_TRIP_CAPACITY
+	for _i: int in 15:
+		sim2.tick()
+	_check(sim2.winch_transit.has(head_cell), "second scenario also reaches a mid-trip state")
+	var captured: Dictionary = SaveGame.capture(sim2)
+
+	# Drop the station's entry from a COPY of the captured envelope, simulating a save that outlived the
+	# machine it was written against -- the surviving Head keeps the cargo.
+	var without_station: Array = (captured["machines"] as Array).duplicate(true)
+	for i: int in range(without_station.size() - 1, -1, -1):
+		if (without_station[i] as Dictionary)["cell"] == station_cell:
+			without_station.remove_at(i)
+	var data_a: Dictionary = captured.duplicate(true)
+	data_a["machines"] = without_station
+	var restored_a: FactorySim = FactorySim.new()
+	_check(SaveGame.restore(restored_a, data_a),
+		"a save with a dangling route still restores (fails closed, not refused whole)")
+	_check(not restored_a.winch_routes.has(head_cell), "the dangling route itself is dropped")
+	var restored_head: MachineState = restored_a.machine_at(head_cell)
+	_check(restored_head != null, "…but the surviving Head machine is NOT dropped with it")
+	_check(int(restored_head.input_buffer.get(&"ore", 0)) == FactorySim.WINCH_TRIP_CAPACITY,
+		"the in-flight cargo is NOT destroyed -- it returns to the surviving Head's own buffer")
+	_check(_items_present(restored_a, &"ore") == FactorySim.WINCH_TRIP_CAPACITY,
+		"conservation holds after an invalid-route-load reconciliation (head survives)")
+
+	# Drop BOTH endpoints from another copy: nothing is left to hold the cargo as a buffer, so it must
+	# spill to the world floor instead -- the same overflow path take_into_pack already uses, not a new one.
+	var without_either: Array = (captured["machines"] as Array).duplicate(true)
+	for i: int in range(without_either.size() - 1, -1, -1):
+		var mc: Vector2i = (without_either[i] as Dictionary)["cell"]
+		if mc == station_cell or mc == head_cell:
+			without_either.remove_at(i)
+	var data_b: Dictionary = captured.duplicate(true)
+	data_b["machines"] = without_either
+	var restored_b: FactorySim = FactorySim.new()
+	_check(SaveGame.restore(restored_b, data_b), "a save with BOTH endpoints missing still restores")
+	_check(not restored_b.winch_routes.has(head_cell), "the route is dropped")
+	_check(restored_b.machine_at(head_cell) == null, "neither endpoint survives, by construction of this case")
+	_check(_items_present(restored_b, &"ore") == FactorySim.WINCH_TRIP_CAPACITY,
+		"the cargo is not destroyed even with no machine left to hold it -- it spilled to the world floor")
 
 
 ## Torches are the placeable light, a placed layer like rope. One mounts only on a backed open cell,

@@ -54,6 +54,13 @@ func _items_present(sim: FactorySim, item: StringName) -> int:
 	for machine: MachineState in sim.machines:
 		total += int(machine.input_buffer.get(item, 0))
 		total += int(machine.output_buffer.get(item, 0))
+	# Freight Winch cargo mid-trip lives in neither a machine buffer nor the ground -- it is its own
+	# route-scoped dictionary (factory_sim.gd's winch_transit) precisely so it can bypass _flow(). Omitting
+	# it here would make this helper under-count by exactly one in-flight trip's worth, reading a real,
+	# conserved item as though it had vanished for the WINCH_TRANSIT_TICKS it spends in the air.
+	for transit: Variant in sim.winch_transit.values():
+		var carried: Dictionary = (transit as Dictionary).get("items", {})
+		total += int(carried.get(item, 0))
 	return total
 
 
