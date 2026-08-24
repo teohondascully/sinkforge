@@ -5,8 +5,12 @@ extends RefCounted
 ## bazaar STATE. "active" is derived from the world (a valid wood frame == active, FactorySim.find_bazaars).
 ## This layer remembers which frames we've already seen so it can fire a one-shot, block-by-block COSMETIC
 ## TRANSFORMATION the instant a frame completes: plain wood visibly becoming a decorated market stall
-## (awning, banners, lantern, a shopkeeper NPC walking in), so it's obvious "a transformation happened".
+## (awning, banners, lantern, a counter apparatus lighting up), so it's obvious "a transformation happened".
 ## Pure draw + timers; it never writes the sim. Delete it and production numbers are identical.
+##
+## T3.5 (director, 2026-08-24): "a stubborn buried exchange, not a chatty NPC" -- non-humanoid, personality
+## through physical behavior. `_draw_apparatus` is that call: no shopkeeper, a salvaged counter, a
+## mechanical shutter, a scale, a slate ledger, one lamp that is the whole "is anyone home" cue.
 
 const CELL: int = FactorySim.CELL
 ## The block-by-block reveal: each frame cell lights up CELL_STAGGER after the previous; a cell's bright
@@ -94,7 +98,7 @@ func _draw_bazaar(canvas: CanvasItem, origin: Vector2i, age: float) -> void:
 	if age > full:
 		var a: float = clampf((age - full) / SETTLE, 0.0, 1.0)
 		_draw_sign(canvas, base, a)
-		_draw_keeper(canvas, base, a)
+		_draw_apparatus(canvas, base, a)
 
 
 ## A frame cell's market dressing: an awning segment on a beam cell, a draped banner (+ lantern on the
@@ -183,13 +187,59 @@ func _draw_sign(canvas: CanvasItem, base: Vector2, a: float) -> void:
 	canvas.draw_circle(c + Vector2(0.0, 5.5), 2.6, Color(0.95, 0.8, 0.45, a))       # a gold mark
 
 
-## The shopkeeper NPC standing in the interior: a robed figure, distinct from the miner silhouette.
-func _draw_keeper(canvas: CanvasItem, base: Vector2, a: float) -> void:
-	var feet := base + Vector2(FactorySim.BAZAAR_W * CELL * 0.5, FactorySim.BAZAAR_H * CELL - 2.0)
-	var robe := Color(0.52, 0.38, 0.62, a)                                          # plum merchant robe
-	var skin := Color(0.82, 0.64, 0.48, a)
-	canvas.draw_colored_polygon(PackedVector2Array([                               # robe (trapezoid)
-		feet + Vector2(-7.0, 0.0), feet + Vector2(7.0, 0.0),
-		feet + Vector2(4.0, -16.0), feet + Vector2(-4.0, -16.0)]), robe)
-	canvas.draw_circle(feet + Vector2(0.0, -20.0), 4.0, skin)                       # head
-	canvas.draw_rect(Rect2(feet + Vector2(-4.5, -25.0), Vector2(9.0, 3.0)), Color(0.86, 0.52, 0.26, a))  # turban/cap
+## T3.5 (director, 2026-08-24): the Bazaar reads as a stubborn buried exchange, not a chatty NPC --
+## personality through PHYSICAL BEHAVIOR, not a character standing in for one. No humanoid: a salvaged
+## counter (two mismatched planks, patched rather than built new), a mechanical roll-shutter that could
+## close this place off, a scale for weighing what crosses the counter, and a slate ledger tallying it.
+## The one lamp is the sole "is anyone home" cue, the same warm-ember language the post lanterns already
+## use, just bigger and centred: a place that can go dark, not a face that can smile.
+func _draw_apparatus(canvas: CanvasItem, base: Vector2, a: float) -> void:
+	var foot := base + Vector2(FactorySim.BAZAAR_W * CELL * 0.5, FactorySim.BAZAAR_H * CELL - 2.0)
+	var iron := Color(0.34, 0.33, 0.34, a)          # dull worked iron: shutter, scale, braces
+	var rust := Color(0.58, 0.36, 0.22, a * 0.85)   # a streak of what the earth does to iron left in it
+	var plank_a := Color(0.44, 0.33, 0.22, a)       # two DIFFERENT wood tones -- salvage, not a matched build
+	var plank_b := Color(0.36, 0.27, 0.19, a)
+	var slate := Color(0.30, 0.32, 0.34, a)
+
+	# THE COUNTER: two overlapping planks at slightly different heights, a mismatch that reads as
+	# "assembled from what was on hand" rather than a clean single slab.
+	canvas.draw_rect(Rect2(foot + Vector2(-13.0, -9.0), Vector2(16.0, 5.0)), plank_a)
+	canvas.draw_rect(Rect2(foot + Vector2(-2.0, -7.0), Vector2(15.0, 5.0)), plank_b)
+	canvas.draw_rect(Rect2(foot + Vector2(-13.0, -4.0), Vector2(28.0, 4.0)), plank_a.darkened(0.15))  # apron
+	canvas.draw_rect(Rect2(foot + Vector2(-13.0, -9.0), Vector2(3.0, 9.0)), iron)                     # corner brace
+	canvas.draw_rect(Rect2(foot + Vector2(12.0, -7.0), Vector2(3.0, 7.0)), rust)                      # a rustier one
+
+	# THE SHUTTER: a stack of slatted bars behind the counter, standing in for the hatch this place could
+	# close -- an exchange that can refuse you reads more alive than one that cannot.
+	for i: int in 4:
+		var y: float = -30.0 + float(i) * 4.5
+		canvas.draw_rect(Rect2(foot + Vector2(-9.0, y), Vector2(18.0, 3.2)), iron.lightened(0.05 * float(i)))
+	canvas.draw_rect(Rect2(foot + Vector2(-10.0, -31.0), Vector2(2.0, 21.0)), iron.darkened(0.2))  # left rail
+	canvas.draw_rect(Rect2(foot + Vector2(8.0, -31.0), Vector2(2.0, 21.0)), iron.darkened(0.2))    # right rail
+
+	# THE SCALE: a balance on a short post at the counter's end -- what crosses this counter gets weighed,
+	# not haggled over.
+	var post: Vector2 = foot + Vector2(15.0, -9.0)
+	canvas.draw_line(post, post + Vector2(0.0, -12.0), iron, 1.6)
+	canvas.draw_line(post + Vector2(-6.0, -12.0), post + Vector2(6.0, -12.0), iron, 1.6)
+	canvas.draw_line(post + Vector2(-6.0, -12.0), post + Vector2(-6.0, -8.0), iron, 1.0)
+	canvas.draw_line(post + Vector2(6.0, -12.0), post + Vector2(6.0, -6.0), iron, 1.0)   # a hair uneven: loaded
+	canvas.draw_circle(post + Vector2(-6.0, -7.0), 2.6, iron.lightened(0.1))
+	canvas.draw_circle(post + Vector2(6.0, -5.0), 2.6, iron.lightened(0.1))
+
+	# THE LEDGER: a slate propped against the counter, a few scratched tallies -- what it wants and what
+	# it gives, kept as a mark count rather than a sentence, matching the sign's own terseness.
+	var slate_p: Vector2 = foot + Vector2(-15.0, -3.0)
+	canvas.draw_rect(Rect2(slate_p, Vector2(10.0, 12.0)), slate)
+	canvas.draw_rect(Rect2(slate_p, Vector2(10.0, 12.0)), slate.darkened(0.3), false, 1.0)
+	for i: int in 3:
+		var ty: float = slate_p.y + 3.0 + float(i) * 3.0
+		canvas.draw_line(Vector2(slate_p.x + 2.0, ty), Vector2(slate_p.x + 7.0, ty),
+			Color(0.85, 0.82, 0.74, a * 0.8), 1.0)
+
+	# THE LAMP: one warm ember over the counter, the place's whole face -- lit while active, and the
+	# thing that goes dark rather than a keeper who leaves.
+	var lamp: Vector2 = foot + Vector2(2.0, -34.0)
+	canvas.draw_line(lamp, lamp + Vector2(0.0, -6.0), Color(0.2, 0.15, 0.1, a), 1.2)
+	canvas.draw_circle(lamp, 6.5, Color(1.0, 0.78, 0.4, 0.35 * a))
+	canvas.draw_circle(lamp, 3.2, Color(1.0, 0.88, 0.58, a))

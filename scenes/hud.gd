@@ -1547,7 +1547,7 @@ func _draw_bazaar_detail(g: Dictionary) -> void:
 ## The counter, drawn as a lamp-lit object rather than as a dialog box: elevation instead of a border, a
 ## gradient instead of a fill, one accent doing one job, and a 0.13s rise on open.
 func _draw_inventory_overlay() -> void:
-	# Dimmed, not blacked. You are at a counter with a shopkeeper beside you and banners overhead, which
+	# Dimmed, not blacked. You are at a counter with a lit lamp and banners overhead, which
 	# `scenes/bazaars.gd` stages block by block, so the world stays legible behind the panel instead of
 	# being switched off. MainView blurs it in the same breath, which is what makes the panel read as
 	# being in front of something.

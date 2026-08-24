@@ -188,7 +188,7 @@ var _inv_selected: int = 0
 ## Cosmetic falling-product layer (driven by the sim's flow_events, never feeds back). Its own module.
 var _falling := FallingItems.new()
 ## Bazaar view: detects completed wood frames (sim.find_bazaars) and plays the block-by-block transform
-## into a decorated stall + shopkeeper. Representation-only; never writes the sim.
+## into a decorated stall + counter apparatus. Representation-only; never writes the sim.
 var _bazaars := Bazaars.new()
 ## Cosmetic particle + screenshake juice (dig/land/place/collect). Pure representation.
 var _particles := Particles.new()
