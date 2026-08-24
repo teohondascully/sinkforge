@@ -225,7 +225,7 @@ production state — delete them and the numbers are unchanged):
 - **`MainView`** (`scenes/main.gd`, `Node2D`) — the **CONTROLLER + session root**. OWNS a `FactorySim`,
   advances it (pausable), hosts the embodied `Player` + follow `Camera2D` + a screen-fixed `Hud` +
   the `WorldRenderer`, and translates mouse/keys into the body's reach-gated **world-verbs**
-  (`try_mine`/`try_deposit`/`try_build`/`try_craft`). Does NOT draw — it pushes the aim cursor + its
+  (`try_mine`/`try_drop`/`try_build`/`try_craft`). Does NOT draw — it pushes the aim cursor + its
   computed reach/placeable/ghost state to the renderer via `set_aim()` each frame. Every world edit
   goes through the sim's discrete API.
 - **`WorldRenderer`** (`scenes/world_renderer.gd`, `Node2D`) — the **VIEW**. Draws all world-space sim

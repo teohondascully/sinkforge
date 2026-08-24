@@ -3,7 +3,7 @@ extends RefCounted
 
 ## PlayAgent — the embodied test-driver. It PLAYS the real game: it moves the real Player body with
 ## real platformer physics and triggers the real, reach-gated verbs on MainView (try_mine / try_build /
-## try_deposit / try_craft / select) — the SAME surface a human drives with mouse + keys. Nothing here
+## try_drop / try_craft / select) — the SAME surface a human drives with mouse + keys. Nothing here
 ## reaches past the verb layer to fake a result; if the body can't walk to a cell, it can't mine it,
 ## exactly like a player. That's what makes a passing play-test mean "a person could actually do this".
 ##
@@ -778,13 +778,54 @@ func select_item(item_id: StringName) -> bool:
 
 
 ## Walk within reach of a machine and deposit the selected carried item into it.
+##
+## THIS USED TO DRIVE A VERB NO PLAYER CAN REACH, and that is a driver fault rather than a style point.
+## `7d2b20b` ("controls remap + gravity drop-feed") took `try_deposit()` out of the input path and put
+## `try_drop()` there instead. Nothing has called `try_deposit` from a key since. This file's own header
+## says it drives "the SAME surface a human drives with mouse + keys"; for feeding a machine it did not,
+## and the two verbs do not agree about WHICH machine gets the goods:
+##
+##     try_deposit   first machine in `sim.machines` that is in reach. Build order. No check that the
+##                   machine wants the item, so it will push coal into something that cannot burn it.
+##     try_drop      `_reachable_eater`: the NEAREST machine in reach that actually eats the item, and
+##                   otherwise the old arc, over a ledge or down the column onto the floor.
+##
+## So every play-test statement about feeding a machine was made through a path the game retired, with
+## the wrong targeting rule, and the old `sim.machines[0]` on the line below coupled the APPROACH to
+## build order too. Both halves are replaced here: walk to a machine that will take the item, then press
+## the key a player presses.
+##
+## Reporting is tightened at the same time, because `try_drop` returns true for a stack that merely
+## landed on the floor and this function's name promises more than that. It answers on the buffer.
 func deposit_selected(budget: int = 720) -> bool:
 	if sim.machines.is_empty():
 		return false
-	var machine: MachineState = sim.machines[0]
+	var slots: Array[Dictionary] = sim.inventory_slots()
+	if slots.is_empty():
+		return false
+	var sel: int = clampi(main._inv_selected, 0, slots.size() - 1)
+	var item: StringName = slots[sel]["item"]
+	# Mirror `_reachable_eater`'s criterion when choosing where to WALK. Choosing a destination is the
+	# actor's own business and not a verb, but picking one the player's verb would then refuse is how the
+	# old line managed to be wrong twice.
+	var here: Vector2i = main._cell_at(player.position)
+	var machine: MachineState = null
+	var best: float = INF
+	for m: MachineState in sim.machines:
+		if not sim.machine_eats(m, item):
+			continue
+		var d: float = Vector2(m.cell - here).length_squared()
+		if d < best:
+			best = d
+			machine = m
+	if machine == null:
+		machine = sim.machines[0]     # nothing here eats it; go to the same place the old code went
+	var before: int = int(machine.input_buffer.get(item, 0))
 	if not await approach(machine.cell, budget):
 		return false
-	return main.try_deposit()
+	if not main.try_drop():
+		return false
+	return int(machine.input_buffer.get(item, 0)) > before
 
 
 ## Stand under a column and wait for product to fall + auto-collect into the pack (the spit→collect loop).

@@ -2023,7 +2023,19 @@ func _show_gains(before: Dictionary, at: Vector2) -> void:
 			_payouts.gain(at, item, delta)
 
 
-## Hand the selected carried item into the nearest machine within reach (the manual half of the arc).
+## RETIRED, AND KEPT SO THE NEXT READER IS NOT MISLED BY IT. No key reaches this. `7d2b20b` ("controls
+## remap + gravity drop-feed") replaced the `try_deposit()` call in the input path with `try_drop()`, and
+## the toss has fed machines ever since. It has no callers at all as of the driver repair below.
+##
+## THIS COMMENT USED TO READ "into the NEAREST machine within reach" AND THE CODE NEVER DID THAT. It takes
+## the first machine in `sim.machines` that is in reach, which is BUILD ORDER, and it does not ask whether
+## the machine wants the item, so it will push coal into something that cannot burn it. The live verb's
+## `_reachable_eater` does both correctly. The gap mattered because `tools/play_agent.gd` drove this one
+## while claiming parity with the human surface; that is fixed there, not here.
+##
+## Kept rather than deleted because two design documents describe the verb surface and a handoff note in
+## `docs/handoff/` records a pain-test run through it. Deleting it would silently strand those references;
+## a retired function that says it is retired does not.
 func try_deposit() -> bool:
 	var slots: Array[Dictionary] = sim.inventory_slots()
 	if slots.is_empty():

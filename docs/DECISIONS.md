@@ -129,7 +129,7 @@ each of which states the discipline in its own words.*
 ### Build playable loops, validated by play-tests against the real input path (LOCKED)
 
 `tools/play_agent.gd` drives the real `Player` body with real platformer physics and triggers the real,
-reach-gated verbs on `MainView` (`try_mine`, `try_build`, `try_deposit`, `try_craft`, `select`), which is
+reach-gated verbs on `MainView` (`try_mine`, `try_build`, `try_drop`, `try_craft`, `select`), which is
 the same surface a person drives with mouse and keys. Nothing in it reaches past the verb layer to fake a
 result, so a passing play-test means a person could actually do the thing.
 
