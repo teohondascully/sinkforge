@@ -87,6 +87,7 @@ func _run() -> void:
 		["friction: escape a deep pit (not trapped)", _goal_escape_deep_pit],
 		["friction: cross a jagged tunnel", _goal_cross_jagged_tunnel],
 		["friction: haul a pack that actually fills", _goal_haul_a_capped_pack],
+		["friction: what a hand leaves behind", _goal_hand_leaves_the_vein],
 	]:
 		var goal_name: String = goal[0]
 		if _only != "" and not goal_name.to_lower().contains(_only.to_lower()):
@@ -1487,6 +1488,105 @@ func _goal_haul_a_capped_pack() -> bool:
 			% [int(agent.sim.inventory.get(&"rope", 0)), agent.sim.carried_bulk()])
 	return await _finish(agent, dug and filled and up,
 		"hauled a pack that reached PACK_BULK_CAP back to the surface")
+
+## The topmost SOLID ore cell in a column, or -1. The face a hand can still strike.
+func _top_ore(agent: PlayAgent, col: int, y0: int, y1: int) -> int:
+	for y: int in range(y0, y1 + 1):
+		if agent.sim.material_at(Vector2i(col, y)) == &"ore":
+			return y
+	return -1
+
+
+## How many SOLID ore cells are left. This is the face, and it is the loop's termination condition.
+func _face_cells(agent: PlayAgent, col: int, y0: int, y1: int) -> int:
+	var n: int = 0
+	for y: int in range(y0, y1 + 1):
+		if agent.sim.material_at(Vector2i(col, y)) == &"ore":
+			n += 1
+	return n
+
+
+## UNITS still in the ground in a column, whether the cell is still solid or has been opened into a lode.
+##
+## THIS IS THE FUNCTION THE FIRST VERSION OF THIS RUNG DID NOT HAVE, and its absence produced a confident
+## wrong answer. Hand-mining clears the block and pockets a 3-6 burst; the rest of the cell's yield stays
+## put as a LODE for a drill (`factory_sim.gd:788`). `material_at` goes blank the instant a cell is
+## struck, so a counter built on it reports a vein as GONE while most of its units are still in the
+## ground. The rung read that as 173 units spilling onto the floor and asserted a conservation failure
+## against a population that had never been in play.
+func _vein_units(agent: PlayAgent, col: int, y0: int, y1: int) -> int:
+	var n: int = 0
+	for y: int in range(y0, y1 + 1):
+		n += int(agent.sim.deposits.get(Vector2i(col, y), 0))
+	return n
+
+
+## WHAT A HAND LEAVES BEHIND. The T1.0 measurement that a single descent can actually take.
+##
+## THIS ROW WAS QUEUED AS A TRIPS RUNG AND THAT RUNG IS BLOCKED, on `climb_to_surface` and not on the
+## game: a pilot that has roped a shaft, climbed out and re-descended cannot climb out a SECOND time. It
+## rope-stalls two columns off the shaft axis, identically at depth 24 and depth 40, with 284 of 300 rope
+## unspent. Not a budget, not a depth. The evidence and the next experiment are in the state file; the
+## trips half of T1.0 stays open and is not silently converted into this.
+##
+## WHAT THE FIRST ATTEMPT GOT WRONG IS THE REASON THIS ROW EXISTS AT ALL. It counted the face as the
+## `deposits` sitting under solid ore cells, watched 173 units vanish, and reported a spill. There was no
+## spill. Hand-mining an ore block clears the cell and pockets a 3-6 burst; the rest of that cell's yield
+## stays in the ground as a LODE for a drill (`factory_sim.gd:788`), and `material_at` goes blank the
+## instant the cell is struck. **A counter built on `material_at` reports a vein as gone while most of it
+## is still there.** The population was wrong, so the conservation law was written against units that had
+## never been in play.
+##
+## Corrected, that mistake is the finding: a hand miner does not clear a vein, and cannot, at any number
+## of trips. This rung measures the share.
+##
+## THE ASSERTIONS, AND EACH HAS A NEGATIVE THAT WAS RUN, NOT IMAGINED.
+##
+##   1. `produced > 0`. The hand won something; without it the other two are about an untouched vein.
+##   2. `left > produced`. MOST OF THE VEIN IS STILL THERE when the hand is done. This is the claim.
+##      Negative: pose the same face at 3 units a cell instead of 10 and the burst takes each cell whole,
+##      leaving nothing for a drill, and the assertion fails. Run below.
+##   3. `in_pack == produced`. Nothing spilled, so `produced` is a measurement of the pack and not of the
+##      floor. Negative: drop the room guard and a full pack spills the burst.
+func _goal_hand_leaves_the_vein() -> bool:
+	var agent: PlayAgent = await _boot()
+	var col: int = 36                                        # clear of the capped rung at 32
+	var per: int = int(OS.get_environment("SF_VEIN_PER")) if OS.has_environment("SF_VEIN_PER") else 10
+	var vein: Vector2i = _bury_vein(agent, col, 24, 24, per)
+	var y0: int = MainView.SURFACE
+	var cells0: int = _face_cells(agent, col, y0, vein.y)
+	var units0: int = _vein_units(agent, col, y0, vein.y)
+	agent.give(&"earth", 20)
+	agent.give(&"rope", 60)
+	const MAX_BURST: int = 6                                 # `_ore_burst` is 3 + (hash % 4)
+	var face: int = _top_ore(agent, col, y0, vein.y)
+	var down: bool = await agent.descend_to(Vector2i(col, face - 1))
+	# Strike DOWN one cell at a time while a whole burst can fit, so the pack never has to spill and
+	# `produced` stays a measurement of what the hand carried rather than of what hit the floor.
+	while agent.sim.pack_room() >= MAX_BURST:
+		var f: int = _top_ore(agent, col, y0, vein.y)
+		if f < 0:
+			break
+		if not await agent.mine_cell(Vector2i(col, f)):
+			break
+	var produced: int = int(agent.sim.total_produced.get(&"ore", 0))
+	var in_pack: int = int(agent.sim.inventory.get(&"ore", 0))
+	var left: int = _vein_units(agent, col, y0, vein.y)
+	var struck: int = cells0 - _face_cells(agent, col, y0, vein.y)
+	print(("  friction: %s  (down=%s cells=%d struck=%d units=%d produced=%d in_pack=%d "
+		+ "left_for_drill=%d)")
+		% [agent.friction(), down, cells0, struck, units0, produced, in_pack, left])
+	print("    HAND SHARE: %d of %d unit(s) in the ground came out by hand, %.1f%%. The rest needs a drill."
+		% [produced, units0, 100.0 * float(produced) / maxf(1.0, float(units0))])
+	if left <= produced:
+		print("    the hand took most of this vein (%d left against %d won), so it does not pose the "
+			% [left, produced] + "question a drill exists to answer")
+	if in_pack != produced:
+		print("    %d produced unit(s) are not in the pack: they SPILLED, and `produced` is then a "
+			% (produced - in_pack) + "measurement of the floor")
+	return await _finish(agent, produced > 0 and left > produced and in_pack == produced,
+		"a hand miner wins the burst and leaves most of the vein for a drill")
+
 
 func _do_step(agent: PlayAgent, id: StringName) -> bool:
 	match id:
