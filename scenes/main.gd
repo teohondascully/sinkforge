@@ -1021,13 +1021,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(Controls.HELP):
 		_show_help = not _show_help
 	elif event.is_action_pressed(Controls.TECH):
-		# T is a tab of the counter rather than a second screen: the ladder and the verb that acts on it are the
-		# same panel (docs/BAZAAR.md).
+		# T lands on BENCH, same shape as E lands on PACK and B lands on WORKS. All three still open the
+		# one counter panel (docs/BAZAAR.md) -- what changed is that the WHEEL and the number row, below,
+		# no longer let a player wander from one of these into another. Pack and the Bazaar are reported as
+		# feeling like one merged screen; a dedicated key per screen is the fix, not a second panel.
 		if _inventory_open and _hud.bazaar_tab == Hud.TAB_BENCH:
 			_inventory_open = false
 		else:
 			_inventory_open = true
 			_hud.set_bazaar_tab(Hud.TAB_BENCH)
+	elif event.is_action_pressed(Controls.BAZAAR):
+		# B lands on WORKS, the tab you actually build or buy from -- the Bazaar's front door, the same way
+		# E is the Pack's.
+		if _inventory_open and _hud.bazaar_tab == Hud.TAB_WORKS:
+			_inventory_open = false
+		else:
+			_inventory_open = true
+			_hud.set_bazaar_tab(Hud.TAB_WORKS)
 	elif event.is_action_pressed(Controls.DASHBOARD):
 		_show_dashboard = not _show_dashboard
 	elif event.is_action_pressed(Controls.CLOSE):
@@ -1097,11 +1107,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_hud.flash("dig plan cleared")
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		# Nothing scrolls any more, since two columns of ten rows hold everything the game can list, so the wheel
-		# is free to do the thing you actually want at a counter: change counter.
-		if _inventory_open: _hud.set_bazaar_tab((_hud.bazaar_tab + 1) % 3)
+		# is free to do the thing you actually want at a counter: change counter. It stays inside whichever
+		# screen you opened, though: E/B/T are what choose Pack vs. the Bazaar now, so the wheel walking a
+		# player out of one and into the other was the same merged-menu complaint under a different key.
+		if _inventory_open: _cycle_bazaar_tab()
 		else: _cycle_inventory(1)                  # otherwise: the hotbar scroll select
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		if _inventory_open: _hud.set_bazaar_tab((_hud.bazaar_tab + 2) % 3)
+		if _inventory_open: _cycle_bazaar_tab()
 		else: _cycle_inventory(-1)
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and ((event.keycode >= KEY_1 and event.keycode <= KEY_9) or event.keycode == KEY_0):
@@ -1110,8 +1122,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _inventory_open:
 			# While the counter is open the number row picks a tab rather than a recipe. Buying moved to a cursor and
 			# Enter, which is what let the shift-digit rows, 11 through 20 on a list that had outgrown its panel, go
-			# away entirely.
-			if idx < 3:
+			# away entirely. Same rule as the wheel just above: it stays inside whichever screen E/B/T opened, so
+			# "3" cannot jump a Pack-opened counter onto BENCH.
+			if idx < 3 and (idx == Hud.TAB_PACK) == (_hud.bazaar_tab == Hud.TAB_PACK):
 				_hud.set_bazaar_tab(idx)
 		else:
 			_select_slot(idx)                           # otherwise they select the hotbar slot
@@ -2465,6 +2478,16 @@ func _toggle_ping(canvas_pos: Vector2) -> void:
 	else:
 		_ping_world = world.clamp(Vector2.ZERO, WORLD_SIZE)
 	_renderer.set_ping(_ping_world)
+
+
+## The wheel's answer to the tab keys, while the counter is open: step to the OTHER tab in whichever
+## screen E/B/T actually opened. PACK has no sibling tab, so this is a no-op there rather than a jump into
+## the Bazaar; WORKS and BENCH are the Bazaar's whole tab set, so between the two of them this is just a
+## toggle regardless of scroll direction — there is nowhere else to land.
+func _cycle_bazaar_tab() -> void:
+	if _hud.bazaar_tab == Hud.TAB_PACK:
+		return
+	_hud.set_bazaar_tab(Hud.TAB_BENCH if _hud.bazaar_tab == Hud.TAB_WORKS else Hud.TAB_WORKS)
 
 
 ## Move the active hotbar slot, wrapping across the items currently carried.

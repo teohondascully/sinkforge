@@ -31,6 +31,7 @@ const SAVE := &"sf_save"
 const LOAD := &"sf_load"
 const CLEAR_MARKS := &"sf_clear_marks"
 const TECH := &"sf_tech"
+const BAZAAR := &"sf_bazaar"
 const DASHBOARD := &"sf_dashboard"
 const GRAPPLE := &"sf_grapple"
 const MUTE := &"sf_mute"
@@ -81,9 +82,9 @@ static func pressed(action: StringName) -> bool:
 ##                 back means here.
 ##   START/BACK    pause and map.
 ##
-## Deliberately unbound on the pad: SAVE, LOAD, TECH, DASHBOARD, SPEED, MUTE, RESEARCH, CLEAR_MARKS and
-## HELP. A pad has about fourteen inputs against this game's twenty-five actions, so binding everything
-## would mean chords and long-presses; those nine are conveniences or reachable from menus.
+## Deliberately unbound on the pad: SAVE, LOAD, TECH, BAZAAR, DASHBOARD, SPEED, MUTE, RESEARCH,
+## CLEAR_MARKS and HELP. A pad has about fourteen inputs against this game's twenty-six actions, so binding
+## everything would mean chords and long-presses; those ten are conveniences or reachable from menus.
 static func defaults() -> Dictionary:
 	return {
 		LEFT: [{"key": KEY_A}, {"key": KEY_LEFT}, {"axis": JOY_AXIS_LEFT_X, "dir": -1}],
@@ -111,6 +112,7 @@ static func defaults() -> Dictionary:
 		LOAD: [{"key": KEY_F9}],
 		CLEAR_MARKS: [{"key": KEY_X}],  # wipe the painted dig plan
 		TECH: [{"key": KEY_T}],         # the tech-tree overlay
+		BAZAAR: [{"key": KEY_B}],       # WORKS + RACK: what you can build or buy right now
 		DASHBOARD: [{"key": KEY_G}],    # the production dashboard: throughput and factory census
 		# One input both fires and releases, so the line is flicked rather than managed, and all three
 		# bindings are reachable without moving a hand off WASD and aim, or off a stick.

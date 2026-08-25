@@ -78,6 +78,7 @@ func _on_frame() -> void:
 		return
 	process_frame.disconnect(_on_frame)
 	_one_verb_r()
+	_bazaar_key_and_family_lock()
 	_main.queue_free()
 	_verdict("check_controls")
 
@@ -128,3 +129,56 @@ func _press(action: StringName) -> InputEventAction:
 
 func _center(c: Vector2i) -> Vector2:
 	return Vector2(c) * float(CELL) + Vector2(CELL, CELL) * 0.5
+
+
+func _wheel(down: bool) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_WHEEL_DOWN if down else MOUSE_BUTTON_WHEEL_UP
+	e.pressed = true
+	return e
+
+
+func _digit(k: Key) -> InputEventKey:
+	var e := InputEventKey.new()
+	e.keycode = k
+	e.pressed = true
+	return e
+
+
+## Pack and the Bazaar are reported as feeling like one merged screen (the same input, arrow keys/Enter
+## AND the wheel/number row, walking a player between "what am I carrying" and "what can I buy" with no
+## warning). B/E/T now choose the screen; this asserts the wheel and the number row can no longer undo
+## that choice by wandering into the other one.
+func _bazaar_key_and_family_lock() -> void:
+	_main._inventory_open = false
+
+	_main._unhandled_input(_press(Controls.BAZAAR))
+	_check(_main._inventory_open and _main._hud.bazaar_tab == Hud.TAB_WORKS,
+		"B opens the counter on WORKS")
+	_main._unhandled_input(_press(Controls.BAZAAR))
+	_check(not _main._inventory_open, "B again closes it (same shape as E and T)")
+
+	_main._unhandled_input(_press(Controls.TECH))
+	_check(_main._inventory_open and _main._hud.bazaar_tab == Hud.TAB_BENCH, "T opens the counter on BENCH")
+
+	_main._unhandled_input(_wheel(true))
+	_check(_main._hud.bazaar_tab == Hud.TAB_WORKS, "wheel from BENCH steps to WORKS — inside the Bazaar")
+	_main._unhandled_input(_wheel(true))
+	_check(_main._hud.bazaar_tab == Hud.TAB_BENCH, "…and back — WORKS/BENCH is a plain toggle")
+
+	_main._unhandled_input(_digit(KEY_1))   # idx 0 = PACK, a different screen from the Bazaar
+	_check(_main._hud.bazaar_tab == Hud.TAB_BENCH,
+		"\"1\" (PACK) is refused while the Bazaar is open — it does not jump screens")
+	_main._unhandled_input(_digit(KEY_2))   # idx 1 = WORKS, still inside the Bazaar
+	_check(_main._hud.bazaar_tab == Hud.TAB_WORKS, "\"2\" (WORKS) is honoured — same screen, other tab")
+
+	_main._unhandled_input(_press(Controls.CRAFT))
+	_check(_main._inventory_open and _main._hud.bazaar_tab == Hud.TAB_PACK, "E opens the counter on PACK")
+
+	_main._unhandled_input(_wheel(true))
+	_check(_main._hud.bazaar_tab == Hud.TAB_PACK,
+		"wheel on PACK is a no-op — it has no sibling tab to reach for")
+	_main._unhandled_input(_digit(KEY_2))   # idx 1 = WORKS, the Bazaar — a different screen from PACK
+	_check(_main._hud.bazaar_tab == Hud.TAB_PACK,
+		"\"2\" (WORKS) is refused while PACK is open — it does not jump into the Bazaar either")
+	_main._inventory_open = false

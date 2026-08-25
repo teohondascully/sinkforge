@@ -103,6 +103,16 @@ is the whole reason the panel is one shape instead of two.
 `R` losing its second meaning is worth stating plainly: research becomes a thing you do to a node you have
 selected and can see the price of, rather than a key you press hoping the right one is next.
 
+> **Addendum, 2026-08-24 — a fourth key, and the wheel/number row stop crossing screens.** Live-playtest
+> feedback: "the bazaar is the same menu as the inventory, these should be two separate things." The panel
+> stays the one shape section 4 argues for — that invariant is untouched — but the KEYS now draw a line
+> `1`/`2`/`3` and the mouse wheel used to erase. `B` opens the panel on WORKS (new: `Controls.BAZAAR`,
+> unbound before this). `E`/`B`/`T` are the only three ways to cross from Pack to the Bazaar or back; once
+> the panel is open, the wheel and `1`/`2`/`3` only move within whichever side you are already on — PACK
+> has no sibling tab to reach for (the wheel is a no-op there), and WORKS/BENCH toggle between each other
+> but refuse to jump to PACK. `docs/handoff/PRODUCT_RECOVERY_PASS_2026-08-24.md` has the full report;
+> `tools/check_controls.gd`'s `_bazaar_key_and_family_lock` is the assertion.
+
 ## 6. The Rack — deliberately a stub
 
 The Rack is the *surface*; what it sells is a separate design (the tool-shapes idea: picks that differ by
