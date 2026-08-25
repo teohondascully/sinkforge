@@ -120,3 +120,54 @@ git history is untouched past commit `b45510f`.
 Blocks: this session's remaining commit budget. Stage 2 (`replay_determinism_test`) is not attempted —
 it would only add more `tests/` LOC against the same still-tiny `core/`, worsening the same red rather
 than working around it.
+
+## D0004 — RESOLVED, 2026-08-26
+The director supplied both missing constants directly: world scale 16px = 1m (= the machine/logic
+cell), terrain grid 4px, max playable depth 4096px (256m). i32/16-fractional-bits checked against them
+in `docs/adr/0003-fixed-point-representation.md` and confirmed far from binding (8x range headroom,
+precision several orders finer than anything that consumes it). `core/fixed_point.gd` implements
+exactly this format. This entry is not edited above — D0004 is left as the honest record of what was
+unknown at the time; this is the follow-up, not a correction of it.
+
+## D0009 · 2026-08-26 · core/fixed_point.gd
+Decided: `Fx.isqrt()` uses Newton's method (Heron's method) on plain non-negative integers, verified
+against Python's `math.isqrt` for 27 values including 0, 1, perfect squares, and random values up to
+2^47 before being trusted.
+Alternative: a bit-by-bit binary digit-extraction integer sqrt (the classic hardware-style algorithm),
+or a fixed iteration count instead of convergence-based termination.
+Why: Newton's method for integer sqrt converges monotonically and terminates in a handful of iterations
+for any input in this project's actual range; it's fewer lines and easier to verify by hand than the
+bit-by-bit form, and termination-by-convergence (rather than a fixed iteration count) means it's
+correct rather than "correct enough after N steps" — no separate argument needed for why N is enough.
+Reverse: CHEAP — nothing outside `core/` calls it yet, and both algorithms produce the same output for
+the same input by construction (floor(sqrt(x))), so swapping is a drop-in replacement if a performance
+reason ever justifies it.
+
+## D0010 · 2026-08-26 · core/fixed_point.gd
+Decided: `Fx.div(a, b)` with `b == 0` returns 0 and logs via `push_error()`, rather than letting
+GDScript's `/` raise.
+Alternative: return a saturated sentinel (max/min i32 depending on the sign of `a`), or let it raise and
+require every caller to pre-check `b != 0` themselves.
+Why: an unguarded `/` by zero doesn't crash the process in a bare `--headless --script` run — it HANGS,
+because the runtime script error aborts execution before `quit()` is ever reached, and nothing catches
+it (GDScript has no try/catch). Verified empirically before writing this entry, not assumed; see
+`core/MODULE.md`'s Gotchas for the general statement. A hang is strictly worse than a wrong-but-visible
+return value for a test suite or CI job, so returning 0 (loud in the log, not fatal to the run) was
+chosen over both letting it raise and over a saturating sentinel, which would be quieter about a real
+bug than an explicit error log is.
+Reverse: CHEAP — one function, no caller depends on the specific sentinel value yet.
+
+## D0011 · 2026-08-26 · core/fixed_point.gd
+Decided: `Fx.length()`/`Fx.length_sq()` are scoped explicitly as LOCAL-neighborhood primitives (safe to
+~181px per axis, documented and demonstrated by a test that shows the exact wraparound point), not
+extended to handle arbitrary world-scale distances.
+Alternative: widen the intermediate (accumulate the squared terms in a wider format before reducing) so
+the function is safe across the full ~2048m depth budget.
+Why: named need was "distance" for `sim/body`/`sim/transport`, which is collision-adjacent and
+inherently local (nearest-neighbor checks, per-tick movement deltas) — never a distance query spanning
+a meaningful fraction of the world. Building a world-scale-safe version now would be exactly the
+"square roots beyond what collision needs" the autonomous grant named as a stop condition, for a need
+nothing currently has. Documented precisely instead of built defensively.
+Reverse: EXPENSIVE once something calls `length()` on a delta anywhere near 181px and gets silently
+wrong output — this is the specific risk the doc comment and the boundary test exist to prevent, but a
+reverse (widening the intermediate) would still just be adding to the same file, not restructuring it.

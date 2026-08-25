@@ -320,6 +320,28 @@ retrofit — even though feel tuning itself is deferred to stage 4. Four resolut
 | Machine / logic | 16px | placement, ports, routing |
 | Collision | **derived** from the fine terrain, never equal to it | see below |
 
+### The world scale (normative)
+
+Decided 2026-08-26, alongside the fixed-point representation these numbers exist to validate —
+`docs/adr/0003-fixed-point-representation.md`. Position and velocity are stored in **pixels**, not
+meters; "meters" in `docs/GDD.md`'s narrative depth readouts are a display conversion of this scale,
+never a second unit the sim itself reasons in.
+
+| Constant | Value | Note |
+|---|---|---|
+| World scale | 16px = 1m | Also the machine/logic cell size above — a machine occupies one "meter." |
+| Terrain/digging grid | 4px | The upper end of the 2-4px range above; fixed at 4 for this constant's arithmetic. |
+| Maximum playable depth | 4096px (256m) | The deepest depth any run is expected to reach — not a hard world-generation limit, a range budget for the representation below. |
+
+**Fixed-point representation: i32, 16 fractional bits.** Integer range ±32,768 px (±2,048 m), precision
+1/65,536 px. Both are far from binding against the numbers above: 256m of max depth uses 4,096 of the
+32,768 px available (8x headroom), and 1/65,536 px of precision is many orders finer than anything
+either rendering (1px) or the terrain grid (4px) will ever resolve. i32 rather than i64 is independently
+motivated — it makes fixed-point multiply safe using a native 64-bit intermediate (i32 × i32 always
+fits in 64 bits; i64 × i64 would need 128-bit intermediates the runtime doesn't have) — so this format
+was not chosen for range reasons alone and would not need to change if the depth budget above grew
+moderately.
+
 **The derivation.** Noita's rigid bodies trace a polygon outline from the pixel grid (marching
 squares), simplify it (Douglas-Peucker), triangulate, and hand the result to Box2D — collision
 geometry is polygonal contours derived from pixels, never the pixel grid itself. That decoupling is

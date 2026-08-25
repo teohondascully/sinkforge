@@ -30,8 +30,53 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+- `SplitRng` (`split_rng.gd`) — seeded, splittable PRNG stream. SplitMix64. `.next_u64()`,
+  `.split(label: String) -> SplitRng` (deterministic, keyed off the root seed not current draw
+  position — order-independent), `.get_state()` / `.set_state()` for serialization. Naming the actual
+  per-subsystem streams (`world`, `terrain_gen`, ...) is each sim/ module's job, not core's — this file
+  doesn't know sim/'s module list.
+- `EntityIdPool` (`entity_id_pool.gd`) — generational-index entity IDs, packed as one 64-bit int
+  (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer.
+  `.allocate()`, `.release(id) -> bool` (false on double-release or an id that was never allocated,
+  never a crash), `.is_valid(id) -> bool`, `.live_count()`.
+- `Fx` (`fixed_point.gd`) — fixed-point scalar arithmetic, i32 with 16 fractional bits. World-scale
+  constants and the range/precision check this format was validated against: `docs/ARCHITECTURE.md` §9
+  ("The world scale"), `docs/adr/0003-fixed-point-representation.md`. `.from_int()`, `.to_float()`
+  (debug/render only), `.add()`, `.sub()`, `.mul()`, `.div()` (returns 0 and logs an error on
+  division by zero rather than raising — see Gotchas), `.lerp()`, `.isqrt()`, `.length_sq()`,
+  `.length()`. **`length()`/`length_sq()` are LOCAL-neighborhood-only** — safe for deltas up to ~181px
+  per axis, silently wrong beyond that; see the doc comment above `length()` for the exact boundary and
+  why it exists.
 
 ## Gotchas
 
-None yet.
+- **GDScript's `>>` is an arithmetic (sign-extending) shift, not logical.** `SplitRng` and
+  `EntityIdPool` need a logical right shift to treat a 64-bit int as an unsigned bit pattern (SplitMix64's
+  mixing steps; unpacking the generation field). Each defines its own small `_ushr()` static helper
+  rather than sharing one file for two call sites — verified empirically against the pinned engine
+  (4.6.2-stable), not assumed; see the relevant test suite for the mutation check. `Fx` doesn't need this
+  helper: its rescale step (`mul`'s `>>`) wants arithmetic (sign-preserving) shift semantics, which is
+  what GDScript already gives it for free.
+- **GDScript's parser rejects `>>`/`<<` where the LEFT OPERAND is syntactically a negative literal, a
+  negative const, or a direct unary-minus expression** ("Invalid operands for bit shifting. Only positive
+  operands are supported") — but allows it fine at runtime through a plain variable that happens to hold
+  a negative value, even one assigned from an identical expression one line earlier. This is a syntactic
+  restriction, not a value-based one: never write `(-x) >> n` directly; assign the negated value to a
+  variable first, then shift the variable.
+- **An unguarded runtime script error (division by zero, `null` dereference, etc.) inside a bare
+  `--headless --script` run does not crash the process or the test suite — it HANGS.** Nothing after the
+  error runs, including whatever `_check()`/`_finish()`/`quit()` calls would have reported the failure
+  and exited, and the bare SceneTree idles forever with no further output. Verified empirically (see the
+  commit that added `Fx.div`'s zero-guard). Any arithmetic in `core/` or `sim/` that could divide by a
+  caller-supplied value must guard it explicitly — `push_error()` logs without triggering this, a raw
+  `/` does not.
+- **GDScript hex literals cannot represent values ≥ 2^63.** Any 64-bit constant with its top bit set
+  (several of SplitMix64's) has to be written as its signed two's-complement decimal equivalent, computed
+  externally — `python3 -c "print(x - (1<<64) if x >= (1<<63) else x)"` — not typed as hex.
+- **`free` is reserved.** Every GDScript class inherits `Object.free()`. `EntityIdPool`'s release
+  operation is named `release()`, not `free()`, to avoid the collision — caught by a parse error, not a
+  silent shadow, but worth knowing before reaching for the obvious name again.
+- **The global script class cache does not rebuild itself for a bare `--headless --script` run.** A
+  freshly added or renamed `class_name` isn't visible until `godot --headless --path . --import` runs
+  once. If a test suite reports "Identifier not declared in the current scope" for a class you just
+  wrote, this is almost always why — not a real reference error.
