@@ -82,10 +82,25 @@ static func works_window_first(count: int, capacity: int, base: int, cursor: int
 ## three columns at four rows. With the full tech tree, machines 19 and rack 7, it wants ten rows, which
 ## asks for more height than the counter has and is clamped.
 func _works_rows_needed() -> int:
+	var base: int = 24
 	for r: int in range(1, 25):
 		if int(works_demand(r)["total"]) <= BAZAAR_COLS:
-			return r
-	return 24
+			base = r
+			break
+	# The "N more wait behind research" line lives in this same content box, at its bottom edge, and was
+	# never counted here — so the box was sized to the grid alone and the line drew on top of the grid's
+	# own last row. One reserved row keeps the two from sharing space instead of moving the line elsewhere.
+	if _hidden_count() > 0:
+		base += 1
+	return base
+
+
+## The single count of what the counter is not showing: locked machines plus locked rack items. Read
+## by both the height this tab asks for and the line `_tab_works` draws, so they cannot disagree about
+## whether there is anything to reserve room for.
+func _hidden_count() -> int:
+	return (cat.craft_options.size() - cat.open_machines().size()) \
+		+ (cat.rack_options.size() - cat.open_rack().size())
 
 
 ## What the two lists ask for at a given row count, before the squeeze. The split exists because a
@@ -104,7 +119,14 @@ func works_demand(rows: int) -> Dictionary:
 func _tab_works(g: Dictionary) -> void:
 	var content: Rect2 = g["content"]
 	var rows: int = int(g["rows"])
-	var lay: Dictionary = works_columns(rows)
+	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only
+	# honest if the panel still says there is one, because otherwise the counter looks finished at four
+	# machines and the tech ladder looks optional. When it is shown, the grid gets one fewer row so the
+	# line has its own space at the bottom of the content box instead of drawing over the last card row —
+	# `_works_rows_needed` reserved that row already, matched here by the same `_hidden_count`.
+	var hidden: int = _hidden_count()
+	var grid_rows: int = rows - (1 if hidden > 0 else 0)
+	var lay: Dictionary = works_columns(grid_rows)
 	# The columns spread to fill the counter. Once WORKS lists only what you can build, most of the game is
 	# two columns rather than three, and three columns of narrow rows with an empty third is exactly the
 	# dead space this layout exists to kill. It is capped, because a row wide enough to lose its price at
@@ -114,13 +136,9 @@ func _tab_works(g: Dictionary) -> void:
 		(content.size.x - BAZAAR_GUTTER * float(used - 1)) / float(used))
 	var open_m: Array[int] = cat.open_machines()
 	var open_r: Array[int] = cat.open_rack()
-	_works_group(content, 0, int(lay["machines"]), col_w, rows, "MACHINES", cat.craft_options, open_m, 0, true)
-	_works_group(content, int(lay["machines"]), int(lay["rack"]), col_w, rows, "THE RACK",
+	_works_group(content, 0, int(lay["machines"]), col_w, grid_rows, "MACHINES", cat.craft_options, open_m, 0, true)
+	_works_group(content, int(lay["machines"]), int(lay["rack"]), col_w, grid_rows, "THE RACK",
 		cat.rack_options, open_r, open_m.size(), false)
-	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only
-	# honest if the panel still says there is one, because otherwise the counter looks finished at four
-	# machines and the tech ladder looks optional.
-	var hidden: int = (cat.craft_options.size() - open_m.size()) + (cat.rack_options.size() - open_r.size())
 	if hidden > 0:
 		# The key is a cap and not a word in a sentence. "press 3 for the BENCH" asks the reader to parse an
 		# instruction to find the one glyph that matters, while the cap grammar the rail and footer already
