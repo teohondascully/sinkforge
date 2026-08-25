@@ -145,3 +145,9 @@ _diag_*.png.import
 # describe nothing. Regenerated automatically if a capture is ever moved back.
 /_moment_*.png.import
 /_crop_*.png.import
+
+# Scratch work lives here and only here (docs/ONBOARDING.md, "How to work"). If a scratch
+# script turns out to be worth keeping, it becomes a real tool with a claim ID and moves out.
+# The README explaining the directory's purpose is tracked; everything else in it is not.
+tools/scratch/*
+!tools/scratch/README.md

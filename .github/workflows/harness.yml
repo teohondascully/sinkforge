@@ -1,39 +1,25 @@
-# CI: run the verification harness (determinism, conservation, movement gauges,
-# the scripted play-tests, and the pixel layers) on every push to main and every PR.
+# CI, post-pivot.
 #
-# WHY THERE ARE TWO JOBS, AND WHY THAT IS THE WHOLE POINT OF THIS FILE.
-# This used to be one headless job whose name promised the lot. It could not deliver
-# the lot: four layers judge PIXELS, a headless Godot paints blank frames with the
-# dummy renderer, and those four detected that and stopped. They stopped by exiting 0,
-# so the run reported every layer green with four of them unexecuted — for as long as
-# this workflow has existed. The tell was the clock: `check_opening` takes 12s on a
-# machine with a display and 1s without, and one second is not a test run.
+# This file used to run the prior codebase's full 108-layer check suite against a live
+# Godot build (two jobs: one headless, one under xvfb for the pixel-dependent layers —
+# see git history for that version's header, which is worth reading for how carefully
+# it earned each of its two jobs). That codebase now lives in legacy/, frozen and
+# read-only, and docs/ARCHITECTURE.md excludes it from every lint and gate on purpose:
+# a green check against code nobody is changing anymore is not evidence about anything.
+# Running that suite here would violate the exclusion this file exists to enforce.
 #
-# Two things fixed it. The runner now reports PASS / FAIL / SKIP separately and never
-# says "ALL" over a list with a skip in it (tools/run_harness.sh). And the layers that
-# need a surface now actually get one here: `xvfb-run` supplies the display and Mesa's
-# software Vulkan (lavapipe, from mesa-vulkan-drivers) supplies the device, so no GPU is
-# needed. That was measured before it was written, in an ubuntu:24.04 x86_64 container
-# standing in for this runner: opening 18s, underground 34s, water_reads 16s, all PASS,
-# under the DEFAULT Vulkan driver — no `--rendering-driver` override needed.
+# What replaces it: the structural gates docs/QUALITY.md requires from the first
+# commit of real code, built in docs/ONBOARDING.md Task 0 before there is any code
+# for them to check. They are static analysis over the source tree — no Godot
+# install, no display, no engine boot — because none of them need to run the game to
+# answer their question (a layer-dependency violation, an oversized file, an
+# unschema'd data file are all facts about the text of the repository).
 #
-# AND IT IS NOT COSMETIC COVERAGE. `check_dig_hitch` compares a texture read back after a
-# dig against a full rebake. Headless, the dummy renderer uploads nothing, so it compared
-# two blank surfaces and passed — while the stale-cache bug it guards was live on main.
-# Run in that same container against the pre-fix tree: headless PASS (exit 0), and under
-# xvfb `FAIL: region bake is byte-identical to a full bake` (exit 1). This job would have
-# caught it. Against fixed main it passes both ways, and its per-cell timing ratio is
-# 1.175 under xvfb versus 1.180 headless against a gate of 3.00 — the software renderer
-# does not move it, so there is nothing flaky about running it here.
-#
-# ONE LAYER IS DELIBERATELY LEFT OUT — `check_frametime` — and that is measured too
-# rather than assumed. Under a software rasterizer the game draws at 6-9 fps, and its
-# hitch ratios stop describing the game: the same commit PASSED in the x86_64 container
-# (133s, RUN p95 0.7x quiet) and FAILED in an arm64 one (99s, RUN p95 2.3x quiet against
-# a 2.0x cap). Same code, two software-rendered Linux boxes, opposite verdicts — that is
-# a flaky gate, and a flaky gate is one somebody deletes within a month. It runs on
-# developer machines with a real GPU, where the runner now defaults to SF_STRICT=1 and
-# goes red if it ever quietly skips there.
+# The `authorship` job's commit-trailer check ports forward unchanged: it is pure git
+# hygiene with no game-code coupling (docs/DECISIONS.md's locked no-trailer rule),
+# so it moved to the new tools/ rather than into legacy/tools/ with everything else.
+# The capture-manifest check did not port — its subject (the active capture-generation
+# workflow) isn't part of the new build yet, and reviving it is a separate decision.
 name: harness
 
 on:
@@ -46,30 +32,20 @@ concurrency:
   group: harness-${{ github.ref }}
   cancel-in-progress: true
 
-# ONE ENGINE VERSION, WRITTEN ONCE. It used to be typed into both jobs, and two literals that must agree
-# with nothing relating them is the shape this repository keeps paying for: the jobs could drift a patch
-# release apart and every symptom would look like flakiness in whichever layer noticed first. The install
-# steps below also CHECK what they got against this string rather than merely printing it — `--version` was
-# already being run and its output was not read by anything, so a release retagged under the same URL, a
-# truncated download, or a wrong architecture would all have sailed through and been diagnosed as a code
-# change. Bump this one line to move both jobs.
-env:
-  GODOT_VERSION: "4.6.2-stable"
-
 jobs:
-  # Every commit must be authored by the repository owner and carry no co-author trailer, per
-  # docs/DECISIONS.md. The tracked commit-msg hook covers the ordinary path but is skipped by
-  # --no-verify, so the same check runs here where it cannot be bypassed. Takes about thirty seconds.
+  # Every commit must be authored by the repository owner and carry no co-author
+  # trailer, per docs/DECISIONS.md. The tracked commit-msg hook covers the ordinary
+  # path but is skipped by --no-verify, so the same check runs here where it cannot
+  # be bypassed.
   authorship:
     name: authorship
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # fetch-depth: 0 IS THE JOB. The default is a depth-1 checkout, and a trailer scan over one commit
-      # finds nothing and prints the identical green line it prints over a clean 500-commit history — the
-      # exact vacuity this repo has spent two days finding elsewhere. `check_trailers.sh` refuses to report
-      # a verdict on a shallow clone rather than pass on one, so removing this line turns the job red
-      # instead of turning it into a formality.
+      # fetch-depth: 0 IS THE JOB. A depth-1 checkout makes a trailer scan over one
+      # commit find nothing and print the identical green line a clean history prints —
+      # tools/check_trailers.sh refuses to report a verdict on a shallow clone rather
+      # than pass on one, so removing this line turns the job red instead of a formality.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -77,214 +53,40 @@ jobs:
       - name: Check commit authorship
         run: bash tools/check_trailers.sh
 
-      # The capture manifest is GENERATED from git, so this is not a style check — it fails only when the
-      # tracked file has stopped describing the repository, which happens the moment somebody adds or
-      # re-shoots a capture without regenerating it. `fetch-depth: 0` above is load-bearing here too: the
-      # manifest reads each capture's last-writing commit, and a shallow clone would attribute all 48 to
-      # the checkout tip and report one tidy cohort that does not exist.
-      - name: The capture manifest still describes the archive
-        run: bash tools/capture_manifest.sh --check
-
-  headless:
-    name: every layer, headless (the pixel layers skip here)
+  # docs/QUALITY.md gates 1-7, 13, 15-16 — the structural gates docs/ONBOARDING.md
+  # Task 0.6 requires before any real code, so a violation is caught the moment it's
+  # introduced rather than discovered as an inherited mess later. Every script here
+  # is self-contained Python, mutation-tested against a deliberately broken fixture
+  # before being trusted (docs/QUALITY.md §2: "a check that has never been observed
+  # failing is not a check").
+  gates:
+    name: structural gates (layer boundaries, size limits, LOC ratio, schema, claims)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      # FULL HISTORY, BECAUSE THIS JOB RUNS `check_trailers` AS LAYER 28 AND A SHALLOW CLONE
-      # MAKES THAT A PERMANENT RED FROM CONFIGURATION RATHER THAN FROM CODE. The layer refuses to
-      # report a verdict on a history it cannot see -- "shallow clone; the history was not scanned" --
-      # which is exactly right and is why it cannot be left alone: it is the guard on the no-trailer
-      # rule, a locked project constraint, and the Actions tab has been carrying a standing failure on
-      # it whose cause is a checkout setting. The `authorship` job already sets this and passes there
-      # (896 commits, one author, no trailers), so the coverage existed and the sweep's copy of it did
-      # not. Fixing it here rather than skipping the layer in this job: a skip re-creates the vacuity
-      # the refusal was written to prevent. Found in the CI log for bd2b1d7.
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Install Godot (headless linux)
-        run: |
-          set -euo pipefail
-          V="$GODOT_VERSION"
-          wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
-          unzip -q godot.zip
-          BIN="$PWD/Godot_v${V}_linux.x86_64"
-          chmod +x "$BIN"
-          echo "GODOT=$BIN" >> "$GITHUB_ENV"
-          # READ THE VERSION, DO NOT JUST PRINT IT. Godot reports `4.6.2.stable.official.<hash>`; the pin is
-          # `4.6.2-stable`. Compare on the dotted form, and fail here rather than three hundred layer-seconds
-          # later somewhere that looks like a game defect.
-          want="$(printf '%s' "$V" | tr '-' '.')"
-          got="$("$BIN" --version)"
-          echo "pinned: $want   installed: $got"
-          case "$got" in
-            "$want".*) ;;
-            *) echo "!! the engine on this runner is not the pinned one: wanted $want, got $got"; exit 1 ;;
-          esac
-
-      # Build .godot/ — including the global class-name cache the harness's
-      # `class_name` references resolve through under `--script`.
-      - name: Import project
-        run: "$GODOT --headless --import"
-
-      # No display here by design, so the layers that need one report SKIP — or PASS* if
-      # they ran and stood a single assertion down — and the summary says so out loud
-      # instead of folding either into the pass count. SF_STRICT is left at its default
-      # (off without a display): the last time an `add_gl` layer was forced to run on a
-      # machine with no window, Godot died in main.cpp before any GDScript ran and CI was
-      # red for 33 straight pushes. The display job below is what covers those layers;
-      # this job's job is to be honest about not covering them.
-      - name: Run the harness
-        env:
-          SF_LOG_DIR: ${{ runner.temp }}/harness-logs
-        run: bash tools/run_harness.sh
-
-      # The result table on the run page, so "what actually ran" is readable without opening an artifact or
-      # scrolling the log — AND a check that the run was a result at all before anyone reads its verdict.
-      # This used to be a bare `cat` of the summary, which publishes a truncated table, a killed run and a
-      # sweep whose every layer died at load in exactly the same shape as a clean one.
-      - name: Publish the result table, and check the run was a result
-        if: always()
-        uses: ./.github/actions/harness-verdict
-        with:
-          log-dir: ${{ runner.temp }}/harness-logs
-          label: harness — headless
-
-      # Every layer's stdout/stderr, kept. Before this, the runner mktemp'd its log dir
-      # and rm -rf'd it on EXIT, so the evidence for a red CI run died with the job and
-      # left 14 tail lines behind.
-      - name: Keep the layer logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: harness-logs-headless
-          path: ${{ runner.temp }}/harness-logs
-          if-no-files-found: warn
-          retention-days: 14
-
-  pixels:
-    name: the layers that need a surface, on a real display (xvfb + software Vulkan)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
-      # xvfb is the display; mesa-vulkan-drivers is lavapipe, the software Vulkan device
-      # Godot's Forward+ renderer binds to when there is no GPU. The X client libs are
-      # what Godot's display driver dlopens. Audio needs nothing: with no sound device it
-      # falls back to the dummy driver on its own, which these layers do not care about.
-      - name: Install a display and a software renderer
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            xvfb mesa-vulkan-drivers libgl1-mesa-dri \
-            libxcursor1 libxinerama1 libxrandr2 libxi6
-
-      - name: Install Godot (linux)
-        run: |
-          set -euo pipefail
-          V="$GODOT_VERSION"
-          wget -q "https://github.com/godotengine/godot/releases/download/${V}/Godot_v${V}_linux.x86_64.zip" -O godot.zip
-          unzip -q godot.zip
-          BIN="$PWD/Godot_v${V}_linux.x86_64"
-          chmod +x "$BIN"
-          echo "GODOT=$BIN" >> "$GITHUB_ENV"
-          # Same check as the headless job. Repeated rather than factored out, unlike the verdict gate
-          # below: six lines guarding the download directly above them are readable where they stand, and
-          # the constant they compare against is already shared, so the two copies cannot drift apart on the
-          # only value that matters. The gate is a hundred lines of judgment and earns its own file.
-          want="$(printf '%s' "$V" | tr '-' '.')"
-          got="$("$BIN" --version)"
-          echo "pinned: $want   installed: $got"
-          case "$got" in
-            "$want".*) ;;
-            *) echo "!! the engine on this runner is not the pinned one: wanted $want, got $got"; exit 1 ;;
-          esac
-
-      - name: Import project
-        run: "$GODOT --headless --import"
-
-      # SF_STRICT=1 is the fail-closed half. A display was provided, so a layer that
-      # reports SKIP here has not been excused by circumstance — it means xvfb or lavapipe
-      # did not come up and the layer quietly opted out, which must be red rather than a
-      # green run that judged nothing. That is the exact failure this whole change exists
-      # to make impossible, so the job that runs the pixel layers refuses to tolerate it.
-      #
-      # JOBS=1 is not caution, it is a measurement. Run four-up in the container, one layer
-      # came back `Killed` with exit 137 — four Godot processes each holding a 1920x1080
-      # software-rendered swapchain and a full world bake do not fit in a runner's memory.
-      # Serially the same four passed. A pixel layer OOM-killed at random is worse than a
-      # slow job, and the runner tells us how many there are rather than this comment doing it.
-      # SELECTED BY REGISTRATION, NOT BY NAME. This read
-      #   SF_ONLY: check_opening|check_underground|check_water_reads|check_dig_hitch
-      # and that list was accurate on the day it was typed. `add_gl` then grew to six, and
-      # `check_item_reads` and `check_hud_layout` ran in NEITHER job — they skip in the
-      # headless one because they need a surface, and this one never selected them. Nothing
-      # anywhere printed that; both jobs were green over two layers that never executed,
-      # which is the exact failure this workflow's whole header is about, returned in a new
-      # place. SF_GL_ONLY asks the runner which layers need a window; SF_NOT states the one
-      # exclusion out loud, because in a hand-kept list "left out on purpose" and "forgotten"
-      # look the same. `check_ci_coverage` asserts the two files agree, both directions.
-      #
-      # Every name in SF_NOT needs one of these, and `check_ci_coverage` asserts it. The marker is
-      # structured rather than prose because prose is what fooled the first two versions of that layer:
-      # a keyword search for the name matched the paragraph explaining the defect.
-      # CI-EXCLUDED check_frametime: a software rasterizer draws at 6-9 fps, and its hitch RATIOS stop
-      #   describing the game — the same commit passed in an x86_64 container (RUN p95 0.7x quiet) and
-      #   failed in an arm64 one (2.3x against a 2.0x cap). Opposite verdicts, same code, two software
-      #   renderers. It runs on developer machines with a real GPU, under SF_STRICT.
-      - name: Run the pixel layers on a real display
-        env:
-          SF_GL_ONLY: "1"
-          SF_NOT: check_frametime
-          SF_STRICT: "1"
-          SF_LOG_DIR: ${{ runner.temp }}/harness-logs
-          JOBS: "1"
-          # THE PICTURES, FOR THE LAYERS WHOSE WHOLE ARGUMENT IS A PICTURE. These four layers can each dump
-          # the patches and masks they judged, behind a per-layer environment variable, and all four were
-          # unset here — so a pixel layer failing in CI handed back a number and no way to see what it was
-          # looking at, which is the one kind of failure text cannot carry. They write only when the
-          # variable is set, so this costs nothing on a green run beyond the bytes, and the log directory is
-          # already uploaded as the artifact below.
-          SF_CEREMONY_DUMP: ${{ runner.temp }}/harness-logs
-          SF_GREADS_DUMP: ${{ runner.temp }}/harness-logs
-          SF_MIDENT_DUMP: ${{ runner.temp }}/harness-logs
-          SF_MSTATE_DUMP: ${{ runner.temp }}/harness-logs
-        # EXIT 4 IS THIS JOB'S GREEN, AND FOR ITS WHOLE LIFE IT HAS BEEN THIS JOB'S RED. SF_STRICT above
-        # makes any stand-down a non-zero exit, and two of the layers selected here carry registered
-        # `always` rows -- grapple.gr05-preview-share and ceremony.words-vs-sky -- that stand down on
-        # every run on every machine. So this step could not return 0 on ANY tree, and the workflow was
-        # red on all of its last 40 runs. Commit 32e7a45 is the proof rather than the theory: the table
-        # read 16 PASS / 0 FAIL / 0 SKIP of 16 and the job still failed.
-        #
-        # tools/harness_verdict.sh states the reachable target out loud -- "EXIT 4, WITH EXACTLY THESE
-        # STAND-DOWNS AND NO OTHERS" -- and the step below is what judges it. That check used to exempt
-        # subset runs, which is what this job is, so nothing was judging it from either end. With the
-        # exemption gone, tolerating 4 here hands the verdict to the thing designed to give it.
-        #
-        # ONLY 4. A FAIL still fails this step, and exit 1 masks 4, so a failure cannot hide inside the
-        # tolerance -- which is the only way this could have become a licence.
-        run: |
-          set +e
-          xvfb-run -a -s "-screen 0 1920x1080x24" bash tools/run_harness.sh
-          rc=$?
-          echo "run_harness.sh exited $rc"
-          case $rc in 0|4) exit 0 ;; *) exit "$rc" ;; esac
-
-      - name: Publish the result table, and check the run was a result
-        if: always()
-        uses: ./.github/actions/harness-verdict
+      - uses: actions/setup-python@v5
         with:
-          log-dir: ${{ runner.temp }}/harness-logs
-          label: harness — pixel layers (xvfb)
+          python-version: "3.12"
 
-      - name: Keep the layer logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: harness-logs-pixels
-          path: ${{ runner.temp }}/harness-logs
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Install schema validator dependency
+        run: pip install pyyaml
+
+      - name: Layer dependency lint (ARCHITECTURE §3)
+        run: python3 tools/layer_lint/layer_lint.py
+
+      - name: No engine imports in core/ or sim/ (ARCHITECTURE §3-4)
+        run: python3 tools/layer_lint/no_engine_imports.py
+
+      - name: File and function size limits (QUALITY gates 3-4)
+        run: python3 tools/layer_lint/check_size_limits.py
+
+      - name: Instrument LOC must not exceed game LOC (QUALITY gate 7)
+        run: python3 tools/layer_lint/check_loc_ratio.py
+
+      - name: Schema validation for data/ (QUALITY gate 13)
+        run: python3 tools/schema_validator/schema_validator.py
+
+      - name: Every scenario and harness layer names a claim (QUALITY gates 15-16)
+        run: python3 tools/layer_lint/check_claim_references.py
