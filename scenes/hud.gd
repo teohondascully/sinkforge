@@ -471,6 +471,7 @@ const HELPER_TAGS: Dictionary = {
 	# ambient: state, read at a glance, never answered
 	"_draw_depth": &"ambient",
 	"_draw_forged": &"ambient",
+	"_draw_pack_full": &"ambient",        # under FORGED, only while the pack has no room left
 	"_draw_inventory": &"ambient",        # the hotbar
 	"_draw_hint": &"ambient",             # the bottom-left key legend
 	"_draw_fastforward": &"ambient",
@@ -526,6 +527,7 @@ func _draw() -> void:
 	# by its plate, and a chip cut by an edge reads as a drawing fault.
 	if not _modal_open():
 		_draw_forged()         # top-right production chip (small)
+		_draw_pack_full()      # under it — only while the pack has no room left
 		_draw_depth()          # top-left depth readout, the one number a descent game owes you
 		_draw_objective_line()  # top-centre, one current step, the signpost without the wall of text
 		_draw_inventory()      # bottom-centre hotbar
@@ -1018,6 +1020,24 @@ func _draw_forged() -> void:
 	draw_string(_font, Vector2(x, cy + 5.0), "FORGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI_TEXT_DIM)
 	x += label_w + 8.0
 	draw_string(_font, Vector2(x, cy + 6.0), count, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI_TEXT)
+
+
+## PACK FULL, under the FORGED chip which owns the corner — the same placement rule the fast-forward
+## chip uses on the left. Bulk material stops entering the pack past `FactorySim.PACK_BULK_CAP`, and
+## until this existed nothing on screen said so: a pile a full pack cannot take looks identical to one
+## nothing has touched. Ambient rather than an alert, because there is no cell to ping and no machine
+## behind it — it is state about the player, read at a glance, gone the moment there is room again.
+func _draw_pack_full() -> void:
+	if sim.pack_room() > 0:
+		return
+	var label: String = "PACK FULL"
+	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var w: float = lw + 24.0
+	var chip := Rect2(CANVAS.x - w - 10.0, 34.0, w, 22.0)
+	_panel(chip)
+	draw_rect(Rect2(chip.position.x, chip.position.y, 2.5, chip.size.y), UI_WARN)
+	draw_string(_font, Vector2(chip.position.x + 10.0, chip.position.y + 15.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.94, 0.64, 0.44))
 
 
 ## How long a fresh step shows its full how-to line, how long that takes to fade, and how long you have
