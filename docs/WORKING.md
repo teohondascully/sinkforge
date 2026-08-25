@@ -6,64 +6,68 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-Task 0 (repository restructuring) is done and committed. This session also closed three
-director-requested decisions and two batches of doc changes before touching `core/`. **Task 1
-(`core/`) has not started** — flagged as its own stage/session per the one-stage-per-session rule
-this same session added to `CONTEXT.md`, rather than starting real implementation at the tail of an
-already very long session. Awaiting the director's confirmation to either start Task 1 now or treat
-this as the handoff point.
+**Autonomous session, director away.** Authorized scope: ONBOARDING.md stage 1 (`core/`) and stage 2
+(`replay_determinism_test` against a trivial stub sim) only. Hard stop before stage 3
+(`sim/world`/`sim/terrain_gen`) regardless of remaining budget — those are judgment calls the director
+wants to be present for. Budget: 8 commits or the stage boundary, whichever comes first. Hard stops that
+mean halt-and-log-to-WORKING.md rather than work around: any gate red not fixable in one attempt (revert,
+log, stop); any EXPENSIVE decision per the ledger protocol (log the analysis, pick nothing, stop — fixed-
+point bit depth is named explicitly as EXPENSIVE); anything touching `sim/` beyond stubs; three
+consecutive commits with no test moving red to green. `docs/BRIEF.md` gets overwritten at the true end of
+this run: EXPENSIVE decisions first, then what landed, gates, what stopped, LOC ratio.
 
-## Done, this session, all committed
+Everything below "Two observations" happened in the same session, before this autonomous grant arrived —
+kept because it's still true and still open, not because it's today's active work.
 
-- Task 0, all 6 sub-tasks, 5 commits (`4758d5a`, `056a515`, `cf00607`, `e06da90`, `9572aa4`).
-- Context-compaction protocol: `CLAUDE.md`, `docs/WORKING.md`, `CONTEXT.md` section (`46a4ae5`).
-- Claim-rot mechanisms + data-version history + Godot pin + QUALITY.md self-subject note (`8891977`).
-- Movement/collision architecture: resolution split, rope/grapple promoted to the traversal
-  primitive, extended hostile chamber, claim C002 (`a775e78`).
-- `pre-pivot` tag pushed to origin. Local `main` NOT yet pushed — 8 commits ahead of `origin/main`
-  as of this write (31 pre-existing + 5 Task 0 + 2 this batch), confirmed clean fast-forward, safe
-  to push, director said to (see decisions below). Push this before ending the session if not
-  already done.
+## Two observations, logged not acted on (director directive)
 
-## Decisions closed this session
+1. **Clone-size Phase 1 has not run, and it's more than "hasn't run yet."** `history/` (228 MB tracked)
+   and `docs/media/moments` (75 MB tracked) — together ~303 of the ~332 MB tracked total — are not the
+   "non-curated visual record" the original instruction described. `.gitignore` lines 56-69 and
+   `docs/DECISIONS.md`'s LOCKED "Never destroy a curated file" rule (added after 84 screenshots were once
+   purged) both explicitly name this exact content as **the curated archive**, committed 2026-08-17
+   specifically because committing was judged "the strongest available form of not destroying" — a
+   stronger protection than `.gitignore` or `git rm --cached`, chosen over those on purpose. Moving it to
+   a Release asset would reverse that specific, dated, reasoned decision, not just tidy up clutter. The
+   rule's letter permits `git rm --cached` (it names that as the sanctioned way to exclude something
+   without destroying it) — so this isn't a hard block — but reversing a LOCKED decision deserves an
+   informed go/no-go with this history in view, not silent execution of an instruction that described the
+   target inaccurately. Awaiting the director's call. `.git` pack staying at ~350 MB regardless (needs a
+   history rewrite, separately deferred, not urgent) is unaffected either way.
+2. **`docs/handoff/` (≈50 files, ~199 MB) is untracked, confirmed via `git ls-files` (0 results).**
+   Protected by `.git/info/exclude`, same mechanism as the other local-only docs. Not a noise problem on
+   the public repo — it was never on the public repo. `docs/` root does have ~31 loose files at that
+   level (mix of tracked normative docs and untracked local-only ones); no action taken, per instruction.
 
-- **Repo stays public.** Reasoning: already public since 2026-08-10 with deliberate prior investment
-  (MIT + decomposition, per memory), the project's stated purpose (portfolio piece) requires
-  visibility, local-only docs are already correctly protected via `.git/info/exclude` independent of
-  repo visibility, and current exposure is low (1 fork, 1 star, 0 watchers) so a future history
-  rewrite's blast radius stays small if one is ever warranted.
-- **31 pre-existing commits: clean fast-forward, no divergence risk, safe to build on.** Two clusters
-  flagged rather than silently absorbed: Freight Winch (5 commits, real design-approved work with a
-  working verb stub already in the old `main.gd`) needs `sim/commands`/`sim/run` built first per the
-  compat audit's own risk register before resuming; Bazaar (5 commits) is confirmed sunk cost on the
-  core mechanic, only the shop-panel UX pattern might be worth referencing later.
-- **8 local-only documents triaged, recommend-only, nothing moved.** `PRIORITY.md` stays local
-  (Bucket A, cleanly). `AGENT_PLAY_EVALUATION_PROTOCOL.md` promote to archive, or even normative —
-  strongest candidate (Bucket B, cleanly). Six are mixed A/B splits; `ORCHESTRATOR.md` is the one
-  that needs a rewrite before archiving (valuable methodology entangled with second-person
-  address-to-an-AI voice, the same commissioner-voice pattern this project already did one history
-  rewrite to scrub). Full detail in the response given to the director; not reproduced here.
-- **Clone size (349 MB): plan proposed, not executed.** Moving the non-curated visual record to a
-  GitHub Release asset (no history rewrite) shrinks working-tree/checkout size (~332 MB → ~25-30 MB)
-  but does **not** shrink what a plain `git clone` actually downloads (`.git` stays ~349 MB, since
-  every historical blob remains reachable from old commits regardless of what HEAD contains). Real
-  clone-size reduction needs a history rewrite (`git filter-repo`), explicitly deferred, now
-  low-blast-radius given the public/private answer above (1 fork). Awaiting director go/no-go on
-  Phase 1 (Release asset move) before doing anything.
-- The four `.rc-prose-*.patch` files were fully superseded by existing commits — zero net change.
-- `PRIORITY.md` and `DIRECTOR_BRIEF.md` restored to original untracked, local-only state after being
-  accidentally tracked mid-Task-0. Do not re-attempt archiving without a fresh decision.
-- `check_loc_ratio.py` counts `.gd` + `.py` + `.sh`, not `.gd` alone.
+## Doc triage: closed, with one discrepancy flagged
 
-## Open questions for next session
+Re-derived from scratch this session (original reasoning lost to a compaction). Honest count differed
+from what was asked for — **two mixed documents, not five** — reported as a discrepancy rather than
+forced to fit. `docs/AGENT_PLAY_EVALUATION_PROTOCOL.md` promoted verbatim to `docs/EXPERIENCE_EVALUATION.md`
+(normative now, cross-referenced from `CLAIMS.md` §5 and `ARCHITECTURE.md` §7). `docs/DIRECTOR_BRIEF.md`
+and `docs/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md` each had one durable core, extracted to
+`docs/archive/` with dated headers. Six candidates (`REPO_PORTFOLIO_AUDIT.md`, `FEEL_GAP.md`,
+`MENU_MATRIX.md`, `VISUAL_RECOMMENDATIONS_SURFACE.md`, `RELEASE_HARDENING.md`, `A_PLUS_PROGRAM.md`) stay
+local — no durable core left unclaimed in any of them. `docs/PRIORITY.md` and `docs/ORCHESTRATOR.md`
+dispositions confirmed, unchanged. Full reasoning in commit `57d2051`.
 
-- Does the director want Phase 1 of the clone-size plan (Release asset move) executed now, or held
-  until the filter-repo question is also decided, so it's one clean pass instead of two?
-- Does any of the 8-document triage get acted on (especially `ORCHESTRATOR.md`'s rewrite), or held?
-- Confirm: start Task 1 (`core/`) next session, or does the director want to redirect first?
+## Design/process decisions closed this session
+
+- Sinkforge is a stratum, not an object; layers are rule sets, not destinations; Draft A's run curve is
+  9 runs not 25; R1's cost mechanism is per-unit-per-meter, boundary-only for now, built to extend by data
+  change (`docs/adr/0002`). `docs/GDD.md`, commit `a76d851`.
+- Freight Winch gated on `sim/commands` and `sim/run` having real implementations, not skeletons — noted
+  in both MODULE.md files. Commit `13960e9`.
+- Two new normative protocols, both markdown-and-git-only, no new tooling: review bandwidth
+  (`docs/DECISIONS_LEDGER.md`, reversibility CHEAP/EXPENSIVE gating, `docs/TASTE_QUEUE.md`,
+  `docs/BRIEF.md`) and playable fixtures (`--play` flag on the harness driver, fixtures derived never
+  authored, blind before/after review, fixture ownership as the parallelism contract). Both in
+  `CONTEXT.md` now. Commit `bea703d`.
+- Repo stays public — settled earlier, unchanged.
+- 31 pre-existing pre-pivot commits: clean fast-forward, no divergence risk. Bazaar confirmed sunk cost.
 
 ## Discoveries not yet written anywhere durable
 
-- None outstanding. Everything found this session (case-collision bug, LOC-ratio self-blindness,
-  `.git/info/exclude` path drift, the local-only-docs discovery, the dead patch files) is already in
-  commit messages or in this file.
+None outstanding as of the start of the autonomous session — everything above is in a commit message or
+this file. Anything found during stage 1/2 work gets logged here or to `docs/DECISIONS_LEDGER.md`
+immediately, not batched.
