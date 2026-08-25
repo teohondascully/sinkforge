@@ -76,6 +76,10 @@ var inv_selected_getter: Callable
 ## Inspector facts for the machine under the aim, pushed here by MainView: name, recipe, routing mode
 ## and what it holds. Empty means nothing is hovered. Drawn top-right under FORGED.
 var hover_info: Dictionary = {}
+## A ground pile the body currently has no open path to, or Vector2i(-1, -1) for none. Pushed by
+## MainView's throttled `_check_stuck_pile`; see `FactorySim.pile_reachable`'s header for the failure.
+var stuck_pile: Vector2i = Vector2i(-1, -1)
+var stuck_pile_below: bool = false        ## which way to dig, relative to the body's own row
 var _hover_rect: Rect2 = Rect2()          ## the inspector's canvas rect this frame (the pin region)
 var _knob_hits: Array[Dictionary] = []    ## clickable knob chips this frame: [{rect, payload}]
 ## Stalled machines from `sim.machine_problems()`, pushed each frame. A compact left-edge stack that
@@ -472,6 +476,7 @@ const HELPER_TAGS: Dictionary = {
 	"_draw_depth": &"ambient",
 	"_draw_forged": &"ambient",
 	"_draw_pack_full": &"ambient",        # under FORGED, only while the pack has no room left
+	"_draw_stuck_pile": &"ambient",       # under FORGED, only while a pile has no open path back to you
 	"_draw_inventory": &"ambient",        # the hotbar
 	"_draw_hint": &"ambient",             # the bottom-left key legend
 	"_draw_fastforward": &"ambient",
@@ -528,6 +533,7 @@ func _draw() -> void:
 	if not _modal_open():
 		_draw_forged()         # top-right production chip (small)
 		_draw_pack_full()      # under it, only while the pack has no room left
+		_draw_stuck_pile()     # same slot when PACK FULL is not showing, else one row further down
 		_draw_depth()          # top-left depth readout, the one number a descent game owes you
 		_draw_objective_line()  # top-centre, one current step, the signpost without the wall of text
 		_draw_inventory()      # bottom-centre hotbar
@@ -1034,6 +1040,25 @@ func _draw_pack_full() -> void:
 	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	var w: float = lw + 24.0
 	var chip := Rect2(CANVAS.x - w - 10.0, 34.0, w, 22.0)
+	_panel(chip)
+	draw_rect(Rect2(chip.position.x, chip.position.y, 2.5, chip.size.y), UI_WARN)
+	draw_string(_font, Vector2(chip.position.x + 10.0, chip.position.y + 15.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.94, 0.64, 0.44))
+
+
+## STUCK PILE, the same ambient corner register PACK FULL just used, stacked under it when it is showing
+## (else in its slot). Names the failure `pile_reachable`'s header describes: a Drill and a Forge, both
+## dug into the same one-cell shaft, together seal the only way back into it, so product landing below
+## the Forge has no path the walk-over auto-collect can ever close. Not a new mechanic: picking the
+## sealing machine back up (RMB) already reopens the column, this only says so instead of staying quiet.
+func _draw_stuck_pile() -> void:
+	if stuck_pile.x < 0:
+		return
+	var label: String = "STUCK PILE BELOW" if stuck_pile_below else "STUCK PILE ABOVE"
+	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var w: float = lw + 24.0
+	var y: float = 34.0 if sim.pack_room() > 0 else 58.0
+	var chip := Rect2(CANVAS.x - w - 10.0, y, w, 22.0)
 	_panel(chip)
 	draw_rect(Rect2(chip.position.x, chip.position.y, 2.5, chip.size.y), UI_WARN)
 	draw_string(_font, Vector2(chip.position.x + 10.0, chip.position.y + 15.0), label,

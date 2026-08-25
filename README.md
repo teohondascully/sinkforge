@@ -201,7 +201,7 @@ wired to anything. Run it once and that layer passes. Build machines set `CI`, w
 that one assertion down and says so, because nothing commits from a build machine and the wiring
 would prove nothing there.
 
-The runner registers 117 layers, one script each, and launches each as its own Godot process, up to
+The runner registers 118 layers, one script each, and launches each as its own Godot process, up to
 the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
 into roughly six kinds:
 
@@ -290,7 +290,7 @@ and between nothing and everything the widest layer here makes several hundred a
 fallen to one
 and still printed PASS. A verdict missing either line is not a result.
 
-117 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
+118 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
 game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
 claim.
 
@@ -418,7 +418,7 @@ This README carries no build badge while any job is red.
 | `scenes/` | everything visible: the controller `main.gd`, the renderer, the HUD, the player body, and five shaders. |
 | `assets/sprites/` | the only authored art in the project: 16 miner frames and their Aseprite source. |
 | `tests/` | four headless suites sharing `test_base.gd`, 64 test functions, run with no scene tree. |
-| `tools/` | the harness runner and its 117 layers, the play-tests, the capture and profiling tools, the machine lock. |
+| `tools/` | the harness runner and its 118 layers, the play-tests, the capture and profiling tools, the machine lock. |
 | `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
 | `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
 | `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |

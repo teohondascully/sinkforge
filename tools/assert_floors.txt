@@ -125,6 +125,7 @@ check_opening	3	asserted
 check_pacing	5	asserted
 check_pack_layout	55	asserted
 check_paint_terms	7	asserted
+check_pile_reach	13	asserted
 check_pixel_snap	91	asserted
 check_plunge	8	asserted
 check_posed_fields	24	asserted

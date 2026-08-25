@@ -675,6 +675,7 @@ func _process(delta: float) -> void:
 		_land_drops()
 		_age_drop_grace(delta)
 		_collect_ground_under_player()
+		_check_stuck_pile(delta)
 	_update_mining(delta)  # refreshes _aim from the mouse
 	_update_bazaars(delta)
 	_update_juice(delta)
@@ -2250,6 +2251,31 @@ const DROP_IMPACT_CELLS: float = 8.0
 const DROP_VOICE_MIN: float = 0.15   ## below this it is a place-down, not a fall, and stays silent
 const DROP_VOICE_MAX: int = 2        ## simultaneous landing sounds; more is a rattle, not more landings
 var _no_pickup: Dictionary = {}
+
+## How often to re-ask `sim.first_unreachable_pile`, in seconds. The BFS is bounded but still O(piles),
+## and the answer only changes when the body moves a whole cell or the world does, neither of which
+## happens between two frames, so asking every frame would spend cycles a slower cadence cannot lose.
+const STUCK_PILE_CHECK_S: float = 1.0
+var _stuck_pile_age: float = 0.0
+## The nearest ground pile the body currently has no open path to, or Vector2i(-1, -1) for none. The HUD
+## reads this to draw the "out of reach" chip; see `sim.pile_reachable`'s header for the failure it names.
+var _stuck_pile: Vector2i = Vector2i(-1, -1)
+
+
+## Throttled re-check of `_stuck_pile`. Reads the cell the body is IN rather than its pixel centre, since
+## `pile_reachable`'s BFS works in whole cells the same way `_blocked` does.
+func _check_stuck_pile(delta: float) -> void:
+	if _player == null:
+		return
+	_stuck_pile_age += delta
+	if _stuck_pile_age < STUCK_PILE_CHECK_S:
+		return
+	_stuck_pile_age = 0.0
+	var body_cell: Vector2i = _cell_at(_player.position)
+	_stuck_pile = sim.first_unreachable_pile(body_cell, COLLECT_REACH_CELLS)
+	if _hud != null:
+		_hud.stuck_pile = _stuck_pile
+		_hud.stuck_pile_below = _stuck_pile.y > body_cell.y
 
 
 ## Age the per-cell no-pickup grace; drop cells whose grace has elapsed so they auto-collect again.

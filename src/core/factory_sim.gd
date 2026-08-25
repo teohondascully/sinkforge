@@ -3200,3 +3200,60 @@ func collect_ground(cell: Vector2i) -> int:
 	else:
 		ground[cell] = pile
 	return collected
+
+
+## Bounded BFS budget for `pile_reachable`: a pile resting in a wide-open cave must not walk the whole
+## map before giving up. Chosen well past any shaft depth the tutorial digs (`DROP_IMPACT_CELLS` calls
+## eight rows a full-weight fall) with headroom for lateral wandering, while staying cheap enough to run
+## every call rather than needing its own throttle.
+const PILE_REACH_SCAN_CAP: int = 200
+
+## Is `pile_cell` connected, through cells neither solid (foliage excepted, same as the avatar's own
+## collision) nor machine-occupied, to any cell within `reach` cells of `from`? Pure query, 4-directional
+## bounded BFS. Reuses `is_solid`/`material_at`/`machine_at`, the exact test `player.gd`'s `_blocked`
+## walks against, so this can never answer "reachable" for a path the body could not actually walk, or
+## "blocked" for one it could.
+##
+## THE FAILURE THIS ANSWERS: a machine occupies its whole cell to the body (`_blocked`), so a Drill
+## placed above a vein and a Forge placed below it, both dug as a single column-wide shaft (the natural
+## shape of hand-mining, and the shape the tutorial itself teaches), together plug the ONLY way back into
+## that column. Ore or an ingot landing below the Forge is real, sitting in `ground`, and the walk-over
+## auto-collect (`COLLECT_REACH_CELLS`) never fires because no reachable cell is ever close enough --
+## not because the player did not walk close enough, but because there is no path to get closer. Nothing
+## here fixes that; it only lets the presentation layer say so instead of staying silent about it.
+func pile_reachable(pile_cell: Vector2i, from: Vector2i, reach: float) -> bool:
+	var reach_sq: float = reach * reach
+	if Vector2(pile_cell).distance_squared_to(Vector2(from)) <= reach_sq:
+		return true
+	var seen: Dictionary = {pile_cell: true}
+	var frontier: Array[Vector2i] = [pile_cell]
+	var scanned: int = 0
+	while not frontier.is_empty() and scanned < PILE_REACH_SCAN_CAP:
+		var next_frontier: Array[Vector2i] = []
+		for c: Vector2i in frontier:
+			scanned += 1
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var n: Vector2i = c + d
+				if seen.has(n) or not in_bounds(n):
+					continue
+				seen[n] = true
+				if is_solid(n) and not _is_foliage(material_at(n)):
+					continue
+				if machine_at(n) != null:
+					continue
+				if Vector2(n).distance_squared_to(Vector2(from)) <= reach_sq:
+					return true
+				next_frontier.append(n)
+		frontier = next_frontier
+	return false
+
+
+## The nearest ground pile NOT reachable via an open path from `from` within `reach` cells, or
+## Vector2i(-1, -1) if every current pile is (including the common case of no piles at all). Read-only;
+## the caller decides how often to ask and how to surface it -- `pile_reachable` is cheap per call but
+## this is O(piles), so a per-frame caller should still throttle.
+func first_unreachable_pile(from: Vector2i, reach: float) -> Vector2i:
+	for cell: Vector2i in ground.keys():
+		if not ground[cell].is_empty() and not pile_reachable(cell, from, reach):
+			return cell
+	return Vector2i(-1, -1)
