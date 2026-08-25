@@ -147,6 +147,7 @@ check_save_isolation	27	asserted
 check_saveload	8	asserted
 check_scan	11	asserted
 check_score	21	asserted
+check_seal_desire	7	asserted
 check_seam	14	asserted
 check_seam_flood	11	asserted
 check_selection_reads	10	asserted

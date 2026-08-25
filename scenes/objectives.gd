@@ -51,7 +51,7 @@ var steps: Array[Dictionary] = [
 	{"id": &"power",     "label": "Research POWER at the Bazaar (T, then ENTER) — the deep needs energy", "goal": "Research Power"},
 	{"id": &"generator", "label": "Craft a GENERATOR, place it, and toss coal in (Q) to burn it for power", "goal": "Burn coal for power"},
 	{"id": &"descent",   "label": "Research the DESCENT ENGINE at the Bazaar — the way down is sealed", "goal": "Research Descent"},
-	{"id": &"breach",    "label": "Feed a Descent Engine on the seal to breach into Stonereach — then explore on your own", "goal": "Breach the seal"},
+	{"id": &"breach",    "label": "Feed a Descent Engine on the seal to breach into Stonereach — iron waits below", "goal": "Breach the seal"},
 ]
 
 

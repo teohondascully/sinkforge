@@ -39,9 +39,13 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 			return {"name": "Ore Vein", "in": [], "out": [], "holding": [],
 				"mode": "%d ore — drop a Drill just above it (%s)" % [dep, _rate_eta(drill_rate, dep)]}
 		# The seal is its own answer: no pick ever opens it, the Descent Engine does (docs/PROGRESSION.md).
+		# `rate` carries the destination rather than a number here, the one hover slot with room for a
+		# second line: a wall with no payoff named reads as "go deeper because the layer is there," not a
+		# reason to actually cross it.
 		if sim.material_at(aim) == &"sealrock":
 			return {"name": "The Seal", "in": [], "out": [], "holding": [],
-				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA}
+				"mode": "no pick will breach it — research DESCENT, stand an Engine on it, feed it %d ingots" % FactorySim.DESCENT_QUOTA,
+				"rate": "Stonereach lies past it — iron, and the machines only iron builds"}
 		# A hanging rope: its coil count and the one-action recovery.
 		if sim.is_climbable(aim):
 			return {"name": "Rope", "in": [], "out": [], "holding": [],
