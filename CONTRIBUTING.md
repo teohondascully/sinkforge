@@ -1,5 +1,13 @@
 # Contributing
 
+> **Stale as of the 2026-08-25 pivot.** Everything below describes the pre-pivot workflow — `tools/`,
+> `scenes/`, `src/`, and the full-fidelity/headless harness split — which now lives read-only under
+> `legacy/` (see `legacy/README.md`). It is left unrewritten rather than guessed at, because the new
+> contribution workflow (build, test, and gate commands for `core/`, `sim/`, `interface/`, ...) doesn't
+> fully exist yet. A real rewrite is worth doing deliberately once there's a workflow to describe, not
+> as part of a mechanical repository restructuring pass. Until then, `docs/QUALITY.md` and
+> `docs/ONBOARDING.md` are the current source of truth for how work happens here.
+
 `README.md` covers what the game is; `docs/ARCHITECTURE.md` covers where the code lives. This file is
 the working setup: what the test suite protects, how to run part of it without invalidating the part
 you did not run, and what a change has to do before it is finished.

@@ -1,5 +1,14 @@
 # Sinkforge
 
+> **Stale as of the 2026-08-25 pivot.** Everything below this notice describes the pre-pivot
+> persistent-world game — its controls, mechanics, repository layout, and test harness — which now
+> lives read-only under `legacy/` (see `legacy/README.md`) and is no longer what running this project
+> does. It is left unrewritten rather than guessed at: the new game (a run-based roguelite and design
+> instrument, see `CONTEXT.md` and `docs/GDD.md`) doesn't exist yet in playable form, so there is
+> nothing true to describe here in its place. This is the single most reader-visible file in the
+> repository and deserves a real rewrite once there's a game to write about, not a mechanical
+> restructuring pass's guess at one — flagged, not silently fixed.
+
 A 2D side-view game about digging a factory down into solid earth.
 
 [![godot 4.6.2](https://img.shields.io/badge/godot-4.6.2-478cbf)](https://godotengine.org)
@@ -72,9 +81,12 @@ godot --path .
 
 Opening `project.godot` in the editor and pressing play does the same thing.
 
-Two things are worth knowing before cloning. The tracked tree is about 326 MB, of which 322 MB is
-screenshots, so it is a large clone. And `export_presets.cfg` is gitignored, so a fresh clone runs
-the game from source but cannot yet produce a packaged build.
+Two things are worth knowing before cloning. It is a large clone: `.git` is 350 MB and a full checkout
+is 332 MB, of which `history/` (229 MB, a dated screenshot archive) and `docs/media/` (104 MB, the
+curated visual record) together account for nearly all of it — both tracked deliberately, both
+excluded from Godot's import scan via `.gdignore`. Measured 2026-08-25, post-pivot; `legacy/`, the
+frozen pre-pivot codebase, adds only 7.3 MB on top. And `export_presets.cfg` is gitignored, so a fresh
+clone runs the game from source but cannot yet produce a packaged build.
 
 Development happens on macOS and CI runs the project on Linux. There is no Windows job and no
 Windows testing.
