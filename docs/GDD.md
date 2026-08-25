@@ -83,7 +83,7 @@ This is the central asymmetry. It makes the factory necessary (you cannot hand-c
 
 **Implementation note.** The prior codebase had no precedent for this: every upward mechanism used a proportional power throttle, a rate or capacity gate, never a per-unit or per-distance charge. New economic construction, not a tuning pass.
 
-**Open sub-question:** does R1 govern every upward movement inside the shaft, or only the shaft-to-surface boundary? The rule as written says every. The cheaper first implementation is the boundary only. Decide before building, record as an ADR.
+**Scope, decided 2026-08-26:** R1 governs every upward movement in principle, but the cost mechanism is wired only to the shaft-to-surface lift for now — internal in-shaft lifts stay free until this is revisited. The mechanism itself (per-unit-per-meter cost) is built general from the start so that extending the charge to internal movement is a data change, not a rewrite; see `docs/adr/0002-r1-scope-boundary-only.md` for the constraint this is meant to preserve.
 
 **Corollary that is easy to get wrong.** If fuel is found above the player, gravity delivers it free and fuel logistics becomes trivial. Fuel must be found within or below the layer being worked, so the interesting problem is lateral distribution and metering.
 
@@ -128,8 +128,8 @@ Three axes. None of them is a multiplier.
 ### Starting depth is the prestige bar
 
 Run 1: you start at the surface with nothing and spend six minutes hand-mining topsoil.
-Run 12: you start with a pre-sunk 40m shaft, a forge already lit at the bottom, one drill in your pack. Those six minutes are gone.
-Run 30: you start at 100m with a working two-drill line and a chute already running to the surface bin. Your run begins where run 1 ended.
+Run 5: you start with a pre-sunk 40m shaft, a forge already lit at the bottom, one drill in your pack. Those six minutes are gone.
+Run 9: you start at 100m with a working two-drill line and a chute already running to the surface bin. Your run begins where run 1 ended.
 
 That is prestige structure applied to a factory, and it delivers the idle-game feeling without touching a single ratio. The layout puzzle stays intact because the puzzle just moved deeper.
 
@@ -195,7 +195,7 @@ Decided. Treat as requirements.
 
 **No zeroes.** Pack contents are always kept. No run in a bounded-session game should be worth nothing; that is how players are lost permanently.
 
-**The Sinkforge is a horizon, not a mechanic.** It is at the bottom. Nobody has reached it. Deepest run is a record. It does not consume, pull, or act on the world.
+**The Sinkforge is a stratum, not an object.** At the bottom of every shaft, at the same depth no matter where the shaft was bored, the player breaks through into a manufactured plane: machined metal extending past view in every direction, no center and no edges. It is the bottom of the world, and it is built. A stratum has no location, so every shaft finds it — a machine at a single point could not work once different runs bore different parts of the sinkhole. It has been consuming the crust from underneath for a long time: that is the sinkhole's origin, and the reason deposits get richer with depth — every run has been mining its collection. It takes no action during a run. Its one interaction is the ending: it is the only material nothing in the toolset can cut, so the final unlock is not a better drill but a breach built from deep material, and the last run is the one that goes through.
 
 **No combat, no enemies, no health bar.** Danger is environmental and systemic. Scope decision as much as design decision.
 
@@ -207,9 +207,11 @@ Do not architect around a specific answer. Each must be expressible as configura
 
 **Run cadence: Draft A or Draft C.** The largest open question.
 
-*Draft A, escalating runs.* Length grows with purchased pump capacity: roughly 2, 3, 5, 8, 12, 20, 30, 40 minutes across about twenty-five runs. Sketch of the intended shape: first ingot around minute five of total playtime, first machine placed on the rig around minute eight, first automation in the shaft around minute twenty-five after roughly five separate purchases. Front-loaded reward cadence, which matters enormously: a fixed forty-minute structure delivers one progression event in the time Draft A delivers five. The opening is replayed and mastered rather than authored once and abandoned. Early runs are cheap to sweep, which serves the instrument directly.
+*Draft A, escalating runs.* Length grows with purchased pump capacity: roughly 2, 3, 5, 8, 12, 18, 25, 35, 42 minutes across about nine runs, roughly two to three hours total. Sketch of the intended shape: first ingot around minute five of total playtime, first machine placed on the rig around minute eight, first automation in the shaft around minute twenty-five after roughly five separate purchases. Front-loaded reward cadence, which matters enormously: a fixed forty-minute structure delivers one progression event in the time Draft A delivers five. The opening is replayed and mastered rather than authored once and abandoned. Early runs are cheap to sweep, which serves the instrument directly.
 
-Risks: a two-minute run may read as a menu with a walk attached, and this is unverified; the factory is absent from the shaft for the first twenty minutes of play (mitigated by placing the rig factory in front of the player at minute eight); twenty-five differently-lengthed runs is a large tuning surface.
+**Revised down from a ~25-run curve on 2026-08-26.** The earlier draft was calibrated for a commercial roguelite where content-per-hour is the product; this project is repo-first with a playable build attached, and the content cost of 25 runs is not justified by what it would buy. Nine runs preserves the escalating shape and the front-loaded cadence argument above; it just stops sooner.
+
+Risks: a two-minute run may read as a menu with a walk attached, and this is unverified; the factory is absent from the shaft for the first twenty minutes of play (mitigated by placing the rig factory in front of the player at minute eight); nine differently-lengthed runs is a modest tuning surface.
 
 *Draft C, fixed short runs.* Every run is ten to twelve minutes. Depth comes from starting deeper and better tools. Constant cadence, no length-tuning problem, much less content risk. Risk: ten minutes may cap layout complexity, and the game may never deliver the long sustained build that makes factory games feel like factory games.
 
@@ -232,6 +234,10 @@ Recorded so they are not reinvented. Each of these is the obvious first answer t
 **Global multipliers and percentage upgrades.** See §2. This is the one most likely to be reintroduced by good intentions, because it is what every idle game does and it is easy.
 
 **The Sinkforge as a continuous consumer.** The idea: it sits at the bottom, eats material forever, and feeding it opens the way down. Fails on four counts. It is invisible from anywhere the player stands, so it cannot carry emotional weight. If everything sinks uniformly, nothing sinks. A continuous open column to the bottom is a ladder past every gate. And it fights the lateral relocation pressure that finite deposits create. It existed to solve the missing-sink problem in a persistent world; the run-based structure solves that without it.
+
+**A void with no floor.** The alternative to a physical Sinkforge: the shaft simply never ends, nothing is ever found at the bottom. Rejected — a limit a player can descend into forever without ever reaching it risks reading as unfinished content rather than a genuine boundary, since from inside the game the two are indistinguishable.
+
+**The sinkhole itself is the Sinkforge, with nothing underneath.** The surface sinkhole the rig sits over and the Sinkforge would be the same fact, not two things — no deeper structure to find, the hole simply is it. Tonally strong: it explains itself the moment a player looks up from the bottom. But mechanically empty — there is nothing left to reach, nothing to describe, no shape for an ending. A destination has to be a place, not a fact already known.
 
 **Chutes as the bulk path to the surface.** Physically impossible: chutes fall downward. This error invalidated a chain of dependent conclusions before it was caught.
 
@@ -281,7 +287,7 @@ The first logistics failure follows immediately and is self-inflicted: fuel and 
 
 *Run 8.* Start at 25m with a forge. Through shale in eight minutes. Hit hard rock at 80m and stop cold, because a single drill cannot be fueled fast enough at that distance. Spend the middle of the run building the fuel chute, get four minutes of extraction, water takes it. You now understand that the fuel chain is the game.
 
-*Run 25.* Start at 100m with a running line. Spend the first ten minutes not mining at all, building a pump wall at 180m to hold a section dry. Punch into the deep layer at 210m. The water climbs while two pumps and a heavy drill run off one chute that is now your entire economy. At minute 36 the pump starves, the section floods in twelve seconds, and you sprint up the rope with a full pack.
+*Run 9.* Start at 100m with a running line. Spend the first ten minutes not mining at all, building a pump wall at 180m to hold a section dry. Punch into the deep layer at 210m. The water climbs while two pumps and a heavy drill run off one chute that is now your entire economy. At minute 36 the pump starves, the section floods in twelve seconds, and you sprint up the rope with a full pack.
 
 Same shape at a different scale, which is precisely why idle games work.
 
@@ -291,12 +297,14 @@ Same shape at a different scale, which is precisely why idle games work.
 
 Three layers plus the core. Each earns its existence with one physical rule and one economic consequence.
 
+**Layers are rule sets, not destinations.** Depth is continuous and always increasing; there is no discrete jump from one layer to the next inside a run, only a depth threshold where the physical rule underfoot changes. A shaft does not "reach Stonereach" the way a level select reaches a zone — it just keeps getting deeper until hand-mining stops working. Two different runs can sit in the same layer at very different depths: run 3 might hand-dig to 60m and stall inside Topsoil/shale, while run 9's real infrastructure carries it past 240m still inside that same rule set, because what changed between those runs is the infrastructure, not the layer. Meters measure progress within a run. Layers describe which physical rules apply at the depth you are currently at.
+
 | Layer | Physical rule | Teaches |
 |---|---|---|
 | Topsoil / shale | Soft, fast digging. Fuel and first ore. Water seeps. | Gravity routing |
 | Stonereach | Hard rock, hand-mining ineffective. Flooding is a real threat. Richer ore. | Pumping and fuel routing |
 | The Deep Works | Engineered, not natural. Someone built here. Heat and pressure. | Long-distance haul |
-| The Sinkforge | The bottom. Unreached. | Nothing. It is a horizon. |
+| The Sinkforge | Manufactured, not natural — the true floor, same depth under every shaft. Unreached in normal play. | Nothing, except an endgame breach. |
 
 Three layers authored well beats seven gestured at.
 
