@@ -1991,12 +1991,13 @@ func machine_census() -> Array[Dictionary]:
 
 
 ## Factory alerts: machines that were meant to RUN but stalled, because the output has no drain
-## (`blocked`) or the fuel ran dry (`no_fuel`). Grouped by (id, status); each entry carries one
-## representative cell so the HUD can ping the culprit as a beacon, since the camera is body-locked and
-## cannot jump. Pure read over `grid`. Starvation (`no_input`) is deliberately OUT: it usually means
-## "not hooked up yet" rather than a breakdown, and would fire on every just-placed machine.
+## (`blocked`), a downstream Station is full (`blocked_station`), or the fuel ran dry (`no_fuel`). Grouped
+## by (id, status); each entry carries one representative cell so the HUD can ping the culprit as a beacon,
+## since the camera is body-locked and cannot jump. Pure read over `grid`. Starvation (`no_input`) is
+## deliberately OUT: it usually means "not hooked up yet" rather than a breakdown, and would fire on every
+## just-placed machine.
 ## [{id, name, def, status, count, cell}], most-numerous first.
-const _ALERT_STATUSES: Array[StringName] = [&"blocked", &"no_fuel"]
+const _ALERT_STATUSES: Array[StringName] = [&"blocked", &"blocked_station", &"no_fuel"]
 func machine_problems() -> Array[Dictionary]:
 	var by: Dictionary = {}                                    # "id|status" -> entry
 	for cell: Vector2i in grid:
@@ -2235,9 +2236,13 @@ func _run_winch_station(_machine: MachineState) -> void:
 ## unpowered; feed it and THEN it will say what is actually stopping it). `&"unlinked"` (shared with the
 ## Spur; Visuals already knows its lamp colour and cross mark) covers "placed, but nothing to route to". A
 ## trip already in flight reads `working` regardless of current power, the same way `_advance_winch_transit`
-## does not re-check power once queued. `&"blocked"` is new here: `_run_winch_head` silently holds the trip
-## when the Station is at `WINCH_STATION_CAP`, which used to read identically to `working` -- a full
-## downstream station is exactly the kind of "something is stopping this" state the lamp exists to name.
+## does not re-check power once queued. `&"blocked_station"` is new here: `_run_winch_head` silently holds
+## the trip when the Station is at `WINCH_STATION_CAP`, which used to read identically to `working` -- a
+## full downstream station is exactly the kind of "something is stopping this" state the lamp exists to
+## name. Its own status name rather than the generic `&"blocked"` for the same reason the Drift Rig has
+## `blocked_pay`/`blocked_spoil` instead of one shared `blocked`: "dig a drain" (`ALERT_REASON`'s text for
+## `blocked`) is correct for a jammed column and actively wrong here -- there is no drain to dig, the fix is
+## clearing or rerouting the Station.
 func _status_winch_head(machine: MachineState) -> StringName:
 	if not winch_routes.has(machine.cell):
 		return &"unlinked"
@@ -2253,7 +2258,7 @@ func _status_winch_head(machine: MachineState) -> StringName:
 		for it: StringName in station.input_buffer:
 			station_load += int(station.input_buffer[it])
 		if station_load >= WINCH_STATION_CAP:
-			return &"blocked"
+			return &"blocked_station"
 	return &"working"
 
 

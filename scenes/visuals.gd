@@ -82,9 +82,10 @@ const STATUS_LOOK: Dictionary = {
 	&"no_fuel":       {"color": Color(0.96, 0.26, 0.20), "mark": &"feed",  "fix": &"feed",     "feeds": true},
 	&"no_input":      {"color": Color(0.97, 0.72, 0.22), "mark": &"feed",  "fix": &"feed",     "feeds": true},
 	&"no_power":      {"color": Color(0.36, 0.84, 0.98), "mark": &"power", "fix": &"power",    "feeds": false},
-	&"blocked":       {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
-	&"blocked_pay":   {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
-	&"blocked_spoil": {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",    "feeds": false},
+	&"blocked":         {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",  "feeds": false},
+	&"blocked_pay":     {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",  "feeds": false},
+	&"blocked_spoil":   {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",  "feeds": false},
+	&"blocked_station": {"color": Color(0.95, 0.45, 0.18), "mark": &"clear", "fix": &"clear",  "feeds": false},
 	&"unlinked":      {"color": Color(0.86, 0.40, 0.92), "mark": &"link",  "fix": &"link",     "feeds": false},
 }
 

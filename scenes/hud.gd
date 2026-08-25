@@ -91,6 +91,8 @@ const ALERT_REASON: Dictionary = {
 	# jammed (docs/DRIFT.md §7).
 	&"blocked_pay": "ore column jammed — dig a drain UNDER it",
 	&"blocked_spoil": "spoil column jammed — dig a drain BEHIND it",
+	# The Winch Head's own blocked reading: nothing to dig, the Station is the drain and it is full.
+	&"blocked_station": "the Station is full — collect from it, or route elsewhere",
 	&"no_power": "no power — it eats a network, not a coal box",
 	# Spent is not starved. A Head that has finished its vein has nothing wrong with it, and calling it
 	# starved sends the player hunting for a feed problem that does not exist (docs/LODE.md §5).
