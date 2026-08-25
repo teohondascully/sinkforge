@@ -145,6 +145,42 @@ is not.
 
 ---
 
+## Review bandwidth
+
+Throughput regularly exceeds review capacity. Gates catch structural drift; they do not catch a design
+decision quietly made in the wrong direction inside an otherwise-clean diff. That is what this section
+exists to surface.
+
+- **Every judgment call not dictated by a normative doc gets a `docs/DECISIONS_LEDGER.md` entry**,
+  written when made, not at session end. Four lines: decided, alternative, why, reverse cost. Test:
+  would a competent engineer with these documents have plausibly chosen differently? If yes, log it.
+- **Reversibility gates whether to proceed.** CHEAP — proceed by default, log it, the director skims
+  and reverts if wrong. EXPENSIVE — stop and wait; do not proceed on an assumption. EXPENSIVE means it
+  shapes a public interface, a data schema, the tick order, a save format, or anything the four design
+  rules touch — or, the more general test: would this make it a different game? When unsure, EXPENSIVE.
+- **`docs/TASTE_QUEUE.md`** holds feel/visual/design judgment calls as playable fixtures (below), never
+  mixed with correctness. Batched for review together; does not block unless also EXPENSIVE.
+- **`docs/BRIEF.md`** regenerates at the end of every session, overwritten, one screen, EXPENSIVE
+  decisions awaiting the director listed first. If it takes more than 90 seconds to read, it's too long.
+- Markdown and git only. If this starts to look like a subsystem, say so instead of building it.
+
+## Playable fixtures
+
+A scenario is a declarative fixture (seed, rig state, loadout, start depth, goal) whether a bot or a
+human drives it. Full detail: `docs/ARCHITECTURE.md` §6, `docs/QUALITY.md` §2.
+
+- Every stage ships at least one playable fixture demonstrating what it changed, in `scenarios/`,
+  identical format to the bot ones.
+- Fixtures are **derived, never authored** — reproducible from a real run, never hand-crafted to a state
+  the game can't actually produce.
+- Review unit is before/after on the **same** recorded input, presented blind, revealed after the
+  director picks.
+- Fixture ownership is the parallelism contract once parallel write work starts: two workers on
+  disjoint fixtures cannot collide in a way the gates won't catch. Stronger than disjoint files alone,
+  and the condition to meet before parallel write work starts on `sim/` or `view/`.
+
+---
+
 ## Tick order
 
 Fixed and documented. Changing it requires an ADR.

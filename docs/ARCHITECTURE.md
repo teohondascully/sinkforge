@@ -226,6 +226,21 @@ Outputs: `result.json`, `telemetry.jsonl`, `state_hashes.txt`, `input.log`, `rep
 
 Must run with no GPU, no window, in CI, at 100x realtime or better for a two-minute scenario.
 
+### Playable fixtures
+
+A scenario is already a declarative fixture — the same YAML above, whether a bot or a human ends up
+driving it. The driver takes a `--play` flag that boots one with a renderer and human input instead of
+an agent, in place of `--agent`. No new system, one entry point; the scenario format and the fixture
+format are the same format.
+
+Every stage ships at least one playable fixture demonstrating what it changed, alongside the bot
+scenarios in `scenarios/`. Fixtures are derived, never hand-authored: a seed, a config, and — where the
+question is about feel rather than a cold boot — a recorded `input.log` from a real run, so before/after
+review replays the identical input against pre- and post-change code rather than two different sessions.
+Hand-crafting a state the game cannot actually produce is reviewing a game that doesn't exist. See
+`docs/QUALITY.md` §2 for the mutation-testing analog of this rule, and `docs/TASTE_QUEUE.md` for how
+fixtures reach review.
+
 ### Two clocks
 
 **Fast loop.** Deterministic scripted bots, small scenarios, every PR, under sixty seconds total. Assertion-based, binary, gating.

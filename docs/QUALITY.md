@@ -80,6 +80,8 @@ Carried forward from the prior program largely intact. This body of standards wa
 
 **New, and load-bearing:** where a gate measures a property of the codebase, the gate is itself part of the codebase and is not exempt from its own property. A gate that quietly excludes itself reports green forever regardless of what it's supposed to be watching — worse than no gate, because it looks like coverage. Live example: `check_loc_ratio.py` (`docs/QUALITY.md` gate 7) originally counted only `.gd` files, which made its own several hundred lines of Python instrument code invisible to the ratio it exists to enforce — caught only because it was mutation-tested against its own source directory, not only against fixtures standing in for game code. Every gate's mutation test must include a case where the gate's own file (or its own output directory, its own line count, whatever property it measures) is the thing that trips it.
 
+**New, and load-bearing:** the same discipline applies to playable fixtures (`docs/ARCHITECTURE.md` §6), which are the feel/design equivalent of a scenario. A fixture must be derived — a seed, a config, and where relevant a replayable input log, always reproducible from a run the game actually produced — never hand-authored to represent a state the game cannot reach on its own. A hand-crafted fixture is a mutation test with no mutation: it proves a reviewer's reaction to a scene, not whether the game produces that scene. Treat "is this fixture derived?" as a checkable property the same way "does this check fail when broken?" is.
+
 ---
 
 ## 3. Reliability

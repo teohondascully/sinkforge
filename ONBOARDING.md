@@ -135,6 +135,8 @@ The 5-file rule is about module *boundaries*, not iteration count. `sim/body` co
 
 Do not move past this stage until the thresholds are green. If movement is not right in a bare box it will never be right inside a factory.
 
+**First playable fixtures, requested for this stage specifically (director directive, 2026-08-26):** the hostile chamber with fresh-dig irregular slopes, and a rope traversal segment. Both need recorded input logs from the first change onward, so the before/after review works from day one rather than being retrofitted later. See `docs/ARCHITECTURE.md` §6, "Playable fixtures."
+
 **5. `sim/commands` and `interface/`** — the typed command vocabulary and the single door. Both greenfield. This is where fog filtering and capability envelopes live. Get the envelope abstraction right here; it is expensive to retrofit and it is what makes agent runs comparable to human runs.
 
 **6. `sim/run` and `sim/meta`** — the session state machine and the run/meta save split. Fully greenfield; nothing in `legacy/` distinguishes starting a session from the process existing. The old entry point constructed the entire live object graph in one function with `reload_current_scene()` as its only reset primitive. Build the lifecycle in front of construction, not around it.
