@@ -8,7 +8,7 @@ extends RefCounted
 ## (awning, banners, lantern, a counter apparatus lighting up), so it's obvious "a transformation happened".
 ## Pure draw + timers; it never writes the sim. Delete it and production numbers are identical.
 ##
-## T3.5 (director, 2026-08-24): "a stubborn buried exchange, not a chatty NPC" -- non-humanoid, personality
+## T3.5: "a stubborn buried exchange, not a chatty NPC" -- non-humanoid, personality
 ## through physical behavior. `_draw_apparatus` is that call: no shopkeeper, a salvaged counter, a
 ## mechanical shutter, a scale, a slate ledger, one lamp that is the whole "is anyone home" cue.
 
@@ -187,7 +187,7 @@ func _draw_sign(canvas: CanvasItem, base: Vector2, a: float) -> void:
 	canvas.draw_circle(c + Vector2(0.0, 5.5), 2.6, Color(0.95, 0.8, 0.45, a))       # a gold mark
 
 
-## T3.5 (director, 2026-08-24): the Bazaar reads as a stubborn buried exchange, not a chatty NPC --
+## T3.5: the Bazaar reads as a stubborn buried exchange, not a chatty NPC --
 ## personality through PHYSICAL BEHAVIOR, not a character standing in for one. No humanoid: a salvaged
 ## counter (two mismatched planks, patched rather than built new), a mechanical roll-shutter that could
 ## close this place off, a scale for weighing what crosses the counter, and a slate ledger tallying it.

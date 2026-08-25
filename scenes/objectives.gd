@@ -8,12 +8,11 @@ extends RefCounted
 ## self-directs through the tech tree and depth, and it deliberately does not keep nudging into L3
 ## (docs/PROGRESSION.md).
 ##
-## The "hopper" step, 2026-08-25: a live playtest and a design review (docs/handoff/
-## PRODUCT_RECOVERY_PASS_2026-08-24.md) found the chain jumped straight from "drop coal on the Drill by
-## hand" to "research Power," with nothing about the Hopper in between -- so the player's own hand-feeding
-## never stopped, "first automation" stayed half-manual, and Power read as the only answer to a problem a
-## Hopper already solves. `hopper.filter`/`R` re-taste and `_first_machine_below` are not new mechanics;
-## this step is the first thing in the whole chain to teach them.
+## The "hopper" step: a player report and a design review found the chain jumped straight from "drop coal
+## on the Drill by hand" to "research Power," with nothing about the Hopper in between -- so the player's
+## own hand-feeding never stopped, "first automation" stayed half-manual, and Power read as the only answer
+## to a problem a Hopper already solves. `hopper.filter`/`R` re-taste and `_first_machine_below` are not
+## new mechanics; this step is the first thing in the whole chain to teach them.
 ##
 ## Representation only: it reads the sim, never mutates it and never enters the tick. Progress is measured
 ## as deltas against a baseline snapshotted at construction (lifetime counters minus their start value),

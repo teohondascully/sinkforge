@@ -716,7 +716,7 @@ func _resolve_tex(key: String) -> Texture2D:
 
 
 ## How full the pack reads, 0..1. There is no carry cap in the sim (T3.8: mass is counts and slots, not a
-## weight system), so this saturates on total item count rather than a fraction of some capacity — a single
+## weight system), so this saturates on total item count rather than a fraction of some capacity: a single
 ## ore ticks the pack visibly, a loaded-up return trip reads as full, and nothing has to invent a max.
 const CARRY_VISUAL_SATURATION: float = 10.0
 
@@ -743,7 +743,7 @@ func _draw() -> void:
 	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
 	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
 	# The pack: a load-scaled sack drawn behind the body, on the back (opposite facing) at shoulder height,
-	# so the body sprite occludes the near half and only the carried bulk peeks out — T3.8, "haul has no
+	# so the body sprite occludes the near half and only the carried bulk peeks out, T3.8's "haul has no
 	# body." Drawn before the tex so it sits underneath; the sack itself never reads a sprite frame.
 	var load: float = _carry_load()
 	if load > 0.0:
@@ -752,7 +752,7 @@ func _draw() -> void:
 		# A canvas tan, not a leather brown: the overalls and the sprite's own outline already own the dark
 		# warm register, so a bulge in that family would sit unread against them at small sizes. The same
 		# cool rim used on the body silhouette (line ~772) separates the sack the same way it separates the
-		# body, drawn as one oversized circle underneath rather than the 8-direction loop — cheap and the
+		# body, drawn as one oversized circle underneath rather than the 8-direction loop: cheap, and the
 		# pack has no limbs to halo around.
 		draw_set_transform(pack_center, 0.0, Vector2(0.85, 1.0))
 		draw_circle(Vector2.ZERO, pack_r + 1.2, Color(0.80, 0.93, 1.0, 0.85))

@@ -2483,7 +2483,7 @@ func _toggle_ping(canvas_pos: Vector2) -> void:
 ## The wheel's answer to the tab keys, while the counter is open: step to the OTHER tab in whichever
 ## screen E/B/T actually opened. PACK has no sibling tab, so this is a no-op there rather than a jump into
 ## the Bazaar; WORKS and BENCH are the Bazaar's whole tab set, so between the two of them this is just a
-## toggle regardless of scroll direction — there is nowhere else to land.
+## toggle regardless of scroll direction: there is nowhere else to land.
 func _cycle_bazaar_tab() -> void:
 	if _hud.bazaar_tab == Hud.TAB_PACK:
 		return

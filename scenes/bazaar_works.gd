@@ -103,7 +103,7 @@ func _works_rows_needed() -> int:
 			base = r
 			break
 	# The "N more wait behind research" line lives in this same content box, at its bottom edge, and was
-	# never counted here — so the box was sized to the grid alone and the line drew on top of the grid's
+	# never counted here, so the box was sized to the grid alone and the line drew on top of the grid's
 	# own last row. One reserved row keeps the two from sharing space instead of moving the line elsewhere.
 	if _hidden_count() > 0:
 		base += 1
@@ -138,7 +138,7 @@ func _tab_works(g: Dictionary) -> void:
 	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only
 	# honest if the panel still says there is one, because otherwise the counter looks finished at four
 	# machines and the tech ladder looks optional. When it is shown, the grid gets one fewer row so the
-	# line has its own space at the bottom of the content box instead of drawing over the last card row —
+	# line has its own space at the bottom of the content box instead of drawing over the last card row.
 	# `_works_rows_needed` reserved that row already, matched here by the same `_hidden_count`.
 	var hidden: int = _hidden_count()
 	var grid_rows: int = rows - (1 if hidden > 0 else 0)

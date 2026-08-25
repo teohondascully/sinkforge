@@ -354,13 +354,13 @@ func _update_space(listener: Vector2, delta: float) -> void:
 
 const OCCLUSION_REACH: int = 24                ## cells walked at most between a source and the listener
 ## A placeholder, not a tuned value: how many dB a fully-occluded source loses on top of ordinary distance
-## falloff. Conservative on purpose — the curve this should follow (and whether low-pass belongs beside
-## it) is a listening call, same class as T3.10's swing-release tuning, and stays open for a director pass.
+## falloff. Conservative on purpose: the curve this should follow (and whether low-pass belongs beside
+## it) is a listening call, same class as T3.10's swing-release tuning, and stays open for a tuning pass.
 const OCCLUSION_DB_MAX: float = 10.0
 
 ## Fraction of solid cells on the straight line from `listener` to `source`, 0..1. The same fixed-step walk
 ## `_probe_space` uses for the listener's OWN enclosure (`sim.is_solid`/`sim.in_bounds`), aimed at one point
-## instead of swept in twelve fixed directions — today only the space around the listener shapes the
+## instead of swept in twelve fixed directions: today only the space around the listener shapes the
 ## reverb; the rock between a distant sound and the ear does nothing to it. T4.5.
 func _occlusion(source: Vector2, listener: Vector2) -> float:
 	var sim: FactorySim = _sim()
