@@ -15,6 +15,21 @@ extends BazaarSurface
 var bazaar_row: int = 0
 var cat: BazaarCatalogue = null
 
+## Screen rect -> flat cursor index for every row this frame actually drew, so a click can be routed to
+## the same index the keyboard cursor already uses. Populated in `_works_group`, read by `click_hit`, the
+## same rect-cache-then-hit-test shape `Hud._alert_hits` already uses for the alert stack.
+var _click_hits: Array[Dictionary] = []
+
+
+## Which flat row index, if any, `mouse` (canvas coords) landed on this frame. -1 on a miss, which
+## includes every frame before the tab has drawn once, so a stray click while nothing is visible yet is
+## silently a no-op rather than aimed at stale geometry.
+func click_hit(mouse: Vector2) -> int:
+	for hit: Dictionary in _click_hits:
+		if (hit["rect"] as Rect2).has_point(mouse):
+			return int(hit["index"])
+	return -1
+
 
 ## The ink for a short row with the cursor on it. Affordability and the cursor are orthogonal, so there
 ## are four combinations and not three. The name colour read `(gold if selected else UiTheme.UI_TEXT) if afford
@@ -119,6 +134,7 @@ func works_demand(rows: int) -> Dictionary:
 func _tab_works(g: Dictionary) -> void:
 	var content: Rect2 = g["content"]
 	var rows: int = int(g["rows"])
+	_click_hits.clear()    # stale unless _works_group repopulates it below; a miss this frame is a miss
 	# ...and one quiet line saying the rest exists and where it lives. Hiding the locked half is only
 	# honest if the panel still says there is one, because otherwise the counter looks finished at four
 	# machines and the tech ladder looks optional. When it is shown, the grid gets one fewer row so the
@@ -180,7 +196,9 @@ func _works_group(content: Rect2, col0: int, cols: int, col_w: float, rows: int,
 		var oi: int = open_rows[first + i]
 		var rr := Rect2(x0 + float(i / rows) * (col_w + BAZAAR_GUTTER),
 			content.position.y + float(i % rows) * BAZAAR_ROW_H, col_w, BAZAAR_ROW_H - 3.0)
-		_works_row(rr, opts[oi], _works_id(machines, oi), base + first + i == bazaar_row)
+		var idx: int = base + first + i
+		_works_row(rr, opts[oi], _works_id(machines, oi), idx == bazaar_row)
+		_click_hits.append({"rect": rr, "index": idx})
 
 
 ## One row, drawn as a card and not as an outlined box: a surface tint you can see through to the panel,

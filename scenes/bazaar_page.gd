@@ -362,6 +362,16 @@ func bazaar_action() -> Dictionary:
 			return {"kind": "hold", "id": slots[i]["item"], "row": i}
 
 
+## The mouse's answer to `bazaar_move` + Enter, in one motion: which flat row `mouse` (canvas coords)
+## landed on, or -1 on a miss. WORKS only for now, the tab the "mouse can't buy things" report was about
+## and the one that already caches its drawn row rects; the other tabs fall through to -1 rather than
+## guess at geometry nothing cached this frame.
+func bazaar_click(mouse: Vector2) -> int:
+	if bazaar_tab != TAB_WORKS:
+		return -1
+	return _works_page().click_hit(mouse)
+
+
 ## Change tab, keeping each tab's place in its own list. Re-picking the tab you are already on means
 ## "back to the top", which is the only way left to send the cursor home now that leaving and returning
 ## no longer does it.

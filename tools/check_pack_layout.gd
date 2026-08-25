@@ -336,7 +336,44 @@ func _real_catalogue() -> void:
 		"full tech: every row of both groups is inside the drawn window when the cursor is on it%s"
 			% ["" if lost.is_empty() else " — LOST: " + ", ".join(lost.slice(0, 6))])
 	_adaptive_panel(main, hud)
+	await _click_routes_to_row(main, hud)
 	main.queue_free()
+
+
+## THE MOUSE'S ANSWER TO ENTER, routed to the same flat index the keyboard cursor already uses. This is
+## the one path nothing above exercises: every check here reads geometry or the census, never a click.
+##
+## Does NOT call `_tab_works` to get real geometry: `CanvasItem.draw_*` refuses to run outside an actual
+## `_draw()` callback ("Drawing is only allowed inside this node's `_draw()`..."), and under
+## `run_harness.sh` this layer runs `--headless`, where nothing ever delivers that real callback — a first
+## version of this check called `_tab_works` directly and it "passed" while spraying that engine error
+## into the log on every row drawn, and an earlier version still waited on `RenderingServer.frame_post_draw`
+## and hung the layer outright, since headless never fires it either. Seeding `_click_hits` by hand instead
+## tests exactly the new logic (the hit-test search in `click_hit`, the tab guard in `bazaar_click`)
+## without depending on a render pipeline this layer does not have. `_works_group`'s own arithmetic for
+## the rect and the flat index is a single, reviewed line (`bazaar_works.gd`) rather than a second thing
+## this check would otherwise have to re-derive.
+func _click_routes_to_row(main: MainView, hud: Hud) -> void:
+	main._inventory_open = true
+	hud.set_bazaar_tab(Hud.TAB_WORKS)
+	_check(hud.bazaar_click(Vector2(50.0, 50.0)) == -1,
+		"a click misses (-1) while nothing has been cached yet")
+	var works: BazaarWorks = hud._bazaar()._works_page()
+	works._click_hits = [
+		{"rect": Rect2(20.0, 20.0, 40.0, 20.0), "index": 0},
+		{"rect": Rect2(70.0, 20.0, 40.0, 20.0), "index": 5},
+	]
+	_check(hud.bazaar_click(Vector2(40.0, 30.0)) == 0,
+		"a click inside row 0's cached rect routes to flat index 0")
+	_check(hud.bazaar_click(Vector2(90.0, 30.0)) == 5,
+		"a click inside a later row's cached rect routes to ITS flat index (5), not the first one seen")
+	_check(hud.bazaar_click(Vector2(500.0, 500.0)) == -1,
+		"a click outside every cached rect misses (-1) rather than falling back to the nearest one")
+	hud.set_bazaar_tab(Hud.TAB_BENCH)
+	_check(hud.bazaar_click(Vector2(40.0, 30.0)) == -1,
+		"the same point that hit row 0 on WORKS misses on another tab — clicks do not leak across tabs")
+	hud.set_bazaar_tab(Hud.TAB_WORKS)
+	main._inventory_open = false
 
 
 ## What one list ASKS for, before `works_columns` clamps it.

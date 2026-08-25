@@ -1685,6 +1685,10 @@ func bazaar_action() -> Dictionary:
 	return _bazaar().bazaar_action()
 
 
+func bazaar_click(mouse: Vector2) -> int:
+	return _bazaar().bazaar_click(mouse)
+
+
 func set_bazaar_tab(tab: int) -> void:
 	_bazaar().set_bazaar_tab(tab)
 

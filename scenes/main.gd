@@ -1070,6 +1070,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
 			and _cursor_on_hover_panel():
 		_apply_knob(_hud.hover_click(Controls.pointer_viewport(self)))   # config-panel chips
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT \
+			and _inventory_open:
+		# A click means what Enter means: land the cursor on the row and commit, in one motion, the same
+		# grammar the WORKS grid already uses for a keyboard press. A miss (outside every drawn row) is
+		# silently a no-op, same as a click anywhere else in the world that hits nothing.
+		var hit: int = _hud.bazaar_click(Controls.pointer_viewport(self))
+		if hit >= 0:
+			_hud.bazaar_row = hit
+			_bazaar_enter()
 	elif event.is_action_pressed(Controls.GRAPPLE):
 		_toggle_grapple()
 	elif event.is_action_pressed(Controls.LINK):
