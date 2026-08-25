@@ -21,14 +21,38 @@ doc changes, before touching `core/`.
 
 ## In flight right now
 
-- Fork triaging the 8 local-only documents (`PRIORITY.md`, `DIRECTOR_BRIEF.md`, `ORCHESTRATOR.md`,
-  `AGENT_PLAY_EVALUATION_PROTOCOL.md`, `FEEL_GAP.md`, `MENU_MATRIX.md`,
-  `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`, `VISUAL_RECOMMENDATIONS_SURFACE.md`) into three
-  buckets: stays-local, promote-to-archive, genuinely-private. Recommend only, don't act. Not yet
-  reported back.
-- Not yet started: claim-rot mechanisms doc changes (docs/CLAIMS.md), Godot version pin
-  (project.godot + README.md), movement/collision resolution-split doc changes (ARCHITECTURE.md §9,
-  CONTEXT.md, GDD.md, one new BLOCKED claim), QUALITY.md note on gates being subject to themselves.
+- Claim-rot mechanisms, data-version history, Godot pin, QUALITY.md self-subject note — DONE,
+  committed (`8891977`).
+- Movement/collision architecture doc changes — IN PROGRESS. ARCHITECTURE.md §9 resolution-split +
+  rope/grapple promotion done, not yet committed. Still to do: extend hostile-chamber spec (sub-tile
+  rubble, 1-3px ledges, jagged fresh-dig), CONTEXT.md one-liner, GDD.md rope/grapple promotion near
+  §1's Noita reference, new BLOCKED claim (velocity_efficiency ≥0.92 over freshly-dug terrain).
+- Still owed to director: full write-up of items 1-3 from their last message (clone-size plan,
+  31-commit summary — done above — and now the 8-doc triage), plus the public/private
+  recommendation with reasoning that gates the clone-size filter-repo question.
+
+## 8-document triage (fork result, recommend-only per director's request — nothing moved)
+
+Bucket A (stays local) cleanly: `PRIORITY.md`. Bucket B (promote to archive) cleanly:
+`AGENT_PLAY_EVALUATION_PROTOCOL.md` (strong candidate — reads as an active spec, could even go
+normative rather than archive/). Six are mixed:
+- `DIRECTOR_BRIEF.md` — already known, §4.1-4.3 (~65/594 lines) is B, rest is A.
+- `FEEL_GAP.md` — ~26/39 "strikes" are B (already self-flags as superseded, low-friction to archive).
+- `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md` — leans B (~55-65%): eval protocol/rubric/review
+  methodology is B, the 50-item raw finding table is A.
+- `MENU_MATRIX.md` — leans A (~80%): ticket ledger is A, WCAG contrast audit + a documented
+  design-alternatives decision are B.
+- `VISUAL_RECOMMENDATIONS_SURFACE.md` — leans A (~90%): ticket queue is A, a short "reference
+  philosophies" section (Factorio/Noita) is B.
+- `ORCHESTRATOR.md` — the outlier. Genuinely valuable methodology (§5 assertion philosophy, §6
+  Works/Feels/Belongs + SEES tier, §10 design maxims) is NOT cleanly separable from a document-wide
+  voice problem: second-person address to an AI agent plus a verbatim "the user's own words"
+  quote block — the same commissioner-voice pattern this project already did a full history rewrite
+  to scrub once (memory: history-rewrite-2026-08-19). Needs a rewrite before archiving, not just a
+  cut.
+
+No embarrassing/liability content found in any of the eight. Recommendation synthesis still owed to
+director in the final write-up.
 
 ## Open questions (director owes/awaits an answer, or I owe one back)
 

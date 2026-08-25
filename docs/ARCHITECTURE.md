@@ -291,6 +291,59 @@ build_cost: { ingot_iron: 8 }
 
 `sim/body`. Fully deterministic, testable without rendering. This is what makes feel auditable.
 
+### Resolution is not one number
+
+Decided now, before `sim/body` or `sim/world` are built, because it's structural and expensive to
+retrofit — even though feel tuning itself is deferred to stage 4. Four resolutions, decoupled:
+
+| Layer | Resolution | Governs |
+|---|---|---|
+| Visual | 1px | fine grain |
+| Terrain / digging | fine grid, 2-4px cells | what you excavate, what water flows through. `legacy/` already has a fine-terrain layer to port from. |
+| Machine / logic | 16px | placement, ports, routing |
+| Collision | **derived** from the fine terrain, never equal to it | see below |
+
+**The derivation.** Noita's rigid bodies trace a polygon outline from the pixel grid (marching
+squares), simplify it (Douglas-Peucker), triangulate, and hand the result to Box2D — collision
+geometry is polygonal contours derived from pixels, never the pixel grid itself. That decoupling is
+the real lesson, but the pipeline that produces it is not something to copy: it fights two
+constraints this project has that Noita doesn't. The sim is engine-free, so the polygon solver would
+have to be written from scratch rather than borrowed from Box2D. And the sim is fixed-point
+deterministic, where real polygon collision (clipping, triangulation, manifold generation) is real,
+expensive, hard-to-verify work.
+
+Build the 80% version instead. Derive a per-column surface height from the fine terrain and treat
+walkable ground as a heightfield: sub-pixel column heights, linearly interpolated between columns.
+The player walks a 3px rubble slope as a ramp rather than colliding with three stacked steps. Ceilings
+and walls stay grid-swept — nearly all edge-catching lives on the ground plane, which is what the
+player is actually standing on most of the time, so that's where the payoff is concentrated. This is
+trivially deterministic (integer column heights, linear interpolation, no geometry solver) and it's
+incremental over a capsule sweep, not a rewrite.
+
+Keep the existing forgiveness set on top of this, unchanged: capsule collider, auto step-up, corner
+correction, shortest-axis depenetration, coyote time and jump buffer.
+
+**Where the frictionless feeling actually comes from.** Noita players do get stuck on single pixels —
+it's a documented complaint with a built-in unstuck mechanism — so Noita's collision quality is not
+the source of its frictionless feel. Flight is: Noita gives the player near-unlimited vertical
+mobility, which deletes ground-traversal friction entirely rather than solving it. That specific
+answer isn't available here — a flying player breaks R1 outright (upward movement becomes free, lifts
+become pointless, the central asymmetry evaporates) — so the primitive this project's freedom has to
+come from is different. It's the rope. See "Rope and grapple: the vertical traversal primitive"
+below and `docs/GDD.md` §1 for the full reasoning. Collision correctness (this section) is necessary
+for good feel; it is not sufficient, and effort should be allocated accordingly once stage 4 starts.
+
+### Rope and grapple: the vertical traversal primitive
+
+Currently just one feature among several inside `sim/body` ("climb, rope, swim, carry weight" in the
+module table above). It should be named and budgeted as the primitive that carries this game's
+movement feel, the way flight carries Noita's — not because it needs to do everything flight does,
+but because it's the one system where getting the feel right buys the most. Concrete requirements,
+not yet tuned but stated so a build can be checked against them: fast attach, fast climb, no
+fumbling, auto-anchor at shaft mouths, a dismount that does not fling the player, and swing momentum
+worth chaining. If traversal ends up feeling great, it will be because the rope is great, not because
+collision is perfect.
+
 | Property | Value |
 |---|---|
 | Collider | Capsule or rounded AABB, 1 tile wide, 2.5 tall |
@@ -306,7 +359,7 @@ build_cost: { ingot_iron: 8 }
 | Machine collision | Non-solid to the player except a 1-tile base |
 | Carry penalty | Accel and jump scale with pack mass. Collision behavior never changes. |
 
-**Acceptance criteria, automated, run against a fixed hostile-geometry chamber** with 1-tile ledges, 1-tile pits, machine clusters, narrow shafts, half-dug slopes, rope transitions:
+**Acceptance criteria, automated, run against a fixed hostile-geometry chamber** with 1-tile ledges, 1-tile pits, machine clusters, narrow shafts, half-dug slopes, rope transitions, **sub-tile rubble slopes, 1-to-3px ledges, and jagged fresh-dig surfaces**. That last group is not optional texture on the chamber — as specified before this addition, the chamber would pass a controller that still catches on excavated debris, which is the surface the player is actually standing on most of the time (this is what the heightfield collision derivation above exists to handle; the chamber has to actually exercise it):
 
 | Metric | Threshold |
 |---|---|

@@ -23,6 +23,8 @@ The emotional fantasy: descend into an unknown underground world and build the i
 
 **Reference points, worth playing before designing against this document:** Dome Keeper (dig down, haul up, run-based, feeding a persistent thing at the top) is the closest existing game to this structure. SteamWorld Dig 2 is the best-feeling dig platformer ever made and a better movement reference than Noita or Terraria.
 
+**Why Noita is the wrong movement reference, precisely, and what to take instead.** Noita's collision is genuinely well-built — collision geometry derived from the pixel grid, not equal to it (`docs/ARCHITECTURE.md` §9 has the engineering detail) — but that is not where its frictionless feel comes from. Noita players do get stuck on single pixels; it's a documented complaint with a built-in unstuck mechanism. The feeling comes from flight: near-unlimited vertical mobility that deletes ground-traversal friction entirely rather than solving it. That answer isn't available here. A flying player breaks R1 outright — upward movement becomes free, lifts become pointless, the central asymmetry of the whole design evaporates — so it cannot be copied even partially. **The rope and grapple are this game's answer to the same problem, and should be treated as the vertical traversal primitive, not one feature among several.** Fast attach, fast climb, no fumbling, auto-anchor at shaft mouths, a dismount that doesn't fling the player, swing momentum worth chaining. If traversal ends up feeling great, it will be because the rope is great, not because collision is perfect — collision correctness is necessary, not sufficient, and design/engineering effort on movement should be allocated accordingly.
+
 ---
 
 ## 2. The genre synthesis

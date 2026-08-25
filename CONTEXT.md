@@ -166,6 +166,7 @@ Non-negotiable, because it is what makes agent testing, replay debugging, and sw
 - Seeded, split RNG. One stream per subsystem. Streams are serialized state.
 - No iteration over hash maps in state-affecting code.
 - Generational-index entity IDs. Never pointers, never bare array positions.
+- Four decoupled resolutions (visual, terrain/digging, machine/logic, collision) — collision is derived from the fine terrain as an integer heightfield, never equal to the pixel grid itself. `docs/ARCHITECTURE.md` §9.
 
 `replay_determinism_test` must exist and pass from day one: run a recorded input log twice from one seed, hash state every 100 ticks, assert identical.
 
