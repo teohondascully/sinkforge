@@ -59,6 +59,8 @@ var _defs: Array[Dictionary] = [
 		"text": "LIFT — hauls goods and YOU up its column."},
 	{"id": &"splitter", "item": &"splitter",
 		"text": "SPLITTER — routes falling items down and right. R cycles the ratio."},
+	{"id": &"spur", "item": &"spur",
+		"text": "SPUR — place on lode, touching the Drill (or another Spur). One more mouth, same drain."},
 	{"id": &"h_drill", "item": &"h_drill",
 		"text": "BORER — bores sideways, the way you face. Feed it coal."},
 	{"id": &"drift_rig", "item": &"drift_rig",
