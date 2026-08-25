@@ -98,6 +98,10 @@ static func describe(sim: FactorySim, aim: Vector2i, reachable: bool, drill_rate
 				stock += int(m.input_buffer[it])
 			if m.filter == &"":
 				info["mode"] = "stockpiles %d — keeps the FIRST thing it tastes, passes the rest" % stock
+			elif sim.machine_status(m) == &"blocked":
+				info["mode"] = "banks %s (%d) — BACKED UP, the machine below is full" % [String(m.filter), stock]
+				info["knobs"] = [{"kind": "action", "id": "clear_filter",
+					"label": "[ clear filter — re-taste ]"}]
 			else:
 				info["mode"] = "banks %s (%d) — passes everything else" % [String(m.filter), stock]
 				info["knobs"] = [{"kind": "action", "id": "clear_filter",

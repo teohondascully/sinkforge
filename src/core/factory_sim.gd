@@ -153,7 +153,7 @@ const _BEHAVIORS: Dictionary = {
 		"dests": &"_destinations_splitter"},
 	&"drill": {"run": &"_run_drill", "status": &"_status_drill"},
 	&"generator": {"run": &"_run_generator", "status": &"_status_generator", "power_source": true},
-	&"hopper": {"run": &"_run_hopper", "status": &"_status_mover"},
+	&"hopper": {"run": &"_run_hopper", "status": &"_status_hopper"},
 	&"descent": {"run": &"_run_descent", "status": &"_status_descent"},
 	&"h_drill": {"run": &"_run_h_drill", "status": &"_status_h_drill", "dests": &"_destinations_h_drill"},
 	&"drift": {"run": &"_run_drift", "status": &"_status_drift", "dests": &"_destinations_drift",
@@ -410,7 +410,9 @@ func machine_eats(machine: MachineState, item: StringName) -> bool:
 ##   &"working"  actively doing its job: producing, moving or burning
 ##   &"no_fuel"  a drill or generator with no fuel and no coal to burn
 ##   &"no_input" a recipe machine (forge) starved of ingredients, or a drill with nothing borable below
-##   &"blocked"  a drill whose ore has no drain below (rock or floor directly under the vein)
+##   &"blocked"  a drill whose ore has no drain below (rock or floor directly under the vein), OR a
+##               hopper banking its filtered good with nowhere to put it: the machine below is backed
+##               up to HOPPER_FEED_CAP, so releasing would only pile up there instead of running
 ##   &"idle"     a mover (lift/hopper/splitter) with nothing in it right now; benign, not broken
 func machine_status(machine: MachineState) -> StringName:
 	var entry: Dictionary = _BEHAVIORS.get(machine.def.behavior, {})
@@ -543,6 +545,25 @@ func _status_generator(machine: MachineState) -> StringName:
 
 ## A mover (lift/hopper/splitter): working while goods are in it, idle when empty.
 func _status_mover(machine: MachineState) -> StringName:
+	return &"working" if not machine.input_buffer.is_empty() else &"idle"
+
+
+## The hopper's status, mirroring `_run_hopper`'s own back-pressure gate (the one gate `_status_mover`
+## cannot see, since it only reads "holds something"). A hopper with nothing below it is deliberately
+## reported as `working`, not `blocked`: `_run_hopper`'s own comment calls that configuration storage,
+## not a stall, so this must not contradict it by raising an alarm over a bin the player built on
+## purpose. Back-pressure is the one case that actually looks broken from outside: the mound is full,
+## the trickle glyph is animating, and nothing is moving downstream, which is precisely the "is it
+## working or not?" confusion a status-only read cannot resolve on its own.
+func _status_hopper(machine: MachineState) -> StringName:
+	if machine.filter != &"" and machine.input_buffer.has(machine.filter):
+		var below: MachineState = _first_machine_below(machine.cell)
+		if below != null:
+			var load: int = 0
+			for it: StringName in below.input_buffer:
+				load += int(below.input_buffer[it])
+			if load >= HOPPER_FEED_CAP:
+				return &"blocked"
 	return &"working" if not machine.input_buffer.is_empty() else &"idle"
 
 

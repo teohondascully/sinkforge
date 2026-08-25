@@ -104,6 +104,8 @@ check_grid	4	passlines
 check_hash_mixing	24	asserted
 check_head	40	asserted
 check_hint_gate	32	asserted
+check_hopper_objective	9	asserted
+check_hopper_status	12	asserted
 check_hud_layout	114	asserted
 check_impact	6	asserted
 check_input_deafness	7	asserted
