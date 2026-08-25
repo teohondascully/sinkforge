@@ -50,3 +50,7 @@ None yet.
 
 See the `meta` dependency note above — this is the most consequential open
 question in `sim/`'s dependency graph.
+
+**Freight Winch / haul-mechanic work is gated on this module and `sim/commands` having real
+implementations, not just skeletons.** Same directive and reasoning as `sim/commands/MODULE.md`'s
+Gotchas entry — do not resume Freight Winch work until both modules actually exist as code.

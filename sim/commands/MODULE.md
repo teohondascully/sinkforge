@@ -40,4 +40,8 @@ None yet.
 
 ## Gotchas
 
-None yet.
+**Freight Winch / haul-mechanic work is gated on `sim/run` and this module having real
+implementations, not just this skeleton.** The old codebase's Freight Winch regrew as ad hoc verbs on
+the pre-pivot entry point once (5 commits, see `docs/WORKING.md`'s commit-audit note); the risk is a
+haul-related command type getting added here before the typed command vocabulary and run lifecycle it
+should route through actually exist. Director directive, 2026-08-26.
