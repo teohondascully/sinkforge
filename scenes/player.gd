@@ -715,6 +715,20 @@ func _resolve_tex(key: String) -> Texture2D:
 	return idle if idle != null else Art.tex("miner")
 
 
+## How full the pack reads, 0..1. There is no carry cap in the sim (T3.8: mass is counts and slots, not a
+## weight system), so this saturates on total item count rather than a fraction of some capacity — a single
+## ore ticks the pack visibly, a loaded-up return trip reads as full, and nothing has to invent a max.
+const CARRY_VISUAL_SATURATION: float = 10.0
+
+func _carry_load() -> float:
+	if sim == null or sim.inventory.is_empty():
+		return 0.0
+	var total: int = 0
+	for count: Variant in sim.inventory.values():
+		total += int(count)
+	return 1.0 - exp(-float(total) / CARRY_VISUAL_SATURATION)
+
+
 ## The miner. Draws the motion-appropriate `assets/sprites/miner*.png` frame if present, feet-anchored
 ## and flipped by facing. Falls back to the idle frame and then to the code-drawn figure.
 func _draw() -> void:
@@ -728,6 +742,23 @@ func _draw() -> void:
 	var sxq: float = 1.0 + 0.18 * _squash             # landing squash widens X
 	var syq: float = 1.0 - 0.22 * _squash             # ...and flattens Y
 	var bob: float = -absf(sin(_walk_phase)) * 1.2 if (on_floor and absf(velocity.x) > 10.0) else 0.0
+	# The pack: a load-scaled sack drawn behind the body, on the back (opposite facing) at shoulder height,
+	# so the body sprite occludes the near half and only the carried bulk peeks out — T3.8, "haul has no
+	# body." Drawn before the tex so it sits underneath; the sack itself never reads a sprite frame.
+	var load: float = _carry_load()
+	if load > 0.0:
+		var pack_center := Vector2(-f * WIDTH * 0.46, -HEIGHT * 0.10 + bob)
+		var pack_r: float = WIDTH * (0.30 + 0.30 * load)
+		# A canvas tan, not a leather brown: the overalls and the sprite's own outline already own the dark
+		# warm register, so a bulge in that family would sit unread against them at small sizes. The same
+		# cool rim used on the body silhouette (line ~772) separates the sack the same way it separates the
+		# body, drawn as one oversized circle underneath rather than the 8-direction loop — cheap and the
+		# pack has no limbs to halo around.
+		draw_set_transform(pack_center, 0.0, Vector2(0.85, 1.0))
+		draw_circle(Vector2.ZERO, pack_r + 1.2, Color(0.80, 0.93, 1.0, 0.85))
+		draw_circle(Vector2.ZERO, pack_r, Color(0.74, 0.60, 0.38, 0.96))
+		draw_circle(Vector2.ZERO, pack_r * 0.55, Color(0.52, 0.40, 0.24, 0.9))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var tex: Texture2D = _resolve_tex(_sprite_key())
 	if tex != null:
 		var w: float = float(tex.get_width()) * sxq
