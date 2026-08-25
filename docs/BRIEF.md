@@ -3,72 +3,68 @@
 Regenerated at the end of every session, overwritten. `CONTEXT.md`, "Review bandwidth." If this takes
 more than 90 seconds to read, it's too long.
 
-**Last session: 2026-08-26, autonomous, stopped early at a hard stop (not the stage boundary).**
+**Last updated: 2026-08-26, after Stage 1 landed.**
 
 ---
 
 ## EXPENSIVE, awaiting you
 
-1. **Fixed-point bit depth (`core/` — blocks `sim/body`, `sim/transport`).** `i32, 16 fractional bits`
-   is the existing spec (`ARCHITECTURE.md` §4, `core/MODULE.md`), but I can't validate the ±32,767-unit
-   range against anything: no pixels-per-meter (or equivalent) constant and no maximum playable depth
-   are written down anywhere. Picked nothing. Need either both constants stated somewhere normative, or
-   a decision that position uses a chunked/relative scheme instead, which changes what "range" even
-   means. `docs/DECISIONS_LEDGER.md` D0004.
-2. **Clone-size Phase 1 target is the LOCKED curated archive, not "non-curated."** `history/` +
-   `docs/media/moments` (≈303 of ≈332 MB tracked) are explicitly named "the curated archive" and
-   protected by `docs/DECISIONS.md`'s "Never destroy a curated file" rule, committed 2026-08-17 on
-   purpose as the strongest available protection. Not executed. Full detail: `docs/WORKING.md`.
-3. **`check_loc_ratio.py` will very likely FAIL again the next time Stage 1 is attempted, for
-   structural reasons, not code quality.** `tools/` (863 lines) already exceeds any plausible `core/`
-   size on its own — see "Gates" and D0008 below. Worth deciding how Stage 1 should proceed given this
-   before more time goes into it: accept the red as expected and land it anyway, extend the gate's
-   bootstrap exception, or pull some `sim/` work forward alongside `core/` so the ratio has something to
-   balance against. Not something to resolve without you present — it's a QUALITY-gate calibration
-   question, same class as the fixed-point one.
+1. **Clone-size Phase 1 conflict** — see the director's item 3 reply this session for the one-paragraph
+   statement of the conflict. Not executed either way.
+2. **Doc-triage follow-through on `docs/EXPERIENCE_EVALUATION.md`** — is the CLAIMS.md §5 cross-reference
+   (already committed) the right resolution, or should the two documents merge further? Awaiting your
+   read of the pasted section.
+3. **`docs/handoff/` and `history/`** — tracked-status answered this session (`history/` tracked, 228MB;
+   `docs/handoff/` untracked, 199MB). Neither moved. Still awaiting a decision on what to actually do
+   about either.
+
+Resolved since the last brief: fixed-point bit depth (director supplied the missing constants directly,
+ADR-0003) and the LOC-ratio gate calibration (rewritten as a trend measure, own commit).
 
 ## What landed
 
-- `SplitRng` (`core/split_rng.gd`) — SplitMix64, deterministic split(), get/set_state. 39 tests,
-  golden vectors from an independent Python reference, mutation-checked. **Not committed** (see above).
-- `EntityIdPool` (`core/entity_id_pool.gd`) — packed-int generational ids, `allocate`/`release`/
-  `is_valid`/`live_count`. 29 tests including a 2000-step reproducible randomized-churn check.
-  **Not committed.**
-- `tests/test_base.gd` — new minimal suite-runner, adapted from `legacy/tests/test_base.gd`'s
-  convention. **Not committed.**
-- Earlier in the session (all committed and pushed, see `docs/WORKING.md` for the fuller list): the
-  Sinkforge-as-stratum design decisions and R1 ADR, the Freight Winch build gate, the review-bandwidth
-  and playable-fixtures protocols (this file and `docs/DECISIONS_LEDGER.md` are part of that), and the
-  document triage (`docs/EXPERIENCE_EVALUATION.md` promoted, two archive extractions).
+- `check_loc_ratio.py` rewritten: trailing-10-commit-window trend, 2x floor, ADVISORY under 2,000 game
+  LOC, absolute ratio always printed. `.github/workflows/harness.yml`'s `gates` job given
+  `fetch-depth: 0` so the window actually has history to read in CI. Verified against four synthetic
+  git repos (insufficient history, balanced growth, >2x violation, sub-floor game LOC) before trusting
+  it. Commit `4fbfb71`.
+- `docs/ARCHITECTURE.md` §9 gained "The world scale" (16px/m, 4px terrain grid, 4096px/256m max depth)
+  and `docs/adr/0003-fixed-point-representation.md`.
+- **`core/` Stage 1 landed** (commit `560ee78`): `Fx` (fixed-point, i32/16-fractional-bits, validated
+  against the constants above — `length()`/`length_sq()` documented and test-demonstrated as
+  local-neighborhood-only, safe to ~181px per axis), `SplitRng` (SplitMix64, 39 tests), `EntityIdPool`
+  (packed-int generational ids, 29 tests). 96 tests across three suites, all green, all mutation-checked.
+- Two real GDScript-runtime findings worth knowing before writing more `core/`/`sim/` code, both now in
+  `core/MODULE.md`'s Gotchas: (1) an unguarded runtime error (division by zero, etc.) inside a bare
+  `--headless --script` run doesn't crash, it hangs forever with no exit code; (2) `>>`/`<<` reject a
+  syntactically-negative left operand at parse time but allow the identical value through a variable.
 
 ## Gates
 
-- **RED: `check_loc_ratio.py`** — instrument 1112 (tools 863, tests 249) vs game 152 (core 152). This is
-  the state on disk right now, uncommitted. Was PASS (WARN/bootstrap) before this session's `core/` work
-  existed. See D0008.
-- All other 5 gates: PASS (`check_claim_references`, `check_size_limits`, `layer_lint`,
-  `no_engine_imports`, `schema_validator`).
+All PASS or ADVISORY (informational, non-blocking): `check_claim_references`, `check_size_limits`,
+`layer_lint`, `no_engine_imports`, `schema_validator` — PASS. `check_loc_ratio` — ADVISORY, game LOC
+(257) under the 2,000-line floor; velocity check would currently FAIL on its own (instrument grew faster
+than game over the last 10 commits, expected while `core/` is landing without `sim/` alongside it yet)
+but this isn't gating.
 
 ## Claims
 
-No status or value changes. `C001` and `C002` remain `BLOCKED`, never measured — unaffected by this
-session's work (`sim/run`, `sim/body`, `sim/world` still don't exist).
+No status or value changes. `C001`, `C002` remain `BLOCKED`, never measured.
 
 ## Blocked, and what it's waiting on
 
-- Fixed-point / `sim/body` / `sim/transport` — waiting on the two missing constants above (EXPENSIVE #1).
-- Clone-size Phase 1 — waiting on your go/no-go given the LOCKED-rule conflict (EXPENSIVE #2).
-- Stage 1 landing cleanly — waiting on a decision about the LOC-ratio interaction (EXPENSIVE #3).
-- Stage 2 (`replay_determinism_test`) — not attempted. Would only add more `tests/` LOC against the same
-  small `core/`, worsening the same red rather than sidestepping it.
-- Freight Winch / haul work — waiting on `sim/commands` and `sim/run` having real implementations
-  (gated earlier this session, unchanged).
+- Stage 2 (`replay_determinism_test`) — not started. No blocker, paused to answer this session's other
+  items first.
+- `sim/body` / `sim/transport` — waiting on Stage 3+ (explicitly out of this session's scope).
+- Freight Winch / haul work — waiting on `sim/commands`/`sim/run` real implementations.
+- Clone-size Phase 1, `docs/handoff/`, `history/` — waiting on your decisions (see EXPENSIVE above).
 
 ## LOC ratio
 
-Instrument 1112 / game 152 = 7.32, on disk (uncommitted). Instrument 863 / game 0 (WARN, not a real
-ratio) is what's actually committed at `origin/main`. Delta if the uncommitted work lands as-is: ratio
-goes from "unenforceable" to a real, failing 7.32 — this is what EXPENSIVE #3 is about.
+Instrument 1,314 (tools 943, tests 371) / game 257 (core 257) = 5.11 absolute — informational only.
+Trailing-10-commit window: instrument grew, game grew by less than half as much — would fail the 2x
+velocity check on its own, but ADVISORY-only while game LOC is under 2,000, so not gating. Expected to
+look exactly like this for a while: `core/` is small by design and `sim/` (most of "game") is stage 3+.
 
 ## Taste queue
 

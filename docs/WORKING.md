@@ -6,22 +6,20 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-**Autonomous session, director away — stopped early, at a hard stop, not the stage boundary.**
-Authorized scope was ONBOARDING.md stage 1 (`core/`) and stage 2 (`replay_determinism_test`). Stage 1
-produced `SplitRng` and `EntityIdPool`, both complete and mutation-tested (see below), but hit a real
-hard stop before a first commit: `check_loc_ratio.py` FAILs the moment `core/` goes non-empty without
-`sim/` also landing LOC, because `tools/` alone (863 lines, built in Task 0 before any game code existed)
-already exceeds any plausible size for a "small, pure" `core/`. Full analysis in
-`docs/DECISIONS_LEDGER.md` D0008. **This was arithmetically near-inevitable given the stage-1-only
-boundary** — worth knowing before the next attempt at this stage, not a defect in what got built.
+**Stage 1 (`core/`) landed, commit `560ee78`.** The hard stop below was resolved by the director directly
+rather than worked around: `check_loc_ratio.py` rewritten to measure trailing-window growth instead of
+absolute totals (own commit `4fbfb71`, four synthetic-repo controls verified before trusting it), and the
+missing fixed-point constants (world scale 16px/m, terrain grid 4px, max depth 256m) supplied directly
+(`docs/adr/0003-fixed-point-representation.md`). `core/` now has `SplitRng`, `EntityIdPool`, and `Fx`
+(fixed-point), all fully unit-tested and mutation-checked — 96 tests total across three suites, all
+green, gates all PASS/ADVISORY. Stage 2 (`replay_determinism_test`) has not been attempted yet; the
+director's most recent message shifted to active back-and-forth (six numbered items, several needing a
+direct answer) rather than continued unattended autonomy, so this session paused coding to answer those
+before deciding whether to continue into stage 2.
 
-Fixed-point arithmetic hit a separate, earlier stop: the range this needs (pixels-per-meter conversion,
-max playable depth) isn't written down anywhere, so it wasn't implemented at all — D0004.
-
-**Nothing from this coding session is committed.** `core/split_rng.gd`, `core/entity_id_pool.gd`,
-`core/MODULE.md`'s update, and three test files sit on disk, unstaged, exactly as built — real,
-verified, tested work, deliberately not committed past a red gate. `git status` shows them as untracked/
-modified; nothing was deleted. `docs/BRIEF.md` has the full report.
+Superseded, kept for provenance: the paragraph below described the pre-resolution hard-stop state (gate
+red, fixed-point unvalidated, nothing committed). Both are resolved now; the record stays because the
+reasoning in `docs/DECISIONS_LEDGER.md` D0004/D0008 is still the reasoning, just closed out.
 
 Everything below "Two observations" happened earlier in the same session, before this autonomous grant
 arrived — kept because it's still true and still open, not because it's today's active work.
