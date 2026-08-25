@@ -6,18 +6,25 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-**Autonomous session, director away.** Authorized scope: ONBOARDING.md stage 1 (`core/`) and stage 2
-(`replay_determinism_test` against a trivial stub sim) only. Hard stop before stage 3
-(`sim/world`/`sim/terrain_gen`) regardless of remaining budget — those are judgment calls the director
-wants to be present for. Budget: 8 commits or the stage boundary, whichever comes first. Hard stops that
-mean halt-and-log-to-WORKING.md rather than work around: any gate red not fixable in one attempt (revert,
-log, stop); any EXPENSIVE decision per the ledger protocol (log the analysis, pick nothing, stop — fixed-
-point bit depth is named explicitly as EXPENSIVE); anything touching `sim/` beyond stubs; three
-consecutive commits with no test moving red to green. `docs/BRIEF.md` gets overwritten at the true end of
-this run: EXPENSIVE decisions first, then what landed, gates, what stopped, LOC ratio.
+**Autonomous session, director away — stopped early, at a hard stop, not the stage boundary.**
+Authorized scope was ONBOARDING.md stage 1 (`core/`) and stage 2 (`replay_determinism_test`). Stage 1
+produced `SplitRng` and `EntityIdPool`, both complete and mutation-tested (see below), but hit a real
+hard stop before a first commit: `check_loc_ratio.py` FAILs the moment `core/` goes non-empty without
+`sim/` also landing LOC, because `tools/` alone (863 lines, built in Task 0 before any game code existed)
+already exceeds any plausible size for a "small, pure" `core/`. Full analysis in
+`docs/DECISIONS_LEDGER.md` D0008. **This was arithmetically near-inevitable given the stage-1-only
+boundary** — worth knowing before the next attempt at this stage, not a defect in what got built.
 
-Everything below "Two observations" happened in the same session, before this autonomous grant arrived —
-kept because it's still true and still open, not because it's today's active work.
+Fixed-point arithmetic hit a separate, earlier stop: the range this needs (pixels-per-meter conversion,
+max playable depth) isn't written down anywhere, so it wasn't implemented at all — D0004.
+
+**Nothing from this coding session is committed.** `core/split_rng.gd`, `core/entity_id_pool.gd`,
+`core/MODULE.md`'s update, and three test files sit on disk, unstaged, exactly as built — real,
+verified, tested work, deliberately not committed past a red gate. `git status` shows them as untracked/
+modified; nothing was deleted. `docs/BRIEF.md` has the full report.
+
+Everything below "Two observations" happened earlier in the same session, before this autonomous grant
+arrived — kept because it's still true and still open, not because it's today's active work.
 
 ## Two observations, logged not acted on (director directive)
 
