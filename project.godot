@@ -10,8 +10,12 @@ config_version=5
 [application]
 
 config/name="Sinkforge"
-config/description="A 2D side-view game about digging an industrial empire into a destructible underworld. Mine by hand, automate what you did yourself, and descend — gravity is the conveyor belt (down is free; up costs power)."
-run/main_scene="res://scenes/main.tscn"
+config/description="A 2D side-view roguelite about boring a shaft from a permanent surface rig, hauling material up before the shaft floods, and spending it on the rig that outlives every run. Down is free; up is powered."
+; No main_scene: the pre-pivot entry point (res://scenes/main.tscn) moved to legacy/scenes/main.tscn,
+; which is excluded from the build path on purpose (docs/ARCHITECTURE.md, docs/ONBOARDING.md Task 0.2) —
+; pointing this at legacy content would contradict that exclusion. There is no new entry point yet;
+; view/ and shell/ are empty skeletons until docs/ONBOARDING.md stage 11. Set this once shell/ exists.
+; The old game remains runnable by checking out the `pre-pivot` git tag.
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [display]
