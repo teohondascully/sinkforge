@@ -61,6 +61,10 @@ var _defs: Array[Dictionary] = [
 		"text": "SPLITTER — routes falling items down and right. R cycles the ratio."},
 	{"id": &"h_drill", "item": &"h_drill",
 		"text": "BORER — bores sideways, the way you face. Feed it coal."},
+	{"id": &"drift_rig", "item": &"drift_rig",
+		"text": "DRIFT RIG — bores sideways on POWER, not coal, and sorts pay from spoil at the face."},
+	{"id": &"crusher", "item": &"crusher",
+		"text": "CRUSHER — packs spoil into gravel, 2:1. Ore passes through untouched."},
 	{"id": &"descent_engine", "item": &"descent_engine",
 		"text": "DESCENT ENGINE — stand it on the violet seal, then toss " + str(FactorySim.DESCENT_QUOTA)
 			+ " ingots down its shaft."},
