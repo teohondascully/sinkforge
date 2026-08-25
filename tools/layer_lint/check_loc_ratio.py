@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
-"""Instrument LOC may not exceed game LOC. docs/QUALITY.md gate 7, docs/CLAIMS.md §2.
+"""Instrument LOC growth may not outpace game LOC growth. docs/QUALITY.md gate 7, docs/CLAIMS.md §2.
 
     python3 tools/layer_lint/check_loc_ratio.py
+
+Rewritten 2026-08-26, replacing an absolute-totals comparison that was specified wrong. Comparing
+`instrument > game` on the totals sitting on disk is meaningless at project start: any nonzero
+instrument code exceeds zero game code on day one, and it duly FAILed the instant Task 1 landed `core/`
+without `sim/` landing alongside it in the same commit -- a true statement about that moment, but not
+the failure this gate exists to catch. What actually happened in the prior codebase was a TREND:
+`tools/` grew 90% in five days against `src/`'s 9%, instrumentation compounding roughly seven times
+faster than the game over one short window -- not a single line being crossed once
+(docs/archive/COMPAT_AUDIT..., docs/archive/PIVOT_PLAN...). This measures the trend instead: net LOC
+change over a trailing window of commits, never the totals on disk right now.
 
     instrument = harness/ + experiment/ + tools/ + tests/
     game       = core/ + sim/ + interface/ + view/ + shell/
 
-This is the single check that failed hardest in the prior codebase: tools/
-grew 90% in five days against src/'s 9% (docs/archive/COMPAT_AUDIT... and
-docs/archive/PIVOT_PLAN...), and no individual commit that produced that
-looked wrong on its own. This gate exists to make the trend visible on every
-PR instead of discoverable only in retrospect.
+Window is WINDOW_COMMITS commits, not wall-clock days: commit count doesn't depend on the CI runner's
+clock or timezone, and unlike a date window it can't silently shrink to zero commits in a quiet week
+while still reporting a number. This needs full git history, which is why `.github/workflows/harness.yml`
+'s `gates` job was given `fetch-depth: 0` in the same commit that introduced this rewrite --
+`actions/checkout` defaults to a depth-1 (single-commit) clone, which would make this check's own
+history read empty and its comparison meaningless on every CI run. The `authorship` job already carries
+the identical fetch-depth comment for the same failure shape hitting `tools/check_trailers.sh` once
+before this gate existed.
 
-legacy/ is excluded from both sides — it is frozen, pre-pivot code and
-counting it would make this gate meaningless in both directions.
+FAIL when instrument growth exceeds game growth by more than RATIO_LIMIT, gated by GROWTH_FLOOR so a
+handful of added lines in a quiet week can't trip it on ratio alone. ADVISORY (never blocking, exit 0
+regardless of the verdict) while current game LOC is under GAME_LOC_ADVISORY_FLOOR: below that the
+absolute numbers are too small for a ratio to mean anything, so the floor itself is written down here
+rather than left an implicit side effect of small numbers, per the threshold-before-measurement
+discipline this project applies to claims (docs/CLAIMS.md §10b).
 
-`tools/scratch/` is excluded from the instrument side: it is gitignored
-precisely so throwaway exploration doesn't count against anything, per
-docs/ONBOARDING.md's scratch-work rule.
-
-Counts `.gd`, `.py`, and `.sh` — not `.gd` alone. The gates in this very
-directory are Python, and counting only GDScript would make them invisible
-to the ratio they're supposed to be part of: exactly the "instrument cannot
-register its subject" failure this project's own culture watches for.
+The absolute (all-time) ratio is still computed and printed every run -- purely informational, feeds
+docs/BRIEF.md's "LOC ratio" line by hand, never gates the exit code. Losing that number entirely would
+have hidden exactly the state this gate's predecessor caught (instrument outpacing game in absolute
+terms); it just isn't grounds for a FAIL on its own anymore.
 """
+from __future__ import annotations
+
+import subprocess
 import sys
 from pathlib import Path
 
@@ -32,63 +48,127 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTRUMENT_DIRS = ["harness", "experiment", "tools", "tests"]
 GAME_DIRS = ["core", "sim", "interface", "view", "shell"]
 SCRATCH_PREFIX = "tools/scratch"
-CODE_EXTENSIONS = ("*.gd", "*.py", "*.sh")
+CODE_EXTENSIONS = (".gd", ".py", ".sh")
+
+WINDOW_COMMITS = 10
+RATIO_LIMIT = 2.0
+GROWTH_FLOOR = 50
+GAME_LOC_ADVISORY_FLOOR = 2000
 
 
-def loc_under(dirname: str) -> int:
+def _run_git(args: list[str]) -> str:
+    result = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+    return result.stdout
+
+
+def _is_counted(rel_path: str) -> bool:
+    if rel_path.startswith(SCRATCH_PREFIX + "/"):
+        return False
+    return rel_path.endswith(CODE_EXTENSIONS)
+
+
+def loc_under_worktree(dirname: str) -> int:
     base = ROOT / dirname
     if not base.is_dir():
         return 0
     total = 0
-    paths = (p for ext in CODE_EXTENSIONS for p in base.rglob(ext))
-    for p in paths:
-        rel = p.relative_to(ROOT).as_posix()
-        if rel.startswith(SCRATCH_PREFIX + "/"):
-            continue
-        total += len(p.read_text(encoding="utf-8", errors="replace").splitlines())
+    for ext in ("*.gd", "*.py", "*.sh"):
+        for p in base.rglob(ext):
+            rel = p.relative_to(ROOT).as_posix()
+            if rel.startswith(SCRATCH_PREFIX + "/"):
+                continue
+            total += len(p.read_text(encoding="utf-8", errors="replace").splitlines())
     return total
 
 
-def main() -> int:
-    instrument = {d: loc_under(d) for d in INSTRUMENT_DIRS}
-    game = {d: loc_under(d) for d in GAME_DIRS}
-    instrument_total = sum(instrument.values())
-    game_total = sum(game.values())
+def loc_at_commit(commit: str, dirname: str) -> int:
+    """Total counted-code lines under `dirname` as of `commit`, read via git plumbing -- no checkout,
+    no worktree mutation, safe to call from inside a dirty working tree."""
+    try:
+        listing = _run_git(["ls-tree", "-r", "--name-only", commit, "--", dirname])
+    except RuntimeError:
+        return 0
+    total = 0
+    for rel in listing.splitlines():
+        if not _is_counted(rel):
+            continue
+        try:
+            content = _run_git(["show", f"{commit}:{rel}"])
+        except RuntimeError:
+            continue  # in the tree listing but not readable as text -- skip rather than crash
+        total += len(content.splitlines())
+    return total
 
-    print("check_loc_ratio: instrument (harness+experiment+tools+tests):")
-    for d, n in instrument.items():
+
+def resolve_window_start() -> str | None:
+    """The commit WINDOW_COMMITS back from HEAD, or None if history is shorter than that (a shallow
+    clone, or a young repo) -- both are real conditions this gate must say it can't measure, not
+    silently treat as a zero-growth window."""
+    try:
+        commits = _run_git(["log", "--format=%H", f"-n{WINDOW_COMMITS + 1}"]).splitlines()
+    except RuntimeError:
+        return None
+    if len(commits) <= WINDOW_COMMITS:
+        return None
+    return commits[-1]
+
+
+def main() -> int:
+    instrument_now = {d: loc_under_worktree(d) for d in INSTRUMENT_DIRS}
+    game_now = {d: loc_under_worktree(d) for d in GAME_DIRS}
+    instrument_total = sum(instrument_now.values())
+    game_total = sum(game_now.values())
+
+    print("check_loc_ratio: instrument (harness+experiment+tools+tests), current:")
+    for d, n in instrument_now.items():
         print(f"    {d:12s} {n:6d}")
     print(f"    {'total':12s} {instrument_total:6d}")
-    print("check_loc_ratio: game (core+sim+interface+view+shell):")
-    for d, n in game.items():
+    print("check_loc_ratio: game (core+sim+interface+view+shell), current:")
+    for d, n in game_now.items():
         print(f"    {d:12s} {n:6d}")
     print(f"    {'total':12s} {game_total:6d}")
 
     if game_total == 0:
-        # Bootstrap exception, not a loophole: the gate scripts under tools/ MUST exist
-        # before core/ and sim/ do (docs/ONBOARDING.md Task 0.6, "build the gates before
-        # the code"), so a nonzero instrument total here is expected, not drift. The ratio
-        # this gate exists to police ("instrument outpacing game") is meaningless with no
-        # game to compare against — see docs/ARCHITECTURE.md discussion in this project's
-        # memory of "expected null carries no conclusion": a zero-game state is a different
-        # condition than "instrument exceeds game," not a degenerate case of it.
-        # This WARN must stop being silent the moment Task 1 lands core/ — if this line is
-        # still printing once game_total has been nonzero in a prior run, that is the drift
-        # this gate exists to catch, and it should be treated as a FAIL by hand until then.
-        print(
-            f"check_loc_ratio: WARN — {instrument_total} lines of instrument exist with zero "
-            "lines of game. Expected before Task 1 lands core/; the ratio is unenforceable "
-            "until then. PASS on this bootstrap exception, not because the ratio holds."
-        )
+        print(f"check_loc_ratio: absolute ratio = inf ({instrument_total} instrument, 0 game) "
+              "-- informational, does not gate")
+    else:
+        print(f"check_loc_ratio: absolute ratio = {instrument_total / game_total:.3f} "
+              "(instrument / game) -- informational, does not gate")
+
+    window_start = resolve_window_start()
+    if window_start is None:
+        print(f"check_loc_ratio: fewer than {WINDOW_COMMITS} commits of history available "
+              "(shallow clone or a young repo) -- cannot measure a trailing-window trend. "
+              "ADVISORY: not gating on velocity this run.")
         return 0
 
-    ratio = instrument_total / game_total
-    print(f"check_loc_ratio: ratio = {ratio:.3f} (instrument / game)")
-    if instrument_total > game_total:
-        print(
-            f"check_loc_ratio: FAIL — instrument ({instrument_total}) exceeds game ({game_total}). "
-            "Per docs/CLAIMS.md, the next unit of work is game, not another check."
-        )
+    instrument_then = sum(loc_at_commit(window_start, d) for d in INSTRUMENT_DIRS)
+    game_then = sum(loc_at_commit(window_start, d) for d in GAME_DIRS)
+    instrument_growth = instrument_total - instrument_then
+    game_growth = game_total - game_then
+
+    print(f"check_loc_ratio: over the last {WINDOW_COMMITS} commits ({window_start[:8]}..HEAD): "
+          f"instrument {instrument_then} -> {instrument_total} ({instrument_growth:+d}), "
+          f"game {game_then} -> {game_total} ({game_growth:+d})")
+
+    violates_velocity = (
+        instrument_growth > GROWTH_FLOOR
+        and instrument_growth > RATIO_LIMIT * max(game_growth, 0)
+    )
+
+    if game_total < GAME_LOC_ADVISORY_FLOOR:
+        verdict = "would FAIL" if violates_velocity else "would PASS"
+        print(f"check_loc_ratio: ADVISORY -- game LOC ({game_total}) is under the "
+              f"{GAME_LOC_ADVISORY_FLOOR}-line floor where this ratio means anything. "
+              f"Velocity check {verdict} but is not gating this run.")
+        return 0
+
+    if violates_velocity:
+        print(f"check_loc_ratio: FAIL -- instrument grew {instrument_growth} lines against game's "
+              f"{game_growth} over the last {WINDOW_COMMITS} commits, more than {RATIO_LIMIT:.0f}x. "
+              "Per docs/CLAIMS.md, the next unit of work is game, not another check.")
         return 1
 
     print("check_loc_ratio: PASS")

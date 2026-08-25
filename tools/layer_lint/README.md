@@ -9,11 +9,14 @@ check that has never been observed failing is not a check."
 - `no_engine_imports.py` — `core/` and `sim/` may not reference the scene tree, file IO, wall-clock
   time, or unseeded randomness.
 - `check_size_limits.py` — no file over 400 lines (warn at 300), no function over 50.
-- `check_loc_ratio.py` — instrument LOC (`harness/` + `experiment/` + `tools/` + `tests/`) must not
-  exceed game LOC (`core/` + `sim/` + `interface/` + `view/` + `shell/`). Reads WARN, not FAIL, while
-  `core/` hasn't landed yet (Task 1) — a zero-game state is a different condition from "instrument
-  exceeds game," not a degenerate case of it. That WARN should stop appearing once `core/` exists;
-  if it's still printing after that, treat it as the FAIL it actually is.
+- `check_loc_ratio.py` — instrument LOC growth (`harness/` + `experiment/` + `tools/` + `tests/`) may
+  not exceed game LOC growth (`core/` + `sim/` + `interface/` + `view/` + `shell/`) by more than 2x
+  over a trailing 10-commit window, with a floor so small numbers don't trip it. Rewritten 2026-08-26 —
+  the original absolute-totals form correctly went red the moment `core/` landed with `sim/` still
+  empty, but that was the wrong thing to gate on: any nonzero instrument exceeds zero game on day one.
+  ADVISORY (never blocking) until current game LOC passes 2,000; always prints the absolute ratio as
+  information regardless. Needs `.github/workflows/harness.yml`'s `gates` job to check out full history
+  (`fetch-depth: 0`) — see the script's own header for why.
 - `check_claim_references.py` — every scenario in `scenarios/` and every harness layer with a
   registered `func run()` names a claim ID that exists in `claims/` AND has been observed FAILING at
   least once (`first_failed_at` populated — `docs/CLAIMS.md` §10a), or is explicitly marked

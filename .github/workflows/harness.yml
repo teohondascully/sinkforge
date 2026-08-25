@@ -64,7 +64,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # fetch-depth: 0, same reason as the authorship job above: check_loc_ratio.py (QUALITY gate 7)
+      # reads a trailing window of commit history to measure instrument-vs-game LOC growth, not just
+      # the totals on disk. A depth-1 checkout would make that history read empty on every run, which
+      # the script itself detects and reports as ADVISORY rather than silently mismeasuring — but a
+      # gate that can never actually gate in its own CI environment is the failure worth avoiding here.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
