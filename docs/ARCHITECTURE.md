@@ -1,368 +1,371 @@
-# Sinkforge — Technical Architecture
+# Architecture
 
-> The technical source of truth. The load-bearing systems get a section each — responsibility, public API,
-> relationships — and the **Module index** near the bottom lists every remaining script in `src/` and
-> `scenes/` with one line on what it is for, so that nothing in the tree is absent from this file without
-> being absent on purpose. Update this whenever a system is built or refactored.
-
-## Core Principle: Data-Driven Everything
-
-Machines, materials, recipes, and depth layers are **Godot custom Resources (data files)**, consumed by a generic engine. Adding new content = creating/editing a data file, NOT writing new classes. This is the load-bearing architectural decision.
-
-## Core Principle: Discrete Items Are Source of Truth
-
-Production is **discrete and integer**. A machine fills `output_buffer`; `_flow` hands those items to the
-machine's destination list; nothing anywhere is a rate. `production_rate()` is **derived bookkeeping** — a
-ring buffer of `total_produced` snapshots, read only by the HUD for legibility, never read back by
-production logic.
-
-The falling-item sprites (`FallingItems`) are a cosmetic layer spawned from `flow_events`. **Delete them
-and every production count is identical.**
-
-> *This principle used to be written the other way round — "production math runs entirely through the
-> abstract rate-based flow layer, discrete falling items are cosmetic". That inverted the actual
-> dependency: items are authoritative and the rate layer is the cosmetic one. It described an earlier
-> architecture and would have led a new contributor to build against a layer that does not exist.
-> Corrected 2026-08-17.*
+**Status:** normative. **Last revised:** 2026-08-25. **Changes to anything in this document require an ADR in `docs/adr/`.**
 
 ---
 
-## Systems
+## 1. The premise this architecture serves
 
-> The whiteboard view: simulation (node-free, authoritative) on one side, representation
-> (Nodes, disposable, read-only) on the other. The boundary is the load-bearing invariant.
+Sinkforge is a game and a measurement instrument for game design. The instrument only works if automated agents can play the real game, thousands of times, with no human and no window, and produce evidence that is comparable to how humans actually play.
 
-### FactorySim — the simulation (source of truth)
-- **Location:** `src/core/factory_sim.gd` (`RefCounted`, node-free)
-- **Responsibility:** Runs all production math on a fixed 20 Hz tick; owns the grid topology
-  and the item flow. Deterministic; runs headless.
-- **Public API:** `place_machine(def, cell) -> MachineState` · `remove_machine(cell)` ·
-  `machine_at(cell)` · `in_bounds(cell)` · `advance(delta)` (game-loop time driver) ·
-  `tick()` (one logical step). Terrain/pack/economy: `is_solid`/`material_at`/`set_solid`/`mine` ·
-  `inventory_slots()` · `deposit(cell,item,n)` · `collect_ground(cell)` (walk-over pickup of a spat
-  pile) · `craft(def)` (spend `craft_cost` ingots → a machine item, counted as consumed) ·
-  `build_from_pack(def,cell)` / `pickup_machine(cell)` (place/return a carried machine, salvaging
-  buffers). Reads: `machines`, `grid`, `inventory`, `ground`, `sink`, `total_produced/consumed`.
-- **Topology:** machines occupy grid cells (`GRID_COLS`×`GRID_ROWS`, row increases downward).
-  Each tick: every machine runs, then `_flow` hands each machine's output to its **destination
-  list** (`_destinations` → `_column_landing`). An ordinary machine has ONE destination (straight
-  down its column): the next machine below catches it (cascade), else it **lands on top of the
-  first solid floor as a physical `ground` pile** the player walks over to collect; a column dug
-  clear to the void uses `sink` (conservation-only). A **splitter** (`behavior == &"splitter"`)
-  runs no recipe — it passes its incoming stream through and `_flow` divides it evenly between
-  TWO destinations (down + the column to its right), dealt round-robin via the machine's
-  `route_toggle` so odd counts split fairly over time. Right-wall splitters degrade to down-only
-  (PROVISIONAL edge). A **lift** (`behavior == &"lift"`) routes UP (`_column_rise`)
-  rate-limited by `LIFT_THROUGHPUT`; a **drill** (`behavior == &"drill"`) draws from the WORLD, not a
-  buffer — `_run_drill` takes the cell `drill_target()` picks out of the column straight below it,
-  drains that cell's finite `deposits` pool, and spits ore down its column like an ordinary machine.
-  There is no reach constant on the vertical drill: `drill_target()` scans the whole column. The
-  horizontal sibling does have one, `H_DRILL_RANGE`.
-- **THE BEHAVIOR REGISTRY (`_BEHAVIORS`):** the ONE sim-side table wiring a `behavior` tag into the
-  tick — per-tag `run` / `status` / `dests` hook method-names (dispatched via `call()`; names, not
-  bound Callables, so a RefCounted sim never self-references) plus semantic flags (`updraft`,
-  `power_source`) read by `updraft_at` and the power sweep. No entry = the default named
-  recipe-runner (`_run_recipe`). **Adding a machine behavior = its functions + one `_BEHAVIORS`
-  entry + one `Visuals.MACHINE_STYLE` entry (its look) + a `.tres`** — never a scattered if-ladder.
-  Behavior-SPECIFIC view reads (renderer `_machine_active`/`_draw_machine_io`, the hover `mode`
-  text in `MainView`) keep sane defaults, so most new machines never touch them.
-- **The DESCENT ENGINE (`behavior == &"descent"`, docs/PROGRESSION.md §2):** the L1→L2 gate-breacher.
-  Standing over THE SEAL (an unbroken worldgen band of unmineable `sealrock`, `SEAL_ROWS` deep from
-  `LayeredWorldGen.SEAL_TOP`, with a mineable deepslate SHELF above and IRON only below), `_run_descent`
-  EATS gravity-fed `DESCENT_EATS` (ingots) toward `DESCENT_QUOTA` (`MachineState.fed`) — the throughput
-  WALL — passing every other item through; at quota it BREACHES the contiguous seal below (`set_solid` +
-  pile resettle). *Both numbers were spelled out here as "rows 56-57" and "40" and both had drifted from
-  the real 84 and 64. They now name the constants, per DECISIONS: a comment that states a number is a test
-  with no runner.*
-  Misplaced = `blocked` and everything passes. Research-locked behind the `descent` tech.
-- **Placed layers (conduit / rope / torch):** sparse world layers beside `solid`/`wall`, NOT machines —
-  item-flow, collision, and the tick never see them. `conduit` carries power. `rope`
-  (`is_climbable`/`place_rope`/`remove_rope`) is the placeable climb: `place_rope(anchor)` UNROLLS down
-  the open column one carried segment per cell (a stranded digger aims above themself and the rope drops
-  to them); `remove_rope` cuts that segment + the hanging tail. The avatar reads `is_climbable` to climb
-  (representation-only, like the updraft). `torch` (`has_torch`/`place_torch`/`remove_torch`) is placeable LIGHT: mounts only on a BACKED open cell (wall behind or a solid neighbour); the
-  warm pool it casts is pure representation (`_paint_lights`). ALL placed layers use symmetric ledger
-  accounting (place = consumed, remove = produced) — **the ledger is total: every item id satisfies
-  present == produced − consumed** (craft outputs count produced; placed machines count consumed;
-  pickups produce back).
-- **Water — the fluid layer (L3 Aquifer):** `water` (cell→integer level `1..WATER_MAX`)
-  is authoritative world state beside `solid`/`wall`/`conduit`/`rope`/`torch`/`deposits`. Discrete-cell,
-  integer-only (deliberately NOT per-pixel falling-sand — fits the discrete-cell hook). API
-  `water_at`/`add_water`/`remove_water`/`total_water`. `WaterFlow.step()` (`src/core/water_flow.gd`, called
-  from `FactorySim` each tick after `_flow`) is a
-  deterministic snapshot-based two-rule step — DOWN (gravity, the hook) then LATERAL even-fill settle —
-  that only MOVES water, so `total_water` is invariant (conserved). `add_water`/`remove_water` are the
-  explicit accounted source/drain; `set_solid`/`place_block` DISPLACE (erase) a cell's water. The **Pump**
-  (`behavior == &"pump"`, `_run_pump`/`_status_pump`) is the fluid sibling of the lift — while POWERED it
-  DRAINS its column (rate ∝ `power_throttle`, `PUMP_RATE`/`PUMP_REACH`), on-hook: water fell in free,
-  pumping out costs power. Research-locked behind the `drainage` tech. Seeded from `WorldData.water` in
-  `load_world`; rides the save envelope + the determinism canary.
-- **Production rate (legibility):** a tick-driven ring buffer of `total_produced` snapshots (1/s, ~60s
-  window) behind `production_rate(item)` (per-minute) + `production_rates()` (sorted live list). Derived
-  bookkeeping — deterministic, conservation-neutral, never read back by production logic. The HUD's
-  hover "factory makes X/min" row + the pack header's "making …" pulse line read it.
-- **Factory census (legibility):** `machine_census()` — a pure read over `grid` tallying machines by
-  `def.id` with a live `machine_status`-derived working-count (`[{id, name, def, count, working}]`,
-  most-numerous-first). Same role as `production_rates()` for the machine side; no state, never ticks.
-  The PRODUCTION DASHBOARD ([G]) draws both together — throughput bars + this census.
-- **Factory alerts (legibility):** `machine_problems()` — a pure read over `grid` for machines that
-  STALLED (`blocked`/`no_fuel`, grouped by id+status, worst-first, each carrying a representative cell;
-  starvation `no_input` excluded as "not hooked up yet"). Drives the calm-by-default alert stack; clicking a row pings the culprit (`set_ping`), since the camera is body-locked.
-- **Save/load — `SaveGame` (`src/core/save_game.gd`):** the sim being plain data makes a
-  save a straight `capture(sim) → Dictionary` of the authoritative state (terrain/wall/deposits, pack/
-  ground/sink, both ledgers, the three placed layers, research, machines as def-id + runtime fields),
-  in one VERSIONED envelope written with the binary Variant serializer (Vector2i keys round-trip; no
-  JSON mangling, envelope **v2**). DERIVED state (grid, power, flow_events, terrain_dirty, the rate
-  buffer, the tick accumulator) is not saved — it rebuilds next tick, and restore RESETS it explicitly so
-  an in-process F9 and a fresh-process load resume identically. AUTHORITATIVE PHASE (`seep_tick`) *is*
-  saved, because when the next weep lands is part of the world's future. `restore(sim, data)` mutates IN
-  PLACE (live references survive) and is genuinely all-or-nothing: the whole envelope is validated and
-  staged into a scratch dictionary first, so an unknown version, a malformed field, or a missing def
-  refuses without having written a single byte into the sim.
-  **The write is atomic and keeps a backup:** encode to `<path>.tmp` → close → read it back and prove it
-  decodes → copy the current save aside to `<path>.bak` → rename the temp over the slot. A failure at any
-  step leaves the previous save intact, and `read()` falls back to `.bak` when the slot is damaged,
-  reporting which happened through `SaveGame.last_read` (NONE / OK / RECOVERED / CORRUPT) so the UI can
-  tell "you have no save" apart from "your save was damaged". The controller owns the file (F5/F9 →
-  `_save_game`/`_load_game`, `user://sinkforge.save` via the overridable `MainView.save_path`, +
-  `player_pos` in the envelope) but NOT the seed — `sim.world_seed` is the single authority, and the
-  controller keeping a second copy was a live bug that re-stamped loaded worlds with the wrong seed.
-  It calls `WorldRenderer.repaint_world()` (requeue all retained chunks + veil, drop lazy caches) after a
-  load. **Determinism is the verifier:** capture → restore → tick both 120× → identical signatures
-  (`_test_save_load`), plus two live layers — `tools/check_saveload.gd` (boot the real scene: save, scar
-  the world, load, exact heal + conservation) and `tools/check_save_durability.gd` (the unhappy paths:
-  truncation, unopenable path, missing keys, v1 migration, phase equivalence, seed ownership).
-- **Research — the PULL (docs/PROGRESSION.md §5):** `research` (tech id → true) is sim state mutated only
-  by `research_tech(id)` — a discrete call that consumes an analyze-SAMPLE of the tech's signature
-  material + its refined-goods cost (both ledgered). The tree is static data in **`ResearchRules`**
-  (`src/data/research_rules.gd`, the MiningRules pattern): TECHS (requires/sample/cost/unlocks) + ORDER +
-  `next_tech`. `craft` refuses defs whose `locking_tech` isn't researched (`craft_unlocked`); the
-  controller's `try_research` adds the Bazaar-proximity gate (the bench), and `R` in the pack screen
-  researches the next tech. Adding a tech = one TECHS entry.
-- **Block placement + the Bazaar:** `place_block(cell, material)` is the Terraria build primitive
-  (inverse of `mine`; consumes the material, counted like a craft so conservation holds). A **Bazaar**
-  is a structure DETECTED in the world, not a machine: `is_bazaar_at`/`find_bazaars`/`near_bazaar` read
-  a distinctive 4×3 wood frame with an open interior — "active" is derived from the world, no state. The
-  decorated look + the block-by-block transform on completion live in the `Bazaars` view.
-- **The LODE plane — what you EXTRACT, beside what you CARVE (docs/LODE.md):** `lode` (cell → material id)
-  and `lode_max` (cell → units the vein held when opened) are sparse layers beside `solid`/`wall`/`water`.
-  The old model made a vein *be* the rock, so a tunnel driven through an ore body destroyed everything it
-  did not pocket. Now **terrain is what you carve and the lode is what you extract**: a blow OPENS a vein
-  rather than ending it, and what the burst did not take stays in the cell to keep working. A lode is not
-  collision (you walk through it) and not "items present" (latent, like `deposits`); it is cleared only by
-  `load_world` and by being worked dry, and placing a block back over one **covers** it rather than
-  destroying it. API: `lode_at` · `lode_workable` · `take_lode` (hand extraction) · `lode_fraction` (the
-  denominator the renderer's fleck density thins against — measured against `lode_max`, not against a
-  standard vein, or a full 45-unit starter adit draws as one fleck in six and reads as stripped on the
-  first face a new player ever sees).
-  Three machines work it: the **Head** (`behavior == &"h_drill"`) stands ON a lode and drains it in place;
-  the **Spur** (`&"spur"`) is a passive coverage extender chained off a Head; the **Drift Rig** (`&"drift"`)
-  cuts rock and sorts pay from spoil into two columns (which is why it owns a `flow` hook — the default
-  round-robin deal is exactly wrong for a machine that already sorted at the face).
-  **Status (2026-08-17): phase 3a shipped, phase 3b is NOT done** — see `docs/LODE_PLAN.md`. Generated
-  worlds now carry a lode plane (`WorldData.lodes` → `FactorySim.lode`), proven across 12 seeds × 5 sizes;
-  ore blocks still exist alongside it, and converting them is 3b. The Borer and Drift Rig expose lode, but
-  **whether their pay chute draws on a generated world is UNTESTED, not exonerated** — the symptom that
-  produced "draws nothing" had an upstream cause (no generated lode existed at all) which 3a removed, and
-  no fixture has since driven either machine on a generated world and watched it pay.
-- **Finite ore deposits:** `deposits` (cell→remaining yield) is a sparse pool over ore cells; an
-  ore cell absent from it counts as 1 (so worlds that never set richness behave as before). Drained
-  by hand-`mine` and the Drill; clearing the block only when empty. Latent world resource, NOT
-  counted as "items present" — the ore it yields is `total_produced` (conservation-neutral). Seeded
-  from `WorldData.amounts` in `load_world`.
-- **Depends on:** `MachineState`, and the data Resources (`MachineDef`/`RecipeDef`).
-- **Used by:** `MainView` (reads it to draw; drives it via `advance`/place/remove).
-
-### MachineState — per-machine runtime data
-- **Location:** `src/core/machine_state.gd` (`RefCounted`, plain data)
-- **Responsibility:** Holds one placed machine's mutable state: `cell`, `input_buffer`,
-  `output_buffer`, `progress`, and a reference to its shared `MachineDef` (flyweight).
-
-### Data Resources — the content schema (flyweight)
-- **Location:** `src/data/` — `MachineDef`, `RecipeDef` and `MaterialDef`, with the `.tres` instances in
-  `src/data/machines/`, `src/data/recipes/` and `src/data/materials/`. The static rule tables
-  (`bit_rules.gd`, `mining_rules.gd`, `research_rules.gd`, `seams.gd`) sit beside them.
-- **Responsibility:** Shared definitions consumed by the generic sim. A machine = a named
-  recipe-runner; a source = a recipe with no inputs; a thin `behavior: StringName` tag
-  (default empty) lets non-recipe machines branch in the sim without a type-enum. PROVISIONAL machine
-  model (see `docs/DECISIONS.md`, 2026-06-27). Every def carries a stable `id: StringName` (save/reference
-  safety). **The authoritative list of behaviour tags is `FactorySim._BEHAVIORS`** — this doc used to say
-  "the few non-recipe machines (currently the splitter)", which was true when the splitter was the only
-  one and had been wrong for a long time by 2026-08-17, when there were eleven. Read the table; don't
-  restate it here.
-
-### World engine — the gen↔viz handshake
-- **Location:** `src/core/world_data.gd`, `src/core/world_gen.gd`, `src/core/heightmap_world_gen.gd`,
-  `src/core/layered_world_gen.gd` (the generator the live world actually uses);
-  `src/data/material_def.gd` + `src/data/materials/*.tres`.
-- **Responsibility:** Decouple HOW the world is generated from HOW it is visualised, so either
-  improves without the other. Three contract pieces:
-  - **`MaterialDef`** (Resource, flyweight) — the shared vocabulary. A cell holds a material
-    **id**; appearance (`base_color`, `grain`, `cap_color`, `nugget_color`, `depth_darken`) +
-    `layer` (`&"block"`/`&"wall"`) live here. The generator emits ids; the visualiser maps
-    `id → MaterialDef` through `WorldRenderer`'s `_materials` registry.
-  - **`WorldData`** (`RefCounted`, plain data, no engine deps) — the handshake artifact a generator
-    PRODUCES and the sim INGESTS: `cols`, `rows`, `seed`, the two grids `blocks` + `walls`
-    (cell → material id), `amounts` (deposit richness), and `water` (cell → level, the L3 aquifer
-    grid `LayeredWorldGen._seed_aquifers` fills; ingested into `sim.water`).
-    The bounded, two-layer world.
-  - **`WorldGen`** (`RefCounted`) — `generate(cols, rows, seed) -> WorldData`, contractually
-    **deterministic** (seeded RNG). Concrete: `HeightmapWorldGen` (heightmap surface, seeded ore,
-    a stone layer below a depth, stone/dirt walls behind sub-surface cells); `LayeredWorldGen`
-    (extends it — adds noise CAVES that keep their wall + open up with depth, and DEPTH-BANDED ore
-    veins: deeper = richer. Generation-only — zero renderer change. This is what the live world uses).
-- **Relationships / dependency rule:** WorldGen depends only on material ids + WorldData (not the
-  sim, not rendering). `FactorySim.load_world(WorldData)` ingests both grids; the sim gained a
-  background **wall layer** (`wall`, `wall_at`/`set_wall`) and `mine` now clears the block but keeps
-  the wall (Terraria-style). The renderer reads the live grids + the registry. **Improve generation
-  = a new WorldGen; improve the look = edit MaterialDefs; neither touches the other.** Conforms to
-  the node-free-sim / data-driven-Resources / viz-as-driven-layer principles.
-
-### Representation layer — controller / view / cosmetics (disposable, read-only)
-The representation is split into focused modules (the node-free sim is the model; none of these write
-production state — delete them and the numbers are unchanged):
-
-- **`MainView`** (`scenes/main.gd`, `Node2D`) — the **CONTROLLER + session root**. OWNS a `FactorySim`,
-  advances it (pausable), hosts the embodied `Player` + follow `Camera2D` + a screen-fixed `Hud` +
-  the `WorldRenderer`, and translates mouse/keys into the body's reach-gated **world-verbs**
-  (`try_mine`/`try_drop`/`try_build`/`try_craft`). Does NOT draw — it pushes the aim cursor + its
-  computed reach/placeable/ghost state to the renderer via `set_aim()` each frame. Every world edit
-  goes through the sim's discrete API.
-- **`WorldRenderer`** (`scenes/world_renderer.gd`, `Node2D`) — the **VIEW**. Draws all world-space sim
-  state (terrain texture/AO/surface, background walls, ground piles, machines, the falling stream,
-  drop guides, updrafts, the aim cursor) **and** the lighting passes (owns the `MaterialDef` registry,
-  the cosmetic clock, the two `LightLayer` canvases + glow textures). One-way data flow: it derives
-  what it can from the sim and reads the pushed aim state; it never reaches back into the controller.
-  - **Lighting model — SKYLIGHT + ambient (not a depth gradient), as a LIGHTMAP TEXTURE (#17).**
-    The darkness is a small texture — ONE TEXEL PER CELL (RGB = SHADOW_COLOR, A = darkness) —
-    stretched over the whole world by the `_dark` LightLayer with LINEAR filtering, so light grades
-    smoothly in every direction (the old pass drew a rect per cell: hard edges on every lit shaft).
-    The skylight/ambient BASE (`_bake_veil_base`, ~0.5 ms) rebakes only when terrain or the
-    quantized daylight changes: daylight floods DOWN each column's open air (attenuating via
-    `SKY_REACH`), blocked by the first solid rock (`sim.surface_row`), with a night floor above
-    ground. Each frame `_update_veil` (~0.04–0.4 ms) copies the base and the live sources CUT
-    radial holes in the alpha — lamp, torches, working machines, powered conduits, falling drops —
-    so where light falls the veil OPENS and the world shows its true colours; the `_lights`
-    LightLayer (additive) then lays the warm pools on top (flicker/pulse stays additive-only; the
-    cuts are steady). Warm artificial light vs cold dark = the deliberate vibe, now with light that
-    REVEALS rather than just tints.
-  - **Post-FX (modern-rendering).** `MainView._setup_post_fx()` adds a
-    `WorldEnvironment` (selective softlight GLOW on the bright cores + a gentle colour grade) and a
-    full-screen LENS pass — `scenes/post_fx.gdshader` (vignette + film grain + edge chromatic
-    aberration) on a ColorRect on a CanvasLayer at layer 5, BELOW the HUD (bumped to layer 10), so the
-    world gets the lens and the UI stays crisp. `_setup_ambient_motes()` adds a `GPUParticles2D` dust
-    haze (z 45, under the lighting veil — motes glow in the lamp, fade in the dark) that follows the
-    camera. All representation-layer; the sim never knows.
-- **`Objectives`** (`scenes/objectives.gd`, RefCounted) — the **tutorial chain / legibility guide**
-  ("how do I play?"). A sim-READING ordered chain (dig→feed→forge→craft→build→automate); each step's
-  predicate is a SESSION DELTA off a baseline snapshot taken at construction (so it guides correctly
-  even when the dev-start kit pre-stocks the pack), and completions LATCH. `MainView` owns one + refreshes
-  it each frame; the `Hud` renders it top-left. Reads only — deleting it changes no production number.
-- **`Hud`** (`scenes/hud.gd`, `Node2D` under a `CanvasLayer`) — the **screen-space UI**, one cohesive
-  skin (palette + beveled accent `_panel()`): the OBJECTIVES panel, the machine INSPECTOR (recipe
-  in→out chips / mode / holding, pushed by `MainView._hover_info()`), a cached MINIMAP (terrain by
-  material + you-here + viewport rect; rebuilt only when `sim.solid` changes; terrain colour via the
-  renderer's `material_color` Callable), the FORGED chip, and the unified craft+hotbar "pack". Reads
-  the sim + a few pushed values; never mutates.
-- **`Settings`** (`scenes/settings.gd`, static) — machine-local **player preferences**: audio levels (master → the Master bus; sound/ambience → dB offsets `Sfx` adds lazily),
-  screen-shake toggle, zoom index, and key-binding OVERRIDES rebound into `InputMap` over the
-  `Controls` defaults. Persists to `user://settings.cfg` (ConfigFile) — deliberately SEPARATE from
-  `SaveGame`: a save is a world, settings are this machine. HARNESS RULE: `persist` is false by
-  default and only a real (unscripted) boot loads/saves the file, so every fixture runs on pure
-  defaults (`tools/check_settings.gd`, on its own temp path — this used to name its position in the runner,
-  "harness layer 13", which drifted the moment anyone added a layer above it). The UI is a drawn
-  HUD page (ESC on a calm screen): sliders/chips/remap rows return payloads through
-  `Hud.settings_click()`; `MainView` turns them into `Settings` calls — the knob pattern.
-- **`Visuals`** (`scenes/visuals.gd`, static) — the shared **visual vocabulary**: the
-  `MACHINE_STYLE` registry (behavior tag → glyph kind + casing colour, the representation twin of
-  the sim's `_BEHAVIORS`), the scalable animated machine glyph (drawn by both the world + the HUD,
-  so they never drift), item glyphs/colour. **`FallingItems`** (`scenes/falling_items.gd`, RefCounted) — the cosmetic falling-product
-  layer (state + spawn-from-`flow_events` + advance + draw + light-motes). **`LightLayer`**
-  (`scenes/light_layer.gd`) — a thin canvas giving each lighting pass its own blend mode.
-- **Input (embodied, Factorio-style):** the bindings themselves are not listed here, because they moved
-  and this list did not. `scenes/controls.gd` is the source of truth — it holds every default, keyboard
-  and gamepad, and registers them into Godot's `InputMap` at runtime, which is why `project.godot` has no
-  `[input]` section at all. `README.md` carries the reader-facing table. Architecturally what matters is
-  the shape: `Player` owns movement and rope-riding; every verb that changes the world goes through a
-  reach-gated method on `MainView` and nowhere else; and you **auto-collect** product piles by walking
-  over them. The cursor is
-  context-sensitive (`WorldRenderer._draw_aim`): a solid cell shows a MINE box; an open in-reach cell
-  shows a BUILD ghost of the selected machine item (green = placeable) — only when a machine is
-  selected. The Ore Vent is excluded from crafting so you stay the ore source by hand. **The economy
-  added no determinism/boundary change** — placement/removal/craft are discrete sim calls; reach +
-  "where allowed" are representation concerns, so the sim API stays position-agnostic and the
-  determinism boundary holds.
-
-### Dev harness (Track B)
-- **Location:** `tests/test_*.gd` (headless sim/worldgen/power/stress suites sharing `test_base.gd`),
-  `tools/check_*.gd` + `tools/play_tests.gd` (embodied movement + scripted-pilot play-tests).
-  Run everything with `bash tools/run_harness.sh`.
+Every structural decision below follows from that. If a decision here seems expensive, check it against this question: *does it let an agent play the real game headlessly and comparably?* Most of them are the cheapest way to buy that property.
 
 ---
 
-## Module index
+## 2. Layers
 
-The systems above are the ones whose design needs explaining. These are the rest of the tree: every other
-script under `src/` and `scenes/`, so that this file can be checked against `ls` rather than trusted.
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ L4  EXPERIMENT            the research layer. no game code.          │
+│                                                                      │
+│   claims/         one file per design assertion + threshold + status │
+│   corpus/         every scenario ever written. append-only.          │
+│   sweeps/         N seeds x M envelopes -> distributions             │
+│   ablations/      change one data value, re-run, diff every metric   │
+│   calibration/    recorded human sessions, same schema as agents     │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ metrics, provenance, verdicts
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ L3  HARNESS               makes runs happen and comparable           │
+│                                                                      │
+│   scenario/       declarative fixture: seed, rig state, goal, budget │
+│   envelope/       agent capability: fog, lookahead, noise, priors    │
+│   driver/         headless boot, tick loop, budget enforcement       │
+│   aggregate/      telemetry -> metrics -> report artifacts           │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ commands in / observations out
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ L2  INTERFACE             THE ONLY DOOR. everything enters here.     │
+│                                                                      │
+│      observe(envelope) -> fogged view      apply(Command) -> Result  │
+│                                                                      │
+│   ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐  │
+│   │  HUMAN     │   │  SCRIPTED  │   │  PLANNER   │   │  LANGUAGE  │  │
+│   │  via view  │   │  bot (T0)  │   │  bot (T1)  │   │  agent(T2) │  │
+│   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘  │
+│         └────────────────┴────────────────┴────────────────┘         │
+│                              peers. same door.                       │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ Command / Observation. nothing else.
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ L1  SIM                   pure. deterministic. engine-free.          │
+│                                                                      │
+│   world  terrain_gen  body  items  machines  behaviors  transport    │
+│   fluid  economy  run  meta  commands  telemetry  invariants         │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+┌───────────────────────────────┴──────────────────────────────────────┐
+│ L0  CORE          fixed-point · seeded split RNG · stable IDs        │
+└──────────────────────────────────────────────────────────────────────┘
 
-### `src/` — no engine dependency beyond `RefCounted`
+           VIEW hangs off L2 as a peer, never above L1
+           ┌──────────────────────────────────────────┐
+           │  render_world  render_entities  hud  fx  │
+           │  reads observations · emits commands     │
+           │  ONE narrow reverse channel:             │
+           │    frame capture -> vision model         │
+           │    (legibility claims only)              │
+           └──────────────────────────────────────────┘
+```
 
-| Module | What it is |
-| --- | --- |
-| `src/core/power_flow.gd` | the per-tick power propagation: clears and refills the sim's `power` field from the fuelled generators outward |
-| `src/core/water_flow.gd` | the per-tick fluid algorithm, stateless over the sim's `water` and `solid` grids. `WaterFlow.step()` is the water section above |
-| `src/core/fine_terrain.gd` | the deterministic fine-grid build of the dual-grid terrain, filling the sim's `_fine_solid` byte grid |
-| `src/core/flora.gd` | the per-tick flora pass: planted saplings age into trees |
-| `src/data/mining_rules.gd` | how hard each material is to break by hand, and which tool can break it |
-| `src/data/bit_rules.gd` | picks that differ in shape rather than in speed. Design: `docs/BITS.md` |
-| `src/data/seams.gd` | the grain of the rock: a seam direction per cell, and what striking along it calves off |
+The research loop this enables:
 
-### `scenes/` — representation only; reads the sim, never writes to it
+```
+   design claim ──> scenario ──> sweep ──> metrics ──> verdict
+        ▲                                                 │
+        │                                                 ▼
+   human decides <── proposed data diff <── agent reads metrics
+```
 
-| Module | What it is |
-| --- | --- |
-| `scenes/player.gd` | the embodied avatar. A representation entity that reads the sim's world and owns movement |
-| `scenes/grapple.gd` | the piton and winch line: the traversal verb for getting back up |
-| `scenes/controls.gd` | the single source of truth for keybindings, keyboard and gamepad, registered into `InputMap` at runtime |
-| `scenes/terrain_painter.gd` | the coarse-terrain draw pipeline: per-cell fill, grain, ore crystals, the autotile silhouette |
-| `scenes/fine_terrain.gd` | the fine terrain bake, rendering the sim's terrain as molded rock at an 8px sub-cell resolution |
-| `scenes/sky_painter.gd` | the parallax celestial backdrop: gradient, stars, sun and moon, clouds |
-| `scenes/strata.gd` | the descent named: rows grouped into coloured depth bands, and the accessors over that table |
-| `scenes/world_seeder.gd` | builds the tutorial world state onto a freshly generated sim, including the hand-placed spawn fixtures |
-| `scenes/hover_info.gd` | assembles the dictionary the HUD's info panel renders for the cell under the cursor |
-| `scenes/hints.gd` | just-in-time teaching: a bubble the first time an item with a non-obvious use reaches the pack |
-| `scenes/payouts.gd` | the "+3 ore" tick that rises off a broken block, so the reward reads at the point of impact |
-| `scenes/particles.gd` | the cosmetic particle layer, driven by bursts `MainView` emits on world verbs |
-| `scenes/bazaars.gd` | a representation-only view of the Bazaar structures the sim detects |
-| `scenes/art.gd` | a drop-in sprite loader: a texture for a logical key when its PNG exists, and nothing otherwise |
-| `scenes/sfx.gd` | procedural audio. Every sound is synthesised at boot rather than loaded |
-| `scenes/score.gd` | the music, as a pure function of depth. No track list and no cue system |
-
-Shaders live beside them: `post_fx.gdshader` (described under Drawing in `README.md`), plus
-`erase.gdshader`, `heat_haze.gdshader`, `rock_grit.gdshader` and `rock_tooth.gdshader`.
+Agent proposes, instrument evaluates, human decides. That is the whole pitch, and it is achievable. What it is not, and must never be claimed as, is an agent autonomously optimizing engagement.
 
 ---
 
-## Data Schema Reference
-The three schema classes are `src/data/recipe_def.gd`, `src/data/machine_def.gd` and
-`src/data/material_def.gd`; the `.tres` files under `src/data/recipes/`, `src/data/machines/` and
-`src/data/materials/` are instances of them.
+## 3. Dependency rules
 
-- **`RecipeDef`** — `id: StringName`, `inputs: Dictionary` (item id→count), `outputs: Dictionary`, `time: float`.
-- **`MachineDef`** — `id: StringName`, `display_name: String`, `recipe: RecipeDef`, `behavior: StringName`
-  (empty = plain recipe-runner; otherwise a tag, of which `FactorySim._BEHAVIORS` is the authoritative
-  list), `craft_cost: Dictionary` (item id→count, what the bench charges) and `craft_count: int` (how many
-  the craft yields).
-- Items are referenced by `StringName` id (e.g. `&"ore"`, `&"ingot"`); no `ItemDef` yet (added when needed).
+Lint-enforced. A violation is a build failure, not a code smell. The lint lives in `tools/layer_lint` and runs in CI.
 
-## Scene Tree Overview
-- `Main` (`MainView`, Node2D) — the session root, set as `run/main_scene`. Owns the `FactorySim` in
-  script and **hosts real children**: the embodied `Player`, a follow `Camera2D`, the `WorldRenderer`,
-  a screen-fixed `Hud` on its own `CanvasLayer` (layer 10), the post-FX `ColorRect` on a `CanvasLayer`
-  at layer 5, and a `GPUParticles2D` mote haze. Drawing is still immediate-mode `_draw` inside those
-  nodes rather than sprites — that part was never the same claim.
+- `core` depends on nothing.
+- `sim` depends only on `core`. **No engine imports. No file IO. No wall clock. No global mutable state.**
+- `interface` depends on `sim` and `core`.
+- `harness` depends on `interface`, `sim`, `core`. May do file IO and process control. May not depend on `view`.
+- `experiment` depends on `harness`. May not depend on `sim` directly.
+- `view` depends on `interface` and `core`. Reads observations, emits commands, never calls a sim mutator.
+- `shell` depends on everything.
+- **No module imports a sibling's internal files.** Each module exposes exactly one public interface file.
 
-  > *This section read "the entire Prototype-1 scene. Owns the sim in script; no child nodes yet
-  > (everything is `_draw`n)" while the Representation section of this same file described MainView
-  > hosting a Player, a Camera2D, a Hud and the WorldRenderer. One file, two answers. Corrected
-  > 2026-08-17; "no child nodes yet" had been false since the body was embodied.*
+---
+
+## 4. L1: the simulation
+
+### Modules
+
+Each is a directory with `MODULE.md`, one interface file, internal implementation, and tests.
+
+| Module | Responsibility | Must not |
+|---|---|---|
+| `world` | Tile grid, chunks, material IDs, hardness, terrain queries and mutations | Know about machines or items |
+| `terrain_gen` | Seeded strata generation, deposit and ruin placement, per-site parameters | Depend on run state |
+| `body` | Player kinematics: integration, collision, depenetration, step-up, corner correction, coyote and buffer, climb, rope, swim, carry weight | Read input devices; know about rendering |
+| `items` | Item instances as packed arrays; falling, settling, pile state, pickup | Own transport policy |
+| `machines` | Instances, placement validity, tick scheduling, state machine | Contain per-machine-type code |
+| `behaviors` | The composable primitives machines are built from. Under a dozen, ever. | Grow one class per machine |
+| `transport` | Chutes (free, gravity), lifts (powered, cost per unit-meter), feeders. Implements R1. | Special-case machine types |
+| `fluid` | Water automaton, active-cell set, flood level, aquifer breach | Tick every cell every frame |
+| `economy` | Recipes, tiers, refinery conversion, haul accounting. Implements R2. | Hardcode quantities |
+| `run` | Run lifecycle, flood clock driven by rig state (R3), termination, extraction resolution | Know about menus or saves |
+| `meta` | Persistent rig state, unlocks, stockpile, offline processing | Mutate run state directly |
+
+**One module shape is unresolved and it affects this table.** `docs/GDD.md` §8 leaves open whether the surface rig is a small fixed deck or a second buildable factory built upward. If it is a factory, `meta` is not one module: it needs its own placement, routing, and machine scheduling, and the honest options are either reusing `world`, `machines`, and `transport` against a second grid, or a dedicated `rig` module. Reusing is strongly preferred and is a reason to keep those three modules free of any assumption that there is exactly one world. Do not resolve this by building the deck version and discovering later that it cannot grow. Ask.
+| `commands` | The complete typed command vocabulary | Contain logic |
+| `telemetry` | Structured event emission from inside the sim | Do IO |
+| `invariants` | Continuous assertions | Be disabled in tests |
+
+### Determinism
+
+- Fixed timestep, 60 Hz. Rendering interpolates. The sim never sees `delta`.
+- Fixed-point (i32, 16 fractional bits) for all state-affecting positions and velocities. No `sin`/`cos`/`pow` on state-affecting paths.
+- Seeded, split RNG: one stream per subsystem, streams are serialized state. No global random.
+- No iteration over hash maps in state-affecting code. Sorted arrays or insertion-ordered structures with stable IDs.
+- Generational-index entity IDs.
+- Fixed tick phase order: `input → body → machines → transport → items → fluid → economy → invariants → telemetry`.
+
+`replay_determinism_test`: run a 20,000-tick recorded input log twice from one seed, hash full state every 100 ticks, assert identical. Exists from day one.
+
+### Invariants, asserted continuously
+
+Conservation of matter across the tick modulo declared sinks. Non-negative buffers. No items inside solid rock. No machine in an invalid cell. Flood level monotonic within a run. Panic in debug, log in release. Most factory-game bugs are invariant violations discovered ten hours later.
+
+---
+
+## 5. L2: the interface
+
+The only door. Two operations:
+
+```
+observe(envelope) -> Observation
+apply(Command)    -> Result
+```
+
+**Commands are typed values, not method calls.** The full vocabulary lives in `sim/commands` and is small enough to read in one sitting. A command is submitted, validated, and either applied or rejected with a reason. Rejection reasons are part of the telemetry.
+
+**Observations are filtered by envelope.** This is the part that is easy to get wrong and expensive to fix later.
+
+### Capability envelopes
+
+An agent with perfect information measures a different game than the one you ship. Agent capability is per-scenario configuration, not a property of the bot.
+
+| Dimension | What it controls |
+|---|---|
+| Vision | Unexplored terrain, undiscovered deposits, unrevealed strata |
+| Planning | Lookahead depth, whether replanning mid-action is allowed |
+| Motor | Movement noise, reaction latency, raw controller vs semantic `goto` |
+| Priors | Which recipes, machine behaviors, and map facts are known a priori |
+
+Three standard envelopes:
+
+- **Oracle.** Perfect information, optimal play. Measures the ceiling: dominant strategies, throughput maxima, exploits, reachability.
+- **Constrained.** Fogged, bounded lookahead, movement noise. Measures the floor: discoverability. If a constrained agent never finds hole-as-conveyor, neither will a human.
+- **Language.** Natural-language reasoning over player-visible observation only. Measures legibility. Slow, nondeterministic, never in CI.
+
+**The gap between oracle and constrained is the difficulty of the design.** It is a number you can watch move.
+
+### Two action levels
+
+**Raw:** the same input frame a human produces. Used for movement testing and true agility measurement.
+
+**Semantic:** `goto(cell)`, `mine(cell)`, `place(machine, cell)`, `haul_to(cell)`. Implemented on top of raw by an executor **inside the harness, never inside the sim**. Used where movement noise would pollute the signal.
+
+**The raw level exists independently of `interface` and predates it in build order.** `sim/body` (§4) is validated first, against a fixed hostile-geometry chamber, before `sim/commands` or `interface` exist — movement is the highest-risk stage in the whole build sequence and should not sit blocked behind a command layer. That early validation driver is not a throwaway harness: it is a sequence of raw input frames replayed against `sim/body` with acceptance metrics read from telemetry, and it is built as the raw action level described above from the start. When `interface` lands, this driver becomes `observe`/`apply`'s raw path rather than being discarded. A second, incompatible input-replay format built for pre-interface testing would be a design leak; if one starts to look necessary, that is a sign to stop and reconsider rather than proceed.
+
+The fog filter applies identically to the renderer and the agent. That is what makes an agent run and a human run comparable.
+
+---
+
+## 6. L3: the harness
+
+### Scenario format
+
+Declarative, versioned, schema-validated at build time.
+
+```yaml
+name: first_bore
+claim: C001
+seed: 12345
+world:
+  site: shallow_clay
+rig:
+  pump_capacity: 2min
+  unlocks: [hand_pick]
+  stockpile: {}
+player:
+  start_depth: 0
+  pack: []
+envelope: constrained
+goal:
+  type: deliver
+  material: ore_copper
+  quantity: 6
+budget_ticks: 7200
+assertions:
+  - invariants_hold
+  - no_edge_catch_events
+  - sim_tick_p99_under_ms: 4
+```
+
+**Every scenario names a claim.** A scenario with no claim does not merge.
+
+### Driver
+
+```
+sinkforge run --scenario scenarios/first_bore.yaml --seed 12345 \
+  --agent scripted:greedy_miner --out runs/<timestamp>/
+```
+
+Outputs: `result.json`, `telemetry.jsonl`, `state_hashes.txt`, `input.log`, `report.md`, `heatmap.png`.
+
+Must run with no GPU, no window, in CI, at 100x realtime or better for a two-minute scenario.
+
+### Two clocks
+
+**Fast loop.** Deterministic scripted bots, small scenarios, every PR, under sixty seconds total. Assertion-based, binary, gating.
+
+**Slow loop.** Thousands of runs across seeds and envelopes, nightly, statistical. Non-gating, produces distributions and trend lines. **Never let the slow loop gate CI.** A flaky gate destroys trust in the whole suite within a week.
+
+---
+
+## 7. L4: the experiment layer
+
+### Metrics that matter
+
+**Strategy diversity.** Run 200 oracle agents with randomized objective weightings on one seed. Cluster their build orders. Convergence on one build means a dominant strategy and the rest of the design is furniture. A spread across many clusters with comparable outcomes means real decision space. This is computable, it is the thing factory games live or die on, and almost nobody measures it.
+
+**Supporting family.** Time-to-milestone distribution. Stall seconds and their location. Backtrack ratio. Decision entropy per run phase. Payback time on built infrastructure. Fraction of unlocked machines a competent agent never uses (a direct measure of dead content). Oracle-to-constrained gap.
+
+### Ablations
+
+Change one data value, re-run the corpus, diff every metric. Balance stops being taste and becomes an experiment with a control.
+
+### Calibration
+
+A small corpus of recorded human sessions, captured through the same L2 interface, producing the same telemetry schema. Without it, every number the instrument produces is unfalsifiable and the first serious reviewer will say so. With it, you can state which proxies track human friction and which do not, which is a more interesting result than a clean dashboard.
+
+Ten sessions is enough to start.
+
+### The honest limitation, stated in every report
+
+Agents find mechanical dead ends, softlocks, unreachable goals, and dominant strategies. They do not find boredom. Any engagement claim needs a stated proxy and a stated account of what it misses.
+
+---
+
+## 8. Content is data
+
+The single strongest defense against a code monolith.
+
+A machine definition is data:
+
+```yaml
+id: drill_mk1
+tier: 1
+footprint: [2, 2]
+placement_rule: attached_to_vein
+behaviors:
+  - Consume { resource: fuel, rate: 1 per 40 ticks }
+  - Extract { target: vein, rate: 1 per 30 ticks, hardness_max: 2 }
+  - Emit     { port: bottom }
+states: [idle, working, starved, flooded]
+build_cost: { ingot_iron: 8 }
+```
+
+- Adding a machine is adding one data file. Zero new classes. A genuinely new verb means a new behavior primitive, which is an architectural event and needs an ADR.
+- Recipes, strata, materials, upgrades, run configs, and progression curves get the same treatment.
+- **Shaft modifiers are data too.** `docs/GDD.md` §2 makes per-shaft constraints (floods fast, no fuel above 50m, hard rock starts early) the primary source of long-tail variety, on the argument that constraint variety costs an order of magnitude less per hour of play than content variety. That only holds if a modifier is a data file and not a code branch. Design `terrain_gen` and `run` so a modifier composes with any site rather than special-casing one.
+- Schema-validated at build time. A malformed definition fails the build, not the game.
+- `data/` is human-diffable text. Never binary resources.
+- **Balance numbers are never in code.** A tuning pass is a diff of `data/`, so an agent can change balance without touching logic and a human can review balance without reading logic.
+- **Draft A versus Draft C is a data file.** If switching requires a code change, that is a defect.
+
+---
+
+## 9. Movement
+
+`sim/body`. Fully deterministic, testable without rendering. This is what makes feel auditable.
+
+| Property | Value |
+|---|---|
+| Collider | Capsule or rounded AABB, 1 tile wide, 2.5 tall |
+| Ground accel / decel | 8 ticks to max / 4 ticks to zero |
+| Air control | 60% of ground accel |
+| Coyote time / jump buffer | 6 ticks / 6 ticks |
+| Variable jump | Release cuts upward velocity to 40% |
+| Apex float | Gravity x0.6 within 3 ticks of apex |
+| Auto step-up | 1 tile, no input, when blocked and the cell above is clear |
+| Mantle | 2 tiles on toward-and-up hold |
+| Corner correction | Horizontal nudge up to 6px on ceiling contact near a corner |
+| Depenetration | Shortest-axis ejection, max 1 tile per tick, never teleport |
+| Machine collision | Non-solid to the player except a 1-tile base |
+| Carry penalty | Accel and jump scale with pack mass. Collision behavior never changes. |
+
+**Acceptance criteria, automated, run against a fixed hostile-geometry chamber** with 1-tile ledges, 1-tile pits, machine clusters, narrow shafts, half-dug slopes, rope transitions:
+
+| Metric | Threshold |
+|---|---|
+| `edge_catch_events` | 0 |
+| `depenetration_events` | 0 |
+| `velocity_efficiency` | ≥ 0.92 |
+| `step_up_success_rate` | 100% |
+| `corner_correction_success_rate` | 100% |
+| `input_to_state_change_latency` | ≤ 2 ticks |
+| `stall_seconds` (input held, blocked unintentionally) | 0 |
+| `traverse_time` on the standard route | within 5% of golden |
+
+A movement change that regresses any of these fails CI. "It feels sticky" becomes a number.
+
+---
+
+## 10. Performance budgets
+
+Budgets are asserted, not aspired to. Each has a benchmark scenario in CI.
+
+| Budget | Target |
+|---|---|
+| Sim tick p50 / p99 | ≤ 2.0 ms / ≤ 4.0 ms at 2,000 machines, 20,000 items, 40,000 active fluid cells |
+| Frame time p99 | ≤ 16.6 ms at 1080p |
+| Draw calls | ≤ 150 |
+| Headless throughput | ≥ 100x realtime |
+| Save / load | ≤ 250 ms at late-run state |
+| Peak sim memory | ≤ 256 MB |
+
+**Why this is the research loop and not polish.** A two-minute run is 7,200 ticks. At 2 ms that is fourteen seconds of compute, or well under a second headless. A thousand-run sweep is a couple of minutes on a few cores. At 20 ms per tick the same sweep takes half an hour and you stop running it. The perf budget determines whether the slow loop exists at all.
+
+Requirements to hit it: no node per item or per machine; event-driven machine ticks so idle machines cost zero; active-cell fluid; chunked terrain with dirty-rect rebuilds; a uniform-grid spatial index, not a quadtree; flat render packets, no per-entity objects crossing a boundary. Note also that per-frame cosmetic scanning of all machines and fluid (for audio or HUD) is a real cost that is easy to leave out of a budget; it belongs in the budget.
+
+---
+
+## 11. Save and run lifecycle
+
+```
+MetaIdle → SiteSelect → RunConfig(seed, start_depth, loadout, pump_capacity)
+  → RunActive(flood clock ticking)
+  → RunEnding(extraction resolution)
+  → RunResolved(materials banked, artifacts applied)
+  → MetaIdle
+```
+
+- Run state and meta state are separate structs with no shared mutable references. A run can be discarded without touching meta. This is what makes runs cheap to simulate in bulk.
+- Run duration derives from rig pump capacity. Never a constant.
+- Two files: `meta.save` (durable, precious, written atomically) and `run.save` (disposable, mid-run resume). A corrupt `run.save` must never take down `meta.save`.
+- Versioned schema with an explicit integer version and a migration chain, each migration unit-tested against a stored fixture save.
+- Offline processing is a pure function of elapsed real time, applied on load. Never a background timer.
+
+---
+
+## 12. Language and runtime
+
+**GDScript, for now.** The prior codebase demonstrated, by measurement rather than assertion, that the three concerns behind an earlier Rust recommendation are already addressed: the sim was genuinely node-free under the strictest available test, determinism was proven live by byte-identical replay including a save/load round trip, and untyped declarations are already a build failure via project settings.
+
+What remains of the case for a port is runtime headroom at a scale nothing has been measured against. That is not a reason to migrate; it is a reason to build the benchmark.
+
+**The trigger for revisiting this is a specific benchmark scenario at the Section 10 load returning a number GDScript cannot hit.** Not a deadline, not a document. Building that benchmark is independently worth doing and should happen early.
+
+If the trigger fires, the sim's engine-free boundary is what makes a port tractable, which is another reason that boundary is worth its cost.

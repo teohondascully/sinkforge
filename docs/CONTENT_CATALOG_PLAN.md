@@ -1,5 +1,8 @@
 # One catalog, one schema, one owner per fact
 
+> **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were
+> removed or marked below. The rest of this document is unchanged and still describes current reality.
+
 `docs/DECISIONS.md` §"Adding content is a data file, not a class" is marked LOCKED, and it is half true.
 A machine really is a `.tres`. The sim really is generic over it. What the entry concedes in its second
 paragraph is the part this document is about: *"the known cost is registration"*. This is a plan to pay
@@ -226,9 +229,10 @@ the machine and material directories headless in milliseconds (`:28`, `:40`).
 | V10 | `RecipeDef.time > 0.0` | `progress` never reaches a non-positive threshold, or reaches it every tick |
 | V11 | `MaterialDef.layer` is `&"block"` or `&"wall"` | anything else is a material the renderer's two planes both ignore |
 | V12 | every key in `MiningRules.REQUIRED_TOOL` / `REQUIRED_TIER` / `HARDNESS` is a real material id | a table keyed on a material that was renamed is dead weight that reads as a rule |
-| V13 | every `ResearchRules.TECHS[*].unlocks` id is a machine, tool or bit id; every `sample` is a real item | an unlock naming nothing is a rung that grants nothing, and `locking_tech` returns `&""` so it never complains |
-| V14 | `ResearchRules.ORDER` is a permutation of `TECHS.keys()` | a tech absent from ORDER is unreachable through the bench key |
 | V15 | every craftable machine id has an `ITEM_PURPOSE` entry | coverage, not derivation; the population comes from the catalog |
+
+> _[V13–V14 removed 2026-08-25, pivot: both rules validated `ResearchRules` fields, which are dead design.
+> See git history for the original text.]_
 
 V15 is currently **satisfied**: all 19 craftable machines and every carriable material have a purpose line,
 and the two materials that do not (`leaves`, `sealrock`) are ones the pack can never hold. This rule is a
@@ -419,13 +423,16 @@ order is a dependency order rather than a preference.
 | S0 | Rename `FineTerrain` → `TerrainMold` on the sim side | mechanical | 7 sites, §6 | `check_grid`, `check_dig_hitch`, `check_bake_idempotent`, `test_worldgen` |
 | S1 | Add `src/data/catalog.gd` + `tools/check_catalog.gd`; nothing consumes them yet | mechanical | 2 new, 1 line in `run_harness.sh` | the layer's own planted-fault control |
 | S2 | `WorldRenderer._materials` reads the catalog | low | `world_renderer.gd:348` | `check_material_registry`, and see the caveat |
-| S3 | Add `sort_order: int` to `MachineDef`, write the current 19 indices into the defs, derive `MainView._craftable` | medium | `machine_def.gd`, 20 `.tres`, `main.gd:260` | `check_craftable_registry`, `check_row_identity`, plus a one-shot equality assertion |
 | S4 | Move `Catalog.items()` in; `check_item_reads` calls it instead of owning it | mechanical | `catalog.gd`, `check_item_reads.gd:468` | the layer is its own guard; output must be identical |
 | S5 | Turn V4–V15 on in `check_catalog` | low | `catalog.gd` only | the layer's own planted-fault control; every rule is satisfied by today's content, so a red here is a bug in the rule |
 | S6 | Add `item_color` to `MaterialDef`; move the material literals into the defs; make `Visuals.item_color` fall back to `machine_color(def)` for a machine id and give the four bits an entry; assert old == new for all 23 existing arms; then delete the ladder | **risky** | `material_def.gd`, 16 `.tres`, `visuals.gd:984` | see below — needs a test that does not exist |
 | S7 | Move the fourteen layout constants (and settle the dead fifteenth) from `MainView` to `src/data/spawn_layout.gd` | medium | `main.gd:566-628`, `world_seeder.gd`, `check_progression_payable.gd` | `check_teaching`, `check_mining`, `play-tests`, `test_worldgen` |
 | S8 | Add `spawn_into_pack` / `seed_deposit` / `seed_lode` to the sim; move `world_seeder.gd` to `src/core/`; give it a `class_name` | medium | `factory_sim.gd`, `world_seeder.gd`, `main.gd:634`, `check_progression_payable.gd:32` | `test_sim` conservation, `check_carry_cap`, `check_teaching` |
 | S9 | Promote `_is_ore_like`, `is_spoil` and `PLAIN_ROCK` to `MaterialDef` booleans | medium | `material_def.gd`, 16 `.tres`, `factory_sim.gd`, `layered_world_gen.gd` | `test_sim`, `check_spoil`, `check_lode`, `check_drift`, `test_worldgen` |
+
+> _[S3 removed 2026-08-25, pivot: it staged `MainView._craftable`'s ordering specifically for the Bazaar's
+> rows and keybindings, and the Bazaar is dead design. Stray mentions of S3 below (dependency notes) are
+> left as historical record. See git history for the original text.]_
 
 ### Mechanical vs risky, stated plainly
 

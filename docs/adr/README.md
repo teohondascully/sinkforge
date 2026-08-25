@@ -1,0 +1,1 @@
+Numbered architecture decision records, starting at 0001. An ADR is normative from the moment it merges. Required for any change to: tick phase order, save schema, layer boundaries, the behavior primitive set, the determinism strategy, the four design rules, or the language decision.

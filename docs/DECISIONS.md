@@ -199,6 +199,15 @@ recommendation and a cheap first slice that commits to nothing.
 
 *Attested: `docs/PROGRESSION.md` header, which cites this entry by date.*
 
+**SUPERSEDED (content only) by the 2026-08-25 pivot.** The specific progression spine this entry
+resolved — the Sinkforge as a fed endgame, a tech graph, crafter modules waiting on a recipe graph — is
+persistent-world content and is dead; see `docs/GDD.md` §9 ("the Sinkforge as a continuous consumer",
+"persistent-world progression... the research tree as a menu... the descent gate as a one-time toll").
+The *meta*-decision — the paragraph above this note — is not superseded and still governs how design
+work happens here: prefer provisional, reversible, demand-pull framings over forcing a decision. Recorded
+as a content-only supersession rather than archiving the whole entry, per this file's own convention,
+because the reasoning about *how to decide* still matters even though *what was decided* does not.
+
 ### The danger model: you open the wall (REOPENED, then subsumed)
 
 The base is safe by construction. Because you mine through solid earth, a carved tunnel has no open space

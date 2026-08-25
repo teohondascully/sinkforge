@@ -1,0 +1,1 @@
+Superseded documents, each with a dated header saying what superseded it. Kept, not deleted — code in legacy/ may still implement what they describe, and an agent reading that code needs to find out why.

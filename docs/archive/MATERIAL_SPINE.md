@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** Superseded by the new `docs/GDD.md`. Worth citing even after archival: an independent source-derived analysis in this document reached the same diagnosis as the design-side pivot reasoning by a completely different path (a dead mid-tier production chain / de-facto universal currency), which is unusually strong corroborating evidence — see `docs/GDD.md` §3.
+> Kept for provenance: `legacy/` may still contain code that implements what this document describes,
+> and an agent reading that code needs to be able to find out why. See `docs/GDD.md` for current design.
+
+---
+
 # The material spine — what actually ships today
 
 **Written 2026-08-17.** This is a MAP, not a proposal. It is the whole economy read off the `.tres` data

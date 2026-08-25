@@ -1,5 +1,8 @@
 # THE BIT SET — picks that differ in SHAPE, and rock that has a grain
 
+> **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were
+> removed or marked below. The rest of this document is unchanged and still describes current reality.
+
 > **Status: SHIPPED (#S31 + #S32 + #S37, 2026-08-16).** Seams, the five bits, the drive/bit split and the
 > deletion of the speed axis landed as #S31/#S32 — `src/data/seams.gd`, `src/data/bit_rules.gd`,
 > `MainView._shape` / `_calve` / `_mineable`, `WorldRenderer._draw_seams` — held by `tools/check_seam.gd`
@@ -149,12 +152,9 @@ better for.
 
 ## 7. Where they come from
 
-- **Drives** are research (Bench tab): they are tech, they gate depth, and they belong on the same ladder
-  as everything else that gates depth.
-- **Bits** are merchandise (Rack tab, `docs/BAZAAR.md` §6): bought with **refined goods**, never raw ore, so
-  buying one is always a reason to run the factory harder and never a reason to hand-mine more.
-
-That split is a good reason the Bazaar has both tabs, rather than an accident of layout.
+> _[Section removed 2026-08-25, pivot: the Bench-research/Rack-purchase acquisition model is dead design;
+> only how bits are acquired changes, not the bit set or SEAMS themselves (see `docs/GDD.md` §4, R4). See
+> git history for the original text.]_
 
 ## 8. What the harness must say
 

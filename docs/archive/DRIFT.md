@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** Describes dead persistent-world design; the code it discusses is now frozen in `legacy/`.
+> Kept for provenance: `legacy/` may still contain code that implements what this document describes,
+> and an agent reading that code needs to be able to find out why. See `docs/GDD.md` for current design.
+
+---
+
 # THE DRIFT RIG & SPOIL — horizontal extraction, vertical logistics
 
 > **Status: §3 SHIPPED as STRIKE 35, §4 SHIPPED as STRIKE 36** (2026-08-16) — the Drift Rig is in the game, researched under

@@ -1,5 +1,8 @@
 # THE LODE — ore lives in the wall, and mining stops being a trap
 
+> **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were
+> removed or marked below. The rest of this document is unchanged and still describes current reality.
+
 > **Status: PHASE 1 SHIPPED as STRIKE 38, PHASE 2a as STRIKE 39, the STARTER POCKET as STRIKE 40
 > (2026-08-16); 2b-4 SPEC.** The lode layer, the hand-work
 > verb, the vein-in-the-wall rendering and the trap being gone are in the game — `FactorySim.lode` /
@@ -157,18 +160,8 @@ costing a fraction of a Head. Whether a Spur draws its own power or leans on the
 
 ## 6. What this re-sources (and what it must not break)
 
-**The Drift Rig.** `docs/DRIFT.md` §3 shipped a machine that separates pay from spoil at the face. Under
-this spec the rig cuts *rock* (spoil) and **exposes** lode rather than eating ore blocks; its pay chute draws
-from the backing in the cells it opens. Small deviation, better story: the rig is the excavator, the Head is
-the extractor, and the two-chute geometry the player already learned is unchanged.
-
-**The Borer** keeps its mixed stream and its coal, per DRIFT §6 — it must not become dead content.
-
-**Coal is ore-like and gets the same treatment**, which keeps the coal→drill demand web intact. Clay, shale
-and foliage are terrain and stay terrain.
-
-**Ore stops being an obstacle.** You can never again be walled in by rock you cannot afford to break. Counted
-as pure gain: the "expensive block in my way" decision was never interesting.
+> _[Section removed 2026-08-25, pivot: it re-sourced the Drift Rig and the Borer for the lode model, and
+> both are dead machines. See git history for the original text.]_
 
 ## 7. What could go wrong
 

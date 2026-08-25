@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** Superseded by the new `docs/GDD.md`, which explicitly supersedes this file by name in its own header.
+> Kept for provenance: `legacy/` may still contain code that implements what this document describes,
+> and an agent reading that code needs to be able to find out why. See `docs/GDD.md` for current design.
+
+---
+
 # PROGRESSION — the Sinkforge spine
 
 > **Update 2026-07-11:** §5's research engine is BUILT (first slice) — the Bazaar bench + the L1 tech

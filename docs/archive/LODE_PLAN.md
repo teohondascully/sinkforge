@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** Superseded by the new `docs/GDD.md`.
+> Kept for provenance: `legacy/` may still contain code that implements what this document describes,
+> and an agent reading that code needs to be able to find out why. See `docs/GDD.md` for current design.
+
+---
+
 # The lode migration: plan, blast radius, and the eval gate
 
 Companion to `docs/LODE.md`, which is the design. This document is the how: what breaks, in what order it

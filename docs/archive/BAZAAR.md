@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-08-25.** Superseded by the new `docs/GDD.md`; the Bazaar-as-shop concept is explicitly dead design per the new GDD §9.
+> Kept for provenance: `legacy/` may still contain code that implements what this document describes,
+> and an agent reading that code needs to be able to find out why. See `docs/GDD.md` for current design.
+
+---
+
 # THE BAZAAR — one counter, three tabs
 
 > **Status: SHIPPED** as #S33 (2026-08-16), with one deviation from the text below. Chosen
