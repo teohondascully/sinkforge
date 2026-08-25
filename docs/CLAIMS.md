@@ -105,6 +105,8 @@ Being precise here is what separates an instrument from a dashboard.
 
 **There is no `engagement` kind, deliberately.** An agent cannot measure whether a game is fun. Claims that gesture at fun must be decomposed into structural, balance, or legibility claims with a stated proxy, or they do not belong in the corpus. If you find yourself writing a claim whose metric is a composite "engagement score," stop: that is the failure mode this project exists to avoid, and it is the first thing a serious reviewer will attack.
 
+**`docs/EXPERIENCE_EVALUATION.md` is the concrete method for stated-proxy work above `legibility`** — the calibrated-actor, validity-classified, never-averaged protocol for asking questions a single vision-model glance can't answer. It is a specification, not a harness layer: nothing in this section changes because it exists, and no claim may cite it in place of naming a real `kind` and a real metric.
+
 ---
 
 ## 6. Workflow

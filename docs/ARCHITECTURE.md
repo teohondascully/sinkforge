@@ -267,6 +267,8 @@ A small corpus of recorded human sessions, captured through the same L2 interfac
 
 Ten sessions is enough to start.
 
+`docs/EXPERIENCE_EVALUATION.md` specifies how calibrated-agent journeys, screenshot-only criticism, and counterfactual A/B evaluation actually get run — the layers above what a single rendered-frame legibility check (`docs/CLAIMS.md` §5) can answer, and below what only a human session can. Specification and backlog only; implement no new harness subsystem for it before the readiness gates it states are met.
+
 ### The honest limitation, stated in every report
 
 Agents find mechanical dead ends, softlocks, unreachable goals, and dominant strategies. They do not find boredom. Any engagement claim needs a stated proxy and a stated account of what it misses.
