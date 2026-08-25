@@ -342,36 +342,49 @@ func _real_catalogue() -> void:
 
 ## THE MOUSE'S ANSWER TO ENTER, routed to the same flat index the keyboard cursor already uses. This is
 ## the one path nothing above exercises: every check here reads geometry or the census, never a click.
+## Covers all three tabs `bazaar_click` dispatches to (WORKS/BENCH/PACK), since each keeps its own
+## `_click_hits` cache and `BazaarPage.bazaar_click` must route to the one actually open.
 ##
-## Does NOT call `_tab_works` to get real geometry: `CanvasItem.draw_*` refuses to run outside an actual
-## `_draw()` callback ("Drawing is only allowed inside this node's `_draw()`..."), and under
-## `run_harness.sh` this layer runs `--headless`, where nothing ever delivers that real callback — a first
-## version of this check called `_tab_works` directly and it "passed" while spraying that engine error
-## into the log on every row drawn, and an earlier version still waited on `RenderingServer.frame_post_draw`
-## and hung the layer outright, since headless never fires it either. Seeding `_click_hits` by hand instead
-## tests exactly the new logic (the hit-test search in `click_hit`, the tab guard in `bazaar_click`)
-## without depending on a render pipeline this layer does not have. `_works_group`'s own arithmetic for
-## the rect and the flat index is a single, reviewed line (`bazaar_works.gd`) rather than a second thing
-## this check would otherwise have to re-derive.
+## Does NOT call `_tab_works`/`_tab_bench`/`_tab_pack` to get real geometry: `CanvasItem.draw_*` refuses
+## to run outside an actual `_draw()` callback ("Drawing is only allowed inside this node's `_draw()`..."),
+## and under `run_harness.sh` this layer runs `--headless`, where nothing ever delivers that real callback
+## — a first version of this check called the draw function directly and it "passed" while spraying that
+## engine error into the log on every row drawn, and an earlier version still waited on
+## `RenderingServer.frame_post_draw` and hung the layer outright, since headless never fires it either.
+## Seeding each tab's `_click_hits` by hand instead tests exactly the new logic (the hit-test search in
+## `click_hit`, the per-tab dispatch in `bazaar_click`) without depending on a render pipeline this layer
+## does not have. Each tab's own arithmetic for the rect and the flat index is a single, reviewed line in
+## its own file rather than a second thing this check would otherwise have to re-derive.
 func _click_routes_to_row(main: MainView, hud: Hud) -> void:
 	main._inventory_open = true
 	hud.set_bazaar_tab(Hud.TAB_WORKS)
 	_check(hud.bazaar_click(Vector2(50.0, 50.0)) == -1,
-		"a click misses (-1) while nothing has been cached yet")
-	var works: BazaarWorks = hud._bazaar()._works_page()
-	works._click_hits = [
+		"WORKS: a click misses (-1) while nothing has been cached yet")
+	hud._bazaar()._works_page()._click_hits = [
 		{"rect": Rect2(20.0, 20.0, 40.0, 20.0), "index": 0},
 		{"rect": Rect2(70.0, 20.0, 40.0, 20.0), "index": 5},
 	]
 	_check(hud.bazaar_click(Vector2(40.0, 30.0)) == 0,
-		"a click inside row 0's cached rect routes to flat index 0")
+		"WORKS: a click inside row 0's cached rect routes to flat index 0")
 	_check(hud.bazaar_click(Vector2(90.0, 30.0)) == 5,
-		"a click inside a later row's cached rect routes to ITS flat index (5), not the first one seen")
+		"WORKS: a click inside a later row's cached rect routes to ITS flat index (5), not the first seen")
 	_check(hud.bazaar_click(Vector2(500.0, 500.0)) == -1,
-		"a click outside every cached rect misses (-1) rather than falling back to the nearest one")
+		"WORKS: a click outside every cached rect misses (-1) rather than falling back to the nearest one")
+
 	hud.set_bazaar_tab(Hud.TAB_BENCH)
+	hud._bazaar()._bench_page()._click_hits = [{"rect": Rect2(200.0, 200.0, 30.0, 30.0), "index": 2}]
 	_check(hud.bazaar_click(Vector2(40.0, 30.0)) == -1,
-		"the same point that hit row 0 on WORKS misses on another tab — clicks do not leak across tabs")
+		"BENCH: the point that hit WORKS row 0 misses here — dispatch reads BENCH's own cache, not WORKS's")
+	_check(hud.bazaar_click(Vector2(210.0, 210.0)) == 2,
+		"BENCH: a click inside BENCH's own cached chip routes to its tech index (2)")
+
+	hud.set_bazaar_tab(Hud.TAB_PACK)
+	hud._bazaar()._pack_page()._click_hits = [{"rect": Rect2(5.0, 5.0, 30.0, 30.0), "index": 1}]
+	_check(hud.bazaar_click(Vector2(210.0, 210.0)) == -1,
+		"PACK: the point that hit BENCH's chip misses here — dispatch reads PACK's own cache, not BENCH's")
+	_check(hud.bazaar_click(Vector2(15.0, 15.0)) == 1,
+		"PACK: a click inside PACK's own cached well routes to its slot index (1)")
+
 	hud.set_bazaar_tab(Hud.TAB_WORKS)
 	main._inventory_open = false
 

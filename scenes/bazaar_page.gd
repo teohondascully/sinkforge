@@ -363,13 +363,16 @@ func bazaar_action() -> Dictionary:
 
 
 ## The mouse's answer to `bazaar_move` + Enter, in one motion: which flat row `mouse` (canvas coords)
-## landed on, or -1 on a miss. WORKS only for now, the tab the "mouse can't buy things" report was about
-## and the one that already caches its drawn row rects; the other tabs fall through to -1 rather than
-## guess at geometry nothing cached this frame.
+## landed on, or -1 on a miss. Reads whichever tab is open, the same tab `bazaar_action` would act on, so
+## a click and a keyboard Enter can never disagree about what "the highlighted row" means.
 func bazaar_click(mouse: Vector2) -> int:
-	if bazaar_tab != TAB_WORKS:
-		return -1
-	return _works_page().click_hit(mouse)
+	match bazaar_tab:
+		TAB_WORKS:
+			return _works_page().click_hit(mouse)
+		TAB_BENCH:
+			return _bench_page().click_hit(mouse)
+		_:
+			return _pack_page().click_hit(mouse)
 
 
 ## Change tab, keeping each tab's place in its own list. Re-picking the tab you are already on means

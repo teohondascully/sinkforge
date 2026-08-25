@@ -51,6 +51,18 @@ var _tooltip_count: int = 0
 var _tooltip_anchor: Vector2 = Vector2.ZERO   ## top-centre of the hovered slot
 
 
+## Screen rect -> flat cursor index for every well this frame actually drew, the same cache-then-hit-test
+## shape `BazaarWorks._click_hits` uses. Populated in `_tab_pack`, read by `click_hit`.
+var _click_hits: Array[Dictionary] = []
+
+
+func click_hit(mouse: Vector2) -> int:
+	for hit: Dictionary in _click_hits:
+		if (hit["rect"] as Rect2).has_point(mouse):
+			return int(hit["index"])
+	return -1
+
+
 ## How many wells fit across the content and how many rows they take. `_tab_pack` calls the first of
 ## these rather than keeping its own copy of the division.
 func _pack_cols(w: float) -> int:
@@ -65,6 +77,7 @@ func _pack_rows(w: float) -> int:
 ## PACK: the whole carried inventory as a grid of wells, given the whole width. It is the same pack it
 ## always was, and it simply stopped sharing a 360px column with two other screens.
 func _tab_pack(g: Dictionary) -> void:
+	_click_hits.clear()    # stale unless the loop below repopulates it; a miss this frame is a miss
 	var content: Rect2 = g["content"]
 	var slots: Array[Dictionary] = _sim.inventory_slots()
 	var cell: float = PACK_CELL
@@ -91,6 +104,7 @@ func _tab_pack(g: Dictionary) -> void:
 			cell - 6.0, cell - 6.0)
 		if box.end.y > wells.end.y:
 			break
+		_click_hits.append({"rect": box, "index": i})
 		var item: StringName = slots[i]["item"]
 		var hot: bool = box.has_point(Controls.pointer_viewport(_canvas))
 		var picked: bool = i == bazaar_row

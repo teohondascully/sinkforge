@@ -15,6 +15,19 @@ extends BazaarSurface
 ## that line, so the indent is the lamp's own right edge plus air. It used to be 15 on a narrow chip and
 ## 19 on a wide one, beside a dot drawn at 8 and 11 with a radius of 3.2, which is 3.8 and 4.8 of dead
 ## space in the one measurement the names were short of.
+## Screen rect -> flat cursor index for every chip this frame actually drew, the same
+## cache-then-hit-test shape `BazaarWorks._click_hits` uses. Populated in `_tab_bench`, read by
+## `click_hit`.
+var _click_hits: Array[Dictionary] = []
+
+
+func click_hit(mouse: Vector2) -> int:
+	for hit: Dictionary in _click_hits:
+		if (hit["rect"] as Rect2).has_point(mouse):
+			return int(hit["index"])
+	return -1
+
+
 const BENCH_NARROW: float = 96.0      ## under this a chip tucks its lamp in against the edge
 
 
@@ -134,6 +147,7 @@ func _draw_tech_chip(tid: StringName, rr: Rect2, is_next: bool, picked: bool, fs
 ## Tiers derive from each tech's `requires` chain, so a branching tree simply stacks its chips in a
 ## column and no layout changes. The chips are scaled to the panel rather than the panel to the chips.
 func _tab_bench(g: Dictionary, picked: StringName) -> void:
+	_click_hits.clear()    # stale unless the loop below repopulates it; a miss this frame is a miss
 	var content: Rect2 = g["content"]
 	var tiers: Array = _bench_tiers()
 	if tiers.is_empty():
@@ -171,5 +185,7 @@ func _tab_bench(g: Dictionary, picked: StringName) -> void:
 		_canvas.draw_line(p0, p1, lc, 1.5)
 		_canvas.draw_colored_polygon(PackedVector2Array([p1, p1 + Vector2(-5.0, -3.5), p1 + Vector2(-5.0, 3.5)]), lc)
 	var next: StringName = ResearchRules.next_tech(_sim.research)
-	for tid: StringName in ResearchRules.ORDER:
+	for idx: int in ResearchRules.ORDER.size():
+		var tid: StringName = ResearchRules.ORDER[idx]
 		_draw_tech_chip(tid, rects[tid], tid == next, tid == picked, fs)
+		_click_hits.append({"rect": rects[tid], "index": idx})
