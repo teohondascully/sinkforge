@@ -70,8 +70,10 @@ the migration, including what breaks.
 
 ## Running from source
 
-The project needs Godot 4.6.2. `project.godot` targets the 4.6 feature set, and CI installs
-`4.6.2-stable`.
+The project needs Godot **4.6.2-stable**, pinned in `project.godot`'s header comment. CI no longer
+installs Godot at all — the structural gates (`docs/QUALITY.md`) are pure static analysis over the
+source tree, so there's currently no automated check that a contributor's local engine matches this
+pin; keep the two in sync by hand until a CI step that boots the engine exists again.
 
 ```sh
 git clone https://github.com/teohondascully/sinkforge

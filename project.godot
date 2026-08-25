@@ -7,6 +7,16 @@
 
 config_version=5
 
+; Pinned engine version: 4.6.2-stable. Reproducibility — the same version everyone develops
+; against and the same one CI used to install before the gates job (docs/QUALITY.md, "structural
+; gates") replaced the Godot-installing CI jobs with pure static analysis that needs no engine at
+; all. There is currently no CI step that verifies a contributor's local Godot matches this pin;
+; README.md's "Running from source" section states the same version so the two can't drift apart
+; silently. If a CI step that boots the engine is ever added back (e.g. for the movement
+; acceptance suite, docs/ARCHITECTURE.md §9), pin and verify it there the way the old
+; .github/workflows/harness.yml did — compare the installed engine's reported version string
+; against this one rather than only printing it, since an unread version string catches nothing.
+
 [application]
 
 config/name="Sinkforge"

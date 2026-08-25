@@ -21,8 +21,6 @@ doc changes, before touching `core/`.
 
 ## In flight right now
 
-- Fork auditing the 31 pre-existing unpushed commits (content summary, pivot-relevance, divergence
-  risk between local `main` and `origin/main`). Not yet reported back.
 - Fork triaging the 8 local-only documents (`PRIORITY.md`, `DIRECTOR_BRIEF.md`, `ORCHESTRATOR.md`,
   `AGENT_PLAY_EVALUATION_PROTOCOL.md`, `FEEL_GAP.md`, `MENU_MATRIX.md`,
   `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`, `VISUAL_RECOMMENDATIONS_SURFACE.md`) into three
@@ -42,7 +40,19 @@ doc changes, before touching `core/`.
    from old commits regardless of what HEAD currently contains. Real clone-size reduction needs
    either a history rewrite (deferred, gated on public/private + fork/star exposure) or GitHub
    Release assets (genuinely outside git's object model, not gated on a rewrite).
-2. **31-commit audit** — pending fork above.
+2. **31-commit audit — DONE.** Clean fast-forward confirmed (`merge-base origin/main pre-pivot`
+   == `origin/main` tip; `git log pre-pivot..origin/main` empty). Single author throughout, no
+   divergence risk, safe to push whenever. Content: 100% of the 31 commits touch code now in
+   `legacy/`, none ported yet. Two clusters worth flagging rather than silently absorbing:
+   **Freight Winch (5 commits)** is real, design-approved work (a working verb stub already existed
+   in the old `main.gd`) that `docs/archive/COMPAT_AUDIT_2026-08-25.md`'s own risk register #1 says
+   needs `sim/commands`/`sim/run` built first so it has a real home rather than regrowing as ad hoc
+   verbs — treat that as a prerequisite gate before resuming Winch work, not a suggestion. **Bazaar
+   (5 commits)** is confirmed sunk cost on the core mechanic (the audit names `scenes/bazaars.gd` an
+   explicit DELETE); the surrounding shop-panel mouse-click UX pattern may still be worth referencing
+   when porting generic shop/menu infra, but the Bazaar concept itself is cut. Remaining 21 commits
+   (tutorial/teaching content, HUD/UX polish, docs/housekeeping) are orthogonal or genuinely portable
+   per the existing compat audit's subsystem scores — nothing else blocks starting `core/`.
 3. **8-document triage** — pending fork above.
 4. **Public vs. private, with reasoning** — leaning public: already public since 2026-08-10 with
    deliberate prior investment (MIT decomposition, per memory), portfolio purpose requires

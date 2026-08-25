@@ -15,5 +15,6 @@ check that has never been observed failing is not a check."
   exceeds game," not a degenerate case of it. That WARN should stop appearing once `core/` exists;
   if it's still printing after that, treat it as the FAIL it actually is.
 - `check_claim_references.py` — every scenario in `scenarios/` and every harness layer with a
-  registered `func run()` names a claim ID that exists in `claims/`, or is explicitly marked
-  `EXEMPT (ADR-0001)`.
+  registered `func run()` names a claim ID that exists in `claims/` AND has been observed FAILING at
+  least once (`first_failed_at` populated — `docs/CLAIMS.md` §10a), or is explicitly marked
+  `EXEMPT (ADR-0001)`. Also enforces the 40-active-claim cap (`docs/CLAIMS.md` §10c).

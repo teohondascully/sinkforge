@@ -39,6 +39,7 @@ kind: structural         # structural | balance | feel | legibility | performanc
 owner: design            # design | engineering
 created: 2026-08-25
 last_measured: never
+first_failed_at: never   # date+commit of the first FAILING measurement. see §10.
 scenario: scenarios/first_bore.yaml
 ---
 
@@ -69,8 +70,8 @@ Required. Every claim has a blind spot and naming it is what keeps the corpus
 honest.
 
 ## History
-| Date | Commit | Value | Status | Note |
-|---|---|---|---|---|
+| Date | Commit | Data version | Value | Status | Note |
+|---|---|---|---|---|---|
 ```
 
 ---
@@ -148,3 +149,48 @@ The weakest part of any claim system, so state the rules:
 - A threshold needs a one-sentence justification. "Because it felt right" is an acceptable justification if it is honestly labeled as such; an unlabeled guess is not.
 - Thresholds move only with a recorded reason in History. Moving a threshold to make a claim pass is the same offence as lowering a CI gate to make it green.
 - A claim whose threshold has moved three times is telling you the claim is wrong, not the number.
+
+---
+
+## 10. Claim-rot mechanisms
+
+`docs/QUALITY.md`'s claim-reference gate constrains instrumentation: every check must trace to a
+claim. Nothing constrains claims themselves. That's a gap, and pressure moves to fill it the same
+way it filled the prior codebase's instrumentation — a claim filed to unblock a PR, describing what
+the code already does rather than constraining what it must keep doing. That is what paperwork looks
+like in a system built to resist paperwork. Four mitigations, none sufficient alone:
+
+**a. A claim must have been observed failing at least once.** `first_failed_at` in the frontmatter
+records the date and commit of the first `FAILING` measurement. A claim born `FAILING` and driven to
+`PASSING` has demonstrated discriminating power — it distinguished a state where the design assertion
+didn't hold from one where it does. A claim born `PASSING` was written to describe existing behavior,
+which cannot fail by construction and defends nothing. This is `docs/QUALITY.md` §2's mutation
+principle ("a check that has never been observed failing is not a check") applied to the corpus
+itself, not just to individual harness layers. **Until `first_failed_at` is populated, the claim is
+provisional and does not satisfy the claim-reference gate for any harness layer** — a check citing an
+unproven claim ID is the same violation as citing no claim ID at all.
+
+**b. Threshold before measurement.** Fill in `Threshold` before `Current value`. If the current value
+is measured first and the threshold is set to match it, the threshold has ratcheted to whatever the
+code happens to do today and the claim measures nothing going forward — it will read `PASSING` at the
+moment of authorship and regress the instant reality changes, which inverts the claim's purpose.
+Record which came first in `History`'s `Note` column the first time a claim is measured
+("threshold set before first measurement" or the reverse, honestly, if it happened the wrong way
+round).
+
+**c. Cap the active (non-`RETIRED`) corpus at 40 claims.** Adding a 41st claim means retiring one
+first. Retirement is hygiene, not failure — a claim can be `RETIRED` because the design it measured
+changed, because a stronger claim subsumed it, or because it turned out to measure nothing useful.
+The cap exists so the corpus stays something a reviewer can actually read, and so writing a new claim
+is a real cost weighed against the existing forty rather than a free action. The `docs/CLAIMS.md` §8
+"portfolio artifact" framing depends on the corpus staying legible; forty claims already tests that.
+
+**d. Draw the claim/test boundary explicitly.** A correctness assertion is a test: it belongs in
+`tests/`, and it would pass or fail identically regardless of what the design decided. A design
+assertion is a claim: it could be true or false depending on a decision someone could have made
+differently, and the corpus exists to make that decision checkable. "Conservation of matter holds"
+is a test — no design choice makes it acceptable for matter to vanish. "A two-minute run is not a
+menu with a walk attached" is a claim — a different Draft A/C decision changes what's being asserted.
+Without this line, the corpus fills with trivially-true correctness claims dressed as design claims,
+which inflates the count against the cap in (c) without buying any of what a claim is supposed to
+buy: a design decision made falsifiable.

@@ -6,6 +6,7 @@ kind: structural
 owner: engineering
 created: 2026-08-25
 last_measured: never
+first_failed_at: never
 scenario: scenarios/first_bore.yaml
 blocked_on: sim/run does not exist. No session lifecycle, flood clock, or extraction resolution exists in any form.
 ---
@@ -61,6 +62,6 @@ Each of those needs its own claim. This one establishes only that the loop close
 
 ## History
 
-| Date | Commit | Value | Status | Note |
-|---|---|---|---|---|
-| 2026-08-25 | — | not measured | BLOCKED | Claim authored at pivot. Blocked on `sim/run`. |
+| Date | Commit | Data version | Value | Status | Note |
+|---|---|---|---|---|---|
+| 2026-08-25 | — | — | not measured | BLOCKED | Claim authored at pivot. Blocked on `sim/run`. |

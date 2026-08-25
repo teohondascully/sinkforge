@@ -78,6 +78,8 @@ Carried forward from the prior program largely intact. This body of standards wa
 
 **New, and load-bearing:** a check whose subject is scheduled for deletion is retired with its subject, not maintained. A green check for a deleted mechanic is a worse failure than a missing check.
 
+**New, and load-bearing:** where a gate measures a property of the codebase, the gate is itself part of the codebase and is not exempt from its own property. A gate that quietly excludes itself reports green forever regardless of what it's supposed to be watching — worse than no gate, because it looks like coverage. Live example: `check_loc_ratio.py` (`docs/QUALITY.md` gate 7) originally counted only `.gd` files, which made its own several hundred lines of Python instrument code invisible to the ratio it exists to enforce — caught only because it was mutation-tested against its own source directory, not only against fixtures standing in for game code. Every gate's mutation test must include a case where the gate's own file (or its own output directory, its own line count, whatever property it measures) is the thing that trips it.
+
 ---
 
 ## 3. Reliability
