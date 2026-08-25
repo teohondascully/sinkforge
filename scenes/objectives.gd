@@ -2,10 +2,18 @@ class_name Objectives
 extends RefCounted
 
 ## The guided step ladder: an ordered chain that walks a new player from bare hands to their first
-## automation (the self-feeding ore to ingot line), then hands off toward L2 with a few nudges (research
-## Power, burn coal in a generator, research Descent, breach the seal into Stonereach). It ends at the L1
-## to L2 gate by design, since past it the player self-directs through the tech tree and depth, and it
-## deliberately does not keep nudging into L3 (docs/PROGRESSION.md).
+## automation (the self-feeding ore to ingot line), through routing coal so the line runs unattended, then
+## hands off toward L2 with a few nudges (research Power, burn coal in a generator, research Descent,
+## breach the seal into Stonereach). It ends at the L1 to L2 gate by design, since past it the player
+## self-directs through the tech tree and depth, and it deliberately does not keep nudging into L3
+## (docs/PROGRESSION.md).
+##
+## The "hopper" step, 2026-08-25: a live playtest and a design review (docs/handoff/
+## PRODUCT_RECOVERY_PASS_2026-08-24.md) found the chain jumped straight from "drop coal on the Drill by
+## hand" to "research Power," with nothing about the Hopper in between -- so the player's own hand-feeding
+## never stopped, "first automation" stayed half-manual, and Power read as the only answer to a problem a
+## Hopper already solves. `hopper.filter`/`R` re-taste and `_first_machine_below` are not new mechanics;
+## this step is the first thing in the whole chain to teach them.
 ##
 ## Representation only: it reads the sim, never mutates it and never enters the tick. Progress is measured
 ## as deltas against a baseline snapshotted at construction (lifetime counters minus their start value),
@@ -39,6 +47,7 @@ var steps: Array[Dictionary] = [
 	{"id": &"build",  "label": "Drop the Drill into the shaft just ABOVE the ore vein (RMB) — it bores down into it", "goal": "Build the line"},
 	{"id": &"fuel",   "label": "The Drill needs COAL — mine the coal vein right of the shaft, then drop coal on the Drill (Q)", "goal": "Fuel the Drill"},
 	{"id": &"auto",   "label": "Stand back — the fueled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"hopper", "label": "Coal by hand runs dry — craft a HOPPER (E), place it above the Drill (RMB), then drop coal in the top", "goal": "Automate the coal feed"},
 	# --- the L1 to L2 handoff. The chain ends after this; the player self-directs from here.
 	{"id": &"power",     "label": "Research POWER at the Bazaar (T, then ENTER) — the deep needs energy", "goal": "Research Power"},
 	{"id": &"generator", "label": "Craft a GENERATOR, place it, and toss coal in (Q) to burn it for power", "goal": "Burn coal for power"},
@@ -117,6 +126,7 @@ func _achieved(id: StringName) -> bool:
 		&"build": return not _find_line().is_empty()                                             # the drill/forge stack exists
 		&"fuel":  return _drill_fueled()                                                          # the drill has coal to burn
 		&"auto":  return _line_has_run()                                                          # it forged an ingot on its own
+		&"hopper":    return _coal_hopper_feeding_drill()                                         # coal routed, not hand-dropped
 		&"power":     return sim.is_researched(&"power")                                          # the generator is unlocked
 		&"generator": return _generator_burning()                                                # a placed generator is burning
 		&"descent":   return sim.is_researched(&"descent")                                        # the engine is unlocked
@@ -159,6 +169,20 @@ func _drill_fueled() -> bool:
 	for m: MachineState in sim.machines:
 		if m.def.behavior == &"drill" and (m.fuel > 0 or int(m.input_buffer.get(&"coal", 0)) > 0):
 			return true
+	return false
+
+
+## A Hopper banking coal and sitting directly above a Drill, the real (and only) mechanism the game has
+## for routing fuel automatically: `_run_hopper` metes its filtered good straight down to whatever
+## `_first_machine_below` finds. Reads the filter rather than the buffer, since a hopper can hold zero
+## coal for a beat between deliveries and still be the thing doing the routing -- the buffer is transient,
+## the filter latches the moment coal is first banked and only clears on a deliberate R.
+func _coal_hopper_feeding_drill() -> bool:
+	for m: MachineState in sim.machines:
+		if m.def.behavior == &"hopper" and m.filter == &"coal":
+			var below: MachineState = sim._first_machine_below(m.cell)
+			if below != null and below.def.behavior == &"drill":
+				return true
 	return false
 
 
