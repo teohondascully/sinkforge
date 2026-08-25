@@ -254,7 +254,7 @@ exit codes in all, and a caller that reads "not zero" as "a test failed" will mi
 This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
 
 ```
-115 PASS / 0 FAIL / 0 SKIP of 115
+119 PASS / 0 FAIL / 0 SKIP of 119
 HARNESS_EXIT=4
 ```
 
