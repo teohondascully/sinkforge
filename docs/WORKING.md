@@ -6,98 +6,64 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-Between Task 0 (repository restructuring) and Task 1 (`core/`). Task 0 is committed and done. Not
-yet building code — resolving three decisions the director wants closed first, plus two batches of
-doc changes, before touching `core/`.
+Task 0 (repository restructuring) is done and committed. This session also closed three
+director-requested decisions and two batches of doc changes before touching `core/`. **Task 1
+(`core/`) has not started** — flagged as its own stage/session per the one-stage-per-session rule
+this same session added to `CONTEXT.md`, rather than starting real implementation at the tail of an
+already very long session. Awaiting the director's confirmation to either start Task 1 now or treat
+this as the handoff point.
 
-## Done
+## Done, this session, all committed
 
-- Task 0, all 6 sub-tasks, 5 commits (`4758d5a` legacy move, `056a515` root cleanup, `cf00607` doc
-  triage, `e06da90` skeleton, `9572aa4` gates). `pre-pivot` tag pushed to origin. Local `main` is
-  36 commits ahead of `origin/main`, not yet pushed (see open question below).
-- Confirmed: repo is public on GitHub (`teohondascully/sinkforge`), 1 fork, 1 star, 0 watchers,
-  created 2026-08-10. Director's quick answer was "stays public, push what I have" — full reasoning
-  still owed (see open questions).
+- Task 0, all 6 sub-tasks, 5 commits (`4758d5a`, `056a515`, `cf00607`, `e06da90`, `9572aa4`).
+- Context-compaction protocol: `CLAUDE.md`, `docs/WORKING.md`, `CONTEXT.md` section (`46a4ae5`).
+- Claim-rot mechanisms + data-version history + Godot pin + QUALITY.md self-subject note (`8891977`).
+- Movement/collision architecture: resolution split, rope/grapple promoted to the traversal
+  primitive, extended hostile chamber, claim C002 (`a775e78`).
+- `pre-pivot` tag pushed to origin. Local `main` NOT yet pushed — 8 commits ahead of `origin/main`
+  as of this write (31 pre-existing + 5 Task 0 + 2 this batch), confirmed clean fast-forward, safe
+  to push, director said to (see decisions below). Push this before ending the session if not
+  already done.
 
-## In flight right now
+## Decisions closed this session
 
-- Claim-rot mechanisms, data-version history, Godot pin, QUALITY.md self-subject note — DONE,
-  committed (`8891977`).
-- Movement/collision architecture doc changes — IN PROGRESS. ARCHITECTURE.md §9 resolution-split +
-  rope/grapple promotion done, not yet committed. Still to do: extend hostile-chamber spec (sub-tile
-  rubble, 1-3px ledges, jagged fresh-dig), CONTEXT.md one-liner, GDD.md rope/grapple promotion near
-  §1's Noita reference, new BLOCKED claim (velocity_efficiency ≥0.92 over freshly-dug terrain).
-- Still owed to director: full write-up of items 1-3 from their last message (clone-size plan,
-  31-commit summary — done above — and now the 8-doc triage), plus the public/private
-  recommendation with reasoning that gates the clone-size filter-repo question.
+- **Repo stays public.** Reasoning: already public since 2026-08-10 with deliberate prior investment
+  (MIT + decomposition, per memory), the project's stated purpose (portfolio piece) requires
+  visibility, local-only docs are already correctly protected via `.git/info/exclude` independent of
+  repo visibility, and current exposure is low (1 fork, 1 star, 0 watchers) so a future history
+  rewrite's blast radius stays small if one is ever warranted.
+- **31 pre-existing commits: clean fast-forward, no divergence risk, safe to build on.** Two clusters
+  flagged rather than silently absorbed: Freight Winch (5 commits, real design-approved work with a
+  working verb stub already in the old `main.gd`) needs `sim/commands`/`sim/run` built first per the
+  compat audit's own risk register before resuming; Bazaar (5 commits) is confirmed sunk cost on the
+  core mechanic, only the shop-panel UX pattern might be worth referencing later.
+- **8 local-only documents triaged, recommend-only, nothing moved.** `PRIORITY.md` stays local
+  (Bucket A, cleanly). `AGENT_PLAY_EVALUATION_PROTOCOL.md` promote to archive, or even normative —
+  strongest candidate (Bucket B, cleanly). Six are mixed A/B splits; `ORCHESTRATOR.md` is the one
+  that needs a rewrite before archiving (valuable methodology entangled with second-person
+  address-to-an-AI voice, the same commissioner-voice pattern this project already did one history
+  rewrite to scrub). Full detail in the response given to the director; not reproduced here.
+- **Clone size (349 MB): plan proposed, not executed.** Moving the non-curated visual record to a
+  GitHub Release asset (no history rewrite) shrinks working-tree/checkout size (~332 MB → ~25-30 MB)
+  but does **not** shrink what a plain `git clone` actually downloads (`.git` stays ~349 MB, since
+  every historical blob remains reachable from old commits regardless of what HEAD contains). Real
+  clone-size reduction needs a history rewrite (`git filter-repo`), explicitly deferred, now
+  low-blast-radius given the public/private answer above (1 fork). Awaiting director go/no-go on
+  Phase 1 (Release asset move) before doing anything.
+- The four `.rc-prose-*.patch` files were fully superseded by existing commits — zero net change.
+- `PRIORITY.md` and `DIRECTOR_BRIEF.md` restored to original untracked, local-only state after being
+  accidentally tracked mid-Task-0. Do not re-attempt archiving without a fresh decision.
+- `check_loc_ratio.py` counts `.gd` + `.py` + `.sh`, not `.gd` alone.
 
-## 8-document triage (fork result, recommend-only per director's request — nothing moved)
+## Open questions for next session
 
-Bucket A (stays local) cleanly: `PRIORITY.md`. Bucket B (promote to archive) cleanly:
-`AGENT_PLAY_EVALUATION_PROTOCOL.md` (strong candidate — reads as an active spec, could even go
-normative rather than archive/). Six are mixed:
-- `DIRECTOR_BRIEF.md` — already known, §4.1-4.3 (~65/594 lines) is B, rest is A.
-- `FEEL_GAP.md` — ~26/39 "strikes" are B (already self-flags as superseded, low-friction to archive).
-- `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md` — leans B (~55-65%): eval protocol/rubric/review
-  methodology is B, the 50-item raw finding table is A.
-- `MENU_MATRIX.md` — leans A (~80%): ticket ledger is A, WCAG contrast audit + a documented
-  design-alternatives decision are B.
-- `VISUAL_RECOMMENDATIONS_SURFACE.md` — leans A (~90%): ticket queue is A, a short "reference
-  philosophies" section (Factorio/Noita) is B.
-- `ORCHESTRATOR.md` — the outlier. Genuinely valuable methodology (§5 assertion philosophy, §6
-  Works/Feels/Belongs + SEES tier, §10 design maxims) is NOT cleanly separable from a document-wide
-  voice problem: second-person address to an AI agent plus a verbatim "the user's own words"
-  quote block — the same commissioner-voice pattern this project already did a full history rewrite
-  to scrub once (memory: history-rewrite-2026-08-19). Needs a rewrite before archiving, not just a
-  cut.
+- Does the director want Phase 1 of the clone-size plan (Release asset move) executed now, or held
+  until the filter-repo question is also decided, so it's one clean pass instead of two?
+- Does any of the 8-document triage get acted on (especially `ORCHESTRATOR.md`'s rewrite), or held?
+- Confirm: start Task 1 (`core/`) next session, or does the director want to redirect first?
 
-No embarrassing/liability content found in any of the eight. Recommendation synthesis still owed to
-director in the final write-up.
+## Discoveries not yet written anywhere durable
 
-## Open questions (director owes/awaits an answer, or I owe one back)
-
-1. **Clone size (349 MB).** Director wants a plan: ~10 curated images stay in `docs/media/`, the
-   rest of the curated visual record moves out of the default clone, a pointer left explaining
-   where. Must report honestly whether this shrinks the actual `.git` clone transfer or only the
-   working-tree checkout — early analysis says: without a history rewrite, moving files out now
-   only shrinks the checkout, not the `.git` pack, because every historical blob stays reachable
-   from old commits regardless of what HEAD currently contains. Real clone-size reduction needs
-   either a history rewrite (deferred, gated on public/private + fork/star exposure) or GitHub
-   Release assets (genuinely outside git's object model, not gated on a rewrite).
-2. **31-commit audit — DONE.** Clean fast-forward confirmed (`merge-base origin/main pre-pivot`
-   == `origin/main` tip; `git log pre-pivot..origin/main` empty). Single author throughout, no
-   divergence risk, safe to push whenever. Content: 100% of the 31 commits touch code now in
-   `legacy/`, none ported yet. Two clusters worth flagging rather than silently absorbing:
-   **Freight Winch (5 commits)** is real, design-approved work (a working verb stub already existed
-   in the old `main.gd`) that `docs/archive/COMPAT_AUDIT_2026-08-25.md`'s own risk register #1 says
-   needs `sim/commands`/`sim/run` built first so it has a real home rather than regrowing as ad hoc
-   verbs — treat that as a prerequisite gate before resuming Winch work, not a suggestion. **Bazaar
-   (5 commits)** is confirmed sunk cost on the core mechanic (the audit names `scenes/bazaars.gd` an
-   explicit DELETE); the surrounding shop-panel mouse-click UX pattern may still be worth referencing
-   when porting generic shop/menu infra, but the Bazaar concept itself is cut. Remaining 21 commits
-   (tutorial/teaching content, HUD/UX polish, docs/housekeeping) are orthogonal or genuinely portable
-   per the existing compat audit's subsystem scores — nothing else blocks starting `core/`.
-3. **8-document triage** — pending fork above.
-4. **Public vs. private, with reasoning** — leaning public: already public since 2026-08-10 with
-   deliberate prior investment (MIT decomposition, per memory), portfolio purpose requires
-   visibility, local-only docs are already correctly protected regardless of repo visibility. Low
-   fork/star count (1/1) means a future history rewrite's blast radius is currently small if one
-   is ever warranted. Full write-up still owed to the director.
-
-## Decisions made this session
-
-- Repo stays public (director-confirmed, quick answer; full reasoning still being written).
-- The four `.rc-prose-*.patch` files were fully superseded by existing commits — zero net change
-  after resolving all conflicts in favor of HEAD. No action needed beyond deleting the patch files
-  (done).
-- `PRIORITY.md` and `DIRECTOR_BRIEF.md` restored to their original untracked, local-only state after
-  being accidentally tracked mid-pass. Do not re-attempt archiving them without a fresh decision.
-- `check_loc_ratio.py` counts `.gd` + `.py` + `.sh`, not `.gd` alone (was blind to its own source).
-
-## Discoveries not yet written anywhere durable (write before compaction if this list grows)
-
-- None outstanding — the case-collision bug (`docs/ADR/` vs `docs/adr/`), the LOC-ratio
-  self-blindness bug, and the `.git/info/exclude` path drift after the `legacy/` move are all
-  already fixed in place and described in commit messages (`9572aa4`, `cf00607`). Nothing currently
-  lives only in this session's context except the two forks' not-yet-returned results and the
-  reasoning above — both captured here now.
+- None outstanding. Everything found this session (case-collision bug, LOC-ratio self-blindness,
+  `.git/info/exclude` path drift, the local-only-docs discovery, the dead patch files) is already in
+  commit messages or in this file.
