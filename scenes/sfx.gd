@@ -80,6 +80,7 @@ var _probe_dirs: PackedVector2Array = PackedVector2Array()
 var _probe_in: float = 0.0                    # seconds until the next enclosure probe
 var _closed: float = 0.0
 var _room: float = 0.35
+var _listener_pos: Vector2 = Vector2.ZERO     # last position set_ambience saw; play() has no listener of its own
 var _world: FactorySim = null                 # the sim, found lazily from the parent; see _sim()
 ## Under the headless Dummy driver the mixer never steps, so a started voice is never reaped and trips
 ## the ObjectDB leak warning at quit. Playback is a no-op there; synthesis still runs.
@@ -211,7 +212,8 @@ func play(name: StringName, pos: Vector2, pitch: float = 1.0, vol_db: float = 0.
 	p.stream = stream
 	p.global_position = pos
 	p.pitch_scale = pitch * randf_range(0.96, 1.04)
-	p.volume_db = -8.0 + vol_db + Settings.sound_db()
+	var occ: float = _occlusion(pos, _listener_pos)
+	p.volume_db = -8.0 + vol_db + Settings.sound_db() - occ * OCCLUSION_DB_MAX
 	p.play()
 
 
@@ -310,6 +312,7 @@ func set_rush(level: float, delta: float) -> void:
 ## derived upstream from how deep the body sits below its column's surface. Past a cave level of 0.3
 ## the dark starts dripping too: a blip every 3 to 9 seconds, placed at random around the listener.
 func set_ambience(surface: float, cave: float, listener: Vector2, delta: float) -> void:
+	_listener_pos = listener
 	_wind_level = move_toward(_wind_level, clampf(surface, 0.0, 1.0), delta * 0.6)
 	_cave_level = move_toward(_cave_level, clampf(cave, 0.0, 1.0), delta * 0.6)
 	_wind_player.volume_db = lerpf(-60.0, -26.0, _wind_level) + Settings.ambience_db()
@@ -347,6 +350,34 @@ func _update_space(listener: Vector2, delta: float) -> void:
 	# than as the same place at two tail lengths.
 	_reverb.damping = lerpf(0.82, 0.30, _room)
 	_reverb.predelay_msec = lerpf(4.0, 30.0, _room)
+
+
+const OCCLUSION_REACH: int = 24                ## cells walked at most between a source and the listener
+## A placeholder, not a tuned value: how many dB a fully-occluded source loses on top of ordinary distance
+## falloff. Conservative on purpose — the curve this should follow (and whether low-pass belongs beside
+## it) is a listening call, same class as T3.10's swing-release tuning, and stays open for a director pass.
+const OCCLUSION_DB_MAX: float = 10.0
+
+## Fraction of solid cells on the straight line from `listener` to `source`, 0..1. The same fixed-step walk
+## `_probe_space` uses for the listener's OWN enclosure (`sim.is_solid`/`sim.in_bounds`), aimed at one point
+## instead of swept in twelve fixed directions — today only the space around the listener shapes the
+## reverb; the rock between a distant sound and the ear does nothing to it. T4.5.
+func _occlusion(source: Vector2, listener: Vector2) -> float:
+	var sim: FactorySim = _sim()
+	if sim == null:
+		return 0.0
+	var from := Vector2i(floori(listener.x / float(CELL)), floori(listener.y / float(CELL)))
+	var to := Vector2i(floori(source.x / float(CELL)), floori(source.y / float(CELL)))
+	var cells: int = mini(maxi(absi(to.x - from.x), absi(to.y - from.y)), OCCLUSION_REACH)
+	if cells <= 0:
+		return 0.0
+	var hits: int = 0
+	for s: int in range(1, cells + 1):
+		var t: float = float(s) / float(cells)
+		var c := Vector2i(roundi(lerpf(float(from.x), float(to.x), t)), roundi(lerpf(float(from.y), float(to.y), t)))
+		if sim.in_bounds(c) and sim.is_solid(c):
+			hits += 1
+	return float(hits) / float(cells)
 
 
 func _probe_space(listener: Vector2) -> void:
