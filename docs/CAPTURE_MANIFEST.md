@@ -49,7 +49,7 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `map` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- map` |
 | `mouth` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- mouth` |
 | `pack` | 2026-08-20 18:32 | `b87bae9a44` | `capture_moments.gd -- pack` |
-| `pack_fresh` | 2026-08-18 03:12 | `2aedbf3c18` | `capture_moments.gd -- pack_fresh` |
+| `pack_fresh` | 2026-08-24 17:55 | `7f2d734618` | `capture_moments.gd -- pack_fresh` |
 | `pack_full` | 2026-08-18 04:33 | `4d43d0337e` | `capture_moments.gd -- pack_full` |
 | `plunge` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- plunge` |
 | `quiet` | 2026-08-18 04:58 | `bdb891424d` | `capture_moments.gd -- quiet` |
@@ -59,9 +59,10 @@ A recipe invented to fill that column would be worse than a blank one, because i
 | `room_before` | 2026-08-17 14:03 | `0a2e586b7c` | `UNRECORDED` |
 | `room_zoom` | 2026-08-17 14:03 | `0a2e586b7c` | `zoom.gd -- _moment_room.png <crop UNRECORDED>` |
 | `scarp` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- scarp` |
-| `settings` | 2026-08-18 03:12 | `2aedbf3c18` | `capture_moments.gd -- settings` |
-| `settings_audio` | 2026-08-24 11:20 | `ac865fa766` | `capture_moments.gd -- settings_audio` |
-| `settings_controls` | 2026-08-24 11:20 | `ac865fa766` | `capture_moments.gd -- settings_controls` |
+| `settings` | 2026-08-24 17:55 | `7f2d734618` | `capture_moments.gd -- settings` |
+| `settings_audio` | 2026-08-24 17:55 | `7f2d734618` | `capture_moments.gd -- settings_audio` |
+| `settings_controls` | 2026-08-24 17:55 | `7f2d734618` | `capture_moments.gd -- settings_controls` |
+| `settings_feel` | 2026-08-24 17:55 | `7f2d734618` | `capture_moments.gd -- settings_feel` |
 | `stain` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- stain` |
 | `swing` | 2026-08-17 14:03 | `0a2e586b7c` | `capture_moments.gd -- swing` |
 | `swing_zoom` | 2026-08-17 14:03 | `0a2e586b7c` | `zoom.gd -- _moment_swing.png <crop UNRECORDED>` |
@@ -74,9 +75,9 @@ A recipe invented to fill that column would be worse than a blank one, because i
 
 - `0a2e586b7c` — 37 frames
 - `4d43d0337e` — 8 frames
-- `2aedbf3c18` — 4 frames
+- `7f2d734618` — 5 frames
 - `bdb891424d` — 2 frames
-- `ac865fa766` — 2 frames
+- `2aedbf3c18` — 2 frames
 - `b87bae9a44` — 1 frames
 
 One line here means the archive is one renderer. More than one means it is mixed, which is
