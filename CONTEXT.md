@@ -121,6 +121,30 @@ The primary implementers here are agents with bounded context. These are archite
 
 ---
 
+## Surviving context compaction
+
+The repository is the memory. A session's in-flight reasoning is not — it lives only in context and
+is gone on compaction unless it was written down first. Documents are re-readable; a train of thought
+is not.
+
+- **`CLAUDE.md`** is auto-loaded every session and survives compaction by construction. It is a short
+  pointer, not content: it names the reading order and sends you to `docs/WORKING.md`.
+- **`docs/WORKING.md`** is current state, not a log: current stage, what's done, what's in flight,
+  decisions made this session, open questions, discoveries not yet written anywhere durable. Under
+  150 lines. Update it as you work, not at the end. When a stage closes, its durable content moves
+  to an ADR, a `MODULE.md`, or a claim, and `docs/WORKING.md` resets for the next stage.
+- **Write discoveries immediately, not at a natural pause.** The test: if this session ended right
+  now, would this be lost? If yes, write it before continuing — an ADR for a decision, a `MODULE.md`
+  gotcha for a trap, `docs/WORKING.md` for everything else.
+- **After any compaction, re-read `CLAUDE.md` and `docs/WORKING.md` before touching anything**, and
+  state in one paragraph what you're doing and why. If that paragraph doesn't match
+  `docs/WORKING.md`, stop and say so rather than guessing forward.
+- **One stage per session.** End deliberately at a stage boundary with a written handoff rather than
+  drifting into a compaction mid-task. If a stage looks too large to fit one session, say so before
+  starting it — the same signal as a task needing more than five files.
+
+---
+
 ## Tick order
 
 Fixed and documented. Changing it requires an ADR.
