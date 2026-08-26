@@ -54,6 +54,22 @@ func next_u64() -> int:
 	return z
 
 
+## Uniform float in [0, 1), from the top 53 bits of one draw (the double mantissa's width) --
+## standard technique, and exact: dividing an exactly-representable integer by an exactly-representable
+## power of two has no rounding error, so this can never round up to 1.0.
+func next_float() -> float:
+	var top53: int = _ushr(next_u64(), 11)
+	return float(top53) / float(1 << 53)
+
+
+## Uniform integer in [lo, hi_inclusive]. Built on next_float() rather than a modulo of next_u64(), which
+## trades a little uniformity (float multiply-and-truncate, not rejection sampling) for simplicity -- fine
+## for world generation and nothing here is adversarial or needs cryptographic-grade uniformity.
+func next_range(lo: int, hi_inclusive: int) -> int:
+	var span: int = hi_inclusive - lo + 1
+	return lo + int(next_float() * float(span))
+
+
 static func _fnv1a64(text: String) -> int:
 	var h: int = _FNV_OFFSET
 	for b: int in text.to_utf8_buffer():

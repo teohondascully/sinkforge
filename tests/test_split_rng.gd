@@ -12,6 +12,10 @@ func _initialize() -> void:
 	_test_split_labels_diverge()
 	_test_state_roundtrip()
 	_test_two_seeds_diverge()
+	_test_next_float_matches_reference()
+	_test_next_float_stays_in_unit_range()
+	_test_next_range_matches_reference()
+	_test_next_range_stays_in_bounds()
 	_finish("split_rng")
 
 
@@ -89,3 +93,37 @@ func _test_two_seeds_diverge() -> void:
 	var a: SplitRng = SplitRng.new(1)
 	var b: SplitRng = SplitRng.new(2)
 	_check(a.next_u64() != b.next_u64(), "different seeds draw differently")
+
+
+## Golden vectors from the same from-scratch Python reference (top-53-bits-over-2^53), seed 20260826.
+func _test_next_float_matches_reference() -> void:
+	var expected: Array = [0.6420846259901432, 0.36378469822816084, 0.9814630693060211,
+		0.5435652025774595, 0.27764076052823683]
+	var rng: SplitRng = SplitRng.new(20260826)
+	for i in expected.size():
+		var got: float = rng.next_float()
+		_check(is_equal_approx(got, expected[i]), "next_float() draw %d = %.16f (expected %.16f)" %
+			[i, got, expected[i]])
+
+
+func _test_next_float_stays_in_unit_range() -> void:
+	var rng: SplitRng = SplitRng.new(2026)
+	for i in 500:
+		var f: float = rng.next_float()
+		_check(f >= 0.0 and f < 1.0, "next_float() draw %d = %f is in [0, 1)" % [i, f])
+
+
+## Same seed and reference as next_float(); next_range(3, 9) applies span=7 to each of those draws.
+func _test_next_range_matches_reference() -> void:
+	var expected: Array = [7, 5, 9, 6, 4]
+	var rng: SplitRng = SplitRng.new(20260826)
+	for i in expected.size():
+		var got: int = rng.next_range(3, 9)
+		_check(got == expected[i], "next_range(3, 9) draw %d = %d (expected %d)" % [i, got, expected[i]])
+
+
+func _test_next_range_stays_in_bounds() -> void:
+	var rng: SplitRng = SplitRng.new(4242)
+	for i in 500:
+		var r: int = rng.next_range(-3, 3)
+		_check(r >= -3 and r <= 3, "next_range(-3, 3) draw %d = %d is in bounds" % [i, r])
