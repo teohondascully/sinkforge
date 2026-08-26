@@ -1143,3 +1143,95 @@ have flagged on its own. Worth a general note: any two measurements that share a
 noise source, or dataset are implicitly coupled, and a fix to one invalidates cached conclusions from
 the other, whether or not anyone thought to check.
 Reverse: N/A — a measurement and a set of pointers, not a code or design change.
+
+## D0047 · 2026-08-26 · CI now actually runs the Godot test suites
+Decided: `.github/workflows/harness.yml` ran only static Python gates plus the commit-authorship check —
+no Godot install, no test execution. `docs/QUALITY.md` states "every gate is CI-enforced," but gates 8
+(determinism), 9 (conservation), and 11 (movement acceptance) all depend on `tests/test_*.gd` actually
+running, which never happened in CI; every "all green" claim this project made was locally verified
+only, and the README implied CI coverage that didn't exist. Added a `tests` job: downloads and
+SHA-512-verifies the exact pinned Godot build (`4.6.2-stable`, `Godot_v4.6.2-stable_linux.x86_64.zip`,
+matching what `godot --version` reports locally — verified the download URL and checksum directly
+against `gh api repos/godotengine/godot/releases/tags/4.6.2-stable` before writing them into the
+workflow, not copied from memory), runs `--headless --path . --import` first (a fresh checkout has no
+`.godot/` cache, and without importing first every `class_name` global fails to parse, not to run — this
+exact gap has bitten this project before), then runs each of the 13 suites as its own step.
+Alternative: a third-party marketplace GitHub Action for installing Godot. Rejected — this job depends
+on nothing but GitHub's own release infrastructure and a version/checksum this file states itself,
+rather than trusting an action's own maintenance and its own dependency chain for something this
+mechanical (download, verify, unzip).
+Alternative: one shell script looping over all suites in a single step. Rejected — one step per suite
+means a failure names the exact suite in the Actions UI directly, and one suite hanging (the documented
+`core/MODULE.md` hazard: an unguarded runtime error in a bare `--headless --script` run doesn't crash,
+it hangs with no exit code) times out that one step via `timeout-minutes` rather than silently consuming
+the whole job's budget with no attribution.
+Why: the gap existed because the post-pivot CI file's own header explicitly reasoned through why it
+carried forward only static gates ("none of them need to run the game"), which was correct for what
+existed at the time (Task 0, before any Godot code) but was never revisited once `sim/body` and its
+acceptance suite actually landed — a decision correct when made, never re-examined as its own premise
+changed underneath it.
+Reverse: CHEAP — one job, additive; removing it returns to exactly the prior (documented-gap) state.
+
+## D0048 · 2026-08-26 · EntityIdPool's "unmasked generation" audit finding, measured and mostly not real
+Decided: an external audit flagged `EntityIdPool.pack()` for not masking `generation` to 32 bits before
+`generation << 32`, framing it as a defect that lets a stale generation-zero id alias a fresh one at
+2^32 slot reuses. Measured directly before trusting that framing (CLAUDE.md: verify a numeric claim
+against actual tool output) — a probe comparing `generation << 32` against
+`(generation & 0xFFFFFFFF) << 32` across generation values from 0 up to `1<<62`, INCLUDING exactly `2^32`
+and `2^32+1`, found them bit-identical in every case. GDScript's `<<` on a 64-bit int already drops any
+bits shifted past position 63 (standard two's-complement wraparound), which for a left-shift-by-32
+already discards everything at bit 32 and above of the input — exactly what an explicit mask would also
+do. The audit's proposed fix changes no actual output. What IS real, independent of masking: generation
+0 and generation 2^32 do pack to the same id — a 32-bit field wrapping after 2^32 increments, which is
+the SAME already-documented (never observed, "not a limit this project will hit") behavior this file's
+own header already states for `index`. The audit's finding conflated "this aliasing exists" (true, and
+already documented as an accepted limit) with "an unmasked shift causes it" (false, measured).
+Added the explicit mask anyway — defensive symmetry with `index`, which already had one, and a reader
+shouldn't need to know GDScript's exact 64-bit shift semantics by heart to trust this line — but the
+code comment and the new test (`_test_generation_wraps_at_2_32_same_as_index_does`) state the measured
+fact, not the audit's framing. The `_test_pack_unpack_roundtrip`-style test this file's first attempt
+wrote (asserting `pack(index,0) != pack(index,2^32)`) was itself wrong and was corrected before being
+kept — that assertion contradicts a 32-bit field wrapping, which is the field's own intended behavior.
+Alternative: implement the audit's fix silently, without measuring first, on the reasoning that "adding
+a mask can't hurt." Rejected — that is exactly the failure this ledger's numbering rule and CLAUDE.md's
+verification rule both exist to prevent: a claim (however well-intentioned) shipped as a fix without
+checking whether it changes anything, becoming an inaccurate commit message and an inaccurate future
+citation of "this was a real bug, fixed."
+Reverse: CHEAP — one redundant mask, inert either way; a future change to `_generations`'s invariants
+(currently always non-negative) is the only scenario where this would ever matter, and doesn't today.
+
+## D0049 · 2026-08-26 · batch: README staleness, data_codegen's uncaught crash, Fx.div's untested log
+Decided, three small items, batched:
+1. `README.md` claimed "8 suites, 57 test functions," "seven structural gates," and "all green" phrasing
+   implying CI coverage that (before D0047) didn't exist. Actual current count, verified by grep rather
+   than recalled: 13 runnable suites (`test_base.gd` is the shared base, not a suite), 96 `_test_*`
+   functions — not 59 either, which is what the same audit's own snapshot (commit `489e728`) correctly
+   reported at the time; stage 4's five new test files (`test_body`, `test_body_acceptance`,
+   `test_heightfield`, `test_hostile_chamber`, `test_cave_geometry`) landed after that commit and before
+   this session's own audit-response work, making even the audit's own "actual" number stale by the time
+   it was quoted back. Also corrected: "scaffolded and not yet built" still named `sim/body` and
+   `sim/invariants`, both of which now have real, tested code — a bigger staleness than the count alone,
+   found while fixing the count and left uncorrected would have sat right next to the newly-accurate
+   number contradicting it. Gate table updated to the real nine (two gates existed in CI but not in the
+   README's own table: `data_codegen --check`, `check_working_freshness.py`), and a line added
+   describing the new `tests` job (D0047).
+2. `tools/data_codegen/generate.py` crashed with an unhandled Python traceback (`TypeError` from
+   `gdscript_literal()` on an unquoted YAML date auto-parsed into `datetime.date`; separately,
+   `yaml.YAMLError` from a syntax error) instead of the script's own controlled `data_codegen: FAIL --
+   ...` format every OTHER bad-input case already used. Reproduced both crashes directly (a throwaway
+   `data/_test_repro_kind/` inside the real repo, deleted after) before fixing, confirmed the fix
+   produces the controlled message for both, and confirmed the real `data/` tree still passes `--check`
+   unchanged.
+3. `tests/test_fixed_point.gd`'s div-by-zero test asserted only the return value (`0`), never that
+   `Fx.div`'s `push_error()` actually ran — deleting that line would still pass the old test. Stock
+   GDScript has no in-process way to intercept a `push_error()` call from the same script that made it,
+   so the fix spawns `tests/fixture_div_by_zero_probe.gd` as a real subprocess via
+   `OS.execute(OS.get_executable_path(), ...)` (the SAME pinned binary this process is itself running)
+   and greps its actual stderr for the exact message. Mutation-tested: removing `push_error()` from
+   `Fx.div` while keeping the `return 0` guard makes the new test fail; the old test still passed it.
+Why batched: none of the three individually changes a design decision another engineer could plausibly
+have made differently in shape — they're each "make an existing claim/behavior match reality" — but
+each involved a real verification step (grep counts, reproduce a crash, mutation-test a new assertion)
+worth recording so the next reader doesn't have to redo that work to trust the fix.
+Reverse: CHEAP for all three — prose corrections, a narrowed exception handler, and one additive test
+plus its fixture script.

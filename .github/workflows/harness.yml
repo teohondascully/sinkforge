@@ -20,6 +20,13 @@
 # so it moved to the new tools/ rather than into legacy/tools/ with everything else.
 # The capture-manifest check did not port — its subject (the active capture-generation
 # workflow) isn't part of the new build yet, and reviving it is a separate decision.
+#
+# Added 2026-08-26 (D0047): the `tests` job below. Its absence was a real gap, not a
+# deliberate scope decision like the two above — docs/QUALITY.md states "every gate is
+# CI-enforced," but gates 8 (determinism), 9 (conservation), and 11 (movement acceptance)
+# all depend on running `tests/test_*.gd` under the real engine, which this file never
+# did. Every "all green" claim this project made was locally verified only; this job is
+# what makes that claim true of CI itself, not just of whoever last ran the suite by hand.
 name: harness
 
 on:
@@ -106,3 +113,81 @@ jobs:
 
       - name: docs/WORKING.md is not older than HEAD (QUALITY gate 23)
         run: python3 tools/layer_lint/check_working_freshness.py
+
+  # Runs every tests/test_*.gd suite under the real, pinned engine (QUALITY gates 8, 9, 11 —
+  # determinism, conservation, movement acceptance — all depend on this actually happening).
+  # Godot is downloaded and checksum-verified rather than pulled from a marketplace action,
+  # so this job depends on nothing but GitHub's own release infrastructure and a number this
+  # file states itself. Pinned to the exact version this project develops against locally
+  # (`godot --version` => 4.6.2.stable.official) so a CI pass and a local pass mean the same
+  # thing; bump both together, not CI alone, or the two silently diverge again.
+  #
+  # Each suite is its own step on purpose: a failure names the exact suite in the Actions UI
+  # without needing to open a log and find the right line, and one suite hanging (the
+  # documented core/MODULE.md hazard: an unguarded runtime error in a bare --headless --script
+  # run does not crash, it hangs with no exit code) times out that one step via timeout-minutes
+  # rather than silently consuming the whole job's budget.
+  tests:
+    name: godot test suites (determinism, conservation, movement acceptance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: "4.6.2-stable"
+      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+
+      # A fresh checkout has no .godot/ import cache. Without this, every class_name global
+      # (Body, TileGrid, HostileChamber, ...) fails to resolve and every suite below fails to
+      # parse, not to run — this exact gap has bitten this project before (docs memory: "a
+      # fresh worktree is not a control").
+      - name: Import project (populate .godot/ cache)
+        run: ./godot --headless --path . --import
+
+      - name: test_fixed_point
+        run: ./godot --headless --path . --script res://tests/test_fixed_point.gd
+
+      - name: test_split_rng
+        run: ./godot --headless --path . --script res://tests/test_split_rng.gd
+
+      - name: test_entity_id_pool
+        run: ./godot --headless --path . --script res://tests/test_entity_id_pool.gd
+
+      - name: test_replay_determinism (QUALITY gate 8)
+        run: ./godot --headless --path . --script res://tests/test_replay_determinism.gd
+
+      - name: test_tile_grid
+        run: ./godot --headless --path . --script res://tests/test_tile_grid.gd
+
+      - name: test_world_materials
+        run: ./godot --headless --path . --script res://tests/test_world_materials.gd
+
+      - name: test_value_noise
+        run: ./godot --headless --path . --script res://tests/test_value_noise.gd
+
+      - name: test_shaft_generator
+        run: ./godot --headless --path . --script res://tests/test_shaft_generator.gd
+
+      - name: test_heightfield
+        run: ./godot --headless --path . --script res://tests/test_heightfield.gd
+
+      - name: test_body
+        run: ./godot --headless --path . --script res://tests/test_body.gd
+
+      - name: test_hostile_chamber
+        run: ./godot --headless --path . --script res://tests/test_hostile_chamber.gd
+
+      - name: test_cave_geometry
+        run: ./godot --headless --path . --script res://tests/test_cave_geometry.gd
+
+      - name: test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
+        run: ./godot --headless --path . --script res://tests/test_body_acceptance.gd

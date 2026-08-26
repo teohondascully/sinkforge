@@ -68,11 +68,23 @@ def id_field_is_eligible(schema: dict) -> bool:
     return bool(id_rule.get("required")) and id_rule.get("type") == "str"
 
 
+def safe_load_yaml(path: Path):
+    """`yaml.safe_load`, with a malformed file reported the same controlled way every other bad-input
+    case in this script is (`data_codegen: FAIL -- <file>: <reason>`), not as a raw Python traceback.
+    Re-raises as `ValueError` deliberately -- `main()`'s per-kind loop already catches that for the
+    other "this file is bad" case (`no top-level 'id' field`), so this reuses that path rather than
+    adding a second one."""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise ValueError(f"{path.relative_to(ROOT)}: invalid YAML -- {e}") from e
+
+
 def load_records(kind_dir: Path) -> dict | None:
     schema_path = kind_dir / "SCHEMA.yaml"
     if not schema_path.is_file():
         return None
-    schema = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    schema = safe_load_yaml(schema_path) or {}
     if not id_field_is_eligible(schema):
         return None
 
@@ -82,7 +94,7 @@ def load_records(kind_dir: Path) -> dict | None:
 
     records: dict = {}
     for data_path in data_files:
-        doc = yaml.safe_load(data_path.read_text(encoding="utf-8"))
+        doc = safe_load_yaml(data_path)
         if not isinstance(doc, dict) or "id" not in doc:
             raise ValueError(f"{data_path.relative_to(ROOT)}: no top-level 'id' field to key RECORDS by")
         records[doc["id"]] = doc
@@ -136,7 +148,15 @@ def main() -> int:
             continue
 
         eligible += 1
-        rendered = render(kind, records)
+        try:
+            rendered = render(kind, records)
+        except TypeError as e:
+            # gdscript_literal() raises this for a YAML value type it has no GDScript literal for --
+            # a bare, unquoted date (`2026-08-25`) is the realistic case, since YAML auto-parses that
+            # into a Python datetime.date PyYAML's safe_load produces and this script never expected.
+            # Reported the same controlled way as every other bad-input case, not a raw traceback.
+            print(f"data_codegen: FAIL -- {kind}: {e}", file=sys.stderr)
+            return 2
         out_path = kind_dir / "generated.gd"
         current = out_path.read_text(encoding="utf-8") if out_path.is_file() else None
         if current == rendered:

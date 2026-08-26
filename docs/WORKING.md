@@ -69,22 +69,31 @@ that rule now exists to prevent. Independent Codex audit of commit `489e728`. Or
    genuinely-reachable columns dropped to 0/4,800 (0/100 shafts), down from 41/4,800. D0042's own record
    is left as written (it accurately describes what was measured against the pre-fix code); ADR-0005 and
    `docs/ARCHITECTURE.md` §9 both now point to D0046 so the 0.85%/12% figure isn't read as current.
-4. **[OPEN]** CI does not run the tests. The `harness` workflow job runs only static gates plus the
-   authorship check — no Godot, no test execution. Every "all green" claim is locally verified only, and
-   the README implies CI coverage that doesn't exist. Add Godot to CI and run all suites; if genuinely
-   hard in GitHub Actions, say so rather than skip it.
+4. **[CLOSED, D0047]** CI does not run the tests. Added a `tests` job to `.github/workflows/harness.yml`:
+   downloads and SHA-512-verifies the exact pinned Godot build, imports the project (fresh checkout has
+   no `.godot/` cache), runs all 13 suites as individual steps. `docs/QUALITY.md` gates 8/9/11 are now
+   actually CI-enforced, not locally-verified-only.
 5. **[OPEN]** `split()` order-independence is untested despite D0006 claiming it is. Codex mutated
    `split()` to use `_state` instead of `_root_seed`; the suite stayed green. Write the test that actually
    proves order-independence, then append a *correcting* ledger entry — do not edit D0006, append-only
    means visible correction, not silent repair.
-6. **[OPEN]** Batch of four smaller findings:
-   - README says 57 test functions (actual 59) and seven gates (CI runs nine); "all green" phrasing
-     implies CI coverage that doesn't exist. Fix all three.
-   - `EntityIdPool` generation isn't masked to 32 bits before packing — at 2^32 reuses of one slot, a
-     stale generation-zero ID aliases a fresh one. Theoretical, two-character fix.
-   - `tools/data_codegen/generate.py` crashes with an unhandled `TypeError` on invalid YAML instead of a
-     controlled failure.
-   - The test suite accepts `Fx.div`'s `push_error` output as a pass rather than asserting on it directly.
+6. **[CLOSED, D0048/D0049]** Batch of four smaller findings:
+   - README said 57 test functions (actual 59 as of the audited commit, now 96 across 13 suites — even
+     the audit's own "actual" number had gone stale by the time it was quoted); seven gates (CI now runs
+     nine, two more than the README's own table listed). Fixed all three, plus a bigger staleness found
+     alongside it: the README still called `sim/body`/`sim/invariants` "scaffolded, zero lines of code."
+   - `EntityIdPool` generation-masking: measured before fixing, and the audit's framing turned out not
+     to be real — GDScript's `<<` on a 64-bit int already discards bits at position 32+ on a shift-by-32,
+     so masking changes no actual output. The aliasing itself (generation 0 == generation 2^32) is real
+     but is the field's own already-documented 32-bit wraparound, same as `index` already has. Added the
+     mask anyway (defensive symmetry), corrected the framing in the code comment and the test.
+   - `tools/data_codegen/generate.py` now reports a malformed YAML file (syntax error, or an unquoted
+     date auto-parsed to `datetime.date`) via its own controlled `FAIL --` format instead of an uncaught
+     Python traceback. Reproduced both crashes before fixing, confirmed the real `data/` tree unaffected.
+   - `tests/test_fixed_point.gd`'s div-by-zero test now spawns a real subprocess
+     (`tests/fixture_div_by_zero_probe.gd`) and greps its stderr for `Fx.div`'s exact `push_error`
+     message, rather than only checking the return value. Mutation-tested: removing `push_error()` from
+     `Fx.div` makes the new test fail; the old test didn't notice.
 7. **[OPEN]** LOC ratio is 3.564 and `check_loc_ratio.py` is advisory below the 2,000-line game-LOC floor
    — reports the bad state accurately, then permits it. Director is not changing the floor (reasoning is
    right); note in this file that the gate is non-enforcing at present and that this is known, not

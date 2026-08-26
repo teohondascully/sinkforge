@@ -25,8 +25,18 @@ static func _ushr(x: int, n: int) -> int:
 	return (x >> n) & ((1 << (64 - n)) - 1)
 
 
+## `generation` is masked to 32 bits before the shift, matching `index` -- explicit, not a behavior
+## change: verified directly (D0048) that GDScript's `<<` on a 64-bit int already drops any bits of
+## `generation` at position 32 or above when shifting left by 32 (standard 2's-complement wraparound), so
+## `generation << 32` and `(generation & 0xFFFFFFFF) << 32` produce IDENTICAL results for every value
+## tested, including 2^32 itself -- an explicit audit finding that this file was silently missing a mask
+## turned out, on measurement, not to change any actual output. The mask stays for the same reason
+## `index`'s already had one: symmetry and a reader not needing to know GDScript's shift semantics by
+## heart to trust this line. The real, unrelated fact underneath the audit's finding: `generation=0` and
+## `generation=2^32` DO pack to the same id either way -- a 32-bit field wrapping after 2^32 increments,
+## the same documented (not hit in practice) limit this file's own header already names for `index`.
 static func pack(index: int, generation: int) -> int:
-	return (generation << 32) | (index & 0xFFFFFFFF)
+	return ((generation & 0xFFFFFFFF) << 32) | (index & 0xFFFFFFFF)
 
 
 static func unpack_index(id: int) -> int:

@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_test_mul_matches_float_for_small_values()
 	_test_div_basic()
 	_test_div_by_zero_returns_zero_and_does_not_hang()
+	_test_div_by_zero_logs_via_push_error()
 	_test_lerp()
 	_test_isqrt_known_values()
 	_test_length_pythagorean_triples()
@@ -73,6 +74,26 @@ func _test_div_by_zero_returns_zero_and_does_not_hang() -> void:
 	# suite hung with no further output and no exit code, per core/fixed_point.gd's own header comment.
 	var result: int = Fx.div(Fx.from_int(10), 0)
 	_check(result == 0, "div(10, 0) returns 0 rather than hanging the run")
+
+
+## D0049. The test above only ever checked the RETURN value, not that `push_error()` actually ran --
+## deleting the `push_error()` line from `Fx.div` (leaving the zero-guard's `return 0` intact) would
+## still pass it, silently losing the "log loudly" half of the contract `core/fixed_point.gd`'s own
+## header states. Stock GDScript has no in-process way to intercept a `push_error()` call from the same
+## script that made it, so this spawns `tests/fixture_div_by_zero_probe.gd` as a real subprocess (the
+## SAME pinned Godot binary this process is itself running, via `OS.get_executable_path()`) and greps
+## its actual stderr for the exact message -- the only way to genuinely observe this, not assume it.
+func _test_div_by_zero_logs_via_push_error() -> void:
+	var project_root: String = ProjectSettings.globalize_path("res://")
+	var output: Array = []
+	var exit_code: int = OS.execute(OS.get_executable_path(),
+		["--headless", "--path", project_root, "--script", "res://tests/fixture_div_by_zero_probe.gd"],
+		output, true)
+	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
+	var combined: String = "\n".join(output)
+	_check(combined.contains("Fx.div: division by zero"),
+		"the probe's own stderr contains Fx.div's exact push_error message -- proves push_error actually ran, not just that div() returned 0 (captured output: %s)" %
+		combined)
 
 
 func _test_lerp() -> void:

@@ -9,6 +9,7 @@ func _initialize() -> void:
 	_test_release_never_allocated_returns_false()
 	_test_live_count()
 	_test_stress_churn()
+	_test_generation_wraps_at_2_32_same_as_index_does()
 	_finish("entity_id_pool")
 
 
@@ -104,3 +105,28 @@ func _test_stress_churn() -> void:
 	_check(all_live_valid, "after %d randomized ops (seed %d), every id this test believes live is valid" %
 		[steps, seed])
 	_check(pool.live_count() == live.size(), "pool.live_count() agrees with the independently tracked live set")
+
+
+## D0048. An external audit flagged `pack()` for not masking `generation` to 32 bits before shifting.
+## Measured directly before trusting that framing (CLAUDE.md: verify a numeric claim against actual tool
+## output): GDScript's `<<` on a 64-bit int already drops any bits of `generation` at position 32+ when
+## shifted left by 32 (2's-complement wraparound), so an explicit mask changes NO actual output --
+## `pack(index, g)` and `pack(index, g & 0xFFFFFFFF)` are bit-identical for every `g` tested, including
+## exactly `2^32`. What the audit's finding correctly points at, independent of the mask: `generation=0`
+## and `generation=2^32` DO pack to the same id -- a 32-bit field wrapping after 2^32 increments, the
+## same already-documented (never observed) limit this file's own header states for `index`. This test
+## pins that real, narrower fact, not the "missing mask" framing the mask itself doesn't change.
+func _test_generation_wraps_at_2_32_same_as_index_does() -> void:
+	var index: int = 7
+	var id_gen0: int = EntityIdPool.pack(index, 0)
+	var id_gen_2_32: int = EntityIdPool.pack(index, 1 << 32)
+	_check(id_gen0 == id_gen_2_32,
+		"generation 0 and generation 2^32 pack to the SAME id at a given index -- a 32-bit field wrapping, not a bug the mask changes (got %d and %d)" %
+		[id_gen0, id_gen_2_32])
+	_check(EntityIdPool.unpack_generation(id_gen_2_32) == 0,
+		"2^32 unpacks as generation 0, confirming the wrap is mod 2^32 (got %d)" %
+		EntityIdPool.unpack_generation(id_gen_2_32))
+	var id_gen1: int = EntityIdPool.pack(index, (1 << 32) + 1)
+	_check(EntityIdPool.unpack_generation(id_gen1) == 1,
+		"2^32 + 1 unpacks as generation 1, same wraparound as index already has at 2^32 (got %d)" %
+		EntityIdPool.unpack_generation(id_gen1))

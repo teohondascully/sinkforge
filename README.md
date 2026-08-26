@@ -7,15 +7,15 @@ measurement instrument for game design — the entire simulation runs headless a
 scripted agents can play it thousands of times and produce falsifiable evidence about whether the
 design works, rather than an opinion about whether it might.
 
-**Stage 3 of 7 toward `C001`, the first playable milestone — last updated 2026-08-26.** The build
+**Stage 4 of 7 toward `C001`, the first playable milestone — last updated 2026-08-26.** The build
 sequence toward `claims/C001-two-minute-run.md` — a scripted agent completing one bounded run entirely
-headless — is ordered and stage-gated (`ONBOARDING.md`). `core/` (stage 1) and a stub determinism
-harness (stage 2) landed first; `sim/world` and `sim/terrain_gen` (stage 3) landed this round, along
-with a full audit of the two findings that stage produced and a pre-stage-4 punch list (a real fixed-
-point overflow, a YAML dual-source problem, both resolved). `sim/body`, the movement rewrite, is stage
-4 and next, followed by `sim/commands`+`interface` (5), `sim/run`+`meta` (6), and `harness/` (7) —
-`first_bore`, the first scripted-agent run through the full interface. `ONBOARDING.md` lists five more
-stages after that (items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal
+headless — is ordered and stage-gated (`ONBOARDING.md`). `core/` (stage 1), a stub determinism harness
+(stage 2), and `sim/world`+`sim/terrain_gen` (stage 3) landed first. `sim/body` — collision, the
+heightfield ground plane, the full forgiveness set (step-up, corner correction, coyote time, jump
+buffer) — is stage 4, and its movement acceptance suite is green against a hostile fixed chamber
+(`docs/ARCHITECTURE.md` §9). Next: `sim/commands`+`interface` (5), `sim/run`+`meta` (6), and `harness/`
+(7) — `first_bore`, the first scripted-agent run through the full interface. `ONBOARDING.md` lists five
+more stages after that (items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal
 `view/`, then closing `C001` itself) toward the fuller game. Live detail: `docs/WORKING.md` (current
 state) and `docs/BRIEF.md` (this session's digest).
 
@@ -37,17 +37,20 @@ of return trips. Full design reasoning: `docs/GDD.md`.
 ## What exists, and what doesn't
 
 Real and tested: `core/` (fixed-point arithmetic, a seeded splittable RNG, generational entity IDs),
-`sim/world` (the tile grid and material registry), and `sim/terrain_gen` (seeded strata generation,
-cave carving, ore/coal/iron veins). All of it is engine-free GDScript, verified against a from-scratch
-reference wherever the algorithm mattered, mutation-tested throughout — 8 suites, 57 test functions,
-all green.
+`sim/world` (the tile grid and material registry), `sim/terrain_gen` (seeded strata generation, cave
+carving, ore/coal/iron veins), `sim/body` (kinematics, collision, the sub-pixel heightfield ground
+plane, step-up/mantle/corner-correction/coyote/jump-buffer), and the first real check in
+`sim/invariants` (a diagnostic guard on `sim/body`'s floor resolution, `docs/adr/0005`). All of it is
+engine-free GDScript, verified against a from-scratch reference wherever the algorithm mattered,
+mutation-tested throughout — 13 suites, 96 test functions, all green (`.github/workflows/harness.yml`
+runs every suite under the real, pinned engine on every push, not only locally).
 
-Scaffolded and not yet built: twelve more `sim/` modules (`body`, `commands`, `run`, `meta`, `items`,
-`machines`, `behaviors`, `transport`, `fluid`, `economy`, `invariants`, `telemetry`) each have a
-`MODULE.md` stating their responsibility and boundaries, and zero lines of code. There is no
-`interface/`, no `harness/`, no `view/`, no playable build, and no packaged release. Two claims exist
-(`claims/`) and both are `BLOCKED`, never measured, because the modules they depend on don't exist
-yet. None of this is softened elsewhere in the repository — `docs/WORKING.md` and `docs/BRIEF.md` say
+Scaffolded and not yet built: ten more `sim/` modules (`commands`, `run`, `meta`, `items`, `machines`,
+`behaviors`, `transport`, `fluid`, `economy`, `telemetry`) each have a `MODULE.md` stating their
+responsibility and boundaries, and zero lines of code. There is no `interface/`, no `harness/`, no
+`view/`, no playable build, and no packaged release. Two claims exist (`claims/`) and both are
+`BLOCKED`, never measured, because the modules they depend on don't exist yet. None of this is softened
+elsewhere in the repository — `docs/WORKING.md` and `docs/BRIEF.md` say
 the same thing in more detail, and the claim files carry `BLOCKED` in their own front matter.
 
 ## The architecture, and why
@@ -102,7 +105,7 @@ not a virtue.
 
 ## The gates
 
-Seven structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
+Nine structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
 
 | Gate | What it checks |
 | --- | --- |
@@ -113,6 +116,14 @@ Seven structural gates run in CI on every push (`tools/layer_lint/`, `.github/wo
 | `check_loc_ratio.py` | instrument code isn't outgrowing game code |
 | `schema_validator.py` | every data file matches its schema |
 | `check_claim_references.py` | every scenario names a claim that actually exists |
+| `data_codegen/generate.py --check` | every generated `data/<kind>/generated.gd` matches its YAML source |
+| `check_working_freshness.py` | `docs/WORKING.md`'s stated date isn't older than `HEAD`'s own commit |
+
+A separate `tests` job (added 2026-08-26, D0047) downloads the exact pinned Godot version this project
+develops against and runs every `tests/test_*.gd` suite under it — the gates above are static analysis
+over the source tree and answer questions that don't need the engine; the suites answer the ones that
+do (determinism, conservation, the movement acceptance thresholds in `docs/ARCHITECTURE.md` §9). Before
+this, "all green" above was locally verified only; every suite passing is now a CI fact, not a claim.
 
 Two findings this stage show the gates doing real work rather than performing it. `no_engine_imports.py`
 had checked for engine coupling since the project's restructuring, but only against a handful of
