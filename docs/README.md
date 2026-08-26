@@ -15,7 +15,7 @@ Read in this order. These describe what is true now and what must remain true.
 | `ARCHITECTURE.md` | The layered instrument architecture. Dependency rules, determinism, interface contract, budgets. | Before any structural change. |
 | `QUALITY.md` | The continuous gates. Harness truth standards. Definition of done. | Before opening a PR. |
 | `CLAIMS.md` | The claim system: format, statuses, workflow, what each kind can establish. | Before writing a claim or a check. |
-| `EXPERIENCE_EVALUATION.md` | The agent-play evaluation protocol for questions above a legibility check's reach. Specification and backlog, not a harness layer. | Before proposing any evaluation of fun, motivation, or desire. |
+| `EXPERIENCE_EVALUATION.md` | Subordinate to `CLAIMS.md`, not a rival taxonomy: the concrete method for gathering evidence toward a claim `CLAIMS.md` §5 already permits (structural/balance/legibility with a stated proxy) but doesn't show how to build. Specification and backlog, not a harness layer — no claim may cite it in place of naming a real kind and metric. | Before proposing any evaluation of fun, motivation, or desire. |
 | `DECISIONS.md` | The architecture decision record. Why the sim is node-free, why determinism is provable, why content is data — the reasoning that makes this repository's structural claims checkable rather than asserted. | Before changing anything an ADR would gate, or citing why something is built the way it is. |
 | `../ONBOARDING.md` | The session brief. Task 0, the ordered build sequence, the prohibitions. | Starting a session, or resuming after a gap. |
 | `../claims/` | Not a document, but normative. Each claim is an assertion the project currently defends. | Continuously. |

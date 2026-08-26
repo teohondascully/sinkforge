@@ -8,6 +8,12 @@
 > nothing true to describe here in its place. This is the single most reader-visible file in the
 > repository and deserves a real rewrite once there's a game to write about, not a mechanical
 > restructuring pass's guess at one — flagged, not silently fixed.
+>
+> **For that rewrite, when it happens:** `docs/EXPERIENCE_EVALUATION.md`'s "no layer may certify all six
+> questions" and its six-layer separation of evidence (deterministic checks, encounter checks, agent
+> journeys, screenshot-only criticism, counterfactual A/B, human calibration) is the clearest statement
+> of this project's thesis that exists anywhere in the repository. It belongs in the real README, not
+> buried in a specification document — director directive, 2026-08-26.
 
 A 2D side-view game about digging a factory down into solid earth.
 
@@ -444,9 +450,12 @@ on purpose. The captures under `docs/media/` are the evidence the presentation w
 frame, and several documents reason from specific named frames. A claim of the form "this change is
 invisible at play zoom" is only checkable while the before frame is still in the tree, and a baseline
 that has to be regenerated to be consulted is not a baseline. `history/` is the same argument over a
-longer span. Moving either to a release attachment or an LFS store would shrink the clone and make those
-arguments unverifiable, so the size is accepted deliberately rather than by neglect. Neither directory is
-read by the game; both carry a `.gdignore` so the engine does not import them.
+longer span: 165 screenshots recording the project's development, committed rather than referenced. The
+stronger reason predates and outlasts either argument — 84 of these screenshots were once permanently
+lost during a refactor, and `docs/DECISIONS.md`'s "Never destroy a curated file" rule exists because of
+it. Committing is the strongest protection this repository can give them; a release attachment or an
+LFS store would be a step back to a weaker one, considered and rejected for exactly that reason.
+Neither directory is read by the game; both carry a `.gdignore` so the engine does not import them.
 
 ## Documents
 
