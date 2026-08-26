@@ -1263,3 +1263,62 @@ since a wrong "verified" claim is more dangerous than an absent one: it stops th
 asked again.
 Reverse: CHEAP — one additive test, no production code changed. `core/split_rng.gd::split()` is
 unmodified; it was already correct, only the coverage claim about it was wrong.
+
+## D0051 · 2026-08-26 · corrects D0042/D0046's own reading: the multi-level-floor case was an artifact, not a property — resolves D0042
+Decided: `docs/adr/0005-heightfield-local-window.md`'s framing of D0046's 0/4,800 result was sharpened
+per the director's instruction, into two explicitly distinct claims rather than one blurred together.
+"We accepted a documented limitation" (what the ADR said before this pass) and "the limitation this ADR
+was built to accept was substantially a bug in an adjacent module (`ValueNoise` over-carving relative to
+legacy's own threshold tuning, D0045), and the residual rate after fixing it is zero across 4,800
+columns" (what is actually true) are different findings — the second correctly stops a future reader
+from crediting this ADR's own design trade-off for a fix (D0045) it had nothing to do with. Also made
+explicit, per instruction: 0/4,800 is not zero, it is a null result below this sample's resolution
+(roughly 0.06% upper bound at n=4,800 by a standard zero-count estimate), and the guard
+(`Invariants.check_floor_selection`) stays — its job changes from "measure a known cost" to "the only
+thing that would notice this case reappearing after a future noise, threshold, or site-config change,"
+which is arguably more valuable than its original purpose, not less.
+Alternative: treat D0046 as simply superseding D0042's number and move on — "the figure is now 0/4,800,
+noted" — without re-deriving what that implies about the ORIGINAL finding's own causal story.
+Why: a reader who only sees "0/4,800, down from 0.85%/12%" could reasonably conclude the design trade
+this ADR accepted got cheaper, when the more accurate reading is that the specific terrain shape the
+trade was calculated against barely occurred in the first place once an unrelated bug was fixed — a
+different claim, and the one this project's own "verify a numeric claim against actual tool output"
+rule and the "elaboration is the tell" / "presence is not identity" pattern (both in the house failure
+class this project tracks) argue for stating explicitly rather than letting the sharper-but-quieter
+number imply it on its own.
+Reverse: CHEAP — prose only, in `docs/adr/0005-heightfield-local-window.md` and
+`docs/ARCHITECTURE.md` §9 (already carried the corrected framing from D0046's own pass). No code
+changed. `sim/invariants/invariants.gd`'s header comment updated to match (drops the stale 0.85%/12%
+figure as the module's own stated purpose, points to this entry and D0046 instead).
+
+## D0052 · 2026-08-26 · Invariants floor-selection guard rate-limited at the caller, not inside Invariants — resolves the log-volume finding from D0044
+Decided: `sim/body/body.gd::_resolve_floor()` now suppresses a repeat call to
+`Invariants.report_floor_selection` while the resolved (column, floor) pair is unchanged from the last
+report, via two new instance fields (`_last_violation_col`/`_last_violation_row`, sentinel -1, cleared
+back to -1 the moment `check_floor_selection` returns null so a later recurrence at the identical pair
+is still treated as a fresh episode, not a continuation). `sim/invariants/invariants.gd` itself is
+unchanged — `check_floor_selection`/`report_floor_selection` still run and log unconditionally every
+call, exactly as stateless as the module's own MODULE.md requires ("produces no gameplay state
+itself"); the memory lives in `body.gd`, which already tracks the body's own position every tick, per
+the director's explicit instruction not to put state into the checking module.
+Alternative considered and rejected: de-duplicate inside `Invariants` itself (a static/instance cache of
+last-seen violations) — rejected because it would make the module stop being stateless by design, the
+one property its own MODULE.md states as a purpose, for a caller-specific concern (`body.gd` is
+currently the module's only real caller, but the module itself has no reason to assume that stays true).
+Measured, not assumed: mutation-tested by temporarily reverting the new gate to unconditional reporting
+and re-running `tests/test_cave_geometry.gd`'s existing 400-tick settle fixture as a subprocess —
+778 push_errors (not merely ~400, one per tick, as body.gd's own pre-fix comment guessed:
+`_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks, once inside its own
+substep loop and once via its trailing catch-all, so an unratelimited guard fires roughly twice per
+tick, not once). With the real fix restored: exactly 1. New test
+`_test_a_real_settle_rate_limits_the_guard_to_one_report` (`tests/test_cave_geometry.gd`, spawning
+`tests/fixture_settle_violation_probe.gd`, same subprocess+stderr-grep pattern as
+`fixture_div_by_zero_probe.gd`) asserts this and would fail on the reverted mutant. Full 13-suite regression
+run (all `tests/test_*.gd`) stayed green before and after, both at the mutant and at the real fix.
+Why: an invariant that fires dozens of times a second on a stationary body buries the signal it exists
+to produce and makes a real-play incidence count impossible to derive — the director's own framing, and
+correct; the actual multiplicity (778, not ~390) was worse than the informal guess in body.gd's own
+pre-fix comment, caught only by measuring rather than trusting that guess, corrected in the same pass
+(comments in `body.gd`, `invariants.gd`, and this ADR's own text all updated to the verified number).
+Reverse: CHEAP — two new instance fields and one conditional in `body.gd`, no change to
+`sim/invariants`'s public surface or behavior when called directly (e.g. from a test).

@@ -396,12 +396,19 @@ query can *see*, never when a body has actually *reached* a candidate floor
 re-run staying byte-identical at both widths. Measured perf cost: 37.2µs/tick at 6 rows, 55.3µs/tick at
 48 (one in-process body, against a 2.0ms p50 sim-tick budget shared by 2,000 machines and 20,000 items —
 negligible). Accepted as a documented, measured limitation rather than building stateful
-floor-selection tracking across ticks — the ADR has the full record, the rejected alternative, and one
-open finding not yet addressed: the guard logs every tick the condition holds, not once per episode.
-0.85%/12% is the figure this design decision was made against, but it is stale: `ValueNoise`'s cave
-density was itself corrected afterward (D0045), and re-measuring this exact case against the corrected
-generator found 0 of 4,800 reachable columns (D0046) — lower, not higher, so the decision to accept
-this as a documented limitation only gets more conservative, not less.
+floor-selection tracking across ticks — the ADR has the full record and the rejected alternative.
+0.85%/12% is the figure this design decision was originally made against, but the reading is sharper
+than "stale": `ValueNoise`'s cave density was itself over-carving relative to legacy's own tuning
+(D0045), and re-measuring this exact case against the corrected generator found **0 of 4,800**
+reachable columns (D0046) — not a smaller version of the same phenomenon, but evidence the terrain
+shape that would have exercised this representational gap was substantially an artifact of that
+adjacent bug, not a property of the cave-generation design itself. 0/4,800 is a null result at this
+sample's resolution, not proof the case cannot occur. The guard (`sim/invariants`,
+`Invariants.check_floor_selection`) stays regardless, and its purpose is now different: not measuring a
+known, accepted cost, but watching for this case to reappear after any future change to noise,
+thresholds, or site configs. It rate-limits its own logging at the caller (`sim/body/body.gd`) to once
+per distinct (column, floor) pair rather than once per tick, so a real occurrence stays legible instead
+of burying itself in repetition.
 
 Keep the existing forgiveness set on top of this, unchanged: capsule collider, auto step-up, corner
 correction, shortest-axis depenetration, coyote time and jump buffer.

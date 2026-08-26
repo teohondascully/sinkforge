@@ -217,8 +217,29 @@ pointer, not the record.
   confirmed by the acceptance suite staying byte-identical at both widths) and its perf cost measured
   directly (37.2µs/tick → 55.3µs/tick, negligible against the §10 sim-tick budget). `tests/test_cave_geometry.gd`
   now proves the guard genuinely fires on the fixture it was built to catch. One finding flagged, not
-  fixed: the guard logs every tick the condition holds (~390 lines from one settle), not once per
-  episode — de-duplicating would need caller-side state or a design change, out of scope here.
+  fixed at the time: the guard logged on nearly every call, not once per episode — since **closed
+  (D0052)**, see below.
+- **The 0.85%/12% multi-level-floor figure was substantially an artifact, not a property of the terrain
+  design — ADR-0005 reframed accordingly (D0051, resolves D0042).** Per the director's review: "we
+  accepted a documented limitation" and "the limitation was a bug in an adjacent module, and the residual
+  rate after fixing it is zero across 4,800 columns" are different findings. `ValueNoise`'s cave density
+  was over-carving relative to legacy's own threshold tuning (D0045); the corrected generator measures
+  0/4,800 reachable multi-level columns (D0046), not a smaller version of the same phenomenon. Stated
+  explicitly per instruction: 0/4,800 is a null result below this sample's resolution (~0.06% upper
+  bound), not proof the case cannot occur. The guard stays — its purpose changes from measuring a known
+  cost to watching for this case to reappear after a future generator change.
+- **The guard's per-tick logging, rate-limited at the caller (D0052).** `sim/body/body.gd::_resolve_floor()`
+  now suppresses a repeat `Invariants.report_floor_selection` call while the resolved (column, floor)
+  pair is unchanged, via two new instance fields (`_last_violation_col`/`_last_violation_row`), cleared
+  when the violation clears so a later recurrence reads as a fresh episode — per the director's explicit
+  instruction, the state lives at the caller, not inside `sim/invariants` (stays stateless by design).
+  Measured, not assumed: mutation-testing the new gate (temporarily reverting it) showed the real
+  multiplicity is 778 push_errors from one ~400-tick settle, not the ~390 originally guessed —
+  `_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks. With the fix: exactly
+  1. New test `_test_a_real_settle_rate_limits_the_guard_to_one_report` (`tests/test_cave_geometry.gd`,
+  spawning `tests/fixture_settle_violation_probe.gd` as a subprocess, same pattern as
+  `fixture_div_by_zero_probe.gd`) proves it and fails on the reverted mutant. Full 13-suite regression
+  green before and after, at both the mutant and the real fix.
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
   collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
   curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio

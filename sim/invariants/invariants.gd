@@ -4,22 +4,29 @@ extends RefCounted
 ## Continuous checking module (`sim/invariants/MODULE.md`): reads other submodules' state after
 ## they've acted, flags violations, produces no gameplay state itself. First real check: whether
 ## `sim/body`'s floor resolution picked between two competing standing surfaces without either of
-## them knowing it -- `docs/adr/0005-heightfield-local-window.md` measured this at 0.85% of
-## columns / 12% of shafts in real generated terrain (D0042), rare enough to accept as a documented
-## limitation rather than build stateful floor tracking to eliminate. This check turns a silent
+## them knowing it. First measured at 0.85% of columns / 12% of shafts in real generated terrain
+## (D0042) -- since superseded: that terrain shape was substantially an artifact of a `ValueNoise`
+## calibration bug (D0045), and the corrected generator measures 0 of 4,800 columns (D0046,
+## `docs/adr/0005-heightfield-local-window.md` has the full finding, including why 0/4,800 is a null
+## result at this sample's resolution, not proof the case cannot occur). This check turns a silent
 ## "standing on the wrong floor, no error" bug report into a reproducible, position-and-seed-logged
-## one, and gives a real-play incidence number to compare against the generated-terrain figure. The
-## window this check is called with must actually be wide enough to see the case it exists to catch --
-## `Body.FLOOR_SCAN_ROWS` (D0044) is sized from a real re-measurement of the row-gap distribution
-## between genuinely-reachable stacked floors, not the original 6-row window, which could not see it
-## by construction and reported zero regardless of real incidence.
+## one; its purpose now is not measuring a known cost but watching for this case to reappear after a
+## future noise, threshold, or site-config change. The window this check is called with must actually
+## be wide enough to see the case it exists to catch -- `Body.FLOOR_SCAN_ROWS` (D0044) is sized from a
+## real re-measurement of the row-gap distribution between genuinely-reachable stacked floors, not the
+## original 6-row window, which could not see it by construction and reported zero regardless of real
+## incidence.
 ##
-## Known, not yet addressed: `report_floor_selection` logs on EVERY tick the condition holds, not once
-## per episode -- a body resting on an ambiguous floor for N ticks produces N near-identical log lines
-## (measured: ~390 lines from one ~400-tick settle in `tests/test_cave_geometry.gd`). This module is
-## deliberately stateless (MODULE.md's own purpose: "produces no gameplay state itself"), so de-duplicating
-## across ticks would need either caller-side state in `body.gd` or a design change here; flagged rather
-## than fixed, since the case itself is sub-1% and this session's scope was the window, not log volume.
+## `report_floor_selection` itself logs unconditionally, every call, by design -- it stays exactly as
+## cheap and stateless as `check_floor_selection`, which this module's own MODULE.md requires ("produces
+## no gameplay state itself"). Left unratelimited, a body resting on one ambiguous floor logs the
+## identical violation on nearly every call to this check (measured by mutation-testing the caller's own
+## gate: 778 push_errors from one ~400-tick settle in `tests/test_cave_geometry.gd`, not merely once per
+## tick -- `body.gd::_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks),
+## burying the signal it exists to produce. That de-duplication happens
+## at the CALLER instead (`sim/body/body.gd::_resolve_floor()`, D0052): it already tracks the body's own
+## position every tick, so it is where the memory of "already reported this (column, floor) pair"
+## belongs, not here.
 ##
 ## `docs/ARCHITECTURE.md` §9: "Panic in debug, log in release." This file logs via `push_error()`
 ## unconditionally rather than `assert()`-ing, in both build types -- `core/MODULE.md`'s own

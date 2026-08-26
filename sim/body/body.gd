@@ -82,6 +82,14 @@ var _coyote_ticks_left: int = 0
 var _jump_buffer_ticks_left: int = 0
 var _was_jump_held: bool = false
 
+## Rate-limits `Invariants.report_floor_selection` to once per distinct (column, floor) pair rather than
+## once per tick -- D0052. `sim/invariants` stays stateless by design (its own MODULE.md: "produces no
+## gameplay state itself"), so this memory lives here, in the caller that already tracks the body's own
+## position every tick, not in the check module. -1 is not a valid column or row, so it never collides
+## with a real violation and correctly reads as "no active violation" at construction.
+var _last_violation_col: int = -1
+var _last_violation_row: int = -1
+
 ## Per-tick telemetry, read once by the caller and not cleared automatically -- the caller (the
 ## acceptance driver) resets what it needs each tick. Exists so the acceptance suite can count events
 ## without `body.gd` knowing anything about scenarios, metrics, or telemetry schemas.
@@ -315,18 +323,40 @@ func _resolve_floor(grid: TileGrid) -> bool:
 		on_floor = false
 		return false
 	# Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured this
-	# ambiguity at 0.85% of columns / 12% of shafts in real terrain and accepted it as a documented
-	# limitation rather than building stateful floor tracking; this is what turns a silent
-	# wrong-floor bug report into a reproducible, position-and-seed-logged one. Checks the column
-	# nearest `pos_x` only, not every column the three foot samples straddle -- a scoped first pass,
-	# not full coverage (docs/DECISIONS_LEDGER.md D0043). Shares FLOOR_SCAN_ROWS with the resolve calls
-	# above on purpose (D0044) -- this check exists to answer "did the query that just picked a floor
-	# also see another one," which is only a true answer if it's given the SAME window that query used.
+	# ambiguity in real terrain and accepted it as a documented limitation rather than building
+	# stateful floor tracking; this is what turns a silent wrong-floor bug report into a reproducible,
+	# position-and-seed-logged one. Checks the column nearest `pos_x` only, not every column the three
+	# foot samples straddle -- a scoped first pass, not full coverage (docs/DECISIONS_LEDGER.md D0043).
+	# Shares FLOOR_SCAN_ROWS with the resolve calls above on purpose (D0044) -- this check exists to
+	# answer "did the query that just picked a floor also see another one," which is only a true answer
+	# if it's given the SAME window that query used.
 	var check_col: int = _px_to_cell(pos_x)
 	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, FLOOR_SCAN_ROWS)
 	if chosen_row >= 0:
-		Invariants.report_floor_selection(
-			grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
+		var violation: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
+			grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX)
+		# Rate-limited HERE, at the caller, not inside Invariants (D0052) -- sim/invariants stays
+		# stateless by design, and body.gd already tracks its own position every tick, so the memory
+		# for "have I already reported THIS (column, floor) pair" belongs where the context already is.
+		# Without this, a body resting on one ambiguous floor logs the identical violation on nearly
+		# every call to this block -- measured directly by mutation-testing this exact gate (temporarily
+		# reverting it to unconditional reporting): 778 push_errors from one ~400-tick settle in
+		# tests/test_cave_geometry.gd, not merely once per tick -- `_move_and_resolve_vertical` calls
+		# `_resolve_floor` twice on most resting ticks (once inside the substep loop, once via its own
+		# trailing catch-all), and this gate suppresses both, not just inter-tick repeats. A real
+		# occurrence would bury itself in its own repetition, and the log volume would make a genuine
+		# incidence count impossible to derive from real play. Clearing to -1 when the violation clears
+		# (rather than only ever remembering the LAST reported pair) means a condition that resolves and later
+		# recurs -- even at the exact same (column, floor) -- is treated as a fresh occurrence, which
+		# is the right call: it did stop and start again, that's a second episode, not a continuation.
+		if violation == null:
+			_last_violation_col = -1
+			_last_violation_row = -1
+		elif violation.column != _last_violation_col or violation.chosen_floor_row != _last_violation_row:
+			Invariants.report_floor_selection(
+				grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
+			_last_violation_col = check_col
+			_last_violation_row = chosen_row
 	pos_y = surface - (HEIGHT_PX * Fx.SCALE) / 2
 	vel_y = 0
 	on_floor = true

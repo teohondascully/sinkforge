@@ -86,32 +86,66 @@ model.
 least one such column: **12%** (12 of 100). Distribution: mostly isolated single columns, not
 contiguous runs — median run length 1, longest observed run 9 columns.
 
-**Stale as of D0045/D0046, left as written — see D0046 for the current figure.** This measurement ran
-against `ValueNoise`'s uncalibrated (too-dense) cave carving. D0045 corrected that density; D0046
-re-ran this exact method against the corrected generator and found 0 of 4,800 reachable columns (0 of
-100 shafts), down from 41/4,800. The decision below is unaffected — a lower true rate only strengthens
-it — but a reader citing "0.85%/12%" as a current figure should read D0046 first.
+**Superseded by D0045/D0046 — this was largely an artifact, not a property of the terrain design.**
+Left as written below because the ledger is append-only and this is what was actually measured at the
+time, but the reading has to be sharper than "the number is stale." This measurement ran against
+`ValueNoise`'s output at roughly 1.7x `FastNoiseLite`'s real standard deviation — legacy's cave
+thresholds (`threshold_top`/`threshold_deep`) were tuned against the NARROWER distribution and ported
+into this codebase unchanged, so the wider one cleared them far more often than legacy's own tuning
+ever intended. D0045 corrected the calibration; D0046 re-ran this exact method against the corrected
+generator and found **0 of 4,800 reachable columns**, down from 41. That is not "the same phenomenon,
+measured smaller." Two different claims, and they are not the same finding:
 
-**The caveat that changes the framing.** This measurement modelled a top-down scan (matching how
-`tests/test_hostile_chamber.gd` and `column_surface_y` are called elsewhere in this codebase for
-presence checks), not `_resolve_floor`'s actual narrow window. Real in-game exposure is lower than
-0.85%, likely well below it — see Finding 2. The measured figure is an upper bound on what a *global*
-heightfield would have exposed, not a measurement of what this codebase's actual, already-local query
-exposes.
+- *What this document originally said*: a real design trade-off exists — the local-window query cannot
+  represent a floor under a reachable overhang — and its residual cost is low enough to accept rather
+  than build stateful tracking for.
+- *What is actually true*: the representational gap is real (Finding 1 stands on its own regardless —
+  a global heightfield genuinely cannot encode two floors in one column), but the specific TERRAIN SHAPE
+  that would have exercised it was, to the resolution of this measurement, an artifact of a bug in an
+  adjacent module (`ValueNoise` carving denser than legacy's tuning intended), not a property of the
+  cave-generation design Codex's audit was actually looking at. Legacy never intended this geometry to
+  occur at the rate the uncorrected generator produced it. Fixing the adjacent bug removed the case
+  this ADR was built to accept, rather than merely shrinking it.
 
-**Decision.** Accept 0.85% / 12%, median-scattered, as a documented and now-measured limitation.
+The second framing is both more accurate and the better record: it says the terrain design was never
+actually the source of the residual risk this ADR spent its effort accepting, and a reader relying on
+"we accepted a documented limitation" alone would misattribute the fix (D0045) to a decision (this ADR)
+it had nothing to do with.
+
+**0/4,800 is not zero.** It is a null result below the resolution of a 100-seed sample — the correct
+reading is an upper bound (roughly 0.06% at this sample size by a standard zero-count estimate), not
+"the case cannot occur." A rarer residual, or one the corrected generator's other site configs produce
+at a different rate, is not ruled out.
+
+**The guard stays, and this changes what it's for.** Before D0045/D0046, `Invariants.check_floor_selection`
+existed to measure a known, accepted, non-zero cost. After, its job is different and arguably more
+valuable: it is now the ONLY thing that would tell us this case reappeared — from a future noise change,
+a new site config, a threshold retune, or any other change to cave generation — without anyone having to
+think to re-run this measurement by hand. A guard that fires zero times in normal testing and exists
+specifically to catch a regression nobody is currently watching for is exactly the shape of instrument
+worth keeping even when its current incidence is a null result.
+
+**Decision.** Accept the local-window query's representational gap (Finding 1) as a real, permanent
+property of this design — a global heightfield genuinely cannot do better without the stateful tracking
+below — but do not treat 0.85%/12% as the residual cost that trade was made against; that number's own
+terrain shape has since been shown to be substantially an artifact of D0045's bug, not of the design.
 Do not build stateful floor-selection tracking (continuity across ticks, remembering which pocket the
-body last stood in) to close the residual gap. This is what D0042 (`docs/DECISIONS_LEDGER.md`) records
-as its own point: a documented trade-off whose cost was never measured is an assumption with better
-formatting, not a decision — this ADR exists so the next reader inherits a measured trade instead of an
-assumed one.
+body last stood in): even under the corrected generator, where the measured case is now a null result,
+there is no positive evidence of a real cost to weigh against that mechanic's design cost. This is what
+D0042 (`docs/DECISIONS_LEDGER.md`) records as its own point: a documented trade-off whose cost was never
+measured is an assumption with better formatting, not a decision — this ADR exists so the next reader
+inherits a measured trade instead of an assumed one, including the correction to that measurement.
 
 **Rejected alternative:** build the stateful selection anyway, on the grounds that "genuinely
-reachable" cases are exactly the ones a player will eventually stand in. Rejected because the
-measured cost of *not* building it — a player meeting a silently-wrong floor roughly once every eight
-runs, scattered, median one column wide — is real but low, and the design cost of continuity tracking
-(the query would need to know which pocket the body was last resolved into, and prefer staying
-consistent with it across ties) is a stateful mechanic serving a case this rare. The guard below
+reachable" cases are exactly the ones a player will eventually stand in. Rejected on two independent
+grounds, stated separately because either alone would have been enough. First, as measured before
+D0045/D0046: the cost of *not* building it — a player meeting a silently-wrong floor roughly once every
+eight runs, scattered, median one column wide — was real but low against the design cost of continuity
+tracking (the query would need to know which pocket the body was last resolved into, and prefer staying
+consistent with it across ties). Second, as understood after D0045/D0046: most of what that cost
+estimate was based on has since been shown to be an artifact of a noise-calibration bug, not a property
+of the terrain design, so building a stateful mechanic to serve it would have been solving a problem
+that — to the resolution of the best available measurement — does not currently exist. The guard below
 converts the residual cost from "silent" to "measured," which is the cheaper fix for what actually
 matters about a rare case: not eliminating it, knowing when it happens.
 
@@ -122,8 +156,13 @@ into `_resolve_floor` diagnostically (D0043) — it never changes which floor ge
 detects when the chosen floor's own scan window also contains a second real, walkable-clearance floor,
 and logs it (`push_error`, not `assert()` — see below) with column, both candidate rows, seed, and
 position. This is what turns "player reports standing on the wrong floor, no error, no way to
-reproduce it" into a position-and-seed-reproducible event, and gives a real-play incidence number to
-compare against the 0.85%/12% generated-terrain figure.
+reproduce it" into a position-and-seed-reproducible event. Originally framed as a way to compare a
+real-play incidence number against the 0.85%/12% generated-terrain figure; per D0046, that figure is
+now a null result (0/4,800), so the guard's live purpose going forward is different and, if anything,
+more load-bearing: it is the only thing that would notice this case reappearing after a future noise,
+threshold, or site-config change, without anyone having to re-run D0042's measurement by hand to find
+out. A real-play report from this guard is no longer "the incidence we expected," it's a signal
+something upstream changed.
 
 **Correction, same day (D0044): the first version of this guard could not do that.** It shared
 `_resolve_floor`'s original 6-row window exactly, and `tests/test_cave_geometry.gd`'s first pass proved
@@ -169,13 +208,20 @@ With the corrected window, `tests/test_cave_geometry.gd` was rewritten (its firs
 `Body.FLOOR_SCAN_ROWS` directly rather than an arbitrary widened test value: the guard now genuinely
 fires standing on the shelf, both via a direct `check_floor_selection` call and via a real `Body`
 settling through real `tick()` physics (`push_error` visibly firing in the suite's own stderr). A new
-finding surfaced by that same rewrite, flagged rather than fixed: the guard logs on *every tick* the
-condition holds, not once — one ~400-tick settle onto the ambiguous shelf produced roughly 390 near-
-identical log lines. `sim/invariants` is deliberately stateless (its own `MODULE.md`: "produces no
-gameplay state itself"), so de-duplicating across ticks needs either caller-side state in `body.gd` or
-a design change to the module — out of scope for this correction, which was about whether the guard
-can see the case at all, not about log volume once it does. Recorded in `sim/invariants/invariants.gd`'s
-own header so it isn't lost.
+finding surfaced by that same rewrite: the guard logs on *nearly every call*, not once — one ~400-tick
+settle onto the ambiguous shelf produced, measured directly by mutation-testing the fix below
+(temporarily reverting it and re-running the same probe), 778 near-identical log lines, not merely once
+per tick: `body.gd::_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks (once
+inside its substep loop, once via its own trailing catch-all), so an unratelimited guard fires roughly
+twice per tick. This would bury the signal a real occurrence exists to produce and make an incidence
+count impossible to derive from real play. Fixed (D0052), not merely flagged: `sim/invariants` stays
+deliberately stateless (its own `MODULE.md`: "produces no gameplay state itself"), so the de-duplication
+lives at the CALLER instead — `sim/body/body.gd::_resolve_floor()` already tracks the body's own
+position every tick, and now suppresses a repeat report while the resolved (column, floor) pair is
+unchanged, regardless of how many times `_resolve_floor` runs that same tick, clearing that memory the
+moment the violation itself clears so a later recurrence — even at the identical pair — is treated as a
+fresh episode. `tests/test_cave_geometry.gd` proves this directly: the same ~400-tick settle that
+produced 778 lines under the reverted gate produces exactly one under the real fix.
 
 **`push_error()`, not `assert()`.** `docs/ARCHITECTURE.md` §4's "Invariants, asserted continuously"
 states "panic in debug, log in release." This module logs unconditionally in both build types instead.

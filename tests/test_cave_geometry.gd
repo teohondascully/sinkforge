@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_real_wired_window_detects_the_case_standing_on_the_shelf()
 	_test_real_wired_window_detects_the_case_standing_on_the_lower_floor()
 	_test_a_real_settle_actually_trips_the_guard()
+	_test_a_real_settle_rate_limits_the_guard_to_one_report()
 	_finish("cave_geometry")
 
 
@@ -143,3 +144,29 @@ func _test_a_real_settle_actually_trips_the_guard() -> void:
 		grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_FLOOR_ROW, Body.HEIGHT_PX / CELL)
 	_check(v != null,
 		"re-deriving the same check with the settled body's own real column/window (not a hand-picked one) still finds the violation -- confirms _test_local_window_resolves_the_shelf_when_body_lands_there's settle above is the exact scenario that fires the guard live, matching the push_error the test run's own stderr shows")
+
+
+## D0052. Before rate-limiting, this exact ~400-tick settle produced 778 near-identical push_error
+## lines (measured directly while building the fix, by temporarily reverting body.gd's rate-limit
+## gate to unconditional reporting and re-running this same probe) -- not merely once per tick, since
+## `body.gd::_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks (once
+## inside its substep loop, once via its own trailing catch-all). `body.gd::_resolve_floor()` now
+## suppresses a repeat report while the resolved (column, floor) pair is unchanged, however many times
+## it runs in a tick; this proves that in the real tick() path, not just against a direct
+## check_floor_selection() call, which cannot observe rate-limiting at all since it holds no state
+## across calls. Stock GDScript has no in-process way to count `push_error()` calls from the same
+## script that made them (the same reason `fixture_div_by_zero_probe.gd` exists), so this spawns
+## `tests/fixture_settle_violation_probe.gd` as a real subprocess and counts occurrences of the
+## violation's own message text in its actual stderr.
+func _test_a_real_settle_rate_limits_the_guard_to_one_report() -> void:
+	var project_root: String = ProjectSettings.globalize_path("res://")
+	var output: Array = []
+	var exit_code: int = OS.execute(OS.get_executable_path(),
+		["--headless", "--path", project_root, "--script", "res://tests/fixture_settle_violation_probe.gd"],
+		output, true)
+	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
+	var combined: String = "\n".join(output)
+	var occurrences: int = combined.count("ambiguous floor selection")
+	_check(occurrences == 1,
+		"a 400-tick settle on the ambiguous shelf logs the violation exactly ONCE, not once per tick -- got %d occurrences in the probe's own stderr (captured output: %s)" %
+		[occurrences, combined])
