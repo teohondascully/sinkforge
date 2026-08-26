@@ -48,6 +48,13 @@ _zoom_*.png
 # their UIDs are noise. Game-script UIDs (scenes/ src/ tests/) ARE committed.
 tools/*.uid
 
+# Same reasoning, legacy/tools/ specifically: legacy/ is frozen/read-only, but Godot's --import step
+# still regenerates a missing .uid the moment it scans the tree, on every machine, every time — which
+# showed up as 192 files of working-tree noise in a tree nobody is supposed to be editing. legacy/src/'s
+# UIDs stay committed (same rule as scenes/ src/ tests/ above); legacy/tools/'s dev/QA scripts run by
+# path like tools/ does.
+legacy/tools/*.uid
+
 # COUNT THEM WITH `git ls-files 'docs/media/moments/_moment_*.png' | wc -l`, NOT WITH `ls`, and do not
 # write the answer down here. Three different numbers for this one set were once carried in three files
 # at once, all of them stale, because a count in a comment is a test with no runner. The captures live
