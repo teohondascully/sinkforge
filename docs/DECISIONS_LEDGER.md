@@ -353,3 +353,25 @@ is exactly how the sim quietly regains engine coupling" — a category nobody ad
 omission). Caught by reading the gate before writing the code that would have tripped it, not by a red.
 Reverse: CHEAP to relax per-file if a real exception ever needs one (the gate has no allowlist mechanism
 yet, but none of L1 has needed an exception so far).
+
+## D0024 · 2026-08-26 · integration test missed a floor a unit test caught
+Found while mutation-checking `ShaftGenerator._grow_vein`'s `min_row` floor (the guard stopping an
+iron vein from accreting upward into hardrock): removing the floor did NOT fail the full-scale
+generation test (`_test_iron_only_appears_at_or_below_stonereach`, seed 20260826, real
+`StrataData.SHALLOW_CLAY` dimensions).
+Why it didn't catch it: an accretion blob is compact (radius roughly sqrt(size/pi) for a 2D fill), and
+iron's size range (10-40 cells) gives a radius of about 2-4 cells. Iron's seed depth is uniform over a
+464-row band, so only a small fraction of the ~307 attempts per run seed within a few rows of the
+`stonereach_end` floor at all, and among those, whether the blob's random walk happens to reach upward
+across the line is a further coin flip. The floor is real and load-bearing; the seed this test happened
+to use just didn't expose it.
+Fix: added a second, targeted test that isolates `_grow_vein` directly -- an all-host-rock grid, a seed
+sitting exactly on the floor, size large enough (60, against a 20x10 available band) that the frontier
+is forced to repeatedly offer cells one row above the floor. Mutation-confirmed this one catches it.
+Same pattern for the "never fills a carved cave" half of the host-rock check: an integration-scale test
+never confirmed it either (caves are sparse enough that a random vein rarely lands next to one); a
+direct unit test seeding a vein beside a pre-carved cell does.
+General lesson, matches [[correct-instrument-wrong-scale]]/[[instrument-cannot-register-subject]] in
+spirit: a full-generation integration test asks "does the finished world look right," which is the wrong
+scale to ask "does this one guard ever fire." A guard needs a test built to force it, not a test that
+merely runs code that happens to contain it.
