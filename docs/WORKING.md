@@ -96,10 +96,11 @@ that rule now exists to prevent. Independent Codex audit of commit `489e728`. Or
      (`tests/fixture_div_by_zero_probe.gd`) and greps its stderr for `Fx.div`'s exact `push_error`
      message, rather than only checking the return value. Mutation-tested: removing `push_error()` from
      `Fx.div` makes the new test fail; the old test didn't notice.
-7. **[OPEN]** LOC ratio is 3.564 and `check_loc_ratio.py` is advisory below the 2,000-line game-LOC floor
-   — reports the bad state accurately, then permits it. Director is not changing the floor (reasoning is
-   right); note in this file that the gate is non-enforcing at present and that this is known, not
-   overlooked.
+7. **[CLOSED]** LOC ratio (current, measured: 2.896 — the audit's own 3.564 was already stale by the
+   time it was quoted) — `check_loc_ratio.py` is advisory below the 2,000-line game-LOC floor, reports
+   the state accurately, then permits it. Director is not changing the floor (reasoning is right); see
+   the dedicated note under "LOC ratio target" above — the gate's non-enforcement is now a stated fact
+   in this file, not something inferred from console output.
 
 **Also from this round, not part of the numbered list:** the invariants guard shipped for item 1 had its
 own real coverage gap (its window could not see the case it was built to catch). **[CLOSED, D0044]**
@@ -133,6 +134,20 @@ gates on it yet. Every `docs/BRIEF.md` from now on reports absolute ratio plus t
 or not the gate is advisory that session — this is a standing reporting obligation, not a one-time note.
 If the ratio is still above 2 when stage 7 lands, that has to be stated as a finding in that session's
 brief, not narrated around.
+
+**Item 7 of the Codex-audit follow-up queue, closed 2026-08-26 — no code change, a stated fact.**
+The audit's own snapshot (commit `489e728`) reported absolute ratio 3.564; that number is now stale too
+(stage 4's `sim/body`/`sim/invariants` landed since, growing game LOC faster than instrument LOC in
+relative terms). Current, measured just now via `check_loc_ratio.py` rather than recalled: **2.896**
+(instrument 3,553 = tools 1,529 + tests 2,024; game 1,227 = core 296 + sim 931). Still ADVISORY — game
+LOC (1,227) remains under the 2,000-line floor where this gate starts actually blocking anything — and
+the director has explicitly decided NOT to change that floor; the reasoning for it (below 2,000 lines of
+real game code, a ratio number is mostly measuring how much scaffolding a young project needed, not
+whether it's earning its instrumentation) is correct and stands. This note is what makes the gate's
+current non-enforcement a stated, known fact rather than something a reader has to infer from the gate
+script's own console output — the same "invisible unless something reports it" failure class as the
+unpushed-commit-count and LOC-velocity rules above, closed the same way: report it every time, whether
+or not there's a gate actively acting on it.
 
 **Unpushed commit count, added as a standing rule 2026-08-26 (director's ask, item A of the Codex-audit
 follow-up):** every `docs/BRIEF.md` reports `git log origin/main..HEAD --oneline | wc -l` — actually run,
