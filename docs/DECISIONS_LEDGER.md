@@ -1027,3 +1027,51 @@ one real caller, not a structural commitment. Reverse of the push_error-not-asse
 is EXPENSIVE in a different sense: reverting to a literal `assert()` would reintroduce the exact hang
 hazard this entry names, so "reverse" here means "revisit only if the hang hazard itself is ever
 independently resolved," not "cheap to flip back."
+
+## D0044 · 2026-08-26 · corrects D0043: the guard's window was too narrow to ever fire, widened to 48
+Decided: D0043's `check_floor_selection` guard shared `_resolve_floor`'s original 6-row window exactly.
+The director's own review of that work caught what mutation-testing it should have caught first: a
+fixture built to match D0042's "genuinely reachable" definition (two floors 16 rows apart) never tripped
+the guard, because a 6-row window cannot see 16 rows — the guard reported zero by construction, not by
+measurement. Director's framing, exact: "a zero that cannot be nonzero is not evidence — it is a check
+that looks like one." Same failure class this project's memory already names: an instrument that cannot
+register its subject reads as a quiet green. Widened `sim/body/body.gd`'s window (now a named constant,
+`FLOOR_SCAN_ROWS`, shared by the resolve calls and the diagnostic check — they were always meant to see
+the same thing) from 6 to 48 rows, sized from a real re-measurement, not a round number: re-ran D0042's
+own reachability analysis and this time recorded the row-gap between a genuinely-reachable column's own
+two floors (never captured the first time, only lateral clustering was) — min 11, p50 16, p90 23, p95
+24, p99 36, max 36, across 197 samples over the same 100-seed/4,800-column run. 48 covers the observed
+max with headroom.
+Alternative (the director's own option (b)): keep the window narrow and state plainly, in the ADR and
+the guard's own docstring, that it cannot validate 0.85%/12% and must not be cited as if it does.
+Rejected in favor of actually fixing the instrument: the perf cost of widening was unknown, not
+assumed prohibitive, and once measured (below) it was clearly affordable, at which point disclaiming a
+fixable blind spot is worse than fixing it — this project's own dominant failure class is exactly
+"instrument cannot register its subject," and the fix here was cheap once measured.
+Two things verified before trusting the wider window, neither assumed:
+1. Safety for ordinary falling. The naive worry — a wider window lets a falling body see a distant
+   floor early and snap onto it, breaking normal free-fall — is wrong, and re-reading `_resolve_floor`
+   shows why: `_bottom_y() < surface` refuses every candidate the body hasn't physically reached yet,
+   regardless of window width; widening only lets the query see further, never changes when a body is
+   allowed to land. Confirmed by a direct probe (window temporarily set to 40, tick-by-tick trajectory
+   unchanged) and by the full acceptance suite staying byte-identical (`test_body.gd` 17/17,
+   `test_body_acceptance.gd` 9/9, `velocity_efficiency` 0.9978, `traverse_time` 225 ticks) at both the
+   original and final widths.
+2. Perf cost. An in-process microbenchmark (200,000 `tick()` calls on a resting body, isolating
+   per-tick cost from Godot's own startup noise) measured 37.2µs/tick at 6 rows, 55.3µs/tick at 48 — a
+   real ~18µs/tick increase, under 3% of `docs/ARCHITECTURE.md` §10's 2.0ms p50 sim-tick budget, for a
+   cost that exists once (one player body). Negligible; not optimized further.
+`tests/test_cave_geometry.gd` was rewritten — its first version's entire point (proving the narrow
+window couldn't see the case) is no longer true — to prove the corrected window actually detects the
+case, via both a direct `check_floor_selection` call and a real `Body` settling through real `tick()`
+physics with `push_error` genuinely firing. A new finding surfaced by that rewrite, flagged not fixed:
+the guard logs every tick the condition holds (≈390 lines from one ~400-tick settle), not once per
+episode — `sim/invariants` is deliberately stateless, so de-duplicating needs either caller-side state
+in `body.gd` or a design change to the module. Out of scope for this correction.
+Why: the same lesson as D0024 and half this session's own memory record — reaching a check is not the
+same as the check firing, and neither is having a check the same as the check being *able* to fire.
+Mutation-testing D0043's guard should have used the real production window from the start rather than a
+separately widened test-only value; using the real value would have caught this before it shipped.
+Reverse: CHEAP — one constant, `FLOOR_SCAN_ROWS`, tunable independently of anything else; both the
+resolve calls and the diagnostic check already read from the same named value, so a future width change
+is a one-line edit with the same safety property (verified once here, not per-value) still holding.

@@ -59,6 +59,19 @@ const STEP_UP_PX: int = LOGIC_TILE_PX        ## 1 tile, docs/ARCHITECTURE.md §9
 const MANTLE_PX: int = LOGIC_TILE_PX * 2     ## 2 tiles
 const CORNER_NUDGE_PX: int = 6       ## docs/ARCHITECTURE.md §9
 
+## `_resolve_floor`'s local scan window, in terrain rows. Widened from an original 6 to cover the real
+## vertical gap between two genuinely-reachable stacked floors, measured directly rather than assumed:
+## re-running D0042's own reachability analysis (real `ShaftGenerator` output, `shallow_clay`, 100
+## seeds) and this time recording the row-gap between a reachable column's own two floors gives min=11,
+## p50=16, p90=23, p95=24, p99=36, max=36 across 197 samples. 48 covers the observed max with headroom;
+## the original 6 could not see anything past row-2..row+4 and reported zero by construction, not by
+## measurement (D0044). Confirmed safe for ordinary single-floor falling, not just for this new case:
+## `_bottom_y() < surface` below still refuses to snap onto ANY candidate the body hasn't physically
+## reached yet regardless of window width, so widening only ever lets this query see further, it never
+## changes which floor a body resting on solid, unambiguous ground gets assigned -- verified by full
+## acceptance-suite re-run at this width, unchanged from the narrow window (D0044).
+const FLOOR_SCAN_ROWS: int = 48
+
 var pos_x: int
 var pos_y: int
 var vel_x: int = 0
@@ -294,9 +307,9 @@ func _resolve_ceiling(grid: TileGrid) -> bool:
 func _resolve_floor(grid: TileGrid) -> bool:
 	var row: int = _px_to_cell(_bottom_y())
 	var scan_from: int = maxi(0, row - 2)
-	var s_left: int = Heightfield.surface_y_at_x(grid, _left_x() + Fx.SCALE, scan_from, 6)
-	var s_right: int = Heightfield.surface_y_at_x(grid, _right_x() - Fx.SCALE, scan_from, 6)
-	var s_center: int = Heightfield.surface_y_at_x(grid, pos_x, scan_from, 6)
+	var s_left: int = Heightfield.surface_y_at_x(grid, _left_x() + Fx.SCALE, scan_from, FLOOR_SCAN_ROWS)
+	var s_right: int = Heightfield.surface_y_at_x(grid, _right_x() - Fx.SCALE, scan_from, FLOOR_SCAN_ROWS)
+	var s_center: int = Heightfield.surface_y_at_x(grid, pos_x, scan_from, FLOOR_SCAN_ROWS)
 	var surface: int = mini(mini(s_left, s_right), s_center)
 	if surface == Heightfield.NO_FLOOR or _bottom_y() < surface:
 		on_floor = false
@@ -306,12 +319,14 @@ func _resolve_floor(grid: TileGrid) -> bool:
 	# limitation rather than building stateful floor tracking; this is what turns a silent
 	# wrong-floor bug report into a reproducible, position-and-seed-logged one. Checks the column
 	# nearest `pos_x` only, not every column the three foot samples straddle -- a scoped first pass,
-	# not full coverage (docs/DECISIONS_LEDGER.md D0043).
+	# not full coverage (docs/DECISIONS_LEDGER.md D0043). Shares FLOOR_SCAN_ROWS with the resolve calls
+	# above on purpose (D0044) -- this check exists to answer "did the query that just picked a floor
+	# also see another one," which is only a true answer if it's given the SAME window that query used.
 	var check_col: int = _px_to_cell(pos_x)
-	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, 6)
+	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, FLOOR_SCAN_ROWS)
 	if chosen_row >= 0:
 		Invariants.report_floor_selection(
-			grid, check_col, scan_from, 6, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
+			grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
 	pos_y = surface - (HEIGHT_PX * Fx.SCALE) / 2
 	vel_y = 0
 	on_floor = true

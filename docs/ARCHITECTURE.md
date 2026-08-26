@@ -366,8 +366,9 @@ cannot represent two disjoint walkable floors in the same column, a floor under 
 because "the surface height of column X" has no room for a second answer. `sim/body/heightfield.gd`'s
 actual implementation was never that global scan. It is a bounded LOCAL query —
 `column_surface_y(grid, col, scan_from_row, max_rows)` — and `body.gd::_resolve_floor()` always calls
-it with a small window centred on the body's own current row (6 rows: `scan_from = row - 2`), never a
-scan from the top of the column. This divergence from the written spec predates this correction and
+it with a small window centred on the body's own current row (`Body.FLOOR_SCAN_ROWS` rows,
+`scan_from = row - 2`; 48 as of D0044, measured — see below), never a scan from the top of the column.
+This divergence from the written spec predates this correction and
 was never itself a recorded decision; it is simply what got built, and it happens to be the right
 shape rather than the wrong one — a per-column heightfield genuinely cannot represent an overhang, but
 a *local, bounded* query only needs to be right about the few rows near wherever the body actually is,
@@ -384,13 +385,19 @@ reach — jump apex measured empirically from the real `Body` constants, not the
 digging; 12% of the 100 shafts contain at least one such column; occurrences are mostly scattered
 single columns (median contiguous run length 1, longest observed run 9). `sim/invariants`
 (`Invariants.check_floor_selection`, wired into `_resolve_floor` diagnostically, D0043) turns a
-mis-resolved floor into a logged, position-and-seed-reproducible event instead of a silent one — but it
-shares `_resolve_floor`'s own 6-row window, so in practice it only catches two candidate floors within
-that same narrow band, a smaller slice than "reachable" in general (jump reach alone spans up to 18
-terrain cells; `tests/test_cave_geometry.gd` measures this directly and confirms the guard is silent on
-a constructed 16-row-separated reachable case). Accepted as a documented, measured limitation rather
-than building stateful floor-selection tracking across ticks — the ADR has the full three-part record
-and the rejected alternative.
+mis-resolved floor into a logged, position-and-seed-reproducible event instead of a silent one. Its
+first version shared `_resolve_floor`'s original 6-row window and, `tests/test_cave_geometry.gd` proved,
+could not actually see a 16-row-apart case — a check that cannot be nonzero is not evidence. Corrected
+(D0044): `FLOOR_SCAN_ROWS` widened to 48, sized from re-measuring the real row-gap distribution between
+genuinely-reachable stacked floors (min 11, p50 16, p99 36, max 36 across 197 samples) rather than
+guessed, and verified safe for ordinary falling before landing — the window only ever gates how far the
+query can *see*, never when a body has actually *reached* a candidate floor
+(`_bottom_y() < surface` still refuses every premature one), confirmed by a full acceptance-suite
+re-run staying byte-identical at both widths. Measured perf cost: 37.2µs/tick at 6 rows, 55.3µs/tick at
+48 (one in-process body, against a 2.0ms p50 sim-tick budget shared by 2,000 machines and 20,000 items —
+negligible). Accepted as a documented, measured limitation rather than building stateful
+floor-selection tracking across ticks — the ADR has the full record, the rejected alternative, and one
+open finding not yet addressed: the guard logs every tick the condition holds, not once per episode.
 
 Keep the existing forgiveness set on top of this, unchanged: capsule collider, auto step-up, corner
 correction, shortest-axis depenetration, coyote time and jump buffer.

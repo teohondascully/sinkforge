@@ -48,6 +48,50 @@ doing. Every date this session wrote between the finding above and 2026-08-26 us
 2026-08-25; the real calendar has since rolled over, so 2026-08-26 is now correct going forward and is
 no longer part of the ~15+-file discrepancy this note describes.
 
+## Codex audit follow-up queue (commit 489e728), director-ordered
+
+Logged here 2026-08-26, verbatim from the director's chat message, per the new "multi-item task lands
+in WORKING.md before work starts" rule (`CONTEXT.md`, "Review bandwidth") — this exact list existed only
+in chat for one round of work and never reached the session that needed items 3-7, which is the failure
+that rule now exists to prevent. Independent Codex audit of commit `489e728`. Order is the director's.
+
+1. **[CLOSED]** Heightfield rewrite. Superseded by `docs/adr/0005-heightfield-local-window.md` — measured
+   and accepted as a documented limitation rather than rewritten. D0042/D0043.
+2. **[CLOSED]** Cave geometry in the chamber, proving the local-window query's behavior against the
+   limitation above. `tests/test_cave_geometry.gd`.
+3. **[OPEN]** `ValueNoise` distribution mismatch against the legacy-configured `FastNoiseLite` it was
+   ported from — Codex measured SD 0.4223 vs 0.2453, range [-0.995,0.999] vs [-0.833,0.712], sampled over
+   cave coordinates. Ported thresholds are carving at a different rate than the value they were copied
+   from; no test asserts density, only that caves exist. Two options, director wants a recommendation:
+   (a) rescale `ValueNoise` output to the measured `FastNoiseLite` SD, keeping ported thresholds
+   meaningful; (b) re-derive thresholds against `ValueNoise`'s own actual distribution, treating the
+   legacy numbers as no longer applicable (more honest, but changes D0025's "ported" count). Either way:
+   add a test asserting the output distribution so it cannot drift again.
+4. **[OPEN]** CI does not run the tests. The `harness` workflow job runs only static gates plus the
+   authorship check — no Godot, no test execution. Every "all green" claim is locally verified only, and
+   the README implies CI coverage that doesn't exist. Add Godot to CI and run all suites; if genuinely
+   hard in GitHub Actions, say so rather than skip it.
+5. **[OPEN]** `split()` order-independence is untested despite D0006 claiming it is. Codex mutated
+   `split()` to use `_state` instead of `_root_seed`; the suite stayed green. Write the test that actually
+   proves order-independence, then append a *correcting* ledger entry — do not edit D0006, append-only
+   means visible correction, not silent repair.
+6. **[OPEN]** Batch of four smaller findings:
+   - README says 57 test functions (actual 59) and seven gates (CI runs nine); "all green" phrasing
+     implies CI coverage that doesn't exist. Fix all three.
+   - `EntityIdPool` generation isn't masked to 32 bits before packing — at 2^32 reuses of one slot, a
+     stale generation-zero ID aliases a fresh one. Theoretical, two-character fix.
+   - `tools/data_codegen/generate.py` crashes with an unhandled `TypeError` on invalid YAML instead of a
+     controlled failure.
+   - The test suite accepts `Fx.div`'s `push_error` output as a pass rather than asserting on it directly.
+7. **[OPEN]** LOC ratio is 3.564 and `check_loc_ratio.py` is advisory below the 2,000-line game-LOC floor
+   — reports the bad state accurately, then permits it. Director is not changing the floor (reasoning is
+   right); note in this file that the gate is non-enforcing at present and that this is known, not
+   overlooked.
+
+**Also from this round, not part of the numbered list:** the invariants guard shipped for item 1 had its
+own real coverage gap (its window could not see the case it was built to catch). **[CLOSED, D0044]**
+— widened and measured, see the "Landed and closed" bullet above. Addressed before 3-7 as instructed.
+
 ## Current stage
 
 **Stage 4, steps (a)-(d), CLOSED and reported. Holding here per the Overnight queue's own instruction
@@ -133,11 +177,20 @@ pointer, not the record.
   first sim-internal caller, wired diagnostically into `_resolve_floor` (reads nothing back, changes no
   behavior — confirmed via full re-run: `test_body.gd` 17/17, `test_body_acceptance.gd` 9/9 unchanged).
   `tests/body/hostile_chamber.gd` gained a cave-geometry section outside the scripted traversal span, and
-  `tests/test_cave_geometry.gd` mutation-tests the new guard directly — including the honest finding that
-  the guard's real 6-row window (matching `_resolve_floor`'s own) does NOT fire on this fixture even
-  though it was built to match the measured "genuinely reachable" case; a widened test-only window
-  confirms the check logic itself is correct. `docs/ARCHITECTURE.md` §9 now describes the local windowed
-  query as the actual design. This replaces the item-1 rewrite the post-audit list originally scoped.
+  `tests/test_cave_geometry.gd` mutation-tests the new guard directly. `docs/ARCHITECTURE.md` §9 now
+  describes the local windowed query as the actual design. This replaces the item-1 rewrite the
+  post-audit list originally scoped.
+  **Corrected same round (D0044):** the guard's first version shared `_resolve_floor`'s original 6-row
+  window and, per the director's review, "reported zero not because the case doesn't happen, but
+  because it structurally could not see it." `sim/body/body.gd`'s window is now a named constant,
+  `Body.FLOOR_SCAN_ROWS = 48`, sized from re-measuring the real row-gap distribution between
+  genuinely-reachable stacked floors (min 11, p50 16, p99 36, max 36) rather than guessed — verified
+  safe for ordinary falling (`_bottom_y() < surface` gates every candidate regardless of window width,
+  confirmed by the acceptance suite staying byte-identical at both widths) and its perf cost measured
+  directly (37.2µs/tick → 55.3µs/tick, negligible against the §10 sim-tick budget). `tests/test_cave_geometry.gd`
+  now proves the guard genuinely fires on the fixture it was built to catch. One finding flagged, not
+  fixed: the guard logs every tick the condition holds (~390 lines from one settle), not once per
+  episode — de-duplicating would need caller-side state or a design change, out of scope here.
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
   collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
   curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio

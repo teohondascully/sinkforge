@@ -48,9 +48,12 @@ exhibited it.
 ## Finding 3: measurement showed the residual case is rare enough that the trade holds
 
 A local window bounds the overhang problem, it does not eliminate it. Two disjoint walkable floors
-closer together than the window itself (6 rows) can still tie inside one call to `surface_y_at_x`,
-and `_resolve_floor` picks whichever is higher (`mini` of the three foot/centre samples) with no
-knowledge that a second, lower one exists. The question this session was asked to answer, before
+closer together than the window itself can still tie inside one call to `surface_y_at_x`, and
+`_resolve_floor` picks whichever is higher (`mini` of the three foot/centre samples) with no knowledge
+that a second, lower one exists — no finite window closes this completely, only bounds how far apart
+two floors have to be before it can happen (`Body.FLOOR_SCAN_ROWS`, see "The guard, and what it
+actually covers" below, for the measured width this project actually uses). The question this session
+was asked to answer, before
 proposing anything: how often does `sim/terrain_gen/shaft_generator.gd`'s real cave generation actually
 produce that shape, and how much of it is genuinely reachable rather than merely present.
 
@@ -116,20 +119,57 @@ position. This is what turns "player reports standing on the wrong floor, no err
 reproduce it" into a position-and-seed-reproducible event, and gives a real-play incidence number to
 compare against the 0.85%/12% generated-terrain figure.
 
-Its coverage is narrower than the 0.85%/12% figure, and that gap is itself worth recording rather than
-leaving implicit. The guard is wired with the exact same 6-row window `_resolve_floor` uses (deliberately
-— checking a wider window than the resolve call itself would report ambiguity the resolve call could
-never have actually hit). `tests/test_cave_geometry.gd` builds a fixture matching the measurement's own
-definition of "genuinely reachable" — a shelf and a lower floor separated by a 6-row slab plus the full
-10-row body-height clearance a walkable pocket needs, 16 rows apart — and confirms directly: with the
-real 6-row window, the guard is silent standing on either floor. Widening the check's own window (a
-separate, non-realistic test call) confirms the check *logic* is correct — it does find the competing
-floor when given a window that can see it — so the silence on the real fixture is the window's scope,
-not a bug in the check. In practice, the guard can only catch two candidate floors within roughly its
-own 6-row band, a narrower and rarer sub-case than "reachable by jump" (which the measurement's graph
-allowed up to 18 cells). It will under-report relative to 0.85%/12%, not match it. A future reader
-comparing a real-play incidence number against the generated-terrain figure should read a lower number
-as partly this, not only as evidence the generated-terrain measurement was pessimistic.
+**Correction, same day (D0044): the first version of this guard could not do that.** It shared
+`_resolve_floor`'s original 6-row window exactly, and `tests/test_cave_geometry.gd`'s first pass proved
+the guard was silent on a fixture built to match this ADR's own "genuinely reachable" definition — a
+shelf and a lower floor 16 rows apart. A window that cannot span 16 rows cannot report a 16-row-apart
+violation; the guard reported zero not because the case doesn't happen, but because it structurally
+could not see it. A check that cannot be nonzero is not evidence, it's a check that looks like one — the
+director's own framing, and correct. Two resolutions were on the table: keep the window narrow and state
+plainly that it cannot validate 0.85%/12%, or widen the window and measure what that costs. Widened.
+
+First, whether widening is even safe was verified empirically before committing to it, because the
+naive worry is real: if `_resolve_floor`'s window directly gates which floor a *falling* body snaps
+onto, widening it should let a body detect a distant floor from far above and teleport down to it,
+breaking ordinary free-fall. It doesn't, and re-reading the code shows why: `if surface == NO_FLOOR or
+_bottom_y() < surface: on_floor = false; return false` gates every candidate on the body having
+*already physically reached* it — the window only controls how far the query can see, never when a
+body is allowed to land. A wider window lets the query notice a real floor sooner; it can't make the
+body arrive there sooner. Confirmed both by direct experiment (temporarily setting the window to 40 in
+a probe changed nothing about a normal fall's tick-by-tick trajectory) and by the full acceptance suite
+staying byte-identical at the final width (below).
+
+Second, the width itself is measured, not guessed. Re-running this ADR's own reachability analysis
+(same method, same 100 seeds / 4,800 columns) and this time recording the row-gap between a
+genuinely-reachable column's own two floors — a quantity the original measurement never captured, only
+lateral clustering across columns — gives, across 197 gap samples: min 11, p50 16, p90 23, p95 24, p99
+36, max 36. `sim/body/body.gd`'s `FLOOR_SCAN_ROWS` is now **48**, covering the observed max with
+headroom. `tests/test_cave_geometry.gd`'s own 16-row fixture sits almost exactly on the measured
+median (16), which is a useful cross-check that the fixture is representative, not a chosen-to-pass
+outlier.
+
+Third, the perf cost, measured rather than assumed: an in-process microbenchmark (200,000 `tick()`
+calls on a body at rest, isolating per-tick cost from Godot's own process-startup noise) measured
+**37.2µs/tick at the original 6-row window, 55.3µs/tick at 48 rows** — a real ~18µs/tick increase, all
+of it from the diagnostic check's own scan (the resolve calls themselves cost the same at either width
+once a floor is found on the first row, which is the common case). Against `docs/ARCHITECTURE.md` §10's
+sim-tick budget (≤2.0ms p50 / ≤4.0ms p99, at a much larger scale — 2,000 machines, 20,000 items,
+40,000 active fluid cells — not the one player body this cost belongs to), 55µs is under 3% of the p50
+budget for the *entire* simulation, for a cost that exists exactly once (there is one body). Accepted
+as negligible; not optimized further, since there is no measured reason to.
+
+With the corrected window, `tests/test_cave_geometry.gd` was rewritten (its first version's whole point
+— proving the narrow window couldn't see the case — is no longer true) to prove the *opposite*, using
+`Body.FLOOR_SCAN_ROWS` directly rather than an arbitrary widened test value: the guard now genuinely
+fires standing on the shelf, both via a direct `check_floor_selection` call and via a real `Body`
+settling through real `tick()` physics (`push_error` visibly firing in the suite's own stderr). A new
+finding surfaced by that same rewrite, flagged rather than fixed: the guard logs on *every tick* the
+condition holds, not once — one ~400-tick settle onto the ambiguous shelf produced roughly 390 near-
+identical log lines. `sim/invariants` is deliberately stateless (its own `MODULE.md`: "produces no
+gameplay state itself"), so de-duplicating across ticks needs either caller-side state in `body.gd` or
+a design change to the module — out of scope for this correction, which was about whether the guard
+can see the case at all, not about log volume once it does. Recorded in `sim/invariants/invariants.gd`'s
+own header so it isn't lost.
 
 **`push_error()`, not `assert()`.** `docs/ARCHITECTURE.md` §4's "Invariants, asserted continuously"
 states "panic in debug, log in release." This module logs unconditionally in both build types instead.
@@ -148,9 +188,11 @@ point in D0043.
   ADR and the measured incidence cited inline, so a reader no longer has to discover the divergence
   between prose and code the way this investigation did.
 - `sim/body/body.gd::_resolve_floor()` gained one diagnostic-only block (reports to `Invariants`, reads
-  nothing back, changes no behavior) — confirmed via full acceptance-suite re-run:
+  nothing back, changes no behavior) and a new named constant, `FLOOR_SCAN_ROWS = 48` (D0044, widened
+  from the original 6), shared by the resolve calls and the diagnostic check on purpose — confirmed via
+  full acceptance-suite re-run, both at the original width and again at the final one:
   `tests/test_body.gd` (17/17), `tests/test_body_acceptance.gd` (9/9, `velocity_efficiency` 0.9978 and
-  `traverse_time` 225 ticks against golden 225, unchanged from before this change), zero invariant
+  `traverse_time` 225 ticks against golden 225, byte-identical at both widths), zero invariant
   violations fired anywhere on the existing scripted chamber (expected — no existing section has
   multi-level geometry).
 - `sim/invariants` gained its first real code and its first sim-internal consumer (`sim/body`). Its

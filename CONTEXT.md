@@ -188,6 +188,14 @@ exists to surface.
   finding about an old commit and a false contradiction of a current report are indistinguishable from
   the outside — resolving one from first principles (`git log`, `git ls-tree <hash>`, re-running the
   gate the audit cites, at the disputed hash) is possible but should never be necessary.
+- **Any multi-item task the director hands a session lands in `docs/WORKING.md` before work starts, not
+  only in the chat message that gave it.** Added 2026-08-26 after a numbered "items 1-7" list survived
+  entirely in chat, outside the repo, across a chunk of session work — it never reached the session that
+  went to act on it, because nothing durable carried it. The fix is mechanical, the same shape as the
+  pinned-hash rule above: a list that only lives in a message is one compaction, one session boundary, or
+  one summary away from gone, which is exactly the failure this protocol exists to prevent. The session
+  receiving the list writes it into `docs/WORKING.md` verbatim (or a faithful summary that preserves
+  every item's number and substance) before starting item 1, not after finishing it.
 - Markdown and git only. If this starts to look like a subsystem, say so instead of building it.
 
 ## Playable fixtures

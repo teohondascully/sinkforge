@@ -8,7 +8,18 @@ extends RefCounted
 ## columns / 12% of shafts in real generated terrain (D0042), rare enough to accept as a documented
 ## limitation rather than build stateful floor tracking to eliminate. This check turns a silent
 ## "standing on the wrong floor, no error" bug report into a reproducible, position-and-seed-logged
-## one, and gives a real-play incidence number to compare against the generated-terrain figure.
+## one, and gives a real-play incidence number to compare against the generated-terrain figure. The
+## window this check is called with must actually be wide enough to see the case it exists to catch --
+## `Body.FLOOR_SCAN_ROWS` (D0044) is sized from a real re-measurement of the row-gap distribution
+## between genuinely-reachable stacked floors, not the original 6-row window, which could not see it
+## by construction and reported zero regardless of real incidence.
+##
+## Known, not yet addressed: `report_floor_selection` logs on EVERY tick the condition holds, not once
+## per episode -- a body resting on an ambiguous floor for N ticks produces N near-identical log lines
+## (measured: ~390 lines from one ~400-tick settle in `tests/test_cave_geometry.gd`). This module is
+## deliberately stateless (MODULE.md's own purpose: "produces no gameplay state itself"), so de-duplicating
+## across ticks would need either caller-side state in `body.gd` or a design change here; flagged rather
+## than fixed, since the case itself is sub-1% and this session's scope was the window, not log volume.
 ##
 ## `docs/ARCHITECTURE.md` §9: "Panic in debug, log in release." This file logs via `push_error()`
 ## unconditionally rather than `assert()`-ing, in both build types -- `core/MODULE.md`'s own
