@@ -180,6 +180,14 @@ exists to surface.
   pre-ledger commit — a null result, not an audit). The reviewer runs it, reads that commit's full diff,
   and checks it against the ledger entries claiming to cover it — a session selecting its own sample
   defeats the point, which is checking whether the session under-reported.
+- **Every external audit is run against an explicit, pinned commit hash — never "the repo" or "the
+  current state".** Local commits are routinely ahead of `origin/main` (sessions push rarely), so an
+  auditor working from a clone or a stale checkout can genuinely be looking at a different tree than the
+  one a session most recently reported on, with no signal to either party that this happened. Both the
+  brief handed to the auditor and the report it returns must state the hash. Without this, a real
+  finding about an old commit and a false contradiction of a current report are indistinguishable from
+  the outside — resolving one from first principles (`git log`, `git ls-tree <hash>`, re-running the
+  gate the audit cites, at the disputed hash) is possible but should never be necessary.
 - Markdown and git only. If this starts to look like a subsystem, say so instead of building it.
 
 ## Playable fixtures

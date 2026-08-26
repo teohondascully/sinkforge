@@ -896,3 +896,56 @@ nudge it can never use here fixes nothing and adds a code path the acceptance su
 separately verify.
 Reverse: CHEAP — one constant pair and one placement function; nothing outside `test_hostile_chamber.gd`'s
 presence check and the acceptance driver's span gate depends on the exact (column, row).
+
+## D0040 · 2026-08-26 · the Codex audit contradiction was two trees, not one — resolved by hash
+Decided: an external Codex audit reported `sim/body` absent, 8 GDScript suites / 59 `_test_*` functions,
+and an instrument/game LOC ratio of 3.564 — all apparently contradicting this session's stage 4(d) report
+(D0038: acceptance suite green, `sim/body/body.gd` present and exercised). Resolved by hash, not by
+re-arguing either report: `git log --oneline -5` / `git rev-parse HEAD` put this session's tree at
+`2fb9101` with a clean `git status --short`; `sim/body/body.gd` is tracked there
+(`git ls-files sim/body/`). But `git rev-parse origin/main` is `b2142e2`, and `git log
+origin/main..HEAD --oneline` lists all 31 commits between them — every stage-4 commit
+(`94bcc66`..`2fb9101`) is local, unpushed. Bisecting the LOC ratio and test-file count across the local,
+pre-stage-4 commits found an EXACT match at `489e728`/`0dfe2a5` (identical LOC state): ratio 3.564, 9
+files matching `tests/test_*.gd` of which 8 are runnable suites (`test_base.gd` is the shared base
+class, not a suite), 59 `_test_*` functions. That is Codex's audit, exactly, numeral for numeral. Both
+reports are correct — about two different, correctly-identified commits on the same local branch, one of
+which had never left this machine.
+Alternative: treat the audit as evidence something in the just-reported acceptance suite was fabricated
+or the local commits were somehow lost, and re-verify D0038 from scratch. Rejected once the hash
+bisection produced an exact numeric match to a real, identifiable local commit — a coincidence at that
+resolution (ratio to three decimal places, function count, suite count, all simultaneously) is far less
+likely than "the auditor was pointed at a different, older commit."
+Why this happened: nothing pins an external audit's brief (or its report) to the commit it was actually
+run against — see the new `CONTEXT.md` "Review bandwidth" rule this finding produced (every external
+audit states its hash, both directions), so the next ambiguity of this shape resolves by reading a line
+instead of bisecting history.
+Reverse: N/A — a diagnosis, not a code change. The `CONTEXT.md` rule it produced is its own CHEAP entry
+in spirit (prose only, no code depends on it) but doesn't warrant a separate number.
+
+## D0041 · 2026-08-26 · two errors in the audit brief the director sent Codex, self-reported
+Decided: recording two brief-authoring defects the director identified in their own message, not found
+by this session — logged here because the ledger is the project's record of judgment calls, not only
+this session's own, and because the director explicitly asked that the next audit brief be "assembled
+from measured state rather than from what the previous session reported," which is a standing process
+rule worth having a citable entry for.
+1. The brief told Codex "stage 4 might be complete" without checking first. At the time the brief was
+   sent, this could be verified in under a minute the same way D0040 was resolved (`git ls-files
+   sim/body/`, or reading that session's own `docs/WORKING.md`) — asserting a completion state
+   sight-unseen is the same failure class D0038/D0039 spent an entire acceptance suite trying to stamp
+   out of the CHAMBER: a claim standing in for a measurement.
+2. The brief repeated `claims/C002-traversal-over-rubble.md`'s stated blocker ("`sim/world` does not
+   exist") directly from the claim file, without checking whether it was still true. `sim/world/tile_grid.gd`
+   and `sim/world/materials.gd` have existed since before `origin/main`'s current HEAD (`c3fb970`,
+   `feat(sim/world): TileGrid and WorldMaterials`) — the blocker was stale, not fabricated, but passed
+   through unverified into a brief handed to an outside party. The correction to the claim file itself is
+   tracked separately (the director's own item 6), not duplicated here.
+Why: both are the identical failure shape — passing a number or a claim through a brief without
+re-deriving it against current state — which is worth naming once rather than as two unrelated slips,
+since a brief-assembly habit ("read the claim file", "recall what the last session reported") is exactly
+what produces both.
+Alternative: treat these as too minor to log, since neither caused incorrect CODE and both were
+self-caught. Rejected: the ledger's own numbering-rule header exists to keep small, self-corrected
+judgment calls visible rather than quietly absorbed, and this is precisely the kind of thing a spot audit
+would otherwise have to rediscover from scratch.
+Reverse: N/A — a process finding, not a code or doc change beyond this entry.
