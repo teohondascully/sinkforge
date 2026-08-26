@@ -1322,3 +1322,21 @@ pre-fix comment, caught only by measuring rather than trusting that guess, corre
 (comments in `body.gd`, `invariants.gd`, and this ADR's own text all updated to the verified number).
 Reverse: CHEAP — two new instance fields and one conditional in `body.gd`, no change to
 `sim/invariants`'s public surface or behavior when called directly (e.g. from a test).
+
+## D0053 · 2026-08-26 · tests/body/play_scene.gd reads raw physical keys, not a project input map
+Decided: the (g) debug play-mode input handler (`tests/body/play_scene.gd::_read_play_input()`) polls
+`Input.is_physical_key_pressed()` for Left/Right/A/D, Space, and Up/W directly, rather than defining a
+project-wide `InputMap` action set and reading `Input.is_action_pressed()`.
+Alternative: define real named input actions (`move_left`, `jump`, etc.) in `project.godot`'s
+`[input]` section now, so a later real driver or menu could reuse them.
+Why: nothing in this codebase has needed a project input map before this file — `sim/body` is driven
+entirely by `InputFrame`, constructed either by `ScriptedTraverse` or (now) this file's own raw-key
+read, never by Godot's own input system. Building a named action set now, for a debug fixture whose own
+directive is "minimal... resist making it look good," would be scope the director didn't ask for and a
+real decision (what the action names are, whether they're remappable, whether they belong in
+`project.godot` at all before `interface/`'s real command vocabulary exists) made by default rather than
+on purpose. Raw keys are the smaller, more reversible choice, and this file's own header names the
+decision so a later session building the real driver doesn't mistake the absence of an input map for an
+oversight.
+Reverse: CHEAP — `tests/body/play_scene.gd` is itself new, unshipped code; switching to named actions
+later touches this one file and adds one `project.godot` section, nothing else depends on either choice.

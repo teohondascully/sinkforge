@@ -30,9 +30,10 @@ isn't already here, or adding a step, is itself a HARD STOP.
       driving policy, the acceptance driver's own span math), never in the controller. Zero of the two
       permitted constant-adjustment rounds spent. STOPPING HERE per this item's own instruction and the
       director's "report at (d) before starting (e)" — (f)/(g) are NOT started; this is the checkpoint.
-- [ ] (f) Minimal debug renderer: terrain grid, capsule, camera. Flat colors only, explicitly not art.
-- [ ] (g) `--play` flag + recorded-input plumbing on the scenario driver; one fixture, the hostile
-      chamber traverse.
+- [x] (f) Minimal debug renderer: terrain grid, capsule, camera. Flat colors only, explicitly not art.
+      `tests/body/play_scene.gd`/`.tscn`.
+- [x] (g) `--play` flag + recorded-input plumbing on the scenario driver; one fixture, the hostile
+      chamber traverse. Same file. D0053.
 
 **Dating note, found while wiring the gate above:** every commit in this repository's actual git log is
 dated 2026-08-25, but "2026-08-26" appears as the stated date across ~15+ tracked files — `ONBOARDING.md`,
@@ -108,9 +109,13 @@ own real coverage gap (its window could not see the case it was built to catch).
 
 ## Current stage
 
-**Stage 4, steps (a)-(d), CLOSED and reported. Holding here per the Overnight queue's own instruction
-and the director's "report at (d) before starting (e)" — (f)/(g) not started, awaiting the director's
-read of the acceptance numbers below before this session (or the next) continues.** The acceptance
+**Stage 4, steps (a)-(g), CLOSED and reported. Holding here per the director's explicit "stop after (g)"
+instruction** — rope (step e) is deliberately not started; it has no acceptance criteria yet and the
+director wants to play the bare controller first, in a session they're present for. To play it:
+`godot --path . tests/body/play_scene.tscn -- --play`. Controls: Left/Right or A/D to move, Space to
+jump (hold for full height, tap for a short hop), Up/W held while moving toward a ledge for
+`mantle_hold`. The session ends and writes its recording to `tests/body/recordings/play_<timestamp>.log`
+when the window is closed. The acceptance
 suite (D0038) is fully green against `HostileChamber` + `ScriptedTraverse` with `sim/body/body.gd`
 unchanged since D0035: every one of the ~7 bugs found while getting there was in this session's own
 fixture code (the chamber's geometry, the scripted driving policy, or the acceptance driver's own span
@@ -240,6 +245,20 @@ pointer, not the record.
   spawning `tests/fixture_settle_violation_probe.gd` as a subprocess, same pattern as
   `fixture_div_by_zero_probe.gd`) proves it and fails on the reverted mutant. Full 13-suite regression
   green before and after, at both the mutant and the real fix.
+- **(f)/(g): minimal debug renderer + `--play` mode + recorded-input plumbing
+  (`tests/body/play_scene.gd`/`.tscn`, D0053).** Flat-color terrain/body/camera, no shaders or sprites,
+  on the director's own instruction to resist polish. Two run modes off one `--play` cmdline flag:
+  `agent` (driven by the already-trusted `ScriptedTraverse`, for self-verification without a human) and
+  `play` (real physical-key input, no project input map — D0053, a real reversible choice, not an
+  oversight). Both write a tick-by-tick input log to `tests/body/recordings/` (`tick,move_dir,
+  jump_pressed,jump_held,mantle_hold`), the precursor of `docs/ARCHITECTURE.md` §6's real `input.log` —
+  kept deliberately (not gitignored) as the seed of a future golden corpus, per the director's own
+  instruction. Verified: parses clean; a real windowed run (screenshot capture) shows the terrain,
+  body, and camera rendering correctly against the actual hostile-chamber geometry; a headless agent-mode
+  run reaches the chamber's end column and writes a correctly-formatted 226-tick log; a `--play`-mode
+  smoke run (no human input available to this session) initializes, renders, and records without
+  crashing. `tests/body/recordings/README.md` documents the format and retention policy (`agent_*.log`
+  disposable, `play_*.log` requires director confirmation before deletion).
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
   collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
   curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio
@@ -258,3 +277,17 @@ README stage-count correction ("stage 3 of 12" → "stage 3 of 7 toward `C001`")
 already scoped; none are new findings requiring their own ledger entries. D0019 and D0020 (chunk size,
 coordinate type scheme) remain open EXPENSIVE questions, unchanged this round. Anything found during
 stage 4 gets logged here or to the ledger immediately, not batched.
+
+**Hazard, not yet root-caused: a non-headless Godot launch rewrote `project.godot` once, silently
+dropping `gdscript/warnings/enable=true`** (the parent flag `docs/DECISIONS.md` names as "Enforcement
+tripwire #1" for the whole typed-everywhere rule — `untyped_declaration=2` alone, without `enable=true`,
+may not actually fire) along with every documentation comment in the file. Caught by routine
+`git status` before this session's own commit, not by any gate — `project.godot` is unpoliced by
+`layer_lint.py` or any other check. Reverted (`git checkout -- project.godot`) before committing.
+Could not reproduce on a second attempt (same non-headless `godot --path . tests/body/play_scene.tscn`
+invocation, screenshot flags, left `project.godot` untouched); a headless `--check-only`/`--import` also
+left it untouched both times. Likely a one-time resave triggered by something specific to an earlier
+non-headless launch this session (first-open project-settings migration is one guess, not confirmed) —
+flagged rather than chased further, since it doesn't reproduce on demand and this session's own
+scope was (f)/(g), not a Godot-internals investigation. Practical mitigation for any session running
+Godot non-headlessly: `git diff project.godot` before every commit, not just before this one.
