@@ -1,0 +1,6 @@
+fields:
+  id: {required: true, type: str}
+  layer: {required: true, type: str}
+  kind: {required: true, type: str}
+  hardness: {required: true, type: float}
+  display_name: {required: false, type: str}

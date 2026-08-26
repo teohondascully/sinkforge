@@ -1,0 +1,7 @@
+# Stonereach's signature ore -- richer than ore_copper per docs/GDD.md §11 ("Richer ore"), matching
+# the legacy generator's iron-below-a-depth-gate pattern (legacy/src/core/layered_world_gen.gd).
+id: ore_iron
+layer: stonereach
+kind: ore
+hardness: 3.5
+display_name: Iron ore

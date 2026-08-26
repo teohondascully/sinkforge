@@ -1,0 +1,7 @@
+# The shallow, first ore -- matches docs/ARCHITECTURE.md §6's scenario-format example (material:
+# ore_copper) exactly, so the first real scenario and the first real ore share a name.
+id: ore_copper
+layer: topsoil_shale
+kind: ore
+hardness: 2.0
+display_name: Copper ore

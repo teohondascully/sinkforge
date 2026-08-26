@@ -216,3 +216,126 @@ replay-and-hash mechanism itself gets exercised at the scale the real requiremen
 actual specified tick count now is what proves the mechanism holds up at that scale before anything
 real depends on it — the whole point of building this stage before there's a sim worth testing.
 Reverse: CHEAP — two constants.
+
+## D0016 · 2026-08-26 · data/strata/shallow_clay.yaml
+Decided: every ported generation constant (cave thresholds, strata banding, ore/coal/iron attempts and
+sizing) lives in one per-site YAML file that `sim/terrain_gen`'s `generate()` takes as an explicit
+parameter, rather than as constants inside the generator's own code.
+Alternative: keep the constants as GDScript consts (as legacy did) and add per-shaft modifier support
+as a later refactor once the modifier system is actually designed.
+Why: `docs/GDD.md` §2's per-shaft modifiers ("floods fast", "hard rock starts early") are stated as data
+requirements now, and `docs/QUALITY.md`/`data/README.md` both treat "a generation parameter that can
+only vary by code branch" as the specific failure this project polices. Parameterizing now, before the
+modifier system exists, is the same pattern as ADR-0002's R1 scope decision: the option a later modifier
+needs is preserved by construction rather than retrofitted.
+Reverse: CHEAP — the parameter object's shape, not this.
+
+## D0017 · 2026-08-26 · sim/terrain_gen — scope cut, not silently dropped
+Decided: `legacy/src/core/layered_world_gen.gd`'s big caverns, tunnels, rifts, ledges, spires, rubble,
+lodes, aquifers, aquifer-treasure, surface trees, the bazaar-ruin stamp, the research-gated "seal", and
+`_restore_turf` are NOT ported this stage. Only strata banding, cave carving, and ore/coal/iron vein
+scattering are.
+Alternative: port everything for structural completeness, deferring only the genuinely dead-mechanic
+passes (bazaar ruin, the seal).
+Why: several of the cut passes are themselves tied to dead pre-pivot mechanics (the seal gates a
+research tier that no longer exists; aquifers were a different, superseded water-risk concept from R3's
+clock-driven flood; rifts assumed a persistent explorable world the player finds structure in, where the
+new design has the player's own dig AS the vertical structure). Porting these faithfully would mean
+re-deciding pre-pivot design questions this stage isn't scoped to touch. What's kept (strata, caves,
+ore/coal/iron) is what `docs/ARCHITECTURE.md` §9's determinism/resolution goals and `docs/GDD.md` §11's
+three-layer structure actually need to be provable this stage.
+One specific regression risk carried forward, not silently: legacy's `STRATA_SHELF_EVERY` comment
+documents a real defect at value 2 (shelf bands collapse into one contiguous slab), held by a legacy
+test not ported here. `data/strata/shallow_clay.yaml`'s value (3) matches legacy's, but nothing in this
+port's own test suite would catch a future edit reintroducing that defect the way legacy's test did.
+Reverse: CHEAP to add any cut pass later — each was additive in legacy's own `generate()` pipeline.
+EXPENSIVE if the strata-shelf regression is ever silently reintroduced without a test to catch it —
+flagged here specifically so it isn't rediscovered by feel.
+
+## D0018 · 2026-08-26 · sim/terrain_gen — ruin placement, minimal scope
+Decided: one guaranteed empty chamber per generated shaft, past a minimum depth, marked with a distinct
+material/flag and nothing else. No artifact, no schematic, no loot table.
+Alternative: wait until `sim/items` exists and skip ruin placement entirely this stage, since
+`terrain_gen`'s own MODULE.md names "ruin placement" as in scope.
+Why: `docs/GDD.md` §5's ruins ("artifacts found in deep ruins... skip extraction entirely, sprint, grab
+the schematic") describe a mechanic whose exact generation parameters (frequency, size, content rules)
+are undesigned — inventing them now would be deciding unstated design, not porting a stated one. Placing
+an empty, marked chamber satisfies the MODULE.md's literal scope (terrain_gen decides WHERE, not WHAT)
+without inventing artifact semantics that belong to a module that doesn't exist yet.
+Reverse: CHEAP — one function, no consumer depends on ruin content yet.
+
+## D0019 · 2026-08-26 · EXPENSIVE, analyzed not decided — chunk size
+Not decided: fixed chunk array size for `sim/world`'s tile storage.
+`sim/world/tile_grid.gd` uses a sparse `Dictionary` (`terrain_cell: Vector2i -> material: StringName`),
+matching legacy's own `WorldData` representation, which sidesteps needing a chunk size at all for
+correctness — "chunk" in this stage means only "the bounded region one shaft's generation touches,"
+addressed sparsely, not a fixed-size backing array.
+The actual chunk-size question (what size for a packed array optimization later) interacts with three
+things this stage has no data on: dirty-rect rebuild cost for the fine-terrain remold (`legacy/src/core/
+fine_terrain.gd`'s `SYNC_BAND`/`SUBDIV` pattern is the closest precedent — a coarse-cell edit remolds a
+`SUBDIV × (1 + 2×SYNC_BAND)` fine-cell block, so a bigger chunk means a bigger minimum remold even for a
+one-cell edit), the fluid active-cell set's iteration cost once `sim/fluid` exists, and the size of
+whatever gets sent to `view/` as a render packet. A size aligned to the 16px logic grid (so a chunk
+boundary lines up with a machine-placement cell — e.g. 16×16 or 32×32 terrain cells) is the natural
+family to pick from, but which one trades those three costs correctly is not knowable without measuring
+any of them, which nothing built yet can do.
+Reverse: N/A — nothing implemented depends on a chunk size. Revisit once `sim/fluid` and `view/` exist
+enough to measure against.
+
+## D0020 · 2026-08-26 · EXPENSIVE, proposed not committed — coordinate type scheme
+Not committed: how the 4px terrain grid and the 16px machine/logic grid are distinguished in the API.
+Working choice for this stage, explicitly reversible: naming convention only — every `sim/world`/
+`sim/terrain_gen` function signature and parameter is named `terrain_cell: Vector2i` (never a bare
+`cell`), reserving `logic_cell: Vector2i` for whichever future module (`sim/machines`, most likely)
+needs the 16px grid. Both grids share GDScript's `Vector2i`; nothing at the type level stops a caller
+from passing a `logic_cell` where a `terrain_cell` is expected.
+Two stronger alternatives, proposed, not adopted:
+  (a) Distinct lightweight wrapper classes (`TerrainCell`, `LogicCell`, each holding one `Vector2i`) —
+      a type-level guarantee, a real GDScript class per coordinate, so a mismatch is a compile-time
+      type error rather than a naming-discipline lapse. Cost: every coordinate becomes a `RefCounted`
+      allocation, and terrain-grid coordinates are queried at collision/rendering frequency — the
+      allocation cost is unmeasured, not assumed acceptable.
+  (b) A single coordinate type carrying its own grid tag (e.g. an int enum field alongside x/y), checked
+      at the API boundary with an explicit assert. Weaker than (a) at compile time, cheaper at runtime,
+      catches a mismatch at the first call rather than never.
+Why naming-only for now: it's the only option with zero performance cost and zero speculative
+structure, and per the director's instruction this is a propose-don't-commit question — adopting (a) or
+(b) now would foreclose the other without the measurement needed to choose between them.
+Reverse: EXPENSIVE if a real cross-grid coordinate bug ships before this is revisited — the risk this
+naming-only choice accepts, stated plainly rather than assumed away.
+
+## D0021 · 2026-08-26 · data/ has no GDScript-side runtime loader yet — flagged, not solved
+Finding, not really a choice: Godot ships no YAML parser, so nothing in `sim/` can read
+`data/strata/shallow_clay.yaml` or `data/materials/*.yaml` directly at runtime. `sim/terrain_gen`'s
+`site_shallow_clay.gd` and `sim/world`'s `materials.gd` are GDScript dictionaries hand-mirroring the
+YAML files' values, kept in sync by hand for now — not a data-loading pipeline.
+Alternative considered and rejected for this stage: write a minimal YAML-subset parser (flat and
+one-level-nested scalars only, which is all this stage's files use). Rejected as scope creep: a parser,
+however minimal, is infrastructure for all of `data/`, not something `sim/world`/`sim/terrain_gen`
+should own or that this stage's budget should absorb.
+This is closer to EXPENSIVE than CHEAP and is flagged as such rather than decided: how `data/` gets from
+YAML to a running GDScript value touches every future data-driven module (`sim/machines`,
+`sim/economy`, `sim/meta`), not just this stage's two. Options for whoever picks this up: a small
+hand-written parser scoped to the actual subset in use, a build-time codegen step (YAML -> a generated
+.gd file, checked in), or switching `data/`'s on-disk format to something Godot's `JSON` singleton reads
+natively while keeping `.yaml` review copies. Not chosen here.
+Reverse: EXPENSIVE — every hand-mirrored file is a place the two copies can silently drift; the mirrors
+this stage adds are named exactly for the file they mirror so drift is at least easy to search for.
+
+## D0022 · 2026-08-26 · tests/, not scenarios/, for the shaft-determinism check
+Decided: "generates a shaft from a seed and asserts determinism across two generations" is a
+`tests/` suite, not a `scenarios/*.yaml` fixture with a claim reference.
+Alternative: create a real `scenarios/*.yaml` file matching `docs/ARCHITECTURE.md` §6's declarative
+format, naming a new claim (C003 or similar).
+Why: `docs/CLAIMS.md` §10d draws the claim/test boundary explicitly — "a correctness assertion is a
+test... no design choice makes it acceptable for [it] to [fail]." Nothing about Draft A vs. C, R1's
+scope, or any other design decision changes whether the same seed must produce the same terrain twice;
+that's an architectural invariant, the same category as conservation of matter, not a design claim.
+Filing it as a claim would also immediately fail `check_claim_references.py`'s scenario check, which
+requires a cited claim's `first_failed_at` to be populated before the gate passes — unsatisfiable for a
+brand-new claim with no harness yet to observe it failing for real. Same pattern as stage 2's stub
+living in `tests/`, not `harness/`.
+Reverse: CHEAP — nothing stops a future `scenarios/*.yaml` fixture from covering shaft generation for an
+actual design claim (e.g. "a generated shaft always has a completable ore-to-surface route") once such a
+claim exists; this entry is about the determinism check specifically, not about scenarios never
+existing for terrain_gen.

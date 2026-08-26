@@ -1,0 +1,7 @@
+# Fuel, found shallow per docs/GDD.md §10 ("they need both fuel and ore"). Spans topsoil into
+# Stonereach rather than being confined to one layer.
+id: coal
+layer: topsoil_shale
+kind: fuel
+hardness: 1.5
+display_name: Coal

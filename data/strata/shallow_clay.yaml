@@ -1,0 +1,78 @@
+# The first site, matching docs/ARCHITECTURE.md §6's scenario-format example (world.site: shallow_clay).
+# Every numeric value below is ported from legacy/src/core/layered_world_gen.gd and
+# legacy/src/core/heightmap_world_gen.gd (their original names are in each comment) with the SAME
+# ratios/behavior, retargeted from the old L1/L2/L3 progression-gated layers to docs/GDD.md §11's three
+# rule-set layers. None are re-tuned; re-tuning is separate work once there is a game to feel it in.
+#
+# Layer thresholds, ore/coal/iron depth ranges, and cave carve depth are all data here specifically so a
+# per-shaft modifier (docs/GDD.md §2 -- "floods fast", "hard rock starts early") can override any of them
+# with a second file later, without touching sim/terrain_gen's code (docs/DECISIONS_LEDGER.md D0016).
+
+id: shallow_clay
+width_cells: 48          # terrain-grid (4px) cells wide -- a shaft, not an open world
+max_depth_m: 256          # docs/ARCHITECTURE.md §9's stated depth budget
+
+layer_thresholds_m:
+  topsoil_shale_end: 40   # docs/GDD.md §11: soft, fast digging, fuel and first ore
+  stonereach_end: 140     # docs/GDD.md §11: hard rock, richer ore. Deep Works is stonereach_end..max_depth_m.
+
+cave:
+  # legacy CAVE_FREQ / CAVE_THRESHOLD_TOP / CAVE_THRESHOLD_DEEP / CAVE_MIN_DEPTH / CAVE_XSTRETCH
+  frequency: 0.11
+  threshold_top: 0.47
+  threshold_deep: 0.31
+  min_depth_cells: 6
+  x_stretch: 2.1
+
+strata_shelf:
+  # legacy STRATA_BAND_H / STRATA_SHELF_EVERY / STRATA_SHELF_RESIST -- see that file's comment for why
+  # SHELF_EVERY must not drop to 2 (a real regression, held by a legacy test this port does not carry
+  # forward yet; tracked as a gap, not silently dropped -- docs/DECISIONS_LEDGER.md D0017)
+  band_height_cells: 4
+  shelf_every: 3
+  shelf_resist: 0.34
+
+ore:
+  # legacy ORE_ATTEMPTS_PER_COL / ORE_CHANCE_DEEP / ORE_SHALLOW_FLOOR / ORE_SIZE_MIN /
+  # ORE_SIZE_DEPTH_BONUS / ORE_AMOUNT_BASE / ORE_AMOUNT_DEPTH_BONUS / RICH_CHANCE / RICH_AMOUNT_MULT
+  material: ore_copper
+  attempts_per_col: 1.0
+  chance_deep: 0.85
+  shallow_floor: 0.34
+  size_min: 8
+  size_depth_bonus: 44
+  amount_base: 30
+  amount_depth_bonus: 170
+  rich_chance: 0.45
+  rich_amount_mult: 1.5
+
+coal:
+  # legacy COAL_ATTEMPTS_PER_COL / COAL_CHANCE_DEEP / COAL_SHALLOW_FLOOR / COAL_SIZE_MIN /
+  # COAL_SIZE_DEPTH_BONUS / COAL_AMOUNT_BASE / COAL_AMOUNT_DEPTH_BONUS
+  material: coal
+  attempts_per_col: 0.8
+  chance_deep: 0.95
+  shallow_floor: 0.42
+  size_min: 6
+  size_depth_bonus: 30
+  amount_base: 30
+  amount_depth_bonus: 170
+
+iron:
+  # legacy IRON_ATTEMPTS_PER_COL / IRON_SIZE_MIN / IRON_SIZE_DEPTH_BONUS / IRON_AMOUNT. Legacy gated iron
+  # below a research-progression "seal" (SEAL_TOP); that gate is dead pre-pivot design, so this port
+  # gates iron by depth threshold (stonereach_end) alone.
+  material: ore_iron
+  attempts_per_col: 0.5
+  size_min: 10
+  size_depth_bonus: 30
+  amount: 220
+
+ruin:
+  # New concept (docs/GDD.md §5, "artifacts found in deep ruins") -- no legacy analog ported (the old
+  # _stamp_bazaar_ruin was tied to the dead Bazaar mechanic). One guaranteed chamber per shaft, no
+  # earlier than min_depth_m, marked but empty: what a ruin actually contains is sim/items territory,
+  # not yet built. docs/DECISIONS_LEDGER.md D0018.
+  count: 1
+  min_depth_m: 100
+  radius_cells: 4

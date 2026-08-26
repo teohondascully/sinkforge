@@ -1,0 +1,7 @@
+# The Deep Works layer's rock. Engineered, not natural, per docs/GDD.md §11 -- the hardest naturally
+# minable rock; the Sinkforge floor beneath it is not minable at all by anything in this data set.
+id: deepstone
+layer: deep_works
+kind: rock
+hardness: 5.0
+display_name: Deepstone

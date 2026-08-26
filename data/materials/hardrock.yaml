@@ -1,0 +1,6 @@
+# Stonereach layer's rock. Hard, hand-mining ineffective per docs/GDD.md §11.
+id: hardrock
+layer: stonereach
+kind: rock
+hardness: 3.0
+display_name: Hardrock

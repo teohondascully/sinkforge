@@ -1,0 +1,11 @@
+fields:
+  id: {required: true, type: str}
+  width_cells: {required: true, type: int}
+  max_depth_m: {required: true, type: float}
+  layer_thresholds_m: {required: true, type: dict}
+  cave: {required: true, type: dict}
+  strata_shelf: {required: true, type: dict}
+  ore: {required: true, type: dict}
+  coal: {required: true, type: dict}
+  iron: {required: true, type: dict}
+  ruin: {required: true, type: dict}

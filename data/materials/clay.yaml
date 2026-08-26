@@ -1,0 +1,6 @@
+# Topsoil/shale layer's rock. Soft, fast digging per docs/GDD.md §11.
+id: clay
+layer: topsoil_shale
+kind: rock
+hardness: 1.0
+display_name: Clay
