@@ -41,7 +41,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-POLICED_DIRS = ("sim/world", "sim/terrain_gen")
+POLICED_DIRS = ("sim/world", "sim/terrain_gen", "sim/body")
 
 _FUNC_RE = re.compile(
     r'^\s*(?:static\s+)?func\s+(?P<name>\w+)\s*\((?P<params>.*)\)\s*'

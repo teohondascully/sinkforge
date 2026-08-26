@@ -639,3 +639,74 @@ left for the director to schedule, not folded into this commit. Every date this 
 here on uses the correct 2026-08-25.
 Reverse: CHEAP — the commands and gates are additive and each independently revertible; nothing they
 touch changes behavior outside their own checks.
+
+## D0032 · 2026-08-25 · EXPENSIVE, flagged not decided — collider is a flat AABB, not a capsule
+Not decided: `docs/ARCHITECTURE.md` §9 states "capsule or rounded AABB" for the collider. `sim/body/
+body.gd` uses a flat-bottomed axis-aligned box instead, because the heightfield ground plane (D0033)
+needs a single well-defined flat contact edge to sample a surface height against — a rounded capsule's
+curved bottom has no one "foot point" without extra geometry (closest-point-on-arc, or similar) this
+stage doesn't build. This is exactly the "if the heightfield approach makes that a live question"
+condition the director's stage-4 brief named as EXPENSIVE, stop-do-not-decide. Built the flat-AABB
+version so the rest of the stage's work (chamber, forgiveness set, acceptance suite) could proceed, not
+as a resolution of the question.
+Alternative: a true capsule/rounded shape, sampling the heightfield at the point directly below the
+capsule's curve centre rather than its bottom edge, and using the curve radius to compute ceiling/wall
+contact instead of a flat top/side. Not built — real added geometry work with no clear payoff given the
+ground plane is already sub-pixel-smooth from the heightfield alone; the capsule's usual value
+(smoothing collision against ANGLED polygon geometry) doesn't apply here since walls/ceilings are
+grid-swept axis-aligned boxes, not arbitrary polygons.
+Reverse: CHEAP now (nothing built on top of the collider shape yet) — EXPENSIVE once `sim/transport`,
+machine placement, or anything else assumes a specific footprint shape.
+
+## D0033 · 2026-08-25 · sim/body/heightfield.gd: the sub-pixel ground plane, verified against exact math
+Decided: `docs/ARCHITECTURE.md` §9's "80% version" of a heightfield, implemented as specified —
+per-column surface height (topmost solid cell's top face) linearly interpolated between COLUMN CENTRES.
+The "sub-tile rubble slopes at 1, 2, and 3px" the director's chamber spec requires aren't a separate
+mechanic: they fall directly out of interpolating across any single-cell (4px) height difference between
+adjacent columns, which real dig/carve output produces in abundance. Verified exactly, not just run:
+hand-built a fixture with one such step and checked the interpolated height at 1px, 2px, and 3px into the
+ramp against independently-computed expected values (39px/38px/37px from a 40px base) — all exact
+matches, no rounding slop, confirmed the "why" (`Fx.div` is scale-covariant on two same-scale operands,
+so dividing two already-`Fx`-scaled pixel deltas gives the real ratio directly). Also verified: a flat
+floor reads flat at every sub-pixel offset (no ripple from sampling off a column centre), a column's own
+centre reads its own height exactly (no blend leaking from neighbors), and a real gap returns `NO_FLOOR`
+rather than an average with the solid ground beside it — mutation-tested the last one by removing the
+`NO_FLOOR` guard, which correctly failed the mixed-sides case (though not the both-sides-NO_FLOOR case,
+since `lerp(NO_FLOOR, NO_FLOOR, t) == NO_FLOOR` regardless — the guard's real job is only the mixed case).
+Reverse: CHEAP — one file, no other module reads it yet except `sim/body/body.gd`.
+
+## D0034 · 2026-08-25 · sim/body/body.gd: the base controller, and a real ordering bug testing caught
+Decided: implemented `docs/ARCHITECTURE.md` §9's stated mechanics directly — ground/air accel as
+tick-counts (8/4 ticks to max/zero, not legacy's px/s² constants), coyote (6 ticks), jump buffer (6
+ticks), variable jump (release cuts to 40% of CURRENT velocity, once, not a continuous gravity
+multiplier the way legacy did it), apex float (gravity x0.6 within 3 ticks of the velocity-zero
+crossing), auto step-up (1 tile) and mantle (2 tiles, gated on a held toward-and-up input), corner
+correction (up to 6px horizontal nudge on ceiling contact), shortest-axis-style depenetration via the
+same ledge-vs-ceiling classifier `legacy/scenes/player.gd`'s own history names as its fixed bug (shallow
+Y overlap is only a ledge exemption when the blocking cell's centre is BELOW the body's centre; the
+identical shape with a cell above it is a ceiling and must still block). RUN_SPEED/GRAVITY/
+JUMP_VELOCITY/MAX_FALL are not stated in §9's table (only ratios/tick-counts are) — ported from
+legacy's tuning as the stated starting point, converted to per-tick Fx deltas since `docs/ARCHITECTURE.md`
+§4 fixes the tick at 60Hz with no `delta` ever reaching the sim.
+Vertical movement is sub-stepped at 2px per iteration (`V_SUBSTEP_PX`), not moved-then-resolved in one
+shot: `MAX_FALL_PX_S` (560) divided by 60 ticks is ~9.3px/tick, more than two 4px terrain cells, so an
+unsubstepped move could tunnel through a one-cell-thick floor or ceiling at terminal velocity — the
+fixed-tick equivalent of `legacy/scenes/player.gd`'s own `MAX_SUBSTEP` clamp, needed for the same reason.
+Found by testing, not written correctly the first time: a buffered jump could never fire on the exact
+tick a body lands, because `_handle_jump` originally ran BEFORE the vertical resolve that sets `on_floor`
+for that tick, so the buffered-jump check always saw the PREVIOUS tick's grounded state. Fixed by moving
+jump-handling to run after vertical resolve — a landing this tick can now be immediately overridden by a
+buffered jump, a one-tick touch-and-go. `docs/QUALITY.md` §2's own lesson applies here: this shipped
+first, wrong, and only `tests/test_body.gd`'s jump-buffer test (deliberately built to land within the
+6-tick window rather than after an arbitrarily long fall) caught it — an earlier draft of that same test
+fell for 200 ticks first and passed even with the bug present, because the buffer had long since expired
+by the time it landed and never got a chance to prove anything.
+Also found by mutation-testing, not by review: the first version of `tests/test_body.gd`'s
+ceiling-classifier test placed the ceiling far enough from the body that horizontal movement never
+actually touched it — reverting the classifier to legacy's exact original bug (direction-blind,
+`if ov_x > ov_y: continue` with no centre comparison) still passed every test. Rewritten to drive
+`_resolve_horizontal` directly with an exact, deterministic 1px vertical overlap (not dependent on where
+a multi-tick walk happens to land, the same sub-cell-phase dependency that made the original legacy bug
+invisible to its own fixtures) — the mutation now fails 2 of 16 tests, confirmed, then restored.
+Reverse: EXPENSIVE once `sim/transport`/`sim/machines` assume specific collision behavior; CHEAP right
+now, since nothing outside this module and its own tests reads it yet.
