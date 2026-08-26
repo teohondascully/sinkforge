@@ -7,12 +7,17 @@ measurement instrument for game design — the entire simulation runs headless a
 scripted agents can play it thousands of times and produce falsifiable evidence about whether the
 design works, rather than an opinion about whether it might.
 
-**Stage 3 of 12, last updated 2026-08-26.** The build sequence toward `claims/C001-two-minute-run.md`
-— a scripted agent completing one bounded run entirely headless — is ordered and stage-gated
-(`ONBOARDING.md`). `core/` (stage 1) and a stub determinism harness (stage 2) landed first;
-`sim/world` and `sim/terrain_gen` (stage 3) landed this round, along with a full audit of the two
-findings that stage produced. `sim/body`, the movement rewrite, is next. Live detail:
-`docs/WORKING.md` (current state) and `docs/BRIEF.md` (this session's digest).
+**Stage 3 of 7 toward `C001`, the first playable milestone — last updated 2026-08-26.** The build
+sequence toward `claims/C001-two-minute-run.md` — a scripted agent completing one bounded run entirely
+headless — is ordered and stage-gated (`ONBOARDING.md`). `core/` (stage 1) and a stub determinism
+harness (stage 2) landed first; `sim/world` and `sim/terrain_gen` (stage 3) landed this round, along
+with a full audit of the two findings that stage produced and a pre-stage-4 punch list (a real fixed-
+point overflow, a YAML dual-source problem, both resolved). `sim/body`, the movement rewrite, is stage
+4 and next, followed by `sim/commands`+`interface` (5), `sim/run`+`meta` (6), and `harness/` (7) —
+`first_bore`, the first scripted-agent run through the full interface. `ONBOARDING.md` lists five more
+stages after that (items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal
+`view/`, then closing `C001` itself) toward the fuller game. Live detail: `docs/WORKING.md` (current
+state) and `docs/BRIEF.md` (this session's digest).
 
 ## The pivot, and why it's a strength
 
