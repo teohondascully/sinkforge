@@ -42,8 +42,8 @@ phases — not itself one of the fixed tick phases.
   (`Array[Vector2i]`, sorted, block cells only — named and typed this way, not the bare `Array` it
   returned before D0026's resolution audit, so a caller sees "terrain" without reading the doc comment),
   `.state_signature()` (canonical, for determinism checks).
-- `WorldMaterials` (`materials.gd`) — hardness by material id. `.hardness()`, `.exists()`. Mirrors
-  `data/materials/*.yaml` by hand — no runtime YAML loader exists yet, see Gotchas.
+- `WorldMaterials` (`materials.gd`) — hardness by material id. `.hardness()`, `.exists()`. Reads
+  `data/materials/generated.gd`, codegen'd from `data/materials/*.yaml` — see Gotchas.
 
 ## Gotchas
 
@@ -55,6 +55,7 @@ phases — not itself one of the fixed tick phases.
 - **The 16px machine/logic grid is not represented here at all**, on purpose. It's a view over this
   grid's data, not a second array — whatever module needs it (`sim/machines`, most likely) builds that
   view when it exists; `sim/world` only ever stores the 4px grid.
-- **`data/materials/*.yaml` has no runtime loader.** `WorldMaterials.HARDNESS` is a hand-kept mirror —
-  `docs/DECISIONS_LEDGER.md` D0021 has the full reasoning (Godot ships no YAML parser) and the real
-  options for fixing it. If the two ever disagree, the `.yaml` file is right and this table is stale.
+- **`data/materials/*.yaml` is read through generated code, not hand-mirrored.** `tools/data_codegen/
+  generate.py` emits `data/materials/generated.gd` (`MaterialsRecords.RECORDS`); `WorldMaterials` reads
+  it directly. `docs/adr/0004-data-codegen.md` has the contract, `docs/DECISIONS_LEDGER.md` D0021 the
+  original gap this resolves. Drift is now a build failure (`generate.py --check`), not a hand-sync task.

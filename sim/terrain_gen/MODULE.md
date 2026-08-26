@@ -38,8 +38,9 @@ per-tick phase order.
   `StrataData` site config and a seed, returns a fully generated `TileGrid`. Depth-bands the base rock
   into `docs/GDD.md` §11's three layers, carves caves, scatters ore/coal/iron veins, places one empty
   ruin chamber. Deterministic in `(site, seed)` only — no run state, per this module's Must-not.
-- `StrataData` (`strata_data.gd`) — hand-mirrors `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`.
-  Same no-runtime-YAML-loader gap as `sim/world/materials.gd` — see its Gotcha.
+- `StrataData` (`strata_data.gd`) — reads `data/strata/generated.gd`, codegen'd from
+  `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`. Same mechanism as `sim/world/materials.gd` —
+  `docs/adr/0004-data-codegen.md`.
 - `ValueNoise` (`value_noise.gd`) — deterministic engine-free 2D noise, `.sample(x, y, seed) -> float`
   in roughly [-1, 1]. Not terrain_gen-specific in principle, but has no other consumer yet.
 

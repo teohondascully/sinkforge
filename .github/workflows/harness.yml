@@ -53,7 +53,7 @@ jobs:
       - name: Check commit authorship
         run: bash tools/check_trailers.sh
 
-  # docs/QUALITY.md gates 1-7, 13, 15-16 — the structural gates docs/ONBOARDING.md
+  # docs/QUALITY.md gates 1-7, 13, 15-16, 22 — the structural gates docs/ONBOARDING.md
   # Task 0.6 requires before any real code, so a violation is caught the moment it's
   # introduced rather than discovered as an inherited mess later. Every script here
   # is self-contained Python, mutation-tested against a deliberately broken fixture
@@ -100,3 +100,6 @@ jobs:
 
       - name: Every scenario and harness layer names a claim (QUALITY gates 15-16)
         run: python3 tools/layer_lint/check_claim_references.py
+
+      - name: Generated data/ records are fresh (QUALITY gate 22, ADR 0004)
+        run: python3 tools/data_codegen/generate.py --check

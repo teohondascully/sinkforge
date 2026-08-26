@@ -4,24 +4,17 @@ extends RefCounted
 ## Material registry: hardness by material id. `sim/world/MODULE.md`'s stated job ("material IDs,
 ## hardness") lives here, separate from `TileGrid`'s spatial storage -- one concept per file.
 ##
-## Mirrors `data/materials/*.yaml` by hand. No runtime YAML loader exists yet (Godot ships none);
-## `docs/DECISIONS_LEDGER.md` D0021 has the full reasoning and the options for fixing this properly.
-## Each entry below names the file it mirrors -- if a value here and that file ever disagree, the
-## `.yaml` is the source of truth and this table is the one that's wrong.
-
-const HARDNESS: Dictionary = {
-	&"clay": 1.0,        # data/materials/clay.yaml
-	&"hardrock": 3.0,    # data/materials/hardrock.yaml
-	&"deepstone": 5.0,   # data/materials/deepstone.yaml
-	&"coal": 1.5,        # data/materials/coal.yaml
-	&"ore_copper": 2.0,  # data/materials/ore_copper.yaml
-	&"ore_iron": 3.5,    # data/materials/ore_iron.yaml
-}
-
+## Reads `data/materials/generated.gd` (`MaterialsRecords.RECORDS`), codegen'd from
+## `data/materials/*.yaml` by `tools/data_codegen/generate.py` -- `docs/adr/0004-data-codegen.md`,
+## resolving `docs/DECISIONS_LEDGER.md` D0021. `data/` is the actual source of truth now; this file no
+## longer hand-mirrors it. GDScript's `Dictionary` lookups compare `String`/`StringName` keys by value,
+## not by static type, so `RECORDS.get(material_id, ...)` works directly with a `StringName` argument
+## even though `RECORDS` is keyed by plain `String` -- verified empirically before relying on it.
 
 static func hardness(material_id: StringName) -> float:
-	return float(HARDNESS.get(material_id, 0.0))
+	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
+	return float(record.get("hardness", 0.0))
 
 
 static func exists(material_id: StringName) -> bool:
-	return HARDNESS.has(material_id)
+	return MaterialsRecords.RECORDS.has(material_id)

@@ -543,3 +543,47 @@ it's just scoped to `mul()`'s general behavior now, not to `length()`/`length_sq
 Reverse: CHEAP to revert the code (one file, already has the old shape in this ledger entry above), but
 EXPENSIVE the moment anything calls `length()` on a delta near 181px in the meantime — this is the same
 asymmetry D0011 named, now on the other side of it.
+
+## D0030 · 2026-08-26 · resolves D0021 — data/ is codegen'd, not hand-mirrored
+Decided: built the codegen approach ADR 0004 (`docs/adr/0004-data-codegen.md`) proposed. This is a
+resolution of D0021, not an edit to it — the ledger is append-only, numbers are addresses, and D0021 is
+left exactly as written; this entry points back to it instead.
+`tools/data_codegen/generate.py` reads `data/materials/*.yaml` and `data/strata/*.yaml` (the two kinds
+whose `SCHEMA.yaml` declares a required `id: str` field) and emits `data/materials/generated.gd`
+(`MaterialsRecords.RECORDS`) and `data/strata/generated.gd` (`StrataRecords.RECORDS`), both checked in.
+`sim/world/materials.gd` and `sim/terrain_gen/strata_data.gd` are refactored to read from those generated
+records instead of hand-copied literals — their public APIs (`hardness()`, `exists()`, `get_site()`, the
+`SHALLOW_CLAY` constant) are unchanged, so nothing outside these two files needed to change.
+`generate.py --check` is the new gate (`docs/QUALITY.md` gate 22, `.github/workflows/harness.yml`):
+regenerates every expected file in memory and fails, naming the file, if it differs from what's on disk.
+Verified: `godot --headless --path . --import` then every affected test suite
+(`test_world_materials`, `test_tile_grid`, `test_shaft_generator`) — all green, no test changes needed,
+confirming the refactor preserved behavior. All 8 gates green (the 7 from D0026 onward plus the new
+one). Mutation-tested the gate itself twice: edited a source `.yaml` without regenerating (`--check`
+correctly failed, naming the stale file, then passed again after regenerating and restoring the edit);
+separately hand-edited a `generated.gd` directly without touching its source (`--check` correctly failed
+the same way, then passed again after restoring the original content) — confirming the gate catches
+drift from either direction, not just one.
+One real, verified-inert behavior change, not a silently dropped one: leaf string fields nested inside a
+record (`id`, `material`) are plain GDScript `String` now, not `StringName`, because codegen does no type
+conversion by design (adapters do that, per the ADR). Grepped `sim/` and `tests/` before trusting this:
+nothing reads those specific leaf fields today (`shaft_generator.gd`'s `_scatter_vein_material` calls use
+a `StringName` literal at their own call sites, not a value read out of the config dict) — confirmed via
+`grep -rn '\["material"\]'` returning nothing. Also verified directly, not assumed: GDScript's
+`Dictionary.get()`/`.has()` compare `String` and `StringName` keys by value, not by static type, so
+`WorldMaterials.hardness(material_id: StringName)` looking up a plain-`String`-keyed `RECORDS` dict
+needed no `String()`/`StringName()` conversion at the call site — checked with a throwaway two-file
+scratch test against the pinned engine before relying on it, same as the const-folding check below.
+Also verified, separately: GDScript const-folds a dictionary subscript of another class's `const` at
+parse time (`const SHALLOW_CLAY: Dictionary = StrataRecords.RECORDS["shallow_clay"]` resolves at compile
+time), via the same kind of throwaway scratch test, before this was relied on to keep `StrataData`'s
+public shape a plain `const` rather than a computed getter.
+Side effect worth stating plainly, since it's directly relevant to the LOC-ratio finding this session
+also produced (see WORKING.md): `sim/`'s line count went DOWN by 39 lines from this refactor (the
+hand-copied `SHALLOW_CLAY` dict literal collapsed to a one-line const-fold), not up. Codegen'd data lives
+in `data/`, counted in neither `check_loc_ratio.py` bucket (`docs/adr/0004-data-codegen.md`'s
+Consequences section names this trade explicitly) — so this genuinely shrank hand-written game code
+without moving the shrink into `data/`'s own count as a hidden offset.
+Reverse: EXPENSIVE — `sim/machines`, `sim/economy`, and any future data-driven module now inherit this
+contract (a required `id: str` field to be codegen-eligible); reverting would mean re-introducing
+hand-mirrored dictionaries in at least two files and losing the staleness gate.
