@@ -101,6 +101,10 @@ tests/                unit, property, scenario, golden
 docs/                 normative documents only. see docs/README.md
 docs/adr/             numbered decision records
 docs/archive/         superseded documents, headed and dated
+docs/BRIEF.md         this session's digest, incl. "What was learned" — findings, not a work log
+docs/WORKING.md       current state. not a log. resets when a stage closes
+docs/DECISIONS_LEDGER.md   append-only judgment calls, numbered, never edited after the fact
+history/              curated images, capped at 12. earns its place by illustrating a finding
 legacy/               the pre-pivot codebase. read-only. excluded from build.
 ```
 
@@ -163,7 +167,13 @@ exists to surface.
 - **`docs/BRIEF.md`** regenerates as the last action before reporting to the director, not at an
   arbitrary session boundary — a brief regenerated mid-session goes stale the moment more decisions land.
   One screen, EXPENSIVE decisions awaiting the director listed first. If it takes more than 90 seconds to
-  read, it's too long.
+  read, it's too long. Its "What was learned" section is findings, not a work log: what happened, what
+  was learned, and pointers into the ledger and commits for detail — write it before the final
+  regeneration, in the same terse style as a ledger entry. This absorbed what would otherwise be a
+  separate `docs/JOURNAL.md`; folding it in means one fewer document to remember, and because `BRIEF.md`
+  is committed every session, the running narrative lives in `git log -p -- docs/BRIEF.md`, not in an
+  ever-growing file. Five documents carry the process now — ledger, brief, working state, taste queue,
+  history — and if a sixth starts to seem necessary, that is a signal something else should retire.
 - **Ledger spot-audits are sampled by the director, never by the session being audited.**
   `tools/spot_audit.py` picks one commit uniformly at random from those made after
   `docs/DECISIONS_LEDGER.md`'s own creation (an earlier version sampled the entire history and drew a

@@ -33,6 +33,16 @@ build/
 !/.github/
 !/.githooks/
 
+# .claude/ needs a narrower re-inclusion than the two above: it also holds machine-local session state
+# (.DS_Store, scheduled_tasks.lock, worktrees/) that must NOT ship, alongside commands/, which must --
+# a slash command is a project asset the runtime re-reads every invocation, not a habit that degrades
+# across sessions and compactions, so it belongs in the repo the same way .githooks/ does. Un-ignoring a
+# nested path under a wildcard-excluded parent needs the parent un-ignored first (so git descends into
+# it), then everything directly inside it re-excluded, then the one subdirectory that ships re-included.
+!/.claude/
+/.claude/*
+!/.claude/commands/
+
 # Dev harness — generated screenshots (+ their Godot import sidecars)
 /_capture*.png
 /_capture*.png.import

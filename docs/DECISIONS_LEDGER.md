@@ -595,3 +595,47 @@ without moving the shrink into `data/`'s own count as a hidden offset.
 Reverse: EXPENSIVE — `sim/machines`, `sim/economy`, and any future data-driven module now inherit this
 contract (a required `id: str` field to be codegen-eligible); reverting would mean re-introducing
 hand-mirrored dictionaries in at least two files and losing the staleness gate.
+
+## D0031 · 2026-08-25 · session rituals made mechanical, before the overnight run
+Decided, per the director's explicit instruction ("the rituals are becoming a memory problem, so make
+them mechanical"): four changes, all landed before stage 4 work resumed.
+1. Four slash commands in `.claude/commands/`: `/handoff` (post-compaction re-orientation), `/wrap`
+   (end-of-session checklist), `/audit` (points at `tools/spot_audit.py`, director-run only), `/loop`
+   (this run's fixed-queue driver, scoped to tonight — see the "Overnight queue" section of this file
+   and the HARD STOPS it names). Each file is the checklist itself, not a pointer to prose elsewhere,
+   because a slash command is a file the runtime re-reads every invocation and a habit is not.
+2. `.githooks/commit-msg` gained a new gate: a commit touching `core/` or `sim/` with no
+   `docs/DECISIONS_LEDGER.md` change staged in the same commit is refused, unless the message carries a
+   `No-Ledger-Entry: <reason>` trailer — the override is visible in the log, which is the point; a
+   silent gap and a stated one are not the same failure. Mutation-tested all four cases before trusting
+   it: sim/-only staged with no ledger and no trailer (refused), with the trailer (allowed), with a
+   genuine ledger modification also staged (allowed), and nothing under core/sim staged at all
+   (allowed) — the last two required actually modifying `docs/DECISIONS_LEDGER.md` in the test, not
+   just re-staging its unchanged content, which does not register as a diff.
+3. `tools/layer_lint/check_working_freshness.py` (`docs/QUALITY.md` gate 23): fails if
+   `docs/WORKING.md`'s stated "Last updated" date is older than `HEAD`'s own commit date. A proxy, not a
+   guarantee — a session can bump the date without saying anything true — but it catches commits landing
+   on top of a working-tree summary nobody touched, mechanically rather than by someone noticing later.
+   Mutation-tested: a deliberately stale date failed the gate, restored and passed again.
+4. `CLAUDE.md` rewritten as a checklist under 40 lines (was already short prose; now points at the new
+   commands and states the standing rules — no-trailer, ledger-per-judgment-call, verify-before-writing,
+   mutation-test-new-guards — as a list rather than narrative).
+Also: `docs/JOURNAL.md`, proposed earlier in the same conversation as a new standalone findings log, was
+superseded before being created — the director's own follow-up message folded it into `docs/BRIEF.md`'s
+"What was learned" section instead, reasoning that `BRIEF.md` is already committed every session, so the
+narrative survives in `git log -p -- docs/BRIEF.md` without a sixth document to remember.
+`history/README.md` states the new 12-image cap policy but does NOT apply it: the directory holds 165
+pre-pivot images, and culling to 12 is a real curation decision (which images, if any, still illustrate
+a finding that survives the pivot) plus a destructive one at this scale — flagged for the director
+rather than decided here, consistent with `docs/DECISIONS.md`'s locked never-destroy-a-curated-file rule.
+Found while wiring gate 23, disclosed rather than fixed wholesale: `docs/WORKING.md`'s stated date was
+"2026-08-26," one day ahead of every actual commit in this repository's git log (confirmed against the
+system clock and `git log` independently) — and the same "2026-08-26" appears across ~15+ tracked files
+predating this session (`ONBOARDING.md`, `docs/ARCHITECTURE.md` §9, `docs/GDD.md`, ADRs 0002-0004,
+`docs/EXPERIENCE_EVALUATION.md`, `docs/archive/*`, `sim/commands/MODULE.md`, several `tools/`
+docstrings), a systemic off-by-one-day error this session did not introduce. Only `docs/WORKING.md`'s
+own date was corrected here, since it feeds gate 23 directly; the rest is a separate, larger cleanup
+left for the director to schedule, not folded into this commit. Every date this session writes from
+here on uses the correct 2026-08-25.
+Reverse: CHEAP — the commands and gates are additive and each independently revertible; nothing they
+touch changes behavior outside their own checks.

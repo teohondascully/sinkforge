@@ -4,6 +4,22 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
+**Last updated: 2026-08-25.** Bump this date whenever this file changes — a CI gate fails if it's
+older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
+caught mechanically rather than relying on someone noticing later.
+
+**Dating note, found while wiring the gate above:** every commit in this repository's actual git log is
+dated 2026-08-25, but "2026-08-26" appears as the stated date across ~15+ tracked files — `ONBOARDING.md`,
+`docs/ARCHITECTURE.md` §9, `docs/GDD.md`, ADRs 0002-0004, `docs/EXPERIENCE_EVALUATION.md`,
+`docs/archive/*`, `sim/commands/MODULE.md`, and several `tools/` docstrings — plus every entry in this
+session's own `docs/DECISIONS_LEDGER.md` and, until this edit, this file and `README.md`. That is a
+systemic off-by-one-day error predating this session, not something introduced by it (confirmed via
+`git log`, the system clock, and the session's own `currentDate` context all agreeing on 2026-08-25).
+Not corrected wholesale here — a 15+-file historical sweep is a real, separate task with its own
+verification cost, not a two-minute fix to fold into unrelated work, and none of it affects any actual
+git history or code logic, only prose-stated dates. Flagged for the director to decide when it's worth
+doing. Every date this session writes from this point forward uses the correct 2026-08-25.
+
 ## Current stage
 
 **Stage 3 (`sim/world`, `sim/terrain_gen`) landed and closed; a director-set pre-stage-4 punch list is

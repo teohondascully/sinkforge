@@ -57,6 +57,7 @@ Every gate is CI-enforced. A PR that fails any gate does not merge. No gate is l
 20. **ADR required** for any change to: tick phase order, save schema, layer boundaries, the behavior primitive set, the determinism strategy, the four design rules, or the language decision.
 21. **Public API documented.** Every symbol in a module interface file has a doc comment stating contract and invariants.
 22. **Generated data records are fresh.** Every `data/<kind>/generated.gd` matches what `tools/data_codegen/generate.py` would produce right now from its `data/<kind>/*.yaml` source. `tools/data_codegen/generate.py --check`, `docs/adr/0004-data-codegen.md`. Appended here rather than inserted near gate 13 ("Schema") — several gate scripts cite their own number in their own docstrings, and renumbering would make those citations wrong; gate numbers are addresses, same reason `docs/DECISIONS_LEDGER.md` entries are.
+23. **`docs/WORKING.md` is not stale.** Its stated "Last updated" date is not older than `HEAD`'s own commit date. `tools/layer_lint/check_working_freshness.py`. A proxy, not a guarantee — a session can bump the date without saying anything true — but it catches the specific, common failure of commits landing on top of a working-tree summary nobody touched.
 
 ---
 

@@ -24,4 +24,24 @@ if grep -qiE "$PATTERN" "$msg_file"; then
 	echo "  every ref inside the suite, so skipping this only defers the failure." >&2
 	exit 1
 fi
+
+# A change to core/ or sim/ carries a judgment call often enough that "log it" degrades across sessions
+# into "forgot to." docs/DECISIONS_LEDGER.md is append-only precisely so a reviewer can trust its
+# coverage without re-deriving it from the diff every time — a rule enforced by remembering it is a rule
+# enforced by nobody, the same reasoning the trailer check above is built on. If a change genuinely had
+# no judgment call in it (a rename, a formatting pass, a comment fix), the override trailer says so
+# explicitly rather than the commit silently having none — the override is visible in the log, which is
+# the point; a silent gap and a stated one are not the same failure.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^(core|sim)/'; then
+	if ! git diff --cached --name-only --diff-filter=ACMR | grep -qx 'docs/DECISIONS_LEDGER.md'; then
+		if ! grep -qiE '^[[:space:]]*no-ledger-entry:' "$msg_file"; then
+			echo "commit-msg: REFUSED — this commit touches core/ or sim/ with no new" >&2
+			echo "  docs/DECISIONS_LEDGER.md entry in the same commit." >&2
+			echo "  If this change is a real judgment call, add the ledger entry and commit again." >&2
+			echo "  If it genuinely has none (rename, formatting, comment-only), add a trailer:" >&2
+			echo "    No-Ledger-Entry: <why this needed no judgment call>" >&2
+			exit 1
+		fi
+	fi
+fi
 exit 0

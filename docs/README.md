@@ -19,6 +19,8 @@ Read in this order. These describe what is true now and what must remain true.
 | `DECISIONS.md` | The architecture decision record. Why the sim is node-free, why determinism is provable, why content is data — the reasoning that makes this repository's structural claims checkable rather than asserted. | Before changing anything an ADR would gate, or citing why something is built the way it is. |
 | `../ONBOARDING.md` | The session brief. Task 0, the ordered build sequence, the prohibitions. | Starting a session, or resuming after a gap. |
 | `../claims/` | Not a document, but normative. Each claim is an assertion the project currently defends. | Continuously. |
+| `BRIEF.md` | This session's digest, regenerated last, before reporting. Its "What was learned" section is findings written while they're fresh — not the ledger's judgment-call record, and not a work log — because a project's narrative doesn't reassemble itself from thirty ledger entries after the fact. | Every session, and whenever the narrative behind a decision matters more than the decision itself. |
+| `../history/` | Not a document, but curated: images, capped at 12. An image earns its place by illustrating a finding, not by marking a date — when a thirteenth is worth keeping, one comes out, and the swap is a line in `BRIEF.md`'s "What was learned." | When the visual record of a finding matters for the method story. |
 
 Plus `adr/` — numbered decision records. An ADR is normative from the moment it merges.
 
