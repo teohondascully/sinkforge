@@ -6,7 +6,7 @@ func _initialize() -> void:
 	_test_wall_get_set()
 	_test_is_solid()
 	_test_excavate_reveals_wall_not_material()
-	_test_occupied_cells_sorted_and_excludes_air()
+	_test_occupied_terrain_cells_sorted_and_excludes_air()
 	_test_state_signature_stable_and_sensitive()
 	_finish("tile_grid")
 
@@ -55,16 +55,16 @@ func _test_excavate_reveals_wall_not_material() -> void:
 	_check(grid.get_wall(cell) == &"hardrock", "excavated cell's wall is unaffected -- the hole is a conveyor, not a void")
 
 
-func _test_occupied_cells_sorted_and_excludes_air() -> void:
+func _test_occupied_terrain_cells_sorted_and_excludes_air() -> void:
 	var grid: TileGrid = TileGrid.new(5, 5, 1)
 	grid.set_material(Vector2i(3, 1), &"clay")
 	grid.set_material(Vector2i(0, 1), &"clay")
 	grid.set_material(Vector2i(2, 0), &"clay")
 	grid.set_wall(Vector2i(4, 4), &"hardrock")  # a wall with no block should not appear
-	var cells: Array = grid.occupied_cells()
-	_check(cells.size() == 3, "occupied_cells excludes wall-only cells (%d found, expected 3)" % cells.size())
+	var cells: Array[Vector2i] = grid.occupied_terrain_cells()
+	_check(cells.size() == 3, "occupied_terrain_cells excludes wall-only cells (%d found, expected 3)" % cells.size())
 	_check(cells[0] == Vector2i(2, 0) and cells[1] == Vector2i(0, 1) and cells[2] == Vector2i(3, 1),
-		"occupied_cells sorted by (y, x): got %s" % [cells])
+		"occupied_terrain_cells sorted by (y, x): got %s" % [cells])
 
 
 func _test_state_signature_stable_and_sensitive() -> void:

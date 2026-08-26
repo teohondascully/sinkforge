@@ -75,7 +75,7 @@ func _test_caves_carve_something() -> void:
 func _test_ore_appears_somewhere() -> void:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 20260826)
 	var found: bool = false
-	for cell: Vector2i in grid.occupied_cells():
+	for cell: Vector2i in grid.occupied_terrain_cells():
 		if grid.get_material(cell) == &"ore_copper":
 			found = true
 			break
@@ -85,7 +85,7 @@ func _test_ore_appears_somewhere() -> void:
 func _test_coal_appears_somewhere() -> void:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 20260826)
 	var found: bool = false
-	for cell: Vector2i in grid.occupied_cells():
+	for cell: Vector2i in grid.occupied_terrain_cells():
 		if grid.get_material(cell) == &"coal":
 			found = true
 			break
@@ -97,7 +97,7 @@ func _test_iron_only_appears_at_or_below_stonereach() -> void:
 	var stonereach_end: int = int(StrataData.SHALLOW_CLAY["layer_thresholds_m"]["stonereach_end"]) * ShaftGenerator.TERRAIN_CELLS_PER_METER
 	var found: bool = false
 	var violations: int = 0
-	for cell: Vector2i in grid.occupied_cells():
+	for cell: Vector2i in grid.occupied_terrain_cells():
 		if grid.get_material(cell) == &"ore_iron":
 			found = true
 			if cell.y < stonereach_end:

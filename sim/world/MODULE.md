@@ -38,8 +38,10 @@ phases — not itself one of the fixed tick phases.
 - `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed. Every
   coordinate is named `terrain_cell: Vector2i` (never a bare `cell`) — `docs/DECISIONS_LEDGER.md` D0020.
   `.get_material()`/`.set_material()`, `.get_wall()`/`.set_wall()` (the background layer, revealed by
-  `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_cells()`
-  (sorted, block cells only), `.state_signature()` (canonical, for determinism checks).
+  `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_terrain_cells()`
+  (`Array[Vector2i]`, sorted, block cells only — named and typed this way, not the bare `Array` it
+  returned before D0026's resolution audit, so a caller sees "terrain" without reading the doc comment),
+  `.state_signature()` (canonical, for determinism checks).
 - `WorldMaterials` (`materials.gd`) — hardness by material id. `.hardness()`, `.exists()`. Mirrors
   `data/materials/*.yaml` by hand — no runtime YAML loader exists yet, see Gotchas.
 

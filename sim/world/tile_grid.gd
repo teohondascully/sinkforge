@@ -63,9 +63,15 @@ func excavate(terrain_cell: Vector2i) -> void:
 
 
 ## All occupied terrain cells (blocks only, not walls), sorted for anything that needs a stable
-## iteration order -- determinism tests, canonical signatures.
-func occupied_cells() -> Array:
-	var cells: Array = _blocks.keys()
+## iteration order -- determinism tests, canonical signatures. Named (and typed) `Array[Vector2i]`
+## rather than the bare `Array` this returned before D0026's audit: a return value is exactly as able
+## to smuggle a wrong-scale coordinate past a caller as a parameter is, and `occupied_cells()` didn't
+## carry the `terrain_cell` naming discipline every parameter here does -- an untyped `Array` from a
+## function whose name doesn't say "terrain" told a reader nothing about scale at all.
+func occupied_terrain_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for terrain_cell: Vector2i in _blocks:
+		cells.append(terrain_cell)
 	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		return a.y < b.y or (a.y == b.y and a.x < b.x))
 	return cells
@@ -75,7 +81,7 @@ func occupied_cells() -> Array:
 ## same shape as `tests/test_base.gd`'s `_canon()`. Used by the shaft-determinism check.
 func state_signature() -> String:
 	var parts: PackedStringArray = []
-	for terrain_cell: Vector2i in occupied_cells():
+	for terrain_cell: Vector2i in occupied_terrain_cells():
 		var wall: StringName = get_wall(terrain_cell)
 		parts.append("%d,%d:%s/%s" % [terrain_cell.x, terrain_cell.y, get_material(terrain_cell), wall])
 	return "|".join(parts)
