@@ -111,6 +111,14 @@ _miner_sheet.png.import
 /_crop_*.png.import
 tools/_scratch_*.gd
 
+# Same gap as legacy/tools/*.uid above, for the sibling pattern: this rule is root-anchored to tools/,
+# so it stopped covering these files the moment `chore(pivot): move the pre-pivot codebase to legacy/`
+# (4758d5a) relocated the whole tools/ directory to legacy/tools/ -- a directory move takes untracked,
+# gitignored content with it for free, but nothing updates a root-anchored pattern to follow. Found when
+# ~70 of these showed up as untracked noise in `git status` mid-session; confirmed via `git check-ignore`
+# that this exact anchoring gap, not a live process writing into the frozen legacy/ tree, was the cause.
+legacy/tools/_scratch_*.gd
+
 # One-generation undo for the canonical captures (tools/capture_moments.gd). It was written when they were
 # gitignored and it was the ONLY undo they had; now that they are committed, git holds every generation
 # that was ever committed and this holds the one that was not — capture, look, recapture, all before any
