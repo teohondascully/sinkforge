@@ -135,7 +135,7 @@ def main() -> int:
         for lineno, message in _check_file(path):
             violations.append(f"{rel}:{lineno}: {message}")
 
-    print(f"check_coordinate_naming: {len(files)} files scanned under sim/world/, sim/terrain_gen/")
+    print(f"check_coordinate_naming: {len(files)} files scanned under {', '.join(POLICED_DIRS)}/")
     if violations:
         print(f"check_coordinate_naming: FAIL — {len(violations)} violation(s)")
         for v in violations:

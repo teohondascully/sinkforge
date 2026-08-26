@@ -723,3 +723,41 @@ existing step-up test used a 1-TERRAIN-cell step, well under the corrected, larg
 exercised the boundary either way) — caught by re-reading the constant against its own cited spec before
 building the chamber's step-up section around the wrong height, not by a test.
 Reverse: CHEAP — three constants, no chamber or acceptance work built against the wrong values yet.
+
+## D0036 · 2026-08-25 · the hostile chamber, built and verified present feature-by-feature
+Decided: `tests/body/hostile_chamber.gd` builds the fixed chamber the acceptance suite runs against,
+laid out left-to-right in terrain columns: spawn floor → 1-tile pit → landing floor → 1-tile ledge
+(auto step-up) → plateau → fresh-dig rubble (actually excavated, see below) → machine-cluster stand-in →
+ceiling-corner overhang → 2-tile mantle step → 3-logic-tile-wide vertical shaft → shaft floor. Built
+BEFORE the acceptance driver, per the director's explicit instruction, though `sim/body/heightfield.gd`
+and `sim/body/body.gd` were built first, ahead of the chamber, to have something to unit-test against
+synthetic grids before committing to a real one — a minor sequencing deviation from strict a-then-b-c
+order, not the risk the instruction actually named (tuning feel against a real chamber before it
+exists), since nothing was tuned in that gap.
+The fresh-dig requirement is real, not cosmetic: `_carve_rubble` runs a seeded random walk that calls
+`TileGrid.excavate()` cell-by-cell, biased to step at most one terrain cell up or down per column, so
+the resulting surface is a genuine byproduct of digging rather than authored to look jagged. The
+resulting 1-3px sub-pixel rubble slopes the director's spec asks for are not a separate feature to
+build — they fall directly out of `Heightfield`'s linear interpolation across any single-cell (4px)
+step this carving naturally produces (D0033).
+Every required feature is VERIFIED present, not asserted by construction: `tests/test_hostile_chamber.gd`
+checks each one against the actual built grid (pit has no floor, ledge rises exactly one logic tile,
+rubble has ≥2 distinct heights with a max single-cell step, at least one dug column differs from an
+undug block's own top, the machine cluster protrudes above its own plateau baseline, the overhang exists
+and its clearance is tighter than body height, the mantle step is exactly two logic tiles — taller than
+`STEP_UP_PX` — and the shaft opening is exactly 3 logic tiles / 12 terrain columns wide and genuinely
+open well below its top). This verification pass itself caught three real construction bugs before
+anything ran against them: the machine cluster was placed 4 rows (16px) above the floor instead of 1 row
+(4px), the ceiling overhang's column range silently overlapped the mantle section's boundary sample
+column (producing a nonsensical negative "rise"), and the FIRST version of the machine-cluster test was
+circular — it read a cluster column's OWN height as "the floor" and then checked one row above THAT,
+which can never find the protrusion since `is_solid()` doesn't distinguish a protrusion from ordinary
+ground; fixed to compare against a neighboring baseline column instead.
+"Narrow shaft, roughly 3 cells" is read as 3 LOGIC tiles (48px), not 3 terrain cells (12px) — a literal
+12px corridor is narrower than the 16px-wide body itself and could never be traversed. Stated as a
+judgment call, not assumed silently: the collider dimensions and step-up/mantle rows in this same
+`docs/ARCHITECTURE.md` §9 table consistently use "tile" to mean the 16px unit (D0035 found the same
+pattern), so this reads the shaft width the same way for consistency, not because either reading is
+unambiguous on its own.
+Reverse: CHEAP — one fixture file and its test; nothing outside the acceptance suite depends on its
+exact column numbers yet, only on the named constants (`PIT_START`, `LEDGE_START`, etc.) it exports.
