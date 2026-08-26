@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_next_float_stays_in_unit_range()
 	_test_next_range_matches_reference()
 	_test_next_range_stays_in_bounds()
+	_test_split_is_order_independent_of_prior_draws()
 	_finish("split_rng")
 
 
@@ -127,3 +128,29 @@ func _test_next_range_stays_in_bounds() -> void:
 	for i in 500:
 		var r: int = rng.next_range(-3, 3)
 		_check(r >= -3 and r <= 3, "next_range(-3, 3) draw %d = %d is in bounds" % [i, r])
+
+
+## D0050. D0006 claims "verified in the same test suite that split() gives identical results regardless
+## of how many draws preceded the call" -- no test here ever actually did that: every existing split()
+## test calls it on a freshly-constructed stream with zero prior draws. This is the real thing: two
+## identically-seeded parents, one split() immediately, the other advanced by a different number of
+## next_u64() draws first, both then split() on the SAME label -- their children must draw identically.
+## split() derives from `_root_seed` (fixed at construction), never `_state` (mutated by every draw), so
+## this should hold regardless of prior draw count; this is what actually proves it rather than assuming
+## the docstring's own claim describes the code correctly.
+func _test_split_is_order_independent_of_prior_draws() -> void:
+	var label: String = "world"
+	for prior_draws: int in [0, 1, 3, 17]:
+		var parent: SplitRng = SplitRng.new(555)
+		for i: int in prior_draws:
+			parent.next_u64()
+		var child: SplitRng = parent.split(label)
+
+		var baseline_parent: SplitRng = SplitRng.new(555)
+		var baseline_child: SplitRng = baseline_parent.split(label)
+
+		var a: int = child.next_u64()
+		var b: int = baseline_child.next_u64()
+		_check(a == b,
+			"split(%s) after %d prior draws on the parent gives the SAME child sequence as split() with zero prior draws (got %d vs %d)" %
+			[label, prior_draws, a, b])

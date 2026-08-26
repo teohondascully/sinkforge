@@ -1235,3 +1235,31 @@ each involved a real verification step (grep counts, reproduce a crash, mutation
 worth recording so the next reader doesn't have to redo that work to trust the fix.
 Reverse: CHEAP for all three — prose corrections, a narrowed exception handler, and one additive test
 plus its fixture script.
+
+## D0050 · 2026-08-26 · corrects D0006's claim: split() order-independence was never actually tested
+Decided: D0006 states "verified in the same test suite that split() gives identical results regardless
+of how many draws preceded the call." False — every existing `tests/test_split_rng.gd` test that calls
+`.split()` does so on a freshly-constructed `SplitRng` with zero prior draws
+(`_test_split_is_deterministic`, `_test_split_matches_reference`, etc.); none advances the parent's
+`_state` first and checks the child is unaffected. An external audit demonstrated the gap directly:
+mutating `split()` to derive from `_state` instead of `_root_seed` — exactly the "simpler, but order-
+dependent" alternative D0006 itself named and rejected — left the whole suite green. `split()`'s actual
+code was never wrong; the CLAIM that this specific property had been verified was. Per the director's
+instruction, D0006 is left exactly as written (append-only means visible correction, not silent repair)
+— this entry is the correction, not an edit to it.
+Added `_test_split_is_order_independent_of_prior_draws`: for prior-draw counts [0, 1, 3, 17], one parent
+splits immediately and another advances by that many `next_u64()` calls first, both split on the same
+label, and their children must draw identically. Mutation-tested against the exact mutation the audit
+used (`_root_seed` → `_state` inside `split()`): the new test fails on that mutant at every nonzero
+prior-draw count (3 failures, all correctly attributing the divergence); reverting the mutation restores
+a clean pass. The old suite's own tests stayed fully green on the same mutant, confirming the gap was
+real and this specific test is what closes it, not incidental coverage from something else.
+Why: the same lesson as D0043/D0044's own guard-window gap earlier this session — a docstring or ledger
+entry asserting "this is tested" is itself an untested claim until someone tries to break the property
+directly. `docs/DECISIONS_LEDGER.md`'s own header names the test for what belongs here ("would a
+competent engineer have plausibly chosen differently") but says nothing about auditing whether a past
+entry's OWN factual claims about test coverage were true — worth naming as its own thing to watch for,
+since a wrong "verified" claim is more dangerous than an absent one: it stops the question from being
+asked again.
+Reverse: CHEAP — one additive test, no production code changed. `core/split_rng.gd::split()` is
+unmodified; it was already correct, only the coverage claim about it was wrong.

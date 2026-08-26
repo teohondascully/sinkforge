@@ -73,10 +73,12 @@ that rule now exists to prevent. Independent Codex audit of commit `489e728`. Or
    downloads and SHA-512-verifies the exact pinned Godot build, imports the project (fresh checkout has
    no `.godot/` cache), runs all 13 suites as individual steps. `docs/QUALITY.md` gates 8/9/11 are now
    actually CI-enforced, not locally-verified-only.
-5. **[OPEN]** `split()` order-independence is untested despite D0006 claiming it is. Codex mutated
-   `split()` to use `_state` instead of `_root_seed`; the suite stayed green. Write the test that actually
-   proves order-independence, then append a *correcting* ledger entry — do not edit D0006, append-only
-   means visible correction, not silent repair.
+5. **[CLOSED, D0050]** `split()` order-independence was untested despite D0006 claiming it was. Added
+   `_test_split_is_order_independent_of_prior_draws` (varies prior draw count 0/1/3/17, checks the
+   child sequence is unaffected). Mutation-tested against the exact `_root_seed`→`_state` mutation the
+   audit used: new test fails on the mutant (3 failures), old suite stayed fully green on the same
+   mutant. `core/split_rng.gd` itself is unmodified — it was already correct; only the "verified" claim
+   in D0006 was wrong. D0006 left as written; D0050 is the append-only correction.
 6. **[CLOSED, D0048/D0049]** Batch of four smaller findings:
    - README said 57 test functions (actual 59 as of the audited commit, now 96 across 13 suites — even
      the audit's own "actual" number had gone stale by the time it was quoted); seven gates (CI now runs
