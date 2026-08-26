@@ -77,6 +77,15 @@ or not the gate is advisory that session — this is a standing reporting obliga
 If the ratio is still above 2 when stage 7 lands, that has to be stated as a finding in that session's
 brief, not narrated around.
 
+**Unpushed commit count, added as a standing rule 2026-08-26 (director's ask, item A of the Codex-audit
+follow-up):** every `docs/BRIEF.md` reports `git log origin/main..HEAD --oneline | wc -l` — actually run,
+not recalled — regardless of whether it's zero. Same failure class as the LOC ratio: 31 commits (an
+entire stage, plus this session's own audit-response work) accumulated unpushed across one session
+without either the director or the session noticing, because nothing was reporting the count. It is
+visible only if something reports it, every time, whether or not there's anything to say. `docs/DECISIONS_LEDGER.md`
+D0040 has the discovery this rule came from (the same unpushed gap made an external audit's correct
+report of an older commit read as a contradiction of a correct report of the current one).
+
 `docs/DECISIONS_LEDGER.md` D0016-D0030 carry every judgment call's full reasoning; this section is the
 pointer, not the record.
 

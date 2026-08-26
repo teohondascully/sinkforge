@@ -8,7 +8,7 @@ created: 2026-08-25
 last_measured: never
 first_failed_at: never
 scenario: (none yet — needs the hostile-geometry chamber extended with sub-tile rubble, per docs/ARCHITECTURE.md §9)
-blocked_on: sim/body and sim/world do not exist. Requires the heightfield collision derivation (docs/ARCHITECTURE.md §9, "Resolution is not one number") to be built, not just designed.
+blocked_on: sim/body and sim/world both exist and the heightfield derivation is built with its own passing clean-chamber acceptance suite (docs/DECISIONS_LEDGER.md D0033/D0038) — corrected 2026-08-26, D0041. Still blocked: this claim's own scenario (a raw-input-frame driver excavating a fresh dig pattern, per the Falsifiable form below) has not been built as a distinct measurement, separate from the clean-chamber acceptance run.
 ---
 
 ## Claim
@@ -51,8 +51,9 @@ threshold was set before any measurement exists (`first_failed_at: never`, `last
 
 ## Current value
 
-Never measured. `sim/body` and `sim/world` do not exist. The heightfield collision derivation this
-claim is stated against is a design decision (`docs/ARCHITECTURE.md` §9), not yet an implementation.
+Never measured. `sim/body` and `sim/world` exist and the heightfield collision derivation this claim
+is stated against is built and passing its own clean-chamber acceptance suite (`docs/DECISIONS_LEDGER.md`
+D0033/D0038) — but this claim's own scenario (see `blocked_on` above) has not been run.
 
 ## What this claim does not measure
 
@@ -75,3 +76,4 @@ claim is stated against is a design decision (`docs/ARCHITECTURE.md` §9), not y
 | Date | Commit | Data version | Value | Status | Note |
 |---|---|---|---|---|---|
 | 2026-08-25 | — | — | not measured | BLOCKED | Claim authored alongside the resolution-split architecture decision it tests. Blocked on `sim/body`, `sim/world`, and the extended hostile-geometry chamber. |
+| 2026-08-26 | — | — | not measured | BLOCKED | `blocked_on` corrected: `sim/body`/`sim/world` exist and the heightfield derivation passes its own clean-chamber acceptance suite (D0038). This claim's own scenario is still unbuilt — status unchanged, only the stated blocker was stale (D0041). |
