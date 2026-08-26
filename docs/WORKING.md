@@ -6,41 +6,42 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-**Stages 1 and 2 both landed. Stopped here, deliberately, per explicit instruction: do not begin stage 3
-(`sim/world`, `sim/terrain_gen`) even with budget remaining — those are judgment calls (worldgen
-porting, scenario format) the director wants to be present for.** Stage 1: `560ee78`. Stage 2
-(`tests/test_replay_determinism.gd`, a throwaway stub exercising all three `core/` primitives, full
-20,000-tick/100-tick-interval replay check, mutation-checked): `f51d722`. No commits used toward stage 3
-scope. Next session (or next instruction) starts stage 3 fresh, or redirects.
+**Stage 3 (`sim/world`, `sim/terrain_gen`) landed. Stopped here, deliberately, per explicit instruction:
+do not begin stage 4 (`sim/body`) even with budget remaining.** 7 of 12 commits used:
+`sim/world` (`c3fb970`), `SplitRng.next_float()`/`.next_range()` (`b30eeab`), a real gap closed in
+`no_engine_imports.py` before it could matter (`d68ba29`, D0023), `ValueNoise` (`8b8097a`),
+`ShaftGenerator`/`StrataData` (`1a585a7`), the constant-count report (`250063f`, D0025) — plus the data
+layer from before this stage's code (`b2142e2`). `docs/DECISIONS_LEDGER.md` D0016-D0025 carry every
+judgment call's full reasoning; this section is the pointer, not the record. Next session (or next
+instruction) starts stage 4 fresh, or redirects.
 
 ## Landed and closed, with commit references
 
+- Stages 1 and 2 (`core/`'s `Fx`/`SplitRng`/`EntityIdPool`, `tests/test_replay_determinism.gd`) —
+  `560ee78`, `f51d722`. Detail in `docs/DECISIONS_LEDGER.md` D0005-D0015.
+- **Stage 3 landed**: `sim/world` (`TileGrid`, sparse and not chunked on purpose — D0019 — plus
+  `WorldMaterials`) and `sim/terrain_gen` (`ShaftGenerator`, `StrataData`, `ValueNoise`) — depth-banded
+  base rock into the three `docs/GDD.md` §11 layers, cave carving, ore/coal/iron vein scattering, one
+  empty ruin chamber. Port scope is a real subset of legacy (D0017): 29 of the cited 118 tuning constants
+  carried over by value, 22 of those actually consumed by the generator today (D0025) — reported, not
+  smoothed over. A real architectural gap was found and closed mid-stage, not worked around:
+  `tools/layer_lint/no_engine_imports.py` didn't catch `FastNoiseLite`/`RandomNumberGenerator`, both real
+  Godot engine classes legacy's generator depends on and `sim/` cannot (D0023) — `ValueNoise` is the
+  from-scratch, engine-free replacement, calibrated to the same [-1, 1] output range so the ported
+  threshold constants keep their original meaning. `SplitRng` gained `next_float()`/`next_range()`,
+  needed by any RNG consumer, not just this one. Mutation-testing this stage surfaced its own finding
+  (D0024): a full-generation integration test can pass even with a real safety guard removed, if the
+  guard's own trigger condition is rare at generation scale — two guards needed a targeted unit test
+  built specifically to force them, not just a test that runs code containing them.
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
-  collision architecture decisions — all from the first half of this session, commits `4758d5a` through
-  `51301a4`. Detail in those commit messages, not repeated here.
-- Freight Winch gate on `sim/commands`/`sim/run` (`13960e9`); Sinkforge-as-stratum, layers-as-rule-sets,
-  9-run curve, R1 scope ADR-0002 (`a76d851`); review-bandwidth and playable-fixtures protocols now in
-  `CONTEXT.md` (`bea703d`).
-- Doc triage closed with one discrepancy flagged (two mixed documents, not five — reported rather than
-  forced to fit): `docs/EXPERIENCE_EVALUATION.md` promoted and cross-referenced from `CLAIMS.md` §5 and
-  `docs/README.md`'s normative table; `docs/archive/DIRECTOR_BRIEF.md` and
-  `docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md` extracted (`57d2051`).
-- LOC-ratio gate rewritten as a trailing-window trend measure, verified against four synthetic-repo
-  controls (`4fbfb71`); Stage 1 core/ landed — `Fx`, `SplitRng`, `EntityIdPool`, 96 tests, all
-  mutation-checked (`560ee78`).
-- **Clone-size Phase 1 withdrawn**, made legible in `README.md`'s "On clone size" paragraph instead —
-  `history/`/`docs/media/moments` are the LOCKED curated archive, not disposable bulk; a Release asset
-  would be a step back to weaker protection than committing already gives them.
-- **`docs/handoff/` reviewed and deliberately deferred** — untracked, confirmed via `git ls-files`, never
-  a portfolio problem. Logged so it isn't re-triaged as an open question later.
-- Note for whenever `README.md` gets its real post-pivot rewrite (not now): `docs/EXPERIENCE_EVALUATION.md`
-  's "no layer may certify all six questions" and its six-layer evidence separation belong in it —
-  marked directly in `README.md`'s stale-pivot banner so it isn't lost before then.
+  collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
+  curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio
+  gate's rewrite as a trailing-window trend measure, clone-size Phase 1 (withdrawn), `docs/handoff/`
+  (deferred) — all from earlier this session. Detail in those commits' messages and
+  `docs/DECISIONS_LEDGER.md` D0001-D0004, D0016, not repeated here.
 
 ## Discoveries not yet written anywhere durable
 
-None outstanding. Two real GDScript-runtime findings from Stage 1 are already in `core/MODULE.md`'s
-Gotchas: an unguarded runtime error inside a bare `--headless --script` run hangs rather than crashes
-(no `quit()` ever reached), and `>>`/`<<` reject a syntactically-negative left operand at parse time but
-allow the identical runtime value through a variable. Anything found during Stage 2 gets logged here or
-to `docs/DECISIONS_LEDGER.md` immediately, not batched.
+None outstanding. Everything found during Stage 3 is already in `docs/DECISIONS_LEDGER.md` (D0016-D0025)
+or `sim/terrain_gen/MODULE.md`'s/`sim/world/MODULE.md`'s Gotchas. Anything found during stage 4 gets
+logged here or to the ledger immediately, not batched.
