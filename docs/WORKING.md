@@ -6,11 +6,12 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-**Starting Stage 2: `replay_determinism_test` against a trivial stub sim.** Stage 1 (`core/`) landed
-clean — `560ee78`. Same rules as Stage 1: hard stop on any gate red not fixable in one attempt, hard
-stop on any EXPENSIVE decision (log it, pick nothing), budget of eight commits for this stage. The stub
-should be almost nothing — the point is that the replay-and-hash machinery exists and passes before
-there's anything worth testing, not that the stub itself does anything.
+**Stages 1 and 2 both landed. Stopped here, deliberately, per explicit instruction: do not begin stage 3
+(`sim/world`, `sim/terrain_gen`) even with budget remaining — those are judgment calls (worldgen
+porting, scenario format) the director wants to be present for.** Stage 1: `560ee78`. Stage 2
+(`tests/test_replay_determinism.gd`, a throwaway stub exercising all three `core/` primitives, full
+20,000-tick/100-tick-interval replay check, mutation-checked): `f51d722`. No commits used toward stage 3
+scope. Next session (or next instruction) starts stage 3 fresh, or redirects.
 
 ## Landed and closed, with commit references
 
