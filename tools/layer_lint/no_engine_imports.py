@@ -38,6 +38,10 @@ PATTERNS = [
     (re.compile(r'\bTime\.get_(ticks|unix_time|datetime)'), "Time.get_* — wall clock"),
     (re.compile(r'\bEngine\.get_process_frames\s*\('), "Engine.get_process_frames() — wall/frame clock"),
     (re.compile(r'\b(randi|randf|randomize)\s*\('), "unseeded global RNG (use core's seeded RNG)"),
+    (re.compile(r'\bRandomNumberGenerator\b'),
+     "RandomNumberGenerator — engine RNG class (use core/SplitRng: one stream per subsystem, serializable)"),
+    (re.compile(r'\bFastNoiseLite\b'),
+     "FastNoiseLite — engine noise resource (sim/ is engine-free; write a deterministic noise function)"),
     (re.compile(r'^\s*@onready\b'), "@onready — implies scene-tree membership"),
 ]
 

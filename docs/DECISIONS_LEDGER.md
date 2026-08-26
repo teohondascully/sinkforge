@@ -339,3 +339,17 @@ Reverse: CHEAP — nothing stops a future `scenarios/*.yaml` fixture from coveri
 actual design claim (e.g. "a generated shaft always has a completable ore-to-surface route") once such a
 claim exists; this entry is about the determinism check specifically, not about scenarios never
 existing for terrain_gen.
+
+## D0023 · 2026-08-26 · no_engine_imports gap: FastNoiseLite and RandomNumberGenerator
+Decided: added both classes to `tools/layer_lint/no_engine_imports.py`'s pattern list, ahead of writing
+`sim/terrain_gen`'s cave-carving pass.
+Why: legacy's cave carving uses `FastNoiseLite` and a plain `RandomNumberGenerator`, both real Godot
+engine classes. The gate's own docstring says it encodes only "something docs/ARCHITECTURE.md states
+outright as forbidden," scoped to categories that had come up before this stage (scene-tree, resource
+paths, file IO, wall clock, unseeded global RNG, autoloads) — noise/RNG *classes* were never enumerated,
+so both would have passed the gate cleanly while quietly reintroducing engine coupling into L1, exactly
+the failure mode the file's own comment warns about from the other direction ("loosening a pattern here
+is exactly how the sim quietly regains engine coupling" — a category nobody added yet is the same gap by
+omission). Caught by reading the gate before writing the code that would have tripped it, not by a red.
+Reverse: CHEAP to relax per-file if a real exception ever needs one (the gate has no allowlist mechanism
+yet, but none of L1 has needed an exception so far).
