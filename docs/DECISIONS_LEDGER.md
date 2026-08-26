@@ -375,3 +375,31 @@ General lesson, matches [[correct-instrument-wrong-scale]]/[[instrument-cannot-r
 spirit: a full-generation integration test asks "does the finished world look right," which is the wrong
 scale to ask "does this one guard ever fire." A guard needs a test built to force it, not a test that
 merely runs code that happens to contain it.
+
+## D0025 · 2026-08-26 · constant count vs. the cited 118: 29 ported, not 118
+Reported per the director's instruction ("if you find more or fewer than 118, say so").
+Recount method: `grep -n "^const" legacy/src/core/layered_world_gen.gd | wc -l` = 99,
+`legacy/src/core/heightmap_world_gen.gd` = 19, total 118 — matches
+`docs/archive/COMPAT_AUDIT_2026-08-25.md`'s figure exactly, and this session's earlier independent
+recount before Stage 3 began. Then checked each of those 118 by hand against `data/strata/*.yaml` and
+`sim/terrain_gen/shaft_generator.gd` for whether its NUMERIC VALUE was carried over (not just a role
+carried over by a differently-valued replacement).
+Result: 29 of 118 (24.6%), all from `layered_world_gen.gd` — 0 of `heightmap_world_gen.gd`'s 19. Of
+those 29: 1 (DENSITY_ROWS), 5 cave (CAVE_MIN_DEPTH/FREQ/THRESHOLD_TOP/THRESHOLD_DEEP/XSTRETCH),
+3 strata_shelf, 9 ore (5 used + AMOUNT_BASE/AMOUNT_DEPTH_BONUS/RICH_CHANCE/RICH_AMOUNT_MULT unused),
+7 coal (5 used + AMOUNT_BASE/AMOUNT_DEPTH_BONUS unused), 4 iron (3 used + AMOUNT unused). 22 of the 29
+are actually read by `ShaftGenerator`'s code today; the other 7 are schema-validated in the data but
+unconsumed, pending sim/economy or sim/items. (First draft of this paragraph summed to 33, not 29 —
+caught by re-adding the category counts before this line was trusted; see the commit message.)
+Why the gap is this large: `heightmap_world_gen.gd`'s whole const set (FLAT_START/END, the relief-hill
+sine amplitudes, the three scarps, SURFACE_ROW_MIN/MAX) exists to carve a walkable rolling-hills surface
+for an open, laterally-explored world. A single vertical shaft has no lateral surface to walk across --
+`ShaftGenerator`'s equivalent of `ground_row(col)` is just the constant 0, uniformly, which is why none
+of those 19 carry over. Most of `layered_world_gen.gd`'s remainder is D0017's scope cut (caverns,
+tunnels, rifts, sinkholes, ledges, spires, rubble, lodes, aquifers, aquifer treasure, trees, the bazaar
+ruin, the seal/DEEPSLATE_ROW/SEAL_TOP row numbers, the horizontal-richness field, the drought pass) --
+passes this stage does not build, mostly because they are artifacts of the dead pre-pivot progression
+structure or of open-world traversal this pivot no longer has.
+Not counted as "ported" even though the ROLE carries over: `DEEPSLATE_ROW`/`SEAL_TOP` (76/84, an old
+row-count world) versus this port's `layer_thresholds_m` (40m/140m) -- the new numbers are the
+director's own GDD §11 layer boundaries, not a value derived from the old ones.
