@@ -403,3 +403,66 @@ structure or of open-world traversal this pivot no longer has.
 Not counted as "ported" even though the ROLE carries over: `DEEPSLATE_ROW`/`SEAL_TOP` (76/84, an old
 row-count world) versus this port's `layer_thresholds_m` (40m/140m) -- the new numbers are the
 director's own GDD §11 layer boundaries, not a value derived from the old ones.
+
+## D0026 · 2026-08-26 · no_engine_imports rewritten: derived, not accumulated
+Decided: rewrote `tools/layer_lint/no_engine_imports.py`'s pattern list from a one-time audit of
+Godot's actual `ClassDB`, rather than continuing to add a class the moment someone tripped on it (as
+D0023 did for `FastNoiseLite`/`RandomNumberGenerator`).
+Method: dumped `Engine.get_singleton_list()` (37 singletons) and `ClassDB.get_class_list()` +
+`get_parent_class()` walked to the root (1,040 classes total, 282 Node-descended) via a throwaway
+headless script. Categorized every singleton by hand against the six rule categories already in the
+gate's docstring (scene-tree, file IO, wall clock, unseeded RNG, input devices, threading/network/engine
+subsystems as new categories) plus two considered-and-rejected (Geometry2D/3D, Marshalls — pure
+deterministic utilities; ProjectSettings — deterministic given a fixed project file, not named as
+forbidden by anything in ARCHITECTURE). Full reasoning per singleton is in the script's own docstring
+rather than duplicated here.
+What changed: the scene-tree category now matches ANY of the 282 Node-derived class names (both
+`extends X` and `X.new()`), not just the four stems (`Node\w*`, `CanvasItem`, `Control`, `Sprite2D`)
+someone had hand-listed before. New categories added: input devices (`Input`/`InputMap` — promotes the
+`body` module's existing prose Must-not to an automated, project-wide check), engine subsystem servers
+(rendering/audio/physics/navigation — the sim has its own physics and no engine-owned render/audio
+state), threading (`Thread`/`Mutex`/`Semaphore`/`WorkerThreadPool` — real ordering nondeterminism, a
+category the gate never had at all), network IO (`HTTPClient`/`TCPServer`/`UDPServer`/etc. — file IO's
+sibling), OS subprocess/UI side effects (`OS.execute` et al.), plus `ResourceLoader`/`ResourceSaver`
+(file IO through the resource system), broader `OS`/`Engine`/`Performance` wall-clock coverage, and
+`Crypto` as a second unseeded-RNG source.
+Verified before trusting it: ran clean against the current tree (0 false positives on `core/`+`sim/`'s 9
+files), then deliberately injected one violation per new category into a throwaway scratch file under
+`sim/world/` (`extends Timer`, `Thread.new()`, `HTTPRequest.new()`, `Input.is_action_pressed`,
+`OS.execute`, `Crypto.new()`, `RenderingServer.get_rendering_info`, `ResourceLoader.load`,
+`Performance.get_monitor`) — all 11 caught, file deleted, gate re-confirmed clean. `extends Timer`
+specifically would have passed silently under the old pattern list — a real, not hypothetical, gap.
+Reverse: CHEAP to add a category later; regenerating the Node-derived list only matters if the engine
+version changes meaningfully (documented in the script's own docstring, including how). This lesson is
+now normative, not just logged here — see `docs/QUALITY.md` §2's new "a gate is only as good as its
+pattern list" paragraph.
+
+## D0027 · 2026-08-26 · the resolution-split test, run honestly, and its one real gap
+The director asked a direct test before stage 4: pick three `sim/world` functions at random, and from
+name and signature alone, say whether each is unambiguous about which grid it operates on (4px terrain
+vs. the not-yet-built 16px logic grid). Drawn with Python's `random.sample` (true entropy, not a fixed
+seed) against all 11 public functions across `TileGrid` and `WorldMaterials`, not hand-picked: got
+`exists(material_id: StringName) -> bool`, `occupied_cells() -> Array`, and
+`get_material(terrain_cell: Vector2i) -> StringName`.
+Honest answer, function by function: `exists()` takes no coordinate at all — the question doesn't apply
+to it. `get_material()` — YES, unambiguous: the `terrain_cell` parameter name states which grid, per the
+D0020 naming convention, though nothing at the TYPE level enforces it (D0020's already-accepted risk).
+`occupied_cells()` — NO: it returned a bare, untyped `Array` from a function whose name doesn't mention
+"terrain" either. A caller reading only the signature learns nothing about what's inside it or what
+scale it's on; that information lived only in a doc comment two lines above the function, which is
+exactly the "caveat in prose does not protect" failure this project already has a name for.
+This is 2 of 3 clean and 1 of 3 real, not a clean pass — reported as such rather than rounded up.
+Audited every other public and private signature in `sim/world` and `sim/terrain_gen` for the same gap
+(bare `Array`/`Dictionary` returns, or a `Vector2i` parameter not `_cell`-suffixed) before answering:
+`occupied_cells()` was the only public-API instance. `sim/terrain_gen`'s internal helpers use bare
+`cell`/`center` names in several places, but those are private, file-scoped, and terrain_gen only ever
+touches the terrain-cell grid — there's no second scale for those names to be confused with yet, unlike
+`sim/world`'s API, which `sim/body` will build directly against.
+Fixed, not just noted: renamed to `occupied_terrain_cells() -> Array[Vector2i]` (both the name and the
+element type now carry information the bare `Array` didn't), updated its three call sites in
+`tests/test_shaft_generator.gd` and its own test in `tests/test_tile_grid.gd`, updated
+`sim/world/MODULE.md`. Re-ran every affected test suite and all six gates green after the rename.
+Enforcement going forward is still naming-and-typing discipline only, not a compiler guarantee — D0019
+and D0020 remain open EXPENSIVE questions for exactly this reason. This entry closes the specific gap
+the audit found; it does not resolve D0020.
+Reverse: CHEAP — one rename, three call sites, already done.
