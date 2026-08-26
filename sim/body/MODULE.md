@@ -21,7 +21,10 @@ module is green against that suite.
 
 ## Dependencies
 
-`core`, `world` (collision and depenetration query tile solidity).
+`core`, `world` (collision and depenetration query tile solidity), `invariants`
+(`_resolve_floor` reports a diagnostic-only floor-selection check to
+`Invariants.report_floor_selection` -- docs/adr/0005, D0043 -- never reads a
+result back, never changes behavior from it).
 
 `sim/items` is deliberately *not* declared as a dependency here, even
 though the module's own purpose lists "carry weight." How carried-item

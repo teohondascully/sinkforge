@@ -1,0 +1,163 @@
+# ADR 0005: The ground-plane query is a local windowed scan, not a global per-column heightfield
+
+**Status:** accepted, 2026-08-26.
+
+## Context
+
+An external Codex audit flagged `docs/ARCHITECTURE.md` §9's heightfield ground-plane design: "derive a
+per-column surface height from the fine terrain... sub-pixel column heights, linearly interpolated
+between columns" cannot represent a floor under a reachable overhang — two disjoint walkable air
+pockets in the same terrain column — because a single scalar per column has no room for a second
+answer. This ADR resolves that finding and the investigation it triggered. Deliberately kept as three
+separate findings rather than one, because collapsing them into "the audit found a bug and we fixed
+it" would lose two things that are each independently true and each independently load-bearing for a
+future reader: the spec's own defect, and the fact that the shipped code had already moved past it
+before anyone noticed either way.
+
+## Finding 1: the specification was wrong
+
+`docs/ARCHITECTURE.md` §9, as originally written, described an unqualified per-column surface height —
+one Fx scalar derived from scanning the whole column. That representation genuinely cannot encode a
+floor beneath a reachable overhang: "the height of column X" is a single value, and a column with two
+disjoint walkable air pockets has no single correct answer to give it. Codex was right to flag this as
+a real representational gap, not a false positive. This finding stands on its own regardless of what
+the actual implementation does — a spec can be wrong even if nobody ever built it as written.
+
+## Finding 2: the implementation had already diverged from that spec, in the right direction
+
+`sim/body/heightfield.gd`'s actual code was never the global scan the spec described.
+`column_surface_y(grid, terrain_col, scan_from_row, max_rows)` is a bounded query over an explicit row
+window, not the whole column, and its only real caller, `sim/body/body.gd::_resolve_floor()`, always
+passes a small window centred on the body's own current position: `scan_from = maxi(0, row - 2)`,
+`max_rows = 6`. Nothing in `docs/ARCHITECTURE.md` §9's prose mentions this window; the spec describes an
+unqualified per-column height and the code implements a local one. Investigating Finding 1 (`sim/body`
+present and exercised, one real call site, no stored structure to migrate — recorded in this session's
+own scoping pass before any measurement was taken) is what surfaced this gap between what was written
+and what was built.
+
+This is worth stating as its own finding, separate from "the spec was wrong," because the two claims
+are not the same claim and do not carry the same weight. A wrong spec that was faithfully implemented
+is a defect to fix in the code. A wrong spec whose implementation had already moved past it, in a
+direction that happens to bound the exact failure mode the spec couldn't represent, is a defect in the
+*documentation* — the code was already better than what described it. That is still drift: nobody
+decided to narrow the query to a local window, and nobody updated the spec to say so once it happened.
+Recording it here is what keeps "the implementation is right" from reading as "so there was never a
+problem" — there was a problem, in the doc, and it went unnoticed specifically because the code never
+exhibited it.
+
+## Finding 3: measurement showed the residual case is rare enough that the trade holds
+
+A local window bounds the overhang problem, it does not eliminate it. Two disjoint walkable floors
+closer together than the window itself (6 rows) can still tie inside one call to `surface_y_at_x`,
+and `_resolve_floor` picks whichever is higher (`mini` of the three foot/centre samples) with no
+knowledge that a second, lower one exists. The question this session was asked to answer, before
+proposing anything: how often does `sim/terrain_gen/shaft_generator.gd`'s real cave generation actually
+produce that shape, and how much of it is genuinely reachable rather than merely present.
+
+**Method.** A throwaway analysis script (never committed) drove the real `ShaftGenerator` against the
+`shallow_clay` site config across 100 seeds, full-depth shafts (4,800 terrain columns total). For each
+column: found maximal vertical open runs of at least `Body.HEIGHT_PX / CELL` (10 rows) — "pockets" —
+bounded below by real solid rock. Built a reachability graph over adjacent columns' pockets via
+union-find: two pockets are connected if their open row-ranges overlap, and the climb from either
+pocket's own floor up into that shared band is within the body's real reach (`max(STEP_UP_CELLS=4,
+MANTLE_CELLS=8, max_jump_cells)`) — falling to a pocket's own floor from inside the shared band is
+unconditional (no fall damage exists at this stage, so any drop is valid), only the climb direction
+needs a budget. `max_jump_cells` (18) was measured empirically: a straight-up jump held to its true
+peak under the real `Body.JUMP_VELOCITY`/`GRAVITY_PER_TICK`/`APEX_FLOAT_TICKS` constants, not derived
+from the continuous projectile formula — the two disagree because of the fixed-tick apex float, and
+using the formula would have quietly mis-sized the whole reachability graph in a direction nobody would
+have thought to check.
+
+Two bugs in this method were caught and fixed before the numbers below were trusted. First, an early
+adjacency check compared a pocket's floor row (by definition solid) against the *other* pocket's own
+open range (by definition never containing a solid row), which could never be true — it reported 0%
+reachable against 82% raw multi-pocket columns, an obvious contradiction caught by hand-inspecting a
+few adjacent columns' raw pocket data rather than by re-reading the code, and fixed by comparing the two
+pockets' open-range *overlap* instead. Second, the fixed version applied a single symmetric height cap
+to both climbing and falling, when only climbing needs one; correcting to the asymmetric model above
+moved the final number by less than half a percentage point (0.75% → 0.85%), which is itself evidence
+that most of the naively "connected" pairs were never reachable even under the more permissive correct
+model.
+
+**Result.** Genuinely reachable multi-floor columns: **0.85%** (41 of 4,800). Shafts containing at
+least one such column: **12%** (12 of 100). Distribution: mostly isolated single columns, not
+contiguous runs — median run length 1, longest observed run 9 columns.
+
+**The caveat that changes the framing.** This measurement modelled a top-down scan (matching how
+`tests/test_hostile_chamber.gd` and `column_surface_y` are called elsewhere in this codebase for
+presence checks), not `_resolve_floor`'s actual narrow window. Real in-game exposure is lower than
+0.85%, likely well below it — see Finding 2. The measured figure is an upper bound on what a *global*
+heightfield would have exposed, not a measurement of what this codebase's actual, already-local query
+exposes.
+
+**Decision.** Accept 0.85% / 12%, median-scattered, as a documented and now-measured limitation.
+Do not build stateful floor-selection tracking (continuity across ticks, remembering which pocket the
+body last stood in) to close the residual gap. This is what D0042 (`docs/DECISIONS_LEDGER.md`) records
+as its own point: a documented trade-off whose cost was never measured is an assumption with better
+formatting, not a decision — this ADR exists so the next reader inherits a measured trade instead of an
+assumed one.
+
+**Rejected alternative:** build the stateful selection anyway, on the grounds that "genuinely
+reachable" cases are exactly the ones a player will eventually stand in. Rejected because the
+measured cost of *not* building it — a player meeting a silently-wrong floor roughly once every eight
+runs, scattered, median one column wide — is real but low, and the design cost of continuity tracking
+(the query would need to know which pocket the body was last resolved into, and prefer staying
+consistent with it across ties) is a stateful mechanic serving a case this rare. The guard below
+converts the residual cost from "silent" to "measured," which is the cheaper fix for what actually
+matters about a rare case: not eliminating it, knowing when it happens.
+
+## The guard, and what it actually covers
+
+`sim/invariants/invariants.gd` (`Invariants.check_floor_selection` / `report_floor_selection`) is wired
+into `_resolve_floor` diagnostically (D0043) — it never changes which floor gets picked, it only
+detects when the chosen floor's own scan window also contains a second real, walkable-clearance floor,
+and logs it (`push_error`, not `assert()` — see below) with column, both candidate rows, seed, and
+position. This is what turns "player reports standing on the wrong floor, no error, no way to
+reproduce it" into a position-and-seed-reproducible event, and gives a real-play incidence number to
+compare against the 0.85%/12% generated-terrain figure.
+
+Its coverage is narrower than the 0.85%/12% figure, and that gap is itself worth recording rather than
+leaving implicit. The guard is wired with the exact same 6-row window `_resolve_floor` uses (deliberately
+— checking a wider window than the resolve call itself would report ambiguity the resolve call could
+never have actually hit). `tests/test_cave_geometry.gd` builds a fixture matching the measurement's own
+definition of "genuinely reachable" — a shelf and a lower floor separated by a 6-row slab plus the full
+10-row body-height clearance a walkable pocket needs, 16 rows apart — and confirms directly: with the
+real 6-row window, the guard is silent standing on either floor. Widening the check's own window (a
+separate, non-realistic test call) confirms the check *logic* is correct — it does find the competing
+floor when given a window that can see it — so the silence on the real fixture is the window's scope,
+not a bug in the check. In practice, the guard can only catch two candidate floors within roughly its
+own 6-row band, a narrower and rarer sub-case than "reachable by jump" (which the measurement's graph
+allowed up to 18 cells). It will under-report relative to 0.85%/12%, not match it. A future reader
+comparing a real-play incidence number against the generated-terrain figure should read a lower number
+as partly this, not only as evidence the generated-terrain measurement was pessimistic.
+
+**`push_error()`, not `assert()`.** `docs/ARCHITECTURE.md` §4's "Invariants, asserted continuously"
+states "panic in debug, log in release." This module logs unconditionally in both build types instead.
+`core/MODULE.md`'s own documented, empirically-verified hazard: an unguarded runtime error inside a bare
+`--headless --script` run does not crash the process, it hangs indefinitely with no exit code and no
+further output — the same finding that shaped `Fx.div()`'s zero-guard. A failed `assert()` is a runtime
+error by the same mechanism, so a literal panic would carry that same hang risk in exactly the headless
+test/gate context invariant checks need to run cleanly under. `push_error()` already surfaces loudly
+(editor debugger, release log) without that risk, so "panic in debug" is read here as "surface it
+loudly," not "halt the process" — a stated reinterpretation, not a silent deviation, recorded as its own
+point in D0043.
+
+## Consequences
+
+- `docs/ARCHITECTURE.md` §9 now describes the local windowed query as the actual design, with this
+  ADR and the measured incidence cited inline, so a reader no longer has to discover the divergence
+  between prose and code the way this investigation did.
+- `sim/body/body.gd::_resolve_floor()` gained one diagnostic-only block (reports to `Invariants`, reads
+  nothing back, changes no behavior) — confirmed via full acceptance-suite re-run:
+  `tests/test_body.gd` (17/17), `tests/test_body_acceptance.gd` (9/9, `velocity_efficiency` 0.9978 and
+  `traverse_time` 225 ticks against golden 225, unchanged from before this change), zero invariant
+  violations fired anywhere on the existing scripted chamber (expected — no existing section has
+  multi-level geometry).
+- `sim/invariants` gained its first real code and its first sim-internal consumer (`sim/body`). Its
+  MODULE.md's "nothing in `sim/` reads its output back" still holds in the sense that matters — no
+  gameplay decision depends on a violation — even though a sim module now calls in.
+- `tests/body/hostile_chamber.gd` gained a cave-geometry section (tunnel, one overhang shelf, one gap)
+  outside the scripted traversal span, and `tests/test_hostile_chamber.gd` / `tests/test_cave_geometry.gd`
+  assert what the current query actually does against it, not that the limitation is solved.
+- No `sim/body` behavior changed. No `docs/ARCHITECTURE.md` constant changed. The rewrite this ADR was
+  originally scoped to build did not happen — this document is what happened instead.

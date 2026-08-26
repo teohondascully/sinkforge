@@ -301,6 +301,17 @@ func _resolve_floor(grid: TileGrid) -> bool:
 	if surface == Heightfield.NO_FLOOR or _bottom_y() < surface:
 		on_floor = false
 		return false
+	# Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured this
+	# ambiguity at 0.85% of columns / 12% of shafts in real terrain and accepted it as a documented
+	# limitation rather than building stateful floor tracking; this is what turns a silent
+	# wrong-floor bug report into a reproducible, position-and-seed-logged one. Checks the column
+	# nearest `pos_x` only, not every column the three foot samples straddle -- a scoped first pass,
+	# not full coverage (docs/DECISIONS_LEDGER.md D0043).
+	var check_col: int = _px_to_cell(pos_x)
+	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, 6)
+	if chosen_row >= 0:
+		Invariants.report_floor_selection(
+			grid, check_col, scan_from, 6, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
 	pos_y = surface - (HEIGHT_PX * Fx.SCALE) / 2
 	vel_y = 0
 	on_floor = true

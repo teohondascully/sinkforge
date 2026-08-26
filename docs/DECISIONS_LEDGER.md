@@ -949,3 +949,81 @@ self-caught. Rejected: the ledger's own numbering-rule header exists to keep sma
 judgment calls visible rather than quietly absorbed, and this is precisely the kind of thing a spot audit
 would otherwise have to rediscover from scratch.
 Reverse: N/A — a process finding, not a code or doc change beyond this entry.
+
+## D0042 · 2026-08-26 · multi-level-floor limitation measured, not fixed — docs/adr/0005
+Decided: after Codex flagged that `docs/ARCHITECTURE.md` §9's per-column heightfield cannot represent a
+floor under a reachable overhang, measured how often `sim/terrain_gen/shaft_generator.gd`'s real cave
+generation (`shallow_clay` site, 100 seeds, 4,800 columns) actually produces that shape and how much of
+it is reachable via ordinary movement (jump/step-up/mantle/fall, real `Body` constants, jump apex
+measured empirically rather than from the projectile formula) before proposing any code change. Result:
+0.85% of columns, 12% of shafts, mostly scattered single columns (median run length 1, longest run 9).
+Decided to accept this as a documented, measured limitation rather than build stateful floor-selection
+tracking across ticks. `docs/adr/0005-heightfield-local-window.md` has the full three-part record this
+entry doesn't duplicate: the spec was wrong (Codex right to flag it), the implementation had already
+diverged from that spec toward a bounded local query before anyone noticed either fact, and this
+measurement is what confirmed the residual gap the local query still leaves is rare enough to accept.
+Also recording, because it is a judgment call in its own right and not just color for the above: a
+documented trade-off whose cost was never measured is an assumption with better formatting, not a
+decision — this session's own first framing of the heightfield representation (treating Codex's finding
+as an unqualified defect, before measuring anything) was exactly that, and the correction is the
+process this entry and the ADR both exist to make repeatable the next time a "we knowingly accepted X"
+claim shows up without a number attached to it.
+Alternative: build the stateful floor-selection tracking Codex's finding implied was needed. Rejected
+once the measured cost of not building it (0.85%/12%, scattered, ~once every eight runs) was weighed
+against the design cost of a mechanic that would need the query to remember which pocket the body was
+last resolved into and prefer consistency with it across ties — expensive design serving a case this
+rare and this scattered.
+Why: the alternative to measuring first was proposing a fix sized to an assumed severity ("Codex found
+a real gap, so close it") rather than a measured one. The two self-caught bugs in the measurement
+script itself (documented in the ADR) are why this number is trusted rather than merely produced —
+first-pass adjacency logic reported an impossible 0% reachable against 82% raw multi-pocket columns,
+caught by hand-inspecting real pocket data rather than by re-reading the code; a symmetric climb/fall
+height cap was corrected to asymmetric afterward, moving the final figure by under half a point, which
+is itself evidence most "connected" pairs were never reachable even under the more permissive corrected
+model.
+Reverse: CHEAP — a measurement and an acceptance decision, no `sim/body` behavior changed. Re-measuring
+against a different site config or a wider seed sample would not invalidate this entry, only add a data
+point next to it.
+
+## D0043 · 2026-08-26 · Invariants floor-selection guard: single-column scope, push_error not assert
+Decided: `sim/invariants/invariants.gd`'s new `check_floor_selection`/`report_floor_selection`, wired
+diagnostically into `body.gd::_resolve_floor()` (D0042/docs/adr/0005), makes two scoping choices, both
+narrower than what a first read of "add a guard" might assume.
+1. Checks only the column nearest `pos_x` (the same column `_resolve_floor`'s own `s_center` sample
+   uses), not all three foot-sample columns (`s_left`/`s_right`/`s_center`) the resolve call actually
+   takes the `mini()` of. A scoped first pass, not full coverage — the left/right foot columns can differ
+   from the centre column at a section boundary, and this guard does not see ambiguity that arises there.
+2. Logs via `push_error()` unconditionally in both debug and release, not `assert()`, despite
+   `docs/ARCHITECTURE.md` §4's literal "panic in debug, log in release." `core/MODULE.md`'s own
+   documented hazard — an unguarded runtime error inside a bare `--headless --script` run hangs the
+   process with no exit code rather than crashing, verified empirically, the same finding that shaped
+   `Fx.div()`'s zero-guard — applies to a failed `assert()` exactly the same as any other runtime error,
+   which is precisely the failure mode headless test/gate runs cannot tolerate. Read "panic in debug"
+   here as "surface it loudly," not "halt the process."
+Also recording what `tests/test_cave_geometry.gd` found while proving this guard has teeth (mutation-
+tested, not just written): because the guard shares `_resolve_floor`'s own 6-row scan window, it does
+NOT fire anywhere in a fixture built to match D0042's own definition of "genuinely reachable" (a shelf
+and a lower floor 16 rows apart — a 6-row slab plus the full 10-row body-height clearance a walkable
+pocket needs). A widened test-only window confirms the check's own logic is correct; the real, wired
+window simply cannot see 16 rows with a 6-row scan. The guard's practical coverage is a narrower,
+rarer sub-case of the measured 0.85%/12% figure (roughly, two candidates within ~6 rows of each other)
+than "reachable by jump" in general (up to 18 cells) — a real-play incidence count from this guard
+should be read against that narrower claim, not directly against 0.85%/12%.
+Alternative, for (1): check all three foot-sample columns, matching `_resolve_floor`'s own coverage
+exactly. Rejected for this pass as more surface area for a first version of a brand-new module to get
+subtly wrong (three columns' worth of clearance-probing logic instead of one), with the single-column
+version already sufficient to prove the check logic itself works (this entry's own mutation-test
+finding) and to convert some fraction of real occurrences into reproducible reports — better than the
+zero that existed before. Alternative, for (2): a literal `assert()`, matching §4's prose exactly.
+Rejected for the hang-hazard reason above; a hard panic that can silently wedge a headless CI run
+forever is a worse failure mode than the bug it would be panicking about.
+Why: both choices trade completeness for a smaller, better-understood first version — consistent with
+`sim/invariants` having had no real code before this change at all. The window-width finding specifically
+is why this entry states its own limitation up front rather than leaving a future reader to discover,
+the way this session had to discover the spec/implementation gap in the first place, that a guard's
+existence is not the same claim as a guard's coverage.
+Reverse: CHEAP to widen either scope later — both are narrowing choices inside a single new file with
+one real caller, not a structural commitment. Reverse of the push_error-not-assert choice specifically
+is EXPENSIVE in a different sense: reverting to a literal `assert()` would reintroduce the exact hang
+hazard this entry names, so "reverse" here means "revisit only if the hang hazard itself is ever
+independently resolved," not "cheap to flip back."

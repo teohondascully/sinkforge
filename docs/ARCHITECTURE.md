@@ -359,6 +359,39 @@ player is actually standing on most of the time, so that's where the payoff is c
 trivially deterministic (integer column heights, linear interpolation, no geometry solver) and it's
 incremental over a capsule sweep, not a rewrite.
 
+**Corrected 2026-08-26** (`docs/adr/0005-heightfield-local-window.md`, D0042): the paragraph above, as
+originally written, described an unqualified per-column height — one scalar derived from the whole
+column. That is wrong, and an external audit (Codex) was right to flag it: a single scalar per column
+cannot represent two disjoint walkable floors in the same column, a floor under a reachable overhang,
+because "the surface height of column X" has no room for a second answer. `sim/body/heightfield.gd`'s
+actual implementation was never that global scan. It is a bounded LOCAL query —
+`column_surface_y(grid, col, scan_from_row, max_rows)` — and `body.gd::_resolve_floor()` always calls
+it with a small window centred on the body's own current row (6 rows: `scan_from = row - 2`), never a
+scan from the top of the column. This divergence from the written spec predates this correction and
+was never itself a recorded decision; it is simply what got built, and it happens to be the right
+shape rather than the wrong one — a per-column heightfield genuinely cannot represent an overhang, but
+a *local, bounded* query only needs to be right about the few rows near wherever the body actually is,
+which is what the implementation already does. Code being ahead of its own spec is still drift, logged
+as such rather than folded silently into "the spec was wrong."
+
+The local window bounds the overhang case, it does not eliminate it: two disjoint walkable floors
+closer together than the query's own window can still tie inside one call, and the query picks
+whichever is higher without knowing a second one exists. Measured against
+`sim/terrain_gen/shaft_generator.gd`'s real cave generation (`shallow_clay` site, 100 seeds, 4,800
+columns, full-depth shafts, reachability graph built from this game's own jump/step-up/mantle/fall
+reach — jump apex measured empirically from the real `Body` constants, not the projectile formula):
+0.85% of columns contain a second floor pocket that is genuinely reachable via ordinary movement, no
+digging; 12% of the 100 shafts contain at least one such column; occurrences are mostly scattered
+single columns (median contiguous run length 1, longest observed run 9). `sim/invariants`
+(`Invariants.check_floor_selection`, wired into `_resolve_floor` diagnostically, D0043) turns a
+mis-resolved floor into a logged, position-and-seed-reproducible event instead of a silent one — but it
+shares `_resolve_floor`'s own 6-row window, so in practice it only catches two candidate floors within
+that same narrow band, a smaller slice than "reachable" in general (jump reach alone spans up to 18
+terrain cells; `tests/test_cave_geometry.gd` measures this directly and confirms the guard is silent on
+a constructed 16-row-separated reachable case). Accepted as a documented, measured limitation rather
+than building stateful floor-selection tracking across ticks — the ADR has the full three-part record
+and the rejected alternative.
+
 Keep the existing forgiveness set on top of this, unchanged: capsule collider, auto step-up, corner
 correction, shortest-axis depenetration, coyote time and jump buffer.
 

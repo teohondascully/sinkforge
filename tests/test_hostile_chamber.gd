@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_jump_corner_present()
 	_test_mantle_step_present()
 	_test_narrow_shaft_present_and_correctly_wide()
+	_test_cave_geometry_present()
 	_finish("hostile_chamber")
 
 
@@ -138,3 +139,29 @@ func _test_narrow_shaft_present_and_correctly_wide() -> void:
 	_check(clear_rows >= Body.HEIGHT_PX / CELL,
 		"the exit past the shaft has a full body-height of clearance above its floor (got %d rows, need %d)" %
 		[clear_rows, Body.HEIGHT_PX / CELL])
+
+
+## Not proving the multi-level-floor case is solved -- proving the built geometry is what the
+## comments claim, so `tests/test_cave_geometry.gd`'s behavioral assertions are checking against the
+## intended shape rather than a construction bug (docs/adr/0005, D0043).
+func _test_cave_geometry_present() -> void:
+	var grid: TileGrid = HostileChamber.build()
+	var ceiling_row: int = HostileChamber.CAVE_FLOOR_ROW - HostileChamber.CAVE_CEILING_CLEARANCE_ROWS - 1
+	for col: int in range(HostileChamber.CAVE_START, HostileChamber.CAVE_END):
+		_check(grid.is_solid(Vector2i(col, ceiling_row)),
+			"cave column %d has a ceiling -- rock above, throughout the section" % col)
+	for col: int in range(HostileChamber.CAVE_START, HostileChamber.CAVE_OVERHANG_START):
+		_check(grid.is_solid(Vector2i(col, HostileChamber.CAVE_FLOOR_ROW)),
+			"tunnel column %d has its own floor -- rock below, throughout the plain tunnel span" % col)
+	for col: int in range(HostileChamber.CAVE_OVERHANG_START, HostileChamber.CAVE_GAP_START):
+		_check(grid.is_solid(Vector2i(col, HostileChamber.CAVE_FLOOR_ROW)),
+			"overhang column %d still has the shelf at the tunnel's own floor height" % col)
+		_check(grid.is_solid(Vector2i(col, HostileChamber.CAVE_LOWER_FLOOR_ROW)),
+			"overhang column %d ALSO has a real floor further down, under the shelf" % col)
+		_check(not grid.is_solid(Vector2i(col, HostileChamber.CAVE_LOWER_FLOOR_ROW - 1)),
+			"overhang column %d has real open clearance directly above the lower floor" % col)
+	for col: int in range(HostileChamber.CAVE_GAP_START, HostileChamber.CAVE_END):
+		_check(not grid.is_solid(Vector2i(col, HostileChamber.CAVE_FLOOR_ROW)),
+			"gap column %d has NO shelf -- this is where the tunnel level drops to the lower floor" % col)
+		_check(grid.is_solid(Vector2i(col, HostileChamber.CAVE_LOWER_FLOOR_ROW)),
+			"gap column %d still has the lower floor beneath it" % col)

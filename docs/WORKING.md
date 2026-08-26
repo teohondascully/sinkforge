@@ -121,6 +121,23 @@ pointer, not the record.
   22), mutation-tested in both directions (source edited without regenerating; generated file hand-edited
   directly) before trusting it. `sim/world/materials.gd` and `sim/terrain_gen/strata_data.gd` now read
   from the generated records; their public APIs are unchanged. `data/` is the actual source of truth now.
+- **Multi-level-floor limitation (Codex's `sim/body/heightfield.gd` finding) measured and accepted, not
+  rewritten** (`docs/adr/0005-heightfield-local-window.md`, D0042/D0043): three separated findings — the
+  §9 spec's per-column heightfield genuinely cannot represent a floor under a reachable overhang (Codex
+  was right); the actual implementation had already diverged from that spec toward a bounded local
+  window before anyone noticed either fact; measured against real `ShaftGenerator` output (100 seeds,
+  4,800 columns), the residual gap is 0.85% of columns / 12% of shafts, mostly scattered single columns
+  — accepted as documented rather than closed with stateful floor-selection tracking. `sim/invariants`
+  gained its first real code (`check_floor_selection`/`report_floor_selection`, `push_error` not
+  `assert()` — the hang hazard `core/MODULE.md` documents applies to a failed `assert()` too) and its
+  first sim-internal caller, wired diagnostically into `_resolve_floor` (reads nothing back, changes no
+  behavior — confirmed via full re-run: `test_body.gd` 17/17, `test_body_acceptance.gd` 9/9 unchanged).
+  `tests/body/hostile_chamber.gd` gained a cave-geometry section outside the scripted traversal span, and
+  `tests/test_cave_geometry.gd` mutation-tests the new guard directly — including the honest finding that
+  the guard's real 6-row window (matching `_resolve_floor`'s own) does NOT fire on this fixture even
+  though it was built to match the measured "genuinely reachable" case; a widened test-only window
+  confirms the check logic itself is correct. `docs/ARCHITECTURE.md` §9 now describes the local windowed
+  query as the actual design. This replaces the item-1 rewrite the post-audit list originally scoped.
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
   collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
   curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio

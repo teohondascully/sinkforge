@@ -65,12 +65,33 @@ const SHAFT_FLOOR_ROW: int = 32
 const END_START: int = SHAFT_END
 const END_COL: int = SHAFT_END + 16
 
+## Not part of the scripted traversal (`ScriptedTraverse` stops once `col >= END_START`, well before
+## here) -- a standalone fixture proving the documented multi-level-floor limitation behaves
+## predictably, not proving it's solved (`docs/adr/0005-heightfield-local-window.md`, D0043). A real
+## tunnel (rock above AND below, unlike every other section here, which is open-topped) with one
+## overhang: the tunnel's own floor continues as a shelf over a lower, separately-floored pocket,
+## connected back to the tunnel by a gap in the shelf -- reachable from the side, not a sealed bubble,
+## matching the shape the measured 0.85%/12% figures describe.
+const CAVE_START: int = END_COL
+const CAVE_FLOOR_ROW: int = 20
+const CAVE_CEILING_CLEARANCE_ROWS: int = 15  ## > Body.HEIGHT_PX / CELL (10) -- a normally walkable tunnel
+const CAVE_TUNNEL_COLS: int = 8
+const CAVE_OVERHANG_COLS: int = 4    ## the shelf: floor-height material with nothing below it in reach
+const CAVE_GAP_COLS: int = 4         ## no shelf here -- the tunnel level drops straight to the lower floor
+const CAVE_OVERHANG_START: int = CAVE_START + CAVE_TUNNEL_COLS
+const CAVE_GAP_START: int = CAVE_OVERHANG_START + CAVE_OVERHANG_COLS
+const CAVE_END: int = CAVE_GAP_START + CAVE_GAP_COLS
+## The shelf is a `_fill_flat` slab like any other floor -- 6 rows thick, [CAVE_FLOOR_ROW,
+## CAVE_FLOOR_ROW + 6). Open air needs a full body-height (10 rows) below that before the lower
+## floor, or the lower pocket isn't genuinely walkable.
+const CAVE_LOWER_FLOOR_ROW: int = CAVE_FLOOR_ROW + 6 + 10
+
 
 ## Builds the chamber deterministically from a fixed seed -- the fresh-dig section is carved by an
 ## actual excavation walk (`_carve_rubble`), not authored to look jagged, so its irregularity is a real
 ## byproduct of digging rather than hand-placed geometry.
 static func build() -> TileGrid:
-	var grid: TileGrid = TileGrid.new(END_COL + 4, SHAFT_FLOOR_ROW + 10, 20260825)
+	var grid: TileGrid = TileGrid.new(CAVE_END + 4, maxi(SHAFT_FLOOR_ROW + 10, CAVE_LOWER_FLOOR_ROW + 10), 20260825)
 	_fill_flat(grid, SPAWN_START, PIT_START, FLOOR_ROW)
 	_fill_flat(grid, POST_PIT_START, LEDGE_START, FLOOR_ROW)
 	_place_jump_corner(grid, JUMP_CORNER_COL, JUMP_CORNER_ROW)
@@ -82,6 +103,7 @@ static func build() -> TileGrid:
 	_fill_flat(grid, MANTLE_START, SHAFT_START, FLOOR_ROW - 4 - Body.MANTLE_PX / CELL)  ## 2 tiles higher
 	_place_shaft_walls(grid, SHAFT_START, SHAFT_END, FLOOR_ROW - 4 - Body.MANTLE_PX / CELL, SHAFT_FLOOR_ROW)
 	_fill_flat(grid, SHAFT_END, END_COL, SHAFT_FLOOR_ROW)
+	_place_cave_geometry(grid)
 	return grid
 
 
@@ -147,3 +169,19 @@ static func _place_shaft_walls(grid: TileGrid, from_col: int, to_col: int, top_r
 	for row: int in range(bottom_row, bottom_row + 4):
 		for col: int in range(SHAFT_OPEN_START, to_col):
 			grid.set_material(Vector2i(col, row), &"hardrock")
+
+
+## See the `CAVE_*` constants' own comments. Ceiling runs the whole section -- tunnel, overhang, and
+## gap alike -- so it reads as one continuous enclosed tunnel throughout, not another open-topped
+## chamber section with a roof bolted onto part of it.
+static func _place_cave_geometry(grid: TileGrid) -> void:
+	var ceiling_bottom: int = CAVE_FLOOR_ROW - CAVE_CEILING_CLEARANCE_ROWS
+	for col: int in range(CAVE_START, CAVE_END):
+		for row: int in range(ceiling_bottom - 4, ceiling_bottom):
+			grid.set_material(Vector2i(col, row), &"hardrock")
+	_fill_flat(grid, CAVE_START, CAVE_OVERHANG_START, CAVE_FLOOR_ROW)  # tunnel: plain floor
+	_fill_flat(grid, CAVE_OVERHANG_START, CAVE_GAP_START, CAVE_FLOOR_ROW)  # the shelf itself
+	_fill_flat(grid, CAVE_OVERHANG_START, CAVE_END, CAVE_LOWER_FLOOR_ROW)  # the real floor beneath it
+	# CAVE_GAP_START..CAVE_END deliberately gets no shelf at CAVE_FLOOR_ROW -- this is where the
+	# tunnel's main level drops through to the lower floor, the side-entry the lower pocket needs to
+	# be reachable rather than a sealed bubble.
