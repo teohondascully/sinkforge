@@ -4,6 +4,14 @@ Append-only. Every judgment call not dictated by a normative doc, logged when ma
 end. Four lines: decided, alternative, why, reverse cost. Test: would a competent engineer with these
 documents have plausibly chosen differently? If yes, it belongs here. `CONTEXT.md`, "Review bandwidth."
 
+**Numbering rule:** numbers are permanent addresses, not labels. A resolution, fix, or follow-up to an
+existing entry gets its own new number, pointing back to the original (`## D00NN · ... · resolves D00MM`)
+— it never reuses or edits the original entry's number. D0021→D0030 and D0011→D0029 are the pattern to
+follow. This rule was added after the fact (2026-08-26): D0004 already appears twice under the same
+number (a not-decided entry and, later, its own resolution reusing the number), and one addendum is
+compound-numbered ("D0019/D0020"). Both are left exactly as written — the ledger is append-only, and
+retroactively renumbering past entries would be the same mistake this rule exists to prevent.
+
 ---
 
 ## D0001 · 2026-08-26 · docs/GDD.md §8
