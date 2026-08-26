@@ -171,3 +171,48 @@ nothing currently has. Documented precisely instead of built defensively.
 Reverse: EXPENSIVE once something calls `length()` on a delta anywhere near 181px and gets silently
 wrong output — this is the specific risk the doc comment and the boundary test exist to prevent, but a
 reverse (widening the intermediate) would still just be adding to the same file, not restructuring it.
+
+## D0012 · 2026-08-26 · tests/test_replay_determinism.gd
+Decided: Stage 2's stub sim and its replay test live entirely in `tests/`, not in a new `sim/` or
+`harness/` file.
+Alternative: create minimal placeholder `sim/` and `harness/` modules now, so the stub "lives where the
+real thing eventually will."
+Why: `sim/` and `harness/` are stage 3+, gated on judgment calls (worldgen porting, scenario format) the
+director explicitly wants to be present for. A placeholder module under either name risks reading as
+those layers having started for real. `tests/` is the one place touching this doesn't imply anything
+about layer boundaries not yet decided.
+Reverse: CHEAP — this file is explicitly documented as throwaway scaffolding, superseded rather than
+extended once a real sim exists.
+
+## D0013 · 2026-08-26 · tests/test_replay_determinism.gd
+Decided: the "recorded input log" is a fixed deterministic pattern (spawn every 37 ticks, despawn every
+53) generated once, independent of the stub's own `SplitRng` stream.
+Alternative: derive the input log from RNG too, or skip the input-log concept entirely and just tick
+20,000 times with no per-tick events.
+Why: keeps "recorded external input" and "sim-internal randomness" as two separate concepts even in a
+stub this small, matching what `docs/ARCHITECTURE.md` §6 will actually need (a real `input.log` distinct
+from any RNG stream) — a stub that already respects that boundary is a small head start on the real
+harness's shape.
+Reverse: CHEAP — the pattern's specific numbers are arbitrary and nothing depends on them.
+
+## D0014 · 2026-08-26 · tests/test_replay_determinism.gd
+Decided: checkpoint hashing uses GDScript's built-in `String.hash()`, not a hand-rolled hash function.
+Alternative: implement a deterministic hash (e.g. FNV-1a, already written once for `core/split_rng.gd`)
+to avoid depending on an engine-internal algorithm.
+Why: unlike `SplitRng.split()`'s label hashing (which needed to be independently specified and stable so
+it could be tested against an external Python reference), this hash only ever compares two values
+computed in the same process, in the same run, against each other — it's never persisted, replayed
+across engine versions, or checked against anything outside this one test. Whatever `String.hash()`
+does, it does identically both times it's called in the same process, which is the only property this
+use needs.
+Reverse: CHEAP — swapping the hash function changes nothing about what the test asserts.
+
+## D0015 · 2026-08-26 · tests/test_replay_determinism.gd
+Decided: kept the full 20,000-tick count and 100-tick hash interval from `docs/ARCHITECTURE.md` §4's
+`replay_determinism_test` spec, even though the stub's own state and logic are deliberately trivial.
+Alternative: reduce the tick count too, on the theory that a trivial stub deserves a trivial test.
+Why: "the stub can be almost nothing" (director) is about what the stub simulates, not about whether the
+replay-and-hash mechanism itself gets exercised at the scale the real requirement states. Running the
+actual specified tick count now is what proves the mechanism holds up at that scale before anything
+real depends on it — the whole point of building this stage before there's a sim worth testing.
+Reverse: CHEAP — two constants.
