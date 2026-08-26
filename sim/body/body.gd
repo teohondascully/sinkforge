@@ -51,8 +51,12 @@ const APEX_FLOAT_TICKS: int = 3      ## gravity x0.6 within this many ticks of t
 const APEX_FLOAT_MULT_NUM: int = 3
 const APEX_FLOAT_MULT_DEN: int = 5
 const APEX_BAND: int = APEX_FLOAT_TICKS * GRAVITY_PER_TICK  ## |vel_y| under this counts as "near apex"
-const STEP_UP_PX: int = CELL_PX      ## 1 tile, docs/ARCHITECTURE.md §9
-const MANTLE_PX: int = CELL_PX * 2   ## 2 tiles
+## "1 tile"/"2 tiles" in docs/ARCHITECTURE.md §9's movement table means the 16px machine/logic tile (the
+## same unit the table's own collider row uses: "1 tile wide, 2.5 tall" == WIDTH_PX/HEIGHT_PX above),
+## NOT the 4px terrain cell `CELL_PX` names -- a step-up of 4px would be a quarter of what §9 specifies.
+const LOGIC_TILE_PX: int = 16
+const STEP_UP_PX: int = LOGIC_TILE_PX        ## 1 tile, docs/ARCHITECTURE.md §9
+const MANTLE_PX: int = LOGIC_TILE_PX * 2     ## 2 tiles
 const CORNER_NUDGE_PX: int = 6       ## docs/ARCHITECTURE.md §9
 
 var pos_x: int

@@ -710,3 +710,16 @@ a multi-tick walk happens to land, the same sub-cell-phase dependency that made 
 invisible to its own fixtures) — the mutation now fails 2 of 16 tests, confirmed, then restored.
 Reverse: EXPENSIVE once `sim/transport`/`sim/machines` assume specific collision behavior; CHEAP right
 now, since nothing outside this module and its own tests reads it yet.
+
+## D0035 · 2026-08-25 · body.gd: STEP_UP_PX/MANTLE_PX were the wrong unit, fixed before the chamber
+Found immediately after D0034 landed, before anything was built on top of it: `STEP_UP_PX` was set to
+`CELL_PX` (4px, one TERRAIN cell) instead of one 16px machine/logic TILE. `docs/ARCHITECTURE.md` §9's
+movement table uses "tile" consistently to mean 16px throughout the same table its step-up/mantle rows
+sit in — the collider row in that exact table states "1 tile wide, 2.5 tall," which is 16px/40px, the
+values `WIDTH_PX`/`HEIGHT_PX` already correctly use. A 4px step-up would have been a quarter of the
+specified height, silently. Fixed: added `LOGIC_TILE_PX = 16`, `STEP_UP_PX = LOGIC_TILE_PX`,
+`MANTLE_PX = LOGIC_TILE_PX * 2`. All 16 `tests/test_body.gd` assertions still pass unchanged (the
+existing step-up test used a 1-TERRAIN-cell step, well under the corrected, larger budget, so it never
+exercised the boundary either way) — caught by re-reading the constant against its own cited spec before
+building the chamber's step-up section around the wrong height, not by a test.
+Reverse: CHEAP — three constants, no chamber or acceptance work built against the wrong values yet.
