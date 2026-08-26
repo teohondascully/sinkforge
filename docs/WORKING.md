@@ -59,14 +59,16 @@ that rule now exists to prevent. Independent Codex audit of commit `489e728`. Or
    and accepted as a documented limitation rather than rewritten. D0042/D0043.
 2. **[CLOSED]** Cave geometry in the chamber, proving the local-window query's behavior against the
    limitation above. `tests/test_cave_geometry.gd`.
-3. **[OPEN]** `ValueNoise` distribution mismatch against the legacy-configured `FastNoiseLite` it was
-   ported from — Codex measured SD 0.4223 vs 0.2453, range [-0.995,0.999] vs [-0.833,0.712], sampled over
-   cave coordinates. Ported thresholds are carving at a different rate than the value they were copied
-   from; no test asserts density, only that caves exist. Two options, director wants a recommendation:
-   (a) rescale `ValueNoise` output to the measured `FastNoiseLite` SD, keeping ported thresholds
-   meaningful; (b) re-derive thresholds against `ValueNoise`'s own actual distribution, treating the
-   legacy numbers as no longer applicable (more honest, but changes D0025's "ported" count). Either way:
-   add a test asserting the output distribution so it cannot drift again.
+3. **[CLOSED, D0045]** `ValueNoise` distribution mismatch against the legacy-configured `FastNoiseLite` it
+   was ported from — independently reproduced Codex's finding (SD 0.4336 vs 0.2487 pooled, 20 seeds).
+   Recommended and built option (a): `ValueNoise.FASTNOISELITE_SD_CALIBRATION = 0.574`, applied at the
+   one real call site (`shaft_generator.gd`), not baked into `sample()` itself (would break its own
+   golden-vector tests). `tests/test_value_noise.gd` gained a distribution test re-measuring both noises
+   live each run. **Follow-on finding (D0046), not part of item 3's own scope but surfaced by it:** this
+   fix shares a generator with item 1's own 0.85%/12% multi-level-floor figure — re-measured post-fix,
+   genuinely-reachable columns dropped to 0/4,800 (0/100 shafts), down from 41/4,800. D0042's own record
+   is left as written (it accurately describes what was measured against the pre-fix code); ADR-0005 and
+   `docs/ARCHITECTURE.md` §9 both now point to D0046 so the 0.85%/12% figure isn't read as current.
 4. **[OPEN]** CI does not run the tests. The `harness` workflow job runs only static gates plus the
    authorship check — no Godot, no test execution. Every "all green" claim is locally verified only, and
    the README implies CI coverage that doesn't exist. Add Godot to CI and run all suites; if genuinely

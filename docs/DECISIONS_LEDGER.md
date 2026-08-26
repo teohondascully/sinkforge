@@ -1075,3 +1075,71 @@ separately widened test-only value; using the real value would have caught this 
 Reverse: CHEAP — one constant, `FLOOR_SCAN_ROWS`, tunable independently of anything else; both the
 resolve calls and the diagnostic check already read from the same named value, so a future width change
 is a one-line edit with the same safety property (verified once here, not per-value) still holding.
+
+## D0045 · 2026-08-26 · ValueNoise calibrated to FastNoiseLite's real distribution, not just its range
+Decided: an external Codex audit measured `sim/terrain_gen/value_noise.gd`'s output distribution against
+the `FastNoiseLite` it was tuned to replace and found them meaningfully different (SD ~0.42 vs ~0.25,
+range roughly [-1,1] vs [-0.83,0.71]) at the real cave-carving frequency/x_stretch
+(`data/strata/shallow_clay.yaml`). Independently reproduced before trusting it (CLAUDE.md: verify a
+numeric claim against actual tool output) — a pooled measurement across 20 seeds, 244,800 samples, gave
+ValueNoise SD 0.4336, FastNoiseLite SD 0.2487, matching Codex's finding closely. `data/strata/*.yaml`'s
+cave thresholds (`threshold_top: 0.47`, `threshold_deep: 0.31`) are ported directly, by value, from
+legacy's `FastNoiseLite`-tuned constants (`legacy/src/core/layered_world_gen.gd`, confirmed matching
+1:1) — a wider raw distribution clears the same fixed threshold more often, so every ported threshold
+was carving denser than legacy intended, silently (no test asserted density, only that caves exist).
+Fix: `ValueNoise.FASTNOISELITE_SD_CALIBRATION = 0.574` (measured: 0.2487/0.4336), applied at the one real
+call site (`shaft_generator.gd`'s cave-carving comparison), NOT baked into `ValueNoise.sample()` itself.
+`tests/test_value_noise.gd` gained a distribution test re-measuring both noises directly each run and
+asserting the calibrated SD stays within 15% of FastNoiseLite's — the "cannot drift again" test the
+director asked for regardless of which option got picked.
+Alternative (the director's own option (b)): re-derive `threshold_top`/`threshold_deep` against
+`ValueNoise`'s own actual distribution, treating the legacy numbers as no longer applicable — more
+honest about them no longer being literal ports, at the cost of changing D0025's "29 constants ported by
+value" count and needing separate re-derivation for any other system that later ports a
+FastNoiseLite-tuned threshold. Rejected in favor of calibrating the primitive itself: this is the one
+existing consumer today, but `ValueNoise` is `sim/terrain_gen`'s general noise primitive and a future
+port (legacy's `_carve_caverns`/richer-zone noise bands both also use `FastNoiseLite`) would hit the
+identical mismatch — fixing it once at the primitive, with a named, measured, reusable constant, is
+cheaper than re-deriving per-consumer and keeps D0025's ported-constant count intact and true.
+Why calibrating `sample()`'s output at the CALL SITE rather than inside `sample()` itself: `sample()` has
+bit-exact golden-vector tests in `tests/test_value_noise.gd`, verified against a from-scratch Python
+reference of the raw hash/interpolation math, unrelated to this calibration — baking the multiply in
+would break every one of those and conflate two independent claims ("the hash/interpolation math is
+correct" and "this consumer wants FastNoiseLite parity") into one number. A future consumer with no
+reason to want FastNoiseLite parity also shouldn't have `sample()`'s own real, wider distribution
+silently narrowed out from under it.
+Reverse: CHEAP — one named float constant and one multiply at one call site; reversible by deleting both
+without touching `sample()`'s own verified math. `sample()` itself, and every golden-vector test that
+pins it, is completely untouched by this change.
+
+## D0046 · 2026-08-26 · the D0042 multi-level-floor figure was measured against the uncalibrated (too-dense) generator — re-measured post-D0045
+Decided: recording a cross-check this session ran on its own initiative, not asked for directly, because
+D0045's fix changes the exact generator D0042's 0.85%/12% figure was measured against, and the director's
+item-1 decision (accept the multi-level-floor limitation as documented, D0042/ADR-0005) rests on that
+number. Re-ran D0042's identical method (real `ShaftGenerator`, `shallow_clay`, same 100 seeds,
+same reachability graph, same empirically-measured jump apex) against the NOW-calibrated generator:
+raw multi-pocket columns dropped from 82.17% to **7.85%** (377/4,800); genuinely reachable columns
+dropped from 0.85% (41/4,800) to **0.00% (0/4,800)** — none observed in this sample, down from 12% of
+shafts (12/100) to 0/100. The calibration fix narrows carve density toward what legacy's tuning
+actually intended (D0045); this specific failure mode is a second-order consequence of that same
+over-density, and correcting the density incidentally suppressed most of what produced it.
+A zero count at n=4,800 is not proof the true rate is exactly zero — it bounds it, roughly (a
+zero-count rule-of-thumb upper bound at this sample size is on the order of 0.06%, an order of magnitude
+below the pre-fix 0.85%), but does not rule out a rarer residual. The original 0.85%/12% figure, and the
+ADR/ledger entries that cite it, are left as written — they accurately describe what was measured against
+the code that existed at the time (D0042), and the ledger does not edit past entries. This entry, and a
+pointer added to `docs/adr/0005-heightfield-local-window.md` and `docs/ARCHITECTURE.md` §9, are how a
+future reader learns the CURRENT figure is lower, without the historical record being rewritten to match.
+The underlying design decision (accept as a documented limitation rather than build stateful tracking)
+gets, if anything, MORE conservative given a lower true rate — nothing about D0042's decision needs
+revisiting because of this, only its citation of a live number needed a pointer to a fresher one.
+Alternative: silently let ADR-0005 keep citing 0.85%/12% as if it still described current behavior.
+Rejected — this is exactly the failure class this session's memory names repeatedly: a number that
+described a past state, cited later as if it still describes the present, is a stale number with better
+formatting.
+Why: this only surfaced because item 3's fix happened to touch the exact generator item 1's own
+measurement depended on — a coincidence of scope, not something either task's own description would
+have flagged on its own. Worth a general note: any two measurements that share an underlying generator,
+noise source, or dataset are implicitly coupled, and a fix to one invalidates cached conclusions from
+the other, whether or not anyone thought to check.
+Reverse: N/A — a measurement and a set of pointers, not a code or design change.

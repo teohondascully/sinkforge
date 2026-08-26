@@ -86,6 +86,12 @@ model.
 least one such column: **12%** (12 of 100). Distribution: mostly isolated single columns, not
 contiguous runs — median run length 1, longest observed run 9 columns.
 
+**Stale as of D0045/D0046, left as written — see D0046 for the current figure.** This measurement ran
+against `ValueNoise`'s uncalibrated (too-dense) cave carving. D0045 corrected that density; D0046
+re-ran this exact method against the corrected generator and found 0 of 4,800 reachable columns (0 of
+100 shafts), down from 41/4,800. The decision below is unaffected — a lower true rate only strengthens
+it — but a reader citing "0.85%/12%" as a current figure should read D0046 first.
+
 **The caveat that changes the framing.** This measurement modelled a top-down scan (matching how
 `tests/test_hostile_chamber.gd` and `column_surface_y` are called elsewhere in this codebase for
 presence checks), not `_resolve_floor`'s actual narrow window. Real in-game exposure is lower than

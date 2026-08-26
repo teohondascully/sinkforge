@@ -9,6 +9,7 @@ func _initialize() -> void:
 	_test_sample_stays_in_range()
 	_test_same_inputs_same_output()
 	_test_different_seeds_diverge()
+	_test_calibrated_distribution_matches_fastnoiselite()
 	_finish("value_noise")
 
 
@@ -63,3 +64,48 @@ func _test_different_seeds_diverge() -> void:
 	var a: float = ValueNoise.sample(12.34, 56.78, 1)
 	var b: float = ValueNoise.sample(12.34, 56.78, 2)
 	_check(a != b, "different seeds sample differently at the same point")
+
+
+## D0045: `FASTNOISELITE_SD_CALIBRATION` exists so a threshold ported from a `FastNoiseLite`-tuned
+## legacy system clears at approximately the rate it was tuned for. This re-measures both distributions
+## directly (not from memory of the number that motivated the constant) at the real cave-carving
+## frequency/x_stretch (`data/strata/shallow_clay.yaml`) across several seeds, so a future change to the
+## hash, the interpolation, or the calibration constant itself that drifts this back apart is caught
+## here rather than discovered later as an unexplained change in cave density.
+func _test_calibrated_distribution_matches_fastnoiselite() -> void:
+	var x_stretch: float = 2.1
+	var frequency: float = 0.11
+	var vn_sum: float = 0.0
+	var vn_sq_sum: float = 0.0
+	var fnl_sum: float = 0.0
+	var fnl_sq_sum: float = 0.0
+	var n: int = 0
+	for seed_i: int in range(5):
+		var seed: int = 300000 + seed_i * 7919
+		var fnl := FastNoiseLite.new()
+		fnl.seed = seed
+		fnl.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		fnl.frequency = frequency
+		for col: int in range(0, 48):
+			var nx: float = float(col) / x_stretch * frequency
+			for row: int in range(6, 1024, 8):
+				var ny: float = float(row) * frequency
+				var vn: float = ValueNoise.sample(nx, ny, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+				var fnl_v: float = fnl.get_noise_2d(float(col) / x_stretch, float(row))
+				vn_sum += vn
+				vn_sq_sum += vn * vn
+				fnl_sum += fnl_v
+				fnl_sq_sum += fnl_v * fnl_v
+				n += 1
+	var vn_mean: float = vn_sum / float(n)
+	var fnl_mean: float = fnl_sum / float(n)
+	var vn_sd: float = sqrt(maxf(0.0, vn_sq_sum / float(n) - vn_mean * vn_mean))
+	var fnl_sd: float = sqrt(maxf(0.0, fnl_sq_sum / float(n) - fnl_mean * fnl_mean))
+	_check(n > 10000, "sanity: measured over a real sample size (got %d)" % n)
+	# +/-15% band: wide enough that this isn't re-testing the exact calibration ratio to the digit
+	# (that's what the constant's own derivation comment records), tight enough to catch a real drift --
+	# e.g. an accidental change to FASTNOISELITE_SD_CALIBRATION's magnitude, or a hash/interpolation
+	# change that alters this file's own output distribution shape.
+	_check(fnl_sd > 0.0 and absf(vn_sd - fnl_sd) / fnl_sd < 0.15,
+		"calibrated ValueNoise SD (%.4f) stays within 15%% of FastNoiseLite's real measured SD (%.4f) -- ratio %.3f" %
+		[vn_sd, fnl_sd, vn_sd / fnl_sd])

@@ -12,15 +12,38 @@ extends RefCounted
 ## anywhere (`docs/ARCHITECTURE.md` §4: forbidden on state-affecting paths, and generation is
 ## state-affecting -- it writes the tile grid).
 ##
-## Output range is approximately [-1, 1], matching what `FastNoiseLite.get_noise_2d` returns -- load-
-## bearing, because `data/strata/*.yaml`'s cave thresholds (e.g. `threshold_top: 0.47`) are numeric
-## literals ported directly from `legacy/src/core/layered_world_gen.gd`'s `FastNoiseLite`-calibrated
-## constants. A [0, 1]-ranged noise would silently change what those thresholds mean.
+## Output range is approximately [-1, 1] -- this file's own real property, but NOT, as an earlier
+## version of this comment claimed, a match for `FastNoiseLite.get_noise_2d`'s actual distribution.
+## Corrected 2026-08-26 (D0045), after an external audit measured them directly and this session
+## independently reproduced the result: `FastNoiseLite.TYPE_SIMPLEX_SMOOTH` at legacy's own tuned
+## frequency/seed range does NOT span anywhere near [-1, 1] in practice (measured range roughly
+## [-0.83, 0.78] across 20 seeds), and its standard deviation (~0.25) is under 60% of this file's own
+## (~0.43, pooled 244,800-sample measurement). Matching RANGE endpoints was never the same claim as
+## matching DISTRIBUTION, and only the distribution determines what fraction of samples clear a fixed
+## threshold -- the thing `data/strata/*.yaml`'s cave thresholds (`threshold_top: 0.47`, ported directly
+## from `legacy/src/core/layered_world_gen.gd`'s `FastNoiseLite`-tuned constants) actually depend on.
+## `FASTNOISELITE_SD_CALIBRATION` below is the fix, applied by callers, not baked into `sample()` itself
+## (see that constant's own comment for why).
 ##
 ## Hash: integer inputs masked to 16 bits, weighted-summed, then multiply-xor-shift-mixed once. Not
 ## SplitMix64 (that stream is stateful and sequential; this needs a pure function of (x, y, seed) so the
 ## same cell always hashes the same way regardless of scan order). Verified against a from-scratch Python
 ## reference before this file was trusted -- see the commit message for how.
+
+## Multiply a raw `sample()` by this before comparing it against a threshold that was tuned against
+## `FastNoiseLite` (any `data/*.yaml` value ported from `legacy/`, which used
+## `FastNoiseLite.TYPE_SIMPLEX_SMOOTH` throughout) -- measured directly (D0045), not derived: pooled
+## 244,800 samples across 20 seeds at the real cave-carving frequency/x_stretch gave `FastNoiseLite`
+## SD ~0.2487, this file's own raw SD ~0.4336; 0.2487/0.4336 = 0.574. Deliberately NOT applied inside
+## `sample()` itself -- that would break every golden-vector assertion in `tests/test_value_noise.gd`
+## (bit-exact against a from-scratch Python reference of the RAW hash/interpolation math, unrelated to
+## this calibration), and would silently narrow this file's own real, wider distribution for any FUTURE
+## consumer that has no reason to want FastNoiseLite parity at all. A ratio, not a shape match: same
+## standard deviation does not guarantee identical skew/kurtosis between two differently-generated noise
+## fields, only that a fixed threshold clears at approximately the same rate, which is what a ported
+## threshold constant actually depends on. `tests/test_value_noise.gd`'s distribution test re-measures
+## this against real `FastNoiseLite` output so a hash or interpolation change that drifts it is caught.
+const FASTNOISELITE_SD_CALIBRATION: float = 0.574
 
 
 static func _lattice_hash(x: int, y: int, seed: int) -> int:

@@ -110,7 +110,13 @@ static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictio
 				threshold += shelf_resist
 			var noise_x: float = float(col) / x_stretch * frequency
 			var noise_y: float = float(row) * frequency
-			if ValueNoise.sample(noise_x, noise_y, seed) > threshold:
+			# threshold_top/threshold_deep are ported directly from legacy's FastNoiseLite-tuned
+			# constants (data/strata/*.yaml's own header) -- calibrated here, not left raw, or
+			# ValueNoise's wider real distribution (D0045) carves at a different rate than the ported
+			# thresholds were tuned to produce, silently, since both a raw and a mismatched-calibration
+			# sample look equally plausible without measuring the actual carve density either way.
+			var noise: float = ValueNoise.sample(noise_x, noise_y, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+			if noise > threshold:
 				grid.excavate(cell)  # block erased, wall kept -- a carved room, not a void
 
 
