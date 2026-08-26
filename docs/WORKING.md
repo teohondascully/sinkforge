@@ -6,18 +6,29 @@ a MODULE.md, or a claim first.
 
 ## Current stage
 
-**Stage 3 (`sim/world`, `sim/terrain_gen`) landed AND its post-landing review is closed.** The director
-ran a direct resolution-split test before clearing stage 4 (`sim/body`): pick three `sim/world` functions
-at random, say from name/signature alone whether each is unambiguous about 4px terrain vs. 16px logic
-grid. 2 of 3 were clean; `occupied_cells() -> Array` was not (bare, untyped, name didn't say "terrain"
-either) — fixed to `occupied_terrain_cells() -> Array[Vector2i]` (`c9742ef`, D0027). Two other findings
-from stage 3 were generalized into normative rules rather than left as ledger-only lessons:
-`tools/layer_lint/no_engine_imports.py` rewritten from a full `ClassDB` audit instead of accumulated-by-
-tripping-on-it patterns (`db8e448`, D0026), and both this and the mutation-testing-at-integration-scale
-finding (D0024) are now `docs/QUALITY.md` §2 rules, not just ledger entries. Also this round: the 7
-declared-but-unconsumed generation constants nested under `pending_sim_economy` so "unread" is structural
-(`46a470e`), and `legacy/tools/*.uid` gitignored (`2605315`, housekeeping). Stage 4 has not started.
-`docs/DECISIONS_LEDGER.md` D0016-D0027 carry every judgment call's full reasoning; this section is the
+**Stage 3 (`sim/world`, `sim/terrain_gen`) landed and closed; a director-set pre-stage-4 punch list is
+being worked through now.** After the stage-3 review closed (resolution-split test, `no_engine_imports`
+ClassDB audit, mutation-testing generalization — all below), a full audit dump (README, ledger,
+`git ls-files`, gate status, LOC numbers) surfaced four more items, gated explicitly "before stage 4, not
+after": `Fx.length()`'s real 181px overflow (fixed, D0029), `data/`'s hand-mirrored YAML dual-source
+problem (fixed via codegen + an ADR, D0021→D0030), the LOC ratio needing a stated target instead of a
+feeling (this section, below), and the spot-audit sampling method itself being wrong (in progress). Two
+smaller items (a ledger numbering rule, `BRIEF.md`'s regeneration timing) and one README correction round
+out the list. `sim/body` (stage 4) has not started.
+
+**LOC ratio target, set 2026-08-26 (director's ask, item 3 of the post-audit list):** absolute ratio
+under 1.5 by the time `C001` passes. Current absolute ratio is 3.399 (instrument 2,328 / game 685,
+measured after `bbc18fe`) — well above target, and the trailing-10-commit window shows the wrong
+direction (instrument +363, game −39: the YAML-codegen refactor net-shrank hand-written game code, which
+is real and good, but the same window's `tools/` growth outpaced it). This is a finding stated plainly,
+not smoothed: at stage 3's close, absolute ratio is more than double the target it needs to hit by
+`C001`, and `check_loc_ratio.py` is still ADVISORY (game LOC under its 2,000-line floor) so nothing
+gates on it yet. Every `docs/BRIEF.md` from now on reports absolute ratio plus trailing velocity, whether
+or not the gate is advisory that session — this is a standing reporting obligation, not a one-time note.
+If the ratio is still above 2 when stage 7 lands, that has to be stated as a finding in that session's
+brief, not narrated around.
+
+`docs/DECISIONS_LEDGER.md` D0016-D0030 carry every judgment call's full reasoning; this section is the
 pointer, not the record.
 
 ## Landed and closed, with commit references
@@ -38,6 +49,20 @@ pointer, not the record.
   this stage surfaced its own finding (D0024, now a `docs/QUALITY.md` rule): a full-generation
   integration test can pass even with a real safety guard removed, if the guard's own trigger condition
   is rare at generation scale.
+- **`Fx.length()`/`Fx.length_sq()`'s real 181px overflow, fixed** (`297b6aa`, D0029, supersedes D0011's
+  scope decision): the director found D0011's "local-neighborhood only" scope was wrong, not just
+  narrow — `sim/body`'s grapple, rope, and camera-relative queries have no reason to stay under 11.3m,
+  and the failure mode is a silently wrong distance, not an error. Cause: squared terms were reduced
+  through `mul()`'s i32 wrap before summing. Fix: accumulate raw `dx*dx+dy*dy` in a native i64, `isqrt()`
+  directly — verified in Python that the absolute worst case across `Fx`'s entire range stays under i64
+  max with room to spare. Mutation-tested against D0011's exact old formula (12 assertions failed on it,
+  confirming the new tests catch the regression) before trusting the fix.
+- **`data/materials`/`data/strata`'s hand-mirrored YAML dual-source problem, resolved** (`348a79c` ADR
+  0004, `bbc18fe` D0021→D0030): `tools/data_codegen/generate.py` reads `data/<kind>/*.yaml` and emits a
+  checked-in `data/<kind>/generated.gd`; `--check` mode is the new staleness gate (`docs/QUALITY.md` gate
+  22), mutation-tested in both directions (source edited without regenerating; generated file hand-edited
+  directly) before trusting it. `sim/world/materials.gd` and `sim/terrain_gen/strata_data.gd` now read
+  from the generated records; their public APIs are unchanged. `data/` is the actual source of truth now.
 - Task 0 (repository restructuring), context-compaction protocol, claim-rot mechanisms, movement/
   collision architecture decisions, Freight Winch gate, Sinkforge-as-stratum/layers-as-rule-sets/9-run
   curve/R1 scope ADR-0002, review-bandwidth and playable-fixtures protocols, doc triage, the LOC-ratio
@@ -47,8 +72,12 @@ pointer, not the record.
 
 ## Discoveries not yet written anywhere durable
 
-None outstanding. Everything found this round is already in `docs/DECISIONS_LEDGER.md` (D0026, D0027),
-`docs/QUALITY.md` §2, or the relevant `MODULE.md`'s Gotchas. D0019 and D0020 (chunk size, coordinate type
-scheme) remain open EXPENSIVE questions — the resolution-audit fix closed the one concrete instance the
-test found, not the underlying naming-only enforcement risk both entries already named. Anything found
-during stage 4 gets logged here or to the ledger immediately, not batched.
+The director's post-audit spot-audit-methodology finding (item 4): `git log | shuf -n 1` samples the
+entire history, not just the ledger-covered portion, and the first attempt drew a commit that predates
+`docs/DECISIONS_LEDGER.md`'s own creation — a null result, not a real audit. Fix in progress: a `tools/`
+script constraining the sample to `bea703d..HEAD`, run by the director, never by this session. Remaining
+after that: the ledger-numbering-rule header addition, `BRIEF.md`'s regeneration-timing rule, and the
+README stage-count correction ("stage 3 of 12" → "stage 3 of 7 toward `C001`"). All are small and
+already scoped; none are new findings requiring their own ledger entries. D0019 and D0020 (chunk size,
+coordinate type scheme) remain open EXPENSIVE questions, unchanged this round. Anything found during
+stage 4 gets logged here or to the ledger immediately, not batched.
