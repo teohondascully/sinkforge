@@ -160,8 +160,16 @@ exists to surface.
   rules touch — or, the more general test: would this make it a different game? When unsure, EXPENSIVE.
 - **`docs/TASTE_QUEUE.md`** holds feel/visual/design judgment calls as playable fixtures (below), never
   mixed with correctness. Batched for review together; does not block unless also EXPENSIVE.
-- **`docs/BRIEF.md`** regenerates at the end of every session, overwritten, one screen, EXPENSIVE
-  decisions awaiting the director listed first. If it takes more than 90 seconds to read, it's too long.
+- **`docs/BRIEF.md`** regenerates as the last action before reporting to the director, not at an
+  arbitrary session boundary — a brief regenerated mid-session goes stale the moment more decisions land.
+  One screen, EXPENSIVE decisions awaiting the director listed first. If it takes more than 90 seconds to
+  read, it's too long.
+- **Ledger spot-audits are sampled by the director, never by the session being audited.**
+  `tools/spot_audit.py` picks one commit uniformly at random from those made after
+  `docs/DECISIONS_LEDGER.md`'s own creation (an earlier version sampled the entire history and drew a
+  pre-ledger commit — a null result, not an audit). The reviewer runs it, reads that commit's full diff,
+  and checks it against the ledger entries claiming to cover it — a session selecting its own sample
+  defeats the point, which is checking whether the session under-reported.
 - Markdown and git only. If this starts to look like a subsystem, say so instead of building it.
 
 ## Playable fixtures

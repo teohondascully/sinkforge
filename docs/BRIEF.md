@@ -1,7 +1,8 @@
 # Brief
 
-Regenerated at the end of every session, overwritten. `CONTEXT.md`, "Review bandwidth." If this takes
-more than 90 seconds to read, it's too long.
+Regenerated as the last action before reporting to the director, overwritten — not at an arbitrary
+session boundary, since a brief written mid-session goes stale the moment another decision lands.
+`CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-26. Stage 3 (`sim/world`, `sim/terrain_gen`) landed AND its post-landing review
 is closed. Stopped deliberately before stage 4 (`sim/body`).**
