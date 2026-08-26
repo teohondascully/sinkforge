@@ -1,532 +1,142 @@
 # Sinkforge
 
-> **Stale as of the 2026-08-25 pivot.** Everything below this notice describes the pre-pivot
-> persistent-world game — its controls, mechanics, repository layout, and test harness — which now
-> lives read-only under `legacy/` (see `legacy/README.md`) and is no longer what running this project
-> does. It is left unrewritten rather than guessed at: the new game (a run-based roguelite and design
-> instrument, see `CONTEXT.md` and `docs/GDD.md`) doesn't exist yet in playable form, so there is
-> nothing true to describe here in its place. This is the single most reader-visible file in the
-> repository and deserves a real rewrite once there's a game to write about, not a mechanical
-> restructuring pass's guess at one — flagged, not silently fixed.
->
-> **For that rewrite, when it happens:** `docs/EXPERIENCE_EVALUATION.md`'s "no layer may certify all six
-> questions" and its six-layer separation of evidence (deterministic checks, encounter checks, agent
-> journeys, screenshot-only criticism, counterfactual A/B, human calibration) is the clearest statement
-> of this project's thesis that exists anywhere in the repository. It belongs in the real README, not
-> buried in a specification document — director directive, 2026-08-26.
+Sinkforge is a 2D vertical excavation and factory game: bore a shaft, automate the extraction and
+routing inside it, haul what you refine back to the surface before the shaft floods, and spend the
+yield on a permanent rig that lets the next run go deeper. It is equally, and not incidentally, a
+measurement instrument for game design — the entire simulation runs headless and deterministic, so
+scripted agents can play it thousands of times and produce falsifiable evidence about whether the
+design works, rather than an opinion about whether it might.
 
-A 2D side-view game about digging a factory down into solid earth.
+**Stage 3 of 12, last updated 2026-08-26.** The build sequence toward `claims/C001-two-minute-run.md`
+— a scripted agent completing one bounded run entirely headless — is ordered and stage-gated
+(`ONBOARDING.md`). `core/` (stage 1) and a stub determinism harness (stage 2) landed first;
+`sim/world` and `sim/terrain_gen` (stage 3) landed this round, along with a full audit of the two
+findings that stage produced. `sim/body`, the movement rewrite, is next. Live detail:
+`docs/WORKING.md` (current state) and `docs/BRIEF.md` (this session's digest).
 
-[![godot 4.6.2](https://img.shields.io/badge/godot-4.6.2-478cbf)](https://godotengine.org)
-[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+## The pivot, and why it's a strength
 
-Gravity carries a machine's output downward for free. Moving anything back up, including the miner,
-costs power. Production lines therefore grow vertically, while the tunnels around them sprawl in any
-direction.
+Until 2026-08-25 this was a persistent-world factory game. It didn't get rewritten on a hunch — it got
+measured, twice, independently. A 20-agent structural audit found the simulation layer roughly 72%
+compatible with an engine-free, deterministic rewrite, with zero dependency cycles across the entire
+script graph (`docs/archive/COMPAT_AUDIT_2026-08-25.md`). A second pass, reading the shipped economy
+rather than the code's shape, found the core loop had no continuous demand at the top of its own tech
+tree: two of its highest-tier products were dead ends nobody needed more of, and the material meant to
+anchor the economy had quietly become a currency standing in for one
+(`docs/archive/PIVOT_PLAN_2026-08-25.md`). The architecture was sound. The game built on top of it
+wasn't demanding enough of the player to keep being a game. The pivot kept the architecture, most of
+the code, and the central asymmetry — down is free, up is powered — and rebuilt the loop around it as
+a run-based roguelite with a permanent surface rig: the shape that actually needs a continuous stream
+of return trips. Full design reasoning: `docs/GDD.md`.
 
-![The first automated line running at the surface](docs/media/moments/_moment_line.png)
+## What exists, and what doesn't
 
-## What it is
+Real and tested: `core/` (fixed-point arithmetic, a seeded splittable RNG, generational entity IDs),
+`sim/world` (the tile grid and material registry), and `sim/terrain_gen` (seeded strata generation,
+cave carving, ore/coal/iron veins). All of it is engine-free GDScript, verified against a from-scratch
+reference wherever the algorithm mattered, mutation-tested throughout — 8 suites, 57 test functions,
+all green.
 
-The world is a 128 by 128 grid at 32 pixels to a cell, and a metre is one cell. The surface datum
-sits at row 20: above it is open sky, and from there down to row 127 the ground is solid and minable,
-so the deepest rock reads 107 metres down. A new game starts at the surface with a wood pickaxe and
-nothing else.
+Scaffolded and not yet built: twelve more `sim/` modules (`body`, `commands`, `run`, `meta`, `items`,
+`machines`, `behaviors`, `transport`, `fluid`, `economy`, `invariants`, `telemetry`) each have a
+`MODULE.md` stating their responsibility and boundaries, and zero lines of code. There is no
+`interface/`, no `harness/`, no `view/`, no playable build, and no packaged release. Two claims exist
+(`claims/`) and both are `BLOCKED`, never measured, because the modules they depend on don't exist
+yet. None of this is softened elsewhere in the repository — `docs/WORKING.md` and `docs/BRIEF.md` say
+the same thing in more detail, and the claim files carry `BLOCKED` in their own front matter.
 
-Mining is done by hand at first. Ore goes into a pack, the pack goes to a forge, the forge turns it
-into ingots. Automation then takes that work over. A drill bores the vein on its own, its output
-falls down the column into the forge below, a hopper or a splitter routes what comes out, and a
-power conduit feeds whatever needs feeding. Once a column runs unattended the miner climbs back out
-and digs further down.
+## The architecture, and why
 
-Moving material back up costs power. A Lift carries 2 items per tick hand-cranked and 6 at full
-power. A Pump reaches 4 cells straight down and drains 3 units of water per tick at full power, and
-none at all unpowered.
+The simulation is a pure, deterministic, engine-free library. Everything else — Godot's renderer, a
+human player, a scripted agent — is a client of it, through one interface:
 
-The descent is banded and named: Topsoil at the datum, then the Clayband, Shale Reach, the Long
-Dark, and the Deepslate, whose rock the starter wood pickaxe cannot break. At 64 metres come two
-rows of unminable sealrock. No pickaxe touches the seal. It opens when a Descent Engine standing on
-it has been fed 64 ingots down its column, and the breach bores a shaft through into Stonereach,
-where the iron is. Sealed water pockets are seeded through the deep rock, from two rows into the
-Deepslate down to the world floor, and need a pump before they are worth entering.
-
-There is no reset and no prestige mechanic. The world is permanent and grows downward.
-
-![A drill and five spurs working a seam, 27 metres down](docs/media/moments/_moment_chain.png)
-
-### Terrain is what you carve; the lode is what you extract
-
-Ore used to *be* the rock, which made a tunnel driven through an ore body destroy everything it did
-not pocket into the pack. So ore also lives in the background wall plane now, as a **lode**: a vein
-with a remaining unit count, drawn into the wall bake rather than pasted over it, that you work at
-the face with the same button you dig with. A blow opens a vein instead of ending it, and what the
-burst did not take stays in the cell to keep working. Three things work a lode. A Drill standing on
-one drains it in place, and the code calls that a Head; a Spur chains off a Head to widen the set of
-cells it reaches; a Drift Rig cuts rock and sorts pay from spoil into two drop columns. Of those three,
-only two have a definition under `src/data/machines/` — `spur.tres` and `drift_rig.tres`. There is no
-`head.tres`, because the Head is the Drill, standing somewhere that matters.
-
-The migration is unfinished. The generator seeds lodes into the wall plane, and a hand-placed spawn
-fixture in `scenes/world_seeder.gd` opens a starter pocket with a visible face, so the first one is
-guaranteed rather than left to the seed. Ore *blocks* still exist alongside all of it in the terrain
-plane, and converting them is the next phase. `docs/LODE.md` is the design and `docs/LODE_PLAN.md` is
-the migration, including what breaks.
-
-![An ore lode showing in the back wall of a torch-lit gallery](docs/media/moments/_moment_lode.png)
-
-## Running from source
-
-The project needs Godot **4.6.2-stable**, pinned in `project.godot`'s header comment. CI no longer
-installs Godot at all — the structural gates (`docs/QUALITY.md`) are pure static analysis over the
-source tree, so there's currently no automated check that a contributor's local engine matches this
-pin; keep the two in sync by hand until a CI step that boots the engine exists again.
-
-```sh
-git clone https://github.com/teohondascully/sinkforge
-cd sinkforge
-godot --path .
+```
+L4  experiment   claims, sweeps, ablations, reports
+L3  harness      scenarios, envelopes, driver, aggregation
+L2  interface    observe() and apply(). THE ONLY DOOR into the sim.
+L1  sim          the entire game. deterministic. no engine.
+L0  core         fixed-point, seeded RNG, generational entity IDs
 ```
 
-Opening `project.godot` in the editor and pressing play does the same thing.
+Dependency flow is one-way and lint-enforced (`tools/layer_lint/layer_lint.py`): `L0 ← L1 ← L2 ← L3 ←
+L4`, with `view/` and `shell/` hanging off L2 as peers of the agents rather than layered above the sim.
 
-Two things are worth knowing before cloning. It is a large clone: `.git` is 350 MB and a full checkout
-is 332 MB, of which `history/` (229 MB, a dated screenshot archive) and `docs/media/` (104 MB, the
-curated visual record) together account for nearly all of it — both tracked deliberately, both
-excluded from Godot's import scan via `.gdignore`. Measured 2026-08-25, post-pivot; `legacy/`, the
-frozen pre-pivot codebase, adds only 7.3 MB on top. And `export_presets.cfg` is gitignored, so a fresh
-clone runs the game from source but cannot yet produce a packaged build.
+Two invariants carry the whole design and neither is negotiable. A run must complete with no renderer
+open, or the research loop this instrument exists to run is dead. And agents and humans enter through
+the same door — `observe()`/`apply()` — because different doors would make their numbers incomparable
+and the whole instrument unfalsifiable. Full detail: `docs/ARCHITECTURE.md`.
 
-Development happens on macOS and CI runs the project on Linux. There is no Windows job and no
-Windows testing.
+## The method
 
-`CONTRIBUTING.md` covers the working setup: the commit hooks, the machine lock every Godot
-invocation takes, and how to run one test layer instead of all of them.
+*No layer may certify all six questions.* That line is the clearest statement of what this project's
+evaluation program actually believes, and it belongs here rather than buried in a specification
+document. A technical pass can prove a state transition is correct; it cannot certify that the result
+is fun. An agent that fails a journey doesn't, by itself, prove the game is broken — the failure might
+be the agent's own capability limit, not a defect. So the evaluation program
+(`docs/EXPERIENCE_EVALUATION.md`) is deliberately six separate layers: deterministic system checks,
+real-engine encounter checks, calibrated agent journeys with actor-validity controls, screenshot-only
+criticism from an observer with no code access, counterfactual A/B on a pinned actor and seed, and
+human calibration sessions captured through the same interface an agent uses. Each layer answers a
+narrower question than the others on purpose, and no single number from any one of them is allowed to
+stand in for the rest.
 
-## Controls
+## The claim corpus
 
-| Input | Action |
+Every design assertion the project currently defends is a file in `claims/`: an English statement, the
+scenario that exercises it, a metric, a threshold fixed before anything was measured, the current
+measured value, and a status. `C001-two-minute-run.md` is the tracer bullet — a scripted agent starts
+a run, descends a fresh shaft, smelts one ingot, delivers it to the surface, and the run resolves,
+entirely headless, in under 7,200 ticks. It's `BLOCKED`: `sim/run` doesn't exist yet, so there's
+nothing to measure. `C002-traversal-over-rubble.md` is narrower and further out — the same 0.92
+velocity-efficiency threshold already required over clean geometry, measured instead against terrain
+the player just dug, because a controller that only passes on clean floors hasn't actually proven the
+resolution-split collision architecture works. It's blocked on `sim/body` and `sim/world`'s heightfield
+derivation. Both claims state plainly, in their own "what this does not measure" section, exactly what
+passing them would and wouldn't prove — a claim that oversells its own result is a defect in the claim,
+not a virtue.
+
+## The gates
+
+Seven structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
+
+| Gate | What it checks |
 | --- | --- |
-| `A` `D`, or left and right arrow | walk |
-| `Space` | jump |
-| `W` `S`, or up and down arrow | grip and climb a placed rope |
-| left mouse | mine the aimed cell, or work the lode behind it; drag to paint a dig plan the miner works through |
-| right mouse | place the selected item, or pick one of the placed machines back up |
-| `F` or middle mouse | fire or release the grapple |
-| mouse wheel | cycle the hotbar |
-| `1`-`9`, `0` | select a hotbar slot directly |
-| `Q` | drop the selected stack, or feed the faced cell |
-| `E` | open the counter: pack, works and bench |
-| `R` | configure the machine under the cursor |
-| `X` | clear the painted dig plan |
-| `M` | map |
-| `T` | the tech tree, which is the counter's bench tab |
-| `G` | production dashboard |
-| `Z` | cycle zoom |
-| `.` | step the game clock: 1x, 2x, 4x, 8x |
-| `N` | mute |
-| `P` | pause |
-| `F5` / `F9` | save / load |
-| `H` or `/` | key help |
-| `Esc` | close the open screen, or open settings |
-
-With the counter open the same inputs mean something else: the arrow keys move its cursor, the mouse
-wheel and `1`-`3` change tab, and `Enter` is what commits — buying at the bazaar, and researching a tech
-at the bench. Researching has no other binding, so `Enter` is the one row above that is easy to miss.
-
-Mining, building and feeding are gated on reach, at 3.2 cells from the body's centre, and on a clear
-line of sight to the target cell.
-
-A gamepad layout ships alongside the keyboard defaults and both are live at once. The defaults live
-in one file, `scenes/controls.gd`, and the settings screen rebinds them by overriding Godot's
-`InputMap`. The number row is the exception: it is a fixed convention handled at its call site.
-
-## How it is built
-
-### The simulation and representation seam
-
-`src/core/factory_sim.gd` holds all production state and all production math. It extends
-`RefCounted`, runs on a fixed 20 Hz tick, and does not know a scene tree exists. Every script under
-`src/` extends `RefCounted`, `Resource`, or another script in that directory — none extends `Node`,
-and the directory contains zero `get_tree()` calls. The suites in `tests/` build a sim, tick it, and
-assert on it with no scene instantiated at all.
-
-Everything visible lives in `scenes/`: the renderer, the HUD, the falling-item sprites, the lighting
-passes, the player body. They read the sim and draw it. Player input reaches the sim's discrete verbs
-through a single controller, `scenes/main.gd`, so the input boundary has one crossing point.
-
-Determinism falls out of that. The same seed and the same call sequence produce the same state,
-headless or windowed, which is what makes both the save format and the test suite workable.
-`tests/test_sim.gd` asserts it directly: capture the sim, restore it, tick both copies, compare
-signatures.
-
-### Content is data
-
-Machines, recipes and materials are Godot Resources under `src/data/`. There are currently 20 machine
-definitions, 6 recipes and 16 materials, and a machine is a named recipe-runner by default. 19 of the
-20 carry a `behavior` StringName, and the tag's first job is presentation: `Visuals.MACHINE_STYLE` has
-an entry for each of those 19, and that entry is what gives the machine its glyph and casing colour.
-Only 11 of the tags also appear in `FactorySim._BEHAVIORS`, the sim-side table naming a tag's per-tick
-hooks. The other 8 fall through to the default runner, 5 of them with a recipe attached, and carry a
-tag so the renderer can tell a plate press from a gear mill. Adding a machine with genuinely new
-per-tick work means four things: the hook functions, a row in `_BEHAVIORS`, a row in `MACHINE_STYLE`,
-and the `.tres`. A machine that only runs a recipe needs the last two.
-
-### Worldgen and rendering meet through a contract
-
-`WorldGen.generate(cols, rows, seed)` returns a `WorldData`, which is plain data with no engine
-dependencies: two grids of material ids for foreground blocks and background walls, plus deposit
-richness, a background lode plane, and water levels. `FactorySim.load_world()` ingests it. The
-renderer resolves material ids against `MaterialDef` resources for colour and grain. The generators
-reference nothing under `scenes/`, and `scenes/world_renderer.gd` references no generator, so a new
-generator and a new palette are independent changes.
-
-The live generator is `LayeredWorldGen`, which extends the heightmap generator and adds depth-banded
-ore veins, caves, rifts and sinkholes on top of a heightmap surface. Every ore body in the game is
-born through one function in it, `_grow_vein`, which is what made moving ore into the lode plane a
-change to one funnel rather than to every generation site.
-
-### Drawing
-
-Everything is drawn from code in `_draw`. The only authored images in the project are 16 miner frames
-in `assets/sprites/`, each 32 by 48; every other texture the renderer hands to `draw_texture` is one
-it generated itself. Lighting is a lightmap texture at one texel per cell, stretched over the world
-with linear filtering: daylight floods down open columns until it meets rock, then lamps, torches,
-working machines and powered conduits cut radial holes in the darkness each frame. A
-`WorldEnvironment` glow pass grades the scene, and `scenes/post_fx.gdshader` adds a vignette, film
-grain and a little chromatic aberration on a full-screen rect, on its own canvas layer beneath the
-HUD's, so the world gets the lens and the UI stays crisp.
-
-### Saving
-
-`src/core/save_game.gd` captures the authoritative sim state into one versioned envelope, written
-with Godot's binary Variant serializer so `Vector2i` keys and StringNames survive the round trip.
-Derived state is not saved; it rebuilds on the next tick. The write encodes to a temp file, reads it
-back to prove it decodes, copies the current save to `.bak`, and only then renames over the slot, so
-the slot holds a complete readable game at every point. `restore()` stages the whole envelope into a
-scratch dictionary before touching the sim, so a malformed file is refused without a partial write,
-and a damaged slot falls back to the backup. The envelope is at version 2 and still reads version 1.
-
-## Tests
-
-```sh
-bash tools/run_harness.sh
-```
-
-On a clone that has just been made, the sweep comes back one short, and it is not a defect in the
-game. `check_trailers` asserts that this clone's `core.hooksPath` resolves to the tracked hooks in
-`.githooks/`, and that setting does not survive a `git clone` because nothing carries it: it is a
-property of your copy, not of the repository. Until you run the line the failure itself prints,
-`git config core.hooksPath .githooks`, the layer is correctly telling you the tracked hooks are not
-wired to anything. Run it once and that layer passes. Build machines set `CI`, where the layer stands
-that one assertion down and says so, because nothing commits from a build machine and the wiring
-would prove nothing there.
-
-The runner registers 119 layers, one script each, and launches each as its own Godot process, up to
-the CPU count in parallel. A file lock keeps two sweeps from sharing the machine. The layers fall
-into roughly six kinds:
-
-| Kind | What runs | What it can establish |
-| --- | --- | --- |
-| Simulation | the four headless suites in `tests/`, 64 test functions between them | deterministic state transitions, conservation, save round-trips |
-| World and content | worldgen across seeds, the material and craft registries | that generated worlds and the content graph hold their invariants |
-| Runtime integration | mining, climbing, lifts, settings, save and load through the real scene | that the real code path works under a controlled fixture |
-| Pixels | frames captured from a real window and measured | what a frame actually renders |
-| Timing | frame budget and dig-hitch probes | measured cost on one machine, with nothing else running on it |
-| Play | `tools/play_tests.gd` | that a scripted pilot can reach a goal through the same reach-gated verbs a player uses |
-
-`tools/play_tests.gd` is the closest thing here to an end-to-end test. It boots the real scene with
-an empty pack and walks the real body with real physics through 16 goals, from finding and digging
-the first ore, through the first self-feeding drill and forge line, breaching the seal into
-Stonereach, the iron chain below it, and pumping out a generated aquifer. Four of the goals measure
-friction on journeys a player has to make anyway, including the climb back out of a deep pit. Each
-goal gets up to three tries, because real-time physics and heuristic navigation can miss once. Some
-goals inject resources to arrange the situation; the verb under test is always the real one.
-
-`tools/play_agent.gd` is the driver underneath it, and the split is the point. The agent owns a body and
-a verb set: it walks the real `Player` through real platformer physics and calls the same reach-gated
-verbs the mouse and keyboard call, `try_mine`, `try_build`, `try_deposit`, `try_craft` and `select`.
-Nothing in it reaches past that surface to write a result directly, so if the body cannot walk to a cell
-it cannot mine it, exactly as a player cannot. Actions await the physics frame, which is what lets a goal
-read as a linear script rather than a state machine:
-
-```gdscript
-await agent.dig_down_to(ore)
-await agent.deposit_into_forge()
-```
-
-The one deliberate hatch is `give()`, which injects resources to arrange a situation, such as topping up
-ingots before exercising crafting. It short-circuits the setup and never the verb.
-
-The agent also reports *how* it played, not only whether it finished. Each goal prints jumps, gaps
-bridged, staircases built and frames spent making no progress, alongside blocks broken and blocks laid.
-Those last are friction counts: the byproduct effort of getting somewhere, as distinct from the effort
-the goal is actually about. A goal can pass while thrashing, and these are what make that visible. When
-a mobility tool lands, they are the numbers that are supposed to fall.
-
-A layer reports pass, fail or skip, and skip has its own exit code rather than a quiet zero. 17 layers
-are registered as needing a real window, three of which also need the machine to themselves, and the
-layers that judge pixels detect the absence of a display and skip themselves. The runner prints the
-three counts separately and will not print the word "ALL" over a list containing a skip. There are six
-exit codes in all, and a caller that reads "not zero" as "a test failed" will misdiagnose four of them.
-
-### Exit 4, and why a green sweep does not exit 0
-
-This is the part that surprises people, so it is worth being exact about. A clean local sweep prints
-
-```
-119 PASS / 0 FAIL / 0 SKIP of 119
-HARNESS_EXIT=4
-```
-
-Nothing failed and nothing was skipped, and the run still does not exit 0. **Exit 4 means the sweep was
-not complete, which is a different claim from "something went wrong."** Two things reach it:
-
-- a **skip** — a whole layer that declined to run, under strict mode, which is on by default where there
-  is a display;
-- a **stand-down** — a layer that ran and passed, having declined *some* of its assertions because a
-  precondition for them was not met on this machine.
-
-The second is the usual cause and the reason the number above is 4 rather than 0. Every stand-down is
-declared ahead of time in `tools/stand_downs.txt` with an id, the layer that owns it, and a paragraph
-saying what is not being asserted and why. The runner prints each one and how it resolved, refuses to
-run if it meets an undeclared one, and refuses to let the ledger name a row nobody exercises. So the
-exit code is saying: *these assertions were not made, they are the ones on the list, and the list is
-the same list you could read before the run.*
-
-A row marked `env` is conditional, and the run reports whether this machine reached the assertion or
-not. It is tempting to read a row that reached it as retired. **It usually is not.** Several exist for
-the machines where they do *not* resolve — the authorship word list is deliberately kept out of the
-repository, so a fresh clone has the gate without the list, and the row is what stops that reading as a
-pass over words nothing tested. `ASSERTED` is the state in which such a row is least informative, not
-the state that retires it.
-
-The practical rule: **read the words, not the number.** Two lines carry the answer and they ask different
-questions. `HARNESS_RESULT=yes` says the run *happened*: the runner finished, every declared layer
-reported, and every layer log holds the output of a layer that actually executed. `HARNESS_QUOTABLE=yes`
-says the layers are still doing the work their verdicts claim — every one of them asserted at least as
-many things as it did the last time the floors in `tools/assert_floors.txt` were taken. A layer that
-quietly stops asserting does not go red on its own: refusing a green that asserted *nothing* is cheap,
-and between nothing and everything the widest layer here makes several hundred assertions and could have
-fallen to one
-and still printed PASS. A verdict missing either line is not a result.
-
-119 is a count of registered layers, not a coverage figure. And the suite does not measure whether the
-game is enjoyable: a play goal establishes that a scripted pilot reached it, which is a much narrower
-claim.
-
-The suite protects the real save while it runs. Every layer executes against an isolated `HOME`, and
-a sentinel hashes the production save slot before and after the sweep, so a layer that writes to it
-fails the run loudly with its own exit code instead of quietly eating a game.
-
-### Four ways a layer can run, and what each one can be trusted about
-
-The table above groups layers by *what they assert*. This one groups them by *what has to be true of the
-machine* for the assertion to mean anything, which is the distinction that decides where a layer can run
-and why no single job runs all of them.
-
-| Mode | Registered as | Needs | Trustworthy about | Not trustworthy about |
-| --- | --- | --- | --- | --- |
-| Headless | `add` | nothing but a CPU | logic, state, content, save round-trips | anything drawn |
-| Headed, pixel-reading | `add_gl` | a real surface to draw into | what a frame contains | how long anything took |
-| Headed, exclusive | `add_excl` | the surface **and** the machine to itself | the same, where a neighbour would perturb the picture | anything, if run in parallel |
-| Timing | `add_excl_hl` | the machine to itself, headless | cost on *this* machine, nothing else running | cost anywhere else |
-
-The last row is why `check_frametime` is excluded from CI rather than made to pass there: a software
-rasterizer draws at 6 to 9 fps, so its hitch ratios describe the rasterizer. A timing layer that "passes"
-under those conditions has measured the wrong thing, and the fix for a number that does not transfer is
-not to widen the bound until it does.
-
-The middle two rows are why a green local sweep and a red CI are not a contradiction. A pixel layer is
-only as truthful as the thing that drew the pixels, and there are two renderers.
-
-`docs/HARNESS_LAYERS.md` covers the shape of a layer, the three-state exit protocol, and the failure
-modes that have actually bitten this suite. `CONTRIBUTING.md` covers running a subset safely.
-
-### More test code than game code
-
-Rounded, and counted over tracked GDScript and shell:
-
-| | Files | Lines |
-| --- | --- | --- |
-| Game — `scenes/` and `src/` | 52 | ~27,000 |
-| Tooling — `tools/` | 131 | ~41,000 |
-
-That ratio is not a big generated suite padding a small game. It is what verifying *presentation* costs.
-
-A simulation assertion is cheap to write, because the answer is a number and the check is an equality.
-Most of what makes this project succeed or fail is not a number: whether a machine reads as that machine,
-whether a tunnel reads as carved rock rather than as a hole in a texture, whether a menu's hierarchy
-survives being seen for the first time. None of that can be asserted on directly, so a large share of
-`tools/` is not assertions at all. It is **instruments**: things that render a real frame, reduce it to a
-statistic with a stated meaning, and then assert on the statistic.
-
-An instrument is only worth its verdict if it can still register the thing it is pointed at, so the
-layers that use one carry their controls in the same run rather than in a separate test. The machine
-identity layer is a representative example. Before it compares any two machines it establishes that the
-camera has stopped, that still-frame noise masks less of the cell than two machines are required to
-differ by, that a mask against itself scores zero, and that two masks known to differ by 30% score 0.30.
-Only then does the comparison mean anything, and a failure of one of those controls is a different
-finding from a failure of the comparison.
-
-### The harness polices the harness
-
-A test suite is code, and this one has produced every failure mode it now guards against. So a group of
-layers take the repository, or the suite itself, as their subject rather than the game.
-
-| Layer | What it refuses to let happen |
-| --- | --- |
-| `check_vacuous_assertions` | an assertion that cannot fail: a bound outside the range the expression can reach, or an error path that returns the value the assertion wants |
-| `check_verdict_claims` | a verdict line claiming more than any assertion in that layer actually tested |
-| `check_ci_coverage` | a registered layer that no CI job runs. The motivating defect was live with both jobs green over it: the display job selected its pixel layers by name, so a layer added afterwards was registered, passing locally, and never once run on a build machine |
-| `check_doc_counts` | a layer count printed in prose drifting from the count the runner registers |
-| `check_fixture_pointer` | the guard that turns "a person moved the mouse mid-measurement" into a void rather than a failure, checked in *both* directions, since a guard that never fires voids nothing and a guard that always fires voids every aim assertion in the suite |
-| `check_shared_constants` | two files agreeing on a value by both happening to write it, with no line relating them that could fail when one moves |
-| `check_prose` | the comment register, and documents citing a layer by its index in the registry instead of by its path |
-| `check_binding_conflict`, `check_binding_text` | two keys claiming one job, and key names shown in the UI drifting from the bindings behind them |
-| `check_trailers` | authorship on every commit, through the tracked hooks in `.githooks/` |
-
-The rule they all descend from is in `CONTRIBUTING.md`: *a comment that states a number is a test with no
-runner.* Either derive the fact from the constant, or put it somewhere the harness checks it.
-
-### CI
-
-`.github/workflows/harness.yml` runs three jobs on every push to `main` and every pull request: an
-authorship and capture-manifest check, the whole registration headless, and the window-dependent layers
-under xvfb with a software Vulkan driver. No single job runs every layer. `check_frametime` is
-deliberately excluded from CI, because a software rasterizer draws at 6 to 9 fps and its hitch ratios
-then describe the rasterizer.
-
-CI is red on two layers and a local sweep is red on one of them, and no job's numbers are another's. None
-of that is a contradiction, and it is worth setting out because it is the whole reason this suite is split
-into jobs:
-
-| Where | Renderer | What runs | Result |
-| --- | --- | --- | --- |
-| a local sweep | the machine's real GPU, through a real window | all 115 layers in one run | 114 pass, 1 fail, 0 skip — `check_grapple_reads`, with the six declared stand-downs |
-| CI, headless job | Godot's dummy renderer | all 115 declared; the 16 that detect the absent display stand themselves down | 99 pass, 0 fail, 16 skip |
-| CI, display job | xvfb with Mesa's lavapipe, a software Vulkan device | 16 of the 17 window-dependent layers — `check_frametime` is excluded | 14 pass, 2 fail — `check_grapple_reads` and `check_machine_identity` |
-
-**The frame for those tallies.** They were read at `e89eef9` on 2026-08-23, from one local sweep and one CI
-run, and every one of them moves when a layer is added or a red is fixed. Trust the layer names and the
-shape of the split; the totals are prose, and prose has no runner. The authorship job passes in all cases.
-
-The useful part is that one red crosses both renderers and the other does not. `check_grapple_reads` fails
-the same assertion on a real GPU and on lavapipe, and reads almost the same number doing it: the grapple
-preview out-reads the miner throwing it, 143.3 levels of edge against the body's 87.3 locally and 141.5
-against 88.3 in CI, where the layer wants the body to lead by at least 1.15x. That is a finding about the
-game and not about a rasterizer — an aiming aid is currently louder than the character it belongs to — and
-it is open work. `check_machine_identity` is the other kind: it fails in CI and only intermittently on
-hardware, where the stage cell of a removed machine has not gone quiet within the 180 frames the layer
-allows it. A layer that reads pixels can only be as truthful as the thing that drew them, which is why the
-display job exists at all.
-
-Neither CI job has its assertion floors judged, and the two jobs miss for different reasons. The headless
-job resolves three of the six stand-downs, so `assert_floors` refuses to compare it against floors taken
-under six; the display job is a subset run, and a subset says nothing about the layers it did not run. Both
-print `HARNESS_QUOTABLE=unjudged`. The skip-route gate does judge both jobs, and passes. So the floor gate
-that guards a local sweep is, in CI, running and then declining to answer — a real gap, written down here
-rather than left for a reader to find.
-
-This README carries no build badge while any job is red.
-
-## Repository map
-
-| Path | What lives there |
-| --- | --- |
-| `src/core/` | the simulation: `FactorySim`, the world generators, water and power flow, save and load. No engine dependencies beyond `RefCounted`. |
-| `src/data/` | content as Godot Resources — 20 machines, 6 recipes, 16 materials — plus the static rule tables for mining tiers, research, seams and bits. |
-| `scenes/` | everything visible: the controller `main.gd`, the renderer, the HUD, the player body, and five shaders. |
-| `assets/sprites/` | the only authored art in the project: 16 miner frames and their Aseprite source. |
-| `tests/` | four headless suites sharing `test_base.gd`, 64 test functions, run with no scene tree. |
-| `tools/` | the harness runner and its 119 layers, the play-tests, the capture and profiling tools, the machine lock. |
-| `docs/` | architecture, decisions, design documents, the harness-layer guide, and the generated capture manifest. |
-| `history/` | a dated screenshot archive, 165 frames. A record of builds that no longer exist, not an asset the game loads. |
-| `docs/media/moments/` | the canonical captures of named moments, indexed by `docs/CAPTURE_MANIFEST.md` with the date and renderer signature of the build that produced each one. |
-| `.githooks/` | the tracked `commit-msg` and `pre-commit` hooks. Activate them once per clone; `CONTRIBUTING.md` says how. |
-
-**On clone size.** `history/` and `docs/media/` are together most of the repository, and both are tracked
-on purpose. The captures under `docs/media/` are the evidence the presentation work argues from:
-`docs/CAPTURE_MANIFEST.md` records the date and the renderer signature of the build that produced each
-frame, and several documents reason from specific named frames. A claim of the form "this change is
-invisible at play zoom" is only checkable while the before frame is still in the tree, and a baseline
-that has to be regenerated to be consulted is not a baseline. `history/` is the same argument over a
-longer span: 165 screenshots recording the project's development, committed rather than referenced. The
-stronger reason predates and outlasts either argument — 84 of these screenshots were once permanently
-lost during a refactor, and `docs/DECISIONS.md`'s "Never destroy a curated file" rule exists because of
-it. Committing is the strongest protection this repository can give them; a release attachment or an
-LFS store would be a step back to a weaker one, considered and rejected for exactly that reason.
-Neither directory is read by the game; both carry a `.gdignore` so the engine does not import them.
-
-## Documents
-
-Every document in the repository, grouped by what you would open it for. A design document's own first
-paragraph carries its status; the third column here is a summary of it, so that nothing on this list has
-to be read before you know whether it describes the game as it is or as it is meant to become.
-
-**Start here, then go sideways.** `README.md` says what the game is and how to run it, `CONTRIBUTING.md`
-is how to work on it, `docs/ARCHITECTURE.md` is where the code lives, and `docs/DECISIONS.md` is why any
-of it is the way it is.
-
-### Working on the project
-
-| File | What it is for | Status |
-| --- | --- | --- |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to run the game and the tests, the house conventions, how to add a harness layer | current |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | the load-bearing systems in depth — responsibility, public API, what depends on them — then a module index covering the rest of the tree | current |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the decision record: what was decided, why, and where in the repository to check it | current |
-| [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | how the project is verified: the three execution classes, why an assertion that cannot fail is a defect, and what the capture manifest is for | current |
-| [`docs/HARNESS_LAYERS.md`](docs/HARNESS_LAYERS.md) | the shape of a test layer and the failure modes this suite has actually hit | current |
-
-### What the game is meant to be
-
-| File | What it is for | Status |
-| --- | --- | --- |
-| [`docs/GDD.md`](docs/GDD.md) | the design document — what the game is trying to be | design, v0.2 |
-| [`docs/PROGRESSION.md`](docs/PROGRESSION.md) | the depth ladder: gates, research, and what each layer is for | rungs 1–2 built, the rest design |
-| [`docs/MATERIAL_SPINE.md`](docs/MATERIAL_SPINE.md) | the shipped economy, read off the data files rather than off intent | current, and deliberately not aspirational |
-
-### One feature at a time
-
-Each of these specifies a single system and records, at the top, which parts of itself have actually
-landed and which are still only written down.
-
-| File | What it is for | Status |
-| --- | --- | --- |
-| [`docs/BAZAAR.md`](docs/BAZAAR.md) | the research and crafting counter: one panel, three tabs | shipped, with the deviations recorded in it |
-| [`docs/BITS.md`](docs/BITS.md) | picks that differ in shape, and rock that has a grain | mostly shipped; the Rack and drives-as-research are still spec |
-| [`docs/DRIFT.md`](docs/DRIFT.md) | the Drift Rig and spoil: horizontal extraction, vertical logistics | §3 and §4 shipped; the deeper packing payoffs are spec |
-| [`docs/LODE.md`](docs/LODE.md) | ore in the background wall plane, and why mining stopped being a trap | phases 1–2a shipped, 2b–4 spec |
-| [`docs/LODE_PLAN.md`](docs/LODE_PLAN.md) | the migration behind `LODE.md`: blast radius, order of work, and how to get back | in flight |
-| [`docs/SANDBOX.md`](docs/SANDBOX.md) | a proposed contact-sheet fixture for judging materials side by side | **proposed, not built** — nothing in it exists yet |
-
-### Presentation, and the captured record
-
-| File | What it is for | Status |
-| --- | --- | --- |
-| [`docs/VISUAL_TRIAGE.md`](docs/VISUAL_TRIAGE.md) | the evidence ledger behind the presentation work: screenshot complaints turned into falsifiable workstreams | current |
-| [`docs/CAPTURE_MANIFEST.md`](docs/CAPTURE_MANIFEST.md) | every canonical capture, its date, and the renderer signature of the build that took it | generated; do not edit by hand |
-| [`docs/media/baseline/README.md`](docs/media/baseline/README.md) | the immutable "before" frames for the presentation work, and what was read off them | **historical** — a fixed record of the build at `4e0444c` |
-| [`docs/media/p1/README.md`](docs/media/p1/README.md) | the matching "after" frames for the first presentation pass | **historical** — paired with `docs/media/baseline/` above |
-
-## Status
-
-Early, and in active development.
-
-Playable today: hand-mining, hauling and hand-feeding; crafting and placing machines from the pack; a
-self-feeding drill and forge line; coal-fired power and conduit routing; ropes, a grapple and lifts;
-research at a bazaar bench; the seal breach into Stonereach and the iron chain below it; water as an
-integer-level fluid, with pumps to clear it. Save and load, a map, a tech tree, a production dashboard,
-and a settings screen with remappable keys.
-
-Not there yet. The generated world runs from Topsoil down to Stonereach, the second rung of the ladder
-in `docs/PROGRESSION.md`. The third rung's fluid mechanic already exists as water and pumps and its
-tooling is on the research tree, but the rung itself and everything past it are design rather than
-code. The lode migration is mid-flight. There is no combat and no packaged build. Most of the art is
-placeholder, and underground legibility is an open problem, since outside a lamp pool rock and empty
-space are hard to tell apart.
-
-Expect things to change.
-
-## License
-
-MIT. See [`LICENSE`](LICENSE).
+| `layer_lint.py` | dependency direction between layers is one-way |
+| `no_engine_imports.py` | `core/`/`sim/` never touch the scene tree, file IO, the wall clock, unseeded randomness, or several other categories of engine coupling |
+| `check_coordinate_naming.py` | every coordinate crossing `sim/world`/`sim/terrain_gen`'s API names which of two grids it's on |
+| `check_size_limits.py` | no file over 400 lines, no function over 50 |
+| `check_loc_ratio.py` | instrument code isn't outgrowing game code |
+| `schema_validator.py` | every data file matches its schema |
+| `check_claim_references.py` | every scenario names a claim that actually exists |
+
+Two findings this stage show the gates doing real work rather than performing it. `no_engine_imports.py`
+had checked for engine coupling since the project's restructuring, but only against a handful of
+hand-picked class names — an audit against Godot's actual class registry found it would have let 276
+more engine classes through silently, including something as ordinary as extending `Timer`. It's now
+derived directly from that registry (`docs/DECISIONS_LEDGER.md` D0026). Separately, mutation-testing
+`sim/terrain_gen`'s safety guards found that two of them survived being deliberately broken under the
+project's own full-scale integration test, because the condition each one protects against is rare
+enough that a normal run never happens to exercise it (D0024) — a real defect a green suite would not
+have caught, found by breaking the code on purpose rather than trusting that it passed. Both are now
+`docs/QUALITY.md` §2 rules, not one-off fixes to one file.
+
+## `legacy/`
+
+`legacy/` holds the pre-pivot codebase: read-only, excluded from every build and every gate, tagged in
+full at `pre-pivot`. It's kept because the compatibility audit found most of it worth porting, not
+rewriting — deleting it to start clean would have thrown that finding away and read, correctly, as a
+panic rewrite it wasn't. Files leave one at a time: each commit that moves code out of `legacy/` names
+the original path, states what changed and why, and the result has to fit the new layer boundaries,
+size limits, and naming conventions or it doesn't leave yet. `legacy/README.md` has the detail.
+
+## Clone size
+
+This is a large clone on purpose. `.git` is 351 MB and the tracked working tree is 332 MB;
+`history/` (229 MB, 166 dated screenshots) and `docs/media/` (104 MB, the canonical visual record of
+named moments) together account for nearly all of it, and both are tracked deliberately rather than
+referenced externally. Eighty-four screenshots from an earlier version of this archive were once
+permanently lost during a refactor, which is the entire reason `docs/DECISIONS.md`'s "never destroy a
+curated file" rule exists (LOCKED) — a release attachment or an LFS store was considered and rejected
+for the same reason a moved file isn't a deleted one: it would trade a strong protection for a weaker
+one. `legacy/` itself, the frozen pre-pivot code, adds only 7.3 MB on top of that. Neither `history/`
+nor `docs/media/` is read by the game; both carry a `.gdignore` so the engine's import scan skips them.
