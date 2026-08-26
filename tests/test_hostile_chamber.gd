@@ -12,9 +12,9 @@ func _initialize() -> void:
 	_test_1_tile_ledge_present()
 	_test_rubble_is_jagged_and_actually_dug()
 	_test_machine_cluster_present()
-	_test_ceiling_corner_present_and_tight()
+	_test_jump_corner_present()
 	_test_mantle_step_present()
-	_test_narrow_shaft_present_and_3_tiles_wide()
+	_test_narrow_shaft_present_and_correctly_wide()
 	_finish("hostile_chamber")
 
 
@@ -80,21 +80,19 @@ func _test_machine_cluster_present() -> void:
 	_check(found, "at least one column in the machine-cluster span protrudes above its own floor level")
 
 
-func _test_ceiling_corner_present_and_tight() -> void:
+func _test_jump_corner_present() -> void:
+	# Not "tight relative to a floor" -- this obstruction lives entirely in the pit jump's rising
+	# airspace, never above a walkable floor at all, so there is no floor-relative clearance to measure.
+	# See `HostileChamber.JUMP_CORNER_COL`'s own comment for why THIS shape (a single cell only the jump
+	# arc reaches) is the one corner correction can resolve, unlike this test's predecessor.
 	var grid: TileGrid = HostileChamber.build()
-	var floor_row: int = HostileChamber.FLOOR_ROW - 4
-	var floor_y: int = Fx.from_int(floor_row * CELL)
-	var found_overhang: bool = false
-	var tight: bool = false
-	for col: int in range(HostileChamber.CEILING_CORNER_START, HostileChamber.CEILING_CORNER_END):
-		for row: int in range(0, floor_row):
-			if grid.is_solid(Vector2i(col, row)):
-				found_overhang = true
-				var clearance: int = floor_y - Fx.from_int(row * CELL + CELL)
-				if clearance < Fx.from_int(Body.HEIGHT_PX):
-					tight = true
-	_check(found_overhang, "an overhang exists over the ceiling-corner section")
-	_check(tight, "the overhang's clearance is tighter than the body's own height -- a clean pass requires corner correction, not just walking under it")
+	_check(grid.is_solid(Vector2i(HostileChamber.JUMP_CORNER_COL, HostileChamber.JUMP_CORNER_ROW)),
+		"a corner obstruction exists in the pit jump's rising arc")
+	_check(HostileChamber.JUMP_CORNER_COL >= HostileChamber.PIT_START - ScriptedTraverse.JUMP_RUNWAY_COLS and
+		HostileChamber.JUMP_CORNER_COL < HostileChamber.PIT_END,
+		"the corner sits within the jump's own column span, not off in unrelated terrain")
+	_check(HostileChamber.JUMP_CORNER_ROW < HostileChamber.FLOOR_ROW - (Body.HEIGHT_PX / CELL),
+		"the corner sits above the spawn floor's own headroom -- a grounded body never reaches it, only the jump's arc does")
 
 
 func _test_mantle_step_present() -> void:
@@ -107,17 +105,19 @@ func _test_mantle_step_present() -> void:
 		[Body.MANTLE_PX, rise / Fx.SCALE, Body.STEP_UP_PX])
 
 
-func _test_narrow_shaft_present_and_3_tiles_wide() -> void:
+func _test_narrow_shaft_present_and_correctly_wide() -> void:
 	var grid: TileGrid = HostileChamber.build()
-	var mid_row: int = (HostileChamber.SHAFT_FLOOR_ROW + HostileChamber.FLOOR_ROW) / 2
+	# Sampled well above where the right wall deliberately stops (`Body.HEIGHT_PX` above the shaft floor,
+	# so the body has full standing headroom to walk out) -- a row any lower would read the exit gap as
+	# part of the shaft's own opening and over-count its width.
+	var mid_row: int = HostileChamber.SHAFT_FLOOR_ROW - Body.HEIGHT_PX / CELL - 4
 	var open_cols: int = 0
 	for col: int in range(HostileChamber.SHAFT_START, HostileChamber.SHAFT_END):
 		if not grid.is_solid(Vector2i(col, mid_row)):
 			open_cols += 1
-	var want_cols: int = 3 * (Body.LOGIC_TILE_PX / CELL)
-	_check(open_cols == want_cols,
-		"the shaft opening is exactly 3 logic tiles wide (%d terrain cols, got %d)" %
-		[want_cols, open_cols])
+	_check(open_cols == HostileChamber.SHAFT_OPEN_COLS,
+		"the shaft opening is exactly SHAFT_OPEN_COLS wide (%d terrain cols, got %d)" %
+		[HostileChamber.SHAFT_OPEN_COLS, open_cols])
 	# Confining walls actually exist with real width -- catches the exact bug found while building this:
 	# the outer section bound once matched the opening's own width exactly, leaving zero-width walls.
 	_check(grid.is_solid(Vector2i(HostileChamber.SHAFT_OPEN_START - 1, mid_row)),
@@ -126,3 +126,15 @@ func _test_narrow_shaft_present_and_3_tiles_wide() -> void:
 		"a real wall exists immediately right of the shaft opening, not a zero-width margin")
 	_check(not grid.is_solid(Vector2i(HostileChamber.SHAFT_OPEN_START + 2, HostileChamber.SHAFT_FLOOR_ROW - 1)),
 		"the shaft is genuinely open well below its top, not just a notch")
+	# The exit past SHAFT_OPEN_END needs the body's FULL height of clearance to walk out standing up, not
+	# just an opening at foot level -- a corridor tall enough for feet but not head reads as a wall the
+	# instant the body is close enough to stand on the floor at all (the exact bug this test once missed).
+	var exit_col: int = HostileChamber.SHAFT_OPEN_END + 1
+	var clear_rows: int = 0
+	for row: int in range(HostileChamber.SHAFT_FLOOR_ROW - 1, 0, -1):
+		if grid.is_solid(Vector2i(exit_col, row)):
+			break
+		clear_rows += 1
+	_check(clear_rows >= Body.HEIGHT_PX / CELL,
+		"the exit past the shaft has a full body-height of clearance above its floor (got %d rows, need %d)" %
+		[clear_rows, Body.HEIGHT_PX / CELL])

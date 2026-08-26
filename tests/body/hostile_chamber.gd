@@ -18,20 +18,47 @@ const SPAWN_START: int = 0
 const PIT_START: int = 16          ## 1 tile (4 cols) wide, no floor at all
 const PIT_END: int = 20
 const POST_PIT_START: int = 20     ## same height as spawn -- a pure gap-jump, not also a height change
-const LEDGE_START: int = 36        ## hard 1-tile (16px) step UP -- auto step-up
-const PLATEAU_START: int = 40
-const RUBBLE_START: int = 56       ## jagged, actually-dug surface -- 1-3px sub-pixel rubble slopes
-const RUBBLE_END: int = 64
-const MACHINE_CLUSTER_START: int = 64
-const MACHINE_CLUSTER_END: int = 68
-const CEILING_CORNER_START: int = 68
-const CEILING_CORNER_END: int = 72
-const MANTLE_START: int = 72       ## 2-tile (32px) step -- too tall to auto-step, needs a mantle hold
-const MANTLE_END: int = 80
-const SHAFT_START: int = 80        ## outer bound of the shaft SECTION -- includes the confining walls
-const SHAFT_WALL_COLS: int = 6     ## either side of the 3-tile (12-col) opening, so the walls have a
-const SHAFT_OPEN_COLS: int = 12    ## real width rather than degenerating to zero when the section's
-const SHAFT_END: int = SHAFT_START + SHAFT_WALL_COLS * 2 + SHAFT_OPEN_COLS  ## outer bound exactly matched the opening's own width
+## The pit jump's own natural landing distance, measured on a flat floor with the real ARCHITECTURE §9
+## constants (JUMP_VELOCITY/GRAVITY/APEX_FLOAT), not assumed -- it lands around column 46, ~30 columns
+## past the jump, because APEX_FLOAT's floaty hangtime carries it far past what the ORIGINAL, much
+## shorter POST_PIT-to-LEDGE runway (this constant's predecessor put LEDGE_START at 36) assumed. With
+## that runway, the jump sailed clean over the ledge -- and the platform and rubble past it -- landing for
+## the first time deep in the rubble section with the ledge's own step-up never exercised at all. Moving
+## LEDGE_START (and every section after it) out by the same margin gives the jump room to land and the
+## body room to walk a settled, grounded approach into the ledge, rather than clip it mid-flight.
+const POST_PIT_RUNWAY_COLS: int = 24
+## A single solid cell in the pit jump's own rising arc (docs/DECISIONS_LEDGER.md D0039 has the
+## trajectory math this is placed against): first contact is an EXIT-side graze -- the body's box has
+## already flown past this column by the time its rising top edge reaches this row, so only a sliver of
+## the box's trailing edge still overlaps it. That shape is what `CORNER_NUDGE_PX` can actually resolve
+## (a forward nudge shrinks a trailing graze); a leading-edge graze, or a full-width overhang the body is
+## still walking INTO, grows under the same forward nudge instead of clearing -- corner correction cannot
+## rescue either, no matter how tight the margin. `_place_ceiling_corner`, this constant's predecessor,
+## was exactly that unrescuable shape (a full-corridor-width overhang over the walking path); it never
+## verified traversal, only presence, which is why the acceptance suite -- not the presence check -- is
+## what caught it.
+const JUMP_CORNER_COL: int = 15
+const JUMP_CORNER_ROW: int = 2
+const LEDGE_START: int = 36 + POST_PIT_RUNWAY_COLS        ## hard 1-tile (16px) step UP -- auto step-up
+const PLATEAU_START: int = 40 + POST_PIT_RUNWAY_COLS
+const RUBBLE_START: int = 56 + POST_PIT_RUNWAY_COLS       ## jagged, actually-dug surface -- 1-3px sub-pixel rubble slopes
+const RUBBLE_END: int = 64 + POST_PIT_RUNWAY_COLS
+const MACHINE_CLUSTER_START: int = 64 + POST_PIT_RUNWAY_COLS
+const MACHINE_CLUSTER_END: int = 68 + POST_PIT_RUNWAY_COLS
+const MANTLE_START: int = 72 + POST_PIT_RUNWAY_COLS       ## 2-tile (32px) step -- too tall to auto-step, needs a mantle hold
+const MANTLE_END: int = 80 + POST_PIT_RUNWAY_COLS
+const SHAFT_START: int = 80 + POST_PIT_RUNWAY_COLS        ## outer bound of the shaft SECTION -- includes the confining walls
+const SHAFT_WALL_COLS: int = 6     ## either side of the opening, so the walls have a real width rather
+## The opening's width. A 3-logic-tile (12-column) shaft, "roughly 3 cells" per the original chamber
+## spec, is narrower than the body's OWN natural rightward drift over the full fall under continuous
+## forward input -- measured (with the walls removed, not guessed) at 77.5px total, against 12 columns *
+## 4px - WIDTH_PX(16px) = 32px of lateral room. A first attempt at 16 columns (48px of room) still fell
+## well short for the same reason: 48 < 77.5, it just moved WHERE in the fall contact happened, not
+## whether it happened. A shaft this deep needs the FULL measured drift of room, not a guess at it, or
+## it isn't "narrow", it's "too narrow to fall through cleanly" -- 28 columns (96px of room) clears the
+## measured 77.5px with margin.
+const SHAFT_OPEN_COLS: int = 28
+const SHAFT_END: int = SHAFT_START + SHAFT_WALL_COLS * 2 + SHAFT_OPEN_COLS
 const SHAFT_OPEN_START: int = SHAFT_START + SHAFT_WALL_COLS  ## the actual open (fall-through) columns,
 const SHAFT_OPEN_END: int = SHAFT_OPEN_START + SHAFT_OPEN_COLS              ## not the section's outer bound
 const SHAFT_FLOOR_ROW: int = 32
@@ -46,13 +73,12 @@ static func build() -> TileGrid:
 	var grid: TileGrid = TileGrid.new(END_COL + 4, SHAFT_FLOOR_ROW + 10, 20260825)
 	_fill_flat(grid, SPAWN_START, PIT_START, FLOOR_ROW)
 	_fill_flat(grid, POST_PIT_START, LEDGE_START, FLOOR_ROW)
+	_place_jump_corner(grid, JUMP_CORNER_COL, JUMP_CORNER_ROW)
 	_fill_flat(grid, LEDGE_START, PLATEAU_START, FLOOR_ROW - 4)  ## 1 tile (16px) higher
 	_fill_flat(grid, PLATEAU_START, RUBBLE_START, FLOOR_ROW - 4)
 	_carve_rubble(grid, RUBBLE_START, RUBBLE_END, FLOOR_ROW - 4)
-	_fill_flat(grid, MACHINE_CLUSTER_START, CEILING_CORNER_START, FLOOR_ROW - 4)
+	_fill_flat(grid, MACHINE_CLUSTER_START, MANTLE_START, FLOOR_ROW - 4)
 	_place_machine_cluster(grid, MACHINE_CLUSTER_START, FLOOR_ROW - 4)
-	_fill_flat(grid, CEILING_CORNER_START, MANTLE_START, FLOOR_ROW - 4)
-	_place_ceiling_corner(grid, CEILING_CORNER_START, FLOOR_ROW - 4)
 	_fill_flat(grid, MANTLE_START, SHAFT_START, FLOOR_ROW - 4 - Body.MANTLE_PX / CELL)  ## 2 tiles higher
 	_place_shaft_walls(grid, SHAFT_START, SHAFT_END, FLOOR_ROW - 4 - Body.MANTLE_PX / CELL, SHAFT_FLOOR_ROW)
 	_fill_flat(grid, SHAFT_END, END_COL, SHAFT_FLOOR_ROW)
@@ -91,32 +117,33 @@ static func _place_machine_cluster(grid: TileGrid, from_col: int, top_row: int) 
 		grid.set_material(Vector2i(col, top_row - 1), &"hardrock")  ## one cell (4px) above the floor
 
 
-## A low overhang directly over the walkable path, deliberately a few px TOO tight to clear a full
-## walk-through cleanly (`Body.HEIGHT_PX` minus a small margin, not plus one) -- a body entering or
-## leaving its span partially overlaps the blocking column while the rest of its box has already
-## cleared, exactly the "ceiling contact near a corner" case `CORNER_NUDGE_PX` exists to slip past.
-static func _place_ceiling_corner(grid: TileGrid, from_col: int, top_row: int) -> void:
-	var clearance_rows: int = (Body.HEIGHT_PX - 4) / CELL
-	var overhang_bottom: int = top_row - clearance_rows
-	# Only 3 of this section's 4 columns carry the overhang -- the 4th (this section's last) stays
-	# clear, so a caller sampling "the column right before the next section" doesn't read the overhang
-	# instead of the floor. A real design choice, not an accident: it also gives the body a moment of
-	# full headroom right before the mantle step, matching how a real chamber would breathe between
-	# hostile features rather than stacking them with zero transition.
-	for col: int in range(from_col, from_col + 3):
-		for row: int in range(overhang_bottom - 6, overhang_bottom):
-			grid.set_material(Vector2i(col, row), &"hardrock")
+## A single solid cell, high above the pit, that only the jump's rising arc ever reaches -- see
+## `JUMP_CORNER_COL`'s own comment for why this specific (column, row) is a corner correction can
+## actually resolve rather than an unrescuable full-width overhang.
+static func _place_jump_corner(grid: TileGrid, col: int, row: int) -> void:
+	grid.set_material(Vector2i(col, row), &"hardrock")
 
 
 ## A 3-logic-tile-wide (`SHAFT_OPEN_COLS` terrain cells) vertical shaft: solid walls either side (the
 ## `SHAFT_WALL_COLS`-wide margins between `from_col`/`to_col` and the open span), open in between,
-## descending from `top_row` to `bottom_row`, with a floor at the bottom of the open span.
+## descending from `top_row` to `bottom_row`, with a floor at the bottom of the open span. The LEFT wall
+## runs the full height including below the floor (nothing exits that way); the RIGHT wall stops a full
+## `Body.HEIGHT_PX` above the floor -- the body needs its own full height of clearance to walk out
+## standing up, not just an opening at foot level. Stopping it only at the floor's own top (this
+## function's second version) left a corridor tall enough for the body's feet but not its head, which
+## `_resolve_horizontal` reads as a wall the moment the body is close enough to stand on the floor at all;
+## stopping it at the floor level exactly (the first version) sealed the shaft into a box with no way out.
 static func _place_shaft_walls(grid: TileGrid, from_col: int, to_col: int, top_row: int, bottom_row: int) -> void:
+	var right_wall_bottom: int = bottom_row - Body.HEIGHT_PX / CELL
 	for row: int in range(top_row - 4, bottom_row + 4):
 		for col: int in range(from_col, SHAFT_OPEN_START):
 			grid.set_material(Vector2i(col, row), &"hardrock")
+	for row: int in range(top_row - 4, right_wall_bottom):
 		for col: int in range(SHAFT_OPEN_END, to_col):
 			grid.set_material(Vector2i(col, row), &"hardrock")
+	# Floor spans the open span AND the space the right wall used to occupy below `bottom_row` -- without
+	# that margin, stopping the right wall early (above) leaves a gap with no floor at all between the
+	# shaft's own floor and `END_COL`'s floor, which starts at `to_col`.
 	for row: int in range(bottom_row, bottom_row + 4):
-		for col: int in range(SHAFT_OPEN_START, SHAFT_OPEN_END):
+		for col: int in range(SHAFT_OPEN_START, to_col):
 			grid.set_material(Vector2i(col, row), &"hardrock")

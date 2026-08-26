@@ -778,3 +778,121 @@ function that consumed them drift apart unnoticed. Added a direct regression tes
 immediately outside each side of the opening, which the pre-fix geometry would have failed.
 Reverse: CHEAP — column constants only, still nothing built against them outside this fixture and its
 own tests.
+
+## D0038 · 2026-08-26 · stage 4(d) acceptance suite: green, with zero ARCHITECTURE constants touched
+Decided: `tests/test_body_acceptance.gd` passes all nine `docs/ARCHITECTURE.md` §9 thresholds against
+`HostileChamber` + `ScriptedTraverse`. Every fix that got it there is in fixture code this session wrote
+(`hostile_chamber.gd`, `scripted_traverse.gd`, the acceptance driver's own span checks) — `sim/body/body.gd`
+was not touched again after D0034/D0035 landed; a diff against the pre-debugging copy is byte-identical.
+Zero of the two permitted constant-adjustment rounds were spent.
+The first real run failed 7 of 9 checks, permanently stuck. Root-caused and fixed in sequence, each one
+verified against a full suite re-run before moving to the next (not batched, so each fix's own effect was
+legible):
+1. The acceptance driver's own spawn math passed the body's intended TOP position directly as `pos_y`,
+   which `Body` treats as CENTRE — spawning the body 20px above the true floor. Self-corrected once
+   `_resolve_floor` caught it on the first landing, so it only cost the run's first ~13 ticks, but it
+   muddied every early trace read before it was found. Fixed: `floor_y - HEIGHT_PX/2`, not `floor_y - HEIGHT_PX`.
+2. `_place_ceiling_corner` (D0036) built a 3-column-wide, 24px-tall overhang directly over the walking
+   floor, with clearance 4px shorter than `Body.HEIGHT_PX` — geometrically impossible for a rigid,
+   crouch-less AABB to pass under while grounded, at ANY position, regardless of corner-nudge: a nudge
+   moves the box along the same axis it's already traveling, and a first-contact ("entering") overlap
+   only grows under a nudge in the direction of travel, never shrinks (worked out algebraically, then
+   confirmed against the recorded tick log). `CORNER_NUDGE_PX` can only ever rescue an "exiting" graze —
+   trailing contact on an obstacle the box has already mostly cleared — which never happens on first
+   contact with anything. Replaced with a single solid cell in the pit jump's own rising arc (D0039),
+   the shape corner correction can actually resolve. The presence test this section's construction
+   shipped with (`_test_ceiling_corner_present_and_tight`) asserted exactly the two facts that made it
+   unrescuable ("an overhang exists", "clearance < HEIGHT_PX") and called that "tight" — it never asked
+   whether a body could actually get through, which only the acceptance suite's own end-to-end run could
+   catch. Presence is not passability.
+3. `ScriptedTraverse.next_input`'s `mantle_hold` trigger compared the body's CENTRE column against
+   `MANTLE_START`, but the body's leading edge — where contact with the mantle wall actually begins — is
+   `Body.WIDTH_PX / 2` (2 terrain columns) ahead of centre, and the input read each tick reflects the
+   PREVIOUS tick's position on top of that. Net: the hold activated one tick after contact needed it.
+   Fixed with a 3-column lead (2 for the half-width, 1 for the input's one-tick staleness) — the same
+   staleness applies to any col-gated input trigger in this file and is worth remembering if another one
+   is added. The acceptance driver's own `step_up_in_ledge_span` check had the identical half-width bug
+   in the OTHER direction (gating an OBSERVATION, not a trigger, so only the 2-column term applies) —
+   the ledge's own step-up was firing two columns before the driver's span check started looking for it,
+   so a real, working step-up read as a failure. Both are the same shape: `col` is the body's CENTRE,
+   never its leading edge, and any span check gated on it needs to say so.
+4. `_place_shaft_walls`'s right wall ran the full height straight down to the shaft's own floor with no
+   gap — sealing the shaft into a closed box with a floor and no way out toward `END_COL`. First fix
+   (stopping the wall exactly at the floor's own top row) opened a corridor tall enough for the body's
+   FEET but not its HEAD (a body is `Body.HEIGHT_PX` tall, not one row), which `_resolve_horizontal`
+   still reads as a wall the instant the body is close enough to stand on the exit floor at all. Second
+   fix: stop the right wall a full `Body.HEIGHT_PX` above the floor, and fill the vacated margin as floor
+   rather than leaving a hole between the shaft's own floor and `END_COL`'s. A new chamber test
+   (`_test_narrow_shaft_present_and_correctly_wide`'s clearance check) verifies the exit has a full
+   body-height of open rows above its floor, not just an opening at foot level.
+5. The pit jump's real, measured landing distance (with `docs/ARCHITECTURE.md` §9's actual
+   JUMP_VELOCITY/GRAVITY/APEX_FLOAT constants, not assumed) is ~30 columns past the jump — `APEX_FLOAT`'s
+   hangtime carries it far past the chamber's original, much shorter post-pit runway. The jump sailed
+   clean over `LEDGE_START`, landing for the first time deep in the rubble section, so the ledge's own
+   step-up was never exercised by a grounded approach at all — it was skipped mid-flight, not tested and
+   passing. Fixed by measuring the real landing distance on a flat floor (lands ~column 46 from a jump at
+   column 13-16) and moving `LEDGE_START` (and every section after it, via one `POST_PIT_RUNWAY_COLS`
+   offset) out far enough to give the body a settled, grounded runway before the ledge.
+6. The shaft's confining walls, entered from the mantle plateau's own floor, extended 4 rows ABOVE that
+   floor's own top row (an arbitrary, purposeless margin left over from an earlier version) — an
+   unintended 16px lip at the shaft's entrance that produced one spurious step-up event and one tick of
+   depenetration+stall before the body cleared it. Fixed by starting the wall flush with the floor it
+   adjoins, matching how `_fill_flat` itself never extends material above its own surface row.
+7. The shaft opening (`SHAFT_OPEN_COLS`), read as "roughly 3 [logic] tiles" in D0036, was narrower than
+   the body's own natural rightward drift while falling its full depth under continuous forward input —
+   measured with the confining walls removed, not guessed, at 77.5px over the whole fall, against a
+   12-column opening's 32px of lateral room. A first attempt at 16 columns (48px of room) still fell
+   short for the identical reason — 48 < 77.5, it only moved WHERE in the fall the wall was reached, not
+   whether it was reached — which is itself a reportable lesson: measure the FULL invariant (total drift
+   over the fall), not a partial one that merely relocates the same failure. Widened to 28 columns (96px
+   of room), clearing the measured drift with margin. A per-column trigger to stop holding "right"
+   inside the shaft was tried and reverted before this: it eliminated the contact but did so by
+   forfeiting real forward progress during the fall, which is exactly the "bot compensating for a
+   mechanic" `ScriptedTraverse`'s own header explicitly rejects, and it cost enough distance to fail
+   `velocity_efficiency` on its own. The chamber's own width was the correct place to fix a chamber-scale
+   fact, not the driving policy.
+Final measured numbers, one full clean run, `HostileChamber` + `ScriptedTraverse` unchanged from D0036/39
+except as listed above: edge_catch_events=0, depenetration_events=0, velocity_efficiency=0.9978 (threshold
+≥0.92), step_up_success_rate and corner_correction_success_rate both fired within their designated spans,
+input_to_state_change_latency=0 ticks (threshold ≤2), stall_seconds=0, traverse_time=225 ticks. 225 ticks
+becomes `GOLDEN_TRAVERSE_TICKS`, replacing the 645-tick placeholder guess this file shipped with before
+any run had actually completed — the guess was never load-bearing (no commit depended on its exact value)
+but is recorded here so the discrepancy isn't mistaken for a later regression.
+Alternative: could have "fixed" several of these by giving the scripted policy more compensating logic
+(release jump near the corner, add a crouch-equivalent, hand-tune the shaft entry x-position) rather than
+fixing the chamber geometry or the driver's own span math. Rejected throughout: the director's brief is
+explicit that compensating scripted behavior defeats the acceptance suite's purpose (mechanics must work
+from continuous forward input alone), and every failure here traced to either an impossible/mis-measured
+chamber shape or an off-by-body-width bug in code this session wrote, never to a body.gd defect.
+Reverse: CHEAP for 1, 3, 6 (constants/formulas only). MEDIUM for 2, 4, 7 (each replaced or resized a
+whole chamber section; `test_hostile_chamber.gd` and the acceptance driver's span checks would need
+re-verifying against a reverted geometry). MEDIUM for 5 (shifts every downstream section constant by a
+fixed offset — mechanical, but touches every test that names a section by column number).
+
+## D0039 · 2026-08-26 · the pit jump's corner-catch, placed by trajectory math and verified against it
+Decided: `HostileChamber.JUMP_CORNER_COL/ROW` (15, 2) place a single solid cell in the pit jump's own
+rising arc, derived from the SAME `Body`+chamber simulation the acceptance suite runs, not authored by
+eye. `docs/ARCHITECTURE.md` §9 names "ceiling contact near a corner" as what `CORNER_NUDGE_PX` exists
+for; D0038 item 2 found the chamber's first attempt at this (a flat overhang over the walking floor) was
+an unrescuable shape for ANY corner-nudge implementation, not a placement mistake — the mechanic can only
+resolve a graze where most of the body's box has already cleared the obstacle and a small nudge in the
+current direction of travel finishes the clear (an "exiting" contact). A first-contact ("entering")
+overlap, by the same forward nudge, only grows.
+The jump's actual trajectory (traced tick-by-tick, not computed by a continuous-projectile formula, since
+`Fx` quantization and `APEX_FLOAT`'s gravity multiplier both apply) rises through row 2 (y=8-12px) around
+tick 25 of the jump, by which point the body's box has already flown past column 15 horizontally (its
+LEFT/trailing edge is still barely inside column 15's 4px span while its right edge is long past it) —
+an exiting graze by construction, not by luck: chosen BECAUSE the row where the box's rising top edge
+first reaches a given height is largely independent of when the box's horizontal span first covers a
+given column, so the two can be picked to land in either order. Verified: `corner_corrected_this_tick`
+fires during the recorded run (D0038), and reverting to a cell one row lower (crossed one tick earlier,
+while the box's trailing edge has not yet cleared column 15) reproduces an entering-side hard block —
+confirms the placement is sensitive to this distinction, not incidentally passing.
+Alternative: keep `_place_ceiling_corner`'s original walking-floor overhang and instead teach
+`_resolve_horizontal` to attempt its own corner nudge before depenetrating. Considered and rejected: the
+nudge would still only rescue exiting contacts (same math), and the walking-floor overhang's first
+contact with a body approaching at ground level is unavoidably an entering one — teaching `body.gd` a
+nudge it can never use here fixes nothing and adds a code path the acceptance suite would then need to
+separately verify.
+Reverse: CHEAP — one constant pair and one placement function; nothing outside `test_hostile_chamber.gd`'s
+presence check and the acceptance driver's span gate depends on the exact (column, row).

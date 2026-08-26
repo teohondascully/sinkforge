@@ -4,7 +4,7 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-25.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-08-26.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
@@ -23,8 +23,13 @@ isn't already here, or adding a step, is itself a HARD STOP.
 - [x] (c) The capsule sweep and the forgiveness set (step-up, corner correction, depenetration, coyote,
       jump buffer, variable jump, apex float), ARCHITECTURE §9 constants as given. `sim/body/body.gd`,
       D0032/D0034/D0035 — collider is a flat AABB not a capsule, flagged EXPENSIVE not decided (D0032).
-- [ ] (d) The acceptance suite, headless, against the chamber. All thresholds measured and reported.
-      STOP HERE and report the numbers before continuing to (f).
+- [x] (d) The acceptance suite, headless, against the chamber. All thresholds measured and reported.
+      STOP HERE and report the numbers before continuing to (f). `tests/test_body_acceptance.gd`, D0038/D0039.
+      ALL 9 THRESHOLDS PASS with `body.gd` and every ARCHITECTURE §9 constant unchanged since D0035 — every
+      fix that got the suite green was in this session's own fixture/test code (the chamber, the scripted
+      driving policy, the acceptance driver's own span math), never in the controller. Zero of the two
+      permitted constant-adjustment rounds spent. STOPPING HERE per this item's own instruction and the
+      director's "report at (d) before starting (e)" — (f)/(g) are NOT started; this is the checkpoint.
 - [ ] (f) Minimal debug renderer: terrain grid, capsule, camera. Flat colors only, explicitly not art.
 - [ ] (g) `--play` flag + recorded-input plumbing on the scenario driver; one fixture, the hostile
       chamber traverse.
@@ -39,19 +44,26 @@ systemic off-by-one-day error predating this session, not something introduced b
 Not corrected wholesale here — a 15+-file historical sweep is a real, separate task with its own
 verification cost, not a two-minute fix to fold into unrelated work, and none of it affects any actual
 git history or code logic, only prose-stated dates. Flagged for the director to decide when it's worth
-doing. Every date this session writes from this point forward uses the correct 2026-08-25.
+doing. Every date this session wrote between the finding above and 2026-08-26 used the then-correct
+2026-08-25; the real calendar has since rolled over, so 2026-08-26 is now correct going forward and is
+no longer part of the ~15+-file discrepancy this note describes.
 
 ## Current stage
 
-**Stage 3 closed. The full pre-stage-4 punch list (four prioritized items, two smaller items, a README
-correction) closed this session, plus a separate director-directed process/tooling round making the
-session rituals mechanical (D0031). Stage 4 (`sim/body`) is now active, driven by the fixed "Overnight
-queue" above, steps (a)-(d) then (f)-(g) — rope (e) explicitly excluded, held for a session the director
-is present for.** Two findings from the punch list closed the loop cleanly: `Fx.length()`'s real 181px
-overflow (fixed, D0029) and `data/`'s hand-mirrored YAML dual-source problem (fixed via codegen + an
-ADR, D0021→D0030). A separate finding, unrelated to the punch list, surfaced while wiring gate 23: a
-pre-existing, systemic one-day dating error across ~15+ files (see below) — disclosed, not corrected
-wholesale.
+**Stage 4, steps (a)-(d), CLOSED and reported. Holding here per the Overnight queue's own instruction
+and the director's "report at (d) before starting (e)" — (f)/(g) not started, awaiting the director's
+read of the acceptance numbers below before this session (or the next) continues.** The acceptance
+suite (D0038) is fully green against `HostileChamber` + `ScriptedTraverse` with `sim/body/body.gd`
+unchanged since D0035: every one of the ~7 bugs found while getting there was in this session's own
+fixture code (the chamber's geometry, the scripted driving policy, or the acceptance driver's own span
+math) — never the controller, never an ARCHITECTURE §9 constant. D0038/D0039 carry the full chain.
+Stage 3 closed earlier this session: the full pre-stage-4 punch list (four prioritized items, two
+smaller items, a README correction) closed this session, plus a separate director-directed
+process/tooling round making the session rituals mechanical (D0031). Two findings from the punch list
+closed the loop cleanly: `Fx.length()`'s real 181px overflow (fixed, D0029) and `data/`'s hand-mirrored
+YAML dual-source problem (fixed via codegen + an ADR, D0021→D0030). A separate finding, unrelated to the
+punch list, surfaced while wiring gate 23: a pre-existing, systemic one-day dating error across ~15+
+files (see below) — disclosed, not corrected wholesale.
 
 **LOC ratio target, set 2026-08-25 (director's ask, item 3 of the post-audit list):** absolute ratio
 under 1.5 by the time `C001` passes. Current absolute ratio is 3.399 (instrument 2,328 / game 685,
