@@ -13,9 +13,10 @@ extends RefCounted
 ## structure this codebase no longer has. Iron, which legacy gated below the seal, is gated by the
 ## `stonereach_end` depth threshold alone.
 ##
-## Per-cell richness/deposit amounts are not tracked (`data/strata/*.yaml`'s amount_base et al. are
-## schema-validated but unused here) -- that is `sim/economy`/`sim/items` territory once they exist. A
-## vein cell right now is just its material id, same as any other tile.
+## Per-cell richness/deposit amounts are not tracked -- `data/strata/*.yaml` nests amount_base et al.
+## under each material's `pending_sim_economy` key specifically so "unconsumed" is structural, not just
+## a comment. That's `sim/economy`/`sim/items` territory once they exist. A vein cell right now is just
+## its material id, same as any other tile.
 ##
 ## Ruin placement (D0018): one empty carved chamber per shaft, no earlier than `ruin.min_depth_m`.
 ## "Marked but empty" -- what a ruin contains is sim/items territory, not yet built.

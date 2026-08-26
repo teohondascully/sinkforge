@@ -33,40 +33,49 @@ strata_shelf:
   shelf_resist: 0.34
 
 ore:
-  # legacy ORE_ATTEMPTS_PER_COL / ORE_CHANCE_DEEP / ORE_SHALLOW_FLOOR / ORE_SIZE_MIN /
-  # ORE_SIZE_DEPTH_BONUS / ORE_AMOUNT_BASE / ORE_AMOUNT_DEPTH_BONUS / RICH_CHANCE / RICH_AMOUNT_MULT
+  # legacy ORE_ATTEMPTS_PER_COL / ORE_CHANCE_DEEP / ORE_SHALLOW_FLOOR / ORE_SIZE_MIN / ORE_SIZE_DEPTH_BONUS
   material: ore_copper
   attempts_per_col: 1.0
   chance_deep: 0.85
   shallow_floor: 0.34
   size_min: 8
   size_depth_bonus: 44
-  amount_base: 30
-  amount_depth_bonus: 170
-  rich_chance: 0.45
-  rich_amount_mult: 1.5
+  pending_sim_economy:
+    # legacy ORE_AMOUNT_BASE / ORE_AMOUNT_DEPTH_BONUS / RICH_CHANCE / RICH_AMOUNT_MULT. NOT read by
+    # sim/terrain_gen/shaft_generator.gd -- richness/deposit accounting is sim/economy or sim/items
+    # territory, neither of which exists yet (docs/DECISIONS_LEDGER.md D0025). Nested here, not left
+    # flat alongside the consumed fields above, specifically so "unconsumed" is a structural fact a
+    # reader can see, not a claim living only in this comment. Whichever module lands first should
+    # read these and promote them back to ore's top level.
+    amount_base: 30
+    amount_depth_bonus: 170
+    rich_chance: 0.45
+    rich_amount_mult: 1.5
 
 coal:
-  # legacy COAL_ATTEMPTS_PER_COL / COAL_CHANCE_DEEP / COAL_SHALLOW_FLOOR / COAL_SIZE_MIN /
-  # COAL_SIZE_DEPTH_BONUS / COAL_AMOUNT_BASE / COAL_AMOUNT_DEPTH_BONUS
+  # legacy COAL_ATTEMPTS_PER_COL / COAL_CHANCE_DEEP / COAL_SHALLOW_FLOOR / COAL_SIZE_MIN / COAL_SIZE_DEPTH_BONUS
   material: coal
   attempts_per_col: 0.8
   chance_deep: 0.95
   shallow_floor: 0.42
   size_min: 6
   size_depth_bonus: 30
-  amount_base: 30
-  amount_depth_bonus: 170
+  pending_sim_economy:
+    # legacy COAL_AMOUNT_BASE / COAL_AMOUNT_DEPTH_BONUS. Same gap and same reasoning as ore's above.
+    amount_base: 30
+    amount_depth_bonus: 170
 
 iron:
-  # legacy IRON_ATTEMPTS_PER_COL / IRON_SIZE_MIN / IRON_SIZE_DEPTH_BONUS / IRON_AMOUNT. Legacy gated iron
-  # below a research-progression "seal" (SEAL_TOP); that gate is dead pre-pivot design, so this port
-  # gates iron by depth threshold (stonereach_end) alone.
+  # legacy IRON_ATTEMPTS_PER_COL / IRON_SIZE_MIN / IRON_SIZE_DEPTH_BONUS. Legacy gated iron below a
+  # research-progression "seal" (SEAL_TOP); that gate is dead pre-pivot design, so this port gates iron
+  # by depth threshold (stonereach_end) alone.
   material: ore_iron
   attempts_per_col: 0.5
   size_min: 10
   size_depth_bonus: 30
-  amount: 220
+  pending_sim_economy:
+    # legacy IRON_AMOUNT. Same gap and same reasoning as ore's above.
+    amount: 220
 
 ruin:
   # New concept (docs/GDD.md §5, "artifacts found in deep ruins") -- no legacy analog ported (the old

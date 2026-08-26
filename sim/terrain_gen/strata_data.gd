@@ -38,14 +38,17 @@ const SHALLOW_CLAY: Dictionary = {
 		"shallow_floor": 0.34,
 		"size_min": 8,
 		"size_depth_bonus": 44,
-		# amount_base / amount_depth_bonus / rich_chance / rich_amount_mult are validated by
-		# data/strata/SCHEMA.yaml and mirrored below for completeness, but ShaftGenerator does not
-		# consume them yet -- richness/deposit accounting is sim/economy or sim/items territory, and
-		# neither exists yet. Declared, not solved. See the commit message.
-		"amount_base": 30,
-		"amount_depth_bonus": 170,
-		"rich_chance": 0.45,
-		"rich_amount_mult": 1.5,
+		# Nested, not flat, matching data/strata/shallow_clay.yaml exactly: NOT read by ShaftGenerator
+		# yet -- richness/deposit accounting is sim/economy or sim/items territory, and neither exists.
+		# "unconsumed" is a structural fact here, not a claim living only in a comment (docs/QUALITY.md
+		# §2's caveat-in-prose lesson). Whichever module lands first should promote these to ore's top
+		# level. See docs/DECISIONS_LEDGER.md D0025.
+		"pending_sim_economy": {
+			"amount_base": 30,
+			"amount_depth_bonus": 170,
+			"rich_chance": 0.45,
+			"rich_amount_mult": 1.5,
+		},
 	},
 	"coal": {
 		"material": &"coal",
@@ -54,15 +57,19 @@ const SHALLOW_CLAY: Dictionary = {
 		"shallow_floor": 0.42,
 		"size_min": 6,
 		"size_depth_bonus": 30,
-		"amount_base": 30,
-		"amount_depth_bonus": 170,
+		"pending_sim_economy": {
+			"amount_base": 30,
+			"amount_depth_bonus": 170,
+		},
 	},
 	"iron": {
 		"material": &"ore_iron",
 		"attempts_per_col": 0.5,
 		"size_min": 10,
 		"size_depth_bonus": 30,
-		"amount": 220,
+		"pending_sim_economy": {
+			"amount": 220,
+		},
 	},
 	"ruin": {
 		"count": 1,
