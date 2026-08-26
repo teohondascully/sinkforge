@@ -7,7 +7,14 @@ check that has never been observed failing is not a check."
   reach-in within `sim/`'s submodules. States its own blind spot: GDScript's `class_name` global
   visibility is invisible to a `res://`-path-based scan.
 - `no_engine_imports.py` — `core/` and `sim/` may not reference the scene tree, file IO, wall-clock
-  time, or unseeded randomness.
+  time, or unseeded randomness. Rewritten 2026-08-26 from a one-time audit of Godot's actual `ClassDB`
+  (282 Node-derived classes, 37 singletons) rather than a pattern list accumulated by tripping over
+  gaps one at a time — `docs/DECISIONS_LEDGER.md` D0026.
+- `check_coordinate_naming.py` — every public function in `sim/world/` or `sim/terrain_gen/` that takes
+  or returns a `Vector2i` (or a typed array/dictionary of one) must name which grid it's on —
+  `terrain_` or `logic_` in the identifier. Converts D0020's naming-discipline mitigation (nothing at
+  the type level distinguishes the 4px terrain grid from the 16px logic grid) from something a reviewer
+  has to remember to sample for into a checked property — `docs/DECISIONS_LEDGER.md` D0027, D0028.
 - `check_size_limits.py` — no file over 400 lines (warn at 300), no function over 50.
 - `check_loc_ratio.py` — instrument LOC growth (`harness/` + `experiment/` + `tools/` + `tests/`) may
   not exceed game LOC growth (`core/` + `sim/` + `interface/` + `view/` + `shell/`) by more than 2x

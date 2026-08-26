@@ -466,3 +466,42 @@ Enforcement going forward is still naming-and-typing discipline only, not a comp
 and D0020 remain open EXPENSIVE questions for exactly this reason. This entry closes the specific gap
 the audit found; it does not resolve D0020.
 Reverse: CHEAP — one rename, three call sites, already done.
+
+## D0028 · 2026-08-26 · check_coordinate_naming.py: naming discipline, checked not remembered
+Decided: added a new gate, `tools/layer_lint/check_coordinate_naming.py`, enforcing D0020's naming
+convention mechanically — every public function in `sim/world`/`sim/terrain_gen` taking or returning a
+`Vector2i` (bare, or inside `Array[Vector2i]`/`Dictionary[Vector2i, ...]`) must carry `terrain_` or
+`logic_` in the relevant identifier (the parameter's own name for an input; the function's own name for
+a return, since a return has no parameter name to carry it).
+Why now, and why a lint rather than continued discipline: the director's reasoning, given directly —
+wrapper types would give a compiler guarantee, but in GDScript that means a `RefCounted` allocation
+per coordinate conversion, in the hottest paths in the game, which is a bad trade against the perf
+budget the whole sweep-loop approach depends on. Naming-and-typing discipline is accepted instead, BUT
+discipline degrades across sessions and context compactions in a way a checked property does not —
+D0027 found the one lapse that already existed (`occupied_cells() -> Array`) purely because a human
+happened to sample it, not because anything would have caught the next one.
+Verified before trusting it: clean pass against the real tree (5 files), then a throwaway scratch file
+exercising every branch — an unnamed parameter, a bare `Vector2i` return, an `Array[Vector2i]` return,
+correctly-named parameter and return cases (both `terrain_` and `logic_` tags), and a private
+(underscore-prefixed) function with the same defect, to confirm private functions are correctly
+exempted. All three real violations caught, none of the four correct/exempt cases false-flagged.
+Registered in `.github/workflows/harness.yml`'s `gates` job and `tools/layer_lint/README.md`.
+Known, stated blind spot (not silently missed): an untyped `-> Array`/`-> Dictionary` return can't be
+checked at all, since nothing declares it holds `Vector2i` in the first place — that was
+`occupied_cells()`'s exact original shape. Closing that would be a different, broader "type your
+collections" check than the coordinate-naming rule actually requested; out of scope here on purpose.
+Reverse: CHEAP — one gate, no code it checks needs to change to pass (the whole tree already does).
+
+## D0019/D0020 · 2026-08-26 · addendum — the wrapper-type cost, made explicit
+The director gave the reasoning D0019 and D0020 were missing: real per-coordinate wrapper types
+(`TerrainCell`/`LogicCell` classes, D0020's option (a)) would need to be `RefCounted`, since GDScript has
+no other way to give a value type identity distinct from a plain `Vector2i`. Every conversion between
+representations, and plausibly every coordinate access in `sim/world`'s query/mutation API, would then
+be a heap allocation — in what is the single hottest code path in the entire game (every tile query,
+every cave-carve cell, every collision check once `sim/body` exists, all running inside sweep loops that
+this project runs thousands of times over). That's a real, specific, named cost, not a vague "might be
+slow" — recorded here so a future reread of D0020 sees the actual tradeoff rather than an unexplained
+"cost unmeasured." Naming-and-typing discipline stays the accepted mitigation, now enforced by
+`check_coordinate_naming.py` (D0028) rather than left to a reviewer's memory. Neither D0019 nor D0020
+is resolved by this — both remain open, revisit-when-measurable EXPENSIVE questions; this only records
+why the stronger option was not simply taken instead.

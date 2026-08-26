@@ -86,6 +86,9 @@ jobs:
       - name: No engine imports in core/ or sim/ (ARCHITECTURE §3-4)
         run: python3 tools/layer_lint/no_engine_imports.py
 
+      - name: sim/world and sim/terrain_gen coordinates name their grid (D0020, D0027)
+        run: python3 tools/layer_lint/check_coordinate_naming.py
+
       - name: File and function size limits (QUALITY gates 3-4)
         run: python3 tools/layer_lint/check_size_limits.py
 
