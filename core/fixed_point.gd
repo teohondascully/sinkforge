@@ -72,8 +72,9 @@ static func lerp(a: int, b: int, t: int) -> int:
 
 ## Integer square root, floor(sqrt(x)), for non-negative x. Newton's method (Heron's method): converges
 ## monotonically for any positive integer, needs no floating point, and terminates deterministically.
-## Verified against Python's math.isqrt for zero, one, perfect squares, and random values up to 2^47
-## (the largest magnitude length_sq() can produce here) before being trusted.
+## Verified against Python's math.isqrt for zero, one, perfect squares, and random values up to 2^62
+## (D0029: length_sq() can produce values in this range for the largest valid Fx deltas -- was 2^47
+## before that fix widened length_sq()'s own range) before being trusted.
 static func isqrt(x: int) -> int:
 	if x <= 0:
 		return 0
@@ -86,20 +87,32 @@ static func isqrt(x: int) -> int:
 
 
 ## Squared fixed-point distance between two fixed-point deltas -- exact, no sqrt, prefer this over
-## length() for pure comparisons (nearest/farthest, threshold checks).
-static func length_sq(dx: int, dy: int) -> int:
-	return add(mul(dx, dx), mul(dy, dy))
-
-
-## Fixed-point Euclidean distance. `length_sq` is a fixed-point value V/SCALE; sqrt(V/SCALE)*SCALE =
-## isqrt(V * SCALE), which is what this computes rather than converting through a float at any point.
+## length() for pure comparisons (nearest/farthest, threshold checks). Ordering-preserving like any
+## squared distance, but NOT an `Fx` value in the usual sense (do not call `to_float()` on it expecting
+## a real squared distance -- pass it to `isqrt()`, which is the only thing that reads it).
 ##
-## LOCAL-NEIGHBORHOOD ONLY, not a world-scale distance function: squaring a fixed-point value quadratic-
-## ally consumes i32's range, so `mul(dx, dx)` alone silently wraps once |dx| exceeds 181 (real units,
-## i.e. px) -- 182² is already negative garbage. Combined with a nonzero dy the safe bound is tighter
-## still. `tests/test_fixed_point.gd`'s `_test_length_sq_overflow_boundary_is_exactly_181` demonstrates
-## this boundary directly rather than only describing it. Safe for collision checks and per-tick
-## movement deltas (both comfortably under 181px); never for a distance that could span meaningful
-## fractions of the ~2048m world-depth budget in `docs/ARCHITECTURE.md` §9.
+## D0029 supersedes D0011's scope decision here. The prior version computed `add(mul(dx,dx), mul(dy,dy))`
+## -- routing each squared term through `mul()`'s `_wrap32(product >> FRACTIONAL_BITS)` reduces it to a
+## valid i32 `Fx` value before summing, and an i32 `Fx` value can only hold a squared real-unit magnitude
+## up to ~32767, i.e. a per-axis delta up to ~181px before `mul(dx, dx)` alone wraps negative. That bound
+## was real and reachable: `sim/body`'s grapple, rope, and camera-relative queries have no reason to stay
+## under 11m. Squaring is exactly the operation that needs the extra headroom `mul()`'s i32 reduction
+## throws away, so this accumulates the raw i64 products directly -- `dx`/`dy` are native GDScript ints
+## already (never wrapped through `mul()`), and GDScript's 64-bit `int` holds `dx*dx + dy*dy` for ANY
+## pair of valid `Fx` values (each bounded to i32 magnitude, ±2^31) with room to spare: the worst case,
+## both deltas simultaneously at `Fx`'s own outer limit, is `2*(2^31-1)² ≈ 9.223e18`, still under i64's
+## `9223372036854775807` -- verified exactly, not estimated, before this was trusted (see the commit
+## message). There is no longer a reachable overflow boundary within the range any valid `Fx` value can
+## occupy; the old 181px figure belonged to `mul()`'s general behavior, not to this function specifically
+## -- `tests/test_fixed_point.gd` keeps that test, retitled to say so.
+static func length_sq(dx: int, dy: int) -> int:
+	return dx * dx + dy * dy
+
+
+## Fixed-point Euclidean distance. `isqrt(dx*dx + dy*dy)` is exactly the `Fx` representation of the real
+## distance with no separate rescale needed: `Fx(D) = D*SCALE = sqrt(dx_real²+dy_real²)*SCALE =
+## sqrt((dx_real*SCALE)² + (dy_real*SCALE)²) = sqrt(dx² + dy²)`, since `dx`/`dy` already carry one factor
+## of `SCALE` each. Safe for any pair of valid `Fx` deltas -- see `length_sq()`'s comment for the exact
+## bound checked.
 static func length(dx: int, dy: int) -> int:
-	return isqrt(length_sq(dx, dy) * SCALE)
+	return isqrt(length_sq(dx, dy))

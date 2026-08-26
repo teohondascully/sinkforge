@@ -505,3 +505,41 @@ slow" — recorded here so a future reread of D0020 sees the actual tradeoff rat
 `check_coordinate_naming.py` (D0028) rather than left to a reviewer's memory. Neither D0019 nor D0020
 is resolved by this — both remain open, revisit-when-measurable EXPENSIVE questions; this only records
 why the stronger option was not simply taken instead.
+
+## D0029 · 2026-08-26 · Fx.length()/length_sq(): the 181px scope in D0011 was a real, reachable defect
+Decided: `Fx.length_sq(dx, dy)` now accumulates the raw, unscaled product `dx*dx + dy*dy` directly in a
+native 64-bit int, and `Fx.length(dx, dy)` is `isqrt(length_sq(dx, dy))` with no separate rescale step.
+Neither routes the squared terms through `mul()`'s `_wrap32(product >> 16)` any more. This supersedes
+D0011's scope decision on the same two functions; D0011 is left as written, not edited, per the
+append-only rule.
+Alternative: keep D0011's scope as-is (document the ~181px limit and trust callers to stay under it), or
+widen only the intermediate while keeping the old `add(mul(dx,dx), mul(dy,dy))` shape — both were
+considered and rejected below.
+Why: D0011 justified the 181px scope on the claim that `sim/body`'s distance needs are "inherently
+local." That claim doesn't hold: a grapple, a rope, and camera-relative queries have no reason to stay
+under 11.3m, and the failure mode isn't an error, it's a silently wrong distance — `mul(182, 182)` wraps
+negative with no signal. The bound was never a property of squaring at this scale; it was an artifact of
+reducing each squared term to a valid i32 `Fx` value (via `mul()`) BEFORE summing, which caps what the
+sum can hold to what an i32 can hold. Accumulating the raw products in GDScript's native 64-bit `int`
+instead removes that reduction entirely: verified in Python (not estimated) that the worst case — both
+deltas simultaneously at `Fx`'s own outer limit, i32 max — gives `2*(2^31-1)² = 9223372028264841218`,
+under i64's max of `9223372036854775807` with room to spare. There is no longer a reachable overflow
+boundary anywhere inside the range a valid `Fx` value can occupy. The "widen the intermediate but keep
+`mul()`" alternative was rejected because `mul()`'s i32 reduction is exactly the step that has to go —
+there's no intermediate width that fixes the problem without removing it.
+This does change `length_sq()`'s contract: it no longer returns something `to_float()` can read as "the
+real squared distance" (an i64-scale raw product isn't an `Fx` value), only something `isqrt()` can
+consume. The one caller of the old contract was `tests/test_fixed_point.gd` itself — grepped `sim/`
+first to confirm `sim/body` doesn't exist yet and nothing else calls `length_sq()` — so this is the
+cheapest point this contract will ever be to change.
+Verified: mutation-tested by reverting to D0011's exact prior formula (`add(mul(dx,dx), mul(dy,dy))` /
+`isqrt(length_sq(dx,dy) * SCALE)`) against the new test suite — 12 of the suite's assertions failed,
+including the exact large-distance and outer-limit cases the new tests were written to catch — then
+restored and re-verified all green. All 7 structural gates pass unchanged. New golden `isqrt` vector
+added at the new ceiling (2^62, up from 2^47) via Python's `math.isqrt`, independent of this
+implementation. `_test_mul_self_square_overflow_boundary_is_exactly_181` (renamed from
+`_test_length_sq_overflow_boundary_is_exactly_181`) is kept, not deleted — the 181px boundary is real,
+it's just scoped to `mul()`'s general behavior now, not to `length()`/`length_sq()` specifically.
+Reverse: CHEAP to revert the code (one file, already has the old shape in this ledger entry above), but
+EXPENSIVE the moment anything calls `length()` on a delta near 181px in the meantime — this is the same
+asymmetry D0011 named, now on the other side of it.

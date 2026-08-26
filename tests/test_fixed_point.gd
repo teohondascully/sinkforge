@@ -1,8 +1,8 @@
 extends "res://tests/test_base.gd"
 
 ## Golden isqrt vectors from Python's math.isqrt -- independent reference, not memory. Covers zero, one,
-## perfect squares, and random values up to 2^47 (the largest magnitude length()/length_sq() can produce
-## for values within their documented safe range).
+## perfect squares, and random values up to 2^62 (D0029: the largest magnitude length_sq() can produce
+## for the largest pair of valid Fx deltas -- was 2^47 before that fix widened length_sq()'s own range).
 
 func _initialize() -> void:
 	_test_from_int_to_float_roundtrip()
@@ -14,7 +14,9 @@ func _initialize() -> void:
 	_test_lerp()
 	_test_isqrt_known_values()
 	_test_length_pythagorean_triples()
-	_test_length_sq_overflow_boundary_is_exactly_181()
+	_test_length_works_far_beyond_the_old_181px_limit()
+	_test_length_sq_no_overflow_at_fx_own_outer_limit()
+	_test_mul_self_square_overflow_boundary_is_exactly_181()
 	_finish("fixed_point")
 
 
@@ -89,6 +91,7 @@ func _test_isqrt_known_values() -> void:
 		[68931111375447, 8302476], [39274139637470, 6266908], [28852458447017, 5371448],
 		[8943934050713, 2990641], [26371227175534, 5135292], [65486305405067, 8092360],
 		[118083876374774, 10866640], [126440489012192, 11244575], [78304079650220, 8848959],
+		[4611686018427375559, 2147483647],
 	]
 	for c: Array in cases:
 		var got: int = Fx.isqrt(c[0])
@@ -102,17 +105,54 @@ func _test_length_pythagorean_triples() -> void:
 		var dy: int = Fx.from_int(t[1])
 		var got: float = Fx.to_float(Fx.length(dx, dy))
 		_check(_approx(got, float(t[2]), 0.01), "length(%d, %d) ≈ %d (got %s)" % [t[0], t[1], t[2], got])
-		var got_sq: float = Fx.to_float(Fx.length_sq(dx, dy))
-		_check(_approx(got_sq, float(t[2] * t[2]), 0.01),
-			"length_sq(%d, %d) ≈ %d (got %s)" % [t[0], t[1], t[2] * t[2], got_sq])
+		# D0029: length_sq() is a raw i64 accumulator now, not an Fx-scaled value -- isqrt(length_sq(...))
+		# must equal length(...) exactly, which is the property callers (and length() itself) actually
+		# depend on, rather than to_float(length_sq(...)) meaning "the real squared distance" the way it
+		# used to.
+		_check(Fx.isqrt(Fx.length_sq(dx, dy)) == Fx.length(dx, dy),
+			"isqrt(length_sq(%d, %d)) == length(%d, %d)" % [t[0], t[1], t[0], t[1]])
+
+
+## D0029: length()/length_sq() used to silently corrupt past ~181px per axis (see
+## _test_mul_self_square_overflow_boundary_is_exactly_181 below for why). These are all far beyond that,
+## comfortably inside the ~2048m/32768px world-depth budget (docs/ARCHITECTURE.md §9), and match a
+## from-scratch Python reference (raw i64 dx*dx+dy*dy, then math.isqrt) computed before this was trusted.
+func _test_length_works_far_beyond_the_old_181px_limit() -> void:
+	var cases: Array = [
+		{"dx": 2000, "dy": 0, "want": 2000, "raw_sq": 17179869184000000},
+		{"dx": 2000, "dy": 1500, "want": 2500, "raw_sq": 26843545600000000},
+		{"dx": 20000, "dy": 15000, "want": 25000, "raw_sq": 2684354560000000000},
+	]
+	for c: Dictionary in cases:
+		var dx: int = Fx.from_int(c["dx"])
+		var dy: int = Fx.from_int(c["dy"])
+		var got_raw: int = Fx.length_sq(dx, dy)
+		_check(got_raw == c["raw_sq"], "length_sq(%d, %d) == %d (got %d)" %
+			[c["dx"], c["dy"], c["raw_sq"], got_raw])
+		var got: float = Fx.to_float(Fx.length(dx, dy))
+		_check(_approx(got, float(c["want"]), 0.01), "length(%d, %d) ≈ %d (got %s)" %
+			[c["dx"], c["dy"], c["want"], got])
+
+
+## Executable documentation of D0029's actual claim: even the worst case -- both deltas simultaneously at
+## Fx's own outer representable limit (i32 max, ~32768 real units / ~2048m, far beyond anything
+## docs/ARCHITECTURE.md §9's ~256m playable depth could ever produce) -- fits in a native 64-bit int with
+## room to spare. Verified against Python (2*(2^31-1)² = 9223372028264841218 < i64 max 9223372036854775807)
+## before being trusted, not estimated from the exponents alone.
+func _test_length_sq_no_overflow_at_fx_own_outer_limit() -> void:
+	var extreme: int = 2147483647  # i32 max -- the largest magnitude any valid Fx value can ever hold
+	var raw: int = Fx.length_sq(extreme, extreme)
+	_check(raw == 9223372028264841218, "length_sq(I32_MAX, I32_MAX) == 9223372028264841218 (got %d)" % raw)
+	_check(raw > 0, "no wraparound -- a corrupted result would show up as negative")
 
 
 ## Executable documentation, not just a comment: mul(dx, dx) for dx expressed in whole pixels is only
 ## valid up to dx == 181 before the i32 wrap silently corrupts the result -- verified against an
-## independent Python computation of the exact wraparound point before this test was written. Any
-## caller squaring or measuring a delta anywhere near this magnitude needs to know the bound exists;
-## a comment saying so can go stale, this test cannot pass while it's wrong.
-func _test_length_sq_overflow_boundary_is_exactly_181() -> void:
+## independent Python computation of the exact wraparound point before this test was written. This is a
+## property of Fx.mul() itself (any multiplication whose real-unit product exceeds ~32767 overflows the
+## same way), not of length()/length_sq() specifically -- D0029 moved those off of mul() entirely, which
+## is why this test is scoped to mul() by name now rather than to length_sq()'s old boundary.
+func _test_mul_self_square_overflow_boundary_is_exactly_181() -> void:
 	var safe: int = Fx.from_int(181)
 	var safe_sq: float = Fx.to_float(Fx.mul(safe, safe))
 	_check(_approx(safe_sq, 32761.0), "mul(181, 181) ≈ 32761 (still in range)")

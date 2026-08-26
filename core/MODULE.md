@@ -44,9 +44,11 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   ("The world scale"), `docs/adr/0003-fixed-point-representation.md`. `.from_int()`, `.to_float()`
   (debug/render only), `.add()`, `.sub()`, `.mul()`, `.div()` (returns 0 and logs an error on
   division by zero rather than raising — see Gotchas), `.lerp()`, `.isqrt()`, `.length_sq()`,
-  `.length()`. **`length()`/`length_sq()` are LOCAL-neighborhood-only** — safe for deltas up to ~181px
-  per axis, silently wrong beyond that; see the doc comment above `length()` for the exact boundary and
-  why it exists.
+  `.length()`. `length()`/`length_sq()` were LOCAL-neighborhood-only (safe only to ~181px per axis)
+  until D0029 (`docs/DECISIONS_LEDGER.md`) widened them to accumulate raw i64 rather than route through
+  `mul()`'s i32 reduction — safe now for any pair of valid `Fx` deltas, with no reachable overflow
+  boundary inside the range a valid `Fx` value can occupy. `mul()` ITSELF still has the ~181-per-axis
+  limit when used to square a value directly; that's a `mul()` property, not a `length()` one.
 
 ## Gotchas
 
