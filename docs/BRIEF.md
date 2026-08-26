@@ -4,89 +4,99 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-26. Stage 3 (`sim/world`, `sim/terrain_gen`) closed; the director's pre-stage-4
-punch list (four prioritized items, two smaller items, one README correction) is now fully closed.
-Stage 4 (`sim/body`) has not started.**
+**Last updated: 2026-08-26. Stage 4 (`sim/body`) closed and reported. This round: the director's
+Codex-audit follow-up queue (items 1-7, `docs/WORKING.md`) is fully closed. Moving to (f)/(g) next,
+per the director's explicit instruction.**
 
 ---
 
 ## EXPENSIVE, awaiting you
 
-None carried over as blocking. Two stay deliberately open, not resolved unilaterally:
+None new this round. Two carried over, unchanged, still open:
 
-- **Chunk size** (D0019) — `TileGrid` is a sparse `Dictionary`, correct regardless of what fixed size (if
-  any) a later pass picks. Revisit once `sim/fluid` and `view/` exist enough to measure the three real
-  costs it trades against.
-- **Coordinate type scheme** (D0020) — working choice is naming-only (`terrain_` / `logic_` prefixes on
-  plain `Vector2i`), now mechanically enforced by `check_coordinate_naming.py` (D0028). Two stronger
-  typed alternatives remain proposed and NOT adopted — `RefCounted` wrapper types would cost a heap
-  allocation per coordinate conversion, a bad trade against the sweep-loop perf budget (D0019/D0020
-  addendum). Still open.
+- **Chunk size** (D0019) — `TileGrid` is a sparse `Dictionary`, correct regardless of what fixed size
+  (if any) a later pass picks. Revisit once `sim/fluid` and `view/` exist enough to measure the three
+  real costs it trades against.
+- **Coordinate type scheme** (D0020) — working choice is naming-only (`terrain_`/`logic_` prefixes on
+  plain `Vector2i`), mechanically enforced (`check_coordinate_naming.py`, D0028). Two stronger typed
+  alternatives remain proposed and NOT adopted. Still open.
 
-## What landed this round (the post-audit punch list, in the director's priority order)
+## What was learned
 
-1. **`Fx.length()`/`Fx.length_sq()`'s real 181px overflow, fixed** (`297b6aa`, D0029, supersedes D0011's
-   scope decision — D0011 left as written). D0011 scoped these as "local-neighborhood only," justified as
-   sufficient for `sim/body`'s needs; that justification was wrong, not just narrow — a grapple, a rope,
-   and camera-relative queries have no reason to stay under 11.3m, and the failure mode is a silently
-   wrong distance, not an error. Cause: squared terms were reduced through `mul()`'s i32 wrap before
-   summing. Fix: accumulate raw `dx*dx+dy*dy` in a native i64, `isqrt()` directly — verified in Python
-   that the absolute worst case across `Fx`'s entire representable range (`2*(2^31-1)²`) stays under i64
-   max with room to spare. Mutation-tested against D0011's exact old formula before trusting it: 12
-   assertions failed on the old code, confirming the new tests catch the regression.
-2. **`data/materials`/`data/strata`'s hand-mirrored YAML dual-source problem, resolved** (`348a79c` ADR
-   0004, `bbc18fe` D0021→D0030). `tools/data_codegen/generate.py` reads `data/<kind>/*.yaml` for every
-   kind whose schema requires an `id: str` field, and emits a checked-in `data/<kind>/generated.gd`.
-   `--check` mode is the new gate (`docs/QUALITY.md` gate 22) — mutation-tested in both directions
-   (source edited without regenerating; generated file hand-edited directly) before trusting it.
-   `sim/world/materials.gd` and `sim/terrain_gen/strata_data.gd` now read from the generated records;
-   their public APIs are unchanged, so nothing outside these two files needed to change. One verified-
-   inert leaf change: string fields nested inside a record are `String` now, not `StringName` — grepped
-   `sim/` and `tests/` first to confirm nothing reads those specific fields today.
-3. **LOC ratio given a target and a date, not a feeling.** `docs/WORKING.md` now states: absolute ratio
-   under 1.5 by the time `C001` passes. See Gates below for the current number, stated plainly rather
-   than smoothed.
-4. **Spot-audit methodology fixed** (`5cbc2ab`). The original instruction (`git log | shuf -n 1`) samples
-   the entire history, not just the ledger-covered portion — the first draw landed on a pre-ledger commit
-   and tested nothing. `tools/spot_audit.py` derives `docs/DECISIONS_LEDGER.md`'s own creation commit
-   from git history (not a hardcoded hash) and samples uniformly from commits after it. `CONTEXT.md` now
-   states explicitly that this is run by the director, never by the session being audited.
-5. **Ledger numbering rule added** (`f3a8c05`). D0004 appears twice under the same number; the header now
-   states that a resolution or follow-up always gets a fresh number pointing back, never reuses one. The
-   existing D0004 pair and the compound "D0019/D0020" addendum are left exactly as written — the ledger
-   is append-only.
-6. **`docs/BRIEF.md` regenerates at the last action before reporting, not an arbitrary session boundary**
-   (`5cbc2ab`) — this brief is itself the first one written under that rule.
-7. **README stage line corrected** (`e24cbd9`). "Stage 3 of 12" understated where the project is; now
-   "stage 3 of 7 toward `C001`, the first playable milestone," with the remaining stages (5 through 12)
-   named separately rather than folded into one count. Note: `ONBOARDING.md`'s own text names stage 12
-   itself "Close C001" — your framing that "stages 8-12 are past the C001 milestone" isn't fully
-   reconciled with that, and the README's wording sidesteps rather than resolves the tension by not
-   asserting which stages are or aren't "part of" C001. Flagging this rather than picking a side quietly.
+- **A guard that cannot fire is not evidence, even when it's aimed at a real case.** The first
+  `Invariants.check_floor_selection` wiring shared `_resolve_floor`'s 6-row window and reported zero
+  on a fixture built to match its own target case — not because the case is absent, but because the
+  window couldn't span it. Widened to a measured 48 rows (D0044); the earlier worry that widening
+  would break normal falling turned out false once actually checked (`_bottom_y() < surface` gates
+  landing regardless of window width) — a case where measuring first overturned a plausible-sounding
+  intuition, not just confirmed one.
+- **A fix to one measurement can silently invalidate another that shares its generator.** Calibrating
+  `ValueNoise` to `FastNoiseLite`'s real distribution (D0045, item 3) changed cave density enough that
+  the multi-level-floor incidence D0042 measured — 0.85%/12%, the number the director's item-1 decision
+  was made against — dropped to 0/4,800 on re-measurement (D0046). Nobody would have thought to check
+  this from either task's own description; it surfaced only because the two happened to touch the same
+  generator. Worth watching for generally, not just this once.
+- **An external audit's own numbers go stale the moment work continues.** The Codex audit's "57 test
+  functions," "3.564 LOC ratio," and item 6's own "actual 59" were each correct at the commit they were
+  measured against (`489e728`) and each wrong by the time they were acted on — five new test files and
+  a full stage landed in between. Current, verified counts: 96 test functions across 13 suites, 2.896
+  LOC ratio. Every number in this brief and the ledger entries below was re-measured against current
+  state, not carried forward from the audit or from memory.
+- **A "verified" claim in a ledger entry is itself an unverified claim until someone tries to break it.**
+  D0006 stated `split()`'s order-independence was "verified in the same test suite" — no test ever
+  actually varied the parent's draw count before splitting. The property itself was fine; the sentence
+  claiming it was tested was not. D0050 corrects this without editing D0006, per the ledger's own
+  append-only rule.
+- **Measuring before shipping a "fix" caught one that would have been a no-op.** An audit finding that
+  `EntityIdPool.pack()` needed a mask before shifting `generation` turned out, on direct measurement, to
+  change no actual output — GDScript's `<<` already truncates equivalently. Added the mask anyway
+  (defensive symmetry with `index`), but shipped the honest finding (D0048) rather than a commit message
+  claiming a behavioral fix that isn't one.
+- **A new multi-item task from the director needs a durable home before work starts, not just a chat
+  message.** Items 3-7 of this round's queue existed only in chat for one exchange and didn't reach the
+  session that needed to act on them. `CONTEXT.md` now states this as a standing rule; the list itself
+  is logged verbatim in `docs/WORKING.md`.
 
-## Also landed this round, before the punch list (already reported, unchanged since)
+## What landed this round (director's Codex-audit follow-up queue, items 1-7)
 
-- Stage 3 build: `sim/world` (`TileGrid`, `WorldMaterials`), `sim/terrain_gen` (`ShaftGenerator`,
-  `StrataData`, `ValueNoise`); the resolution-split test and its one real fix (`occupied_cells` →
-  `occupied_terrain_cells`, D0027); `no_engine_imports.py` rewritten from a full `ClassDB` audit (D0026);
-  `check_coordinate_naming.py` added as a gate (D0028); the full README rewrite (`906c40e`); the
-  audit-dump review (README, ledger, `git ls-files`, gate status, LOC numbers, the spot-audit that found
-  its own methodology bug).
+Full detail and commit hashes: `docs/WORKING.md`'s own queue section; ledger entries D0042-D0050.
+
+1. **Heightfield rewrite → measured and accepted, not rewritten.** `docs/adr/0005` keeps three findings
+   separate: the §9 spec's per-column heightfield genuinely can't represent a floor under a reachable
+   overhang (Codex right to flag it); the implementation had already diverged toward a bounded local
+   query before anyone noticed; measurement showed the residual (originally 0.85%/12%, now ~0% post-D0045)
+   is rare enough to accept. `sim/invariants` gained its first real code, wired diagnostically.
+2. **Cave-geometry chamber section**, proving the local-window query's real behavior against the
+   limitation rather than asserting it's solved (`tests/test_cave_geometry.gd`).
+   - **Guard-window correction, same round, on your review**: the guard's 6-row window couldn't see its
+     own target case. Widened to a measured 48 (D0044), perf cost measured (37.2→55.3µs/tick,
+     negligible), test suite rewritten to prove it now fires for real.
+3. **`ValueNoise` calibrated to `FastNoiseLite`'s real distribution** (D0045) — independently reproduced
+   Codex's SD mismatch before trusting it. `FASTNOISELITE_SD_CALIBRATION = 0.574`, applied at the one
+   call site, not baked into `sample()` (would break its golden-vector tests). Distribution test added.
+   Surfaced D0046 (see "What was learned").
+4. **CI now runs all 13 Godot suites** (D0047) — a `tests` job downloading and SHA-512-verifying the
+   exact pinned Godot build, importing first, one step per suite. Verified live on a real run, not just
+   asserted: green in 40s.
+5. **`split()` order-independence actually tested** (D0050), correcting D0006's false "verified" claim.
+   Mutation-tested against the exact audit-described mutation.
+6. **Batch of four**: README's stale counts/claims (D0049), `EntityIdPool`'s masking (D0048, see "What
+   was learned"), `data_codegen`'s uncaught crash on malformed YAML now a controlled failure (D0049),
+   `Fx.div`'s `push_error` now actually asserted via a real subprocess probe (D0049).
+7. **LOC ratio's non-enforcement stated as fact** in `docs/WORKING.md`, current ratio 2.896 (not the
+   audit's stale 3.564). Floor unchanged, per the director's explicit call.
 
 ## Gates
 
-All 8 PASS. `layer_lint`, `no_engine_imports`, `check_coordinate_naming`, `check_size_limits` (19 files),
-`schema_validator` (7 data files), `check_claim_references` (2 claims, 0 proven) — all clean.
-`data_codegen --check` (new, gate 22) — PASS, both generated files fresh.
+All 9 structural gates PASS (`layer_lint`, `no_engine_imports`, `check_coordinate_naming`,
+`check_size_limits`, `check_loc_ratio`, `schema_validator`, `check_claim_references`,
+`data_codegen --check`, `check_working_freshness`). CI's new `tests` job: 13/13 suites PASS, confirmed
+on a live GitHub Actions run (`33011313382`), not only locally.
 
-**LOC ratio** (measured just now, not from memory — reported in full per item 3's standing rule):
-instrument 2,384 (tools 1,452, tests 932) / game 685 (core 286, sim 399). **Absolute ratio 3.480** —
-more than double the 1.5-by-`C001` target stated this round. Trailing 10 commits: instrument 1,965 →
-2,384 (+419), game 738 → 685 (−53) — velocity check would **FAIL** (game shrank, from the codegen
-refactor collapsing hand-written mirrors; `tools/` grew faster, from this round's lint and codegen work).
-Still ADVISORY only — game LOC is under the 2,000-line floor where the gate would actually block. Stated
-plainly per the standing rule: this is the wrong direction on both the absolute number and the trend, and
-stage 4 (a real game module, not tooling) is the next chance to move it back.
+**LOC ratio** (measured just now): instrument 3,553 (tools 1,529, tests 2,024) / game 1,227 (core 296,
+sim 931). **Absolute ratio 2.896** — improved from the audit's own 3.564 snapshot (stage 4's real game
+code grew faster than instrument code in relative terms), still above the 1.5-by-`C001` target set
+2026-08-25, still ADVISORY (game LOC under the 2,000-line floor).
 
 ## Claims
 
@@ -94,12 +104,12 @@ No status or value changes. `C001`, `C002` remain `BLOCKED`, never measured.
 
 ## Blocked, and what it's waiting on
 
-- Stage 4 (`sim/body`) — not started. The full pre-stage-4 punch list is now closed; this is the actual
-  next decision point.
-- `sim/transport` / Freight Winch — downstream of stage 4+, unchanged.
+- (f)/(g) — minimal debug renderer, `--play` flag + recorded-input plumbing — not started. Next, per
+  the director's explicit instruction this round.
+- `sim/commands`+`interface` (stage 5) and beyond — downstream, unchanged.
 - Chunk size and the coordinate type scheme (above) — waiting on measurement, not a missing decision.
 
 ## Taste queue
 
-0 fixtures. Unchanged — the first ones are still wanted at stage 4 (hostile chamber fresh-dig slopes,
-rope traversal segment), per `ONBOARDING.md`.
+0 fixtures. Unchanged — the first ones are still wanted at (f)/(g) or shortly after (hostile chamber
+fresh-dig slopes, rope traversal segment), per `ONBOARDING.md`.
