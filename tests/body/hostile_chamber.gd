@@ -28,11 +28,15 @@ const CEILING_CORNER_START: int = 68
 const CEILING_CORNER_END: int = 72
 const MANTLE_START: int = 72       ## 2-tile (32px) step -- too tall to auto-step, needs a mantle hold
 const MANTLE_END: int = 80
-const SHAFT_START: int = 84        ## 3-tile-wide (48px) vertical descent
-const SHAFT_END: int = 96
+const SHAFT_START: int = 80        ## outer bound of the shaft SECTION -- includes the confining walls
+const SHAFT_WALL_COLS: int = 6     ## either side of the 3-tile (12-col) opening, so the walls have a
+const SHAFT_OPEN_COLS: int = 12    ## real width rather than degenerating to zero when the section's
+const SHAFT_END: int = SHAFT_START + SHAFT_WALL_COLS * 2 + SHAFT_OPEN_COLS  ## outer bound exactly matched the opening's own width
+const SHAFT_OPEN_START: int = SHAFT_START + SHAFT_WALL_COLS  ## the actual open (fall-through) columns,
+const SHAFT_OPEN_END: int = SHAFT_OPEN_START + SHAFT_OPEN_COLS              ## not the section's outer bound
 const SHAFT_FLOOR_ROW: int = 32
-const END_START: int = 96
-const END_COL: int = 112
+const END_START: int = SHAFT_END
+const END_COL: int = SHAFT_END + 16
 
 
 ## Builds the chamber deterministically from a fixed seed -- the fresh-dig section is carved by an
@@ -104,17 +108,15 @@ static func _place_ceiling_corner(grid: TileGrid, from_col: int, top_row: int) -
 			grid.set_material(Vector2i(col, row), &"hardrock")
 
 
-## A 3-logic-tile-wide (12 terrain cells) vertical shaft: solid walls either side, open in between,
-## descending from `top_row` to `bottom_row`.
+## A 3-logic-tile-wide (`SHAFT_OPEN_COLS` terrain cells) vertical shaft: solid walls either side (the
+## `SHAFT_WALL_COLS`-wide margins between `from_col`/`to_col` and the open span), open in between,
+## descending from `top_row` to `bottom_row`, with a floor at the bottom of the open span.
 static func _place_shaft_walls(grid: TileGrid, from_col: int, to_col: int, top_row: int, bottom_row: int) -> void:
-	var shaft_width_cols: int = 3 * (Body.LOGIC_TILE_PX / CELL)
-	var wall_left: int = from_col + (to_col - from_col - shaft_width_cols) / 2
-	var wall_right: int = wall_left + shaft_width_cols
 	for row: int in range(top_row - 4, bottom_row + 4):
-		for col: int in range(from_col, wall_left):
+		for col: int in range(from_col, SHAFT_OPEN_START):
 			grid.set_material(Vector2i(col, row), &"hardrock")
-		for col: int in range(wall_right, to_col):
+		for col: int in range(SHAFT_OPEN_END, to_col):
 			grid.set_material(Vector2i(col, row), &"hardrock")
 	for row: int in range(bottom_row, bottom_row + 4):
-		for col: int in range(wall_left, wall_right):
+		for col: int in range(SHAFT_OPEN_START, SHAFT_OPEN_END):
 			grid.set_material(Vector2i(col, row), &"hardrock")

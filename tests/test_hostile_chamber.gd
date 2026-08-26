@@ -118,5 +118,11 @@ func _test_narrow_shaft_present_and_3_tiles_wide() -> void:
 	_check(open_cols == want_cols,
 		"the shaft opening is exactly 3 logic tiles wide (%d terrain cols, got %d)" %
 		[want_cols, open_cols])
-	_check(not grid.is_solid(Vector2i(HostileChamber.SHAFT_START + 2, HostileChamber.SHAFT_FLOOR_ROW - 1)),
+	# Confining walls actually exist with real width -- catches the exact bug found while building this:
+	# the outer section bound once matched the opening's own width exactly, leaving zero-width walls.
+	_check(grid.is_solid(Vector2i(HostileChamber.SHAFT_OPEN_START - 1, mid_row)),
+		"a real wall exists immediately left of the shaft opening, not a zero-width margin")
+	_check(grid.is_solid(Vector2i(HostileChamber.SHAFT_OPEN_END, mid_row)),
+		"a real wall exists immediately right of the shaft opening, not a zero-width margin")
+	_check(not grid.is_solid(Vector2i(HostileChamber.SHAFT_OPEN_START + 2, HostileChamber.SHAFT_FLOOR_ROW - 1)),
 		"the shaft is genuinely open well below its top, not just a notch")

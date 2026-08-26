@@ -761,3 +761,20 @@ pattern), so this reads the shaft width the same way for consistency, not becaus
 unambiguous on its own.
 Reverse: CHEAP — one fixture file and its test; nothing outside the acceptance suite depends on its
 exact column numbers yet, only on the named constants (`PIT_START`, `LEDGE_START`, etc.) it exports.
+
+## D0037 · 2026-08-25 · hostile_chamber.gd: the shaft's confining walls were zero-width
+Found immediately after D0036 landed: `SHAFT_START`/`SHAFT_END` were set exactly `SHAFT_OPEN_COLS` (12)
+apart — the shaft SECTION's own width exactly matched its OPENING's width, leaving
+`(to_col - from_col - shaft_width_cols) / 2 == 0` margin for the confining walls on either side.
+`_place_shaft_walls`'s wall-building loops were correct; their inputs left them nothing to build. The
+"3 logic tiles wide" verification test still passed, because it only checked the OPENING's width, never
+that a wall existed beside it — a real gap in what "verified present" had actually checked, caught by
+building the acceptance driver next and noticing the shaft had no sides to fall between.
+Fixed: widened the section to `SHAFT_WALL_COLS` (6) margin on each side of the opening, and exposed
+`SHAFT_OPEN_START`/`SHAFT_OPEN_END` as their own named constants rather than leaving every caller
+re-derive the same offset — the exact re-derivation `tests/test_hostile_chamber.gd`'s wall-adjacency
+check itself needed, and the kind of duplicated arithmetic that let the original bug's inputs and the
+function that consumed them drift apart unnoticed. Added a direct regression test: a solid cell
+immediately outside each side of the opening, which the pre-fix geometry would have failed.
+Reverse: CHEAP — column constants only, still nothing built against them outside this fixture and its
+own tests.
