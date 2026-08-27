@@ -35,3 +35,12 @@ it fell under `.gitignore`'s then-existing "ignore every dotted directory by sha
 in favor of gate 27 itself doing the work loudly, rather than a blanket exclusion doing it silently
 (`docs/DECISIONS_LEDGER.md` D0066) — the near-miss is the reason the rule was worth removing, not just an
 anecdote next to the decision.
+
+**A third, candidate for this document's eventual opening line, once it is composed in full rather than
+grown incrementally:** typed references (`docs/DECISIONS_LEDGER.md` D0069) broke two of this session's
+own "fixed" test fixtures — a self-referencing event, structurally valid, semantically nonsensical, that
+passed every check that existed until the type rule arrived. Written by an author paying attention, in
+code whose whole purpose was testing correctness. That is the second such finding in three days, after
+D0004's duplicate ledger header. Both are a rule with no mechanism, violated by someone careful, not
+someone careless — which is the actual argument for Anvil, made twice now as a measured pattern rather
+than asserted once as a thesis (D0075).

@@ -4,23 +4,20 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-27. This round: independent (Codex) audit of ANVIL's own steps 1-2, and the
-response to it.** Two real findings changed the design; the ledger now holds the project's first two
-`FINDING` events, logged by an external audit against its own architecture document. **Anvil crossed its
-own 800-line steps-1-2 cap (922 lines) doing the fixes the audit asked for — flagged, not buried; see
-below.** Step 3 (economy authoring) still waits for the director.
+**Last updated: 2026-08-27. This round: independent (Codex) audit of ANVIL's own steps 1-2, the response
+to it, and the director's ruling on the resulting budget question.** The ledger now holds Anvil's first
+four real events — two `FINDING`s from the audit, a `DECISION` raising the steps-1-2 cap and splitting
+how it's measured, and a third `FINDING` recorded against the fix's own history. Step 3 (economy
+authoring) still waits for the director.
 
 ---
 
 ## EXPENSIVE, awaiting you
 
-- **Anvil-proper is 922 lines against the queue's own 800-line steps-1-2 cap.** `test_check_integrity.py`
-  alone is 420 lines covering 17 branches / 37 cases — real, necessary coverage for real, necessary
-  fixes (typed references, self-reference, UUID shape, empty-array semantics), not padding. "Cheap now"
-  undersold the actual cost. Not proceeding past the audit's items 1-6 without your read on this.
 - Eleven tracked `docs/*.md` files outside `docs/README.md`'s normative table — unchanged, still
   deliberately unresolved pending step 6's manifest gate.
 - `incoming/ANVIL_ARCHITECTURE.md`'s disposition — unchanged, still undetermined.
+- Step 3 (economy authoring) — waits for the director, as it has all session.
 
 ## What was learned
 
@@ -44,6 +41,17 @@ below.** Step 3 (economy authoring) still waits for the director.
   this round the same discipline applied to the untracked-files gate, which had a claimed 3/3 with no
   checked-in way to re-run it. Now it does (`tools/layer_lint/test_check_untracked_files.py`, 5/5,
   disposable scratch git repos).
+- **A cap can be stale rather than wrong, and the two calls for it.** The steps-1-2 cap crossing was
+  reported as a HARD STOP; the director's ruling wasn't "cut to fit" but "the cap itself predates the
+  scope that crossed it" — raised, not defended against. Reported as two numbers (implementation/test)
+  from now on for the same reason the instrument/game ratio measures instrument and game separately: a
+  number only means something if it bounds the thing actually meant to be bounded (D0074).
+- **A defect class can be proven real by breaking your own "correct" code, not just by breaking bad
+  code.** Two of this session's own passing test fixtures turned out to be exactly the semantically-
+  nonsensical-but-structurally-valid case reference typing exists to catch — found by running the suite
+  after the fix landed, not by review. Logged as a `FINDING` against the schema's own history (D0075),
+  the second self-referential finding in three days after D0004's duplicate header — a pattern, not an
+  incident.
 
 ## What landed this round
 
@@ -65,15 +73,19 @@ Full detail: `docs/DECISIONS_LEDGER.md` D0069-D0073. One commit, pushed, CI conf
 
 ## Gates
 
-All 27 structural gates PASS, run and confirmed just now. `test_check_integrity.py`: 37/37 (up from
-17/17). `test_check_untracked_files.py`: 5/5 (new). `check_integrity.py` against the real
-`.anvil/log/` (2 events): PASS, referentially sound.
+All 27 structural gates PASS, run and confirmed just now. `test_check_integrity.py`: 37/37.
+`test_check_untracked_files.py`: 5/5. `check_integrity.py` against the real `.anvil/log/` (4 events, up
+from 2): PASS, referentially sound.
 
-**Anvil line count: 922 / 800 cap for steps 1-2 (115% — over) / 2,000 total budget (46%).**
-**LOC ratio: unchanged this round** (no `core/`/`sim/`/`tests/` GDScript touched) — still the figure from
-the prior round, 3.599, not re-measured since nothing that feeds it changed.
+**Anvil, reported as two numbers from now on (D0074): implementation 504 / test 420 / total 924.**
+Cap is now 1,000 for steps 1-2, applies to implementation only (test LOC uncapped — mutation coverage is
+code this project wants more of, not less). Implementation is comfortably under. 2,000-line total budget
+unchanged, 1,076 lines of headroom for steps 3-9 (measured against the current 924 total).
+**LOC ratio: unchanged this round** (no `core/`/`sim/`/`tests/` GDScript touched) — still 3.599 from the
+prior round, not re-measured since nothing that feeds it changed.
 
-**Commits this round: 1** (`fb9ce00`). **Unpushed: 0.**
+**Commits this round: 2** (`fb9ce00`, plus this round's DECISION/FINDING events + ledger). **Unpushed: to
+be pushed with this round's commit.**
 
 ## Claims
 
@@ -82,9 +94,11 @@ No status or value changes. `C001`, `C002` remain `BLOCKED`, never measured.
 ## Blocked, and what it's waiting on
 
 - **Step 3 (economy authoring) and beyond** — still waits for the director.
-- **The 922-line overage** — awaiting director direction: proceed, cut, or reconsider the cap.
 - Gate 10, item 2 (human-biased fuzzer), rope, chunk size (D0019), coordinate type scheme (D0020) —
   unchanged.
+- **Cohesion note for step 4** (director's instruction, preserved in `docs/WORKING.md`): projections
+  should mirror `sim/invariants`/`replay_determinism_test` deliberately when built, so "one architecture,
+  two scales" is visible in the code, not just asserted. Not started — step 4 hasn't either.
 
 ## Taste queue
 

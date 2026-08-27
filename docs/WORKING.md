@@ -55,13 +55,27 @@ External audit of ANVIL itself. Director's order: items 1-5 land, report, step 3
       eighth type added, per instruction. D0073.
 - [x] 7. Stale brief numbers — left alone, per instruction (step 6's generated brief is the real fix).
 
-**HARD STOP crossed, flagged rather than worked around: Anvil-proper (`tools/anvil/*.py` +
-`.anvil/README.md`) is now 922 lines, over the 800-line cap the director's own queue set for steps 1-2.**
-`test_check_integrity.py` alone grew from 237 to 420 lines adding 20 new mutation cases across 8 new
-branches (typed references, self-reference, UUID shape, empty arrays, source_class values, the empty-log
-message) — real, necessary coverage for real, necessary fixes, not padding, but the growth is what
-crossed the line, and "cheap now" undersold it. Reported prominently, not buried, per the HARD STOP's own
-purpose. Not proceeding past item 5 without the director's read on this.
+**HARD STOP crossed, flagged, then resolved by the director as scope growth against a stale cap, not an
+overrun — D0074.** Cap raised 800 → 1,000 for steps 1-2, now counts IMPLEMENTATION LOC only (test LOC
+reported separately, uncapped, since mutation coverage is exactly the code this project should not
+discourage). Current measured split: implementation 504 / test 420 / total 924. 2,000 total budget
+unchanged, 1,078 lines of headroom for steps 3-9.
+
+- [x] Item 1 (D0074 policy part 1): cap raised, `DECISION` event logged.
+- [x] Item 2 (D0074 policy part 2): implementation/test split adopted as the standing report shape.
+- [x] Item 3 (D0075): the self-referencing test-fixture finding logged as a `FINDING` event against the
+      schema's own history — the strongest evidence yet that D0069's typed-reference fix closed a real
+      gap, not a precautionary one. Pattern noted (second self-referential finding in three days, after
+      D0004): flagged as a candidate opening line for `.anvil/README.md`'s eventual full composition.
+
+**Cohesion note, director's own instruction — for step 4, NOT now, preserved here so it isn't lost by
+then:** when projections land, mirror the sim deliberately. `replay_determinism_test` (hash state every
+100 ticks, assert identity) is the template `sim/invariants`-shaped projection tests should copy in shape
+and naming. Anvil's event log ↔ the sim's input log; Anvil's projections ↔ the sim's tick phases (both
+pure functions of prior state); Anvil's integrity checker ↔ `sim/invariants` (both continuous truth
+assertions). "One architecture, two scales" has to be visible in the code, not just asserted in prose —
+if `sim/invariants` and `tools/anvil/check_integrity` read as siblings, a reviewer notices the symmetry
+without being told. Build for that when step 4 actually starts.
 
 Step 3 still waits for the director, unchanged.
 

@@ -2389,3 +2389,74 @@ arrives pre-loaded, not reargued from scratch under whatever pressure is in the 
 Reverse: N/A — a `FINDING` event, append-only, not an action with a cost to undo. If the gaps turn out not
 to be real once step 4 is built, that becomes a later `FINDING` or `DECISION` explaining why, not an edit
 to this one.
+
+## D0074 · 2026-08-27 · the steps-1-2 cap raised to 1,000, and now counts implementation only
+
+The director's own framing, worth keeping verbatim because it names the actual failure being avoided:
+"The wrong response is to cut good code to hit a stale figure — that is the same move as trimming
+comments to pass the size gate, and we already named that failure" (the size-gate-vs-split rule this
+session's own QUALITY.md addition already covers, `docs/DECISIONS_LEDGER.md` — the "trim vs split" entry
+from the prior session's `sim/body/body.gd` work).
+
+**Two decisions, recorded together because they're one policy, not two:**
+
+1. **The 800-line steps-1-2 cap is raised to 1,000.** It was scoped against steps 1-2 as originally
+   defined, before the external (Codex) audit existed. Reference typing, semantic hardening, and the
+   untracked-gate mutation harness are audit-driven additions made AFTER that scoping and were never
+   counted against the original number — this is scope growth against a stale cap, not an overrun.
+   **The 2,000-line total budget is unchanged**, and now has 1,078 lines of headroom for steps 3-9
+   (2,000 − 922 measured at the time of this decision). If the total is ever at risk, the agreed response
+   is naming and cutting something specific, not raising the total and not trimming good code to hide
+   under a stale sub-cap.
+2. **The cap now applies to implementation LOC only, not test LOC.** Same reasoning as the instrument/game
+   ratio: a number is only useful if it measures the thing actually meant to be bounded. 37 mutation
+   cases and a scratch-git-repo test harness are a large share of the 922-line total measured last round,
+   and are precisely the code this project should not discourage — a cap that penalizes writing more
+   mutation coverage is a cap pointed the wrong way.
+
+**Logged as a real `DECISION` event**, not just ledger prose — Anvil's own event system now governs a
+real decision about Anvil itself. `.anvil/log/2026-08-27T194804.835871Z-a1b205db.json`. Verified
+referentially sound via `check_integrity.py` before this entry was written.
+
+**Measured split, current state** (`tools/anvil/schema.py` + `append.py` + `check_integrity.py` +
+`.anvil/README.md`, docs counted with implementation since they're not test code): **implementation 504
+lines, test 420 lines (`test_check_integrity.py`), total 924.** Both figures are `wc -l` output at
+writing time, not recalled from a prior round's report. Implementation is comfortably under the new
+1,000 cap; reported going forward as two numbers, not one, per the director's instruction.
+
+Reverse: CHEAP — a number in a doc/queue and a reporting convention; reverting undoes no code.
+
+## D0075 · 2026-08-27 · the self-referencing test fixtures — a FINDING against the schema's own history
+
+**What happened, precisely.** Landing D0069's typed-reference check broke two of this session's own
+"fixed" mutation-test fixtures in `tools/anvil/test_check_integrity.py`. Both `branch_unstated_source`'s
+"fixed" case and `branch_supersedes_type_rules`'s first "broken" case called `_valid_measurement(event_id)`
+with the default `claim_id`, which happened to equal the SAME id passed as the event's own `id` — a
+`MEASUREMENT` event referencing itself as its own claim. Both fixtures were written specifically to test
+correctness, by an author paying attention (this session, the prior round), and both passed cleanly under
+the untyped-reference schema that existed before D0069 — the pre-fix checker only asked whether a
+referenced id existed, never whether it made sense to be referenced there, and a self-reference trivially
+satisfies "exists." Invisible until the suite was actually re-run after D0069 landed (35/37 → the two
+failures pinpointed the exact fixtures); not visible from reading the new code.
+
+**Why this is evidence, not just a bug in a test file.** The director's own framing: "the fixtures were
+structurally valid, semantically nonsensical, and passed every check that existed until the type rule
+arrived. Two of them, in code written specifically to test correctness, by someone paying attention." This
+is a measured instance of the exact defect class D0069's typed-reference fix closes, found INSIDE the fix
+itself, in the corpus's own correctness-testing code — the strongest evidence available that the fix
+was addressing a real, live gap rather than a precautionary one.
+
+**Logged as a real `FINDING` event**, `source_class: artifact-instrument` (surfaced by running the test
+suite, not by human review or an external audit), `severity: medium`, `confidence: high`, `independent_of:
+[]` (single source), `invalidates: []`. `.anvil/log/2026-08-27T194813.838887Z-180ca2fc.json`. Verified
+referentially sound before this entry was written.
+
+**The pattern, named because the director asked for it named:** this is the second self-referential
+finding in three days, after D0004's duplicate ledger header (a rule — "never reuse an existing entry's
+number" — violated by a careful author, with no mechanism enforcing it). Both are cases of a rule with no
+mechanism being violated by someone paying attention, not someone careless. That pattern is the actual
+argument for Anvil, stated as a measured recurrence rather than a single incident — flagged as a
+candidate opening for `.anvil/README.md`'s eventual full composition, not written there in full yet.
+
+Reverse: N/A — a `FINDING` event, append-only. The underlying test fixtures are already fixed (D0069's
+own commit); this entry records the finding, not an action with its own cost to undo.
