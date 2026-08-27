@@ -4,101 +4,114 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-27. This round: independent (Codex) audit of ANVIL's own steps 1-2, the response
-to it, and the director's ruling on the resulting budget question.** The ledger now holds Anvil's first
-four real events — two `FINDING`s from the audit, a `DECISION` raising the steps-1-2 cap and splitting
-how it's measured, and a third `FINDING` recorded against the fix's own history. Step 3 (economy
-authoring) still waits for the director.
+**Last updated: 2026-08-27. This round: the run-based roguelite structure is retired.** The director
+brought a full design-reversal brief, a five-point review found four real errors in the director's own
+edit list before any editing started (one of them — a load-bearing identity claim about to be deleted by
+association — the director called potentially real damage), and six commits landed the reversal across
+`docs/GDD.md`, `claims/`, `CONTEXT.md`/`README.md`, `ONBOARDING.md`, `docs/ARCHITECTURE.md`/`QUALITY.md`,
+and the `sim/run`/`sim/meta`/`sim/commands` scaffolding. No code touched anywhere in this round — verified
+directly, not assumed. Stopped before `data/economy/`, as instructed.
 
 ---
 
 ## EXPENSIVE, awaiting you
 
+- **`data/economy/`** — the demand authoring itself (D1/D2/D3, the reachability rule). Waits for you, as
+  instructed.
+- **`sim/run`/`sim/meta`'s actual shape.** Deliberately left open rather than decided this round — see
+  "What was learned" below. This is now a real architecture call, not just unbuilt scaffolding.
+- **Whether lateral variety survives losing re-rolled geology** (new `docs/GDD.md` §8 question, your own
+  instruction to state honestly rather than assume away).
 - Eleven tracked `docs/*.md` files outside `docs/README.md`'s normative table — unchanged, still
-  deliberately unresolved pending step 6's manifest gate.
+  deliberately unresolved.
 - `incoming/ANVIL_ARCHITECTURE.md`'s disposition — unchanged, still undetermined.
-- Step 3 (economy authoring) — waits for the director, as it has all session.
 
 ## What was learned
 
-- **The system's first real test of recording a correction against itself, and it worked.** The director
-  wrote "contradictions unrepresentable"; an external audit found it false; the correction is now six
-  rewritten passages in the architecture doc AND a `FINDING` event, `source_class: external-audit`,
-  independently checked referentially sound before either was written down as done. `docs/DECISIONS_LEDGER.md`
-  D0070.
-- **Untyped references were exactly the failure class this project keeps finding, reappearing inside the
-  tool built to prevent it.** `MEASUREMENT.claim_id` could point at a real event of the wrong type and
-  pass; `CONTENT_LINK.serves_claims` was declared and never traversed. Both fixed (D0069) with a typed
-  table, not a patch per symptom — `supersedes`' legal targets are keyed by the SOURCE event's own type
-  specifically because the architecture doc already has one documented cross-type case (`DECISION` →
-  `ASSUMPTION`) that a same-type-only rule would have wrongly rejected.
-- **A fix's own test fixtures can carry the exact bug the fix is closing, and only run-and-observe catches
-  it.** Adding claim-id type-checking broke two existing "fixed" test cases whose default fixtures
-  happened to self-reference (an id used as both the event's own id and its `claim_id`) — invisible until
-  the suite was actually re-run, not from reading the new code.
-- **"Almost certainly right" was checked, not trusted, again.** The director's own caution about
-  `check_integrity()`'s independent per-check scanning got a dedicated multi-violation fixture last round;
-  this round the same discipline applied to the untracked-files gate, which had a claimed 3/3 with no
-  checked-in way to re-run it. Now it does (`tools/layer_lint/test_check_untracked_files.py`, 5/5,
-  disposable scratch git repos).
-- **A cap can be stale rather than wrong, and the two calls for it.** The steps-1-2 cap crossing was
-  reported as a HARD STOP; the director's ruling wasn't "cut to fit" but "the cap itself predates the
-  scope that crossed it" — raised, not defended against. Reported as two numbers (implementation/test)
-  from now on for the same reason the instrument/game ratio measures instrument and game separately: a
-  number only means something if it bounds the thing actually meant to be bounded (D0074).
-- **A defect class can be proven real by breaking your own "correct" code, not just by breaking bad
-  code.** Two of this session's own passing test fixtures turned out to be exactly the semantically-
-  nonsensical-but-structurally-valid case reference typing exists to catch — found by running the suite
-  after the fix landed, not by review. Logged as a `FINDING` against the schema's own history (D0075),
-  the second self-referential finding in three days after D0004's duplicate header — a pattern, not an
-  incident.
+- **A review response caught four real errors before any editing started, and you found a fifth.** The
+  D2 anti-vacuity rule was worded by layer when it needed to be worded by reachability (as written it
+  would have fired three or four times total and been silent on demands 4-20, exactly where the legacy
+  failure lived) — you supplied the corrected wording directly. "The terrain is the factory" was about to
+  be deleted by association when §2's roguelite section retired, even though it's the project's most
+  quoted identity claim and doesn't depend on runs at all — moved to §1 instead. A direct self-contradiction
+  in the edit list (§5's idle-loop subsection marked both "keep verbatim" and "edit this exact phrase
+  inside it") got caught before it could be resolved by accident. Machine retrieval was slated for
+  retirement with run termination, but the underlying tension (pull a machine before its section floods)
+  resurfaces under local, non-terminal flooding — reworded, not deleted.
+- **A retired claim is a different fact from an edited one, and the corpus format already had a word for
+  it.** `C001` measured a bounded run that no longer exists — title, falsifiable form, metric, and
+  threshold all constructs of the retired structure. Marked `RETIRED` per `docs/CLAIMS.md` §4's own
+  convention rather than rewritten in place, on your explicit reasoning: editing it would erase that a
+  design change happened. `C003` replaces it, shaped as an episode claim (checkpoint/seed/policy/horizon)
+  rather than a bounded run — threshold deliberately left unset, since there's nothing to derive one from
+  until `data/economy/` exists, and a guessed number would be exactly the "guess wearing a decimal point"
+  `docs/CLAIMS.md` §9 warns against.
+- **The engineering layers really were unaffected, and this round is the first time that claim was
+  checked rather than taken on faith.** All five ADRs, `core/`, `sim/world`, `sim/terrain_gen`, `sim/body`
+  — confirmed clean via direct trace (ADR-0002's shaft-to-surface boundary maps identically onto one
+  persistent shaft) and via `git diff --stat -- '*.gd'` across the full six-commit range, which returned
+  nothing. The reversal's entire cost landed in prose.
+- **"Everything that survives between runs" stopped meaning anything once nothing is disposable.**
+  `sim/meta`'s whole definition was relative to a `sim/run` whose state got discarded. With nothing
+  discarded, the definition has no referent — this is a deeper open question than the already-known
+  rig-form one, and it's now stated as such rather than left as stale scaffolding that happens to compile
+  because nothing reads it yet.
+- **Two spots were left deliberately stale, on purpose, inside explicit "keep verbatim" instructions** —
+  §2's "a forty-minute run cannot" and R2's "every run that fails to reach depth into a zero." Flagged in
+  the ledger rather than silently fixed, matching the discipline the director's own corrections enforced
+  twice this round (the §5 phrase-scope correction, and my own overreach on "run cadence" caught and
+  reverted before it was committed).
 
 ## What landed this round
 
-Full detail: `docs/DECISIONS_LEDGER.md` D0069-D0073. One commit, pushed, CI confirmed green
-(`fb9ce00`, run `33109356157`).
+Full detail: `docs/DECISIONS_LEDGER.md` D0076-D0081. Six commits, each its own document group so the
+diff stays reviewable, per your explicit instruction.
 
-1. **Typed references** (D0069): `schema.REFERENCE_FIELDS` / `SUPERSEDES_LEGAL_TARGETS`; every reference
-   now checks existence AND legal target type; `CONTENT_LINK.serves_claims` traversed for the first time.
-2. **Language correction** (D0070): "contradictions unrepresentable" → "contradictions become explicit
-   event history; resolution becomes deterministic projection behavior" (the audit's own framing, adopted
-   verbatim), six occurrences in `incoming/ANVIL_ARCHITECTURE.md`. First `FINDING` event.
-3. **Untracked-gate mutation harness** (D0071): checked in, 5/5 cases, real disposable git repos.
-4. **Semantic hardening** (D0072): malformed UUID rejected, self-reference rejected (generalized beyond
-   `supersedes`), `FINDING.evidence` rejects empty (`independent_of`'s deliberate empty-is-valid case
-   preserved, regression-guarded). Deferred with a stated reason in code: supersedes-cycle detection,
-   commit-SHA existence, timestamp ordering. Empty-log vacuous PASS fixed — reports "0 events", never PASS.
-5. **Seven-types sufficiency** (D0073): second `FINDING` event, three named gaps, NOT resolved, no
-   eighth type added.
+1. **`docs/GDD.md`** (`ebf17e1`, D0076) — the full section-by-section rewrite: §1 gains the
+   run-independent "terrain is the factory" claim; §2 drops to two genres; §3 states the one-word
+   correction; R3 becomes continuous upkeep; §5/§7/§11 lose run-plural language via full rewrites where a
+   one-line patch wasn't enough; §8 gains the honest lateral-variety question and the reworded machine-
+   retrieval question; §9 records the retirement with your exact dictated text; §10's worked sketch moves
+   to hour 1/5/12.
+2. **`claims/`** (`23118e8`, D0077) — `C001` RETIRED, `C003-cold-start-reaches-d1.md` filed BLOCKED with
+   a real `blocked_on` list, both `CONTEXT.md`/`ONBOARDING.md` "definition of done" citations updated in
+   the same commit.
+3. **`CONTEXT.md` + `README.md`** (`f415b5e`, D0078) — orientation-docs propagation, compressed to each
+   file's own terse register.
+4. **`ONBOARDING.md`** (`fc03219`, D0079) — build-roadmap propagation; stage 6 restated as an open
+   question rather than a build target; Task 0's two historical `C001` mentions left untouched on purpose.
+5. **`docs/ARCHITECTURE.md` + `docs/QUALITY.md`** (`31b1f84`, D0080) — §11 kept in full, retitled
+   "pre-reversal design, not current spec" rather than deleted; six smaller stale references fixed
+   individually, not pattern-matched.
+6. **`sim/run`/`sim/meta`/`sim/commands` `MODULE.md`** (`87f127b`, D0081) — the run/meta split marked
+   open, no replacement architecture invented unprompted.
 
 ## Gates
 
-All 27 structural gates PASS, run and confirmed just now. `test_check_integrity.py`: 37/37.
-`test_check_untracked_files.py`: 5/5. `check_integrity.py` against the real `.anvil/log/` (4 events, up
-from 2): PASS, referentially sound.
+All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --check` PASS, run and
+confirmed just now. Test suites not re-run this round — no `.gd` file touched (confirmed, not assumed).
 
-**Anvil, reported as two numbers from now on (D0074): implementation 504 / test 420 / total 924.**
-Cap is now 1,000 for steps 1-2, applies to implementation only (test LOC uncapped — mutation coverage is
-code this project wants more of, not less). Implementation is comfortably under. 2,000-line total budget
-unchanged, 1,076 lines of headroom for steps 3-9 (measured against the current 924 total).
-**LOC ratio: unchanged this round** (no `core/`/`sim/`/`tests/` GDScript touched) — still 3.599 from the
-prior round, not re-measured since nothing that feeds it changed.
+**LOC ratio: unchanged, 3.904** (instrument 5,559 / game 1,424) — no `core`/`sim`/`tests` code touched.
+Still ADVISORY, game LOC under the 2,000-line floor.
 
-**Commits this round: 2** (`fb9ce00`, plus this round's DECISION/FINDING events + ledger). **Unpushed: to
-be pushed with this round's commit.**
+**Anvil: unchanged this round** — implementation 513 / test 420 / total 933, cap 1,000/2,000. No Anvil
+work this session.
+
+**Commits this round: 6.** **Unpushed: 6**, to be pushed with this report.
 
 ## Claims
 
-No status or value changes. `C001`, `C002` remain `BLOCKED`, never measured.
+`C001-two-minute-run.md`: `BLOCKED` → `RETIRED`. `C003-cold-start-reaches-d1.md`: new, `BLOCKED`.
+`C002-traversal-over-rubble.md`: unchanged, `BLOCKED`.
 
 ## Blocked, and what it's waiting on
 
-- **Step 3 (economy authoring) and beyond** — still waits for the director.
+- **`data/economy/`** — waits for you, explicitly.
+- **`sim/run`/`sim/meta`'s shape** — waits for a real decision, not something to resolve unprompted.
 - Gate 10, item 2 (human-biased fuzzer), rope, chunk size (D0019), coordinate type scheme (D0020) —
   unchanged.
-- **Cohesion note for step 4** (director's instruction, preserved in `docs/WORKING.md`): projections
-  should mirror `sim/invariants`/`replay_determinism_test` deliberately when built, so "one architecture,
-  two scales" is visible in the code, not just asserted. Not started — step 4 hasn't either.
+- **Cohesion note for Anvil step 4** (unchanged, unrelated to this round): projections should mirror
+  `sim/invariants`/`replay_determinism_test` when built. Not started.
 
 ## Taste queue
 

@@ -8,7 +8,13 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-## Design reversal — run-based roguelite to persistent single shaft, 2026-08-27
+## Design reversal — run-based roguelite to persistent single shaft, 2026-08-27 — CLOSED
+
+All six commits landed (`ebf17e1`, `23118e8`, `f415b5e`, `fc03219`, `31b1f84`, `87f127b`), each with its
+own ledger entry (D0076-D0081), no code touched (confirmed via `git diff --stat -- '*.gd'` across the
+full range — zero results). Stopped before `data/economy/`, as instructed. Full detail below is kept as
+the record of what was decided and why, not trimmed, matching how the ANVIL and stage-4 queues above are
+kept in this file after closing rather than deleted.
 
 Director-authored, verbatim scope. The run-based structure is retired; the rig becomes the
 continuous consumer, fed by a permanent single shaft that never resets. Full reasoning in the
