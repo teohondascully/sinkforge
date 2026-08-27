@@ -2963,3 +2963,34 @@ Two real fixes landed:
   including the "if that module still exists" qualifier.
 
 Reverse: CHEAP — prose only, `git revert` recovers all three changed files in full.
+
+---
+
+## D0089 · 2026-08-27 · docs/GDD.md:7, docs/GDD.md §9, docs/DECISIONS.md — the persistent-world collision, disambiguated by naming mechanisms not properties
+
+Decided: `docs/GDD.md`:7's "the first playable run" fixed to "session" — a genuine miss from D0082's own
+sweep, since it's a confidence-framing sentence rather than a duration/count/consequence, the specific
+class that sweep searched for. Found by the external audit, not by either prior pass.
+
+The larger fix, per the director's explicit instruction: `docs/GDD.md` §9's dead-list entry used to open
+with "Persistent-world progression" — a property name, not a mechanism, sitting in the same document as
+§1's "Sinkforge is a factory game with a persistent underground shaft." Not a strict logical
+contradiction once a reader traces both referents carefully (the dead entry means the old shop/currency/
+research-tree *economy*; §1 means the shaft's physical persistence), but a cold reader — the only reader
+who matters for a document meant to be read start to finish with no prior context — has no reason to
+trace that carefully before tripping on it. Rewritten to name the actual dead mechanisms: terminal
+products with no standing demand, a one-time descent gate as the only sink, a research-tree menu gating
+one-tier-deep tech. Added one explicit sentence: persistence itself was never the defect. Same treatment
+in `docs/DECISIONS.md`'s own SUPERSEDED note on the pre-pivot progression-spine entry, which quoted the
+same now-corrected GDD language and made the identical property/mechanism error independently — appended
+as a dated correction rather than rewritten in place, since editing SUPERSEDED prose to remove evidence of
+what it originally said would defeat the point of marking something SUPERSEDED instead of deleting it.
+
+**The general rule, extracted because the director asked for it named:** a dead-list entry that names a
+structural property rather than a specific mechanism will eventually be read as killing the property
+itself, not the mechanism the author actually meant. Two independent instances of the exact same wording
+error (`docs/GDD.md` §9 and `docs/DECISIONS.md`'s quote of it) is evidence this is a real pattern in how
+this project writes dead-list entries, not a one-off. Applies going forward: name mechanisms, not
+properties, when recording something as dead.
+
+Reverse: CHEAP — prose only, `git revert` recovers both files in full.

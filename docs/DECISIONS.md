@@ -201,12 +201,22 @@ recommendation and a cheap first slice that commits to nothing.
 
 **SUPERSEDED (content only) by the 2026-08-25 pivot.** The specific progression spine this entry
 resolved — the Sinkforge as a fed endgame, a tech graph, crafter modules waiting on a recipe graph — is
-persistent-world content and is dead; see `docs/GDD.md` §9 ("the Sinkforge as a continuous consumer",
-"persistent-world progression... the research tree as a menu... the descent gate as a one-time toll").
-The *meta*-decision — the paragraph above this note — is not superseded and still governs how design
-work happens here: prefer provisional, reversible, demand-pull framings over forcing a decision. Recorded
-as a content-only supersession rather than archiving the whole entry, per this file's own convention,
-because the reasoning about *how to decide* still matters even though *what was decided* does not.
+dead; see `docs/GDD.md` §9 ("the Sinkforge as a continuous consumer", "terminal products with no standing
+demand... a research-tree menu gating one-tier-deep tech... a one-time descent gate as the only material
+sink"). The *meta*-decision — the paragraph above this note — is not superseded and still governs how
+design work happens here: prefer provisional, reversible, demand-pull framings over forcing a decision.
+Recorded as a content-only supersession rather than archiving the whole entry, per this file's own
+convention, because the reasoning about *how to decide* still matters even though *what was decided* does
+not.
+
+**Correction, 2026-08-27 (second pivot).** The line above originally read "is persistent-world content
+and is dead" — imprecise, and imprecise in exactly the way that eventually causes real confusion: the
+2026-08-27 reversal (`docs/GDD.md` §9) returned the game to a persistent shaft, and a reader landing here
+after that could reasonably wonder whether this entry contradicts it. It does not. What was superseded
+above was never persistence itself — it was the specific mechanisms named: terminal output, a single
+one-time gate, a shallow research-tree menu. Those are still dead. The shaft's physical persistence is
+not, and was never, one of them. Corrected here rather than reworded above, per this file's own
+convention of recording what was actually written and when, not smoothing it after the fact.
 
 ### The danger model: you open the wall (REOPENED, then subsumed)
 

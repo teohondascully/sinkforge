@@ -4,7 +4,7 @@
 
 This document holds the design state. It is deliberately explicit about what is decided, what is open, what is dead, and what has already been ruled out and why. That last category matters most: several of the dead ideas are the obvious first answer to a real problem, and without a record they get reinvented within weeks.
 
-**Confidence, stated so that readers know which parts are load-bearing.** §§1 to 4, 7, 9, 10 and 13 are constraints and hold regardless of what gets built. §5 and §6 are the current best reasoning about a factory that does not exist yet: they are provisional, and the first playable run should be expected to revise them. Where any section makes a claim about how the game will play, it should eventually be replaced by a claim file with a measured value. Until then it is a hypothesis with a paragraph of argument behind it, and it should not be defended as though it were a measurement.
+**Confidence, stated so that readers know which parts are load-bearing.** §§1 to 4, 7, 9, 10 and 13 are constraints and hold regardless of what gets built. §5 and §6 are the current best reasoning about a factory that does not exist yet: they are provisional, and the first playable session should be expected to revise them. Where any section makes a claim about how the game will play, it should eventually be replaced by a claim file with a measured value. Until then it is a hypothesis with a paragraph of argument behind it, and it should not be defended as though it were a measurement.
 
 ---
 
@@ -216,7 +216,7 @@ Recorded so they are not reinvented. Each of these is the obvious first answer t
 
 **Per-run contracts and objectives.** Adds pressure and specificity; also turns the game into a chore list. Artifacts give the second axis without this cost.
 
-**Persistent-world progression, the Bazaar (as shop and as physical structure), currency, the research tree as a menu, the descent gate as a one-time toll, electricity as an early automation tier, waste and tailings, the mid-tier production chain with no demand behind it, horizontal boring.**
+**Terminal products with no standing demand, a one-time descent gate as the only material sink, a research-tree menu gating one-tier-deep tech, the Bazaar (as shop and as physical structure), currency, electricity as an early automation tier, waste and tailings, the mid-tier production chain with no demand behind it, horizontal boring.** Named by mechanism, not by property, on purpose (2026-08-27): this list used to open with "persistent-world progression," and a property name is exactly the kind of dead-list entry that eventually gets read as killing the property itself. **Persistence was never the defect — see §3.** What's dead here is the specific pre-pivot economy those mechanisms describe: terminal output, a single one-time gate, a shallow research-tree menu. The 2026-08-27 reversal (below) returned to a persistent shaft deliberately, and this entry does not contradict that.
 
 **The seven-layer depth plan.** Reduced to three layers plus the core. It was never actually seven in the prior code; that number came from a document, not an implementation.
 
