@@ -1494,3 +1494,62 @@ the next function no longer inflates to 11 (the exact false-positive class, now 
 confirms no other file in the tree was affected either way. `body.gd` itself: comments trimmed to exactly
 400 lines (the file-size limit, not exceeding it) without cutting any of the WHY content the D0055 root
 cause and fix decisions above depend on.
+
+**Definitive answer on direction, verified after the director asked which way the false positive ran:**
+over-reporting only, never under. Ran both the old and new `function_spans()` against every `.gd` file in
+the tree (217 functions where the two disagreed) — every single disagreement has old-count >
+new-count; none run the other way. Old-algorithm violations (>50 lines) across the whole tree: exactly
+1 (`_resolve_floor`, the false positive already fixed). New-algorithm violations: 0. No file was passing
+a limit it actually exceeded — the risk this bug carried was only ever a spurious FAIL, never a hidden
+PASS.
+
+## D0056 · 2026-08-26 · JUMP_CORNER_ROW generalizes: a fixture positioned by watching the controller is not independent of it — new QUALITY.md rule, full HostileChamber constant audit
+Decided, per the director's own framing: D0055's `JUMP_CORNER_ROW` finding — tuned against the OLD
+buggy held-jump's ~18-cell apex, then re-tuned against the corrected tap-jump's ~4-cell apex, both times
+by watching that specific policy's own trajectory — is the same failure class as the out-of-bounds
+launch, not an isolated fixture bug: a fixture and the controller it tests, fitted to each other, produce
+a number that measures their agreement, not correctness. Added to `docs/QUALITY.md` §2 as a new
+"New, and load-bearing" rule, with `JUMP_CORNER_ROW` as the live example and an explicit test for telling
+the two methods apart: does the constant define geometry the body must physically REACH (sized from real
+behavior WITH a stated margin above the measured minimum) — correct — or does the constant itself define
+a test's pass/fail boundary with no margin, a graze or a tangent — circular regardless of measurement
+care, because the measurement and the assertion share the same run.
+
+Audited every `HostileChamber` constant against that test. One falls in the bad category:
+`JUMP_CORNER_COL`/`JUMP_CORNER_ROW` — positioned twice by watching a specific jump's arc, zero margin by
+design (the file's own comment: "first contact is an EXIT-side graze... only a sliver... still
+overlaps"), and it directly IS what `corner_correction_success_rate` asserts against. Not rebuilt in this
+entry — see below.
+
+Everything else audited and found in the correct category, for one of three reasons:
+- **Derived from `Body`'s own declared spec constants**, not from watching behavior: the ledge's rise
+  (`FLOOR_ROW - 4` == `Body.STEP_UP_PX`, "1 tile," `docs/ARCHITECTURE.md` §9) and the mantle's rise
+  (`FLOOR_ROW - 4 - Body.MANTLE_PX/CELL`, "2 tiles," same spec), the shaft's right-wall stopping height
+  (`Body.HEIGHT_PX`), the cave's ceiling clearance and lower-floor drop (both `Body.HEIGHT_PX`-derived
+  with a stated margin, "> 10," "a full body-height below"). These are legitimate thresholds: the
+  constant they gate against (`STEP_UP_PX`/`MANTLE_PX`/`HEIGHT_PX`) is a DECIDED design number that
+  exists independently of any specific run, not something inferred by watching one.
+- **Measured from real behavior, but sized for REACHABILITY with a stated safety margin, not as an exact
+  threshold**: `POST_PIT_RUNWAY_COLS` (the pit jump's own measured landing distance, used to position
+  where the NEXT floor starts so the body has room to walk a settled approach — no test asserts anything
+  about this constant's own value, only whether the body eventually clears the ledge it leads to),
+  `SHAFT_OPEN_COLS` (measured natural rightward drift under the fall, 77.5px, against 96px of provisioned
+  room — real margin, not a razor fit), and `TOP_MARGIN_ROWS` itself (D0055 — sized against the measured
+  max jump apex with real margin, to keep reachable geometry clear of the world edge). None of these
+  constants ARE the thing a test's pass/fail reads; they only make some later, independently-defined
+  mechanic reachable.
+- **Arbitrary level-design placement, untouched by controller behavior at all**: `FLOOR_ROW`'s own base
+  value, `RUBBLE_START`/`RUBBLE_END` (procedurally carved from a seed, not from watching the body),
+  `MACHINE_CLUSTER_START`/`MACHINE_CLUSTER_END`, `SHAFT_FLOOR_ROW`, every `CAVE_*` section-width constant.
+
+Why `JUMP_CORNER_ROW` isn't being rebuilt in this entry: the actual remedy for a jump-arc obstruction
+test is either (a) deriving its position analytically from `docs/ARCHITECTURE.md` §9's own physics
+constants in closed form, decoupled from any one scripted policy's emergent trajectory, or (b) validating
+corner correction generically rather than via one hand-placed graze at all — which is exactly what the
+input fuzzer the director ordered next provides: many arbitrary trajectories will graze many obstacles at
+many angles, giving real, non-circular evidence the mechanic works, without this fixture's inherent
+fitted-pair problem. Rebuilding `JUMP_CORNER_ROW` by hand now would still leave the SAME fixture-testing
+its own tuning target failure mode in place; the fuzzer replaces the need for it rather than patching it.
+
+Reverse: CHEAP — a documentation-only change (`docs/QUALITY.md`, this entry). No code or test behavior
+changed.

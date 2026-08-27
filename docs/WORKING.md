@@ -313,6 +313,14 @@ Registered in CI alongside the other nine structural gates (now ten). Mutation-t
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
 
+**Closed (D0056): `JUMP_CORNER_ROW` generalizes — a fixture tuned by watching the controller is not
+independent of it.** New `docs/QUALITY.md` §2 rule; full `HostileChamber` constant audit found exactly
+one constant in the bad category (`JUMP_CORNER_COL`/`JUMP_CORNER_ROW` — positioned twice by watching a
+specific jump's own arc, zero margin, directly gates `corner_correction_success_rate`), everything else
+either spec-derived, reachability-measured-with-margin, or arbitrary/procedural. Not rebuilt by hand —
+the input fuzzer (next) makes the fixture's own circularity moot by validating corner correction against
+arbitrary trajectories instead of one hand-placed graze. Full audit: D0056.
+
 **Closed (D0055): the jump-glitch out-of-bounds launch, root-caused to THREE independent causes, not
 one.** (1) `Body._try_step` (auto step-up and mantle) had no cap on chained lifts against a wall —
 fixed with a pre-emptive top-boundary refusal, checked before moving. (2) `ScriptedTraverse` asserted
