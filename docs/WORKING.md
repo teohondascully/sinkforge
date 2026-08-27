@@ -14,21 +14,26 @@ Fixed by the director verbatim, mid-session, per the "multi-item task lands in W
 starts" rule. Mini overnight session, steps 1 and 2 only. STOP before step 3 (economy authoring —
 design work, director wants to be present).
 
-- [ ] 1a. bucket 1 and 2 moves, per the confirmed triage
-- [ ] 1b. read `CONVERGENCE_LEDGER.md` and the `FREIGHT_WINCH_*` files specifically, before archiving
-      session-exhaust; report anything not present in the tracked syntheses
-- [ ] 1c. archive `docs/tracelog/` and `docs/handoff/` to `docs/archive/session-exhaust/` with its
-      README. Track, do not delete.
-- [ ] 1d. clean `.git/info/exclude` of everything the project depends on
-- [ ] 1e. the untracked-files gate: fails on untracked AND not covered by the shipped `.gitignore`.
-      Mutation-test against a real gap and a legitimately ignored file before trusting it.
-- [ ] 1f. correct the FEEL_GAP / MENU_MATRIX memory pointers
-- [ ] 2a. event schema: 7 types, universal fields, required fields per type
-- [ ] 2b. append tool
-- [ ] 2c. referential integrity checker
-- [ ] 2d. mutation-test the integrity checker per branch
+- [x] 1a. bucket 1 and 2 moves, per the confirmed triage — `74c397d`, D0062
+- [x] 1b. read `CONVERGENCE_LEDGER.md` and the `FREIGHT_WINCH_*` files specifically, before archiving
+      session-exhaust; report anything not present in the tracked syntheses — done, see session report;
+      surfaced the director_bus.sh/test_director_bus.sh correction (D0062)
+- [x] 1c. archive `docs/tracelog/` and `docs/handoff/` to `docs/archive/session-exhaust/` with its
+      README. Track, do not delete. — `74c397d`
+- [x] 1d. clean `.git/info/exclude` of everything the project depends on — `14646fb`, D0063
+- [x] 1e. the untracked-files gate: fails on untracked AND not covered by the shipped `.gitignore`.
+      Mutation-test against a real gap and a legitimately ignored file before trusting it. — `14646fb`,
+      D0063, 3/3 mutation branches observed
+- [x] 1f. correct the FEEL_GAP / MENU_MATRIX memory pointers — done directly in memory files (outside
+      this repo, no commit)
+- [x] 2a. event schema: 7 types, universal fields, required fields per type — `tools/anvil/schema.py`, D0064
+- [x] 2b. append tool — `tools/anvil/append.py`, D0064
+- [x] 2c. referential integrity checker — `tools/anvil/check_integrity.py`, D0064
+- [x] 2d. mutation-test the integrity checker per branch — `tools/anvil/test_check_integrity.py`,
+      16/16 cases observed, D0064
 
-STOP after 2d. Do not start step 3.
+STOPPED after 2d, as instructed. Step 3 (economy authoring) NOT started — design work, director wants
+to be present.
 
 **Schema constraints, verbatim:** seven types is a constraint, not a starting point — an eighth seeming
 necessary while writing 2a means stop and log the case, don't add it. `MEASUREMENT.source` (measured |

@@ -1992,3 +1992,72 @@ Reverse: CHEAP for the gate script and the `.git/info/exclude` cleanup (both are
 with no behavior elsewhere depending on them). The `.gitignore` addition for the two held-back files is
 CHEAP to reverse and MODERATE to get wrong silently — tracking them by accident later is exactly the
 regression D0062 exists to prevent, which is why the mutation test above specifically covers this case.
+
+## D0064 · 2026-08-27 · ANVIL step 2a/2b/2c/2d — event schema, append tool, referential integrity checker
+
+`tools/anvil/{schema,append,check_integrity,test_check_integrity}.py`, 546 lines total (well under the
+overnight queue's 800-line cap for steps 1-2, well under the 2,000-line total budget). No eighth event
+type considered necessary while writing this; none of the seven types' required fields were changed
+beyond what `incoming/ANVIL_ARCHITECTURE.md` §3 and §5 specify — both EXPENSIVE per the director's queue,
+neither triggered.
+
+**Transcription choices, resolving ambiguity in how the architecture doc's field lists become a concrete
+schema (`tools/anvil/schema.py`'s own docstring has the same list, kept here for the ledger's record):**
+- `id`, `timestamp`, `author`, `commit` treated as universal-required; `supersedes` universal-optional.
+  Several types re-list one of these in their own §3 field row (`CLAIM_AUTHORED` lists `id`, `DECISION`
+  lists `supersedes?`) — read as emphasis in the source doc, not a second distinct field, so not
+  duplicated in the schema.
+- `MEASUREMENT`'s own `commit` mention is the universal field, not a second one for what was measured
+  against.
+- `FINDING.independent_of` is defined in §5 ("Safeguards"), not §3's summary table — folded into
+  `FINDING`'s required fields because the director's own instruction (this session, verbatim: "no
+  default, must be stated") makes it load-bearing regardless of which section of the source doc it's in.
+- `OVERRIDE.author` and `OVERRIDE.target_event`/`reason`/`expiry` — `author` is the universal field;
+  the other three are `OVERRIDE`'s own required fields, per §3 (no `?` on any of them, unlike `DECISION`'s
+  `supersedes?`/`expiry?` — read as fully required, not optional).
+
+**Non-defaulting fields, enforced two ways, not just documented:** `MEASUREMENT.source` and
+`FINDING.independent_of` are required (an absent value is a validation error like any other missing
+field) AND `append.py` contains no fallback/default logic for either — verified by mutation
+(`test_check_integrity.py`'s `branch_unstated_source`/`branch_unstated_independent_of`), not asserted from
+reading the code. `FINDING.independent_of` deliberately accepts an empty list as VALID (a real, if weak,
+statement — "independent of nothing stated") while still rejecting the field's total absence — the
+distinction the director's "no default, must be stated" instruction is actually about.
+
+**`DECISION`/`FINDING` both gained an optional `narrative` field** (the director's own addition, this
+session) — one or two sentences of why-this-then-that, so the connective tissue this session's own
+migration-mechanics analysis (see the director's ANVIL review, item 4) flagged as lost gets a place to
+live inside the events themselves rather than becoming a second, separate narrative document (which the
+director explicitly rejected as a dual source).
+
+**`check_integrity.py`'s reference resolution rules:** `supersedes` (any type) and `target_event`
+(`OVERRIDE`) each resolve against the full set of event ids in the log; `invalidates` and `assumes`
+(wherever either field appears) resolve every id in the list, not just the first; `CONTENT_LINK.path`
+resolves against the real working tree (`Path.exists()`), not just a string shape check — a path that
+looks plausible but was never real would otherwise pass silently, which is exactly the "instrument that
+cannot register its subject" failure class this project's own memory system tracks.
+
+**Mutation coverage, all eight required branches, each observed failing on a broken fixture AND passing
+on the corresponding fixed one (16/16 cases, `python3 tools/anvil/test_check_integrity.py`, transcript in
+this round's session report) — dangling `supersedes`, dangling `invalidates`, dangling `assumes`,
+dangling `CONTENT_LINK.path`, duplicate `id`, a missing required field (`DECISION.reversal_cost`), an
+unstated `MEASUREMENT.source`, an unstated `FINDING.independent_of`.** Built with `tempfile` and a direct
+function import (`check_integrity.check_integrity(log_dir)`), not subprocess or the real `.anvil/log/`,
+so no case can contaminate another or the real log. This is the specific gate the director flagged as
+"most likely to get shortchanged" — the full case list was written into `docs/WORKING.md`'s queue before
+any code existed, and implemented against that list rather than against whatever came to mind while
+writing the checker.
+
+**What still isn't decided, deliberately, per the queue's own EXPENSIVE list:** how projections
+(`queue`, `claims`, `context`, `boot`) will consume these events — that's step 4, not touched. Whether an
+eighth event type or a broader required-field set is ever needed — not decided, logged if it comes up.
+
+Reverse: CHEAP. Four new files, zero existing behavior depends on them yet (`.anvil/log/` is empty —
+nothing has been appended to it this round beyond a smoke-test event, deleted before committing).
+
+**Caught by the new gate 27, not missed:** `.anvil/` fell under `.gitignore`'s existing "every dotted
+directory is ignored by shape" rule, the same one `.github/`/`.githooks/`/`.claude/` already carve an
+exception out of — `.anvil/README.md` would have stayed silently untracked, the exact class of thing
+step 1's gate exists to catch, and did: `check_untracked_files.py` flagged it before this commit, not
+after. Fixed with `!/.anvil/`, the same simple re-inclusion `.github/`/`.githooks/` use (not `.claude/`'s
+narrower two-step form, since nothing under `.anvil/` is machine-local session state).

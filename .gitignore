@@ -32,6 +32,7 @@ build/
 /.*/
 !/.github/
 !/.githooks/
+!/.anvil/
 
 # .claude/ needs a narrower re-inclusion than the two above: it also holds machine-local session state
 # (.DS_Store, scheduled_tasks.lock, worktrees/) that must NOT ship, alongside commands/, which must --
