@@ -4,7 +4,7 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-26.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-08-27.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
@@ -313,30 +313,27 @@ Registered in CI alongside the other nine structural gates (now ten). Mutation-t
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
 
-**In progress (D0057/D0058): the exploration-tier reframe.** `docs/EXPERIENCE_EVALUATION.md` states the
-reframe: a scripted route proves a known path still works and cannot find anything off it; exploration
-(fuzzer, human-biased fuzzer, coverage bot, chaos bot) is a separate tier. Item 1, built:
-`tests/fixture_body_fuzz_probe.gd` + `tests/test_body_fuzz.gd`, 1000 seeds x 1500 ticks of
-fully-decorrelated random input, four invariants asserted hard, two (bounds, floor_selection) reported as
-coverage data since dedicated tests already accept the underlying condition. Item 3, started:
-`tests/property_checks.gd`'s `grounded_implies_solid_beneath`, wired into the same fuzzer loop.
+**Closed (D0059/D0060): JUMP_CORNER embedding, root-caused to FOUR controller defects (not one), and the
+fuzzer is now in CI.** Full chain in D0059: `extends_forward` (step-up/mantle onto an isolated tile),
+`_resolve_ceiling`'s failed-nudge-never-backs-out, the corner-nudge's own missing world-bounds check, and
+`grid_floor_backstop` (a pit-lip heightfield/grid mismatch, found only after the first three fixes cleared
+JUMP_CORNER itself). `embedded`: 1,749 -> 1,068 -> 131 -> 1. `test_reachability_sweep.gd` was rewritten
+along the way — its log-count assertion had a real blind spot (indistinguishable from "never corrected at
+all"), now a direct per-tick `_box_in_bounds` check, strictly stronger. `sim/body/body.gd` split into
+`body.gd` + `sim/body/vertical_resolve.gd` (internal to the module, same shape as `heightfield.gd`) once
+five fixes' worth of WHY-comments pushed it past the 400-line gate with nothing left to trim honestly.
+D0060: `tests/test_body_fuzz_fast.gd` (100x500, ~5s, hard zero on everything) runs in the existing `tests`
+CI job every push/PR; `tests/test_body_fuzz.gd` (full 1000x1500, ~114-142s) runs nightly via a new
+`fuzz_nightly` job, asserting a named, counted allowlist (`embedded <= 1`, `grounded_no_floor <= 32`) for
+the residual D0059 explained but did not fully eliminate. The director's own explicit question — is this
+related to D0056's fitted-threshold finding — answered NO in D0059: real controller bugs independent of
+where the corner constant sits, sharing only a root CAUSE OF INVISIBILITY (one scripted route's narrow
+coverage) with D0056, not the same failure mechanism.
 
-Findings, current status:
-- **Fixed**: `_enforce_grid_bounds`'s bottom clamp set `on_floor=true` unconditionally, asymmetric with
-  the top clamp (velocity-only) — accounted for 3,978 of D0057's "bottom" bounds violations AND 3,978 of
-  D0058's `grounded_no_floor` violations, the same (seed,tick) pairs exactly. Removed; full regression
-  and a before/after fuzz sample confirm the fix touches only that mechanism.
-- **Open**: mantling onto `HostileChamber.JUMP_CORNER`'s single floating tile embeds the body (1,749
-  occurrences, D0057) — `ScriptedTraverse` never reaches it. Not fixed yet.
-- **Open**: ~43-46 residual `grounded_no_floor`/rare `floor_selection` occurrences not yet correlated to a
-  single cause — one shares an exact position with a `floor_selection` hit, suggesting overlap rather than
-  a third independent defect. Not investigated further this round.
-- **Not built**: item 2 (human-biased fuzzer — blocked, `tests/body/recordings/` is currently empty, held
-  per director's explicit choice), the `reachable_state_can_reach_surface` property (`docs/QUALITY.md`
-  gate 10, "No softlock" — never implemented, scoped as its own larger effort), shrinking, item 4
-  (coverage metric).
-- Not added to `.github/workflows/harness.yml` — the `JUMP_CORNER` embedding is still real and unfixed;
-  landing this as a blocking gate now would immediately redden CI on a bug this round did not close.
+Not built yet, per the director's explicit ordering ("JUMP_CORNER, then fuzzer into CI, then gate 10"):
+item 2 (human-biased fuzzer — still blocked, `tests/body/recordings/` is still empty, held per director's
+explicit choice), gate 10 (`reachable_state_can_reach_surface`, "No softlock" — the next task), item 4
+(coverage metric), shrinking.
 
 **Closed (D0056): `JUMP_CORNER_ROW` generalizes — a fixture tuned by watching the controller is not
 independent of it.** New `docs/QUALITY.md` §2 rule; full `HostileChamber` constant audit found exactly

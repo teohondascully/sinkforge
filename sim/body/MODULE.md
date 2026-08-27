@@ -22,9 +22,17 @@ module is green against that suite.
 ## Dependencies
 
 `core`, `world` (collision and depenetration query tile solidity), `invariants`
-(`_resolve_floor` reports a diagnostic-only floor-selection check to
-`Invariants.report_floor_selection` -- docs/adr/0005, D0043 -- never reads a
-result back, never changes behavior from it).
+(`vertical_resolve.gd::resolve_floor` reports a diagnostic-only floor-selection
+check to `Invariants.report_floor_selection` -- docs/adr/0005, D0043 -- never
+reads a result back, never changes behavior from it).
+
+`vertical_resolve.gd` (D0060) is an internal file of this module, same as
+`heightfield.gd`/`input_frame.gd` -- outside code still goes through `body.gd`
+alone, per `tools/layer_lint/layer_lint.py`'s "no sibling reach-in" rule. Split
+out of `body.gd` once the 400-line file-size gate could no longer be met by
+comment trimming without cutting load-bearing reasoning: ceiling/floor
+vertical-axis collision resolution, as static functions taking `body: Body`
+explicitly rather than living as `Body`'s own instance methods.
 
 `sim/items` is deliberately *not* declared as a dependency here, even
 though the module's own purpose lists "carry weight." How carried-item

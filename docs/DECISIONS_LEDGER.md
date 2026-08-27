@@ -1671,3 +1671,161 @@ found violation, e.g. the `JUMP_CORNER` embedding) is also not built yet.
 
 Reverse: CHEAP. `property_checks.gd` is new and additive. The `_enforce_grid_bounds` fix removes one line
 or behavior most real play can never reach; reverting it restores the asymmetry, not a needed capability.
+
+## D0059 · 2026-08-26 · JUMP_CORNER embedding, root-caused as FOUR separate controller defects, not one
+Decided: fixed the fuzzer's `embedded` violation (1,749 occurrences at the run this entry started from)
+down to 1, via four independent fixes, each found by tracing a *different* remaining population after
+the previous fix landed -- not one bug with four symptoms.
+
+1. **`extends_forward` (`sim/body/body.gd::_resolve_horizontal`).** `_try_step` (step-up/mantle) never
+   checked whether the blocking cell had solid material continuing in the direction of travel -- an
+   isolated single-cell obstruction (`HostileChamber.JUMP_CORNER`) passed the same check a real ledge
+   does. Mantling/stepping onto it left `on_floor = true` with nothing supporting most of the body's
+   width; the vertical resolve's own heightfield query found no real floor there the same tick, reverting
+   `on_floor` and letting the fall continue back through the tile it had just "climbed." A first fix
+   attempt (require the body's full PRE-move footprint to already have floor support) was wrong and
+   broke ordinary step-ups -- a real step's own transitional moment straddles old and new floor by
+   construction, so that check rejected every step, not just the pathological one; reverted, and the real
+   fix instead checks only the ONE triggering cell's own forward neighbor. 1,749 -> 1,068.
+
+2. **`_resolve_ceiling`'s failed-nudge path never backs out (`vertical_resolve.gd::resolve_ceiling`,
+   called from `move_and_resolve`).** A jump's rising arc clipping a corner the 6px nudge can't clear
+   used to just halt (`vel_y = 0; return true`) at exactly the substep position that moved the box into
+   the ceiling -- unlike `resolve_floor`, which always recomputes `pos_y` from the heightfield and so
+   can never leave the box embedded, a failed ceiling stop left it there. General ceiling-collision bug,
+   not JUMP_CORNER-specific -- traced independently via seed=4 tick=1036 and seed=605 tick=479, both
+   ordinary jumps clipping the corner from below, no mantle/step-up involved. Fix: back out the substep's
+   own displacement on a failed stop. Landing this alone regressed `test_reachability_sweep.gd` (a
+   NEW, real bounds touch at the chamber's true right edge, 1 occurrence) -- root-caused as a THIRD,
+   separate defect: `_resolve_ceiling`'s corner-nudge never checked whether the nudge would carry the box
+   past the world's own edge (`is_solid` reads a cell past the grid's declared width/height as open, not
+   solid, the same class of gap D0055 already fixed for `_try_step`'s vertical case). Fixed by gating the
+   nudge on staying in-bounds. 1,068 -> 131 (this fix + fix 3 together; the two were inseparable in one
+   sweep since fix 3 was needed to even measure fix 2 cleanly).
+
+3. See above -- the corner-nudge world-bounds guard, found as a direct consequence of landing fix 2.
+
+4. **`test_reachability_sweep.gd`'s own blind spot, found while diagnosing fix 3's regression.** Its
+   assertion counted `push_error` "left the world" lines and required exactly 0 -- but D0052's own
+   rate-limiting latches to ONE logged line whether the body is corrected once and settles, or never
+   corrected at all and stays out of bounds forever (verified directly: temporarily disabling
+   `_enforce_grid_bounds`'s correction entirely still produced exactly 1 logged line for the same 3,000-
+   tick sweep). Rewrote the test to run in-process and check `_box_in_bounds` after every tick, the same
+   pattern `test_bounds_invariant.gd`'s two real per-tick checks already use -- strictly STRONGER than
+   the log-count it replaced (confirmed: the disabled-correction mutation, which the old assertion could
+   not see, now fails this test), not a loosened bound. `fixture_aggressive_sweep_probe.gd` is now dead
+   code (nothing else called it) and was deleted rather than left orphaned.
+
+5. **The pit-lip heightfield/grid mismatch (`vertical_resolve.gd::grid_floor_backstop`), found tracing
+   the remaining 131.** All 131 were at `HostileChamber`'s pit lip (columns 15/20, row 60 --
+   `POST_PIT_START`'s own edges), none at JUMP_CORNER. `Heightfield.surface_y_at_x` deliberately returns
+   `NO_FLOOR` when a foot sample straddles a real gap (documented, correct for its own contract -- "a
+   ramp cannot blend into a hole"); a body whose box spans the pit's own width can have all THREE foot
+   samples straddle the lip at once even while most of its footprint sits over the lip's real, solid
+   ground, so `resolve_floor` reports no floor and the fall continues into terrain `is_solid` already
+   says is there -- the body embeds, oscillating for a dozen-plus ticks as step-up keeps re-attempting a
+   climb the heightfield immediately un-confirms. Fix: a grid-solidity backstop, same authority
+   `_resolve_ceiling`/`_try_step` already trust, resting the body on the topmost solid row anywhere in
+   its own footprint when `_resolve_floor` finds nothing. First version of this fix regressed
+   `test_cave_geometry.gd`'s own overhang test (a body meant to fall PAST a narrow shelf into a real
+   lower floor instead snapped onto the shelf) -- both scenarios are geometrically identical in cross-
+   section (one edge column solid, the rest open), so the backstop needed a guard: only trust the raw-
+   grid edge as a landing when NO open column in the footprint has a real, unreached floor further down
+   within the same scan window (`Heightfield.column_surface_y`, per-column, not the interpolating
+   wrapper) -- a pit with nothing below at all is a lip to rest on; a shelf over a real lower floor is a
+   gap to fall through. Also found and fixed in the same investigation: the trailing, unconditional
+   `_resolve_floor` catch-all in `move_and_resolve` was clobbering `on_floor` back to `false`
+   immediately after a same-tick backstop landing, since `resolve_floor` alone unconditionally sets
+   `on_floor = false` whenever it can't confirm a floor -- guarded with a `resolved_this_tick` flag so
+   the redundant trailing call is skipped exactly when the substep loop already resolved. 131 -> 1.
+
+**The director's own question: is this related to D0056's JUMP_CORNER_ROW finding (a threshold fitted
+to one buggy policy's behavior, no real margin)?** No -- and the distinction matters. D0056 is a
+methodology defect: WHERE the corner constant sits was chosen by watching one specific (buggy) policy's
+behavior, not derived independently, so the resulting number measured agreement between two things fit
+to each other. Fixes 1-5 above are real, independent CONTROLLER bugs in `_resolve_horizontal`/
+`_resolve_ceiling`/`move_and_resolve`'s own logic -- they exist regardless of JUMP_CORNER_ROW's exact
+value, and would reproduce against ANY isolated single-cell obstruction, or (fix 5) against any pit-style
+edge geometry, positioned anywhere a real spec might legitimately place one. Even a JUMP_CORNER
+positioned with a fully independent, generously-margined derivation (D0056's own fix) would still be
+climbable via fix 1's exact mechanism, still ceiling-embeddable via fix 2, if the fuzzer's random inputs
+approached it the same ways. What the two findings DO share is not a mechanism but a CAUSE OF
+INVISIBILITY: `ScriptedTraverse`'s single scripted route approaches every landmark from one controlled
+angle, which is narrow enough to hide a badly-fitted constant (D0056) for one reason (no margin to be
+wrong within) and hide four real controller defects (this entry) for an unrelated reason (the specific
+angles/velocities/hold-states that trigger each one never occur on that one route). Message B's own
+framing -- "the gap is input-space coverage, and that is mechanizable" -- is the reason both went
+undetected, not a reason the two defects are the same kind of thing.
+
+**Remaining, allowlisted (not fixed further in this entry) -- D0060 has the exact counts and mechanism.**
+1 `embedded`: a single-tick graze of JUMP_CORNER's own corner by a body already correctly falling toward
+the real floor below -- not an oscillation, self-resolving the very next tick via ordinary horizontal
+depenetration, and `grid_floor_backstop`'s own deeper-floor guard (fix 5) correctly refuses to treat it
+as a landing. 32 `grounded_no_floor`: `grid_floor_backstop`'s own by-design trade-off (rest on the
+topmost solid row of a PARTIAL footprint at a pit lip, rather than embed and oscillate forever) violates
+`PropertyChecks.grounded_implies_solid_beneath`'s stricter "every column has support" definition on
+purpose.
+
+**Also split `sim/body/body.gd` into `sim/body/body.gd` + `sim/body/vertical_resolve.gd`** (new, internal
+to the `body` module per `tools/layer_lint/layer_lint.py`'s existing "no sibling reach-in" rule, same
+shape as `heightfield.gd`/`input_frame.gd`) -- five fixes' worth of new lines plus their WHY-comments
+pushed `body.gd` to 467 lines against the 400-line hard gate (`docs/QUALITY.md` gate 3), and this file has
+needed comment-trimming to survive the limit at least three separate times across this stage alone. Moved
+the four vertical-axis collision functions (`move_and_resolve`, `resolve_ceiling`, `grid_floor_backstop`,
+`resolve_floor`) as static functions taking `body: Body` explicitly, verbatim behavior -- confirmed via
+full regression (all green) and a full fuzz re-run producing the IDENTICAL allowlisted counts (1
+embedded, 32 grounded_no_floor) before and after the split, not just a passing status.
+
+Mutation-tested: fix 1 (temporarily hardcoding `extends_forward = true` reproduced the JUMP_CORNER
+embedding at the exact traced seed/tick); fix 2 (disabling the substep backout reproduced the seed=4/
+seed=605 embeddings); the deeper-floor guard in fix 5 (disabling it reproduced the overhang regression
+exactly); the rewritten `test_reachability_sweep.gd` (the disabled-correction mutation, invisible to the
+old log-count assertion, correctly fails the new one).
+
+Reverse: CHEAP for fixes 1-4 (each a small, localized guard or a test rewrite). MODERATE for fix 5 --
+`grid_floor_backstop` changes real landing behavior at every pit-style edge in the chamber, not just
+JUMP_CORNER's own geometry; reverting it restores the oscillation, not a needed capability, but the
+surface area is wider than the other three fixes. The file split is CHEAP and mechanical (verified
+byte-identical fuzz output before/after).
+
+## D0060 · 2026-08-26 · fuzzer into CI: allowlist for D0059's residual, fast/deep split, resolves D0057
+Decided: registered `tests/test_body_fuzz_fast.gd` (new) in `.github/workflows/harness.yml`'s existing
+`tests` job (every push/PR) and `tests/test_body_fuzz.gd` (the full sweep) in a new `fuzz_nightly` job,
+gated `if: github.event_name == 'schedule'` on a new daily cron trigger. The director's own framing:
+"Fast loop in CI, deeper sweep nightly... a fuzzer that takes four minutes will get disabled within a
+month."
+
+**CI shape, measured, not guessed:**
+- Fast (every push/PR): 100 seeds x 500 ticks = 50,000 total ticks, ~4.8-5.1s wall-clock (measured twice).
+  Asserts ALL SIX violation types hard-zero, including `embedded`/`grounded_no_floor` -- D0059's known
+  residual (seed=605 tick=844; seeds>=98 past tick 500) falls entirely outside this window's specific
+  seeds/tick-depth, confirmed by direct measurement (0/0 on this exact range), not assumed from
+  proportional scaling. A NEW occurrence inside this smaller, every-commit window is real regression
+  evidence, not the known residual, so zero tolerance is the CORRECT bound here, not a looser one.
+- Deep (nightly, 06:17 UTC): the full 1000 x 1500 sweep, ~114-142s wall-clock (measured three times
+  across this session, varying with system load) -- too slow for every commit, matches the director's
+  own instruction to run it "nightly" rather than gate it. Asserts the D0060 allowlist below.
+
+`fixture_body_fuzz_probe.gd`'s `NUM_SEEDS`/`TICKS_PER_SEED` changed from `const` to `var`, overridable via
+`-- --seeds=N --ticks=N` (`tests/body/play_scene.gd`'s own `OS.get_cmdline_user_args()` convention) --
+default unchanged (1000/1500), so every existing local invocation behaves identically unless it opts in.
+
+**The allowlist itself, exact counts from the post-D0059 full sweep, both explained in D0059:**
+`embedded <= 1` (one single-tick JUMP_CORNER graze, self-resolving); `grounded_no_floor <= 32`
+(`grid_floor_backstop`'s own partial-footprint-rest trade-off at pit lips). `overflow`/`discontinuity`/
+`deadlock` remain hard zero -- no accepted exception exists for any of the three. An allowlist with a
+number attached is honest; a disabled check is not (the director's own words) -- these are `<=` bounds,
+not exact-match, so a FUTURE fix that reduces either count further does not need to touch this file, but
+any run that EXCEEDS either bound is a real, new regression and fails the suite. `docs/BRIEF.md`'s
+"What was learned" template gains a standing line (fuzzer runs, seeds covered, violations by property,
+allowlist count) per the director's own explicit, ongoing instruction -- visible every round, not
+reconstructed later.
+
+Alternative considered and rejected: disabling `embedded`/`grounded_no_floor` checking entirely until
+zero. Rejected on the director's own explicit instruction -- an allowlist with a number is the honest
+version of "known, tracked residual," a disabled check has no number and can grow silently.
+
+Reverse: CHEAP. The CI job additions are pure YAML; reverting drops the fuzzer from CI entirely (back to
+D0057/D0058's state, run only locally). The allowlist constants are two integers in one `Dictionary`;
+tightening them to 0 the moment D0059's two open items are actually fixed is a one-line change, not a
+structural one.

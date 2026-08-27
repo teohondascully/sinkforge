@@ -4,16 +4,26 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-26. Stage 4 (`sim/body`), steps (a)-(g), CLOSED and reported. This round: three
-director corrections to last round's work (ADR-0005 reframed, the invariants guard rate-limited,
-EntityIdPool confirmed correct), then (f)/(g) — the minimal debug renderer and `--play` mode. Holding
-here per the director's explicit "stop after (g)" instruction; rope (step e) is not started.**
-
-**To play it:** `godot --path . tests/body/play_scene.tscn -- --play`. Left/Right or A/D to move, Space
-to jump (hold for full height, tap for a short hop), Up/W toward a ledge for `mantle_hold`. Closing the
-window writes the session's recording to `tests/body/recordings/play_<timestamp>.log`.
+**Last updated: 2026-08-27. This round: JUMP_CORNER embedding root-caused to four independent
+controller defects (not one) and fixed to a named residual, the fuzzer landed in CI (fast per-commit +
+deep nightly), `sim/body/body.gd` split for the first time to stay under the file-size gate.** Order
+followed the director's own: "JUMP_CORNER, then fuzzer into CI, then gate 10" — gate 10
+(`reachable_state_can_reach_surface`) is next, not started this round.
 
 ---
+
+## Fuzzer numbers — standing report, every round from now on
+
+Full sweep (`tests/test_body_fuzz.gd`, 1000 seeds x 1500 ticks, 1,500,000 total ticks, ~114-142s
+wall-clock measured this round): **18,251 total violations** — 18,218 `bounds` + 0 `floor_selection`
+(both reported, not gated — dedicated tests already accept the underlying condition), 0 `overflow` / 0
+`discontinuity` / 0 `deadlock` (hard-asserted), **1 `embedded` / 32 `grounded_no_floor`** (allowlisted,
+D0060 — both explained in D0059, not unexplained noise). Allowlist bound: `embedded <= 1`,
+`grounded_no_floor <= 32` — exact match to what this round's sweep produced.
+
+Fast sweep (`tests/test_body_fuzz_fast.gd`, 100 seeds x 500 ticks, every push/PR, ~5s): all six types
+hard zero — the known residual above falls entirely outside this narrower seed/tick range, verified by
+direct measurement, not assumed.
 
 ## EXPENSIVE, awaiting you
 
@@ -28,88 +38,102 @@ None new this round. Two carried over, unchanged, still open:
 
 ## What was learned
 
-- **"The number is stale" and "the number was never real" are different findings, and only one of them
-  is safe to act on without re-checking.** D0046 measured 0/4,800 reachable multi-level-floor columns
-  after calibrating `ValueNoise` — the natural read is "the accepted-limitation figure went down." The
-  sharper read, per the director's own correction (D0051): the terrain shape D0042's 0.85%/12% measured
-  was substantially an artifact of the calibration bug, not a smaller instance of a real design cost.
-  Conflating the two would have let a future reader credit this ADR's own trade-off for a fix (D0045)
-  it had nothing to do with. Also stated explicitly now: 0/4,800 is a null result below this sample's
-  resolution, not proof the case cannot occur — a distinction worth naming every time a measurement
-  reaches exactly zero, not just this once.
-- **An informal "measured: ~N" guess in a code comment is itself an unverified claim.** `body.gd`'s
-  pre-fix comment guessed the unratelimited guard logged "~390 lines" from a 400-tick settle — one per
-  tick, the obvious mental model. Mutation-testing the actual fix (temporarily reverting the new gate)
-  found the real number: **778**, because `_move_and_resolve_vertical` calls `_resolve_floor` twice on
-  most resting ticks (once in its substep loop, once via its own trailing catch-all), not once. The
-  guess wasn't wrong about the problem, only about its size — caught only by measuring the mutant
-  directly rather than trusting a comment that sounded plausible. Every place that number was cited
-  (`body.gd`, `invariants.gd`, the ADR, the new test) was corrected to the measured figure in the same
-  pass, per this project's own "verify a numeric claim against actual tool output" rule.
-- **Rate-limiting state belongs at the caller, not inside a module whose contract says stateless —
-  and the director's reasoning for that generalizes.** `sim/invariants` documents itself as producing
-  "no gameplay state" (D0052's own instruction was explicit: don't put the memory there even though
-  de-duplication needs memory somewhere). `body.gd` already tracks the body's position every tick, so
-  that's where "have I already reported this pair" belongs. Worth remembering as a pattern the next
-  time a stateless checking module needs de-duplication: push the memory to whichever caller already
-  carries the relevant context, don't compromise the module's own contract to save it a line of state.
-- **A non-headless engine launch can silently rewrite a config file's own semantics, not just its
-  formatting.** One `godot --path .` window launch this round left `project.godot` with every doc
-  comment stripped AND `gdscript/warnings/enable=true` gone — the parent flag `docs/DECISIONS.md` names
-  as the whole typed-everywhere rule's own enforcement tripwire. Caught by routine `git status` before
-  committing, not by any gate (`project.godot` is unpoliced). Could not reproduce it on a second
-  attempt with the same command, so it's flagged as an unroot-caused hazard (`docs/WORKING.md`) rather
-  than chased to a mechanism — but it's a concrete argument for treating `git diff project.godot` as a
-  standing pre-commit check on any session that runs Godot non-headlessly, not just this one.
+- **A fixture-tuning defect and a controller defect can share a symptom without sharing a mechanism —
+  the director's own explicit question, answered.** D0056 found `JUMP_CORNER_ROW` was positioned by
+  watching one buggy policy's behavior (no real margin). This round found the SAME location also embeds
+  the body via four separate, real controller bugs — but confirmed, not assumed: even a correctly,
+  independently-derived corner position would still be climbable via the missing `extends_forward`
+  check, still ceiling-embeddable via `_resolve_ceiling`'s no-backout bug, since neither depends on
+  JUMP_CORNER's exact coordinates. The two findings share a CAUSE OF INVISIBILITY (one scripted route's
+  narrow approach angle hides both, for unrelated reasons), not a failure mechanism — collapsing them
+  into "the same pattern again" would have been the sloppier, more comfortable answer.
+- **Fixing bug N sometimes only reveals bug N+1, and the population size at each step is the evidence
+  that a *different* mechanism, not a bigger case of the same one, is left.** `embedded` moved
+  1,749 -> 1,068 -> 131 -> 1 across four fixes; every one of the first three intermediate counts was
+  traced to a *distinct* location/mechanism, not a partial reduction of the same one. Stopping after the
+  first fix (or reporting "much better, mostly fixed") would have left three more real defects
+  unreported. The stopping point (1 remaining) is itself a judgment call, not a forced zero — a
+  single-tick, self-resolving graze, structurally different from the sustained oscillations the other
+  three fixes eliminated, and named as such rather than silently tolerated.
+- **A regression test can measure something strictly weaker than its own stated claim, and the gap is
+  invisible until a mutation specifically targets it.** `test_reachability_sweep.gd` asserted zero
+  logged "left the world" lines — but D0052's own rate-limiting logs exactly one line whether the body
+  is corrected once and settles, or never corrected at all and stays out of bounds permanently.
+  Confirmed directly: disabling the correction entirely still produced exactly 1 logged line. The fix
+  (a per-tick `_box_in_bounds` check, matching `test_bounds_invariant.gd`'s own two direct checks) is
+  strictly stronger, not a rewrite for its own sake — proven by re-running the same disabling mutation
+  against the new version and watching it fail where the old one didn't.
+- **Two scenarios that are geometrically identical in cross-section can call for opposite handling, and
+  the deciding signal has to be added explicitly, not inferred from shape.** A pit lip (rest here,
+  nothing better exists) and a shelf over a real lower floor (fall through, something better exists) both
+  present as "one edge column solid, the rest of the footprint open." The fix needed an explicit guard —
+  does any open column in the footprint have a real, unreached floor further down within the same scan
+  window — because there's no way to tell the two apart from the current tick's geometry alone.
+- **A file split done to satisfy a size gate is worth verifying byte-identical, not just green.**
+  `sim/body/body.gd`'s four vertical-resolve functions moved to a new file as static functions; the full
+  regression suite passing is necessary but not sufficient evidence the refactor changed nothing — the
+  full 1.5M-tick fuzz sweep producing the IDENTICAL allowlisted counts (1/32) before and after is the
+  actual proof, and was run rather than assumed from "the tests are green."
 
 ## What landed this round
 
-Full detail and mutation-test evidence: `docs/DECISIONS_LEDGER.md` D0051-D0053; commits `322bba2`
-(follow-ups) and `9ea21f7` ((f)/(g)).
+Full detail and mutation-test evidence: `docs/DECISIONS_LEDGER.md` D0059-D0060.
 
-1. **ADR-0005 reframed** (D0051, resolves D0042): the multi-level-floor case was substantially an
-   artifact of a `ValueNoise` calibration bug (D0045), not a property of the cave-generation design —
-   stated as its own finding, not folded into "the number is stale." 0/4,800 stated explicitly as a
-   null result below this sample's resolution. The guard's purpose reframed from "measure a known cost"
-   to "watch for this case to reappear after a future generator change."
-2. **The floor-selection guard rate-limited at the caller** (D0052): `body.gd::_resolve_floor()` now
-   suppresses a repeat `Invariants.report_floor_selection` call while the resolved (column, floor) pair
-   is unchanged, clearing on resolution so a later recurrence reads as fresh. `sim/invariants` itself is
-   untouched — stays stateless per its own MODULE.md, per the director's explicit instruction. Mutation-
-   tested: 778 push_errors from one ~400-tick settle without the gate, exactly 1 with it. New test
-   `_test_a_real_settle_rate_limits_the_guard_to_one_report` proves it and fails on the reverted mutant.
-3. **EntityIdPool no-op confirmed correct** — no action needed; the director confirmed last round's
-   handling (ship the mask for defensive symmetry, correct the commit message rather than claim a
-   behavioral fix) was the right call.
-4. **(f) Minimal debug renderer**: `tests/body/play_scene.gd`/`.tscn` — flat-color terrain, body, and
-   camera, no shaders or sprites, on the director's explicit instruction to resist polish. Verified via
-   real windowed screenshot capture against the actual hostile-chamber geometry.
-5. **(g) `--play` flag + recorded-input plumbing**: one `--play` cmdline flag switches the same file
-   between `agent` mode (`ScriptedTraverse`, self-verifiable without a human) and `play` mode (real
-   physical keys — no project input map, D0053, a reversible choice not an oversight). Both write a
-   tick-by-tick log to `tests/body/recordings/` — the precursor of `docs/ARCHITECTURE.md` §6's real
-   `input.log`, kept deliberately as the seed of a future golden corpus per the director's instruction.
-   Verified: parses clean; a headless agent-mode run reaches the chamber's end column and writes a
-   correctly-formatted log; a `--play`-mode smoke run initializes and records without crashing (no human
-   input available to this session to exercise real key presses).
+1. **`extends_forward` (`sim/body/body.gd::_resolve_horizontal`)** — step-up/mantle now requires the
+   blocking cell to have solid material continuing in the direction of travel, not just be solid itself.
+   Fixes mantling/stepping onto `HostileChamber.JUMP_CORNER`'s isolated single-cell tile. A first attempt
+   (require the body's full pre-move footprint to already have new-floor support) was wrong — broke
+   every ordinary step-up, since a real step's transitional moment straddles old/new floor by
+   construction — caught by immediate regression, reverted, rebuilt at the correct scope. 1,749 -> 1,068.
+2. **`_resolve_ceiling`'s failed-nudge path now backs out its own substep** (`vertical_resolve.gd::
+   resolve_ceiling`) — previously halted movement at exactly the position that moved the box into the
+   ceiling, leaving it embedded; general ceiling bug, not JUMP_CORNER-specific, traced independently at
+   two other seed/tick pairs. 1,068 -> 131 (combined with fix 3 below).
+3. **The corner-nudge now refuses to cross the world's own bounds** — found because fix 2 alone
+   regressed `test_reachability_sweep.gd` with a new, real (if tiny, 0.125px) bounds touch at the
+   chamber's true right edge: `is_solid` reads any cell past the grid's declared width/height as open,
+   not solid, so nothing stopped the nudge from carrying the body past the edge. Same class of gap D0055
+   already fixed for `_try_step`'s vertical case.
+4. **`test_reachability_sweep.gd` rewritten** to check `_box_in_bounds` directly, in-process, every
+   tick — its own log-count assertion could not distinguish "corrected once, settles" from "never
+   corrected, stays out of bounds forever" (both log exactly one line under D0052's rate-limiting).
+   `fixture_aggressive_sweep_probe.gd` deleted as dead code once nothing else called it.
+5. **`grid_floor_backstop`** (`vertical_resolve.gd`, new) — a grid-solidity fallback for when
+   `Heightfield.surface_y_at_x`'s foot-sample straddle rule (deliberate, correct for its own contract)
+   causes ALL three samples to miss real solid ground at a pit's own lip. Rests on the topmost solid row
+   in the box's own footprint, guarded to defer when an open column in that footprint has a real,
+   unreached floor further down (the overhang/gap case, which a first version of this fix wrongly caught
+   too — regressed `test_cave_geometry.gd`, caught by immediate regression, fixed with the guard). Also
+   fixed in the same pass: the trailing catch-all `resolve_floor` call was clobbering a same-tick backstop
+   landing back to `on_floor = false`; guarded with a `resolved_this_tick` flag. 131 -> 1.
+6. **`sim/body/body.gd` split into `body.gd` + `sim/body/vertical_resolve.gd`** — internal to the `body`
+   module (same shape as `heightfield.gd`), moving `move_and_resolve`/`resolve_ceiling`/
+   `grid_floor_backstop`/`resolve_floor` out as static functions once five fixes' own WHY-comments pushed
+   the file to 467 lines against the 400-line hard gate. Verified byte-identical via a full fuzz re-run.
+7. **Fuzzer landed in CI** (D0060): `test_body_fuzz_fast.gd` (100x500, ~5s) in the existing `tests` job,
+   every push/PR; `test_body_fuzz.gd` (full 1000x1500) in a new `fuzz_nightly` job, daily cron. Named,
+   counted allowlist for the residual (`embedded <= 1`, `grounded_no_floor <= 32`) — an allowlist with a
+   number is honest, a disabled check is not, per the director's own words.
 
 ## Gates
 
-All 9 structural gates PASS (`layer_lint`, `no_engine_imports`, `check_coordinate_naming`,
+All 10 structural gates PASS (`layer_lint`, `no_engine_imports`, `check_coordinate_naming`,
 `check_size_limits`, `check_loc_ratio`, `schema_validator`, `check_claim_references`,
-`data_codegen --check`, `check_working_freshness`), plus `check_trailers`. CI's `tests` job: 13/13 Godot
-suites PASS, confirmed on the actual latest pushed commit (`gh run` `33023803888`, `9ea21f7`), not an
-earlier one — the workflow's `cancel-in-progress` concurrency group means only the newest push's run is
-the one that counts. Full local suite: 100 `_test_*` functions across 13 suites, re-counted via `grep`
-just now (not carried forward from a prior brief).
+`data_codegen --check`, `check_working_freshness`, `check_project_settings`), plus `check_trailers`.
+`check_size_limits` now WARNS (not fails) on `sim/body/body.gd` at 309 lines (warn threshold 300, hard
+limit 400) — down from 467 after this round's split, headroom restored. Full local suite: 18 test files,
+111 `_test_*` functions, both re-counted via `grep`/`ls` just now. CI not yet re-verified against the
+pushed commit for THIS round's changes (verify on the actual `gh run` before the next brief, per this
+project's own "verify a numeric claim against actual tool output" rule — not done here since these
+changes are not yet pushed at brief-writing time).
 
-**LOC ratio** (measured just now): instrument 3,789 (tools 1,529, tests 2,260) / game 1,264 (core 296,
-sim 968). **Absolute ratio 2.998** — essentially flat against last round's 2.896 (this round added real
-test/tool code — the new fixture probe, the play_scene renderer's own verification — alongside a modest
-amount of real game code). Still above the 1.5-by-`C001` target, still ADVISORY (game LOC under the
-2,000-line floor).
+**LOC ratio** (measured just now): instrument 4,691 / game 1,424. **Absolute ratio 3.294** — up from a
+prior round's 2.896-2.998 range (this round added a substantial amount of both `sim/body` game code, the
+`vertical_resolve.gd` split, and test/CI code for the fuzzer). Still ADVISORY (game LOC under the
+2,000-line floor) and still above the 1.5-by-`C001` target — stated plainly, not smoothed.
 
-**Unpushed commits: 0.** Both of this round's commits are on `origin/main`.
+**Unpushed commits: 0** (this round's own changes are not yet committed at brief-writing time — commit
+and push are the next action after this brief).
 
 ## Claims
 
@@ -117,14 +141,12 @@ No status or value changes. `C001`, `C002` remain `BLOCKED`, never measured.
 
 ## Blocked, and what it's waiting on
 
-- **Rope (stage 4, step e)** — deliberately not started. Held for a session the director is present
-  for: it has no acceptance criteria yet, an agent building it unsupervised would optimize for whatever
-  it could measure and risk masking a subtly wrong base controller. The director wants to play the bare
-  controller first — see "To play it" above.
+- **Item 2, the human-biased fuzzer** — still blocked, `tests/body/recordings/` is still empty. Held per
+  the director's own explicit choice until a real `--play` session exists.
+- **Rope (stage 4, step e)** — deliberately not started, held for a session the director is present for.
 - `sim/commands`+`interface` (stage 5) and beyond — downstream, unchanged.
 - Chunk size and the coordinate type scheme (above) — waiting on measurement, not a missing decision.
 
 ## Taste queue
 
-0 fixtures. The first ones are still wanted once the director has played the bare controller — likely
-around rope, or the hostile-chamber fresh-dig slopes already built for (a).
+0 fixtures. Unchanged from prior rounds.

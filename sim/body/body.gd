@@ -161,7 +161,7 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	_resolve_horizontal(grid, input)
 
 	_integrate_vertical()
-	_move_and_resolve_vertical(grid)
+	VerticalResolve.move_and_resolve(self, grid)
 
 	# Jump is handled AFTER vertical resolve, not before: a buffered jump has to see THIS tick's own
 	# landing, not the previous tick's `on_floor` -- checking it earlier meant a jump buffered right up
@@ -230,6 +230,7 @@ func _try_step(grid: TileGrid, lift: int) -> bool:
 		return false
 	pos_y -= lift
 	on_floor = true
+	vel_y = 0
 	return true
 
 
@@ -260,114 +261,22 @@ func _resolve_horizontal(grid: TileGrid, input: InputFrame) -> void:
 			if ov_x > ov_y and (cell_top + cell_bottom) / 2 > pos_y:
 				continue  # a ledge beneath the body -- the vertical resolve lands it, not a wall
 			var lift: int = bottom - cell_top
-			if vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE and _try_step(grid, lift):
+			# D0059: a real ledge has more solid material continuing forward; an isolated single-cell
+			# obstruction (HostileChamber.JUMP_CORNER) does not -- stepping/mantling onto one anyway
+			# leaves nothing supporting most of the body's width, and `on_floor` reverts the same tick.
+			var extends_forward: bool = _blocked(grid, Vector2i(cx + (1 if moving_right else -1), cy))
+			if extends_forward and vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE and _try_step(grid, lift):
 				stepped_up_this_tick = true
 				continue
-			if vel_x != 0 and lift <= MANTLE_PX * Fx.SCALE and input.mantle_hold and _try_step(grid, lift):
+			if extends_forward and vel_x != 0 and lift <= MANTLE_PX * Fx.SCALE and input.mantle_hold and _try_step(grid, lift):
 				mantled_this_tick = true
 				continue
-			if vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE:
+			if extends_forward and vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE:
 				edge_caught_this_tick = true  # should have been walkable; head clearance refused it
 			pos_x += (cell_left - right) if moving_right else (cell_right - left)
 			depenetrated_this_tick = true
 			vel_x = 0
 
-
-const V_SUBSTEP_PX: int = 2  ## Comfortably under one terrain cell (4px), so no substep can cross more
-                              ## than one row boundary and skip past it -- the fixed-tick equivalent of
-                              ## `legacy/scenes/player.gd`'s `MAX_SUBSTEP` clamp, needed because
-                              ## `MAX_FALL_PX_S` alone covers more than one cell per 60Hz tick.
-
-
-## Vertical movement, substepped so a fast fall or jump cannot tunnel through a one-cell-thick floor or
-## ceiling. Ceilings are grid-swept and hard; the ground plane is `Heightfield`, sub-pixel.
-func _move_and_resolve_vertical(grid: TileGrid) -> void:
-	var total: int = vel_y / TICK_HZ
-	var dir: int = signi(total)
-	if dir != 0:
-		on_floor = false
-	var remaining: int = absi(total)
-	var substep: int = V_SUBSTEP_PX * Fx.SCALE
-	while remaining > 0 and dir != 0:
-		var move: int = mini(remaining, substep)
-		pos_y += dir * move
-		remaining -= move
-		var stopped: bool = _resolve_ceiling(grid) if dir < 0 else _resolve_floor(grid)
-		if stopped:
-			break
-	if dir >= 0:
-		_resolve_floor(grid)  ## also catches a body at rest (dir == 0) every tick, per-column
-
-
-## Hard grid-swept ceiling block, with corner correction: a horizontal nudge up to 6px toward the
-## direction the body is already moving, tried before blocking outright, since a ceiling contact right
-## at a corner is exactly the case docs/ARCHITECTURE.md §9 names this mechanic for.
-func _resolve_ceiling(grid: TileGrid) -> bool:
-	if not _box_blocked(grid, _left_x(), _top_y(), _right_x(), _bottom_y()):
-		return false
-	var nudge_dir: int = signi(vel_x) if vel_x != 0 else facing
-	var nudge: int = nudge_dir * CORNER_NUDGE_PX * Fx.SCALE
-	if not _box_blocked(grid, _left_x() + nudge, _top_y(), _right_x() + nudge, _bottom_y()):
-		pos_x += nudge
-		corner_corrected_this_tick = true
-		return false
-	vel_y = 0
-	return true
-
-
-## The ground plane: sample the heightfield under both feet and the centre, rest on whichever is
-## highest (smallest Fx `y`) -- matches `legacy/scenes/player.gd`'s `_follow_slope` sampling rule,
-## adapted to a continuous heightfield instead of an authored ramp overlay. `NO_FLOOR` at all three
-## means open air: falling continues, `on_floor` stays false.
-func _resolve_floor(grid: TileGrid) -> bool:
-	var row: int = _px_to_cell(_bottom_y())
-	var scan_from: int = maxi(0, row - 2)
-	var s_left: int = Heightfield.surface_y_at_x(grid, _left_x() + Fx.SCALE, scan_from, FLOOR_SCAN_ROWS)
-	var s_right: int = Heightfield.surface_y_at_x(grid, _right_x() - Fx.SCALE, scan_from, FLOOR_SCAN_ROWS)
-	var s_center: int = Heightfield.surface_y_at_x(grid, pos_x, scan_from, FLOOR_SCAN_ROWS)
-	var surface: int = mini(mini(s_left, s_right), s_center)
-	if surface == Heightfield.NO_FLOOR or _bottom_y() < surface:
-		on_floor = false
-		return false
-	# Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured this
-	# ambiguity in real terrain and accepted it as a documented limitation rather than building
-	# stateful floor tracking; this is what turns a silent wrong-floor bug report into a reproducible,
-	# position-and-seed-logged one. Checks the column nearest `pos_x` only, not every column the three
-	# foot samples straddle -- a scoped first pass, not full coverage (docs/DECISIONS_LEDGER.md D0043).
-	# Shares FLOOR_SCAN_ROWS with the resolve calls above on purpose (D0044) -- this check exists to
-	# answer "did the query that just picked a floor also see another one," which is only a true answer
-	# if it's given the SAME window that query used.
-	var check_col: int = _px_to_cell(pos_x)
-	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, FLOOR_SCAN_ROWS)
-	if chosen_row >= 0:
-		var violation: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-			grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX)
-		# Rate-limited HERE, at the caller, not inside Invariants (D0052) -- sim/invariants stays
-		# stateless by design, and body.gd already tracks its own position every tick, so the memory
-		# for "have I already reported THIS (column, floor) pair" belongs where the context already is.
-		# Without this, a body resting on one ambiguous floor logs the identical violation on nearly
-		# every call to this block -- measured directly by mutation-testing this exact gate (temporarily
-		# reverting it to unconditional reporting): 778 push_errors from one ~400-tick settle in
-		# tests/test_cave_geometry.gd, not merely once per tick -- `_move_and_resolve_vertical` calls
-		# `_resolve_floor` twice on most resting ticks (once inside the substep loop, once via its own
-		# trailing catch-all), and this gate suppresses both, not just inter-tick repeats. A real
-		# occurrence would bury itself in its own repetition, and the log volume would make a genuine
-		# incidence count impossible to derive from real play. Clearing to -1 when the violation clears
-		# (rather than only ever remembering the LAST reported pair) means a condition that resolves and later
-		# recurs -- even at the exact same (column, floor) -- is treated as a fresh occurrence, which
-		# is the right call: it did stop and start again, that's a second episode, not a continuation.
-		floor_selection_violation_this_tick = violation != null
-		if violation == null:
-			_last_violation_col = -1; _last_violation_row = -1
-		elif violation.column != _last_violation_col or violation.chosen_floor_row != _last_violation_row:
-			Invariants.report_floor_selection(
-				grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
-			_last_violation_col = check_col
-			_last_violation_row = chosen_row
-	pos_y = surface - (HEIGHT_PX * Fx.SCALE) / 2
-	vel_y = 0
-	on_floor = true
-	return true
 
 
 ## World boundary, not terrain (D0055) -- called last in `tick()`, reports (D0052) BEFORE correcting.

@@ -18,8 +18,14 @@ extends SceneTree
 ## waste time, not add coverage.
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
-const NUM_SEEDS: int = 1000
-const TICKS_PER_SEED: int = 1500
+const DEFAULT_NUM_SEEDS: int = 1000
+const DEFAULT_TICKS_PER_SEED: int = 1500
+## D0060: overridable via `-- --seeds=N`/`--ticks=N` (`tests/body/play_scene.gd`'s own
+## `OS.get_cmdline_user_args()` convention), so CI can run a fast per-commit subset while a scheduled
+## job still runs the full sweep these defaults describe -- "a fuzzer that takes four minutes will get
+## disabled within a month" (the director's own words) applies to every commit, not just this file.
+var NUM_SEEDS: int = DEFAULT_NUM_SEEDS
+var TICKS_PER_SEED: int = DEFAULT_TICKS_PER_SEED
 const DEADLOCK_TICKS: int = 300  ## consecutive identical (pos,vel,on_floor) tuples despite varying
                                   ## random input -- a real freeze, not a body legitimately resting
 const POSITION_SANITY_PX: int = 1_000_000  ## far past any real chamber; catches wraparound/overflow
@@ -121,6 +127,11 @@ func _check_tick(body: Body, grid: TileGrid, grid_w: int, grid_h: int, state: _R
 
 
 func _initialize() -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--seeds="):
+			NUM_SEEDS = int(arg.trim_prefix("--seeds="))
+		elif arg.begins_with("--ticks="):
+			TICKS_PER_SEED = int(arg.trim_prefix("--ticks="))
 	var grid: TileGrid = HostileChamber.build()
 	var grid_w: int = grid.width * CELL * Fx.SCALE
 	var grid_h: int = grid.height * CELL * Fx.SCALE

@@ -33,6 +33,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # D0060: the full 1000x1500 fuzz sweep (~114s measured) is too slow for every commit -- "a fuzzer
+    # that takes four minutes will get disabled within a month" (the director's own words) -- but the
+    # allowlisted residual (docs/DECISIONS_LEDGER.md D0060) needs SOME regular, real run to catch it
+    # growing. Daily, not per-commit: `fuzz_nightly` below.
+    - cron: "17 6 * * *"
 
 # A newer push to the same ref supersedes an in-flight run.
 concurrency:
@@ -200,3 +206,38 @@ jobs:
 
       - name: test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
         run: ./godot --headless --path . --script res://tests/test_reachability_sweep.gd
+
+      - name: test_body_fuzz_fast (QUALITY gate 26 — goalless input fuzzer, fast per-commit subset)
+        run: ./godot --headless --path . --script res://tests/test_body_fuzz_fast.gd
+
+  # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
+  # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
+  # `schedule` trigger declared above; push/PR events skip this job entirely. Duplicates the Godot
+  # setup steps from `tests` rather than sharing them across jobs -- GitHub Actions jobs don't share
+  # filesystem state, and a `needs:` dependency here would make every push/PR wait on a job it never
+  # actually runs.
+  fuzz_nightly:
+    name: fuzz nightly (full 1000x1500 sweep, allowlisted residual per D0060)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GODOT_VERSION: "4.6.2-stable"
+      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Import project (populate .godot/ cache)
+        run: ./godot --headless --path . --import
+
+      - name: test_body_fuzz (full sweep, D0060 allowlist)
+        run: ./godot --headless --path . --script res://tests/test_body_fuzz.gd
