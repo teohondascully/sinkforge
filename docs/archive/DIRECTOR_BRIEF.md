@@ -4,6 +4,11 @@
 > a pre-pivot ticket numbering that no longer applies. This entire document describes future work — the
 > Freight Winch is gated behind `sim/commands` and `sim/run` landing (see `sim/commands/MODULE.md`,
 > `sim/run/MODULE.md`) and is explicitly out of scope for the current one-month vertical-slice push.
+>
+> **Path update, 2026-08-27:** "the untracked original" above now has an address —
+> `docs/archive/DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md`, moved there while closing the
+> `.git/info/exclude` hole (ANVIL step 1). Same file, same extraction relationship; it just stopped being
+> untracked.
 
 # Freight Winch and experience evaluation — director's design brief
 

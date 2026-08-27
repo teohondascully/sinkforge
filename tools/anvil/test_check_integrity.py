@@ -184,10 +184,38 @@ def branch_unstated_independent_of() -> None:
               expect_fail=False)
 
 
+def branch_multi_violation() -> None:
+    """One fixture, several simultaneous violations -- each check runs independently over the same
+    event list (check_integrity.py's own loop structure), so this should report ALL of them, not just
+    the first one found. The director's own instruction: "each check scans independently is almost
+    certainly right" is exactly the sentence that precedes an instrument failure in this project's
+    history (memory: two-instruments-are-not-a-cover, count-without-membership) -- verified here rather
+    than trusted.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        # a.json: missing required field (no reversal_cost) AND a dangling supersedes, in one event.
+        broken = _valid_decision(_id(1), supersedes=_id(99))
+        del broken["reversal_cost"]
+        _write(log_dir, "a.json", broken)
+        # b.json: same id as a.json (duplicate) AND a dangling invalidates.
+        _write(log_dir, "b.json", _valid_finding(_id(1), invalidates=[_id(98)]))
+        errors = check_integrity(log_dir)
+        expected_substrings = ["reversal_cost", "supersedes", "duplicate id", "invalidates"]
+        found = {s: any(s in e for e in errors) for s in expected_substrings}
+        ok = all(found.values()) and len(errors) >= 4
+        RESULTS.append(("multi-violation fixture reports every violation, not just the first", ok))
+        status = "OBSERVED" if ok else "NOT OBSERVED -- BRANCH UNTESTED"
+        print(f"[{status}] multi-violation fixture -- {len(errors)} error(s) found, per-kind hits: {found}")
+        if errors:
+            for e in errors:
+                print(f"    {e}")
+
+
 def main() -> int:
     for branch in (branch_dangling_supersedes, branch_dangling_invalidates, branch_dangling_assumes,
                    branch_dangling_content_link_path, branch_duplicate_id, branch_missing_required_field,
-                   branch_unstated_source, branch_unstated_independent_of):
+                   branch_unstated_source, branch_unstated_independent_of, branch_multi_violation):
         branch()
 
     failed = [name for name, ok in RESULTS if not ok]

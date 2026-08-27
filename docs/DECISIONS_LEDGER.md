@@ -2055,6 +2055,131 @@ eighth event type or a broader required-field set is ever needed — not decided
 Reverse: CHEAP. Four new files, zero existing behavior depends on them yet (`.anvil/log/` is empty —
 nothing has been appended to it this round beyond a smoke-test event, deleted before committing).
 
+## D0065 · 2026-08-27 · the CONVERGENCE_LEDGER reversal, as a first-class finding
+
+Elevated out of D0062's own paragraph, per the director's explicit instruction: this is the cleanest
+piece of evidence this project has that unread content is not unimportant content, and it deserves to be
+findable as its own entry, not discovered only by reading all of D0062.
+
+**What happened, precisely.** This session proposed tracking `legacy/tools/director_bus.sh` and
+`legacy/tools/test_director_bus.sh` (bucket 1 of the exclusion-hole triage). The director confirmed that
+proposal. Only afterward, executing step 1b — reading `docs/archive/session-exhaust/handoff/CONVERGENCE_LEDGER.md`
+specifically, because the director's own queue required it before archiving `docs/handoff/` at all, not
+because anything about bucket 1 looked suspicious — did this session find a dated, reasoned, 2026-08-23
+decision by a prior session to keep those exact two files untracked, specifically because this is a
+public portfolio repository and they are session-coordination tooling. The already-confirmed bucket-1
+proposal was wrong, and the only reason this session found out before executing it was a read ordered for
+an unrelated reason (the FREIGHT_WINCH content, not this file).
+
+**Why this is the argument for archiving bucket 3 rather than deleting it, not just a lucky catch.** The
+director's own instruction to archive `docs/tracelog/`/`docs/handoff/` whole, rather than deleting after
+this session's initial classify-by-filename-and-size recommendation, was made BEFORE this reversal
+happened — on the general principle that untracked deletion isn't recoverable and archiving is. This
+finding landed within hours and is direct, concrete proof of that general principle, not just supporting
+color: had `docs/handoff/` been deleted unread per the original recommendation, `CONVERGENCE_LEDGER.md`
+would be gone, this session would have executed a bucket-1 mistake with a real public-repo-hygiene cost,
+and there would be no way to discover the mistake after the fact, because the evidence against it would
+have been deleted along with the correct evidence for it.
+
+**The general shape, stated once so it can be pattern-matched later:** a bucket confirmed as correct can
+still be wrong, if the evidence that would have caught it was never read. Confirmation resolves whether a
+proposal was reasonable given what was known; it cannot resolve whether something unknown existed. The
+fix that actually worked here was not "be more careful before proposing" — this session's original
+proposal WAS reasonable given what it knew — the fix was "read the specific things flagged as unread
+before finalizing anything that touches them," which is exactly what step 1b's instruction did.
+
+Reverse: N/A — this entry records a finding, not an action; the action (moving the two files to
+`.gitignore` instead of tracking them) is already recorded in D0062.
+
+## D0066 · 2026-08-27 · the .gitignore dotted-directory blanket rule, replaced with a loud default
+
+The director's own framing: "`.anvil/` was caught [by gate 27]. `.github/`, `.githooks/`, `.claude/` were
+created before the gate existed and were never checked. Verify each is actually tracked as intended,
+right now, rather than assuming the shape rule happened to spare them."
+
+**Verified, not assumed** (`git ls-files <dir>/ | wc -l`): `.github/` 1 tracked file, `.githooks/` 2,
+`.claude/` 4 (exactly `commands/{audit,handoff,loop,wrap}.md`), `.anvil/` 1. All four tracked as intended.
+The shape rule happened to spare them — this time — but "happened to" is doing the load-bearing work in
+that sentence, which is precisely the problem.
+
+**The class fixed, not the instance.** `.gitignore`'s blanket `/.*/` (ignore every dotted root directory
+by shape, re-include `.github/`/`.githooks/`/`.anvil/` by name) is now REMOVED. What it protected against
+— accidentally committing local tool state before anyone names a real pattern for it — is now gate 27's
+job: an unrecognized dotted directory FAILS the untracked-files check the moment it appears with real
+content, loudly, in CI, rather than silently vanishing from every future clone. `.claude/`'s own narrower
+`/.claude/*` + `!/.claude/commands/` rule stands alone now (it never depended on the blanket rule; it is
+its own exclude-then-reinclude pair). `.godot/`, `.import/`, `.vscode/`, `.idea/` were already named
+explicitly elsewhere in the file and needed no change.
+
+**Verified, not asserted, that the property actually flipped:** created a fresh `.newtool/state.json`
+with no matching `.gitignore` pattern. Under the old blanket rule this would have been silently ignored,
+invisible to `git status`, invisible to a fresh clone forever. Under the new rule, `check_untracked_files.py`
+FAILED immediately, naming the file. Removed after confirming; gate re-verified clean on the real tree.
+
+Reverse: CHEAP. Deleting the new comment block and re-adding `/.*/` plus its three re-inclusions restores
+the old behavior exactly; nothing downstream depends on the new shape beyond gate 27 itself, which does
+not care which mechanism produced a clean tree, only that one exists.
+
+## D0067 · 2026-08-27 · multi-violation fixture added to `check_integrity.py`'s mutation suite
+
+The director's own instruction, verbatim: "Your reasoning that each check scans independently is almost
+certainly right, and 'almost certainly right' is the phrase that precedes every instrument failure in
+this project's history." Correct standing rule, applied to a live case rather than accepted on reasoning
+alone — this project's memory record backs the general claim (`two-instruments-are-not-a-cover`,
+`count-without-membership`, and others all begin as "the reasoning looked right").
+
+**Added:** one fixture with four simultaneous violations across two events — a missing required field
+AND a dangling `supersedes` on one event; a duplicate `id` AND a dangling `invalidates` on another, sharing
+the first event's id. `check_integrity()` reported all four, not just the first found — confirmed by
+substring match against all four expected error kinds, not just a nonzero error count (a checker that
+reports only ONE of four real problems would still produce `len(errors) >= 1`, which is why the assertion
+checks each specific kind is present, not just that something failed). 17/17 mutation cases now, up from
+16 — the eight original branches unchanged, this one new.
+
+**What this confirms, precisely:** `check_integrity()`'s loop structure (each reference-integrity check
+runs its own pass over the full event/id set, independent of the others, none short-circuiting on the
+first hit) does what the code's shape suggested it would. What it does NOT confirm: interaction effects
+this fixture didn't construct (e.g., a dangling reference that only becomes dangling because ANOTHER
+event in the same batch is itself invalid) — named here rather than implied as fully covered.
+
+Reverse: CHEAP. One test function; removing it loses coverage, not correctness.
+
+## D0068 · 2026-08-27 · self-correction: the "unreconciled snapshot" framing for two archived files was wrong
+
+Recorded because this project's own standing discipline is to disclose a wrong finding as plainly as a
+right one, not to quietly fix it and move on.
+
+**What was claimed** (this session, in D0062 and in the two files' own archive headers): that
+`docs/archive/DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md` and
+`docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS-postpivot-edit-2026-08-25.md` were divergent,
+unreconciled edit passes relative to their same-named twins already in `docs/archive/`, with "which is
+authoritative" left as an open question.
+
+**What was actually true, found only when the director asked for the loose end to be made explicit and
+this session re-read the smaller twin's own header before writing that note:** both smaller files already
+carry a header, written 2026-08-26, stating plainly that they are a deliberate, curated EXTRACTION from
+the larger file — `docs/archive/DIRECTOR_BRIEF.md` (241 lines) extracts "the Freight Winch product design
+and the 18-part experience-evaluation program" from what is now the 607-line
+`DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md`, explicitly leaving out sections tied to dead pre-pivot
+ticket numbering; `docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md` (96 lines) extracts "the
+three-way visual experiment protocol" from the 465-line `...-postpivot-edit-2026-08-25.md`, leaving out
+findings about dead Bazaar-era screens. There is no authority question. There never was one.
+
+**Root cause of the mistake, named precisely:** a line-count diff (738 lines, 497 lines) was treated as
+evidence of divergent, competing edits, and the smaller file's own explanatory header — which already
+answered the question — was never read before that conclusion was written down. The diff was real; the
+inference from it was not checked against the one piece of evidence that would have corrected it
+immediately. Structurally the same failure class this project's memory tracks as "elaboration is the
+tell" and "a caveat in prose does not protect" — a hedge ("guessing would have been worse than two dated
+files with this note") was used in place of the five extra minutes it would have taken to read the other
+file.
+
+**Fixed:** all four headers involved (`DIRECTOR_BRIEF.md`, `DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md`,
+`VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`, `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS-postpivot-edit-2026-08-25.md`)
+now state the correct parent/extraction relationship and cross-reference each other's path directly.
+
+Reverse: N/A — a correction to prose, not an action with a cost to undo.
+
 **Caught by the new gate 27, not missed:** `.anvil/` fell under `.gitignore`'s existing "every dotted
 directory is ignored by shape" rule, the same one `.github/`/`.githooks/`/`.claude/` already carve an
 exception out of — `.anvil/README.md` would have stayed silently untracked, the exact class of thing

@@ -1,9 +1,12 @@
-> **ARCHIVED 2026-08-27, as a second dated snapshot.** `docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`
-> already exists (the pre-pivot original). This copy sat untracked at `docs/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`
-> and diverges from that one by 497 lines — its own "Edited 2026-08-25" header below suggests it's the
-> output of `docs/archive/PIVOT_PLAN_2026-08-25.md` §1's prescribed durable/dead split, never committed.
-> Which is authoritative was not reconciled; two dated files with this note is honest, guessing is not.
-> Moved here while closing the `.git/info/exclude` hole (ANVIL step 1).
+> **ARCHIVED 2026-08-27 — CORRECTED, not a loose end.** First written up as "two dated snapshots, authority
+> unreconciled." Wrong, same correction as `docs/archive/DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md`'s
+> own header: `docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS.md`'s header already explains the
+> relationship — "the three-way visual experiment protocol... extracted 2026-08-26" FROM this exact file,
+> leaving out "the 50-atomic-findings audit and the priority-sequence mapping... both about pre-pivot
+> Bazaar-era screens that no longer exist." 96 extracted lines + that stated reason vs. this file's 465
+> full lines is a clean parent -> curated-subset relationship, not two competing edits. This file IS "the
+> untracked original" that file refers to; its header now names this path directly. Moved here while
+> closing the `.git/info/exclude` hole (ANVIL step 1).
 
 ---
 

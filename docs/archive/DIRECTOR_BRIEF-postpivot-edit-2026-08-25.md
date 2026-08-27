@@ -1,8 +1,12 @@
-> **ARCHIVED 2026-08-27, as a second dated snapshot.** `docs/archive/DIRECTOR_BRIEF.md` already exists
-> (the pre-pivot original, archived with a superseded header at pivot time). This copy sat untracked at
-> `docs/DIRECTOR_BRIEF.md` and diverges from that one by 738 lines — a later edit pass, timestamped the
-> same second as several other pivot-adjacent files (2026-08-25 14:49:16). Which edit pass is
-> authoritative was not reconciled; guessing would have been worse than two dated files with this note.
+> **ARCHIVED 2026-08-27 — CORRECTED, not a loose end.** First written up as "two dated snapshots, authority
+> unreconciled." Wrong: `docs/archive/DIRECTOR_BRIEF.md`'s own header already explains the relationship —
+> it is "the Freight Winch product design and the 18-part experience-evaluation program... extracted
+> 2026-08-26" FROM this exact file, deliberately leaving out "the priority-sweep and active-agent tactical
+> sections... since they key off a pre-pivot ticket numbering that no longer applies." 241 extracted lines
+> + that stated reason vs. this file's 607 full lines is consistent with a clean parent -> curated-subset
+> relationship, not two competing edits — a diff-only check found a big number and stopped short of
+> reading the smaller file's own header, which already answered the question. This file IS "the untracked
+> original" `docs/archive/DIRECTOR_BRIEF.md` refers to; that file's header now names this path directly.
 > Moved here while closing the `.git/info/exclude` hole (ANVIL step 1).
 
 ---

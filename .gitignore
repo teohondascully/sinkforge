@@ -19,28 +19,28 @@ build/
 .vscode/
 .idea/
 
-# Every other dotted directory at the root is local tooling state, and it is ignored BY SHAPE rather
-# than by name. The rule here used to name one specific tool, which put a vendor's name into a file
-# that ships. Deleting the name closed that and opened something worse: the only surviving rule was in
-# .git/info/exclude, which is local and is NOT part of a clone, so a fresh clone ignored nothing and a
-# single broad `git add` would have committed a working directory full of tool state. Ignoring by shape
-# keeps the protection, names nobody, and covers tooling that does not exist yet.
+# Local tooling state used to be ignored BY SHAPE (a blanket `/.*/` matching every dotted directory at
+# the root, with .github//.githooks//.anvil/ re-included by name) rather than by naming what's actually
+# local. REPLACED 2026-08-27 (ANVIL step 1, D0065): a blanket default is a trap for anything created
+# later. `.anvil/` proved it can go either way in the same round it landed -- caught here, this time,
+# only because `check_untracked_files.py` (gate 27) existed to catch it; `.github/`, `.githooks/`,
+# `.claude/`'s commands/ predate that gate and were verified tracked as intended only by checking now, not
+# by the shape rule reliably protecting them. A blanket ignore-by-shape rule and a gate that fails loudly
+# on anything ungoverned are opposites: the first makes a new local-tooling directory silently vanish from
+# a fresh clone; the second makes it a build failure until someone decides, explicitly, whether it ships
+# or not. Gate 27 is the correct mechanism now that it exists, so the blanket rule is redundant with it at
+# best and a silent single point of failure at worst -- removed rather than kept "just in case."
 #
-# The two dotted directories that must ship are re-included explicitly. Re-inclusion works here because
-# the exclusion applies to the DIRECTORY and is lifted on the same directory; a negation on a path
-# inside an excluded directory would not work, since git does not descend into one.
-/.*/
-!/.github/
-!/.githooks/
-!/.anvil/
-
-# .claude/ needs a narrower re-inclusion than the two above: it also holds machine-local session state
-# (.DS_Store, scheduled_tasks.lock, worktrees/) that must NOT ship, alongside commands/, which must --
-# a slash command is a project asset the runtime re-reads every invocation, not a habit that degrades
-# across sessions and compactions, so it belongs in the repo the same way .githooks/ does. Un-ignoring a
-# nested path under a wildcard-excluded parent needs the parent un-ignored first (so git descends into
-# it), then everything directly inside it re-excluded, then the one subdirectory that ships re-included.
-!/.claude/
+# What's actually local, named directly instead of inferred from a leading dot: `.godot/`/`.import/`
+# above (Godot's own cache), `.vscode/`/`.idea/` above (editor state). Nothing else needs a directory-shape
+# rule; anything new that shows up untracked and ungoverned is gate 27's job to flag, not this file's job
+# to pre-emptively hide.
+#
+# .claude/ still needs its own narrower rule: it holds machine-local session state (.DS_Store,
+# scheduled_tasks.lock, worktrees/) alongside commands/, which must ship -- a slash command is a project
+# asset the runtime re-reads every invocation, not a habit that degrades across sessions and compactions,
+# so it belongs in the repo the same way .githooks/ does. This one stands alone now, not as a narrower
+# case of the blanket rule above it.
 /.claude/*
 !/.claude/commands/
 

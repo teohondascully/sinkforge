@@ -3,6 +3,11 @@
 > 50-atomic-findings audit and the priority-sequence mapping were left in the untracked original: both are
 > about pre-pivot Bazaar-era screens that no longer exist. This project's visual work is out of scope for
 > the current one-month vertical-slice push; kept for when it resumes.
+>
+> **Path update, 2026-08-27:** "the untracked original" above now has an address —
+> `docs/archive/VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS-postpivot-edit-2026-08-25.md`, moved there while
+> closing the `.git/info/exclude` hole (ANVIL step 1). Same file, same extraction relationship; it just
+> stopped being untracked.
 
 # Three-way visual experiment protocol
 
