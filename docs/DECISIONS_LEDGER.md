@@ -3014,3 +3014,41 @@ from memory of what a document said, rather than checked against the document, d
 to warrant its own extraction of the general rule — D0083 already states it.
 
 Reverse: CHEAP — one sentence, `git revert` recovers it.
+
+---
+
+## D0091 · 2026-08-27 · a sweep bounded by the sweeper's own model of the corpus misses whatever is outside it
+
+Not a decision about this commit range specifically — a pattern named across two, because the director
+asked for it recorded as one. This is the second consecutive round where an outside reader found live
+specifications inside files nobody on this project's own side thought to check. D0026 (`no_engine_imports.py`
+checked engine coupling against a hand-picked list of class names; an audit against Godot's actual class
+registry found 276 more classes it would have let through silently) is the first instance, from before
+this reversal existed as a topic. This round is the second: my own two sweeps for run-structure language
+(D0082, checking `docs/GDD.md` by grep pattern; the six-group reversal commit, checking the files the
+original queue named) both missed `CLAUDE.md`, `docs/CLAIMS.md`, eight `sim/*/MODULE.md` files, and
+`docs/ARCHITECTURE.md` §5/§6's own worked example — an independent external audit, reading the corpus
+cold with no model of which files "should" need checking, found all of them in one pass.
+
+**Both misses share the same shape, not just the same outcome.** `no_engine_imports.py`'s gap was a list
+of class names accumulated ad hoc, checked against nothing broader than itself. My own sweeps were lists
+of *files* accumulated the same way — the original reversal queue named the files the director's brief
+happened to mention, and D0082's follow-up swept `docs/GDD.md` specifically because that was the file
+already open. Neither sweep asked "what is the full set of files that could contain this class of
+statement," because neither sweep's own model of the corpus included an answer to that question.
+
+**The general rule, named because the director asked for it named:** a sweep bounded by the sweeper's own
+model of the corpus will systematically miss whatever is outside that model — not randomly, but
+specifically the things the model never included as candidates in the first place. The only reliable
+correction available is a reader with no model at all: cold, corpus-wide, unaware of which files "should"
+matter. Two independent instances of this exact shape (a hand-picked class list, a hand-picked file list)
+is what makes it a pattern worth recording rather than two unrelated near-misses.
+
+**Practical consequence for future work of this shape:** when a change is going to be checked for
+completeness, prefer a corpus-wide mechanical search (grep every tracked file, not the files a queue
+happened to name) over an enumerated list of "the files this probably touches" — the enumeration is
+exactly the boundary that misses things. Where a full mechanical sweep isn't practical, an independent
+cold read is the next-best substitute, and this round is the second time it has out-performed a directed
+one.
+
+Reverse: N/A — a record entry, not an action with a cost to undo.
