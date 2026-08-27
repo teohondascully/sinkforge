@@ -35,8 +35,9 @@ weakest-confidence dependency call in `sim/`.
 ## Consumers
 
 `interface`, at minimum. Sim-internal: `economy` (haul accounting reads
-transport cost/movement), `run` (R1's cost model factors into run economy
-and termination).
+transport cost/movement), `run` (R1's cost model factors into the economy —
+"and termination" dropped from this line 2026-08-27: no run-ending event
+exists for R1's cost model to factor into anymore).
 
 ## Tick phase
 

@@ -11,12 +11,19 @@ Water automaton: active-cell set, flood level, aquifer breach.
   performance constraint, not a style preference.
 
 The base fluid automaton's design contract guarantees total water is
-conserved across a tick. A run's rising flood clock is a controlled,
-deliberate violation of that contract, and it must stay contained to one
-clearly-named function gated by run state — not threaded through the
-conservation-preserving passes. Anyone reading the conservation-checking
-code should be able to find the one place water is deliberately injected
-without having to audit the whole module.
+conserved across a tick. Continuous seepage into excavated sections (R3,
+`docs/GDD.md` §4 — rewritten 2026-08-27 from a run-ending clock to local,
+continuous upkeep) is a controlled, deliberate violation of that contract,
+and it must stay contained to one clearly-named function gated by
+section/pump state — not threaded through the conservation-preserving
+passes. Anyone reading the conservation-checking code should be able to
+find the one place water is deliberately injected without having to audit
+the whole module.
+
+**What owns the seepage/pump-upkeep logic is an open question, same as
+`sim/run`'s own shape (see `sim/run/MODULE.md`).** The description below
+still names `run` because nothing has replaced it yet — read it as "whatever
+ends up owning local flood/pump state," not a confirmed dependency.
 
 ## Dependencies
 
@@ -24,10 +31,11 @@ without having to audit the whole module.
 
 ## Consumers
 
-`interface`, at minimum. Sim-internal: `invariants` (flood level monotonic
-within a run reads this module's flood level state directly, not through
-`run`), `run` (drives the flood clock via the one gated override function
-described above).
+`interface`, at minimum. Sim-internal: `invariants` (flood level in a given
+section, monotonic while rising, reads this module's flood level state
+directly, not through `run`), `run` (drives the seepage/pump-upkeep
+mechanic via the one gated override function described above — provisional
+naming, see the open question noted under Purpose above).
 
 ## Tick phase
 

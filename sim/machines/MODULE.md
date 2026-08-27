@@ -25,8 +25,9 @@ from behaviors — this is the direct reason `machines` exists above
 
 `interface`, at minimum. Sim-internal: `economy` (refinery-type machine
 state feeds conversion accounting), `invariants` (checks like "no machine
-in an invalid cell" read machine state), `run` (extraction resolution and
-termination conditions may reference machine state).
+in an invalid cell" read machine state), `run` (extraction resolution may
+reference machine state — "termination" dropped from this line 2026-08-27:
+there is no more run-ending event to have a condition for).
 
 Note: `transport` is a peer of `items`/`machines`, not a consumer or a
 dependency of this module — it implements R1 (down free, up powered)

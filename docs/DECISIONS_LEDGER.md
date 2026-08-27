@@ -2902,3 +2902,36 @@ to the retired structure, not a live claim — left alone for the same reason si
 "playthrough" — both files' remaining "run" usages were already in the reserved sense.
 
 Reverse: CHEAP — prose only, `git revert` recovers both files in full.
+
+---
+
+## D0087 · 2026-08-27 · sim/*/MODULE.md — the eight modules with real run-structure content
+
+Decided: of the eleven `sim/` module files with at least one "run" hit (checked exhaustively via
+`grep -c` across all fourteen `sim/*/MODULE.md` files, not sampled), eight needed real fixes and three
+(`items`, `economy`, `world`) needed none — their only hit was "Sim-internal: `run` (...)" naming the
+still-real (if TBD-shaped) module by name, with no dead-specific language attached, same as the low-value
+category flagged and deliberately left in D0080/D0081. `behaviors`, `body`, `telemetry`, and `sim/MODULE.md`
+itself had zero or purely-verb hits (executes/runs-through, harness-execution sense) and needed nothing.
+
+The eight: `sim/run`, `sim/meta`, `sim/commands` (already fixed in the prior round, D0081) plus five found
+by this exhaustive check and fixed now:
+
+- **`sim/terrain_gen`**: "called per-run and scoped to a bounded shaft region" was the exact contradiction
+  `ONBOARDING.md` had already been corrected against — this file was the one place the old wording
+  survived. Rewritten to "called once, at shaft creation," with a dated note distinguishing "per-session
+  repetition is gone" from "still only generates the bounded shaft region, not one persistent world" —
+  those are two different claims and conflating them would trade one confusion for another.
+- **`sim/fluid`**: the largest rewrite. "A run's rising flood clock is a controlled, deliberate violation"
+  and "gated by run state" directly contradicted R3's 2026-08-27 rewrite (continuous, section/pump-gated
+  upkeep, not a run-ending clock). Rewritten to match, with an explicit pointer to `sim/run`'s own open
+  shape question rather than asserting `run` still owns this mechanic with confidence nothing currently
+  supports.
+- **`sim/invariants`**: "flood level monotonic within a run" → "in a given section... while it is rising,"
+  matching the identical fix already made in `docs/ARCHITECTURE.md`'s own invariants list and `sim/fluid`
+  above — three copies of the same sentence, now consistent.
+- **`sim/machines`, `sim/transport`**: both named "termination conditions"/"termination" as something
+  `run` tracks — a run-ending event that no longer exists. Dropped, with an inline note explaining why
+  rather than a silent deletion, so a future reader doesn't wonder if it was an oversight.
+
+Reverse: CHEAP — prose only, `git revert` recovers all five files in full.

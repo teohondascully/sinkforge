@@ -3,18 +3,23 @@
 ## Purpose
 
 Seeded strata generation, deposit and ruin placement, per-site parameters.
-Writes into `world`'s tile grid. Generation is called per-run and scoped to
-a bounded shaft region now, not a single persistent grid — this changed
-from the pre-pivot design, where terrain generation produced one world that
-persisted across the whole game.
+Writes into `world`'s tile grid. Generation is called once, at shaft
+creation, and scoped to that one shaft's bounded region — updated
+2026-08-27: the 2026-08-25 pivot had this called per-run (once per
+disposable session); the 2026-08-27 reversal retired that structure, so
+generation now runs exactly once, ever, per persistent shaft, not
+repeatedly across sessions and not for one persistent *world* either (it
+still only generates the bounded shaft region, same as before — only the
+per-session repetition is gone).
 
 ## Must-not
 
-- Depend on run state. Generation takes a seed and site parameters as
-  inputs; it must not reach into `sim/run` for phase, flood clock, or any
-  other in-run state. This keeps generation callable in isolation (by
-  `harness/scenario` fixtures, by tooling, by tests) without spinning up a
-  run.
+- Depend on session state. Generation takes a seed and site parameters as
+  inputs; it must not reach into `sim/run` (or whatever ends up owning
+  session/flood state — see `sim/run/MODULE.md`'s own open question) for
+  phase, flood clock, or any other in-session state. This keeps generation
+  callable in isolation (by `harness/scenario` fixtures, by tooling, by
+  tests) without spinning up a session.
 
 ## Dependencies
 
@@ -24,12 +29,13 @@ doesn't invent its own representation of them).
 ## Consumers
 
 `interface`, indirectly (generated terrain is what `observe()` surfaces
-once a shaft exists). Sim-internal: `run` (invokes generation at
-site-selection/run-start, scoped to that run's shaft).
+once a shaft exists). Sim-internal: `run` (invokes generation once at
+shaft creation — provisional naming, see `sim/run/MODULE.md`'s own open
+question about what module this ends up being).
 
 ## Tick phase
 
-None. Generation runs once at run/site setup, not as part of the fixed
+None. Generation runs once at shaft creation, not as part of the fixed
 per-tick phase order.
 
 ## Public API
@@ -37,7 +43,7 @@ per-tick phase order.
 - `ShaftGenerator` (`shaft_generator.gd`) — `.generate(site: Dictionary, seed: int) -> TileGrid`. Reads a
   `StrataData` site config and a seed, returns a fully generated `TileGrid`. Depth-bands the base rock
   into `docs/GDD.md` §11's three layers, carves caves, scatters ore/coal/iron veins, places one empty
-  ruin chamber. Deterministic in `(site, seed)` only — no run state, per this module's Must-not.
+  ruin chamber. Deterministic in `(site, seed)` only — no session state, per this module's Must-not.
 - `StrataData` (`strata_data.gd`) — reads `data/strata/generated.gd`, codegen'd from
   `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`. Same mechanism as `sim/world/materials.gd` —
   `docs/adr/0004-data-codegen.md`.

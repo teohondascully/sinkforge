@@ -4,7 +4,8 @@
 
 Continuous assertions: conservation of matter across the tick modulo
 declared sinks, non-negative buffers, no items inside solid rock, no
-machine in an invalid cell, flood level monotonic within a run. This is a
+machine in an invalid cell, flood level in a given section monotonic while
+it is rising. This is a
 checking module — it reads other submodules' state after they've acted
 this tick and flags violations; it doesn't itself produce gameplay state.
 
