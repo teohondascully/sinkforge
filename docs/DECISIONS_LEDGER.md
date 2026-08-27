@@ -2845,3 +2845,25 @@ entry after the sim/*/MODULE.md group): a sweep is bounded by what the sweeper t
 `CLAUDE.md` — the single most-read file in the repository — was never in either sweep's own list.
 
 Reverse: CHEAP — one line, `git revert` recovers it.
+
+---
+
+## D0085 · 2026-08-27 · docs/README.md — the normative table was missing three documents CLAUDE.md already calls normative
+
+Decided: added `WORKING.md`, `DECISIONS_LEDGER.md`, and `TASTE_QUEUE.md` to `docs/README.md`'s normative
+table. `CLAUDE.md`'s own "Normative docs" section has always listed all three as normative; `docs/README.md`'s
+table — the document whose entire stated purpose is "if a document is not listed as normative below, it
+is not normative" — never had them. Surfaced by the same external audit as D0084, unrelated to the run/
+persistent reversal: this is a pre-existing documentation-governance gap, not reversal damage. Fixed in
+this pass anyway, per the director's explicit call, because two normative documents disagreeing about
+which documents are authoritative is the one class of inconsistency that cannot be left open while
+everything else in the corpus is being reconciled against it.
+
+Alternative: remove the three from `CLAUDE.md`'s list instead, on the theory that `docs/README.md`'s
+table is the more authoritative of the two (it is the dedicated document index; `CLAUDE.md` is a short
+pointer). Rejected — `CLAUDE.md` was correct and `docs/README.md` was incomplete, not the reverse: all
+three documents genuinely are normative by every definition this project uses (append-only judgment
+record, current-state tracker, taste-review record), and `docs/README.md`'s own table was simply never
+updated when they were introduced.
+
+Reverse: CHEAP — three table rows, `git revert` recovers the prior state.
