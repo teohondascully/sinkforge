@@ -122,10 +122,10 @@ All 10 structural gates PASS (`layer_lint`, `no_engine_imports`, `check_coordina
 `data_codegen --check`, `check_working_freshness`, `check_project_settings`), plus `check_trailers`.
 `check_size_limits` now WARNS (not fails) on `sim/body/body.gd` at 309 lines (warn threshold 300, hard
 limit 400) — down from 467 after this round's split, headroom restored. Full local suite: 18 test files,
-111 `_test_*` functions, both re-counted via `grep`/`ls` just now. CI not yet re-verified against the
-pushed commit for THIS round's changes (verify on the actual `gh run` before the next brief, per this
-project's own "verify a numeric claim against actual tool output" rule — not done here since these
-changes are not yet pushed at brief-writing time).
+111 `_test_*` functions, both re-counted via `grep`/`ls` just now. CI's `tests` job: confirmed GREEN on
+the actual pushed commit (`0a928c6`, `gh run` `33048577092`), including the new `test_body_fuzz_fast`
+step (gate 26) — not assumed from the local pass. `fuzz_nightly` correctly skipped (push trigger, not
+`schedule`) rather than silently not running for an unnoticed reason.
 
 **LOC ratio** (measured just now): instrument 4,691 / game 1,424. **Absolute ratio 3.294** — up from a
 prior round's 2.896-2.998 range (this round added a substantial amount of both `sim/body` game code, the
