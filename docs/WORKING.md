@@ -52,9 +52,10 @@ Queue, one commit per document group so the diff stays reviewable (director's ex
 - [x] 4. `ONBOARDING.md` broader cleanup (stages 6/9/10, the deferred run-console section, Draft
       A/C references in "things I specifically do not want") — excludes the lines touched by
       commit 2. D0079. Task 0's two historical `C001` mentions left untouched on purpose.
-- [ ] 5. `docs/ARCHITECTURE.md` §11 (save/run lifecycle state machine), the `run` module table
+- [x] 5. `docs/ARCHITECTURE.md` §11 (save/run lifecycle state machine), the `run` module table
       row, §8's "Draft A versus Draft C is a data file" line, `docs/QUALITY.md`'s "a corrupt run
-      save never takes down the meta save" line.
+      save never takes down the meta save" line. D0080. §11 kept, retitled "pre-reversal design,
+      not current spec" rather than deleted.
 - [ ] 6. `sim/run`/`sim/meta`/`sim/commands` `MODULE.md` — the run/meta split assumed multiple
       discrete sessions. Zero lines of code exist under any of the three, confirmed. Mark the
       split as explicitly open/TBD rather than inventing a replacement architecture myself — that

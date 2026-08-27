@@ -2662,3 +2662,43 @@ misrepresent what actually happened when it ran, which is a worse error than lea
 but historically accurate mention of `C001`.
 
 Reverse: CHEAP — prose only, `git revert` recovers the file in full.
+
+---
+
+## D0080 · 2026-08-27 · docs/ARCHITECTURE.md, docs/QUALITY.md — architecture-layer propagation, §11 marked pre-reversal
+
+Decided: `docs/ARCHITECTURE.md`'s `run` module table row rewritten to state its shape is open, not a
+build target, with a second paragraph explaining why (the state machine it named assumed multiple
+discrete sessions). §11 ("Save and run lifecycle") kept in full rather than deleted or rewritten to a
+new spec — retitled "pre-reversal design, not current spec," with an explicit note it is a record of
+what was decided against, and the table's own §4 entry now points here instead of asserting it. This
+mirrors D0076's choice for `docs/GDD.md` §9 (dead ideas are recorded, not erased) rather than inventing
+a replacement state machine unprompted — the same reasoning `ONBOARDING.md`'s "do not resolve the open
+design questions yourself" gives for the `sim/run`/`sim/meta` `MODULE.md` files (next commit).
+
+§8's "Draft A versus Draft C is a data file" bullet dropped outright, no replacement — Draft A/C is
+retired entire (`docs/GDD.md` §8's rewrite, D0076), not renamed, so there is nothing left for the bullet
+to assert.
+
+Six smaller propagations, each a genuine stale reference rather than a generic use of the word "run"
+(verb uses — "run a suite," "re-run the corpus" — left untouched, checked individually via grep, not
+pattern-matched): the invariants list's "flood level monotonic within a run" (a run boundary no longer
+exists to bound it by — restated as "within a given section while it is rising"); the §8 shaft-modifiers
+note, which cited the now-retired "primary source of long-tail variety" framing directly; §10's max-depth
+and save/load-latency budget rows ("any run" / "late-run state"); and the "why this is the research loop"
+paragraph's own illustrative arithmetic (a two-minute *scenario*, not *run* — the arithmetic is
+unaffected, only the noun tying it to a retired concept).
+
+`docs/QUALITY.md`'s "a corrupt run save never takes down the meta save" reworded to state the isolation
+property survives independent of how many files the eventual (undecided) save schema ends up being,
+rather than asserting the two-file split as settled.
+
+Alternative, for §11 specifically: delete it now that it's dead, and let a future stage rewrite it from
+scratch. Rejected — the retired state machine is real design work with real reasoning behind it (why
+two save files, why the state split, why offline processing is a pure function of elapsed time), and
+several of its properties are explicitly worth preserving in whatever replaces it (cheap-to-discard
+session state, no-background-timer offline processing). Deleting it would lose that reasoning the same
+way editing `C001` in place instead of retiring it would have (D0077's own argument, applied here to an
+architecture section instead of a claim).
+
+Reverse: CHEAP — prose only, `git revert` recovers both files in full.

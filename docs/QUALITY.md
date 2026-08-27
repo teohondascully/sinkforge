@@ -113,7 +113,7 @@ trimmed back to the limit rather than split, and the pattern repeated a fourth t
 - Explicit save versions with a tested migration chain.
 - No test fixture may overwrite a real save. Harness runs use isolated save and config directories, verified by a sentinel that hashes the real save before and after every sweep.
 - Save restoration is validated, not assumed.
-- A corrupt run save never takes down the meta save.
+- A corrupt save file never takes down another one — the two-file `run.save`/`meta.save` split this rule was written against is itself an open question again (`docs/ARCHITECTURE.md` §11, `docs/DECISIONS_LEDGER.md` D0076); the isolation property survives regardless of how many files the eventual schema ends up being.
 
 ---
 

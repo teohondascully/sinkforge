@@ -105,7 +105,7 @@ Each is a directory with `MODULE.md`, one interface file, internal implementatio
 | Module | Responsibility | Must not |
 |---|---|---|
 | `world` | Tile grid, chunks, material IDs, hardness, terrain queries and mutations | Know about machines or items |
-| `terrain_gen` | Seeded strata generation, deposit and ruin placement, per-site parameters | Depend on run state |
+| `terrain_gen` | Seeded strata generation, deposit and ruin placement, per-site parameters | Depend on session state |
 | `body` | Player kinematics: integration, collision, depenetration, step-up, corner correction, coyote and buffer, climb, rope, swim, carry weight | Read input devices; know about rendering |
 | `items` | Item instances as packed arrays; falling, settling, pile state, pickup | Own transport policy |
 | `machines` | Instances, placement validity, tick scheduling, state machine | Contain per-machine-type code |
@@ -113,10 +113,12 @@ Each is a directory with `MODULE.md`, one interface file, internal implementatio
 | `transport` | Chutes (free, gravity), lifts (powered, cost per unit-meter), feeders. Implements R1. | Special-case machine types |
 | `fluid` | Water automaton, active-cell set, flood level, aquifer breach | Tick every cell every frame |
 | `economy` | Recipes, tiers, refinery conversion, haul accounting. Implements R2. | Hardcode quantities |
-| `run` | Run lifecycle, flood clock driven by rig state (R3), termination, extraction resolution | Know about menus or saves |
-| `meta` | Persistent rig state, unlocks, stockpile, offline processing | Mutate run state directly |
+| `run` | **Shape open, 2026-08-27.** Named for a session lifecycle (`MetaIdle`→`RunResolved`) that assumed multiple discrete, disposable sessions. One persistent shaft doesn't obviously need that state machine. Local flooding (R3) and haul/extraction resolution still need to live somewhere — this module or its replacement. See §11. | Know about menus or saves |
+| `meta` | Persistent rig state, unlocks, stockpile, offline processing | Mutate session state directly |
 
-**One module shape is unresolved and it affects this table.** `docs/GDD.md` §8 leaves open whether the surface rig is a small fixed deck or a second buildable factory built upward. If it is a factory, `meta` is not one module: it needs its own placement, routing, and machine scheduling, and the honest options are either reusing `world`, `machines`, and `transport` against a second grid, or a dedicated `rig` module. Reusing is strongly preferred and is a reason to keep those three modules free of any assumption that there is exactly one world. Do not resolve this by building the deck version and discovering later that it cannot grow. Ask.
+**Two module shapes are unresolved, and both affect this table.** `docs/GDD.md` §8 leaves open whether the surface rig is a small fixed deck or a second buildable factory built upward. If it is a factory, `meta` is not one module: it needs its own placement, routing, and machine scheduling, and the honest options are either reusing `world`, `machines`, and `transport` against a second grid, or a dedicated `rig` module. Reusing is strongly preferred and is a reason to keep those three modules free of any assumption that there is exactly one world. Do not resolve this by building the deck version and discovering later that it cannot grow. Ask.
+
+Separately, and more fundamentally: whether `run` names a real concept at all once the shaft never resets. The 2026-08-27 design reversal (`docs/GDD.md` §9) retired the run-based structure `run`'s original shape assumed. What replaces it — one continuous session with no boundary, or some other unit — is undecided. Do not build the state machine in §11 below; it describes the pre-reversal design and is kept as a record of what was decided against, not a spec to implement.
 | `commands` | The complete typed command vocabulary | Contain logic |
 | `telemetry` | Structured event emission from inside the sim | Do IO |
 | `invariants` | Continuous assertions | Be disabled in tests |
@@ -134,7 +136,7 @@ Each is a directory with `MODULE.md`, one interface file, internal implementatio
 
 ### Invariants, asserted continuously
 
-Conservation of matter across the tick modulo declared sinks. Non-negative buffers. No items inside solid rock. No machine in an invalid cell. Flood level monotonic within a run. Panic in debug, log in release. Most factory-game bugs are invariant violations discovered ten hours later.
+Conservation of matter across the tick modulo declared sinks. Non-negative buffers. No items inside solid rock. No machine in an invalid cell. Flood level in a given section monotonic while it is rising (never oscillates from a bug). Panic in debug, log in release. Most factory-game bugs are invariant violations discovered ten hours later.
 
 ---
 
@@ -296,11 +298,10 @@ build_cost: { ingot_iron: 8 }
 
 - Adding a machine is adding one data file. Zero new classes. A genuinely new verb means a new behavior primitive, which is an architectural event and needs an ADR.
 - Recipes, strata, materials, upgrades, run configs, and progression curves get the same treatment.
-- **Shaft modifiers are data too.** `docs/GDD.md` §2 makes per-shaft constraints (floods fast, no fuel above 50m, hard rock starts early) the primary source of long-tail variety, on the argument that constraint variety costs an order of magnitude less per hour of play than content variety. That only holds if a modifier is a data file and not a code branch. Design `terrain_gen` and `run` so a modifier composes with any site rather than special-casing one.
+- **Shaft modifiers are data too, if they ever exist.** `docs/GDD.md` §9's post-reversal note: per-shaft constraints (floods fast, no fuel above 50m, hard rock starts early) no longer have an obvious home now that there's one shaft, not many — they survive only as an unexplored, unscoped post-breach possibility, not the primary source of variety they were under the retired run-based structure. If they get built, the rule stands regardless: a modifier is a data file, never a code branch. Design `terrain_gen` so a modifier composes with any site rather than special-casing one.
 - Schema-validated at build time. A malformed definition fails the build, not the game.
 - `data/` is human-diffable text. Never binary resources.
 - **Balance numbers are never in code.** A tuning pass is a diff of `data/`, so an agent can change balance without touching logic and a human can review balance without reading logic.
-- **Draft A versus Draft C is a data file.** If switching requires a code change, that is a defect.
 
 ---
 
@@ -331,7 +332,7 @@ never a second unit the sim itself reasons in.
 |---|---|---|
 | World scale | 16px = 1m | Also the machine/logic cell size above — a machine occupies one "meter." |
 | Terrain/digging grid | 4px | The upper end of the 2-4px range above; fixed at 4 for this constant's arithmetic. |
-| Maximum playable depth | 4096px (256m) | The deepest depth any run is expected to reach — not a hard world-generation limit, a range budget for the representation below. |
+| Maximum playable depth | 4096px (256m) | The deepest depth the shaft is expected to reach — not a hard world-generation limit, a range budget for the representation below. |
 
 **Fixed-point representation: i32, 16 fractional bits.** Integer range ±32,768 px (±2,048 m), precision
 1/65,536 px. Both are far from binding against the numbers above: 256m of max depth uses 4,096 of the
@@ -476,16 +477,22 @@ Budgets are asserted, not aspired to. Each has a benchmark scenario in CI.
 | Frame time p99 | ≤ 16.6 ms at 1080p |
 | Draw calls | ≤ 150 |
 | Headless throughput | ≥ 100x realtime |
-| Save / load | ≤ 250 ms at late-run state |
+| Save / load | ≤ 250 ms at a mature, deeply-built shaft state |
 | Peak sim memory | ≤ 256 MB |
 
-**Why this is the research loop and not polish.** A two-minute run is 7,200 ticks. At 2 ms that is fourteen seconds of compute, or well under a second headless. A thousand-run sweep is a couple of minutes on a few cores. At 20 ms per tick the same sweep takes half an hour and you stop running it. The perf budget determines whether the slow loop exists at all.
+**Why this is the research loop and not polish.** A two-minute scenario is 7,200 ticks. At 2 ms that is fourteen seconds of compute, or well under a second headless. A thousand-scenario sweep is a couple of minutes on a few cores. At 20 ms per tick the same sweep takes half an hour and you stop running it. The perf budget determines whether the slow loop exists at all.
 
 Requirements to hit it: no node per item or per machine; event-driven machine ticks so idle machines cost zero; active-cell fluid; chunked terrain with dirty-rect rebuilds; a uniform-grid spatial index, not a quadtree; flat render packets, no per-entity objects crossing a boundary. Note also that per-frame cosmetic scanning of all machines and fluid (for audio or HUD) is a real cost that is easy to leave out of a budget; it belongs in the budget.
 
 ---
 
-## 11. Save and run lifecycle
+## 11. Save and session lifecycle — pre-reversal design, not current spec
+
+**This section describes the run-based structure retired 2026-08-27 (`docs/GDD.md` §9,
+`docs/DECISIONS_LEDGER.md` D0076). Kept as a record of what was decided against, not something to
+build.** The state machine below assumed a session was a bounded, disposable expedition with a defined
+end; one persistent shaft that never resets doesn't have a `RunResolved` to reach or a `MetaIdle` to
+return to. What replaces this is an open question (§4's `run` module row), not decided here.
 
 ```
 MetaIdle → SiteSelect → RunConfig(seed, start_depth, loadout, pump_capacity)
@@ -495,11 +502,11 @@ MetaIdle → SiteSelect → RunConfig(seed, start_depth, loadout, pump_capacity)
   → MetaIdle
 ```
 
-- Run state and meta state are separate structs with no shared mutable references. A run can be discarded without touching meta. This is what makes runs cheap to simulate in bulk.
-- Run duration derives from rig pump capacity. Never a constant.
-- Two files: `meta.save` (durable, precious, written atomically) and `run.save` (disposable, mid-run resume). A corrupt `run.save` must never take down `meta.save`.
-- Versioned schema with an explicit integer version and a migration chain, each migration unit-tested against a stored fixture save.
-- Offline processing is a pure function of elapsed real time, applied on load. Never a background timer.
+- Run state and meta state were separate structs with no shared mutable references. A run could be discarded without touching meta. This is what made runs cheap to simulate in bulk — worth preserving as a goal even though the mechanism above is dead: whatever replaces it should still let sim state be discarded/regenerated cheaply for sweeps, if that's achievable without a run to discard.
+- Run duration derived from rig pump capacity, never a constant — R3 kept this property (continuous upkeep instead of a countdown), just without a duration to derive.
+- Two files: `meta.save` (durable, precious, written atomically) and `run.save` (disposable, mid-run resume). Whether a persistent single shaft still wants a two-file split (e.g. rig/meta state versus shaft state) or one file is part of the open question above.
+- Versioned schema with an explicit integer version and a migration chain, each migration unit-tested against a stored fixture save — this requirement survives regardless of what the schema ends up shaped like.
+- Offline processing is a pure function of elapsed real time, applied on load. Never a background timer. — unaffected, still correct.
 
 ---
 
