@@ -4,7 +4,9 @@
 
 Meta-progression / unlock data — what's unlocked, in what order, at what
 cost. Read by `sim/meta`, which owns persistent rig state and unlocks but
-must never mutate run state directly.
+must never mutate `sim/run`'s state directly, if that module still exists
+once its own open shape question resolves (`sim/run/MODULE.md`,
+`sim/meta/MODULE.md`).
 
 ## Schema (informal, not yet fixed)
 

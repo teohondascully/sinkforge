@@ -10,7 +10,7 @@ and enforces the scenario's budget (tick/time limit).
 ## Must-not
 
 - Require a GPU or a window. Must run headless, in CI, at 100x realtime or
-  better for a two-minute scenario. This is a hard performance constraint:
+  better for a short (few-thousand-tick) scenario. This is a hard performance constraint:
   if the fast loop can't finish in under 60 seconds total across its
   scenarios, something here is too slow, not the CI budget too tight.
 

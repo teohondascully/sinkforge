@@ -2935,3 +2935,31 @@ by this exhaustive check and fixed now:
   rather than a silent deletion, so a future reader doesn't wonder if it was an oversight.
 
 Reverse: CHEAP — prose only, `git revert` recovers all five files in full.
+
+---
+
+## D0088 · 2026-08-27 · harness/*, shell/README.md, data/progression/README.md — the "run" standardization
+
+Decided: checked all four `harness/*/README.md` files, `shell/README.md`, and `data/progression/README.md`
+against the director's new rule (reserve "run" for evaluation/harness executions; "session"/"playthrough"
+for the sim-execution sense). Real finding, not assumed: three of the four harness files (`scenario`,
+`driver`, `aggregate`) turned out to already be using "run"/"per run" correctly under the new rule — a
+scenario's fixture format, a driver's per-execution outputs, and an aggregator's cross-execution stats are
+all literally describing evaluation executions, the reserved sense. **`harness/bots/README.md` has zero
+"run" hits at all and needed nothing** — reported here as a null result, not silently skipped, per the
+director's explicit ask to keep doing that.
+
+Two real fixes landed:
+
+- **`harness/driver/README.md`**: "at 100x realtime or better for a two-minute scenario" cited the
+  retired `C001` duration as a concrete performance target — softened to "a short (few-thousand-tick)
+  scenario," same fix already made in `docs/ARCHITECTURE.md`.
+- **`shell/README.md`**: "moving between menus and a run" was the game-session sense, describing the
+  retired `MetaIdle`/`RunActive` flow specifically. Rewritten to "moving between menus and gameplay," with
+  an explicit pointer to `sim/run`'s own open shape question rather than asserting a flow nothing
+  currently specifies.
+- **`data/progression/README.md`**: "must never mutate run state directly" duplicated the exact phrase
+  already corrected in `sim/meta/MODULE.md`'s own Must-not section — brought into agreement with it,
+  including the "if that module still exists" qualifier.
+
+Reverse: CHEAP — prose only, `git revert` recovers all three changed files in full.
