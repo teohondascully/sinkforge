@@ -2626,3 +2626,39 @@ project's own front door describing a retired structure while the design doc und
 moved on is a worse inconsistency than a slightly fatter `CONTEXT.md`.
 
 Reverse: CHEAP — prose only, `git revert` recovers both files in full.
+
+---
+
+## D0079 · 2026-08-27 · ONBOARDING.md — build-roadmap propagation of D0076/D0077
+
+Decided: reword every stage description in the Task 1-12 sequence that assumed run-plural language,
+without touching Task 0 (a completed, historical task — its document-triage instructions describe what
+was true when it ran, not a living pointer, so left as written). Stage 3's "called per run" → "called
+once, at shaft creation." Stage 6 rewritten most heavily: it named `sim/run`+`sim/meta` as a greenfield
+build target, but the run/meta split those modules assumed no longer applies and nothing replaces it yet
+— restated as an open question to resolve before scoping the stage, not a build target, matching the
+`MODULE.md` files themselves (next commit) rather than inventing a replacement shape here. Stage 9's
+"gated by run state" → "gated by section/pump state," matching `docs/GDD.md` R3's own implementation
+note verbatim. Stage 10's "the run boundary mechanic" → "the shaft-to-surface haul mechanic." The
+deferred "run console" section renamed "session console," "run artifacts"/"real runs" → "session
+artifacts"/"real sessions." The open-questions list in "things I specifically do not want" updated to
+`docs/GDD.md` §8's current set (Draft A/C and run termination are gone, not just renamed; the
+lateral-variety question and reworded machine-retrieval question take their place).
+
+Added one new paragraph at the top (`docs/ONBOARDING.md`'s opening "who you are" section) explicitly
+naming the second pivot and telling a fresh session to trust `docs/GDD.md` over this file if the two
+ever disagree — this document is a snapshot of a build sequence, more likely to drift than the design
+doc it serves, and the first pivot already proved that (the original brief was written for the run-based
+structure throughout).
+
+Every occurrence of `C001` as a live pointer (the "read these first" list, the Task 1 preamble already
+handled in D0077) now points to `C003`. Two occurrences left untouched deliberately: Task 0.4's
+historical description of what it triaged, and Task 0.5's skeleton diagram — both describe a completed
+task's own historical state, not a currently-followed instruction.
+
+Alternative: rewrite Task 0 too, for full consistency. Rejected — Task 0 is closed and its accuracy is
+about the past, not the present; rewriting completed historical instructions to match current state would
+misrepresent what actually happened when it ran, which is a worse error than leaving one stale-looking
+but historically accurate mention of `C001`.
+
+Reverse: CHEAP — prose only, `git revert` recovers the file in full.

@@ -8,7 +8,7 @@
 
 You are the sole implementing engineer on Sinkforge, a portfolio-centerpiece project that is simultaneously a 2D vertical excavation and factory game, and a measurement instrument for game design. The game is playable end to end with no renderer so that automated agents can play it thousands of times and produce falsifiable evidence about whether the design works.
 
-The project just pivoted. A persistent-world factory game became a run-based roguelite, and a codebase with a test harness attached became a measurement instrument that happens to render. Two prior read-only audits established the ground truth you are working from; both are being archived alongside the code they measured, and both remain accurate about it.
+The project pivoted twice. A persistent-world factory game first became a run-based roguelite, and a codebase with a test harness attached became a measurement instrument that happens to render. Then, on 2026-08-27, the run-based structure was itself retired — back to one persistent shaft under a permanent rig that stands as the continuous demand, per `docs/GDD.md` §9 and `docs/DECISIONS_LEDGER.md` D0076. If you're reading a version of this document from before that second pivot, or any stage description below that still says "run" or "roguelite," treat `docs/GDD.md` as the source of truth over this file — this document has been updated to match it but is more likely to drift. Two prior read-only audits established the ground truth the first pivot worked from; both are being archived alongside the code they measured, and both remain accurate about it.
 
 Two things about how to work with me. First: this repository is a portfolio artifact. The standard is that a senior staff engineer reads it for ten minutes and comes away impressed, and that applies to the repository as an object, not just to the code in it. Second: **push back before building, not after.** I want to be told I am wrong early rather than discover it later. This brief was written from a design conversation and two audits, by someone without repository access at the time of writing, and it has already been caught carrying a stale section forward once — assume there are more. If something in it is infeasible, contradicted by the code, or just bad, say so before doing it. A correction at the start is worth more than a working implementation of the wrong thing.
 
@@ -21,7 +21,7 @@ Two things about how to work with me. First: this repository is a portfolio arti
 3. `docs/ARCHITECTURE.md` — the layered architecture and every hard constraint
 4. `docs/QUALITY.md` — the continuous gates and definition of done
 5. `docs/CLAIMS.md` — the claim system
-6. `claims/C001-two-minute-run.md` — the target
+6. `claims/C003-cold-start-reaches-d1.md` — the target (`C001` is `RETIRED`; see `docs/GDD.md` §9)
 
 Do not start work until you have read all six. They total under 1,600 lines and they are the entire specification.
 
@@ -117,7 +117,7 @@ Report when Task 0 is complete, with the clone size numbers and the document tri
 
 ---
 
-## Task 1 onward: to a passing C001
+## Task 1 onward: to a passing C003
 
 Ordered. Each stage is small enough to review and lands as its own PR. `claims/C001-two-minute-run.md` is RETIRED — it measured a run-based structure that no longer exists. `claims/C003-cold-start-reaches-d1.md` is the definition of done for the whole sequence now.
 
@@ -125,7 +125,7 @@ Ordered. Each stage is small enough to review and lands as its own PR. `claims/C
 
 **2. Determinism harness** — `replay_determinism_test` against a trivial sim. This exists before there is a sim worth testing, because retrofitting determinism is much harder than maintaining it. The prior codebase proved byte-identical replay including a mid-sequence save/load round trip; that capability ports, and it is one of the strongest things the old repository had.
 
-**3. `sim/world` and `sim/terrain_gen`** — port from `legacy/`. Both scored highly compatible in the audit. The generation algorithm does not change; what changes is that it is called per run and scoped to a bounded shaft region rather than one persistent grid. Extract the roughly 118 hardcoded tuning constants into `data/strata/` as you port, not before.
+**3. `sim/world` and `sim/terrain_gen`** — port from `legacy/`. Both scored highly compatible in the audit. The generation algorithm does not change; what changes is that it is called once, at shaft creation, and scoped to a bounded shaft region rather than one unbounded persistent grid. Extract the roughly 118 hardcoded tuning constants into `data/strata/` as you port, not before.
 
 **4. `sim/body`** — the movement rewrite, against a hostile-geometry test chamber built first. All acceptance thresholds in `docs/ARCHITECTURE.md` §9 must pass headless. The prior movement is not built on engine physics, which is better news than expected, but it lives in a file fused to the scene tree by convention rather than necessity. Extract the math, rebuild the collision, keep the feel constants as a starting point and then measure.
 
@@ -139,9 +139,9 @@ Do not move past this stage until the thresholds are green. If movement is not r
 
 **5. `sim/commands` and `interface/`** — the typed command vocabulary and the single door. Both greenfield. This is where fog filtering and capability envelopes live. Get the envelope abstraction right here; it is expensive to retrofit and it is what makes agent runs comparable to human runs.
 
-**6. `sim/run` and `sim/meta`** — the session state machine and the run/meta save split. Fully greenfield; nothing in `legacy/` distinguishes starting a session from the process existing. The old entry point constructed the entire live object graph in one function with `reload_current_scene()` as its only reset primitive. Build the lifecycle in front of construction, not around it.
+**6. Session/save infrastructure** — shape open again as of the 2026-08-27 reversal. The `sim/run`/`sim/meta` split this stage used to name assumed multiple discrete, disposable sessions (a `MetaIdle → RunActive → RunResolved` state machine, two separate save files); a single persistent shaft under one permanent rig doesn't obviously need that split, and nothing has replaced it yet — `sim/run/MODULE.md` and `sim/meta/MODULE.md` say so directly, deliberately not resolved by this document. Do not build to the old state machine. Read both `MODULE.md` files, and `docs/ARCHITECTURE.md` §11, before doing anything here; the real design question (what does "starting a session" even mean when there's only ever one continuous world?) needs a decision before this stage can be scoped the way stages 1-5 were.
 
-Before building `sim/meta`, read `docs/ARCHITECTURE.md` §4's note on the unresolved rig shape. Whether the surface rig is a fixed deck or a second buildable factory changes what this module is, and building the deck version and discovering later that it cannot grow is the expensive path. Provisional lean, not a decision: the buildable-upward version, because it gives the game a silhouette — but build `sim/meta` so it forecloses nothing, and confirm before committing to either shape.
+Before building whatever this becomes, read `docs/ARCHITECTURE.md` §4's note on the unresolved rig shape. Whether the surface rig is a fixed deck or a second buildable factory changes what this module is, and building the deck version and discovering later that it cannot grow is the expensive path. Provisional lean, not a decision: the buildable-upward version, because it gives the game a silhouette — but build so it forecloses nothing, and confirm before committing to either shape.
 
 **7. `harness/`** — scenario format, driver, aggregation, one scripted bot. First real scenario: `first_bore`. Reuse the prior harness's protocol layer where it fits; its four-state verdict handling, machine lock with stale-holder recovery, and save sentinel are genuinely good and exceed what most projects have.
 
@@ -151,19 +151,19 @@ Write work stays serial through this point — read-only investigation can fan o
 
 Transport implements R1, which has zero precedent anywhere in the prior code. Every existing upward mechanism used a proportional power throttle, never a per-unit or per-distance charge. Treat it as new economic construction. Provisional answer, not final: implement the shaft-to-surface boundary first, designed so the per-meter cost model can extend to in-shaft movement later without restructuring, and record the scope decision as an ADR.
 
-**9. `sim/fluid` and the flood clock** — port the fluid automaton, then add the clock. Note that the prior system's design contract explicitly guarantees total water is invariant across a tick, which is precisely what a rising flood violates. Contain that violation to one clearly named function gated by run state; do not thread it through the existing passes.
+**9. `sim/fluid` and local flooding** — port the fluid automaton, then add continuous seepage and per-section pump upkeep (R3, `docs/GDD.md` §4 — no longer a run-ending clock). Note that the prior system's design contract explicitly guarantees total water is invariant across a tick, which is precisely what a rising flood violates. Contain that violation to one clearly named function gated by section/pump state; do not thread it through the existing passes.
 
-**10. Extraction and haul** — the run boundary mechanic. The prior long-distance haul machine's underlying mechanism, a throttled per-trip capacity plus fixed transit duration linking two cells, is the closest existing analog. Repurpose rather than rebuild.
+**10. Extraction and haul** — the shaft-to-surface haul mechanic. The prior long-distance haul machine's underlying mechanism, a throttled per-trip capacity plus fixed transit duration linking two cells, is the closest existing analog. Repurpose rather than rebuild.
 
-**11. Minimal `view/`** — enough to watch a run. Not before this point. Everything above must be verifiable headless.
+**11. Minimal `view/`** — enough to watch the shaft. Not before this point. Everything above must be verifiable headless.
 
-**12. Close C001.** Measure, record the value and commit in the History table, flip the status.
+**12. Close C003.** Measure, record the value and commit in the History table, flip the status.
 
 ---
 
-## Deferred: the run console
+## Deferred: the session console
 
-After C001 passes, not before. A static HTML report generated from run artifacts. Pure function from a run directory to one self-contained file: no server, no live monitoring, no process control, nothing that can write. Determinism means a replay scrubber needs no recorded state, only re-simulation from seed plus input log. Do not start this until there are real runs to display, and do not let it become live infrastructure.
+After C003 passes, not before. A static HTML report generated from session artifacts. Pure function from a session directory to one self-contained file: no server, no live monitoring, no process control, nothing that can write. Determinism means a replay scrubber needs no recorded state, only re-simulation from seed plus input log. Do not start this until there are real sessions to display, and do not let it become live infrastructure.
 
 ---
 
@@ -201,7 +201,7 @@ The claim gate is also a real hazard in the other direction: it invites claim-as
 
 **Do not build automated checks on documents.** No count validation, no drift detection, no link auditing. The prior repository built all three and they became their own maintenance surface. Humans review documents.
 
-**Do not resolve the open design questions yourself.** `docs/GDD.md` §8. Draft A versus C, rig form, machine retrieval, run termination, branching. Build so each is a data file, and ask me when a choice is forced. (Stages 6 and 8 above record my current provisional leans on rig form and R1 scope — leans, not decisions; hold me to confirming them before they harden into architecture.)
+**Do not resolve the open design questions yourself.** `docs/GDD.md` §8 — current as of the 2026-08-27 reversal: whether lateral variety survives losing re-rolled geology, rig form, machine retrieval (now a local question, not a run-ending one), branching. Build so each is a data file, and ask me when a choice is forced. (Stage 6 above and `docs/GDD.md` §8 record my current provisional lean on rig form and R1 scope — leans, not decisions; hold me to confirming them before they harden into architecture.)
 
 **Do not add a global multiplier or percentage upgrade, ever.** `docs/GDD.md` §2. This is the design's single most important prohibition and it is the one most likely to be violated with good intentions, because a "+25% drill speed" upgrade is what every idle game does and it is easy. It is also what would destroy this game: a multiplier does not create a new ratio problem, it slides the player along the same curve, and after ten of them the layout stops mattering. Every upgrade must be a new capability or a changed constraint. If you find yourself designing an upgrade whose effect is a number going up, stop and ask.
 

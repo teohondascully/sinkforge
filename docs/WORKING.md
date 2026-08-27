@@ -49,9 +49,9 @@ Queue, one commit per document group so the diff stays reviewable (director's ex
       state" section) — excludes the lines already touched by commit 2. D0078. `CONTEXT.md` is
       274 lines against its own stated 250 budget — already 266 before this commit, flagged not
       fully fixed.
-- [ ] 4. `ONBOARDING.md` broader cleanup (stages 6/9/10, the deferred run-console section, Draft
+- [x] 4. `ONBOARDING.md` broader cleanup (stages 6/9/10, the deferred run-console section, Draft
       A/C references in "things I specifically do not want") — excludes the lines touched by
-      commit 2.
+      commit 2. D0079. Task 0's two historical `C001` mentions left untouched on purpose.
 - [ ] 5. `docs/ARCHITECTURE.md` §11 (save/run lifecycle state machine), the `run` module table
       row, §8's "Draft A versus Draft C is a data file" line, `docs/QUALITY.md`'s "a corrupt run
       save never takes down the meta save" line.
