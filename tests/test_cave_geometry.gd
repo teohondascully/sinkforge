@@ -35,17 +35,22 @@ func _col_center_x(col: int) -> int:
 	return col * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2
 
 
-## Drops a body from directly below the cave ceiling and lets it settle. `start_row=12` is not
-## arbitrary: the ceiling occupies rows [1,5) (`CAVE_CEILING_CLEARANCE_ROWS`), and a body spawned with
-## its own top still inside that -- row 6, the first naive guess -- overlaps solid rock at spawn, which
-## `_resolve_horizontal`'s depenetration pushes sideways every tick regardless of input (it isn't gated
-## on `vel_x != 0`), turning "drop straight down" into "drift sideways and fall past the section
-## entirely." Caught by watching per-tick `pos_x` drift with a debug probe before trusting a single
-## settle value -- exactly the kind of thing this file exists to catch happening for real, not assume
-## away. row 12 clears the ceiling with margin.
+## Drops a body from directly below the cave ceiling and lets it settle. The spawn row is not
+## arbitrary: the ceiling occupies rows [ceiling_bottom-4, ceiling_bottom) (`CAVE_CEILING_CLEARANCE_ROWS`
+## below `CAVE_FLOOR_ROW`), and a body spawned with its own top still inside that -- `ceiling_bottom+1`,
+## the first naive guess -- overlaps solid rock at spawn, which `_resolve_horizontal`'s depenetration
+## pushes sideways every tick regardless of input (it isn't gated on `vel_x != 0`), turning "drop
+## straight down" into "drift sideways and fall past the section entirely." Caught by watching per-tick
+## `pos_x` drift with a debug probe before trusting a single settle value -- exactly the kind of thing
+## this file exists to catch happening for real, not assume away. `ceiling_bottom+7` clears the ceiling
+## with margin -- expressed relative to `HostileChamber`'s own constants (D0055: this used to be the bare
+## literal `12`, tuned against the chamber's pre-margin row values; a hardcoded absolute row silently
+## stopped clearing the ceiling at all once `TOP_MARGIN_ROWS` shifted it, landing the body ON TOP of the
+## ceiling material instead of below it) so it survives any future shift the same way.
 func _settle(pos_x: int) -> Body:
 	var grid: TileGrid = HostileChamber.build()
-	var body: Body = Body.new(pos_x, Fx.from_int(12 * CELL))
+	var ceiling_bottom: int = HostileChamber.CAVE_FLOOR_ROW - HostileChamber.CAVE_CEILING_CLEARANCE_ROWS
+	var body: Body = Body.new(pos_x, Fx.from_int((ceiling_bottom + 7) * CELL))
 	for i: int in range(400):
 		body.tick(InputFrame.new(), grid)
 	return body

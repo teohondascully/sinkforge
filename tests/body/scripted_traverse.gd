@@ -18,10 +18,19 @@ const JUMP_RUNWAY_COLS: int = 3  ## columns before the pit's edge the policy pre
 static func next_input(body: Body, _grid: TileGrid) -> InputFrame:
 	var input: InputFrame = InputFrame.new()
 	input.move_dir = 1
-	input.jump_held = true
 	var col: int = Body._px_to_cell(body.pos_x)
+	# D0055: `jump_held` used to be asserted on EVERY tick, unconditionally -- not a deliberate
+	# "hold jump" policy, an oversight that meant `_handle_jump`'s variable-height cut never engaged
+	# at all (it fires only once `_was_jump_held` was true and `input.jump_held` goes false on a
+	# LATER tick), so every jump here ran full, uncut, to its measured ~18-cell apex. Scoping
+	# `jump_held` to the same tick as `jump_pressed` (a tap, not a hold) is both the mechanically
+	# appropriate choice for clearing a small horizontal gap -- height was never the pit's own
+	# requirement, distance was -- and what surfaced a real out-of-bounds launch this held-forever
+	# jump was quietly reaching every single run, previously invisible because nothing bounded the
+	# world at all (`docs/DECISIONS_LEDGER.md` D0055 has the full trace).
 	if col >= HostileChamber.PIT_START - JUMP_RUNWAY_COLS and col < HostileChamber.PIT_START and body.on_floor:
 		input.jump_pressed = true
+		input.jump_held = true
 	# The shaft is a pure vertical drop -- nothing about falling through it needs rightward progress, and
 	# holding right while airborne there only drifts the body into whichever confining wall is downstream
 	# of its entry point, generating wall contact the drop itself never asked for. Releasing it here isn't

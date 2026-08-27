@@ -99,3 +99,57 @@ static func report_floor_selection(grid: TileGrid, column: int, scan_from_row: i
 		v.pos_y = pos_y
 		push_error(v._to_string())
 	return v
+
+
+class BoundsViolation:
+	var left: int  ## Fx, all six fields
+	var top: int
+	var right: int
+	var bottom: int
+	var grid_max_x: int
+	var grid_max_y: int
+	var seed: int
+	var pos_x: int  ## Fx
+	var pos_y: int  ## Fx
+
+	func _to_string() -> String:
+		return ("Invariants: body's own box [%d,%d)x[%d,%d) extends outside the grid's own [0,%d)x" +
+			"[0,%d) -- left the world. seed=%d pos=(%d,%d)") % [left, right, top, bottom, grid_max_x,
+			grid_max_y, seed, pos_x, pos_y]
+
+
+## Second real check (D0055): whether the body's own AABB still fits inside the grid's declared
+## extent. Bounds are handed over as plain Fx values (`grid_min_x`/`grid_min_y`/`grid_max_x`/
+## `grid_max_y`), not a `TileGrid` plus a cell size, for the same reason `check_floor_selection`'s
+## callers hand over their own constants: this module has no reason to know `sim/body`'s pixel
+## scale or `Heightfield`'s cell size, only the box comparison itself. Found live, not by design
+## review: a chained auto-step-up/mantle (`body.gd::_try_step`, no bound of its own) launched a real
+## `--play` session's body to y=-15.85px, well above row 0 -- `docs/DECISIONS_LEDGER.md` has the
+## full root-cause trace. This is the diagnostic half of that fix: `body.gd` now also clamps the
+## body back inside the grid every tick (the actual fix), and this check exists so a FUTURE
+## regression that reopens some other path out of the world is still loud, not a silent clamp.
+static func check_bounds(grid_min_x: int, grid_min_y: int, grid_max_x: int, grid_max_y: int,
+		left: int, top: int, right: int, bottom: int) -> BoundsViolation:
+	if left >= grid_min_x and top >= grid_min_y and right <= grid_max_x and bottom <= grid_max_y:
+		return null
+	var v: BoundsViolation = BoundsViolation.new()
+	v.left = left
+	v.top = top
+	v.right = right
+	v.bottom = bottom
+	v.grid_max_x = grid_max_x
+	v.grid_max_y = grid_max_y
+	return v
+
+
+## Runs `check_bounds`, and if it fires, logs it -- same "log always, never assert" policy as
+## `report_floor_selection`.
+static func report_bounds(grid_min_x: int, grid_min_y: int, grid_max_x: int, grid_max_y: int,
+		left: int, top: int, right: int, bottom: int, seed: int, pos_x: int, pos_y: int) -> BoundsViolation:
+	var v: BoundsViolation = check_bounds(grid_min_x, grid_min_y, grid_max_x, grid_max_y, left, top, right, bottom)
+	if v != null:
+		v.seed = seed
+		v.pos_x = pos_x
+		v.pos_y = pos_y
+		push_error(v._to_string())
+	return v

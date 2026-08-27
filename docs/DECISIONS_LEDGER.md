@@ -1365,3 +1365,132 @@ Mutation-tested against three cases before trusting it: the exact incident (`ena
 `untyped_declaration` demoted from error (2) to warn (1), and the whole `[debug]` section missing — all
 three fail with the specific key/value that's wrong; the real, unmodified `project.godot` passes clean.
 Reverse: CHEAP — one new ~55-line script and one CI step; does not touch `project.godot` itself.
+
+## D0055 · 2026-08-26 · a real out-of-bounds launch, root-caused: uncapped mantle chaining, a scripted-policy bug, AND the chamber's own geometry having no headroom above row 0 — adds a bounds invariant and a reachability sweep
+Decided, in four parts, because the real bug had three independent causes and the director's directive
+had two deliverables:
+
+1. **`_try_step` (`sim/body/body.gd`) now refuses a lift that would put the body's own top above row 0**,
+checked BEFORE moving, not after. Auto step-up and mantle both call `_try_step`, and neither had ever
+been checked against the grid's own declared extent — holding move+jump+mantle against a wall chains
+repeated 8-row mantles with nothing capping how many fire in a row, which is exactly what the director's
+own play session hit (seed 20260825, pos=(42070016,-1038746), well above row 0). A post-hoc-only
+correction (clamp position after the fact, in a new `Invariants.check_bounds`/`_enforce_grid_bounds`)
+was tried first and rejected: clamping `pos_y` doesn't undo the horizontal wall-contact that triggered
+the mantle attempt, so the same attempt re-fires and re-clamps every following tick forever — measured
+directly, this stalled the real acceptance traversal for 258 ticks. Refusing the lift pre-emptively
+instead falls through to `_resolve_horizontal`'s own normal depenetration/stop path, exactly as if solid
+rock were there — no oscillation, because nothing ever moved in the first place.
+
+2. **`Invariants.BoundsViolation`/`check_bounds`/`report_bounds`** (`sim/invariants/invariants.gd`),
+built to the same architectural pattern as the existing `FloorSelectionViolation` guard — a pure,
+stateless check plus a `report_*` wrapper, bounds handed over as plain Fx values so the module stays
+agnostic of `sim/body`'s own scale constants. `Body._enforce_grid_bounds()` calls it as the last
+statement in `tick()`, rate-limited to one report per continuous excursion via a single boolean latch
+(`_had_bounds_violation` — simpler than D0052's (col,row) pair, since "still out of bounds" has no
+interesting distinct sub-cases), and unconditionally clamps the body back inside bounds regardless of
+whether it reports. This is the diagnostic-plus-safety-net half of the fix: part 1 above is what
+actually prevents a legitimate mantle chain from ever reaching the boundary; this is what catches any
+OTHER path (a plain unassisted jump, horizontal drift at the left edge) that could still reach it.
+
+3. **`ScriptedTraverse.next_input()` (`tests/body/scripted_traverse.gd`) had `jump_held = true` asserted
+unconditionally on every tick** — not a deliberate "hold jump" policy, an oversight. `Body._handle_jump`'s
+variable-height cut only engages once `_was_jump_held` was true and `input.jump_held` goes false on a
+LATER tick; with it always true, that transition never happens, so every scripted jump ran full, uncut,
+to its measured ~17.858-cell apex instead of the short tap a small gap-jump actually needs. This silently
+defeated the cut mechanic in every acceptance run to date AND was the direct cause of one of the two real
+bounds violations (the pit-area jump crossing row 0). Fixed by scoping `jump_held = true` to the same
+tick as `jump_pressed` — a tap, matching what clearing a horizontal gap actually needs (distance, not
+height).
+
+4. **`HostileChamber`'s own row constants had no headroom above row 0** (`tests/body/hostile_chamber.gd`),
+independent of any controller bug: `FLOOR_ROW - 4 - Body.MANTLE_PX / CELL` (the mantle's post-climb
+floor, row 8 unmargined) put a body just STANDING there — no chain, no held jump, nothing — with its own
+top at row -2, and the cave section's ceiling (`CAVE_FLOOR_ROW - CAVE_CEILING_CLEARANCE_ROWS`, rows
+[1,5) unmargined) sat one row from the same edge. Every row constant in the file was authored when row 0
+carried no special meaning (`TileGrid.is_solid` was a bare Dictionary lookup, unbounded in every
+direction) and never revisited once row 0 became a real wall. Fixed with one new `TOP_MARGIN_ROWS = 40`
+constant added to the four independent absolute-row anchors (`FLOOR_ROW`, `JUMP_CORNER_ROW`,
+`SHAFT_FLOOR_ROW`, `CAVE_FLOOR_ROW` — everything else in the file derives from these, so a uniform shift
+of all four preserves every relative distance in the chamber exactly). Sized against the worst case a
+*reachable* policy can produce, not just the scripted route's own short tap-jump: a fully held jump
+(~17.858-cell apex, re-measured fresh via a probe mimicking the corrected policy) launched from the
+shallowest floor in the traversal band must still clear row 0 with real margin, since part (b) below
+commits this chamber to a reachability sweep beyond the scripted path.
+
+`JUMP_CORNER_ROW` also needed repositioning, not just margin-shifting, for an unrelated reason exposed by
+fixing (3): it was tuned (`2`, an 18-row rise above `FLOOR_ROW`) against the OLD, buggy always-held jump's
+full ~18-cell apex — once (3)'s cut bug was fixed, the real apex rise dropped to ~4 cells (measured via a
+probe mimicking the corrected tap-jump exactly) and the corner tile was simply never reached anymore.
+`corner_correction_success_rate`'s own acceptance check had been unknowingly relying on the held-jump bug
+to be reachable at all. Repositioned to `6` (a 14-row rise), the corrected policy's own measured
+near-apex column/row, verified against the real chamber before setting.
+
+Two test-fixture bugs surfaced by the margin shift, both the same class as the chamber's own: absolute
+values hand-tuned against the pre-margin geometry, silently wrong once it moved.
+`tests/test_cave_geometry.gd::_settle()` spawned bodies at the bare literal row `12` ("clears the ceiling
+with margin") — once the ceiling moved to rows [41,45), row 12 was now WAY above it, and the body fell
+onto the ceiling's own top as a floor instead of past it into the tunnel. Fixed by deriving the spawn row
+from `HostileChamber.CAVE_FLOOR_ROW`/`CAVE_CEILING_CLEARANCE_ROWS` instead of a bare number.
+`tests/test_hostile_chamber.gd` had seven `Heightfield.column_surface_y(grid, col, 0, 40)` calls — a
+hardcoded `(0, 40)` scan window sized against the old `FLOOR_ROW` (20); once `FLOOR_ROW` became 60, every
+floor these tests measure fell outside the window, so every column returned the same "nothing found"
+sentinel (5 failures, all reading "got 0px" or "got 1 distinct height" — not a real absence, an
+out-of-window scan). Fixed with one `SCAN_ROWS = HostileChamber.FLOOR_ROW + 10` constant replacing the
+literal at all seven sites.
+
+**(b) The reachability-sweep extension** (`tests/test_reachability_sweep.gd`,
+`tests/fixture_aggressive_sweep_probe.gd`): the director's own framing — "the chamber's TRAVERSAL PATH
+and the chamber's REACHABLE SPACE are different sets, and only the first is tested... if a player can get
+somewhere, the suite should go there" — is a real gap the golden `ScriptedTraverse` alone can never close,
+since by design it only ever exercises its own narrow scripted route. New suite runs a policy that holds
+right, re-presses jump on every grounded tick, and holds mantle continuously for 3000 ticks across the
+chamber's full built width (through the cave section, not just `ScriptedTraverse`'s own `END_START`
+stopping point), asserting zero bounds-violation reports in the subprocess's own stderr (same
+subprocess+stderr-grep pattern as D0052's rate-limit test, since `push_error` can't be counted
+in-process). This is additive to, not a replacement for, `test_bounds_invariant.gd`'s existing pinned
+repros (the real shaft wall, sustained left-edge pressure) — those prove the guard at two specific
+spots; this sweeps the level.
+
+Mutation-testing finding, disclosed rather than papered over: `test_bounds_invariant.gd`'s existing
+pinned "real shaft wall" test (built before this session, spawns at `SHAFT_START - 1` and holds
+move+jump+mantle) stays GREEN even with both part-1's `_try_step` refusal AND part-2's
+`_enforce_grid_bounds` call fully disabled — verified directly, not assumed. Cause: that wall is only
+~32 rows tall, shorter than `TOP_MARGIN_ROWS` (40), so the wall's own finite height, not either fix, is
+what stops that particular chain from crossing row 0 now. `docs/QUALITY.md` §2's own documented failure
+class ("a guard whose trigger condition normal execution rarely reaches will survive being deliberately
+broken") — exactly this. Added a new, margin-independent test
+(`_test_a_staircase_of_short_ledges_cannot_be_chain_mantled_past_the_top`): a synthetic 40-step mantle
+staircase (each step exactly `MANTLE_PX` above the last, spanning 320 rows from a floor at row 100) that
+an uncapped chain would carry deep negative — verified directly (disabling both fixes reaches top row
+~-14; with both restored, the body climbs 12 steps and correctly halts at top row 2, never crossing 0).
+The old pinned test is kept — it's still a real, valuable regression pin on the actual reported incident —
+with its own comment now explaining why it's mutation-insensitive to the general defect.
+
+All 15 suites (13 pre-existing plus the two new ones) verified green together, not just individually, both
+before and after every fix in this entry.
+
+Reverse: MODERATE. `_try_step`'s refusal and `_enforce_grid_bounds` are additive (new checks, no existing
+behavior removed) and cheap to revert. `HostileChamber`'s `TOP_MARGIN_ROWS` shift touches every row
+constant in the fixture — reverting it would require re-deriving `JUMP_CORNER_ROW`'s position again (it's
+now tied to the corrected jump's own measured apex, not an arbitrary number) and would resurface the
+`test_cave_geometry.gd`/`test_hostile_chamber.gd` fixture bugs this entry fixed, since those fixes are
+now expressed relative to the margined constants.
+
+**Addendum, found while getting this entry's own changes gate-clean:** `body.gd`'s new comments pushed
+it to 426 lines (`docs/QUALITY.md` gate 3, limit 400) and, while trimming them back down,
+`tools/layer_lint/check_size_limits.py` reported `_resolve_floor()` at 53-65 lines across several trims
+— a function this entry never touched. Cause, verified by reading the checker: its function-length
+counter attributed EVERY blank/comment line to the PRECEDING function unconditionally, before checking
+what followed — so `_enforce_grid_bounds`'s own multi-line leading doc-comment, sitting directly after
+`_resolve_floor`'s closing brace, counted entirely against `_resolve_floor` instead of the function it
+documents. `_resolve_floor`'s real body is 48 lines, under the limit; this was always a latent
+false-positive, just never triggered before nothing had placed a long doc-comment directly after it.
+Fixed: a run of blank/comment lines now only extends a function's counted length if a later,
+deeper-indented real line proves it was genuinely interior or trailing — otherwise it belongs to
+whatever follows. Mutation-tested in both directions: a genuinely 56-line function is still correctly
+flagged (positive control unaffected); a genuinely-3-line function followed by an 8-line doc-comment for
+the next function no longer inflates to 11 (the exact false-positive class, now fixed). Full gate re-run
+confirms no other file in the tree was affected either way. `body.gd` itself: comments trimmed to exactly
+400 lines (the file-size limit, not exceeding it) without cutting any of the WHY content the D0055 root
+cause and fix decisions above depend on.

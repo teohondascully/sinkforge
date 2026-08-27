@@ -1,6 +1,6 @@
 # Quality Standard
 
-**Status:** normative. **Last revised:** 2026-08-25. **Replaces:** the A+ Program.
+**Status:** normative. **Last revised:** 2026-08-26. **Replaces:** the A+ Program.
 
 ---
 
@@ -58,6 +58,8 @@ Every gate is CI-enforced. A PR that fails any gate does not merge. No gate is l
 21. **Public API documented.** Every symbol in a module interface file has a doc comment stating contract and invariants.
 22. **Generated data records are fresh.** Every `data/<kind>/generated.gd` matches what `tools/data_codegen/generate.py` would produce right now from its `data/<kind>/*.yaml` source. `tools/data_codegen/generate.py --check`, `docs/adr/0004-data-codegen.md`. Appended here rather than inserted near gate 13 ("Schema") — several gate scripts cite their own number in their own docstrings, and renumbering would make those citations wrong; gate numbers are addresses, same reason `docs/DECISIONS_LEDGER.md` entries are.
 23. **`docs/WORKING.md` is not stale.** Its stated "Last updated" date is not older than `HEAD`'s own commit date. `tools/layer_lint/check_working_freshness.py`. A proxy, not a guarantee — a session can bump the date without saying anything true — but it catches the specific, common failure of commits landing on top of a working-tree summary nobody touched.
+24. **The body never leaves the grid.** Its own collision box stays inside the grid's declared `[0,width)x[0,height)` extent every tick, not just along `HostileChamber`'s scripted traversal route. `tests/test_bounds_invariant.gd`, `docs/DECISIONS_LEDGER.md` D0055. Appended here rather than near gate 11 ("Movement acceptance suite") for the same reason gate 22 sits here — gate numbers are addresses.
+25. **Movement acceptance covers the chamber's full reachable extent, not only the scripted route.** A real out-of-bounds launch found in play was invisible to gate 11's own scripted-input run because the traversal path and the reachable space are different sets. `tests/test_reachability_sweep.gd`, `docs/DECISIONS_LEDGER.md` D0055.
 
 ---
 

@@ -11,8 +11,10 @@
   be one.
 
 Function boundaries are found by indentation: a `func` line at indent N ends
-at the next line at indent <= N that is not blank/comment, or EOF. This is
-GDScript's actual block-scoping rule, so it is exact, not a heuristic.
+at its LAST line at indent > N, or EOF. A run of blank/comment lines is only
+attributed to the function if a deeper-indented real line follows it (proving
+it was interior or trailing) -- otherwise it's the next function's own
+leading doc-comment, not this one's tail.
 """
 import re
 import sys
@@ -40,24 +42,34 @@ def indent_of(line: str) -> int:
 
 
 def function_spans(lines: list[str]):
-    """Yields (name, start_line_1idx, length) for each top-level or nested func."""
+    """Yields (name, start_line_1idx, length) for each top-level or nested func.
+
+    A blank/comment line only extends the span if a LATER line at deeper indent proves it was
+    genuinely interior (or trailing) to this function's own body -- otherwise it's the next
+    function's own leading doc-comment and must not be attributed here. Found live: a multi-line
+    doc-comment for `_enforce_grid_bounds` was landing entirely on `_resolve_floor`'s own count, since
+    the original version counted every blank/comment line unconditionally before checking what came
+    after it. `docs/QUALITY.md` §2's "a gate is only as good as its pattern list" applies to
+    line-attribution as much as to a name list.
+    """
     for i, line in enumerate(lines):
-        stripped = line.strip()
         m = FUNC_NAME_RE.match(line)
         if not m:
             continue
         name = m.group(1)
         base_indent = indent_of(line)
-        length = 1
-        for j in range(i + 1, len(lines)):
+        last_real_offset = 0
+        j = i + 1
+        while j < len(lines):
             nxt = lines[j]
             if nxt.strip() == "" or nxt.strip().startswith("#"):
-                length += 1
+                j += 1
                 continue
             if indent_of(nxt) <= base_indent:
                 break
-            length += 1
-        yield name, i + 1, length
+            last_real_offset = j - i
+            j += 1
+        yield name, i + 1, last_real_offset + 1
 
 
 def main() -> int:

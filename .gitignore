@@ -176,3 +176,6 @@ _diag_*.png.import
 # The README explaining the directory's purpose is tracked; everything else in it is not.
 tools/scratch/*
 !tools/scratch/README.md
+
+# Python bytecode cache, regenerated automatically by every gate script's own interpreter.
+__pycache__/

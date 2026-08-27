@@ -194,3 +194,9 @@ jobs:
 
       - name: test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
         run: ./godot --headless --path . --script res://tests/test_body_acceptance.gd
+
+      - name: test_bounds_invariant (QUALITY gate 24 — body never leaves the grid)
+        run: ./godot --headless --path . --script res://tests/test_bounds_invariant.gd
+
+      - name: test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
+        run: ./godot --headless --path . --script res://tests/test_reachability_sweep.gd

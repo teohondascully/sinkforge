@@ -5,6 +5,21 @@ extends "res://tests/test_base.gd"
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 
+## D0055: raised from 10. `body.gd::_enforce_grid_bounds()` (the bounds invariant's own fix) now
+## refuses to let the body's box cross row 0; at floor_row=10 a resting body's own TOP edge sat at
+## EXACTLY row 0 (10 - HEIGHT_PX/CELL/2 x2 = 0), so any jump at all -- even one cut short after a
+## single tick -- immediately tripped the new guard and zeroed vel_y before
+## `_test_variable_jump_cut_on_release` ever saw its own cut math take effect. 40 leaves 30 rows of
+## real headroom above the resting top, comfortably past a full held jump's measured ~18-cell apex.
+const TEST_FLOOR_ROW: int = 40
+
+## D0055: replaces `Fx.from_int(0)` as this file's "start high, fall and settle" spawn row.
+## `Body.HEIGHT_PX/CELL/2` (5) is the shallowest row whose body's own TOP edge is not already past
+## row 0 before it ever takes a single tick -- spawning at row 0 put a fresh body's top at row -5,
+## tripping `_enforce_grid_bounds` immediately on every affected test even though nothing was
+## actually wrong; correct (rate-limited, non-fatal) but pure noise in an otherwise-clean run.
+const TEST_SPAWN_ROW: int = Body.HEIGHT_PX / Heightfield.TERRAIN_CELL_PX / 2
+
 
 func _initialize() -> void:
 	_test_falls_and_rests_on_flat_floor()
@@ -31,21 +46,21 @@ func _idle_input() -> InputFrame:
 
 
 func _test_falls_and_rests_on_flat_floor() -> void:
-	var grid: TileGrid = _flat_grid(10, 20)
-	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(0))
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(200):
 		body.tick(_idle_input(), grid)
 	_check(body.on_floor, "a body given 200 ticks to fall settles on the floor")
 	_check(body.vel_y == 0, "vel_y is exactly zero at rest (got %d)" % body.vel_y)
-	var expected_bottom: int = Fx.from_int(10 * CELL)
+	var expected_bottom: int = Fx.from_int(TEST_FLOOR_ROW * CELL)
 	_check(body._bottom_y() == expected_bottom,
 		"resting body's feet are exactly at the floor surface (got %d, want %d)" %
 		[body._bottom_y(), expected_bottom])
 
 
 func _test_jump_from_ground_within_2_ticks() -> void:
-	var grid: TileGrid = _flat_grid(10, 20)
-	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(0))
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)
 	_check(body.on_floor, "settled before the jump test begins")
@@ -65,12 +80,14 @@ func _test_jump_from_ground_within_2_ticks() -> void:
 
 func _test_coyote_time_allows_a_late_jump() -> void:
 	# Body starts exactly at the floor, already resting, then walks off the edge of a one-column shelf
-	# (no floor beyond column 10) and jumps a few ticks after leaving it -- inside COYOTE_TICKS.
-	var grid: TileGrid = TileGrid.new(30, 30, 1)
+	# (no floor beyond column 10) and jumps a few ticks after leaving it -- inside COYOTE_TICKS. Floor
+	# row matches TEST_FLOOR_ROW's own D0055 reasoning above (this test builds its own grid rather
+	# than using `_flat_grid`, since it also needs the shelf to end at a specific column).
+	var grid: TileGrid = TileGrid.new(30, TEST_FLOOR_ROW + 5, 1)
 	for col: int in range(0, 11):
-		for row: int in range(10, 13):
+		for row: int in range(TEST_FLOOR_ROW, TEST_FLOOR_ROW + 3):
 			grid.set_material(Vector2i(col, row), &"hardrock")
-	var body: Body = Body.new(9 * CELL * Fx.SCALE + CELL * Fx.SCALE / 2, Fx.from_int(0))
+	var body: Body = Body.new(9 * CELL * Fx.SCALE + CELL * Fx.SCALE / 2, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)
 	_check(body.on_floor, "settled on the shelf before walking off it")
@@ -91,11 +108,11 @@ func _test_coyote_time_allows_a_late_jump() -> void:
 
 
 func _test_jump_buffer_allows_an_early_jump() -> void:
-	var grid: TileGrid = _flat_grid(10, 20)
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
 	# A few px above the resting height -- close enough that landing happens well inside the 6-tick
 	# jump-buffer window, which is the case this mechanic actually exists for ("pressed just before
 	# landing"), not an arbitrarily distant fall.
-	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(10 * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE - 3 * Fx.SCALE)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE - 3 * Fx.SCALE)
 	var jump: InputFrame = InputFrame.new()
 	jump.jump_pressed = true
 	jump.jump_held = true
@@ -112,14 +129,18 @@ func _test_jump_buffer_allows_an_early_jump() -> void:
 func _test_auto_step_up_one_tile_ledge() -> void:
 	# A one-tile-high step at column 10, with three clear tiles of headroom above it -- exactly the
 	# "1 tile, no input, when blocked and the cell above is clear" case from docs/ARCHITECTURE.md §9.
-	var grid: TileGrid = TileGrid.new(30, 30, 1)
+	# Width 100, not 30 (D0055): 120 ticks of held rightward walking can cover ~75 cells at top
+	# speed, and `body.gd::_enforce_grid_bounds()` now stops the body dead at the grid's own right
+	# edge -- a real, generally-correct behavior that turned this test's own narrow floor into a
+	# spurious "left the world" report on a walk this fixture never expected to run that far.
+	var grid: TileGrid = TileGrid.new(100, 30, 1)
 	for col: int in range(0, 10):
 		for row: int in range(11, 14):
 			grid.set_material(Vector2i(col, row), &"hardrock")
-	for col: int in range(10, 30):
+	for col: int in range(10, 100):
 		for row: int in range(10, 14):
 			grid.set_material(Vector2i(col, row), &"hardrock")
-	var body: Body = Body.new(5 * CELL * Fx.SCALE, Fx.from_int(0))
+	var body: Body = Body.new(5 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)
 	_check(body.on_floor, "settled on the lower shelf")
@@ -164,8 +185,8 @@ func _test_ceiling_is_not_treated_as_a_step_up_ledge() -> void:
 
 
 func _test_ground_accel_reaches_top_speed_in_8_ticks() -> void:
-	var grid: TileGrid = _flat_grid(10, 20)
-	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(0))
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)  # settle first
 	var walk: InputFrame = InputFrame.new()
@@ -178,8 +199,8 @@ func _test_ground_accel_reaches_top_speed_in_8_ticks() -> void:
 
 
 func _test_variable_jump_cut_on_release() -> void:
-	var grid: TileGrid = _flat_grid(10, 20)
-	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(0))
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)
 	var jump: InputFrame = InputFrame.new()

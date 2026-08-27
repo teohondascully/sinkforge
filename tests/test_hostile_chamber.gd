@@ -5,6 +5,14 @@ extends "res://tests/test_base.gd"
 ## docs/DECISIONS_LEDGER.md D0036 has the layout reasoning this checks against.
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
+## D0055: this used to be the bare literal `40` at every call site below -- sized against the chamber's
+## pre-margin `FLOOR_ROW` (20), comfortably past every floor this file measures (all <= FLOOR_ROW). Once
+## `TOP_MARGIN_ROWS` shifted `FLOOR_ROW` (and everything derived from it -- the ledge, mantle, and
+## machine-cluster floors this file reads) deeper, a hardcoded `40` silently stopped covering any of
+## them: every scan found nothing in-window and returned the same "no floor" sentinel for every column,
+## which is why `before - after` read 0 and "at least 2 distinct heights" read 1 -- not a real absence,
+## an out-of-window scan. Expressed relative to `HostileChamber.FLOOR_ROW` so it survives the next shift.
+const SCAN_ROWS: int = HostileChamber.FLOOR_ROW + 10
 
 
 func _initialize() -> void:
@@ -32,8 +40,8 @@ func _test_1_tile_pit_present() -> void:
 
 func _test_1_tile_ledge_present() -> void:
 	var grid: TileGrid = HostileChamber.build()
-	var before: int = Heightfield.column_surface_y(grid, HostileChamber.LEDGE_START - 1, 0, 40)
-	var after: int = Heightfield.column_surface_y(grid, HostileChamber.LEDGE_START, 0, 40)
+	var before: int = Heightfield.column_surface_y(grid, HostileChamber.LEDGE_START - 1, 0, SCAN_ROWS)
+	var after: int = Heightfield.column_surface_y(grid, HostileChamber.LEDGE_START, 0, SCAN_ROWS)
 	var rise: int = before - after
 	_check(rise == Fx.from_int(Body.LOGIC_TILE_PX),
 		"the ledge rises exactly one logic tile (%dpx, got %dpx)" %
@@ -44,7 +52,7 @@ func _test_rubble_is_jagged_and_actually_dug() -> void:
 	var grid: TileGrid = HostileChamber.build()
 	var heights: Array[int] = []
 	for col: int in range(HostileChamber.RUBBLE_START, HostileChamber.RUBBLE_END):
-		heights.append(Heightfield.column_surface_y(grid, col, 0, 40))
+		heights.append(Heightfield.column_surface_y(grid, col, 0, SCAN_ROWS))
 	var distinct: Dictionary = {}
 	for h: int in heights:
 		distinct[h] = true
@@ -72,10 +80,10 @@ func _test_machine_cluster_present() -> void:
 	# The baseline is the section's OWN plateau height, read from a column outside the cluster's own
 	# span -- sampling a cluster column's height directly would just report the protrusion's own row as
 	# "the floor," since is_solid() doesn't distinguish a protrusion from ordinary ground.
-	var baseline: int = Heightfield.column_surface_y(grid, HostileChamber.MACHINE_CLUSTER_START, 0, 40)
+	var baseline: int = Heightfield.column_surface_y(grid, HostileChamber.MACHINE_CLUSTER_START, 0, SCAN_ROWS)
 	var found: bool = false
 	for col: int in range(HostileChamber.MACHINE_CLUSTER_START + 1, HostileChamber.MACHINE_CLUSTER_END - 1):
-		var here: int = Heightfield.column_surface_y(grid, col, 0, 40)
+		var here: int = Heightfield.column_surface_y(grid, col, 0, SCAN_ROWS)
 		if here < baseline:  # smaller Fx y == higher up == protruding above the plateau
 			found = true
 	_check(found, "at least one column in the machine-cluster span protrudes above its own floor level")
@@ -98,8 +106,8 @@ func _test_jump_corner_present() -> void:
 
 func _test_mantle_step_present() -> void:
 	var grid: TileGrid = HostileChamber.build()
-	var before: int = Heightfield.column_surface_y(grid, HostileChamber.MANTLE_START - 1, 0, 40)
-	var after: int = Heightfield.column_surface_y(grid, HostileChamber.MANTLE_START, 0, 40)
+	var before: int = Heightfield.column_surface_y(grid, HostileChamber.MANTLE_START - 1, 0, SCAN_ROWS)
+	var after: int = Heightfield.column_surface_y(grid, HostileChamber.MANTLE_START, 0, SCAN_ROWS)
 	var rise: int = before - after
 	_check(rise == Fx.from_int(Body.MANTLE_PX),
 		"the mantle step rises exactly two logic tiles (%dpx, got %dpx) -- taller than STEP_UP_PX (%dpx), so only a mantle hold clears it" %

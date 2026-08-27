@@ -109,9 +109,21 @@ own real coverage gap (its window could not see the case it was built to catch).
 
 ## Current stage
 
-**Stage 4, steps (a)-(g), CLOSED and reported. Holding here per the director's explicit "stop after (g)"
-instruction** — rope (step e) is deliberately not started; it has no acceptance criteria yet and the
-director wants to play the bare controller first, in a session they're present for. To play it:
+**Post-(g), director-directed round: "fix 1" (root-cause the out-of-bounds glitch, add a bounds
+invariant, sweep the chamber's full reachable extent) is CLOSED — D0055 above. Next per the director's
+explicit "fix 1 first, then 2" ordering: item 2, legibility from the screenshots** — distinct flat
+colors for solid rock / excavated space / out-of-grid, a toggleable 4px grid overlay, camera zoom so the
+chamber fills more of the frame with the body kept centered, and resolving whether the stray up-left
+cell in three of the four screenshots is an intentional marker or a stray tile. Items 3 (document the
+red/yellow airborne-vs-grounded body-state color in `play_scene.gd`'s own docstring) and 4 (one gotchas
+line about the `Input.parse_input_event`/`flush_buffered_events` quirk) follow. Rope (step e) remains
+explicitly not started — "rope still not started" was restated in the same message that assigned this
+round.
+
+**Stage 4, steps (a)-(g), CLOSED and reported earlier this session.** Holding at (g) per the director's
+explicit "stop after (g)" instruction — rope (step e) is deliberately not started; it has no acceptance
+criteria yet and the director wants to play the bare controller first, in a session they're present for.
+To play it:
 `godot --path . tests/body/play_scene.tscn -- --play`. Controls: Left/Right or A/D to move, Space to
 jump (hold for full height, tap for a short hop), Up/W held while moving toward a ledge for
 `mantle_hold`. The session ends and writes its recording to `tests/body/recordings/play_<timestamp>.log`
@@ -301,15 +313,20 @@ Registered in CI alongside the other nine structural gates (now ten). Mutation-t
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
 
-**Discovery, not yet acted on: the director's first real `--play` session hit a jump glitch that put
-the body out of bounds, and the invariants guard caught it live.** Reported stderr: `body resolved to
-floor row 1 in column 160/161/162/163/164..., seed=20260825 pos=(42070016,-1038746)` — decoding
-`pos_y=-1038746` gives **-15.85px**, meaning the body's own centre was above row 0, above the top of
-the entire generated grid, while `pos_x` placed it at column 160 — right at `HostileChamber.END_COL`
-(the scripted traversal never goes there; this is real human input finding a real out-of-bounds state
-past where the acceptance suite drives). The rate-limiter (D0052) is doing exactly its designed job
-here, not misbehaving: a fresh report per DISTINCT column as the body swept rightward through many of
-them while stuck in the anomalous state, not 60 reports/sec of the same one — the volume is real
-because the glitch is real (something launched the body somewhere it should never physically reach,
-possibly at high velocity), not because rate-limiting failed. Not investigated further — the director
-said to hold, and whatever else comes back from the play session decides what happens next.
+**Closed (D0055): the jump-glitch out-of-bounds launch, root-caused to THREE independent causes, not
+one.** (1) `Body._try_step` (auto step-up and mantle) had no cap on chained lifts against a wall —
+fixed with a pre-emptive top-boundary refusal, checked before moving. (2) `ScriptedTraverse` asserted
+`jump_held = true` unconditionally every tick, an oversight that silently defeated the variable
+jump-height cut in every acceptance run to date and was the direct cause of the pit-area violation —
+fixed by scoping it to the jump-press tick only (a tap, not a hold). (3) `HostileChamber`'s own row
+constants had no headroom above row 0 at all — a body just STANDING on the mantle's intended post-climb
+floor, no bug involved, already had its own top two rows past the boundary — fixed with a uniform
+`TOP_MARGIN_ROWS = 40` shift across the fixture's four independent row anchors. Also added:
+`Invariants.check_bounds`/`report_bounds` plus `Body._enforce_grid_bounds()` (a real, tested safety net
+for any OTHER path to the boundary), and `tests/test_reachability_sweep.gd` (the director's second
+ask: sweep the chamber's full reachable extent, not just the scripted route — closes the actual gap the
+glitch exposed, that traversal-path coverage and reachable-space coverage are different sets). All 15
+suites green together; every new guard mutation-tested, including one honest negative finding (the
+pre-existing pinned "shaft wall" test turned out to be mutation-insensitive after the margin shift,
+since that wall is shorter than the new margin — disclosed and fixed with a margin-independent
+synthetic staircase test, not silently left green). Full reasoning: `docs/DECISIONS_LEDGER.md` D0055.

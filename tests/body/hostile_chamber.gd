@@ -9,7 +9,23 @@ extends RefCounted
 ## All terrain columns; `FLOOR_ROW` is where the spawn platform sits. One logic tile (`Body.LOGIC_TILE_PX`,
 ## 16px) is 4 terrain columns -- section widths below are stated in both for readability.
 
-const FLOOR_ROW: int = 20
+## Real, measured margin above row 0 -- `TileGrid`'s own declared top edge, the world's physical surface
+## in the game's fiction (the bore-model lore: nothing exists above the crust the cannon bored through).
+## Every row constant below was originally authored with row 0 carrying no special meaning --
+## `TileGrid.is_solid` was a bare Dictionary lookup with no bounds check, so grid coordinates were
+## effectively unbounded in every direction and nothing here needed headroom. D0055's bounds invariant
+## (`sim/invariants/invariants.gd`) makes row 0 a real wall for the first time, and the chamber's OWN
+## intended geometry -- not a scripted-route bug -- already violated it: a body just standing still on
+## the mantle's post-climb floor (unmargined, `FLOOR_ROW - 4 - Body.MANTLE_PX / CELL` = row 8) has its
+## top edge at row -2, two rows past the boundary, before it has moved at all; the cave section's ceiling
+## (unmargined, rows [1,5)) was one row from the same edge. This margin is sized against the worst case a
+## *reachable* policy can produce, not just the scripted route's own tap-jump: a fully HELD jump (~17.858
+## cells apex rise, measured) launched from the shallowest floor in the traversal band (the mantle's own
+## post-climb floor) must still clear row 0 with real margin, since D0055 also commits this chamber to a
+## reachability sweep beyond the scripted path.
+const TOP_MARGIN_ROWS: int = 40
+
+const FLOOR_ROW: int = 20 + TOP_MARGIN_ROWS
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 
 ## Section boundaries (terrain-column indices), in traverse order. Each is the FIRST column of its
@@ -38,7 +54,17 @@ const POST_PIT_RUNWAY_COLS: int = 24
 ## verified traversal, only presence, which is why the acceptance suite -- not the presence check -- is
 ## what caught it.
 const JUMP_CORNER_COL: int = 15
-const JUMP_CORNER_ROW: int = 2
+## D0055: repositioned. This was `2` (an 18-row rise above `FLOOR_ROW`), tuned against the OLD, buggy
+## `ScriptedTraverse` that held jump every tick and so never engaged the variable-height cut -- every
+## jump ran full, uncut, to its measured ~17.858-cell apex, and this corner was placed to graze THAT
+## arc. Once the cut bug was fixed (`jump_held` scoped to the press tick, a tap, not a hold) the real
+## apex rise dropped to ~4 cells (measured via a fresh probe mimicking the corrected policy exactly:
+## move right + a one-tick jump hold from a standing start) -- the corner's own acceptance check
+## (`corner_correction_success_rate`) was itself unknowingly relying on the held-jump bug to reach this
+## tile at all, and stopped passing the moment that bug was fixed. `6` (an 14-row rise) is that same
+## probe's measured apex column (~14-15, landing almost exactly on `JUMP_CORNER_COL`) and near-apex row,
+## re-verified against the real chamber + `ScriptedTraverse` before this constant was set.
+const JUMP_CORNER_ROW: int = 6 + TOP_MARGIN_ROWS
 const LEDGE_START: int = 36 + POST_PIT_RUNWAY_COLS        ## hard 1-tile (16px) step UP -- auto step-up
 const PLATEAU_START: int = 40 + POST_PIT_RUNWAY_COLS
 const RUBBLE_START: int = 56 + POST_PIT_RUNWAY_COLS       ## jagged, actually-dug surface -- 1-3px sub-pixel rubble slopes
@@ -61,7 +87,7 @@ const SHAFT_OPEN_COLS: int = 28
 const SHAFT_END: int = SHAFT_START + SHAFT_WALL_COLS * 2 + SHAFT_OPEN_COLS
 const SHAFT_OPEN_START: int = SHAFT_START + SHAFT_WALL_COLS  ## the actual open (fall-through) columns,
 const SHAFT_OPEN_END: int = SHAFT_OPEN_START + SHAFT_OPEN_COLS              ## not the section's outer bound
-const SHAFT_FLOOR_ROW: int = 32
+const SHAFT_FLOOR_ROW: int = 32 + TOP_MARGIN_ROWS
 const END_START: int = SHAFT_END
 const END_COL: int = SHAFT_END + 16
 
@@ -73,7 +99,7 @@ const END_COL: int = SHAFT_END + 16
 ## connected back to the tunnel by a gap in the shelf -- reachable from the side, not a sealed bubble,
 ## matching the shape the measured 0.85%/12% figures describe.
 const CAVE_START: int = END_COL
-const CAVE_FLOOR_ROW: int = 20
+const CAVE_FLOOR_ROW: int = 20 + TOP_MARGIN_ROWS
 const CAVE_CEILING_CLEARANCE_ROWS: int = 15  ## > Body.HEIGHT_PX / CELL (10) -- a normally walkable tunnel
 const CAVE_TUNNEL_COLS: int = 8
 const CAVE_OVERHANG_COLS: int = 4    ## the shelf: floor-height material with nothing below it in reach

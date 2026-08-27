@@ -90,6 +90,8 @@ var _was_jump_held: bool = false
 var _last_violation_col: int = -1
 var _last_violation_row: int = -1
 
+var _had_bounds_violation: bool = false  ## D0052 pattern again: one excursion latch, no sub-cases
+
 ## Per-tick telemetry, read once by the caller and not cleared automatically -- the caller (the
 ## acceptance driver) resets what it needs each tick. Exists so the acceptance suite can count events
 ## without `body.gd` knowing anything about scenarios, metrics, or telemetry schemas.
@@ -168,6 +170,7 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	# touch-and-go: the position this tick is still correctly on the ground, only next tick's
 	# integration reflects the jump.
 	_handle_jump(input)
+	_enforce_grid_bounds(grid)
 
 	_coyote_ticks_left = COYOTE_TICKS if on_floor else maxi(0, _coyote_ticks_left - 1)
 	_jump_buffer_ticks_left = maxi(0, _jump_buffer_ticks_left - 1)
@@ -218,7 +221,13 @@ func _handle_jump(input: InputFrame) -> void:
 ## Auto step-up (1 tile) and mantle (2 tiles): raise the body by `lift` if the space it would occupy at
 ## that height is clear. Both call this identically -- the only difference is which caller allows a
 ## larger `lift` and under what input condition, per docs/ARCHITECTURE.md §9.
+##
+## D0055: refuses a lift crossing row 0, BEFORE moving -- correcting after the fact alone left the body
+## oscillating forever against the same wall (measured: 258 ticks); this falls through to the normal
+## depenetration/stop path instead, as if solid rock were there.
 func _try_step(grid: TileGrid, lift: int) -> bool:
+	if _top_y() - lift < 0:
+		return false
 	if _box_blocked(grid, _left_x(), _top_y() - lift, _right_x(), _bottom_y() - lift):
 		return false
 	pos_y -= lift
@@ -361,3 +370,31 @@ func _resolve_floor(grid: TileGrid) -> bool:
 	vel_y = 0
 	on_floor = true
 	return true
+
+
+## World boundary, not terrain -- D0055 has the root cause. Called last in `tick()`. Reports via
+## `Invariants` (rate-limited, D0052's pattern) BEFORE correcting -- silent clamping would hide this.
+func _enforce_grid_bounds(grid: TileGrid) -> void:
+	var grid_max_x: int = grid.width * CELL_PX * Fx.SCALE
+	var grid_max_y: int = grid.height * CELL_PX * Fx.SCALE
+	var violation: Invariants.BoundsViolation = Invariants.check_bounds(
+		0, 0, grid_max_x, grid_max_y, _left_x(), _top_y(), _right_x(), _bottom_y())
+	if violation == null:
+		_had_bounds_violation = false
+	elif not _had_bounds_violation:
+		Invariants.report_bounds(0, 0, grid_max_x, grid_max_y,
+			_left_x(), _top_y(), _right_x(), _bottom_y(), grid.seed, pos_x, pos_y)
+		_had_bounds_violation = true
+	if _left_x() < 0:  # correction itself is never rate-limited
+		pos_x = (WIDTH_PX * Fx.SCALE) / 2
+		vel_x = maxi(vel_x, 0)
+	elif _right_x() > grid_max_x:
+		pos_x = grid_max_x - (WIDTH_PX * Fx.SCALE) / 2
+		vel_x = mini(vel_x, 0)
+	if _top_y() < 0:
+		pos_y = (HEIGHT_PX * Fx.SCALE) / 2
+		vel_y = maxi(vel_y, 0)
+	elif _bottom_y() > grid_max_y:
+		pos_y = grid_max_y - (HEIGHT_PX * Fx.SCALE) / 2
+		vel_y = 0
+		on_floor = true
