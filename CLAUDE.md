@@ -5,7 +5,7 @@ Auto-loaded every session, including after compaction. Its only job is to point 
 ## Every session
 
 1. Read, in order: `CONTEXT.md` → `docs/GDD.md` → `docs/ARCHITECTURE.md` → `docs/QUALITY.md` →
-   `docs/CLAIMS.md` → `claims/C001-two-minute-run.md` → `docs/WORKING.md`.
+   `docs/CLAIMS.md` → `claims/C003-cold-start-reaches-d1.md` → `docs/WORKING.md`.
 2. If this is a fresh session or you just resumed from a compaction: run `/handoff` before touching
    anything.
 3. Before reporting to the director: run `/wrap`.

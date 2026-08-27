@@ -2828,3 +2828,20 @@ here — the failure mode named above is specifically what happens when that ste
 trusts the list over the source it describes.
 
 Reverse: N/A — a record entry, not an action with a cost to undo.
+
+---
+
+## D0084 · 2026-08-27 · CLAUDE.md — the auto-loaded reading order pointed at retired C001
+
+Decided: `CLAUDE.md`'s "Every session" reading order named `claims/C001-two-minute-run.md`, unfixed since
+before this whole reversal effort started — found by an independent external audit, not by either of the
+two prior sweeps of this project's own documentation. Fixed to `claims/C003-cold-start-reaches-d1.md`.
+Landed alone, first, per the director's explicit ordering: this file is auto-loaded every session
+including this one, so it misleads the next reader before anything else in the corpus gets a chance to
+correct it.
+
+This is the concrete instance behind the ledger-wide finding recorded separately this round (see the
+entry after the sim/*/MODULE.md group): a sweep is bounded by what the sweeper thought to check, and
+`CLAUDE.md` — the single most-read file in the repository — was never in either sweep's own list.
+
+Reverse: CHEAP — one line, `git revert` recovers it.
