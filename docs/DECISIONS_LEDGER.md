@@ -2460,3 +2460,103 @@ candidate opening for `.anvil/README.md`'s eventual full composition, not writte
 
 Reverse: N/A — a `FINDING` event, append-only. The underlying test fixtures are already fixed (D0069's
 own commit); this entry records the finding, not an action with its own cost to undo.
+
+---
+
+## D0076 · 2026-08-27 · docs/GDD.md — the run-based roguelite retired, the rig replaces it as the consumer
+
+**The decision itself is the director's, made in chat before this entry.** The run-based structure (one
+disposable shaft per session, the run itself as the material sink) is retired. Replaced by one persistent
+shaft under one permanent rig, the rig standing as a continuous consumer that wants specific material per
+unlock. Full reasoning: the director's brief and the review that preceded it (this session's transcript).
+This entry covers the judgment calls made *executing* that decision in `docs/GDD.md`, not the decision to
+make it.
+
+**§1.** "The terrain is the factory" moved here from §2's now-retired roguelite subsection, as a
+standalone, run-independent claim — the director's own correction to my first pass at the edit, which
+would have deleted it by association with the roguelite framing it used to sit inside. Only the
+run-dependent clause ("fresh geology every run") died with the move.
+
+**§2.** "From roguelites" removed entire (bounded sessions, meta-progression-via-runs, the fresh-geology
+argument now living in §1/§8). Added one line noting the synthesis is now two genres, not three, so a
+reader doesn't wonder where the third one went.
+
+**§3.** Rewritten around the director's own correction, verbatim in spirit: the original diagnosis
+(persistent = no demand) was right; the run-based fix was wrong by one word (it was persistence that got
+blamed, not terminal products). "The rig is the consumer" replaces "the run itself is the sink."
+
+**§4 R3.** Renamed and rewritten — "Run length is a purchased resource" (a countdown) becomes "Water is
+continuous upkeep, not a countdown." Kept the original's three arguments for why a physical flood beats a
+literal timer (they don't depend on runs existing), rescoped from a run-ending event to a local,
+per-section one, consistent with §3's "submerged machines are wrecked, recovered as scrap."
+
+**§5.** Dropped the "starting depth and loadout" currency row and its whole prestige subsection (dead —
+there's no "next run" to start deeper into). Rewrote the two-currencies paragraph to the director's exact
+correction: material buys verbs via rig demands, artifacts via ruins, a dive run becomes an "expedition."
+Idle-loop subsection: surgical removal of "between every run including the two-minute ones" only, per
+explicit instruction — everything else in that subsection, including "run cadence" two sentences later,
+stays verbatim as directed, even though it is arguably also stale. Narrower is what was asked for.
+
+**§6.** Depreciation rewritten in full, not patched — the original was stated entirely in run-minutes
+("at minute 8... at minute 33"). New version is flood-risk-relative: is a build past the current pump
+wall, and does it pay back before the water reaches it. Same argument, different clock, per the
+director's own framing.
+
+**§7.** Four bullets rewritten: run→persistent, "fresh shaft into a different part"→one shaft (full
+rewrite, not a word swap — the whole bullet's "lateral variety without relocating the base" argument
+depended on multiple shafts and has no referent with one), "score is the surface bin"→"progress is demand
+satisfied," and the Sinkforge-stratum paragraph's "same depth no matter where the shaft was bored"
+mechanical justification dropped (kept the lore, per instruction — "a stratum has no location" doesn't
+need to do mechanical work anymore, there's only one shaft to place it under). The matching "same depth
+under every shaft" clause in §11's table was the same claim recurring in a second location; dropped for
+the same reason, not separately instructed but the identical case. "No zeroes" retired outright — no run
+to be worth nothing.
+
+**§8.** Added the honest open question the director specifically asked for: lateral variety now depends
+on the un-mined extent of one world, not re-rolled geology, and whether that's enough is unverified.
+Machine retrieval reworded, not retired, per the director's correction — the underlying tension (pull a
+machine before its section floods) resurfaced under local, non-terminal flooding, and killing the
+question with the run structure would have silently lost it. Run cadence (Draft A/C) and run termination
+retired outright — no run to have a cadence or a termination.
+
+**§9.** New entry naming the run-based-roguelite structure dead, using the director's own dictated text
+verbatim (their instruction gave the exact string, dated 2026-08-28 — `date` confirms today is actually
+2026-08-27, the project's known systemic off-by-one-day pattern, not corrected here since the text was
+dictated to be inserted as given). Folded in the "constraint variety survives as a one-line note" instruction
+as a coda on the same entry rather than a separate one. Added one cross-reference sentence to the existing
+"Sinkforge as continuous consumer" entry, distinguishing it from the new top-of-shaft consumer, since a
+reader hitting that older entry cold would otherwise wonder whether the new rig-as-consumer idea is the
+same thing being reintroduced.
+
+**§10.** Worked sketch rewritten from Run 1/8/9 to Hour 1/5/12, per the director's own explicit
+instruction in the original brief (not something I inferred) — same beats (first demand met, first
+automated line, first real flood cost), same "same shape at a different scale" closing line.
+
+**§11.** "Deepest layer reached is the hard gate" (a second, separate meta-progression gate) dropped —
+it's now implicit in what a demand requires, per the director's instruction that this become implicit
+rather than an explicit second gate. The "run 3 / run 9" illustrative pair in "layers are rule sets, not
+destinations" was not explicitly named in the edit list but is the identical pattern to §7's rewritten
+bullets (an illustration that depended on multiple runs existing) — rewritten as "early on" / "much
+later" in the same shaft's own history rather than left stale by omission.
+
+**§12, §13.** Untouched, confirmed via a full re-read after editing — neither references runs, scores, or
+the flood clock anywhere.
+
+**Two places deliberately left untouched despite carrying stale run-language, flagged here rather than
+silently fixed:** §2's "From factory games" ("Factorio earns depth from forty hours of recipe graph. A
+forty-minute run cannot...") and §4 R2's ruled-out alternative ("...turns every run that fails to reach
+depth into a zero..."). Both sit inside spans the director named explicitly, twice, as "keep verbatim" —
+once in the original brief, once by not being revisited in the corrections reply. Fixing them anyway would
+have been the same mistake the review this entry follows from was written to catch: touching text outside
+an explicit instruction's scope. Left for the director to decide whether they're worth a follow-up edit or
+acceptable as historical residue.
+
+Alternative, for the entry as a whole: interpret "keep verbatim" and the edit instructions more liberally
+and fix every stale reference encountered while in the file. Rejected — the director corrected exactly
+this kind of scope inference twice already this session (the §5 idle-loop contradiction, my own overreach
+on "unlock cadence must be decoupled from run cadence" caught and reverted before this entry was written);
+narrow execution of what was actually asked, with everything else flagged rather than assumed, is the
+established and confirmed-correct discipline for this task.
+
+Reverse: CHEAP — prose only, no code or schema touched, `git revert` recovers the pre-reversal document
+in full.

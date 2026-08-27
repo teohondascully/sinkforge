@@ -8,6 +8,70 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## Design reversal — run-based roguelite to persistent single shaft, 2026-08-27
+
+Director-authored, verbatim scope. The run-based structure is retired; the rig becomes the
+continuous consumer, fed by a permanent single shaft that never resets. Full reasoning in the
+director's brief (this session's transcript) and the review that preceded it. `data/economy/`
+(the actual demand content) is explicitly next session's work — **stop before it**.
+
+Six corrections from the director's reply to the review, all to apply during the GDD edit:
+
+1. D2-anti-vacuity rule restated in reachability terms (not layer terms) — verbatim wording from
+   the director, goes in `data/economy/README.md` *when that file is written*, not this round.
+2. "The terrain is the factory" moves to §1 as a standalone, run-independent claim; only the
+   run-dependent clause ("fresh geology every run") dies. New honest open question in §8: lateral
+   variety now comes from the un-mined extent of one world, not re-rolled geology — unverified.
+3. §5 idle-loop subsection: drop "between every run [including the two-minute ones]" only, keep
+   the rest verbatim.
+4. §6 depreciation and §7's "fresh shaft into a different part" bullet are full rewrites, not
+   one-line patches — both were run-minutes/runs-plural end to end.
+5. Machine retrieval is NOT retired — reworded as a local question (pull a machine from a section
+   about to flood, before the water reaches it) rather than deleted with run termination.
+6. `claims/C001-two-minute-run.md` is RETIRED, not edited in place — its title, falsifiable form,
+   metric, and threshold are bounded-run constructs. Replacement is an episode claim per the
+   checkpoint-lineage idea (§4 of the brief): cold start, does a scripted bot reach D1 within N
+   sim-minutes. File BLOCKED, `blocked_on` naming everything that doesn't exist yet (no save/load
+   code anywhere, no `interface/`, no `harness/`, no `sim/commands`, no `data/economy/`,
+   determinism proven only against `core/` + a stub sim, never a real session).
+
+Queue, one commit per document group so the diff stays reviewable (director's explicit ask):
+
+- [x] 1. `docs/GDD.md` — the full edit (§1 through §11, per the reviewed-and-corrected §6 list),
+      plus ledger entries for judgment calls made executing it (exact wording choices, not
+      whether to make the change). D0076. Two spots left deliberately stale (§2 "forty-minute
+      run", R2's "every run that fails") — inside explicit "keep verbatim" spans, flagged not
+      fixed.
+- [ ] 2. `claims/C001-two-minute-run.md` RETIRED + new episode claim filed BLOCKED, plus the two
+      narrow "C001 is the definition of done" lines in `CONTEXT.md` and `ONBOARDING.md` — same
+      commit, per explicit instruction.
+- [ ] 3. `CONTEXT.md` + `README.md` broader cleanup (roguelite language, R3 restated, "current
+      state" section) — excludes the lines already touched by commit 2.
+- [ ] 4. `ONBOARDING.md` broader cleanup (stages 6/9/10, the deferred run-console section, Draft
+      A/C references in "things I specifically do not want") — excludes the lines touched by
+      commit 2.
+- [ ] 5. `docs/ARCHITECTURE.md` §11 (save/run lifecycle state machine), the `run` module table
+      row, §8's "Draft A versus Draft C is a data file" line, `docs/QUALITY.md`'s "a corrupt run
+      save never takes down the meta save" line.
+- [ ] 6. `sim/run`/`sim/meta`/`sim/commands` `MODULE.md` — the run/meta split assumed multiple
+      discrete sessions. Zero lines of code exist under any of the three, confirmed. Mark the
+      split as explicitly open/TBD rather than inventing a replacement architecture myself — that
+      is a real design question (`ONBOARDING.md`: "do not resolve the open design questions
+      yourself").
+
+**Explicitly not touched this round, flagged not fixed:** `docs/DECISIONS_LEDGER.md` D0017's
+reasoning (aquifers/rifts cut partly because they "assumed a persistent explorable world")
+partially inverts now — the director did not ask for this to be revisited and reviving cut
+content is a real design call, not mine to make unprompted. The 11 non-normative `docs/*.md`
+files with "edited for the run-based pivot" headers (`LODE.md`, `BITS.md`,
+`CONTENT_CATALOG_PLAN.md`, `EXPERIENCE_EVALUATION.md` among them) likely need a second pass —
+already deferred to step 6's manifest gate, not new scope.
+
+**Dating note:** the director's own dictated §9 text is stamped 2026-08-28; `date` confirms today
+is actually 2026-08-27. Using the director's exact string verbatim in §9 (it was given as exact
+text to insert), the verified date everywhere else this session writes in its own voice — same
+off-by-one-day pattern already flagged elsewhere in this file, not a new problem.
+
 ## Overnight queue — ANVIL steps 1-2, 2026-08-27
 
 Fixed by the director verbatim, mid-session, per the "multi-item task lands in WORKING.md before work
@@ -58,8 +122,9 @@ External audit of ANVIL itself. Director's order: items 1-5 land, report, step 3
 **HARD STOP crossed, flagged, then resolved by the director as scope growth against a stale cap, not an
 overrun — D0074.** Cap raised 800 → 1,000 for steps 1-2, now counts IMPLEMENTATION LOC only (test LOC
 reported separately, uncapped, since mutation coverage is exactly the code this project should not
-discourage). Current measured split: implementation 504 / test 420 / total 924. 2,000 total budget
-unchanged, 1,078 lines of headroom for steps 3-9.
+discourage). Current measured split: implementation 513 / test 420 / total 933 (corrected 2026-08-27: the D0074
+count predated .anvil/README.md's own D0075 paragraph landing in the same commit). 2,000 total budget
+unchanged, 1,067 lines of headroom for steps 3-9.
 
 - [x] Item 1 (D0074 policy part 1): cap raised, `DECISION` event logged.
 - [x] Item 2 (D0074 policy part 2): implementation/test split adopted as the standing report shape.

@@ -1,6 +1,6 @@
 # Game Design Document
 
-**Status:** normative. **Last revised:** 2026-08-25 (pivot). **Supersedes:** the archived `GDD.md`, `PROGRESSION.md`, `BAZAAR.md`, `MATERIAL_SPINE.md`, `LODE_PLAN.md`, `DIRECTOR_BRIEF.md`.
+**Status:** normative. **Last revised:** 2026-08-27 (second pivot: run-based roguelite retired, back to a persistent single shaft — see §9). **Supersedes:** the archived `GDD.md`, `PROGRESSION.md`, `BAZAAR.md`, `MATERIAL_SPINE.md`, `LODE_PLAN.md`, `DIRECTOR_BRIEF.md`.
 
 This document holds the design state. It is deliberately explicit about what is decided, what is open, what is dead, and what has already been ruled out and why. That last category matters most: several of the dead ideas are the obvious first answer to a real problem, and without a record they get reinvented within weeks.
 
@@ -10,14 +10,16 @@ This document holds the design state. It is deliberately explicit about what is 
 
 ## 1. Premise
 
-**Sinkforge is a factory game with a roguelite structure and an idle game's progression curve.**
+**Sinkforge is a factory game with a persistent underground shaft and an idle game's progression curve.**
 
-The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, hauls refined material back up, and surfaces before the shaft floods. The shaft is lost. The material is spent on the rig, which extends and deepens the next run.
+The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, and hauls refined material back up to satisfy demands waiting at the rig. There is no reset: the shaft the player is digging today is the same shaft they started on, deeper and more built-out than it was an hour ago. Satisfying a demand unlocks the next capability — a tool, a machine, access to a harder material — which is what lets the shaft go deeper still.
 
-Two factories exist and they do different jobs:
+One shaft, one permanent rig, and they do different jobs:
 
-- **The shaft factory is disposable and different every run.** Chutes, drills, forges, pumps, built fast under a clock, lost when the run ends. This is the logistics puzzle.
-- **The surface rig is permanent and never lost.** It processes what you haul up and is optimized across dozens of runs. This is the long game.
+- **The shaft is where the factory lives.** Chutes, drills, forges, pumps — built once, extended as depth demands more, never discarded wholesale. This is the logistics puzzle, and it only gets more contended as it grows.
+- **The rig is the standing consumer.** It sits at the top, wants specific material in specific quantity per unlock, and is what turns "keep digging" into a reason rather than a default. This is what makes the factory necessary in the first place.
+
+**The terrain is the factory.** The shape you dig is the routing — an aquifer where you wanted your main chute, a shale band eight tiles thick instead of two, ore forty meters further than the last vein. This is true regardless of whether the shaft resets; it never depended on runs, and it is the project's central identity claim (`CONTEXT.md` quotes it directly). What no longer holds is the claim that used to sit next to it — that every playthrough reshuffles the geology. There is one shaft now, so the terrain surprises the player exactly once, laterally, as they dig into ground nobody has touched yet. See §8 for the honest open question that leaves.
 
 The emotional fantasy: descend into an unknown underground world and build the infrastructure that lets you reach places and resources you could not handle alone. An embodied engineer, not an omniscient factory planner.
 
@@ -31,6 +33,8 @@ The emotional fantasy: descend into an unknown underground world and build the i
 
 This section exists because the premise alone does not constrain enough. Each parent genre contributes something specific and each contributes something that must be refused.
 
+**Two parent genres now, not three.** The roguelite lens — bounded sessions, run-to-run variety, the push-your-luck ending — is retired along with the run structure it described; see §9. What it was doing that still matters (constraint-driven variety, the terrain being the actual routing problem) moved to §1 and §9 rather than disappearing with it.
+
 ### From factory games
 
 **Take:** ratio puzzles, throughput bottlenecks, the satisfaction of a line that runs without you, legible material flow through physical space.
@@ -38,18 +42,6 @@ This section exists because the premise alone does not constrain enough. Each pa
 **Refuse:** recipe-tree depth as the source of complexity. Factorio earns depth from forty hours of recipe graph. A forty-minute run cannot, so depth has to come from somewhere structurally different. See §6.
 
 **Refuse:** planar routing. In Factorio, if two things need a belt you build a second belt, because space is free. Here everything shares a few vertical lines and contention is the puzzle.
-
-### From roguelites
-
-**Take:** bounded sessions, procedural variety, meta-progression, the push-your-luck moment at the end of a run.
-
-**Refuse:** run-to-run randomness as the only variety. After fifteen runs the geology stops surprising anyone. Long-tail variety comes from **constraints**, not content: one modifier per shaft (this one floods fast, no fuel above 50m, hard rock starts early). Each is an afternoon of work and they compose. Constraint variety beats content variety by an order of magnitude in cost per hour of play.
-
-**The reason roguelite structure fits this game specifically, and does not fit factory games generally:** in most factory games terrain barely matters. Ore patches are a rounding error against a flat infinite plane, which is exactly why nobody has made a good roguelite Factorio: randomizing the map does not change your build.
-
-**Here the terrain is the factory.** The shape you dig is the routing. So procedural geology directly rewrites your layout every run: ore at 60m on the left instead of 30m on the right, an aquifer where you wanted your main chute, a shale band eight tiles thick instead of two. You cannot run the same build twice.
-
-That is the differentiator. Not gravity by itself. **Gravity plus procedural excavation means the layout problem is fresh every run.**
 
 ### From idle games
 
@@ -63,13 +55,15 @@ There is no upgrade in Sinkforge whose effect is to multiply an existing rate. S
 
 ---
 
-## 3. Why the pivot happened
+## 3. Why the pivot happened, and why the first fix was wrong
 
 The previous design was a persistent world whose only material sink was a one-time descent gate. The game is therefore structurally complete the moment the first automated line exists, roughly fifteen minutes in. Every observed symptom (no reason to descend, machines with no motivating pain, a shop showing fifteen options before the player wants any) was downstream of that single absence.
 
 An independent source-derived analysis in the prior repository reached the same diagnosis from the code side: the mid-tier production chain was a dead end and one material had become a de facto universal currency. Two independent paths to the same conclusion is the strongest evidence available that the read was correct.
 
-The run-based structure supplies the missing demand without inventing a new sink: **the run itself is the sink.** Everything built inside a shaft is spent to reach depth, and the shaft is lost.
+**That diagnosis was right, and the fix that followed it was wrong by one word: the old game did not fail because it was persistent, it failed because its products were terminal.** The run-based structure supplied the missing demand, but it did so by deleting the factory every few minutes rather than by giving the factory somewhere to send its output. That is a fix that happens to work, not the actual cause treated.
+
+**The rig is the consumer.** It sits at the top, wants specific material in specific quantity, and answers "then what?" the way Factorio's science packs do — a demand that always wants more, and wants new kinds as the player goes deeper. Nothing has to be lost to make that demand real; it has to be satisfied.
 
 ---
 
@@ -95,15 +89,15 @@ Ruled out: roughly 5x value per layer. It makes shallow material worthless, stra
 
 **Implementation note.** No value or price concept existed in the prior data model. R2 is greenfield recipe-quantity design.
 
-### R3. Run length is a purchased resource
+### R3. Water is continuous upkeep, not a countdown
 
-The rig's pump capacity determines how long a shaft holds before flooding. Session length becomes diegetic and progression legible, and run length grows from very short to long without a menu-unlocked timer.
+Groundwater seeps into every excavated section, always. Pump capacity is infrastructure the player builds and maintains, not a one-time purchase that buys more minutes before an ending. A well-pumped section stays dry indefinitely. A starved one floods, and the machines in it are wrecked — recovered as scrap at a fraction of their value, not simply lost.
 
-**Why the flood and not a timer.** A literal timer that unlocks from 15 to 40 minutes reads as artificial and feels like being told to stop playing. Water rising from below ends the run for a physical reason the player can push back against with infrastructure. It also gives the design several things at once: pumping is a continuous fuel sink that scales with depth, depth becomes a real decision rather than a formality, and a rising waterline in a cross-section shaft is the game's best screenshot.
+**Why upkeep and not a timer.** A literal timer that unlocks longer sessions reads as artificial and feels like being told to stop playing. Water rising for a physical reason the player can push back against with infrastructure is still the right mechanism — it no longer forces play itself to end, it forces a *section* to be defended or written off. Pumping stays a continuous fuel sink that scales with depth, depth stays a real decision rather than a formality, and a section fighting its own waterline is still the game's best screenshot.
 
-**Water kills machines, not the player.** It rises from the bottom, so it eats the factory from the bottom up, which means the deepest, richest, most expensive production is always the first thing lost. That tension curve is automatic and it is the right one. Diving below the waterline to grab one last thing is a voluntary risk that needs no health system.
+**Water kills machines, not the player.** It rises from the bottom of whatever section is under-pumped, so it eats that section's factory from the bottom up, which means the deepest, richest, most expensive production in a given section is always the first thing at risk. That tension is local and continuous now rather than a single curve per run, which is the right shape for something that never ends. Diving into a rising section to grab one last thing, or to pull a machine out before it drowns, is a voluntary risk that needs no health system.
 
-**Implementation note.** The prior fluid system's design contract explicitly guarantees total water is invariant across a tick. A flood clock is a controlled source. Contain that violation to one clearly named function gated by run state; do not thread it through the existing passes.
+**Implementation note.** The prior fluid system's design contract explicitly guarantees total water is invariant across a tick. Local flooding is a controlled source. Contain that violation to one clearly named function gated by section/pump state; do not thread it through the existing passes.
 
 ### R4. Every tool tier removes one skill and introduces another
 
@@ -117,23 +111,12 @@ This is what gets twenty hours out of eight machines, and it is the mechanical e
 
 ## 5. Meta-progression
 
-Three axes. None of them is a multiplier.
+Two axes. Neither is a multiplier.
 
 | Axis | Currency | Effect |
 |---|---|---|
-| Starting depth and loadout | Material | Compresses the early run |
 | Verbs | Artifacts | Changes what layouts are possible |
 | Surface rig | Material | Offline processing, the idle hook |
-
-### Starting depth is the prestige bar
-
-Run 1: you start at the surface with nothing and spend six minutes hand-mining topsoil.
-Run 5: you start with a pre-sunk 40m shaft, a forge already lit at the bottom, one drill in your pack. Those six minutes are gone.
-Run 9: you start at 100m with a working two-drill line and a chute already running to the surface bin. Your run begins where run 1 ended.
-
-That is prestige structure applied to a factory, and it delivers the idle-game feeling without touching a single ratio. The layout puzzle stays intact because the puzzle just moved deeper.
-
-**Starting deep compresses content, it does not skip it.** Riding the rig's bore past your old depths at speed is the prestige feeling. Deleting the shallow layers from play is not.
 
 ### Verbs, not tiers
 
@@ -147,9 +130,9 @@ Two notes on specific families. **Body upgrades** (pack size, dig speed, climb s
 
 ### The two currencies do different jobs
 
-Material buys capacity. Artifacts, found in deep ruins, unlock verbs.
+Material buys verbs, through rig demands: deliver what is asked for, unlock the next capability. Artifacts, found in deep ruins, unlock verbs too, through a different door.
 
-This creates a second viable strategy rather than one optimal line. Sometimes mining straight down *is* correct: you spot a ruin at 140m, skip extraction entirely, sprint, grab the schematic, take a terrible material score, and come back with a new verb unlocked. That is a **dive run**, and it has a real cost rather than being a degenerate exploit, because you still need drills to punch through hard rock to get there.
+This creates a second viable strategy rather than one optimal line. Sometimes mining straight down *is* correct: you spot a ruin at 140m, skip everything you could have extracted on the way, sprint, and grab the schematic instead. That is an **expedition** — a dive without building, trading a haul's worth of material for a verb you would otherwise wait on. It has a real cost rather than being a degenerate exploit, because you still need drills to punch through hard rock to get there.
 
 ### The idle loop
 
@@ -157,7 +140,7 @@ The surface rig processes raw material on a real clock while you are not playing
 
 Capped deliberately: uncapped offline production teaches players to wait instead of dig, which is the opposite of what this game wants.
 
-**Unlock cadence must be decoupled from run cadence.** Three separate clocks so something is always resolving: purchases between every run including the two-minute ones, artifacts found mid-run that apply immediately, and rig construction that completes on its own schedule. A structure where the player waits two hours for one dopamine event is a structure that loses the player.
+**Unlock cadence must be decoupled from run cadence.** Three separate clocks so something is always resolving: purchases, artifacts found mid-run that apply immediately, and rig construction that completes on its own schedule. A structure where the player waits two hours for one dopamine event is a structure that loses the player.
 
 ---
 
@@ -167,7 +150,7 @@ A forty-minute factory cannot earn depth the way a forty-hour one does. Three so
 
 **The spine.** A vertical factory is a sequence, not a plane. Everything shares the same few vertical lines, so every new consumer at 90m contends with everything below it, and contention worsens as you descend rather than staying flat. Contention on a shared spine is a genuinely different puzzle from planar routing. This is the strongest mechanical asset in the design and it is currently unexploited.
 
-**Depreciation.** Infrastructure has a lifespan, because water is coming for it from below. Every build decision is therefore an investment question: *will this drill pay back its fuel and my two minutes before it drowns?* At minute 8 a deep drill is a great investment. At minute 33 the same drill is resource you should have spent hauling. No factory game asks this, because their structures are permanent and therefore always worth building. This turns a build order into an economics problem whose answer changes minute to minute.
+**Depreciation.** Infrastructure has a lifespan wherever local water pressure outruns local pump capacity, because water is always coming for it from below. Every build decision is therefore an investment question: *is this drill deep enough to be at real flood risk, and will it pay back its fuel before the water reaches it?* A drill placed just past the current pump wall is a great investment. The same drill three unpumped sections deeper is resource that should have been spent hauling instead. No factory game asks this, because their structures are permanent and therefore always worth building. This turns a build order into an economics problem whose answer changes with how far the pump wall has been pushed, not with a clock.
 
 Note that this property depends on whether machines can be carried out (see §8, open). Full retrieval collapses the calculus entirely.
 
@@ -183,19 +166,17 @@ Note that this property depends on whether machines can be carried out (see §8,
 
 Decided. Treat as requirements.
 
-**Run-based, not persistent world.** A session is a bounded expedition with a defined end.
+**Persistent, one shaft.** There is no session boundary and no reset. The shaft the player is digging today is the same shaft they started on.
 
-**One permanent rig over one enormous sinkhole.** Each run bores a fresh shaft into a different part of it. New geology every run without a fiction for terrain regeneration; lateral variety without relocating the base.
+**One permanent rig over one shaft.** The rig sits over a single bore that deepens and widens as the player digs. No fiction is needed for terrain regeneration, because nothing regenerates — the shaft is exactly what has been excavated, once, and stays that way.
 
-**Material, not score.** A run's output is physical material delivered to the surface, spent as material. No abstract points, no currency, no shop. If you haul forty iron up, you have forty iron.
+**Material, not score.** What reaches the surface is physical material, spent as material. No abstract points, no currency, no shop. If you haul forty iron up, you have forty iron.
 
-**Two currencies.** Material buys capacity. Artifacts unlock verbs. Nothing else.
+**Two currencies.** Material buys verbs, through rig demands. Artifacts unlock verbs too, through ruins. Nothing else.
 
-**Score is what is in the surface bin when the run ends.** Not what was mined, not what is in a chute. What actually arrived. The throughput of the haul chain *is* the score rate.
+**Progress is demand satisfied.** Not what was mined, not what is in a chute. What actually arrived at the rig and was consumed by a demand. The throughput of the haul chain is what drives that progress.
 
-**No zeroes.** Pack contents are always kept. No run in a bounded-session game should be worth nothing; that is how players are lost permanently.
-
-**The Sinkforge is a stratum, not an object.** At the bottom of every shaft, at the same depth no matter where the shaft was bored, the player breaks through into a manufactured plane: machined metal extending past view in every direction, no center and no edges. It is the bottom of the world, and it is built. A stratum has no location, so every shaft finds it — a machine at a single point could not work once different runs bore different parts of the sinkhole. It has been consuming the crust from underneath for a long time: that is the sinkhole's origin, and the reason deposits get richer with depth — every run has been mining its collection. It takes no action during a run. Its one interaction is the ending: it is the only material nothing in the toolset can cut, so the final unlock is not a better drill but a breach built from deep material, and the last run is the one that goes through.
+**The Sinkforge is a stratum, not an object.** At the bottom of the shaft, the player breaks through into a manufactured plane: machined metal extending past view in every direction, no center and no edges. It is the bottom of the world, and it is built. It has been consuming the crust from underneath for a long time — that is the sinkhole's origin, and the reason deposits get richer with depth: everything below has been in its collection longer. Its one interaction is the ending: it is the only material nothing in the toolset can cut, so the final unlock is not a better drill but a breach built from deep material, and reaching it is the endgame. It takes no action before then.
 
 **No combat, no enemies, no health bar.** Danger is environmental and systemic. Scope decision as much as design decision.
 
@@ -205,23 +186,11 @@ Decided. Treat as requirements.
 
 Do not architect around a specific answer. Each must be expressible as configuration or data. If switching would require touching logic, that is a design leak and should be reported.
 
-**Run cadence: Draft A or Draft C.** The largest open question.
-
-*Draft A, escalating runs.* Length grows with purchased pump capacity: roughly 2, 3, 5, 8, 12, 18, 25, 35, 42 minutes across about nine runs, roughly two to three hours total. Sketch of the intended shape: first ingot around minute five of total playtime, first machine placed on the rig around minute eight, first automation in the shaft around minute twenty-five after roughly five separate purchases. Front-loaded reward cadence, which matters enormously: a fixed forty-minute structure delivers one progression event in the time Draft A delivers five. The opening is replayed and mastered rather than authored once and abandoned. Early runs are cheap to sweep, which serves the instrument directly.
-
-**Revised down from a ~25-run curve on 2026-08-26.** The earlier draft was calibrated for a commercial roguelite where content-per-hour is the product; this project is repo-first with a playable build attached, and the content cost of 25 runs is not justified by what it would buy. Nine runs preserves the escalating shape and the front-loaded cadence argument above; it just stops sooner.
-
-Risks: a two-minute run may read as a menu with a walk attached, and this is unverified; the factory is absent from the shaft for the first twenty minutes of play (mitigated by placing the rig factory in front of the player at minute eight); nine differently-lengthed runs is a modest tuning surface.
-
-*Draft C, fixed short runs.* Every run is ten to twelve minutes. Depth comes from starting deeper and better tools. Constant cadence, no length-tuning problem, much less content risk. Risk: ten minutes may cap layout complexity, and the game may never deliver the long sustained build that makes factory games feel like factory games.
-
-They share nearly all machinery. A collapses to C by flattening the curve. Build A, keep C as a data-only fallback.
+**Whether lateral variety survives losing re-rolled geology.** §1 claims "the terrain is the factory" independent of runs, and that claim is true — but part of what made it a *differentiator* was that procedural geology used to reshuffle on every run. One persistent shaft rolls its geology once. Lateral variety now has to come from the un-mined extent of the one world — new material kinds forcing search sideways as much as down — rather than from re-rolled terrain. Whether that sustains interest the way the old differentiator did is unverified. This is the largest open question the reversal itself introduces, and it should be treated as one rather than assumed away.
 
 **Surface rig form.** A vertical factory built upward, mirroring the shaft, versus a small fixed deck with slots. The upward version is more distinctive, gives the game a silhouette (a growing tower above, a growing scar below), and uses the same puzzle language as the shaft with inverted economics: on the rig you have power, so up is cheap. It is also a second layout system, and its machine set must stay small, perhaps six.
 
-**Machine retrieval.** Whether the player can carry placed machines out of a flooding shaft. Determines whether depreciation exists (see §6). Retrieval creates the best final two minutes available in the design: rich material in one hand, an expensive drill in the other, water rising, pick one. It also competes with material for the same pack, which is good tension. But full retrieval collapses the investment calculus.
-
-**Run termination.** Flood reaching the deck (forced) versus voluntary extraction. Both work; they produce different games. Note that voluntary cash-out plus a good haul at minute twelve makes short farming runs optimal, which dissolves the structure. If voluntary, something must make late minutes disproportionately valuable.
+**Machine retrieval, now a local question rather than a run-ending one.** Local flooding wrecks submerged machines into scrap recovered at a fraction of value (§6, depreciation). Whether a player can pull a machine out of a section before the water reaches it — full salvage, versus reduced scrap regardless of timing — determines how much the flood pressure actually bites. Full retrieval risks the same collapse the old run-ending version of this question named: if nothing is ever really lost, only delayed, depreciation stops being a real cost. The likely answer falls out of how expensive salvage/scrap recovery is tuned to be, which is a tunable rather than a fork — but it still needs a decision once the flood mechanics are actually built, not before.
 
 **Branching.** See §9.
 
@@ -233,7 +202,7 @@ Recorded so they are not reinvented. Each of these is the obvious first answer t
 
 **Global multipliers and percentage upgrades.** See §2. This is the one most likely to be reintroduced by good intentions, because it is what every idle game does and it is easy.
 
-**The Sinkforge as a continuous consumer.** The idea: it sits at the bottom, eats material forever, and feeding it opens the way down. Fails on four counts. It is invisible from anywhere the player stands, so it cannot carry emotional weight. If everything sinks uniformly, nothing sinks. A continuous open column to the bottom is a ladder past every gate. And it fights the lateral relocation pressure that finite deposits create. It existed to solve the missing-sink problem in a persistent world; the run-based structure solves that without it.
+**The Sinkforge as a continuous consumer.** The idea: it sits at the bottom, eats material forever, and feeding it opens the way down. Fails on four counts. It is invisible from anywhere the player stands, so it cannot carry emotional weight. If everything sinks uniformly, nothing sinks. A continuous open column to the bottom is a ladder past every gate. And it fights the lateral relocation pressure that finite deposits create. It existed to solve the missing-sink problem in a persistent world; the run-based structure solved that without it, and its replacement (see below) solves it a different way. A consumer at the top of the shaft is a different object from a consumer at the bottom — it answers the same objections by sitting where the player already stands, above every gate instead of below it — and does not reintroduce this idea.
 
 **A void with no floor.** The alternative to a physical Sinkforge: the shaft simply never ends, nothing is ever found at the bottom. Rejected — a limit a player can descend into forever without ever reaching it risks reading as unfinished content rather than a genuine boundary, since from inside the game the two are indistinguishable.
 
@@ -259,6 +228,8 @@ Recorded so they are not reinvented. Each of these is the obvious first answer t
 
 **One thing should be repurposed rather than deleted.** The prior long-distance haul machine's underlying mechanism, a throttled per-trip capacity plus a fixed transit duration linking two arbitrary cells, is the closest existing analog to the shaft-to-surface haul this design needs.
 
+**Run-based roguelite structure, 2026-08-28.** Adopted to supply demand. It deleted the factory it was meant to serve and created five of seven open design holes. Replaced by rig-as-consumer. The diagnosis it responded to was correct; the fix was not. Keep "Sinkforge as continuous consumer" dead, and note that a consumer at the top is a different object from a consumer at the bottom. Constraint variety (per-shaft modifiers — floods fast, no fuel above 50m, hard rock starts early) does not survive as the primary source of long-tail variety it was under this structure; it might still exist as a post-breach mechanic once the game has an ending to build past, but that is unexplored, not designed.
+
 ---
 
 ## 10. The target first experience
@@ -283,11 +254,11 @@ The first logistics failure follows immediately and is self-inflicted: fuel and 
 
 **A worked sketch of how the curve should feel, for calibration only, not specification:**
 
-*Run 1.* Hand-dig to 30m. Find the forge. Learn the hole trick. Water arrives at minute 30 with no pump. Climb out with a small haul of shallow material. Unlock the pump.
+*Hour 1.* Hand-dig to the shale/rock boundary. Find the forge. Learn the hole trick. Feel the first jam. Scrape together enough iron by hand, slowly, to satisfy the drill demand. Hard rock stops being a wall.
 
-*Run 8.* Start at 25m with a forge. Through shale in eight minutes. Hit hard rock at 80m and stop cold, because a single drill cannot be fueled fast enough at that distance. Spend the middle of the run building the fuel chute, get four minutes of extraction, water takes it. You now understand that the fuel chain is the game.
+*Hour 5.* A small automated line feeds the forge, but haul is still mostly manual — every trip up the shaft is a decision, not a background process. Enough iron and copper cross the surface to satisfy the pump demand. The first section gets sealed dry.
 
-*Run 9.* Start at 100m with a running line. Spend the first ten minutes not mining at all, building a pump wall at 180m to hold a section dry. Punch into the deep layer at 210m. The water climbs while two pumps and a heavy drill run off one chute that is now your entire economy. At minute 36 the pump starves, the section floods in twelve seconds, and you sprint up the rope with a full pack.
+*Hour 12.* Several pump-walled sections, a fuel chute that is functionally the entire economy, and a flood event that costs real material when it wins — a drill wrecked into scrap, a section that has to be re-dug rather than re-flooded. You understand the fuel chain is the game, the same realization the old run-based curve produced at its own equivalent point — the curve is slower now and has no artificial end, but the shape is the same.
 
 Same shape at a different scale, which is precisely why idle games work.
 
@@ -297,20 +268,20 @@ Same shape at a different scale, which is precisely why idle games work.
 
 Three layers plus the core. Each earns its existence with one physical rule and one economic consequence.
 
-**Layers are rule sets, not destinations.** Depth is continuous and always increasing; there is no discrete jump from one layer to the next inside a run, only a depth threshold where the physical rule underfoot changes. A shaft does not "reach Stonereach" the way a level select reaches a zone — it just keeps getting deeper until hand-mining stops working. Two different runs can sit in the same layer at very different depths: run 3 might hand-dig to 60m and stall inside Topsoil/shale, while run 9's real infrastructure carries it past 240m still inside that same rule set, because what changed between those runs is the infrastructure, not the layer. Meters measure progress within a run. Layers describe which physical rules apply at the depth you are currently at.
+**Layers are rule sets, not destinations.** Depth is continuous and always increasing; there is no discrete jump from one layer to the next, only a depth threshold where the physical rule underfoot changes. A shaft does not "reach Stonereach" the way a level select reaches a zone — it just keeps getting deeper until hand-mining stops working. The same shaft can sit in the same layer at very different points in its own history: early on it might hand-dig to 60m and stall inside Topsoil/shale, while much later, with real infrastructure behind it, it carries on past 240m still inside that same rule set, because what changed is the infrastructure, not the layer. Meters measure how far the shaft has actually gotten. Layers describe which physical rules apply at the depth it currently is.
 
 | Layer | Physical rule | Teaches |
 |---|---|---|
 | Topsoil / shale | Soft, fast digging. Fuel and first ore. Water seeps. | Gravity routing |
 | Stonereach | Hard rock, hand-mining ineffective. Flooding is a real threat. Richer ore. | Pumping and fuel routing |
 | The Deep Works | Engineered, not natural. Someone built here. Heat and pressure. | Long-distance haul |
-| The Sinkforge | Manufactured, not natural — the true floor, same depth under every shaft. Unreached in normal play. | Nothing, except an endgame breach. |
+| The Sinkforge | Manufactured, not natural — the true floor. Unreached in normal play. | Nothing, except an endgame breach. |
 
 Three layers authored well beats seven gestured at.
 
-**Why not just mine straight down?** Because hands stop working. Rock hardness is tiered and each tier is impassable without infrastructure, so depth is a function of how far down your supply chain reaches, not how long you hold the dig button. And depth is not the score; material delivered is. A dive to the bottom with an empty pack is worth nothing.
+**Why not just mine straight down?** Because hands stop working. Rock hardness is tiered and each tier is impassable without infrastructure, so depth is a function of how far down your supply chain reaches, not how long you hold the dig button. And depth is not the goal; material delivered is. Reaching the bottom with an empty pack is worth nothing.
 
-**Two gates on meta-progression, pointing the same direction.** Material delivered is the soft currency and buys verbs. Deepest layer reached is the hard gate and determines which verbs are purchasable at all. This kills the grind-shallow-forever exploit twice over: shallow material is worth little, and shallow runs cannot unlock deep tech at any price.
+**One gate on meta-progression, not two.** Material delivered buys verbs, through rig demands. There is no separate "deepest layer reached" gate anymore — it is implicit in what a demand requires: you cannot deliver copper without having gone through hard rock, so depth-gating falls out of the demand chain itself rather than a second currency layered on top of it. This kills the grind-shallow-forever exploit the same way as before: shallow material alone cannot satisfy a demand that needs a deeper material, at any quantity.
 
 **Reaching the bottom and igniting it are one goal, not two.** Two endings in a game without a writer makes both feel thin.
 
