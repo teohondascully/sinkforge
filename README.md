@@ -105,7 +105,7 @@ not a virtue.
 
 ## The gates
 
-Nine structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
+Ten structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
 
 | Gate | What it checks |
 | --- | --- |
@@ -118,6 +118,7 @@ Nine structural gates run in CI on every push (`tools/layer_lint/`, `.github/wor
 | `check_claim_references.py` | every scenario names a claim that actually exists |
 | `data_codegen/generate.py --check` | every generated `data/<kind>/generated.gd` matches its YAML source |
 | `check_working_freshness.py` | `docs/WORKING.md`'s stated date isn't older than `HEAD`'s own commit |
+| `check_project_settings.py` | `project.godot` keeps its load-bearing flags (static typing as a build failure, `DECISIONS.md`'s "Enforcement tripwire #1") — added after a non-headless Godot launch silently stripped it once |
 
 A separate `tests` job (added 2026-08-26, D0047) downloads the exact pinned Godot version this project
 develops against and runs every `tests/test_*.gd` suite under it — the gates above are static analysis

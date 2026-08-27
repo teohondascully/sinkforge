@@ -291,3 +291,12 @@ non-headless launch this session (first-open project-settings migration is one g
 flagged rather than chased further, since it doesn't reproduce on demand and this session's own
 scope was (f)/(g), not a Godot-internals investigation. Practical mitigation for any session running
 Godot non-headlessly: `git diff project.godot` before every commit, not just before this one.
+
+**Closed, same day (D0054): the hazard above is now a CI gate, unreproducible or not.**
+`tools/layer_lint/check_project_settings.py` asserts `project.godot`'s `[debug]` section still carries
+`gdscript/warnings/enable=true` and `gdscript/warnings/untyped_declaration=2` — the exact flag the
+director's own reasoning ties to `docs/ARCHITECTURE.md` §12 / `ONBOARDING.md`'s stated reason a Rust
+migration was rejected ("untyped declarations are already a build failure via project settings").
+Registered in CI alongside the other nine structural gates (now ten). Mutation-tested against the real
+incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
+`[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.

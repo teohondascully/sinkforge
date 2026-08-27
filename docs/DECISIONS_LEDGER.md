@@ -1340,3 +1340,28 @@ decision so a later session building the real driver doesn't mistake the absence
 oversight.
 Reverse: CHEAP — `tests/body/play_scene.gd` is itself new, unshipped code; switching to named actions
 later touches this one file and adds one `project.godot` section, nothing else depends on either choice.
+
+## D0054 · 2026-08-26 · project.godot's static-typing enforcement flags are now a CI gate
+Decided: added `tools/layer_lint/check_project_settings.py`, registered in `.github/workflows/harness.yml`
+alongside the other structural gates. Scope is deliberately narrow — exactly the two `[debug]` keys
+`docs/DECISIONS.md` names as "Enforcement tripwire #1" (`gdscript/warnings/enable=true`,
+`gdscript/warnings/untyped_declaration=2`), the specific setting `docs/ARCHITECTURE.md` §12 and
+`ONBOARDING.md` cite as one of the three measured reasons a Rust migration was rejected ("untyped
+declarations are already a build failure via project settings"). Not gated: `config/features`,
+window/display settings, or anything else in `project.godot` — those are real config but not tied to a
+documented decision that "quietly stops being true" the way the typing tripwire is; gating them would be
+scope beyond what this session was asked to close.
+Alternative: parse `project.godot` with Python's `configparser`. Rejected after it failed on the real
+file — `configparser` requires every key inside a `[section]`, and `project.godot` has a bare
+`config_version=5` line before its first section header. Wrote a ~15-line manual line parser instead
+(section-header/key=value only, ignores `;` comments) rather than pre-processing the file to satisfy a
+stricter parser than the format actually needs.
+Why: the non-headless Godot launch that stripped this flag once (`docs/WORKING.md`'s hazard note) was
+unreproducible on a second attempt — exactly the kind of property that should not depend on someone
+noticing a `git status` diff, per the director's own framing and the same reasoning behind every other
+structural gate here. `project.godot` itself is unpoliced by every existing gate (`layer_lint.py` and
+friends all scope to `res://*.gd`/`data/`/docs), so this closes a real blind spot, not a duplicate check.
+Mutation-tested against three cases before trusting it: the exact incident (`enable=` line dropped),
+`untyped_declaration` demoted from error (2) to warn (1), and the whole `[debug]` section missing — all
+three fail with the specific key/value that's wrong; the real, unmodified `project.godot` passes clean.
+Reverse: CHEAP — one new ~55-line script and one CI step; does not touch `project.godot` itself.

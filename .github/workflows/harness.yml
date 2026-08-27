@@ -114,6 +114,9 @@ jobs:
       - name: docs/WORKING.md is not older than HEAD (QUALITY gate 23)
         run: python3 tools/layer_lint/check_working_freshness.py
 
+      - name: project.godot keeps its load-bearing flags (DECISIONS.md "Enforcement tripwire #1")
+        run: python3 tools/layer_lint/check_project_settings.py
+
   # Runs every tests/test_*.gd suite under the real, pinned engine (QUALITY gates 8, 9, 11 —
   # determinism, conservation, movement acceptance — all depend on this actually happening).
   # Godot is downloaded and checksum-verified rather than pulled from a marketplace action,
