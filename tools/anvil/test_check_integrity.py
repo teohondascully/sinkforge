@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""ANVIL step 2d. Mutation tests for check_integrity.py, one function per branch, each REQUIRED to
-observe its target failure actually firing before the branch counts as covered.
+"""ANVIL step 2d, extended after an external (Codex) audit found real coverage gaps. One function per
+branch, each REQUIRED to observe its target failure actually firing before the branch counts as covered.
 
     python3 tools/anvil/test_check_integrity.py
 
@@ -13,12 +13,15 @@ is not tested, it is decorated.
 Uses tempfile so this never touches the real .anvil/log/, and check_integrity.check_integrity(log_dir) is
 called as a function (imported), not via subprocess -- covered directly, not through the CLI wrapper.
 """
+import contextlib
+import io
 import json
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_integrity as ci_module  # noqa: E402
 from check_integrity import check_integrity  # noqa: E402
 
 UNIVERSAL = {"id": "aaaaaaaa-0000-0000-0000-000000000001", "timestamp": "2026-08-27T00:00:00+00:00",
@@ -49,7 +52,7 @@ def _valid_claim(event_id: str, **overrides) -> dict:
 
 
 def _valid_finding(event_id: str, **overrides) -> dict:
-    event = {**UNIVERSAL, "id": event_id, "type": "FINDING", "observation": "o", "evidence": [],
+    event = {**UNIVERSAL, "id": event_id, "type": "FINDING", "observation": "o", "evidence": ["e1"],
               "severity": "low", "confidence": "high", "source_class": "artifact-instrument",
               "invalidates": [], "independent_of": []}
     event.update(overrides)
@@ -63,11 +66,32 @@ def _valid_measurement(event_id: str, **overrides) -> dict:
     return event
 
 
+def _valid_assumption(event_id: str, **overrides) -> dict:
+    event = {**UNIVERSAL, "id": event_id, "type": "ASSUMPTION", "statement": "s", "held_by": [],
+              "challenged_by": []}
+    event.update(overrides)
+    return event
+
+
+def _valid_content_link(event_id: str, **overrides) -> dict:
+    event = {**UNIVERSAL, "id": event_id, "type": "CONTENT_LINK", "path": "CONTEXT.md",
+              "serves_claims": [], "assumes": []}
+    event.update(overrides)
+    return event
+
+
+def _valid_override(event_id: str, **overrides) -> dict:
+    event = {**UNIVERSAL, "id": event_id, "type": "OVERRIDE", "target_event": _id(1), "reason": "r",
+              "expiry": "2026-09-01"}
+    event.update(overrides)
+    return event
+
+
 RESULTS: list[tuple[str, bool]] = []
 
 
 def check(name: str, log_dir: Path, expect_fail: bool, expect_substring: str | None = None) -> None:
-    errors = check_integrity(log_dir)
+    errors, _count = check_integrity(log_dir)
     fired = bool(errors)
     matched_substring = expect_substring is None or any(expect_substring in e for e in errors)
     ok = (fired == expect_fail) and matched_substring
@@ -108,8 +132,7 @@ def branch_dangling_assumes() -> None:
         check("dangling assumes (broken)", log_dir, expect_fail=True, expect_substring="assumes")
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        _write(log_dir, "a.json", {**UNIVERSAL, "id": _id(1), "type": "ASSUMPTION", "statement": "s",
-                                     "held_by": [], "challenged_by": []})
+        _write(log_dir, "a.json", _valid_assumption(_id(1)))
         _write(log_dir, "b.json", _valid_claim(_id(2), assumes=[_id(1)]))
         check("dangling assumes (fixed: target exists)", log_dir, expect_fail=False)
 
@@ -117,14 +140,11 @@ def branch_dangling_assumes() -> None:
 def branch_dangling_content_link_path() -> None:
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        _write(log_dir, "a.json", {**UNIVERSAL, "id": _id(1), "type": "CONTENT_LINK",
-                                     "path": "this/path/does/not/exist.gd", "serves_claims": [],
-                                     "assumes": []})
+        _write(log_dir, "a.json", _valid_content_link(_id(1), path="this/path/does/not/exist.gd"))
         check("dangling CONTENT_LINK.path (broken)", log_dir, expect_fail=True, expect_substring="does not exist")
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        _write(log_dir, "a.json", {**UNIVERSAL, "id": _id(1), "type": "CONTENT_LINK",
-                                     "path": "CONTEXT.md", "serves_claims": [], "assumes": []})
+        _write(log_dir, "a.json", _valid_content_link(_id(1)))
         check("CONTENT_LINK.path (fixed: real file, CONTEXT.md)", log_dir, expect_fail=False)
 
 
@@ -158,14 +178,19 @@ def branch_missing_required_field() -> None:
 def branch_unstated_source() -> None:
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        broken = _valid_measurement(_id(1))
+        _write(log_dir, "claim.json", _valid_claim(_id(1)))
+        broken = _valid_measurement(_id(2), claim_id=_id(1))
         del broken["source"]
         _write(log_dir, "a.json", broken)
         check("unstated MEASUREMENT.source (broken, non-defaulting)", log_dir, expect_fail=True,
               expect_substring="source")
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        _write(log_dir, "a.json", _valid_measurement(_id(1)))
+        # claim_id must resolve to a real CLAIM_AUTHORED now that references are typed -- a single
+        # MEASUREMENT event with a self-pointing default claim_id (this branch's original single-event
+        # form) would itself now be a self-reference violation, not a clean "fixed" case.
+        _write(log_dir, "a.json", _valid_claim(_id(1)))
+        _write(log_dir, "b.json", _valid_measurement(_id(2), claim_id=_id(1)))
         check("MEASUREMENT.source (fixed: stated)", log_dir, expect_fail=False)
 
 
@@ -194,13 +219,11 @@ def branch_multi_violation() -> None:
     """
     with tempfile.TemporaryDirectory() as d:
         log_dir = Path(d)
-        # a.json: missing required field (no reversal_cost) AND a dangling supersedes, in one event.
         broken = _valid_decision(_id(1), supersedes=_id(99))
         del broken["reversal_cost"]
         _write(log_dir, "a.json", broken)
-        # b.json: same id as a.json (duplicate) AND a dangling invalidates.
         _write(log_dir, "b.json", _valid_finding(_id(1), invalidates=[_id(98)]))
-        errors = check_integrity(log_dir)
+        errors, _count = check_integrity(log_dir)
         expected_substrings = ["reversal_cost", "supersedes", "duplicate id", "invalidates"]
         found = {s: any(s in e for e in errors) for s in expected_substrings}
         ok = all(found.values()) and len(errors) >= 4
@@ -212,10 +235,172 @@ def branch_multi_violation() -> None:
                 print(f"    {e}")
 
 
+def branch_dangling_serves_claims() -> None:
+    """Codex's specific finding: CONTENT_LINK.serves_claims was in the schema and never traversed --
+    a dangling reference passed. Now part of the typed-reference table (schema.REFERENCE_FIELDS).
+    """
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_content_link(_id(1), serves_claims=[_id(99)]))
+        check("dangling CONTENT_LINK.serves_claims (broken -- Codex's finding)", log_dir, expect_fail=True,
+              expect_substring="serves_claims")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_claim(_id(1)))
+        _write(log_dir, "b.json", _valid_content_link(_id(2), serves_claims=[_id(1)]))
+        check("CONTENT_LINK.serves_claims (fixed: target exists and is a CLAIM_AUTHORED)", log_dir,
+              expect_fail=False)
+
+
+def branch_wrong_target_type() -> None:
+    """A reference resolving to a REAL event of the WRONG type -- structurally valid, semantically
+    nonsensical. This is the core of the typed-reference fix: existence alone is not enough.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_decision(_id(1)))  # a DECISION, not a CLAIM_AUTHORED
+        _write(log_dir, "b.json", _valid_measurement(_id(2), claim_id=_id(1)))
+        check("MEASUREMENT.claim_id points at a real event of the WRONG type (broken)", log_dir,
+              expect_fail=True, expect_substring="not one of the legal target types")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_claim(_id(1)))
+        _write(log_dir, "b.json", _valid_measurement(_id(2), claim_id=_id(1)))
+        check("MEASUREMENT.claim_id points at the right type (fixed)", log_dir, expect_fail=False)
+
+
+def branch_supersedes_type_rules() -> None:
+    """supersedes' legal targets depend on the SOURCE event's type: same-type by default, except
+    DECISION -> ASSUMPTION (architecture doc §8.6, explicit). All three shapes checked.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "claim.json", _valid_claim(_id(9)))
+        # id(1) is a MEASUREMENT, valid on its own (claim_id points at id(9)'s real claim) -- isolates
+        # the DECISION.supersedes violation this case is actually testing, not a second unrelated one.
+        _write(log_dir, "a.json", _valid_measurement(_id(1), claim_id=_id(9)))
+        _write(log_dir, "b.json", _valid_decision(_id(2), supersedes=_id(1)))
+        check("DECISION.supersedes -> MEASUREMENT (broken, not a legal target)", log_dir, expect_fail=True,
+              expect_substring="not one of the legal target types")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_assumption(_id(1)))
+        _write(log_dir, "b.json", _valid_decision(_id(2), supersedes=_id(1)))
+        check("DECISION.supersedes -> ASSUMPTION (fixed: the documented §8.6 exception)", log_dir,
+              expect_fail=False)
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_decision(_id(1)))
+        _write(log_dir, "b.json", _valid_decision(_id(2), supersedes=_id(1)))
+        check("DECISION.supersedes -> DECISION (fixed: the default same-type case)", log_dir,
+              expect_fail=False)
+
+
+def branch_self_reference() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        broken = _valid_decision(_id(1))
+        broken["supersedes"] = _id(1)
+        _write(log_dir, "a.json", broken)
+        check("self-supersession (broken)", log_dir, expect_fail=True, expect_substring="own id")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        broken = _valid_finding(_id(1))
+        broken["invalidates"] = [_id(1)]
+        _write(log_dir, "a.json", broken)
+        check("self-reference via invalidates, not just supersedes (broken)", log_dir, expect_fail=True,
+              expect_substring="own id")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_decision(_id(1)))
+        _write(log_dir, "b.json", _valid_decision(_id(2), supersedes=_id(1)))
+        check("supersedes a DIFFERENT event (fixed)", log_dir, expect_fail=False)
+
+
+def branch_malformed_uuid() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        broken = _valid_decision(_id(1))
+        broken["id"] = "notuuid"
+        _write(log_dir, "a.json", broken)
+        check("malformed id, not UUID-shaped (broken -- Codex's exact probe)", log_dir, expect_fail=True,
+              expect_substring="not a valid UUID")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        broken = _valid_decision(_id(1), supersedes="also-not-a-uuid")
+        _write(log_dir, "a.json", broken)
+        check("malformed supersedes value, not UUID-shaped (broken)", log_dir, expect_fail=True,
+              expect_substring="not a valid UUID")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_decision(_id(1)))
+        check("well-formed UUID id (fixed)", log_dir, expect_fail=False)
+
+
+def branch_empty_required_array() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_finding(_id(1), evidence=[]))
+        check("FINDING.evidence = [] (broken -- empty is not a meaningful finding)", log_dir,
+              expect_fail=True, expect_substring="evidence")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_finding(_id(1), evidence=["real evidence"]))
+        check("FINDING.evidence non-empty (fixed)", log_dir, expect_fail=False)
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        # Regression guard: independent_of=[] must STAY valid -- this is not the same fix as evidence.
+        _write(log_dir, "a.json", _valid_finding(_id(1), independent_of=[]))
+        check("FINDING.independent_of = [] still PASSES (deliberate, not a regression)", log_dir,
+              expect_fail=False)
+
+
+def branch_source_class_values() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_finding(_id(1), source_class="made-up-class"))
+        check("FINDING.source_class outside the closed set (broken)", log_dir, expect_fail=True,
+              expect_substring="source_class")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_finding(_id(1), independent_of=["made-up-class"]))
+        check("FINDING.independent_of entry outside the closed set (broken)", log_dir, expect_fail=True,
+              expect_substring="independent_of entry")
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        _write(log_dir, "a.json", _valid_finding(_id(1), independent_of=["human-play"]))
+        check("FINDING.independent_of entry in the closed set (fixed)", log_dir, expect_fail=False)
+
+
+def branch_empty_log_reports_count_not_pass() -> None:
+    """The director's own instruction: an empty log must report '0 events', never PASS -- zero is a fine
+    bootstrap state, but PASS-over-nothing is exactly the vacuous-green class this project documents
+    repeatedly (D0072). Tests main() itself, not check_integrity(), since that's where the string lives.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        log_dir = Path(d)
+        original = ci_module.DEFAULT_LOG_DIR
+        ci_module.DEFAULT_LOG_DIR = log_dir
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                exit_code = ci_module.main()
+        finally:
+            ci_module.DEFAULT_LOG_DIR = original
+        output = buf.getvalue()
+        ok = exit_code == 0 and "0 events" in output and "PASS" not in output
+        RESULTS.append(("empty log reports '0 events', never PASS", ok))
+        status = "OBSERVED" if ok else "NOT OBSERVED -- BRANCH UNTESTED"
+        print(f"[{status}] empty log message -- exit={exit_code}, output={output!r}")
+
+
 def main() -> int:
     for branch in (branch_dangling_supersedes, branch_dangling_invalidates, branch_dangling_assumes,
                    branch_dangling_content_link_path, branch_duplicate_id, branch_missing_required_field,
-                   branch_unstated_source, branch_unstated_independent_of, branch_multi_violation):
+                   branch_unstated_source, branch_unstated_independent_of, branch_multi_violation,
+                   branch_dangling_serves_claims, branch_wrong_target_type, branch_supersedes_type_rules,
+                   branch_self_reference, branch_malformed_uuid, branch_empty_required_array,
+                   branch_source_class_values, branch_empty_log_reports_count_not_pass):
         branch()
 
     failed = [name for name, ok in RESULTS if not ok]
@@ -227,9 +412,7 @@ def main() -> int:
             print(f"  {name}")
         return 1
 
-    print("test_check_integrity: PASS -- every branch (dangling supersedes/invalidates/assumes/"
-          "CONTENT_LINK path, duplicate id, missing required field, unstated source, unstated "
-          "independent_of) was observed failing on a broken fixture and passing on the fixed one.")
+    print("test_check_integrity: PASS.")
     return 0
 
 

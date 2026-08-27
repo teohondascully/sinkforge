@@ -23,12 +23,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def main() -> int:
+def find_violations(root: Path) -> list[str]:
+    """The pure part: untracked files not covered by the .gitignore at `root`. Split out from main() so
+    `test_check_untracked_files.py` can point this at a disposable scratch git repo instead of the real
+    working tree -- an external audit found this gate's mutation claim existed only as a manual
+    transcript, not a checked-in, re-runnable test (`docs/DECISIONS_LEDGER.md` D0071).
+    """
     result = subprocess.run(
         ["git", "ls-files", "--others", "--exclude-from=.gitignore"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=root, capture_output=True, text=True, check=True,
     )
-    violations = [line for line in result.stdout.splitlines() if line.strip()]
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def main() -> int:
+    violations = find_violations(ROOT)
 
     if violations:
         print(f"check_untracked_files: FAIL -- {len(violations)} file(s) are untracked and not covered "

@@ -2186,3 +2186,206 @@ exception out of — `.anvil/README.md` would have stayed silently untracked, th
 step 1's gate exists to catch, and did: `check_untracked_files.py` flagged it before this commit, not
 after. Fixed with `!/.anvil/`, the same simple re-inclusion `.github/`/`.githooks/` use (not `.claude/`'s
 narrower two-step form, since nothing under `.anvil/` is machine-local session state).
+
+## D0069 · 2026-08-27 · typed references, per an external audit's P1 finding
+
+Codex's exact framing, quoted because it names the failure precisely: "Every reference is a string in one
+global ID namespace. Nothing enforces that `MEASUREMENT.claim_id` points at a `CLAIM_AUTHORED`... And
+`CONTENT_LINK.serves_claims` is in the schema and never traversed — a dangling reference passes today...
+That is the project's recurring failure — an instrument that cannot register its subject — reappearing
+inside the tool built to prevent it." Confirmed by direct reproduction before this fix: a `MEASUREMENT`
+whose `claim_id` pointed at a real `DECISION` event (not a `CLAIM_AUTHORED`) passed referential integrity
+cleanly, because the checker only asked "does this id exist," never "is it the right kind of thing."
+
+**`tools/anvil/schema.py` gained two tables:**
+- `REFERENCE_FIELDS`: `(event_type, field_name) -> (is_list, legal_target_types)` for every reference
+  field except `supersedes` — `MEASUREMENT.claim_id` → `CLAIM_AUTHORED` only; `FINDING.invalidates` →
+  `CLAIM_AUTHORED` or `ASSUMPTION`; `CLAIM_AUTHORED.assumes` and `CONTENT_LINK.assumes` → `ASSUMPTION`;
+  `CONTENT_LINK.serves_claims` → `CLAIM_AUTHORED` (Codex's specific gap — now traversed, not just
+  declared); `ASSUMPTION.challenged_by` → `FINDING`; `OVERRIDE.target_event` → `FINDING` or `DECISION`.
+- `SUPERSEDES_LEGAL_TARGETS`: keyed by the SOURCE event's own type, not a fixed set, because architecture
+  doc §8.6 explicitly allows `DECISION` to supersede `ASSUMPTION` — a same-type-only rule (the first,
+  simpler design considered) would have wrongly rejected the one documented cross-type case. Default is
+  same-type; `DECISION` is the one type with two legal targets.
+
+**Deliberately NOT a reference field:** `ASSUMPTION.held_by`. Read as a list of authors/identities who
+hold the assumption, not a list of events — the architecture doc doesn't specify which, and this reading
+was chosen because "who holds this belief" is naturally people/sessions, the same shape as the universal
+`author` field pluralized, not evidence-shaped like `challenged_by` (which IS a reference, to the
+`FINDING` events that did the challenging). A stated choice, not an oversight — recorded so a future
+reader doesn't have to re-derive why it's absent from `REFERENCE_FIELDS`.
+
+**`check_integrity.py`** now resolves every entry from a new shared iterator
+(`schema.iter_reference_targets`) against BOTH existence and legal type, reporting "references unknown
+id" for the first failure and "references X, which is a Y, not one of the legal target types" for the
+second — the second message is new; the first already existed for the untyped fields this replaces.
+
+**Mutation coverage, added to `test_check_integrity.py`:** a `MEASUREMENT.claim_id` pointing at a real
+event of the wrong type (broken) vs. the right type (fixed); all three `supersedes` shapes (wrong type
+broken, the `DECISION`→`ASSUMPTION` exception fixed, the default same-type case fixed); a dangling
+`CONTENT_LINK.serves_claims` (broken) vs. resolving to a real `CLAIM_AUTHORED` (fixed) — closing Codex's
+exact "never traversed" finding. 8 new cases, each observed firing on the broken fixture.
+
+Reverse: CHEAP for the tables and the checker logic (additive, no existing valid event becomes invalid
+except ones that were already semantically wrong). MODERATE for anyone who authored an event assuming
+untyped references — none exist in the real log yet (`.anvil/log/` was empty when this landed), so the
+cost is theoretical, not realized.
+
+## D0070 · 2026-08-27 · language correction: "contradictions unrepresentable" was false, per external audit judgment 11
+
+The director's own words, and they stand as the record of what happened rather than being paraphrased:
+"I wrote 'contradictions unrepresentable.' That is false and Codex is right." The corrected claim, adopted
+verbatim from the audit: **contradictions become explicit event history; resolution becomes deterministic
+projection behavior.**
+
+**Why the original claim was false, stated precisely.** An event log stops two *documents* from both
+being authoritative — there is no file for a contradiction to live inside. It does not stop two *events*
+from asserting incompatible facts: two `DECISION`s can choose incompatible alternatives, two
+`MEASUREMENT`s can disagree, a `CLAIM_AUTHORED` can be marked both valid and invalidated by separate
+`FINDING`s with no `supersedes` link connecting them. All of that is structurally representable today and
+passes `check_integrity.py` cleanly (confirmed, not asserted — D0069's own typed-reference work touches
+exactly these fields and none of it rejects contradictory-but-well-formed pairs, because that was never
+what referential integrity checks). The improvement is real — every fact now has an identity, a
+timestamp, an author, and provenance, and nothing is silently overwritten — but it relocates the
+contradiction problem into the projection layer's resolution rule, which is unwritten code as of this
+entry, not a property the architecture gets for free.
+
+**Corrected in `incoming/ANVIL_ARCHITECTURE.md`, six occurrences** (exact original wording, since the
+file is untracked and this is the only durable record of what it said before): §0 line 15 ("Contradictions
+must be impossible"), §0 line 19 ("state is computed, so contradiction is not representable"), §3 line 56
+("Corrupt state is not something to detect; it is unrepresentable" — kept, since this one IS true as
+narrowly scoped to the D0/D1/D4 write-boundary rule, with a caveat added distinguishing it from the
+broader claim), §3 line 126 ("This makes F1 and F3 structurally impossible rather than detectable"), §4
+line 148 ("Duplicate tickets... are all unrepresentable (F1, F2, F3)"), §15 line 424 ("rebuild the process
+so the failure is unrepresentable"). Each rewritten to state what's actually true — the mechanical failure
+modes (duplicate ids, dangling references, competing files) are genuinely eliminated; the semantic
+question (do the underlying facts agree) is not, and is named as the projection layer's job. Checked
+`CONTEXT.md` and `.anvil/README.md` for the same language — clean, nothing to correct in either.
+
+**Logged as a `FINDING` event, not just ledger prose** — the first real test of whether this system
+records corrections against itself, per the director's own framing. `source_class: external-audit`,
+`independent_of: []` (single-source finding, not yet corroborated), `invalidates: []` (no prior
+`CLAIM_AUTHORED` event asserted the false claim formally — it was prose in an untracked document, not a
+claim this system had already recorded). `.anvil/log/2026-08-27T173622.471783Z-eb30ba67.json`. Verified
+referentially sound via `check_integrity.py` before this entry was written.
+
+Reverse: CHEAP for the six doc edits (prose only). N/A for the `FINDING` event — append-only, cannot be
+edited or deleted; a wrong finding gets superseded by a later one, never erased.
+
+## D0071 · 2026-08-27 · the untracked-files gate needed a checked-in mutation harness, not a brief claim
+
+Codex's exact finding: "The implementation has the intended distinction... I found no current executable
+3/3 mutation test accompanying the gate. The 3/3 claim exists only in the brief." Correct, and a real gap
+by this project's own standard — the manual transcript in a prior round's chat response is not a test
+anyone can re-run, and "trust the transcript" is precisely the discipline this project's gates exist to
+replace.
+
+**`tools/layer_lint/check_untracked_files.py` split**: the git-invoking part (`find_violations(root:
+Path)`) is now a pure-ish function taking a root directory, called by `main()` with the real `ROOT` —
+enabling a test to point it at a disposable scratch repository instead of mutating the canonical tree,
+which the prior round's manual verification did NOT do (three probes were created, checked, and deleted
+by hand in the real working tree, leaving no re-runnable artifact).
+
+**`tools/layer_lint/test_check_untracked_files.py`** (new): builds a real, disposable git repository per
+case (`git init` in a `tempfile.TemporaryDirectory()`, with its own `.gitignore`), and asserts against it
+directly. Four cases: a real gap outside any `.gitignore` pattern (broken); a file matching a real
+pattern (fixed); a file hidden ONLY via that scratch repo's own `.git/info/exclude` (broken — the one
+property that matters, with an added sanity assertion confirming `git status` itself treated the file as
+locally hidden, so the case can't pass for the wrong reason); a clean tree (fixed). 5/5 cases (four plus
+the sanity check), each observed firing correctly.
+
+Reverse: CHEAP. The `find_violations` split changes no behavior for `main()`'s own real-tree invocation
+(confirmed: gate still PASSes/FAILs identically on the real tree before and after).
+
+## D0072 · 2026-08-27 · semantic validation gaps, three fixed and three deferred with a stated reason
+
+Codex constructed eight specific malformed-but-passing probes. Per the director's instruction: fix three
+(empty required arrays, self-supersession, malformed UUID), defer three with the reason stated in the
+checker's own docstring (supersedes-cycle detection, commit-SHA existence, timestamp ordering), accept
+the rest as already covered by D0069's reference typing (a wrong-type target) or already correct
+(non-defaulting fields, confirmed by the audit's own VERIFIED verdict).
+
+**Fixed:**
+- **Malformed UUID.** `schema.py` gained `_is_valid_uuid()` (regex against the standard 8-4-4-4-12
+  hex form) applied to `id` (universal) and every reference field's value (both the field being checked
+  and, via `iter_reference_targets`, every entry of a list-typed reference) — Codex's own reproduction
+  (`id="notuuid"`, no error) now fails with `"id 'notuuid' is not a valid UUID"`.
+- **Self-reference**, generalized beyond the director's named "self-supersession" to every reference
+  field, not just `supersedes` — checked once, generically, in `validate_event()` via the same
+  `iter_reference_targets` iterator D0069 built, rather than as a `supersedes`-only special case. An event
+  whose `invalidates` names its own id is exactly as wrong as one whose `supersedes` does, and the general
+  form was free once the iterator existed.
+- **Empty required arrays** — NOT a blanket "no required list may be empty," which would have broken
+  `FINDING.independent_of`'s own deliberate, already-recorded design (D0064: an empty list is a real,
+  meaningful statement — "independent of nothing stated" — and the field's total ABSENCE, not its
+  emptiness, is what must error). New `non_empty_list_fields` per type, applied to exactly one field:
+  `FINDING.evidence`. A finding with zero evidence isn't a finding. `assumes`, `invalidates`,
+  `held_by`, `challenged_by`, `serves_claims` all keep permitting empty — each is legitimately optional
+  content, not a field whose entire meaning collapses at zero entries the way evidence's does.
+  `test_check_integrity.py` includes a REGRESSION GUARD asserting `independent_of=[]` still passes, so
+  this fix can never silently widen into the field it must not touch.
+- **Bonus, not requested but cheap and directly relevant**: `FINDING.source_class` and every entry of
+  `FINDING.independent_of` are now validated against the architecture doc §5 closed set
+  (`human-play | design-instrument | artifact-instrument | trajectory-instrument | agent-review |
+  external-audit`) — the original implementation checked `independent_of` was a list of strings and
+  nothing more, which is exactly "a field an author asserts, not a property the system verifies"
+  (Codex judgment 13's own framing) at its weakest: even the closed-set membership went unchecked.
+
+**Deferred, with the reason written into `check_integrity.py`'s own docstring so the scope is visible
+where someone would look, not just here:**
+- **`supersedes`-cycle detection** — needs graph traversal over the full supersession chain, which is the
+  same machinery the `graph`/`suspect` projections (step 4) need anyway. Building it twice and
+  reconciling later is worse than building it once, there.
+- **`commit`-SHA existence** — resolvable (`git cat-file -e <sha>`) but slow at log scale, and "how often
+  to pay that cost" is its own decision, not a default to add quietly inside a fix for something else.
+- **Timestamp ordering** — events sort by filename today, which happens to match creation order because
+  `append.py` embeds the timestamp in the filename, but nothing verifies a hand-authored event's
+  `timestamp` field agrees with its filename, or that the log is free of out-of-order entries. Whether
+  order matters to resolution, and which order, is a step-4 projection question.
+
+**The empty-log vacuous PASS, fixed in the same pass.** `check_integrity.py`'s `main()` used to print
+"PASS -- no events... nothing to check" when `.anvil/log/` was empty — exactly the "real green that meant
+nothing" class this project's retrospective documents repeatedly (a suite once printed "ALL 61 LAYERS
+PASS" over four layers that had drawn nothing). Now prints "0 events... not evaluated as healthy or
+unhealthy" and never emits the word PASS over an empty log. `check_integrity()` itself now returns
+`(errors, event_count)` rather than just `errors`, so a caller can always distinguish "0 events, nothing
+validated" from "N events, all valid" — the distinction the old single-list return couldn't make.
+Mutation-tested by monkeypatching `check_integrity.DEFAULT_LOG_DIR` to an empty scratch directory and
+capturing `main()`'s actual stdout, not by reading the code and asserting it must be right.
+
+**Total new/changed mutation coverage this entry + D0069 combined:** `test_check_integrity.py` grew from
+17 cases (9 branches) to 37 cases (17 branches). All 37 observed correctly, `python3 tools/anvil/
+test_check_integrity.py`, transcript in this round's session report.
+
+Reverse: CHEAP for all three fixes and the empty-log message (additive validation, an events-only return
+signature change with one caller updated in the same commit). The deferred items cost nothing to reverse
+because nothing was built for them yet — the cost of deferring wrongly is a real gap staying open a
+while longer, stated in code where it's visible, not hidden.
+
+## D0073 · 2026-08-27 · seven event types: an external audit's sufficiency judgment, logged as evidence, not resolved
+
+Codex's specific claim, not a vague "seven might not be enough": three named gaps. No first-class event
+for an evaluation run or a produced artifact (a `MEASUREMENT` records a value, not the run that produced
+it). No first-class event for a work item, its ownership, or a lease (the `queue` projection, step 4,
+needs to track in-progress claims, and nothing in the current seven represents that). No first-class
+event for a review/adjudication distinct from a product `DECISION` (the loop's own cycle,
+`incoming/ANVIL_ARCHITECTURE.md` §9 — propose/evaluate/gate/block/adjudicate/log — names an "adjudicate"
+step with no event type of its own).
+
+**Not resolved. No eighth type added**, per the director's explicit instruction and the architecture
+doc's own stated discipline ("seven is a constraint, not a starting point... if an eighth seems necessary,
+that is a design signal, not a gap"). Logged as a `FINDING` event instead —
+`.anvil/log/2026-08-27T173633.470582Z-09356413.json`, `source_class: external-audit`, `confidence:
+medium` (Codex's own framing: "this is a design judgment," not a proven defect), `independent_of: []`
+(single source), `invalidates: []` (nothing yet formally claims seven types are sufficient). Verified
+referentially sound via `check_integrity.py` before this entry was written.
+
+**Why logged rather than argued now:** per the director, "if the gaps turn out to be real, an eighth type
+will be a decision made against a record." When step 4's projections are actually built and the queue
+needs to represent an in-progress claim, or the loop needs to represent an adjudication distinct from its
+own decision, this finding is sitting there with the specific evidence already attached — the question
+arrives pre-loaded, not reargued from scratch under whatever pressure is in the room at the time.
+
+Reverse: N/A — a `FINDING` event, append-only, not an action with a cost to undo. If the gaps turn out not
+to be real once step 4 is built, that becomes a later `FINDING` or `DECISION` explaining why, not an edit
+to this one.

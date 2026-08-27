@@ -35,6 +35,36 @@ design work, director wants to be present).
 STOPPED after 2d, as instructed. Step 3 (economy authoring) NOT started — design work, director wants
 to be present.
 
+## Codex audit follow-up, 2026-08-27 — items 1-5, director-ordered
+
+External audit of ANVIL itself. Director's order: items 1-5 land, report, step 3 still waits.
+
+- [x] 1. Typed-reference table (schema.py REFERENCE_FIELDS/SUPERSEDES_LEGAL_TARGETS), check_integrity.py
+      enforcement, serves_claims traversal. D0069.
+- [x] 2. Language correction: "contradictions unrepresentable" → "contradictions become explicit event
+      history; resolution becomes deterministic projection behavior" (Codex's framing, adopted verbatim).
+      Six occurrences in incoming/ANVIL_ARCHITECTURE.md corrected; CONTEXT.md and .anvil/README.md
+      checked, already clean. Logged as a FINDING (source_class: external-audit). D0070.
+- [x] 3. Empty-log vacuous PASS fixed — reports "0 events", never PASS, over an empty log. D0072.
+- [x] 4. Semantic gaps: fixed (empty required arrays — evidence only, not independent_of; self-reference,
+      generalized beyond supersedes; malformed UUID). Deferred with a stated reason in check_integrity.py's
+      own docstring (supersedes-cycle detection, commit-SHA existence, timestamp ordering). D0072.
+- [x] 5. Untracked-gate checked-in mutation harness — tools/layer_lint/test_check_untracked_files.py,
+      5/5 cases, disposable scratch git repos. D0071.
+- [x] 6. Seven-types sufficiency judgment logged as a FINDING (three named gaps), NOT resolved, no
+      eighth type added, per instruction. D0073.
+- [x] 7. Stale brief numbers — left alone, per instruction (step 6's generated brief is the real fix).
+
+**HARD STOP crossed, flagged rather than worked around: Anvil-proper (`tools/anvil/*.py` +
+`.anvil/README.md`) is now 922 lines, over the 800-line cap the director's own queue set for steps 1-2.**
+`test_check_integrity.py` alone grew from 237 to 420 lines adding 20 new mutation cases across 8 new
+branches (typed references, self-reference, UUID shape, empty arrays, source_class values, the empty-log
+message) — real, necessary coverage for real, necessary fixes, not padding, but the growth is what
+crossed the line, and "cheap now" undersold it. Reported prominently, not buried, per the HARD STOP's own
+purpose. Not proceeding past item 5 without the director's read on this.
+
+Step 3 still waits for the director, unchanged.
+
 **Schema constraints, verbatim:** seven types is a constraint, not a starting point — an eighth seeming
 necessary while writing 2a means stop and log the case, don't add it. `MEASUREMENT.source` (measured |
 inherited | asserted) and `FINDING.independent_of` are non-defaulting — unstated must be an error, not a

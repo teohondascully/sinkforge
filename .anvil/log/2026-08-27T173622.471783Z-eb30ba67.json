@@ -1,0 +1,18 @@
+{
+  "author": "claude-code-session-2026-08-27",
+  "commit": "47fd110373ac48440a307a17373d210f34d9f7dd",
+  "confidence": "high",
+  "evidence": [
+    "incoming/ANVIL_ARCHITECTURE.md original lines 15, 19, 56, 126, 148, 424 (pre-correction text, see docs/DECISIONS_LEDGER.md D0070 for the exact original wording of each)",
+    "Codex judgment 11 (pasted audit transcript, this session): two DECISION events choosing incompatible alternatives, or a claim marked both valid and invalid by separate events, are both structurally representable and pass referential integrity today"
+  ],
+  "id": "eb30ba67-fd91-4abf-a622-0ffbc0946a84",
+  "independent_of": [],
+  "invalidates": [],
+  "narrative": "The director adopted the audits corrected framing verbatim: contradictions become explicit event history; resolution becomes deterministic projection behavior. All six original instances in incoming/ANVIL_ARCHITECTURE.md corrected in place, each with the caveat that the projections resolution rule is now the thing that can be wrong, and it is unwritten code as of this finding. First real correction this system has recorded against its own architecture document -- source_class external-audit, independent_of empty because this is a single-source finding, not yet corroborated by a second independent source.",
+  "observation": "incoming/ANVIL_ARCHITECTURE.md claimed, in six places, that contradictions become impossible / unrepresentable in the event log (section 0 thesis, section 2, section 3 referential-integrity summary, section 4 queue projection description, section 15 portfolio claim). An external audit (Codex) found this false: two structurally valid events can still assert incompatible facts, and nothing about appending them prevents that -- only the projection layers resolution rule, unwritten as of this finding, determines which fact wins.",
+  "severity": "medium",
+  "source_class": "external-audit",
+  "timestamp": "2026-08-27T17:36:22.471783+00:00",
+  "type": "FINDING"
+}

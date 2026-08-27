@@ -1,0 +1,18 @@
+{
+  "author": "claude-code-session-2026-08-27",
+  "commit": "47fd110373ac48440a307a17373d210f34d9f7dd",
+  "confidence": "medium",
+  "evidence": [
+    "Codex judgment, seven event types section (pasted audit transcript, this session): CLAIM_AUTHORED mixes claim definition/assumptions/instrumentation metadata/decidability/TTL; FINDING mixes observation/evidence/invalidation/confidence/source identity/corroboration; DECISION mixes product choice/alternative rejection/reversal cost/expiry/narrative",
+    "incoming/ANVIL_ARCHITECTURE.md section 9 (the loop cycle: propose, evaluate, gate, block, adjudicate, log) names an adjudicate step with no event type of its own"
+  ],
+  "id": "09356413-0853-447f-acfd-0162e40cd010",
+  "independent_of": [],
+  "invalidates": [],
+  "narrative": "Per the directors explicit instruction: not resolved now, no eighth type added. Logged as evidence so that when step 4 projections are built, this question arrives with evidence attached rather than as a fresh argument -- if the three named gaps turn out to be real, an eighth type becomes a decision made against a record, not a guess.",
+  "observation": "An external audit (Codex) judges the seven ANVIL event types insufficient for three specific kinds of information the project will demonstrably need once projections (step 4) and the loop (step 9) are built: (1) no first-class event for an evaluation run or a produced artifact (screenshot, log, sweep output) -- MEASUREMENT records a value but not the run that produced it; (2) no first-class event for a work item, its ownership, or a lease -- the queue projection needs to track in-progress claims, and nothing in the current seven types represents that; (3) no first-class event for a review or adjudication distinct from a product DECISION -- the loop autonomy cycle (propose/evaluate/gate/block/adjudicate/log) needs an adjudication record separate from the decision it produces.",
+  "severity": "medium",
+  "source_class": "external-audit",
+  "timestamp": "2026-08-27T17:36:33.470582+00:00",
+  "type": "FINDING"
+}
