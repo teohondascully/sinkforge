@@ -18,8 +18,8 @@ blocked_on: nearly everything. No save/load code exists anywhere in the reposito
 
 A scripted agent, given no privileged information beyond what a first-time player would have, can start
 from a cold checkpoint (fresh persistent shaft, permanent rig, nothing built), and satisfy the rig's
-first demand (D1, `docs/GDD.md` §2 of the reversal brief — currently drafted as 30 iron ingot, unlocking
-the drill), entirely headless, within N sim-minutes.
+first demand (D1 — currently drafted, in the director's reversal brief, this session's transcript, not a
+tracked repository file — as 30 iron ingot, unlocking the drill), entirely headless, within N sim-minutes.
 
 ## Why this matters
 

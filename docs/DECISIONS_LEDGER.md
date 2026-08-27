@@ -2994,3 +2994,23 @@ this project writes dead-list entries, not a one-off. Applies going forward: nam
 properties, when recording something as dead.
 
 Reverse: CHEAP — prose only, `git revert` recovers both files in full.
+
+---
+
+## D0090 · 2026-08-27 · claims/C003-cold-start-reaches-d1.md — a citation error of my own, found by the external audit
+
+Decided: `C003`'s Claim section cited D1 as "`docs/GDD.md` §2 of the reversal brief" — a conflation I
+introduced when writing the file. `docs/GDD.md` §2 is the genre synthesis; it has never contained a D1
+definition. The actual source was the director's own reversal brief (a chat message, this session's
+transcript), whose own §2 held the D1/D2/D3 demand table — I wrote the citation as though the brief and
+`docs/GDD.md` were the same document with shared section numbers. Fixed to cite the brief explicitly as
+"this session's transcript, not a tracked repository file," which is the same disclosure convention
+D0070 already used for `incoming/ANVIL_ARCHITECTURE.md` edits that couldn't be committed. Checked the rest
+of the file for the same error — two other references to "the reversal brief" (the checkpoint-lineage
+citation, the reachability-rule citation) were already correctly scoped to the brief itself, not GDD.md.
+
+This is a real, if narrow, instance of the same class named in D0083/D0089 this round: a citation written
+from memory of what a document said, rather than checked against the document, drifted. Small enough not
+to warrant its own extraction of the general rule — D0083 already states it.
+
+Reverse: CHEAP — one sentence, `git revert` recovers it.
