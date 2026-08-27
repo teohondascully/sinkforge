@@ -188,17 +188,18 @@ The fog filter applies identically to the renderer and the agent. That is what m
 
 ### Scenario format
 
-Declarative, versioned, schema-validated at build time.
+Declarative, versioned, schema-validated at build time. **Illustrating the format's shape, not a live
+scenario** — no scenario file has been built yet, and the `rig` block below is provisional until
+`data/economy/` exists and demand-satisfaction has a real shape to describe:
 
 ```yaml
-name: first_bore
-claim: C001
+name: example_scenario
+claim: C0NN
 seed: 12345
 world:
   site: shallow_clay
 rig:
-  pump_capacity: 2min
-  unlocks: [hand_pick]
+  demands_satisfied: []
   stockpile: {}
 player:
   start_depth: 0
@@ -208,7 +209,7 @@ goal:
   type: deliver
   material: ore_copper
   quantity: 6
-budget_ticks: 7200
+budget_ticks: 100000
 assertions:
   - invariants_hold
   - no_edge_catch_events
@@ -220,13 +221,14 @@ assertions:
 ### Driver
 
 ```
-sinkforge run --scenario scenarios/first_bore.yaml --seed 12345 \
+sinkforge run --scenario scenarios/<name>.yaml --seed 12345 \
   --agent scripted:greedy_miner --out runs/<timestamp>/
 ```
 
 Outputs: `result.json`, `telemetry.jsonl`, `state_hashes.txt`, `input.log`, `report.md`, `heatmap.png`.
 
-Must run with no GPU, no window, in CI, at 100x realtime or better for a two-minute scenario.
+Must run with no GPU, no window, in CI, at 100x realtime or better for a short (few-thousand-tick)
+scenario.
 
 ### Playable fixtures
 

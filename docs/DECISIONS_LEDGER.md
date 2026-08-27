@@ -2867,3 +2867,38 @@ record, current-state tracker, taste-review record), and `docs/README.md`'s own 
 updated when they were introduced.
 
 Reverse: CHEAP — three table rows, `git revert` recovers the prior state.
+
+---
+
+## D0086 · 2026-08-27 · docs/CLAIMS.md, docs/ARCHITECTURE.md §5/§6 — the methodology and scenario documents
+
+Decided: `docs/CLAIMS.md`'s file-format example used `C001`'s exact retired content (title, scenario
+path) as its worked template — genericized to `id: C0NN`, a placeholder title, `scenarios/<name>.yaml`,
+so it illustrates format without asserting a specific claim's current state (durable against whichever
+claim retires next, not just this one). §7's "claims worth writing first" directly asserted stale facts
+as current — "`C001` establishes that the loop closes" (rewritten to `C003`), "the whole Draft A cadence"
+as a live open question (replaced with the actual current open question, lateral variety without
+re-rolled geology, `docs/GDD.md` §8), "pay back inside a run" (rewritten to "before local flooding
+reaches it," matching §6's already-corrected depreciation framing). §10d's own illustrative claim/test
+example also cited Draft A directly — replaced with the same lateral-variety claim used above, one
+illustrative example doing double duty rather than two independently-stale ones.
+
+`docs/ARCHITECTURE.md` §6's scenario-format example named `claim: C001`, `pump_capacity: 2min` (a
+run-length-purchase field with no referent under R3's rewrite), and `budget_ticks: 7200` (C001's own
+retired threshold) — genericized the same way as `docs/CLAIMS.md`'s example, with an explicit note that
+the `rig` block is provisional until `data/economy/` exists, rather than inventing real demand-shaped
+fields the director specifically reserved for the authoring step. §6's driver-constraint sentence ("for a
+two-minute scenario") softened to "a short (few-thousand-tick) scenario" for the same reason — there is
+no canonical duration anymore to cite as a concrete number.
+
+**"Run" standardization applied within both files, per the director's rule (reserve "run" for evaluation/
+harness executions; "session"/"playthrough" for the sim-execution sense) — checked, not assumed correct
+by pattern-matching:** every remaining "run"/"runs" instance in both files was individually verified as
+the harness-execution sense (`sinkforge run`, `runs/<timestamp>/` as a per-execution output directory,
+"an agent run and a human run," "thousands of agent runs produce numbers") and left alone. One instance
+in `docs/CLAIMS.md` §7 ("rather than every run the way it used to") is a deliberate historical comparison
+to the retired structure, not a live claim — left alone for the same reason similar comparisons in
+`docs/GDD.md` were left alone in D0082. Nothing in either file needed converting to "session"/
+"playthrough" — both files' remaining "run" usages were already in the reserved sense.
+
+Reverse: CHEAP — prose only, `git revert` recovers both files in full.

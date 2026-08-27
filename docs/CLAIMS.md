@@ -32,15 +32,15 @@ One file per claim, in `claims/`, named `C###-short-slug.md`.
 
 ```markdown
 ---
-id: C001
-title: A bounded run completes in under two minutes
+id: C0NN
+title: One sentence a person could disagree with
 status: FAILING          # FAILING | PASSING | RETIRED | BLOCKED
 kind: structural         # structural | balance | feel | legibility | performance
 owner: design            # design | engineering
 created: 2026-08-25
 last_measured: never
 first_failed_at: never   # date+commit of the first FAILING measurement. see §10.
-scenario: scenarios/first_bore.yaml
+scenario: scenarios/<name>.yaml
 ---
 
 ## Claim
@@ -123,14 +123,14 @@ Being precise here is what separates an instrument from a dashboard.
 
 ## 7. The claims worth writing first
 
-`C001` establishes that the loop closes. The next few should target the design's highest-uncertainty assumptions, because those are what a document cannot settle and what the first playable run can.
+`C003` establishes that the loop closes at its first real checkpoint. The next few should target the design's highest-uncertainty assumptions, because those are what a document cannot settle and what the first playable session can.
 
 In rough order of how badly a wrong answer would hurt:
 
 - **Does the hole-as-conveyor discovery happen unprompted?** Give a constrained agent, and then three humans, a shaft with a forge and a fuel source at different depths, and measure whether anyone digs a connecting chute without being told. `docs/GDD.md` §10 calls this the single most important thing the design can produce. If nobody finds it, the premise needs a teaching moment and one must be designed.
-- **Is a two-minute run a game or a menu?** The whole Draft A cadence rests on this and it is entirely unverified. `docs/GDD.md` §8.
+- **Does lateral variety sustain interest without re-rolled geology?** One persistent shaft means the terrain surprises the player exactly once, laterally, rather than every run the way it used to. `docs/GDD.md` §8 calls this the reversal's own largest open question and it is entirely unverified.
 - **Does strategy diversity exist?** Cluster the build orders of many oracle agents with randomized objective weightings on one seed. Convergence on a single build means the rest of the design is furniture. This is the metric that most directly tests whether the game is a factory game at all.
-- **Does infrastructure pay back inside a run?** If building a drill costs more material than it returns before the water reaches it, the optimal strategy is to build nothing and hand-mine, and the game eats itself. `docs/GDD.md` §6.
+- **Does infrastructure pay back before local flooding reaches it?** If building a drill costs more material than it returns before the water in that section rises, the optimal strategy is to build nothing and hand-mine, and the game eats itself. `docs/GDD.md` §6.
 
 Write these as `BLOCKED` now if you like. A blocked claim that names what it waits on is a better artifact than a plan that says the same thing in prose.
 
@@ -191,8 +191,9 @@ is a real cost weighed against the existing forty rather than a free action. The
 `tests/`, and it would pass or fail identically regardless of what the design decided. A design
 assertion is a claim: it could be true or false depending on a decision someone could have made
 differently, and the corpus exists to make that decision checkable. "Conservation of matter holds"
-is a test — no design choice makes it acceptable for matter to vanish. "A two-minute run is not a
-menu with a walk attached" is a claim — a different Draft A/C decision changes what's being asserted.
+is a test — no design choice makes it acceptable for matter to vanish. "Lateral variety sustains
+interest without re-rolled geology" is a claim — a different `data/economy/` design changes what's
+being asserted.
 Without this line, the corpus fills with trivially-true correctness claims dressed as design claims,
 which inflates the count against the cap in (c) without buying any of what a claim is supposed to
 buy: a design decision made falsifiable.
