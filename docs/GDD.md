@@ -39,7 +39,7 @@ This section exists because the premise alone does not constrain enough. Each pa
 
 **Take:** ratio puzzles, throughput bottlenecks, the satisfaction of a line that runs without you, legible material flow through physical space.
 
-**Refuse:** recipe-tree depth as the source of complexity. Factorio earns depth from forty hours of recipe graph. A forty-minute run cannot, so depth has to come from somewhere structurally different. See §6.
+**Refuse:** recipe-tree depth as the source of complexity. Factorio earns depth from forty hours of recipe graph. This project's complexity is meant to come from the spine, depreciation, and labor instead — a deliberate identity choice, not a limit imposed by session length. See §6.
 
 **Refuse:** planar routing. In Factorio, if two things need a belt you build a second belt, because space is free. Here everything shares a few vertical lines and contention is the puzzle.
 
@@ -85,7 +85,7 @@ This is the central asymmetry. It makes the factory necessary (you cannot hand-c
 
 No exponential per-unit value by depth. Tier-N upgrades require tier-N material *and* large quantities of tier-1 material. The exponential lives in quantity required, which produces the idle-game curve while keeping every layer permanently relevant.
 
-Ruled out: roughly 5x value per layer. It makes shallow material worthless, strands the surface refinery on deep material only, turns every run that fails to reach depth into a zero, and kills all shallow content.
+Ruled out: roughly 5x value per layer. It makes shallow material worthless, strands the surface refinery on deep material only, makes the early game — before hard rock is even reachable — feel like pure overhead rather than real progress, and kills all shallow content.
 
 **Implementation note.** No value or price concept existed in the prior data model. R2 is greenfield recipe-quantity design.
 
@@ -146,7 +146,7 @@ Capped deliberately: uncapped offline production teaches players to wait instead
 
 ## 6. Where the depth comes from
 
-A forty-minute factory cannot earn depth the way a forty-hour one does. Three sources are available here that Factorio does not have, and they are what makes the short-session structure viable rather than merely convenient.
+Recipe-tree depth alone isn't the source of complexity here, by choice — not because there isn't time to build one now that the shaft is persistent. Three sources are available here that Factorio does not have, and they are what let a shallow recipe graph feel deep anyway.
 
 **The spine.** A vertical factory is a sequence, not a plane. Everything shares the same few vertical lines, so every new consumer at 90m contends with everything below it, and contention worsens as you descend rather than staying flat. Contention on a shared spine is a genuinely different puzzle from planar routing. This is the strongest mechanical asset in the design and it is currently unexploited.
 

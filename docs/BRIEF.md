@@ -4,13 +4,16 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-27. This round: the run-based roguelite structure is retired.** The director
-brought a full design-reversal brief, a five-point review found four real errors in the director's own
-edit list before any editing started (one of them — a load-bearing identity claim about to be deleted by
-association — the director called potentially real damage), and six commits landed the reversal across
-`docs/GDD.md`, `claims/`, `CONTEXT.md`/`README.md`, `ONBOARDING.md`, `docs/ARCHITECTURE.md`/`QUALITY.md`,
-and the `sim/run`/`sim/meta`/`sim/commands` scaffolding. No code touched anywhere in this round — verified
-directly, not assumed. Stopped before `data/economy/`, as instructed.
+**Last updated: 2026-08-27. This round: the run-based roguelite structure is retired, plus two
+follow-ups.** The director brought a full design-reversal brief, a five-point review found four real
+errors in the director's own edit list before any editing started, and six commits landed the reversal
+across `docs/GDD.md`, `claims/`, `CONTEXT.md`/`README.md`, `ONBOARDING.md`,
+`docs/ARCHITECTURE.md`/`QUALITY.md`, and the `sim/run`/`sim/meta`/`sim/commands` scaffolding. Two
+follow-ups landed after that report: the two stale spans flagged in D0076 (plus a third found by a full
+sweep) rewritten to the persistent frame, and a successor to D0075 recording the pattern behind both
+rounds of errors — edit lists authored from a summary miss things a read of the source catches. No code
+touched anywhere in either round — verified directly, not assumed. Stopped before `data/economy/`, as
+instructed.
 
 ---
 
@@ -56,16 +59,24 @@ directly, not assumed. Stopped before `data/economy/`, as instructed.
   discarded, the definition has no referent — this is a deeper open question than the already-known
   rig-form one, and it's now stated as such rather than left as stale scaffolding that happens to compile
   because nothing reads it yet.
-- **Two spots were left deliberately stale, on purpose, inside explicit "keep verbatim" instructions** —
-  §2's "a forty-minute run cannot" and R2's "every run that fails to reach depth into a zero." Flagged in
-  the ledger rather than silently fixed, matching the discipline the director's own corrections enforced
-  twice this round (the §5 phrase-scope correction, and my own overreach on "run cadence" caught and
-  reverted before it was committed).
+- **Flagging a stale span is not the same as it being fine to leave stale, and the director corrected
+  that directly.** The two spots flagged in D0076 (§2's "a forty-minute run cannot," R2's "every run that
+  fails to reach depth into a zero") sat inside sections the edit list marked "keep verbatim" — but, per
+  the director, "my edit list marked sections, not sentences." Both fixed, plus a third found by sweeping
+  the whole document for the same class rather than trusting two was the complete count (§6's opening
+  line carried the identical false-causality problem — "a forty-minute factory cannot earn depth the way
+  a forty-hour one does," as if session length were still a real constraint). D0082.
+- **The named pattern is now two incidents deep, not one.** D0083, a successor to D0075: an edit list
+  authored from a summary of `docs/GDD.md` rather than the file itself produced two silent-loss errors
+  this round (the terrain-is-the-factory near-deletion, the §5 self-contradiction) — the director's own
+  count makes this the second time this exact failure class has appeared, after an earlier audit-brief
+  incident. Recorded as a pattern: whoever authors an edit list should not be the party who cannot see
+  the file.
 
 ## What landed this round
 
-Full detail: `docs/DECISIONS_LEDGER.md` D0076-D0081. Six commits, each its own document group so the
-diff stays reviewable, per your explicit instruction.
+Full detail: `docs/DECISIONS_LEDGER.md` D0076-D0083. Six commits, each its own document group so the
+diff stays reviewable, per your explicit instruction, plus one small follow-up commit.
 
 1. **`docs/GDD.md`** (`ebf17e1`, D0076) — the full section-by-section rewrite: §1 gains the
    run-independent "terrain is the factory" claim; §2 drops to two genres; §3 states the one-word
@@ -85,6 +96,8 @@ diff stays reviewable, per your explicit instruction.
    individually, not pattern-matched.
 6. **`sim/run`/`sim/meta`/`sim/commands` `MODULE.md`** (`87f127b`, D0081) — the run/meta split marked
    open, no replacement architecture invented unprompted.
+7. **`docs/GDD.md` follow-up** (D0082/D0083) — the two flagged stale spans plus one swept-in third,
+   rewritten to the persistent frame; the edit-list-from-summary pattern recorded as a successor to D0075.
 
 ## Gates
 
@@ -97,7 +110,7 @@ Still ADVISORY, game LOC under the 2,000-line floor.
 **Anvil: unchanged this round** — implementation 513 / test 420 / total 933, cap 1,000/2,000. No Anvil
 work this session.
 
-**Commits this round: 6.** **Unpushed: 6**, to be pushed with this report.
+**Commits this round: 7.** **Unpushed: 7**, to be pushed with this report.
 
 ## Claims
 

@@ -16,6 +16,24 @@ full range — zero results). Stopped before `data/economy/`, as instructed. Ful
 the record of what was decided and why, not trimmed, matching how the ANVIL and stage-4 queues above are
 kept in this file after closing rather than deleted.
 
+**Two follow-ups, director-ordered after this round's report, both landed:**
+
+1. The two stale spans D0076 flagged (`docs/GDD.md` §2, R2) fixed, plus one more found by a full sweep
+   for the same class (§6's opening line) — the director's own point: "the edit list marked sections, not
+   sentences," so run-relative prose survived inside spans marked keep-verbatim at the section level.
+   D0082. One residual surfaced, not swept: §5's "run cadence"/"mid-run," left alone since it's a
+   relationship, not a duration/count/consequence, and sits inside the exact span the director separately
+   ruled "keep verbatim."
+2. A successor to D0075 (D0083) records the director's own framing: this is the second time an edit list
+   authored from a summary rather than the source document introduced errors caught only by reading the
+   file, after an earlier incident with an audit brief. Named as a pattern, not just this incident.
+
+`sim/run`/`sim/meta`'s shape: confirmed still open, not resolved — the director's own framing this round
+("meta-state is just state... two candidate futures, neither obvious yet") matches what D0081 already
+left open. Nothing to change; noted here so it isn't mistaken for new scope.
+
+Stopped, as instructed. `data/economy/` waits for the director.
+
 Director-authored, verbatim scope. The run-based structure is retired; the rig becomes the
 continuous consumer, fed by a permanent single shaft that never resets. Full reasoning in the
 director's brief (this session's transcript) and the review that preceded it. `data/economy/`

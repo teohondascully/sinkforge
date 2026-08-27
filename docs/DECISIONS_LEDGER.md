@@ -2743,3 +2743,88 @@ unprompted, the same failure `ONBOARDING.md` names directly ("do not resolve the
 yourself").
 
 Reverse: CHEAP — prose only, no code, no schema; `git revert` recovers all three files in full.
+
+---
+
+## D0082 · 2026-08-27 · docs/GDD.md — the two flagged stale spans fixed, plus a third found by sweeping
+
+Decided: rewrite the two spans D0076 flagged and deliberately left alone (they sat inside spans the
+director's own edit list marked "keep verbatim" at the section level, and the director's follow-up ruled
+that the edit list "marked sections, not sentences," so run-relative prose survived inside them) — plus a
+third instance found by sweeping the whole document for the same class, rather than trusting that two was
+the complete count.
+
+**§2** ("Refuse: recipe-tree depth... Factorio earns depth from forty hours of recipe graph. A
+forty-minute run cannot, so depth has to come from somewhere structurally different"): this was not just
+a stale duration, it was a stale *causal claim*. The original reasoning was "recipe-tree depth is
+infeasible because sessions are short" — under persistence, sessions aren't short anymore, so that
+reasoning is now literally false, not just dated. Rewritten to the real reason, which was already stated
+elsewhere in the document and didn't depend on session length at all: this project refuses recipe-tree
+depth by *choice* (§6's spine/depreciation/labor are the actual source of complexity), not because there
+wasn't time to build one.
+
+**R2** ("Ruled out: roughly 5x value per layer... turns every run that fails to reach depth into a zero"):
+rewritten to "makes the early game... feel like pure overhead rather than real progress" — same
+consequence (shallow-focused play reads as worthless), restated for a world with an early game instead of
+a run that can fail.
+
+**§6's opening line** ("A forty-minute factory cannot earn depth the way a forty-hour one does... makes
+the short-session structure viable rather than merely convenient") — found by the sweep, not previously
+flagged by either the director or the original review. Same false-causality problem as the §2 instance
+(literally the same sentence pattern, in fact — both cited "forty-minute" against "forty-hour" as if
+session length were still a constraint). Rewritten to state the same choice-not-constraint framing
+directly, consistent with the §2 fix.
+
+**Sweep method, so it's checkable rather than asserted:** `grep -niE` across the full file for
+duration/count patterns (`[0-9]+-minute`, `forty.hour`, `every run`, `per run`, `short-session`,
+`Draft A`, `Draft C`, `session length`) plus a full manual read section-by-section, checking every match
+against whether it was (a) a live claim about Sinkforge stated in run-relative terms — the class to fix,
+(b) a deliberately historical comparison to the retired structure — already correctly framed, left alone
+(§4 R3's "single curve per run" contrast, §8's "the old differentiator"/"the old run-based version of
+this question," §9's dead-idea entry), or (c) a duration/count that was never actually run-relative in
+the first place (R4/§5's "twenty hours"/"twenty-eight unlocks," §10's "first five/ten minutes" as an
+onboarding beat rather than a run boundary, §1's Dome Keeper reference describing an external game
+accurately). Three matched (a); the rest were (b) or (c) and needed nothing.
+
+**One residual, surfaced not silently resolved:** §5's "Unlock cadence must be decoupled from run
+cadence... artifacts found mid-run" still names "run cadence" and "mid-run," both of which lack a strict
+referent now. Left untouched — this doesn't fit the duration/count/consequence class the director's
+instruction named (it's a relationship between two cadences, not a stated duration or count), and it sits
+inside the exact span the director explicitly ruled on this session ("drop 'between every run' ... keep
+the rest of it verbatim"). Flagged rather than swept in on the theory that the new instruction implicitly
+supersedes the old one.
+
+Reverse: CHEAP — prose only, `git revert` recovers the file in full.
+
+---
+
+## D0083 · 2026-08-27 · resolves in part D0075 — edit lists authored from a summary lose things a read of the source catches
+
+The director's own framing, recorded because they asked for it recorded: this is the second time this
+project has seen an edit list written from a summary of a document introduce errors that were only
+caught by reading the actual file, after an earlier incident with an audit brief. This round produced two
+concrete instances — the director's own §6 edit list for `docs/GDD.md` would have deleted "the terrain is
+the factory" by association with the roguelite section it happened to live inside (a load-bearing,
+frequently-quoted identity claim with no dependency on runs at all), and separately instructed "keep
+verbatim" at the section level while a specific-phrase edit landed inside the same span, a contradiction
+neither instruction's author could see without the file open. Both were caught in the review that preceded
+any editing, by reading `docs/GDD.md` directly rather than working from the brief's own description of it.
+
+**The pattern, not just the incident:** an edit list is itself a compressed representation of a document,
+subject to the same failure class the compressed representation was compressed FROM — a summary can be
+accurate about what it describes and still omit or misplace something a full read would have kept
+correctly scoped. `docs/DECISIONS_LEDGER.md` D0075's own framing applies here directly: a rule with no
+mechanism ("scope your edits to what the file actually contains"), violated by someone paying close
+attention (the director's own edit list was careful, detailed, and still missed two things), not someone
+careless. The mechanism that caught both instances this time was mundane and specific: whoever executes an
+edit list reads the actual file section by section before applying it, and treats a mismatch between the
+list and the file as a stop-and-report condition rather than a reason to guess which one is right.
+
+**Naming it for future authorship, since the director asked for exactly this framing:** whoever writes an
+edit list should not be the party who cannot see the file. When a director-authored edit list is handed to
+a session with the file open, the session reading the file first (as this round's review did, per the
+brief's own explicit "do not begin work until I have replied") is the existing mitigation and it worked
+here — the failure mode named above is specifically what happens when that step is skipped or the reader
+trusts the list over the source it describes.
+
+Reverse: N/A — a record entry, not an action with a cost to undo.
